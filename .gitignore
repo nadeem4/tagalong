@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+out/
+build/
+*.tsbuildinfo
+.turbo/
+
+# electron-builder
+release/
+apps/desktop/dist/
+apps/desktop/out/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# test & coverage
+coverage/
+.vitest/
+playwright-report/
+test-results/
+
+# editors & os
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# local agent history
+.remember/
