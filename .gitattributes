@@ -1,0 +1,8 @@
+# Normalize to LF in the repository; .editorconfig asks for LF in working copies too.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.icns binary
+pnpm-lock.yaml -diff
