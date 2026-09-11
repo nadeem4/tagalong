@@ -1,0 +1,17 @@
+{
+  "name": "@tagalong/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/main.js",
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "dev": "echo \"dev:desktop arrives in Phase 1 (electron-vite scaffold)\" && exit 0"
+  },
+  "dependencies": {
+    "@tagalong/core": "workspace:*",
+    "@tagalong/protocol": "workspace:*",
+    "@tagalong/ui": "workspace:*"
+  }
+}

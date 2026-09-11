@@ -1,0 +1,36 @@
+{
+  "name": "tagalong",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A crew of AI companions that tag along on your screen.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "tsc -b",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "dev:desktop": "pnpm --filter @tagalong/desktop dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.20.2",
+    "@vitest/coverage-v8": "5.0.0",
+    "eslint": "10.10.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.12.0",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.0",
+    "vitest": "5.0.0"
+  }
+}
