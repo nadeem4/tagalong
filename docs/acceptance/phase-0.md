@@ -26,7 +26,7 @@ Run on **2026-09-11**, Windows 11 Home 10.0.26200, from a clean `C:\ai_pet`.
 - [x] README explains layout, commands, conventions, privacy, and the no-computer-control rule
 - [x] `docs/architecture.md` exists with both Mermaid diagrams in the black-and-white theme
 - [x] `.env.example` lists every variable used anywhere in the repo
-- [ ] CI is green on the first push — verified after this commit lands
+- [x] CI is green on the first push — run 34658763363, all six steps passed on windows-latest
 
 ## Purity guard
 
