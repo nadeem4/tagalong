@@ -1,0 +1,158 @@
+/*
+ * @tagalong/ui is written against Tailwind utility classes. The desktop host cannot add
+ * the Tailwind toolchain in this task, so this sheet covers the structural rules those
+ * classes would have supplied — enough for a usable panel until the build gains Tailwind.
+ */
+
+:root {
+  --ink: #0f172a;
+  --muted: #64748b;
+  --line: #e2e8f0;
+  --surface: #ffffff;
+  font-family:
+    'Segoe UI Variable Text',
+    'Segoe UI',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+#root {
+  height: 100%;
+}
+
+/* The avatar window is transparent and the whole pet is the drag handle. */
+.avatar-body {
+  background: transparent;
+}
+
+.avatar {
+  -webkit-app-region: drag;
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+}
+
+.avatar__open {
+  -webkit-app-region: no-drag;
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  cursor: pointer;
+  padding: 2px 7px;
+  font-size: 11px;
+}
+
+section {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+}
+
+ul {
+  flex: 1;
+  overflow-y: auto;
+  margin: 0;
+  padding: 8px 12px;
+  list-style: none;
+}
+
+li {
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+}
+
+form {
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding: 8px;
+}
+
+input,
+select,
+textarea {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+}
+
+button {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--ink);
+  color: #fff;
+  padding: 6px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+[data-testid='context-chip'] {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding: 6px 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Settings is a plain form, not a chat surface. */
+.settings {
+  display: block;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.settings label {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.settings label span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settings input,
+.settings select {
+  width: 100%;
+}
+
+.settings__note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settings__error {
+  color: #b91c1c;
+  font-size: 12px;
+}

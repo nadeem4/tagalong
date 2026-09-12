@@ -1,0 +1,42 @@
+import { contextBridge, ipcRenderer } from 'electron';
+import type { IpcRendererEvent } from 'electron';
+import type { ContextSnapshot, Pet, SettingsPatch } from '@tagalong/protocol';
+import type { AskInput, HostBridge, TurnEvent } from '@tagalong/ui';
+import { IPC } from '../shared/ipc';
+import type { HostView, TagalongHostApi } from '../shared/ipc';
+
+/**
+ * The renderer's entire view of the outside world.
+ *
+ * Nothing from node or electron crosses this boundary — only plain data over IPC — so a
+ * compromised page can reach exactly the calls listed here and nothing else.
+ */
+const bridge: HostBridge = {
+  ask: (input: AskInput) => ipcRenderer.invoke(IPC.ask, input) as Promise<{ turnId: string }>,
+  interrupt: (turnId: string) => ipcRenderer.invoke(IPC.interrupt, turnId) as Promise<void>,
+  listPets: () => ipcRenderer.invoke(IPC.listPets) as Promise<Pet[]>,
+  onTurnEvent: (handler: (event: TurnEvent) => void) => {
+    const listener = (_event: IpcRendererEvent, turnEvent: TurnEvent): void => handler(turnEvent);
+    ipcRenderer.on(IPC.turnEvent, listener);
+    return () => void ipcRenderer.off(IPC.turnEvent, listener);
+  },
+};
+
+const host: TagalongHostApi = {
+  getContext: () => ipcRenderer.invoke(IPC.getContext) as Promise<ContextSnapshot | null>,
+  onContext: (handler) => {
+    const listener = (_event: IpcRendererEvent, snapshot: ContextSnapshot | null): void =>
+      handler(snapshot);
+    ipcRenderer.on(IPC.contextEvent, listener);
+    return () => void ipcRenderer.off(IPC.contextEvent, listener);
+  },
+  getHostView: () => ipcRenderer.invoke(IPC.hostView) as Promise<HostView>,
+  saveSettings: (patch: SettingsPatch) => ipcRenderer.invoke(IPC.saveSettings, patch),
+  saveApiKey: (apiKey: string) => ipcRenderer.invoke(IPC.saveApiKey, apiKey) as Promise<void>,
+  openSettings: () => ipcRenderer.invoke(IPC.openSettings) as Promise<void>,
+  hidePanel: () => ipcRenderer.invoke(IPC.hidePanel) as Promise<void>,
+  togglePanel: () => ipcRenderer.invoke(IPC.togglePanel) as Promise<void>,
+};
+
+contextBridge.exposeInMainWorld('tagalong', bridge);
+contextBridge.exposeInMainWorld('tagalongHost', host);
