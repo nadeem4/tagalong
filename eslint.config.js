@@ -113,6 +113,21 @@ export default tseslint.config(
     },
   },
   {
+    files: ['**/*.{ts,tsx}'],
+    rules: {
+      // Underscore prefix is the documented way to say "deliberately discarded".
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
+        },
+      ],
+    },
+  },
+  {
     files: ['**/*.test.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
