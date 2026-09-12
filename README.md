@@ -83,7 +83,12 @@ Prerequisites:
 - Windows 11 (primary dev target; macOS and Linux arrive in Phase 7 — `createPlatform` throws on any
   other platform today)
 - Node.js 22 or newer (`node -v`)
-- pnpm 10 (`corepack enable`; the root `packageManager` field pins the exact version)
+- pnpm 10 — the root `packageManager` field pins the exact version. Two ways to get it:
+  - `corepack enable` — only works from an **elevated** shell. From a normal shell on Windows it fails
+    with `Internal Error: EPERM: operation not permitted, open 'C:\Program Files\nodejs\pnpm.ps1'`
+    (the filename varies: `yarnpkg`, `pnpm.cmd`, and so on). If you see that, use the next line.
+  - `npm install -g pnpm@10` — installs into the user-level npm prefix and needs no elevation. This is
+    what the current machine uses.
 - Git
 
 No C++ toolchain is needed. `better-sqlite3` and `get-windows` ship prebuilt binaries, and their
@@ -107,16 +112,33 @@ Inside `apps/desktop`:
 ```bash
 pnpm build            # ensure-electron, then electron-vite build into dist/
 pnpm start            # ensure-electron, then electron-vite preview against the built output
-pnpm test:e2e         # electron-vite build, then the Playwright smoke suite
+pnpm test:e2e         # ensure-electron, electron-vite build, then the Playwright smoke suite
 pnpm ensure-electron  # fetch the Electron binary on its own
 ```
 
+Quit any running Tagalong before `pnpm test:e2e`. The main process takes a single-instance lock, so a
+second copy quits immediately and Playwright reports the confusing
+`electron.launch: Target page, context or browser has been closed` instead of naming the real cause.
+
 ## Running the desktop app
+
+PowerShell (the primary dev shell on Windows):
+
+```powershell
+pnpm install
+$env:TAGALONG_FAKE_PROVIDERS = '1'
+pnpm dev:desktop
+```
+
+bash (Git Bash, WSL, macOS, Linux):
 
 ```bash
 pnpm install
 TAGALONG_FAKE_PROVIDERS=1 pnpm dev:desktop
 ```
+
+PowerShell has no inline `VAR=value command` prefix; pasting the bash line into PowerShell fails with
+`TAGALONG_FAKE_PROVIDERS=1 : The term ... is not recognized`.
 
 Two things are worth knowing before the first run.
 
@@ -156,14 +178,19 @@ the length of the shared prefix through timing.
 
 ## Environment variables
 
-Copy `.env.example` to `.env.local` and fill in what the phase you are on needs.
+`.env.example` is a **reference list of the variables the project will use**, not a file the app loads.
+Nothing reads `.env.local` today: there is no dotenv dependency, and no code in `packages/` or `apps/`
+opens a `.env` file. Copying it therefore changes nothing at runtime.
 
-| Variable                    | Used for                                                                                                                                             |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ANTHROPIC_API_KEY`         | Claude API calls through the `anthropic` BrainProvider. In the app the key is entered in Settings and stored in the OS keychain, not read from here. |
-| `ELEVENLABS_API_KEY`        | Text to speech through the ElevenLabs TtsProvider. Needed from Phase 3.                                                                              |
-| `OPENAI_API_KEY`            | Whisper speech to text only. Needed from Phase 3.                                                                                                    |
-| `TAGALONG_FAKE_PROVIDERS=1` | Forces the fake brain provider, for tests and demos. No keys or network needed.                                                                      |
+The only environment variable read today is `TAGALONG_FAKE_PROVIDERS`, read straight from `process.env`
+in `packages/core/src/providers/registry.ts`. **Set it in the shell you launch from**, as shown above.
+
+| Variable                    | Status today                                                                                                                                            |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TAGALONG_FAKE_PROVIDERS=1` | **Read.** Forces the fake brain provider, for tests and demos. No keys or network needed. Must be set in the shell environment.                         |
+| `ANTHROPIC_API_KEY`         | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment. |
+| `ELEVENLABS_API_KEY`        | **Not used yet.** Text to speech through the ElevenLabs TtsProvider, from Phase 3.                                                                      |
+| `OPENAI_API_KEY`            | **Not used yet.** Whisper speech to text only, from Phase 3.                                                                                            |
 
 Secrets never enter git. In the app they live in the OS keychain through Electron `safeStorage`, written
 as ciphertext to `secrets.json`; if the OS has no encryption backend the store refuses to write at all
