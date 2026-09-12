@@ -18,3 +18,10 @@ export const DEFAULT_ENGINE_PORT = 47321;
 export function engineUrl(port: number = DEFAULT_ENGINE_PORT): string {
   return `ws://${ENGINE_HOST}:${port}`;
 }
+
+export * from './context';
+export * from './pet';
+export * from './message';
+export * from './rpc';
+export * from './settings';
+export * from './methods';
