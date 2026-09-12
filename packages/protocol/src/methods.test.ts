@@ -31,6 +31,7 @@ const CORE_TO_HOST_NOTIFICATIONS = [
   'turn.toolResult',
   'turn.completed',
   'turn.error',
+  'turn.warning',
   'pet.message',
 ] as const;
 
@@ -155,6 +156,20 @@ describe('notification schemas', () => {
       usage: { inputTokens: -1, outputTokens: 0 },
     };
     expect(notificationParamsSchemaFor('turn.completed').safeParse(bad).success).toBe(false);
+  });
+
+  it('validates a turn.warning payload', () => {
+    const parsed = notificationParamsSchemaFor('turn.warning').parse({
+      turnId,
+      code: 'vision_unsupported',
+      message: 'This pet cannot see images, so the screenshot was not sent.',
+    });
+    expect(parsed.code).toBe('vision_unsupported');
+  });
+
+  it('rejects a turn.warning without a code, so no host has to guess why', () => {
+    const bad = { turnId, message: 'something happened' };
+    expect(notificationParamsSchemaFor('turn.warning').safeParse(bad).success).toBe(false);
   });
 
   it('validates a pet.message handoff payload', () => {

@@ -16,7 +16,18 @@ describe('Settings', () => {
     expect(s.pageTextBudget).toBe(40_000);
     expect(s.historyMessages).toBe(20);
     expect(s.hotkeys.ask).toBe('CommandOrControl+Shift+Space');
+    expect(s.hotkeys.look).toBe('CommandOrControl+Shift+S');
     expect(s.avatar).toEqual({ x: null, y: null });
+  });
+
+  it('keeps a rebound look hotkey', () => {
+    const s = Settings.parse({ hotkeys: { ask: 'Alt+Space', look: 'Alt+S' } });
+    expect(s.hotkeys.look).toBe('Alt+S');
+  });
+
+  it('accepts settings written before the look hotkey existed', () => {
+    const s = Settings.parse({ hotkeys: { ask: 'Alt+Space' } });
+    expect(s.hotkeys.look).toBeUndefined();
   });
 
   it('keeps explicit values', () => {

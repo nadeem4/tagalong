@@ -39,6 +39,20 @@ export {
   type SecretStore,
 } from './settings/settings';
 
+export {
+  GET_SELECTION,
+  LOOK_AT_SCREEN,
+  createPerceptionToolset,
+  findCaptureBlock,
+  mayPersistScreenshot,
+  type ActiveWindow,
+  type CaptureBlock,
+  type PerceptionHost,
+  type PerceptionToolset,
+  type PerceptionToolsetOptions,
+  type ToolOutcome,
+} from './perception';
+
 export { DB_FILENAME, LATEST_SCHEMA_VERSION, migrate, openDatabase } from './memory/db';
 export { ConversationStore } from './memory/store';
 
@@ -49,6 +63,7 @@ export {
   createProvider,
   type BrainCapabilities,
   type BrainContent,
+  type BrainContentBlock,
   type BrainErrorCode,
   type BrainEvents,
   type BrainMessage,

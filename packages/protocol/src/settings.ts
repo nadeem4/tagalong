@@ -20,7 +20,7 @@ export const SETTINGS_DEFAULTS = {
   defaultModel: 'claude-opus-5',
   pageTextBudget: 40_000,
   historyMessages: 20,
-  hotkeys: { ask: 'CommandOrControl+Shift+Space' },
+  hotkeys: { ask: 'CommandOrControl+Shift+Space', look: 'CommandOrControl+Shift+S' },
   avatar: { x: null, y: null },
   /**
    * Why this set: every entry is a window where the pixels on screen are a credential.
@@ -114,7 +114,13 @@ const settingsFields = {
   pageTextBudget: z.number().int().positive(),
   /** How many past messages are replayed to the model. */
   historyMessages: z.number().int().positive(),
-  hotkeys: z.object({ ask: z.string().min(1) }),
+  /**
+   * `look` is optional so a settings file written before the looking hotkey existed still
+   * parses — and because a patch replaces the whole `hotkeys` object, so a caller that only
+   * rebinds `ask` must not be forced to resend a key it never touched. The host falls back
+   * to its own default when it is absent.
+   */
+  hotkeys: z.object({ ask: z.string().min(1), look: z.string().min(1).optional() }),
   /** Remembered avatar position; null means "dock to the default edge". */
   avatar: z.object({ x: z.number().nullable(), y: z.number().nullable() }),
   /** Windows where capture is refused outright. */

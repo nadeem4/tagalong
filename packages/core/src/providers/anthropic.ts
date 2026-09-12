@@ -14,6 +14,7 @@ import type {
 import type {
   BrainCapabilities,
   BrainContent,
+  BrainContentBlock,
   BrainEvents,
   BrainMessage,
   BrainProvider,
@@ -39,6 +40,22 @@ export interface AnthropicProviderOptions {
   baseURL?: string;
 }
 
+/**
+ * Images lead. Claude answers questions about an image far more reliably when the
+ * picture arrives before the words asking about it — inside a tool result as much as
+ * inside a message, so both paths run through here.
+ */
+function imagesFirst<T extends { type: string }>(blocks: readonly T[]): T[] {
+  return [...blocks.filter((b) => b.type === 'image'), ...blocks.filter((b) => b.type !== 'image')];
+}
+
+type ToolResultContent = NonNullable<ToolResultBlockParam['content']>;
+
+function toToolResultContent(content: string | BrainContentBlock[]): ToolResultContent {
+  if (typeof content === 'string') return content;
+  return imagesFirst(content).map(toContentBlock) as ToolResultContent;
+}
+
 function toContentBlock(block: BrainContent): ContentBlockParam {
   switch (block.type) {
     case 'text':
@@ -54,20 +71,14 @@ function toContentBlock(block: BrainContent): ContentBlockParam {
       return {
         type: 'tool_result',
         tool_use_id: block.toolUseId,
-        content: block.content,
+        content: toToolResultContent(block.content),
         ...(block.isError === undefined ? {} : { is_error: block.isError }),
       };
   }
 }
 
-/**
- * Images lead the message. Claude answers questions about an image far more reliably
- * when the picture arrives before the words asking about it.
- */
 function toMessageParam(message: BrainMessage): MessageParam {
-  const images = message.content.filter((block) => block.type === 'image');
-  const rest = message.content.filter((block) => block.type !== 'image');
-  return { role: message.role, content: [...images, ...rest].map(toContentBlock) };
+  return { role: message.role, content: imagesFirst(message.content).map(toContentBlock) };
 }
 
 function toTool(tool: BrainTool): Tool {
@@ -188,7 +199,7 @@ export class AnthropicProvider implements BrainProvider {
           results.push({
             type: 'tool_result',
             tool_use_id: block.id,
-            content: result.content,
+            content: toToolResultContent(result.content),
             ...(result.isError === undefined ? {} : { is_error: result.isError }),
           });
         }

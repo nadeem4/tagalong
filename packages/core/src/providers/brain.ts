@@ -11,11 +11,36 @@ export interface BrainCapabilities {
   streaming: boolean;
 }
 
-export type BrainContent =
+/**
+ * The blocks that carry payload a model reads directly.
+ *
+ * Split out of `BrainContent` so a tool result can reuse exactly these — an image inside
+ * a tool result is the same picture as an image inside a message, and a second image
+ * shape would have to be kept in step with this one forever.
+ */
+export type BrainContentBlock =
   | { type: 'text'; text: string }
-  | { type: 'image'; mime: 'image/png' | 'image/jpeg'; base64: string }
+  | { type: 'image'; mime: 'image/png' | 'image/jpeg'; base64: string };
+
+/**
+ * `tool_result.content` stays `string` for the common case and widens to blocks only when
+ * a tool has something a model must *see*. Most results are plain prose and always will
+ * be; forcing every one of them into a single-element array to serve the one tool that
+ * returns pixels would churn every call site to buy nothing.
+ *
+ * The block array is deliberately provider-neutral: an Ollama or OpenAI-compatible
+ * provider translates it into whatever that API wants, exactly as `AnthropicProvider`
+ * translates it into SDK blocks. Nothing here mirrors Anthropic's wire format.
+ */
+export type BrainContent =
+  | BrainContentBlock
   | { type: 'tool_use'; id: string; name: string; input: unknown }
-  | { type: 'tool_result'; toolUseId: string; content: string; isError?: boolean };
+  | {
+      type: 'tool_result';
+      toolUseId: string;
+      content: string | BrainContentBlock[];
+      isError?: boolean;
+    };
 
 export interface BrainMessage {
   role: 'user' | 'assistant';
@@ -43,7 +68,7 @@ export interface BrainEvents {
     id: string;
     name: string;
     input: unknown;
-  }): Promise<{ content: string; isError?: boolean }>;
+  }): Promise<{ content: string | BrainContentBlock[]; isError?: boolean }>;
 }
 
 export interface BrainResult {

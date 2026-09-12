@@ -5,6 +5,7 @@
 export type {
   BrainCapabilities,
   BrainContent,
+  BrainContentBlock,
   BrainEvents,
   BrainMessage,
   BrainProvider,
