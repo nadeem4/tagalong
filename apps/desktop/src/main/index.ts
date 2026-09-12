@@ -1,10 +1,13 @@
+import { randomUUID } from 'node:crypto';
 import { BrowserWindow, Menu, Tray, app, dialog, ipcMain } from 'electron';
-import type { ContextSnapshot, Pet, Settings, SettingsPatch } from '@tagalong/protocol';
+import { ContextSnapshot } from '@tagalong/protocol';
+import type { PerceptionTarget, Pet, Settings, SettingsPatch } from '@tagalong/protocol';
 import { SettingsStore } from '@tagalong/core';
-import { captureAskSnapshot } from './context';
+import { captureNotice, captureTooltip } from './capture-notice';
+import { captureAskSnapshot, capturePatch } from './context';
 import { ANTHROPIC_KEY, startEngineHost } from './engine-host';
 import type { EngineHost } from './engine-host';
-import { DEFAULT_ASK_HOTKEY, registerAskHotkey } from './hotkeys';
+import { DEFAULT_LOOK_HOTKEY, HotkeyManager } from './hotkeys';
 import { createPlatform } from './platform/index';
 import type { Platform } from './platform/index';
 import { SafeStorageSecretStore } from './secret-store';
@@ -13,7 +16,7 @@ import { createAvatarWindow } from './windows/avatar';
 import { createPanelWindow, showPanelBeside } from './windows/panel';
 import { createSettingsWindow } from './windows/settings';
 import { IPC } from '../shared/ipc';
-import type { HostView } from '../shared/ipc';
+import type { CaptureNotice, HostView } from '../shared/ipc';
 
 /** Everything the app owns once it is up. Assembled in `start`, torn down on quit. */
 interface Desktop {
@@ -22,6 +25,8 @@ interface Desktop {
   bootError: string | null;
   platform: Platform;
   settingsStore: SettingsStore;
+  /** The settings the running app is using; refreshed whenever they are saved. */
+  settings: Settings;
   secrets: SafeStorageSecretStore;
   avatar: BrowserWindow | null;
   panel: BrowserWindow | null;
@@ -31,6 +36,7 @@ interface Desktop {
   pendingSnapshot: ContextSnapshot | null;
   /** Turn ids in flight: the panel must not vanish on focus loss mid-answer. */
   activeTurns: Set<string>;
+  hotkeys: HotkeyManager;
   hotkeyError: string | null;
 }
 
@@ -61,6 +67,7 @@ if (!app.requestSingleInstanceLock()) {
 app.on('window-all-closed', () => {});
 
 app.on('before-quit', () => {
+  desktop?.hotkeys.dispose();
   void desktop?.host?.shutdown();
 });
 
@@ -70,6 +77,8 @@ async function start(): Promise<void> {
   const secrets = new SafeStorageSecretStore(dataDir);
   const settingsStore = new SettingsStore(dataDir);
 
+  const settings = settingsStore.get();
+
   let host: EngineHost | null = null;
   let bootError: string | null = null;
   try {
@@ -78,6 +87,8 @@ async function start(): Promise<void> {
       secrets,
       platform,
       onNotification: forwardToRenderers,
+      captureExclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
+      onCapture: announceCapture,
     });
   } catch (error) {
     // A missing API key is the ordinary first run, not a crash. Quitting here would leave
@@ -86,13 +97,12 @@ async function start(): Promise<void> {
     console.error('[main] the engine did not start:', bootError);
   }
 
-  const settings = settingsStore.get();
-
   desktop = {
     host,
     bootError,
     platform,
     settingsStore,
+    settings,
     secrets,
     avatar: null,
     panel: null,
@@ -100,6 +110,10 @@ async function start(): Promise<void> {
     settingsWindow: null,
     pendingSnapshot: null,
     activeTurns: new Set(),
+    hotkeys: new HotkeyManager({
+      onAsk: () => void openPanelWithContext({ screenshot: false }),
+      onLook: () => void openPanelWithContext({ screenshot: true }),
+    }),
     hotkeyError: null,
   };
 
@@ -124,17 +138,34 @@ async function start(): Promise<void> {
     },
   });
 
-  const outcome = registerAskHotkey({
-    accelerator: settings.hotkeys.ask || DEFAULT_ASK_HOTKEY,
-    onTrigger: () => void openPanelWithContext(),
-  });
-  if (!outcome.registered) {
-    desktop.hotkeyError = outcome.error ?? 'the hotkey could not be registered';
-    console.error(`[main] ${desktop.hotkeyError}`);
+  const problem = applyHotkeys(settings);
+  if (problem !== null) {
     // Silence here would look like a broken app: the user would press the hotkey and get
     // nothing, with no way to learn that another program owns the combo.
-    dialog.showErrorBox('Tagalong could not register its hotkey', desktop.hotkeyError);
+    dialog.showErrorBox('Tagalong could not register a hotkey', problem);
   }
+}
+
+/**
+ * Binds both hotkeys to what settings currently say, and reports what was refused.
+ *
+ * Called again on every settings save, which is what makes a rebind take effect without
+ * a restart: the manager releases only the accelerator that changed.
+ */
+function applyHotkeys(settings: Settings): string | null {
+  if (desktop === null) return null;
+  const outcomes = desktop.hotkeys.apply({
+    ask: settings.hotkeys.ask,
+    look: settings.hotkeys.look ?? DEFAULT_LOOK_HOTKEY,
+  });
+
+  const refused = outcomes
+    .filter((outcome) => !outcome.registered)
+    .map((outcome) => outcome.error ?? `${outcome.accelerator} could not be registered`);
+
+  desktop.hotkeyError = refused.length > 0 ? refused.join('\n') : null;
+  if (desktop.hotkeyError !== null) console.error(`[main] ${desktop.hotkeyError}`);
+  return desktop.hotkeyError;
 }
 
 /** Turn notifications drive the UI, and main is the only thing holding the socket. */
@@ -188,7 +219,7 @@ function createTray(): Tray {
       { label: 'Quit', click: () => app.quit() },
     ]),
   );
-  tray.on('click', () => void openPanelWithContext());
+  tray.on('click', () => void openPanelWithContext({ screenshot: false }));
   return tray;
 }
 
@@ -205,13 +236,65 @@ function openSettings(): void {
   desktop.settingsWindow = window;
 }
 
-/** The hotkey path: look at the screen, then open the panel with what was found. */
-async function openPanelWithContext(): Promise<void> {
+/**
+ * Tells everyone that a capture just happened.
+ *
+ * Both surfaces matter: the avatar badges the moment itself, and the tray keeps the
+ * record with its time, so nothing Tagalong reads from the screen is ever unannounced.
+ */
+function announceCapture(notice: CaptureNotice): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send(IPC.captureEvent, notice);
+  }
+  desktop?.tray.setToolTip(captureTooltip(notice));
+}
+
+/**
+ * The hotkey path: perceive, announce it, then open the panel with what was found.
+ *
+ * `screenshot` is what separates the two hotkeys. The text-only one stays cheap — a
+ * screenshot costs roughly 1,500 extra input tokens on every ask that carries one.
+ */
+async function openPanelWithContext(options: { screenshot: boolean }): Promise<void> {
   if (desktop === null || desktop.panel === null || desktop.avatar === null) return;
-  desktop.pendingSnapshot = await captureAskSnapshot(desktop.platform);
-  desktop.panel.webContents.send(IPC.contextEvent, desktop.pendingSnapshot);
+
+  const { snapshot, blocked } = await captureAskSnapshot(desktop.platform, {
+    screenshot: options.screenshot,
+    exclusions: desktop.settings.captureExclusions,
+  });
+  desktop.pendingSnapshot = snapshot;
+
+  announceCapture(captureNotice({ at: new Date(), screenshot: options.screenshot, blocked }));
+  desktop.panel.webContents.send(IPC.contextEvent, snapshot);
   desktop.avatar.show();
   showPanelBeside(desktop.panel, desktop.avatar);
+}
+
+/**
+ * The panel's own capture button. Null means refused, which is how the panel learns to
+ * say capture is blocked here rather than silently staying blind.
+ */
+async function captureForPanel(
+  current: Desktop,
+  targets: readonly PerceptionTarget[],
+): Promise<ContextSnapshot | null> {
+  const { patch, blocked } = await capturePatch(current.platform, targets, {
+    exclusions: current.settings.captureExclusions,
+  });
+  announceCapture(
+    captureNotice({ at: new Date(), screenshot: targets.includes('screenshot'), blocked }),
+  );
+  if (blocked !== null) return null;
+
+  const snapshot = ContextSnapshot.parse({
+    id: randomUUID(),
+    capturedAt: new Date().toISOString(),
+    host: 'desktop',
+    ...patch,
+  });
+  current.pendingSnapshot = snapshot;
+  current.panel?.webContents.send(IPC.contextEvent, snapshot);
+  return snapshot;
 }
 
 function registerIpc(): void {
@@ -256,6 +339,10 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.getContext, () => required().pendingSnapshot);
 
+  ipcMain.handle(IPC.capture, async (_event, targets: PerceptionTarget[]) =>
+    captureForPanel(required(), targets),
+  );
+
   ipcMain.handle(IPC.hostView, async (): Promise<HostView> => {
     const current = required();
     const settings = await readSettings();
@@ -271,8 +358,16 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.saveSettings, async (_event, patch: SettingsPatch): Promise<Settings> => {
     const current = required();
-    if (current.host === null) return current.settingsStore.set(patch);
-    return (await current.host.client.call('settings.set', { patch })).settings;
+    const saved =
+      current.host === null
+        ? current.settingsStore.set(patch)
+        : (await current.host.client.call('settings.set', { patch })).settings;
+
+    // Rebinding here is the whole point: a hotkey the user just typed has to work now,
+    // not after a restart.
+    current.settings = saved;
+    if (patch.hotkeys !== undefined) applyHotkeys(saved);
+    return saved;
   });
 
   ipcMain.handle(IPC.saveApiKey, async (_event, apiKey: string) => {
@@ -286,6 +381,6 @@ function registerIpc(): void {
   ipcMain.handle(IPC.togglePanel, async () => {
     const current = required();
     if (current.panel?.isVisible() === true) current.panel.hide();
-    else await openPanelWithContext();
+    else await openPanelWithContext({ screenshot: false });
   });
 }

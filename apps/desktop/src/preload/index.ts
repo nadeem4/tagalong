@@ -1,9 +1,9 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron';
-import type { ContextSnapshot, Pet, SettingsPatch } from '@tagalong/protocol';
+import type { ContextSnapshot, PerceptionTarget, Pet, SettingsPatch } from '@tagalong/protocol';
 import type { AskInput, HostBridge, TurnEvent } from '@tagalong/ui';
 import { IPC } from '../shared/ipc';
-import type { HostView, TagalongHostApi } from '../shared/ipc';
+import type { CaptureNotice, HostView, TagalongHostApi } from '../shared/ipc';
 
 /**
  * The renderer's entire view of the outside world.
@@ -13,6 +13,8 @@ import type { HostView, TagalongHostApi } from '../shared/ipc';
  */
 const bridge: HostBridge = {
   ask: (input: AskInput) => ipcRenderer.invoke(IPC.ask, input) as Promise<{ turnId: string }>,
+  capture: (targets: readonly PerceptionTarget[]) =>
+    ipcRenderer.invoke(IPC.capture, targets) as Promise<ContextSnapshot | null>,
   interrupt: (turnId: string) => ipcRenderer.invoke(IPC.interrupt, turnId) as Promise<void>,
   listPets: () => ipcRenderer.invoke(IPC.listPets) as Promise<Pet[]>,
   onTurnEvent: (handler: (event: TurnEvent) => void) => {
@@ -29,6 +31,11 @@ const host: TagalongHostApi = {
       handler(snapshot);
     ipcRenderer.on(IPC.contextEvent, listener);
     return () => void ipcRenderer.off(IPC.contextEvent, listener);
+  },
+  onCapture: (handler) => {
+    const listener = (_event: IpcRendererEvent, notice: CaptureNotice): void => handler(notice);
+    ipcRenderer.on(IPC.captureEvent, listener);
+    return () => void ipcRenderer.off(IPC.captureEvent, listener);
   },
   getHostView: () => ipcRenderer.invoke(IPC.hostView) as Promise<HostView>,
   saveSettings: (patch: SettingsPatch) => ipcRenderer.invoke(IPC.saveSettings, patch),
