@@ -16,6 +16,13 @@
     "clean": "tsc -b --clean"
   },
   "dependencies": {
-    "@tagalong/protocol": "workspace:*"
+    "@anthropic-ai/sdk": "0.125.0",
+    "@tagalong/protocol": "workspace:*",
+    "better-sqlite3": "13.0.3",
+    "ws": "8.21.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "9.6.0",
+    "@types/ws": "8.18.1"
   }
 }
