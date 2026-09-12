@@ -52,7 +52,7 @@ tagalong/
       settings/settings.ts          # SettingsStore, SecretStore, InMemorySecretStore
     ui/src/
       index.ts, host-bridge.ts      # HostBridge contract and its React context
-      pet-avatar.tsx, message-list.tsx, composer.tsx, context-chip.tsx, chat-panel.tsx
+      pet-avatar.tsx, message-list.tsx, composer.tsx, sight-bar.tsx, chat-panel.tsx
       test-support/fake-host-bridge.ts
   apps/
     desktop/
@@ -72,7 +72,7 @@ tagalong/
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/protocol` | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC, plus the method catalog. Depends only on zod.                                                                                          |
 | `packages/core`     | The Tagalong Engine: pets, conversation runner, prompt assembly, SQLite memory, host protocol server, pairing, provider adapters. Pure Node. Voice, the inter-pet bus, and the MCP client arrive in later phases. |
-| `packages/ui`       | React components shared by hosts: `PetAvatar`, `MessageList`, `Composer`, `ContextChip`, `ChatPanel`, and the `HostBridge` context.                                                                               |
+| `packages/ui`       | React components shared by hosts: `PetAvatar`, `MessageList`, `Composer`, `SightBar`, `ChatPanel`, and the `HostBridge` context.                                                                                  |
 | `apps/desktop`      | Electron host. Runs the engine in the main process, dials it over the loopback socket, and owns the avatar, panel, settings window, tray, hotkey, and secret storage.                                             |
 | `apps/extension`    | Chrome MV3 host. Connects to the running engine and speaks the protocol only. Stub until Phase 6.                                                                                                                 |
 
@@ -158,6 +158,18 @@ Once running: the pet sits on screen as a small always-on-top window, `Ctrl+Shif
 selection and the active window and opens the chat panel beside it, Escape or focus loss hides the
 panel (unless a turn is still streaming), and the tray menu shows or hides the pets, opens settings,
 and quits.
+
+`Ctrl+Shift+S` does the same but also takes a screenshot of the active window. The two are separate
+on purpose: an image costs roughly 1,500 extra input tokens per question, so the everyday hotkey
+stays text-only. Both accelerators are editable in the settings window and rebind while the app runs
+— no restart — and an accelerator another application already owns is reported rather than silently
+dropped.
+
+Capture is never silent. Every capture, including one a pet's own tool asked for, badges the avatar
+and updates the tray tooltip to say what was read and when. Before any screenshot the host checks the
+focused window against the capture exclusions in settings (password managers and the Windows
+credential prompts by default); when one matches, no picture is taken at all and the panel is told
+that capture is blocked here, naming only the exclusion entry that matched.
 
 ### The pairing token
 
@@ -260,7 +272,14 @@ Two things Phase 1 left standing, both recorded here so nobody rediscovers them.
 - A visible indicator shows every capture (Phase 2).
 - An exclusion list blocks capture in password managers and other listed apps (Phase 2).
 - Everything is stored locally in SQLite.
-- Screenshots are not persisted by default.
+- Screenshots are not persisted by default. The image is stripped from the stored snapshot before
+  the row is written, so the database holds the question and the window title but never the pixels.
+  Set `screenshotRetention` to `{ "mode": "hours", "hours": 1-24 }` to keep them for debugging;
+  expired images — and every stored image, the moment you switch retention back off — are swept on
+  the next turn.
+- A pet whose provider cannot see images never receives the screenshot: it is dropped before the
+  request is built and the host is told with a `turn.warning` (`code: "vision_unsupported"`), so the
+  turn still answers instead of failing.
 - API keys live in the OS keychain through Electron safe storage.
 
 ## No computer control
