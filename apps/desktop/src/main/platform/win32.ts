@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import { clipboard } from 'electron';
+import { clipboard, desktopCapturer, screen } from 'electron';
+import { captureActiveWindowImageWith } from './capture';
 import { captureSelectionWith } from './selection';
 import type { ActiveWindowInfo, CapturedImage, Platform } from './index';
 
@@ -40,7 +41,15 @@ export class Win32Platform implements Platform {
     return clipboard.readText();
   }
 
-  async captureActiveWindowImage(_maxLongSide: number): Promise<CapturedImage | null> {
-    throw new Error('captureActiveWindowImage is not implemented until Phase 2');
+  async captureActiveWindowImage(maxLongSide: number): Promise<CapturedImage | null> {
+    return captureActiveWindowImageWith(
+      {
+        desktopCapturer,
+        screen,
+        getActiveWindow: () => this.getActiveWindow(),
+        log: (message) => console.log(`[platform:win32] ${message}`),
+      },
+      maxLongSide,
+    );
   }
 }
