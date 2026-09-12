@@ -35,7 +35,9 @@
   },
   "pnpm": {
     "ignoredBuiltDependencies": [
-      "better-sqlite3"
+      "better-sqlite3",
+      "esbuild",
+      "get-windows"
     ]
   }
 }

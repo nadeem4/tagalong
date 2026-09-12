@@ -1,0 +1,60 @@
+import { app } from 'electron';
+import { ANTHROPIC_KEY, Engine } from '@tagalong/core';
+import type { SecretStore } from '@tagalong/core';
+import { DESKTOP_CAPABILITIES, capturePatch } from './context';
+import { EngineClient } from './engine-client';
+import type { EngineNotification } from './engine-client';
+import type { Platform } from './platform/index';
+
+export { ANTHROPIC_KEY };
+
+export interface EngineHost {
+  engine: Engine;
+  client: EngineClient;
+  shutdown: () => Promise<void>;
+}
+
+export interface StartEngineHostOptions {
+  dataDir: string;
+  secrets: SecretStore;
+  platform: Platform;
+  onNotification: (notification: EngineNotification) => void;
+}
+
+/**
+ * Boots the engine inside the main process and dials it as an ordinary host.
+ *
+ * In-process is an optimisation, not a shortcut: the host still speaks the protocol over
+ * the loopback socket, so nothing here can come to depend on engine internals that the
+ * Chrome host will not have.
+ */
+export async function startEngineHost(options: StartEngineHostOptions): Promise<EngineHost> {
+  const { dataDir } = options;
+
+  const engine = await Engine.boot({
+    dataDir,
+    secretStore: options.secrets,
+    engineVersion: app.getVersion(),
+    env: process.env,
+  });
+
+  const client = await EngineClient.connect({
+    port: engine.port,
+    token: engine.pairingToken,
+    hostVersion: app.getVersion(),
+    capabilities: DESKTOP_CAPABILITIES,
+    capture: (what) => capturePatch(options.platform, what),
+    onNotification: options.onNotification,
+  });
+
+  console.log(`[engine-host] engine listening on 127.0.0.1:${engine.port}, data dir ${dataDir}`);
+
+  return {
+    engine,
+    client,
+    shutdown: async () => {
+      client.close();
+      await engine.shutdown();
+    },
+  };
+}
