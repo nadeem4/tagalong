@@ -11,6 +11,7 @@
     "types": ["node"]
   },
   "include": [
+    "packages/*/src/test-setup.ts",
     "packages/*/src/**/*.test.ts",
     "packages/*/src/**/*.test.tsx",
     "packages/*/src/**/*.test-d.ts",

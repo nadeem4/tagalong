@@ -1,10 +1,27 @@
 /**
  * React components shared by the desktop renderer and the extension side panel.
  *
- * This package must never import electron. Hosts hand it a HostBridge instead.
- * Components arrive in Phase 1; this file keeps the package buildable until then.
+ * This package must never import electron or reach for a socket. Hosts hand it a
+ * HostBridge and the components talk to nothing else.
  */
-import { PROTOCOL_VERSION } from '@tagalong/protocol';
+export { HostBridgeProvider, useHostBridge } from './host-bridge';
+export type { AskInput, HostBridge, HostBridgeProviderProps, TurnEvent } from './host-bridge';
 
-/** Protocol version the components in this package are written against. */
-export const UI_PROTOCOL_VERSION = PROTOCOL_VERSION;
+export { PetAvatar } from './pet-avatar';
+export type { PetAvatarProps, PetState } from './pet-avatar';
+
+export { MessageList } from './message-list';
+export type { ChatMessage, MessageListProps } from './message-list';
+
+export { Composer } from './composer';
+export type { ComposerProps } from './composer';
+
+export { ContextChip } from './context-chip';
+export type { ContextChipProps } from './context-chip';
+
+export { ChatPanel } from './chat-panel';
+export type { ChatPanelProps } from './chat-panel';
+
+/** Exported so hosts can test their renderer wiring without booting an engine. */
+export { createFakeHostBridge } from './test-support/fake-host-bridge';
+export type { FakeHostBridge } from './test-support/fake-host-bridge';
