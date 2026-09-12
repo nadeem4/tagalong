@@ -4,6 +4,7 @@ import type {
   ContextSnapshot,
   CoreToHostNotification,
   NotificationParamsOf,
+  PerceptionTarget,
   Pet,
 } from '@tagalong/protocol';
 
@@ -31,6 +32,12 @@ export interface AskInput {
  */
 export interface HostBridge {
   ask(input: AskInput): Promise<{ turnId: string }>;
+  /**
+   * Perceives the screen now, on the user's click. Resolves to null when the host
+   * refused — an excluded window — so the panel can say capture is blocked here
+   * instead of silently staying blind.
+   */
+  capture(targets: readonly PerceptionTarget[]): Promise<ContextSnapshot | null>;
   interrupt(turnId: string): Promise<void>;
   /** Returns an unsubscribe function. */
   onTurnEvent(handler: (event: TurnEvent) => void): () => void;

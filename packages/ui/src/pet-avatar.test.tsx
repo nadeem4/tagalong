@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Pet } from '@tagalong/protocol';
 import { PetAvatar } from './pet-avatar';
 
@@ -47,5 +47,38 @@ describe('PetAvatar', () => {
     render(<PetAvatar pet={sage} />);
 
     expect(screen.getByRole('img')).toHaveAttribute('data-state', 'idle');
+  });
+});
+
+describe('PetAvatar capture badge', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('shows no badge before anything has been captured', () => {
+    render(<PetAvatar pet={sage} />);
+
+    expect(screen.queryByTestId('capture-badge')).not.toBeInTheDocument();
+  });
+
+  it('shows the eye badge for one second on a capture', () => {
+    const { rerender } = render(<PetAvatar pet={sage} captureCount={0} />);
+
+    rerender(<PetAvatar pet={sage} captureCount={1} />);
+    expect(screen.getByTestId('capture-badge')).toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(999));
+    expect(screen.getByTestId('capture-badge')).toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(1));
+    expect(screen.queryByTestId('capture-badge')).not.toBeInTheDocument();
+  });
+
+  it('shows the badge again on every later capture', () => {
+    const { rerender } = render(<PetAvatar pet={sage} captureCount={1} />);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.queryByTestId('capture-badge')).not.toBeInTheDocument();
+
+    rerender(<PetAvatar pet={sage} captureCount={2} />);
+    expect(screen.getByTestId('capture-badge')).toBeInTheDocument();
   });
 });

@@ -13,12 +13,24 @@ const snapshot: ContextSnapshot = {
   selection: 'x'.repeat(42),
 };
 
-function renderPanel(bridge: FakeHostBridge) {
+const screenshot: ContextSnapshot = {
+  id: '22222222-2222-4222-8222-222222222222',
+  capturedAt: '2026-09-11T10:05:00.000Z',
+  host: 'desktop',
+  app: { name: 'chrome.exe', windowTitle: 'Zod 4 changelog' },
+  screenshot: { mime: 'image/png', base64: 'iVBORw0KGgo=', width: 1280, height: 800 },
+};
+
+function renderPanel(bridge: FakeHostBridge, attached: ContextSnapshot | null = snapshot) {
   return render(
     <HostBridgeProvider bridge={bridge}>
-      <ChatPanel petId="sage" snapshot={snapshot} />
+      <ChatPanel petId="sage" {...(attached === null ? {} : { snapshot: attached })} />
     </HostBridgeProvider>,
   );
+}
+
+function look(): void {
+  fireEvent.click(screen.getByRole('button', { name: 'Look at screen' }));
 }
 
 function send(text: string): void {
@@ -27,10 +39,64 @@ function send(text: string): void {
 }
 
 describe('ChatPanel', () => {
-  it('shows the context chip for what will be attached', () => {
+  it('shows the sight bar naming what will be attached', () => {
     renderPanel(createFakeHostBridge());
 
-    expect(screen.getByTestId('context-chip')).toHaveTextContent('42 chars selected');
+    const bar = screen.getByTestId('sight-bar');
+    expect(bar).toHaveAttribute('data-state', 'seeing');
+    expect(bar).toHaveTextContent('42 chars');
+    expect(bar).toHaveTextContent('Code.exe');
+  });
+
+  it('says it is not seeing anything when the host captured nothing', () => {
+    renderPanel(createFakeHostBridge(), null);
+
+    expect(screen.getByTestId('sight-bar')).toHaveAttribute('data-state', 'blind');
+    expect(screen.getByRole('textbox')).toHaveAttribute(
+      'placeholder',
+      'Ask anything — or attach what you are looking at',
+    );
+  });
+
+  it('attaches a screenshot to the next ask when Look is clicked', async () => {
+    const bridge = createFakeHostBridge({ capture: screenshot });
+    renderPanel(bridge, null);
+
+    look();
+
+    expect(bridge.captures).toEqual([['screenshot', 'activeWindow']]);
+    await waitFor(() => expect(screen.getByTestId('sight-thumbnail')).toBeInTheDocument());
+    expect(screen.getByTestId('sight-bar')).toHaveTextContent('chrome.exe');
+
+    send('What is wrong here?');
+
+    expect(bridge.asks).toEqual([
+      { petId: 'sage', text: 'What is wrong here?', snapshot: screenshot },
+    ]);
+  });
+
+  it('says capture is blocked here when the host refuses', async () => {
+    const bridge = createFakeHostBridge({ capture: null });
+    renderPanel(bridge, null);
+
+    look();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('sight-bar')).toHaveAttribute('data-state', 'blocked'),
+    );
+    expect(screen.getByTestId('sight-bar')).toHaveTextContent('Capture is blocked here');
+  });
+
+  it('drops the attached context when the remove control is used', () => {
+    const bridge = createFakeHostBridge();
+    renderPanel(bridge);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(screen.getByTestId('sight-bar')).toHaveAttribute('data-state', 'blind');
+
+    send('Explain this');
+
+    expect(bridge.asks).toEqual([{ petId: 'sage', text: 'Explain this' }]);
   });
 
   it('asks through the bridge with the pet, text and snapshot, and echoes the question', () => {
