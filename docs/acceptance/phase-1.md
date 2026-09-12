@@ -106,8 +106,9 @@ in Settings — the fake provider returns scripted text that cannot satisfy them
 
 1. **Set `productName`** in `apps/desktop/package.json` before any packaging or
    auto-update work. Until then user data lands in `%APPDATA%\@tagalong\desktop`, and
-   changing it later strands every existing user's settings, secrets and database. See
-   `docs/issues/phase-1.md` issue 5.
+   changing it later strands every existing user's settings, secrets and database. See the
+   [Tagalong Issues](https://app.notion.com/p/fbe46b28758244c586dde6f27f9696ac) database in
+   Notion.
 2. **Add an Anthropic API key** through the Settings window to exercise the real provider.
    It is stored through `SecretStore` with Electron `safeStorage` — not from `.env.local`,
    which nothing reads for this.

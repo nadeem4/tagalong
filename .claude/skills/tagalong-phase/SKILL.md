@@ -15,13 +15,14 @@ source of truth for HOW.**
 
 ## Canonical sources
 
-| Thing                                                   | Where                                                                                      |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Project home, architecture, phase index                 | https://app.notion.com/p/3d809730490481a4be8ac5bd000b8bfc                                  |
-| Task board (74 tasks, `Phase` + `Order` + `Acceptance`) | Notion database `Tagalong Tasks` (`collection://77eeaf1d-3ff5-4681-a3da-798819627121`)     |
-| Decision log                                            | Notion database `Tagalong Decisions` (`collection://47551ad7-8cb0-4f67-a411-c651c15146d9`) |
-| Local design copy                                       | `docs/specs/2026-09-11-tagalong-design.md`                                                 |
-| Per-phase sign-off                                      | `docs/acceptance/phase-N.md`                                                               |
+| Thing                                                   | Where                                                                                                                                                |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Project home, architecture, phase index                 | https://app.notion.com/p/3d809730490481a4be8ac5bd000b8bfc                                                                                            |
+| Task board (74 tasks, `Phase` + `Order` + `Acceptance`) | Notion database `Tagalong Tasks` (`collection://77eeaf1d-3ff5-4681-a3da-798819627121`)                                                               |
+| Decision log                                            | Notion database `Tagalong Decisions` (`collection://47551ad7-8cb0-4f67-a411-c651c15146d9`)                                                           |
+| Issue log                                               | Notion database [`Tagalong Issues`](https://app.notion.com/p/fbe46b28758244c586dde6f27f9696ac) (`collection://081abced-a751-43c3-90af-8ea129b6a226`) |
+| Local design copy                                       | `docs/specs/2026-09-11-tagalong-design.md`                                                                                                           |
+| Per-phase sign-off                                      | `docs/acceptance/phase-N.md`                                                                                                                         |
 
 Fetch the phase page before starting the phase. Fetch the task rows before starting each task.
 
@@ -40,11 +41,15 @@ Fetch the phase page before starting the phase. Fetch the task rows before start
 
 1. Read the phase page in Notion, then every task row for that phase ordered by `Order`.
 2. Work tasks in `Order`. Do not skip ahead; later tasks assume earlier ones landed.
-3. Run the phase acceptance script. Write `docs/acceptance/phase-N.md` with each checkbox
-   ticked, the date, and notes from the real run.
-4. Push, then report to the human: what shipped, what the acceptance run showed, what is
+3. Record every error as a row in the Notion `Tagalong Issues` database as you hit it — every
+   error, blocker and workaround of the phase, including the process mistakes, not only the
+   ones still unfixed at the end. The repo must **not** carry an issue log of its own — no
+   issues folder under `docs/`; errors live in Notion, where they can be filtered and reopened.
+4. Run the phase acceptance script. Write `docs/acceptance/phase-N.md` with each checkbox
+   ticked, the date, and notes from the real run. The acceptance record stays in the repo.
+5. Push, then report to the human: what shipped, what the acceptance run showed, what is
    blocked on them.
-5. Stop and wait. The human may amend the next phase before it starts.
+6. Stop and wait. The human may amend the next phase before it starts.
 
 ## Invariants that outrank convenience
 
