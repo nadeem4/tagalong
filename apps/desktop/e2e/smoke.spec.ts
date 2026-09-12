@@ -91,12 +91,14 @@ test('ask streams an answer and completes the turn', async () => {
     timeout: 15_000,
   });
 
-  // The fake provider streams word by word, so the streaming bubble appears first...
-  await expect(panel.getByTestId('streaming-message')).toBeVisible({ timeout: 15_000 });
-
-  // ...and the turn is only complete once that bubble is gone and a settled assistant
-  // message has taken its place. The streaming bubble also carries data-role="assistant",
-  // so it has to be excluded or this assertion would pass mid-stream.
+  // The streaming bubble is deliberately NOT asserted here. It exists only between the
+  // first turn.delta and turn.completed, and the fake provider streams with no delay, so
+  // the whole turn can finish between two Playwright polls — the bubble may never be
+  // observable. Its incremental growth is covered deterministically in
+  // packages/ui/src/chat-panel.test.tsx, which drives the deltas through a fake bridge.
+  //
+  // What this test asserts is the settled end state. The streaming bubble also carries
+  // data-role="assistant", so it has to be excluded or this assertion could pass mid-stream.
   const settled = panel.locator('[data-role="assistant"]:not([data-testid="streaming-message"])');
   await expect(settled.first()).toBeVisible({ timeout: 30_000 });
   await expect(settled.first()).not.toBeEmpty();

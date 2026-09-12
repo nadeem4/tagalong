@@ -251,6 +251,32 @@ Every error hit while building Phase 1, including the ones already recovered fro
 - **Impact on the plan:** `.env.example` still lists voice and Anthropic keys that nothing
   reads yet. Harmless, but worth knowing they are aspirational.
 
+### 16. The smoke test asserted a transient UI state, and CI caught it
+
+- **Symptom:** `Smoke test (Electron end-to-end)` passed on every local run and failed on the
+  Windows CI runner with `element(s) not found — Expect "toBeVisible"
+getByTestId('streaming-message') with timeout 15000ms`. The assertion immediately before
+  it — the question echoed back as `[data-role="user"]` — passed, so the ask reached the
+  engine and the renderer updated. Only the transient streaming bubble was missed.
+- **Root cause:** `streaming-message` is ephemeral by design: `MessageList` renders it only
+  while `streamingText` is non-empty, which is the window between the first `turn.delta` and
+  `turn.completed`. `FakeBrainProvider` streams with `delayMs` defaulting to `0` and
+  `createProvider` never sets it, so the whole scripted answer streams in a few milliseconds
+  and the bubble can come and go between two Playwright polls. Asserting that an
+  intermediate state was _seen_ is racy by construction — the test was not detecting a
+  regression, it was betting on scheduler timing, and a loaded CI runner lost the bet.
+- **Fix:** `apps/desktop/e2e/smoke.spec.ts` no longer requires the streaming bubble to be
+  observed. It still asserts the user echo, then the settled end state: an assistant message
+  that is not the streaming bubble appears, is not empty, and no streaming bubble remains.
+  The streaming behaviour itself is covered where it can be driven deterministically —
+  `packages/ui/src/chat-panel.test.tsx` pushes `turn.delta` events through a fake bridge and
+  asserts the text grows `A fox` → `A fox is a` → `A fox is a small canid.` before
+  `turn.completed` settles it. No timeout was raised, no retry added, and no delay was put
+  into production code to make a test easier.
+- **Impact on the plan:** a rule for the end-to-end suite going forward — it asserts settled,
+  observable states; anything transient belongs in the unit tests, where the events are
+  driven rather than awaited.
+
 ## What this phase changed about the plan
 
 Most of the issues above cost time and changed nothing. Four of them changed the plan:
