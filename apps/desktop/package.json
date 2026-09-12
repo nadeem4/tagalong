@@ -13,5 +13,10 @@
     "@tagalong/core": "workspace:*",
     "@tagalong/protocol": "workspace:*",
     "@tagalong/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "6.1.1",
+    "electron": "44.3.0",
+    "electron-vite": "5.0.0"
   }
 }
