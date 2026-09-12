@@ -156,3 +156,55 @@ describe('ConversationStore.lastMessages', () => {
     expect(store.lastMessages(conversation.id, 20)).toHaveLength(1);
   });
 });
+
+describe('ConversationStore.purgeExpiredScreenshots', () => {
+  const withShot: ContextSnapshot = {
+    ...snapshot,
+    screenshot: { mime: 'image/png', base64: 'iVBORw0KGgoSECRETPIXELS', width: 8, height: 8 },
+  };
+
+  function storeOne(): string {
+    const conversation = store.createConversation({ petId: 'scout' });
+    store.appendMessage({
+      conversationId: conversation.id,
+      role: 'user',
+      content: [{ type: 'text', text: 'what is this?' }],
+      snapshot: withShot,
+    });
+    return conversation.id;
+  }
+
+  it('leaves a screenshot inside its retention window alone', () => {
+    const id = storeOne();
+    expect(store.purgeExpiredScreenshots({ mode: 'hours', hours: 24 })).toBe(0);
+    expect(store.listMessages(id)[0]?.snapshot?.screenshot).toBeDefined();
+  });
+
+  it('strips a screenshot once its window has passed', () => {
+    const id = storeOne();
+    const later = new Date(Date.now() + 2 * 60 * 60 * 1000);
+
+    expect(store.purgeExpiredScreenshots({ mode: 'hours', hours: 1 }, later)).toBe(1);
+    const message = store.listMessages(id)[0];
+    expect(message?.snapshot?.screenshot).toBeUndefined();
+    // The rest of the snapshot is evidence of the conversation, not of the screen.
+    expect(message?.snapshot?.selection).toBe('the highlighted paragraph');
+  });
+
+  it('strips every stored screenshot when retention is switched off', () => {
+    const id = storeOne();
+    expect(store.purgeExpiredScreenshots({ mode: 'off' })).toBe(1);
+    expect(store.listMessages(id)[0]?.snapshot?.screenshot).toBeUndefined();
+  });
+
+  it('reports nothing purged when no row holds a screenshot', () => {
+    const conversation = store.createConversation({ petId: 'scout' });
+    store.appendMessage({
+      conversationId: conversation.id,
+      role: 'user',
+      content: [{ type: 'text', text: 'hi' }],
+      snapshot,
+    });
+    expect(store.purgeExpiredScreenshots({ mode: 'off' })).toBe(0);
+  });
+});

@@ -9,6 +9,7 @@ import type { SecretStore } from './settings/settings';
 import { createProvider } from './providers';
 import type { BrainProvider } from './providers';
 import { ConversationRunner } from './conversation';
+import { createPerceptionToolset } from './perception';
 import { EngineServer } from './server/ws-server';
 import type { MethodHandlers } from './server/ws-server';
 import { readOrCreatePairingToken } from './server/pairing';
@@ -86,6 +87,14 @@ export class Engine {
       settings,
       provider,
       emit: (event) => live.server?.broadcast(event.method, event.params),
+      // Both lookups are lazy: hosts connect and drop between turns, and the exclusion
+      // list is edited while the app runs, so neither can be captured at boot.
+      tools: createPerceptionToolset({
+        hosts: () => live.server?.sessions() ?? [],
+        exclusions: () => settings.get().captureExclusions,
+        // Without this, look_at_screen would only ever describe the screen in words.
+        vision: () => provider.capabilities.vision,
+      }),
     });
 
     const handlers = buildHandlers({ runner, pets, settings });
