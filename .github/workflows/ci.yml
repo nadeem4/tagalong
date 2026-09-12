@@ -42,3 +42,12 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      # The runner is windows-latest, which has an interactive desktop session, so Electron
+      # opens real windows and needs no xvfb-style wrapper (that would only be needed if
+      # this job ever moved to a Linux runner). The step is capped because Electron answers
+      # an uncaught main-process exception with a *modal* dialog, which blocks the event
+      # loop: without a cap such a failure hangs the job instead of failing it.
+      - name: Smoke test (Electron end-to-end)
+        run: pnpm --filter @tagalong/desktop test:e2e
+        timeout-minutes: 10
