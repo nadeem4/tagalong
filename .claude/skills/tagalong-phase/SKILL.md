@@ -72,6 +72,22 @@ git diff --cached --shortstat
 Generated lockfiles are the usual cause of an oversized commit; commit `pnpm-lock.yaml` on its
 own when it dominates the diff.
 
+## Branching and pull requests
+
+Never commit to `main`. Every unit of work goes through a branch and a merged PR.
+
+1. Branch from an up-to-date `main`: `feat/phase-<N>-<workstream>` (for example
+   `feat/phase-1-protocol`, `feat/phase-1-providers`). One branch per workstream, not per
+   phase — a 17-task phase in one PR is not reviewable.
+2. Commit to the branch in the 500-800 line slices described above.
+3. Push and open a PR with `gh pr create`. The body states what shipped, which Notion task IDs
+   it closes, and how the acceptance text was verified.
+4. Wait for CI to pass on the PR. A red PR is never merged.
+5. Merge with `gh pr merge --squash --delete-branch`, then pull `main` before the next branch.
+6. Never add Claude or AI attribution lines to commit messages or PR bodies.
+
+A phase is finished when every one of its workstream PRs is merged and `main` is green.
+
 ## Recording decisions
 
 When a choice is non-obvious — a library swap, a protocol shape, a deviation from the phase
