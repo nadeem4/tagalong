@@ -39,6 +39,9 @@ const BASE_INSTRUCTIONS = [
   'Answer about what is on screen first, and only then about anything else.',
   'Be concise. A couple of sentences unless the user asks for depth.',
   'Say so plainly when the context does not contain the answer.',
+  'With a screenshot, describe what is visible before interpreting it.',
+  'Quote on-screen text exactly when asked; never paraphrase it as a quote.',
+  'Say plainly when the image is unreadable rather than guessing at it.',
   'You can only look and talk. You never click, type, or change anything on the machine, and you must never claim to have clicked or typed anything.',
 ].join('\n');
 
@@ -68,12 +71,11 @@ export function assemblePrompt(input: AssembleInput): BrainRequest {
   const screenshot = input.snapshot?.screenshot;
 
   if (contextText || screenshot) {
-    const extra: BrainContent[] = [];
-    if (contextText) extra.push({ type: 'text', text: contextText });
-    if (screenshot) {
-      extra.push({ type: 'image', mime: screenshot.mime, base64: screenshot.base64 });
-    }
-    attachToLastUserMessage(messages, extra);
+    const leading: BrainContent[] = screenshot
+      ? [{ type: 'image', mime: screenshot.mime, base64: screenshot.base64 }]
+      : [];
+    const trailing: BrainContent[] = contextText ? [{ type: 'text', text: contextText }] : [];
+    attachToLastUserMessage(messages, leading, trailing);
   }
 
   return {
@@ -91,17 +93,24 @@ function systemPrompt(pet: Pet): string {
 }
 
 /**
- * Context is appended to the user's own message rather than sent as its own turn:
+ * Context is attached to the user's own message rather than sent as its own turn:
  * the model reads it as "here is what I was looking at when I asked", and the
  * volatile part of the prompt stays behind the cacheable system block.
+ *
+ * The screenshot leads and the text context trails, because a model answers about a
+ * picture far more reliably when it has seen the picture before reading the question.
  */
-function attachToLastUserMessage(messages: BrainMessage[], extra: BrainContent[]): void {
+function attachToLastUserMessage(
+  messages: BrainMessage[],
+  leading: BrainContent[],
+  trailing: BrainContent[],
+): void {
   const last = messages.at(-1);
   if (last?.role === 'user') {
-    last.content = [...last.content, ...extra];
+    last.content = [...leading, ...last.content, ...trailing];
     return;
   }
-  messages.push({ role: 'user', content: extra });
+  messages.push({ role: 'user', content: [...leading, ...trailing] });
 }
 
 /** Selection, page, window, screenshot — the order a person would look in. */
