@@ -51,23 +51,35 @@ function usable(source: CaptureSource): boolean {
  * ids `get-windows` reports, so the title is the only handle the two share. Titles change
  * while the user works and duplicate across tabs, which is why the display fallback
  * exists at all: a screenshot of the right monitor beats no screenshot.
+ *
+ * `active` may be null. Windows reports no foreground window more often than it sounds —
+ * a locked or disconnected session, a UAC prompt sitting on the secure desktop, a
+ * full-screen exclusive game — and on some machines the call never succeeds at all. The
+ * exclusion rules already decided what to do with a window they cannot name: allow it,
+ * because refusing everything unidentifiable is a pet that never sees. So a nameless
+ * foreground window falls through to a screen rather than ending the capture.
  */
 async function pickSource(
   deps: WindowCaptureDeps,
-  active: ActiveWindowInfo,
+  active: ActiveWindowInfo | null,
   thumbnailSize: PixelSize,
 ): Promise<CaptureSource | null> {
-  const windows = await deps.desktopCapturer.getSources({ types: ['window'], thumbnailSize });
-  const match = windows.find((source) => source.name === active.title && usable(source));
-  if (match !== undefined) return match;
+  if (active !== null) {
+    const windows = await deps.desktopCapturer.getSources({ types: ['window'], thumbnailSize });
+    const match = windows.find((source) => source.name === active.title && usable(source));
+    if (match !== undefined) return match;
+  }
 
-  const display = deps.screen.getDisplayMatching(active.bounds);
   const screens = await deps.desktopCapturer.getSources({ types: ['screen'], thumbnailSize });
-  const onDisplay = screens.find(
-    (source) => source.display_id === String(display.id) && usable(source),
-  );
+  if (active !== null) {
+    const display = deps.screen.getDisplayMatching(active.bounds);
+    const onDisplay = screens.find(
+      (source) => source.display_id === String(display.id) && usable(source),
+    );
+    if (onDisplay !== undefined) return onDisplay;
+  }
   // Windows sometimes reports a blank display_id, so a single usable screen still counts.
-  return onDisplay ?? screens.find(usable) ?? null;
+  return screens.find(usable) ?? null;
 }
 
 /**
@@ -83,15 +95,17 @@ export async function captureActiveWindowImageWith(
 ): Promise<CapturedImage | null> {
   const log = deps.log ?? (() => {});
   const active = await deps.getActiveWindow();
-  if (active === null) {
-    log('captureActiveWindowImage: no active window');
-    return null;
-  }
+  if (active === null) log('captureActiveWindowImage: no active window, falling back to a screen');
 
-  const requested = fitWithin(active.bounds.width, active.bounds.height, maxLongSide);
+  // With no window there are no bounds to shape the request, so the bound itself is the
+  // box: the capturer fits the frame inside it and keeps the aspect ratio.
+  const requested =
+    active === null
+      ? { width: maxLongSide, height: maxLongSide }
+      : fitWithin(active.bounds.width, active.bounds.height, maxLongSide);
   const source = await pickSource(deps, active, requested);
   if (source === null) {
-    log(`captureActiveWindowImage: nothing capturable for '${active.title}'`);
+    log(`captureActiveWindowImage: nothing capturable for '${active?.title ?? 'the desktop'}'`);
     return null;
   }
 

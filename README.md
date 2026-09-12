@@ -271,6 +271,9 @@ Two things Phase 1 left standing, both recorded here so nobody rediscovers them.
 - Capture happens only when you ask, never continuously.
 - A visible indicator shows every capture (Phase 2).
 - An exclusion list blocks capture in password managers and other listed apps (Phase 2).
+- When Windows reports no foreground window at all — a locked session, a UAC prompt on the secure
+  desktop — capture falls back to the screen rather than refusing, which matches the exclusion
+  rules: a window that cannot be named is allowed, because a pet that never sees reads as broken.
 - Everything is stored locally in SQLite.
 - Screenshots are not persisted by default. The image is stripped from the stored snapshot before
   the row is written, so the database holds the question and the window title but never the pixels.

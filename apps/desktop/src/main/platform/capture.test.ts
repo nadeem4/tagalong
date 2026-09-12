@@ -122,7 +122,25 @@ describe('captureActiveWindowImageWith', () => {
     expect(captured?.width).toBe(1568);
   });
 
-  it('returns null when there is no active window to look at', async () => {
+  it('falls back to a screen when Windows reports no active window at all', async () => {
+    // GetForegroundWindow answers with nothing more often than it sounds: a locked or
+    // disconnected session, a UAC prompt on the secure desktop, a full-screen exclusive
+    // game. Returning null there left the pet permanently blind on machines where the
+    // call never succeeds, which the user meets as "the app is broken". The exclusion
+    // rules already decided that an unidentifiable window is allowed to be captured
+    // (see findCaptureBlock), so bailing out here contradicted the policy above it.
+    const d = deps({ screen: [source('Screen 1', fakeImage(1920, 1080), '1')] }, { active: null });
+
+    const captured = await captureActiveWindowImageWith(d, BOUND);
+
+    expect(captured?.width).toBe(1568);
+    // Only the screens are asked for: with no window to match by title, enumerating every
+    // window on the desktop would decode bitmaps nobody is going to look at.
+    expect(d.calls.map((call) => call.types)).toEqual([['screen']]);
+    expect(d.calls[0]?.thumbnailSize).toEqual({ width: BOUND, height: BOUND });
+  });
+
+  it('returns null when there is no active window and nothing capturable either', async () => {
     expect(await captureActiveWindowImageWith(deps({}, { active: null }), BOUND)).toBeNull();
   });
 
