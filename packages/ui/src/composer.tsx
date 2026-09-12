@@ -5,9 +5,17 @@ export interface ComposerProps {
   onSend: (text: string) => void;
   /** True while a turn streams: one turn per pet at a time, so a second ask must wait. */
   disabled: boolean;
+  /** True when something is attached. The placeholder must not promise sight there isn't. */
+  seeing?: boolean;
 }
 
-export function Composer({ onSend, disabled }: ComposerProps) {
+/** The placeholder is a promise, so it only offers sight when sight is attached. */
+const PLACEHOLDER = {
+  seeing: 'Ask about what is on screen',
+  blind: 'Ask anything — or attach what you are looking at',
+};
+
+export function Composer({ onSend, disabled, seeing = false }: ComposerProps) {
   const [text, setText] = useState('');
   const trimmed = text.trim();
 
@@ -34,7 +42,7 @@ export function Composer({ onSend, disabled }: ComposerProps) {
         rows={2}
         value={text}
         disabled={disabled}
-        placeholder="Ask about what is on screen"
+        placeholder={seeing ? PLACEHOLDER.seeing : PLACEHOLDER.blind}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={handleKeyDown}
         className="flex-1 resize-none rounded-md border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-sky-500 disabled:bg-slate-100"

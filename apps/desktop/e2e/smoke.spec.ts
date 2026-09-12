@@ -104,3 +104,52 @@ test('ask streams an answer and completes the turn', async () => {
   await expect(settled.first()).not.toBeEmpty();
   await expect(panel.getByTestId('streaming-message')).toHaveCount(0, { timeout: 30_000 });
 });
+
+test('capture takes a real, downscaled PNG of the screen', async () => {
+  const avatar = await windowFor('avatar');
+
+  // Driven through the bridge the preload already exposes, not through Ctrl+Shift+S: a
+  // global hotkey needs the app to hold focus, which nothing guarantees on a CI desktop.
+  //
+  // This is the one thing a unit test cannot reach. `capture.test.ts` proves the picking
+  // and resizing logic against an injected fake capturer; only here does a real
+  // `desktopCapturer.getSources` run inside a real Electron main process, against real
+  // displays, and come back through IPC as the snapshot the engine would receive.
+  //
+  // The decoding happens inside the page on purpose. The base64 of a 1568px PNG is
+  // megabytes, and returning it whole would push all of it over the CDP connection just
+  // to look at its first four bytes.
+  const shot = await avatar.evaluate(async () => {
+    const snapshot = await window.tagalong.capture(['screenshot', 'activeWindow']);
+    const screenshot = snapshot?.screenshot;
+    if (screenshot === undefined) return null;
+    // 12 base64 characters decode to 9 whole bytes, which is more than the signature needs.
+    const head = atob(screenshot.base64.slice(0, 12));
+    return {
+      mime: screenshot.mime,
+      base64Length: screenshot.base64.length,
+      width: screenshot.width,
+      height: screenshot.height,
+      magic: [...head].slice(0, 4).map((character) => character.charCodeAt(0)),
+    };
+  });
+
+  if (shot === null) {
+    throw new Error(
+      'perception.capture returned no screenshot: either the host refused it or ' +
+        'desktopCapturer found nothing capturable on this machine',
+    );
+  }
+
+  // Bytes, not a truthy string: a scripted stub, an empty buffer or a JPEG would all pass
+  // a "something came back" assertion. 89 50 4E 47 is the PNG signature.
+  expect(shot.magic).toEqual([0x89, 0x50, 0x4e, 0x47]);
+  expect(shot.mime).toBe('image/png');
+  expect(shot.base64Length).toBeGreaterThan(0);
+
+  // Positive dimensions, and the downscale actually applied in the running app — 1568 is
+  // MAX_SCREENSHOT_LONG_SIDE, past which the vision models charge without seeing more.
+  expect(shot.width).toBeGreaterThan(0);
+  expect(shot.height).toBeGreaterThan(0);
+  expect(Math.max(shot.width, shot.height)).toBeLessThanOrEqual(1568);
+});

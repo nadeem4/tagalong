@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
-import type { ContextSnapshot, MessageContent, MessageRole } from '@tagalong/protocol';
+import type {
+  ContextSnapshot,
+  MessageContent,
+  MessageRole,
+  ScreenshotRetention,
+} from '@tagalong/protocol';
 import { Conversation, Message } from '@tagalong/protocol';
 
 interface ConversationRow {
@@ -33,6 +38,11 @@ export interface NewMessage {
 
 /** Rows are ordered by time, with rowid breaking ties inside the same millisecond. */
 const ORDERED = 'ORDER BY created_at ASC, rowid ASC';
+
+const MS_PER_HOUR = 60 * 60 * 1000;
+
+/** Sorts after every real `created_at`, which is how "sweep everything" is expressed. */
+const MAX_TIMESTAMP = '9999-12-31T23:59:59.999Z';
 
 /**
  * Conversations and messages on top of the migrated SQLite file.
@@ -97,6 +107,44 @@ export class ConversationStore {
       .prepare<[string], MessageRow>(`SELECT * FROM messages WHERE conversation_id = ? ${ORDERED}`)
       .all(conversationId)
       .map(toMessage);
+  }
+
+  /**
+   * Drops screenshots that have outlived the retention setting, and returns how many rows
+   * changed. Only the image goes: the rest of the snapshot is what the conversation was
+   * about, and deleting it would leave answers with no question behind them.
+   *
+   * Takes `now` so a test can age a row without waiting, and so a caller sweeping several
+   * things at once uses one consistent instant. No timer lives here — Phase 4 owns
+   * background jobs; this is a method someone calls.
+   */
+  purgeExpiredScreenshots(retention: ScreenshotRetention, now: Date = new Date()): number {
+    // 'off' sweeps everything: the setting was turned off, so what was kept under it goes.
+    const cutoff =
+      retention.mode === 'off'
+        ? MAX_TIMESTAMP
+        : new Date(now.getTime() - retention.hours * MS_PER_HOUR).toISOString();
+
+    const rows = this.db
+      .prepare<[string], Pick<MessageRow, 'id' | 'snapshot_json'>>(
+        'SELECT id, snapshot_json FROM messages WHERE snapshot_json IS NOT NULL AND created_at < ?',
+      )
+      .all(cutoff);
+
+    const update = this.db.prepare<[string, string]>(
+      'UPDATE messages SET snapshot_json = ? WHERE id = ?',
+    );
+
+    let purged = 0;
+    for (const row of rows) {
+      if (row.snapshot_json === null) continue;
+      const snapshot = JSON.parse(row.snapshot_json) as ContextSnapshot;
+      if (snapshot.screenshot === undefined) continue;
+      const { screenshot: _dropped, ...rest } = snapshot;
+      update.run(JSON.stringify(rest), row.id);
+      purged += 1;
+    }
+    return purged;
   }
 
   /** The newest `limit` messages, returned oldest first so they can be replayed as-is. */

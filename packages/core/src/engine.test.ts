@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 import { PROTOCOL_VERSION } from '@tagalong/protocol';
 import { Engine } from './engine';
+import { FakeBrainProvider } from './providers';
+import type { BrainProvider } from './providers';
 import { InMemorySecretStore } from './settings/settings';
 
 let dir: string;
@@ -22,7 +24,7 @@ afterEach(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-async function boot(): Promise<Engine> {
+async function boot(provider?: BrainProvider): Promise<Engine> {
   engine = await Engine.boot({
     dataDir: dir,
     secretStore: new InMemorySecretStore(),
@@ -30,6 +32,7 @@ async function boot(): Promise<Engine> {
     // Port 0 lets the OS pick, so a real engine on 47321 never collides with a test.
     port: 0,
     env: { TAGALONG_FAKE_PROVIDERS: '1' },
+    ...(provider ? { provider } : {}),
   });
   return engine;
 }
@@ -40,11 +43,19 @@ class TestHost {
   #nextId = 1;
   #pending = new Map<number, (msg: Record<string, unknown>) => void>();
   readonly notifications: { method: string; params: Record<string, unknown> }[] = [];
+  /** Answers core-to-host requests such as perception.capture. */
+  onRequest: ((method: string, params: unknown) => unknown) | undefined;
 
   private constructor(socket: WebSocket) {
     this.#socket = socket;
     socket.on('message', (raw) => {
       const msg = JSON.parse(String(raw)) as Record<string, unknown>;
+      // A core-to-host request carries both an id and a method.
+      if ('id' in msg && 'method' in msg) {
+        const answer = this.onRequest?.(String(msg['method']), msg['params']);
+        this.#socket.send(JSON.stringify({ jsonrpc: '2.0', id: msg['id'], result: answer }));
+        return;
+      }
       if ('id' in msg && !('method' in msg)) {
         const resolve = this.#pending.get(msg['id'] as number);
         this.#pending.delete(msg['id'] as number);
@@ -184,6 +195,39 @@ describe('ask', () => {
 
     expect(res['error']).toBeDefined();
     expect(String((res['error'] as Record<string, unknown>)['message'])).toContain('nobody');
+  });
+});
+
+describe('built-in perception tools', () => {
+  it('routes look_at_screen to the connected host and finishes the turn', async () => {
+    const e = await boot(
+      new FakeBrainProvider({
+        text: 'a spreadsheet',
+        toolCall: { id: 'call-1', name: 'look_at_screen', input: {} },
+      }),
+    );
+    const host = await TestHost.connect(e.port);
+    const asked: unknown[] = [];
+    host.onRequest = (method, params) => {
+      asked.push((params as Record<string, unknown>)['what']);
+      expect(method).toBe('perception.capture');
+      return {
+        snapshot: {
+          app: { name: 'notepad.exe', windowTitle: 'budget.txt' },
+          screenshot: { mime: 'image/png', base64: 'iVBORw0KGgo=', width: 640, height: 480 },
+        },
+      };
+    };
+    await host.call('hello', {
+      ...helloParams(e.pairingToken),
+      capabilities: ['selection', 'activeWindow', 'screenshot'] as const,
+    });
+
+    await host.call('ask', { petId: 'scout', input: { text: 'what is this?' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+
+    // The window is identified before any pixels are taken, so an exclusion can still bite.
+    expect(asked).toEqual([['activeWindow'], ['screenshot']]);
   });
 });
 

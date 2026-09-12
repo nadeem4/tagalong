@@ -1,10 +1,13 @@
 import { app } from 'electron';
 import { ANTHROPIC_KEY, Engine } from '@tagalong/core';
 import type { SecretStore } from '@tagalong/core';
+import type { CaptureExclusions } from '@tagalong/protocol';
+import { captureNotice } from './capture-notice';
 import { DESKTOP_CAPABILITIES, capturePatch } from './context';
 import { EngineClient } from './engine-client';
 import type { EngineNotification } from './engine-client';
 import type { Platform } from './platform/index';
+import type { CaptureNotice } from '../shared/ipc';
 
 export { ANTHROPIC_KEY };
 
@@ -19,6 +22,10 @@ export interface StartEngineHostOptions {
   secrets: SecretStore;
   platform: Platform;
   onNotification: (notification: EngineNotification) => void;
+  /** Read at capture time rather than at boot, so an edited exclusion list takes effect. */
+  captureExclusions: () => CaptureExclusions;
+  /** A pet's own tool can ask to look; that capture must be as visible as the hotkey's. */
+  onCapture: (notice: CaptureNotice) => void;
 }
 
 /**
@@ -43,7 +50,15 @@ export async function startEngineHost(options: StartEngineHostOptions): Promise<
     token: engine.pairingToken,
     hostVersion: app.getVersion(),
     capabilities: DESKTOP_CAPABILITIES,
-    capture: (what) => capturePatch(options.platform, what),
+    capture: async (what) => {
+      const { patch, blocked } = await capturePatch(options.platform, what, {
+        exclusions: options.captureExclusions(),
+      });
+      options.onCapture(
+        captureNotice({ at: new Date(), screenshot: what.includes('screenshot'), blocked }),
+      );
+      return patch;
+    },
     onNotification: options.onNotification,
   });
 

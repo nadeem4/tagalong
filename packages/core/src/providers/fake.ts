@@ -31,7 +31,12 @@ function promptLength(req: BrainRequest): number {
         case 'text':
           return block.text;
         case 'tool_result':
-          return block.content;
+          // A block-carrying result is billed for its pixels too, so count the base64.
+          return typeof block.content === 'string'
+            ? block.content
+            : block.content
+                .map((part) => (part.type === 'text' ? part.text : part.base64))
+                .join('');
         case 'tool_use':
           return JSON.stringify(block.input);
         case 'image':

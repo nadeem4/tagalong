@@ -1,6 +1,7 @@
 import { StrictMode, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
+import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import './app.css';
 import type { HostView } from '../../shared/ipc';
 
@@ -33,6 +34,9 @@ function Settings() {
       const saved = await window.tagalongHost.saveSettings({
         providerId: String(form.get('providerId')),
         defaultModel: String(form.get('defaultModel')),
+        // Both keys go together: a patch replaces the whole hotkeys object, so sending
+        // one of them would drop the other.
+        hotkeys: { ask: String(form.get('askHotkey')), look: String(form.get('lookHotkey')) },
       });
       if (apiKey.length > 0) {
         await window.tagalongHost.saveApiKey(apiKey);
@@ -81,8 +85,16 @@ function Settings() {
         </label>
 
         <label>
-          <span>Ask hotkey (editable in Phase 7)</span>
-          <input value={settings.hotkeys.ask} readOnly />
+          <span>Ask hotkey (text only)</span>
+          <input name="askHotkey" defaultValue={settings.hotkeys.ask} />
+        </label>
+
+        <label>
+          <span>Look hotkey (adds a screenshot)</span>
+          <input
+            name="lookHotkey"
+            defaultValue={settings.hotkeys.look ?? SETTINGS_DEFAULTS.hotkeys.look}
+          />
         </label>
 
         {view.hotkeyError !== undefined && <p className="settings__error">{view.hotkeyError}</p>}

@@ -231,6 +231,71 @@ describe('AnthropicProvider', () => {
     expect(result.usage).toEqual({ inputTokens: 21, outputTokens: 11 });
   });
 
+  it('sends an image-carrying tool result back as tool_result content blocks', async () => {
+    const toolTurn: FakeMessage = {
+      content: [{ type: 'tool_use', id: 'tu_1', name: 'look_at_screen', input: {} }],
+      stop_reason: 'tool_use',
+      usage: { input_tokens: 10, output_tokens: 4 },
+    };
+    sdk.stream
+      .mockReturnValueOnce(streamOf(toolTurn))
+      .mockReturnValueOnce(streamOf(textMessage('a budget')));
+    const { events } = recorder();
+    events.onToolUse = () =>
+      Promise.resolve({
+        content: [
+          { type: 'text' as const, text: 'Screenshot of notepad.exe.' },
+          { type: 'image' as const, mime: 'image/png' as const, base64: 'AAA' },
+        ],
+      });
+
+    await provider().complete(request, events, new AbortController().signal);
+
+    const [secondBody] = sdk.stream.mock.calls[1] as [any, any];
+    expect(secondBody.messages[2].content[0]).toEqual({
+      type: 'tool_result',
+      tool_use_id: 'tu_1',
+      // Image first here too: the picture has to arrive before the words about it.
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAA' } },
+        { type: 'text', text: 'Screenshot of notepad.exe.' },
+      ],
+    });
+  });
+
+  it('replays an image-carrying tool result out of history unchanged', async () => {
+    sdk.stream.mockReturnValue(streamOf(textMessage('ok')));
+
+    await provider().complete(
+      {
+        ...request,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'tool_result',
+                toolUseId: 'tu_9',
+                content: [{ type: 'image', mime: 'image/png', base64: 'BBB' }],
+              },
+            ],
+          },
+        ],
+      },
+      recorder().events,
+      new AbortController().signal,
+    );
+
+    const [body] = sdk.stream.mock.calls[0] as [any, any];
+    expect(body.messages[0].content[0]).toEqual({
+      type: 'tool_result',
+      tool_use_id: 'tu_9',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'BBB' } },
+      ],
+    });
+  });
+
   it('surfaces a friendly message when the model refuses', async () => {
     sdk.stream.mockReturnValue(streamOf(textMessage('', 'refusal')));
     const { events, deltas } = recorder();

@@ -5,6 +5,13 @@ import { z } from 'zod';
  * the host's SecretStore and never appear in settings.get or on disk in this shape.
  */
 
+/**
+ * Ceiling on screenshot retention. The plan offers exactly one debugging window — 24
+ * hours — so anything longer is a typo or a misunderstanding, not a supported choice.
+ * Bounding it here means no host has to invent its own limit later.
+ */
+export const MAX_SCREENSHOT_RETENTION_HOURS = 24;
+
 /** Default value for every setting, in one place so the patch schema can stay defaults-free. */
 export const SETTINGS_DEFAULTS = {
   enginePort: 47321,
@@ -13,9 +20,80 @@ export const SETTINGS_DEFAULTS = {
   defaultModel: 'claude-opus-5',
   pageTextBudget: 40_000,
   historyMessages: 20,
-  hotkeys: { ask: 'CommandOrControl+Shift+Space' },
+  hotkeys: { ask: 'CommandOrControl+Shift+Space', look: 'CommandOrControl+Shift+S' },
   avatar: { x: null, y: null },
+  /**
+   * Why this set: every entry is a window where the pixels on screen are a credential.
+   * The four desktop password managers below cover the overwhelming majority of Windows
+   * installs; `CredentialUIBroker.exe` is the "Windows Security" prompt that asks for a
+   * PIN, a password or a passkey, and `LogonUI.exe` is the lock screen. `consent.exe`
+   * (UAC) is listed for completeness even though it runs on the secure desktop and is
+   * usually uncapturable anyway — cheap insurance if that ever stops being true.
+   *
+   * The title patterns exist because the same secrets are reached through a browser: the
+   * process is then `chrome.exe` or `msedge.exe`, which we must never block wholesale.
+   * They are deliberately few — a broad pattern like `*password*` would block an
+   * ordinary docs page about passwords and teach the user to switch the feature off.
+   */
+  captureExclusions: {
+    processNames: [
+      '1Password.exe',
+      'Bitwarden.exe',
+      'KeePass.exe',
+      'KeePassXC.exe',
+      'LastPass.exe',
+      'CredentialUIBroker.exe',
+      'LogonUI.exe',
+      'consent.exe',
+    ],
+    titlePatterns: ['*1Password*', '*Bitwarden*', '*KeePass*', '*LastPass*', '*Windows Security*'],
+  },
+  /**
+   * Off by default. A screenshot is the most sensitive thing this app ever touches — it
+   * can hold a bank balance, a private message or a token that happened to be on screen —
+   * and the plan says screenshots are not persisted. Retention is therefore opt-in, for
+   * debugging, and bounded.
+   */
+  screenshotRetention: { mode: 'off' },
 } as const;
+
+/** A non-blank, trimmed entry. A blank one would match every window and blind the pet. */
+const exclusionEntry = z.string().trim().min(1);
+
+/**
+ * Windows a capture must refuse.
+ *
+ * Two rules rather than one because the same secret is reached two ways: a native app has
+ * a stable process name, while a web vault only shows up in the title of a browser window
+ * we must not block by process.
+ *
+ * `titlePatterns` are globs (`*` only), not regular expressions. A user-supplied regex
+ * would be run against every active window on every capture, so one pathological pattern
+ * could hang capture — and nobody debugging "why can't my pet see" wants to discover they
+ * wrote a catastrophic backtrack. Globs also read the way people expect a blocklist to.
+ */
+export const CaptureExclusions = z.object({
+  /** Matched case-insensitively against the whole process name, never by substring. */
+  processNames: z.array(exclusionEntry),
+  /** Anchored, case-insensitive globs over the window title; `*` is the only wildcard. */
+  titlePatterns: z.array(exclusionEntry),
+});
+export type CaptureExclusions = z.infer<typeof CaptureExclusions>;
+
+/**
+ * How long a captured screenshot may live in the database.
+ *
+ * A tagged union rather than a number, so "never persist" is a state of its own instead of
+ * a zero that every reader has to remember the meaning of.
+ */
+export const ScreenshotRetention = z.discriminatedUnion('mode', [
+  z.object({ mode: z.literal('off') }),
+  z.object({
+    mode: z.literal('hours'),
+    hours: z.number().int().min(1).max(MAX_SCREENSHOT_RETENTION_HOURS),
+  }),
+]);
+export type ScreenshotRetention = z.infer<typeof ScreenshotRetention>;
 
 /**
  * Field validators without defaults attached.
@@ -36,9 +114,19 @@ const settingsFields = {
   pageTextBudget: z.number().int().positive(),
   /** How many past messages are replayed to the model. */
   historyMessages: z.number().int().positive(),
-  hotkeys: z.object({ ask: z.string().min(1) }),
+  /**
+   * `look` is optional so a settings file written before the looking hotkey existed still
+   * parses — and because a patch replaces the whole `hotkeys` object, so a caller that only
+   * rebinds `ask` must not be forced to resend a key it never touched. The host falls back
+   * to its own default when it is absent.
+   */
+  hotkeys: z.object({ ask: z.string().min(1), look: z.string().min(1).optional() }),
   /** Remembered avatar position; null means "dock to the default edge". */
   avatar: z.object({ x: z.number().nullable(), y: z.number().nullable() }),
+  /** Windows where capture is refused outright. */
+  captureExclusions: CaptureExclusions,
+  /** Whether a captured screenshot may be stored, and for how long. */
+  screenshotRetention: ScreenshotRetention,
 };
 
 export const Settings = z.object({
@@ -50,6 +138,13 @@ export const Settings = z.object({
   historyMessages: settingsFields.historyMessages.default(SETTINGS_DEFAULTS.historyMessages),
   hotkeys: settingsFields.hotkeys.prefault({ ...SETTINGS_DEFAULTS.hotkeys }),
   avatar: settingsFields.avatar.prefault({ ...SETTINGS_DEFAULTS.avatar }),
+  captureExclusions: settingsFields.captureExclusions.prefault({
+    processNames: [...SETTINGS_DEFAULTS.captureExclusions.processNames],
+    titlePatterns: [...SETTINGS_DEFAULTS.captureExclusions.titlePatterns],
+  }),
+  screenshotRetention: settingsFields.screenshotRetention.prefault({
+    ...SETTINGS_DEFAULTS.screenshotRetention,
+  }),
 });
 export type Settings = z.infer<typeof Settings>;
 

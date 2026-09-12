@@ -16,8 +16,8 @@ export type { ChatMessage, MessageListProps } from './message-list';
 export { Composer } from './composer';
 export type { ComposerProps } from './composer';
 
-export { ContextChip } from './context-chip';
-export type { ContextChipProps } from './context-chip';
+export { SightBar } from './sight-bar';
+export type { SightBarProps, SightProblem } from './sight-bar';
 
 export { ChatPanel } from './chat-panel';
 export type { ChatPanelProps } from './chat-panel';

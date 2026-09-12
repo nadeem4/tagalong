@@ -173,6 +173,56 @@ describe('assemblePrompt context block', () => {
   });
 });
 
+describe('assemblePrompt vision rules', () => {
+  it('tells the model to describe, quote exactly, and admit an unreadable image', () => {
+    const { system } = assemblePrompt({ pet, history: [userMessage('hi')], settings });
+
+    expect(system).toMatch(/describe what is visible before interpreting/i);
+    expect(system).toMatch(/quote on-screen text exactly/i);
+    expect(system).toMatch(/unreadable/i);
+  });
+
+  it('puts the image block ahead of every text block in the last user message', () => {
+    const content =
+      assemblePrompt({
+        pet,
+        history: [userMessage('what is this?')],
+        snapshot: snapshotWithEverything(),
+        settings,
+      }).messages.at(-1)?.content ?? [];
+
+    const firstImage = content.findIndex((block) => block.type === 'image');
+    const firstText = content.findIndex((block) => block.type === 'text');
+    expect(firstImage).toBe(0);
+    expect(firstImage).toBeLessThan(firstText);
+  });
+
+  it('leads a context-only user message with the image', () => {
+    const content =
+      assemblePrompt({
+        pet,
+        history: [assistantMessage('still thinking')],
+        snapshot: snapshotWithEverything(),
+        settings,
+      }).messages.at(-1)?.content ?? [];
+
+    expect(content.at(0)?.type).toBe('image');
+  });
+
+  it('emits no image block when the snapshot carries no screenshot', () => {
+    const content =
+      assemblePrompt({
+        pet,
+        history: [userMessage('what is this?')],
+        snapshot: snapshotWithEverything({ screenshot: undefined }),
+        settings,
+      }).messages.at(-1)?.content ?? [];
+
+    expect(content.some((block) => block.type === 'image')).toBe(false);
+    expect(content.at(0)).toEqual({ type: 'text', text: 'what is this?' });
+  });
+});
+
 describe('assemblePrompt messages', () => {
   it('emits the screenshot as an image content block', () => {
     const request = assemblePrompt({
@@ -182,7 +232,7 @@ describe('assemblePrompt messages', () => {
       settings,
     });
 
-    expect(request.messages.at(-1)?.content.at(-1)).toEqual({
+    expect(request.messages.at(-1)?.content.at(0)).toEqual({
       type: 'image',
       mime: 'image/png',
       base64: 'aGk=',

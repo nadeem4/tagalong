@@ -40,6 +40,22 @@ describe('Composer', () => {
     expect(onSend).not.toHaveBeenCalled();
   });
 
+  it('only promises sight in the placeholder when something is attached', () => {
+    const { rerender } = render(<Composer onSend={vi.fn()} disabled={false} />);
+
+    expect(screen.getByRole('textbox')).toHaveAttribute(
+      'placeholder',
+      'Ask anything — or attach what you are looking at',
+    );
+
+    rerender(<Composer onSend={vi.fn()} disabled={false} seeing />);
+
+    expect(screen.getByRole('textbox')).toHaveAttribute(
+      'placeholder',
+      'Ask about what is on screen',
+    );
+  });
+
   it('is inert while a turn is streaming', () => {
     const onSend = vi.fn();
     const { rerender } = render(<Composer onSend={onSend} disabled={false} />);

@@ -1,4 +1,4 @@
-import type { Pet } from '@tagalong/protocol';
+import type { ContextSnapshot, PerceptionTarget, Pet } from '@tagalong/protocol';
 import type { AskInput, HostBridge, TurnEvent } from '../host-bridge';
 
 export interface FakeHostBridge extends HostBridge {
@@ -6,25 +6,39 @@ export interface FakeHostBridge extends HostBridge {
   emit(event: TurnEvent): void;
   readonly asks: readonly AskInput[];
   readonly interrupts: readonly string[];
+  /** The targets of every capture() call, in order. */
+  readonly captures: readonly (readonly PerceptionTarget[])[];
+  /** What the next capture() resolves to; null stands in for a blocked window. */
+  nextCapture: ContextSnapshot | null;
 }
 
 /**
  * Shipped from the package rather than kept in test files: the desktop host needs the
  * same bridge double to test its renderer without booting an engine.
  */
-export function createFakeHostBridge(options: { pets?: Pet[] } = {}): FakeHostBridge {
+export function createFakeHostBridge(
+  options: { pets?: Pet[]; capture?: ContextSnapshot | null } = {},
+): FakeHostBridge {
   const handlers = new Set<(event: TurnEvent) => void>();
   const asks: AskInput[] = [];
   const interrupts: string[] = [];
+  const captures: (readonly PerceptionTarget[])[] = [];
   let turnCount = 0;
 
-  return {
+  const fake: FakeHostBridge = {
     asks,
     interrupts,
+    captures,
+    nextCapture: options.capture ?? null,
     ask(input) {
       asks.push(input);
       turnCount += 1;
       return Promise.resolve({ turnId: `turn-${turnCount}` });
+    },
+    capture(targets) {
+      captures.push(targets);
+      // Read off the object so a test can change the answer between captures.
+      return Promise.resolve(fake.nextCapture);
     },
     interrupt(turnId) {
       interrupts.push(turnId);
@@ -46,4 +60,6 @@ export function createFakeHostBridge(options: { pets?: Pet[] } = {}): FakeHostBr
       }
     },
   };
+
+  return fake;
 }

@@ -59,6 +59,14 @@ Fetch the phase page before starting the phase. Fetch the task rows before start
 - **No computer control, ever.** No mouse or keyboard automation anywhere in the repo. The one
   exception already in the plan is the Ctrl+C selection trick in the desktop host, which is
   scoped to reading the selection and restoring the clipboard.
+- **Test with the fake provider. Always.** Every test, every manual check, every launch you
+  do yourself runs on `FakeBrainProvider` — set `TAGALONG_FAKE_PROVIDERS=1`, or `providerId:
+'fake'`. **Never** run a real Anthropic, OpenAI or ElevenLabs call to verify your own work.
+  The user pays per token for API calls; burning their budget to satisfy your curiosity is not
+  yours to spend. Acceptance steps that genuinely need a real provider — "the answer references
+  the selected text" — are handed to the user to run, listed under "Needs a human run", and left
+  unticked. Only switch to a real provider when the user asks for it in that session; a previous
+  session's permission does not carry over.
 - **Never overengineer.** Build what the current task needs. An interface exists only where the
   plan names a second implementation.
 - **Secrets never enter git.** Env vars in development, OS keychain in the packaged app. Every
@@ -106,3 +114,5 @@ a decision the next agent will have to re-think unless it is written down.
 - About to mark a task `Done` without running its `Acceptance` text
 - About to start phase N+1 while a phase N task is still `Not started`
 - Reaching for a mouse/keyboard automation library
+- About to make a real API call to check your own work — use the fake provider
+- About to tick an acceptance item that needs a real provider, instead of handing it to the user

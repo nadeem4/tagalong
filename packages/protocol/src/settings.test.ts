@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { Settings, SettingsPatch } from './settings';
+import {
+  MAX_SCREENSHOT_RETENTION_HOURS,
+  SETTINGS_DEFAULTS,
+  Settings,
+  SettingsPatch,
+} from './settings';
 
 describe('Settings', () => {
   it('fills every default from an empty object', () => {
@@ -11,7 +16,18 @@ describe('Settings', () => {
     expect(s.pageTextBudget).toBe(40_000);
     expect(s.historyMessages).toBe(20);
     expect(s.hotkeys.ask).toBe('CommandOrControl+Shift+Space');
+    expect(s.hotkeys.look).toBe('CommandOrControl+Shift+S');
     expect(s.avatar).toEqual({ x: null, y: null });
+  });
+
+  it('keeps a rebound look hotkey', () => {
+    const s = Settings.parse({ hotkeys: { ask: 'Alt+Space', look: 'Alt+S' } });
+    expect(s.hotkeys.look).toBe('Alt+S');
+  });
+
+  it('accepts settings written before the look hotkey existed', () => {
+    const s = Settings.parse({ hotkeys: { ask: 'Alt+Space' } });
+    expect(s.hotkeys.look).toBeUndefined();
   });
 
   it('keeps explicit values', () => {
@@ -50,6 +66,59 @@ describe('Settings', () => {
   });
 });
 
+describe('Settings.captureExclusions', () => {
+  it('ships defaults that cover password managers and the Windows credential UI', () => {
+    const { captureExclusions } = Settings.parse({});
+    const processes = captureExclusions.processNames.map((p) => p.toLowerCase());
+    expect(processes).toContain('1password.exe');
+    expect(processes).toContain('bitwarden.exe');
+    expect(processes).toContain('keepass.exe');
+    expect(processes).toContain('lastpass.exe');
+    expect(processes).toContain('credentialuibroker.exe');
+    expect(captureExclusions.titlePatterns).toContain('*Windows Security*');
+  });
+
+  it('accepts an empty list so a user can opt out of every default', () => {
+    const s = Settings.parse({ captureExclusions: { processNames: [], titlePatterns: [] } });
+    expect(s.captureExclusions).toEqual({ processNames: [], titlePatterns: [] });
+  });
+
+  it('rejects a blank entry, which would otherwise match every window', () => {
+    expect(
+      Settings.safeParse({ captureExclusions: { processNames: [''], titlePatterns: [] } }).success,
+    ).toBe(false);
+    expect(
+      Settings.safeParse({ captureExclusions: { processNames: [], titlePatterns: ['  '] } })
+        .success,
+    ).toBe(false);
+  });
+});
+
+describe('Settings.screenshotRetention', () => {
+  it('is off by default, so screenshots never reach the database unasked', () => {
+    expect(Settings.parse({}).screenshotRetention).toEqual({ mode: 'off' });
+    expect(SETTINGS_DEFAULTS.screenshotRetention.mode).toBe('off');
+  });
+
+  it('accepts the 24 hour debugging window', () => {
+    const s = Settings.parse({ screenshotRetention: { mode: 'hours', hours: 24 } });
+    expect(s.screenshotRetention).toEqual({ mode: 'hours', hours: 24 });
+  });
+
+  it('rejects retention beyond the documented maximum', () => {
+    expect(
+      Settings.safeParse({
+        screenshotRetention: { mode: 'hours', hours: MAX_SCREENSHOT_RETENTION_HOURS + 1 },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects an unknown mode and a mode without its hours', () => {
+    expect(Settings.safeParse({ screenshotRetention: { mode: 'forever' } }).success).toBe(false);
+    expect(Settings.safeParse({ screenshotRetention: { mode: 'hours' } }).success).toBe(false);
+  });
+});
+
 describe('SettingsPatch', () => {
   it('accepts a single field', () => {
     expect(SettingsPatch.parse({ providerId: 'fake' })).toEqual({ providerId: 'fake' });
@@ -61,5 +130,16 @@ describe('SettingsPatch', () => {
 
   it('still validates the fields it is given', () => {
     expect(SettingsPatch.safeParse({ enginePort: 80 }).success).toBe(false);
+  });
+
+  it('never invents the new privacy fields when they are omitted', () => {
+    const patch = SettingsPatch.parse({ providerId: 'fake' });
+    expect(patch).not.toHaveProperty('captureExclusions');
+    expect(patch).not.toHaveProperty('screenshotRetention');
+  });
+
+  it('validates the privacy fields it is given', () => {
+    expect(SettingsPatch.safeParse({ screenshotRetention: { mode: 'off' } }).success).toBe(true);
+    expect(SettingsPatch.safeParse({ screenshotRetention: { mode: 'weeks' } }).success).toBe(false);
   });
 });

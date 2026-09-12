@@ -131,6 +131,19 @@ export const TurnErrorParams = z.object({
   code: z.string().min(1),
   message: z.string(),
 });
+/**
+ * Something the user must know about a turn that is still going to answer.
+ *
+ * Separate from `turn.error` on purpose: an error ends the turn, and a host that aborts
+ * on one would wrongly throw away a perfectly good reply. Shaped like `turn.error` so a
+ * host can render both with the same code, only in a quieter colour.
+ */
+export const TurnWarningParams = z.object({
+  turnId: z.uuid(),
+  /** Machine-readable so a host can decide what to show; `vision_unsupported` is the first. */
+  code: z.string().min(1),
+  message: z.string(),
+});
 /** Phase 4. */
 export const PetMessageParams = z.object({
   fromPetId: z.string().min(1),
@@ -175,6 +188,7 @@ export const coreToHostNotifications = {
   'turn.toolResult': { params: TurnToolResultParams },
   'turn.completed': { params: TurnCompletedParams },
   'turn.error': { params: TurnErrorParams },
+  'turn.warning': { params: TurnWarningParams },
   'pet.message': { params: PetMessageParams },
 } as const satisfies Record<string, NotificationSpec>;
 

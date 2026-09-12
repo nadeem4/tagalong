@@ -7,7 +7,7 @@ describe('ui package surface', () => {
       [
         'ChatPanel',
         'Composer',
-        'ContextChip',
+        'SightBar',
         'HostBridgeProvider',
         'MessageList',
         'PetAvatar',

@@ -21,9 +21,9 @@ describe('createPlatform', () => {
     expect(() => createPlatform('linux')).toThrow(/Phase 7/);
   });
 
-  it('defers window capture to Phase 2 instead of pretending it works', async () => {
-    await expect(createPlatform('win32').captureActiveWindowImage(1024)).rejects.toThrow(
-      /not implemented until Phase 2/,
-    );
+  it('exposes window capture now that Phase 2 has landed', () => {
+    // What capture actually does is covered in capture.test.ts against injected fakes;
+    // calling it here would reach Electron's real capturer and need a display.
+    expect(typeof createPlatform('win32').captureActiveWindowImage).toBe('function');
   });
 });

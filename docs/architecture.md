@@ -63,13 +63,13 @@ stub until Phase 6.
 
 ## Package responsibilities
 
-| Package           | Responsibility                                                                                                                                                                                                      | Must never import                                |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| packages/protocol | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC envelopes, plus the method and notification catalog                                                                                       | anything except zod                              |
-| packages/core     | Engine facade, conversation runner, prompt assembler, SQLite memory, pet registry, settings and SecretStore, pairing, websocket server, brain providers                                                             | electron, react, DOM globals                     |
-| packages/ui       | React components — `PetAvatar`, `MessageList`, `Composer`, `ContextChip`, `ChatPanel` — plus the `HostBridge` contract and its context, and a fake bridge for host tests                                            | electron, sockets, node APIs                     |
-| apps/desktop      | Electron host. Runs the engine in the main process, dials it over the loopback socket, owns avatar, panel and settings windows, the tray, the global hotkey, perception, and safeStorage secrets, one folder per OS | nothing from core internals, only its public API |
-| apps/extension    | Chrome MV3 host. Connects to the running engine, supplies exact page text and selection, renders pets in the side panel                                                                                             | core at all; it speaks the protocol only         |
+| Package           | Responsibility                                                                                                                                                                                                                                                                          | Must never import                                |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| packages/protocol | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC envelopes, plus the method and notification catalog                                                                                                                                                           | anything except zod                              |
+| packages/core     | Engine facade, conversation runner, prompt assembler, SQLite memory, pet registry, settings and SecretStore, pairing, websocket server, brain providers                                                                                                                                 | electron, react, DOM globals                     |
+| packages/ui       | React components — `PetAvatar`, `MessageList`, `Composer`, `SightBar`, `ChatPanel` — plus the `HostBridge` contract and its context, and a fake bridge for host tests                                                                                                                   | electron, sockets, node APIs                     |
+| apps/desktop      | Electron host. Runs the engine in the main process, dials it over the loopback socket, owns avatar, panel and settings windows, the tray, the two global hotkeys (text-only and look), perception with exclusions and capture announcements, and safeStorage secrets, one folder per OS | nothing from core internals, only its public API |
+| apps/extension    | Chrome MV3 host. Connects to the running engine, supplies exact page text and selection, renders pets in the side panel                                                                                                                                                                 | core at all; it speaks the protocol only         |
 
 ## Host contracts
 
@@ -100,9 +100,10 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
 - **Host to core:** `hello`, `ask`, `interrupt`, `pets.list`, `pets.upsert`, `pets.delete`,
   `settings.get`, `settings.set`, `tool.approve` (Phase 5).
 - **Core to host:** `perception.capture`, the one call that goes the other way.
-- **Core to host notifications:** `turn.started`, `turn.delta`, `turn.completed`, `turn.error`, plus
-  `turn.audio` (Phase 3), `turn.toolRequest` and `turn.toolResult` (Phase 5), and `pet.message`
-  (Phase 4).
+- **Core to host notifications:** `turn.started`, `turn.delta`, `turn.completed`, `turn.error`,
+  `turn.warning`, plus `turn.audio` (Phase 3), `turn.toolRequest` and `turn.toolResult` (Phase 5),
+  and `pet.message` (Phase 4). `turn.warning` carries the same `{ code, message }` as `turn.error`
+  but does not end the turn — a host that aborts on it throws away a reply that is still coming.
 
 ## The ask flow
 
@@ -136,13 +137,18 @@ notifications.
    `ContextSnapshot`.
 2. `ConversationRunner.run` opens a conversation if none was named, stores the user message (with its
    snapshot) in SQLite, mints a `turnId`, emits `turn.started`, and **returns immediately**. The `ask`
-   result is `{ turnId }` and nothing else.
-3. The runner reads back the last `settings.historyMessages` messages — after the question was stored,
+   result is `{ turnId }` and nothing else. The stored snapshot loses its screenshot unless
+   `screenshotRetention` allows keeping it, and the same call sweeps screenshots that have outlived
+   the setting — the turn is the only moment the engine reliably wakes up, and Phase 4 owns timers.
+3. If the pet's provider reports `capabilities.vision === false` and the ask carried a screenshot, the
+   image is dropped before the request is assembled and a `turn.warning` with code
+   `vision_unsupported` goes out. The turn continues without the picture.
+4. The runner reads back the last `settings.historyMessages` messages — after the question was stored,
    so the prompt ends on what was asked — and `assemblePrompt` builds the provider-neutral request:
    the base instructions, the pet's persona, the reply-style rule, the history, and a screen-context
    block appended to the last user message rather than sent as its own turn.
-4. The provider streams. Every text delta becomes a `turn.delta` notification.
-5. The turn ends with exactly one of `turn.completed` — carrying the full text, a stop reason of `end`,
+5. The provider streams. Every text delta becomes a `turn.delta` notification.
+6. The turn ends with exactly one of `turn.completed` — carrying the full text, a stop reason of `end`,
    `max_tokens`, `aborted` or `refusal`, and token usage — or `turn.error`, carrying a `BrainErrorCode`
    (`rate_limit`, `auth`, `connection`, `config`, `unknown`) and a message written for the person
    looking at the panel. The assistant message is stored only if it has text, so an interrupted turn
@@ -158,8 +164,23 @@ still running before closing the database, because a stream left in flight would
 database that is about to close.
 
 Tool calls are part of the contract already: the provider's `onToolUse` is awaited before the dependent
-text streams. Until Phase 5 the runner answers every call with "no tools are available yet", honestly
-and as an error result, rather than pretending.
+text streams. Phase 2 fills it with two built-ins from `packages/core/src/perception/tools.ts` —
+`look_at_screen` and `get_selection` — offered to every pet whose provider advertises
+`capabilities.tools`, and to no other. A call that arrives with no toolset wired still gets the honest
+"no tools are available yet" error result rather than a pretend success.
+
+Both tools call the connected host's `perception.capture` through the injected `hosts()` lookup, which
+is read per call because hosts connect and drop mid-conversation. Each one asks for `activeWindow`
+**first** and runs `findCaptureBlock` against the live exclusion list before asking for pixels or
+selected text: an exclusion that only filters the answer has already taken the screenshot it promised
+not to take. A blocked window, a host with no `screenshot` capability, and a host that fails to answer
+all come back as error tool results naming the reason, never as silence.
+
+Results are **text**, never a snapshot object: `BrainTool` results are strings by contract, and a model
+handed `{"screenshot":{"base64":"iVBO…"}}` learns nothing it can reason about while the blob swamps its
+context. So `get_selection` returns the selected text itself, and `look_at_screen` reports the window and
+the image size and says plainly that pixels cannot ride back through a tool result — the image reaches
+the model through the snapshot attached to an ask.
 
 ## The desktop host's shape
 
@@ -175,7 +196,9 @@ every window, and what makes the two hosts interchangeable.
 The preload exposes exactly two globals, and the split between them is deliberate:
 
 - `window.tagalong` is precisely the `HostBridge` interface that `@tagalong/ui` consumes — `ask`,
-  `interrupt`, `listPets`, `onTurnEvent`. Nothing more.
+  `capture`, `interrupt`, `listPets`, `onTurnEvent`. Nothing more. `capture` is how the panel's
+  Look button reaches the screen; it resolves to null when the window is excluded, so the sight bar
+  can say capture is blocked here instead of quietly showing nothing.
 - `window.tagalongHost` carries everything specific to this host — the captured snapshot, the settings
   view, saving the API key, opening settings, hiding and toggling the panel.
 
