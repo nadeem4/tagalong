@@ -1,0 +1,59 @@
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import Database from 'better-sqlite3';
+
+/** The SQLite file a host finds in its data dir. */
+export const DB_FILENAME = 'tagalong.db';
+
+/**
+ * Numbered migrations, applied in order and never edited once shipped: an installed
+ * database has already run them, so a change here would only ever reach fresh installs.
+ * Add a new entry instead.
+ */
+const MIGRATIONS: readonly string[] = [
+  `CREATE TABLE pets (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at TEXT NOT NULL);
+   CREATE TABLE conversations (id TEXT PRIMARY KEY, pet_id TEXT NOT NULL, title TEXT, created_at TEXT NOT NULL);
+   CREATE TABLE messages (id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, role TEXT NOT NULL, content_json TEXT NOT NULL, snapshot_json TEXT, created_at TEXT NOT NULL);
+   CREATE INDEX messages_conv ON messages(conversation_id, created_at);`,
+];
+
+/** Version a fully migrated database reports. */
+export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;
+
+/**
+ * Brings a database up to the latest schema and returns the version it now sits at.
+ * Applied versions are recorded row by row, so rerunning this is a no-op.
+ */
+export function migrate(db: Database.Database): number {
+  db.exec(
+    'CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)',
+  );
+  const current =
+    db
+      .prepare<[], { version: number | null }>('SELECT MAX(version) AS version FROM schema_version')
+      .get()?.version ?? 0;
+
+  const record = db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (?, ?)');
+  for (let version = current + 1; version <= MIGRATIONS.length; version += 1) {
+    const sql = MIGRATIONS[version - 1];
+    if (sql === undefined) continue;
+    // One transaction per migration so a failure leaves the previous version intact.
+    db.transaction(() => {
+      db.exec(sql);
+      record.run(version, new Date().toISOString());
+    })();
+  }
+
+  return LATEST_SCHEMA_VERSION;
+}
+
+/** Opens (creating if needed) the migrated database for a host's data dir. */
+export function openDatabase(dataDir: string): Database.Database {
+  mkdirSync(dataDir, { recursive: true });
+  const db = new Database(join(dataDir, DB_FILENAME));
+  // Foreign keys are off by default in SQLite, and WAL keeps reads from blocking writes.
+  db.pragma('journal_mode = WAL');
+  db.pragma('foreign_keys = ON');
+  migrate(db);
+  return db;
+}
