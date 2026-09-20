@@ -1,7 +1,7 @@
-import { spawn } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 
-import { LIST_WINDOWS_SCRIPT, runWindowHelper } from './window-helper';
+import { runPowerShellScript } from './powershell';
+import { LIST_WINDOWS_SCRIPT } from './window-helper';
 import { parseWindowList } from './window-list';
 
 /**
@@ -23,18 +23,21 @@ import { parseWindowList } from './window-list';
  */
 const onWindows = process.platform === 'win32';
 
-/** Exactly how `Win32Platform` starts PowerShell. Kept in step with it on purpose. */
+/**
+ * The application's own runner, not a copy of it.
+ *
+ * The first version of this file re-declared the spawn arguments beside a comment saying
+ * they were kept in step with `Win32Platform` by hand. They were not, and could not be:
+ * changing `-EncodedCommand` to `-Command` at the real call site broke the app and left
+ * all four of these green. The test proved the mechanism works, which was never in doubt,
+ * and never touched the thing that actually breaks — which arguments the app passes.
+ *
+ * That is the original bug's shape one level up. There, fixture tests proved the parser
+ * and never reached the transport. Here, the detector proved the transport and never
+ * reached the call site. Both times the check could not fail.
+ */
 function runRealHelper(script: string, timeoutMs = 20_000): Promise<string> {
-  return runWindowHelper(
-    (encoded) =>
-      spawn(
-        'powershell.exe',
-        ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded],
-        { windowsHide: true },
-      ),
-    script,
-    timeoutMs,
-  );
+  return runPowerShellScript(script, timeoutMs);
 }
 
 describe.skipIf(!onWindows)('the PowerShell transport, against a real PowerShell', () => {

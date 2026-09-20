@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { clipboard, desktopCapturer, nativeImage, screen } from 'electron';
 import { buildInventory } from '@tagalong/core';
@@ -11,7 +10,8 @@ import type { ReadTextAnswer, ReadWindowTextParams } from './read-text';
 import { captureSelectionWith } from './selection';
 import { createUiaTextLayer } from './text-layer';
 import type { TextLayerProvider } from './text-layer';
-import { LIST_WINDOWS_SCRIPT, runWindowHelper } from './window-helper';
+import { runPowerShellScript } from './powershell';
+import { LIST_WINDOWS_SCRIPT } from './window-helper';
 import {
   attachTextCounts,
   countableHandles,
@@ -87,39 +87,12 @@ export class Win32Platform implements Platform {
    * returns partial output, so a window that will not answer costs some of the inventory
    * rather than the ask behind it.
    */
-  /**
-   * Runs a PowerShell script and resolves with whatever it printed.
-   *
-   * Shared by enumeration and the text layer so there is one place that decides how
-   * PowerShell is started, and one place to change when it needs to be started
-   * differently.
-   */
-  #runScript(script: string, timeoutMs: number): Promise<string> {
-    return runWindowHelper(
-      (encoded) =>
-        spawn(
-          'powershell.exe',
-          [
-            '-NoProfile',
-            '-NonInteractive',
-            '-ExecutionPolicy',
-            'Bypass',
-            '-EncodedCommand',
-            encoded,
-          ],
-          { windowsHide: true },
-        ),
-      script,
-      timeoutMs,
-    );
-  }
-
   get #textLayer(): TextLayerProvider {
-    return createUiaTextLayer((script, timeoutMs) => this.#runScript(script, timeoutMs));
+    return createUiaTextLayer(runPowerShellScript);
   }
 
   async listWindows(exclusions: CaptureExclusions): Promise<WindowInventory> {
-    const stdout = await this.#runScript(LIST_WINDOWS_SCRIPT, WINDOW_HELPER_TIMEOUT_MS);
+    const stdout = await runPowerShellScript(LIST_WINDOWS_SCRIPT, WINDOW_HELPER_TIMEOUT_MS);
     const outcome = parseWindowList(stdout);
     // Nothing to count and nothing to classify: hand the failure up rather than spending
     // a second PowerShell start on an empty list.
