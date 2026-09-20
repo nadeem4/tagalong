@@ -12,6 +12,7 @@ import {
   DEFAULT_PAUSE_SIGHT_HOTKEY,
   DEFAULT_SEE_EVERYTHING_HOTKEY,
   HotkeyManager,
+  describeHotkeyProblems,
 } from './hotkeys';
 import { createPlatform } from './platform/index';
 import { gateSight } from './platform/sight-gate';
@@ -164,12 +165,13 @@ async function start(): Promise<void> {
     },
   });
 
-  const problem = applyHotkeys(settings);
-  if (problem !== null) {
-    // Silence here would look like a broken app: the user would press the hotkey and get
-    // nothing, with no way to learn that another program owns the combo.
-    dialog.showErrorBox('Tagalong could not register a hotkey', problem);
-  }
+  // Deliberately not a modal, and deliberately not fatal. The only way to store an
+  // accelerator that cannot be registered is to type it into Settings, so refusing to
+  // start because of it leaves the user locked out of the one window that could fix it,
+  // with the settings file as the only way back. The manager binds each key
+  // independently, so the others are already live; the failure is surfaced in the panel
+  // and in Settings, where there is something to do about it.
+  applyHotkeys(settings);
 }
 
 /**
@@ -187,12 +189,15 @@ function applyHotkeys(settings: Settings): string | null {
     pauseSight: settings.hotkeys.pauseSight ?? DEFAULT_PAUSE_SIGHT_HOTKEY,
   });
 
-  const refused = outcomes
-    .filter((outcome) => !outcome.registered)
-    .map((outcome) => outcome.error ?? `${outcome.accelerator} could not be registered`);
-
-  desktop.hotkeyError = refused.length > 0 ? refused.join('\n') : null;
+  desktop.hotkeyError = describeHotkeyProblems(outcomes);
   if (desktop.hotkeyError !== null) console.error(`[main] ${desktop.hotkeyError}`);
+
+  // Broadcast rather than wait for the next getHostView. The panel may already be open,
+  // and a window still showing a problem the user has just fixed is the same kind of lie
+  // as never showing it at all.
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send(IPC.hotkeyProblemEvent, desktop.hotkeyError);
+  }
   return desktop.hotkeyError;
 }
 

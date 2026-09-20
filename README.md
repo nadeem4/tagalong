@@ -197,6 +197,13 @@ All four accelerators are editable in the settings window and rebind while the a
 restart — and an accelerator another application already owns is reported rather than silently
 dropped, without costing the other three.
 
+**A hotkey that cannot be registered never stops Tagalong from starting.** The only way to store an
+accelerator Windows refuses is to type it into Settings, so an app that refused to open because of
+one would leave you locked out of the window that fixes it, with the settings file as the only way
+back. Instead the app starts, the other three keys work, and the failure appears in the panel and in
+Settings naming which binding broke and what it was bound to. Correcting it takes effect
+immediately, with no restart.
+
 ### The two cost controls
 
 Both live in the settings window and both take effect on save, with no restart: they are read at the

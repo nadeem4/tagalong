@@ -93,3 +93,30 @@ describe('buildSettingsPatch', () => {
     expect(patch.avatar).toBeUndefined();
   });
 });
+
+describe('what a rejected save tells the user', () => {
+  it('names the field, not just that something was wrong', () => {
+    // A save that refuses with "invalid input" is the same lie as one that silently keeps
+    // a different value: the user cannot tell which of eight fields to change.
+    for (const bad of ['', 'lots', '-200', String(MAX_WINDOW_TEXT_CHARS + 1)]) {
+      let message = '';
+      try {
+        buildSettingsPatch({ ...values, windowTextBudget: bad });
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error);
+      }
+      expect(message.toLowerCase(), bad).toContain('window text budget');
+    }
+  });
+
+  it('says what would make it acceptable', () => {
+    let message = '';
+    try {
+      buildSettingsPatch({ ...values, windowTextBudget: 'lots' });
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toContain('1');
+    expect(message).toContain(String(MAX_WINDOW_TEXT_CHARS));
+  });
+});

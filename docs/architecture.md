@@ -288,8 +288,17 @@ neighbours in `Engine.boot`. A value captured at boot would make each of them a 
 what the user typed and changes nothing until the next launch, which is the worst kind of settings
 bug: the screen agrees with the user and the program does not.
 
-The hotkeys work the other way round, because a global accelerator is held by the OS rather than
-read per use. `HotkeyManager` owns what is currently registered and swaps only the accelerators that
+A hotkey that cannot be registered is reported, never fatal. `HotkeyManager` binds each accelerator
+independently, so one refusal costs only its own action, and `describeHotkeyProblems` turns the
+outcomes into a message naming the action rather than only the combination. That message is pushed to
+every open window on `IPC.hotkeyProblemEvent` and also returned by `getHostView`, so a window opened
+after the failure and a window already open both show it — and both stop showing it the moment the
+binding is corrected. Boot deliberately does not raise a modal for this: the only way to store a bad
+accelerator is to type it in Settings, and a modal before any window exists locks the user out of the
+one surface that could fix it.
+
+The hotkeys work the other way round from the sight settings, because a global accelerator is held by
+the OS rather than read per use. `HotkeyManager` owns what is currently registered and swaps only the accelerators that
 changed, and the settings save handler calls it. That one call is the whole of "without restart" for
 hotkeys, and it is covered by a smoke test rather than a unit test — every unit test injects a fake
 registrar and applies the bindings itself, which proves the manager rebinds and never that a save

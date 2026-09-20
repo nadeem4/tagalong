@@ -21,6 +21,7 @@ export const IPC = {
   sightPauseEvent: 'tagalong:sight-pause-event',
   getSightPaused: 'tagalong:get-sight-paused',
   toggleSightPause: 'tagalong:toggle-sight-pause',
+  hotkeyProblemEvent: 'tagalong:hotkey-problem-event',
 } as const;
 
 /**
@@ -73,6 +74,13 @@ export interface TagalongHostApi {
   getSightPaused(): Promise<boolean>;
   /** Fires whenever the user pauses or resumes sight, so the avatar can grey its eye. */
   onSightPause(handler: (paused: boolean) => void): () => void;
+  /**
+   * Fires when a hotkey fails to register, and again with null once it is fixed.
+   *
+   * A window that only read the problem on mount would keep showing it after the user
+   * corrected the binding, which is the same lie as never showing it at all.
+   */
+  onHotkeyProblem(handler: (problem: string | null) => void): () => void;
   /**
    * Flips sight off or on, returning the state it moved to.
    *

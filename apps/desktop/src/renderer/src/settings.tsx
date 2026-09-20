@@ -20,13 +20,36 @@ function Settings() {
   const [view, setView] = useState<HostView | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [status, setStatus] = useState('');
+  // A refused save has to look refused. Rendering it in the same muted style as "Saved."
+  // is how a user reads a rejection as a confirmation and walks away.
+  const [statusIsError, setStatusIsError] = useState(false);
 
   useEffect(() => {
     window.tagalongHost
       .getHostView()
       .then(setView)
-      .catch((error: unknown) => setStatus(String(error)));
+      .catch((error: unknown) => {
+        setStatus(String(error));
+        setStatusIsError(true);
+      });
   }, []);
+
+  // Saving a fixed accelerator re-registers it in main, which is where the outcome is
+  // known. Without this the window would keep showing the old failure next to the very
+  // field that just corrected it.
+  useEffect(
+    () =>
+      window.tagalongHost.onHotkeyProblem((problem) =>
+        setView((current) => {
+          if (current === null) return current;
+          // Rebuilt without the key rather than spread over: spreading `{}` for the
+          // fixed case would leave the stale error exactly where it is least welcome.
+          const { hotkeyError: _cleared, ...rest } = current;
+          return problem === null ? rest : { ...rest, hotkeyError: problem };
+        }),
+      ),
+    [],
+  );
 
   if (view === null) return <main className="settings">Loading…</main>;
 
@@ -60,8 +83,12 @@ function Settings() {
       setStatus(
         'Saved. Hotkeys and sight settings apply now; a new provider or key needs a restart.',
       );
+      setStatusIsError(false);
     } catch (error) {
+      // buildSettingsPatch throws with the field named, so this reaches the user as
+      // "Window text budget must be…" rather than a bare validation complaint.
       setStatus(error instanceof Error ? error.message : String(error));
+      setStatusIsError(true);
     }
   }
 
@@ -165,7 +192,14 @@ function Settings() {
           Engine {view.engineVersion} on 127.0.0.1:{settings.enginePort}. The key is encrypted with
           the OS keychain and never written in plain text.
         </p>
-        {status !== '' && <p className="settings__note">{status}</p>}
+        {status !== '' && (
+          <p
+            className={statusIsError ? 'settings__error' : 'settings__note'}
+            role={statusIsError ? 'alert' : 'status'}
+          >
+            {status}
+          </p>
+        )}
       </form>
     </main>
   );
