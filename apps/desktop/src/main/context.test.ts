@@ -7,7 +7,7 @@ import {
   captureAskSnapshot,
   capturePatch,
 } from './context';
-import type { Platform } from './platform/index';
+import type { DisplaysCapture, Platform } from './platform/index';
 
 function fakePlatform(overrides: Partial<Platform> = {}): Platform {
   return {
@@ -374,5 +374,245 @@ describe('a failed window enumeration', () => {
 
     expect(patch.windows).toHaveLength(1);
     expect(warnings).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 2B: the see-everything capture
+// ---------------------------------------------------------------------------
+
+const PNG = { base64: 'aGk=', width: 1568, height: 882 };
+
+function displayCapture(overrides: Partial<DisplaysCapture> = {}): DisplaysCapture {
+  return {
+    composite: PNG,
+    displays: [
+      {
+        id: 101,
+        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+        scaleFactor: 1,
+        primary: true,
+        focused: true,
+        blocked: null,
+        image: PNG,
+      },
+      {
+        id: 102,
+        bounds: { x: 1920, y: 0, width: 1920, height: 1080 },
+        scaleFactor: 1,
+        primary: false,
+        focused: false,
+        blocked: null,
+        image: PNG,
+      },
+    ],
+    ...overrides,
+  };
+}
+
+const ONE_WINDOW = [
+  {
+    id: 'w-1',
+    processName: 'Code.exe',
+    title: 'context.ts',
+    state: 'background' as const,
+    browser: false,
+    displayId: 102,
+  },
+];
+
+describe('captureAskSnapshot, full view', () => {
+  it('carries every display, the composite and the window inventory', async () => {
+    const platform = fakePlatform({
+      captureDisplays: async () => displayCapture(),
+      listWindows: async () => ({ windows: ONE_WINDOW }),
+    });
+
+    const { snapshot } = await captureAskSnapshot(platform, {
+      screenshot: false,
+      fullView: true,
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(snapshot.displays).toHaveLength(2);
+    expect(snapshot.composite?.mime).toBe('image/png');
+    expect(snapshot.windows).toHaveLength(1);
+  });
+
+  it('does not reach for displays or windows on the cheap ask', async () => {
+    // Ctrl+Shift+Space must stay cheap. Enumerating windows costs seconds, and a
+    // capture that quietly does it on every ask is the paper cut that makes the fast
+    // path stop feeling fast.
+    const captureDisplays = vi.fn();
+    const listWindows = vi.fn();
+    const platform = fakePlatform({ captureDisplays, listWindows });
+
+    await captureAskSnapshot(platform, { screenshot: false, exclusions: NOTHING_EXCLUDED });
+
+    expect(captureDisplays).not.toHaveBeenCalled();
+    expect(listWindows).not.toHaveBeenCalled();
+  });
+
+  it('reports the exclusion that blanked the focused display', async () => {
+    // The capture notice says why the pet cannot see. A full-view capture that blanks
+    // the screen the user is on has to announce it, or the refusal is invisible.
+    const platform = fakePlatform({
+      captureDisplays: async () =>
+        displayCapture({
+          displays: [
+            {
+              id: 101,
+              bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+              scaleFactor: 1,
+              primary: true,
+              focused: true,
+              blocked: { rule: 'processName', entry: '1Password.exe' },
+              image: PNG,
+            },
+          ],
+        }),
+      listWindows: async () => ({ windows: [] }),
+    });
+
+    const { blocked } = await captureAskSnapshot(platform, {
+      screenshot: false,
+      fullView: true,
+      exclusions: PASSWORD_MANAGER,
+    });
+
+    expect(blocked).toEqual({ rule: 'processName', entry: '1Password.exe' });
+  });
+
+  it('still produces a snapshot when the displays cannot be captured at all', async () => {
+    // Perception is best effort everywhere else; a thrown capturer must not cost the
+    // user the selection they highlighted before pressing the key.
+    const platform = fakePlatform({
+      captureDisplays: async () => {
+        throw new Error('desktopCapturer unavailable');
+      },
+      listWindows: async () => ({ windows: ONE_WINDOW }),
+    });
+
+    const { snapshot } = await captureAskSnapshot(platform, {
+      screenshot: false,
+      fullView: true,
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(snapshot.displays).toBeUndefined();
+    expect(snapshot.windows).toHaveLength(1);
+    expect(snapshot.selection).toBe('the highlighted paragraph');
+  });
+
+  it('omits an inventory that failed rather than passing off nothing as an empty desktop', async () => {
+    const platform = fakePlatform({
+      captureDisplays: async () => displayCapture(),
+      listWindows: async () => ({ windows: [], failure: 'no-output' as const }),
+    });
+
+    const { snapshot } = await captureAskSnapshot(platform, {
+      screenshot: false,
+      fullView: true,
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(snapshot.windows).toBeUndefined();
+  });
+
+  it('drops a display image the capturer could not produce', async () => {
+    const platform = fakePlatform({
+      captureDisplays: async () =>
+        displayCapture({
+          displays: [
+            {
+              id: 101,
+              bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+              scaleFactor: 1,
+              primary: true,
+              focused: true,
+              blocked: null,
+              image: null,
+            },
+          ],
+        }),
+      listWindows: async () => ({ windows: [] }),
+    });
+
+    const { snapshot } = await captureAskSnapshot(platform, {
+      screenshot: false,
+      fullView: true,
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(snapshot.displays?.[0]?.image).toBeUndefined();
+    expect(snapshot.displays?.[0]?.id).toBe(101);
+  });
+});
+
+describe('capturePatch, displays', () => {
+  it('answers the displays target the host advertises a capability for', async () => {
+    // DESKTOP_CAPABILITIES names `displays`, so the engine is entitled to ask for it.
+    // A host that advertises a capability and then ignores the target makes the engine
+    // call something that silently returns nothing, which reads as a broken pet.
+    const platform = fakePlatform({
+      captureDisplays: async () => displayCapture(),
+      listWindows: async () => ({ windows: [] }),
+    });
+
+    const { patch } = await capturePatch(platform, ['displays'], {
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(patch.displays).toHaveLength(2);
+    expect(patch.composite?.mime).toBe('image/png');
+  });
+
+  it('does not capture displays for a target that did not ask for them', async () => {
+    const captureDisplays = vi.fn();
+    await capturePatch(fakePlatform({ captureDisplays }), ['selection'], {
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(captureDisplays).not.toHaveBeenCalled();
+  });
+
+  it('reports the refusal when the focused display is blanked', async () => {
+    const platform = fakePlatform({
+      captureDisplays: async () =>
+        displayCapture({
+          displays: [
+            {
+              id: 101,
+              bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+              scaleFactor: 1,
+              primary: true,
+              focused: true,
+              blocked: { rule: 'processName', entry: '1Password.exe' },
+              image: PNG,
+            },
+          ],
+        }),
+    });
+
+    const { blocked } = await capturePatch(platform, ['displays'], {
+      exclusions: PASSWORD_MANAGER,
+    });
+
+    expect(blocked?.entry).toBe('1Password.exe');
+  });
+
+  it('warns rather than staying quiet when the displays cannot be read', async () => {
+    const platform = fakePlatform({
+      captureDisplays: async () => {
+        throw new Error('desktopCapturer unavailable');
+      },
+    });
+
+    const { patch, warnings } = await capturePatch(platform, ['displays'], {
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(patch.displays).toBeUndefined();
+    expect(warnings.join(' ')).toContain('displays');
   });
 });

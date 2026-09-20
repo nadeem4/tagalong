@@ -230,6 +230,26 @@ The host also degrades rather than dying. If the engine refuses to boot — the 
 API key stored — the app still starts, opens the settings window, and reports why; settings reads and
 writes fall back to `SettingsStore` directly so the user can fix the thing that blocked the boot.
 
+### The attach policy
+
+A full-view capture holds far more than fits in a prompt: one picture per display, a composite, and
+every open window. What actually rides along is decided in `assemblePrompt`, once, so no host has to
+know the rules.
+
+Two pictures by default. The composite leads — it is the map of how the monitors sit, and a reader
+makes sense of one screen faster having already seen where that screen is — then the display being
+worked on. Every other display is named in text with its id and size, for the pet to fetch by tool.
+Three monitors must not mean three images on every ask, and the test counts image blocks rather than
+trusting a comment.
+
+Each display line carries both its ordinal and its Electron id, because they serve different needs.
+The composite draws ordinals in its corners, since a ten-digit id costs seven glyphs of a five-pixel
+font and is unreadable at composite scale; `look_at_display` takes the id. Printing one without the
+other leaves the pet able to see a screen it cannot name, or name one it cannot see.
+
+`sightDetail` is the escape hatch, `focused` by default and `all` to attach every display. The
+default is the cheap one because the expensive one scales with hardware rather than with intent.
+
 ### The platform adapter
 
 Everything OS-specific sits behind `Platform` in `src/main/platform/`. `createPlatform` throws on any

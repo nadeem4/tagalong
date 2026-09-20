@@ -172,11 +172,26 @@ selection and the active window and opens the chat panel beside it, Escape or fo
 panel (unless a turn is still streaming), and the tray menu shows or hides the pets, opens settings,
 and quits.
 
-`Ctrl+Shift+S` does the same but also takes a screenshot of the active window. The two are separate
-on purpose: an image costs roughly 1,500 extra input tokens per question, so the everyday hotkey
-stays text-only. Both accelerators are editable in the settings window and rebind while the app runs
-— no restart — and an accelerator another application already owns is reported rather than silently
-dropped.
+`Ctrl+Shift+S` does the same but also takes a screenshot of the active window, and
+`Ctrl+Shift+Alt+S` captures everything: one picture per display, a composite laid out by monitor
+geometry, and a list of every window that is open.
+
+| Hotkey             | What rides along                                            | Roughly what it costs                       |
+| ------------------ | ----------------------------------------------------------- | ------------------------------------------- |
+| `Ctrl+Shift+Space` | Selection and the active window                             | text only                                   |
+| `Ctrl+Shift+S`     | Plus a screenshot of the active window                      | about 1,500 extra input tokens              |
+| `Ctrl+Shift+Alt+S` | Plus the composite, the focused display and the window list | about 3,200, and a few seconds to enumerate |
+
+Three keys rather than one with modifiers, because they differ in what they cost and the user is
+choosing the bill. A full-view capture attaches two pictures by default — the composite, which is
+the map of how the monitors sit, and the display being worked on — and names the others in text so
+the pet can fetch one by tool rather than everything by default. Three monitors must not mean three
+images on every ask. `sightDetail: "all"` in settings overrides that and attaches every display, for
+someone who would rather pay than ask twice.
+
+All three accelerators are editable in the settings window and rebind while the app runs — no
+restart — and an accelerator another application already owns is reported rather than silently
+dropped, without costing the other two.
 
 Capture is never silent. Every capture, including one a pet's own tool asked for, badges the avatar
 and updates the tray tooltip to say what was read and when. Before any screenshot the host checks the

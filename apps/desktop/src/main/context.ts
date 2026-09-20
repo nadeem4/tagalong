@@ -3,7 +3,7 @@ import { findCaptureBlock } from '@tagalong/core';
 import type { CaptureBlock } from '@tagalong/core';
 import { ContextSnapshot } from '@tagalong/protocol';
 import type { CaptureExclusions, ContextSnapshotPatch, PerceptionTarget } from '@tagalong/protocol';
-import type { ActiveWindowInfo, Platform } from './platform/index';
+import type { ActiveWindowInfo, DisplaysCapture, Platform } from './platform/index';
 
 /** What the desktop host tells the engine it can perceive. */
 export const DESKTOP_CAPABILITIES = [
@@ -33,6 +33,14 @@ export const MAX_SCREENSHOT_LONG_SIDE = 1568;
 export interface CaptureOptions {
   /** Screenshots are opt-in per capture: they cost ~1,500 extra input tokens each. */
   screenshot: boolean;
+  /**
+   * Phase 2B: every display, the composite, and the window inventory.
+   *
+   * Opt-in per capture for the same reason as the screenshot, and more so. Enumerating
+   * windows costs seconds of walking accessibility trees, and doing it on the cheap ask
+   * is what would make the fast path stop feeling fast.
+   */
+  fullView?: boolean;
   exclusions: CaptureExclusions;
 }
 
@@ -118,6 +126,76 @@ async function captureScreenshot(
   };
 }
 
+/**
+ * Turns a platform display capture into the snapshot's shape.
+ *
+ * `null` and absent are different on the way in and the same on the way out: the platform
+ * uses null for "no picture", the protocol omits the field. A null that survived would be
+ * an image block with no image, which providers reject.
+ */
+function toSnapshotDisplays(capture: DisplaysCapture): ContextSnapshot['displays'] {
+  return capture.displays.map((display) => ({
+    id: display.id,
+    bounds: display.bounds,
+    scaleFactor: display.scaleFactor,
+    primary: display.primary,
+    focused: display.focused,
+    ...(display.blocked === null ? {} : { blocked: display.blocked }),
+    ...(display.image === null
+      ? {}
+      : {
+          image: {
+            mime: 'image/png' as const,
+            base64: display.image.base64,
+            width: display.image.width,
+            height: display.image.height,
+          },
+        }),
+  }));
+}
+
+/**
+ * The full-view half of a capture: every display plus everything that is open.
+ *
+ * Both reads are best effort, like every other perception. A capturer that throws must
+ * not cost the user the selection they highlighted before pressing the key.
+ */
+async function captureFullView(
+  platform: Platform,
+  exclusions: CaptureExclusions,
+  options: { windows?: boolean } = {},
+): Promise<{ patch: ContextSnapshotPatch; blocked: CaptureBlock | null }> {
+  const wantsWindows = options.windows ?? true;
+  const [capture, inventory] = await Promise.all([
+    attempt('the displays', () => platform.captureDisplays(MAX_SCREENSHOT_LONG_SIDE, exclusions)),
+    wantsWindows ? attempt('the open windows', () => platform.listWindows(exclusions)) : null,
+  ]);
+
+  const patch: ContextSnapshotPatch = {};
+  if (capture !== null) {
+    patch.displays = toSnapshotDisplays(capture);
+    if (capture.composite !== null) {
+      patch.composite = {
+        mime: 'image/png',
+        base64: capture.composite.base64,
+        width: capture.composite.width,
+        height: capture.composite.height,
+      };
+    }
+  }
+  // An empty or failed enumeration stays out of the snapshot: a pet told the desktop has
+  // no windows on it reasons from that as though it had been observed.
+  if (inventory !== null && inventory.failure === undefined && inventory.windows.length > 0) {
+    patch.windows = inventory.windows;
+  }
+
+  // The notice says why the pet cannot see, and the screen the user is on is the one
+  // whose refusal they will notice. A blanked display elsewhere is already named in the
+  // context text and in the composite.
+  const focusedRefusal = capture?.displays.find((display) => display.focused)?.blocked ?? null;
+  return { patch, blocked: focusedRefusal };
+}
+
 /** Everything this host can see, packaged as the snapshot that rides along with an ask. */
 export async function captureAskSnapshot(
   platform: Platform,
@@ -132,6 +210,10 @@ export async function captureAskSnapshot(
     ? await captureScreenshot(platform, options.exclusions, window)
     : { blocked: null };
 
+  const full = options.fullView
+    ? await captureFullView(platform, options.exclusions)
+    : { patch: {}, blocked: null };
+
   return {
     snapshot: ContextSnapshot.parse({
       id: randomUUID(),
@@ -140,8 +222,9 @@ export async function captureAskSnapshot(
       ...(selection !== null && selection.length > 0 ? { selection } : {}),
       ...appOf(window),
       ...('screenshot' in shot && shot.screenshot ? { screenshot: shot.screenshot } : {}),
+      ...full.patch,
     }),
-    blocked: shot.blocked,
+    blocked: shot.blocked ?? full.blocked,
   };
 }
 
@@ -193,11 +276,22 @@ export async function capturePatch(
     }
   }
 
+  if (what.includes('displays')) {
+    const full = await captureFullView(platform, options.exclusions, { windows: false });
+    if (full.patch.displays === undefined) {
+      // The host advertises the `displays` capability, so a silent nothing here is the
+      // engine calling a method it was told would work and getting an empty answer.
+      warnings.push('the displays could not be captured');
+    }
+    Object.assign(patch, full.patch);
+    blocked = full.blocked;
+  }
+
   if (what.includes('activeWindow')) Object.assign(patch, appOf(window));
   if (what.includes('screenshot')) {
     const shot = await captureScreenshot(platform, options.exclusions, window);
     if (shot.screenshot) patch.screenshot = shot.screenshot;
-    blocked = shot.blocked;
+    blocked = shot.blocked ?? blocked;
   }
 
   return { patch, blocked, warnings };
