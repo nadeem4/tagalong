@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ContextSnapshot } from '@tagalong/protocol';
-import type { CaptureExclusions } from '@tagalong/protocol';
-import { MAX_SCREENSHOT_LONG_SIDE, captureAskSnapshot, capturePatch } from './context';
+import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
+import {
+  DESKTOP_CAPABILITIES,
+  MAX_SCREENSHOT_LONG_SIDE,
+  captureAskSnapshot,
+  capturePatch,
+} from './context';
 import type { Platform } from './platform/index';
 
 function fakePlatform(overrides: Partial<Platform> = {}): Platform {
@@ -18,6 +23,9 @@ function fakePlatform(overrides: Partial<Platform> = {}): Platform {
     // still satisfies Platform, and returns an empty capture so a test that reaches it by
     // accident fails on missing displays rather than on a missing method.
     captureDisplays: async () => ({ displays: [], composite: null }),
+    // Phase 2B. Empty by default so a test that reaches the enumeration without meaning
+    // to fails on a missing inventory rather than on invented windows.
+    listWindows: async () => [],
     ...overrides,
   };
 }
@@ -216,5 +224,85 @@ describe('capturePatch', () => {
     expect(captureActiveWindowImage).not.toHaveBeenCalled();
     expect(patch.screenshot).toBeUndefined();
     expect(blocked).toEqual({ rule: 'processName', entry: '1Password.exe' });
+  });
+});
+
+describe('the windows perception target', () => {
+  const inventory: WindowEntry[] = [
+    {
+      id: 'w-1',
+      processName: 'Code.exe',
+      title: 'context.ts — tagalong',
+      state: 'minimized',
+      displayId: 1,
+      browser: false,
+    },
+  ];
+
+  it('asks the platform for the inventory and puts it in the patch', async () => {
+    const platform = fakePlatform({ listWindows: async () => inventory });
+
+    const { patch } = await capturePatch(platform, ['windows'], {
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(patch.windows).toEqual(inventory);
+  });
+
+  it('does not enumerate windows when the engine did not ask for them', async () => {
+    // The enumeration spawns PowerShell. A text-only ask must not pay for it.
+    const listWindows = vi.fn(async () => inventory);
+    const platform = fakePlatform({ listWindows });
+
+    await capturePatch(platform, ['selection'], { exclusions: NOTHING_EXCLUDED });
+
+    expect(listWindows).not.toHaveBeenCalled();
+  });
+
+  it('hands the exclusion list down, so blocked windows are marked at the source', async () => {
+    const listWindows = vi.fn(async () => inventory);
+    const platform = fakePlatform({ listWindows });
+
+    await capturePatch(platform, ['windows'], { exclusions: PASSWORD_MANAGER });
+
+    expect(listWindows).toHaveBeenCalledWith(PASSWORD_MANAGER);
+  });
+
+  it('leaves windows out of the patch when the enumeration fails', async () => {
+    // Perception is best effort. A helper that will not run costs the inventory, not the
+    // ask behind it.
+    const platform = fakePlatform({
+      listWindows: async () => {
+        throw new Error('powershell is not available');
+      },
+    });
+
+    const { patch } = await capturePatch(platform, ['windows'], {
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(patch).not.toHaveProperty('windows');
+  });
+
+  it('omits an empty inventory rather than claiming the desktop is empty', async () => {
+    const platform = fakePlatform({ listWindows: async () => [] });
+
+    const { patch } = await capturePatch(platform, ['windows'], {
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(patch).not.toHaveProperty('windows');
+  });
+});
+
+describe('DESKTOP_CAPABILITIES', () => {
+  it('advertises that this host can enumerate and photograph every display', () => {
+    expect(DESKTOP_CAPABILITIES).toContain('displays');
+  });
+
+  it('does not advertise a text layer yet, which task 4 brings', () => {
+    // Advertising a capability the host cannot honour makes the engine call a method that
+    // will fail, which reads to the user as a broken pet rather than a missing feature.
+    expect(DESKTOP_CAPABILITIES).not.toContain('textLayer');
   });
 });

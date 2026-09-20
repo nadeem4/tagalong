@@ -1,10 +1,14 @@
+import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { clipboard, desktopCapturer, nativeImage, screen } from 'electron';
-import type { CaptureExclusions } from '@tagalong/protocol';
+import { buildInventory } from '@tagalong/core';
+import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
 import { captureActiveWindowImageWith } from './capture';
 import { captureDisplaysWith } from './displays';
 import type { DisplaysCapture } from './displays';
 import { captureSelectionWith } from './selection';
+import { LIST_WINDOWS_SCRIPT, runWindowHelper } from './window-helper';
+import { parseWindowList, placeOnDisplays } from './window-list';
 import type { ActiveWindowInfo, CapturedImage, Platform } from './index';
 
 /**
@@ -20,6 +24,15 @@ async function sendCopy(): Promise<void> {
   await keyboard.pressKey(Key.LeftControl, Key.C);
   await keyboard.releaseKey(Key.LeftControl, Key.C);
 }
+
+/**
+ * How long the window enumeration may take before partial output is used instead.
+ *
+ * The phase page asks for three seconds. Measured on a live twelve-window desktop the
+ * whole enumeration finished well inside it, and this read sits in front of a capture the
+ * user is waiting on.
+ */
+const WINDOW_HELPER_TIMEOUT_MS = 3_000;
 
 /** Windows adapter. Selection comes from the clipboard trick; page text needs the extension. */
 export class Win32Platform implements Platform {
@@ -56,6 +69,31 @@ export class Win32Platform implements Platform {
     );
   }
 
+  /**
+   * Enumerates every top-level window through the UI Automation helper.
+   *
+   * PowerShell is spawned rather than linked: the alternative is a native addon for the
+   * accessibility API, which would need building per Electron ABI and is a large
+   * dependency for a read that happens on demand. The helper carries its own timeout and
+   * returns partial output, so a window that will not answer costs some of the inventory
+   * rather than the ask behind it.
+   */
+  async listWindows(exclusions: CaptureExclusions): Promise<WindowEntry[]> {
+    const stdout = await runWindowHelper(
+      () =>
+        spawn(
+          'powershell.exe',
+          ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', '-'],
+          { windowsHide: true },
+        ),
+      LIST_WINDOWS_SCRIPT,
+      WINDOW_HELPER_TIMEOUT_MS,
+    );
+
+    const placed = placeOnDisplays(parseWindowList(stdout), screen);
+    return buildInventory(placed, exclusions);
+  }
+
   async captureDisplays(
     maxLongSide: number,
     exclusions: CaptureExclusions,
@@ -74,6 +112,7 @@ export class Win32Platform implements Platform {
         },
         desktopCapturer,
         getActiveWindow: () => this.getActiveWindow(),
+        listWindows: () => this.listWindows(exclusions),
         exclusions,
         // The one Electron call the composite makes. Everything upstream of it is buffer
         // arithmetic the unit tests drive with no display attached.

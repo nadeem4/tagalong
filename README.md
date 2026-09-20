@@ -9,12 +9,21 @@ behalf through MCP tools you approve. They never take over your mouse or keyboar
 - Local design copy: [docs/specs/2026-09-11-tagalong-design.md](docs/specs/2026-09-11-tagalong-design.md)
 - Architecture: [docs/architecture.md](docs/architecture.md)
 
-**Status: Phase 0 (Setup) and Phase 1 (Foundation) are complete. Phase 2 (Sight) is next.**
+**Status: Phases 0 (Setup), 1 (Foundation) and 2 (Sight) are complete. Phase 2B (Full View) is in
+progress.**
 
 Phase 1 shipped the whole text path end to end on Windows: the protocol package, the engine with
 SQLite-backed conversations, the Anthropic and fake brain providers, the loopback JSON-RPC server with
 pairing, the shared React components, and the Electron host with a tray, a global hotkey, a draggable
 avatar, a chat panel, and a settings window.
+
+Phase 2 added sight: screenshots of the active window, vision in the prompt, the capture exclusion
+list, and a visible indicator on every capture.
+
+Phase 2B is widening that to everything the user cannot see — every display at once, and every open
+window including the ones behind others and the ones minimized to the taskbar. Landed so far:
+multi-display capture with a composite laid out by monitor geometry, the protocol schemas, and the
+window inventory.
 
 ## Repository layout
 
@@ -46,6 +55,7 @@ tagalong/
       index.ts                      # the public facade hosts import
       engine.ts                     # Engine.boot: wires the parts together and listens
       conversation/                 # ConversationRunner, prompt-assembler
+      perception/                   # exclusions, retention, tools, inventory
       memory/                       # db.ts (numbered migrations), store.ts (ConversationStore)
       pets/registry.ts              # PetRegistry, the default pet Scout
       providers/                    # brain.ts, anthropic.ts, fake.ts, registry.ts, errors.ts
@@ -63,6 +73,8 @@ tagalong/
       e2e/smoke.spec.ts
       src/main/                     # index.ts, engine-host.ts, engine-client.ts, context.ts,
                                     # hotkeys.ts, secret-store.ts, tray-icon.ts, platform/, windows/
+      src/main/platform/            # capture, downscale, composite, canvas, label, displays,
+                                    # window-helper, window-list, selection, win32
       src/preload/index.ts          # exposes window.tagalong and window.tagalongHost
       src/renderer/                 # avatar/panel/settings HTML, src/*.tsx, app.css
       src/shared/ipc.ts             # IPC channel names and the host-only API type

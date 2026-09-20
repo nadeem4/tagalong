@@ -280,3 +280,86 @@ describe('assemblePrompt messages', () => {
     expect(lastText(request)).toContain(CONTEXT_LABELS.selection);
   });
 });
+
+describe('assemblePrompt window inventory', () => {
+  const windows = [
+    {
+      id: 'w-1',
+      processName: 'Code.exe',
+      title: 'runner.ts — tagalong',
+      state: 'minimized' as const,
+      displayId: 1,
+      browser: false,
+    },
+    {
+      id: 'w-2',
+      processName: 'chrome.exe',
+      title: 'Zod docs',
+      state: 'foreground' as const,
+      displayId: 1,
+      browser: true,
+    },
+  ];
+
+  it('attaches the inventory as text on a capture that carries one', () => {
+    const request = assemblePrompt({
+      pet,
+      settings,
+      history: [userMessage('what is open')],
+      snapshot: snapshotWithEverything({ windows }),
+    });
+
+    expect(lastText(request)).toContain(CONTEXT_LABELS.windows);
+    expect(lastText(request)).toContain('w-1');
+    expect(lastText(request)).toContain('w-2');
+  });
+
+  it('says a window is minimized, which is the part the user cannot see', () => {
+    const request = assemblePrompt({
+      pet,
+      settings,
+      history: [userMessage('what is open')],
+      snapshot: snapshotWithEverything({ windows }),
+    });
+
+    expect(lastText(request)).toContain('minimized');
+  });
+
+  it('carries no window text, only the list', () => {
+    // The whole cost argument: the inventory is cheap because it says what is open, not
+    // what is in it. The pet spends a tool call on the one window it wants.
+    const request = assemblePrompt({
+      pet,
+      settings,
+      history: [userMessage('what is open')],
+      snapshot: snapshotWithEverything({ windows }),
+    });
+
+    expect(lastText(request)).toContain('read_window_text');
+  });
+
+  it('leaves the section out entirely when no inventory was captured', () => {
+    const request = assemblePrompt({
+      pet,
+      settings,
+      history: [userMessage('hello')],
+      snapshot: snapshotWithEverything(),
+    });
+
+    expect(lastText(request)).not.toContain(CONTEXT_LABELS.windows);
+  });
+
+  it('leaves the section out for an empty inventory rather than saying nothing is open', () => {
+    // An empty list means the enumeration failed or was not asked for, not that the
+    // desktop is empty. Telling the pet "no windows are open" would be a lie it would
+    // then reason from.
+    const request = assemblePrompt({
+      pet,
+      settings,
+      history: [userMessage('hello')],
+      snapshot: snapshotWithEverything({ windows: [] }),
+    });
+
+    expect(lastText(request)).not.toContain(CONTEXT_LABELS.windows);
+  });
+});

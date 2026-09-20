@@ -24,7 +24,7 @@ export type { CaptureBlock };
  * include the extension. Folding both away is what makes an exclusion list a user can
  * hand-edit actually work.
  */
-function normalizeProcessName(name: string): string {
+export function normalizeProcessName(name: string): string {
   return name
     .trim()
     .toLowerCase()
