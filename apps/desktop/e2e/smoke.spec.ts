@@ -263,3 +263,41 @@ test('a tool call travels the real socket and the real host answers it', async (
   // as much a failure as silence: the pet would tell the user it cannot see their windows.
   expect(result.ok).toBe(true);
 });
+
+/**
+ * The test that catches a pause that does not pause.
+ *
+ * Every unit test in this repo injects a fake platform, and the gate is applied to the
+ * real one in `start()`. So the whole suite passes with the gating removed — verified by
+ * deleting `gateSight` from `start()` and watching 761 tests stay green. A privacy
+ * control whose failure mode is silence needs a check that runs the real wiring.
+ */
+test('pausing sight refuses a real capture, and resuming restores it', async () => {
+  const panel = await windowFor('panel');
+
+  const running = await panel.evaluate(() => window.tagalongHost.getSightPaused());
+  expect(running, 'sight should start running').toBe(false);
+
+  const before = await panel.evaluate(() =>
+    window.tagalong.capture(['screenshot', 'activeWindow']),
+  );
+  expect(before, 'a capture should work before pausing').not.toBeNull();
+
+  const paused = await panel.evaluate(() => window.tagalongHost.toggleSightPause());
+  expect(paused, 'the toggle should report the state it moved to').toBe(true);
+  expect(await panel.evaluate(() => window.tagalongHost.getSightPaused())).toBe(true);
+
+  // Null is how the host says it did not look. If the gate is not wired in, a real
+  // screenshot comes back here and this line is the only thing in the repo that notices.
+  const during = await panel.evaluate(() => window.tagalong.capture(['screenshot']));
+  expect(during, 'a capture while paused must be refused, not taken').toBeNull();
+
+  const inventory = await panel.evaluate(() => window.tagalong.capture(['windows']));
+  expect(inventory, 'the window inventory must be refused while paused').toBeNull();
+
+  await panel.evaluate(() => window.tagalongHost.toggleSightPause());
+  expect(await panel.evaluate(() => window.tagalongHost.getSightPaused())).toBe(false);
+
+  const after = await panel.evaluate(() => window.tagalong.capture(['screenshot']));
+  expect(after, 'resuming must restore capture, or pause is a one-way door').not.toBeNull();
+});

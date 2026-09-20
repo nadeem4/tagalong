@@ -4,6 +4,7 @@ import type { CaptureBlock } from '@tagalong/core';
 import { ContextSnapshot } from '@tagalong/protocol';
 import type { CaptureExclusions, ContextSnapshotPatch, PerceptionTarget } from '@tagalong/protocol';
 import type { ActiveWindowInfo, DisplaysCapture, Platform } from './platform/index';
+import { isSightPaused } from './platform/sight-gate';
 
 /** What the desktop host tells the engine it can perceive. */
 export const DESKTOP_CAPABILITIES = [
@@ -47,11 +48,21 @@ export interface CaptureOptions {
 export interface AskCapture {
   snapshot: ContextSnapshot;
   blocked: CaptureBlock | null;
+  /**
+   * True when the user has sight turned off, which is not the same fact as `blocked`.
+   *
+   * "You turned sight off" and "this app is on your exclusion list" are different
+   * sentences and the user fixes them differently, so the two never collapse into one
+   * flag. Both being false with an empty snapshot means the read simply found nothing.
+   */
+  paused: boolean;
 }
 
 export interface PatchCapture {
   patch: ContextSnapshotPatch;
   blocked: CaptureBlock | null;
+  /** True when sight is paused. Distinct from `blocked`, and from an empty patch. */
+  paused: boolean;
   /**
    * Things that went wrong quietly enough that nothing else would have said so.
    *
@@ -81,8 +92,30 @@ async function attempt<T>(what: string, read: () => Promise<T>): Promise<T | nul
   try {
     return await read();
   } catch (error) {
+    // A pause is a decision the user made, not a failure, and it is the one thing here
+    // that must not be swallowed. Treating it as best effort would turn "you turned sight
+    // off" into an empty capture indistinguishable from a quiet screen — the exact shape
+    // that let four broken reads ship earlier in this phase.
+    if (isSightPaused(error)) throw error;
     console.warn(`[context] could not read ${what}:`, error);
     return null;
+  }
+}
+
+/**
+ * Runs a read that may be refused by the pause, reporting which happened.
+ *
+ * The pause is caught once per capture path rather than per read, so a paused capture is
+ * one fact about the whole attempt instead of a flag each target sets independently.
+ */
+async function unlessPaused<T>(
+  read: () => Promise<T>,
+): Promise<{ value: T | null; paused: boolean }> {
+  try {
+    return { value: await read(), paused: false };
+  } catch (error) {
+    if (isSightPaused(error)) return { value: null, paused: true };
+    throw error;
   }
 }
 
@@ -201,18 +234,22 @@ export async function captureAskSnapshot(
   platform: Platform,
   options: CaptureOptions,
 ): Promise<AskCapture> {
-  const [selection, window] = await Promise.all([
-    attempt('the selection', () => platform.captureSelection()),
-    attempt('the active window', () => platform.getActiveWindow()),
-  ]);
+  const selection = await attempt('the selection', () => platform.captureSelection());
+  // Every screen read sits behind one pause check, so a paused capture is one fact about
+  // the attempt rather than a flag each target sets for itself.
+  const seen = await unlessPaused(async () => {
+    const window = await attempt('the active window', () => platform.getActiveWindow());
 
-  const shot = options.screenshot
-    ? await captureScreenshot(platform, options.exclusions, window)
-    : { blocked: null };
+    const shot = options.screenshot
+      ? await captureScreenshot(platform, options.exclusions, window)
+      : { blocked: null };
 
-  const full = options.fullView
-    ? await captureFullView(platform, options.exclusions)
-    : { patch: {}, blocked: null };
+    const full = options.fullView
+      ? await captureFullView(platform, options.exclusions)
+      : { patch: {}, blocked: null };
+
+    return { window, shot, full };
+  });
 
   return {
     snapshot: ContextSnapshot.parse({
@@ -220,11 +257,14 @@ export async function captureAskSnapshot(
       capturedAt: new Date().toISOString(),
       host: 'desktop',
       ...(selection !== null && selection.length > 0 ? { selection } : {}),
-      ...appOf(window),
-      ...('screenshot' in shot && shot.screenshot ? { screenshot: shot.screenshot } : {}),
-      ...full.patch,
+      ...appOf(seen.value?.window ?? null),
+      ...(seen.value?.shot && 'screenshot' in seen.value.shot && seen.value.shot.screenshot
+        ? { screenshot: seen.value.shot.screenshot }
+        : {}),
+      ...(seen.value?.full.patch ?? {}),
     }),
-    blocked: shot.blocked ?? full.blocked,
+    blocked: seen.value === null ? null : (seen.value.shot.blocked ?? seen.value.full.blocked),
+    paused: seen.paused,
   };
 }
 
@@ -250,49 +290,55 @@ export async function capturePatch(
     if (clipboard !== null) patch.clipboard = clipboard;
   }
 
-  // Read once and share it: the exclusion check and the `app` field want the same window,
-  // and asking twice could see two different foreground windows.
-  const needsWindow = what.includes('activeWindow') || what.includes('screenshot');
-  const window = needsWindow
-    ? await attempt('the active window', () => platform.getActiveWindow())
-    : null;
+  // Everything from here reads the screen, so it sits behind one pause check. A refused
+  // capture must not also report the warnings a failed one would: training the user to
+  // ignore a warning they caused on purpose is how the real ones stop being read.
+  const gated = await unlessPaused(async () => {
+    // Read once and share it: the exclusion check and the `app` field want the same window,
+    // and asking twice could see two different foreground windows.
+    const needsWindow = what.includes('activeWindow') || what.includes('screenshot');
+    const window = needsWindow
+      ? await attempt('the active window', () => platform.getActiveWindow())
+      : null;
 
-  if (what.includes('windows')) {
-    const inventory = await attempt('the open windows', () =>
-      platform.listWindows(options.exclusions),
-    );
-    // The inventory is still omitted from the snapshot when it is empty — a pet told the
-    // desktop has no windows on it will reason from that. What changed is that the
-    // omission is no longer silent: an empty list is a failure, and staying quiet about
-    // it is what let a completely broken enumeration ship unnoticed.
-    if (inventory === null) {
-      warnings.push('the window list could not be read at all');
-    } else if (inventory.failure !== undefined) {
-      const complaint = ENUMERATION_COMPLAINTS[inventory.failure] ?? 'the window list failed';
-      warnings.push(complaint);
-      console.warn(`[context] ${complaint}`);
-    } else if (inventory.windows.length > 0) {
-      patch.windows = inventory.windows;
+    if (what.includes('windows')) {
+      const inventory = await attempt('the open windows', () =>
+        platform.listWindows(options.exclusions),
+      );
+      // The inventory is still omitted from the snapshot when it is empty — a pet told the
+      // desktop has no windows on it will reason from that. What changed is that the
+      // omission is no longer silent: an empty list is a failure, and staying quiet about
+      // it is what let a completely broken enumeration ship unnoticed.
+      if (inventory === null) {
+        warnings.push('the window list could not be read at all');
+      } else if (inventory.failure !== undefined) {
+        const complaint = ENUMERATION_COMPLAINTS[inventory.failure] ?? 'the window list failed';
+        warnings.push(complaint);
+        console.warn(`[context] ${complaint}`);
+      } else if (inventory.windows.length > 0) {
+        patch.windows = inventory.windows;
+      }
     }
-  }
 
-  if (what.includes('displays')) {
-    const full = await captureFullView(platform, options.exclusions, { windows: false });
-    if (full.patch.displays === undefined) {
-      // The host advertises the `displays` capability, so a silent nothing here is the
-      // engine calling a method it was told would work and getting an empty answer.
-      warnings.push('the displays could not be captured');
+    if (what.includes('displays')) {
+      const full = await captureFullView(platform, options.exclusions, { windows: false });
+      if (full.patch.displays === undefined) {
+        // The host advertises the `displays` capability, so a silent nothing here is the
+        // engine calling a method it was told would work and getting an empty answer.
+        warnings.push('the displays could not be captured');
+      }
+      Object.assign(patch, full.patch);
+      blocked = full.blocked;
     }
-    Object.assign(patch, full.patch);
-    blocked = full.blocked;
-  }
 
-  if (what.includes('activeWindow')) Object.assign(patch, appOf(window));
-  if (what.includes('screenshot')) {
-    const shot = await captureScreenshot(platform, options.exclusions, window);
-    if (shot.screenshot) patch.screenshot = shot.screenshot;
-    blocked = shot.blocked ?? blocked;
-  }
+    if (what.includes('activeWindow')) Object.assign(patch, appOf(window));
+    if (what.includes('screenshot')) {
+      const shot = await captureScreenshot(platform, options.exclusions, window);
+      if (shot.screenshot) patch.screenshot = shot.screenshot;
+      blocked = shot.blocked ?? blocked;
+    }
+    return null;
+  });
 
-  return { patch, blocked, warnings };
+  return { patch, blocked, warnings, paused: gated.paused };
 }

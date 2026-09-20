@@ -24,6 +24,7 @@ export const SETTINGS_DEFAULTS = {
     ask: 'CommandOrControl+Shift+Space',
     look: 'CommandOrControl+Shift+S',
     seeEverything: 'CommandOrControl+Shift+Alt+S',
+    pauseSight: 'CommandOrControl+Shift+Alt+P',
   },
   avatar: { x: null, y: null },
   /**
@@ -157,6 +158,14 @@ const settingsFields = {
     look: z.string().min(1).optional(),
     /** Optional for the same reason as `look`, and for the same settings files. */
     seeEverything: z.string().min(1).optional(),
+    /**
+     * Turns all sight off and on again. Optional for the same reason as its neighbours.
+     *
+     * The tray carries the same action, so a settings file that never names this key, or
+     * an accelerator another application already owns, still leaves the user a way to
+     * blind the pet. That matters more here than for the other three.
+     */
+    pauseSight: z.string().min(1).optional(),
   }),
   /** Remembered avatar position; null means "dock to the default edge". */
   avatar: z.object({ x: z.number().nullable(), y: z.number().nullable() }),

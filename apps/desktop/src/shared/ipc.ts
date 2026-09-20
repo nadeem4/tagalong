@@ -18,6 +18,9 @@ export const IPC = {
   hidePanel: 'tagalong:panel:hide',
   togglePanel: 'tagalong:panel:toggle',
   captureEvent: 'tagalong:capture-event',
+  sightPauseEvent: 'tagalong:sight-pause-event',
+  getSightPaused: 'tagalong:get-sight-paused',
+  toggleSightPause: 'tagalong:toggle-sight-pause',
 } as const;
 
 /**
@@ -35,6 +38,13 @@ export interface CaptureNotice {
   message: string;
   /** Set when an exclusion rule refused the screenshot. Names the rule, nothing else. */
   blocked?: CaptureBlock;
+  /**
+   * Set when sight was paused, so nothing was read at all.
+   *
+   * Separate from `blocked` because the two are fixed differently: an exclusion by
+   * editing a list, a pause by pressing a key.
+   */
+  paused?: boolean;
 }
 
 /** What the settings window needs to render. The key itself never comes back out. */
@@ -59,6 +69,19 @@ export interface TagalongHostApi {
   /** Fires on every capture the host makes, so the avatar can badge it and the panel can
    *  show why a capture was refused. */
   onCapture(handler: (notice: CaptureNotice) => void): () => void;
+  /** The current pause state, for a window that opened after the last toggle. */
+  getSightPaused(): Promise<boolean>;
+  /** Fires whenever the user pauses or resumes sight, so the avatar can grey its eye. */
+  onSightPause(handler: (paused: boolean) => void): () => void;
+  /**
+   * Flips sight off or on, returning the state it moved to.
+   *
+   * The shipped surfaces are the hotkey and the tray item; this exists because a window
+   * needs it too — settings will offer the toggle, and the smoke test drives the real
+   * gate through it, which is the only check in the repo that fails when the gate is
+   * left unwired.
+   */
+  toggleSightPause(): Promise<boolean>;
   getHostView(): Promise<HostView>;
   saveSettings(patch: SettingsPatch): Promise<Settings>;
   saveApiKey(apiKey: string): Promise<void>;

@@ -7,8 +7,15 @@ import { captureNotice, captureTooltip } from './capture-notice';
 import { captureAskSnapshot, capturePatch } from './context';
 import { ANTHROPIC_KEY, startEngineHost } from './engine-host';
 import type { EngineHost } from './engine-host';
-import { DEFAULT_LOOK_HOTKEY, DEFAULT_SEE_EVERYTHING_HOTKEY, HotkeyManager } from './hotkeys';
+import {
+  DEFAULT_LOOK_HOTKEY,
+  DEFAULT_PAUSE_SIGHT_HOTKEY,
+  DEFAULT_SEE_EVERYTHING_HOTKEY,
+  HotkeyManager,
+} from './hotkeys';
 import { createPlatform } from './platform/index';
+import { gateSight } from './platform/sight-gate';
+import { SightPause } from './sight-pause';
 import type { Platform } from './platform/index';
 import { SafeStorageSecretStore } from './secret-store';
 import { createTrayIcon } from './tray-icon';
@@ -38,6 +45,8 @@ interface Desktop {
   activeTurns: Set<string>;
   hotkeys: HotkeyManager;
   hotkeyError: string | null;
+  /** Whether the user has sight turned off. Read by the platform gate on every read. */
+  sightPause: SightPause;
 }
 
 let desktop: Desktop | null = null;
@@ -72,7 +81,11 @@ app.on('before-quit', () => {
 });
 
 async function start(): Promise<void> {
-  const platform = createPlatform();
+  const sightPause = new SightPause();
+  // Gated at the source, so every present and future reader is covered by construction.
+  // Nothing downstream is handed the ungated adapter, which is what makes forgetting to
+  // consult the pause impossible rather than merely discouraged.
+  const platform = gateSight(createPlatform(), () => sightPause.paused);
   const dataDir = app.getPath('userData');
   const secrets = new SafeStorageSecretStore(dataDir);
   const settingsStore = new SettingsStore(dataDir);
@@ -114,9 +127,21 @@ async function start(): Promise<void> {
       onAsk: () => void openPanelWithContext({ screenshot: false }),
       onLook: () => void openPanelWithContext({ screenshot: true }),
       onSeeEverything: () => void openPanelWithContext({ screenshot: false, fullView: true }),
+      onPauseSight: () => toggleSightPause(),
     }),
     hotkeyError: null,
+    sightPause,
   };
+
+  // The avatar greys its eye and the tray shows a checkmark, so both follow one state
+  // rather than each remembering to ask.
+  sightPause.onChange((paused) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send(IPC.sightPauseEvent, paused);
+    }
+    desktop?.tray.setContextMenu(buildTrayMenu());
+    desktop?.tray.setToolTip(paused ? 'Tagalong — sight is paused' : 'Tagalong');
+  });
 
   registerIpc();
 
@@ -159,6 +184,7 @@ function applyHotkeys(settings: Settings): string | null {
     ask: settings.hotkeys.ask,
     look: settings.hotkeys.look ?? DEFAULT_LOOK_HOTKEY,
     seeEverything: settings.hotkeys.seeEverything ?? DEFAULT_SEE_EVERYTHING_HOTKEY,
+    pauseSight: settings.hotkeys.pauseSight ?? DEFAULT_PAUSE_SIGHT_HOTKEY,
   });
 
   const refused = outcomes
@@ -199,28 +225,48 @@ function showPets(): void {
   }
 }
 
+/**
+ * Flips sight off or on, from either the hotkey or the tray.
+ *
+ * The tray carries the same action as the hotkey because this is the one hotkey whose
+ * loss matters: a user who needs to blind the pet right now must not first discover that
+ * something else on their machine owns the combination.
+ */
+function toggleSightPause(): boolean {
+  return desktop?.sightPause.toggle() ?? false;
+}
+
+/** Rebuilt whenever pause flips, so the checkmark cannot drift from the real state. */
+function buildTrayMenu(): Menu {
+  return Menu.buildFromTemplate([
+    {
+      label: 'Show or hide pets',
+      click: () => {
+        if (desktop?.avatar === null || desktop === null) return;
+        if (desktop.avatar?.isVisible() === true) {
+          desktop.avatar.hide();
+          desktop.panel?.hide();
+        } else {
+          desktop.avatar?.show();
+        }
+      },
+    },
+    {
+      label: 'Pause sight',
+      type: 'checkbox',
+      checked: desktop?.sightPause.paused ?? false,
+      click: () => toggleSightPause(),
+    },
+    { label: 'Settings', click: openSettings },
+    { type: 'separator' },
+    { label: 'Quit', click: () => app.quit() },
+  ]);
+}
+
 function createTray(): Tray {
   const tray = new Tray(createTrayIcon());
   tray.setToolTip('Tagalong');
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      {
-        label: 'Show or hide pets',
-        click: () => {
-          if (desktop?.avatar === null || desktop === null) return;
-          if (desktop.avatar?.isVisible() === true) {
-            desktop.avatar.hide();
-            desktop.panel?.hide();
-          } else {
-            desktop.avatar?.show();
-          }
-        },
-      },
-      { label: 'Settings', click: openSettings },
-      { type: 'separator' },
-      { label: 'Quit', click: () => app.quit() },
-    ]),
-  );
+  tray.setContextMenu(buildTrayMenu());
   tray.on('click', () => void openPanelWithContext({ screenshot: false }));
   return tray;
 }
@@ -265,7 +311,7 @@ async function openPanelWithContext(options: {
 }): Promise<void> {
   if (desktop === null || desktop.panel === null || desktop.avatar === null) return;
 
-  const { snapshot, blocked } = await captureAskSnapshot(desktop.platform, {
+  const { snapshot, blocked, paused } = await captureAskSnapshot(desktop.platform, {
     screenshot: options.screenshot,
     ...(options.fullView === undefined ? {} : { fullView: options.fullView }),
     exclusions: desktop.settings.captureExclusions,
@@ -279,6 +325,7 @@ async function openPanelWithContext(options: {
       at: new Date(),
       screenshot: options.screenshot || options.fullView === true,
       blocked,
+      paused,
     }),
   );
   desktop.panel.webContents.send(IPC.contextEvent, snapshot);
@@ -294,13 +341,15 @@ async function captureForPanel(
   current: Desktop,
   targets: readonly PerceptionTarget[],
 ): Promise<ContextSnapshot | null> {
-  const { patch, blocked } = await capturePatch(current.platform, targets, {
+  const { patch, blocked, paused } = await capturePatch(current.platform, targets, {
     exclusions: current.settings.captureExclusions,
   });
   announceCapture(
-    captureNotice({ at: new Date(), screenshot: targets.includes('screenshot'), blocked }),
+    captureNotice({ at: new Date(), screenshot: targets.includes('screenshot'), blocked, paused }),
   );
-  if (blocked !== null) return null;
+  // Null is how the panel learns to say why it is blind. Paused and blocked are different
+  // sentences, and the notice above carries which one it was.
+  if (blocked !== null || paused) return null;
 
   const snapshot = ContextSnapshot.parse({
     id: randomUUID(),
@@ -354,6 +403,13 @@ function registerIpc(): void {
   });
 
   ipcMain.handle(IPC.getContext, () => required().pendingSnapshot);
+  // A window that opened after the last toggle has missed the event, and an avatar that
+  // shows sight running while it is paused is the one lie this feature cannot afford.
+  ipcMain.handle(IPC.getSightPaused, () => required().sightPause.paused);
+  ipcMain.handle(IPC.toggleSightPause, () => {
+    required();
+    return toggleSightPause();
+  });
 
   ipcMain.handle(IPC.capture, async (_event, targets: PerceptionTarget[]) =>
     captureForPanel(required(), targets),

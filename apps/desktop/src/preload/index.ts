@@ -37,6 +37,13 @@ const host: TagalongHostApi = {
     ipcRenderer.on(IPC.captureEvent, listener);
     return () => void ipcRenderer.off(IPC.captureEvent, listener);
   },
+  getSightPaused: () => ipcRenderer.invoke(IPC.getSightPaused) as Promise<boolean>,
+  onSightPause: (handler) => {
+    const listener = (_event: IpcRendererEvent, paused: boolean): void => handler(paused);
+    ipcRenderer.on(IPC.sightPauseEvent, listener);
+    return () => void ipcRenderer.off(IPC.sightPauseEvent, listener);
+  },
+  toggleSightPause: () => ipcRenderer.invoke(IPC.toggleSightPause) as Promise<boolean>,
   getHostView: () => ipcRenderer.invoke(IPC.hostView) as Promise<HostView>,
   saveSettings: (patch: SettingsPatch) => ipcRenderer.invoke(IPC.saveSettings, patch),
   saveApiKey: (apiKey: string) => ipcRenderer.invoke(IPC.saveApiKey, apiKey) as Promise<void>,

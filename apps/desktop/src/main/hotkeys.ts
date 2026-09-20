@@ -21,6 +21,19 @@ export const DEFAULT_LOOK_HOTKEY = 'CommandOrControl+Shift+S';
  */
 export const DEFAULT_SEE_EVERYTHING_HOTKEY = 'CommandOrControl+Shift+Alt+S';
 
+/**
+ * Turns all sight off and on again.
+ *
+ * Paired with the full-view key rather than given an unrelated combination: the key that
+ * shows the pet everything and the key that blinds it are the two halves of one decision,
+ * and a user reaching for the second is usually reacting to the first.
+ *
+ * This is the one hotkey whose loss matters, so the tray carries the same action. A user
+ * who needs to blind the pet right now must not first have to find out that something
+ * else on their machine already owns this combination.
+ */
+export const DEFAULT_PAUSE_SIGHT_HOTKEY = 'CommandOrControl+Shift+Alt+P';
+
 /** The part of Electron globalShortcut this module uses, so tests can supply their own. */
 export interface HotkeyRegistrar {
   register(accelerator: string, callback: () => void): boolean;
@@ -40,6 +53,7 @@ export interface HotkeyBindings {
   ask: string;
   look: string;
   seeEverything: string;
+  pauseSight: string;
 }
 
 export interface RegisterHotkeyOptions {
@@ -81,6 +95,7 @@ export interface HotkeyManagerOptions {
   onAsk: () => void;
   onLook: () => void;
   onSeeEverything: () => void;
+  onPauseSight: () => void;
   registrar?: HotkeyRegistrar;
 }
 
@@ -97,7 +112,12 @@ export interface HotkeyManagerOptions {
  */
 export class HotkeyManager {
   readonly #registrar: HotkeyRegistrar;
-  readonly #triggers: { ask: () => void; look: () => void; seeEverything: () => void };
+  readonly #triggers: {
+    ask: () => void;
+    look: () => void;
+    seeEverything: () => void;
+    pauseSight: () => void;
+  };
   /** Accelerators currently held by this process, keyed by action. */
   readonly #bound = new Map<keyof HotkeyBindings, string>();
 
@@ -107,12 +127,13 @@ export class HotkeyManager {
       ask: options.onAsk,
       look: options.onLook,
       seeEverything: options.onSeeEverything,
+      pauseSight: options.onPauseSight,
     };
   }
 
-  /** Applies the bindings, one outcome per action in ask, look, see-everything order. */
+  /** Applies the bindings, one outcome per action in ask, look, see-everything, pause order. */
   apply(bindings: HotkeyBindings): HotkeyOutcome[] {
-    return (['ask', 'look', 'seeEverything'] as const).map((action) =>
+    return (['ask', 'look', 'seeEverything', 'pauseSight'] as const).map((action) =>
       this.#bind(action, bindings[action]),
     );
   }

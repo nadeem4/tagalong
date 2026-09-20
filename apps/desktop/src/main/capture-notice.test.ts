@@ -69,3 +69,49 @@ describe('captureTooltip', () => {
     expect(captureTooltip(notice)).toBe('Tagalong did not capture at 09:05 — blocked in this app');
   });
 });
+
+describe('a notice for a paused capture', () => {
+  it('says sight is off and how to turn it back on', () => {
+    const notice = captureNotice({
+      at: new Date('2026-09-20T14:05:00Z'),
+      screenshot: true,
+      paused: true,
+    });
+
+    expect(notice.paused).toBe(true);
+    expect(notice.message).toMatch(/paused/i);
+    expect(notice.message).toMatch(/resume|again/i);
+  });
+
+  it('does not call it blocked, which is a different fact with a different fix', () => {
+    // An exclusion is fixed by editing a list. A pause is fixed by pressing a key. Saying
+    // the wrong one sends the user to the wrong place.
+    const notice = captureNotice({ at: new Date(), screenshot: true, paused: true });
+
+    expect(notice.message).not.toMatch(/exclusion/i);
+    expect(notice.blocked).toBeUndefined();
+  });
+
+  it('reports pause ahead of a screenshot that never happened', () => {
+    const notice = captureNotice({ at: new Date(), screenshot: true, paused: true });
+
+    expect(notice.message).not.toBe('Tagalong captured the screen.');
+  });
+
+  it('says pause in the tray tooltip too', () => {
+    const notice = captureNotice({
+      at: new Date('2026-09-20T14:05:00Z'),
+      screenshot: true,
+      paused: true,
+    });
+
+    expect(captureTooltip(notice)).toMatch(/paused/i);
+  });
+
+  it('leaves an ordinary notice alone', () => {
+    const notice = captureNotice({ at: new Date(), screenshot: true });
+
+    expect(notice.paused).toBeUndefined();
+    expect(notice.message).toBe('Tagalong captured the screen.');
+  });
+});
