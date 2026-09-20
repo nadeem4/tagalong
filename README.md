@@ -181,9 +181,11 @@ geometry, and a list of every window that is open.
 | `Ctrl+Shift+Space` | Selection and the active window                             | text only                                   |
 | `Ctrl+Shift+S`     | Plus a screenshot of the active window                      | about 1,500 extra input tokens              |
 | `Ctrl+Shift+Alt+S` | Plus the composite, the focused display and the window list | about 3,200, and a few seconds to enumerate |
+| `Ctrl+Shift+Alt+P` | Nothing — turns all sight off, and on again                 | nothing                                     |
 
-Three keys rather than one with modifiers, because they differ in what they cost and the user is
-choosing the bill. A full-view capture attaches two pictures by default — the composite, which is
+Three capture keys rather than one with modifiers, because they differ in what they cost and the
+user is choosing the bill. The fourth takes sight away entirely — see
+[Pausing sight](#pausing-sight). A full-view capture attaches two pictures by default — the composite, which is
 the map of how the monitors sit, and the display being worked on — and names the others in text so
 the pet can fetch one by tool rather than everything by default. Three monitors must not mean three
 images on every ask. `sightDetail: "all"` in settings overrides that and attaches every display, for
@@ -299,6 +301,8 @@ Two things Phase 1 left standing, both recorded here so nobody rediscovers them.
 ## Privacy
 
 - Capture happens only when you ask, never continuously.
+- `Ctrl+Shift+Alt+P`, or **Pause sight** in the tray, stops all of it at once — see
+  [Pausing sight](#pausing-sight).
 - A visible indicator shows every capture (Phase 2).
 - An exclusion list blocks capture in password managers and other listed apps (Phase 2).
 - When Windows reports no foreground window at all — a locked session, a UAC prompt on the secure
@@ -314,6 +318,35 @@ Two things Phase 1 left standing, both recorded here so nobody rediscovers them.
   request is built and the host is told with a `turn.warning` (`code: "vision_unsupported"`), so the
   turn still answers instead of failing.
 - API keys live in the OS keychain through Electron safe storage.
+
+### Pausing sight
+
+`Ctrl+Shift+Alt+P` turns every kind of looking off, and pressing it again turns it back on. The
+tray carries the same item, because this is the one hotkey whose loss matters: a user who needs to
+blind the pet right now must not first discover that something else on their machine owns the
+combination.
+
+While paused:
+
+- Every screenshot, display capture, crop, window enumeration and window text read is **refused
+  before it runs**. The refusal happens above the adapter, so nothing is captured and then
+  discarded — the same ordering the exclusion list uses, for the same reason.
+- The avatar wears a grey eye for as long as it lasts. The amber eye that marks a capture cannot
+  appear, because nothing was read.
+- The pet is told sight is paused rather than that a capture failed, so it says "you turned sight
+  off" rather than inventing a reason or claiming a window is empty.
+- The selection and the clipboard still work. Pausing blinds the pet; it does not refuse what you
+  hand it deliberately, or a paused pet would be useless rather than merely blind.
+
+Pause is a moment, not a setting, so it is deliberately **not** remembered across restarts — an app
+that boots blind because of a keypress last Tuesday reads as broken rather than private. The
+exclusion list is the setting that persists.
+
+It is also one gate rather than a check repeated at each call site. Every read goes through the
+platform adapter, and the adapter handed to the rest of the app is already wrapped, so a capture
+path added later is covered by construction rather than by remembering. Which reads pause covers is
+a mapped type over the adapter's own methods, so adding a method without deciding what pause does to
+it does not compile.
 
 ## No computer control
 

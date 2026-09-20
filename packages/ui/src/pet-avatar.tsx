@@ -32,13 +32,27 @@ export interface PetAvatarProps {
    * allowed to happen silently.
    */
   captureCount?: number;
+  /**
+   * Whether the user has turned sight off.
+   *
+   * A state rather than an event, unlike `captureCount`: the capture badge says "it just
+   * looked" and fades, this says "it cannot look" and stays until the user ends it.
+   */
+  sightPaused?: boolean;
 }
 
-export function PetAvatar({ pet, state = 'idle', captureCount = 0 }: PetAvatarProps) {
+export function PetAvatar({
+  pet,
+  state = 'idle',
+  captureCount = 0,
+  sightPaused = false,
+}: PetAvatarProps) {
   // Which capture the badge has already been shown for. Derived visibility rather than
   // a flag set from an effect, so a re-render can never lose or duplicate the badge.
   const [faded, setFaded] = useState(0);
-  const captured = captureCount > faded;
+  // Nothing was read while paused, so nothing may claim it was: a capture badge here
+  // would be the app announcing a look at the moment it refused one.
+  const captured = !sightPaused && captureCount > faded;
 
   useEffect(() => {
     if (!captured) {
@@ -51,10 +65,19 @@ export function PetAvatar({ pet, state = 'idle', captureCount = 0 }: PetAvatarPr
   return (
     <span
       role="img"
-      aria-label={`${pet.name} is ${state}`}
+      aria-label={`${pet.name} is ${state}${sightPaused ? ', sight paused' : ''}`}
       data-state={state}
       className={`relative inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-2xl ring-4 ${RING_BY_STATE[state]}`}
     >
+      {sightPaused && (
+        <span
+          data-testid="paused-eye"
+          title="Sight is paused — Tagalong cannot see your screen"
+          className="absolute -right-0.5 -top-0.5 rounded-full bg-slate-400 px-1 text-[10px] leading-4 text-slate-900"
+        >
+          👁
+        </span>
+      )}
       {captured && (
         <span
           data-testid="capture-badge"

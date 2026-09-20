@@ -8,6 +8,7 @@ import {
   capturePatch,
 } from './context';
 import type { DisplaysCapture, Platform } from './platform/index';
+import { gateSight } from './platform/sight-gate';
 
 function fakePlatform(overrides: Partial<Platform> = {}): Platform {
   return {
@@ -617,5 +618,143 @@ describe('capturePatch, displays', () => {
 
     expect(patch.displays).toBeUndefined();
     expect(warnings.join(' ')).toContain('displays');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 2B task 8: sight paused
+// ---------------------------------------------------------------------------
+
+/** A platform gated by a pause that is already on, exactly as the host builds it. */
+function pausedPlatform(overrides: Partial<Platform> = {}): Platform {
+  return gateSight(fakePlatform(overrides), () => true);
+}
+
+describe('captureAskSnapshot while sight is paused', () => {
+  it('reports the capture as paused rather than as merely empty', async () => {
+    // The distinction is the whole point. Four reads in this phase failed by returning
+    // nothing, and nothing is what an unproductive capture also looks like.
+    const capture = await captureAskSnapshot(pausedPlatform(), {
+      screenshot: true,
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(capture.paused).toBe(true);
+  });
+
+  it('carries no screenshot, no app and no displays', async () => {
+    const capture = await captureAskSnapshot(pausedPlatform(), {
+      screenshot: true,
+      fullView: true,
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(capture.snapshot.screenshot).toBeUndefined();
+    expect(capture.snapshot.app).toBeUndefined();
+    expect(capture.snapshot.displays).toBeUndefined();
+    expect(capture.snapshot.composite).toBeUndefined();
+    expect(capture.snapshot.windows).toBeUndefined();
+  });
+
+  it('still carries the selection the user highlighted', async () => {
+    // Pausing sight blinds the pet. It does not refuse what the user hands over, or a
+    // paused pet would be useless rather than merely blind.
+    const capture = await captureAskSnapshot(pausedPlatform(), {
+      screenshot: true,
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(capture.snapshot.selection).toBe('the highlighted paragraph');
+  });
+
+  it('is not reported as blocked, which means something else entirely', async () => {
+    // "You turned sight off" and "this app is on your exclusion list" are different
+    // facts, and the pet must not say the second when the first is true.
+    const capture = await captureAskSnapshot(pausedPlatform(), {
+      screenshot: true,
+      exclusions: PASSWORD_MANAGER,
+    });
+
+    expect(capture.paused).toBe(true);
+    expect(capture.blocked).toBeNull();
+  });
+
+  it('reports not paused on an ordinary capture', async () => {
+    const capture = await captureAskSnapshot(fakePlatform(), {
+      screenshot: true,
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(capture.paused).toBe(false);
+  });
+});
+
+describe('capturePatch while sight is paused', () => {
+  it('reports paused and returns none of the gated targets', async () => {
+    const result = await capturePatch(pausedPlatform(), ['screenshot', 'displays', 'windows'], {
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(result.paused).toBe(true);
+    expect(result.patch.screenshot).toBeUndefined();
+    expect(result.patch.displays).toBeUndefined();
+    expect(result.patch.windows).toBeUndefined();
+  });
+
+  it('does not complain that the displays failed, because they did not', async () => {
+    // A paused capture is a refusal, not a broken one. Warning about it would train the
+    // user to ignore the warnings that mean something is actually wrong.
+    const result = await capturePatch(pausedPlatform(), ['displays', 'windows'], {
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(result.warnings).toEqual([]);
+  });
+
+  it('still answers the clipboard and the selection', async () => {
+    const result = await capturePatch(pausedPlatform(), ['selection', 'clipboard'], {
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(result.paused).toBe(false);
+    expect(result.patch.selection).toBe('the highlighted paragraph');
+    expect(result.patch.clipboard).toBe('clipboard contents');
+  });
+
+  it('reports paused for a mixed request and keeps the ungated half', async () => {
+    const result = await capturePatch(pausedPlatform(), ['selection', 'screenshot'], {
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(result.paused).toBe(true);
+    expect(result.patch.selection).toBe('the highlighted paragraph');
+    expect(result.patch.screenshot).toBeUndefined();
+  });
+
+  it('reports not paused on an ordinary capture', async () => {
+    const result = await capturePatch(fakePlatform(), ['selection'], {
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(result.paused).toBe(false);
+  });
+});
+
+describe('a real failure is still swallowed while a pause is not', () => {
+  it('keeps treating an ordinary capture failure as best effort', async () => {
+    // Perception stays best effort: a clipboard the OS briefly locked must not cost the
+    // user their ask. Only the pause is promoted out of that.
+    const capture = await captureAskSnapshot(
+      fakePlatform({
+        captureActiveWindowImage: async () => {
+          throw new Error('the capturer went away');
+        },
+      }),
+      { screenshot: true, exclusions: NOTHING_EXCLUDED },
+    );
+
+    expect(capture.paused).toBe(false);
+    expect(capture.snapshot.screenshot).toBeUndefined();
+    expect(capture.snapshot.selection).toBe('the highlighted paragraph');
   });
 });

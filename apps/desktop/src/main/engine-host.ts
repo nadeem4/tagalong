@@ -64,11 +64,16 @@ export async function startEngineHost(options: StartEngineHostOptions): Promise<
       return { image: { mime: 'image/png', ...image } };
     },
     capture: async (what) => {
-      const { patch, blocked } = await capturePatch(options.platform, what, {
+      const { patch, blocked, paused } = await capturePatch(options.platform, what, {
         exclusions: options.captureExclusions(),
       });
       options.onCapture(
-        captureNotice({ at: new Date(), screenshot: what.includes('screenshot'), blocked }),
+        captureNotice({
+          at: new Date(),
+          screenshot: what.includes('screenshot'),
+          blocked,
+          paused,
+        }),
       );
       return patch;
     },

@@ -198,3 +198,36 @@ describe('Settings.hotkeys.seeEverything', () => {
     );
   });
 });
+
+describe('the pause hotkey setting', () => {
+  it('ships a default that matches the documented key', () => {
+    expect(SETTINGS_DEFAULTS.hotkeys.pauseSight).toBe('CommandOrControl+Shift+Alt+P');
+  });
+
+  it('collides with none of the other defaults', () => {
+    const bound = Object.values(SETTINGS_DEFAULTS.hotkeys);
+    expect(new Set(bound).size).toBe(bound.length);
+  });
+
+  it('stays optional, so a settings file written before it still parses', () => {
+    // Same reason `look` and `seeEverything` are optional: a patch replaces the whole
+    // hotkeys object, so rebinding one key must not force a caller to resend the rest.
+    const parsed = Settings.parse({ hotkeys: { ask: 'CommandOrControl+Shift+Space' } });
+    expect(parsed.hotkeys.pauseSight).toBeUndefined();
+  });
+
+  it('accepts a rebinding', () => {
+    const parsed = Settings.parse({
+      hotkeys: { ask: 'CommandOrControl+Shift+Space', pauseSight: 'Alt+P' },
+    });
+    expect(parsed.hotkeys.pauseSight).toBe('Alt+P');
+  });
+
+  it('rejects an empty accelerator', () => {
+    expect(
+      Settings.safeParse({
+        hotkeys: { ask: 'CommandOrControl+Shift+Space', pauseSight: '' },
+      }).success,
+    ).toBe(false);
+  });
+});

@@ -256,6 +256,27 @@ other leaves the pet able to see a screen it cannot name, or name one it cannot 
 `sightDetail` is the escape hatch, `focused` by default and `all` to attach every display. The
 default is the cheap one because the expensive one scales with hardware rather than with intent.
 
+### Pausing sight
+
+Every read the host can make goes through one `Platform` method, which is what makes a single pause
+gate possible. `gateSight` wraps the adapter at construction in `start()`, and nothing downstream is
+ever handed the ungated one — so a capture path added later consults the pause by construction
+rather than by its author remembering to.
+
+Which methods pause covers is a mapped type over `keyof Platform`, so adding a method to the adapter
+without deciding what pause does to it is a compile error. `sight` covers everything that reads the
+screen, window titles included: "Re: Q3 layoffs — Outlook" is screen content, and a pet that cannot
+see a window but can name it has not been paused in any sense the user meant. `handed-over` covers
+the selection and the clipboard, which the user passed over deliberately.
+
+A paused read **throws** rather than returning nothing. Returning an empty capture would be
+indistinguishable from a quiet screen, which is the exact shape that let four broken reads ship
+earlier in this phase — and `attempt`, which swallows failures because perception is best effort,
+re-throws this one specifically. A refusal is not a failure and must not be treated as one.
+
+Phase 3B's rolling memory needs no change here to be covered: it will read the screen through the
+same adapter, so the gate refuses it on the same flag without that code knowing pause exists.
+
 ### The platform adapter
 
 Everything OS-specific sits behind `Platform` in `src/main/platform/`. `createPlatform` throws on any

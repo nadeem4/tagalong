@@ -82,3 +82,56 @@ describe('PetAvatar capture badge', () => {
     expect(screen.getByTestId('capture-badge')).toBeInTheDocument();
   });
 });
+
+describe('the paused eye', () => {
+  it('is absent while sight is running', () => {
+    render(<PetAvatar pet={sage} />);
+
+    expect(screen.queryByTestId('paused-eye')).toBeNull();
+  });
+
+  it('shows while sight is paused', () => {
+    render(<PetAvatar pet={sage} sightPaused />);
+
+    expect(screen.getByTestId('paused-eye')).toBeInTheDocument();
+  });
+
+  it('is grey, not the amber of a capture', () => {
+    // The two eyes mean opposite things — one says it just looked, the other says it
+    // cannot. Sharing a colour would make the most important signal the least readable.
+    render(<PetAvatar pet={sage} sightPaused />);
+
+    expect(screen.getByTestId('paused-eye').className).toMatch(/slate|gray|grey/);
+    expect(screen.getByTestId('paused-eye').className).not.toMatch(/amber/);
+  });
+
+  it('stays put instead of fading like the capture badge', () => {
+    // The capture badge is an event and lasts a second. Pause is a state and lasts until
+    // the user ends it, so a signal that faded would say sight had come back.
+    vi.useFakeTimers();
+    try {
+      render(<PetAvatar pet={sage} sightPaused />);
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+      });
+      expect(screen.getByTestId('paused-eye')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('says so in the label, for anyone not reading colours', () => {
+    render(<PetAvatar pet={sage} sightPaused />);
+
+    expect(screen.getByRole('img').getAttribute('aria-label')).toMatch(/paused/i);
+  });
+
+  it('does not badge a capture while paused', () => {
+    // Nothing was read, so nothing should claim it was. A capture badge here would be the
+    // app telling the user it looked at the very moment it did not.
+    render(<PetAvatar pet={sage} sightPaused captureCount={1} />);
+
+    expect(screen.queryByTestId('capture-badge')).toBeNull();
+    expect(screen.getByTestId('paused-eye')).toBeInTheDocument();
+  });
+});
