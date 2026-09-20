@@ -1,7 +1,16 @@
 import { z } from 'zod';
-import { ContextSnapshot, ContextSnapshotPatch, HostKind, PerceptionTarget } from './context';
+import {
+  CapturedImage,
+  ContextSnapshot,
+  ContextSnapshotPatch,
+  DisplayBounds,
+  HostKind,
+  MAX_PAGE_TEXT_CHARS,
+  PerceptionTarget,
+  WindowEntry,
+} from './context';
 import { Pet } from './pet';
-import { Settings, SettingsPatch } from './settings';
+import { CaptureBlock, Settings, SettingsPatch } from './settings';
 
 /** What a host tells the engine it is able to perceive or play. */
 export const HostCapability = z.enum([
@@ -12,10 +21,26 @@ export const HostCapability = z.enum([
   'pageText',
   'audioIn',
   'audioOut',
+  /** Phase 2B: can enumerate and photograph every display, not only the focused one. */
+  'displays',
+  /** Phase 2B: can read a window's text without photographing it. */
+  'textLayer',
 ]);
 export type HostCapability = z.infer<typeof HostCapability>;
 
 const Empty = z.object({});
+
+/**
+ * How much of one window's text a read returns unless asked otherwise.
+ *
+ * Eight thousand characters is roughly 2,000 tokens: enough for a terminal's scrollback or
+ * an email body, small enough that a pet reading three windows has not quietly spent a
+ * whole context window.
+ */
+export const DEFAULT_WINDOW_TEXT_CHARS = 8_000;
+
+/** The ceiling a caller may raise the per-window budget to, matching the page text cap. */
+export const MAX_WINDOW_TEXT_CHARS = MAX_PAGE_TEXT_CHARS;
 
 // ---------------------------------------------------------------------------
 // Host to core
@@ -86,6 +111,55 @@ export const ToolApproveResult = z.object({ accepted: z.boolean() });
 /** Lets a pet look on demand mid-turn. */
 export const PerceptionCaptureParams = z.object({ what: z.array(PerceptionTarget).min(1) });
 export const PerceptionCaptureResult = z.object({ snapshot: ContextSnapshotPatch });
+
+/**
+ * Phase 2B. A native-resolution crop of one display, for when the composite is too coarse.
+ *
+ * The composite gives each monitor a few hundred pixels — enough to see that a terminal is
+ * red, not enough to read it. This is the lean-in: the pet names a rectangle and gets it at
+ * a useful size, the way a person walks closer to a screen.
+ */
+export const PerceptionCaptureRegionParams = z.object({
+  displayId: z.number().int(),
+  /** In that display's own pixels. The origin may be negative, as display bounds are. */
+  rect: DisplayBounds,
+  maxLongSide: z.number().int().positive(),
+});
+export const PerceptionCaptureRegionResult = z.object({ image: CapturedImage });
+
+/** Phase 2B. Every top-level window: what and where, never what is inside. */
+export const PerceptionListWindowsParams = Empty;
+export const PerceptionListWindowsResult = z.object({ windows: z.array(WindowEntry) });
+
+/**
+ * Phase 2B. The text of exactly one window.
+ *
+ * There is deliberately no scope that reads everything. Measured on a twelve-window
+ * desktop, the whole text layer is 46,491 characters — roughly 11,600 tokens — in a single
+ * call, and one background browser window supplied 34,588 of them. The pet reads the
+ * inventory, which is about 200 tokens, picks a window, and pays for that one.
+ */
+export const PerceptionReadTextParams = z.object({
+  /** Omit for the foreground window. A window behind another or minimized reads fine. */
+  windowId: z.string().min(1).optional(),
+  maxChars: z
+    .number()
+    .int()
+    .positive()
+    .max(MAX_WINDOW_TEXT_CHARS)
+    .default(DEFAULT_WINDOW_TEXT_CHARS),
+});
+export const PerceptionReadTextResult = z.object({
+  /** Which window answered, so a `focusedWindow` read can be attributed. */
+  windowId: z.string().min(1),
+  text: z.string(),
+  /** True when the text is a prefix, so the pet does not read a cut-off line as the end. */
+  truncated: z.boolean(),
+  /** `ocr` text may contain recognition errors and the pet is told so. */
+  source: z.enum(['uia', 'ocr']),
+  /** Present when an exclusion refused this window. `text` is then empty. */
+  blocked: CaptureBlock.optional(),
+});
 
 // ---------------------------------------------------------------------------
 // Core to host notifications (no result; the host must not answer)
@@ -178,6 +252,15 @@ export const hostToCoreMethods = {
 
 export const coreToHostMethods = {
   'perception.capture': { params: PerceptionCaptureParams, result: PerceptionCaptureResult },
+  'perception.captureRegion': {
+    params: PerceptionCaptureRegionParams,
+    result: PerceptionCaptureRegionResult,
+  },
+  'perception.listWindows': {
+    params: PerceptionListWindowsParams,
+    result: PerceptionListWindowsResult,
+  },
+  'perception.readText': { params: PerceptionReadTextParams, result: PerceptionReadTextResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostNotifications = {

@@ -81,6 +81,22 @@ export const CaptureExclusions = z.object({
 export type CaptureExclusions = z.infer<typeof CaptureExclusions>;
 
 /**
+ * Which configured entry refused a capture.
+ *
+ * Carries the matching rule rather than a bare boolean so the UI can say "1Password.exe is
+ * on your exclusion list" instead of "blocked", and so a user who did not expect a refusal
+ * can find the line that caused it. It lives in the protocol because it now crosses the
+ * socket: a full-view capture refuses one display or one window while returning the rest,
+ * so the reason has to travel with the snapshot.
+ */
+export const CaptureBlock = z.object({
+  rule: z.enum(['processName', 'titlePattern']),
+  /** The exclusion entry exactly as the user wrote it, for display. */
+  entry: z.string().min(1),
+});
+export type CaptureBlock = z.infer<typeof CaptureBlock>;
+
+/**
  * How long a captured screenshot may live in the database.
  *
  * A tagged union rather than a number, so "never persist" is a state of its own instead of
