@@ -8,6 +8,7 @@ import type {
 } from '@tagalong/protocol';
 import { MAX_SELECTION_CHARS } from '@tagalong/protocol';
 import type { BrainContent, BrainMessage, BrainRequest } from '../providers';
+import { renderInventory } from '../perception/inventory';
 
 export { MAX_SELECTION_CHARS };
 
@@ -26,6 +27,7 @@ export const CONTEXT_LABELS = {
   page: 'Page text',
   window: 'Active window',
   screenshot: 'Screenshot',
+  windows: 'Open windows',
 } as const;
 
 /**
@@ -113,7 +115,7 @@ function attachToLastUserMessage(
   messages.push({ role: 'user', content: [...leading, ...trailing] });
 }
 
-/** Selection, page, window, screenshot — the order a person would look in. */
+/** Selection, page, window, screenshot, then everything else that is open. */
 function contextBlock(snapshot: ContextSnapshot, settings: Settings): string {
   const sections: string[] = [];
 
@@ -137,6 +139,13 @@ function contextBlock(snapshot: ContextSnapshot, settings: Settings): string {
     sections.push(
       section(CONTEXT_LABELS.screenshot, 'Attached as an image alongside this message.'),
     );
+  }
+
+  // Omitted when empty rather than rendered as "no windows are open". An empty list means
+  // the enumeration failed or was never asked for, and a pet told the desktop is empty
+  // will reason from that as though it were observed.
+  if (snapshot.windows && snapshot.windows.length > 0) {
+    sections.push(section(CONTEXT_LABELS.windows, renderInventory(snapshot.windows)));
   }
 
   return sections.length > 0 ? ['--- Screen context ---', ...sections].join('\n\n') : '';
