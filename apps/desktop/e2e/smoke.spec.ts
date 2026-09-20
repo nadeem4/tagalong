@@ -301,3 +301,95 @@ test('pausing sight refuses a real capture, and resuming restores it', async () 
   const after = await panel.evaluate(() => window.tagalong.capture(['screenshot']));
   expect(after, 'resuming must restore capture, or pause is a one-way door').not.toBeNull();
 });
+
+/**
+ * The test that proves "without restart" is a fact rather than a promise.
+ *
+ * Every unit test around hotkeys injects a fake registrar and applies the bindings
+ * itself, which proves the manager rebinds and never that a *save* reaches it. Delete the
+ * one line in the save handler that re-applies them and all 780 unit tests still pass
+ * while a rebound hotkey quietly does nothing until the next launch — the same shape as
+ * the transport, the capture path and the pause gate earlier in this phase.
+ *
+ * An accelerator Electron cannot parse is the observable handle: it makes registration
+ * fail, and a failed registration is reported through `hostView`. No keypress needed, and
+ * no dependence on which window has focus.
+ */
+test('a rebound hotkey is applied on save, without a restart', async () => {
+  const settings = await windowFor('panel');
+
+  const before = await settings.evaluate(() => window.tagalongHost.getHostView());
+  expect(before.hotkeyError, 'the app should start with its hotkeys registered').toBeUndefined();
+
+  const original = {
+    ask: before.settings.hotkeys.ask,
+    look: before.settings.hotkeys.look ?? 'CommandOrControl+Shift+S',
+    seeEverything: before.settings.hotkeys.seeEverything ?? 'CommandOrControl+Shift+Alt+S',
+    pauseSight: before.settings.hotkeys.pauseSight ?? 'CommandOrControl+Shift+Alt+P',
+  };
+
+  // Restored in a finally, not at the end of the happy path. Settings persist to the
+  // real data directory, and an unregisterable accelerator left behind there makes the
+  // *next* launch stop on a modal error box before any window appears — a failing
+  // assertion here would otherwise break every later run of this suite instead of just
+  // itself.
+  let during;
+  try {
+    const saved = await settings.evaluate(
+      (keys) =>
+        window.tagalongHost.saveSettings({ hotkeys: { ...keys, ask: 'Ctrl+Shift+Nonsense' } }),
+      original,
+    );
+    expect(saved.hotkeys.ask, 'the patch must reach the store').toBe('Ctrl+Shift+Nonsense');
+
+    // The whole point: this error exists only because the save re-registered the bindings
+    // in the running app. Without that call the store changes and nothing else does.
+    during = await settings.evaluate(() => window.tagalongHost.getHostView());
+  } finally {
+    await settings.evaluate(
+      (keys) => window.tagalongHost.saveSettings({ hotkeys: keys }),
+      original,
+    );
+  }
+
+  expect(
+    during?.hotkeyError,
+    'saving a hotkey must re-register it in the running app, not wait for a restart',
+  ).toBeDefined();
+
+  const after = await settings.evaluate(() => window.tagalongHost.getHostView());
+  expect(after.hotkeyError, 'restoring a valid hotkey must clear the error too').toBeUndefined();
+  expect(after.settings.hotkeys.ask).toBe(original.ask);
+});
+
+/** The two sight settings must survive the round trip through the real store. */
+test('sight detail and the window text budget save and read back', async () => {
+  const settings = await windowFor('panel');
+
+  const before = await settings.evaluate(() => window.tagalongHost.getHostView());
+  const saved = await settings.evaluate(() =>
+    window.tagalongHost.saveSettings({ sightDetail: 'all', windowTextBudget: 12_000 }),
+  );
+  expect(saved.sightDetail).toBe('all');
+  expect(saved.windowTextBudget).toBe(12_000);
+
+  try {
+    const reread = await settings.evaluate(() => window.tagalongHost.getHostView());
+    expect(reread.settings.sightDetail).toBe('all');
+    expect(reread.settings.windowTextBudget).toBe(12_000);
+  } finally {
+    // Same reason as the hotkey test: these persist, and a suite that leaves the budget
+    // raised changes what every later run costs.
+    await settings.evaluate(
+      (previous) =>
+        window.tagalongHost.saveSettings({
+          sightDetail: previous.sightDetail,
+          windowTextBudget: previous.windowTextBudget,
+        }),
+      {
+        sightDetail: before.settings.sightDetail,
+        windowTextBudget: before.settings.windowTextBudget,
+      },
+    );
+  }
+});

@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_TEXT_CHARS } from '@tagalong/protocol';
 import type { DisplaySnapshot, HostCapability } from '@tagalong/protocol';
 import type { FullViewContext } from './full-view-tools';
 import type { PerceptionHost, PerceptionToolsetOptions } from './tools';
@@ -12,6 +13,10 @@ import type { PerceptionHost, PerceptionToolsetOptions } from './tools';
 export function fullViewContext(options: PerceptionToolsetOptions): FullViewContext {
   return {
     vision: () => options.vision?.() ?? false,
+
+    // Absent means the shipped default, which is what a host that never wired settings
+    // through gets — the same fallback the schema uses, so the two cannot disagree.
+    windowTextBudget: () => options.windowTextBudget?.() ?? DEFAULT_WINDOW_TEXT_CHARS,
 
     async displays(): Promise<readonly DisplaySnapshot[] | undefined> {
       const host = options.hosts().find((candidate) => candidate.capabilities.includes('displays'));

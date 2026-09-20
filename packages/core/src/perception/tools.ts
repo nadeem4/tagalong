@@ -1,4 +1,3 @@
-import { DEFAULT_WINDOW_TEXT_CHARS } from '@tagalong/protocol';
 import type {
   CaptureExclusions,
   ContextSnapshotPatch,
@@ -70,6 +69,18 @@ export interface PerceptionToolsetOptions {
    * it burns the user's tokens and teaches it nothing, so the safe default is words.
    */
   vision?: () => boolean;
+  /**
+   * The user's default character cap for one window text read.
+   *
+   * A function, and called per tool use, for the same reason `exclusions` is: this is
+   * edited in Settings while the app runs, and a value captured at boot would be a
+   * control that silently does nothing until the next launch.
+   *
+   * Absent means the shipped default. A pet that names its own `maxChars` still wins —
+   * asking for less than the budget is the pet spending carefully, not overriding the
+   * user.
+   */
+  windowTextBudget?: () => number;
 }
 
 /** Exactly what `BrainEvents.onToolUse` must resolve with. */
@@ -188,7 +199,9 @@ const DEFINITIONS: readonly BrainTool[] = [
         },
         maxChars: {
           type: 'number',
-          description: `How much text to return at most. Defaults to ${DEFAULT_WINDOW_TEXT_CHARS}.`,
+          description:
+            'How much text to return at most. Omit it to use the budget the user set ' +
+            'in Settings; ask for less when you only need the top of a window.',
         },
       },
       additionalProperties: false,

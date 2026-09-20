@@ -5,6 +5,7 @@ import {
   DEFAULT_PAUSE_SIGHT_HOTKEY,
   DEFAULT_SEE_EVERYTHING_HOTKEY,
   HotkeyManager,
+  describeHotkeyProblems,
   registerHotkey,
 } from './hotkeys';
 import type { HotkeyRegistrar } from './hotkeys';
@@ -44,11 +45,12 @@ describe('registerHotkey', () => {
 
     const outcome = registerHotkey({
       accelerator: DEFAULT_ASK_HOTKEY,
+      action: 'ask',
       registrar: registrar(register),
       onTrigger: () => {},
     });
 
-    expect(outcome).toEqual({ accelerator: DEFAULT_ASK_HOTKEY, registered: true });
+    expect(outcome).toEqual({ accelerator: DEFAULT_ASK_HOTKEY, action: 'ask', registered: true });
     expect(register).toHaveBeenCalledWith(DEFAULT_ASK_HOTKEY, expect.any(Function));
   });
 
@@ -58,6 +60,7 @@ describe('registerHotkey', () => {
 
     registerHotkey({
       accelerator: 'CommandOrControl+Shift+Space',
+      action: 'ask',
       registrar: registrar((_accelerator, callback) => {
         fire = callback;
         return true;
@@ -72,6 +75,7 @@ describe('registerHotkey', () => {
   it('reports a combo another app already owns instead of failing silently', () => {
     const outcome = registerHotkey({
       accelerator: 'CommandOrControl+Shift+Space',
+      action: 'ask',
       registrar: registrar(() => false),
       onTrigger: () => {},
     });
@@ -83,6 +87,7 @@ describe('registerHotkey', () => {
   it('turns a thrown registration error into the same reported outcome', () => {
     const outcome = registerHotkey({
       accelerator: 'Bogus+Accelerator',
+      action: 'ask',
       registrar: registrar(() => {
         throw new Error('Invalid accelerator');
       }),
@@ -118,11 +123,13 @@ describe('HotkeyManager', () => {
       pauseSight: DEFAULT_PAUSE_SIGHT_HOTKEY,
     });
 
+    // Each outcome carries its action, so a refusal can name the thing the user lost
+    // rather than only the combination that failed.
     expect(outcomes).toEqual([
-      { accelerator: DEFAULT_ASK_HOTKEY, registered: true },
-      { accelerator: DEFAULT_LOOK_HOTKEY, registered: true },
-      { accelerator: DEFAULT_SEE_EVERYTHING_HOTKEY, registered: true },
-      { accelerator: DEFAULT_PAUSE_SIGHT_HOTKEY, registered: true },
+      { accelerator: DEFAULT_ASK_HOTKEY, action: 'ask', registered: true },
+      { accelerator: DEFAULT_LOOK_HOTKEY, action: 'look', registered: true },
+      { accelerator: DEFAULT_SEE_EVERYTHING_HOTKEY, action: 'seeEverything', registered: true },
+      { accelerator: DEFAULT_PAUSE_SIGHT_HOTKEY, action: 'pauseSight', registered: true },
     ]);
     expect([...reg.bound.keys()]).toEqual([
       DEFAULT_ASK_HOTKEY,
@@ -231,7 +238,7 @@ describe('HotkeyManager', () => {
       pauseSight: DEFAULT_PAUSE_SIGHT_HOTKEY,
     });
 
-    expect(outcomes[1]).toEqual({ accelerator: 'Alt+S', registered: true });
+    expect(outcomes[1]).toEqual({ accelerator: 'Alt+S', action: 'look', registered: true });
     expect(reg.bound.has('Alt+S')).toBe(true);
   });
 
@@ -420,5 +427,81 @@ describe('the pause hotkey', () => {
 
     expect(outcomes[3]?.registered).toBe(false);
     expect(outcomes.slice(0, 3).every((outcome) => outcome.registered)).toBe(true);
+  });
+});
+
+describe('a hotkey that cannot be registered', () => {
+  it('names which action failed, not only the accelerator', () => {
+    // "Ctrl+Shift+Alt+S could not be registered" tells a user nothing about what they
+    // have lost. The point of four hotkeys is that they do different things, so the
+    // message has to say which one stopped working.
+    const manager = new HotkeyManager({
+      onAsk: () => {},
+      onLook: () => {},
+      onSeeEverything: () => {},
+      onPauseSight: () => {},
+      registrar: recordingRegistrar([DEFAULT_SEE_EVERYTHING_HOTKEY]),
+    });
+
+    const outcomes = manager.apply({
+      ask: DEFAULT_ASK_HOTKEY,
+      look: DEFAULT_LOOK_HOTKEY,
+      seeEverything: DEFAULT_SEE_EVERYTHING_HOTKEY,
+      pauseSight: DEFAULT_PAUSE_SIGHT_HOTKEY,
+    });
+
+    expect(outcomes.map((outcome) => outcome.action)).toEqual([
+      'ask',
+      'look',
+      'seeEverything',
+      'pauseSight',
+    ]);
+    const refused = outcomes.find((outcome) => !outcome.registered);
+    expect(refused?.action).toBe('seeEverything');
+  });
+});
+
+describe('describeHotkeyProblems', () => {
+  const ok = { accelerator: 'A', registered: true, action: 'ask' } as const;
+
+  it('says nothing when every hotkey bound', () => {
+    expect(describeHotkeyProblems([ok])).toBeNull();
+  });
+
+  it('names the action in words a user recognises, and the accelerator', () => {
+    const problem = describeHotkeyProblems([
+      ok,
+      {
+        accelerator: 'CommandOrControl+Shift+Alt+S',
+        registered: false,
+        action: 'seeEverything',
+        error: 'Another application already owns it.',
+      },
+    ]);
+
+    expect(problem).toContain('See everything');
+    expect(problem).toContain('CommandOrControl+Shift+Alt+S');
+    expect(problem).toContain('Another application already owns it.');
+  });
+
+  it('reports every failure rather than only the first', () => {
+    const problem = describeHotkeyProblems([
+      { accelerator: 'X', registered: false, action: 'ask' },
+      { accelerator: 'Y', registered: false, action: 'pauseSight' },
+    ]);
+
+    expect(problem).toContain('Ask');
+    expect(problem).toContain('Pause sight');
+  });
+
+  it('says the rest still work, because that is the thing the user cannot see', () => {
+    // A user whose see-everything key died has no way to tell whether the other three
+    // survived. Silence on that reads as "hotkeys are broken", and the honest state is
+    // that exactly one is.
+    const problem = describeHotkeyProblems([
+      ok,
+      { accelerator: 'X', registered: false, action: 'look' },
+    ]);
+    expect(problem?.toLowerCase()).toContain('other');
   });
 });

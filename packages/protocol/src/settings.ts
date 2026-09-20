@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './limits';
+
 /**
  * Engine settings that cross the wire. Secrets are deliberately absent: they live in
  * the host's SecretStore and never appear in settings.get or on disk in this shape.
@@ -72,6 +74,14 @@ export const SETTINGS_DEFAULTS = {
    * look, and the person who bought the third monitor is not the person who chose that.
    */
   sightDetail: 'focused',
+  /**
+   * How much text one `read_window_text` returns when the pet does not say.
+   *
+   * A cost control, not a quality one. Eight thousand characters is roughly 2,000 tokens;
+   * raising it to the ceiling makes a single window read cost as much as five do now, on
+   * every read, because the pet almost never names a smaller number itself.
+   */
+  windowTextBudget: DEFAULT_WINDOW_TEXT_CHARS,
 } as const;
 
 /** A non-blank, trimmed entry. A blank one would match every window and blind the pet. */
@@ -175,6 +185,14 @@ const settingsFields = {
   screenshotRetention: ScreenshotRetention,
   /** Whether a full-view capture attaches every display or only the focused one. */
   sightDetail: z.enum(['focused', 'all']),
+  /**
+   * Default character cap for one window text read.
+   *
+   * Bounded at both ends on purpose: zero would make the text layer silently useless and
+   * read as a broken feature, and the ceiling is the page-text cap, past which one window
+   * can outweigh everything else in the prompt.
+   */
+  windowTextBudget: z.number().int().positive().max(MAX_WINDOW_TEXT_CHARS),
 };
 
 export const Settings = z.object({
@@ -194,6 +212,7 @@ export const Settings = z.object({
     ...SETTINGS_DEFAULTS.screenshotRetention,
   }),
   sightDetail: settingsFields.sightDetail.default(SETTINGS_DEFAULTS.sightDetail),
+  windowTextBudget: settingsFields.windowTextBudget.default(SETTINGS_DEFAULTS.windowTextBudget),
 });
 export type Settings = z.infer<typeof Settings>;
 

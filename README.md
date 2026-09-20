@@ -22,8 +22,10 @@ list, and a visible indicator on every capture.
 
 Phase 2B is widening that to everything the user cannot see — every display at once, and every open
 window including the ones behind others and the ones minimized to the taskbar. Landed so far:
-multi-display capture with a composite laid out by monitor geometry, the protocol schemas, and the
-window inventory.
+multi-display capture with a composite laid out by monitor geometry, the protocol schemas, the
+window inventory, the UI Automation text layer, the see-everything hotkey and its attach policy, the
+five built-in tools a pet reaches all of it with, one pause gate over every capture path, and the
+settings that control what a look costs.
 
 ## Repository layout
 
@@ -188,12 +190,32 @@ user is choosing the bill. The fourth takes sight away entirely — see
 [Pausing sight](#pausing-sight). A full-view capture attaches two pictures by default — the composite, which is
 the map of how the monitors sit, and the display being worked on — and names the others in text so
 the pet can fetch one by tool rather than everything by default. Three monitors must not mean three
-images on every ask. `sightDetail: "all"` in settings overrides that and attaches every display, for
-someone who would rather pay than ask twice.
+images on every ask. **What a see-everything look sends** in the settings window overrides that and
+attaches every display, for someone who would rather pay than ask twice.
 
-All three accelerators are editable in the settings window and rebind while the app runs — no
+All four accelerators are editable in the settings window and rebind while the app runs — no
 restart — and an accelerator another application already owns is reported rather than silently
-dropped, without costing the other two.
+dropped, without costing the other three.
+
+**A hotkey that cannot be registered never stops Tagalong from starting.** The only way to store an
+accelerator Windows refuses is to type it into Settings, so an app that refused to open because of
+one would leave you locked out of the window that fixes it, with the settings file as the only way
+back. Instead the app starts, the other three keys work, and the failure appears in the panel and in
+Settings naming which binding broke and what it was bound to. Correcting it takes effect
+immediately, with no restart.
+
+### The two cost controls
+
+Both live in the settings window and both take effect on save, with no restart: they are read at the
+moment of each capture rather than at boot.
+
+| Setting                              | Default                            | What raising it costs                                                                                                                                                                   |
+| ------------------------------------ | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **What a see-everything look sends** | Composite plus the focused display | `Every screen` sends one picture per monitor, so a three-monitor desk pays roughly three times the image cost on every full-view look                                                   |
+| **Window text budget**               | 8,000 characters                   | How much of a window a read returns when the pet does not ask for less. Roughly one token per four characters, so the default is about 2,000 tokens per read, and the ceiling is 40,000 |
+
+The budget is a ceiling, not a target — a pet that only needs the top of a terminal asks for less,
+and the number it does not ask for is the one set here.
 
 Capture is never silent. Every capture, including one a pet's own tool asked for, badges the avatar
 and updates the tray tooltip to say what was read and when. Before any screenshot the host checks the
@@ -300,11 +322,63 @@ Two things Phase 1 left standing, both recorded here so nobody rediscovers them.
 
 ## Privacy
 
-- Capture happens only when you ask, never continuously.
-- `Ctrl+Shift+Alt+P`, or **Pause sight** in the tray, stops all of it at once — see
-  [Pausing sight](#pausing-sight).
-- A visible indicator shows every capture (Phase 2).
-- An exclusion list blocks capture in password managers and other listed apps (Phase 2).
+### What is captured, and when
+
+Nothing is read until you press a key. There is no background watching, no polling loop, and no
+capture between one question and the next — each hotkey reads once, sends that, and stops.
+
+| You press          | It reads                                                                                                    |
+| ------------------ | ----------------------------------------------------------------------------------------------------------- |
+| `Ctrl+Shift+Space` | The selected text and the active window's title. No picture.                                                |
+| `Ctrl+Shift+S`     | The above, plus one screenshot of the active window.                                                        |
+| `Ctrl+Shift+Alt+S` | The above, plus every monitor, an overview image of how they are arranged, and a list of every open window. |
+
+The pet can also look mid-answer through its own tools — read one window's text, fetch another
+monitor, zoom into part of one. Those run only inside a turn you started, are shown in the panel as
+they happen, and obey everything below.
+
+### What the window list holds
+
+`Ctrl+Shift+Alt+S` sends a list of every open window: its application, its title, which monitor it
+is on, whether it is in front, behind something else or minimized, and roughly how much readable
+text it holds. **It never contains the text inside those windows.** Reading one is a separate,
+deliberate step the pet takes for a single named window.
+
+That "roughly" is honest: counting is given a short budget per window, so a window holding 35,000
+characters may be listed as holding about 4,000. The number is there to help the pet decide whether
+a window is worth reading, and nothing treats it as exact.
+
+### Windows you cannot see are still read
+
+This is the part that goes further than a screenshot ever did, so it is worth stating plainly.
+Windows exposes an accessibility layer, and Tagalong reads it — which means a pet asked to can read
+the text of a window **sitting behind another one, or minimized to the taskbar**, without it ever
+being on screen.
+
+Two limits. Applications that draw their own text — code editors, terminals, design tools — publish
+very little through that layer, so a read may come back nearly empty; the pet is told the difference
+between "this window is empty" and "I could not read inside it", and says so rather than guessing.
+And a browser publishes only the tab you are on: the other tabs are not readable this way, and the
+pet is told to say so instead of pretending.
+
+### What is never read
+
+- **Excluded applications.** The list ships with the common password managers, the Windows security
+  prompt, the lock screen and the UAC prompt, and you can edit it. An excluded window is refused
+  before anything is read — no screenshot, no text, and no character count, because the count would
+  itself say something about a vault you asked us not to look at.
+- **A monitor with an excluded window on it.** If a password manager is open and visible on your
+  second screen, that whole screen is blanked in the full-view capture — not just when it is the
+  window you are working in. The blanked screen is replaced with a flat panel reading BLOCKED, so
+  the pet can see that something was withheld rather than being handed a gap it might guess at.
+  Minimized windows do not blank their monitor: a vault in the taskbar is not on screen, and
+  blanking a screen you are working on because something is hidden would be a bug, not caution.
+- **Anything at all, while sight is paused** — see [Pausing sight](#pausing-sight).
+
+### The rest
+
+- A visible indicator shows every capture.
+- An exclusion list blocks capture in password managers and other listed apps.
 - When Windows reports no foreground window at all — a locked session, a UAC prompt on the secure
   desktop — capture falls back to the screen rather than refusing, which matches the exclusion
   rules: a window that cannot be named is allowed, because a pet that never sees reads as broken.

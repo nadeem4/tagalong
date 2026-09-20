@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './methods';
 import {
   MAX_SCREENSHOT_RETENTION_HOURS,
   SETTINGS_DEFAULTS,
@@ -229,5 +230,38 @@ describe('the pause hotkey setting', () => {
         hotkeys: { ask: 'CommandOrControl+Shift+Space', pauseSight: '' },
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('Settings.windowTextBudget', () => {
+  it('defaults to the documented per-window budget', () => {
+    expect(Settings.parse({}).windowTextBudget).toBe(DEFAULT_WINDOW_TEXT_CHARS);
+    expect(SETTINGS_DEFAULTS.windowTextBudget).toBe(DEFAULT_WINDOW_TEXT_CHARS);
+  });
+
+  it('accepts a raised budget up to the hard ceiling', () => {
+    expect(Settings.parse({ windowTextBudget: 20_000 }).windowTextBudget).toBe(20_000);
+    expect(Settings.parse({ windowTextBudget: MAX_WINDOW_TEXT_CHARS }).windowTextBudget).toBe(
+      MAX_WINDOW_TEXT_CHARS,
+    );
+  });
+
+  it('refuses a budget above the ceiling', () => {
+    // The ceiling is the page-text cap. Past it one window can outweigh everything else
+    // in the prompt, and the user raising a slider has no way to see that coming.
+    expect(Settings.safeParse({ windowTextBudget: MAX_WINDOW_TEXT_CHARS + 1 }).success).toBe(false);
+  });
+
+  it('refuses a budget that would read nothing', () => {
+    expect(Settings.safeParse({ windowTextBudget: 0 }).success).toBe(false);
+    expect(Settings.safeParse({ windowTextBudget: -1 }).success).toBe(false);
+    expect(Settings.safeParse({ windowTextBudget: 1.5 }).success).toBe(false);
+  });
+
+  it('rides in a patch without dragging the other settings with it', () => {
+    const patch = SettingsPatch.parse({ windowTextBudget: 12_000 });
+    expect(patch.windowTextBudget).toBe(12_000);
+    expect(patch.sightDetail).toBeUndefined();
+    expect(patch.captureExclusions).toBeUndefined();
   });
 });

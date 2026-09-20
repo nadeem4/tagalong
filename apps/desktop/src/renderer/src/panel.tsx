@@ -12,10 +12,22 @@ import '../../shared/ipc';
 function Panel() {
   const [snapshot, setSnapshot] = useState<ContextSnapshot | null>(null);
   const [petId, setPetId] = useState<string | null>(null);
+  const [hotkeyProblem, setHotkeyProblem] = useState<string | null>(null);
 
   useEffect(() => {
     void window.tagalongHost.getContext().then(setSnapshot);
     return window.tagalongHost.onContext(setSnapshot);
+  }, []);
+
+  // A broken hotkey is invisible by nature: the user presses a key and nothing happens.
+  // The panel is the surface they can still reach — through the tray — so it says which
+  // binding failed. Read once for a panel opened after the failure, and subscribed so one
+  // already open stops showing a problem the user has since fixed.
+  useEffect(() => {
+    void window.tagalongHost
+      .getHostView()
+      .then((view) => setHotkeyProblem(view.hotkeyError ?? null));
+    return window.tagalongHost.onHotkeyProblem(setHotkeyProblem);
   }, []);
 
   useEffect(() => {
@@ -29,6 +41,14 @@ function Panel() {
 
   return (
     <HostBridgeProvider bridge={window.tagalong}>
+      {hotkeyProblem !== null && (
+        <p className="settings__error" role="status" data-testid="hotkey-problem">
+          {hotkeyProblem}{' '}
+          <button type="button" onClick={() => void window.tagalongHost.openSettings()}>
+            Open Settings
+          </button>
+        </p>
+      )}
       <ChatPanel petId={petId} {...(snapshot !== null ? { snapshot } : {})} />
     </HostBridgeProvider>
   );

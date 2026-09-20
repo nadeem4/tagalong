@@ -92,6 +92,9 @@ export class Engine {
       tools: createPerceptionToolset({
         hosts: () => live.server?.sessions() ?? [],
         exclusions: () => settings.get().captureExclusions,
+        // Lazy for the same reason: the cap is a cost control the user edits in Settings,
+        // and reading it at boot would make saving it do nothing until the next launch.
+        windowTextBudget: () => settings.get().windowTextBudget,
         // Without this, look_at_screen would only ever describe the screen in words.
         vision: () => provider.capabilities.vision,
       }),

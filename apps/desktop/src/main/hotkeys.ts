@@ -44,6 +44,8 @@ export interface HotkeyRegistrar {
 export interface HotkeyOutcome {
   accelerator: string;
   registered: boolean;
+  /** Which action this accelerator was meant to trigger. */
+  action: keyof HotkeyBindings;
   /** Present only on failure, so the caller can show the user what went wrong. */
   error?: string;
 }
@@ -58,8 +60,53 @@ export interface HotkeyBindings {
 
 export interface RegisterHotkeyOptions {
   accelerator: string;
+  action: keyof HotkeyBindings;
   onTrigger: () => void;
   registrar?: HotkeyRegistrar;
+}
+
+/**
+ * What each action is called when a user is being told it stopped working.
+ *
+ * The key names are ours; these are what the settings window labels them, so a message
+ * about a broken binding points at a control the reader can actually find.
+ */
+const ACTION_LABELS: { readonly [K in keyof HotkeyBindings]: string } = {
+  ask: 'Ask',
+  look: 'Look',
+  seeEverything: 'See everything',
+  pauseSight: 'Pause sight',
+};
+
+/**
+ * Turns registration outcomes into something worth showing a user, or null.
+ *
+ * Names the action rather than only the accelerator, because four hotkeys do four
+ * different things and "Ctrl+Shift+Alt+S could not be registered" does not say which one
+ * the user has lost. It also says the others still work: a user whose see-everything key
+ * died has no way to tell whether the rest survived, and silence on that reads as "hotkeys
+ * are broken" when the honest state is that exactly one is.
+ */
+export function describeHotkeyProblems(outcomes: readonly HotkeyOutcome[]): string | null {
+  const refused = outcomes.filter((outcome) => !outcome.registered);
+  if (refused.length === 0) return null;
+
+  const lines = refused.map(
+    (outcome) =>
+      `${ACTION_LABELS[outcome.action]} (${outcome.accelerator}): ` +
+      (outcome.error ?? 'it could not be registered.'),
+  );
+  const survivors = outcomes.length - refused.length;
+
+  return [
+    refused.length === 1
+      ? 'One hotkey could not be registered.'
+      : `${refused.length} hotkeys could not be registered.`,
+    ...lines,
+    survivors > 0
+      ? 'Every other hotkey still works. Pick a different combination in Settings.'
+      : 'Pick different combinations in Settings, or use the tray.',
+  ].join('\n');
 }
 
 /**
@@ -71,20 +118,22 @@ export interface RegisterHotkeyOptions {
  * looks like a broken app.
  */
 export function registerHotkey(options: RegisterHotkeyOptions): HotkeyOutcome {
-  const { accelerator, onTrigger, registrar = globalShortcut } = options;
+  const { accelerator, action, onTrigger, registrar = globalShortcut } = options;
 
   try {
     if (registrar.register(accelerator, onTrigger)) {
-      return { accelerator, registered: true };
+      return { accelerator, action, registered: true };
     }
     return {
       accelerator,
+      action,
       registered: false,
       error: `Another application already owns ${accelerator}. Pick a different hotkey in Settings.`,
     };
   } catch (error) {
     return {
       accelerator,
+      action,
       registered: false,
       error: error instanceof Error ? error.message : String(error),
     };
@@ -146,7 +195,7 @@ export class HotkeyManager {
 
   #bind(action: keyof HotkeyBindings, accelerator: string): HotkeyOutcome {
     const held = this.#bound.get(action);
-    if (held === accelerator) return { accelerator, registered: true };
+    if (held === accelerator) return { accelerator, action, registered: true };
     if (held !== undefined) {
       this.#registrar.unregister(held);
       this.#bound.delete(action);
@@ -154,6 +203,7 @@ export class HotkeyManager {
 
     const outcome = registerHotkey({
       accelerator,
+      action,
       onTrigger: () => this.#triggers[action](),
       registrar: this.#registrar,
     });
