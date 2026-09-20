@@ -139,13 +139,23 @@ interface RawNode {
   left: number;
 }
 
+/**
+ * Why a read produced nothing.
+ *
+ * Absent for a window that published no text, which is a real answer: the helper ran,
+ * walked the tree and found nothing. A helper that returned zero bytes is a different
+ * thing entirely, and collapsing the two makes the pet report an empty window when the
+ * truth is that the read never happened.
+ */
+export type WindowTextFailure = 'no-output' | 'unparseable';
+
 export interface WindowTextReading {
   text: string;
   /** True when the cap cut the read short, so a pet does not read a stop as an ending. */
   truncated: boolean;
+  /** Absent when the read worked, including when it worked and found no text. */
+  failure?: WindowTextFailure;
 }
-
-const EMPTY: WindowTextReading = { text: '', truncated: false };
 
 function isRawNode(value: unknown): value is RawNode {
   if (typeof value !== 'object' || value === null) return false;
@@ -176,13 +186,13 @@ function textOf(node: RawNode): string {
  */
 export function parseWindowText(stdout: string, maxChars: number): WindowTextReading {
   const trimmed = stdout.trim();
-  if (trimmed.length === 0) return EMPTY;
+  if (trimmed.length === 0) return { text: '', truncated: false, failure: 'no-output' };
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(trimmed);
   } catch {
-    return EMPTY;
+    return { text: '', truncated: false, failure: 'unparseable' };
   }
 
   const entries = (Array.isArray(parsed) ? parsed : [parsed]).filter(isRawNode);

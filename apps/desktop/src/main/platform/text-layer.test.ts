@@ -88,9 +88,13 @@ describe('createUiaTextLayer', () => {
   it('returns an empty read rather than throwing when the helper gives nothing', async () => {
     // PowerShell missing, blocked by policy, a window that closed between the inventory
     // and the read. None of those may cost the user their ask.
+    //
+    // It carries the failure as well as the emptiness: a helper that returned zero bytes
+    // and a window that published zero characters are not the same thing, and a caller
+    // that cannot tell them apart says "this window is empty" when the read never ran.
     const reading = await createUiaTextLayer(vi.fn().mockResolvedValue('')).readWindowText(42, 100);
 
-    expect(reading).toEqual({ text: '', truncated: false });
+    expect(reading).toEqual({ text: '', truncated: false, failure: 'no-output' });
   });
 
   it('survives the helper rejecting outright', async () => {
@@ -99,6 +103,7 @@ describe('createUiaTextLayer', () => {
     await expect(createUiaTextLayer(run).readWindowText(42, 100)).resolves.toEqual({
       text: '',
       truncated: false,
+      failure: 'no-output',
     });
   });
 

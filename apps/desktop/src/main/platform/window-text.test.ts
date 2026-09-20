@@ -218,3 +218,29 @@ describe('countWindowTextScript', () => {
     expect(countWindowTextScript([])).toContain('$handles = @()');
   });
 });
+
+describe('telling a failed read from a window with nothing in it', () => {
+  it('reports no-output when the helper printed nothing at all', () => {
+    // A helper that returned zero bytes and a window that published zero characters are
+    // not the same thing, and collapsing them makes the pet say "this window is empty"
+    // when the truth is "the read never ran".
+    expect(parseWindowText('', 8_000).failure).toBe('no-output');
+    expect(parseWindowText('  ', 8_000).failure).toBe('no-output');
+  });
+
+  it('reports unparseable for output that is not JSON', () => {
+    expect(parseWindowText('At line:1 char:1', 8_000).failure).toBe('unparseable');
+  });
+
+  it('reports no failure for a window that legitimately published nothing', () => {
+    // An empty array is a real answer: the helper ran, walked the tree and found no text.
+    const reading = parseWindowText('[]', 8_000);
+
+    expect(reading.failure).toBeUndefined();
+    expect(reading.text).toBe('');
+  });
+
+  it('reports no failure for a window that published text', () => {
+    expect(parseWindowText(JSON.stringify([node({ name: 'a' })]), 8_000).failure).toBeUndefined();
+  });
+});

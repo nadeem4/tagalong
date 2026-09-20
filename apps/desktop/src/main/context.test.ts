@@ -34,7 +34,7 @@ function fakePlatform(overrides: Partial<Platform> = {}): Platform {
     }),
     // Phase 2B. Empty by default so a test that reaches the enumeration without meaning
     // to fails on a missing inventory rather than on invented windows.
-    listWindows: async () => [],
+    listWindows: async () => ({ windows: [] }),
     ...overrides,
   };
 }
@@ -249,7 +249,7 @@ describe('the windows perception target', () => {
   ];
 
   it('asks the platform for the inventory and puts it in the patch', async () => {
-    const platform = fakePlatform({ listWindows: async () => inventory });
+    const platform = fakePlatform({ listWindows: async () => ({ windows: inventory }) });
 
     const { patch } = await capturePatch(platform, ['windows'], {
       exclusions: NOTHING_EXCLUDED,
@@ -260,7 +260,7 @@ describe('the windows perception target', () => {
 
   it('does not enumerate windows when the engine did not ask for them', async () => {
     // The enumeration spawns PowerShell. A text-only ask must not pay for it.
-    const listWindows = vi.fn(async () => inventory);
+    const listWindows = vi.fn(async () => ({ windows: inventory }));
     const platform = fakePlatform({ listWindows });
 
     await capturePatch(platform, ['selection'], { exclusions: NOTHING_EXCLUDED });
@@ -269,7 +269,7 @@ describe('the windows perception target', () => {
   });
 
   it('hands the exclusion list down, so blocked windows are marked at the source', async () => {
-    const listWindows = vi.fn(async () => inventory);
+    const listWindows = vi.fn(async () => ({ windows: inventory }));
     const platform = fakePlatform({ listWindows });
 
     await capturePatch(platform, ['windows'], { exclusions: PASSWORD_MANAGER });
@@ -294,7 +294,7 @@ describe('the windows perception target', () => {
   });
 
   it('omits an empty inventory rather than claiming the desktop is empty', async () => {
-    const platform = fakePlatform({ listWindows: async () => [] });
+    const platform = fakePlatform({ listWindows: async () => ({ windows: [] }) });
 
     const { patch } = await capturePatch(platform, ['windows'], {
       exclusions: NOTHING_EXCLUDED,
@@ -315,5 +315,64 @@ describe('DESKTOP_CAPABILITIES', () => {
     // a broken pet rather than a missing feature. The claim only became true here, when
     // the read landed, so the assertion flips here and nowhere earlier.
     expect(DESKTOP_CAPABILITIES).toContain('textLayer');
+  });
+});
+
+describe('a failed window enumeration', () => {
+  it('complains rather than passing off an empty desktop as the truth', async () => {
+    // The whole reason this exists. A broken helper and a quiet desktop both produced an
+    // empty list, so a completely non-functional enumeration shipped through a task, a
+    // review and a green CI run without one line of output anywhere saying so.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const platform = fakePlatform({
+      listWindows: async () => ({ windows: [], failure: 'no-output' as const }),
+    });
+
+    const { patch, warnings } = await capturePatch(platform, ['windows'], {
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(patch.windows).toBeUndefined();
+    expect(warnings.join(' ')).toMatch(/window list|enumerat/i);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('keeps omitting the inventory from the snapshot, so the pet is not told a lie', async () => {
+    // The judgement call from task 3 stands: an empty list must not reach the prompt as
+    // "no windows are open". What changes is that the omission now comes with a
+    // complaint instead of silence.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const platform = fakePlatform({
+      listWindows: async () => ({ windows: [], failure: 'no-windows' as const }),
+    });
+
+    const { patch } = await capturePatch(platform, ['windows'], { exclusions: NOTHING_EXCLUDED });
+
+    expect(patch.windows).toBeUndefined();
+    warn.mockRestore();
+  });
+
+  it('says nothing when the enumeration worked', async () => {
+    const platform = fakePlatform({
+      listWindows: async () => ({
+        windows: [
+          {
+            id: 'w-1',
+            processName: 'Code.exe',
+            title: 'a',
+            state: 'background' as const,
+            browser: false,
+          },
+        ],
+      }),
+    });
+
+    const { patch, warnings } = await capturePatch(platform, ['windows'], {
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(patch.windows).toHaveLength(1);
+    expect(warnings).toEqual([]);
   });
 });

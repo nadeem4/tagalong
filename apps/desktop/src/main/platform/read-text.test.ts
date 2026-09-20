@@ -146,3 +146,50 @@ describe('readWindowTextWith', () => {
     expect(result.notes === undefined || result.notes.length > 0).toBe(true);
   });
 });
+
+describe('a read that never ran', () => {
+  function failing(failure: 'no-output' | 'unparseable'): ReadWindowTextDeps {
+    const read = vi.fn().mockResolvedValue({ text: '', truncated: false, failure });
+    return {
+      listWindows: () => Promise.resolve([entry()]),
+      textLayer: { readWindowText: read, countWindowText: vi.fn() },
+    };
+  }
+
+  it('does not claim the window published nothing when the helper never answered', async () => {
+    // The lie this prevents: "Code published no text through the accessibility tree" is a
+    // statement about the window. When the helper returned zero bytes it is a statement
+    // about Tagalong, and a pet repeating the first version tells the user their file is
+    // empty.
+    const result = await readWindowTextWith(failing('no-output'), {
+      windowId: 'w-1',
+      maxChars: 8_000,
+    });
+
+    expect(result.notes?.join(' ')).not.toMatch(/published no text/i);
+    expect(result.notes?.join(' ')).toMatch(/could not|did not run|failed/i);
+  });
+
+  it('says the same for output it could not parse', async () => {
+    const result = await readWindowTextWith(failing('unparseable'), {
+      windowId: 'w-1',
+      maxChars: 8_000,
+    });
+
+    expect(result.notes?.join(' ')).toMatch(/could not|did not run|failed/i);
+  });
+
+  it('still claims nothing was published when the window genuinely published nothing', async () => {
+    // The other half of the distinction: an empty read that really happened.
+    const read = vi.fn().mockResolvedValue({ text: '', truncated: false });
+    const result = await readWindowTextWith(
+      {
+        listWindows: () => Promise.resolve([entry()]),
+        textLayer: { readWindowText: read, countWindowText: vi.fn() },
+      },
+      { windowId: 'w-1', maxChars: 8_000 },
+    );
+
+    expect(result.notes?.join(' ')).toMatch(/published no text/i);
+  });
+});

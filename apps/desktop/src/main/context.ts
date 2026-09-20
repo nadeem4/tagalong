@@ -44,7 +44,24 @@ export interface AskCapture {
 export interface PatchCapture {
   patch: ContextSnapshotPatch;
   blocked: CaptureBlock | null;
+  /**
+   * Things that went wrong quietly enough that nothing else would have said so.
+   *
+   * Perception is best effort, and most of what it cannot read is genuinely optional. An
+   * enumeration that returns nothing is different: a running desktop always has at least
+   * one top-level window, since Tagalong's own is one, so nothing is not a thin answer
+   * but a broken one. Carrying it here is what lets the host surface it instead of the
+   * failure looking exactly like a quiet desktop.
+   */
+  warnings: string[];
 }
+
+/** Why an empty window list is a failure rather than an answer. */
+const ENUMERATION_COMPLAINTS: Record<string, string> = {
+  'no-output': 'the window list helper returned nothing at all',
+  unparseable: 'the window list helper returned output that could not be read',
+  'no-windows': 'the window list enumerated no windows, which cannot happen on a running desktop',
+};
 
 /**
  * Perception is best effort.
@@ -138,6 +155,7 @@ export async function capturePatch(
   options: { exclusions: CaptureExclusions },
 ): Promise<PatchCapture> {
   const patch: ContextSnapshotPatch = {};
+  const warnings: string[] = [];
   let blocked: CaptureBlock | null = null;
 
   if (what.includes('selection')) {
@@ -157,12 +175,22 @@ export async function capturePatch(
     : null;
 
   if (what.includes('windows')) {
-    const windows = await attempt('the open windows', () =>
+    const inventory = await attempt('the open windows', () =>
       platform.listWindows(options.exclusions),
     );
-    // An empty list means the enumeration failed or found nothing it could classify, not
-    // that the desktop is empty. Omitting it keeps the pet from reasoning off a lie.
-    if (windows !== null && windows.length > 0) patch.windows = windows;
+    // The inventory is still omitted from the snapshot when it is empty — a pet told the
+    // desktop has no windows on it will reason from that. What changed is that the
+    // omission is no longer silent: an empty list is a failure, and staying quiet about
+    // it is what let a completely broken enumeration ship unnoticed.
+    if (inventory === null) {
+      warnings.push('the window list could not be read at all');
+    } else if (inventory.failure !== undefined) {
+      const complaint = ENUMERATION_COMPLAINTS[inventory.failure] ?? 'the window list failed';
+      warnings.push(complaint);
+      console.warn(`[context] ${complaint}`);
+    } else if (inventory.windows.length > 0) {
+      patch.windows = inventory.windows;
+    }
   }
 
   if (what.includes('activeWindow')) Object.assign(patch, appOf(window));
@@ -172,5 +200,5 @@ export async function capturePatch(
     blocked = shot.blocked;
   }
 
-  return { patch, blocked };
+  return { patch, blocked, warnings };
 }

@@ -87,7 +87,9 @@ export function createUiaTextLayer(run: RunScript): TextLayerProvider {
         const stdout = await run(readWindowTextScript(handle), WINDOW_TEXT_WALK_MS + 1_000);
         return parseWindowText(stdout, maxChars);
       } catch {
-        return { text: '', truncated: false };
+        // A throw is a read that never happened, which is not the same as a window with
+        // nothing in it. Saying so keeps the caller from describing the window as empty.
+        return { text: '', truncated: false, failure: 'no-output' };
       }
     },
 

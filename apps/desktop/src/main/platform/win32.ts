@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { clipboard, desktopCapturer, nativeImage, screen } from 'electron';
 import { buildInventory } from '@tagalong/core';
-import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
+import type { CaptureExclusions } from '@tagalong/protocol';
 import { captureActiveWindowImageWith } from './capture';
 import { captureDisplaysWith } from './displays';
 import type { DisplaysCapture } from './displays';
@@ -18,7 +18,7 @@ import {
   parseWindowList,
   placeOnDisplays,
 } from './window-list';
-import type { ActiveWindowInfo, CapturedImage, Platform } from './index';
+import type { ActiveWindowInfo, CapturedImage, Platform, WindowInventory } from './index';
 
 /**
  * Sends Ctrl+C to the foreground app.
@@ -118,14 +118,18 @@ export class Win32Platform implements Platform {
     return createUiaTextLayer((script, timeoutMs) => this.#runScript(script, timeoutMs));
   }
 
-  async listWindows(exclusions: CaptureExclusions): Promise<WindowEntry[]> {
+  async listWindows(exclusions: CaptureExclusions): Promise<WindowInventory> {
     const stdout = await this.#runScript(LIST_WINDOWS_SCRIPT, WINDOW_HELPER_TIMEOUT_MS);
-    const placed = placeOnDisplays(parseWindowList(stdout), screen);
+    const outcome = parseWindowList(stdout);
+    // Nothing to count and nothing to classify: hand the failure up rather than spending
+    // a second PowerShell start on an empty list.
+    if (outcome.failure !== undefined) return { windows: [], failure: outcome.failure };
 
+    const placed = placeOnDisplays(outcome.windows, screen);
     // Counting is a second pass rather than part of enumeration, so an excluded window is
     // never walked: the exclusion list decides who is countable before anyone looks.
     const counts = await this.#textLayer.countWindowText(countableHandles(placed, exclusions));
-    return buildInventory(attachTextCounts(placed, counts), exclusions);
+    return { windows: buildInventory(attachTextCounts(placed, counts), exclusions) };
   }
 
   async readWindowText(
@@ -133,7 +137,10 @@ export class Win32Platform implements Platform {
     exclusions: CaptureExclusions,
   ): Promise<ReadTextAnswer> {
     return readWindowTextWith(
-      { textLayer: this.#textLayer, listWindows: () => this.listWindows(exclusions) },
+      {
+        textLayer: this.#textLayer,
+        listWindows: async () => (await this.listWindows(exclusions)).windows,
+      },
       params,
     );
   }
@@ -156,7 +163,7 @@ export class Win32Platform implements Platform {
         },
         desktopCapturer,
         getActiveWindow: () => this.getActiveWindow(),
-        listWindows: () => this.listWindows(exclusions),
+        listWindows: async () => (await this.listWindows(exclusions)).windows,
         exclusions,
         // The one Electron call the composite makes. Everything upstream of it is buffer
         // arithmetic the unit tests drive with no display attached.

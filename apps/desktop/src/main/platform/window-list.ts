@@ -45,6 +45,21 @@ function isRawWindow(value: unknown): value is RawWindow {
 }
 
 /**
+ * Why an enumeration produced nothing.
+ *
+ * Every one of these is a failure. They are kept apart because they point at different
+ * causes: `no-output` means the helper never really ran, `unparseable` means something
+ * else wrote to stdout, and `no-windows` means it ran and answered with an impossibility.
+ */
+export type WindowEnumerationFailure = 'no-output' | 'unparseable' | 'no-windows';
+
+export interface WindowListOutcome {
+  windows: EnumeratedWindow[];
+  /** Absent when the enumeration actually worked. */
+  failure?: WindowEnumerationFailure;
+}
+
+/**
  * Reads the helper's stdout into observed windows.
  *
  * Forgiving on purpose. This shares stdout with whatever PowerShell decides to print, the
@@ -52,21 +67,24 @@ function isRawWindow(value: unknown): value is RawWindow {
  * enumerated and being described. None of that may cost the user their ask — a missing
  * inventory is a pet that knows less, while a thrown error is a pet that says nothing.
  */
-export function parseWindowList(stdout: string): EnumeratedWindow[] {
+export function parseWindowList(stdout: string): WindowListOutcome {
   const text = stdout.trim();
-  if (text.length === 0) return [];
+  // Zero bytes is the signature of a helper that failed without saying so: PowerShell
+  // exits 0, prints nothing to either stream, and every caller downstream sees a desktop
+  // with no windows on it. Naming it is the only thing that makes it visible.
+  if (text.length === 0) return { windows: [], failure: 'no-output' };
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch {
-    return [];
+    return { windows: [], failure: 'unparseable' };
   }
 
   // ConvertTo-Json unwraps a one-element array into a bare object unless told otherwise.
   const entries = Array.isArray(parsed) ? parsed : [parsed];
 
-  return entries
+  const windows: EnumeratedWindow[] = entries
     .filter(isRawWindow)
     .slice(0, MAX_WINDOWS)
     .map((window) => ({
@@ -79,6 +97,11 @@ export function parseWindowList(stdout: string): EnumeratedWindow[] {
       state: window.minimized ? 'minimized' : window.foreground ? 'foreground' : 'background',
       bounds: window.bounds,
     }));
+
+  // A running desktop cannot legitimately have zero top-level windows — Tagalong's own
+  // window is one of them. Zero means the enumeration failed, whether the helper printed
+  // an empty list or printed entries that none of them survived validation.
+  return windows.length === 0 ? { windows, failure: 'no-windows' } : { windows };
 }
 
 /** An observed window that still carries the bounds used to place it on a display. */

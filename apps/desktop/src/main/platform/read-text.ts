@@ -96,6 +96,20 @@ export async function readWindowTextWith(
   }
 
   const reading = await deps.textLayer.readWindowText(handle, params.maxChars);
+
+  // A read that never ran is not a window with nothing in it. "Code published no text
+  // through the accessibility tree" is a claim about the window; when the helper returned
+  // zero bytes the only honest claim is about Tagalong. A pet repeating the first version
+  // tells the user their file is empty.
+  if (reading.failure !== undefined) {
+    return nothing(target.id, [
+      `Tagalong could not read this window: the text helper ${
+        reading.failure === 'no-output' ? 'returned nothing' : 'returned output that made no sense'
+      }. This says nothing about what is in the window — do not describe it as empty. Trying ` +
+        `again may work.`,
+    ]);
+  }
+
   const notes = textLayerNotes({
     processName: target.processName,
     state: target.state,
