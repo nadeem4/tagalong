@@ -11,10 +11,13 @@ export const DESKTOP_CAPABILITIES = [
   'activeWindow',
   'clipboard',
   'screenshot',
-  // Phase 2B. `textLayer` is deliberately absent until the text layer lands: advertising
-  // a capability the host cannot honour makes the engine call a method that fails, which
-  // reads to the user as a broken pet rather than a missing feature.
+  // Phase 2B.
   'displays',
+  // The text layer reads any window by id, including ones behind others and minimized
+  // ones. Advertised only now that `perception.readText` is answered: a capability the
+  // host cannot honour makes the engine call a method that fails, which reads to the user
+  // as a broken pet rather than a missing feature.
+  'textLayer',
 ] as const;
 
 /**

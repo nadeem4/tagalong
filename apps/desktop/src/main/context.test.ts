@@ -23,6 +23,15 @@ function fakePlatform(overrides: Partial<Platform> = {}): Platform {
     // still satisfies Platform, and returns an empty capture so a test that reaches it by
     // accident fails on missing displays rather than on a missing method.
     captureDisplays: async () => ({ displays: [], composite: null }),
+    // Phase 2B. Nothing in this file reads window text; the stub keeps the fake a valid
+    // Platform and answers with an empty read, so a test that reaches it by accident
+    // fails on missing text rather than on a missing method.
+    readWindowText: async () => ({
+      windowId: '',
+      text: '',
+      truncated: false,
+      source: 'uia' as const,
+    }),
     // Phase 2B. Empty by default so a test that reaches the enumeration without meaning
     // to fails on a missing inventory rather than on invented windows.
     listWindows: async () => [],
@@ -300,9 +309,11 @@ describe('DESKTOP_CAPABILITIES', () => {
     expect(DESKTOP_CAPABILITIES).toContain('displays');
   });
 
-  it('does not advertise a text layer yet, which task 4 brings', () => {
-    // Advertising a capability the host cannot honour makes the engine call a method that
-    // will fail, which reads to the user as a broken pet rather than a missing feature.
-    expect(DESKTOP_CAPABILITIES).not.toContain('textLayer');
+  it('advertises the text layer, now that perception.readText is answered', () => {
+    // Task 3 asserted the opposite, deliberately: advertising a capability the host
+    // cannot honour makes the engine call a method that fails, which reads to the user as
+    // a broken pet rather than a missing feature. The claim only became true here, when
+    // the read landed, so the assertion flips here and nowhere earlier.
+    expect(DESKTOP_CAPABILITIES).toContain('textLayer');
   });
 });

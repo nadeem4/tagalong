@@ -175,6 +175,9 @@ export const PerceptionReadTextResult = z.object({
    */
   notes: z.array(z.string().min(1)).optional(),
 });
+export type PerceptionReadTextParams = z.infer<typeof PerceptionReadTextParams>;
+export type PerceptionReadTextResult = z.infer<typeof PerceptionReadTextResult>;
+export type PerceptionListWindowsResult = z.infer<typeof PerceptionListWindowsResult>;
 
 // ---------------------------------------------------------------------------
 // Core to host notifications (no result; the host must not answer)

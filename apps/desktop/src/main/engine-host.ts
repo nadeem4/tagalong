@@ -50,6 +50,7 @@ export async function startEngineHost(options: StartEngineHostOptions): Promise<
     token: engine.pairingToken,
     hostVersion: app.getVersion(),
     capabilities: DESKTOP_CAPABILITIES,
+    readText: (params) => options.platform.readWindowText(params, options.captureExclusions()),
     capture: async (what) => {
       const { patch, blocked } = await capturePatch(options.platform, what, {
         exclusions: options.captureExclusions(),

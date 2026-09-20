@@ -6,9 +6,18 @@ import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
 import { captureActiveWindowImageWith } from './capture';
 import { captureDisplaysWith } from './displays';
 import type { DisplaysCapture } from './displays';
+import { readWindowTextWith } from './read-text';
+import type { ReadTextAnswer, ReadWindowTextParams } from './read-text';
 import { captureSelectionWith } from './selection';
+import { createUiaTextLayer } from './text-layer';
+import type { TextLayerProvider } from './text-layer';
 import { LIST_WINDOWS_SCRIPT, runWindowHelper } from './window-helper';
-import { parseWindowList, placeOnDisplays } from './window-list';
+import {
+  attachTextCounts,
+  countableHandles,
+  parseWindowList,
+  placeOnDisplays,
+} from './window-list';
 import type { ActiveWindowInfo, CapturedImage, Platform } from './index';
 
 /**
@@ -78,20 +87,55 @@ export class Win32Platform implements Platform {
    * returns partial output, so a window that will not answer costs some of the inventory
    * rather than the ask behind it.
    */
-  async listWindows(exclusions: CaptureExclusions): Promise<WindowEntry[]> {
-    const stdout = await runWindowHelper(
-      () =>
+  /**
+   * Runs a PowerShell script and resolves with whatever it printed.
+   *
+   * Shared by enumeration and the text layer so there is one place that decides how
+   * PowerShell is started, and one place to change when it needs to be started
+   * differently.
+   */
+  #runScript(script: string, timeoutMs: number): Promise<string> {
+    return runWindowHelper(
+      (encoded) =>
         spawn(
           'powershell.exe',
-          ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', '-'],
+          [
+            '-NoProfile',
+            '-NonInteractive',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-EncodedCommand',
+            encoded,
+          ],
           { windowsHide: true },
         ),
-      LIST_WINDOWS_SCRIPT,
-      WINDOW_HELPER_TIMEOUT_MS,
+      script,
+      timeoutMs,
     );
+  }
 
+  get #textLayer(): TextLayerProvider {
+    return createUiaTextLayer((script, timeoutMs) => this.#runScript(script, timeoutMs));
+  }
+
+  async listWindows(exclusions: CaptureExclusions): Promise<WindowEntry[]> {
+    const stdout = await this.#runScript(LIST_WINDOWS_SCRIPT, WINDOW_HELPER_TIMEOUT_MS);
     const placed = placeOnDisplays(parseWindowList(stdout), screen);
-    return buildInventory(placed, exclusions);
+
+    // Counting is a second pass rather than part of enumeration, so an excluded window is
+    // never walked: the exclusion list decides who is countable before anyone looks.
+    const counts = await this.#textLayer.countWindowText(countableHandles(placed, exclusions));
+    return buildInventory(attachTextCounts(placed, counts), exclusions);
+  }
+
+  async readWindowText(
+    params: ReadWindowTextParams,
+    exclusions: CaptureExclusions,
+  ): Promise<ReadTextAnswer> {
+    return readWindowTextWith(
+      { textLayer: this.#textLayer, listWindows: () => this.listWindows(exclusions) },
+      params,
+    );
   }
 
   async captureDisplays(

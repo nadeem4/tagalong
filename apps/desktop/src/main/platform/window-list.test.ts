@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseWindowList, placeOnDisplays } from './window-list';
+import type { ObservedWindow } from '@tagalong/core';
+
+import {
+  attachTextCounts,
+  countableHandles,
+  parseWindowList,
+  placeOnDisplays,
+} from './window-list';
 import type { RawWindow } from './window-list';
 import type { WindowBounds } from './index';
 
@@ -141,5 +148,85 @@ describe('placeOnDisplays', () => {
     };
     const placed = placeOnDisplays(parseWindowList(ONE), throwing);
     expect(placed[0]?.displayId).toBeUndefined();
+  });
+});
+
+describe('countableHandles', () => {
+  const observed = (id: string, processName: string, title = ''): ObservedWindow => ({
+    id,
+    processName,
+    title,
+    state: 'background',
+  });
+
+  it('offers every window the exclusion list allows', () => {
+    const handles = countableHandles([observed('w-1', 'Code.exe'), observed('w-2', 'chrome.exe')], {
+      processNames: [],
+      titlePatterns: [],
+    });
+
+    expect(handles).toEqual([1, 2]);
+  });
+
+  it('leaves out an excluded window, because counting it means walking it', () => {
+    // The count is not the leak; the walk is. Counting an excluded window would pull its
+    // contents into the helper process to measure them.
+    const handles = countableHandles(
+      [observed('w-1', 'Code.exe'), observed('w-2', '1Password.exe')],
+      { processNames: ['1Password.exe'], titlePatterns: [] },
+    );
+
+    expect(handles).toEqual([1]);
+  });
+
+  it('leaves out a window excluded by its title', () => {
+    const handles = countableHandles([observed('w-1', 'chrome.exe', 'My Vault — 1Password')], {
+      processNames: [],
+      titlePatterns: ['*Vault*'],
+    });
+
+    expect(handles).toEqual([]);
+  });
+
+  it('skips an id it cannot turn back into a handle', () => {
+    expect(
+      countableHandles([observed('nonsense', 'Code.exe')], {
+        processNames: [],
+        titlePatterns: [],
+      }),
+    ).toEqual([]);
+  });
+});
+
+describe('attachTextCounts', () => {
+  const observed = (id: string): ObservedWindow => ({
+    id,
+    processName: 'Code.exe',
+    title: 'a',
+    state: 'background',
+  });
+
+  it('attaches the count for a window that has one', () => {
+    const [window] = attachTextCounts([observed('w-1')], new Map([[1, 456]]));
+    expect(window?.textChars).toBe(456);
+  });
+
+  it('attaches a zero, which says the window published nothing', () => {
+    const [window] = attachTextCounts([observed('w-1')], new Map([[1, 0]]));
+    expect(window?.textChars).toBe(0);
+  });
+
+  it('leaves a window with no count alone rather than calling it zero', () => {
+    // Absent means nobody looked. Rendering that as zero would have the pet skip a
+    // window worth reading.
+    const [window] = attachTextCounts([observed('w-1')], new Map());
+    expect(window?.textChars).toBeUndefined();
+  });
+
+  it('keeps every other field untouched', () => {
+    const [window] = attachTextCounts([observed('w-7')], new Map([[7, 1]]));
+    expect(window?.id).toBe('w-7');
+    expect(window?.processName).toBe('Code.exe');
+    expect(window?.state).toBe('background');
   });
 });

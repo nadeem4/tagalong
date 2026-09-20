@@ -1,4 +1,6 @@
+import { findCaptureBlock } from '@tagalong/core';
 import type { ObservedWindow } from '@tagalong/core';
+import type { CaptureExclusions } from '@tagalong/protocol';
 
 import type { WindowBounds } from './index';
 
@@ -121,4 +123,49 @@ export function handleOf(id: string): number | null {
   if (match === null) return null;
   const handle = Number(match[1]);
   return Number.isSafeInteger(handle) ? handle : null;
+}
+
+/**
+ * Which windows may have their readable characters counted.
+ *
+ * Counting means walking the accessibility tree, and walking an excluded window is
+ * exactly what the exclusion list exists to prevent — the count is not the leak, the walk
+ * that produces it is. Filtering here rather than discarding counts afterwards means an
+ * excluded window's contents are never pulled into the helper process at all.
+ *
+ * Uses the same `findCaptureBlock` the inventory does, so there is one matcher and not
+ * two that can drift apart.
+ */
+export function countableHandles(
+  observed: readonly ObservedWindow[],
+  exclusions: CaptureExclusions,
+): number[] {
+  const handles: number[] = [];
+  for (const window of observed) {
+    const blocked = findCaptureBlock(
+      { processName: window.processName, title: window.title },
+      exclusions,
+    );
+    if (blocked !== null) continue;
+    const handle = handleOf(window.id);
+    if (handle !== null) handles.push(handle);
+  }
+  return handles;
+}
+
+/**
+ * Puts the counted characters back on the windows they belong to.
+ *
+ * A window with no count keeps none. Absent means nobody looked, which is different from
+ * zero, and rendering absent as zero would have the pet skip a window worth reading.
+ */
+export function attachTextCounts(
+  observed: readonly ObservedWindow[],
+  counts: ReadonlyMap<number, number>,
+): ObservedWindow[] {
+  return observed.map((window) => {
+    const handle = handleOf(window.id);
+    const chars = handle === null ? undefined : counts.get(handle);
+    return chars === undefined ? window : { ...window, textChars: chars };
+  });
 }
