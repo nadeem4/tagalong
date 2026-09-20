@@ -1,6 +1,12 @@
 /**
  * The window enumeration helper, and the wrapper that runs it.
  *
+ * The C# for the P/Invokes is one single-quoted line rather than a here-string. PowerShell
+ * reading commands from stdin silently swallows an `Add-Type @"..."@` block and everything
+ * after it: the process exits 0, prints nothing, and reports no error. That failure is
+ * invisible from the outside, which is exactly why the script is shaped to avoid it and
+ * why a test asserts the here-string never comes back.
+ *
  * The script is a string here rather than a file on disk. A bundled `.ps1` has to survive
  * electron-vite's build, the asar archive and the installer, and each of those is a way
  * for the inventory to work in development and be missing in the packaged app. A string
@@ -19,15 +25,7 @@
 export const LIST_WINDOWS_SCRIPT = String.raw`
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-public class TagalongWin {
-  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
-  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
-  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
-}
-"@
+Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class TagalongWin { [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h); [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h); [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); }'
 $foreground = [TagalongWin]::GetForegroundWindow()
 $root = [System.Windows.Automation.AutomationElement]::RootElement
 $tops = $root.FindAll([System.Windows.Automation.TreeScope]::Children, [System.Windows.Automation.Condition]::TrueCondition)
@@ -59,10 +57,26 @@ foreach ($w in $tops) {
 ConvertTo-Json -Depth 4 -Compress @($out)
 `;
 
+/**
+ * Encodes a script for PowerShell's `-EncodedCommand`: UTF-16LE, then base64.
+ *
+ * The whole script arrives as one argument and is parsed as one script block. That is the
+ * point. `-Command -`, which feeds the script over stdin, parses line by line: a `foreach`
+ * whose body spans lines, or an `Add-Type @"..."@`, produces nothing at all — exit 0, no
+ * output, no error, and every statement after it lost. The same text saved as a .ps1 runs
+ * correctly, which is what makes the failure so easy to ship.
+ *
+ * Base64 of UTF-16LE is about 2.7 times the script's length, and Windows allows roughly
+ * 32,000 characters of command line, so these scripts sit an order of magnitude inside the
+ * limit.
+ */
+export function encodePowerShellCommand(script: string): string {
+  return Buffer.from(script, 'utf16le').toString('base64');
+}
+
 /** The slice of a spawned child this wrapper touches, so a test can hand over its own. */
 export interface HelperChild {
   stdout: { on(event: 'data', listener: (chunk: unknown) => void): unknown };
-  stdin: { write(chunk: string): unknown; end(): unknown };
   on(event: string, listener: (...args: unknown[]) => void): unknown;
   kill(): unknown;
 }
@@ -86,14 +100,14 @@ const MAX_OUTPUT_BYTES = 1_000_000;
  * not answer.
  */
 export function runWindowHelper(
-  spawnChild: () => HelperChild,
+  spawnChild: (encoded: string) => HelperChild,
   script: string,
   timeoutMs: number,
 ): Promise<string> {
   return new Promise<string>((resolve) => {
     let child: HelperChild;
     try {
-      child = spawnChild();
+      child = spawnChild(encodePowerShellCommand(script));
     } catch {
       resolve('');
       return;
@@ -128,12 +142,5 @@ export function runWindowHelper(
       output = '';
       finish();
     });
-
-    try {
-      child.stdin.write(script);
-      child.stdin.end();
-    } catch {
-      finish();
-    }
   });
 }

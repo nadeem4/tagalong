@@ -1,6 +1,8 @@
 import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
 
 import type { DisplaysCapture } from './displays';
+import type { ReadTextAnswer, ReadWindowTextParams } from './read-text';
+import type { WindowEnumerationFailure } from './window-list';
 import { Win32Platform } from './win32';
 
 /** Where the foreground window is, so the panel can open next to what the user is reading. */
@@ -52,7 +54,18 @@ export interface Platform {
    * refused while the rest are returned, so the decision belongs inside the enumeration.
    * Entries come back already classified, so nothing downstream has to remember to check.
    */
-  listWindows(exclusions: CaptureExclusions): Promise<WindowEntry[]>;
+  listWindows(exclusions: CaptureExclusions): Promise<WindowInventory>;
+  /**
+   * Phase 2B: the text of one window, named by id or defaulting to the foreground one.
+   *
+   * Takes the exclusion list because the refusal has to happen before the read, not after
+   * it: a read that runs and is then discarded has already pulled the window's contents
+   * into this process.
+   */
+  readWindowText(
+    params: ReadWindowTextParams,
+    exclusions: CaptureExclusions,
+  ): Promise<ReadTextAnswer>;
 }
 
 /**
@@ -65,4 +78,18 @@ export function createPlatform(platform: NodeJS.Platform = process.platform): Pl
 }
 
 export type { Win32Platform };
+/**
+ * The window inventory, and whether producing it actually worked.
+ *
+ * The failure is carried rather than folded into an empty array because the two are
+ * indistinguishable otherwise — which is how an enumeration that never worked at all
+ * shipped through a task, a review and a green CI run.
+ */
+export interface WindowInventory {
+  windows: WindowEntry[];
+  failure?: WindowEnumerationFailure;
+}
+
 export type { CapturedDisplay, DisplayInfo, DisplaysCapture } from './displays';
+export type { ReadTextAnswer, ReadWindowTextParams } from './read-text';
+export type { TextLayerProvider } from './text-layer';

@@ -1,15 +1,24 @@
-import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { clipboard, desktopCapturer, nativeImage, screen } from 'electron';
 import { buildInventory } from '@tagalong/core';
-import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
+import type { CaptureExclusions } from '@tagalong/protocol';
 import { captureActiveWindowImageWith } from './capture';
 import { captureDisplaysWith } from './displays';
 import type { DisplaysCapture } from './displays';
+import { readWindowTextWith } from './read-text';
+import type { ReadTextAnswer, ReadWindowTextParams } from './read-text';
 import { captureSelectionWith } from './selection';
-import { LIST_WINDOWS_SCRIPT, runWindowHelper } from './window-helper';
-import { parseWindowList, placeOnDisplays } from './window-list';
-import type { ActiveWindowInfo, CapturedImage, Platform } from './index';
+import { createUiaTextLayer } from './text-layer';
+import type { TextLayerProvider } from './text-layer';
+import { runPowerShellScript } from './powershell';
+import { LIST_WINDOWS_SCRIPT } from './window-helper';
+import {
+  attachTextCounts,
+  countableHandles,
+  parseWindowList,
+  placeOnDisplays,
+} from './window-list';
+import type { ActiveWindowInfo, CapturedImage, Platform, WindowInventory } from './index';
 
 /**
  * Sends Ctrl+C to the foreground app.
@@ -78,20 +87,35 @@ export class Win32Platform implements Platform {
    * returns partial output, so a window that will not answer costs some of the inventory
    * rather than the ask behind it.
    */
-  async listWindows(exclusions: CaptureExclusions): Promise<WindowEntry[]> {
-    const stdout = await runWindowHelper(
-      () =>
-        spawn(
-          'powershell.exe',
-          ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', '-'],
-          { windowsHide: true },
-        ),
-      LIST_WINDOWS_SCRIPT,
-      WINDOW_HELPER_TIMEOUT_MS,
-    );
+  get #textLayer(): TextLayerProvider {
+    return createUiaTextLayer(runPowerShellScript);
+  }
 
-    const placed = placeOnDisplays(parseWindowList(stdout), screen);
-    return buildInventory(placed, exclusions);
+  async listWindows(exclusions: CaptureExclusions): Promise<WindowInventory> {
+    const stdout = await runPowerShellScript(LIST_WINDOWS_SCRIPT, WINDOW_HELPER_TIMEOUT_MS);
+    const outcome = parseWindowList(stdout);
+    // Nothing to count and nothing to classify: hand the failure up rather than spending
+    // a second PowerShell start on an empty list.
+    if (outcome.failure !== undefined) return { windows: [], failure: outcome.failure };
+
+    const placed = placeOnDisplays(outcome.windows, screen);
+    // Counting is a second pass rather than part of enumeration, so an excluded window is
+    // never walked: the exclusion list decides who is countable before anyone looks.
+    const counts = await this.#textLayer.countWindowText(countableHandles(placed, exclusions));
+    return { windows: buildInventory(attachTextCounts(placed, counts), exclusions) };
+  }
+
+  async readWindowText(
+    params: ReadWindowTextParams,
+    exclusions: CaptureExclusions,
+  ): Promise<ReadTextAnswer> {
+    return readWindowTextWith(
+      {
+        textLayer: this.#textLayer,
+        listWindows: async () => (await this.listWindows(exclusions)).windows,
+      },
+      params,
+    );
   }
 
   async captureDisplays(
@@ -112,7 +136,7 @@ export class Win32Platform implements Platform {
         },
         desktopCapturer,
         getActiveWindow: () => this.getActiveWindow(),
-        listWindows: () => this.listWindows(exclusions),
+        listWindows: async () => (await this.listWindows(exclusions)).windows,
         exclusions,
         // The one Electron call the composite makes. Everything upstream of it is buffer
         // arithmetic the unit tests drive with no display attached.

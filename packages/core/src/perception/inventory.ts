@@ -17,6 +17,14 @@ export interface ObservedWindow {
   readonly state: 'foreground' | 'background' | 'minimized';
   /** Absent when the host could not place the window on a display. */
   readonly displayId?: number;
+  /**
+   * Readable characters the text layer found, when the host counted them.
+   *
+   * Absent and zero mean different things and are kept apart. Absent is "nobody looked",
+   * which happens when the host has no text layer. Zero is "looked, found none", which is
+   * worth telling the pet because it saves a tool call that would return nothing.
+   */
+  readonly textChars?: number;
 }
 
 /**
@@ -83,8 +91,25 @@ export function buildInventory(
       browser: isBrowserProcess(window.processName),
       ...(window.displayId === undefined ? {} : { displayId: window.displayId }),
       ...(blocked === null ? {} : { blocked }),
+      // The count goes the way of the title for a blocked window. Knowing a vault holds
+      // 4,000 readable characters says more than nothing at all, and this is a window the
+      // user asked Tagalong never to read.
+      ...(blocked === null && window.textChars !== undefined
+        ? { textChars: window.textChars }
+        : {}),
     };
   });
+}
+
+/**
+ * The readable-character count as it appears on a line.
+ *
+ * Rounded above a thousand because the pet is deciding whether a read is worth a tool
+ * call, and no decision turns on the difference between 5,399 and 5,400. Rounding also
+ * signals what the number is: an indication, not a promise about what comes back.
+ */
+function countMark(chars: number): string {
+  return chars < 1_000 ? `t${chars}` : `t${Math.round(chars / 1_000)}k`;
 }
 
 function shorten(title: string): string {
@@ -114,11 +139,15 @@ export function renderInventory(windows: readonly WindowEntry[]): string {
     const where = window.displayId === undefined ? '' : ` d${window.displayId}`;
     const browser = window.browser ? ' browser' : '';
     const name = window.processName.replace(/\.exe$/i, '');
-    return `${window.id} ${name}${where} ${STATE_CODE[window.state]} "${shorten(window.title)}"${browser}`;
+    // Absent stays absent rather than rendering as t0: the pet would read "nobody looked"
+    // as "there is nothing there" and skip a window worth reading.
+    const chars = window.textChars === undefined ? '' : ` ${countMark(window.textChars)}`;
+    return `${window.id} ${name}${where} ${STATE_CODE[window.state]} "${shorten(window.title)}"${chars}${browser}`;
   });
 
   return [
-    `Open windows (${windows.length}). fg foreground, bg background, min minimized, d1 display 1.`,
+    `Open windows (${windows.length}). fg foreground, bg background, min minimized, d1 display 1, ` +
+      `t900 about 900 readable characters and t5k about 5,000.`,
     'Read one with read_window_text(id); no window text is included here.',
     'A browser window exposes only its active tab; other tabs need the browser extension.',
     ...lines,

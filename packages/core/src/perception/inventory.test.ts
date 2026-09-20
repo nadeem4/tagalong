@@ -139,20 +139,27 @@ describe('renderInventory', () => {
         title: `A fairly ordinary window title number ${index + 1}`,
         displayId: (index % 3) + 1,
         state: index === 0 ? 'foreground' : index % 4 === 0 ? 'minimized' : 'background',
+        // Counts on every line, because that is what the budget has to survive. A fixture
+        // without them would measure the inventory as it was before the text layer.
+        textChars: index % 5 === 0 ? 0 : index * 1_237,
       }),
     );
   }
 
-  it('stays under 300 tokens on a twelve-window desktop', () => {
+  it('stays under 400 tokens on a twelve-window desktop carrying text counts', () => {
     // The acceptance clause. The inventory rides along with every full-view capture, so
     // it is paid for on every ask whether or not the pet uses it.
     //
-    // Measured at 276 against a budget of 300: about 8% of headroom, which is not much.
-    // Anything added to a *line* is multiplied by the window count, so put new wording in
-    // the header instead. Moving the browser caveat out of the lines is what brought this
-    // from 383 down to 276.
+    // The budget rose from 300 to 400 when the text layer added a readable-character
+    // count to every line. Measured at 311 (932 characters), so about 22% of headroom —
+    // more than the 8% the pre-count inventory was left with, because the counts are
+    // short and the explanation of them sits in the header.
+    //
+    // Anything added to a *line* is multiplied by the window count, so new wording
+    // belongs in the header instead. Moving the browser caveat out of the lines is what
+    // brought the pre-count figure from 383 down to 276.
     const text = renderInventory(buildInventory(desktopOf(12), NOTHING_EXCLUDED));
-    expect(tokens(text)).toBeLessThan(300);
+    expect(tokens(text)).toBeLessThan(400);
   });
 
   it('truncates a long title rather than letting one window eat the budget', () => {
@@ -201,5 +208,57 @@ describe('renderInventory', () => {
 
   it('says plainly when there are no windows', () => {
     expect(renderInventory([])).toMatch(/no .*window/i);
+  });
+});
+
+describe('the readable-character count', () => {
+  it('carries a count the host supplied', () => {
+    const [entry] = buildInventory([observed({ textChars: 5_399 })], NOTHING_EXCLUDED);
+    expect(entry?.textChars).toBe(5_399);
+  });
+
+  it('leaves the count absent when the host did not supply one', () => {
+    const [entry] = buildInventory([observed({})], NOTHING_EXCLUDED);
+    expect(entry?.textChars).toBeUndefined();
+  });
+
+  it('carries a zero count, which is different from not knowing', () => {
+    // A window that published nothing is a fact worth telling the pet: it stops it
+    // spending a tool call to find out.
+    const [entry] = buildInventory([observed({ textChars: 0 })], NOTHING_EXCLUDED);
+    expect(entry?.textChars).toBe(0);
+  });
+
+  it('drops the count for an excluded window', () => {
+    // The count is itself a small leak. Knowing a vault holds 4,000 characters says more
+    // than nothing at all, and the window is one the user asked Tagalong never to read.
+    const [entry] = buildInventory([observed({ processName: '1Password.exe', textChars: 4_000 })], {
+      processNames: ['1Password.exe'],
+      titlePatterns: [],
+    });
+    expect(entry?.blocked).toBeDefined();
+    expect(entry?.textChars).toBeUndefined();
+  });
+
+  it('renders a small count exactly and a large one rounded', () => {
+    const text = renderInventory(
+      buildInventory(
+        [observed({ id: 'w-1', textChars: 456 }), observed({ id: 'w-2', textChars: 5_399 })],
+        NOTHING_EXCLUDED,
+      ),
+    );
+    expect(text).toContain('t456');
+    expect(text).toContain('t5k');
+  });
+
+  it('says nothing about text for a window with no count, rather than implying zero', () => {
+    const text = renderInventory(buildInventory([observed({ id: 'w-9' })], NOTHING_EXCLUDED));
+    const line = text.split('\n').find((row) => row.startsWith('w-9')) ?? '';
+    expect(line).not.toMatch(/\bt\d/);
+  });
+
+  it('explains the count marker in the header, not on every line', () => {
+    const text = renderInventory(buildInventory([observed({ textChars: 10 })], NOTHING_EXCLUDED));
+    expect(text.split('\n')[0]).toMatch(/t\d/);
   });
 });

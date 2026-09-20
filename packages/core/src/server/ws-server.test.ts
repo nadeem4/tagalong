@@ -258,3 +258,60 @@ describe('perception.capture', () => {
     expect(patch.selection).toBe('the highlighted text');
   });
 });
+
+describe('perception.readText', () => {
+  it('asks the host for one window and resolves with what it read', async () => {
+    const s = await start();
+    const client = await TestClient.connect(s.port);
+    await client.call('hello', hello());
+    client.onRequest = () => ({
+      windowId: 'w-1',
+      text: 'error TS2532',
+      truncated: false,
+      source: 'uia',
+    });
+
+    const session = s.sessions()[0] as HostSession;
+    const reading = await session.readText({ windowId: 'w-1', maxChars: 8_000 });
+
+    expect(reading.text).toBe('error TS2532');
+    expect(reading.windowId).toBe('w-1');
+  });
+
+  it('carries the notes that qualify a thin read', async () => {
+    const s = await start();
+    const client = await TestClient.connect(s.port);
+    await client.call('hello', hello());
+    client.onRequest = () => ({
+      windowId: 'w-1',
+      text: '',
+      truncated: false,
+      source: 'uia',
+      notes: ['Code published no text through the accessibility tree.'],
+    });
+
+    const session = s.sessions()[0] as HostSession;
+    const reading = await session.readText({ maxChars: 8_000 });
+
+    expect(reading.notes?.[0]).toMatch(/no text/);
+  });
+
+  it('carries a refusal for an excluded window', async () => {
+    const s = await start();
+    const client = await TestClient.connect(s.port);
+    await client.call('hello', hello());
+    client.onRequest = () => ({
+      windowId: 'w-1',
+      text: '',
+      truncated: false,
+      source: 'uia',
+      blocked: { rule: 'processName', entry: '1Password.exe' },
+    });
+
+    const session = s.sessions()[0] as HostSession;
+    const reading = await session.readText({ windowId: 'w-1', maxChars: 8_000 });
+
+    expect(reading.blocked?.entry).toBe('1Password.exe');
+    expect(reading.text).toBe('');
+  });
+});

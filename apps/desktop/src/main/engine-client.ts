@@ -1,4 +1,9 @@
-import { coreToHostNotifications, engineUrl, resultSchemaFor } from '@tagalong/protocol';
+import {
+  DEFAULT_WINDOW_TEXT_CHARS,
+  coreToHostNotifications,
+  engineUrl,
+  resultSchemaFor,
+} from '@tagalong/protocol';
 import type {
   ContextSnapshotPatch,
   CoreToHostNotification,
@@ -20,6 +25,8 @@ export interface EngineClientOptions {
   token: string;
   hostVersion: string;
   capabilities: readonly HostCapability[];
+  /** Answers perception.readText: the text of one window the pet named. */
+  readText: (params: { windowId?: string; maxChars: number }) => Promise<unknown>;
   /** Answers perception.capture, which is how a pet looks at the screen mid-turn. */
   capture: (what: readonly PerceptionTarget[]) => Promise<ContextSnapshotPatch>;
   onNotification: (notification: EngineNotification) => void;
@@ -148,16 +155,27 @@ export class EngineClient {
     }
   }
 
-  /** The one core-to-host request in Phase 1: the engine asking this host to look. */
+  /** The core-to-host requests this host answers: looking, and reading one window. */
   async #answer(id: string, method: string, params: unknown): Promise<void> {
-    if (method !== 'perception.capture') {
-      this.#send({ jsonrpc: '2.0', id, error: { code: -32601, message: `unknown ${method}` } });
-      return;
-    }
     try {
-      const what = (params as { what?: PerceptionTarget[] }).what ?? [];
-      const snapshot = await this.#options.capture(what);
-      this.#send({ jsonrpc: '2.0', id, result: { snapshot } });
+      if (method === 'perception.capture') {
+        const what = (params as { what?: PerceptionTarget[] }).what ?? [];
+        this.#send({ jsonrpc: '2.0', id, result: { snapshot: await this.#options.capture(what) } });
+        return;
+      }
+      if (method === 'perception.readText') {
+        const asked = params as { windowId?: string; maxChars?: number };
+        this.#send({
+          jsonrpc: '2.0',
+          id,
+          result: await this.#options.readText({
+            ...(asked.windowId === undefined ? {} : { windowId: asked.windowId }),
+            maxChars: asked.maxChars ?? DEFAULT_WINDOW_TEXT_CHARS,
+          }),
+        });
+        return;
+      }
+      this.#send({ jsonrpc: '2.0', id, error: { code: -32601, message: `unknown ${method}` } });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.#send({ jsonrpc: '2.0', id, error: { code: -32000, message } });

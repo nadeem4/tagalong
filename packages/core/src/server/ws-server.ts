@@ -6,6 +6,7 @@ import {
   ENGINE_HOST,
   HelloParams,
   PROTOCOL_VERSION,
+  PerceptionReadTextResult,
   RPC_ERROR_CODES,
   RpcRequest,
   hostToCoreMethods,
@@ -15,6 +16,8 @@ import {
 import type {
   CoreToHostNotification,
   HostCapability,
+  PerceptionReadTextParams,
+  PerceptionReadTextResult as PerceptionReadTextResultType,
   HostKind,
   NotificationParamsOf,
   ParamsOf,
@@ -34,7 +37,19 @@ export interface HostSession {
   notify<N extends CoreToHostNotification>(method: N, params: NotificationParamsOf<N>): void;
   /** Asks the host to perceive something and waits for its answer. */
   capture(what: readonly PerceptionTarget[]): Promise<ContextSnapshotPatch>;
+  /**
+   * Asks the host for the text of one window.
+   *
+   * One window, never a list. Reading the whole desktop's text would be about 11,600
+   * tokens on an ordinary twelve-window session, which is why the pet reads the ~300
+   * token inventory first and names the window it actually wants.
+   */
+  readText(params: ReadTextParams): Promise<ReadTextReading>;
 }
+
+/** What the engine asks for. `windowId` absent means the foreground window. */
+export type ReadTextParams = PerceptionReadTextParams;
+export type ReadTextReading = PerceptionReadTextResultType;
 
 /** Everything a host may call, minus hello, which the server answers itself. */
 export type MethodHandlers = {
@@ -84,6 +99,14 @@ class SessionImpl implements HostSession {
     const raw = await this.#request(id, 'perception.capture', { what });
     const result = raw as { snapshot?: unknown };
     return ContextSnapshotPatch.parse(result.snapshot ?? {});
+  }
+
+  async readText(params: ReadTextParams): Promise<ReadTextReading> {
+    const id = `readText-${this.#nextRequestId++}`;
+    const raw = await this.#request(id, 'perception.readText', params);
+    // Parsed rather than trusted: this crosses a socket, and a malformed reading that
+    // reached the model would look to the user like the pet inventing screen contents.
+    return PerceptionReadTextResult.parse(raw);
   }
 
   /** Resolves a core-to-host request the host has answered. */

@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { LIST_WINDOWS_SCRIPT, runWindowHelper } from './window-helper';
+import { LIST_WINDOWS_SCRIPT, encodePowerShellCommand, runWindowHelper } from './window-helper';
 import type { HelperChild } from './window-helper';
 
 class FakeChild extends EventEmitter implements HelperChild {
@@ -64,12 +64,23 @@ describe('runWindowHelper', () => {
     vi.useRealTimers();
   });
 
-  it('feeds the script in over stdin and closes it', async () => {
+  it('hands the script over as one encoded argument, not over stdin', async () => {
+    // Changed deliberately from the stdin transport this file used to assert. Feeding a
+    // script to `powershell -Command -` parses it line by line: any block spanning lines
+    // produces nothing at all, with exit 0 and no error. Measured on a desktop with
+    // twelve windows open, the enumeration returned an empty list.
     const child = new FakeChild();
-    const run = runWindowHelper(() => child, 'Write-Output 1', 3000);
+    let encoded = '';
+    const run = runWindowHelper(
+      (argument) => {
+        encoded = argument;
+        return child;
+      },
+      'Write-Output 1',
+      3000,
+    );
 
-    expect(child.written.join('')).toContain('Write-Output 1');
-    expect(child.ended).toBe(true);
+    expect(Buffer.from(encoded, 'base64').toString('utf16le')).toBe('Write-Output 1');
 
     child.finish();
     await run;
@@ -143,5 +154,38 @@ describe('runWindowHelper', () => {
     child.finish();
 
     expect((await run).length).toBeLessThanOrEqual(1_000_000);
+  });
+});
+
+describe('encodePowerShellCommand', () => {
+  it('round-trips a multi-line script through UTF-16LE base64', () => {
+    const script = ['foreach ($i in @(1,2)) {', '  Write-Output $i', '}', ''].join('\n');
+    expect(Buffer.from(encodePowerShellCommand(script), 'base64').toString('utf16le')).toBe(script);
+  });
+
+  it('stays far inside the Windows command-line limit', () => {
+    // Base64 of UTF-16LE is about 2.7x the source. Windows allows roughly 32,000
+    // characters, and a script that outgrew that would fail as an unexplained spawn
+    // error rather than anything legible.
+    expect(encodePowerShellCommand(LIST_WINDOWS_SCRIPT).length).toBeLessThan(30_000);
+  });
+});
+
+describe('the scripts and the transport that carries them', () => {
+  it('uses no here-string, which PowerShell swallows however it is fed', () => {
+    // Not a style rule. Feeding `Add-Type @"..."@` to `powershell -Command -` makes the
+    // process exit 0, print nothing and report no error — and every statement after it is
+    // lost with it. The enumeration returned an empty desktop on a machine with eleven
+    // windows open, and nothing anywhere said why.
+    //
+    // Running the same text as a .ps1 file works, which is what makes this so easy to
+    // miss: the script is correct and the transport is not.
+    expect(LIST_WINDOWS_SCRIPT).not.toContain('@"');
+  });
+
+  it('still defines the window helpers it needs from user32', () => {
+    for (const entry of ['IsIconic', 'IsWindowVisible', 'GetForegroundWindow']) {
+      expect(LIST_WINDOWS_SCRIPT).toContain(entry);
+    }
   });
 });

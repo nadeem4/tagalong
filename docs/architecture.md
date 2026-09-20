@@ -236,6 +236,11 @@ Everything OS-specific sits behind `Platform` in `src/main/platform/`. `createPl
 OS with no adapter rather than returning a stub, because a host that silently perceives nothing looks
 like a broken engine instead of a missing port. Windows is the only implementation until Phase 7.
 
+`TextLayerProvider` is the second interface here, and it exists for the same stated reason: Phase 7
+names the macOS implementation, which answers the same two questions through the Accessibility API.
+It reads one window's text by id — including a window behind another and a minimized one, both of
+which UI Automation answers for — and counts readable characters for the inventory.
+
 Each capability is a free function taking its Electron dependencies as ports — `desktopCapturer`,
 `screen`, `nativeImage` — and the class only wires the real ones in. That is what lets the whole
 perception layer be tested in plain Node with no display attached, which matters because CI has no
@@ -246,6 +251,28 @@ not an inconsistency. For a single screenshot the caller checks exclusions and t
 picture or does not, so the answer is yes or no. For a full-view capture one display can be refused
 while the others are returned, and the composite has to show that refusal in the refused display's
 slot — so the decision has to happen inside the capture rather than above it.
+
+#### Talking to PowerShell
+
+The window scripts are strings in the source, passed to `powershell.exe` through
+`-EncodedCommand` as base64 UTF-16LE. Both halves of that are deliberate and both were learned the
+expensive way.
+
+A bundled `.ps1` would have to survive electron-vite, the asar archive and the installer, each of
+which is a way for the inventory to work in development and be missing from the packaged app. A
+string cannot go missing.
+
+`-EncodedCommand` rather than feeding the script to `-Command -` over stdin, because stdin is parsed
+line by line. A `foreach` whose body spans lines, or an `Add-Type @"..."@` block, produces **nothing
+at all** — exit 0, empty stdout, empty stderr, and every statement after it silently lost. The same
+text saved as a `.ps1` and run directly works perfectly, which is what makes the failure so easy to
+ship: verifying the script proves nothing about the transport. `-EncodedCommand` delivers the whole
+script as one argument, parsed as one block. Base64 of UTF-16LE is about 2.7 times the source and
+Windows allows roughly 32,000 characters of command line, so these scripts sit an order of magnitude
+inside the limit. A test asserts the encoded length stays there, and another asserts no here-string
+returns.
+
+#### Building the composite
 
 The composite is the one image Tagalong builds rather than captures. Electron's `nativeImage` resizes
 and encodes but cannot compose, so the pixels are handled directly: `toBitmap` hands over a BGRA

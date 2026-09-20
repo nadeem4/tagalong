@@ -159,7 +159,25 @@ export const PerceptionReadTextResult = z.object({
   source: z.enum(['uia', 'ocr']),
   /** Present when an exclusion refused this window. `text` is then empty. */
   blocked: CaptureBlock.optional(),
+  /**
+   * What the text does not say, in plain sentences the pet can repeat.
+   *
+   * An accessibility tree carries what an application chooses to publish. Editors,
+   * terminals and canvas apps draw their own glyphs and publish only menus and tab
+   * titles, so a read of one returns a few hundred characters that look like a complete
+   * answer and are not. Measured on a live desktop: a minimized editor returned 456
+   * characters, all of it window chrome, none of it the open file.
+   *
+   * A separate field rather than a prefix on `text`, so a pet cannot quote a caveat back
+   * as though it were something on the user's screen. Attached where the read happens
+   * rather than left to whatever surfaces the result later: a qualification that depends
+   * on a later consumer remembering it is a qualification that goes missing.
+   */
+  notes: z.array(z.string().min(1)).optional(),
 });
+export type PerceptionReadTextParams = z.infer<typeof PerceptionReadTextParams>;
+export type PerceptionReadTextResult = z.infer<typeof PerceptionReadTextResult>;
+export type PerceptionListWindowsResult = z.infer<typeof PerceptionListWindowsResult>;
 
 // ---------------------------------------------------------------------------
 // Core to host notifications (no result; the host must not answer)
