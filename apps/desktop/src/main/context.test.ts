@@ -14,6 +14,10 @@ function fakePlatform(overrides: Partial<Platform> = {}): Platform {
     captureSelection: async () => 'the highlighted paragraph',
     readClipboard: async () => 'clipboard contents',
     captureActiveWindowImage: async () => ({ base64: 'cG5n', width: 1568, height: 882 }),
+    // Phase 2B. Nothing in this file asks for displays yet; the stub exists so the fake
+    // still satisfies Platform, and returns an empty capture so a test that reaches it by
+    // accident fails on missing displays rather than on a missing method.
+    captureDisplays: async () => ({ displays: [], composite: null }),
     ...overrides,
   };
 }

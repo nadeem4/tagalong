@@ -1,6 +1,9 @@
 import { setTimeout as delay } from 'node:timers/promises';
-import { clipboard, desktopCapturer, screen } from 'electron';
+import { clipboard, desktopCapturer, nativeImage, screen } from 'electron';
+import type { CaptureExclusions } from '@tagalong/protocol';
 import { captureActiveWindowImageWith } from './capture';
+import { captureDisplaysWith } from './displays';
+import type { DisplaysCapture } from './displays';
 import { captureSelectionWith } from './selection';
 import type { ActiveWindowInfo, CapturedImage, Platform } from './index';
 
@@ -47,6 +50,37 @@ export class Win32Platform implements Platform {
         desktopCapturer,
         screen,
         getActiveWindow: () => this.getActiveWindow(),
+        log: (message) => console.log(`[platform:win32] ${message}`),
+      },
+      maxLongSide,
+    );
+  }
+
+  async captureDisplays(
+    maxLongSide: number,
+    exclusions: CaptureExclusions,
+  ): Promise<DisplaysCapture> {
+    return captureDisplaysWith(
+      {
+        screen: {
+          getAllDisplays: () =>
+            screen.getAllDisplays().map((display) => ({
+              id: display.id,
+              bounds: display.bounds,
+              scaleFactor: display.scaleFactor,
+              primary: display.id === screen.getPrimaryDisplay().id,
+            })),
+          getDisplayMatching: (bounds) => screen.getDisplayMatching(bounds),
+        },
+        desktopCapturer,
+        getActiveWindow: () => this.getActiveWindow(),
+        exclusions,
+        // The one Electron call the composite makes. Everything upstream of it is buffer
+        // arithmetic the unit tests drive with no display attached.
+        encodePng: (bitmap) =>
+          nativeImage
+            .createFromBitmap(bitmap.data, { width: bitmap.width, height: bitmap.height })
+            .toPNG(),
         log: (message) => console.log(`[platform:win32] ${message}`),
       },
       maxLongSide,
