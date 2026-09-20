@@ -35,7 +35,8 @@ tagalong/
   packages/
     protocol/src/
       index.ts                      # PROTOCOL_VERSION, ENGINE_HOST, DEFAULT_ENGINE_PORT, engineUrl
-      context.ts                    # ContextSnapshot, ContextSnapshotPatch, PerceptionTarget
+      context.ts                    # ContextSnapshot, CapturedImage, DisplaySnapshot, WindowEntry,
+                                    # ContextSnapshotPatch, PerceptionTarget
       pet.ts                        # Pet, ReplyStyle
       message.ts                    # Conversation, Message, MessageContent
       rpc.ts                        # JSON-RPC envelopes and error codes

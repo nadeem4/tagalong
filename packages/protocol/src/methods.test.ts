@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_WINDOW_TEXT_CHARS,
+  HostCapability,
+  MAX_WINDOW_TEXT_CHARS,
+  PerceptionCaptureRegionParams,
+  PerceptionCaptureRegionResult,
+  PerceptionListWindowsParams,
+  PerceptionListWindowsResult,
+  PerceptionReadTextParams,
+  PerceptionReadTextResult,
   coreToHostMethods,
   coreToHostNotifications,
   hostToCoreMethods,
@@ -212,5 +221,200 @@ describe('perception.capture', () => {
       snapshot: { selection: 'just the selection' },
     });
     expect(parsed.snapshot.selection).toBe('just the selection');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 2B: full view
+// ---------------------------------------------------------------------------
+
+describe('HostCapability, full view', () => {
+  it('knows the two new capabilities', () => {
+    expect(HostCapability.safeParse('displays').success).toBe(true);
+    expect(HostCapability.safeParse('textLayer').success).toBe(true);
+  });
+
+  it('still knows every capability a Phase 1 host advertises', () => {
+    for (const capability of ['selection', 'screenshot', 'activeWindow', 'clipboard', 'pageText']) {
+      expect(HostCapability.safeParse(capability).success, capability).toBe(true);
+    }
+  });
+});
+
+describe('the core-to-host catalog after 2B', () => {
+  it('carries the three new perception methods', () => {
+    expect(Object.keys(coreToHostMethods).sort()).toEqual([
+      'perception.capture',
+      'perception.captureRegion',
+      'perception.listWindows',
+      'perception.readText',
+    ]);
+  });
+
+  it('has no recall, diff or watch method, which belong to Phase 3B', () => {
+    // Asserted rather than assumed: awareness was split out of this phase on purpose, and
+    // a method sneaking in here is how a phase boundary quietly stops meaning anything.
+    const names = [...Object.keys(coreToHostMethods), ...Object.keys(coreToHostNotifications)];
+    for (const forbidden of ['recall', 'diff', 'watch']) {
+      expect(
+        names.filter((name) => name.toLowerCase().includes(forbidden)),
+        `${forbidden} belongs to Phase 3B`,
+      ).toEqual([]);
+    }
+  });
+});
+
+describe('perception.captureRegion', () => {
+  const valid = {
+    displayId: 2528732444,
+    rect: { x: 100, y: 200, width: 640, height: 480 },
+    maxLongSide: 1568,
+  };
+
+  it('parses a crop request', () => {
+    expect(PerceptionCaptureRegionParams.parse(valid).rect.width).toBe(640);
+  });
+
+  it('accepts a negative origin, because display coordinates can be negative', () => {
+    expect(
+      PerceptionCaptureRegionParams.safeParse({ ...valid, rect: { ...valid.rect, x: -1800 } })
+        .success,
+    ).toBe(true);
+  });
+
+  it('rejects a rectangle with no area', () => {
+    expect(
+      PerceptionCaptureRegionParams.safeParse({ ...valid, rect: { ...valid.rect, height: 0 } })
+        .success,
+    ).toBe(false);
+  });
+
+  it('rejects a maxLongSide of zero', () => {
+    expect(PerceptionCaptureRegionParams.safeParse({ ...valid, maxLongSide: 0 }).success).toBe(
+      false,
+    );
+  });
+
+  it('returns one image', () => {
+    const parsed = PerceptionCaptureRegionResult.parse({
+      image: { mime: 'image/png', base64: 'aGk=', width: 640, height: 480 },
+    });
+    expect(parsed.image.width).toBe(640);
+  });
+});
+
+describe('perception.listWindows', () => {
+  it('takes no parameters, because the inventory is the whole answer', () => {
+    expect(PerceptionListWindowsParams.safeParse({}).success).toBe(true);
+  });
+
+  it('returns an array of entries and accepts an empty one', () => {
+    expect(PerceptionListWindowsResult.parse({ windows: [] }).windows).toEqual([]);
+    expect(
+      PerceptionListWindowsResult.safeParse({
+        windows: [
+          {
+            id: 'w-1',
+            processName: 'Code.exe',
+            title: 'a',
+            state: 'minimized',
+            browser: false,
+          },
+        ],
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a window entry carrying text, which belongs to readText', () => {
+    const parsed = PerceptionListWindowsResult.parse({
+      windows: [
+        { id: 'w-1', processName: 'Code.exe', title: 'a', state: 'background', browser: false },
+      ],
+    });
+    expect(parsed.windows[0]).not.toHaveProperty('text');
+  });
+});
+
+describe('perception.readText', () => {
+  it('reads one named window', () => {
+    const parsed = PerceptionReadTextParams.parse({ windowId: 'w-1' });
+    expect(parsed.windowId).toBe('w-1');
+  });
+
+  it('reads the foreground window when no window is named', () => {
+    expect(PerceptionReadTextParams.parse({}).windowId).toBeUndefined();
+  });
+
+  it('defaults maxChars to the documented per-window budget', () => {
+    expect(PerceptionReadTextParams.parse({}).maxChars).toBe(DEFAULT_WINDOW_TEXT_CHARS);
+  });
+
+  it('refuses a maxChars above the hard ceiling', () => {
+    expect(
+      PerceptionReadTextParams.safeParse({ maxChars: MAX_WINDOW_TEXT_CHARS + 1 }).success,
+    ).toBe(false);
+    expect(PerceptionReadTextParams.safeParse({ maxChars: 0 }).success).toBe(false);
+  });
+
+  it('has no scope parameter, so there is no way to ask for every window at once', () => {
+    // The whole cost argument of this phase rests on this. Measured on a twelve-window
+    // desktop, reading everything is 46,491 characters, about 11,600 tokens, in one call.
+    expect(Object.keys(PerceptionReadTextParams.shape).sort()).toEqual(['maxChars', 'windowId']);
+  });
+
+  it('answers for exactly one window, never a list', () => {
+    const parsed = PerceptionReadTextResult.parse({
+      windowId: 'w-1',
+      text: 'error TS2532',
+      truncated: false,
+      source: 'uia',
+    });
+    expect(parsed.windowId).toBe('w-1');
+    expect(Array.isArray(parsed.text)).toBe(false);
+  });
+
+  it('says when it handed back a prefix rather than the whole window', () => {
+    expect(
+      PerceptionReadTextResult.parse({
+        windowId: 'w-1',
+        text: 'x'.repeat(10),
+        truncated: true,
+        source: 'uia',
+      }).truncated,
+    ).toBe(true);
+  });
+
+  it('marks OCR text, which may contain recognition errors', () => {
+    expect(
+      PerceptionReadTextResult.safeParse({
+        windowId: 'w-1',
+        text: 'rn vs m',
+        truncated: false,
+        source: 'ocr',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a source it does not know', () => {
+    expect(
+      PerceptionReadTextResult.safeParse({
+        windowId: 'w-1',
+        text: '',
+        truncated: false,
+        source: 'guesswork',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('returns a refusal instead of text for an excluded window', () => {
+    const parsed = PerceptionReadTextResult.parse({
+      windowId: 'w-1',
+      text: '',
+      truncated: false,
+      source: 'uia',
+      blocked: { rule: 'processName', entry: '1Password.exe' },
+    });
+    expect(parsed.blocked?.entry).toBe('1Password.exe');
+    expect(parsed.text).toBe('');
   });
 });

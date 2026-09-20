@@ -1,4 +1,4 @@
-import type { CaptureExclusions } from '@tagalong/protocol';
+import type { CaptureBlock, CaptureExclusions } from '@tagalong/protocol';
 
 /**
  * The little a host knows about the focused window when it asks whether it may capture.
@@ -9,12 +9,14 @@ export interface ActiveWindow {
   readonly title?: string;
 }
 
-/** Which configured entry refused the capture, so the UI can say why rather than "blocked". */
-export interface CaptureBlock {
-  readonly rule: 'processName' | 'titlePattern';
-  /** The exclusion entry as the user wrote it, for display. */
-  readonly entry: string;
-}
+/**
+ * Which configured entry refused the capture, re-exported from the protocol.
+ *
+ * It lives there rather than here because it now crosses the socket: a full-view capture
+ * refuses one display or one window while returning the rest, so the reason has to travel
+ * with the snapshot. Two structurally identical definitions would drift.
+ */
+export type { CaptureBlock };
 
 /**
  * Windows process names are not case-stable — the same binary is reported as `Chrome.exe`,

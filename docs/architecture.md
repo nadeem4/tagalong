@@ -80,6 +80,18 @@ Hosts implement two contracts.
   host advertises what it can actually read in the `capabilities` array of `hello`. The desktop host
   currently advertises `selection`, `activeWindow`, and `clipboard`; page text only ever comes from the
   extension.
+- Phase 2B adds three more core-to-host methods and two capabilities behind them. `perception.listWindows`
+  returns the window inventory — what each window is and where, never what is in it. `perception.readText`
+  returns the text of **exactly one** window, named by id or defaulting to the foreground one, capped and
+  flagged when truncated. `perception.captureRegion` returns a native-resolution crop of one display.
+  A host that can do the first and third advertises `displays`; one that can do the second advertises
+  `textLayer`.
+
+  There is deliberately no scope that reads every window at once. Measured on a twelve-window Windows
+  desktop, the whole text layer is 46,491 characters — roughly 11,600 tokens — in a single call, and one
+  background browser window supplied 34,588 of them. The inventory costs about 200 tokens, so the pet
+  reads that, picks a window, and pays for one. The absence is asserted by a test, not left to habit.
+
 - **Presentation** renders pets, streams replies, plays audio, and shows approval cards.
 
 Adding a host or an OS never touches the core.
@@ -99,7 +111,9 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
 
 - **Host to core:** `hello`, `ask`, `interrupt`, `pets.list`, `pets.upsert`, `pets.delete`,
   `settings.get`, `settings.set`, `tool.approve` (Phase 5).
-- **Core to host:** `perception.capture`, the one call that goes the other way.
+- **Core to host:** `perception.capture`, and from Phase 2B `perception.captureRegion`,
+  `perception.listWindows`, and `perception.readText`. Nothing for recall, diff, or watch — those belong
+  to Phase 3B, and a test asserts they have not crept in early.
 - **Core to host notifications:** `turn.started`, `turn.delta`, `turn.completed`, `turn.error`,
   `turn.warning`, plus `turn.audio` (Phase 3), `turn.toolRequest` and `turn.toolResult` (Phase 5),
   and `pet.message` (Phase 4). `turn.warning` carries the same `{ code, message }` as `turn.error`
