@@ -72,6 +72,14 @@ Fetch the phase page before starting the phase. Fetch the task rows before start
 - **Secrets never enter git.** Env vars in development, OS keychain in the packaged app. Every
   variable used anywhere must appear in `.env.example`.
 - **Diagrams are Mermaid, black and white theme only.**
+- **No AI attribution anywhere.** Nothing in this project credits Claude, Claude Code, Anthropic
+  or any AI as an author or contributor — not in commit messages or trailers, PR titles or
+  bodies, the README, `docs/`, acceptance records, code comments, or Notion pages and task
+  updates. No `Co-Authored-By: Claude`, no "Generated with", no "🤖", no "written by an agent"
+  note. The work is the user's and ships under their name alone. Naming Anthropic as a **vendor**
+  is different and fine — the `AnthropicProvider`, the Claude API, the model ids, and the
+  legal-and-compliance note about Claude Max in `docs/specs/` all stay. The test is authorship,
+  not the word: say who built it, never that an AI did.
 
 ## Commit sizing
 
@@ -97,7 +105,7 @@ Never commit to `main`. Every unit of work goes through a branch and a merged PR
    it closes, and how the acceptance text was verified.
 4. Wait for CI to pass on the PR. A red PR is never merged.
 5. Merge with `gh pr merge --squash --delete-branch`, then pull `main` before the next branch.
-6. Never add Claude or AI attribution lines to commit messages or PR bodies.
+6. No AI attribution in the branch, commits or PR — see the invariant above.
 
 A phase is finished when every one of its workstream PRs is merged and `main` is green.
 
@@ -115,4 +123,5 @@ a decision the next agent will have to re-think unless it is written down.
 - About to start phase N+1 while a phase N task is still `Not started`
 - Reaching for a mouse/keyboard automation library
 - About to make a real API call to check your own work — use the fake provider
+- About to write `Co-Authored-By`, "Generated with", "🤖", or any note that an AI did the work
 - About to tick an acceptance item that needs a real provider, instead of handing it to the user
