@@ -26,7 +26,16 @@ test.beforeAll(async () => {
     cwd: appDir,
     // Fake providers keep the smoke test offline and deterministic: no API key, no
     // network, and a scripted answer that always streams the same way.
-    env: { ...process.env, TAGALONG_FAKE_PROVIDERS: '1' },
+    env: {
+      ...process.env,
+      TAGALONG_FAKE_PROVIDERS: '1',
+      // Scripts the fake pet to reach for list_windows before it answers, which is the
+      // only way a tool call travels the real socket to the real host in this suite.
+      // Every tool test feeds the toolset a fake host and every host test feeds the
+      // parser fixture output, so the perception.* methods between them are covered by
+      // neither — and this phase has already shipped two dead paths through that gap.
+      TAGALONG_FAKE_TOOL: 'list_windows',
+    },
   });
 });
 
@@ -209,4 +218,48 @@ test('a full-view capture returns every real display and a composite', async () 
   expect(full.compositeWidth).toBeGreaterThan(0);
   expect(full.compositeHeight).toBeGreaterThan(0);
   expect(Math.max(full.compositeWidth, full.compositeHeight)).toBeLessThanOrEqual(1568);
+});
+
+test('a tool call travels the real socket and the real host answers it', async () => {
+  const avatar = await windowFor('avatar');
+
+  // The gap this closes. Every test in packages/core/src/perception hands the toolset a
+  // fake host, and every test in apps/desktop/src/main/platform feeds a parser fixture
+  // output, so a tool can be right and a host can be right while the perception.* method
+  // between them is unimplemented and the whole suite stays green. Phase 2B shipped that
+  // exact shape twice: a dead PowerShell transport in task 4, and a capture path that
+  // answered perception.capture(['displays']) with nothing in task 5.
+  //
+  // The fake pet is scripted to call list_windows before it answers, so asking anything
+  // drives a real core-to-host request over the loopback socket into the real Electron
+  // host, which really enumerates this machine's windows.
+  const events = await avatar.evaluate(async () => {
+    const seen: Array<{ type: string; tool: string | undefined; ok: boolean | undefined }> = [];
+    const stop = window.tagalong.onTurnEvent((event) => {
+      const carried = event as unknown as { type: string; tool?: string; ok?: boolean };
+      seen.push({ type: carried.type, tool: carried.tool, ok: carried.ok });
+    });
+
+    const pets = await window.tagalong.listPets();
+    const petId = pets[0]?.id;
+    if (petId === undefined) throw new Error('no pet to ask');
+
+    await window.tagalong.ask({ petId, text: 'what windows do I have open?' });
+    await new Promise((resolve) => setTimeout(resolve, 8_000));
+    stop();
+    return seen;
+  });
+
+  const result = events.find((event) => event.type === 'turn.toolResult');
+  if (result === undefined) {
+    throw new Error(
+      'no turn.toolResult arrived: the fake pet was scripted to call list_windows, so ' +
+        'either the tool never reached the host or perception.listWindows is not answered',
+    );
+  }
+
+  expect(result.tool).toBe('list_windows');
+  // ok:false would mean the round trip happened but the host refused or threw, which is
+  // as much a failure as silence: the pet would tell the user it cannot see their windows.
+  expect(result.ok).toBe(true);
 });

@@ -51,6 +51,18 @@ export async function startEngineHost(options: StartEngineHostOptions): Promise<
     hostVersion: app.getVersion(),
     capabilities: DESKTOP_CAPABILITIES,
     readText: (params) => options.platform.readWindowText(params, options.captureExclusions()),
+    listWindows: async () => ({
+      windows: (await options.platform.listWindows(options.captureExclusions())).windows,
+    }),
+    captureRegion: async (params) => {
+      const image = await options.platform.captureRegion(params);
+      if (image === null) {
+        // A refusal the pet can repeat. Throwing would surface as a dead turn instead of
+        // a tool result saying which display could not be cropped.
+        throw new Error(`no crop available for display ${params.displayId}`);
+      }
+      return { image: { mime: 'image/png', ...image } };
+    },
     capture: async (what) => {
       const { patch, blocked } = await capturePatch(options.platform, what, {
         exclusions: options.captureExclusions(),

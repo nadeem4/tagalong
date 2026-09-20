@@ -116,6 +116,12 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
 - **Core to host:** `perception.capture`, and from Phase 2B `perception.captureRegion`,
   `perception.listWindows`, and `perception.readText`. Nothing for recall, diff, or watch — those belong
   to Phase 3B, and a test asserts they have not crept in early.
+- **Core to host notifications** gained `turn.toolRequest` and `turn.toolResult` in Phase 2B. They were
+  in the catalog from Phase 1 and nothing emitted them, which left a tool call invisible twice over: the
+  user watching the panel could not tell a working pet from a hung one, and no test could observe that a
+  tool call reached the host at all. The result carries a short summary rather than the tool's content —
+  the model already has that, and forwarding an 8,000-character window read to every open window would
+  be megabytes of IPC to render one line.
 - **Core to host notifications:** `turn.started`, `turn.delta`, `turn.completed`, `turn.error`,
   `turn.warning`, plus `turn.audio` (Phase 3), `turn.toolRequest` and `turn.toolResult` (Phase 5),
   and `pet.message` (Phase 4). `turn.warning` carries the same `{ code, message }` as `turn.error`

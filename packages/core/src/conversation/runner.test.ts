@@ -200,10 +200,13 @@ describe('ConversationRunner perception tools', () => {
     const runner = makeRunner(observed.provider, toolsFor([host]));
     await runner.run({ pet, text: 'hi' }).done;
 
-    expect(observed.requests[0]?.tools?.map((tool) => tool.name)).toEqual([
-      LOOK_AT_SCREEN,
-      GET_SELECTION,
-    ]);
+    // Asserted as a prefix since Phase 2B added the five full-view tools. What this test
+    // is for is that the runner hands the toolset's definitions to the provider at all —
+    // which tools exist is the toolset's own test, and pinning the whole list here would
+    // make every future tool a two-file change for no extra coverage.
+    const offered = observed.requests[0]?.tools?.map((tool) => tool.name) ?? [];
+    expect(offered.slice(0, 2)).toEqual([LOOK_AT_SCREEN, GET_SELECTION]);
+    expect(offered).toContain('read_window_text');
   });
 
   it('offers no tools to a provider without tool support', async () => {
@@ -589,5 +592,63 @@ describe('ConversationRunner retention sweep', () => {
     await runner.run({ pet, conversationId: first.conversationId, text: 'and now?' }).done;
 
     expect(storedSnapshotJson(first.conversationId)).not.toContain(SCREENSHOT.base64);
+  });
+});
+
+describe('tool notifications', () => {
+  /**
+   * A tool call has to be visible, for two reasons either of which would be enough.
+   *
+   * The user watching the panel needs to tell a pet that is working from one that is
+   * hung. And without a notification there is no way to observe end to end that a tool
+   * call reached the host at all — which is the seam that shipped dead twice in this
+   * phase, once on the PowerShell transport and once on the displays capture path.
+   */
+  function toolset(outcome: ToolOutcome): PerceptionToolset {
+    return {
+      definitions: [{ name: 'list_windows', description: 'x'.repeat(50), inputSchema: {} }],
+      run: () => Promise.resolve(outcome),
+    };
+  }
+
+  function callingProvider(): BrainProvider {
+    return new FakeBrainProvider({
+      text: 'done',
+      toolCall: { id: 't-1', name: 'list_windows', input: {} },
+    });
+  }
+
+  it('announces the request before the result', async () => {
+    const runner = makeRunner(callingProvider(), toolset({ content: 'two windows' }));
+    await runner.run({ pet, text: 'hi' }).done;
+
+    const methods = events.map((event) => event.method);
+    expect(methods).toContain('turn.toolRequest');
+    expect(methods).toContain('turn.toolResult');
+    expect(methods.indexOf('turn.toolRequest')).toBeLessThan(methods.indexOf('turn.toolResult'));
+  });
+
+  it('names the tool in both, so the panel can say which one', async () => {
+    const runner = makeRunner(callingProvider(), toolset({ content: 'two windows' }));
+    await runner.run({ pet, text: 'hi' }).done;
+
+    const request = events.find((event) => event.method === 'turn.toolRequest');
+    const result = events.find((event) => event.method === 'turn.toolResult');
+    expect((request?.params as { tool?: string }).tool).toBe('list_windows');
+    expect((result?.params as { tool?: string; ok?: boolean }).tool).toBe('list_windows');
+    expect((result?.params as { ok?: boolean }).ok).toBe(true);
+  });
+
+  it('reports a failed tool as ok false rather than staying silent', async () => {
+    // Silence and success must not look the same. A refused capture surfacing as nothing
+    // leaves the user watching a pet that appears to be ignoring them.
+    const runner = makeRunner(
+      callingProvider(),
+      toolset({ content: 'no host could answer', isError: true }),
+    );
+    await runner.run({ pet, text: 'hi' }).done;
+
+    const result = events.find((event) => event.method === 'turn.toolResult');
+    expect((result?.params as { ok?: boolean }).ok).toBe(false);
   });
 });

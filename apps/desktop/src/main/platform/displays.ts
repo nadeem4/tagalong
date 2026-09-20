@@ -26,6 +26,8 @@ export interface DisplayImagePort {
   isEmpty(): boolean;
   getSize(): PixelSize;
   resize(size: PixelSize): DisplayImagePort;
+  /** Phase 2B: the native-resolution crop behind look_closer. */
+  crop(rect: { x: number; y: number; width: number; height: number }): DisplayImagePort;
   toPNG(): Buffer;
   toBitmap(): Buffer;
 }
