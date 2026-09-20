@@ -78,8 +78,10 @@ Hosts implement two contracts.
 - **Perception** answers `perception.capture`: selection, active window, clipboard, page text, and from
   Phase 2 the screenshot. The result is a `ContextSnapshotPatch` defined in `packages/protocol`, and a
   host advertises what it can actually read in the `capabilities` array of `hello`. The desktop host
-  currently advertises `selection`, `activeWindow`, and `clipboard`; page text only ever comes from the
-  extension.
+  advertises `selection`, `activeWindow`, `clipboard`, `screenshot` and `displays`; page text only ever
+  comes from the extension, and `textLayer` is not advertised until the host can honour it — a
+  capability the host cannot deliver makes the engine call a method that fails, which reads to the user
+  as a broken pet rather than a missing feature.
 - Phase 2B adds three more core-to-host methods and two capabilities behind them. `perception.listWindows`
   returns the window inventory — what each window is and where, never what is in it. `perception.readText`
   returns the text of **exactly one** window, named by id or defaulting to the foreground one, capped and
@@ -249,6 +251,34 @@ The composite is the one image Tagalong builds rather than captures. Electron's 
 and encodes but cannot compose, so the pixels are handled directly: `toBitmap` hands over a BGRA
 buffer, `createFromBitmap` takes one back, and everything between is ordinary buffer arithmetic in
 `canvas.ts`, `composite.ts` and `label.ts`. No image library, and one Electron call at the end.
+
+### The window inventory
+
+`listWindows` enumerates every top-level window through a UI Automation helper. The helper is a
+PowerShell script held as a string in `window-helper.ts` rather than a `.ps1` on disk: a bundled file
+has to survive electron-vite, the asar archive and the installer, and each of those is a way for the
+inventory to work in development and be missing in the packaged app. It is fed to PowerShell over
+stdin, which also sidesteps every quoting question a long `-Command` argument would raise.
+
+The helper reads **no window contents**. That is what makes the inventory cheap enough to attach to
+every capture — walking one background browser window's descendants yielded 34,588 characters on a
+real desktop. Reading a window is a separate, deliberate call against one id.
+
+The split is the usual one. The host enumerates and maps windows to displays, because both need the
+OS. What a window _means_ — whether it may be read, whether its tabs are reachable, how it reads in a
+prompt — is decided in `packages/core/src/perception/inventory.ts`, where it is tested without a
+desktop. `renderInventory` produces the text the prompt assembler attaches, under a budget of 300
+tokens for a twelve-window desktop.
+
+Two things the inventory is careful about. A blocked window keeps its process name and **loses its
+title**: a process name says a password manager is open, which the user can see anyway, while "Chase —
+Transfer to savings" says most of what the window holds. And an empty inventory is omitted from the
+prompt rather than rendered as "no windows are open" — an empty list means the enumeration failed, not
+that the desktop is empty, and a pet told otherwise will reason from it.
+
+Since Phase 2B, a display is blanked when **any window on it that the user can see** is excluded, not
+only when the foreground window is. The foreground check remains as a floor beneath the inventory, so
+that a helper which cannot run does not silently remove the protection Phase 2 already shipped.
 
 ## Bundling the workspace packages
 

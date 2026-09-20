@@ -5,6 +5,19 @@ import type { Bitmap, Colour } from './canvas';
 import { captureDisplaysWith } from './displays';
 import type { DisplayImagePort, DisplayInfo, DisplaysCaptureDeps } from './displays';
 import type { ActiveWindowInfo, WindowBounds } from './index';
+import type { WindowEntry } from '@tagalong/protocol';
+
+/** A window in the inventory captureDisplaysWith reads to decide what to blank. */
+function entry(overrides: Partial<WindowEntry> = {}): WindowEntry {
+  return {
+    id: 'w-1',
+    processName: 'Code.exe',
+    title: 'a',
+    state: 'background',
+    browser: false,
+    ...overrides,
+  };
+}
 
 const RED: Colour = { r: 255, g: 0, b: 0, a: 255 };
 const GREEN: Colour = { r: 0, g: 255, b: 0, a: 255 };
@@ -57,6 +70,8 @@ function harness(options: {
   active?: ActiveWindowInfo | null;
   focusedDisplayId?: number;
   excludedProcessNames?: string[];
+  /** The inventory captureDisplaysWith consults. Empty unless a test supplies one. */
+  windows?: WindowEntry[];
 }): Harness {
   const encoded: Bitmap[] = [];
   return {
@@ -77,6 +92,7 @@ function harness(options: {
           ),
       },
       getActiveWindow: () => Promise.resolve(options.active ?? null),
+      listWindows: () => Promise.resolve(options.windows ?? []),
       exclusions: {
         processNames: options.excludedProcessNames ?? [],
         titlePatterns: [],
@@ -258,5 +274,119 @@ describe('captureDisplaysWith', () => {
     await captureDisplaysWith(deps, MAX);
 
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('captureDisplaysWith, exclusions beyond the focused window', () => {
+  const VAULT = { rule: 'processName', entry: '1Password.exe' } as const;
+
+  it('blanks a display holding an excluded window that is not the focused one', async () => {
+    // The gap this closes. Focus a document on display 1 while a password manager sits
+    // open and visible on display 3; before this, display 3 was captured in full.
+    const { deps } = harness({
+      displays: THREE_ACROSS,
+      sources: THREE_SOURCES,
+      active: { appName: 'Code.exe', title: 'notes.md', bounds: bounds(0, 0, 800, 600) },
+      focusedDisplayId: 1,
+      windows: [
+        entry({ id: 'w-1', displayId: 1 }),
+        entry({ id: 'w-9', processName: '1Password.exe', displayId: 3, blocked: VAULT }),
+      ],
+    });
+
+    const result = await captureDisplaysWith(deps, MAX);
+
+    expect(result.displays[2]?.blocked).toEqual(VAULT);
+    expect(result.displays[2]?.focused).toBe(false);
+    expect(result.displays[0]?.blocked).toBeNull();
+  });
+
+  it('puts the placeholder for that display in the composite as well', async () => {
+    const harnessed = harness({
+      displays: THREE_ACROSS,
+      sources: THREE_SOURCES,
+      active: { appName: 'Code.exe', title: 'notes.md', bounds: bounds(0, 0, 800, 600) },
+      focusedDisplayId: 1,
+      windows: [entry({ id: 'w-9', processName: '1Password.exe', displayId: 3, blocked: VAULT })],
+    });
+
+    await captureDisplaysWith(harnessed.deps, MAX);
+    const canvas = compositeOf(harnessed);
+    const third = Math.floor(canvas.width / 3);
+    const midY = Math.floor(canvas.height / 2);
+
+    expect(pixelAt(canvas, Math.floor(third * 2.5), midY)).not.toEqual(BLUE);
+    expect(pixelAt(canvas, Math.floor(third * 0.5), midY)).toEqual(RED);
+  });
+
+  it('does not blank a display whose only excluded window is minimized', async () => {
+    // A minimized vault is not on screen. Blanking a monitor the user is working on
+    // because something is hidden in the taskbar is a bug, not caution.
+    const { deps } = harness({
+      displays: THREE_ACROSS,
+      sources: THREE_SOURCES,
+      windows: [
+        entry({
+          id: 'w-9',
+          processName: '1Password.exe',
+          displayId: 2,
+          state: 'minimized',
+          blocked: VAULT,
+        }),
+      ],
+    });
+
+    const result = await captureDisplaysWith(deps, MAX);
+
+    expect(result.displays[1]?.blocked).toBeNull();
+    expect(result.displays[1]?.image).not.toBeNull();
+  });
+
+  it('ignores an excluded window the host could not place on a display', async () => {
+    const { deps } = harness({
+      displays: THREE_ACROSS,
+      sources: THREE_SOURCES,
+      windows: [entry({ id: 'w-9', processName: '1Password.exe', blocked: VAULT })],
+    });
+
+    const result = await captureDisplaysWith(deps, MAX);
+
+    expect(result.displays.every((display) => display.blocked === null)).toBe(true);
+  });
+
+  it('still blanks the focused display when the enumeration comes back empty', async () => {
+    // The fail-safe. PowerShell missing or blocked by policy must not silently remove the
+    // protection Phase 2 already shipped, so the foreground check stays as a floor.
+    const { deps } = harness({
+      displays: THREE_ACROSS,
+      sources: THREE_SOURCES,
+      active: { appName: '1Password.exe', title: 'Vault', bounds: bounds(2000, 100, 800, 600) },
+      focusedDisplayId: 2,
+      excludedProcessNames: ['1Password.exe'],
+      windows: [],
+    });
+
+    const result = await captureDisplaysWith(deps, MAX);
+
+    expect(result.displays[1]?.blocked).toEqual(VAULT);
+  });
+
+  it('names the entry that refused, not just that something did', async () => {
+    const { deps } = harness({
+      displays: THREE_ACROSS,
+      sources: THREE_SOURCES,
+      windows: [
+        entry({
+          id: 'w-9',
+          processName: 'chrome.exe',
+          displayId: 2,
+          blocked: { rule: 'titlePattern', entry: '*Vault*' },
+        }),
+      ],
+    });
+
+    const result = await captureDisplaysWith(deps, MAX);
+
+    expect(result.displays[1]?.blocked).toEqual({ rule: 'titlePattern', entry: '*Vault*' });
   });
 });

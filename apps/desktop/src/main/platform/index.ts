@@ -1,4 +1,4 @@
-import type { CaptureExclusions } from '@tagalong/protocol';
+import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
 
 import type { DisplaysCapture } from './displays';
 import { Win32Platform } from './win32';
@@ -45,6 +45,14 @@ export interface Platform {
    * the decision has to be made inside the capture rather than above it.
    */
   captureDisplays(maxLongSide: number, exclusions: CaptureExclusions): Promise<DisplaysCapture>;
+  /**
+   * Phase 2B: every top-level window, with no window text in it.
+   *
+   * Takes the exclusion list for the same reason `captureDisplays` does — one window is
+   * refused while the rest are returned, so the decision belongs inside the enumeration.
+   * Entries come back already classified, so nothing downstream has to remember to check.
+   */
+  listWindows(exclusions: CaptureExclusions): Promise<WindowEntry[]>;
 }
 
 /**

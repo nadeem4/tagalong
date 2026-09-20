@@ -11,6 +11,10 @@ export const DESKTOP_CAPABILITIES = [
   'activeWindow',
   'clipboard',
   'screenshot',
+  // Phase 2B. `textLayer` is deliberately absent until the text layer lands: advertising
+  // a capability the host cannot honour makes the engine call a method that fails, which
+  // reads to the user as a broken pet rather than a missing feature.
+  'displays',
 ] as const;
 
 /**
@@ -148,6 +152,15 @@ export async function capturePatch(
   const window = needsWindow
     ? await attempt('the active window', () => platform.getActiveWindow())
     : null;
+
+  if (what.includes('windows')) {
+    const windows = await attempt('the open windows', () =>
+      platform.listWindows(options.exclusions),
+    );
+    // An empty list means the enumeration failed or found nothing it could classify, not
+    // that the desktop is empty. Omitting it keeps the pet from reasoning off a lie.
+    if (windows !== null && windows.length > 0) patch.windows = windows;
+  }
 
   if (what.includes('activeWindow')) Object.assign(patch, appOf(window));
   if (what.includes('screenshot')) {
