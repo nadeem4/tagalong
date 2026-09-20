@@ -418,3 +418,29 @@ describe('perception.readText', () => {
     expect(parsed.text).toBe('');
   });
 });
+
+describe('perception.readText notes', () => {
+  const base = { windowId: 'w-1', text: 'hello', truncated: false, source: 'uia' as const };
+
+  it('carries notes that qualify what was read', () => {
+    const parsed = PerceptionReadTextResult.parse({
+      ...base,
+      notes: ['This window exposes only its menus.'],
+    });
+    expect(parsed.notes).toEqual(['This window exposes only its menus.']);
+  });
+
+  it('leaves notes absent when there is nothing to qualify', () => {
+    expect(PerceptionReadTextResult.parse(base).notes).toBeUndefined();
+  });
+
+  it('keeps notes out of the text field, so a pet cannot quote one as window content', () => {
+    const parsed = PerceptionReadTextResult.parse({ ...base, notes: ['a caveat'] });
+    expect(parsed.text).toBe('hello');
+    expect(parsed.text).not.toContain('caveat');
+  });
+
+  it('rejects notes that are not strings', () => {
+    expect(PerceptionReadTextResult.safeParse({ ...base, notes: [{ a: 1 }] }).success).toBe(false);
+  });
+});

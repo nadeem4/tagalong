@@ -12,6 +12,7 @@ export {
   type ObservedWindow,
 } from './inventory';
 export { mayPersistScreenshot } from './retention';
+export { THIN_TEXT_CHARS, textLayerNotes, type TextLayerReading } from './text-layer';
 export {
   GET_SELECTION,
   LOOK_AT_SCREEN,
