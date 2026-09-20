@@ -12,6 +12,15 @@ export const DEFAULT_ASK_HOTKEY = 'CommandOrControl+Shift+Space';
  */
 export const DEFAULT_LOOK_HOTKEY = 'CommandOrControl+Shift+S';
 
+/**
+ * The full-view ask: every display, the composite, and the window inventory.
+ *
+ * A third key rather than a modifier on the looking one, because the three differ in what
+ * they cost and the user is choosing the bill. This one carries two images and a list of
+ * everything open; the looking key carries one image; the ask key carries none.
+ */
+export const DEFAULT_SEE_EVERYTHING_HOTKEY = 'CommandOrControl+Shift+Alt+S';
+
 /** The part of Electron globalShortcut this module uses, so tests can supply their own. */
 export interface HotkeyRegistrar {
   register(accelerator: string, callback: () => void): boolean;
@@ -30,6 +39,7 @@ export interface HotkeyOutcome {
 export interface HotkeyBindings {
   ask: string;
   look: string;
+  seeEverything: string;
 }
 
 export interface RegisterHotkeyOptions {
@@ -70,31 +80,41 @@ export function registerHotkey(options: RegisterHotkeyOptions): HotkeyOutcome {
 export interface HotkeyManagerOptions {
   onAsk: () => void;
   onLook: () => void;
+  onSeeEverything: () => void;
   registrar?: HotkeyRegistrar;
 }
 
 /**
- * Holds both hotkeys and swaps them when the user edits either one.
+ * Holds every hotkey and swaps them when the user edits one.
  *
  * The manager exists because rebinding has to happen while the app runs: telling someone
  * to restart Tagalong to pick up a hotkey they just typed is the kind of paper cut that
  * reads as a bug. Only the accelerators that actually changed are touched, so the one the
  * user did not edit is never briefly dead.
+ *
+ * One refused accelerator costs only its own action. Another application owning the
+ * full-view key must not take the cheap ask down with it.
  */
 export class HotkeyManager {
   readonly #registrar: HotkeyRegistrar;
-  readonly #triggers: { ask: () => void; look: () => void };
+  readonly #triggers: { ask: () => void; look: () => void; seeEverything: () => void };
   /** Accelerators currently held by this process, keyed by action. */
   readonly #bound = new Map<keyof HotkeyBindings, string>();
 
   constructor(options: HotkeyManagerOptions) {
     this.#registrar = options.registrar ?? globalShortcut;
-    this.#triggers = { ask: options.onAsk, look: options.onLook };
+    this.#triggers = {
+      ask: options.onAsk,
+      look: options.onLook,
+      seeEverything: options.onSeeEverything,
+    };
   }
 
-  /** Applies the bindings, returning one outcome per action in ask-then-look order. */
+  /** Applies the bindings, one outcome per action in ask, look, see-everything order. */
   apply(bindings: HotkeyBindings): HotkeyOutcome[] {
-    return (['ask', 'look'] as const).map((action) => this.#bind(action, bindings[action]));
+    return (['ask', 'look', 'seeEverything'] as const).map((action) =>
+      this.#bind(action, bindings[action]),
+    );
   }
 
   /** Releases everything this manager holds, for quit. */

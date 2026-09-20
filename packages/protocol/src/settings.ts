@@ -20,7 +20,11 @@ export const SETTINGS_DEFAULTS = {
   defaultModel: 'claude-opus-5',
   pageTextBudget: 40_000,
   historyMessages: 20,
-  hotkeys: { ask: 'CommandOrControl+Shift+Space', look: 'CommandOrControl+Shift+S' },
+  hotkeys: {
+    ask: 'CommandOrControl+Shift+Space',
+    look: 'CommandOrControl+Shift+S',
+    seeEverything: 'CommandOrControl+Shift+Alt+S',
+  },
   avatar: { x: null, y: null },
   /**
    * Why this set: every entry is a window where the pixels on screen are a credential.
@@ -55,6 +59,18 @@ export const SETTINGS_DEFAULTS = {
    * debugging, and bounded.
    */
   screenshotRetention: { mode: 'off' },
+  /**
+   * How much of a full-view capture is attached as pictures.
+   *
+   * `focused` sends the composite and the display the user is working on; the rest are
+   * named in the context text and fetched by tool if the pet wants one. `all` sends every
+   * display as an image.
+   *
+   * The default is the cheap one because the expensive one scales with hardware: `all` on
+   * a three-monitor desk multiplies the image bill by three on every ask that carries a
+   * look, and the person who bought the third monitor is not the person who chose that.
+   */
+  sightDetail: 'focused',
 } as const;
 
 /** A non-blank, trimmed entry. A blank one would match every window and blind the pet. */
@@ -136,13 +152,20 @@ const settingsFields = {
    * rebinds `ask` must not be forced to resend a key it never touched. The host falls back
    * to its own default when it is absent.
    */
-  hotkeys: z.object({ ask: z.string().min(1), look: z.string().min(1).optional() }),
+  hotkeys: z.object({
+    ask: z.string().min(1),
+    look: z.string().min(1).optional(),
+    /** Optional for the same reason as `look`, and for the same settings files. */
+    seeEverything: z.string().min(1).optional(),
+  }),
   /** Remembered avatar position; null means "dock to the default edge". */
   avatar: z.object({ x: z.number().nullable(), y: z.number().nullable() }),
   /** Windows where capture is refused outright. */
   captureExclusions: CaptureExclusions,
   /** Whether a captured screenshot may be stored, and for how long. */
   screenshotRetention: ScreenshotRetention,
+  /** Whether a full-view capture attaches every display or only the focused one. */
+  sightDetail: z.enum(['focused', 'all']),
 };
 
 export const Settings = z.object({
@@ -161,6 +184,7 @@ export const Settings = z.object({
   screenshotRetention: settingsFields.screenshotRetention.prefault({
     ...SETTINGS_DEFAULTS.screenshotRetention,
   }),
+  sightDetail: settingsFields.sightDetail.default(SETTINGS_DEFAULTS.sightDetail),
 });
 export type Settings = z.infer<typeof Settings>;
 

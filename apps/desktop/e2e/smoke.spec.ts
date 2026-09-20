@@ -153,3 +153,60 @@ test('capture takes a real, downscaled PNG of the screen', async () => {
   expect(shot.height).toBeGreaterThan(0);
   expect(Math.max(shot.width, shot.height)).toBeLessThanOrEqual(1568);
 });
+
+test('a full-view capture returns every real display and a composite', async () => {
+  const avatar = await windowFor('avatar');
+
+  // The task 5 counterpart to the screenshot check above, and the only place the
+  // Phase 2B capture path runs for real. Every unit test in `displays.test.ts`,
+  // `composite.test.ts` and `context.test.ts` injects a fake capturer — they prove the
+  // layout maths and the policy, and all of them would pass with the Electron call
+  // wired to nothing. Task 4 shipped exactly that bug on the PowerShell transport, so
+  // this asserts the real `screen.getAllDisplays` and `desktopCapturer` ran and came
+  // back as the snapshot the engine would receive.
+  const full = await avatar.evaluate(async () => {
+    const snapshot = await window.tagalong.capture(['displays']);
+    const displays = snapshot?.displays;
+    const composite = snapshot?.composite;
+    if (displays === undefined || composite === undefined) return null;
+    const head = atob(composite.base64.slice(0, 12));
+    return {
+      count: displays.length,
+      // A display is either blanked by an exclusion or carries a picture; neither state
+      // is "silently absent", which is what a dead capture would look like.
+      accounted: displays.every(
+        (display) => display.image !== undefined || display.blocked !== undefined,
+      ),
+      longestSide: Math.max(
+        ...displays.map((display) =>
+          Math.max(display.image?.width ?? 0, display.image?.height ?? 0),
+        ),
+      ),
+      compositeMagic: [...head].slice(0, 4).map((character) => character.charCodeAt(0)),
+      compositeWidth: composite.width,
+      compositeHeight: composite.height,
+    };
+  });
+
+  if (full === null) {
+    throw new Error(
+      'perception.capture returned no displays or no composite: the displays target is ' +
+        'advertised as a capability, so an empty answer here is a broken capture rather ' +
+        'than a quiet machine',
+    );
+  }
+
+  // A running desktop has at least one display. Zero is a failure, not a state — the
+  // same reasoning that made an empty window enumeration a complaint rather than silence.
+  expect(full.count).toBeGreaterThan(0);
+  expect(full.accounted).toBe(true);
+  expect(full.longestSide).toBeGreaterThan(0);
+  expect(full.longestSide).toBeLessThanOrEqual(1568);
+
+  // The composite is the one image Tagalong builds rather than captures, so its bytes
+  // prove the BGRA blitting and the nativeImage encode ran, not just that a field exists.
+  expect(full.compositeMagic).toEqual([0x89, 0x50, 0x4e, 0x47]);
+  expect(full.compositeWidth).toBeGreaterThan(0);
+  expect(full.compositeHeight).toBeGreaterThan(0);
+  expect(Math.max(full.compositeWidth, full.compositeHeight)).toBeLessThanOrEqual(1568);
+});

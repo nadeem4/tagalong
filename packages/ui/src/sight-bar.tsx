@@ -22,7 +22,9 @@ export function SightBar({ snapshot, problem, onLook, onClear }: SightBarProps) 
   const attached = describe(snapshot);
   const seeing = attached !== null;
   const state = seeing ? 'seeing' : (problem ?? 'blind');
-  const screenshot = snapshot?.screenshot;
+  // The composite stands in when there is no single screenshot: a full-view capture has
+  // no one screen to show, and the map of the desk is the honest thumbnail for it.
+  const screenshot = snapshot?.screenshot ?? snapshot?.composite;
 
   return (
     <div
@@ -68,6 +70,23 @@ export function SightBar({ snapshot, problem, onLook, onClear }: SightBarProps) 
   );
 }
 
+/**
+ * The screens, numbered the way the composite labels them.
+ *
+ * Counted out loud because a full-view capture shares three times as much of the desk as
+ * a single screenshot, and the bar's job is to make a wrong capture obvious before the
+ * answer arrives rather than after. A blanked screen is named as blocked rather than
+ * silently omitted: a missing number reads as a screen that was captured.
+ */
+function describeDisplays(displays: NonNullable<ContextSnapshot['displays']>): string {
+  const marks = displays.map((display, index) => {
+    const ordinal = index + 1;
+    if (display.blocked !== undefined) return `${ordinal} blocked`;
+    return display.focused ? `${ordinal}◂` : `${ordinal}`;
+  });
+  return `${displays.length} screens: ${marks.join(' ')}`;
+}
+
 const LABEL_BY_PROBLEM: Record<SightProblem | 'blind', string> = {
   blind: 'Not seeing anything',
   blocked: 'Capture is blocked here',
@@ -89,6 +108,9 @@ function describe(snapshot: ContextSnapshot | null): string | null {
   }
   if (snapshot.screenshot !== undefined) {
     parts.push(`screen ${snapshot.screenshot.width}×${snapshot.screenshot.height}`);
+  }
+  if (snapshot.displays !== undefined && snapshot.displays.length > 0) {
+    parts.push(describeDisplays(snapshot.displays));
   }
   if (snapshot.app !== undefined) {
     parts.push(

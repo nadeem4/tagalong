@@ -7,7 +7,7 @@ import { captureNotice, captureTooltip } from './capture-notice';
 import { captureAskSnapshot, capturePatch } from './context';
 import { ANTHROPIC_KEY, startEngineHost } from './engine-host';
 import type { EngineHost } from './engine-host';
-import { DEFAULT_LOOK_HOTKEY, HotkeyManager } from './hotkeys';
+import { DEFAULT_LOOK_HOTKEY, DEFAULT_SEE_EVERYTHING_HOTKEY, HotkeyManager } from './hotkeys';
 import { createPlatform } from './platform/index';
 import type { Platform } from './platform/index';
 import { SafeStorageSecretStore } from './secret-store';
@@ -113,6 +113,7 @@ async function start(): Promise<void> {
     hotkeys: new HotkeyManager({
       onAsk: () => void openPanelWithContext({ screenshot: false }),
       onLook: () => void openPanelWithContext({ screenshot: true }),
+      onSeeEverything: () => void openPanelWithContext({ screenshot: false, fullView: true }),
     }),
     hotkeyError: null,
   };
@@ -157,6 +158,7 @@ function applyHotkeys(settings: Settings): string | null {
   const outcomes = desktop.hotkeys.apply({
     ask: settings.hotkeys.ask,
     look: settings.hotkeys.look ?? DEFAULT_LOOK_HOTKEY,
+    seeEverything: settings.hotkeys.seeEverything ?? DEFAULT_SEE_EVERYTHING_HOTKEY,
   });
 
   const refused = outcomes
@@ -252,19 +254,33 @@ function announceCapture(notice: CaptureNotice): void {
 /**
  * The hotkey path: perceive, announce it, then open the panel with what was found.
  *
- * `screenshot` is what separates the two hotkeys. The text-only one stays cheap — a
- * screenshot costs roughly 1,500 extra input tokens on every ask that carries one.
+ * What is captured separates the three hotkeys, and each costs more than the last. The
+ * text-only one carries no picture. The looking one carries a screenshot, roughly 1,500
+ * extra input tokens. The full-view one carries the composite, the focused display and a
+ * list of everything open.
  */
-async function openPanelWithContext(options: { screenshot: boolean }): Promise<void> {
+async function openPanelWithContext(options: {
+  screenshot: boolean;
+  fullView?: boolean;
+}): Promise<void> {
   if (desktop === null || desktop.panel === null || desktop.avatar === null) return;
 
   const { snapshot, blocked } = await captureAskSnapshot(desktop.platform, {
     screenshot: options.screenshot,
+    ...(options.fullView === undefined ? {} : { fullView: options.fullView }),
     exclusions: desktop.settings.captureExclusions,
   });
   desktop.pendingSnapshot = snapshot;
 
-  announceCapture(captureNotice({ at: new Date(), screenshot: options.screenshot, blocked }));
+  // A full-view capture is a capture: the eye badge and the tray tooltip have to fire for
+  // it too, or the loudest kind of look is the only silent one.
+  announceCapture(
+    captureNotice({
+      at: new Date(),
+      screenshot: options.screenshot || options.fullView === true,
+      blocked,
+    }),
+  );
   desktop.panel.webContents.send(IPC.contextEvent, snapshot);
   desktop.avatar.show();
   showPanelBeside(desktop.panel, desktop.avatar);

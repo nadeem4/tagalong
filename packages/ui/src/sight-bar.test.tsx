@@ -81,3 +81,82 @@ describe('SightBar', () => {
     expect(screen.getByTestId('sight-bar')).toHaveTextContent('Capture did not work');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 2B: the full-view chip
+// ---------------------------------------------------------------------------
+
+const PNG = { mime: 'image/png', base64: 'iVBORw0KGgo=', width: 1568, height: 882 } as const;
+
+function displayed(
+  id: number,
+  extra: { focused?: boolean; blocked?: { rule: 'processName'; entry: string } } = {},
+) {
+  return {
+    id,
+    bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+    scaleFactor: 1,
+    primary: id === 101,
+    focused: extra.focused ?? false,
+    image: PNG,
+    ...(extra.blocked === undefined ? {} : { blocked: extra.blocked }),
+  };
+}
+
+const fullView: ContextSnapshot = {
+  ...snapshot,
+  composite: PNG,
+  displays: [displayed(101, { focused: true }), displayed(102), displayed(103)],
+};
+
+describe('SightBar, full view', () => {
+  it('says how many screens are going with the ask', () => {
+    // The bar names what leaves the machine. Three monitors is three times as much of
+    // the user's desk as they may realise they just shared.
+    render(<SightBar snapshot={fullView} problem={null} onLook={noop} onClear={noop} />);
+
+    expect(screen.getByTestId('sight-bar')).toHaveTextContent('3 screens');
+  });
+
+  it('lists the screens by the number drawn on the composite', () => {
+    render(<SightBar snapshot={fullView} problem={null} onLook={noop} onClear={noop} />);
+
+    const bar = screen.getByTestId('sight-bar');
+    expect(bar).toHaveTextContent('1');
+    expect(bar).toHaveTextContent('2');
+    expect(bar).toHaveTextContent('3');
+  });
+
+  it('says when a screen was blanked rather than letting it look captured', () => {
+    render(
+      <SightBar
+        snapshot={{
+          ...fullView,
+          displays: [
+            displayed(101, { focused: true }),
+            displayed(102, { blocked: { rule: 'processName', entry: '1Password.exe' } }),
+          ],
+        }}
+        problem={null}
+        onLook={noop}
+        onClear={noop}
+      />,
+    );
+
+    expect(screen.getByTestId('sight-bar')).toHaveTextContent('blocked');
+  });
+
+  it('shows the composite as the thumbnail when there is no single screenshot', () => {
+    render(<SightBar snapshot={fullView} problem={null} onLook={noop} onClear={noop} />);
+
+    expect(screen.getByTestId('sight-thumbnail')).toBeInTheDocument();
+  });
+
+  it('leaves a Phase 2 snapshot reading exactly as it did', () => {
+    render(<SightBar snapshot={withScreenshot} problem={null} onLook={noop} onClear={noop} />);
+
+    const bar = screen.getByTestId('sight-bar');
+    expect(bar).toHaveTextContent('screen 1280×800');
+    expect(bar).not.toHaveTextContent('screens');
+  });
+});
