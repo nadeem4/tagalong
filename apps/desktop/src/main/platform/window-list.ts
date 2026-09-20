@@ -108,3 +108,17 @@ export function placeOnDisplays(
     }
   });
 }
+
+/**
+ * Recovers the window handle from an id this module minted.
+ *
+ * Ids reach the host from the model, which can invent one it never saw. Returning null
+ * for anything unrecognised makes that a read that fails honestly, rather than a coerced
+ * NaN interpolated into a script that then targets nothing.
+ */
+export function handleOf(id: string): number | null {
+  const match = /^w-(\d+)$/.exec(id);
+  if (match === null) return null;
+  const handle = Number(match[1]);
+  return Number.isSafeInteger(handle) ? handle : null;
+}
