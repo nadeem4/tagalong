@@ -28,6 +28,16 @@ const GLYPHS: Record<string, string[]> = {
   '7': ['###', '..#', '..#', '..#', '..#'],
   '8': ['###', '#.#', '###', '#.#', '###'],
   '9': ['###', '#.#', '###', '..#', '###'],
+  // Just the letters of BLOCKED, which is the only word this phase draws. Uppercase
+  // because lowercase descenders do not survive a five-pixel cell. Extend deliberately
+  // rather than reaching for a font: every glyph added here is a glyph to keep legible.
+  B: ['##.', '#.#', '##.', '#.#', '##.'],
+  L: ['#..', '#..', '#..', '#..', '###'],
+  O: ['###', '#.#', '#.#', '#.#', '###'],
+  C: ['###', '#..', '#..', '#..', '###'],
+  K: ['#.#', '#.#', '##.', '#.#', '#.#'],
+  E: ['###', '#..', '###', '#..', '###'],
+  D: ['##.', '#.#', '#.#', '#.#', '##.'],
 };
 
 export interface LabelSize {

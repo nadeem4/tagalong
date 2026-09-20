@@ -63,6 +63,40 @@ describe('drawLabel', () => {
     expect(seen.size).toBe(10);
   });
 
+  it('draws every letter of BLOCKED as a distinct shape', () => {
+    // The placeholder covering an excluded display has to read as a word, not as noise:
+    // a pet shown an unlabelled grey rectangle will guess what was behind it.
+    const seen = new Set<string>();
+    for (const letter of 'BLOCKED') {
+      const canvas = createCanvas(8, 8, BLACK);
+      drawLabel(canvas, letter, 0, 0, 1, WHITE, BLACK);
+      seen.add(signature(canvas));
+    }
+
+    // BLOCKED has six distinct letters; the second C of the word is the repeat.
+    expect(seen.size).toBe(new Set('BLOCKED').size);
+    expect(seen.size).toBe(7);
+  });
+
+  it('renders the whole word without dropping a letter', () => {
+    const size = labelSize('BLOCKED', 1);
+    const canvas = createCanvas(size.width + 2, size.height + 2, BLACK);
+    drawLabel(canvas, 'BLOCKED', 0, 0, 1, WHITE, BLACK);
+
+    // Each of the seven glyph cells must have ink in it. A missing entry in the font
+    // table would leave one cell blank and the word would still look plausible.
+    for (let index = 0; index < 7; index += 1) {
+      const left = 1 + index * 4;
+      let lit = 0;
+      for (let y = 1; y < 6; y += 1) {
+        for (let x = left; x < left + 3; x += 1) {
+          if (pixelAt(canvas, x, y).r === 255) lit += 1;
+        }
+      }
+      expect(lit, `glyph ${index} of BLOCKED is blank`).toBeGreaterThan(0);
+    }
+  });
+
   it('separates the digits of a two-digit label', () => {
     const canvas = createCanvas(20, 10, BLACK);
     drawLabel(canvas, '11', 0, 0, 1, WHITE, BLACK);
