@@ -5,10 +5,10 @@ import {
   ContextSnapshotPatch,
   DisplayBounds,
   HostKind,
-  MAX_PAGE_TEXT_CHARS,
   PerceptionTarget,
   WindowEntry,
 } from './context';
+import { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './limits';
 import { Pet } from './pet';
 import { CaptureBlock, Settings, SettingsPatch } from './settings';
 
@@ -30,17 +30,7 @@ export type HostCapability = z.infer<typeof HostCapability>;
 
 const Empty = z.object({});
 
-/**
- * How much of one window's text a read returns unless asked otherwise.
- *
- * Eight thousand characters is roughly 2,000 tokens: enough for a terminal's scrollback or
- * an email body, small enough that a pet reading three windows has not quietly spent a
- * whole context window.
- */
-export const DEFAULT_WINDOW_TEXT_CHARS = 8_000;
-
-/** The ceiling a caller may raise the per-window budget to, matching the page text cap. */
-export const MAX_WINDOW_TEXT_CHARS = MAX_PAGE_TEXT_CHARS;
+export { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './limits';
 
 // ---------------------------------------------------------------------------
 // Host to core

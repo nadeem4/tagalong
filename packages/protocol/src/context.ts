@@ -1,16 +1,13 @@
 import { z } from 'zod';
 
+import { MAX_PAGE_TEXT_CHARS, MAX_SELECTION_CHARS } from './limits';
 import { CaptureBlock } from './settings';
 
 /** Which host produced a snapshot. Hosts differ in what they can perceive. */
 export const HostKind = z.enum(['desktop', 'extension']);
 export type HostKind = z.infer<typeof HostKind>;
 
-/** A selection is always kept whole up to this length; beyond it the host truncates. */
-export const MAX_SELECTION_CHARS = 20_000;
-
-/** Readable page text ceiling. The prompt budget in settings may cut it further. */
-export const MAX_PAGE_TEXT_CHARS = 40_000;
+export { MAX_PAGE_TEXT_CHARS, MAX_SELECTION_CHARS } from './limits';
 
 /**
  * A picture a host captured. PNG only, so providers get one predictable image format.

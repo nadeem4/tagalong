@@ -19,6 +19,7 @@ export function engineUrl(port: number = DEFAULT_ENGINE_PORT): string {
   return `ws://${ENGINE_HOST}:${port}`;
 }
 
+export * from './limits';
 export * from './context';
 export * from './pet';
 export * from './message';

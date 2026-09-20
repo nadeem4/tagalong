@@ -277,6 +277,24 @@ re-throws this one specifically. A refusal is not a failure and must not be trea
 Phase 3B's rolling memory needs no change here to be covered: it will read the screen through the
 same adapter, so the gate refuses it on the same flag without that code knowing pause exists.
 
+### Settings that take effect without a restart
+
+Three of the sight settings are read at the moment they are used rather than at boot, and that is
+deliberate rather than incidental.
+
+The exclusion list, the window text budget and the sight detail are all passed into the engine as
+**functions**, not values — `exclusions: () => settings.get().captureExclusions` and its two
+neighbours in `Engine.boot`. A value captured at boot would make each of them a control that stores
+what the user typed and changes nothing until the next launch, which is the worst kind of settings
+bug: the screen agrees with the user and the program does not.
+
+The hotkeys work the other way round, because a global accelerator is held by the OS rather than
+read per use. `HotkeyManager` owns what is currently registered and swaps only the accelerators that
+changed, and the settings save handler calls it. That one call is the whole of "without restart" for
+hotkeys, and it is covered by a smoke test rather than a unit test — every unit test injects a fake
+registrar and applies the bindings itself, which proves the manager rebinds and never that a save
+reaches it.
+
 ### The platform adapter
 
 Everything OS-specific sits behind `Platform` in `src/main/platform/`. `createPlatform` throws on any

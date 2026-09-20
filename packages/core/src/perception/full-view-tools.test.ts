@@ -111,11 +111,13 @@ function fullViewHost(
 function toolset(
   hosts: readonly PerceptionHost[],
   vision = true,
+  windowTextBudget?: () => number,
 ): ReturnType<typeof createPerceptionToolset> {
   return createPerceptionToolset({
     hosts: () => hosts,
     exclusions: () => NO_EXCLUSIONS,
     vision: () => vision,
+    ...(windowTextBudget === undefined ? {} : { windowTextBudget }),
   });
 }
 
@@ -305,6 +307,39 @@ describe(READ_WINDOW_TEXT, () => {
     expect(host.calls.readText[0]?.maxChars).toBe(DEFAULT_WINDOW_TEXT_CHARS);
   });
 
+  it('falls back to the budget the user configured, not the shipped default', async () => {
+    const host = fullViewHost();
+    await toolset([host], true, () => 3_000).run({
+      name: READ_WINDOW_TEXT,
+      input: { windowId: 'w-1' },
+    });
+    expect(host.calls.readText[0]?.maxChars).toBe(3_000);
+  });
+
+  it('reads the configured budget per call, so a settings edit needs no restart', async () => {
+    // The lookup is a function for the same reason the exclusion list is: the user edits
+    // this while the app runs, and a value captured at boot would be a setting that
+    // silently does nothing until the next launch.
+    const host = fullViewHost();
+    let budget = 3_000;
+    const tools = toolset([host], true, () => budget);
+
+    await tools.run({ name: READ_WINDOW_TEXT, input: { windowId: 'w-1' } });
+    budget = 9_000;
+    await tools.run({ name: READ_WINDOW_TEXT, input: { windowId: 'w-1' } });
+
+    expect(host.calls.readText.map((call) => call.maxChars)).toEqual([3_000, 9_000]);
+  });
+
+  it('still lets the pet ask for less than the configured budget', async () => {
+    const host = fullViewHost();
+    await toolset([host], true, () => 9_000).run({
+      name: READ_WINDOW_TEXT,
+      input: { windowId: 'w-1', maxChars: 500 },
+    });
+    expect(host.calls.readText[0]?.maxChars).toBe(500);
+  });
+
   it('marks truncation so a cut-off line is not read as the end', async () => {
     const host = fullViewHost();
     host.readText = () =>
@@ -384,5 +419,22 @@ describe('when no host can do it', () => {
     const result = await toolset([host]).run({ name: LIST_WINDOWS });
     expect(result.isError).toBe(true);
     expect(asText(result.content)).toContain('socket closed');
+  });
+});
+
+describe('the read_window_text description', () => {
+  it('does not name a character count the user can change underneath it', () => {
+    // The definitions are built once at module load, so any number written into this
+    // description is the shipped default forever — and tells the model something false
+    // the moment the budget is raised in Settings.
+    const tool = toolset([fullViewHost()]).definitions.find(
+      (candidate) => candidate.name === READ_WINDOW_TEXT,
+    );
+    expect(tool).toBeDefined();
+    // The whole definition, because the number would live in the maxChars property
+    // description rather than the tool's own, and the model reads both.
+    const wording = JSON.stringify(tool).toLowerCase();
+    expect(wording).not.toMatch(/\b\d{3,}\b/);
+    expect(wording).toContain('settings');
   });
 });

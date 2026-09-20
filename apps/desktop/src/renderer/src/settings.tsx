@@ -1,15 +1,20 @@
 import { StrictMode, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
-import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
+import { MAX_WINDOW_TEXT_CHARS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import './app.css';
+import { buildSettingsPatch } from './settings-form';
 import type { HostView } from '../../shared/ipc';
 
 /**
- * Phase 1 settings: provider, key, model, and the hotkey as read-only text.
+ * Provider, key, model, the four hotkeys, and the two controls over what looking costs.
  *
  * The stored key is never read back into the form — `hasApiKey` is all main will say —
  * so a saved secret cannot be recovered from a window someone left open.
+ *
+ * Everything here except the provider and the key takes effect immediately. The hotkeys
+ * are re-registered by main on save, and the sight settings are read per capture, so the
+ * note under the button promises a restart only for the two that need one.
  */
 function Settings() {
   const [view, setView] = useState<HostView | null>(null);
@@ -31,13 +36,18 @@ function Settings() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     try {
-      const saved = await window.tagalongHost.saveSettings({
-        providerId: String(form.get('providerId')),
-        defaultModel: String(form.get('defaultModel')),
-        // Both keys go together: a patch replaces the whole hotkeys object, so sending
-        // one of them would drop the other.
-        hotkeys: { ask: String(form.get('askHotkey')), look: String(form.get('lookHotkey')) },
-      });
+      const saved = await window.tagalongHost.saveSettings(
+        buildSettingsPatch({
+          providerId: String(form.get('providerId')),
+          defaultModel: String(form.get('defaultModel')),
+          askHotkey: String(form.get('askHotkey')),
+          lookHotkey: String(form.get('lookHotkey')),
+          seeEverythingHotkey: String(form.get('seeEverythingHotkey')),
+          pauseSightHotkey: String(form.get('pauseSightHotkey')),
+          sightDetail: String(form.get('sightDetail')),
+          windowTextBudget: String(form.get('windowTextBudget')),
+        }),
+      );
       if (apiKey.length > 0) {
         await window.tagalongHost.saveApiKey(apiKey);
         setApiKey('');
@@ -47,7 +57,9 @@ function Settings() {
           ? current
           : { ...current, settings: saved, hasApiKey: current.hasApiKey || apiKey.length > 0 },
       );
-      setStatus('Saved. Restart Tagalong to pick up a new provider or key.');
+      setStatus(
+        'Saved. Hotkeys and sight settings apply now; a new provider or key needs a restart.',
+      );
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     }
@@ -96,6 +108,55 @@ function Settings() {
             defaultValue={settings.hotkeys.look ?? SETTINGS_DEFAULTS.hotkeys.look}
           />
         </label>
+
+        <label>
+          <span>See-everything hotkey (every screen, plus what is open)</span>
+          <input
+            name="seeEverythingHotkey"
+            defaultValue={settings.hotkeys.seeEverything ?? SETTINGS_DEFAULTS.hotkeys.seeEverything}
+          />
+        </label>
+
+        <label>
+          <span>Pause sight hotkey (turns all looking off and on)</span>
+          <input
+            name="pauseSightHotkey"
+            defaultValue={settings.hotkeys.pauseSight ?? SETTINGS_DEFAULTS.hotkeys.pauseSight}
+          />
+        </label>
+
+        <label>
+          <span>What a see-everything look sends</span>
+          <select name="sightDetail" defaultValue={settings.sightDetail}>
+            <option value="focused">
+              The composite and the screen you are on (cheaper, recommended)
+            </option>
+            <option value="all">Every screen as its own picture</option>
+          </select>
+        </label>
+        <p className="settings__note">
+          Every screen sends one picture per monitor. On a three-monitor desk that is roughly three
+          times the image cost on every look, so the default sends an overview plus the screen you
+          are working on and lets the pet ask for another if it needs one.
+        </p>
+
+        <label>
+          <span>Window text budget (characters per window read)</span>
+          <input
+            name="windowTextBudget"
+            type="number"
+            min={1}
+            max={MAX_WINDOW_TEXT_CHARS}
+            step={500}
+            defaultValue={settings.windowTextBudget}
+          />
+        </label>
+        <p className="settings__note">
+          How much of a window the pet reads when it does not ask for less. Roughly one token per
+          four characters, so {SETTINGS_DEFAULTS.windowTextBudget} is about{' '}
+          {Math.round(SETTINGS_DEFAULTS.windowTextBudget / 4)} tokens per window read — raising it
+          costs that much more every time, on every read.
+        </p>
 
         {view.hotkeyError !== undefined && <p className="settings__error">{view.hotkeyError}</p>}
 

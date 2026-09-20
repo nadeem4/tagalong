@@ -1,4 +1,3 @@
-import { DEFAULT_WINDOW_TEXT_CHARS } from '@tagalong/protocol';
 import type { DisplayBounds, DisplaySnapshot, HostCapability } from '@tagalong/protocol';
 import type { BrainContentBlock } from '../providers';
 import type { CaptureBlock } from './exclusions';
@@ -34,6 +33,8 @@ export interface FullViewContext {
     method: K,
   ): FullViewHost<K> | undefined;
   vision(): boolean;
+  /** The user's configured per-window character cap, read fresh on every call. */
+  windowTextBudget(): number;
 }
 
 interface CaptureRegionParams {
@@ -274,7 +275,7 @@ export async function runReadWindowText(
   const maxChars =
     typeof asked.maxChars === 'number' && Number.isFinite(asked.maxChars) && asked.maxChars > 0
       ? Math.floor(asked.maxChars)
-      : DEFAULT_WINDOW_TEXT_CHARS;
+      : context.windowTextBudget();
 
   const host = context.host('textLayer', 'readText');
   if (host === undefined) return noHost('read the text of a window');
