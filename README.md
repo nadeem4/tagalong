@@ -175,8 +175,10 @@ that capture is blocked here, naming only the exclusion entry that matched.
 
 On boot the engine writes a 32-byte hex token to `pairing.token` in its data dir, alongside
 `tagalong.db`, `settings.json`, and `secrets.json`. On Windows that directory is
-`%APPDATA%\@tagalong\desktop`. The token is stable across restarts, so a host that has already paired
-does not have to pair again.
+`%APPDATA%\Tagalong`, which is `productName` in `apps/desktop/package.json` — Electron derives the
+data directory from it, and changing it moves everyone's settings, database and saved keys with no
+migration. The token is stable across restarts, so a host that has already paired does not have to
+pair again.
 
 Every host must present that token in its `hello` call. A connection that sends anything else gets
 RPC error `-32000` and the socket is closed; a connection that calls any other method before `hello`

@@ -1,5 +1,6 @@
 {
   "name": "@tagalong/desktop",
+  "productName": "Tagalong",
   "version": "0.0.0",
   "private": true,
   "type": "module",
