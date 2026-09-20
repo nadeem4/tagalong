@@ -9,8 +9,9 @@ behalf through MCP tools you approve. They never take over your mouse or keyboar
 - Local design copy: [docs/specs/2026-09-11-tagalong-design.md](docs/specs/2026-09-11-tagalong-design.md)
 - Architecture: [docs/architecture.md](docs/architecture.md)
 
-**Status: Phases 0 (Setup), 1 (Foundation) and 2 (Sight) are complete. Phase 2B (Full View) is in
-progress.**
+**Status: Phases 0 (Setup), 1 (Foundation), 2 (Sight) and 2B (Full View) are complete. Phase 6
+(Browser Host) is next — it runs fifth, not ninth, because reading a tab you are not looking at is
+the half of "see what my eyes cannot" that the desktop host can never do.**
 
 Phase 1 shipped the whole text path end to end on Windows: the protocol package, the engine with
 SQLite-backed conversations, the Anthropic and fake brain providers, the loopback JSON-RPC server with
@@ -20,12 +21,15 @@ avatar, a chat panel, and a settings window.
 Phase 2 added sight: screenshots of the active window, vision in the prompt, the capture exclusion
 list, and a visible indicator on every capture.
 
-Phase 2B is widening that to everything the user cannot see — every display at once, and every open
-window including the ones behind others and the ones minimized to the taskbar. Landed so far:
-multi-display capture with a composite laid out by monitor geometry, the protocol schemas, the
-window inventory, the UI Automation text layer, the see-everything hotkey and its attach policy, the
-five built-in tools a pet reaches all of it with, one pause gate over every capture path, and the
-settings that control what a look costs.
+Phase 2B widened that to what the user cannot see — every display at once, and every open window
+including the ones behind others and the ones minimized to the taskbar. It shipped multi-display
+capture with a composite laid out by monitor geometry, the protocol schemas, the window inventory,
+the UI Automation text layer that reads a background or minimized window without photographing it,
+the see-everything hotkey and its attach policy, the five built-in tools a pet reaches all of it
+with, one pause gate over every capture path, and the settings that control what a look costs. The
+OCR fallback is deferred rather than built: `look_closer` already reaches the windows it was for,
+without OCR's recognition errors. Sign-off and the items that need a human at a real desktop are in
+[docs/acceptance/phase-2b.md](docs/acceptance/phase-2b.md).
 
 ## Repository layout
 
