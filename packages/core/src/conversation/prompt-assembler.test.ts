@@ -363,3 +363,224 @@ describe('assemblePrompt window inventory', () => {
     expect(lastText(request)).not.toContain(CONTEXT_LABELS.windows);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 2B: the full-view attach policy
+// ---------------------------------------------------------------------------
+
+const PNG = { mime: 'image/png', base64: 'aGk=', width: 1568, height: 882 } as const;
+
+function display(
+  id: number,
+  overrides: Partial<{
+    focused: boolean;
+    primary: boolean;
+    width: number;
+    height: number;
+    image: typeof PNG | undefined;
+    blocked: { rule: 'processName' | 'titlePattern'; entry: string };
+  }> = {},
+) {
+  const { focused = false, primary = false, width = 1920, height = 1080 } = overrides;
+  return {
+    id,
+    bounds: { x: 0, y: 0, width, height },
+    scaleFactor: 1,
+    primary,
+    focused,
+    ...('image' in overrides ? { image: overrides.image } : { image: PNG }),
+    ...(overrides.blocked === undefined ? {} : { blocked: overrides.blocked }),
+  };
+}
+
+function fullView(overrides: Partial<ContextSnapshot> = {}): ContextSnapshot {
+  return {
+    id: randomUUID(),
+    capturedAt: new Date().toISOString(),
+    host: 'desktop',
+    composite: PNG,
+    displays: [
+      display(101, { focused: true, primary: true }),
+      display(102),
+      display(103, { width: 2560, height: 1440 }),
+    ],
+    ...overrides,
+  } as ContextSnapshot;
+}
+
+function imagesOf(request: ReturnType<typeof assemblePrompt>): number {
+  const last = request.messages.at(-1);
+  return (last?.content ?? []).filter((block) => block.type === 'image').length;
+}
+
+function textOf(request: ReturnType<typeof assemblePrompt>): string {
+  const last = request.messages.at(-1);
+  return (last?.content ?? [])
+    .filter((block): block is { type: 'text'; text: string } => block.type === 'text')
+    .map((block) => block.text)
+    .join('\n');
+}
+
+describe('the full-view attach policy', () => {
+  it('attaches the composite and the focused display, and nothing else', () => {
+    // The whole cost argument of this phase: three monitors must not mean three images
+    // on every ask. The composite is the map; the focused display is where the user is.
+    const request = assemblePrompt({
+      pet,
+      history: [userMessage('what is on my screens')],
+      snapshot: fullView(),
+      settings,
+    });
+
+    expect(imagesOf(request)).toBe(2);
+  });
+
+  it('attaches every display when sightDetail is all', () => {
+    const request = assemblePrompt({
+      pet,
+      history: [userMessage('what is on my screens')],
+      snapshot: fullView(),
+      settings: SettingsSchema.parse({ sightDetail: 'all' }),
+    });
+
+    // Composite plus three displays.
+    expect(imagesOf(request)).toBe(4);
+  });
+
+  it('lists the displays it did not attach, with their ids and sizes', () => {
+    const text = textOf(
+      assemblePrompt({
+        pet,
+        history: [userMessage('what is on my right monitor')],
+        snapshot: fullView(),
+        settings,
+      }),
+    );
+
+    expect(text).toContain('102');
+    expect(text).toContain('103');
+    expect(text).toContain('2560');
+    expect(text).toContain('1440');
+  });
+
+  it('maps each composite label to the display id a tool call needs', () => {
+    // The composite draws ordinals in its corners because a ten-digit Electron id costs
+    // seven glyphs of a five-pixel font. look_at_display takes the id. Without the
+    // mapping in the text, the pet can see "2" and has no way to ask for it.
+    const text = textOf(
+      assemblePrompt({
+        pet,
+        history: [userMessage('look at screen two')],
+        snapshot: fullView(),
+        settings,
+      }),
+    );
+
+    expect(text).toMatch(/\b1\b[^\n]*101/);
+    expect(text).toMatch(/\b2\b[^\n]*102/);
+    expect(text).toMatch(/\b3\b[^\n]*103/);
+  });
+
+  it('says which display is the focused one', () => {
+    const text = textOf(
+      assemblePrompt({
+        pet,
+        history: [userMessage('what am I working on')],
+        snapshot: fullView(),
+        settings,
+      }),
+    );
+
+    expect(text).toMatch(/101[^\n]*focused/);
+  });
+
+  it('names the exclusion that blanked a display rather than calling it empty', () => {
+    const text = textOf(
+      assemblePrompt({
+        pet,
+        history: [userMessage('what is on screen three')],
+        snapshot: fullView({
+          displays: [
+            display(101, { focused: true, primary: true }),
+            display(102),
+            display(103, { blocked: { rule: 'processName', entry: '1Password.exe' } }),
+          ],
+        }),
+        settings,
+      }),
+    );
+
+    expect(text).toContain('1Password.exe');
+  });
+
+  it('does not attach a display the capturer could not read', () => {
+    const request = assemblePrompt({
+      pet,
+      history: [userMessage('what is on my screens')],
+      snapshot: fullView({
+        displays: [display(101, { focused: true, image: undefined }), display(102)],
+      }),
+      settings: SettingsSchema.parse({ sightDetail: 'all' }),
+    });
+
+    // Composite plus the one display that has pixels. A missing image must not become an
+    // empty image block, which providers reject.
+    expect(imagesOf(request)).toBe(2);
+  });
+
+  it('still attaches the composite when no display is focused', () => {
+    // Windows reports no foreground window often enough to matter: a locked session, a
+    // UAC prompt, a full-screen game. The map is still worth sending.
+    const request = assemblePrompt({
+      pet,
+      history: [userMessage('what is on my screens')],
+      snapshot: fullView({ displays: [display(101), display(102)] }),
+      settings,
+    });
+
+    expect(imagesOf(request)).toBe(1);
+  });
+
+  it('leaves a Phase 2 single-screenshot snapshot exactly as it was', () => {
+    // Phase 2's Ctrl+Shift+S path must not change shape because Phase 2B exists.
+    const request = assemblePrompt({
+      pet,
+      history: [userMessage('what is wrong here')],
+      snapshot: {
+        id: randomUUID(),
+        capturedAt: new Date().toISOString(),
+        host: 'desktop',
+        screenshot: PNG,
+      } as ContextSnapshot,
+      settings,
+    });
+
+    expect(imagesOf(request)).toBe(1);
+    expect(textOf(request)).toContain(CONTEXT_LABELS.screenshot);
+  });
+
+  it('keeps the task 3 window inventory attached alongside the displays', () => {
+    const text = textOf(
+      assemblePrompt({
+        pet,
+        history: [userMessage('where should this go')],
+        snapshot: fullView({
+          windows: [
+            {
+              id: 'w-1',
+              processName: 'Code.exe',
+              title: 'displays.ts',
+              state: 'background',
+              browser: false,
+              displayId: 102,
+            },
+          ],
+        }),
+        settings,
+      }),
+    );
+
+    expect(text).toContain(CONTEXT_LABELS.windows);
+    expect(text).toContain('w-1');
+  });
+});

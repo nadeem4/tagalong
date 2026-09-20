@@ -28,6 +28,7 @@ export const CONTEXT_LABELS = {
   window: 'Active window',
   screenshot: 'Screenshot',
   windows: 'Open windows',
+  displays: 'Displays',
 } as const;
 
 /**
@@ -70,12 +71,9 @@ export function assemblePrompt(input: AssembleInput): BrainRequest {
   const messages = history.map(toBrainMessage);
 
   const contextText = input.snapshot ? contextBlock(input.snapshot, settings) : '';
-  const screenshot = input.snapshot?.screenshot;
+  const leading = input.snapshot ? imagesToAttach(input.snapshot, settings) : [];
 
-  if (contextText || screenshot) {
-    const leading: BrainContent[] = screenshot
-      ? [{ type: 'image', mime: screenshot.mime, base64: screenshot.base64 }]
-      : [];
+  if (contextText || leading.length > 0) {
     const trailing: BrainContent[] = contextText ? [{ type: 'text', text: contextText }] : [];
     attachToLastUserMessage(messages, leading, trailing);
   }
@@ -86,6 +84,39 @@ export function assemblePrompt(input: AssembleInput): BrainRequest {
     messages,
     maxTokens: MAX_OUTPUT_TOKENS,
   };
+}
+
+/**
+ * Which pictures ride along with the question.
+ *
+ * Phase 2's single screenshot is unchanged. A full-view capture sends the composite —
+ * the map of how the monitors sit — plus the display the user is actually working on,
+ * and names the rest in text for the pet to fetch by tool. Three monitors must not mean
+ * three images on every ask; that is the whole cost argument of this phase.
+ *
+ * `sightDetail: 'all'` overrides it for someone who would rather pay than ask twice.
+ *
+ * A display with no `image` is skipped everywhere. The capturer returns no source for a
+ * screen it was not allowed to read, and an absent image must not become an empty image
+ * block, which providers reject outright.
+ */
+function imagesToAttach(snapshot: ContextSnapshot, settings: Settings): BrainContent[] {
+  const images: BrainContent[] = [];
+  const add = (image: { mime: 'image/png'; base64: string }): void => {
+    images.push({ type: 'image', mime: image.mime, base64: image.base64 });
+  };
+
+  if (snapshot.screenshot) add(snapshot.screenshot);
+  // The composite leads the displays: it is the map, and a reader makes sense of one
+  // screen faster having already seen where that screen sits.
+  if (snapshot.composite) add(snapshot.composite);
+
+  for (const display of snapshot.displays ?? []) {
+    if (display.image === undefined) continue;
+    if (settings.sightDetail === 'all' || display.focused) add(display.image);
+  }
+
+  return images;
 }
 
 function systemPrompt(pet: Pet): string {
@@ -141,6 +172,10 @@ function contextBlock(snapshot: ContextSnapshot, settings: Settings): string {
     );
   }
 
+  if (snapshot.displays && snapshot.displays.length > 0) {
+    sections.push(section(CONTEXT_LABELS.displays, renderDisplays(snapshot, settings.sightDetail)));
+  }
+
   // Omitted when empty rather than rendered as "no windows are open". An empty list means
   // the enumeration failed or was never asked for, and a pet told the desktop is empty
   // will reason from that as though it were observed.
@@ -150,6 +185,80 @@ function contextBlock(snapshot: ContextSnapshot, settings: Settings): string {
 
   return sections.length > 0 ? ['--- Screen context ---', ...sections].join('\n\n') : '';
 }
+
+/**
+ * The displays as lines the pet can act on.
+ *
+ * The ordinal comes first because that is what the composite draws in each corner — a
+ * ten-digit Electron id would cost seven glyphs of a five-pixel font and be unreadable at
+ * composite scale. The id comes second because `look_at_display` takes the id. Printing
+ * one without the other leaves the pet able to see a screen it cannot name, or name one
+ * it cannot see, so the mapping is the point of this block.
+ */
+function renderDisplays(snapshot: ContextSnapshot, detail: Settings['sightDetail']): string {
+  const displays = snapshot.displays ?? [];
+  const attachedAll = detail === 'all';
+
+  const lines = displays.map((display, index) => {
+    const ordinal = index + 1;
+    const size = `${display.bounds.width}x${display.bounds.height}`;
+    const marks = [
+      display.focused ? 'focused' : '',
+      display.primary ? 'primary' : '',
+      ...appsOn(snapshot, display.id),
+    ].filter((mark) => mark.length > 0);
+
+    if (display.blocked !== undefined) {
+      // Named rather than called empty: a pet shown a grey rectangle with no explanation
+      // will guess what was behind it, and the guess is about a window the user asked
+      // Tagalong never to look at.
+      return `${ordinal} id=${display.id} ${size} blocked by ${display.blocked.entry}`;
+    }
+
+    const attached =
+      display.image === undefined
+        ? 'not captured'
+        : attachedAll || display.focused
+          ? 'attached as an image'
+          : 'not attached — look_at_display to see it';
+
+    return `${ordinal} id=${display.id} ${size}${marks.length > 0 ? ` ${marks.join(' ')}` : ''} — ${attached}`;
+  });
+
+  return [
+    `${displays.length} display${displays.length === 1 ? '' : 's'}. The composite image is ` +
+      'labelled with each number below in its corner; look_at_display takes the id.',
+    ...lines,
+  ].join('\n');
+}
+
+/**
+ * Which applications are on a display, from the window inventory when there is one.
+ *
+ * The phase page asks for the "focused app" of each display, which Windows cannot answer:
+ * there is one foreground window for the whole desktop, so an unfocused display has no
+ * focused app. Naming what is open on it instead answers the question the user actually
+ * has — which screen holds the thing I mean — using data already in the snapshot.
+ */
+function appsOn(snapshot: ContextSnapshot, displayId: number): string[] {
+  const names = new Set<string>();
+  for (const window of snapshot.windows ?? []) {
+    if (window.displayId !== displayId) continue;
+    if (window.state === 'minimized') continue;
+    if (window.blocked !== undefined) continue;
+    names.add(window.processName.replace(/\.exe$/i, ''));
+    if (names.size >= MAX_APPS_PER_DISPLAY) break;
+  }
+  return names.size === 0 ? [] : [[...names].join(',')];
+}
+
+/**
+ * How many application names a display line carries.
+ *
+ * Two, because the budget is shared across every display and the line is a hint about
+ * where to look rather than an inventory — the window list already carries that in full.
+ */
+const MAX_APPS_PER_DISPLAY = 2;
 
 function section(heading: string, body: string): string {
   return `## ${heading}\n${body}`;

@@ -143,3 +143,58 @@ describe('SettingsPatch', () => {
     expect(SettingsPatch.safeParse({ screenshotRetention: { mode: 'weeks' } }).success).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 2B: full view
+// ---------------------------------------------------------------------------
+
+describe('Settings.sightDetail', () => {
+  it('defaults to focused, so a full-view capture stays one image plus one screen', () => {
+    // `all` multiplies the bill by the monitor count on every ask that carries a look.
+    // The default has to be the cheap one; the expensive one is a choice the user makes.
+    expect(Settings.parse({}).sightDetail).toBe('focused');
+    expect(SETTINGS_DEFAULTS.sightDetail).toBe('focused');
+  });
+
+  it('accepts all, which attaches every display', () => {
+    expect(Settings.parse({ sightDetail: 'all' }).sightDetail).toBe('all');
+  });
+
+  it('rejects a detail level it does not know', () => {
+    expect(Settings.safeParse({ sightDetail: 'everything' }).success).toBe(false);
+    expect(Settings.safeParse({ sightDetail: 2 }).success).toBe(false);
+  });
+
+  it('is patchable on its own without resetting anything else', () => {
+    const patch = SettingsPatch.parse({ sightDetail: 'all' });
+    expect(patch.sightDetail).toBe('all');
+    expect(patch).not.toHaveProperty('hotkeys');
+    expect(patch).not.toHaveProperty('captureExclusions');
+  });
+});
+
+describe('Settings.hotkeys.seeEverything', () => {
+  it('has a default distinct from the other two', () => {
+    const { ask, look, seeEverything } = SETTINGS_DEFAULTS.hotkeys;
+    expect(seeEverything).toBe('CommandOrControl+Shift+Alt+S');
+    expect(new Set([ask, look, seeEverything]).size).toBe(3);
+  });
+
+  it('parses a settings file written before this hotkey existed', () => {
+    // Same reason `look` is optional: a patch replaces the whole hotkeys object, so a
+    // caller rebinding only `ask` must not be forced to resend a key it never touched.
+    const s = Settings.parse({ hotkeys: { ask: 'Alt+Space' } });
+    expect(s.hotkeys.seeEverything).toBeUndefined();
+  });
+
+  it('keeps a rebound see-everything key', () => {
+    const s = Settings.parse({ hotkeys: { ask: 'Alt+Space', seeEverything: 'Alt+Shift+S' } });
+    expect(s.hotkeys.seeEverything).toBe('Alt+Shift+S');
+  });
+
+  it('rejects a blank accelerator, which would bind nothing and look like a bug', () => {
+    expect(Settings.safeParse({ hotkeys: { ask: 'Alt+Space', seeEverything: '' } }).success).toBe(
+      false,
+    );
+  });
+});
