@@ -214,6 +214,28 @@ The host also degrades rather than dying. If the engine refuses to boot — the 
 API key stored — the app still starts, opens the settings window, and reports why; settings reads and
 writes fall back to `SettingsStore` directly so the user can fix the thing that blocked the boot.
 
+### The platform adapter
+
+Everything OS-specific sits behind `Platform` in `src/main/platform/`. `createPlatform` throws on any
+OS with no adapter rather than returning a stub, because a host that silently perceives nothing looks
+like a broken engine instead of a missing port. Windows is the only implementation until Phase 7.
+
+Each capability is a free function taking its Electron dependencies as ports — `desktopCapturer`,
+`screen`, `nativeImage` — and the class only wires the real ones in. That is what lets the whole
+perception layer be tested in plain Node with no display attached, which matters because CI has no
+desktop and the one test that does use real pixels is the Playwright smoke test.
+
+`captureDisplays` takes the exclusion list, and `captureActiveWindowImage` does not. The difference is
+not an inconsistency. For a single screenshot the caller checks exclusions and then either asks for a
+picture or does not, so the answer is yes or no. For a full-view capture one display can be refused
+while the others are returned, and the composite has to show that refusal in the refused display's
+slot — so the decision has to happen inside the capture rather than above it.
+
+The composite is the one image Tagalong builds rather than captures. Electron's `nativeImage` resizes
+and encodes but cannot compose, so the pixels are handled directly: `toBitmap` hands over a BGRA
+buffer, `createFromBitmap` takes one back, and everything between is ordinary buffer arithmetic in
+`canvas.ts`, `composite.ts` and `label.ts`. No image library, and one Electron call at the end.
+
 ## Bundling the workspace packages
 
 `electron.vite.config.ts` **bundles** `@tagalong/core`, `@tagalong/protocol`, and `@tagalong/ui` into

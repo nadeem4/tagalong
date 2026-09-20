@@ -1,3 +1,6 @@
+import type { CaptureExclusions } from '@tagalong/protocol';
+
+import type { DisplaysCapture } from './displays';
 import { Win32Platform } from './win32';
 
 /** Where the foreground window is, so the panel can open next to what the user is reading. */
@@ -32,6 +35,16 @@ export interface Platform {
   readClipboard(): Promise<string>;
   /** Phase 2. */
   captureActiveWindowImage(maxLongSide: number): Promise<CapturedImage | null>;
+  /**
+   * Phase 2B: every display at once, plus a composite showing how they are arranged.
+   *
+   * Takes the exclusion list, unlike `captureActiveWindowImage`, where the caller checks
+   * it and then either asks for a picture or does not. That works when a capture is one
+   * image and the answer is yes or no. Here one display can be refused while the others
+   * are returned, and the composite has to show the refusal in that display's slot, so
+   * the decision has to be made inside the capture rather than above it.
+   */
+  captureDisplays(maxLongSide: number, exclusions: CaptureExclusions): Promise<DisplaysCapture>;
 }
 
 /**
@@ -44,3 +57,4 @@ export function createPlatform(platform: NodeJS.Platform = process.platform): Pl
 }
 
 export type { Win32Platform };
+export type { CapturedDisplay, DisplayInfo, DisplaysCapture } from './displays';
