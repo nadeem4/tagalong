@@ -1,15 +1,35 @@
+import { DEFAULT_WINDOW_TEXT_CHARS } from '@tagalong/protocol';
 import type {
   CaptureExclusions,
   ContextSnapshotPatch,
+  DisplayBounds,
   HostCapability,
+  PerceptionCaptureRegionResult,
+  PerceptionListWindowsResult,
+  PerceptionReadTextResult,
   PerceptionTarget,
 } from '@tagalong/protocol';
 import type { BrainContentBlock, BrainTool } from '../providers';
 import { findCaptureBlock, type ActiveWindow, type CaptureBlock } from './exclusions';
+import { fullViewContext as fullView } from './full-view-context';
+import {
+  LIST_DISPLAYS,
+  LIST_WINDOWS,
+  LOOK_AT_DISPLAY,
+  LOOK_CLOSER,
+  READ_WINDOW_TEXT,
+  runListDisplays,
+  runListWindows,
+  runLookAtDisplay,
+  runLookCloser,
+  runReadWindowText,
+} from './full-view-tools';
 
 /** The two built-ins every pet gets. Named as the model sees them. */
 export const LOOK_AT_SCREEN = 'look_at_screen';
 export const GET_SELECTION = 'get_selection';
+
+export { LIST_DISPLAYS, LIST_WINDOWS, LOOK_AT_DISPLAY, LOOK_CLOSER, READ_WINDOW_TEXT };
 
 /**
  * The slice of a connected host the tools need.
@@ -20,6 +40,21 @@ export const GET_SELECTION = 'get_selection';
 export interface PerceptionHost {
   readonly capabilities: readonly HostCapability[];
   capture(what: readonly PerceptionTarget[]): Promise<ContextSnapshotPatch>;
+  /**
+   * The three Phase 2B methods.
+   *
+   * Optional on the type because a host is free to advertise fewer capabilities — the
+   * Chrome host will never enumerate displays — and because the capability array is the
+   * real gate. A host advertising `displays` without these is a wiring mistake, and the
+   * tools report it as a refusal rather than throwing, so the turn survives it.
+   */
+  captureRegion?(params: {
+    displayId: number;
+    rect: DisplayBounds;
+    maxLongSide: number;
+  }): Promise<PerceptionCaptureRegionResult>;
+  listWindows?(): Promise<PerceptionListWindowsResult>;
+  readText?(params: { windowId?: string; maxChars: number }): Promise<PerceptionReadTextResult>;
 }
 
 export interface PerceptionToolsetOptions {
@@ -73,6 +108,92 @@ const DEFINITIONS: readonly BrainTool[] = [
       'message. Returns a plain statement when nothing is selected.',
     inputSchema: NO_INPUT,
   },
+  {
+    name: LIST_DISPLAYS,
+    description:
+      'List the monitors attached to this machine: id, size, position and which one the ' +
+      'user is working on. No pictures, so it is cheap. Call it before look_at_display ' +
+      'or look_closer, which both need a display id from here.',
+    inputSchema: NO_INPUT,
+  },
+  {
+    name: LOOK_AT_DISPLAY,
+    description:
+      'Take a picture of one whole monitor, named by its id from list_displays. Use it ' +
+      'when the user asks about a screen you were not given an image of. For anything ' +
+      `textual prefer ${READ_WINDOW_TEXT}: it is exact and far cheaper than a picture.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        displayId: { type: 'number', description: 'A display id from list_displays.' },
+      },
+      required: ['displayId'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: LOOK_CLOSER,
+    description:
+      'Take a native-resolution picture of one rectangle of a monitor, for when a whole ' +
+      'screen is too coarse to make something out. Use it only when layout, a chart or ' +
+      `an image is what matters. Never use it to read text — ${READ_WINDOW_TEXT} returns ` +
+      'text exactly, while a picture makes you guess at it and costs far more.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        displayId: { type: 'number', description: 'A display id from list_displays.' },
+        rect: {
+          type: 'object',
+          description: "The rectangle to crop, in that display's own pixels.",
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+            width: { type: 'number' },
+            height: { type: 'number' },
+          },
+          required: ['x', 'y', 'width', 'height'],
+          additionalProperties: false,
+        },
+      },
+      required: ['displayId', 'rect'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: LIST_WINDOWS,
+    description:
+      'List every open window — what it is, which monitor it is on, whether it is in ' +
+      'front, behind something else or minimized, and roughly how much readable text it ' +
+      'holds. No window contents, so it is cheap. This is how you find the window you ' +
+      `want before calling ${READ_WINDOW_TEXT} on it, including windows the user cannot ` +
+      'see right now.',
+    inputSchema: NO_INPUT,
+  },
+  {
+    name: READ_WINDOW_TEXT,
+    description:
+      'Read the text of one window, named by its id. Works on a window behind another ' +
+      `and on a minimized one. Call ${LIST_WINDOWS} first and name the single window you ` +
+      'need; there is no way to read them all at once, and asking for the wrong one ' +
+      'costs the user tokens for nothing. Some applications — editors, terminals, ' +
+      'drawing tools — draw their own text and publish almost none of it, so a short ' +
+      'result may mean you could not read inside the window rather than that it is ' +
+      'empty. The result says so when that happens; repeat it rather than guessing.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        windowId: {
+          type: 'string',
+          description: 'A window id from list_windows. Omit to read the window in front.',
+        },
+        maxChars: {
+          type: 'number',
+          description: `How much text to return at most. Defaults to ${DEFAULT_WINDOW_TEXT_CHARS}.`,
+        },
+      },
+      additionalProperties: false,
+    },
+  },
 ];
 
 /**
@@ -93,6 +214,16 @@ export function createPerceptionToolset(options: PerceptionToolsetOptions): Perc
           return capture(options, 'screenshot');
         case GET_SELECTION:
           return capture(options, 'selection');
+        case LIST_DISPLAYS:
+          return runListDisplays(fullView(options));
+        case LOOK_AT_DISPLAY:
+          return runLookAtDisplay(fullView(options), call.input);
+        case LOOK_CLOSER:
+          return runLookCloser(fullView(options), call.input);
+        case LIST_WINDOWS:
+          return runListWindows(fullView(options));
+        case READ_WINDOW_TEXT:
+          return runReadWindowText(fullView(options), call.input);
         default:
           // Named back so the model can correct itself instead of retrying blindly.
           return Promise.resolve({

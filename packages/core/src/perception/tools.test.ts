@@ -65,11 +65,14 @@ function screenshotHost(): ReturnType<typeof fakeHost> {
 }
 
 describe('perception tool definitions', () => {
-  it('offers exactly look_at_screen and get_selection', () => {
-    expect(toolset([]).definitions.map((tool) => tool.name)).toEqual([
-      LOOK_AT_SCREEN,
-      GET_SELECTION,
-    ]);
+  it('offers the Phase 2 pair first, ahead of the full-view tools', () => {
+    // Was "exactly look_at_screen and get_selection" until Phase 2B added five more.
+    // Flipped here and nowhere earlier: the ordering is what this assertion still
+    // protects, because a model reads the catalog top down and these two are the cheap
+    // answers to "what is the user looking at". The full-view set has its own test.
+    const names = toolset([]).definitions.map((tool) => tool.name);
+    expect(names.slice(0, 2)).toEqual([LOOK_AT_SCREEN, GET_SELECTION]);
+    expect(names).toHaveLength(7);
   });
 
   it('describes each tool so a model knows when to reach for it', () => {

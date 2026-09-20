@@ -178,6 +178,8 @@ export const PerceptionReadTextResult = z.object({
 export type PerceptionReadTextParams = z.infer<typeof PerceptionReadTextParams>;
 export type PerceptionReadTextResult = z.infer<typeof PerceptionReadTextResult>;
 export type PerceptionListWindowsResult = z.infer<typeof PerceptionListWindowsResult>;
+export type PerceptionCaptureRegionResult = z.infer<typeof PerceptionCaptureRegionResult>;
+export type PerceptionCaptureRegionParams = z.infer<typeof PerceptionCaptureRegionParams>;
 
 // ---------------------------------------------------------------------------
 // Core to host notifications (no result; the host must not answer)

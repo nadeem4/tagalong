@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { ContextSnapshot, NotificationParamsOf, Pet, Settings } from '@tagalong/protocol';
-import type { BrainProvider, BrainResult } from '../providers';
+import type { BrainContentBlock, BrainProvider, BrainResult } from '../providers';
 import { BrainError } from '../providers';
 import type { ConversationStore } from '../memory/store';
 import type { SettingsStore } from '../settings/settings';
@@ -15,6 +15,8 @@ import { assemblePrompt } from './prompt-assembler';
 export type TurnEvent =
   | { method: 'turn.started'; params: NotificationParamsOf<'turn.started'> }
   | { method: 'turn.delta'; params: NotificationParamsOf<'turn.delta'> }
+  | { method: 'turn.toolRequest'; params: NotificationParamsOf<'turn.toolRequest'> }
+  | { method: 'turn.toolResult'; params: NotificationParamsOf<'turn.toolResult'> }
   | { method: 'turn.completed'; params: NotificationParamsOf<'turn.completed'> }
   | { method: 'turn.warning'; params: NotificationParamsOf<'turn.warning'> }
   | { method: 'turn.error'; params: NotificationParamsOf<'turn.error'> };
@@ -222,8 +224,32 @@ export class ConversationRunner {
         request,
         {
           onText: (text) => this.#options.emit({ method: 'turn.delta', params: { turnId, text } }),
-          onToolUse: (call) =>
-            tools ? tools.run(call) : Promise.resolve({ content: NO_TOOLS_YET, isError: true }),
+          onToolUse: async (call) => {
+            if (!tools) return { content: NO_TOOLS_YET, isError: true };
+            // Announced around the call, not after it. A tool that takes seconds —
+            // enumerating windows walks an accessibility tree — leaves the user watching
+            // a pet that looks hung, and a turn whose tool activity is never broadcast
+            // cannot be observed end to end at all, which is how this phase shipped two
+            // dead perception paths behind a green suite.
+            this.#options.emit({
+              method: 'turn.toolRequest',
+              params: { turnId, approvalId: randomUUID(), tool: call.name, input: call.input },
+            });
+            const outcome = await tools.run(call);
+            this.#options.emit({
+              method: 'turn.toolResult',
+              params: {
+                turnId,
+                tool: call.name,
+                ok: outcome.isError !== true,
+                // The summary is for the panel, not the model: the model already has the
+                // content. Kept short so a 8,000-character window read does not travel
+                // twice, once to the provider and once to every open window.
+                summary: summarise(outcome.content),
+              },
+            });
+            return outcome;
+          },
         },
         signal,
       );
@@ -262,4 +288,20 @@ export class ConversationRunner {
       };
     }
   }
+}
+
+/**
+ * A one-line gist of a tool result, for the panel.
+ *
+ * Blocks become a count of what came back rather than the pixels themselves: a base64
+ * screenshot forwarded to every open window would be megabytes of IPC to render one line
+ * of chrome, and the model already has the image.
+ */
+function summarise(content: string | BrainContentBlock[]): string {
+  if (typeof content !== 'string') {
+    const images = content.filter((block) => block.type === 'image').length;
+    return images > 0 ? `${images} image${images === 1 ? '' : 's'}` : 'no content';
+  }
+  const firstLine = content.split('\n', 1)[0] ?? '';
+  return firstLine.length > 120 ? `${firstLine.slice(0, 117)}...` : firstLine;
 }

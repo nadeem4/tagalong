@@ -1,6 +1,7 @@
 import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
 
 import type { DisplaysCapture } from './displays';
+import type { RegionCaptureParams } from './region';
 import type { ReadTextAnswer, ReadWindowTextParams } from './read-text';
 import type { WindowEnumerationFailure } from './window-list';
 import { Win32Platform } from './win32';
@@ -55,6 +56,14 @@ export interface Platform {
    * Entries come back already classified, so nothing downstream has to remember to check.
    */
   listWindows(exclusions: CaptureExclusions): Promise<WindowInventory>;
+  /**
+   * Phase 2B: a native-resolution crop of one display, for leaning in.
+   *
+   * Takes no exclusion list, unlike its neighbours. A crop is only ever reached through a
+   * display the pet listed first, and that listing is where a blocked display is refused;
+   * checking twice would let the two checks disagree.
+   */
+  captureRegion(params: RegionCaptureParams): Promise<CapturedImage | null>;
   /**
    * Phase 2B: the text of one window, named by id or defaulting to the foreground one.
    *

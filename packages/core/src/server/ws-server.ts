@@ -6,6 +6,8 @@ import {
   ENGINE_HOST,
   HelloParams,
   PROTOCOL_VERSION,
+  PerceptionCaptureRegionResult,
+  PerceptionListWindowsResult,
   PerceptionReadTextResult,
   RPC_ERROR_CODES,
   RpcRequest,
@@ -16,6 +18,9 @@ import {
 import type {
   CoreToHostNotification,
   HostCapability,
+  PerceptionCaptureRegionParams,
+  PerceptionCaptureRegionResult as PerceptionCaptureRegionResultType,
+  PerceptionListWindowsResult as PerceptionListWindowsResultType,
   PerceptionReadTextParams,
   PerceptionReadTextResult as PerceptionReadTextResultType,
   HostKind,
@@ -45,7 +50,14 @@ export interface HostSession {
    * token inventory first and names the window it actually wants.
    */
   readText(params: ReadTextParams): Promise<ReadTextReading>;
+  /** Asks the host for the window inventory: what each window is and where, never its text. */
+  listWindows(): Promise<PerceptionListWindowsResultType>;
+  /** Asks the host for a native-resolution crop of one display, for leaning in. */
+  captureRegion(params: CaptureRegionParams): Promise<PerceptionCaptureRegionResultType>;
 }
+
+/** What the engine asks for when a pet wants a closer look. */
+export type CaptureRegionParams = PerceptionCaptureRegionParams;
 
 /** What the engine asks for. `windowId` absent means the foreground window. */
 export type ReadTextParams = PerceptionReadTextParams;
@@ -107,6 +119,18 @@ class SessionImpl implements HostSession {
     // Parsed rather than trusted: this crosses a socket, and a malformed reading that
     // reached the model would look to the user like the pet inventing screen contents.
     return PerceptionReadTextResult.parse(raw);
+  }
+
+  async listWindows(): Promise<PerceptionListWindowsResultType> {
+    const id = `listWindows-${this.#nextRequestId++}`;
+    const raw = await this.#request(id, 'perception.listWindows', {});
+    return PerceptionListWindowsResult.parse(raw);
+  }
+
+  async captureRegion(params: CaptureRegionParams): Promise<PerceptionCaptureRegionResultType> {
+    const id = `captureRegion-${this.#nextRequestId++}`;
+    const raw = await this.#request(id, 'perception.captureRegion', params);
+    return PerceptionCaptureRegionResult.parse(raw);
   }
 
   /** Resolves a core-to-host request the host has answered. */

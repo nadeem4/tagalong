@@ -29,6 +29,14 @@ export interface EngineClientOptions {
   readText: (params: { windowId?: string; maxChars: number }) => Promise<unknown>;
   /** Answers perception.capture, which is how a pet looks at the screen mid-turn. */
   capture: (what: readonly PerceptionTarget[]) => Promise<ContextSnapshotPatch>;
+  /** Answers perception.listWindows: what each window is and where, never its text. */
+  listWindows: () => Promise<unknown>;
+  /** Answers perception.captureRegion: a native-resolution crop of one display. */
+  captureRegion: (params: {
+    displayId: number;
+    rect: { x: number; y: number; width: number; height: number };
+    maxLongSide: number;
+  }) => Promise<unknown>;
   onNotification: (notification: EngineNotification) => void;
 }
 
@@ -173,6 +181,15 @@ export class EngineClient {
             maxChars: asked.maxChars ?? DEFAULT_WINDOW_TEXT_CHARS,
           }),
         });
+        return;
+      }
+      if (method === 'perception.listWindows') {
+        this.#send({ jsonrpc: '2.0', id, result: await this.#options.listWindows() });
+        return;
+      }
+      if (method === 'perception.captureRegion') {
+        const asked = params as Parameters<EngineClientOptions['captureRegion']>[0];
+        this.#send({ jsonrpc: '2.0', id, result: await this.#options.captureRegion(asked) });
         return;
       }
       this.#send({ jsonrpc: '2.0', id, error: { code: -32601, message: `unknown ${method}` } });

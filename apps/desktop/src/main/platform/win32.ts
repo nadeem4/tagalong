@@ -4,6 +4,8 @@ import { buildInventory } from '@tagalong/core';
 import type { CaptureExclusions } from '@tagalong/protocol';
 import { captureActiveWindowImageWith } from './capture';
 import { captureDisplaysWith } from './displays';
+import { captureRegionWith } from './region';
+import type { RegionCaptureParams } from './region';
 import type { DisplaysCapture } from './displays';
 import { readWindowTextWith } from './read-text';
 import type { ReadTextAnswer, ReadWindowTextParams } from './read-text';
@@ -113,6 +115,25 @@ export class Win32Platform implements Platform {
       {
         textLayer: this.#textLayer,
         listWindows: async () => (await this.listWindows(exclusions)).windows,
+      },
+      params,
+    );
+  }
+
+  async captureRegion(params: RegionCaptureParams): Promise<CapturedImage | null> {
+    return captureRegionWith(
+      {
+        screen: {
+          getAllDisplays: () =>
+            screen.getAllDisplays().map((display) => ({
+              id: display.id,
+              bounds: display.bounds,
+              scaleFactor: display.scaleFactor,
+              primary: display.id === screen.getPrimaryDisplay().id,
+            })),
+        },
+        desktopCapturer,
+        log: (message) => console.log(`[platform:win32] ${message}`),
       },
       params,
     );
