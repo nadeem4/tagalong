@@ -5,6 +5,10 @@
  * OpenAI-compatible endpoint can be added later without touching conversation code.
  */
 
+/** Shown instead of an empty bubble when the model declines to answer. Every provider uses it. */
+export const REFUSAL_MESSAGE =
+  "I'd rather not answer that one. Try rephrasing it, or ask me something else.";
+
 export interface BrainCapabilities {
   vision: boolean;
   tools: boolean;
