@@ -204,6 +204,43 @@ context. So `get_selection` returns the selected text itself, and `look_at_scree
 the image size and says plainly that pixels cannot ride back through a tool result — the image reaches
 the model through the snapshot attached to an ask.
 
+## Brain providers
+
+`BrainProvider` (`providers/brain.ts`) is the only thing the runner talks to. Three implementations
+are registered in `providers/registry.ts` by id:
+
+| id          | Class                      | Wire format                                                                      |
+| ----------- | -------------------------- | -------------------------------------------------------------------------------- |
+| `anthropic` | `AnthropicProvider`        | Anthropic Messages API through `@anthropic-ai/sdk`                               |
+| `nebius`    | `OpenAiCompatibleProvider` | OpenAI chat completions through the `openai` SDK, base URL Nebius Token Factory  |
+| `fake`      | `FakeBrainProvider`        | None: scripted words, for tests and demos; forced by `TAGALONG_FAKE_PROVIDERS=1` |
+
+`OpenAiCompatibleProvider` defaults its base URL to `https://api.tokenfactory.nebius.com/v1/` and
+takes another, so any chat-completions server works. How the provider-neutral blocks map onto that
+format:
+
+- The system prompt is the first message, role `system`.
+- A user message with only text goes as a plain string; one with images goes as content parts, the
+  `image_url` parts (base64 `data:` URLs) ahead of the text, as Anthropic gets them.
+- `tool_use` becomes an assistant `tool_calls` entry whose `arguments` is the input as JSON.
+- `tool_result` becomes a `tool` message. That message is text-only in this format, so **an image a
+  tool returns cannot ride inside it**: the tool message says an image follows, and the pictures go in
+  one user message placed straight after the tool messages, captioned with the tool's name. An error
+  result is prefixed `Error: `.
+- Streamed tool calls arrive in fragments keyed by `index`; they are joined, and a call whose
+  arguments are not valid JSON reaches the tool as the raw string, so the tool's own validation
+  answers instead of the turn dying. Calls are run whenever the stream produced any, even if the
+  server said `stop` — some do.
+- Finish reasons: `length` is `max_tokens`, `content_filter` is `refusal` (with the shared refusal
+  line), anything else is `end`. Usage comes from the final chunk (`stream_options.include_usage`)
+  and is summed across tool rounds; a server that sends none reports zero.
+- Reasoning deltas (`reasoning_content`) are ignored, so a model's thinking never reaches the bubble.
+- HTTP 429 is `rate_limit`, 401 and 403 are `auth`, 404 is `config` naming the model, a network
+  failure is `connection`. Aborting returns the text so far with stop reason `aborted`.
+
+The unit tests feed the real SDK a fake `fetch` that answers with canned server-sent events, so the
+parsing path is the production one and nothing reaches the network.
+
 ## The desktop host's shape
 
 `apps/desktop` runs the engine **in the Electron main process and still speaks to it over the socket**.
@@ -391,5 +428,5 @@ anyway.
 
 Only the genuinely native dependencies stay external: `better-sqlite3` and `get-windows` ship `.node`
 binaries Rollup cannot inline. Because they are then resolved at runtime from the desktop app, they are
-declared as its own dependencies. Pure JavaScript dependencies such as `ws` and the Anthropic SDK are
+declared as its own dependencies. Pure JavaScript dependencies such as `ws`, the Anthropic SDK and the `openai` SDK are
 inlined with everything else.

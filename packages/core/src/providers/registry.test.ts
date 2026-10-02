@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { BrainError } from './errors';
 import { FakeBrainProvider } from './fake';
 import { AnthropicProvider } from './anthropic';
+import { OpenAiCompatibleProvider } from './openai-compatible';
 import { createProvider } from './registry';
 
 vi.mock('@anthropic-ai/sdk', () => ({
@@ -18,6 +19,31 @@ describe('createProvider', () => {
     const provider = createProvider({ providerId: 'anthropic', apiKey: 'k', env: {} });
     expect(provider).toBeInstanceOf(AnthropicProvider);
     expect(provider.id).toBe('anthropic');
+  });
+
+  it('builds the Token Factory provider as nebius', () => {
+    const provider = createProvider({ providerId: 'nebius', apiKey: 'k', env: {} });
+    expect(provider).toBeInstanceOf(OpenAiCompatibleProvider);
+    expect(provider.id).toBe('nebius');
+  });
+
+  it('refuses to build the Token Factory provider without an API key', () => {
+    try {
+      createProvider({ providerId: 'nebius', env: {} });
+      expect.unreachable('expected a BrainError');
+    } catch (error) {
+      expect((error as BrainError).code).toBe('auth');
+      expect((error as BrainError).message).toContain('Token Factory');
+    }
+  });
+
+  it('forces the fake provider over nebius when TAGALONG_FAKE_PROVIDERS is set', () => {
+    const provider = createProvider({
+      providerId: 'nebius',
+      apiKey: 'k',
+      env: { TAGALONG_FAKE_PROVIDERS: '1' },
+    });
+    expect(provider).toBeInstanceOf(FakeBrainProvider);
   });
 
   it('builds the fake provider', () => {

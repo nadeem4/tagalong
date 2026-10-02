@@ -64,7 +64,7 @@ tagalong/
       perception/                   # exclusions, retention, tools, inventory
       memory/                       # db.ts (numbered migrations), store.ts (ConversationStore)
       pets/registry.ts              # PetRegistry, the default pet Scout
-      providers/                    # brain.ts, anthropic.ts, fake.ts, registry.ts, errors.ts
+      providers/                    # brain.ts, anthropic.ts, openai-compatible.ts, nebius-models.ts, fake.ts, registry.ts, errors.ts
       server/                       # ws-server.ts (EngineServer), pairing.ts
       settings/settings.ts          # SettingsStore, SecretStore, InMemorySecretStore
     ui/src/
@@ -289,8 +289,9 @@ Chrome extension, or something new. Adding one never touches the core.
 Providers are the swappable edges of the engine. Each one is an interface in `packages/core` with more
 than one planned implementation.
 
-- **BrainProvider** for the AI engine. Existing: `anthropic` (default), `fake` (tests and demos);
-  `ollama` and `openai-compatible` are planned after Phase 5.
+- **BrainProvider** for the AI engine. Existing: `nebius` (Nemotron on Nebius Token Factory, through
+  the OpenAI-compatible `OpenAiCompatibleProvider`), `anthropic`, and `fake` (tests and demos);
+  `ollama` is planned after Phase 5.
 - **SttProvider** for speech to text and **TtsProvider** for text to speech arrive in Phase 3; neither
   interface exists yet.
 

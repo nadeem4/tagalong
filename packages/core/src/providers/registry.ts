@@ -2,10 +2,12 @@ import type { BrainProvider } from './brain';
 import { AnthropicProvider } from './anthropic';
 import { FakeBrainProvider } from './fake';
 import { BrainError } from './errors';
+import { NEBIUS_FALLBACK_MODELS } from './nebius-models';
+import { OpenAiCompatibleProvider } from './openai-compatible';
 
 /** What the engine knows about the provider before it builds one. */
 export interface ProviderConfig {
-  /** Matches `Settings.providerId`. Phase 1 ships 'anthropic' and 'fake'. */
+  /** Matches `Pet.providerId`: 'anthropic', 'nebius' or 'fake'. */
   providerId: string;
   /** Read from the host's SecretStore; never stored in settings. */
   apiKey?: string | undefined;
@@ -62,10 +64,23 @@ export function createProvider(config: ProviderConfig): BrainProvider {
         throw new BrainError('auth', 'No Anthropic API key is stored. Add one in Settings.');
       }
       return new AnthropicProvider({ apiKey: config.apiKey });
+    case 'nebius':
+      if (!config.apiKey) {
+        throw new BrainError(
+          'auth',
+          'No Nebius Token Factory API key is stored. Add one in Settings.',
+        );
+      }
+      return new OpenAiCompatibleProvider({
+        id: 'nebius',
+        apiKey: config.apiKey,
+        label: 'Token Factory',
+        models: NEBIUS_FALLBACK_MODELS,
+      });
     default:
       throw new BrainError(
         'config',
-        `Unknown provider id '${config.providerId}'. Phase 1 supports 'anthropic' and 'fake'.`,
+        `Unknown provider id '${config.providerId}'. Supported: 'anthropic', 'nebius' and 'fake'.`,
       );
   }
 }
