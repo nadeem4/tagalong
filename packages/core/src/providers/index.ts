@@ -35,3 +35,9 @@ export {
 export { createProvider, type ProviderConfig } from './registry';
 export { carriesImage, modelForTurn } from './vision-routing';
 export { OPENAI_COMPATIBLE_PRESETS, SECRET_KEYS, openAiPreset, type OpenAiPreset } from './presets';
+export {
+  NEMOTRON_NANO_MODEL,
+  WATCH_MODEL_DEFAULTS,
+  watchModelsFor,
+  type WatchModels,
+} from './watch-models';

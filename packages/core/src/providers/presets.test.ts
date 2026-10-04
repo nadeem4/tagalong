@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NEMOTRON_TEXT_MODEL, NEMOTRON_VISION_MODEL } from './nebius-models';
+import { NEMOTRON_NANO_MODEL, NEMOTRON_TEXT_MODEL, NEMOTRON_VISION_MODEL } from './nebius-models';
 import { OPENAI_COMPATIBLE_PRESETS, SECRET_KEYS, openAiPreset } from './presets';
 
 describe('OpenAI-compatible presets', () => {
@@ -11,7 +11,11 @@ describe('OpenAI-compatible presets', () => {
     const nebius = openAiPreset('nebius');
     expect(nebius?.baseURL).toBe('https://api.tokenfactory.nebius.com/v1/');
     expect(nebius?.envVar).toBe('NEBIUS_API_KEY');
-    expect(nebius?.fallbackModels).toEqual([NEMOTRON_TEXT_MODEL, NEMOTRON_VISION_MODEL]);
+    expect(nebius?.fallbackModels).toEqual([
+      NEMOTRON_TEXT_MODEL,
+      NEMOTRON_VISION_MODEL,
+      NEMOTRON_NANO_MODEL,
+    ]);
     expect(nebius?.visionModels).toEqual([NEMOTRON_VISION_MODEL]);
   });
 
