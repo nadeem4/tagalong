@@ -1,5 +1,16 @@
 import { randomUUID } from 'node:crypto';
-import { BrowserWindow, Menu, Notification, Tray, app, dialog, ipcMain, screen } from 'electron';
+import { existsSync } from 'node:fs';
+import {
+  BrowserWindow,
+  Menu,
+  Notification,
+  Tray,
+  app,
+  dialog,
+  ipcMain,
+  screen,
+  shell,
+} from 'electron';
 import { ContextSnapshot } from '@tagalong/protocol';
 import type { PerceptionTarget, Pet, Settings, SettingsPatch } from '@tagalong/protocol';
 import { SettingsStore, WATCH_MODEL_DEFAULTS } from '@tagalong/core';
@@ -10,6 +21,8 @@ import { RollingMemory } from './awareness/rolling-memory';
 import { captureNotice, captureTooltip } from './capture-notice';
 import { captureAskSnapshot, capturePatch } from './context';
 import { startEngineHost } from './engine-host';
+import { extensionFolder, isAllowedLink } from './links';
+import { applyCrewChoice, crewSuggestions, shouldOpenOnboarding } from './onboarding';
 import { providerChoices, secretKeyFor } from './provider-choices';
 import type { EngineHost } from './engine-host';
 import {
@@ -28,9 +41,10 @@ import { createTrayIcon } from './tray-icon';
 import { createAvatarWindow } from './windows/avatar';
 import { createPanelWindow, showPanelBeside } from './windows/panel';
 import { AVATAR_SIZE, resolveAvatarPosition, stripWidth } from './windows/position';
+import { createOnboardingWindow } from './windows/onboarding';
 import { createSettingsWindow } from './windows/settings';
 import { IPC } from '../shared/ipc';
-import type { CaptureNotice, HostView, ModelList } from '../shared/ipc';
+import type { CaptureNotice, CrewChoice, HostView, ModelList } from '../shared/ipc';
 
 /** Everything the app owns once it is up. Assembled in `start`, torn down on quit. */
 interface Desktop {
@@ -46,6 +60,8 @@ interface Desktop {
   panel: BrowserWindow | null;
   tray: Tray;
   settingsWindow: BrowserWindow | null;
+  /** Phase 7: the setup wizard, while it is open. */
+  onboardingWindow: BrowserWindow | null;
   /** The snapshot the last hotkey captured, handed to the panel and sent with the ask. */
   pendingSnapshot: ContextSnapshot | null;
   /** Turn ids in flight: the panel must not vanish on focus loss mid-answer. */
@@ -157,6 +173,7 @@ async function start(): Promise<void> {
     panel: null,
     tray: createTray(),
     settingsWindow: null,
+    onboardingWindow: null,
     pendingSnapshot: null,
     activeTurns: new Set(),
     hotkeys: new HotkeyManager({
@@ -214,6 +231,10 @@ async function start(): Promise<void> {
   // independently, so the others are already live; the failure is surfaced in the panel
   // and in Settings, where there is something to do about it.
   applyHotkeys(settings);
+
+  // A fresh install starts in the wizard: provider, key, crew, hotkeys, then a first
+  // question, all without a terminal. Finishing or skipping it is remembered in settings.
+  if (shouldOpenOnboarding(settings, process.env)) openOnboarding();
 }
 
 /**
@@ -329,6 +350,7 @@ function buildTrayMenu(): Menu {
       click: () => toggleSightPause(),
     },
     { label: 'Settings', click: openSettings },
+    { label: 'Setup wizard', click: openOnboarding },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },
   ]);
@@ -353,6 +375,30 @@ function openSettings(): void {
     if (desktop !== null) desktop.settingsWindow = null;
   });
   desktop.settingsWindow = window;
+}
+
+/** Opens the setup wizard, or brings the open one forward. */
+function openOnboarding(): void {
+  if (desktop === null) return;
+  if (desktop.onboardingWindow !== null && !desktop.onboardingWindow.isDestroyed()) {
+    desktop.onboardingWindow.focus();
+    return;
+  }
+  const window = createOnboardingWindow();
+  window.on('closed', () => {
+    if (desktop !== null) desktop.onboardingWindow = null;
+  });
+  desktop.onboardingWindow = window;
+}
+
+/** Where the unpacked Chrome extension is on this machine, if anywhere. */
+function localExtensionFolder(): string | undefined {
+  return extensionFolder({
+    packaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    appPath: app.getAppPath(),
+    exists: existsSync,
+  });
 }
 
 /**
@@ -510,12 +556,16 @@ function registerIpc(): void {
     const pets =
       current.host === null ? [] : (await current.host.client.call('pets.list', {})).pets;
     const problem = current.hotkeyError ?? current.bootError;
+    const folder = localExtensionFolder();
     return {
       settings,
       pets,
       providers: providerChoices(stored),
       engineVersion: app.getVersion(),
       watchModelDefaults: { ...WATCH_MODEL_DEFAULTS },
+      crewSuggestions: crewSuggestions(),
+      platform: process.platform,
+      ...(folder !== undefined ? { extensionFolder: folder } : {}),
       ...(current.host !== null ? { pairingToken: current.host.engine.pairingToken } : {}),
       ...(problem !== null ? { hotkeyError: problem } : {}),
     };
@@ -583,6 +633,47 @@ function registerIpc(): void {
   });
 
   ipcMain.handle(IPC.openSettings, () => openSettings());
+  ipcMain.handle(IPC.openOnboarding, () => openOnboarding());
+
+  ipcMain.handle(IPC.finishOnboarding, async (_event, openPanel: boolean) => {
+    const current = required();
+    const patch: SettingsPatch = { onboarding: { done: true } };
+    current.settings =
+      current.host === null
+        ? current.settingsStore.set(patch)
+        : (await current.host.client.call('settings.set', { patch })).settings;
+    current.onboardingWindow?.close();
+    if (openPanel && current.panel !== null && current.avatar !== null) {
+      current.avatar.show();
+      showPanelBeside(current.panel, current.avatar);
+    }
+  });
+
+  // Every pick is validated before any pet is written, so one bad model id cannot leave
+  // half the crew moved.
+  ipcMain.handle(IPC.applyCrew, async (_event, choices: Record<string, CrewChoice>) => {
+    const client = engine().client;
+    const { pets } = await client.call('pets.list', {});
+    const moved = pets.map((pet) => {
+      const choice = Object.hasOwn(choices, pet.id) ? choices[pet.id] : undefined;
+      return choice === undefined ? null : applyCrewChoice(pet, choice);
+    });
+    for (const pet of moved) if (pet !== null) await client.call('pets.upsert', { pet });
+    refreshStrip();
+    return (await client.call('pets.list', {})).pets;
+  });
+
+  ipcMain.handle(IPC.openLink, async (_event, url: string) => {
+    if (!isAllowedLink(url)) throw new Error(`Tagalong only opens provider key pages, not ${url}`);
+    await shell.openExternal(url);
+  });
+
+  ipcMain.handle(IPC.showExtensionFolder, async () => {
+    const folder = localExtensionFolder();
+    if (folder === undefined) throw new Error('The Chrome extension has not been built here.');
+    const problem = await shell.openPath(folder);
+    if (problem.length > 0) throw new Error(problem);
+  });
   ipcMain.handle(IPC.hidePanel, () => required().panel?.hide());
   ipcMain.handle(IPC.togglePanel, async () => {
     const current = required();

@@ -75,6 +75,7 @@ export default defineConfig({
           avatar: 'src/renderer/avatar.html',
           panel: 'src/renderer/panel.html',
           settings: 'src/renderer/settings.html',
+          onboarding: 'src/renderer/onboarding.html',
         },
       },
     },

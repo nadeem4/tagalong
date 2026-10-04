@@ -31,6 +31,11 @@ export const IPC = {
   recordingEvent: 'tagalong:recording-event',
   getRecording: 'tagalong:get-recording',
   stopWatch: 'tagalong:watch:stop',
+  openOnboarding: 'tagalong:onboarding:open',
+  finishOnboarding: 'tagalong:onboarding:finish',
+  applyCrew: 'tagalong:onboarding:crew',
+  openLink: 'tagalong:link:open',
+  showExtensionFolder: 'tagalong:extension:show',
 } as const;
 
 /**
@@ -93,6 +98,18 @@ export interface HostView {
   hotkeyError?: string;
   /** Phase 3B. The check model a watch uses on each provider when a pet names none. */
   watchModelDefaults: Record<string, string>;
+  /** Phase 7. The model each default pet starts on, per provider, for the setup wizard. */
+  crewSuggestions: Record<string, Record<string, string>>;
+  /** Phase 7. `process.platform`, so a hotkey reads Ctrl on Windows and Cmd on a Mac. */
+  platform: string;
+  /** Phase 7. The unpacked Chrome extension's folder, when it is on this machine. */
+  extensionFolder?: string;
+}
+
+/** Phase 7. One pet's brain as the setup wizard's crew step picked it. */
+export interface CrewChoice {
+  providerId: string;
+  model: string;
 }
 
 /**
@@ -147,6 +164,19 @@ export interface TagalongHostApi {
   resizeStrip(visiblePets: number): Promise<void>;
   listModels(providerId: string): Promise<ModelList>;
   openSettings(): Promise<void>;
+  /** Phase 7. Opens the setup wizard, from Settings or the tray. */
+  openOnboarding(): Promise<void>;
+  /**
+   * Phase 7. Marks the wizard done (finished or skipped) and closes it. `openPanel` brings
+   * the panel up beside the pets, so the last step can end on a first question.
+   */
+  finishOnboarding(openPanel: boolean): Promise<void>;
+  /** Phase 7. Moves each named pet onto the brain the wizard picked. Returns the crew. */
+  applyCrew(choices: Record<string, CrewChoice>): Promise<Pet[]>;
+  /** Phase 7. Opens a provider's key page in the browser. Main refuses any other URL. */
+  openLink(url: string): Promise<void>;
+  /** Phase 7. Shows the unpacked extension's folder in the file manager. */
+  showExtensionFolder(): Promise<void>;
   hidePanel(): Promise<void>;
   togglePanel(): Promise<void>;
 }
