@@ -783,3 +783,66 @@ Only the genuinely native dependencies stay external: `better-sqlite3` and `get-
 binaries Rollup cannot inline. Because they are then resolved at runtime from the desktop app, they are
 declared as its own dependencies. Pure JavaScript dependencies such as `ws`, the Anthropic SDK and the `openai` SDK are
 inlined with everything else.
+
+The workspace packages are therefore `devDependencies` of `apps/desktop`: they exist at build time
+and are inside `dist/main.js` afterwards. That keeps the desktop's `dependencies` to the native modules
+alone, which matters to packaging: electron-builder copies exactly the `dependencies` tree into the
+installer, and listing the workspace packages there would ship their whole trees a second time.
+
+## Onboarding (Phase 7)
+
+A fresh install opens the setup wizard, a fourth renderer page (`onboarding.html`) in an ordinary
+framed window. Main opens it from `start` when `shouldOpenOnboarding(settings, env)` says so: the
+protocol setting `onboarding.done` is false (its default, so a settings file from before the wizard
+reads as not done) and `TAGALONG_SKIP_ONBOARDING` is not `1`.
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000'}}}%%
+flowchart LR
+  W[Welcome and privacy] --> P[Provider and key]
+  P -->|saveApiKey| C[Crew models]
+  C -->|applyCrew| H[Hotkeys]
+  H --> M[Rolling memory]
+  M -->|saveSettings| E[Chrome extension]
+  E --> F[Done]
+  F -->|finishOnboarding| X[Panel on Scout]
+```
+
+- **Each step saves when it is left**, not at the end, so closing the window halfway keeps a pasted
+  key. Skip setup and the last step both call `finishOnboarding`, which sets `onboarding.done`.
+- **The wizard's decisions are pure functions.** `renderer/src/onboarding-flow.ts` holds the steps,
+  the gate on the provider step (a key stored or typed for at least one of OpenRouter, Token Factory
+  and Anthropic), and each pet's starting pick; `main/onboarding.ts` holds the per-provider model
+  suggestions and `applyCrewChoice`. Both are unit tested in Node; the markup is covered by one
+  Electron smoke test.
+- **Crew picks are applied in main**, because the rules need core's constants: a pet put on a
+  text-only Token Factory model gets Nemotron Nano 2 VL as its vision model, a pet moved to Claude
+  loses any Token Factory vision model, and a watch model is dropped when the provider changes.
+- **A new key answers the next question.** `KeyedProviderResolver` re-reads the keychain before every
+  `ask` and rebuilds a provider only when its key or base URL changed, so a key pasted in the wizard is
+  used without a restart. `models.list` already read the key fresh, so the crew step's live model list
+  appears as soon as the provider step saves.
+- **Links leave through an allowlist.** "Get a key" asks main to open the provider's key page; main
+  opens only `https://openrouter.ai`, `https://tokenfactory.nebius.com` and
+  `https://console.anthropic.com` (`isAllowedLink`), so a renderer cannot make it open anything else.
+
+## Packaging (Phase 7)
+
+`apps/desktop/electron-builder.json` builds a per-user NSIS installer for Windows x64, the target that
+matters for the hackathon, and carries best-effort, unverified dmg, AppImage and deb targets.
+
+- `files` is `dist/**/*` and `package.json`: everything else the app needs is bundled.
+- `asarUnpack: ['**/*.node']`. Node cannot `dlopen` from inside an asar archive; Electron redirects
+  `require` to `app.asar.unpacked` when the file lives there.
+- `npmRebuild: false`. `better-sqlite3` 13, `libnut` and `get-windows` all ship N-API binaries, which
+  are ABI-stable across Node and Electron, so there is nothing to rebuild and no toolchain to require.
+  The phase plan's "rebuild native modules in postinstall" is therefore unnecessary and not done.
+- `get-windows` is in `pnpm.ignoredBuiltDependencies`, which also skips the step that downloads its
+  prebuilt Windows binary. `scripts/fetch-native.mjs` runs that download (never a compile) before
+  `package:win`; without it the active-window lookup answers "no window" and a look captures the whole
+  screen.
+- `extraResources` copies `apps/extension/dist` to `resources/extension`, and `HostView.extensionFolder`
+  points the wizard at it (`main/links.ts#extensionFolder`: the resources folder when packaged, the
+  extension's build in a checkout).
+- `publish: null`: there is no auto-update channel, and electron-builder otherwise crashes writing
+  update metadata for one.
