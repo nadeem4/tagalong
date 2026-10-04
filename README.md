@@ -253,6 +253,23 @@ Super on Token Factory), **Ink** (writer, Claude through OpenRouter) and **Bolt*
 and the others keep working. Edit, add or delete pets in Settings. Deleting a default pet is permanent:
 it is not re-seeded on the next boot.
 
+The crew docks on the desktop as a strip of avatars, one per pet, that moves as one; click a pet to
+open the panel on it. The panel header names the active pet in its colour, every answer is labelled
+with the pet and the model that wrote it (`Ink · anthropic/claude-sonnet-5`), and:
+
+| Do this                                   | What happens                                                                                      |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Type `@Ink draft a reply to this`         | Ink takes over in a new conversation with a summary of the thread and the page; a bubble shows it |
+| Pick **Hand off…** under an answer        | The composer fills with `@Name ` so you can add the request                                       |
+| Ask anything                              | A pet may consult another mid-answer (`ask_pet`); a small card says who it asked                  |
+| Type `/crew <question>` or press **Crew** | Every pet answers in turn, seeing the others, and the pet you asked closes with a synthesis       |
+| Press **Stop** during a roundtable        | The turn in flight stops and the rest are cancelled                                               |
+
+Crew features multiply model calls, so the panel footer shows **N model calls** for any run that made
+more than one. A roundtable of three pets costs four calls by default. Settings edits every pet — name,
+emoji, colour, persona, provider, model, reply style, voice id (stored for Phase 3) — adds and deletes
+pets, and chooses which pets show on the desktop strip.
+
 Pets remember. Tell one "I prefer short answers" and it keeps that across restarts; a pet can also
 save facts on its own, privately or in the crew notebook every pet reads. Memories live in the same
 SQLite file as conversations (`tagalong.db` in the data dir).

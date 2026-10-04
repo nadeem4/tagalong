@@ -57,8 +57,9 @@ The diagram is the finished shape. What exists after Phase 1: the server (`serve
 (`conversation/prompt-assembler.ts`), memory as plain SQLite tables (`memory/db.ts`, `memory/store.ts` —
 FTS5 arrived with Phase 4 recall), the pet registry (`pets/registry.ts`), settings and the SecretStore
 interface (`settings/settings.ts`), and the brain providers (`providers/`). `Engine.boot` in `engine.ts`
-wires all of it together and is the only thing a host starts. `PetBus` (Phase 4), `McpManager` and
-`ApprovalPolicy` (Phase 5), and the STT and TTS providers (Phase 3) do not exist yet. The Chrome extension
+wires all of it together and is the only thing a host starts. The diagram's PetBus is not one class:
+Phase 4 built it as `crew/` (handoff, consult, roundtable) on top of the runner — see "The crew" below.
+`McpManager` and `ApprovalPolicy` (Phase 5), and the STT and TTS providers (Phase 3) do not exist yet. The Chrome extension
 landed in Phase 6, which ran fifth; see "The browser host" below.
 
 ## Package responsibilities
@@ -592,6 +593,29 @@ Hosts follow the run through `pet.message { kind: 'roundtable', round, text: 'Ro
 state: running | done | stopped, round, rounds, modelCalls }` after every turn. A pet that cannot
 answer is written into the transcript as "(Ink could not answer: …)" and the table carries on.
 Interrupting the turn in flight — the panel's Stop button — or `stop()` cancels every remaining turn.
+
+### The crew in the hosts
+
+`ChatPanel` in `packages/ui` is one timeline for the whole crew, in both hosts. It lists the crew
+(from the host, or `bridge.listPets()`), shows the active pet's name and colour with a `CrewStrip` to
+switch, threads each pet's follow-ups into the conversation `turn.started` reported for it, labels each
+answer `Name · model`, draws handoff bubbles, consult cards and round markers from `pet.message`, moves
+to the target pet on a handoff (and tells the host through `onPetChange`), offers a **Hand off…** menu
+under each answer that writes `@Name ` into the composer, and a **Crew** button that sends
+`/crew <text>`. While a roundtable runs (`crew.status` running) the composer waits and **Stop**
+interrupts the turn in flight, which ends the run. The footer shows `crew.status.modelCalls`, or a single
+turn's `modelCalls` when it was more than one. `HostBridge.onTurnEvent` now also delivers
+`pet.message` and `crew.status`; the desktop forwards every notification and the extension's port
+bridge lets these two through.
+
+The desktop avatar window became a strip: one `PetAvatar` button per visible pet, the default pet
+first, sized by `stripWidth(n)` and clamped on screen. The window background is still the drag handle,
+so the crew moves as one and its position is the existing `avatar` setting — one position for the
+strip rather than one per pet. A click calls `selectPet`, which opens the panel and sends it the pet.
+Each avatar's ring follows its own turns (`nextPetStates`), so a roundtable lights the pets in turn.
+`settings.hiddenPets` takes pets off the strip; they still answer in the panel. Settings edits every
+pet field, adds pets (on the fake brain until a provider is picked) and deletes them, and sets
+`settings.summarizer`.
 
 ## The browser host
 
