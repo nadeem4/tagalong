@@ -6,12 +6,14 @@
  * level, because Chrome only delivers events to listeners that exist when a stopped
  * worker is woken.
  */
-import { localStorageArea } from './chrome-adapters';
+import { PerceptionCaptureParams } from '@tagalong/protocol';
+import { chromeTabAccess, localStorageArea } from './chrome-adapters';
 import { EngineConnection } from './engine-connection';
 import { PAIRING_KEY, readPairing } from './pairing';
 import { PortHub } from './port-hub';
 import { PORT_NAME } from './port-messages';
 import { EXTENSION_CAPABILITIES } from './capabilities';
+import { captureSnapshot, captureTab } from './tab-capture';
 
 /** Wakes a stopped worker so it notices the desktop app coming back. */
 const RECONNECT_ALARM = 'tagalong-reconnect';
@@ -21,7 +23,13 @@ const connection = new EngineConnection({
   createSocket: (url) => new WebSocket(url),
   hostVersion: chrome.runtime.getManifest().version,
   capabilities: EXTENSION_CAPABILITIES,
-  answer: (method) => Promise.reject(new Error(`${method} is not answered by the extension yet`)),
+  answer: async (method, params) => {
+    // The only request this host answers. The engine sends readText and the rest to hosts
+    // that advertise them, and the extension advertises none of those.
+    if (method !== 'perception.capture') throw new Error(`the extension does not answer ${method}`);
+    const { what } = PerceptionCaptureParams.parse(params);
+    return { snapshot: await captureTab(what, chromeTabAccess) };
+  },
   onNotification: (method, params) => hub.broadcast({ type: 'notification', method, params }),
   onStatus: (status) => hub.broadcast({ type: 'status', status }),
 });
@@ -29,7 +37,7 @@ const connection = new EngineConnection({
 const hub = new PortHub({
   status: () => connection.status,
   call: (method, params) => connection.call(method, params as never),
-  capture: () => Promise.resolve(null),
+  capture: (targets) => captureSnapshot(targets, chromeTabAccess),
 });
 
 // The toolbar button opens the side panel. It is also the user gesture that grants
