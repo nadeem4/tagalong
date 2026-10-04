@@ -679,3 +679,29 @@ describe('watch mode over rpc', () => {
     expect(again['result']).toEqual({ stopped: false });
   });
 });
+
+describe('watch limits without a restart', () => {
+  it('applies a limit saved through settings.set to the next watch', async () => {
+    const e = await boot(
+      new FakeBrainProvider({
+        text: 'Watching.',
+        toolCall: { id: 'call-l', name: 'watch_for', input: { condition: 'done', displayId: 1 } },
+      }),
+    );
+    const host = await TestHost.connect(e.port);
+    host.onRequest = () => ({ changeRatio: 0, afterAt: new Date().toISOString() });
+    await host.call('hello', {
+      ...helloParams(e.pairingToken),
+      capabilities: ['displays', 'recall'] as const,
+    });
+
+    await host.call('settings.set', {
+      patch: { watch: { maxChecks: 7, maxConcurrent: 1, defaultTimeoutMinutes: 5 } },
+    });
+    await host.call('ask', { petId: 'scout', input: { text: 'tell me when it is done' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('watch.status'), { timeout: 5000 });
+
+    const status = host.notifications.find((n) => n.method === 'watch.status')!;
+    expect(status.params['maxChecks']).toBe(7);
+  });
+});

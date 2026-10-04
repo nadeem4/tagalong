@@ -274,6 +274,43 @@ Pets remember. Tell one "I prefer short answers" and it keeps that across restar
 save facts on its own, privately or in the crew notebook every pet reads. Memories live in the same
 SQLite file as conversations (`tagalong.db` in the data dir).
 
+### Awareness: rolling memory and watches
+
+Two Phase 3B features let a pet know about time, not only about now. Both are in Settings, under
+**Awareness**, and both take effect on save.
+
+- **Rolling memory** (off by default). Turn it on and the desktop keeps the last few minutes — ten by
+  default, at most thirty — of every screen in memory, so you can ask "what was I reading five
+  minutes ago?". The pet answers with `recall_screen` and names the time of the frame it describes;
+  `what_changed` shows it only the part of a screen that changed since a moment ago. A small red dot
+  on the pets shows while it records.
+- **Watches.** Ask "tell me when this finishes" and the pet calls `watch_for`. Tagalong compares the
+  screen on this machine every five seconds and asks a model nothing until the watched region has
+  changed and then held still; then one small, cheap model answers yes or no. On yes the panel shows
+  the result as a card from the pet, a system notification pops up, and the pet's avatar shows an
+  alert. A **Watching** chip in the panel counts the checks spent and has a **Stop** button. Watches are
+  shown, not spoken, until Phase 3 (Voice) lands.
+
+The check model is configurable per pet (Settings → the pet → **Watch check model**). Blank uses the
+pet's provider's default, chosen to be small and cheap because a watch may ask it many times:
+
+| Pet's provider | Default watch check model                                                                               |
+| -------------- | ------------------------------------------------------------------------------------------------------- |
+| Token Factory  | `nvidia/nemotron-3-nano-30b-a3b` (Nemotron 3 Nano; reads the watched window's text, Nano VL for pixels) |
+| OpenRouter     | `anthropic/claude-haiku-4.5`                                                                            |
+| Anthropic      | `claude-haiku-4-5`                                                                                      |
+
+A text-only check model such as Nemotron 3 Nano is handed the last 4,000 characters of the window that
+was in front when the watch began — exactly what a terminal says — and a picture goes to the pet's vision
+model only when there is no text to read. The Token Factory ids are unverified against the live model list;
+the Settings picker shows the live one once a key is stored.
+
+| Watch limit (Settings)         | Default | What it bounds                                    |
+| ------------------------------ | ------- | ------------------------------------------------- |
+| Checks per watch               | 60      | Model calls one watch may make before it gives up |
+| Watches at once                | 3       | A fourth is refused, and the pet says so          |
+| Timeout when the pet names one | 30 min  | How long a watch runs before it ends on its own   |
+
 ### The two cost controls
 
 Both live in the settings window and both take effect on save, with no restart: they are read at the
@@ -449,12 +486,21 @@ What is still standing, recorded here so nobody rediscovers it.
   Vite's own esbuild transform (`esbuild: { jsx: 'automatic' }`) for JSX. Everything builds and runs;
   the only loss is Fast Refresh during `pnpm dev:desktop`.
 
+- **A watch covers a whole display or a rectangle the pet names.** The phase plan also offers the
+  focused window as a region and drag-to-select; the window inventory carries no window bounds, so
+  the focused window is used for the text-only check and to pick the display instead, and
+  drag-to-select is deferred.
+- **Watch alerts are shown, not spoken.** Phase 3 (Voice) is not built; when it lands, `watch.fired`
+  should be spoken in the pet's voice.
+
 ## Privacy
 
 ### What is captured, and when
 
-Nothing is read until you press a key. There is no background watching, no polling loop, and no
-capture between one question and the next — each hotkey reads once, sends that, and stops.
+Nothing is read until you press a key, with two exceptions you switch on yourself: **rolling memory**
+and a **watch** a pet started at your request (both below). Otherwise there is no background watching,
+no polling loop, and no capture between one question and the next — each hotkey reads once, sends
+that, and stops.
 
 | You press          | It reads                                                                                                    |
 | ------------------ | ----------------------------------------------------------------------------------------------------------- |
@@ -531,6 +577,35 @@ page you did not ask about, and the capture exclusion list applies to tab titles
   turn still answers instead of failing.
 - API keys live in the OS keychain through Electron safe storage.
 
+### Rolling memory: what the buffer holds
+
+Off until you tick it in Settings. While it is on:
+
+- Every five seconds the desktop takes a **640-pixel picture of each screen**, the **list of open
+  windows** (titles and positions, never their text) and which window was in front.
+- It keeps the last **ten minutes** by default (you choose one to thirty) and drops anything older.
+- It lives **in memory only**. Nothing is written to disk — not a file, not the database, not a
+  cache — and the code that holds it imports no file APIs, which a test checks.
+- A frame is **skipped** while an app on your exclusion list is in front, and a screen showing one is
+  never stored. Excluded apps are never remembered.
+- **Pausing sight clears it.** Pressing the pause key stops recording and throws away every frame it
+  held, and the red dot on the pets disappears. Resume starts an empty buffer.
+- **Quitting clears it.** After a restart there is nothing to recall from before it; the pet says how
+  far back memory actually reaches.
+- **Turning it off clears it**, at once, without a restart.
+
+Only the frame a pet asks for with `recall_screen` or `what_changed` is ever sent to a model.
+
+### Watches
+
+A watch photographs one screen every five seconds at 640 pixels and compares it with the last frame,
+**on this machine**. Even with rolling memory off, it keeps that screen's recent frames in memory for
+as long as the watch runs, and drops them 30 seconds after the watch ends; pausing sight drops them
+too. A model only sees something when the watched region changed: then the changed part is cropped
+and sent to the pet's small check model — or, for a text-only model, the last 4,000 characters of the
+window you were watching. Every watch shows a **Watching** chip with **Stop**, and ends on its own
+after its timeout or its check limit.
+
 ### Pausing sight
 
 `Ctrl+Shift+Alt+P` turns every kind of looking off, and pressing it again turns it back on. The
@@ -581,6 +656,8 @@ order; each one ends with something testable end to end.
 1. **Foundation** — protocol, core engine, text-only ask with one pet on Windows. _(complete)_
 2. **Sight** — screenshots, vision, exclusions, capture indicator. _(complete)_
 3. **Voice** — push to talk, streaming speech, interruption.
+   3B. **Awareness** — rolling memory, `recall_screen` and `what_changed`, watch mode. _(built; spoken
+   watch alerts wait for Phase 3)_
 4. **Crew** — multiple pets, memory, handoff, consult, roundtable.
 5. **Hands** — MCP client, allowlists, approval cards, action log.
 6. **Browser Host** — Chrome extension on the same engine. _(built; runs fifth, after 2B)_

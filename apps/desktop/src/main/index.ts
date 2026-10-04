@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { BrowserWindow, Menu, Notification, Tray, app, dialog, ipcMain, screen } from 'electron';
 import { ContextSnapshot } from '@tagalong/protocol';
 import type { PerceptionTarget, Pet, Settings, SettingsPatch } from '@tagalong/protocol';
-import { SettingsStore } from '@tagalong/core';
+import { SettingsStore, WATCH_MODEL_DEFAULTS } from '@tagalong/core';
 import { systemClock } from './awareness/clock';
 import { nativeCodec } from './awareness/native-codec';
 import { PerceptionMemory } from './awareness/perception-memory';
@@ -515,6 +515,7 @@ function registerIpc(): void {
       pets,
       providers: providerChoices(stored),
       engineVersion: app.getVersion(),
+      watchModelDefaults: { ...WATCH_MODEL_DEFAULTS },
       ...(current.host !== null ? { pairingToken: current.host.engine.pairingToken } : {}),
       ...(problem !== null ? { hotkeyError: problem } : {}),
     };

@@ -91,6 +91,8 @@ export interface HostView {
   pairingToken?: string;
   /** Set when the global hotkey could not be registered, so settings can say why. */
   hotkeyError?: string;
+  /** Phase 3B. The check model a watch uses on each provider when a pet names none. */
+  watchModelDefaults: Record<string, string>;
 }
 
 /**
