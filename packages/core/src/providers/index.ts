@@ -14,6 +14,24 @@ export type {
   BrainTool,
 } from './brain';
 export { BrainError, type BrainErrorCode } from './errors';
-export { AnthropicProvider, REFUSAL_MESSAGE, type AnthropicProviderOptions } from './anthropic';
-export { FakeBrainProvider, type FakeScript } from './fake';
+export {
+  ANTHROPIC_MODELS,
+  AnthropicProvider,
+  REFUSAL_MESSAGE,
+  type AnthropicProviderOptions,
+} from './anthropic';
+export { FAKE_MODELS, FakeBrainProvider, type FakeScript } from './fake';
+export {
+  NEBIUS_BASE_URL,
+  OpenAiCompatibleProvider,
+  type OpenAiCompatibleProviderOptions,
+} from './openai-compatible';
+export {
+  NEBIUS_FALLBACK_MODELS,
+  NEBIUS_VISION_MODELS,
+  NEMOTRON_TEXT_MODEL,
+  NEMOTRON_VISION_MODEL,
+} from './nebius-models';
 export { createProvider, type ProviderConfig } from './registry';
+export { carriesImage, modelForTurn } from './vision-routing';
+export { OPENAI_COMPATIBLE_PRESETS, SECRET_KEYS, openAiPreset, type OpenAiPreset } from './presets';

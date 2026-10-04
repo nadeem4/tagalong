@@ -20,6 +20,8 @@ export const SETTINGS_DEFAULTS = {
   defaultPetId: 'scout',
   providerId: 'anthropic',
   defaultModel: 'claude-opus-5',
+  /** Every OpenAI-compatible preset on its own base URL until the user says otherwise. */
+  providerBaseUrls: {} as Record<string, string>,
   pageTextBudget: 40_000,
   historyMessages: 20,
   hotkeys: {
@@ -150,9 +152,20 @@ const settingsFields = {
   enginePort: z.number().int().min(1024).max(65535),
   /** Pet used when a host asks without naming one. */
   defaultPetId: z.string().min(1),
-  /** BrainProvider id: 'anthropic' or 'fake' in Phase 1. */
+  /**
+   * Not read by the engine since each pet names its own provider and model (`Pet`).
+   * Kept so settings files written before that still parse.
+   */
   providerId: z.string().min(1),
+  /** Not read by the engine; see `providerId`. */
   defaultModel: z.string().min(1),
+  /**
+   * Base URL overrides for the OpenAI-compatible presets, keyed by provider id
+   * (`nebius`, `openrouter`). An absent entry means the preset's own URL. This is what
+   * makes "any OpenAI-format service" a settings change: a URL here, a key in the
+   * keychain, a model id on the pet.
+   */
+  providerBaseUrls: z.record(z.string().min(1), z.url()),
   /** Character budget for page text in an assembled prompt. */
   pageTextBudget: z.number().int().positive(),
   /** How many past messages are replayed to the model. */
@@ -200,6 +213,9 @@ export const Settings = z.object({
   defaultPetId: settingsFields.defaultPetId.default(SETTINGS_DEFAULTS.defaultPetId),
   providerId: settingsFields.providerId.default(SETTINGS_DEFAULTS.providerId),
   defaultModel: settingsFields.defaultModel.default(SETTINGS_DEFAULTS.defaultModel),
+  providerBaseUrls: settingsFields.providerBaseUrls.prefault({
+    ...SETTINGS_DEFAULTS.providerBaseUrls,
+  }),
   pageTextBudget: settingsFields.pageTextBudget.default(SETTINGS_DEFAULTS.pageTextBudget),
   historyMessages: settingsFields.historyMessages.default(SETTINGS_DEFAULTS.historyMessages),
   hotkeys: settingsFields.hotkeys.prefault({ ...SETTINGS_DEFAULTS.hotkeys }),

@@ -5,8 +5,10 @@ import { buildSettingsPatch } from './settings-form';
 import type { SettingsFormValues } from './settings-form';
 
 const values: SettingsFormValues = {
-  providerId: 'anthropic',
-  defaultModel: 'claude-opus-5',
+  baseUrls: [
+    { providerId: 'nebius', label: 'Token Factory', value: '' },
+    { providerId: 'openrouter', label: 'OpenRouter', value: '' },
+  ],
   askHotkey: 'CommandOrControl+Shift+Space',
   lookHotkey: 'CommandOrControl+Shift+S',
   seeEverythingHotkey: 'CommandOrControl+Shift+Alt+S',
@@ -14,6 +16,38 @@ const values: SettingsFormValues = {
   sightDetail: 'focused',
   windowTextBudget: '8000',
 };
+
+describe('buildSettingsPatch base URLs', () => {
+  it('sends an empty override map when every box is left blank', () => {
+    expect(buildSettingsPatch(values).providerBaseUrls).toEqual({});
+  });
+
+  it('carries a trimmed override for the box that was filled', () => {
+    const patch = buildSettingsPatch({
+      ...values,
+      baseUrls: [
+        { providerId: 'nebius', label: 'Token Factory', value: '' },
+        { providerId: 'openrouter', label: 'OpenRouter', value: ' http://127.0.0.1:8080/v1 ' },
+      ],
+    });
+    expect(patch.providerBaseUrls).toEqual({ openrouter: 'http://127.0.0.1:8080/v1' });
+  });
+
+  it('refuses a base URL that is not a URL, naming the service', () => {
+    expect(() =>
+      buildSettingsPatch({
+        ...values,
+        baseUrls: [{ providerId: 'openrouter', label: 'OpenRouter', value: 'openrouter.ai' }],
+      }),
+    ).toThrow('OpenRouter base URL must be a full URL');
+  });
+
+  it('never sends the retired provider fields', () => {
+    const patch = buildSettingsPatch(values);
+    expect(patch).not.toHaveProperty('providerId');
+    expect(patch).not.toHaveProperty('defaultModel');
+  });
+});
 
 describe('buildSettingsPatch', () => {
   it('carries all four hotkeys, because a patch replaces the whole object', () => {

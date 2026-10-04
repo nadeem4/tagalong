@@ -63,9 +63,10 @@ export interface PerceptionToolsetOptions {
   exclusions: () => CaptureExclusions;
   /**
    * Whether the brain in use can actually see an image. Called per tool use because the
-   * user can switch providers mid-conversation.
+   * user can switch providers mid-conversation. A `ToolTurn` passed to `run` narrows it
+   * for that call; with one, absent here means "whatever the turn says".
    *
-   * Optional, and absent means *no* vision: handing base64 to a model that cannot decode
+   * Optional, and absent (with no turn) means *no* vision: handing base64 to a model that cannot decode
    * it burns the user's tokens and teaches it nothing, so the safe default is words.
    */
   vision?: () => boolean;
@@ -89,9 +90,19 @@ export interface ToolOutcome {
   isError?: boolean;
 }
 
+/** What one turn knows that the toolset does not: whether this pet's brain can see. */
+export interface ToolTurn {
+  vision: boolean;
+}
+
 export interface PerceptionToolset {
   readonly definitions: readonly BrainTool[];
-  run(call: { name: string; input?: unknown }): Promise<ToolOutcome>;
+  /**
+   * `turn` narrows sight for one call. Pets pick their own provider and model, so only
+   * the turn knows whether the brain asking can decode an image; the toolset's own
+   * `vision` option stays a ceiling a turn can lower but never raise.
+   */
+  run(call: { name: string; input?: unknown }, turn?: ToolTurn): Promise<ToolOutcome>;
 }
 
 /** Neither tool takes arguments: "look at the screen" has nothing to parameterise. */
@@ -218,10 +229,14 @@ const DEFINITIONS: readonly BrainTool[] = [
  * object would teach a model nothing, and `get_selection` already returns the selected
  * text itself, which is the part a model can reason about.
  */
-export function createPerceptionToolset(options: PerceptionToolsetOptions): PerceptionToolset {
+export function createPerceptionToolset(base: PerceptionToolsetOptions): PerceptionToolset {
   return {
     definitions: DEFINITIONS,
-    run(call): Promise<ToolOutcome> {
+    run(call, turn): Promise<ToolOutcome> {
+      const options =
+        turn === undefined
+          ? base
+          : { ...base, vision: () => turn.vision && (base.vision?.() ?? true) };
       switch (call.name) {
         case LOOK_AT_SCREEN:
           return capture(options, 'screenshot');

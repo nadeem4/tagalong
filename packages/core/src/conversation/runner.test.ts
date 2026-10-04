@@ -652,3 +652,133 @@ describe('tool notifications', () => {
     expect((result?.params as { ok?: boolean }).ok).toBe(false);
   });
 });
+
+describe('ConversationRunner per-pet providers', () => {
+  /** Records requests; sees only the models it is told about. */
+  function routed(id: string, into: BrainRequest[], sees: readonly string[]): BrainProvider {
+    const fake = new FakeBrainProvider({ text: `answered by ${id}` });
+    return {
+      id,
+      capabilities: { vision: true, tools: true, streaming: true },
+      listModels: () => Promise.resolve([]),
+      canSee: (model) => sees.includes(model),
+      complete: (req, events_, signal) => {
+        into.push(req);
+        return fake.complete(req, events_, signal);
+      },
+    };
+  }
+
+  function runnerFor(resolve: (pet: Pet) => BrainProvider, tools?: PerceptionToolset) {
+    return new ConversationRunner({
+      store,
+      settings,
+      provider: resolve,
+      emit: (event) => events.push(event),
+      ...(tools ? { tools } : {}),
+    });
+  }
+
+  it('asks the provider each pet names', async () => {
+    const nebius: BrainRequest[] = [];
+    const anthropic: BrainRequest[] = [];
+    const providers: Record<string, BrainProvider> = {
+      nebius: routed('nebius', nebius, []),
+      anthropic: routed('anthropic', anthropic, []),
+    };
+    const runner = runnerFor((p) => providers[p.providerId]!);
+
+    const a = await runner.run({ pet: { ...pet, providerId: 'nebius' }, text: 'a' }).done;
+    const b = await runner.run({ pet: { ...pet, id: 'ink', providerId: 'anthropic' }, text: 'b' })
+      .done;
+
+    expect(a.text).toBe('answered by nebius');
+    expect(b.text).toBe('answered by anthropic');
+    expect(nebius).toHaveLength(1);
+    expect(anthropic).toHaveLength(1);
+  });
+
+  it('passes the pet vision model with the request and keeps the screenshot', async () => {
+    const seen: BrainRequest[] = [];
+    const runner = runnerFor(() => routed('nebius', seen, ['vl']));
+
+    await runner.run({
+      pet: { ...pet, model: 'super', visionModel: 'vl' },
+      text: 'what is this?',
+      snapshot: shotSnapshot(),
+    }).done;
+
+    expect(seen[0]?.model).toBe('super');
+    expect(seen[0]?.visionModel).toBe('vl');
+    expect(imageBlocks(seen[0])).toHaveLength(1);
+    expect(methods()).not.toContain('turn.warning');
+  });
+
+  it('drops the screenshot and warns when none of the pet models can see', async () => {
+    const seen: BrainRequest[] = [];
+    const runner = runnerFor(() => routed('nebius', seen, ['vl']));
+
+    const turn = runner.run({
+      pet: { ...pet, model: 'super' },
+      text: 'what is this?',
+      snapshot: shotSnapshot(),
+    });
+    await turn.done;
+
+    expect(imageBlocks(seen[0])).toHaveLength(0);
+    const warning = events.find((event) => event.method === 'turn.warning');
+    expect(warning?.params).toMatchObject({ code: 'vision_unsupported' });
+  });
+
+  it('tells the tools whether this pet can see', async () => {
+    const asked: (boolean | undefined)[] = [];
+    const tools: PerceptionToolset = {
+      definitions: [],
+      run: (_call, turn) => {
+        asked.push(turn?.vision);
+        return Promise.resolve({ content: 'ok' });
+      },
+    };
+    const fake = new FakeBrainProvider({
+      text: 'ok',
+      toolCall: { id: 't1', name: LOOK_AT_SCREEN, input: {} },
+    });
+    const sees = (models: string[]): BrainProvider => ({
+      ...fake,
+      id: 'nebius',
+      capabilities: fake.capabilities,
+      listModels: () => fake.listModels(),
+      complete: (req, ev, sig) => fake.complete(req, ev, sig),
+      canSee: (model) => models.includes(model),
+    });
+
+    await runnerFor(() => sees(['vl']), tools).run({
+      pet: { ...pet, model: 'super', visionModel: 'vl' },
+      text: 'look',
+    }).done;
+    await runnerFor(() => sees(['vl']), tools).run({
+      pet: { ...pet, model: 'super' },
+      text: 'look',
+    }).done;
+
+    expect(asked).toEqual([true, false]);
+  });
+
+  it('reports a provider that cannot be built as a turn error, not a crash', async () => {
+    const runner = runnerFor(() => {
+      throw new BrainError(
+        'auth',
+        'No Nebius Token Factory API key is stored. Add one in Settings.',
+      );
+    });
+
+    const outcome = await runner.run({ pet, text: 'hi' }).done;
+
+    expect(outcome.stopReason).toBe('error');
+    expect(outcome.error).toEqual({
+      code: 'auth',
+      message: 'No Nebius Token Factory API key is stored. Add one in Settings.',
+    });
+    expect(methods().at(-1)).toBe('turn.error');
+  });
+});

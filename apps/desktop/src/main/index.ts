@@ -5,7 +5,8 @@ import type { PerceptionTarget, Pet, Settings, SettingsPatch } from '@tagalong/p
 import { SettingsStore } from '@tagalong/core';
 import { captureNotice, captureTooltip } from './capture-notice';
 import { captureAskSnapshot, capturePatch } from './context';
-import { ANTHROPIC_KEY, startEngineHost } from './engine-host';
+import { startEngineHost } from './engine-host';
+import { providerChoices, secretKeyFor } from './provider-choices';
 import type { EngineHost } from './engine-host';
 import {
   DEFAULT_LOOK_HOTKEY,
@@ -24,7 +25,7 @@ import { createAvatarWindow } from './windows/avatar';
 import { createPanelWindow, showPanelBeside } from './windows/panel';
 import { createSettingsWindow } from './windows/settings';
 import { IPC } from '../shared/ipc';
-import type { CaptureNotice, HostView } from '../shared/ipc';
+import type { CaptureNotice, HostView, ModelList } from '../shared/ipc';
 
 /** Everything the app owns once it is up. Assembled in `start`, torn down on quit. */
 interface Desktop {
@@ -423,11 +424,22 @@ function registerIpc(): void {
   ipcMain.handle(IPC.hostView, async (): Promise<HostView> => {
     const current = required();
     const settings = await readSettings();
-    const apiKey = await current.secrets.get(ANTHROPIC_KEY);
+    const stored = new Set<string>();
+    for (const choice of providerChoices(new Set())) {
+      const secretKey = secretKeyFor(choice.id);
+      if (secretKey === undefined) continue;
+      const value = await current.secrets.get(secretKey);
+      if (value !== null && value.length > 0) stored.add(choice.id);
+    }
+    // Pets live in the engine's database; with no engine the form shows keys and URLs
+    // only, which is exactly what someone fixing a failed boot needs.
+    const pets =
+      current.host === null ? [] : (await current.host.client.call('pets.list', {})).pets;
     const problem = current.hotkeyError ?? current.bootError;
     return {
       settings,
-      hasApiKey: apiKey !== null && apiKey.length > 0,
+      pets,
+      providers: providerChoices(stored),
       engineVersion: app.getVersion(),
       ...(problem !== null ? { hotkeyError: problem } : {}),
     };
@@ -447,10 +459,23 @@ function registerIpc(): void {
     return saved;
   });
 
-  ipcMain.handle(IPC.saveApiKey, async (_event, apiKey: string) => {
+  ipcMain.handle(IPC.saveApiKey, async (_event, providerId: string, apiKey: string) => {
     const { secrets } = required();
-    if (apiKey.length === 0) await secrets.delete(ANTHROPIC_KEY);
-    else await secrets.set(ANTHROPIC_KEY, apiKey);
+    const secretKey = secretKeyFor(providerId);
+    if (secretKey === undefined) throw new Error(`'${providerId}' does not take an API key`);
+    if (apiKey.length === 0) await secrets.delete(secretKey);
+    else await secrets.set(secretKey, apiKey);
+  });
+
+  ipcMain.handle(IPC.savePet, async (_event, pet: Pet): Promise<Pet> => {
+    return (await engine().client.call('pets.upsert', { pet })).pet;
+  });
+
+  ipcMain.handle(IPC.listModels, async (_event, providerId: string): Promise<ModelList> => {
+    const current = required();
+    // No engine, no list: the form still takes a typed model id.
+    if (current.host === null) return { models: [], source: 'fallback' };
+    return current.host.client.call('models.list', { providerId });
   });
 
   ipcMain.handle(IPC.openSettings, () => openSettings());

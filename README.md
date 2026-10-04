@@ -64,7 +64,7 @@ tagalong/
       perception/                   # exclusions, retention, tools, inventory
       memory/                       # db.ts (numbered migrations), store.ts (ConversationStore)
       pets/registry.ts              # PetRegistry, the default pet Scout
-      providers/                    # brain.ts, anthropic.ts, fake.ts, registry.ts, errors.ts
+      providers/                    # brain.ts, anthropic.ts, openai-compatible.ts, presets.ts, nebius-models.ts, vision-routing.ts, fake.ts, registry.ts, errors.ts
       server/                       # ws-server.ts (EngineServer), pairing.ts
       settings/settings.ts          # SettingsStore, SecretStore, InMemorySecretStore
     ui/src/
@@ -170,8 +170,40 @@ you normally never call it yourself.
 **`TAGALONG_FAKE_PROVIDERS=1`.** With this set, `createProvider` returns the scripted
 `FakeBrainProvider` whatever settings say: no API key, no network, and a deterministic word-by-word
 stream. It is how the Playwright smoke suite runs, and the easiest way to see the app work before you
-have a key. Without it, the engine needs an Anthropic key from the OS keychain; if none is stored the
-engine refuses to boot, and the app opens its settings window and says so instead of quitting.
+have a key. Without it, each pet asks the provider it names, with that provider's key from the OS
+keychain. A fresh install's Scout runs on Nemotron through Nebius Token Factory, so until a Token
+Factory key is stored its turns end with "No Token Factory API key is stored. Add one in Settings."
+The engine itself boots without any key.
+
+### Choosing a pet's brain
+
+Settings shows, per pet, a **provider**, a **model id** and an optional **vision model id**, plus one
+API key box per provider and a base URL box per OpenAI-compatible preset.
+
+| Provider     | Base URL (overridable)                    | Key                  | Models                                                  |
+| ------------ | ----------------------------------------- | -------------------- | ------------------------------------------------------- |
+| `openrouter` | `https://openrouter.ai/api/v1`            | `OPENROUTER_API_KEY` | anything OpenRouter serves, e.g. a Claude model         |
+| `nebius`     | `https://api.tokenfactory.nebius.com/v1/` | `NEBIUS_API_KEY`     | Nemotron 3 Super for text, Nemotron Nano 2 VL for sight |
+| `anthropic`  | the Anthropic API                         | Anthropic key        | Claude, directly                                        |
+| `fake`       | none                                      | none                 | scripted, offline                                       |
+
+Both presets go through one `OpenAiCompatibleProvider`, so any other OpenAI-format service is a
+settings change: put its URL in one of the base URL boxes, store its key, and type its model id. The
+model box suggests ids from the service's own `GET /models` once a key is stored, and says when it is
+showing the built-in list instead.
+
+**Vision routing.** A turn that carries a picture — a screenshot, or an image a tool such as
+`look_closer` returns — goes to the pet's model if that model can see, and otherwise to its vision
+model. On Token Factory only Nemotron Nano 2 VL sees, so Scout answers words on Super and pictures on
+Nano VL. On OpenRouter every model is treated as seeing, so a Claude pet answers everything on the one
+model and needs no vision model. A pet with no model that can see never sends pixels: the screenshot
+is dropped with a warning.
+
+A pet's provider and model apply on its next ask. A new key or base URL applies after a restart.
+
+The Nemotron Nano 2 VL id (`nvidia/Nemotron-Nano-V2-12b`) and the OpenRouter fallback ids could not be
+checked when they were written; they live in `packages/core/src/providers/nebius-models.ts` and
+`presets.ts`. The live list in Settings is the authority.
 
 Once running: the pet sits on screen as a small always-on-top window, `Ctrl+Shift+Space` captures the
 selection and the active window and opens the chat panel beside it, Escape or focus loss hides the
@@ -259,6 +291,8 @@ in `packages/core/src/providers/registry.ts`. **Set it in the shell you launch f
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TAGALONG_FAKE_PROVIDERS=1` | **Read.** Forces the fake brain provider, for tests and demos. No keys or network needed. Must be set in the shell environment.                         |
 | `ANTHROPIC_API_KEY`         | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment. |
+| `OPENROUTER_API_KEY`        | **Not read.** The key for the `openrouter` provider, entered in Settings and stored like the Anthropic key.                                             |
+| `NEBIUS_API_KEY`            | **Not read.** The key for the `nebius` provider (Token Factory), entered in Settings and stored like the Anthropic key.                                 |
 | `ELEVENLABS_API_KEY`        | **Not used yet.** Text to speech through the ElevenLabs TtsProvider, from Phase 3.                                                                      |
 | `OPENAI_API_KEY`            | **Not used yet.** Whisper speech to text only, from Phase 3.                                                                                            |
 
@@ -289,13 +323,16 @@ Chrome extension, or something new. Adding one never touches the core.
 Providers are the swappable edges of the engine. Each one is an interface in `packages/core` with more
 than one planned implementation.
 
-- **BrainProvider** for the AI engine. Existing: `anthropic` (default), `fake` (tests and demos);
-  `ollama` and `openai-compatible` are planned after Phase 5.
+- **BrainProvider** for the AI engine. Existing: `openrouter` and `nebius` (two presets of the
+  OpenAI-compatible `OpenAiCompatibleProvider`), `anthropic`, and `fake` (tests and demos); `ollama`
+  is planned after Phase 5. Another OpenAI-format service needs no code — see
+  [Choosing a pet's brain](#choosing-a-pets-brain); a new named preset is one entry in
+  `packages/core/src/providers/presets.ts`.
 - **SttProvider** for speech to text and **TtsProvider** for text to speech arrive in Phase 3; neither
   interface exists yet.
 
-Implement `BrainProvider`, register it in `packages/core/src/providers/registry.ts`, and select it per
-pet in settings. Do not widen the interface for a provider that is not being built.
+Implement `BrainProvider`, register it in `packages/core/src/providers/registry.ts`, give it a
+`SECRET_KEYS` entry if it takes a key, and select it per pet in settings. Do not widen the interface for a provider that is not being built.
 
 ## Conventions
 

@@ -6,8 +6,16 @@ import { ConversationStore } from './memory/store';
 import { PetRegistry } from './pets/registry';
 import { SettingsStore } from './settings/settings';
 import type { SecretStore } from './settings/settings';
-import { createProvider } from './providers';
+import {
+  ANTHROPIC_MODELS,
+  FAKE_MODELS,
+  OpenAiCompatibleProvider,
+  SECRET_KEYS,
+  createProvider,
+  openAiPreset,
+} from './providers';
 import type { BrainProvider } from './providers';
+import type { ProviderResolver } from './conversation/runner';
 import { ConversationRunner } from './conversation';
 import { createPerceptionToolset } from './perception';
 import { EngineServer } from './server/ws-server';
@@ -15,7 +23,85 @@ import type { MethodHandlers } from './server/ws-server';
 import { readOrCreatePairingToken } from './server/pairing';
 
 /** Key the Anthropic API key is filed under in the host's SecretStore. */
-export const ANTHROPIC_KEY = 'anthropic.apiKey';
+export const ANTHROPIC_KEY = SECRET_KEYS.anthropic!;
+
+async function readKey(secrets: SecretStore, providerId: string): Promise<string | undefined> {
+  const secretKey = SECRET_KEYS[providerId];
+  if (secretKey === undefined) return undefined;
+  const value = await secrets.get(secretKey);
+  return value !== null && value.length > 0 ? value : undefined;
+}
+
+/**
+ * Builds each pet's provider the first time a turn needs it, then reuses it.
+ *
+ * Keys are read once, at boot: a key saved in Settings applies from the next launch,
+ * which is what the settings window already promises. Base URLs are read when a
+ * provider is first built. A provider that cannot be built — no key, an unknown id — is
+ * not cached, so the error is raised on the turn that hit it and reported as that
+ * turn's `turn.error` rather than failing boot for every pet.
+ */
+async function providerResolver(
+  secrets: SecretStore,
+  settings: SettingsStore,
+  env: Record<string, string | undefined> | undefined,
+): Promise<ProviderResolver> {
+  const keys = new Map<string, string>();
+  for (const providerId of Object.keys(SECRET_KEYS)) {
+    const value = await readKey(secrets, providerId);
+    if (value !== undefined) keys.set(providerId, value);
+  }
+  const built = new Map<string, BrainProvider>();
+  return (pet) => {
+    const cached = built.get(pet.providerId);
+    if (cached !== undefined) return cached;
+    const provider = createProvider({
+      providerId: pet.providerId,
+      apiKey: keys.get(pet.providerId),
+      baseURL: settings.get().providerBaseUrls[pet.providerId],
+      env,
+    });
+    built.set(pet.providerId, provider);
+    return provider;
+  };
+}
+
+/**
+ * The models Settings offers for one provider.
+ *
+ * The key is read fresh here, unlike the turn path, so a key saved a moment ago fills the
+ * picker without a restart. Fake mode never asks the network, and any failure to reach
+ * the service — offline, a refused key, a wrong base URL — falls back to the built-in
+ * list and says so, because an empty picker is worse than a short one.
+ */
+async function listModels(
+  providerId: string,
+  secrets: SecretStore,
+  settings: SettingsStore,
+  env: Record<string, string | undefined>,
+): Promise<{ models: string[]; source: 'live' | 'fallback' }> {
+  const preset = openAiPreset(providerId);
+  if (preset !== undefined) {
+    const fallback = { models: [...preset.fallbackModels], source: 'fallback' as const };
+    const apiKey = await readKey(secrets, providerId);
+    if (apiKey === undefined || env.TAGALONG_FAKE_PROVIDERS === '1') return fallback;
+    const provider = createProvider({
+      providerId,
+      apiKey,
+      baseURL: settings.get().providerBaseUrls[providerId],
+      env,
+    });
+    if (!(provider instanceof OpenAiCompatibleProvider)) return fallback;
+    try {
+      return { models: await provider.fetchModels(), source: 'live' };
+    } catch {
+      return fallback;
+    }
+  }
+  if (providerId === 'anthropic') return { models: [...ANTHROPIC_MODELS], source: 'fallback' };
+  if (providerId === 'fake') return { models: [...FAKE_MODELS], source: 'fallback' };
+  throw new Error(`no provider with id '${providerId}'`);
+}
 
 export interface EngineOptions {
   /** Where the database, settings, and pairing token live. The host picks this. */
@@ -68,13 +154,9 @@ export class Engine {
     pets.seedDefaults();
 
     const current = settings.get();
+    // Each pet names its own provider, so there is no single brain to build at boot.
     const provider =
-      options.provider ??
-      createProvider({
-        providerId: current.providerId,
-        apiKey: (await options.secretStore.get(ANTHROPIC_KEY)) ?? undefined,
-        env: options.env,
-      });
+      options.provider ?? (await providerResolver(options.secretStore, settings, options.env));
 
     const store = new ConversationStore(db);
 
@@ -95,12 +177,18 @@ export class Engine {
         // Lazy for the same reason: the cap is a cost control the user edits in Settings,
         // and reading it at boot would make saving it do nothing until the next launch.
         windowTextBudget: () => settings.get().windowTextBudget,
-        // Without this, look_at_screen would only ever describe the screen in words.
-        vision: () => provider.capabilities.vision,
+        // No `vision` here: whether a look returns pixels depends on the pet asking, so
+        // the runner passes it with every tool call.
       }),
     });
 
-    const handlers = buildHandlers({ runner, pets, settings });
+    const handlers = buildHandlers({
+      runner,
+      pets,
+      settings,
+      models: (providerId) =>
+        listModels(providerId, options.secretStore, settings, options.env ?? process.env),
+    });
 
     const server = await EngineServer.start({
       port: options.port ?? current.enginePort ?? DEFAULT_ENGINE_PORT,
@@ -160,8 +248,9 @@ function buildHandlers(parts: {
   runner: ConversationRunner;
   pets: PetRegistry;
   settings: SettingsStore;
+  models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
 }): MethodHandlers {
-  const { runner, pets, settings } = parts;
+  const { runner, pets, settings, models } = parts;
 
   return {
     ask: (params) => {
@@ -186,5 +275,6 @@ function buildHandlers(parts: {
 
     'settings.get': () => ({ settings: settings.get() }),
     'settings.set': (params) => ({ settings: settings.set(params.patch) }),
+    'models.list': (params) => models(params.providerId),
   };
 }

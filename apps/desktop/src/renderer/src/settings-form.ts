@@ -9,8 +9,8 @@ import type { SettingsPatch as SettingsPatchType } from '@tagalong/protocol';
  * rendering — it was which fields end up in the patch.
  */
 export interface SettingsFormValues {
-  providerId: string;
-  defaultModel: string;
+  /** One box per OpenAI-compatible preset. Blank means the preset's own URL. */
+  baseUrls: readonly { providerId: string; label: string; value: string }[];
   askHotkey: string;
   lookHotkey: string;
   seeEverythingHotkey: string;
@@ -29,12 +29,12 @@ export interface SettingsFormValues {
  * stopped being the one the user typed.
  *
  * Nothing the form does not show is included, so saving cannot reset the exclusion list
- * or the retention mode as a side effect of changing a model name.
+ * or the retention mode as a side effect of changing a base URL. Models are not here at
+ * all: each pet carries its own and is saved through `pets.upsert`.
  */
 export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchType {
   return SettingsPatch.parse({
-    providerId: values.providerId.trim(),
-    defaultModel: values.defaultModel.trim(),
+    providerBaseUrls: parseBaseUrls(values.baseUrls),
     hotkeys: {
       ask: values.askHotkey.trim(),
       look: values.lookHotkey.trim(),
@@ -68,4 +68,26 @@ function parseBudget(raw: string): number {
     );
   }
   return budget;
+}
+
+/**
+ * Reads the base URL boxes into the override map.
+ *
+ * Every preset is shown, so the map is sent whole and a box emptied by the user really
+ * does go back to the preset's URL. A value is checked here, with the service named,
+ * because the schema's own complaint would point at `providerBaseUrls.openrouter`.
+ */
+function parseBaseUrls(boxes: SettingsFormValues['baseUrls']): Record<string, string> {
+  const overrides: Record<string, string> = {};
+  for (const box of boxes) {
+    const value = box.value.trim();
+    if (value.length === 0) continue;
+    if (!URL.canParse(value)) {
+      throw new Error(
+        `${box.label} base URL must be a full URL, such as https://example.com/v1 — or blank for the default.`,
+      );
+    }
+    overrides[box.providerId] = value;
+  }
+  return overrides;
 }

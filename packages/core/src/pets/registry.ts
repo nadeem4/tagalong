@@ -1,13 +1,16 @@
 import type { Database } from 'better-sqlite3';
 import { Pet } from '@tagalong/protocol';
+import { NEMOTRON_TEXT_MODEL, NEMOTRON_VISION_MODEL } from '../providers/nebius-models';
 
 /**
  * The pet a fresh install starts with.
  *
  * Phase 1 ships one companion so the whole path can be exercised end to end; Ink and
  * Bolt join the crew in Phase 4 when handoff and roundtable give them something to do.
- * Scout runs on sonnet because explaining what is on screen is a fast, frequent ask
- * and opus would cost several times as much for no visible gain.
+ * Scout runs on NVIDIA Nemotron through Nebius Token Factory: Nemotron 3 Super for words,
+ * switching to Nemotron Nano 2 VL whenever a turn carries a picture, since Super cannot
+ * see. Claude stays one Settings change away. Only a fresh install gets this; seeding never
+ * overwrites a pet that already exists, so an install that started on Claude stays there.
  */
 export const SCOUT: Pet = {
   id: 'scout',
@@ -17,8 +20,9 @@ export const SCOUT: Pet = {
     'You are Scout. You explain what the user is looking at, plainly and briefly. ' +
     'Prefer a direct answer over a preamble. When something on screen is ambiguous, ' +
     'say what you see and ask one short question rather than guessing.',
-  model: 'claude-sonnet-5',
-  providerId: 'anthropic',
+  model: NEMOTRON_TEXT_MODEL,
+  visionModel: NEMOTRON_VISION_MODEL,
+  providerId: 'nebius',
   toolAllowlist: [],
   replyStyle: 'text',
 };

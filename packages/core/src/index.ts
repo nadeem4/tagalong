@@ -59,6 +59,7 @@ export {
   type PerceptionToolset,
   type PerceptionToolsetOptions,
   type ToolOutcome,
+  type ToolTurn,
 } from './perception';
 
 export { DB_FILENAME, LATEST_SCHEMA_VERSION, migrate, openDatabase } from './memory/db';
@@ -68,7 +69,19 @@ export {
   AnthropicProvider,
   BrainError,
   FakeBrainProvider,
+  NEBIUS_BASE_URL,
+  NEBIUS_FALLBACK_MODELS,
+  NEMOTRON_TEXT_MODEL,
+  NEBIUS_VISION_MODELS,
+  NEMOTRON_VISION_MODEL,
+  OPENAI_COMPATIBLE_PRESETS,
+  OpenAiCompatibleProvider,
+  SECRET_KEYS,
+  carriesImage,
   createProvider,
+  modelForTurn,
+  openAiPreset,
+  type OpenAiPreset,
   type BrainCapabilities,
   type BrainContent,
   type BrainContentBlock,

@@ -1,5 +1,5 @@
 import { app } from 'electron';
-import { ANTHROPIC_KEY, Engine } from '@tagalong/core';
+import { Engine } from '@tagalong/core';
 import type { SecretStore } from '@tagalong/core';
 import type { CaptureExclusions } from '@tagalong/protocol';
 import { captureNotice } from './capture-notice';
@@ -8,8 +8,6 @@ import { EngineClient } from './engine-client';
 import type { EngineNotification } from './engine-client';
 import type { Platform } from './platform/index';
 import type { CaptureNotice } from '../shared/ipc';
-
-export { ANTHROPIC_KEY };
 
 export interface EngineHost {
   engine: Engine;

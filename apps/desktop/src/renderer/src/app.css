@@ -147,6 +147,12 @@ button:disabled {
   width: 100%;
 }
 
+.settings__pet {
+  margin: 0 0 16px;
+  padding: 8px 12px 0;
+  border: 1px solid var(--line);
+}
+
 .settings__note {
   color: var(--muted);
   font-size: 12px;

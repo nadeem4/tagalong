@@ -7,6 +7,26 @@ import {
   SettingsPatch,
 } from './settings';
 
+describe('Settings providerBaseUrls', () => {
+  it('starts empty, so every preset uses its built-in base URL', () => {
+    expect(Settings.parse({}).providerBaseUrls).toEqual({});
+  });
+
+  it('keeps a base URL override per provider', () => {
+    const s = Settings.parse({ providerBaseUrls: { openrouter: 'http://127.0.0.1:8080/v1' } });
+    expect(s.providerBaseUrls).toEqual({ openrouter: 'http://127.0.0.1:8080/v1' });
+  });
+
+  it('rejects a base URL that is not a URL', () => {
+    expect(Settings.safeParse({ providerBaseUrls: { nebius: 'not a url' } }).success).toBe(false);
+  });
+
+  it('can be patched on its own', () => {
+    const patch = SettingsPatch.parse({ providerBaseUrls: { nebius: 'https://example.com/v1/' } });
+    expect(patch).toEqual({ providerBaseUrls: { nebius: 'https://example.com/v1/' } });
+  });
+});
+
 describe('Settings', () => {
   it('fills every default from an empty object', () => {
     const s = Settings.parse({});

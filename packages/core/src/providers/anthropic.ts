@@ -22,17 +22,20 @@ import type {
   BrainResult,
   BrainTool,
 } from './brain';
+import { REFUSAL_MESSAGE } from './brain';
 import { BrainError } from './errors';
 
-/** Shown instead of an empty bubble when the model declines to answer. */
-export const REFUSAL_MESSAGE =
-  "I'd rather not answer that one. Try rephrasing it, or ask me something else.";
+export { REFUSAL_MESSAGE };
 
 /**
  * Models this provider is known to serve. Kept as a list rather than a `models.list`
  * call so settings UI and tests never depend on the network.
  */
-const ANTHROPIC_MODELS = ['claude-opus-5', 'claude-sonnet-5', 'claude-haiku-4-5'];
+export const ANTHROPIC_MODELS: readonly string[] = [
+  'claude-opus-5',
+  'claude-sonnet-5',
+  'claude-haiku-4-5',
+];
 
 export interface AnthropicProviderOptions {
   apiKey: string;

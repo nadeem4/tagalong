@@ -1,5 +1,5 @@
 import type { CaptureBlock } from '@tagalong/core';
-import type { ContextSnapshot, Settings, SettingsPatch } from '@tagalong/protocol';
+import type { ContextSnapshot, Pet, Settings, SettingsPatch } from '@tagalong/protocol';
 import type { HostBridge } from '@tagalong/ui';
 
 /** Channel names, in one place so main and preload cannot drift apart. */
@@ -14,6 +14,8 @@ export const IPC = {
   hostView: 'tagalong:host:view',
   saveSettings: 'tagalong:settings:save',
   saveApiKey: 'tagalong:secret:api-key',
+  savePet: 'tagalong:pets:save',
+  listModels: 'tagalong:models:list',
   openSettings: 'tagalong:settings:open',
   hidePanel: 'tagalong:panel:hide',
   togglePanel: 'tagalong:panel:toggle',
@@ -48,10 +50,31 @@ export interface CaptureNotice {
   paused?: boolean;
 }
 
-/** What the settings window needs to render. The key itself never comes back out. */
+/** One brain a pet can run on, as the settings window shows it. */
+export interface ProviderChoice {
+  id: string;
+  label: string;
+  /** Present for OpenAI-compatible presets: the URL used when settings name none. */
+  defaultBaseUrl?: string;
+  /** The variable `.env.example` lists for this key, for the form's hint. */
+  envVar?: string;
+  needsKey: boolean;
+  /** Whether a key is stored. The key itself never comes back out. */
+  hasKey: boolean;
+}
+
+/** The models a provider offers, and whether the list is the service's own. */
+export interface ModelList {
+  models: string[];
+  source: 'live' | 'fallback';
+}
+
+/** What the settings window needs to render. Keys never come back out. */
 export interface HostView {
   settings: Settings;
-  hasApiKey: boolean;
+  /** Empty while the engine is down: pets live in its database. */
+  pets: Pet[];
+  providers: ProviderChoice[];
   engineVersion: string;
   /** Set when the global hotkey could not be registered, so settings can say why. */
   hotkeyError?: string;
@@ -92,7 +115,10 @@ export interface TagalongHostApi {
   toggleSightPause(): Promise<boolean>;
   getHostView(): Promise<HostView>;
   saveSettings(patch: SettingsPatch): Promise<Settings>;
-  saveApiKey(apiKey: string): Promise<void>;
+  /** An empty key deletes the stored one. */
+  saveApiKey(providerId: string, apiKey: string): Promise<void>;
+  savePet(pet: Pet): Promise<Pet>;
+  listModels(providerId: string): Promise<ModelList>;
   openSettings(): Promise<void>;
   hidePanel(): Promise<void>;
   togglePanel(): Promise<void>;

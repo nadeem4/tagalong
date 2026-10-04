@@ -2,13 +2,17 @@ import type { BrainProvider } from './brain';
 import { AnthropicProvider } from './anthropic';
 import { FakeBrainProvider } from './fake';
 import { BrainError } from './errors';
+import { OpenAiCompatibleProvider } from './openai-compatible';
+import { openAiPreset } from './presets';
 
 /** What the engine knows about the provider before it builds one. */
 export interface ProviderConfig {
-  /** Matches `Settings.providerId`. Phase 1 ships 'anthropic' and 'fake'. */
+  /** Matches `Pet.providerId`: 'anthropic', 'nebius', 'openrouter' or 'fake'. */
   providerId: string;
   /** Read from the host's SecretStore; never stored in settings. */
   apiKey?: string | undefined;
+  /** From `Settings.providerBaseUrls`; absent means the preset's own URL. */
+  baseURL?: string | undefined;
   /** Injected so tests can set TAGALONG_FAKE_PROVIDERS without touching the process. */
   env?: Record<string, string | undefined> | undefined;
 }
@@ -54,6 +58,21 @@ export function createProvider(config: ProviderConfig): BrainProvider {
     return new FakeBrainProvider(fakeScriptFrom(env));
   }
 
+  const preset = openAiPreset(config.providerId);
+  if (preset !== undefined) {
+    if (!config.apiKey) {
+      throw new BrainError('auth', `No ${preset.label} API key is stored. Add one in Settings.`);
+    }
+    return new OpenAiCompatibleProvider({
+      id: preset.id,
+      apiKey: config.apiKey,
+      baseURL: config.baseURL ?? preset.baseURL,
+      label: preset.label,
+      models: preset.fallbackModels,
+      visionModels: preset.visionModels,
+    });
+  }
+
   switch (config.providerId) {
     case 'fake':
       return new FakeBrainProvider(fakeScriptFrom(env));
@@ -65,7 +84,7 @@ export function createProvider(config: ProviderConfig): BrainProvider {
     default:
       throw new BrainError(
         'config',
-        `Unknown provider id '${config.providerId}'. Phase 1 supports 'anthropic' and 'fake'.`,
+        `Unknown provider id '${config.providerId}'. Supported: 'nebius', 'openrouter', 'anthropic' and 'fake'.`,
       );
   }
 }

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 import { PROTOCOL_VERSION } from '@tagalong/protocol';
 import { Engine } from './engine';
-import { FakeBrainProvider } from './providers';
+import { FakeBrainProvider, NEBIUS_FALLBACK_MODELS, SECRET_KEYS } from './providers';
 import type { BrainProvider } from './providers';
 import { InMemorySecretStore } from './settings/settings';
 
@@ -135,6 +135,126 @@ describe('Engine.boot', () => {
     });
 
     expect(engine.pairingToken).toBe(token);
+  });
+});
+
+describe('per-pet providers', () => {
+  async function bootWithoutFakes(): Promise<{ e: Engine; host: TestHost }> {
+    engine = await Engine.boot({
+      dataDir: dir,
+      secretStore: new InMemorySecretStore(),
+      engineVersion: '0.0.0-test',
+      port: 0,
+      env: {},
+    });
+    const host = await TestHost.connect(engine.port);
+    await host.call('hello', helloParams(engine.pairingToken));
+    return { e: engine, host };
+  }
+
+  it('boots without any key, and a Nemotron pet with no key fails its turn readably', async () => {
+    const { host } = await bootWithoutFakes();
+
+    await host.call('ask', { petId: 'scout', input: { text: 'hi' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.error'), { timeout: 5000 });
+
+    const error = host.notifications.find((n) => n.method === 'turn.error');
+    expect(error?.params['code']).toBe('auth');
+    expect(String(error?.params['message'])).toContain('Token Factory');
+  });
+
+  it('builds an OpenRouter pet from its stored key and reaches the turn', async () => {
+    const secrets = new InMemorySecretStore();
+    await secrets.set(SECRET_KEYS.openrouter!, 'sk-or-test');
+    engine = await Engine.boot({
+      dataDir: dir,
+      secretStore: secrets,
+      engineVersion: '0.0.0-test',
+      port: 0,
+      // A dead base URL keeps this test off the network: the key is found, the provider
+      // is built, and the request fails to connect rather than going anywhere real.
+      env: {},
+    });
+    const host = await TestHost.connect(engine.port);
+    await host.call('hello', helloParams(engine.pairingToken));
+    await host.call('settings.set', {
+      patch: { providerBaseUrls: { openrouter: 'http://127.0.0.1:9/v1' } },
+    });
+    const scout = ((await host.call('pets.list'))['result'] as { pets: Record<string, unknown>[] })
+      .pets[0];
+    await host.call('pets.upsert', {
+      pet: { ...scout, providerId: 'openrouter', model: 'anthropic/claude-sonnet-5' },
+    });
+
+    await host.call('ask', { petId: 'scout', input: { text: 'hi' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.error'), { timeout: 10000 });
+
+    const error = host.notifications.find((n) => n.method === 'turn.error');
+    // Not 'auth': the key was found. The dead URL is what failed.
+    expect(error?.params['code']).toBe('connection');
+    expect(String(error?.params['message'])).toContain('OpenRouter');
+  });
+
+  it('answers each pet from the provider it names', async () => {
+    const { host } = await bootWithoutFakes();
+    const scout = ((await host.call('pets.list'))['result'] as { pets: Record<string, unknown>[] })
+      .pets[0];
+    await host.call('pets.upsert', {
+      pet: { ...scout, id: 'ink', name: 'Ink', providerId: 'fake', model: 'fake-model' },
+    });
+
+    await host.call('ask', { petId: 'ink', input: { text: 'hi' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+
+    expect(host.methods()).not.toContain('turn.error');
+  });
+});
+
+describe('models.list', () => {
+  async function connected(env: Record<string, string>, secrets = new InMemorySecretStore()) {
+    engine = await Engine.boot({
+      dataDir: dir,
+      secretStore: secrets,
+      engineVersion: '0.0.0-test',
+      port: 0,
+      env,
+    });
+    const host = await TestHost.connect(engine.port);
+    await host.call('hello', helloParams(engine.pairingToken));
+    return host;
+  }
+
+  it('offers the built-in Nemotron list when no Token Factory key is stored', async () => {
+    const host = await connected({});
+    const res = await host.call('models.list', { providerId: 'nebius' });
+    expect(res['result']).toEqual({
+      models: [...NEBIUS_FALLBACK_MODELS],
+      source: 'fallback',
+    });
+  });
+
+  it('never asks the network in fake mode, even with a key stored', async () => {
+    const secrets = new InMemorySecretStore();
+    await secrets.set(SECRET_KEYS.openrouter!, 'sk-or-test');
+    const host = await connected({ TAGALONG_FAKE_PROVIDERS: '1' }, secrets);
+
+    const res = await host.call('models.list', { providerId: 'openrouter' });
+
+    expect((res['result'] as { source: string }).source).toBe('fallback');
+  });
+
+  it('lists the fixed models of providers without a live list', async () => {
+    const host = await connected({});
+    const anthropic = await host.call('models.list', { providerId: 'anthropic' });
+    const fake = await host.call('models.list', { providerId: 'fake' });
+    expect((anthropic['result'] as { models: string[] }).models).toContain('claude-opus-5');
+    expect((fake['result'] as { models: string[] }).models).toEqual(['fake-model']);
+  });
+
+  it('answers an unknown provider with an error', async () => {
+    const host = await connected({});
+    const res = await host.call('models.list', { providerId: 'ollama' });
+    expect(res['error']).toBeDefined();
   });
 });
 

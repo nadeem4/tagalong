@@ -5,6 +5,10 @@
  * OpenAI-compatible endpoint can be added later without touching conversation code.
  */
 
+/** Shown instead of an empty bubble when the model declines to answer. Every provider uses it. */
+export const REFUSAL_MESSAGE =
+  "I'd rather not answer that one. Try rephrasing it, or ask me something else.";
+
 export interface BrainCapabilities {
   vision: boolean;
   tools: boolean;
@@ -55,6 +59,11 @@ export interface BrainTool {
 
 export interface BrainRequest {
   model: string;
+  /**
+   * The model to switch to when the turn carries an image and `model` cannot see.
+   * Providers that route by model read it; the rest ignore it. See `modelForTurn`.
+   */
+  visionModel?: string | undefined;
   system: string;
   messages: BrainMessage[];
   tools?: BrainTool[];
@@ -81,5 +90,11 @@ export interface BrainProvider {
   id: string;
   capabilities: BrainCapabilities;
   listModels(): Promise<string[]>;
+  /**
+   * Whether one model of this provider accepts images. Absent means every model does,
+   * as long as `capabilities.vision` is set. Only a provider whose models differ — a
+   * chat-completions server with text-only and vision models side by side — needs it.
+   */
+  canSee?(model: string): boolean;
   complete(req: BrainRequest, events: BrainEvents, signal: AbortSignal): Promise<BrainResult>;
 }

@@ -87,6 +87,19 @@ export const SettingsGetResult = z.object({ settings: Settings });
 export const SettingsSetParams = z.object({ patch: SettingsPatch });
 export const SettingsSetResult = z.object({ settings: Settings });
 
+/**
+ * The models a provider offers, for the Settings model picker.
+ *
+ * `source` says whether the list came from the service itself (`GET /models`) or is the
+ * engine's built-in fallback — no key stored, offline, or a service that refused — so
+ * a host can say "showing the built-in list" instead of passing a guess off as live.
+ */
+export const ModelsListParams = z.object({ providerId: z.string().min(1) });
+export const ModelsListResult = z.object({
+  models: z.array(z.string().min(1)),
+  source: z.enum(['live', 'fallback']),
+});
+
 /** Phase 5. Present from Phase 1 so the catalog matches the documented table. */
 export const ToolApproveParams = z.object({
   approvalId: z.uuid(),
@@ -257,6 +270,7 @@ export const hostToCoreMethods = {
   'pets.delete': { params: PetsDeleteParams, result: PetsDeleteResult },
   'settings.get': { params: SettingsGetParams, result: SettingsGetResult },
   'settings.set': { params: SettingsSetParams, result: SettingsSetResult },
+  'models.list': { params: ModelsListParams, result: ModelsListResult },
   'tool.approve': { params: ToolApproveParams, result: ToolApproveResult },
 } as const satisfies Record<string, MethodSpec>;
 
