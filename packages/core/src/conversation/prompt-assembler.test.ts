@@ -5,6 +5,7 @@ import { Settings as SettingsSchema } from '@tagalong/protocol';
 import {
   CONTEXT_LABELS,
   MAX_SELECTION_CHARS,
+  MEMORY_HEADING,
   TRUNCATION_MARKER,
   assemblePrompt,
 } from './prompt-assembler';
@@ -79,6 +80,53 @@ describe('assemblePrompt system prompt', () => {
     expect(spoken.system).not.toBe(
       assemblePrompt({ pet, history: [userMessage('hi')], settings }).system,
     );
+  });
+});
+
+describe('assemblePrompt memory section', () => {
+  const memory = (text: string, overrides: Record<string, unknown> = {}) => ({
+    id: randomUUID(),
+    scope: 'pet' as const,
+    petId: 'scout',
+    kind: 'preference' as const,
+    text,
+    createdAt: new Date().toISOString(),
+    ...overrides,
+  });
+
+  it('adds what the pet remembers to the system prompt, labelled by kind and scope', () => {
+    const request = assemblePrompt({
+      pet,
+      history: [userMessage('hi')],
+      settings,
+      memories: [
+        memory('Prefers short answers'),
+        memory('The repo uses pnpm', { scope: 'crew', petId: null, kind: 'fact' }),
+      ],
+    });
+
+    expect(request.system).toContain(MEMORY_HEADING);
+    expect(request.system).toContain('- (preference) Prefers short answers');
+    expect(request.system).toContain('- (fact, shared by the crew) The repo uses pnpm');
+    // Remembered preferences outrank the generic style rule, so they come after it.
+    expect(request.system.indexOf(MEMORY_HEADING)).toBeGreaterThan(
+      request.system.indexOf('You are Scout'),
+    );
+  });
+
+  it('keeps the section under the 2,000 character budget', () => {
+    const many = Array.from({ length: 10 }, (_, i) => memory(`${i} ${'y'.repeat(300)}`));
+    const request = assemblePrompt({ pet, history: [userMessage('hi')], settings, memories: many });
+
+    const section = request.system.slice(request.system.indexOf(MEMORY_HEADING));
+    expect(section.length).toBeLessThanOrEqual(2000);
+    expect(section).toContain('0 yyy');
+  });
+
+  it('leaves the section out when there is nothing to remember', () => {
+    const request = assemblePrompt({ pet, history: [userMessage('hi')], settings, memories: [] });
+
+    expect(request.system).not.toContain(MEMORY_HEADING);
   });
 });
 

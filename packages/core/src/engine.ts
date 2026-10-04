@@ -3,6 +3,7 @@ import { DEFAULT_ENGINE_PORT, Settings } from '@tagalong/protocol';
 import type { Pet } from '@tagalong/protocol';
 import { openDatabase } from './memory/db';
 import { ConversationStore } from './memory/store';
+import { MemoryStore } from './memory/memories';
 import { PetRegistry } from './pets/registry';
 import { SettingsStore } from './settings/settings';
 import type { SecretStore } from './settings/settings';
@@ -160,6 +161,7 @@ export class Engine {
       options.provider ?? (await providerResolver(options.secretStore, settings, options.env));
 
     const store = new ConversationStore(db);
+    const memory = new MemoryStore(db);
 
     // The runner needs an event sink before the server exists, and the server needs the
     // runner's handlers before it starts. The holder ties that knot without a mutable
@@ -170,6 +172,7 @@ export class Engine {
       settings,
       provider,
       emit: (event) => live.server?.broadcast(event.method, event.params),
+      memory,
       // Both lookups are lazy: hosts connect and drop between turns, and the exclusion
       // list is edited while the app runs, so neither can be captured at boot.
       tools: createPerceptionToolset({

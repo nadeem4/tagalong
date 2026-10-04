@@ -92,6 +92,22 @@ export class MemoryStore {
     return toMemory(row);
   }
 
+  /**
+   * Adds a memory unless an identical one already sits in the same place, and returns
+   * whichever is stored. Saying "I prefer short answers" every morning should not fill
+   * five recall slots with the same sentence.
+   */
+  addOnce(input: NewMemory): Memory {
+    const text = input.text.trim();
+    const existing = this.db
+      .prepare<[string, string, string | null, string | null], MemoryRow>(
+        `SELECT * FROM memories WHERE text = ? AND scope = ? AND (pet_id = ? OR (pet_id IS NULL AND ? IS NULL))
+         LIMIT 1`,
+      )
+      .get(text, input.scope, input.petId ?? null, input.petId ?? null);
+    return existing === undefined ? this.add(input) : toMemory(existing);
+  }
+
   /** The newest memories one pet can see, newest first. */
   recent(petId: string, limit: number): Memory[] {
     return this.db

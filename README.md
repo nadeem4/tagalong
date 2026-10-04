@@ -253,6 +253,10 @@ Super on Token Factory), **Ink** (writer, Claude through OpenRouter) and **Bolt*
 and the others keep working. Edit, add or delete pets in Settings. Deleting a default pet is permanent:
 it is not re-seeded on the next boot.
 
+Pets remember. Tell one "I prefer short answers" and it keeps that across restarts; a pet can also
+save facts on its own, privately or in the crew notebook every pet reads. Memories live in the same
+SQLite file as conversations (`tagalong.db` in the data dir).
+
 ### The two cost controls
 
 Both live in the settings window and both take effect on save, with no restart: they are read at the

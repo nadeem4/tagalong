@@ -506,6 +506,23 @@ question is turned into an FTS query by quoting each distinct word and OR-ing th
 quotes, `*`, `NEAR(` and friends in a user's text are plain words rather than syntax errors, and BM25
 ranks the closest memory first.
 
+### Recall
+
+Every turn recalls before it assembles (`memory/recall.ts`): the pet's five newest visible memories,
+then up to five FTS matches against the question plus the selection that are not already listed,
+dropping whole memories past a 2,000-character budget. `assemblePrompt` renders them last in the system
+prompt under `## What you remember`, labelled `(preference)`, `(fact)` or `(fact, shared by the
+crew)`, and caps the whole section — heading included — at 2,000 characters. Last, so a remembered
+"short answers" reads as overriding the generic reply-style rule above it.
+
+Memories are written two ways. The `remember` tool (`conversation/crew-tools.ts`) is offered to every
+pet whose provider supports tools: `{ text, kind: fact | preference, shared? }`, filed under the
+calling pet or, with `shared: true`, in the crew notebook. Under it sits a deterministic safety net:
+when the user's own message states a lasting preference — "I prefer…", "from now on…", "remember
+that…", "always answer…" — the runner files that sentence as a private `preference` before the turn
+runs, so "Scout keeps answers short after a restart" does not hinge on a model choosing to call a tool.
+`addOnce` keeps the same sentence from filling five recall slots.
+
 ## The browser host
 
 `apps/extension` is a Manifest V3 extension built by Vite into `dist/`, the folder Chrome loads

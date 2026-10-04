@@ -360,6 +360,38 @@ describe('built-in perception tools', () => {
   });
 });
 
+describe('memory across a restart', () => {
+  it('remembers a stated preference after the engine restarts', async () => {
+    const systems: string[] = [];
+    const fake = new FakeBrainProvider({ text: 'Sure.' });
+    const recording: BrainProvider = {
+      id: 'fake',
+      capabilities: fake.capabilities,
+      listModels: () => fake.listModels(),
+      complete: (req, handlers, signal) => {
+        systems.push(req.system);
+        return fake.complete(req, handlers, signal);
+      },
+    };
+
+    const first = await boot(recording);
+    let host = await TestHost.connect(first.port);
+    await host.call('hello', helloParams(first.pairingToken));
+    await host.call('ask', { petId: 'scout', input: { text: 'I prefer short answers.' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+    await first.shutdown();
+    engine = undefined;
+
+    const second = await boot(recording);
+    host = await TestHost.connect(second.port);
+    await host.call('hello', helloParams(second.pairingToken));
+    await host.call('ask', { petId: 'scout', input: { text: 'Explain DNS.' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+
+    expect(systems.at(-1)).toContain('I prefer short answers.');
+  });
+});
+
 describe('pets and settings over rpc', () => {
   it('lists the seeded crew', async () => {
     const e = await boot();

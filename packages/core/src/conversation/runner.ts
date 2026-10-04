@@ -3,6 +3,9 @@ import type { ContextSnapshot, NotificationParamsOf, Pet, Settings } from '@taga
 import type { BrainContentBlock, BrainProvider, BrainResult } from '../providers';
 import { BrainError, modelForTurn } from '../providers';
 import type { ConversationStore } from '../memory/store';
+import type { MemoryStore } from '../memory/memories';
+import { recall, statedPreference } from '../memory/recall';
+import { rememberTool, type CrewTool } from './crew-tools';
 import type { SettingsStore } from '../settings/settings';
 import type { PerceptionToolset } from '../perception';
 import { mayPersistScreenshot } from '../perception';
@@ -44,6 +47,11 @@ export interface ConversationRunnerOptions {
    * should not have to stand up a host to run.
    */
   tools?: PerceptionToolset | undefined;
+  /**
+   * Phase 4. The crew's memory: recalled into every prompt, written by the `remember`
+   * tool and by preferences the user states. Optional so turn-mechanics tests stay small.
+   */
+  memory?: MemoryStore | undefined;
 }
 
 export interface RunAsk {
@@ -146,6 +154,17 @@ export class ConversationRunner {
       ...(stored ? { snapshot: stored } : {}),
     });
 
+    // Filed before the turn runs, so even a turn that fails still keeps what was said.
+    const preference = this.#options.memory ? statedPreference(ask.text) : null;
+    if (preference !== null) {
+      this.#options.memory?.addOnce({
+        scope: 'pet',
+        petId: ask.pet.id,
+        kind: 'preference',
+        text: preference,
+      });
+    }
+
     const turnId = randomUUID();
     const controller = new AbortController();
     this.#active.set(turnId, { petId: ask.pet.id, controller });
@@ -226,17 +245,31 @@ export class ConversationRunner {
       });
     }
 
+    const memories = this.#options.memory
+      ? recall(
+          this.#options.memory,
+          ask.pet.id,
+          [ask.text, ask.snapshot?.selection ?? ''].join(' '),
+        )
+      : [];
+
     const base = assemblePrompt({
       pet: ask.pet,
       history,
       settings,
+      memories,
       ...(snapshot ? { snapshot } : {}),
     });
 
     // A provider without tool support is never sent tools: some reject the field outright,
     // and the rest would only be told about an ability they cannot use.
     const tools = provider.capabilities.tools ? this.#options.tools : undefined;
-    const request = tools ? { ...base, tools: [...tools.definitions] } : base;
+    const crewTools = provider.capabilities.tools ? this.#crewTools() : [];
+    const definitions = [
+      ...(tools?.definitions ?? []),
+      ...crewTools.map((tool) => tool.definition),
+    ];
+    const request = definitions.length > 0 ? { ...base, tools: definitions } : base;
 
     try {
       const result = await provider.complete(
@@ -244,7 +277,8 @@ export class ConversationRunner {
         {
           onText: (text) => this.#options.emit({ method: 'turn.delta', params: { turnId, text } }),
           onToolUse: async (call) => {
-            if (!tools) return { content: NO_TOOLS_YET, isError: true };
+            const crewTool = crewTools.find((tool) => tool.definition.name === call.name);
+            if (!tools && !crewTool) return { content: NO_TOOLS_YET, isError: true };
             // Announced around the call, not after it. A tool that takes seconds —
             // enumerating windows walks an accessibility tree — leaves the user watching
             // a pet that looks hung, and a turn whose tool activity is never broadcast
@@ -254,7 +288,9 @@ export class ConversationRunner {
               method: 'turn.toolRequest',
               params: { turnId, approvalId: randomUUID(), tool: call.name, input: call.input },
             });
-            const outcome = await tools.run(call, { vision: canSee });
+            const outcome = crewTool
+              ? await crewTool.run(call.input, { pet: ask.pet, turnId, signal, snapshot })
+              : await (tools as PerceptionToolset).run(call, { vision: canSee });
             this.#options.emit({
               method: 'turn.toolResult',
               params: {
@@ -296,6 +332,13 @@ export class ConversationRunner {
     } catch (error) {
       return this.#fail(turnId, conversationId, error);
     }
+  }
+
+  /** The tools the crew layer adds to a turn: memory today, consulting another pet next. */
+  #crewTools(): CrewTool[] {
+    const tools: CrewTool[] = [];
+    if (this.#options.memory) tools.push(rememberTool(this.#options.memory));
+    return tools;
   }
 
   #fail(turnId: string, conversationId: string, error: unknown): TurnOutcome {
