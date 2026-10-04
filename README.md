@@ -12,7 +12,9 @@ behalf through MCP tools you approve. They never take over your mouse or keyboar
 **Status: Phases 0 (Setup), 1 (Foundation), 2 (Sight) and 2B (Full View) are complete. Phase 6
 (Browser Host) is built and awaiting its by-hand Chrome run — it runs fifth, not ninth, because the
 browser is where the desktop host cannot read exactly. See [the extension](#the-chrome-extension)
-and [docs/acceptance/phase-6.md](docs/acceptance/phase-6.md).**
+and [docs/acceptance/phase-6.md](docs/acceptance/phase-6.md). Phase 3B (Awareness) — rolling memory
+and watches — is built and awaiting its Windows run; see [Awareness](#awareness-rolling-memory-and-watches)
+and [docs/acceptance/phase-3b.md](docs/acceptance/phase-3b.md).**
 
 Phase 1 shipped the whole text path end to end on Windows: the protocol package, the engine with
 SQLite-backed conversations, the Anthropic and fake brain providers, the loopback JSON-RPC server with

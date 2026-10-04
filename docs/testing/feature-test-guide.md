@@ -429,3 +429,203 @@ add next?`.
 it`, then run `/crew Is this article convincing?`.
 3. **Expected:** the same handoff bubble, labels, round dividers, synthesis and model-call count as in
    the desktop panel.
+
+## Phase 3B: Awareness
+
+Covers rolling memory and its recording dot, `recall_screen` and `what_changed`, watch mode with its
+Watching chip, the watch check model, the Awareness settings, and the image token estimate in the
+sight bar (tasks 87, 81, 88, 82, 89, 85, 90).
+
+**Test configuration.** As the rest of this guide: **OpenRouter and a Claude model**. Test 3B.16 runs a
+watch on **Nebius Token Factory with Nemotron 3 Nano** as the check model. Voice (Phase 3) is not built,
+so a watch that fires is **shown, not spoken** — every "spoken" expectation in the phase page is checked
+as a card, a toast and an avatar alert.
+
+**Before you start:**
+
+1. Launch with `pnpm dev:desktop` (no `TAGALONG_FAKE_PROVIDERS`). You need a Windows desktop with a
+   terminal (Windows Terminal or `cmd`) and a browser.
+2. Open Settings from the tray. Store your **OpenRouter API key**, then set **Scout** to **Provider**
+   OpenRouter, **Model id** a Claude id from the live list (for example `anthropic/claude-sonnet-5`),
+   **Vision model id** empty, and **Watch check model** empty. Click Save and restart the app once so
+   the key is read.
+3. Keep `%APPDATA%\Tagalong` open in Explorer: several tests check that nothing new is written there.
+
+### 3B.1. The Awareness settings and their defaults
+
+1. **Setup:** Settings open.
+2. **Action:** scroll to **Awareness**, then to Scout's section.
+3. **Expected:**
+   - **Rolling memory** is unticked, **Minutes to remember** is 10, **Checks per watch** 60,
+     **Watches at once** 3, **Watch timeout** 30.
+   - Scout's **Watch check model** box is empty and its grey placeholder reads
+     `anthropic/claude-haiku-4.5`; the note under it names OpenRouter's default.
+   - Switching Scout's **Provider** to Token Factory (do not save) changes the placeholder to
+     `nvidia/nemotron-3-nano-30b-a3b`. Switch it back.
+
+### 3B.2. Turning rolling memory on shows the red dot, without a restart
+
+1. **Setup:** 3B.1; the desktop avatars visible.
+2. **Action:** tick **Rolling memory**, click Save. Do not restart.
+3. **Expected:** within a second every pet avatar shows a **small red dot** in its bottom-left corner.
+   Hovering an avatar's label says it is recording the screen. No new file appears in
+   `%APPDATA%\Tagalong` (only `tagalong.db`, `settings.json`, `secrets.json`, `pairing.token` and the
+   logs that were there before).
+
+### 3B.3. "What was I reading five minutes ago?" _(acceptance 1)_
+
+1. **Setup:** rolling memory on (3B.2). In the browser, open a page with a distinctive title — for
+   example the Wikipedia article "Transformer (deep learning architecture)" — and leave it in front for
+   one minute. Then switch to a different app (Notepad, say) and wait **five minutes**.
+2. **Action:** press `Ctrl+Shift+Space`, ask Scout: `what was I reading five minutes ago?`
+3. **Expected:**
+   - The panel shows a `recall_screen` tool row (with "1 image" or "2 images" as its summary).
+   - The answer names the Wikipedia article (title or content), and **states a time** — a clock time or
+     "about five minutes ago" — rather than describing it as what is on screen now.
+   - It does not describe Notepad as what you were reading.
+
+### 3B.4. Asking further back than memory reaches
+
+1. **Setup:** rolling memory on; set **Minutes to remember** to **1**, Save (no restart). Wait 90 s.
+2. **Action:** ask Scout: `what was on my screen ten minutes ago?`
+3. **Expected:** the answer says memory only reaches back about a minute and describes the oldest
+   moment it has, with its time. It does not invent a ten-minute-old screen. Set the minutes back to
+   **10** and Save.
+
+### 3B.5. Rolling memory off
+
+1. **Setup:** untick **Rolling memory**, Save.
+2. **Action:** confirm the red dot is gone from every avatar, then ask Scout:
+   `what was I doing two minutes ago?`
+3. **Expected:** the dot disappeared on save. The answer says rolling memory is off and that it can be
+   turned on in Settings under Awareness. Tick **Rolling memory** again and Save before continuing.
+
+### 3B.6. What changed on screen
+
+1. **Setup:** rolling memory on for at least two minutes. Leave a terminal in front showing a prompt.
+2. **Action:** in the terminal run `echo the quick brown fox`, then ask Scout:
+   `what changed on my main screen in the last minute?` (if Scout asks which display, answer "1" or
+   tell it to list the displays).
+3. **Expected:** the panel shows a `what_changed` tool row (summary "2 images"). The answer mentions
+   the new terminal line and names the two times it compared. Asking the same about a screen you did
+   not touch answers that nothing changed.
+
+### 3B.7. Excluded apps are never recorded
+
+1. **Setup:** rolling memory on. A password manager on the exclusion list installed (KeePass,
+   Bitwarden or 1Password — any of the defaults), or add `notepad.exe` to the exclusion list in
+   `settings.json` and restart.
+2. **Action:** bring the excluded app to the front for **30 seconds**, with something recognisable in
+   it. Then switch away and ask Scout: `what was on my screen 15 seconds ago?`
+3. **Expected:** the answer does not describe the excluded app's contents. It either describes an
+   older moment (with its time) or another display, or says nothing was recorded for that moment.
+
+### 3B.8. Pause stops recording and clears it _(acceptance 3)_
+
+1. **Setup:** rolling memory on for at least a minute; red dots visible.
+2. **Action:** press the pause hotkey `Ctrl+Shift+Alt+P`. Then ask Scout:
+   `what was on my screen thirty seconds ago?`
+3. **Expected:** the red dots **disappear** and the grey paused eye appears. The answer says nothing is
+   remembered — memory starts empty after a pause — and does not describe the screen from before the
+   pause.
+4. **Action:** press `Ctrl+Shift+Alt+P` again, wait 10 seconds, ask the same question.
+5. **Expected:** the red dots **come back**. The answer describes only the last few seconds since the
+   resume, and says memory does not reach back thirty seconds.
+
+### 3B.9. Quit and restart: the buffer is empty _(acceptance 4)_
+
+1. **Setup:** rolling memory on for at least two minutes.
+2. **Action:** quit Tagalong from the tray. Check `%APPDATA%\Tagalong`: no new frame or image file is
+   there. Start it again, wait 10 seconds, and ask Scout: `what was I doing five minutes ago?`
+3. **Expected:** no image files on disk. After the restart the answer says memory only reaches back
+   a few seconds (since the app started) — nothing from before the restart. The red dots are back
+   because the setting is still on.
+
+### 3B.10. Watch a long command finish _(acceptance 2, text only)_
+
+1. **Setup:** Scout on OpenRouter + Claude, **Watch check model** empty (so checks run on
+   `anthropic/claude-haiku-4.5`). Open `cmd` and keep it on your main screen.
+2. **Action:** in `cmd`, run `ping -n 45 127.0.0.1 && echo BUILD DONE` (about 45 seconds). While it
+   runs, press `Ctrl+Shift+Space` and ask Scout: `tell me when this command finishes`.
+3. **Expected:**
+   - Scout replies briefly that it is watching. A blue **Watching** chip appears in the panel:
+     `Watching Scout: "…finishes" … 0/60 checks · anthropic/claude-haiku-4.5` with a **Stop** button.
+     Scout's avatar shows a ⏱ mark.
+   - While ping prints a line every second the check count stays at or near **0**: the screen keeps
+     changing, so no check is made.
+   - Within **10 seconds** of `BUILD DONE` appearing: a card from Scout with an ⏰ heading
+     ("watching for …") and a one-sentence reason, a Windows notification "Tagalong — a watch fired",
+     a red **!** on Scout's avatar, and the chip disappears. The panel comes up if it was hidden.
+   - The chip's count before it vanished was a **handful** (1–3), not dozens.
+   - Nothing is spoken (Phase 3 is not built).
+4. **Action:** click Scout's avatar. **Expected:** the red **!** goes away.
+
+### 3B.11. Stop a watch
+
+1. **Setup:** start a watch as in 3B.10 with a command that never ends: `ping -t 127.0.0.1`.
+2. **Action:** click **Stop** on the Watching chip. Then press `Ctrl+C` in `cmd`.
+3. **Expected:** the chip disappears at once and no card appears afterwards — stopping is final. The
+   ⏱ mark on Scout's avatar goes.
+
+### 3B.12. At most three watches at once
+
+1. **Setup:** three terminals each running `ping -t 127.0.0.1`.
+2. **Action:** ask Scout to watch each one ("tell me when this stops"), one after another, then a
+   fourth time.
+3. **Expected:** three Watching chips. The fourth request is refused: Scout says it is already watching
+   three things, the most at once, and that one can be stopped from its chip. Stop all three.
+
+### 3B.13. A watch times out
+
+1. **Setup:** `ping -t 127.0.0.1` running.
+2. **Action:** ask Scout: `watch this terminal for the word FINISHED, but give up after one minute`.
+3. **Expected:** a chip appears. About a minute later it disappears and the panel shows a grey line
+   saying nothing matched before the timeout. No card, no notification.
+
+### 3B.14. A watch that runs out of checks
+
+1. **Setup:** in Settings set **Checks per watch** to **2**, Save (no restart). In `cmd` run
+   `for /l %i in (1,1,50) do @(echo step %i & timeout /t 12 >nul)` — a line every 12 s.
+2. **Action:** ask Scout: `tell me when this prints step 99`.
+3. **Expected:** the chip counts `1/2`, then `2/2` checks as lines appear, then disappears with a line
+   saying it checked 2 times without seeing it. Set **Checks per watch** back to **60**.
+
+### 3B.15. A per-pet watch check model
+
+1. **Setup:** Settings, Scout's **Watch check model**: type `anthropic/claude-haiku-4.5` explicitly
+   (or another small model from the list). Save.
+2. **Action:** reopen Settings; then start a watch as in 3B.10.
+3. **Expected:** the box still holds the model you typed. The Watching chip names that model. Clear the
+   box and Save: the placeholder default is used again on the next watch.
+
+### 3B.16. A watch on Token Factory with Nemotron 3 Nano as the check model _(hackathon demo)_
+
+_This test changes the test configuration on purpose._
+
+1. **Setup:** store a **Token Factory API key** (Settings, Save, restart). Set Scout to **Provider**
+   Token Factory, **Model id** `nvidia/nemotron-3-super-120b-a12b`, **Vision model id**
+   `nvidia/Nemotron-Nano-V2-12b`, **Watch check model** empty. Confirm that
+   `nvidia/nemotron-3-nano-30b-a3b` appears in the live model list Scout's note mentions; if Token
+   Factory names Nemotron 3 Nano differently, type the listed id into **Watch check model** and note
+   the difference in Notion Issues. Click Save.
+2. **Action:** in `cmd` run `ping -n 45 127.0.0.1 && echo BUILD DONE`, keep that window in front, and
+   ask Scout: `tell me when this command finishes`.
+3. **Expected:**
+   - The Watching chip names **`nvidia/nemotron-3-nano-30b-a3b`** as the check model.
+   - Within 10 seconds of `BUILD DONE`, the card, notification and avatar alert of 3B.10 appear, with
+     a reason that quotes or describes the terminal's last line — Nano read the terminal's text, since
+     it cannot see pictures.
+   - In the Token Factory usage page, the watch's calls are on Nemotron 3 Nano (a handful), not on
+     Nemotron 3 Super.
+   - If `cmd` publishes no text to the accessibility tree on your machine, the check falls back to a
+     picture on `nvidia/Nemotron-Nano-V2-12b`; the watch still fires. Note which one happened.
+
+### 3B.17. Estimated image tokens in the sight bar
+
+1. **Setup:** any pet; the panel closed.
+2. **Action:** press `Ctrl+Shift+Space` (no picture), then `Ctrl+Shift+S`, then `Ctrl+Shift+Alt+S`,
+   reading the sight bar each time.
+3. **Expected:** no token estimate with the text-only key. With `Ctrl+Shift+S` the bar shows
+   `~N image tokens` where N is about width × height ÷ 750 of the screenshot named beside it (a
+   1568×882 shot shows about 1,844). With `Ctrl+Shift+Alt+S` on two monitors it shows a larger N and
+   `· 3 images` (the overview plus the focused display — more with **Every screen** chosen).
