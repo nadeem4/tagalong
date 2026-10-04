@@ -249,22 +249,45 @@ export class OpenAiCompatibleProvider implements BrainProvider {
   readonly #label: string;
   readonly #models: readonly string[];
   readonly #visionModels: readonly string[] | undefined;
+  readonly #baseURL: string;
 
   constructor(options: OpenAiCompatibleProviderOptions) {
     this.id = options.id;
     this.#label = options.label ?? 'Token Factory';
     this.#models = options.models ?? [];
     this.#visionModels = options.visionModels;
+    this.#baseURL = options.baseURL ?? NEBIUS_BASE_URL;
     this.#client = new OpenAI({
       apiKey: options.apiKey,
-      baseURL: options.baseURL ?? NEBIUS_BASE_URL,
+      baseURL: this.#baseURL,
       ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
       ...(options.maxRetries === undefined ? {} : { maxRetries: options.maxRetries }),
     });
   }
 
+  /** Where requests go. Read by Settings to show which service a pet is on. */
+  get baseURL(): string {
+    return this.#baseURL;
+  }
+
+  /** The built-in list. Never touches the network, so Settings can always show something. */
   listModels(): Promise<string[]> {
     return Promise.resolve([...this.#models]);
+  }
+
+  /**
+   * The service's own list, from `GET /models`, sorted so a long list is scannable.
+   * Throws a `BrainError` when the service cannot be asked; the caller decides whether
+   * to fall back to `listModels`.
+   */
+  async fetchModels(): Promise<string[]> {
+    try {
+      const ids: string[] = [];
+      for await (const model of this.#client.models.list()) ids.push(model.id);
+      return ids.sort((a, b) => a.localeCompare(b));
+    } catch (error) {
+      throw this.#toBrainError(error);
+    }
   }
 
   canSee(model: string): boolean {
@@ -386,7 +409,7 @@ export class OpenAiCompatibleProvider implements BrainProvider {
   }
 
   /** Turns an SDK failure into something worth showing a person. */
-  #toBrainError(error: unknown, model: string): BrainError {
+  #toBrainError(error: unknown, model?: string): BrainError {
     const label = this.#label;
     if (error instanceof RateLimitError) {
       return new BrainError('rate_limit', `${label} is rate limiting us. Try again in a moment.`, {
@@ -399,11 +422,12 @@ export class OpenAiCompatibleProvider implements BrainProvider {
       });
     }
     if (error instanceof NotFoundError) {
-      return new BrainError(
-        'config',
-        `${label} does not serve the model '${model}'. Pick another one in Settings.`,
-        { cause: error },
-      );
+      // No model means the request was not about one: the base URL itself is wrong.
+      const message =
+        model === undefined
+          ? `${label} answered 404 at ${this.#baseURL}. Check the base URL in Settings.`
+          : `${label} does not serve the model '${model}'. Pick another one in Settings.`;
+      return new BrainError('config', message, { cause: error });
     }
     if (error instanceof APIConnectionError) {
       return new BrainError('connection', `Could not reach ${label}. Check your connection.`, {

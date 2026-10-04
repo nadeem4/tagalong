@@ -667,3 +667,66 @@ describe('OpenAiCompatibleProvider vision routing', () => {
     });
   });
 });
+
+describe('OpenAiCompatibleProvider models', () => {
+  function models(replies: Reply[]) {
+    const fake = fakeFetch(replies);
+    const p = new OpenAiCompatibleProvider({
+      id: 'openrouter',
+      apiKey: 'k',
+      baseURL: 'https://openrouter.ai/api/v1',
+      fetch: fake.fetch,
+      maxRetries: 0,
+      models: ['fallback-model'],
+    });
+    return { provider: p, calls: fake.calls };
+  }
+
+  it('lists its fallback models without touching the network', async () => {
+    const { provider: p, calls } = models([]);
+    expect(await p.listModels()).toEqual(['fallback-model']);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('fetches the live list from GET /models', async () => {
+    const { provider: p, calls } = models([
+      new Response(
+        JSON.stringify({
+          object: 'list',
+          data: [
+            { id: 'b-model', object: 'model', created: 0, owned_by: 'x' },
+            { id: 'a-model', object: 'model', created: 0, owned_by: 'x' },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    ]);
+
+    expect(await p.fetchModels()).toEqual(['a-model', 'b-model']);
+    expect(calls[0]?.url).toBe('https://openrouter.ai/api/v1/models');
+    expect(calls[0]?.method).toBe('GET');
+  });
+
+  it('reports a failed live list as a BrainError naming the service', async () => {
+    const { provider: p } = models([jsonError(401, 'bad key')]);
+    await expect(p.fetchModels()).rejects.toMatchObject({ code: 'auth' });
+  });
+
+  it('blames the base URL, not a model, when GET /models is a 404', async () => {
+    const { provider: p } = models([jsonError(404, 'nope')]);
+    await expect(p.fetchModels()).rejects.toThrow('Check the base URL');
+  });
+
+  it('streams through the comment lines OpenRouter sends while it waits', async () => {
+    const body =
+      ': OPENROUTER PROCESSING\n\n' +
+      `data: ${JSON.stringify(chunk({ content: 'hi' }))}\n\n` +
+      `data: ${JSON.stringify(chunk({}, 'stop'))}\n\n` +
+      'data: [DONE]\n\n';
+    const { provider: p } = models([
+      new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } }),
+    ]);
+    const result = await p.complete(request, recorder().events, signal());
+    expect(result.text).toBe('hi');
+  });
+});

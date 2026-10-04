@@ -17,7 +17,7 @@ export interface FakeScript {
 /** Rough characters-per-token ratio, good enough for a plausible-looking usage report. */
 const CHARS_PER_TOKEN = 4;
 
-const FAKE_MODELS = ['fake-model'];
+export const FAKE_MODELS: readonly string[] = ['fake-model'];
 
 function countTokens(chars: number): number {
   return Math.max(1, Math.ceil(chars / CHARS_PER_TOKEN));

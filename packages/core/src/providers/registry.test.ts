@@ -34,6 +34,28 @@ describe('createProvider', () => {
     expect(provider.canSee?.(NEMOTRON_TEXT_MODEL)).toBe(false);
   });
 
+  it('builds the OpenRouter provider, whose models all see', () => {
+    const provider = createProvider({ providerId: 'openrouter', apiKey: 'k', env: {} });
+    expect(provider).toBeInstanceOf(OpenAiCompatibleProvider);
+    expect(provider.id).toBe('openrouter');
+    expect((provider as OpenAiCompatibleProvider).baseURL).toBe('https://openrouter.ai/api/v1');
+    expect(provider.canSee?.('anthropic/claude-sonnet-5')).toBe(true);
+  });
+
+  it('uses a base URL from settings over the preset one', () => {
+    const provider = createProvider({
+      providerId: 'nebius',
+      apiKey: 'k',
+      baseURL: 'http://127.0.0.1:8000/v1/',
+      env: {},
+    });
+    expect((provider as OpenAiCompatibleProvider).baseURL).toBe('http://127.0.0.1:8000/v1/');
+  });
+
+  it('refuses to build the OpenRouter provider without an API key', () => {
+    expect(() => createProvider({ providerId: 'openrouter', env: {} })).toThrow('OpenRouter');
+  });
+
   it('refuses to build the Token Factory provider without an API key', () => {
     try {
       createProvider({ providerId: 'nebius', env: {} });

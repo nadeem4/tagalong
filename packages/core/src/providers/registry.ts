@@ -2,15 +2,17 @@ import type { BrainProvider } from './brain';
 import { AnthropicProvider } from './anthropic';
 import { FakeBrainProvider } from './fake';
 import { BrainError } from './errors';
-import { NEBIUS_FALLBACK_MODELS, NEBIUS_VISION_MODELS } from './nebius-models';
 import { OpenAiCompatibleProvider } from './openai-compatible';
+import { openAiPreset } from './presets';
 
 /** What the engine knows about the provider before it builds one. */
 export interface ProviderConfig {
-  /** Matches `Pet.providerId`: 'anthropic', 'nebius' or 'fake'. */
+  /** Matches `Pet.providerId`: 'anthropic', 'nebius', 'openrouter' or 'fake'. */
   providerId: string;
   /** Read from the host's SecretStore; never stored in settings. */
   apiKey?: string | undefined;
+  /** From `Settings.providerBaseUrls`; absent means the preset's own URL. */
+  baseURL?: string | undefined;
   /** Injected so tests can set TAGALONG_FAKE_PROVIDERS without touching the process. */
   env?: Record<string, string | undefined> | undefined;
 }
@@ -56,6 +58,21 @@ export function createProvider(config: ProviderConfig): BrainProvider {
     return new FakeBrainProvider(fakeScriptFrom(env));
   }
 
+  const preset = openAiPreset(config.providerId);
+  if (preset !== undefined) {
+    if (!config.apiKey) {
+      throw new BrainError('auth', `No ${preset.label} API key is stored. Add one in Settings.`);
+    }
+    return new OpenAiCompatibleProvider({
+      id: preset.id,
+      apiKey: config.apiKey,
+      baseURL: config.baseURL ?? preset.baseURL,
+      label: preset.label,
+      models: preset.fallbackModels,
+      visionModels: preset.visionModels,
+    });
+  }
+
   switch (config.providerId) {
     case 'fake':
       return new FakeBrainProvider(fakeScriptFrom(env));
@@ -64,24 +81,10 @@ export function createProvider(config: ProviderConfig): BrainProvider {
         throw new BrainError('auth', 'No Anthropic API key is stored. Add one in Settings.');
       }
       return new AnthropicProvider({ apiKey: config.apiKey });
-    case 'nebius':
-      if (!config.apiKey) {
-        throw new BrainError(
-          'auth',
-          'No Nebius Token Factory API key is stored. Add one in Settings.',
-        );
-      }
-      return new OpenAiCompatibleProvider({
-        id: 'nebius',
-        apiKey: config.apiKey,
-        label: 'Token Factory',
-        models: NEBIUS_FALLBACK_MODELS,
-        visionModels: NEBIUS_VISION_MODELS,
-      });
     default:
       throw new BrainError(
         'config',
-        `Unknown provider id '${config.providerId}'. Supported: 'anthropic', 'nebius' and 'fake'.`,
+        `Unknown provider id '${config.providerId}'. Supported: 'nebius', 'openrouter', 'anthropic' and 'fake'.`,
       );
   }
 }
