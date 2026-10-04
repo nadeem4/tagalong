@@ -1,16 +1,70 @@
 # Tagalong feature test guide
 
 Step-by-step manual tests for what each phase adds, written so someone who did not build the
-feature can run it and know whether it passed.
+feature can run it and know whether it passed. Each step lists **Setup**, **Action** and
+**Expected**. A step passes only if everything under Expected is true.
 
-**Test configuration.** Unless a step says otherwise, run every test with **OpenRouter and a Claude
-model**: in the desktop app's Settings, store an OpenRouter API key, set the pet's **Provider** to
-OpenRouter, pick a Claude model from the live list, and leave **Vision model ID** empty (on
-OpenRouter every model sees). Launch with `pnpm dev:desktop` and without `TAGALONG_FAKE_PROVIDERS`.
-Steps marked _fake provider_ need no key: launch with `TAGALONG_FAKE_PROVIDERS=1` instead.
+## Contents
 
-Each step lists **Setup**, **Action** and **Expected**. A step passes only if everything under
-Expected is true.
+- [Configuration](#configuration)
+  - [OpenRouter + Claude (the default for this guide)](#openrouter--claude-the-default-for-this-guide)
+  - [Nebius Token Factory + Nemotron](#nebius-token-factory--nemotron)
+  - [Fake provider (no key)](#fake-provider-no-key)
+- [Phase H: model providers](#phase-h-model-providers)
+- [Phase 6: Browser Host](#phase-6-browser-host)
+- [Phase 4: Crew](#phase-4-crew)
+- [Phase 3B: Awareness](#phase-3b-awareness)
+- [Phase 7: onboarding and installer](#phase-7-onboarding-and-installer)
+- [Demo run: the hackathon story](#demo-run-the-hackathon-story)
+- [Not in this build](#not-in-this-build)
+
+## Configuration
+
+Every test runs on the Windows desktop app, either installed (Phase 7) or from source with
+`pnpm dev:desktop` **without** `TAGALONG_FAKE_PROVIDERS`. Keys are entered in the setup wizard or in
+Settings (tray → **Settings**); a saved key is used from the next question, with no restart.
+
+### OpenRouter + Claude (the default for this guide)
+
+Unless a step says otherwise, run every test with **OpenRouter and a Claude model**.
+
+1. Get a key at <https://openrouter.ai/keys> and paste it into **OpenRouter API key**.
+2. For each pet under test set **Provider** to OpenRouter and **Model id** to a Claude id, for example
+   `anthropic/claude-sonnet-5`. Leave **Vision model id** empty: on OpenRouter every model is treated
+   as seeing, and Claude does.
+3. Save.
+
+**Where the model ids come from.** OpenRouter's catalog, <https://openrouter.ai/models>, which is also
+what `GET https://openrouter.ai/api/v1/models` returns. The model box in Settings and in the wizard
+lists those ids live once the key is stored, and its note says "N models from OpenRouter"; "Built-in
+list" means the key or base URL was refused.
+
+### Nebius Token Factory + Nemotron
+
+Steps marked _hackathon demo_ also use Nebius Token Factory with NVIDIA Nemotron.
+
+1. Get a key at <https://tokenfactory.nebius.com/> (API keys) and paste it into **Token Factory API
+   key**.
+2. For a pet on Nemotron set **Provider** to Token Factory and pick its models:
+
+| Role                      | Model id                            | Model                                |
+| ------------------------- | ----------------------------------- | ------------------------------------ |
+| Text (a pet's main model) | `nvidia/nemotron-3-super-120b-a12b` | Nemotron 3 Super                     |
+| Vision (sees screenshots) | `nvidia/Nemotron-Nano-V2-12b`       | Nemotron Nano 2 VL                   |
+| Watch checks              | `nvidia/nemotron-3-nano-30b-a3b`    | Nemotron 3 Nano (small, cheap, text) |
+
+**Where the model ids come from.** Token Factory's model list, `GET
+https://api.tokenfactory.nebius.com/v1/models`, which Settings and the wizard show live once the key
+is stored ("N models from Token Factory"). The Super id is the one Nebius published with Nemotron 3
+Super; the Nano 2 VL and Nemotron 3 Nano ids could not be checked when they were written. If the live
+list names them differently, use the listed id and record the difference in Notion Issues. A pet on
+Super needs the Nano 2 VL id as its **Vision model id** to see pictures (the wizard sets it for you).
+
+### Fake provider (no key)
+
+Steps marked _fake provider_ need no key: launch from source with `TAGALONG_FAKE_PROVIDERS=1`
+(PowerShell: `$env:TAGALONG_FAKE_PROVIDERS = '1'`). Every pet then streams a scripted answer and
+nothing leaves the machine.
 
 ## Phase H: model providers
 
@@ -23,7 +77,7 @@ Settings from the tray.
 ### H1. OpenRouter key and live model list
 
 1. **Setup:** an OpenRouter API key.
-2. **Action:** paste it into **OpenRouter API key**, click Save, restart the app, reopen Settings.
+2. **Action:** paste it into **OpenRouter API key**, click Save, close and reopen Settings.
 3. **Expected:** the key box says "one is stored"; Scout's note says "N models from OpenRouter". If
    it says "Built-in list", the key or base URL was refused — stop and fix that first.
 
@@ -57,7 +111,7 @@ Settings from the tray.
 
 _Not the default configuration: this step uses Nebius Token Factory._
 
-1. **Setup:** paste a key into **Token Factory API key**, Save, restart, reopen Settings; the note
+1. **Setup:** paste a key into **Token Factory API key**, Save, reopen Settings; the note
    says "models from Token Factory". Set Scout's **Provider** to Token Factory, **Model ID** to
    `nvidia/nemotron-3-super-120b-a12b`, **Vision model ID** to the Nemotron Nano 2 VL id from the
    live list (if it is not `nvidia/Nemotron-Nano-V2-12b`, correct `NEMOTRON_VISION_MODEL`). Save.
@@ -71,7 +125,7 @@ _Not the default configuration: this step uses Nebius Token Factory._
 
 1. **Setup:** Settings open.
 2. **Action:** (a) enter a bad base URL such as `openrouter.ai` and save; (b) blank the box and save;
-   (c) remove the key, restart, and ask.
+   (c) remove the key (clear the box, Save) and ask.
 3. **Expected:** (a) refused on save with a message naming the service; (b) back to the default;
    (c) the turn error "No … API key is stored. Add one in Settings." and the app keeps running.
 
@@ -83,8 +137,8 @@ any tab.
 
 **Before you start:**
 
-- Windows with Chrome 116 or newer, and the desktop app running (`pnpm dev:desktop`) with the test
-  configuration above.
+- Windows with Chrome 116 or newer, and the desktop app running (installed, or `pnpm dev:desktop`)
+  with the [test configuration](#openrouter--claude-the-default-for-this-guide).
 - A long article open in a Chrome tab — for example a Wikipedia article — referred to below as
   _the article_.
 - In the desktop app's Settings, the capture exclusion list includes the title pattern `*Bank*`
@@ -224,7 +278,7 @@ any tab.
 Covers the default crew, memory and recall, conversation summaries, handoff, consult, the roundtable,
 the crew strip, the pet editor and the model-call counter (tasks 44–51).
 
-**Test configuration.** As the rest of this guide: **OpenRouter and a Claude model**. One test, 4.13,
+**Test configuration.** [OpenRouter + Claude](#openrouter--claude-the-default-for-this-guide). One test, 4.13,
 uses a mixed crew on OpenRouter and Nebius Token Factory. Voice (Phase 3) is not built, so nothing in
 this phase speaks; every "voice" in the phase page is checked as text.
 
@@ -233,7 +287,8 @@ this phase speaks; every "voice" in the phase page is checked as text.
 1. Quit Tagalong. Rename `%APPDATA%\Tagalong` to `Tagalong.before-phase-4` so the app starts as a
    fresh install (rename it back afterwards to keep your old history).
 2. Launch with `pnpm dev:desktop` (no `TAGALONG_FAKE_PROVIDERS`).
-3. Open Settings from the tray, paste your **OpenRouter API key**, click Save, restart the app.
+3. Skip the setup wizard (Phase 7 tests it). Open Settings from the tray, paste your **OpenRouter
+   API key** and click Save.
 
 ### 4.1. A fresh install seeds three pets
 
@@ -350,7 +405,7 @@ avatar?` and press Enter.
 
 _This test changes the test configuration on purpose._
 
-1. **Setup:** store a **Token Factory API key** as well (Settings, Save, restart). Then set:
+1. **Setup:** store a **Token Factory API key** as well (Settings, Save). Then set:
    - **Scout** — Token Factory, `nvidia/nemotron-3-super-120b-a12b`, vision model
      `nvidia/Nemotron-Nano-V2-12b`
    - **Bolt** — Token Factory, `nvidia/Nemotron-Nano-V2-12b`, vision model empty
@@ -436,7 +491,7 @@ Covers rolling memory and its recording dot, `recall_screen` and `what_changed`,
 Watching chip, the watch check model, the Awareness settings, and the image token estimate in the
 sight bar (tasks 87, 81, 88, 82, 89, 85, 90).
 
-**Test configuration.** As the rest of this guide: **OpenRouter and a Claude model**. Test 3B.16 runs a
+**Test configuration.** [OpenRouter + Claude](#openrouter--claude-the-default-for-this-guide). Test 3B.16 runs a
 watch on **Nebius Token Factory with Nemotron 3 Nano** as the check model. Voice (Phase 3) is not built,
 so a watch that fires is **shown, not spoken** — every "spoken" expectation in the phase page is checked
 as a card, a toast and an avatar alert.
@@ -447,8 +502,7 @@ as a card, a toast and an avatar alert.
    terminal (Windows Terminal or `cmd`) and a browser.
 2. Open Settings from the tray. Store your **OpenRouter API key**, then set **Scout** to **Provider**
    OpenRouter, **Model id** a Claude id from the live list (for example `anthropic/claude-sonnet-5`),
-   **Vision model id** empty, and **Watch check model** empty. Click Save and restart the app once so
-   the key is read.
+   **Vision model id** empty, and **Watch check model** empty. Click Save.
 3. Keep `%APPDATA%\Tagalong` open in Explorer: several tests check that nothing new is written there.
 
 ### 3B.1. The Awareness settings and their defaults
@@ -602,7 +656,7 @@ as a card, a toast and an avatar alert.
 
 _This test changes the test configuration on purpose._
 
-1. **Setup:** store a **Token Factory API key** (Settings, Save, restart). Set Scout to **Provider**
+1. **Setup:** store a **Token Factory API key** (Settings, Save). Set Scout to **Provider**
    Token Factory, **Model id** `nvidia/nemotron-3-super-120b-a12b`, **Vision model id**
    `nvidia/Nemotron-Nano-V2-12b`, **Watch check model** empty. Confirm that
    `nvidia/nemotron-3-nano-30b-a3b` appears in the live model list Scout's note mentions; if Token
@@ -629,3 +683,200 @@ _This test changes the test configuration on purpose._
    `~N image tokens` where N is about width × height ÷ 750 of the screenshot named beside it (a
    1568×882 shot shows about 1,844). With `Ctrl+Shift+Alt+S` on two monitors it shows a larger N and
    `· 3 images` (the overview plus the focused display — more with **Every screen** chosen).
+
+## Phase 7: onboarding and installer
+
+Covers the setup wizard (task 69) and the Windows installer (task 71). The wizard tests run from
+source or installed; 7.12 onward need the installer.
+
+**Test configuration.** [OpenRouter + Claude](#openrouter--claude-the-default-for-this-guide), plus a
+Token Factory key for 7.6.
+
+**Before you start:** quit Tagalong and rename `%APPDATA%\Tagalong` to `Tagalong.before-phase-7`, so
+the next start is a fresh install. Rename it back at the end to keep your history.
+
+### 7.1. The wizard opens on a fresh install
+
+1. **Setup:** the fresh profile.
+2. **Action:** start Tagalong (`pnpm dev:desktop`, or the installed app).
+3. **Expected:** a window titled **Welcome to Tagalong** opens in the middle of the screen, reading
+   "Step 1 of 7". The pets and the tray icon are there behind it.
+
+### 7.2. Welcome states what Tagalong does and the privacy promise
+
+1. **Setup:** 7.1.
+2. **Action:** read the first step.
+3. **Expected:** a paragraph on what Tagalong does, then **The privacy promise** with six points:
+   nothing read until you ask, screenshots not written to disk, password managers never captured, keys
+   in the OS keychain, requests only to the chosen provider, one key pauses sight. Buttons: **Skip
+   setup** and **Next**.
+
+### 7.3. The provider step will not continue without a key
+
+1. **Setup:** click **Next**.
+2. **Action:** with every key box empty, click **Next**. Then click **Get an API key from OpenRouter**.
+3. **Expected:** three cards — OpenRouter, Nebius Token Factory, Anthropic — each with a key box and a
+   **Get an API key from …** button. **Next** shows the red line "Paste an API key for at least one provider, or
+   press Skip setup…" and stays on the step. **Get an API key from OpenRouter** opens
+   `https://openrouter.ai/keys` in your default browser, not inside Tagalong.
+
+### 7.4. A pasted key fills the crew step with the live model list
+
+1. **Setup:** 7.3.
+2. **Action:** select the **OpenRouter** radio, paste your OpenRouter key, click **Next**.
+3. **Expected:** "Step 3 of 7 — Meet your crew" with three sections — 🔎 Scout, ✒️ Ink, ⚡ Bolt — each
+   with **Provider** OpenRouter and a Claude model id already filled in (`anthropic/claude-sonnet-5`
+   for Scout and Ink, `anthropic/claude-haiku-4.5` for Bolt). The note under each says "N models from
+   OpenRouter" (N in the hundreds), and the model box offers them as you type.
+
+### 7.5. The crew picks are saved
+
+1. **Setup:** 7.4.
+2. **Action:** change Bolt's model to another Claude id from the list. Click **Next**. Open Settings
+   from the tray.
+3. **Expected:** the wizard moves on with no error. Settings shows Scout, Ink and Bolt on OpenRouter
+   with the models from the crew step, and every **Vision model id** empty. The OpenRouter key box says
+   "one is stored".
+
+### 7.6. A Nemotron pet gets its vision model automatically _(hackathon demo)_
+
+1. **Setup:** in the wizard, click **Back** to the provider step.
+2. **Action:** paste a Token Factory key too, click **Next**. On the crew step set Scout to **Nebius
+   Token Factory**: the model fills in as `nvidia/nemotron-3-super-120b-a12b`. Set Bolt to Token Factory
+   (`nvidia/Nemotron-Nano-V2-12b`). Leave Ink on OpenRouter. Click **Next**, then open Settings.
+3. **Expected:** the crew step's notes say "N models from Token Factory" for Scout and Bolt. Settings
+   shows Scout with **Vision model id** `nvidia/Nemotron-Nano-V2-12b` (set by the wizard), Bolt with an
+   empty vision model (its model already sees), and Ink unchanged.
+
+### 7.7. The hotkeys step matches Settings
+
+1. **Setup:** the wizard on "Three keys to remember".
+2. **Action:** compare it with the hotkey boxes in Settings.
+3. **Expected:** four keys — `Ctrl + Shift + Space` (Ask), `Ctrl + Shift + S` (Look),
+   `Ctrl + Shift + Alt + S` (See everything), `Ctrl + Shift + Alt + P` (Pause sight) — the same as
+   Settings, plus a line on `@Ink` handoff and `/crew`. If you rebound a key earlier, the wizard shows
+   your binding.
+
+### 7.8. Rolling memory from the wizard
+
+1. **Setup:** the wizard on "Rolling memory (optional)".
+2. **Action:** tick **Turn on rolling memory**, set minutes to `5`, click **Next**. Then go **Back**,
+   set minutes to `0`, click **Next**.
+3. **Expected:** after the first **Next** a small red dot appears on every pet within a second, and
+   Settings → Awareness shows rolling memory on with 5 minutes. The second **Next** is refused with
+   "Rolling memory keeps between 1 and 30 minutes." Set it back to 5 (or untick it) to continue.
+
+### 7.9. The Chrome extension step
+
+1. **Setup:** the wizard on "Chrome extension (optional)".
+2. **Action:** read the folder named in step 2 and click **Show folder**. Click **Copy token**.
+3. **Expected:** installed: the folder is `…\Programs\Tagalong\resources\extension` and Explorer
+   opens on it, holding `manifest.json`. From source with the extension built: `apps\extension\dist`;
+   not built: the step says how to build it instead of naming a folder. The token matches **Settings →
+   Browser extension**. Loading that folder unpacked and pairing with the token works as in 6.1–6.3.
+
+### 7.10. A first answer without a terminal _(task 69 acceptance)_
+
+1. **Setup:** the wizard on "You are set". No restart since 7.1.
+2. **Action:** click **Ask Scout something**. Ask "What can you do?".
+3. **Expected:** the wizard closes, the panel opens beside the pets on Scout, and the answer streams
+   and completes, labelled with Scout's model. No error about a missing key, and no restart was needed
+   for the key pasted in 7.4.
+
+### 7.11. Skip, and the wizard does not come back by itself
+
+1. **Setup:** quit Tagalong, delete `%APPDATA%\Tagalong` again, start it.
+2. **Action:** click **Skip setup** on the first step. Quit and start Tagalong again.
+3. **Expected:** the wizard closes at once. On the next start it does not open. The pets are on the
+   fresh-install defaults (Scout and Bolt on Token Factory, Ink on OpenRouter).
+
+### 7.12. Rerun the wizard from the tray and from Settings
+
+1. **Setup:** 7.11 done, an OpenRouter key stored in Settings.
+2. **Action:** tray → **Setup wizard**. Go to the provider step and click **Next** without typing a key.
+   Close the wizard with the window's X. Then Settings → **Run the setup wizard again**.
+3. **Expected:** the wizard opens both times. The provider step lets you through because a key is
+   already stored ("stored — type to replace"). On the crew step, pets already on a provider with a key
+   keep their current model; the others move to your main provider. Closing with X keeps what earlier
+   steps saved.
+
+### 7.13. Build the Windows installer
+
+1. **Setup:** Windows with Node.js 22 and pnpm 10; a clean checkout of this branch; `pnpm install`.
+2. **Action:** `pnpm package:win` from the repository root.
+3. **Expected:** it ends without errors and `apps\desktop\release\Tagalong-Setup-0.0.0-x64.exe` exists
+   (about 125 MB). The log shows "fetching the get-windows binding for win32-x64" succeeding and
+   "skipped dependencies rebuild reason=npmRebuild is set to false". In
+   `apps\desktop\release\win-unpacked\resources` there are `app.asar`, `app.asar.unpacked` (holding
+   `better-sqlite3\prebuilds\win32-x64.node` and `get-windows\lib\binding\napi-9-win32-unknown-x64`)
+   and `extension`.
+
+### 7.14. Install on a fresh Windows machine _(Phase 7 acceptance 1)_
+
+1. **Setup:** a Windows machine or Windows Sandbox that has never run Tagalong, with no Node.js and no
+   terminal open. Copy the installer from 7.13 onto it.
+2. **Action:** double-click the installer. If SmartScreen appears, **More info → Run anyway**. Keep the
+   default folder, finish, and complete the wizard with an OpenRouter key through 7.10.
+3. **Expected:** no administrator prompt. Tagalong installs to
+   `%LOCALAPPDATA%\Programs\Tagalong`, adds Start menu and desktop shortcuts, and starts when the
+   installer finishes. The wizard opens, and a first answer arrives — all without a terminal.
+
+### 7.15. Native modules work in the installed app _(task 71 acceptance)_
+
+1. **Setup:** the installed app from 7.14.
+2. **Action:** (a) ask Scout "remember that my favourite colour is teal", quit from the tray, start
+   Tagalong from the Start menu, ask "what is my favourite colour?". (b) Put Notepad beside a browser,
+   click into Notepad, press `Ctrl+Shift+S` and ask "which app am I in?".
+3. **Expected:** (a) "teal" — conversations and memories persist, so SQLite (`better-sqlite3`) loaded
+   from the packaged app. (b) The sight bar names Notepad and the screenshot is of the Notepad window,
+   not the whole screen — the active-window binding (`get-windows`) loaded. Selecting text and pressing
+   `Ctrl+Shift+Space` shows the selection, so the selection helper (`libnut`) loaded.
+
+### 7.16. Uninstall keeps your data; reinstall picks it up
+
+1. **Setup:** the installed app with a conversation in it.
+2. **Action:** quit Tagalong, uninstall it from **Settings → Apps**, then install it again.
+3. **Expected:** the uninstall removes the program folder and shortcuts but leaves
+   `%APPDATA%\Tagalong`. After reinstalling, the wizard does not open (it was finished), and the pets,
+   keys and history are as before.
+
+## Demo run: the hackathon story
+
+A short end-to-end run of the story the hackathon demo tells. Run it on the installed app, with an
+OpenRouter key and a Token Factory key at hand. Tick each line.
+
+- [ ] **Install and set up.** Install from the NSIS installer (7.14). In the wizard paste both keys;
+      crew: Scout on Token Factory `nvidia/nemotron-3-super-120b-a12b`, Bolt on Token Factory
+      `nvidia/Nemotron-Nano-V2-12b`, Ink on OpenRouter `anthropic/claude-sonnet-5`. Finish with **Ask
+      Scout something**.
+- [ ] **Nemotron on Token Factory.** Select a paragraph anywhere, press `Ctrl+Shift+Space`, ask Scout
+      to explain it. The answer is labelled `Scout · nvidia/nemotron-3-super-120b-a12b`.
+- [ ] **Vision routing.** Press `Ctrl+Shift+S` and ask Scout "what is on my screen?". It describes
+      the screen with no "cannot see images" warning: Super handed the picture to Nemotron Nano 2 VL
+      (the Token Factory usage page shows the Nano VL call).
+- [ ] **Crew roundtable on mixed models.** Type `/crew What should I build next?`. Three answers
+      labelled with three models from two providers, each reacting to the others, then a synthesis by
+      Scout; the footer reads "4 model calls".
+- [ ] **Handoff.** Type `@Ink turn that into a short announcement`. A handoff bubble, then Ink's draft
+      on Claude.
+- [ ] **Watch mode on Nemotron Nano.** In `cmd` run `ping -n 45 127.0.0.1 && echo BUILD DONE`, then ask
+      Scout "tell me when this command finishes". The Watching chip names
+      `nvidia/nemotron-3-nano-30b-a3b`; within ten seconds of `BUILD DONE` a card and a Windows
+      notification arrive after a handful of checks.
+- [ ] **Chrome.** In the side panel on an article, ask Scout "summarise this page". The summary is of
+      that article.
+- [ ] **Privacy.** Press `Ctrl+Shift+Alt+P`: the pets' eye turns grey and a look is refused. Press it
+      again to resume.
+
+## Not in this build
+
+These appear in the plan but are not built; do not test them here.
+
+- **Voice (Phase 3).** No push to talk, no spoken answers, no microphone or speaker step in the
+  wizard. Reply style and voice id save but change nothing; watch alerts are shown, not spoken.
+- **Hands (Phase 5).** No MCP tools, no tool allowlists beyond the built-in perception and crew tools,
+  no approval cards, no action log.
+- **macOS and Linux platform code (tasks 67, 68).** The app stops at launch on both; the dmg, AppImage
+  and deb configs exist but are unverified.
+- **Cost dashboard (task 72).** The panel counts model calls per run and the sight bar estimates image
+  tokens, but there is no per-pet, per-day usage view or price table.

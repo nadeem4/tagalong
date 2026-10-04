@@ -358,3 +358,18 @@ describe('Settings.watch', () => {
     ).toBe(false);
   });
 });
+
+describe('Settings.onboarding', () => {
+  it('starts not done, so a fresh install opens the setup wizard', () => {
+    expect(Settings.parse({}).onboarding).toEqual({ done: false });
+  });
+
+  it('parses a settings file written before onboarding existed', () => {
+    expect(Settings.parse({ hiddenPets: [] }).onboarding.done).toBe(false);
+  });
+
+  it('rides in a patch alone, so finishing the wizard touches nothing else', () => {
+    const patch = SettingsPatch.parse({ onboarding: { done: true } });
+    expect(patch).toEqual({ onboarding: { done: true } });
+  });
+});

@@ -3,7 +3,13 @@ import type { IpcRendererEvent } from 'electron';
 import type { ContextSnapshot, PerceptionTarget, Pet, SettingsPatch } from '@tagalong/protocol';
 import type { AskInput, HostBridge, TurnEvent } from '@tagalong/ui';
 import { IPC } from '../shared/ipc';
-import type { CaptureNotice, HostView, ModelList, TagalongHostApi } from '../shared/ipc';
+import type {
+  CaptureNotice,
+  CrewChoice,
+  HostView,
+  ModelList,
+  TagalongHostApi,
+} from '../shared/ipc';
 
 /**
  * The renderer's entire view of the outside world.
@@ -73,6 +79,13 @@ const host: TagalongHostApi = {
   listModels: (providerId: string) =>
     ipcRenderer.invoke(IPC.listModels, providerId) as Promise<ModelList>,
   openSettings: () => ipcRenderer.invoke(IPC.openSettings) as Promise<void>,
+  openOnboarding: () => ipcRenderer.invoke(IPC.openOnboarding) as Promise<void>,
+  finishOnboarding: (openPanel: boolean) =>
+    ipcRenderer.invoke(IPC.finishOnboarding, openPanel) as Promise<void>,
+  applyCrew: (choices: Record<string, CrewChoice>) =>
+    ipcRenderer.invoke(IPC.applyCrew, choices) as Promise<Pet[]>,
+  openLink: (url: string) => ipcRenderer.invoke(IPC.openLink, url) as Promise<void>,
+  showExtensionFolder: () => ipcRenderer.invoke(IPC.showExtensionFolder) as Promise<void>,
   hidePanel: () => ipcRenderer.invoke(IPC.hidePanel) as Promise<void>,
   togglePanel: () => ipcRenderer.invoke(IPC.togglePanel) as Promise<void>,
 };

@@ -99,6 +99,11 @@ export const SETTINGS_DEFAULTS = {
   rollingMemory: { enabled: false, minutes: 10 },
   /** Phase 3B. The phase plan's caps: 60 model checks a watch, 3 watches at once. */
   watch: { maxChecks: 60, maxConcurrent: 3, defaultTimeoutMinutes: 30 },
+  /**
+   * Phase 7. Whether the first-run setup wizard has been finished or skipped. A settings
+   * file from before the wizard reads as not done, so an existing install sees it once.
+   */
+  onboarding: { done: false },
 } as const;
 
 /** A non-blank, trimmed entry. A blank one would match every window and blind the pet. */
@@ -248,6 +253,8 @@ const settingsFields = {
       .min(1)
       .max(24 * 60),
   }),
+  /** Phase 7. Set when the setup wizard is finished or skipped; Settings can rerun it. */
+  onboarding: z.object({ done: z.boolean() }),
 };
 
 export const Settings = z.object({
@@ -275,6 +282,7 @@ export const Settings = z.object({
   hiddenPets: settingsFields.hiddenPets.prefault([...SETTINGS_DEFAULTS.hiddenPets]),
   rollingMemory: settingsFields.rollingMemory.prefault({ ...SETTINGS_DEFAULTS.rollingMemory }),
   watch: settingsFields.watch.prefault({ ...SETTINGS_DEFAULTS.watch }),
+  onboarding: settingsFields.onboarding.prefault({ ...SETTINGS_DEFAULTS.onboarding }),
 });
 export type Settings = z.infer<typeof Settings>;
 

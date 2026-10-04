@@ -18,7 +18,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "dev:desktop": "pnpm --filter @tagalong/desktop dev"
+    "dev:desktop": "pnpm --filter @tagalong/desktop dev",
+    "package:win": "pnpm build && pnpm --filter @tagalong/desktop package:win",
+    "package:mac": "pnpm build && pnpm --filter @tagalong/desktop package:mac",
+    "package:linux": "pnpm build && pnpm --filter @tagalong/desktop package:linux"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -36,6 +39,7 @@
   "pnpm": {
     "ignoredBuiltDependencies": [
       "better-sqlite3",
+      "electron-winstaller",
       "esbuild",
       "get-windows"
     ]

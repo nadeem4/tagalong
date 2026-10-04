@@ -11,6 +11,7 @@ import type { SecretStore } from './settings/settings';
 import {
   ANTHROPIC_MODELS,
   FAKE_MODELS,
+  KeyedProviderResolver,
   OpenAiCompatibleProvider,
   SECRET_KEYS,
   createProvider,
@@ -38,40 +39,6 @@ async function readKey(secrets: SecretStore, providerId: string): Promise<string
   if (secretKey === undefined) return undefined;
   const value = await secrets.get(secretKey);
   return value !== null && value.length > 0 ? value : undefined;
-}
-
-/**
- * Builds each pet's provider the first time a turn needs it, then reuses it.
- *
- * Keys are read once, at boot: a key saved in Settings applies from the next launch,
- * which is what the settings window already promises. Base URLs are read when a
- * provider is first built. A provider that cannot be built — no key, an unknown id — is
- * not cached, so the error is raised on the turn that hit it and reported as that
- * turn's `turn.error` rather than failing boot for every pet.
- */
-async function providerResolver(
-  secrets: SecretStore,
-  settings: SettingsStore,
-  env: Record<string, string | undefined> | undefined,
-): Promise<ProviderResolver> {
-  const keys = new Map<string, string>();
-  for (const providerId of Object.keys(SECRET_KEYS)) {
-    const value = await readKey(secrets, providerId);
-    if (value !== undefined) keys.set(providerId, value);
-  }
-  const built = new Map<string, BrainProvider>();
-  return (pet) => {
-    const cached = built.get(pet.providerId);
-    if (cached !== undefined) return cached;
-    const provider = createProvider({
-      providerId: pet.providerId,
-      apiKey: keys.get(pet.providerId),
-      baseURL: settings.get().providerBaseUrls[pet.providerId],
-      env,
-    });
-    built.set(pet.providerId, provider);
-    return provider;
-  };
 }
 
 /**
@@ -165,9 +132,19 @@ export class Engine {
     pets.seedDefaults();
 
     const current = settings.get();
-    // Each pet names its own provider, so there is no single brain to build at boot.
-    const provider =
-      options.provider ?? (await providerResolver(options.secretStore, settings, options.env));
+    // Each pet names its own provider, so there is no single brain to build at boot. Keys
+    // are re-read before every ask, so one saved while the app runs answers the next turn.
+    const keyed =
+      options.provider === undefined
+        ? new KeyedProviderResolver({
+            secrets: options.secretStore,
+            baseUrl: (providerId) => settings.get().providerBaseUrls[providerId],
+            env: options.env,
+          })
+        : null;
+    await keyed?.refresh();
+    const provider: BrainProvider | ProviderResolver =
+      options.provider ?? ((pet: Pet) => keyed!.resolve(pet));
 
     const store = new ConversationStore(db);
     const memory = new MemoryStore(db);
@@ -228,6 +205,7 @@ export class Engine {
       settings,
       hosts,
       watches,
+      refreshProviders: async () => keyed?.refresh(),
       models: (providerId) =>
         listModels(providerId, options.secretStore, settings, options.env ?? process.env),
     });
@@ -298,13 +276,16 @@ function buildHandlers(parts: {
   hosts: () => readonly PerceptionHost[];
   watches: WatchManager;
   models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
+  /** Re-reads provider keys, so a key saved since the last ask is used by this one. */
+  refreshProviders: () => Promise<void>;
 }): MethodHandlers {
-  const { runner, store, emit, pets, settings, models, hosts, watches } = parts;
+  const { runner, store, emit, pets, settings, models, hosts, watches, refreshProviders } = parts;
 
   return {
     ask: async (params) => {
       const pet = pets.get(params.petId);
       if (pet === null) throw new Error(`no pet with id '${params.petId}'`);
+      await refreshProviders();
       // A desktop hotkey pressed in a browser gets the extension's exact selection and the
       // page text, when the extension answers within half a second.
       const snapshot = await browserContextFor(params.snapshot, {

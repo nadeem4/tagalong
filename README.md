@@ -1,38 +1,195 @@
 # Tagalong
 
-Tagalong is a desktop screen companion: a crew of AI pets that tag along on your screen. They see what
-you are looking at, answer in text or voice, remember context, talk to each other, and act on your
-behalf through MCP tools you approve. They never take over your mouse or keyboard.
+Tagalong is a desktop screen companion: a crew of AI pets that tag along on your screen. Press a key
+and the pet you are talking to reads what you selected, looks at your screen, or reads the page you
+are on in Chrome, then answers in a panel beside it. Pets remember what you tell them, hand work to
+each other, and can watch the screen for you. They never take over your mouse or keyboard.
 
-- Canonical plan, phase instructions, task board, and decisions:
-  <https://app.notion.com/p/3d809730490481a4be8ac5bd000b8bfc>
-- Local design copy: [docs/specs/2026-09-11-tagalong-design.md](docs/specs/2026-09-11-tagalong-design.md)
-- Architecture: [docs/architecture.md](docs/architecture.md)
+- [Using Tagalong](#using-tagalong): install it, set it up, and use it. Start here.
+- [Developer guide](#developer-guide): build, test and package it from source.
+- Canonical plan, task board and decisions: <https://app.notion.com/p/3d809730490481a4be8ac5bd000b8bfc>
+- Design: [docs/specs/2026-09-11-tagalong-design.md](docs/specs/2026-09-11-tagalong-design.md) ·
+  Architecture: [docs/architecture.md](docs/architecture.md) · Test guide:
+  [docs/testing/feature-test-guide.md](docs/testing/feature-test-guide.md)
 
-**Status: Phases 0 (Setup), 1 (Foundation), 2 (Sight) and 2B (Full View) are complete. Phase 6
-(Browser Host) is built and awaiting its by-hand Chrome run — it runs fifth, not ninth, because the
-browser is where the desktop host cannot read exactly. See [the extension](#the-chrome-extension)
-and [docs/acceptance/phase-6.md](docs/acceptance/phase-6.md). Phase 3B (Awareness) — rolling memory
-and watches — is built and awaiting its Windows run; see [Awareness](#awareness-rolling-memory-and-watches)
-and [docs/acceptance/phase-3b.md](docs/acceptance/phase-3b.md).**
+## What is in this build
 
-Phase 1 shipped the whole text path end to end on Windows: the protocol package, the engine with
-SQLite-backed conversations, the Anthropic and fake brain providers, the loopback JSON-RPC server with
-pairing, the shared React components, and the Electron host with a tray, a global hotkey, a draggable
-avatar, a chat panel, and a settings window.
+| In this build                                                                                       | Not in this build                                                   |
+| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Windows desktop app with a setup wizard and an NSIS installer                                       | macOS and Linux (the installer configs exist but are unverified)    |
+| Three providers: OpenRouter (Claude), Nebius Token Factory (NVIDIA Nemotron), Anthropic             | Voice: push to talk and spoken answers                              |
+| Sight: selection, screenshot, every display, every open window, window text, capture exclusions     | Hands: MCP tools and approval cards                                 |
+| Vision routing: a text-only Nemotron pet reads pictures with Nemotron Nano 2 VL                     | A cost dashboard                                                    |
+| The crew: Scout, Ink and Bolt, handoff with `@Name`, pets consulting each other, `/crew` roundtable | Data export and delete-all in Settings                              |
+| Memory across restarts, rolling screen memory (opt-in), watches ("tell me when this finishes")      | Code signing (the installer is unsigned) and an app icon of its own |
+| The Chrome extension: the same crew in Chrome's side panel, reading the page you are on             |                                                                     |
 
-Phase 2 added sight: screenshots of the active window, vision in the prompt, the capture exclusion
-list, and a visible indicator on every capture.
+# Using Tagalong
 
-Phase 2B widened that to what the user cannot see — every display at once, and every open window
-including the ones behind others and the ones minimized to the taskbar. It shipped multi-display
-capture with a composite laid out by monitor geometry, the protocol schemas, the window inventory,
-the UI Automation text layer that reads a background or minimized window without photographing it,
-the see-everything hotkey and its attach policy, the five built-in tools a pet reaches all of it
-with, one pause gate over every capture path, and the settings that control what a look costs. The
-OCR fallback is deferred rather than built: `look_closer` already reaches the windows it was for,
-without OCR's recognition errors. Sign-off and the items that need a human at a real desktop are in
-[docs/acceptance/phase-2b.md](docs/acceptance/phase-2b.md).
+## Install
+
+**Windows installer.** Run `Tagalong-Setup-<version>-x64.exe`. It installs for your user only, so it
+needs no administrator rights, and it starts Tagalong when it finishes. The installer is not code
+signed yet, so Windows SmartScreen may say "Windows protected your PC": click **More info**, then
+**Run anyway**. Uninstalling from **Settings → Apps** keeps your settings and conversations in
+`%APPDATA%\Tagalong`; delete that folder too to remove everything.
+
+To build the installer yourself, on Windows with Node.js 22 and pnpm 10:
+
+```powershell
+pnpm install
+pnpm package:win     # writes apps\desktop\release\Tagalong-Setup-0.0.0-x64.exe
+```
+
+**From source.** With Node.js 22 and pnpm 10 (see [How to run](#how-to-run) for getting pnpm):
+
+```powershell
+pnpm install
+pnpm dev:desktop
+```
+
+Tagalong lives in the system tray. Its pets sit on the desktop as a small strip of avatars you can
+drag anywhere.
+
+## First run: the setup wizard
+
+The first time Tagalong starts, a setup wizard walks you through everything, one step at a time.
+Every step can be skipped with **Skip setup**, and you can run the wizard again from the tray menu
+(**Setup wizard**) or from **Settings → Run the setup wizard again**.
+
+1. **Welcome.** What Tagalong does and the privacy promise (also below, in [Privacy](#privacy)).
+2. **Choose a provider.** Pick OpenRouter, Nebius Token Factory or Anthropic, click **Get an API key** to
+   open that provider's key page in your browser, and paste the key. You can paste keys for more than
+   one; the crew can mix providers. Keys go straight into the operating system's keychain.
+3. **Meet your crew.** Scout explains, Ink writes, Bolt reads errors and code. Pick a provider and a
+   model for each one. The model box lists the provider's live models as soon as the key is stored.
+4. **Hotkeys.** The four keys to remember, and the crew commands.
+5. **Rolling memory (optional).** Let Tagalong remember the last few minutes of the screen, in memory
+   only.
+6. **Chrome extension (optional).** Where the extension is and the pairing token to paste into it.
+7. **Done.** Press **Ask Scout something** to open the panel and ask your first question.
+
+A key saved in the wizard or in Settings works on the very next question. No restart is needed.
+
+## Providers and keys
+
+Each pet runs on one provider and one model, and each provider needs its own API key. Keys are
+entered in the wizard or in Settings, encrypted with the OS keychain, and only ever sent to the
+provider they belong to.
+
+| Setup                               | Where to get the key                                                                                                       | Model ids                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **OpenRouter + Claude**             | [openrouter.ai/keys](https://openrouter.ai/keys)                                                                           | OpenRouter's catalog at [openrouter.ai/models](https://openrouter.ai/models), for example `anthropic/claude-sonnet-5` or `anthropic/claude-haiku-4.5`. The wizard and Settings list them live.                                                                                                                                |
+| **Nebius Token Factory + Nemotron** | [tokenfactory.nebius.com](https://tokenfactory.nebius.com/), under API keys                                                | Token Factory's model list (`GET https://api.tokenfactory.nebius.com/v1/models`, shown live once the key is stored): `nvidia/nemotron-3-super-120b-a12b` (Nemotron 3 Super, text), `nvidia/Nemotron-Nano-V2-12b` (Nemotron Nano 2 VL, sees pictures), `nvidia/nemotron-3-nano-30b-a3b` (Nemotron 3 Nano, cheap watch checks). |
+| **Anthropic**                       | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) (an API key, not a Claude subscription) | `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5`.                                                                                                                                                                                                                                                                       |
+
+The two Nemotron ids marked as seeing and watching above could not be checked against the live list
+when they were written. If a pet answers "model not found", open Settings and pick the id from the
+live list next to the model box: it is the authority.
+
+**Pictures on a text-only model.** Nemotron 3 Super cannot see. A pet on it gets a **vision model**
+(Nemotron Nano 2 VL by default), and any turn that carries a screenshot goes there instead. Claude sees
+on its own and needs no vision model.
+
+Any other OpenAI-compatible service also works: in Settings, put its base URL in one of the base URL
+boxes, store its key there, and type its model id on the pet.
+
+## Hotkeys
+
+| Key                | What it does                                                                          |
+| ------------------ | ------------------------------------------------------------------------------------- |
+| `Ctrl+Shift+Space` | **Ask.** Opens the panel with the text you have selected and the active window's name |
+| `Ctrl+Shift+S`     | **Look.** The same, plus a screenshot of the active window                            |
+| `Ctrl+Shift+Alt+S` | **See everything.** Every screen, plus a list of every open window                    |
+| `Ctrl+Shift+Alt+P` | **Pause sight.** Nothing is read until you press it again (also in the tray)          |
+| `Alt+Shift+Space`  | In Chrome, with the extension: opens the side panel with your selection               |
+
+Escape or clicking elsewhere hides the panel. Every key can be changed in Settings, and the change
+works at once. The bigger the look, the more it costs: a screenshot adds roughly 1,500 input tokens.
+
+## Pets and the crew
+
+A fresh install has three pets. Click one on the strip to talk to it.
+
+| Pet      | Good at                               |
+| -------- | ------------------------------------- |
+| 🔎 Scout | Explaining what is on your screen     |
+| ✒️ Ink   | Writing and rewriting in your voice   |
+| ⚡ Bolt  | Reading errors, stack traces and code |
+
+- **Hand off.** Start a message with `@Ink` (or any pet's name) and that pet takes over, with a
+  summary of the conversation so far. **Hand off…** under an answer does the same.
+- **Ask another pet.** A pet may consult another one mid-answer when it knows better; a small card in
+  the panel says who it asked.
+- **The roundtable.** Start a message with `/crew` (or press **Crew**) and every pet answers in turn,
+  seeing the others' answers, and the pet you asked closes with a summary. Pets on different
+  providers and models think differently, which is the point. A roundtable of three costs four model
+  calls; the panel footer counts them.
+- **Memory.** Tell a pet "I prefer short answers" and it remembers across restarts.
+
+Settings edits every pet (name, emoji, colour, persona, provider, model), adds and deletes pets, and
+chooses which ones sit on the desktop.
+
+## The Chrome extension
+
+The extension puts the same crew in Chrome's side panel and lets a pet read the exact page you are
+on. It needs the desktop app running.
+
+1. Open `chrome://extensions` and turn on **Developer mode**.
+2. Click **Load unpacked** and choose the extension folder. The installer ships it in
+   `%LOCALAPPDATA%\Programs\Tagalong\resources\extension` (the wizard's **Show folder** button opens
+   it). From source, build it with `pnpm --filter @tagalong/extension build` and choose
+   `apps/extension/dist`.
+3. Copy the pairing token from the wizard or from **Settings → Browser extension**, paste it into the
+   extension's options page, and click **Save and connect**.
+
+Then click the toolbar button, or select text and press `Alt+Shift+Space`. More in
+[The Chrome extension](#the-chrome-extension-in-detail).
+
+## Watch mode and rolling memory
+
+- **Watches.** Ask "tell me when this finishes" and the pet watches the screen for you. Tagalong
+  compares the screen on your machine every five seconds and only asks a small, cheap model (Nemotron 3
+  Nano on Token Factory, Claude Haiku elsewhere) once something changed and settled. When it happens
+  you get a notification and a card in the panel. A **Watching** chip shows the checks spent and has
+  **Stop**.
+- **Rolling memory** (off by default; turn it on in the wizard or **Settings → Awareness**). Tagalong
+  keeps a small picture of each screen every five seconds, in memory only, for the last ten minutes,
+  so you can ask "what was I reading five minutes ago?". A red dot on the pets shows while it
+  records.
+
+## Privacy
+
+- Nothing is read until you press a hotkey or ask, except rolling memory and watches, which you turn
+  on. Every look badges the pets and the tray says what was read and when.
+- Password managers, the Windows security prompt and the lock screen are never captured. The list is
+  editable.
+- Screenshots are not written to disk. Rolling memory and watches live in memory only and are thrown
+  away when you pause sight or quit.
+- What you ask goes only to the provider your pet runs on. There is no Tagalong server.
+- API keys are encrypted with the OS keychain.
+- `Ctrl+Shift+Alt+P` pauses all sight at once.
+
+The full detail is in [Privacy in detail](#privacy-in-detail).
+
+## Troubleshooting
+
+| Problem                                                        | What to do                                                                                                                                         |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A pet says "No … API key is stored"                            | Paste that provider's key in the wizard or Settings. It works on the next question.                                                                |
+| A pet says the model was not found, or the provider refused it | Open Settings and pick the model from the live list next to the pet's model box.                                                                   |
+| The pet ignores the screenshot, or warns it cannot see         | Its model is text-only. Give it a vision model in Settings (Nemotron Nano 2 VL on Token Factory) or move it to Claude.                             |
+| A hotkey does nothing                                          | Settings and the panel name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).               |
+| The Chrome side panel says "Disconnected"                      | The desktop app must be running. If it is, copy the pairing token again from Settings and paste it into the extension's options.                   |
+| "Windows protected your PC" when installing                    | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                               |
+| You want the wizard again                                      | Tray → **Setup wizard**, or Settings → **Run the setup wizard again**.                                                                             |
+| You want to start over                                         | Quit Tagalong and delete `%APPDATA%\Tagalong`. That removes settings, conversations, memories and stored keys; the wizard opens on the next start. |
+| From source, a look always captures the whole screen           | The active-window helper was not downloaded: run `node apps/desktop/scripts/fetch-native.mjs`. The installer already includes it.                  |
+| It does not start on macOS or Linux                            | Not in this build: only Windows has a platform adapter so far.                                                                                     |
+
+# Developer guide
+
+Everything below is for building, testing and packaging Tagalong from source.
 
 ## Repository layout
 
@@ -78,14 +235,17 @@ tagalong/
     desktop/
       electron.vite.config.ts       # main / preload / renderer builds
       playwright.config.ts
+      electron-builder.json         # installer config: NSIS (Windows), dmg, AppImage, deb
       scripts/ensure-electron.mjs   # fetches the Electron binary
+      scripts/fetch-native.mjs      # fetches get-windows' prebuilt binding before packaging
       e2e/smoke.spec.ts
       src/main/                     # index.ts, engine-host.ts, engine-client.ts, context.ts,
-                                    # hotkeys.ts, secret-store.ts, tray-icon.ts, platform/, windows/
+                                    # hotkeys.ts, secret-store.ts, tray-icon.ts, onboarding.ts,
+                                    # links.ts, platform/, windows/
       src/main/platform/            # capture, downscale, composite, canvas, label, displays,
                                     # window-helper, window-list, selection, win32
       src/preload/index.ts          # exposes window.tagalong and window.tagalongHost
-      src/renderer/                 # avatar/panel/settings HTML, src/*.tsx, app.css
+      src/renderer/                 # avatar/panel/settings/onboarding HTML, src/*.tsx, app.css
       src/shared/ipc.ts             # IPC channel names and the host-only API type
     extension/                      # Chrome MV3 host, built by Vite into dist/ (load unpacked)
       src/manifest.ts               # the manifest as data; the build writes dist/manifest.json
@@ -131,6 +291,9 @@ pnpm test            # Vitest across every package and app
 pnpm test:coverage   # Vitest with v8 coverage; packages/core and packages/protocol must stay above 70%
 pnpm build           # build every package (tsc -b, and electron-vite for the desktop app)
 pnpm dev:desktop     # run the Electron host in development
+pnpm package:win     # build everything, then the Windows NSIS installer (run on Windows)
+pnpm package:mac     # dmg — configured, not verified
+pnpm package:linux   # AppImage and deb — configured, not verified
 ```
 
 Inside `apps/desktop`:
@@ -140,7 +303,36 @@ pnpm build            # ensure-electron, then electron-vite build into dist/
 pnpm start            # ensure-electron, then electron-vite preview against the built output
 pnpm test:e2e         # ensure-electron, electron-vite build, then the Playwright smoke suite
 pnpm ensure-electron  # fetch the Electron binary on its own
+pnpm package:win      # fetch-native, electron-vite build, electron-builder --win nsis
+pnpm package:dir      # an unpacked app in release/, for checking what gets packaged
 ```
+
+### Packaging
+
+`apps/desktop/electron-builder.json` drives every installer; the output lands in
+`apps/desktop/release/`.
+
+- **Windows (the one that matters).** A per-user NSIS installer for x64: no admin rights, a choice of
+  folder, Start menu and desktop shortcuts, and Tagalong starts when it finishes. Build it on Windows
+  with `pnpm package:win` from the root. It is unsigned; signing needs a certificate and the
+  `CSC_LINK` / `CSC_KEY_PASSWORD` variables electron-builder reads, which a personal build can skip.
+- **Native modules are not rebuilt.** `better-sqlite3` 13 and nut-js's `libnut` ship N-API binaries,
+  which load in Electron unchanged (checked: the packaged app opens SQLite 3.53.4 on Electron 44), so
+  `npmRebuild` is off and no C++ toolchain is ever needed. Every `.node` file is unpacked out of
+  `app.asar`, where Node cannot load it. `get-windows`' Windows binary is downloaded by
+  `scripts/fetch-native.mjs`, because pnpm skips the install script that normally fetches it.
+- **Only the native modules are packaged.** The workspace packages are bundled into `dist/` by
+  electron-vite, so they are `devDependencies`; the desktop's `dependencies` are exactly the three
+  native modules electron-builder copies.
+- **The Chrome extension ships inside.** `apps/extension/dist` is copied to `resources/extension`, so
+  someone with only the installer can still load it unpacked. `pnpm package:win` from the root builds
+  it first.
+- **macOS dmg and Linux AppImage/deb are configured but unverified**, and would not run anyway: there
+  is no macOS or Linux platform adapter in this build.
+- CI does not build the installer yet. The two workflow steps that would (build it on
+  `windows-latest`, upload it as the `tagalong-windows-installer` artifact) are in
+  [docs/acceptance/phase-7.md](docs/acceptance/phase-7.md#ci-steps-for-the-installer), to be added to
+  `.github/workflows/ci.yml` by hand.
 
 Quit any running Tagalong before `pnpm test:e2e`. The main process takes a single-instance lock, so a
 second copy quits immediately and Playwright reports the confusing
@@ -166,7 +358,8 @@ TAGALONG_FAKE_PROVIDERS=1 pnpm dev:desktop
 PowerShell has no inline `VAR=value command` prefix; pasting the bash line into PowerShell fails with
 `TAGALONG_FAKE_PROVIDERS=1 : The term ... is not recognized`.
 
-Two things are worth knowing before the first run.
+On a fresh profile the setup wizard opens first; **Skip setup** closes it for good, and the tray's
+**Setup wizard** item brings it back. Two more things are worth knowing before the first run.
 
 **`ensure-electron`.** Electron 44.3.0 publishes no npm install script, so `pnpm install` unpacks the
 package without ever downloading the platform binary, and the first launch dies with an error that
@@ -206,7 +399,8 @@ Nano VL. On OpenRouter every model is treated as seeing, so a Claude pet answers
 model and needs no vision model. A pet with no model that can see never sends pixels: the screenshot
 is dropped with a warning.
 
-A pet's provider and model apply on its next ask. A new key or base URL applies after a restart.
+A pet's provider and model apply on its next ask, and so does a new key or base URL: the engine
+re-reads the keychain before every ask, so no restart is needed.
 
 The Nemotron Nano 2 VL id (`nvidia/Nemotron-Nano-V2-12b`) and the OpenRouter fallback ids could not be
 checked when they were written; they live in `packages/core/src/providers/nebius-models.ts` and
@@ -355,7 +549,7 @@ programs on this one. Without the token, any local program could drive the user'
 conversations, and spend their API budget. Comparison is constant-time, because a plain `===` leaks
 the length of the shared prefix through timing.
 
-## The Chrome extension
+## The Chrome extension in detail
 
 The extension is a second host for the same engine: same pets, same memory, same settings. It gives
 pets the **exact** selection and the readable text of the page you are on, and puts the crew in
@@ -412,17 +606,19 @@ any tab when I ask** on its options page. It still reads nothing until you ask.
 Nothing reads `.env.local` today: there is no dotenv dependency, and no code in `packages/` or `apps/`
 opens a `.env` file. Copying it therefore changes nothing at runtime.
 
-The only environment variable read today is `TAGALONG_FAKE_PROVIDERS`, read straight from `process.env`
-in `packages/core/src/providers/registry.ts`. **Set it in the shell you launch from**, as shown above.
+Two environment variables are read today, both straight from `process.env`: `TAGALONG_FAKE_PROVIDERS`
+in `packages/core/src/providers/registry.ts`, and `TAGALONG_SKIP_ONBOARDING` in
+`apps/desktop/src/main/onboarding.ts`. **Set them in the shell you launch from**, as shown above.
 
-| Variable                    | Status today                                                                                                                                            |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TAGALONG_FAKE_PROVIDERS=1` | **Read.** Forces the fake brain provider, for tests and demos. No keys or network needed. Must be set in the shell environment.                         |
-| `ANTHROPIC_API_KEY`         | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment. |
-| `OPENROUTER_API_KEY`        | **Not read.** The key for the `openrouter` provider, entered in Settings and stored like the Anthropic key.                                             |
-| `NEBIUS_API_KEY`            | **Not read.** The key for the `nebius` provider (Token Factory), entered in Settings and stored like the Anthropic key.                                 |
-| `ELEVENLABS_API_KEY`        | **Not used yet.** Text to speech through the ElevenLabs TtsProvider, from Phase 3.                                                                      |
-| `OPENAI_API_KEY`            | **Not used yet.** Whisper speech to text only, from Phase 3.                                                                                            |
+| Variable                     | Status today                                                                                                                                            |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TAGALONG_FAKE_PROVIDERS=1`  | **Read.** Forces the fake brain provider, for tests and demos. No keys or network needed. Must be set in the shell environment.                         |
+| `TAGALONG_SKIP_ONBOARDING=1` | **Read.** Keeps the setup wizard shut. The Electron smoke tests set it; a person uses **Skip setup** instead.                                           |
+| `ANTHROPIC_API_KEY`          | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment. |
+| `OPENROUTER_API_KEY`         | **Not read.** The key for the `openrouter` provider, entered in Settings and stored like the Anthropic key.                                             |
+| `NEBIUS_API_KEY`             | **Not read.** The key for the `nebius` provider (Token Factory), entered in Settings and stored like the Anthropic key.                                 |
+| `ELEVENLABS_API_KEY`         | **Not used yet.** Text to speech through the ElevenLabs TtsProvider, from Phase 3.                                                                      |
+| `OPENAI_API_KEY`             | **Not used yet.** Whisper speech to text only, from Phase 3.                                                                                            |
 
 Secrets never enter git. In the app they live in the OS keychain through Electron `safeStorage`, written
 as ciphertext to `secrets.json`; if the OS has no encryption backend the store refuses to write at all
@@ -496,10 +692,14 @@ What is still standing, recorded here so nobody rediscovers it.
   focused window as a region and drag-to-select; the window inventory carries no window bounds, so
   the focused window is used for the text-only check and to pick the display instead, and
   drag-to-select is deferred.
+- **The installer is unsigned and uses Electron's default icon.** SmartScreen warns on first run.
+- **Windows only.** The macOS and Linux installers are configured, but there is no platform adapter for
+  either, so the app stops at launch there.
+- **No microphone or speaker step in the setup wizard.** Voice (Phase 3) is not in this build.
 - **Watch alerts are shown, not spoken.** Phase 3 (Voice) is not built; when it lands, `watch.fired`
   should be spoken in the pet's voice.
 
-## Privacy
+## Privacy in detail
 
 ### What is captured, and when
 
@@ -644,10 +844,10 @@ it does not compile.
 ## No computer control
 
 Tagalong never automates the mouse or the keyboard. Pets do not click, type, or drive other
-applications — the system prompt says so explicitly, and forbids claiming otherwise. Everything a pet
-does happens through MCP tools you configure, with a per-pet allowlist: read-only tools run
-automatically, tools that write require a tap on an approval card, and every action is logged. Mouse and
-keyboard automation is out of scope. If it ever arrives, it arrives as an MCP server behind the same
+applications — the system prompt says so explicitly, and forbids claiming otherwise. When Hands
+(Phase 5, not in this build) lands, everything a pet does will happen through MCP tools you configure,
+with a per-pet allowlist: read-only tools run automatically, tools that write require a tap on an
+approval card, and every action is logged. Mouse and keyboard automation is out of scope. If it ever arrives, it arrives as an MCP server behind the same
 approval gate.
 
 The one keyboard event in the repo is the desktop host's Ctrl+C selection trick, scoped to reading the
@@ -664,7 +864,9 @@ order; each one ends with something testable end to end.
 3. **Voice** — push to talk, streaming speech, interruption.
    3B. **Awareness** — rolling memory, `recall_screen` and `what_changed`, watch mode. _(built; spoken
    watch alerts wait for Phase 3)_
-4. **Crew** — multiple pets, memory, handoff, consult, roundtable.
+4. **Crew** — multiple pets, memory, handoff, consult, roundtable. _(built)_
 5. **Hands** — MCP client, allowlists, approval cards, action log.
 6. **Browser Host** — Chrome extension on the same engine. _(built; runs fifth, after 2B)_
-7. **Polish and Cross-platform** — macOS, Linux, onboarding, packaging, cost dashboard.
+7. **Polish and Cross-platform** — macOS, Linux, onboarding, packaging, cost dashboard. _(setup
+   wizard and Windows installer built; macOS, Linux, complete settings, cost dashboard and the
+   release checklist are not in this build)_

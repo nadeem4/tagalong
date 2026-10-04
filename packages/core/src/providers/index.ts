@@ -33,6 +33,7 @@ export {
   NEMOTRON_VISION_MODEL,
 } from './nebius-models';
 export { createProvider, type ProviderConfig } from './registry';
+export { KeyedProviderResolver, type KeyedProviderResolverOptions } from './key-resolver';
 export { carriesImage, modelForTurn } from './vision-routing';
 export { OPENAI_COMPATIBLE_PRESETS, SECRET_KEYS, openAiPreset, type OpenAiPreset } from './presets';
 export {

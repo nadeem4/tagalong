@@ -156,9 +156,9 @@ function PetEditor({
  * saved secret cannot be recovered from a window someone left open.
  *
  * A pet's provider and model apply on its next ask, because the engine looks the pet up
- * per turn. Keys and base URLs are read when a provider is first built, so those two
- * need a restart, and the note under the button says so. Hotkeys are re-registered by
- * main on save, and the sight settings are read per capture.
+ * per turn. Keys are re-read by the engine before every ask and a provider is rebuilt when
+ * its key or base URL changed, so those apply on the next ask too. Hotkeys are
+ * re-registered by main on save, and the sight settings are read per capture.
  */
 function Settings() {
   const [view, setView] = useState<HostView | null>(null);
@@ -280,9 +280,7 @@ function Settings() {
               ),
             },
       );
-      setStatus(
-        'Saved. Pets, hotkeys and sight settings apply now; a new key or base URL needs a restart.',
-      );
+      setStatus('Saved. Everything applies from the next ask, keys and base URLs included.');
       setStatusIsError(false);
     } catch (error) {
       // The builders throw with the field named, so this reaches the user as
@@ -331,7 +329,6 @@ function Settings() {
             deleted default pet does not come back.
           </p>
         )}
-
         <fieldset>
           <legend>Conversation summaries</legend>
           <label>
@@ -357,7 +354,6 @@ function Settings() {
             to the model stays small. Each summary is one model call.
           </p>
         </fieldset>
-
         {keyed.map((choice) => (
           <label key={choice.id}>
             <span>
@@ -373,7 +369,6 @@ function Settings() {
             />
           </label>
         ))}
-
         {presets.map((choice) => (
           <label key={choice.id}>
             <span>{choice.label} base URL (blank for the default)</span>
@@ -388,12 +383,10 @@ function Settings() {
           Any OpenAI-compatible service works: point one of these at its base URL, store its key,
           and give the pet one of its model ids.
         </p>
-
         <label>
           <span>Ask hotkey (text only)</span>
           <input name="askHotkey" defaultValue={settings.hotkeys.ask} />
         </label>
-
         <label>
           <span>Look hotkey (adds a screenshot)</span>
           <input
@@ -401,7 +394,6 @@ function Settings() {
             defaultValue={settings.hotkeys.look ?? SETTINGS_DEFAULTS.hotkeys.look}
           />
         </label>
-
         <label>
           <span>See-everything hotkey (every screen, plus what is open)</span>
           <input
@@ -409,7 +401,6 @@ function Settings() {
             defaultValue={settings.hotkeys.seeEverything ?? SETTINGS_DEFAULTS.hotkeys.seeEverything}
           />
         </label>
-
         <label>
           <span>Pause sight hotkey (turns all looking off and on)</span>
           <input
@@ -417,7 +408,6 @@ function Settings() {
             defaultValue={settings.hotkeys.pauseSight ?? SETTINGS_DEFAULTS.hotkeys.pauseSight}
           />
         </label>
-
         <label>
           <span>What a see-everything look sends</span>
           <select name="sightDetail" defaultValue={settings.sightDetail}>
@@ -432,7 +422,6 @@ function Settings() {
           times the image cost on every look, so the default sends an overview plus the screen you
           are working on and lets the pet ask for another if it needs one.
         </p>
-
         <label>
           <span>Window text budget (characters per window read)</span>
           <input
@@ -450,7 +439,6 @@ function Settings() {
           {Math.round(SETTINGS_DEFAULTS.windowTextBudget / 4)} tokens per window read — raising it
           costs that much more every time, on every read.
         </p>
-
         <fieldset>
           <legend>Awareness</legend>
           <label className="settings__check">
@@ -515,12 +503,12 @@ function Settings() {
             once, {SETTINGS_DEFAULTS.watch.defaultTimeoutMinutes} minutes.
           </p>
         </fieldset>
-
         {view.hotkeyError !== undefined && <p className="settings__error">{view.hotkeyError}</p>}
-
         {view.pairingToken !== undefined && <PairingToken token={view.pairingToken} />}
-
-        <button type="submit">Save</button>
+        <button type="submit">Save</button>{' '}
+        <button type="button" onClick={() => void window.tagalongHost.openOnboarding()}>
+          Run the setup wizard again
+        </button>
         <p className="settings__note">
           Engine {view.engineVersion} on 127.0.0.1:{settings.enginePort}. Keys are encrypted with
           the OS keychain and never written in plain text.
