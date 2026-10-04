@@ -320,6 +320,10 @@ describe('DESKTOP_CAPABILITIES', () => {
     // the read landed, so the assertion flips here and nowhere earlier.
     expect(DESKTOP_CAPABILITIES).toContain('textLayer');
   });
+
+  it('advertises recall, now that perception.recall and perception.diff are answered', () => {
+    expect(DESKTOP_CAPABILITIES).toContain('recall');
+  });
 });
 
 describe('a failed window enumeration', () => {

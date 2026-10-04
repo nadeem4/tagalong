@@ -49,6 +49,12 @@ const host: TagalongHostApi = {
     ipcRenderer.on(IPC.hotkeyProblemEvent, listener);
     return () => void ipcRenderer.off(IPC.hotkeyProblemEvent, listener);
   },
+  getRecording: () => ipcRenderer.invoke(IPC.getRecording) as Promise<boolean>,
+  onRecording: (handler) => {
+    const listener = (_event: IpcRendererEvent, recording: boolean): void => handler(recording);
+    ipcRenderer.on(IPC.recordingEvent, listener);
+    return () => void ipcRenderer.off(IPC.recordingEvent, listener);
+  },
   getHostView: () => ipcRenderer.invoke(IPC.hostView) as Promise<HostView>,
   saveSettings: (patch: SettingsPatch) => ipcRenderer.invoke(IPC.saveSettings, patch),
   saveApiKey: (providerId: string, apiKey: string) =>

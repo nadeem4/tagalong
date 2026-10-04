@@ -3,6 +3,10 @@ import { BrowserWindow, Menu, Tray, app, dialog, ipcMain, screen } from 'electro
 import { ContextSnapshot } from '@tagalong/protocol';
 import type { PerceptionTarget, Pet, Settings, SettingsPatch } from '@tagalong/protocol';
 import { SettingsStore } from '@tagalong/core';
+import { systemClock } from './awareness/clock';
+import { nativeCodec } from './awareness/native-codec';
+import { PerceptionMemory } from './awareness/perception-memory';
+import { RollingMemory } from './awareness/rolling-memory';
 import { captureNotice, captureTooltip } from './capture-notice';
 import { captureAskSnapshot, capturePatch } from './context';
 import { startEngineHost } from './engine-host';
@@ -50,6 +54,10 @@ interface Desktop {
   hotkeyError: string | null;
   /** Whether the user has sight turned off. Read by the platform gate on every read. */
   sightPause: SightPause;
+  /** Phase 3B: the last few minutes of the screen, in memory, opt-in. */
+  rolling: RollingMemory;
+  /** Phase 3B: answers perception.recall and perception.diff. */
+  perceptionMemory: PerceptionMemory;
 }
 
 let desktop: Desktop | null = null;
@@ -80,6 +88,9 @@ app.on('window-all-closed', () => {});
 
 app.on('before-quit', () => {
   desktop?.hotkeys.dispose();
+  // Memory only, and gone on quit: nothing here was ever written anywhere to clean up.
+  desktop?.rolling.dispose();
+  desktop?.perceptionMemory.clear();
   void desktop?.host?.shutdown();
 });
 
@@ -95,6 +106,26 @@ async function start(): Promise<void> {
 
   const settings = settingsStore.get();
 
+  const rolling = new RollingMemory({
+    platform,
+    clock: systemClock,
+    exclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
+    isPaused: () => sightPause.paused,
+    onRecordingChange: (recording) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) window.webContents.send(IPC.recordingEvent, recording);
+      }
+    },
+    log: (message) => console.log(`[rolling-memory] ${message}`),
+  });
+  const perceptionMemory = new PerceptionMemory({
+    rolling,
+    platform,
+    codec: nativeCodec,
+    clock: systemClock,
+    exclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
+  });
+
   let host: EngineHost | null = null;
   let bootError: string | null = null;
   try {
@@ -105,6 +136,8 @@ async function start(): Promise<void> {
       onNotification: forwardToRenderers,
       captureExclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
       onCapture: announceCapture,
+      recall: (params) => perceptionMemory.recall(params),
+      diff: (params) => perceptionMemory.diff(params),
     });
   } catch (error) {
     // A missing API key is the ordinary first run, not a crash. Quitting here would leave
@@ -134,11 +167,18 @@ async function start(): Promise<void> {
     }),
     hotkeyError: null,
     sightPause,
+    rolling,
+    perceptionMemory,
   };
+
+  rolling.configure(settings.rollingMemory);
 
   // The avatar greys its eye and the tray shows a checkmark, so both follow one state
   // rather than each remembering to ask.
   sightPause.onChange((paused) => {
+    // A pause stops rolling memory and drops every frame either ring held.
+    rolling.pauseChanged(paused);
+    if (paused) perceptionMemory.clear();
     for (const window of BrowserWindow.getAllWindows()) {
       window.webContents.send(IPC.sightPauseEvent, paused);
     }
@@ -423,6 +463,7 @@ function registerIpc(): void {
   // A window that opened after the last toggle has missed the event, and an avatar that
   // shows sight running while it is paused is the one lie this feature cannot afford.
   ipcMain.handle(IPC.getSightPaused, () => required().sightPause.paused);
+  ipcMain.handle(IPC.getRecording, () => required().rolling.recording);
   ipcMain.handle(IPC.toggleSightPause, () => {
     required();
     return toggleSightPause();
@@ -469,6 +510,8 @@ function registerIpc(): void {
     current.settings = saved;
     if (patch.hotkeys !== undefined) applyHotkeys(saved);
     if (patch.hiddenPets !== undefined) refreshStrip();
+    // Rolling memory starts, stops or trims the moment the user saves, not after a restart.
+    if (patch.rollingMemory !== undefined) current.rolling.configure(saved.rollingMemory);
     return saved;
   });
 

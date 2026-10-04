@@ -28,6 +28,9 @@ export const IPC = {
   selectPet: 'tagalong:pets:select',
   activePetEvent: 'tagalong:active-pet-event',
   resizeStrip: 'tagalong:avatar:resize-strip',
+  recordingEvent: 'tagalong:recording-event',
+  getRecording: 'tagalong:get-recording',
+  stopWatch: 'tagalong:watch:stop',
 } as const;
 
 /**
@@ -123,6 +126,10 @@ export interface TagalongHostApi {
    * left unwired.
    */
   toggleSightPause(): Promise<boolean>;
+  /** Phase 3B. Whether rolling memory is recording now, for a window that just opened. */
+  getRecording(): Promise<boolean>;
+  /** Phase 3B. Fires when rolling memory starts or stops: the avatar's red dot. */
+  onRecording(handler: (recording: boolean) => void): () => void;
   getHostView(): Promise<HostView>;
   saveSettings(patch: SettingsPatch): Promise<Settings>;
   /** An empty key deletes the stored one. */

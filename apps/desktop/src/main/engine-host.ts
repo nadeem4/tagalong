@@ -1,7 +1,11 @@
 import { app } from 'electron';
 import { Engine } from '@tagalong/core';
 import type { SecretStore } from '@tagalong/core';
-import type { CaptureExclusions } from '@tagalong/protocol';
+import type {
+  CaptureExclusions,
+  PerceptionDiffParams,
+  PerceptionRecallParams,
+} from '@tagalong/protocol';
 import { captureNotice } from './capture-notice';
 import { DESKTOP_CAPABILITIES, capturePatch } from './context';
 import { EngineClient } from './engine-client';
@@ -24,6 +28,9 @@ export interface StartEngineHostOptions {
   captureExclusions: () => CaptureExclusions;
   /** A pet's own tool can ask to look; that capture must be as visible as the hotkey's. */
   onCapture: (notice: CaptureNotice) => void;
+  /** Phase 3B: rolling memory and the watch diff, answered from in-memory frames. */
+  recall: (params: PerceptionRecallParams) => Promise<unknown>;
+  diff: (params: PerceptionDiffParams) => Promise<unknown>;
 }
 
 /**
@@ -75,6 +82,8 @@ export async function startEngineHost(options: StartEngineHostOptions): Promise<
       );
       return patch;
     },
+    recall: options.recall,
+    diff: options.diff,
     onNotification: options.onNotification,
   });
 

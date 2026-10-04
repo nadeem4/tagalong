@@ -18,6 +18,7 @@ function Avatar() {
   const [pets, setPets] = useState<Pet[]>([]);
   const [states, setStates] = useState<Record<string, PetState>>({});
   const [sightPaused, setSightPaused] = useState(false);
+  const [recording, setRecording] = useState(false);
 
   useEffect(() => {
     Promise.all([window.tagalong.listPets(), window.tagalongHost.getHostView()])
@@ -38,6 +39,15 @@ function Avatar() {
       .then(setSightPaused)
       .catch((error: unknown) => console.error('could not read the sight pause', error));
     return window.tagalongHost.onSightPause(setSightPaused);
+  }, []);
+
+  // The recording dot, read on mount for the same reason as the pause above.
+  useEffect(() => {
+    window.tagalongHost
+      .getRecording()
+      .then(setRecording)
+      .catch((error: unknown) => console.error('could not read rolling memory state', error));
+    return window.tagalongHost.onRecording(setRecording);
   }, []);
 
   useEffect(
@@ -66,7 +76,12 @@ function Avatar() {
           style={{ borderBottomColor: pet.color ?? DEFAULT_PET_COLOR }}
           onClick={() => void window.tagalongHost.selectPet(pet.id)}
         >
-          <PetAvatar pet={pet} state={states[pet.id] ?? 'idle'} sightPaused={sightPaused} />
+          <PetAvatar
+            pet={pet}
+            state={states[pet.id] ?? 'idle'}
+            sightPaused={sightPaused}
+            recording={recording}
+          />
         </button>
       ))}
       {pets.length === 0 && (

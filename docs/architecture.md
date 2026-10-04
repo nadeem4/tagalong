@@ -643,6 +643,28 @@ catalog does not have — time.
   `timeout`, `capped` or `error` — with the checks spent, so a host can show a Watching chip and take
   it down. `watch.stop { watchId }` is the chip's Stop button.
 
+### Rolling memory
+
+`apps/desktop/src/main/awareness/` holds the desktop half. `RollingMemory` ticks every five seconds
+while it is on and sight is not paused: it asks for the focused window first and skips the frame if
+that window is on the exclusion list, then captures every display at 640 pixels through the
+sight-gated platform, lists the windows, and pushes the moment into a `FrameRing`. The ring is a time
+window, not a count — `minutes` from settings, ten by default — and frames are kept as PNGs, about a
+tenth of the raw bitmap. A blocked display's placeholder is never stored.
+
+Pausing sight stops the timer and clears the ring; turning memory off clears it; quitting disposes it.
+Nothing in the folder imports `fs`, and a test asserts that. While it records, every avatar shows a
+small red dot (`PetAvatar recording`), driven by `onRecordingChange` over IPC.
+
+`PerceptionMemory` answers the two methods. Recall reads the rolling ring. Diff takes a fresh frame —
+reusing one taken in the last second, since a watch asks twice per tick — and compares it with the
+frame nearest `sinceSeconds` ago from the rolling ring or, when memory is off, a scratch ring kept only
+for displays a diff asked about and dropped after 30 s without one. `pixel-diff.ts` does the
+comparison on BGRA buffers: a channel moving more than 24 levels counts, the ratio is changed pixels
+over the region's area, and frames of different sizes count as wholly changed. The after crop is taken
+again at native resolution through `captureRegion` (1024 px long side), so a check model can read text
+a 640-pixel frame turns into a smear.
+
 ## The browser host
 
 `apps/extension` is a Manifest V3 extension built by Vite into `dist/`, the folder Chrome loads
