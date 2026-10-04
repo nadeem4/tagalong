@@ -200,7 +200,7 @@ function Onboarding() {
                 type="button"
                 onClick={() => void window.tagalongHost.openLink(provider.keyUrl)}
               >
-                Get a {provider.label} key
+                Get an API key from {provider.label}
               </button>
             </fieldset>
           );

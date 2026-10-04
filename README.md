@@ -58,7 +58,7 @@ Every step can be skipped with **Skip setup**, and you can run the wizard again 
 (**Setup wizard**) or from **Settings → Run the setup wizard again**.
 
 1. **Welcome.** What Tagalong does and the privacy promise (also below, in [Privacy](#privacy)).
-2. **Choose a provider.** Pick OpenRouter, Nebius Token Factory or Anthropic, click **Get a key** to
+2. **Choose a provider.** Pick OpenRouter, Nebius Token Factory or Anthropic, click **Get an API key** to
    open that provider's key page in your browser, and paste the key. You can paste keys for more than
    one; the crew can mix providers. Keys go straight into the operating system's keychain.
 3. **Meet your crew.** Scout explains, Ink writes, Bolt reads errors and code. Pick a provider and a
