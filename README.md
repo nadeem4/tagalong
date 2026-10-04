@@ -10,8 +10,9 @@ behalf through MCP tools you approve. They never take over your mouse or keyboar
 - Architecture: [docs/architecture.md](docs/architecture.md)
 
 **Status: Phases 0 (Setup), 1 (Foundation), 2 (Sight) and 2B (Full View) are complete. Phase 6
-(Browser Host) is next — it runs fifth, not ninth, because reading a tab you are not looking at is
-the half of "see what my eyes cannot" that the desktop host can never do.**
+(Browser Host) is built and awaiting its by-hand Chrome run — it runs fifth, not ninth, because the
+browser is where the desktop host cannot read exactly. See [the extension](#the-chrome-extension)
+and [docs/acceptance/phase-6.md](docs/acceptance/phase-6.md).**
 
 Phase 1 shipped the whole text path end to end on Windows: the protocol package, the engine with
 SQLite-backed conversations, the Anthropic and fake brain providers, the loopback JSON-RPC server with
@@ -84,7 +85,11 @@ tagalong/
       src/preload/index.ts          # exposes window.tagalong and window.tagalongHost
       src/renderer/                 # avatar/panel/settings HTML, src/*.tsx, app.css
       src/shared/ipc.ts             # IPC channel names and the host-only API type
-    extension/src/service-worker.ts # Chrome MV3 stub until Phase 6
+    extension/                      # Chrome MV3 host, built by Vite into dist/ (load unpacked)
+      src/manifest.ts               # the manifest as data; the build writes dist/manifest.json
+      src/service-worker.ts         # Chrome glue: engine socket, side panel, shortcut
+      src/sidepanel/, src/options/  # side panel (packages/ui) and the pairing page
+      src/content/page-reader.ts    # injected on demand: selection, URL, title, page text
 ```
 
 | Package             | Responsibility                                                                                                                                                                                                    |
@@ -93,7 +98,7 @@ tagalong/
 | `packages/core`     | The Tagalong Engine: pets, conversation runner, prompt assembly, SQLite memory, host protocol server, pairing, provider adapters. Pure Node. Voice, the inter-pet bus, and the MCP client arrive in later phases. |
 | `packages/ui`       | React components shared by hosts: `PetAvatar`, `MessageList`, `Composer`, `SightBar`, `ChatPanel`, and the `HostBridge` context.                                                                                  |
 | `apps/desktop`      | Electron host. Runs the engine in the main process, dials it over the loopback socket, and owns the avatar, panel, settings window, tray, hotkey, and secret storage.                                             |
-| `apps/extension`    | Chrome MV3 host. Connects to the running engine and speaks the protocol only. Stub until Phase 6.                                                                                                                 |
+| `apps/extension`    | Chrome MV3 host. Connects to the running engine and speaks the protocol only. Side panel, pairing page, on-demand page reader, and the open-panel shortcut.                                                       |
 
 ## How to run
 
@@ -278,6 +283,57 @@ programs on this one. Without the token, any local program could drive the user'
 conversations, and spend their API budget. Comparison is constant-time, because a plain `===` leaks
 the length of the shared prefix through timing.
 
+## The Chrome extension
+
+The extension is a second host for the same engine: same pets, same memory, same settings. It gives
+pets the **exact** selection and the readable text of the page you are on, and puts the crew in
+Chrome's side panel.
+
+**It needs the desktop app running.** The extension holds no engine of its own; it connects to the
+one inside the Tagalong desktop app on `ws://127.0.0.1:47321`. With the app closed, the side panel
+says "Disconnected … Is the Tagalong app running?" and reconnects by itself — within a second or two
+with the panel open, within about thirty seconds without. A headless engine service that runs without
+the desktop app is a possible later option, recorded in the decisions log; it does not exist today.
+
+### Build and load it
+
+```bash
+pnpm install
+pnpm --filter @tagalong/extension build    # writes apps/extension/dist
+```
+
+1. Open `chrome://extensions` and switch on **Developer mode** (top right).
+2. Click **Load unpacked** and choose `apps/extension/dist`.
+3. Pin Tagalong from the puzzle-piece menu so its toolbar button is visible.
+
+After a rebuild, click the reload arrow on the Tagalong card in `chrome://extensions`.
+
+### Pair it, once
+
+1. In the desktop app, open **Settings** from the tray. Under **Browser extension**, click **Copy
+   token**.
+2. Chrome opens the extension's options page on first use (or right-click the toolbar button →
+   **Options**). Paste the token and click **Save and connect**. Leave the port empty unless you
+   moved the engine off `47321`.
+3. The options page says "Connected to Tagalong …". The token is stored in this browser's local
+   extension storage only, never synced.
+
+### Use it
+
+| Do this                                     | What happens                                                                                                                |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Click the toolbar button                    | The side panel opens with the crew and attaches the page it opened beside (selection, title, readable text).                |
+| Select text, press `Alt+Shift+Space`        | The side panel opens with that exact selection and the page title in the sight bar.                                         |
+| Press the desktop hotkey `Ctrl+Shift+Space` | The desktop panel opens as before; when Chrome is in front, the engine swaps in the exact selection and adds the page text. |
+| Click **Read this page** / **Clear**        | Re-reads the tab, or sends the next ask with nothing attached.                                                              |
+
+`Ctrl+Shift+Space` stays the desktop app's: it is a global hotkey and Chrome never sees it, so the
+extension's own shortcut is `Alt+Shift+Space`. Rebind it at `chrome://extensions/shortcuts`.
+
+The extension reads a tab only after you use it there (Chrome's `activeTab`). To let it read
+whichever tab is in front when you ask — including from the desktop hotkey — click **Allow reading
+any tab when I ask** on its options page. It still reads nothing until you ask.
+
 ## Environment variables
 
 `.env.example` is a **reference list of the variables the project will use**, not a file the app loads.
@@ -349,13 +405,16 @@ Implement `BrainProvider`, register it in `packages/core/src/providers/registry.
 
 ## Known gaps
 
-Two things Phase 1 left standing, both recorded here so nobody rediscovers them.
+What is still standing, recorded here so nobody rediscovers it.
 
 - **No Tailwind build in the desktop renderer.** `@tagalong/ui` is written against Tailwind utility
   classes, but the desktop renderer has no Tailwind toolchain, so those class names resolve to nothing.
   `apps/desktop/src/renderer/src/app.css` hand-writes the structural rules the utilities would have
   supplied — enough for a usable panel, but the components are unstyled beyond that until the build
   gains Tailwind.
+- **No approval cards in the side panel yet.** They arrive with Phase 5 (Hands), in `packages/ui`,
+  and the side panel will show them without extension changes — its bridge already relays every
+  `turn.*` event and every engine call.
 - **No Fast Refresh in dev.** `@vitejs/plugin-react` 6.x imports `vite/internal`, which only exists in
   Vite 8, while electron-vite 5 pins Vite 7. The renderer config therefore drops the plugin and uses
   Vite's own esbuild transform (`esbuild: { jsx: 'automatic' }`) for JSX. Everything builds and runs;
@@ -401,6 +460,15 @@ very little through that layer, so a read may come back nearly empty; the pet is
 between "this window is empty" and "I could not read inside it", and says so rather than guessing.
 And a browser publishes only the tab you are on: the other tabs are not readable this way, and the
 pet is told to say so instead of pretending.
+
+### What the Chrome extension reads
+
+Only when you ask — the toolbar button, its shortcut, **Read this page**, or an ask while Chrome is
+in front — the extension reads the tab in front: your selection, the URL and title, and the page's
+main text with menus and footers stripped, capped at 40,000 characters. The sight bar names what is
+attached before you send. Nothing is read from tabs you are not on, the extension never runs in a
+page you did not ask about, and the capture exclusion list applies to tab titles too. It talks only to
+`127.0.0.1`.
 
 ### What is never read
 
@@ -482,9 +550,9 @@ order; each one ends with something testable end to end.
 
 0. **Setup** — monorepo, CI, conventions, keys. _(complete)_
 1. **Foundation** — protocol, core engine, text-only ask with one pet on Windows. _(complete)_
-2. **Sight** — screenshots, vision, exclusions, capture indicator. _(next)_
+2. **Sight** — screenshots, vision, exclusions, capture indicator. _(complete)_
 3. **Voice** — push to talk, streaming speech, interruption.
 4. **Crew** — multiple pets, memory, handoff, consult, roundtable.
 5. **Hands** — MCP client, allowlists, approval cards, action log.
-6. **Browser Host** — Chrome extension on the same engine.
+6. **Browser Host** — Chrome extension on the same engine. _(built; runs fifth, after 2B)_
 7. **Polish and Cross-platform** — macOS, Linux, onboarding, packaging, cost dashboard.

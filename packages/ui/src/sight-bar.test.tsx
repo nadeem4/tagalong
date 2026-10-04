@@ -30,6 +30,39 @@ describe('SightBar', () => {
     expect(bar).toHaveTextContent('README.md - ai_pet');
   });
 
+  it('names the page title when the browser host attached a page', () => {
+    const page: ContextSnapshot = {
+      id: '11111111-1111-4111-8111-111111111111',
+      capturedAt: '2026-09-11T10:00:00.000Z',
+      host: 'extension',
+      app: { name: 'chrome', windowTitle: 'Release notes' },
+      selection: 'the exact words',
+      page: { url: 'https://example.com/notes', title: 'Release notes', text: 'x'.repeat(1200) },
+    };
+    render(<SightBar snapshot={page} problem={null} onLook={noop} onClear={noop} />);
+
+    const bar = screen.getByTestId('sight-bar');
+    expect(bar).toHaveAttribute('data-state', 'seeing');
+    expect(bar).toHaveTextContent('15 chars');
+    expect(bar).toHaveTextContent('page “Release notes”');
+    // The tab title is the page title; saying it twice would crowd out everything else.
+    expect(bar).not.toHaveTextContent('chrome — Release notes');
+  });
+
+  it('lets a host name its Look action for what it actually captures', () => {
+    render(
+      <SightBar
+        snapshot={null}
+        problem={null}
+        onLook={noop}
+        onClear={noop}
+        lookLabel="Read this page"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Read this page' })).toBeInTheDocument();
+  });
+
   it('shows a thumbnail of the attached screenshot', () => {
     render(<SightBar snapshot={withScreenshot} problem={null} onLook={noop} onClear={noop} />);
 

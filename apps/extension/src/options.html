@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Tagalong — pairing</title>
+    <link rel="stylesheet" href="./options/options.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Pair Tagalong with this browser</h1>
+      <p>
+        Open Tagalong on this computer, go to <strong>Settings → Browser extension</strong>, copy
+        the pairing token, and paste it here. You only do this once.
+      </p>
+      <form id="pairing-form">
+        <label>
+          <span>Pairing token</span>
+          <input name="token" autocomplete="off" spellcheck="false" required />
+        </label>
+        <label>
+          <span>Engine port (leave empty for 47321)</span>
+          <input name="port" inputmode="numeric" />
+        </label>
+        <button type="submit">Save and connect</button>
+        <button type="button" id="forget">Forget pairing</button>
+      </form>
+      <p id="message" role="status"></p>
+      <h2>Reading tabs</h2>
+      <p>
+        By default the extension can read a tab only after you use it there — the toolbar button,
+        the shortcut, or the side panel. Turn this on to let it read whichever tab is in front when
+        you ask, including from the desktop hotkey. It still reads nothing until you ask.
+      </p>
+      <p>
+        <button type="button" id="all-sites">Allow reading any tab when I ask</button>
+        <span id="all-sites-state"></span>
+      </p>
+      <p>Connection: <strong id="status">checking…</strong></p>
+      <p class="note">
+        The extension needs the Tagalong desktop app running on this computer. It talks only to
+        127.0.0.1 and stores the token in this browser's local extension storage.
+      </p>
+    </main>
+    <script type="module" src="./options/main.ts"></script>
+  </body>
+</html>

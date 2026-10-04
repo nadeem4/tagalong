@@ -9,6 +9,7 @@ import type {
   PerceptionTarget,
 } from '@tagalong/protocol';
 import type { BrainContentBlock, BrainTool } from '../providers';
+import { captureSelection } from './browser-route';
 import { findCaptureBlock, type ActiveWindow, type CaptureBlock } from './exclusions';
 import { fullViewContext as fullView } from './full-view-context';
 import {
@@ -267,6 +268,7 @@ async function capture(
   options: PerceptionToolsetOptions,
   target: 'screenshot' | 'selection',
 ): Promise<ToolOutcome> {
+  if (target === 'selection') return selection(options);
   const host = options.hosts().find((candidate) => candidate.capabilities.includes(target));
   if (host === undefined) {
     return {
@@ -292,6 +294,38 @@ async function capture(
   } catch (error) {
     // A host that cannot answer — disconnected, timed out, or broken — has to surface as
     // a tool result. Rethrowing would abort the whole turn over a failed glance.
+    const message = error instanceof Error ? error.message : String(error);
+    return { content: `The host could not complete the capture: ${message}`, isError: true };
+  }
+}
+
+/**
+ * `get_selection`, routed: in a browser the extension reads the DOM selection exactly, and
+ * the desktop's clipboard trick is the fallback. See `captureSelection` for the rules.
+ */
+async function selection(options: PerceptionToolsetOptions): Promise<ToolOutcome> {
+  try {
+    const read = await captureSelection({
+      hosts: options.hosts(),
+      exclusions: options.exclusions(),
+    });
+    if (read === null) {
+      return {
+        content:
+          'No connected host can read the selection, so you cannot see what is selected. Tell the user that.',
+        isError: true,
+      };
+    }
+    if ('blocked' in read) return { content: refusal(read.blocked), isError: true };
+    return {
+      content: describe(
+        'selection',
+        read.selection === undefined ? {} : { selection: read.selection },
+        read.app,
+        false,
+      ),
+    };
+  } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return { content: `The host could not complete the capture: ${message}`, isError: true };
   }

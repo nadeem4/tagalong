@@ -11,6 +11,11 @@ export interface SightBarProps {
   onLook: () => void;
   /** Drops the attached context without closing the panel. */
   onClear: () => void;
+  /**
+   * What the Look button says. The browser host reads the page rather than photographing
+   * the screen, and a button promising a screenshot it will not take is a small lie.
+   */
+  lookLabel?: string;
 }
 
 /**
@@ -18,7 +23,13 @@ export interface SightBarProps {
  * cannot used to look identical — an empty chip rendered nothing — and the only way
  * to find out was to ask and be told no. This bar never renders nothing.
  */
-export function SightBar({ snapshot, problem, onLook, onClear }: SightBarProps) {
+export function SightBar({
+  snapshot,
+  problem,
+  onLook,
+  onClear,
+  lookLabel = 'Look at screen',
+}: SightBarProps) {
   const attached = describe(snapshot);
   const seeing = attached !== null;
   const state = seeing ? 'seeing' : (problem ?? 'blind');
@@ -62,7 +73,7 @@ export function SightBar({ snapshot, problem, onLook, onClear }: SightBarProps) 
             onClick={onLook}
             className="rounded-md border border-dashed border-slate-400 bg-white px-2 py-0.5 font-medium text-slate-600"
           >
-            Look at screen
+            {lookLabel}
           </button>
         )}
       </span>
@@ -112,7 +123,11 @@ function describe(snapshot: ContextSnapshot | null): string | null {
   if (snapshot.displays !== undefined && snapshot.displays.length > 0) {
     parts.push(describeDisplays(snapshot.displays));
   }
-  if (snapshot.app !== undefined) {
+  if (snapshot.page !== undefined) {
+    parts.push(`page “${snapshot.page.title || snapshot.page.url}”`);
+  }
+  // A browser tab's title is the page title, so the window is named only when no page is.
+  if (snapshot.app !== undefined && snapshot.page === undefined) {
     parts.push(
       snapshot.app.windowTitle === undefined
         ? snapshot.app.name

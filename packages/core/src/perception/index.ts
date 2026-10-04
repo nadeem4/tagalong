@@ -11,6 +11,12 @@ export {
   renderInventory,
   type ObservedWindow,
 } from './inventory';
+export {
+  BROWSER_HOST_TIMEOUT_MS,
+  browserContextFor,
+  captureSelection,
+  isBrowserHost,
+} from './browser-route';
 export { mayPersistScreenshot } from './retention';
 export { THIN_TEXT_CHARS, textLayerNotes, type TextLayerReading } from './text-layer';
 export {

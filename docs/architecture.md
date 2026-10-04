@@ -58,8 +58,8 @@ The diagram is the finished shape. What exists after Phase 1: the server (`serve
 FTS5 arrives with Phase 4 recall), the pet registry (`pets/registry.ts`), settings and the SecretStore
 interface (`settings/settings.ts`), and the brain providers (`providers/`). `Engine.boot` in `engine.ts`
 wires all of it together and is the only thing a host starts. `PetBus` (Phase 4), `McpManager` and
-`ApprovalPolicy` (Phase 5), and the STT and TTS providers (Phase 3) do not exist yet; the extension is a
-stub until Phase 6.
+`ApprovalPolicy` (Phase 5), and the STT and TTS providers (Phase 3) do not exist yet. The Chrome extension
+landed in Phase 6, which ran fifth; see "The browser host" below.
 
 ## Package responsibilities
 
@@ -69,7 +69,7 @@ stub until Phase 6.
 | packages/core     | Engine facade, conversation runner, prompt assembler, SQLite memory, pet registry, settings and SecretStore, pairing, websocket server, brain providers                                                                                                                                 | electron, react, DOM globals                     |
 | packages/ui       | React components — `PetAvatar`, `MessageList`, `Composer`, `SightBar`, `ChatPanel` — plus the `HostBridge` contract and its context, and a fake bridge for host tests                                                                                                                   | electron, sockets, node APIs                     |
 | apps/desktop      | Electron host. Runs the engine in the main process, dials it over the loopback socket, owns avatar, panel and settings windows, the tray, the two global hotkeys (text-only and look), perception with exclusions and capture announcements, and safeStorage secrets, one folder per OS | nothing from core internals, only its public API |
-| apps/extension    | Chrome MV3 host. Connects to the running engine, supplies exact page text and selection, renders pets in the side panel                                                                                                                                                                 | core at all; it speaks the protocol only         |
+| apps/extension    | Chrome MV3 host. Connects to the running engine from its service worker, supplies the exact selection and page text on demand, renders pets in the side panel, pairs from its options page                                                                                              | core at all; it speaks the protocol only         |
 
 ## Host contracts
 
@@ -95,6 +95,35 @@ Hosts implement two contracts.
   reads that, picks a window, and pays for one. The absence is asserted by a test, not left to habit.
 
 - **Presentation** renders pets, streams replies, plays audio, and shows approval cards.
+
+### Routing between the desktop and the browser host
+
+The extension advertises `selection`, `pageText` and `activeWindow`, and nothing else. The engine tells
+the two hosts apart by `pageText`, which only the browser host can read, so connection order never
+decides who answers (`perception/browser-route.ts`):
+
+- **Window identity** always comes from the desktop host when one is connected. Exclusions are checked
+  against it before either host reads anything.
+- **`get_selection`** asks the extension first when the front window is a browser, and the desktop's
+  clipboard trick otherwise. The extension gets `BROWSER_HOST_TIMEOUT_MS` (500 ms); a refusal falls back
+  at once, a silence after 500 ms.
+- **A desktop hotkey ask made in a browser** is filled in by the engine before the turn starts:
+  `browserContextFor` asks the extension for the selection, the page and the tab, replaces the clipboard
+  copy with the exact selection when there is one, adds the page, and drops the lot if the tab it read is
+  excluded. Past 500 ms the ask goes out exactly as the desktop made it.
+- **An ask from the side panel** carries the extension's own snapshot. The engine applies the exclusion
+  list to its tab before the turn starts and, on a match, keeps only which tab it was.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
+flowchart LR
+  H["Desktop hotkey in Chrome"] --> D["Desktop host: window + clipboard copy"]
+  D --> E{"Extension connected?"}
+  E -- "no" --> T["Turn"]
+  E -- "yes" --> X["Extension: selection + page, 500 ms"]
+  X -- "answered" --> T
+  X -- "refused or late" --> T
+```
 
 Adding a host or an OS never touches the core.
 
@@ -444,6 +473,37 @@ that the desktop is empty, and a pet told otherwise will reason from it.
 Since Phase 2B, a display is blanked when **any window on it that the user can see** is excluded, not
 only when the foreground window is. The foreground check remains as a floor beneath the inventory, so
 that a helper which cannot run does not silently remove the protection Phase 2 already shipped.
+
+## The browser host
+
+`apps/extension` is a Manifest V3 extension built by Vite into `dist/`, the folder Chrome loads
+unpacked. It imports `@tagalong/protocol` and `@tagalong/ui`, never `@tagalong/core`.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
+flowchart LR
+  P["Side panel<br>ChatPanel over PortBridge"] -- "port 'tagalong'" --> W["Service worker<br>PortHub + EngineConnection"]
+  O["Options page<br>pairing"] -- "port 'tagalong'" --> W
+  W -- "ws://127.0.0.1:47321<br>hello as 'extension'" --> E["Engine in the desktop app"]
+  W -- "executeScript, on demand" --> R["page-reader.js<br>selection, title, Readability text"]
+```
+
+- **One socket, in the service worker.** `EngineConnection` holds the pairing token, sends `hello`
+  with `selection`, `pageText` and `activeWindow`, and reconnects with backoff from one second to
+  thirty. A rejected token stops the retries until the user pairs again. A `pets.list` heartbeat every
+  20 s proves the engine is answering and keeps Chrome from stopping the worker; a 30 s alarm wakes a
+  stopped worker so it notices the app coming back.
+- **Pages talk to the worker, not the engine.** The side panel and options page open a
+  `chrome.runtime` port; `PortHub` relays engine calls, tab captures, turn notifications and the
+  connection status, and replays the status to every page that opens.
+- **Reading a page is on demand.** There is no standing content script. The worker injects
+  `page-reader.js` (a single classic script, 35 kB, Readability inlined, no zod) into the active tab
+  and reads the selection exactly as Chrome reports it, the URL and title, and the main text capped at
+  40,000 characters. Chrome allows this on a tab the user invoked the extension on (`activeTab`), or on
+  any tab once the user switches on the optional all-sites grant.
+- **The shortcut** (`Alt+Shift+Space`) opens the side panel inside the command's user gesture and
+  hands it the tab's selection and page. The desktop's `Ctrl+Shift+Space` is a global hotkey and
+  never reaches Chrome.
 
 ## Bundling the workspace packages
 
