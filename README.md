@@ -245,6 +245,14 @@ back. Instead the app starts, the other three keys work, and the failure appears
 Settings naming which binding broke and what it was bound to. Correcting it takes effect
 immediately, with no restart.
 
+### The crew
+
+A fresh install starts with three pets on three different brains: **Scout** (explainer, Nemotron 3
+Super on Token Factory), **Ink** (writer, Claude through OpenRouter) and **Bolt** (coder, Nemotron Nano
+2 VL on Token Factory). Each needs its provider's key; a pet whose key is missing says so on its turn
+and the others keep working. Edit, add or delete pets in Settings. Deleting a default pet is permanent:
+it is not re-seeded on the next boot.
+
 ### The two cost controls
 
 Both live in the settings window and both take effect on save, with no restart: they are read at the

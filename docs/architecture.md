@@ -55,7 +55,7 @@ flowchart LR
 The diagram is the finished shape. What exists after Phase 1: the server (`server/ws-server.ts` plus
 `server/pairing.ts`), the runner (`conversation/runner.ts`), the prompt assembler
 (`conversation/prompt-assembler.ts`), memory as plain SQLite tables (`memory/db.ts`, `memory/store.ts` —
-FTS5 arrives with Phase 4 recall), the pet registry (`pets/registry.ts`), settings and the SecretStore
+FTS5 arrived with Phase 4 recall), the pet registry (`pets/registry.ts`), settings and the SecretStore
 interface (`settings/settings.ts`), and the brain providers (`providers/`). `Engine.boot` in `engine.ts`
 wires all of it together and is the only thing a host starts. `PetBus` (Phase 4), `McpManager` and
 `ApprovalPolicy` (Phase 5), and the STT and TTS providers (Phase 3) do not exist yet. The Chrome extension
@@ -473,6 +473,27 @@ that the desktop is empty, and a pet told otherwise will reason from it.
 Since Phase 2B, a display is blanked when **any window on it that the user can see** is excluded, not
 only when the foreground window is. The foreground check remains as a floor beneath the inventory, so
 that a helper which cannot run does not silently remove the protection Phase 2 already shipped.
+
+## The crew (Phase 4)
+
+Phase 4 turns one companion into a crew. Everything below lives in `packages/core`; hosts only render
+what the engine broadcasts.
+
+### The registry and the default crew
+
+`pets/registry.ts` keeps each pet as a validated JSON blob in the `pets` table and exposes it through
+`pets.list`, `pets.upsert` and `pets.delete`. A fresh install is seeded with three pets that
+deliberately run on different brains, so the crew spans providers from the first boot:
+
+| Pet   | Role                 | Provider     | Model                                                |
+| ----- | -------------------- | ------------ | ---------------------------------------------------- |
+| Scout | Explainer and reader | `nebius`     | Nemotron 3 Super, Nemotron Nano 2 VL for pictures    |
+| Ink   | Writer               | `openrouter` | `anthropic/claude-sonnet-5`                          |
+| Bolt  | Coder                | `nebius`     | Nemotron Nano 2 VL (reads screenshots of errors too) |
+
+Seeding is remembered per pet in `pet_seeds` (migration 2). An install that predates the crew gains
+Ink and Bolt on its next boot, a pet the user edited is never overwritten, and a default the user
+deleted stays deleted. Each pet carries an optional `color` (`#rrggbb`) for the strip and the panel.
 
 ## The browser host
 

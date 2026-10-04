@@ -3,10 +3,8 @@ import { Pet } from '@tagalong/protocol';
 import { NEMOTRON_TEXT_MODEL, NEMOTRON_VISION_MODEL } from '../providers/nebius-models';
 
 /**
- * The pet a fresh install starts with.
+ * The explainer, and the pet a fresh install opens on.
  *
- * Phase 1 ships one companion so the whole path can be exercised end to end; Ink and
- * Bolt join the crew in Phase 4 when handoff and roundtable give them something to do.
  * Scout runs on NVIDIA Nemotron through Nebius Token Factory: Nemotron 3 Super for words,
  * switching to Nemotron Nano 2 VL whenever a turn carries a picture, since Super cannot
  * see. Claude stays one Settings change away. Only a fresh install gets this; seeding never
@@ -16,6 +14,7 @@ export const SCOUT: Pet = {
   id: 'scout',
   name: 'Scout',
   avatar: '🔎',
+  color: '#0ea5e9',
   persona:
     'You are Scout. You explain what the user is looking at, plainly and briefly. ' +
     'Prefer a direct answer over a preamble. When something on screen is ambiguous, ' +
@@ -27,7 +26,50 @@ export const SCOUT: Pet = {
   replyStyle: 'text',
 };
 
-const DEFAULT_CREW: readonly Pet[] = [SCOUT];
+/** OpenRouter's id for the Claude model Ink starts on. Any OpenRouter model id works. */
+export const INK_MODEL = 'anthropic/claude-sonnet-5';
+
+/**
+ * The writer. Ink runs on Claude through OpenRouter so a fresh crew already spans two
+ * providers and three models — the point of a crew whose members think differently.
+ * Claude sees images itself, so Ink needs no separate vision model.
+ */
+export const INK: Pet = {
+  id: 'ink',
+  name: 'Ink',
+  avatar: '✒️',
+  color: '#a855f7',
+  persona:
+    'You are Ink, the writer of the crew. You draft replies and rewrite text so it reads ' +
+    "well while keeping the user's own voice. Ask about tone once if it is unclear, then " +
+    'commit to a draft rather than offering a menu of options.',
+  model: INK_MODEL,
+  providerId: 'openrouter',
+  toolAllowlist: [],
+  replyStyle: 'text',
+};
+
+/**
+ * The coder. Bolt runs on Nemotron Nano 2 VL through Token Factory: a smaller, faster
+ * Nemotron that also reads screenshots, which is most of what reading an error is.
+ */
+export const BOLT: Pet = {
+  id: 'bolt',
+  name: 'Bolt',
+  avatar: '⚡',
+  color: '#f59e0b',
+  persona:
+    'You are Bolt, the coder of the crew. You read errors, stack traces and diffs, and ' +
+    'propose the smallest fix that works. Cite the file and line when they are visible. ' +
+    'Be direct; skip the pleasantries.',
+  model: NEMOTRON_VISION_MODEL,
+  providerId: 'nebius',
+  toolAllowlist: [],
+  replyStyle: 'text',
+};
+
+/** The crew a fresh install starts with, in the order the strip shows them. */
+export const DEFAULT_CREW: readonly Pet[] = [SCOUT, INK, BOLT];
 
 interface PetRow {
   readonly id: string;
@@ -47,16 +89,30 @@ export class PetRegistry {
   }
 
   /**
-   * Inserts missing default pets. Existing rows are left alone, so a pet the user has
-   * edited survives every later boot.
+   * Inserts default pets that were never seeded before. Existing rows are left alone, so
+   * a pet the user has edited survives every later boot, and a default the user deleted
+   * stays deleted: `pet_seeds` remembers it was offered once.
    */
   seedDefaults(): void {
     const insert = this.#db.prepare(
       'INSERT OR IGNORE INTO pets (id, json, updated_at) VALUES (?, ?, ?)',
     );
+    const record = this.#db.prepare(
+      'INSERT OR IGNORE INTO pet_seeds (id, seeded_at) VALUES (?, ?)',
+    );
+    const seeded = new Set(
+      this.#db
+        .prepare<[], { id: string }>('SELECT id FROM pet_seeds')
+        .all()
+        .map((row) => row.id),
+    );
     const now = new Date().toISOString();
     this.#db.transaction(() => {
-      for (const pet of DEFAULT_CREW) insert.run(pet.id, JSON.stringify(pet), now);
+      for (const pet of DEFAULT_CREW) {
+        if (seeded.has(pet.id)) continue;
+        insert.run(pet.id, JSON.stringify(pet), now);
+        record.run(pet.id, now);
+      }
     })();
   }
 

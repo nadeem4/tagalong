@@ -15,6 +15,11 @@ const MIGRATIONS: readonly string[] = [
    CREATE TABLE conversations (id TEXT PRIMARY KEY, pet_id TEXT NOT NULL, title TEXT, created_at TEXT NOT NULL);
    CREATE TABLE messages (id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, role TEXT NOT NULL, content_json TEXT NOT NULL, snapshot_json TEXT, created_at TEXT NOT NULL);
    CREATE INDEX messages_conv ON messages(conversation_id, created_at);`,
+  // Phase 4. Which default pets were ever seeded, so deleting one keeps it deleted while
+  // an install that predates the crew still gains the new members. Pets already present
+  // count as seeded: they came from an earlier seed or from the user.
+  `CREATE TABLE pet_seeds (id TEXT PRIMARY KEY, seeded_at TEXT NOT NULL);
+   INSERT INTO pet_seeds (id, seeded_at) SELECT id, updated_at FROM pets;`,
 ];
 
 /** Version a fully migrated database reports. */

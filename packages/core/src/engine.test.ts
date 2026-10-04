@@ -112,7 +112,11 @@ describe('Engine.boot', () => {
 
     expect(result['protocolVersion']).toBe(PROTOCOL_VERSION);
     expect(result['engineVersion']).toBe('0.0.0-test');
-    expect(result['pets']).toHaveLength(1);
+    expect((result['pets'] as { id: string }[]).map((pet) => pet.id)).toEqual([
+      'bolt',
+      'ink',
+      'scout',
+    ]);
   });
 
   it('rejects a host presenting the wrong pairing token', async () => {
@@ -183,8 +187,9 @@ describe('per-pet providers', () => {
     await host.call('settings.set', {
       patch: { providerBaseUrls: { openrouter: 'http://127.0.0.1:9/v1' } },
     });
-    const scout = ((await host.call('pets.list'))['result'] as { pets: Record<string, unknown>[] })
-      .pets[0];
+    const scout = (
+      (await host.call('pets.list'))['result'] as { pets: Record<string, unknown>[] }
+    ).pets.find((pet) => pet['id'] === 'scout');
     await host.call('pets.upsert', {
       pet: { ...scout, providerId: 'openrouter', model: 'anthropic/claude-sonnet-5' },
     });
@@ -200,8 +205,9 @@ describe('per-pet providers', () => {
 
   it('answers each pet from the provider it names', async () => {
     const { host } = await bootWithoutFakes();
-    const scout = ((await host.call('pets.list'))['result'] as { pets: Record<string, unknown>[] })
-      .pets[0];
+    const scout = (
+      (await host.call('pets.list'))['result'] as { pets: Record<string, unknown>[] }
+    ).pets.find((pet) => pet['id'] === 'scout');
     await host.call('pets.upsert', {
       pet: { ...scout, id: 'ink', name: 'Ink', providerId: 'fake', model: 'fake-model' },
     });
@@ -355,7 +361,7 @@ describe('built-in perception tools', () => {
 });
 
 describe('pets and settings over rpc', () => {
-  it('lists the seeded pet', async () => {
+  it('lists the seeded crew', async () => {
     const e = await boot();
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
@@ -363,7 +369,35 @@ describe('pets and settings over rpc', () => {
     const res = await host.call('pets.list', {});
     const pets = (res['result'] as Record<string, unknown>)['pets'] as unknown[];
 
-    expect(pets).toHaveLength(1);
+    expect(pets).toHaveLength(3);
+  });
+
+  it('round-trips an upsert and a delete through rpc, and the delete survives a restart', async () => {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const pip = {
+      id: 'pip',
+      name: 'Pip',
+      avatar: '🐣',
+      persona: 'You are Pip.',
+      model: 'fake-model',
+      providerId: 'fake',
+      color: '#22c55e',
+      toolAllowlist: [],
+      replyStyle: 'text',
+    };
+
+    const saved = await host.call('pets.upsert', { pet: pip });
+    expect((saved['result'] as { pet: unknown }).pet).toEqual(pip);
+    const deleted = await host.call('pets.delete', { petId: 'ink' });
+    expect(deleted['result']).toEqual({ deleted: true });
+
+    await e.shutdown();
+    engine = undefined;
+    const again = await boot();
+    const ids = again.pets.map((pet) => pet.id);
+    expect(ids).toEqual(['bolt', 'pip', 'scout']);
   });
 
   it('round-trips a settings patch', async () => {

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Database } from 'better-sqlite3';
 import { openDatabase } from '../memory/db';
 import { NEMOTRON_TEXT_MODEL, NEMOTRON_VISION_MODEL } from '../providers';
-import { PetRegistry, SCOUT } from './registry';
+import { BOLT, DEFAULT_CREW, INK, PetRegistry, SCOUT } from './registry';
 
 let dir: string;
 let db: Database;
@@ -21,13 +21,52 @@ afterEach(() => {
 });
 
 describe('PetRegistry seeding', () => {
-  it('seeds Scout on an empty database', () => {
+  it('seeds Scout, Ink and Bolt on an empty database', () => {
     const registry = new PetRegistry(db);
     registry.seedDefaults();
 
-    const pets = registry.list();
-    expect(pets).toHaveLength(1);
-    expect(pets[0]?.id).toBe('scout');
+    expect(registry.list().map((pet) => pet.id)).toEqual(['bolt', 'ink', 'scout']);
+  });
+
+  it('gives each of the default crew its own colour and a different brain', () => {
+    expect(new Set(DEFAULT_CREW.map((pet) => pet.color)).size).toBe(3);
+    expect(new Set(DEFAULT_CREW.map((pet) => `${pet.providerId}:${pet.model}`)).size).toBe(3);
+  });
+
+  it('puts Ink on Claude through OpenRouter and Bolt on Nemotron Nano', () => {
+    expect(INK.providerId).toBe('openrouter');
+    expect(INK.model).toMatch(/^anthropic\/claude/);
+    expect(BOLT.providerId).toBe('nebius');
+    expect(BOLT.model).toBe(NEMOTRON_VISION_MODEL);
+  });
+
+  it('adds Ink and Bolt to an install that only ever had Scout', () => {
+    db.prepare('DELETE FROM pet_seeds').run();
+    db.prepare('INSERT INTO pets (id, json, updated_at) VALUES (?, ?, ?)').run(
+      'scout',
+      JSON.stringify({ ...SCOUT, persona: 'Kept.' }),
+      new Date().toISOString(),
+    );
+    db.prepare('INSERT INTO pet_seeds (id, seeded_at) VALUES (?, ?)').run(
+      'scout',
+      new Date().toISOString(),
+    );
+
+    const registry = new PetRegistry(db);
+    registry.seedDefaults();
+
+    expect(registry.list().map((pet) => pet.id)).toEqual(['bolt', 'ink', 'scout']);
+    expect(registry.get('scout')?.persona).toBe('Kept.');
+  });
+
+  it('does not bring back a default pet the user deleted', () => {
+    const registry = new PetRegistry(db);
+    registry.seedDefaults();
+    registry.delete('ink');
+
+    registry.seedDefaults();
+
+    expect(registry.get('ink')).toBeNull();
   });
 
   it('starts Scout on Nemotron through Token Factory, with Nano VL for pictures', () => {
@@ -41,7 +80,7 @@ describe('PetRegistry seeding', () => {
     registry.seedDefaults();
     registry.seedDefaults();
 
-    expect(registry.list()).toHaveLength(1);
+    expect(registry.list()).toHaveLength(3);
   });
 
   it('does not overwrite a pet the user edited', () => {
@@ -80,7 +119,7 @@ describe('PetRegistry CRUD', () => {
     registry.seedDefaults();
     registry.upsert({ ...SCOUT, name: 'Scouty' });
 
-    expect(registry.list()).toHaveLength(1);
+    expect(registry.list()).toHaveLength(3);
     expect(registry.get('scout')?.name).toBe('Scouty');
   });
 
@@ -94,7 +133,7 @@ describe('PetRegistry CRUD', () => {
 
     expect(registry.delete('scout')).toBe(true);
     expect(registry.delete('scout')).toBe(false);
-    expect(registry.list()).toHaveLength(0);
+    expect(registry.list().map((pet) => pet.id)).toEqual(['bolt', 'ink']);
   });
 
   it('lists pets in a stable order', () => {
