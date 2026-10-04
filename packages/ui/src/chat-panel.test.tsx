@@ -75,6 +75,32 @@ describe('ChatPanel', () => {
     ]);
   });
 
+  it('captures what the host says Look means, under the label it gives', async () => {
+    const page: ContextSnapshot = {
+      id: '33333333-3333-4333-8333-333333333333',
+      capturedAt: '2026-09-11T10:06:00.000Z',
+      host: 'extension',
+      page: { url: 'https://example.com/', title: 'Example', text: 'Body text.' },
+    };
+    const bridge = createFakeHostBridge({ capture: page });
+    render(
+      <HostBridgeProvider bridge={bridge}>
+        <ChatPanel
+          petId="sage"
+          lookTargets={['selection', 'pageText', 'activeWindow']}
+          lookLabel="Read this page"
+        />
+      </HostBridgeProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Read this page' }));
+
+    expect(bridge.captures).toEqual([['selection', 'pageText', 'activeWindow']]);
+    await waitFor(() =>
+      expect(screen.getByTestId('sight-bar')).toHaveTextContent('page “Example”'),
+    );
+  });
+
   it('says capture is blocked here when the host refuses', async () => {
     const bridge = createFakeHostBridge({ capture: null });
     renderPanel(bridge, null);

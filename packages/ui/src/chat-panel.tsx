@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ContextSnapshot } from '@tagalong/protocol';
+import type { ContextSnapshot, PerceptionTarget } from '@tagalong/protocol';
 import { Composer } from './composer';
 import { MessageList, type ChatMessage } from './message-list';
 import { SightBar, type SightProblem } from './sight-bar';
@@ -12,9 +12,18 @@ export interface ChatPanelProps {
   petId: string;
   /** What the host captured for this ask: named in the sight bar and sent with the turn. */
   snapshot?: ContextSnapshot;
+  /** What Look captures in this host. Defaults to a screenshot of the active window. */
+  lookTargets?: readonly PerceptionTarget[];
+  /** The Look button's words, to match what `lookTargets` captures. */
+  lookLabel?: string;
 }
 
-export function ChatPanel({ petId, snapshot }: ChatPanelProps) {
+export function ChatPanel({
+  petId,
+  snapshot,
+  lookTargets = LOOK_TARGETS,
+  lookLabel,
+}: ChatPanelProps) {
   const bridge = useHostBridge();
   // The host's capture is a starting point, not the last word: Look and Clear own it after.
   const [attached, setAttached] = useState<ContextSnapshot | null>(snapshot ?? null);
@@ -40,7 +49,7 @@ export function ChatPanel({ petId, snapshot }: ChatPanelProps) {
 
   function handleLook(): void {
     bridge
-      .capture(LOOK_TARGETS)
+      .capture(lookTargets)
       .then((captured) => {
         // Null is a refusal, not an error: an excluded window has to say so out loud.
         setProblem(captured === null ? 'blocked' : null);
@@ -98,7 +107,13 @@ export function ChatPanel({ petId, snapshot }: ChatPanelProps) {
 
   return (
     <section className="flex h-full flex-col bg-white text-slate-900">
-      <SightBar snapshot={attached} problem={problem} onLook={handleLook} onClear={handleClear} />
+      <SightBar
+        snapshot={attached}
+        problem={problem}
+        onLook={handleLook}
+        onClear={handleClear}
+        {...(lookLabel !== undefined ? { lookLabel } : {})}
+      />
       <MessageList messages={messages} streamingText={streamingText} />
       <Composer onSend={handleSend} disabled={activeTurnId !== null} seeing={attached !== null} />
     </section>
