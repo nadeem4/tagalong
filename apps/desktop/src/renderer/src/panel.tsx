@@ -40,6 +40,9 @@ function Panel() {
       .catch((error: unknown) => console.error('could not list pets', error));
   }, []);
 
+  // A click on the desktop crew strip picks the pet this panel talks to.
+  useEffect(() => window.tagalongHost.onActivePet(setPetId), []);
+
   if (petId === null) return <p className="settings__note">Waking the crew…</p>;
 
   return (
