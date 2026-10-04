@@ -360,6 +360,49 @@ describe('built-in perception tools', () => {
   });
 });
 
+describe('handoff over rpc', () => {
+  it('hands Scout’s thread to Ink when the user types @Ink, with the context intact', async () => {
+    const seen: { model: string; text: string }[] = [];
+    const fake = new FakeBrainProvider({ text: 'An answer.' });
+    const recording: BrainProvider = {
+      id: 'fake',
+      capabilities: fake.capabilities,
+      listModels: () => fake.listModels(),
+      complete: (req, handlers, signal) => {
+        seen.push({ model: req.model, text: JSON.stringify(req.messages) });
+        return fake.complete(req, handlers, signal);
+      },
+    };
+    const e = await boot(recording);
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+
+    await host.call('ask', { petId: 'scout', input: { text: 'Explain the release notes' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+    const started = host.notifications.find((n) => n.method === 'turn.started');
+    const conversationId = started?.params['conversationId'];
+
+    await host.call('ask', {
+      petId: 'scout',
+      conversationId,
+      input: { text: '@Ink draft a reply to this' },
+    });
+    await vi.waitFor(
+      () => expect(host.methods().filter((m) => m === 'turn.completed')).toHaveLength(2),
+      { timeout: 5000 },
+    );
+
+    const handoff = host.notifications.find((n) => n.method === 'pet.message');
+    expect(handoff?.params).toMatchObject({ kind: 'handoff', fromPetId: 'scout', toPetId: 'ink' });
+    const inkStart = host.notifications.filter((n) => n.method === 'turn.started')[1];
+    expect(inkStart?.params).toMatchObject({ petId: 'ink', model: 'anthropic/claude-sonnet-5' });
+    expect(inkStart?.params['conversationId']).not.toBe(conversationId);
+    expect(seen[1]?.model).toBe('anthropic/claude-sonnet-5');
+    expect(seen[1]?.text).toContain('Explain the release notes');
+    expect(seen[1]?.text).toContain('draft a reply to this');
+  });
+});
+
 describe('memory across a restart', () => {
   it('remembers a stated preference after the engine restarts', async () => {
     const systems: string[] = [];

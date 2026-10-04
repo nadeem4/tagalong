@@ -538,6 +538,25 @@ The brain is `settings.summarizer` (`{ providerId, model }`) when set, and other
 provider and model. The phase page named `claude-haiku-4-5`; defaulting to the pet's own brain means a
 crew on Token Factory and OpenRouter never needs a third key for housekeeping.
 
+### Handoff
+
+`crew/commands.ts` reads the crew syntax at the start of an ask, in core, so every host gets it: a
+leading `@Name` (a pet's name or id, any case) other than the pet being asked is a handoff, and
+`/crew <question>` is a roundtable. A mention of the pet already being asked is stripped; an unknown
+mention, or one mid-sentence, is ordinary text.
+
+`crew/handoff.ts` builds the `HandoffPayload` — `{ fromPetId, toPetId, summary, request, snapshot }` —
+from the stored thread without a model call. The summary is two paragraphs: what the user asked (first
+and latest questions, and the page or app they were in), then the source pet's latest answer, clipped
+to 700 characters. The snapshot is the one attached to this ask, or else the latest one in the thread.
+`startHandoff` opens a new conversation for the target, whose first user message is the summary plus
+the request, and broadcasts `pet.message { kind: 'handoff', text: summary, turnId, conversationId }`
+through the runner's `beforeStart` hook — so it reaches hosts _before_ the target's `turn.started`
+and the panel draws the bubble ahead of the answer.
+
+`turn.started` now carries `providerId` and `model` (and `runId` for crew runs), so a panel can label
+every answer with who said it and on what.
+
 ## The browser host
 
 `apps/extension` is a Manifest V3 extension built by Vite into `dist/`, the folder Chrome loads

@@ -19,6 +19,9 @@ import {
 import type { BrainProvider } from './providers';
 import type { ProviderResolver } from './conversation/runner';
 import { ConversationRunner } from './conversation';
+import type { TurnEventSink } from './conversation/runner';
+import { parseCrewCommand } from './crew/commands';
+import { startHandoff } from './crew/handoff';
 import { browserContextFor, createPerceptionToolset } from './perception';
 import type { PerceptionHost } from './perception';
 import { EngineServer } from './server/ws-server';
@@ -177,11 +180,12 @@ export class Engine {
     // runner's handlers before it starts. The holder ties that knot without a mutable
     // binding: no turn can run before boot returns, so the sink is never called empty.
     const live: { server?: EngineServer } = {};
+    const emit: TurnEventSink = (event) => live.server?.broadcast(event.method, event.params);
     const runner = new ConversationRunner({
       store,
       settings,
       provider,
-      emit: (event) => live.server?.broadcast(event.method, event.params),
+      emit,
       memory,
       // Off the request path: the reply is already on screen when the summary starts.
       afterTurn: ({ pet, conversationId }) => void summarizer.schedule(conversationId, pet),
@@ -200,6 +204,8 @@ export class Engine {
 
     const handlers = buildHandlers({
       runner,
+      store,
+      emit,
       pets,
       settings,
       hosts: () => live.server?.sessions() ?? [],
@@ -263,13 +269,15 @@ export class Engine {
 
 function buildHandlers(parts: {
   runner: ConversationRunner;
+  store: ConversationStore;
+  emit: TurnEventSink;
   pets: PetRegistry;
   settings: SettingsStore;
   /** Lazy, like the toolset's: the extension connects and drops while the app runs. */
   hosts: () => readonly PerceptionHost[];
   models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
 }): MethodHandlers {
-  const { runner, pets, settings, models, hosts } = parts;
+  const { runner, store, emit, pets, settings, models, hosts } = parts;
 
   return {
     ask: async (params) => {
@@ -282,9 +290,23 @@ function buildHandlers(parts: {
         exclusions: settings.get().captureExclusions,
       });
       // Phase 3 transcribes params.input.audio; Phase 1 is text only.
+      const command = parseCrewCommand(params.input.text ?? '', pets.list(), pet.id);
+      if (command.kind === 'handoff') {
+        const handle = startHandoff(
+          { runner, store, emit },
+          {
+            from: pet,
+            to: command.target,
+            conversationId: params.conversationId,
+            request: command.request,
+            snapshot,
+          },
+        );
+        return { turnId: handle.turnId };
+      }
       const handle = runner.run({
         pet,
-        text: params.input.text ?? '',
+        text: command.kind === 'ask' ? command.text : (params.input.text ?? ''),
         conversationId: params.conversationId,
         snapshot,
       });

@@ -43,6 +43,7 @@ const CORE_TO_HOST_NOTIFICATIONS = [
   'turn.error',
   'turn.warning',
   'pet.message',
+  'crew.status',
 ] as const;
 
 describe('method catalog', () => {
@@ -190,6 +191,59 @@ describe('notification schemas', () => {
       text: 'over to you',
     });
     expect(parsed.kind).toBe('handoff');
+  });
+
+  it('carries who said what and on which model in turn.started', () => {
+    const parsed = notificationParamsSchemaFor('turn.started').parse({
+      turnId,
+      petId: 'ink',
+      conversationId: turnId,
+      providerId: 'openrouter',
+      model: 'anthropic/claude-sonnet-5',
+      runId: turnId,
+    });
+    expect(parsed.model).toBe('anthropic/claude-sonnet-5');
+    expect(parsed.providerId).toBe('openrouter');
+  });
+
+  it('counts model calls on turn.completed when the engine knows them', () => {
+    const parsed = notificationParamsSchemaFor('turn.completed').parse({
+      turnId,
+      text: 'done',
+      stopReason: 'end',
+      usage: { inputTokens: 1, outputTokens: 1 },
+      modelCalls: 3,
+    });
+    expect(parsed.modelCalls).toBe(3);
+  });
+
+  it('links a pet.message to the turn and run it belongs to', () => {
+    const parsed = notificationParamsSchemaFor('pet.message').parse({
+      fromPetId: 'scout',
+      toPetId: 'ink',
+      kind: 'roundtable',
+      text: 'Round 1',
+      turnId,
+      conversationId: turnId,
+      runId: turnId,
+      round: 1,
+    });
+    expect(parsed.round).toBe(1);
+  });
+
+  it('validates a crew.status for a roundtable', () => {
+    const parsed = notificationParamsSchemaFor('crew.status').parse({
+      runId: turnId,
+      kind: 'roundtable',
+      state: 'running',
+      round: 2,
+      rounds: 2,
+      modelCalls: 4,
+    });
+    expect(parsed.state).toBe('running');
+    expect(
+      notificationParamsSchemaFor('crew.status').safeParse({ ...parsed, state: 'paused' }).success,
+    ).toBe(false);
   });
 
   it('rejects an unknown pet.message kind', () => {

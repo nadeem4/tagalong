@@ -22,7 +22,9 @@ export type TurnEvent =
   | { method: 'turn.toolResult'; params: NotificationParamsOf<'turn.toolResult'> }
   | { method: 'turn.completed'; params: NotificationParamsOf<'turn.completed'> }
   | { method: 'turn.warning'; params: NotificationParamsOf<'turn.warning'> }
-  | { method: 'turn.error'; params: NotificationParamsOf<'turn.error'> };
+  | { method: 'turn.error'; params: NotificationParamsOf<'turn.error'> }
+  | { method: 'pet.message'; params: NotificationParamsOf<'pet.message'> }
+  | { method: 'crew.status'; params: NotificationParamsOf<'crew.status'> };
 
 /** Injected rather than inherited from an EventEmitter: one sink, no subscription bookkeeping. */
 export type TurnEventSink = (event: TurnEvent) => void;
@@ -65,6 +67,13 @@ export interface RunAsk {
   /** Omitted for the first ask; the runner opens a conversation and reports its id. */
   conversationId?: string | undefined;
   snapshot?: ContextSnapshot | undefined;
+  /** Phase 4. Ties the turn to a crew run, and rides on its `turn.started`. */
+  runId?: string | undefined;
+  /**
+   * Called with the turn's ids just before `turn.started` goes out, so a crew feature can
+   * announce what is about to happen — a handoff bubble — ahead of the answer itself.
+   */
+  beforeStart?: ((ids: { turnId: string; conversationId: string }) => void) | undefined;
 }
 
 export interface TurnOutcome {
@@ -173,9 +182,17 @@ export class ConversationRunner {
     const turnId = randomUUID();
     const controller = new AbortController();
     this.#active.set(turnId, { petId: ask.pet.id, controller });
+    ask.beforeStart?.({ turnId, conversationId });
     this.#options.emit({
       method: 'turn.started',
-      params: { turnId, petId: ask.pet.id, conversationId },
+      params: {
+        turnId,
+        petId: ask.pet.id,
+        conversationId,
+        providerId: ask.pet.providerId,
+        model: ask.pet.model,
+        ...(ask.runId === undefined ? {} : { runId: ask.runId }),
+      },
     });
 
     const done = this.#stream(ask, turnId, conversationId, settings, controller.signal).finally(
