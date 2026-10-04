@@ -1,0 +1,50 @@
+{
+  "appId": "dev.tagalong.desktop",
+  "productName": "Tagalong",
+  "copyright": "Copyright \u00a9 2026 Tagalong",
+  "directories": {
+    "output": "release",
+    "buildResources": "resources"
+  },
+  "files": ["dist/**/*", "package.json"],
+  "asar": true,
+  "asarUnpack": ["**/*.node"],
+  "npmRebuild": false,
+  "publish": null,
+  "extraResources": [
+    {
+      "from": "../extension/dist",
+      "to": "extension"
+    }
+  ],
+  "artifactName": "${productName}-Setup-${version}-${arch}.${ext}",
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "executableName": "Tagalong"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Tagalong",
+    "runAfterFinish": true,
+    "deleteAppDataOnUninstall": false
+  },
+  "mac": {
+    "target": ["dmg"],
+    "category": "public.app-category.productivity"
+  },
+  "linux": {
+    "target": ["AppImage", "deb"],
+    "category": "Utility",
+    "maintainer": "Tagalong",
+    "executableName": "tagalong"
+  }
+}
