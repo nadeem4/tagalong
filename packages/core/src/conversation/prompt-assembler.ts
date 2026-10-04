@@ -80,6 +80,7 @@ export function assemblePrompt(input: AssembleInput): BrainRequest {
 
   return {
     model: pet.model,
+    ...(pet.visionModel === undefined ? {} : { visionModel: pet.visionModel }),
     system: systemPrompt(pet),
     messages,
     maxTokens: MAX_OUTPUT_TOKENS,

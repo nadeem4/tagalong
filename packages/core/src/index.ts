@@ -59,6 +59,7 @@ export {
   type PerceptionToolset,
   type PerceptionToolsetOptions,
   type ToolOutcome,
+  type ToolTurn,
 } from './perception';
 
 export { DB_FILENAME, LATEST_SCHEMA_VERSION, migrate, openDatabase } from './memory/db';

@@ -8,6 +8,7 @@ import { SettingsStore } from './settings/settings';
 import type { SecretStore } from './settings/settings';
 import { createProvider } from './providers';
 import type { BrainProvider } from './providers';
+import type { ProviderResolver } from './conversation/runner';
 import { ConversationRunner } from './conversation';
 import { createPerceptionToolset } from './perception';
 import { EngineServer } from './server/ws-server';
@@ -16,6 +17,42 @@ import { readOrCreatePairingToken } from './server/pairing';
 
 /** Key the Anthropic API key is filed under in the host's SecretStore. */
 export const ANTHROPIC_KEY = 'anthropic.apiKey';
+
+/** Which SecretStore entry holds the key for each provider id that needs one. */
+const PROVIDER_KEYS: Readonly<Record<string, string>> = {
+  anthropic: ANTHROPIC_KEY,
+};
+
+/**
+ * Builds each pet's provider the first time a turn needs it, then reuses it.
+ *
+ * Keys are read once, at boot: a key saved in Settings applies from the next launch,
+ * which is what the settings window already promises. A provider that cannot be built —
+ * no key, an unknown id — is not cached, so the error is raised on the turn that hit it
+ * and reported as that turn's `turn.error` rather than failing boot for every pet.
+ */
+async function providerResolver(
+  secrets: SecretStore,
+  env: Record<string, string | undefined> | undefined,
+): Promise<ProviderResolver> {
+  const keys = new Map<string, string>();
+  for (const [providerId, secretKey] of Object.entries(PROVIDER_KEYS)) {
+    const value = await secrets.get(secretKey);
+    if (value !== null && value.length > 0) keys.set(providerId, value);
+  }
+  const built = new Map<string, BrainProvider>();
+  return (pet) => {
+    const cached = built.get(pet.providerId);
+    if (cached !== undefined) return cached;
+    const provider = createProvider({
+      providerId: pet.providerId,
+      apiKey: keys.get(pet.providerId),
+      env,
+    });
+    built.set(pet.providerId, provider);
+    return provider;
+  };
+}
 
 export interface EngineOptions {
   /** Where the database, settings, and pairing token live. The host picks this. */
@@ -68,13 +105,8 @@ export class Engine {
     pets.seedDefaults();
 
     const current = settings.get();
-    const provider =
-      options.provider ??
-      createProvider({
-        providerId: current.providerId,
-        apiKey: (await options.secretStore.get(ANTHROPIC_KEY)) ?? undefined,
-        env: options.env,
-      });
+    // Each pet names its own provider, so there is no single brain to build at boot.
+    const provider = options.provider ?? (await providerResolver(options.secretStore, options.env));
 
     const store = new ConversationStore(db);
 
@@ -95,8 +127,8 @@ export class Engine {
         // Lazy for the same reason: the cap is a cost control the user edits in Settings,
         // and reading it at boot would make saving it do nothing until the next launch.
         windowTextBudget: () => settings.get().windowTextBudget,
-        // Without this, look_at_screen would only ever describe the screen in words.
-        vision: () => provider.capabilities.vision,
+        // No `vision` here: whether a look returns pixels depends on the pet asking, so
+        // the runner passes it with every tool call.
       }),
     });
 

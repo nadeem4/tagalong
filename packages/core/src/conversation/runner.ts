@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { ContextSnapshot, NotificationParamsOf, Pet, Settings } from '@tagalong/protocol';
 import type { BrainContentBlock, BrainProvider, BrainResult } from '../providers';
-import { BrainError } from '../providers';
+import { BrainError, modelForTurn } from '../providers';
 import type { ConversationStore } from '../memory/store';
 import type { SettingsStore } from '../settings/settings';
 import type { PerceptionToolset } from '../perception';
@@ -24,11 +24,19 @@ export type TurnEvent =
 /** Injected rather than inherited from an EventEmitter: one sink, no subscription bookkeeping. */
 export type TurnEventSink = (event: TurnEvent) => void;
 
+/**
+ * Finds the brain a pet names in `providerId`. Called once per turn, so a pet the user
+ * just moved to another provider answers from it on the next ask. May throw a
+ * `BrainError` — no key stored, an unknown id — which the turn reports as `turn.error`.
+ */
+export type ProviderResolver = (pet: Pet) => BrainProvider;
+
 export interface ConversationRunnerOptions {
   store: ConversationStore;
   /** Read per turn, so changing the history window takes effect without a restart. */
   settings: SettingsStore;
-  provider: BrainProvider;
+  /** One provider for every pet, or a resolver that picks each pet's own. */
+  provider: BrainProvider | ProviderResolver;
   emit: TurnEventSink;
   /**
    * The built-in perception tools. Optional because the runner has to work before any
@@ -191,11 +199,22 @@ export class ConversationRunner {
     // Read history after the question is stored so the prompt ends on what was asked.
     const history = this.#options.store.lastMessages(conversationId, settings.historyMessages);
 
-    // Sending pixels to a model that cannot decode them costs the user tokens and buys a
-    // confident answer about an image nobody read. Dropping it silently would be worse
-    // still, so the warning goes out — as a warning, because the turn still answers.
+    let provider: BrainProvider;
+    try {
+      const option = this.#options.provider;
+      provider = typeof option === 'function' ? option(ask.pet) : option;
+    } catch (error) {
+      return this.#fail(turnId, conversationId, error);
+    }
+
+    // Whether any model this pet may use can decode an image. Sending pixels to one that
+    // cannot costs the user tokens and buys a confident answer about an image nobody read.
+    // Dropping it silently would be worse still, so the warning goes out — as a warning,
+    // because the turn still answers.
+    const canSee = modelForTurn(provider, ask.pet, true) !== null;
+
     let snapshot = ask.snapshot;
-    if (snapshot?.screenshot && !this.#options.provider.capabilities.vision) {
+    if (snapshot?.screenshot && !canSee) {
       snapshot = withoutScreenshot(snapshot);
       this.#options.emit({
         method: 'turn.warning',
@@ -216,11 +235,11 @@ export class ConversationRunner {
 
     // A provider without tool support is never sent tools: some reject the field outright,
     // and the rest would only be told about an ability they cannot use.
-    const tools = this.#options.provider.capabilities.tools ? this.#options.tools : undefined;
+    const tools = provider.capabilities.tools ? this.#options.tools : undefined;
     const request = tools ? { ...base, tools: [...tools.definitions] } : base;
 
     try {
-      const result = await this.#options.provider.complete(
+      const result = await provider.complete(
         request,
         {
           onText: (text) => this.#options.emit({ method: 'turn.delta', params: { turnId, text } }),
@@ -235,7 +254,7 @@ export class ConversationRunner {
               method: 'turn.toolRequest',
               params: { turnId, approvalId: randomUUID(), tool: call.name, input: call.input },
             });
-            const outcome = await tools.run(call);
+            const outcome = await tools.run(call, { vision: canSee });
             this.#options.emit({
               method: 'turn.toolResult',
               params: {
@@ -275,18 +294,22 @@ export class ConversationRunner {
       });
       return { turnId, conversationId, ...result };
     } catch (error) {
-      const code = error instanceof BrainError ? error.code : 'unknown';
-      const message = error instanceof Error ? error.message : String(error);
-      this.#options.emit({ method: 'turn.error', params: { turnId, code, message } });
-      return {
-        turnId,
-        conversationId,
-        text: '',
-        stopReason: 'error',
-        usage: { inputTokens: 0, outputTokens: 0 },
-        error: { code, message },
-      };
+      return this.#fail(turnId, conversationId, error);
     }
+  }
+
+  #fail(turnId: string, conversationId: string, error: unknown): TurnOutcome {
+    const code = error instanceof BrainError ? error.code : 'unknown';
+    const message = error instanceof Error ? error.message : String(error);
+    this.#options.emit({ method: 'turn.error', params: { turnId, code, message } });
+    return {
+      turnId,
+      conversationId,
+      text: '',
+      stopReason: 'error',
+      usage: { inputTokens: 0, outputTokens: 0 },
+      error: { code, message },
+    };
   }
 }
 

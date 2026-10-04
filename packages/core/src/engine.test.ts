@@ -138,6 +138,46 @@ describe('Engine.boot', () => {
   });
 });
 
+describe('per-pet providers', () => {
+  async function bootWithoutFakes(): Promise<{ e: Engine; host: TestHost }> {
+    engine = await Engine.boot({
+      dataDir: dir,
+      secretStore: new InMemorySecretStore(),
+      engineVersion: '0.0.0-test',
+      port: 0,
+      env: {},
+    });
+    const host = await TestHost.connect(engine.port);
+    await host.call('hello', helloParams(engine.pairingToken));
+    return { e: engine, host };
+  }
+
+  it('boots without any key, and a Nemotron pet with no key fails its turn readably', async () => {
+    const { host } = await bootWithoutFakes();
+
+    await host.call('ask', { petId: 'scout', input: { text: 'hi' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.error'), { timeout: 5000 });
+
+    const error = host.notifications.find((n) => n.method === 'turn.error');
+    expect(error?.params['code']).toBe('auth');
+    expect(String(error?.params['message'])).toContain('Token Factory');
+  });
+
+  it('answers each pet from the provider it names', async () => {
+    const { host } = await bootWithoutFakes();
+    const scout = ((await host.call('pets.list'))['result'] as { pets: Record<string, unknown>[] })
+      .pets[0];
+    await host.call('pets.upsert', {
+      pet: { ...scout, id: 'ink', name: 'Ink', providerId: 'fake', model: 'fake-model' },
+    });
+
+    await host.call('ask', { petId: 'ink', input: { text: 'hi' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+
+    expect(host.methods()).not.toContain('turn.error');
+  });
+});
+
 describe('ask', () => {
   it('streams a turn from ask through to completion', async () => {
     const e = await boot();

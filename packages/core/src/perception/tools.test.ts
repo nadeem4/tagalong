@@ -225,3 +225,30 @@ describe('unknown tools', () => {
     expect(result.content).toContain('delete_everything');
   });
 });
+
+describe('per-turn vision', () => {
+  it('sends pixels when the turn says its brain can see and the host sets no ceiling', async () => {
+    const tools = createPerceptionToolset({
+      hosts: () => [screenshotHost()],
+      exclusions: () => NO_EXCLUSIONS,
+    });
+    const outcome = await tools.run({ name: LOOK_AT_SCREEN }, { vision: true });
+    expect(Array.isArray(outcome.content)).toBe(true);
+  });
+
+  it('answers in words when this turn cannot see, even though the toolset could', async () => {
+    const outcome = await toolset([screenshotHost()]).run(
+      { name: LOOK_AT_SCREEN },
+      { vision: false },
+    );
+    expect(typeof outcome.content).toBe('string');
+  });
+
+  it('never lets a turn widen a toolset that was built blind', async () => {
+    const outcome = await toolset([screenshotHost()], NO_EXCLUSIONS, false).run(
+      { name: LOOK_AT_SCREEN },
+      { vision: true },
+    );
+    expect(typeof outcome.content).toBe('string');
+  });
+});

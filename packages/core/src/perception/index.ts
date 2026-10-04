@@ -21,4 +21,5 @@ export {
   type PerceptionToolset,
   type PerceptionToolsetOptions,
   type ToolOutcome,
+  type ToolTurn,
 } from './tools';
