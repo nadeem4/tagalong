@@ -17,6 +17,7 @@ const bridge: HostBridge = {
     ipcRenderer.invoke(IPC.capture, targets) as Promise<ContextSnapshot | null>,
   interrupt: (turnId: string) => ipcRenderer.invoke(IPC.interrupt, turnId) as Promise<void>,
   listPets: () => ipcRenderer.invoke(IPC.listPets) as Promise<Pet[]>,
+  stopWatch: (watchId: string) => ipcRenderer.invoke(IPC.stopWatch, watchId) as Promise<void>,
   onTurnEvent: (handler: (event: TurnEvent) => void) => {
     const listener = (_event: IpcRendererEvent, turnEvent: TurnEvent): void => handler(turnEvent);
     ipcRenderer.on(IPC.turnEvent, listener);

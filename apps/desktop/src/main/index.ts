@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BrowserWindow, Menu, Tray, app, dialog, ipcMain, screen } from 'electron';
+import { BrowserWindow, Menu, Notification, Tray, app, dialog, ipcMain, screen } from 'electron';
 import { ContextSnapshot } from '@tagalong/protocol';
 import type { PerceptionTarget, Pet, Settings, SettingsPatch } from '@tagalong/protocol';
 import { SettingsStore } from '@tagalong/core';
@@ -262,11 +262,29 @@ function forwardToRenderers(notification: { method: string; params: unknown }): 
     desktop?.activeTurns.delete(params.turnId);
   }
 
+  if (notification.method === 'watch.fired') announceWatch(notification.params);
+
   // The renderer speaks the UI package's TurnEvent shape: the wire params plus the
   // method as a discriminant.
   const event = { type: notification.method, ...params };
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.send(IPC.turnEvent, event);
+  }
+}
+
+/**
+ * A watch fired: say so where the user will see it. The panel gets the message as a card
+ * through the ordinary event forward; this adds a system toast and brings the panel up
+ * beside the avatar. Not spoken — Phase 3 (Voice) is not built, and speaking it is
+ * deferred there.
+ */
+function announceWatch(params: unknown): void {
+  const { message } = (params ?? {}) as { message?: string };
+  if (message !== undefined && Notification.isSupported()) {
+    new Notification({ title: 'Tagalong — a watch fired', body: message, silent: false }).show();
+  }
+  if (desktop?.panel != null && desktop.avatar != null && !desktop.panel.isVisible()) {
+    showPanelBeside(desktop.panel, desktop.avatar);
   }
 }
 
@@ -449,6 +467,10 @@ function registerIpc(): void {
       });
     },
   );
+
+  ipcMain.handle(IPC.stopWatch, async (_event, watchId: string) => {
+    await engine().client.call('watch.stop', { watchId });
+  });
 
   ipcMain.handle(IPC.interrupt, async (_event, turnId: string) => {
     await engine().client.call('interrupt', { turnId });
