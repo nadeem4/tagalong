@@ -60,3 +60,23 @@ describe('Pet', () => {
     expect(Pet.safeParse({ ...valid, color: 'blue' }).success).toBe(false);
   });
 });
+
+describe('Pet.watchModel', () => {
+  const pet = {
+    id: 'scout',
+    name: 'Scout',
+    avatar: 'S',
+    persona: '',
+    model: 'nvidia/nemotron-3-super-120b-a12b',
+    providerId: 'nebius',
+  };
+
+  it('is optional: absent means the provider default check model', () => {
+    expect(Pet.parse(pet).watchModel).toBeUndefined();
+  });
+
+  it('keeps a model the user picked and refuses an empty one', () => {
+    expect(Pet.parse({ ...pet, watchModel: 'nano' }).watchModel).toBe('nano');
+    expect(Pet.safeParse({ ...pet, watchModel: '' }).success).toBe(false);
+  });
+});

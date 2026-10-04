@@ -30,6 +30,12 @@ export const Pet = z.object({
    * Optional: a pet on a model that sees, or a provider whose models all do, needs none.
    */
   visionModel: z.string().min(1).optional(),
+  /**
+   * Phase 3B. The small, cheap model that answers a watch's frequent yes-or-no check, on
+   * the pet's own provider. Absent means that provider's default — Nemotron 3 Nano on
+   * Token Factory, Claude Haiku on OpenRouter and Anthropic.
+   */
+  watchModel: z.string().min(1).optional(),
   /** BrainProvider id: 'nebius', 'anthropic' or 'fake'. Each pet picks its own. */
   providerId: z.string().min(1),
   /** Phase 3. */
