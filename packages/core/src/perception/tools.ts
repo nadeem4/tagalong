@@ -4,7 +4,11 @@ import type {
   DisplayBounds,
   HostCapability,
   PerceptionCaptureRegionResult,
+  PerceptionDiffParams,
+  PerceptionDiffResult,
   PerceptionListWindowsResult,
+  PerceptionRecallParams,
+  PerceptionRecallResult,
   PerceptionReadTextResult,
   PerceptionTarget,
 } from '@tagalong/protocol';
@@ -24,12 +28,22 @@ import {
   runLookCloser,
   runReadWindowText,
 } from './full-view-tools';
+import { RECALL_SCREEN, WHAT_CHANGED, runRecallScreen, runWhatChanged } from './recall-tools';
+import type { RecallContext } from './recall-tools';
 
 /** The two built-ins every pet gets. Named as the model sees them. */
 export const LOOK_AT_SCREEN = 'look_at_screen';
 export const GET_SELECTION = 'get_selection';
 
-export { LIST_DISPLAYS, LIST_WINDOWS, LOOK_AT_DISPLAY, LOOK_CLOSER, READ_WINDOW_TEXT };
+export {
+  LIST_DISPLAYS,
+  LIST_WINDOWS,
+  LOOK_AT_DISPLAY,
+  LOOK_CLOSER,
+  READ_WINDOW_TEXT,
+  RECALL_SCREEN,
+  WHAT_CHANGED,
+};
 
 /**
  * The slice of a connected host the tools need.
@@ -55,6 +69,10 @@ export interface PerceptionHost {
   }): Promise<PerceptionCaptureRegionResult>;
   listWindows?(): Promise<PerceptionListWindowsResult>;
   readText?(params: { windowId?: string; maxChars: number }): Promise<PerceptionReadTextResult>;
+  /** Phase 3B, behind the `recall` capability: a buffered frame from a moment ago. */
+  recall?(params: PerceptionRecallParams): Promise<PerceptionRecallResult>;
+  /** Phase 3B, behind the `recall` capability: how a display changed since then. */
+  diff?(params: PerceptionDiffParams): Promise<PerceptionDiffResult>;
 }
 
 export interface PerceptionToolsetOptions {
@@ -83,6 +101,8 @@ export interface PerceptionToolsetOptions {
    * user.
    */
   windowTextBudget?: () => number;
+  /** Phase 3B. Milliseconds since the epoch; injected so recall wording is testable. */
+  now?: () => number;
 }
 
 /** Exactly what `BrainEvents.onToolUse` must resolve with. */
@@ -219,6 +239,45 @@ const DEFINITIONS: readonly BrainTool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: RECALL_SCREEN,
+    description:
+      'Look back at the screen as it was a while ago, from rolling memory: a picture of each ' +
+      'display and the windows open at that moment. Use it when the user asks what they were ' +
+      'doing, reading or looking at earlier — "five minutes ago", "before the meeting". ' +
+      'Always state the time of the frame you describe, and never present it as the screen ' +
+      'now. Memory is opt-in and holds only the last few minutes; the result says when it is ' +
+      'off or does not reach back that far.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        secondsAgo: { type: 'number', description: 'How many seconds back to look.' },
+        displayId: {
+          type: 'number',
+          description: 'One display id from list_displays. Omit for every display.',
+        },
+      },
+      required: ['secondsAgo'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: WHAT_CHANGED,
+    description:
+      'Compare one display now with how it looked some seconds ago and see only the part ' +
+      'that changed, before and after, with how much of the screen it was. Use it for ' +
+      '"what just happened", "what changed while I was away". State the two times you are ' +
+      'comparing.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        displayId: { type: 'number', description: 'A display id from list_displays.' },
+        sinceSeconds: { type: 'number', description: 'How many seconds back to compare with.' },
+      },
+      required: ['displayId', 'sinceSeconds'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 /**
@@ -253,6 +312,10 @@ export function createPerceptionToolset(base: PerceptionToolsetOptions): Percept
           return runListWindows(fullView(options));
         case READ_WINDOW_TEXT:
           return runReadWindowText(fullView(options), call.input);
+        case RECALL_SCREEN:
+          return runRecallScreen(recallContext(options), call.input);
+        case WHAT_CHANGED:
+          return runWhatChanged(recallContext(options), call.input);
         default:
           // Named back so the model can correct itself instead of retrying blindly.
           return Promise.resolve({
@@ -260,6 +323,23 @@ export function createPerceptionToolset(base: PerceptionToolsetOptions): Percept
             isError: true,
           });
       }
+    },
+  };
+}
+
+/** Binds the Phase 3B tools to whichever host advertises `recall` and implements the method. */
+function recallContext(options: PerceptionToolsetOptions): RecallContext {
+  return {
+    vision: () => options.vision?.() ?? false,
+    now: () => options.now?.() ?? Date.now(),
+    host(capability, method) {
+      const found = options
+        .hosts()
+        .find(
+          (candidate) =>
+            candidate.capabilities.includes(capability) && typeof candidate[method] === 'function',
+        );
+      return found as ReturnType<RecallContext['host']>;
     },
   };
 }

@@ -665,6 +665,26 @@ over the region's area, and frames of different sizes count as wholly changed. T
 again at native resolution through `captureRegion` (1024 px long side), so a check model can read text
 a 640-pixel frame turns into a smear.
 
+### The tools
+
+`packages/core/src/perception/recall-tools.ts` adds two built-ins to the perception toolset, after the
+full-view five. Both find a host that advertises `recall` and implements the method, and both name
+the moment they describe in every answer, because a pet describing a frame from five minutes ago as
+the screen now is the failure this feature invites.
+
+- `recall_screen(secondsAgo, displayId?)` calls `perception.recall`. A seeing pet gets each frame as
+  an image block followed by `Display 1 at <time>`, then a text block with the time in words, the
+  focused window and the window list of that moment. When the frame found is more than ten seconds
+  newer than the moment asked for, the text says how far back memory actually reaches. Memory off
+  and memory empty are two different sentences, so the pet can tell the user which.
+- `what_changed(displayId, sinceSeconds)` calls `perception.diff` with images. A seeing pet gets
+  `Before, at <time>`, the before crop, `After, at <time>`, the after crop, and the share of the
+  display that changed with the changed box. No earlier frame and nothing changed are answered in
+  words.
+
+A blind pet gets the same facts as text and is told it has not seen the pictures. The panel's
+`turn.toolResult` summary counts images rather than forwarding them.
+
 ## The browser host
 
 `apps/extension` is a Manifest V3 extension built by Vite into `dist/`, the folder Chrome loads

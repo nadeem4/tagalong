@@ -22,6 +22,8 @@ export { THIN_TEXT_CHARS, textLayerNotes, type TextLayerReading } from './text-l
 export {
   GET_SELECTION,
   LOOK_AT_SCREEN,
+  RECALL_SCREEN,
+  WHAT_CHANGED,
   createPerceptionToolset,
   type PerceptionHost,
   type PerceptionToolset,

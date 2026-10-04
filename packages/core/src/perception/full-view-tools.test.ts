@@ -122,7 +122,7 @@ function toolset(
 }
 
 describe('the full-view toolset', () => {
-  it('offers exactly the five full-view tools alongside the Phase 2 pair', () => {
+  it('offers the five full-view tools after the Phase 2 pair, then the Phase 3B pair', () => {
     expect(toolset([fullViewHost()]).definitions.map((tool) => tool.name)).toEqual([
       LOOK_AT_SCREEN,
       GET_SELECTION,
@@ -131,6 +131,8 @@ describe('the full-view toolset', () => {
       LOOK_CLOSER,
       LIST_WINDOWS,
       READ_WINDOW_TEXT,
+      'recall_screen',
+      'what_changed',
     ]);
   });
 
@@ -140,7 +142,8 @@ describe('the full-view toolset', () => {
     // tool taking an array of window ids, or named for "all", would reopen it quietly.
     for (const tool of toolset([fullViewHost()]).definitions) {
       expect(JSON.stringify(tool.inputSchema), tool.name).not.toMatch(/"type":\s*"array"/);
-      expect(tool.name).not.toMatch(/all|every/i);
+      // Whole words only: `recall_screen` has "all" inside "recall" and reads nothing.
+      expect(tool.name).not.toMatch(/(^|_)(all|every)(_|$)/i);
     }
   });
 
