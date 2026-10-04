@@ -139,6 +139,12 @@ describe('WatchManager', () => {
     expect(check.requests).toHaveLength(0);
   });
 
+  it('names the check model in its status', async () => {
+    const { manager, events } = setup();
+    await started(manager);
+    expect(events[0]?.params).toMatchObject({ checkModel: 'claude-haiku-4-5' });
+  });
+
   it('polls with a local diff and no images until something changes', async () => {
     const { clock, screen, manager } = setup();
     await started(manager);

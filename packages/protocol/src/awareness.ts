@@ -100,6 +100,8 @@ export const WatchStatusParams = z.object({
   /** Model checks spent so far, against `maxChecks`. */
   checks: z.number().int().nonnegative(),
   maxChecks: z.number().int().positive(),
+  /** The small model answering this watch's checks, so the chip can say which one. */
+  checkModel: z.string().min(1).optional(),
   /** A sentence for the user when the watch ended for a reason worth saying. */
   detail: z.string().optional(),
 });

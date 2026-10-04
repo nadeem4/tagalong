@@ -31,6 +31,7 @@ interface RunningWatch {
   condition: string;
   checks: number;
   maxChecks: number;
+  checkModel?: string;
 }
 
 /** Who is answering a turn, from its `turn.started`. */
@@ -225,6 +226,7 @@ export function ChatPanel({
             condition: event.condition,
             checks: event.checks,
             maxChecks: event.maxChecks,
+            ...(event.checkModel === undefined ? {} : { checkModel: event.checkModel }),
           };
           setWatches((current) => [
             ...current.filter((watch) => watch.watchId !== event.watchId),
@@ -348,8 +350,12 @@ export function ChatPanel({
             <span className="truncate">
               {watcher === undefined ? '' : `${watcher.name}: `}“{watch.condition}”
             </span>
-            <span className="ml-auto shrink-0 text-sky-700" title="Model checks spent">
-              {watch.checks}/{watch.maxChecks}
+            <span
+              className="ml-auto shrink-0 text-sky-700"
+              title="Model checks spent, and the small model answering them"
+            >
+              {watch.checks}/{watch.maxChecks} checks
+              {watch.checkModel === undefined ? '' : ` · ${watch.checkModel}`}
             </span>
             {bridge.stopWatch !== undefined && (
               <button

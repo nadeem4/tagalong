@@ -640,7 +640,7 @@ catalog does not have — time.
   with `includeImages: false` and asks for the crops only when it is about to show them to a model.
 - `watch.fired { watchId, petId, message, displayId }` says a watch's condition came true; the watch is
   over. `watch.status` reports `watching`, then exactly one final state — `fired`, `stopped`,
-  `timeout`, `capped` or `error` — with the checks spent, so a host can show a Watching chip and take
+  `timeout`, `capped` or `error` — with the checks spent and the check model, so a host can show a Watching chip and take
   it down. `watch.stop { watchId }` is the chip's Stop button.
 
 ### Rolling memory

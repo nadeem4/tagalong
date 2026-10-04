@@ -145,6 +145,20 @@ describe('watch notifications', () => {
     ).toBe(false);
   });
 
+  it('watch.status may name the model answering the checks', () => {
+    const status = {
+      watchId,
+      petId: 'scout',
+      condition: 'x',
+      displayId: 1,
+      state: 'watching',
+      checks: 0,
+      maxChecks: 60,
+      checkModel: 'nvidia/nemotron-3-nano-30b-a3b',
+    };
+    expect(WatchStatusParams.parse(status).checkModel).toBe('nvidia/nemotron-3-nano-30b-a3b');
+  });
+
   it('watch.stop takes a watch id and says whether it stopped one', () => {
     expect(WatchStopParams.safeParse({ watchId }).success).toBe(true);
     expect(WatchStopParams.safeParse({ watchId: 'nope' }).success).toBe(false);

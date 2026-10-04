@@ -234,6 +234,7 @@ export class WatchManager {
         state,
         checks: watch.checks,
         maxChecks: watch.maxChecks,
+        checkModel: watchModelsFor(watch.pet).model,
         ...(detail === undefined ? {} : { detail }),
       },
     });

@@ -45,6 +45,7 @@ function status(
       state,
       checks: extra.checks ?? 0,
       maxChecks: 60,
+      checkModel: 'anthropic/claude-haiku-4.5',
       ...(extra.detail === undefined ? {} : { detail: extra.detail }),
     });
   });
@@ -60,6 +61,8 @@ describe('the Watching chip', () => {
     expect(chip).toHaveTextContent('Watching');
     expect(chip).toHaveTextContent('the build finishes');
     expect(chip).toHaveTextContent('2/60');
+    // Which model answers the checks is part of what the chip says: it is the cost story.
+    expect(chip).toHaveTextContent('anthropic/claude-haiku-4.5');
   });
 
   it('shows one chip per watch', () => {
