@@ -13,7 +13,14 @@ const PURE_PACKAGES = ['packages/core/**/*.ts', 'packages/protocol/**/*.ts'];
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/out/**', '**/coverage/**', '**/node_modules/**', '.remember/**'],
+    ignores: [
+      '**/dist/**',
+      '**/out/**',
+      '**/coverage/**',
+      '**/node_modules/**',
+      '**/release/**',
+      '.remember/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
