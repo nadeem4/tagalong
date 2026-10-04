@@ -303,3 +303,13 @@ describe('Settings.summarizer', () => {
     );
   });
 });
+
+describe('Settings.hiddenPets', () => {
+  it('shows every pet on the desktop by default', () => {
+    expect(Settings.parse({}).hiddenPets).toEqual([]);
+  });
+
+  it('keeps the pets the user hid', () => {
+    expect(SettingsPatch.parse({ hiddenPets: ['bolt'] }).hiddenPets).toEqual(['bolt']);
+  });
+});

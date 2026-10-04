@@ -48,6 +48,20 @@ body {
   user-select: none;
 }
 
+.avatar__pet {
+  -webkit-app-region: no-drag;
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
 .avatar__open {
   -webkit-app-region: no-drag;
   position: absolute;
@@ -143,14 +157,28 @@ button:disabled {
 }
 
 .settings input,
-.settings select {
+.settings select,
+.settings textarea {
   width: 100%;
+}
+
+/* A checkbox stretched to 100% pushes its own label off the line. */
+.settings__check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings__check input {
+  width: auto;
 }
 
 .settings__pet {
   margin: 0 0 16px;
   padding: 8px 12px 0;
   border: 1px solid var(--line);
+  /* Painted in the pet's own colour by the editor. */
+  border-left-width: 4px;
 }
 
 .settings__note {

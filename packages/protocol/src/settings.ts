@@ -85,6 +85,7 @@ export const SETTINGS_DEFAULTS = {
    */
   windowTextBudget: DEFAULT_WINDOW_TEXT_CHARS,
   summarizer: null,
+  hiddenPets: [] as string[],
 } as const;
 
 /** A non-blank, trimmed entry. A blank one would match every window and blind the pet. */
@@ -213,6 +214,8 @@ const settingsFields = {
    * OpenRouter never needs a third key just for housekeeping.
    */
   summarizer: z.object({ providerId: z.string().min(1), model: z.string().min(1) }).nullable(),
+  /** Phase 4. Pets left off the desktop crew strip. They still answer in the panel. */
+  hiddenPets: z.array(z.string().min(1)),
 };
 
 export const Settings = z.object({
@@ -237,6 +240,7 @@ export const Settings = z.object({
   sightDetail: settingsFields.sightDetail.default(SETTINGS_DEFAULTS.sightDetail),
   windowTextBudget: settingsFields.windowTextBudget.default(SETTINGS_DEFAULTS.windowTextBudget),
   summarizer: settingsFields.summarizer.default(SETTINGS_DEFAULTS.summarizer),
+  hiddenPets: settingsFields.hiddenPets.prefault([...SETTINGS_DEFAULTS.hiddenPets]),
 });
 export type Settings = z.infer<typeof Settings>;
 

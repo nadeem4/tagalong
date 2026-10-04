@@ -17,6 +17,11 @@ export interface SettingsFormValues {
   pauseSightHotkey: string;
   sightDetail: string;
   windowTextBudget: string;
+  /** Phase 4. The pets unticked under "Show on desktop". Absent leaves the setting alone. */
+  hiddenPets?: readonly string[];
+  /** Phase 4. Both blank means each pet summarises with its own brain. */
+  summarizerProviderId?: string;
+  summarizerModel?: string;
 }
 
 /**
@@ -43,7 +48,27 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
     },
     sightDetail: values.sightDetail,
     windowTextBudget: parseBudget(values.windowTextBudget),
+    ...(values.hiddenPets !== undefined ? { hiddenPets: [...values.hiddenPets] } : {}),
+    ...(values.summarizerProviderId !== undefined || values.summarizerModel !== undefined
+      ? { summarizer: parseSummarizer(values.summarizerProviderId, values.summarizerModel) }
+      : {}),
   });
+}
+
+/** Both boxes or neither: half a summarizer is a typo, not a choice. */
+function parseSummarizer(
+  rawProvider: string | undefined,
+  rawModel: string | undefined,
+): { providerId: string; model: string } | null {
+  const providerId = (rawProvider ?? '').trim();
+  const model = (rawModel ?? '').trim();
+  if (providerId.length === 0 && model.length === 0) return null;
+  if (providerId.length === 0 || model.length === 0) {
+    throw new Error(
+      'The summarizer needs both a provider and a model — or leave both blank to use each pet’s own.',
+    );
+  }
+  return { providerId, model };
 }
 
 /**
