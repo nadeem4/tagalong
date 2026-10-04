@@ -30,7 +30,7 @@ export function engineInfo(port?: number): EngineInfo {
 
 export { ANTHROPIC_KEY, Engine, type EngineOptions } from './engine';
 
-export { PetRegistry, SCOUT } from './pets/registry';
+export { BOLT, DEFAULT_CREW, INK, INK_MODEL, PetRegistry, SCOUT } from './pets/registry';
 
 export {
   InMemorySecretStore,
@@ -64,6 +64,14 @@ export {
 
 export { DB_FILENAME, LATEST_SCHEMA_VERSION, migrate, openDatabase } from './memory/db';
 export { ConversationStore } from './memory/store';
+export {
+  MemoryStore,
+  ftsQuery,
+  type Memory,
+  type MemoryKind,
+  type MemoryScope,
+  type NewMemory,
+} from './memory/memories';
 
 export {
   AnthropicProvider,

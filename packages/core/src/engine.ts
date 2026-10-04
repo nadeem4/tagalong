@@ -3,6 +3,8 @@ import { DEFAULT_ENGINE_PORT, Settings } from '@tagalong/protocol';
 import type { Pet } from '@tagalong/protocol';
 import { openDatabase } from './memory/db';
 import { ConversationStore } from './memory/store';
+import { MemoryStore } from './memory/memories';
+import { Summarizer } from './memory/summarizer';
 import { PetRegistry } from './pets/registry';
 import { SettingsStore } from './settings/settings';
 import type { SecretStore } from './settings/settings';
@@ -17,6 +19,10 @@ import {
 import type { BrainProvider } from './providers';
 import type { ProviderResolver } from './conversation/runner';
 import { ConversationRunner } from './conversation';
+import type { TurnEventSink } from './conversation/runner';
+import { parseCrewCommand } from './crew/commands';
+import { startHandoff } from './crew/handoff';
+import { startRoundtable } from './crew/roundtable';
 import { browserContextFor, createPerceptionToolset } from './perception';
 import type { PerceptionHost } from './perception';
 import { EngineServer } from './server/ws-server';
@@ -160,16 +166,31 @@ export class Engine {
       options.provider ?? (await providerResolver(options.secretStore, settings, options.env));
 
     const store = new ConversationStore(db);
+    const memory = new MemoryStore(db);
+    const resolve: ProviderResolver =
+      typeof provider === 'function' ? provider : () => provider as BrainProvider;
+    const summarizer = new Summarizer({
+      store,
+      memories: memory,
+      settings,
+      provider: resolve,
+      onError: (error) => console.warn('[engine] a conversation summary failed:', error),
+    });
 
     // The runner needs an event sink before the server exists, and the server needs the
     // runner's handlers before it starts. The holder ties that knot without a mutable
     // binding: no turn can run before boot returns, so the sink is never called empty.
     const live: { server?: EngineServer } = {};
+    const emit: TurnEventSink = (event) => live.server?.broadcast(event.method, event.params);
     const runner = new ConversationRunner({
       store,
       settings,
       provider,
-      emit: (event) => live.server?.broadcast(event.method, event.params),
+      emit,
+      memory,
+      // Off the request path: the reply is already on screen when the summary starts.
+      afterTurn: ({ pet, conversationId }) => void summarizer.schedule(conversationId, pet),
+      consult: { pets: () => pets.list() },
       // Both lookups are lazy: hosts connect and drop between turns, and the exclusion
       // list is edited while the app runs, so neither can be captured at boot.
       tools: createPerceptionToolset({
@@ -185,6 +206,8 @@ export class Engine {
 
     const handlers = buildHandlers({
       runner,
+      store,
+      emit,
       pets,
       settings,
       hosts: () => live.server?.sessions() ?? [],
@@ -248,13 +271,15 @@ export class Engine {
 
 function buildHandlers(parts: {
   runner: ConversationRunner;
+  store: ConversationStore;
+  emit: TurnEventSink;
   pets: PetRegistry;
   settings: SettingsStore;
   /** Lazy, like the toolset's: the extension connects and drops while the app runs. */
   hosts: () => readonly PerceptionHost[];
   models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
 }): MethodHandlers {
-  const { runner, pets, settings, models, hosts } = parts;
+  const { runner, store, emit, pets, settings, models, hosts } = parts;
 
   return {
     ask: async (params) => {
@@ -267,9 +292,31 @@ function buildHandlers(parts: {
         exclusions: settings.get().captureExclusions,
       });
       // Phase 3 transcribes params.input.audio; Phase 1 is text only.
+      const command = parseCrewCommand(params.input.text ?? '', pets.list(), pet.id);
+      if (command.kind === 'handoff') {
+        const handle = startHandoff(
+          { runner, store, emit },
+          {
+            from: pet,
+            to: command.target,
+            conversationId: params.conversationId,
+            request: command.request,
+            snapshot,
+          },
+        );
+        return { turnId: handle.turnId };
+      }
+      if (command.kind === 'roundtable') {
+        // The whole crew, the asked pet first; the run reports itself through crew.status.
+        const run = startRoundtable(
+          { runner, emit },
+          { starter: pet, pets: pets.list(), question: command.question, snapshot },
+        );
+        return { turnId: run.firstTurnId };
+      }
       const handle = runner.run({
         pet,
-        text: params.input.text ?? '',
+        text: command.text,
         conversationId: params.conversationId,
         snapshot,
       });

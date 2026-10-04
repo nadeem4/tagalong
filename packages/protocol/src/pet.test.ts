@@ -51,4 +51,12 @@ describe('Pet', () => {
   it('rejects an empty vision model', () => {
     expect(Pet.safeParse({ ...valid, visionModel: '' }).success).toBe(false);
   });
+
+  it('keeps a colour the crew strip can paint', () => {
+    expect(Pet.parse({ ...valid, color: '#0ea5e9' }).color).toBe('#0ea5e9');
+  });
+
+  it('rejects a colour that is not a six-digit hex', () => {
+    expect(Pet.safeParse({ ...valid, color: 'blue' }).success).toBe(false);
+  });
 });

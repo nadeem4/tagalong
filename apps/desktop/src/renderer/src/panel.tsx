@@ -30,12 +30,18 @@ function Panel() {
     return window.tagalongHost.onHotkeyProblem(setHotkeyProblem);
   }, []);
 
+  // Opens on the default pet (Scout on a fresh install); the crew strip moves it from there.
   useEffect(() => {
-    window.tagalong
-      .listPets()
-      .then((pets) => setPetId(pets[0]?.id ?? null))
+    Promise.all([window.tagalong.listPets(), window.tagalongHost.getHostView()])
+      .then(([pets, view]) => {
+        const preferred = pets.find((pet) => pet.id === view.settings.defaultPetId);
+        setPetId((preferred ?? pets[0])?.id ?? null);
+      })
       .catch((error: unknown) => console.error('could not list pets', error));
   }, []);
+
+  // A click on the desktop crew strip picks the pet this panel talks to.
+  useEffect(() => window.tagalongHost.onActivePet(setPetId), []);
 
   if (petId === null) return <p className="settings__note">Waking the crew…</p>;
 
@@ -49,7 +55,11 @@ function Panel() {
           </button>
         </p>
       )}
-      <ChatPanel petId={petId} {...(snapshot !== null ? { snapshot } : {})} />
+      <ChatPanel
+        petId={petId}
+        onPetChange={setPetId}
+        {...(snapshot !== null ? { snapshot } : {})}
+      />
     </HostBridgeProvider>
   );
 }

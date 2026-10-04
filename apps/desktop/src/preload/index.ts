@@ -54,6 +54,15 @@ const host: TagalongHostApi = {
   saveApiKey: (providerId: string, apiKey: string) =>
     ipcRenderer.invoke(IPC.saveApiKey, providerId, apiKey) as Promise<void>,
   savePet: (pet: Pet) => ipcRenderer.invoke(IPC.savePet, pet) as Promise<Pet>,
+  deletePet: (petId: string) => ipcRenderer.invoke(IPC.deletePet, petId) as Promise<boolean>,
+  selectPet: (petId: string) => ipcRenderer.invoke(IPC.selectPet, petId) as Promise<void>,
+  onActivePet: (handler) => {
+    const listener = (_event: IpcRendererEvent, petId: string): void => handler(petId);
+    ipcRenderer.on(IPC.activePetEvent, listener);
+    return () => void ipcRenderer.off(IPC.activePetEvent, listener);
+  },
+  resizeStrip: (visiblePets: number) =>
+    ipcRenderer.invoke(IPC.resizeStrip, visiblePets) as Promise<void>,
   listModels: (providerId: string) =>
     ipcRenderer.invoke(IPC.listModels, providerId) as Promise<ModelList>,
   openSettings: () => ipcRenderer.invoke(IPC.openSettings) as Promise<void>,

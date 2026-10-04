@@ -13,6 +13,14 @@ export const Pet = z.object({
   name: z.string().min(1),
   /** Emoji or an asset key the host knows how to render. */
   avatar: z.string().min(1),
+  /**
+   * Phase 4. The pet's colour in the crew strip and the panel header, as `#rrggbb`.
+   * Optional so a pet saved before the crew existed still parses; hosts pick a neutral one.
+   */
+  color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, 'a colour is #rrggbb')
+    .optional(),
   /** System prompt fragment describing personality and role. */
   persona: z.string(),
   /** The model that answers text turns. */

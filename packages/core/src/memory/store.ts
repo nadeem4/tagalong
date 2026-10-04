@@ -147,15 +147,42 @@ export class ConversationStore {
     return purged;
   }
 
-  /** The newest `limit` messages, returned oldest first so they can be replayed as-is. */
+  /**
+   * The newest `limit` messages not yet folded into a summary, returned oldest first so
+   * they can be replayed as-is. Summarized messages stay on disk; the summary memory
+   * stands in for them in the prompt.
+   */
   lastMessages(conversationId: string, limit: number): Message[] {
     return this.db
       .prepare<[string, number], MessageRow>(
-        'SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?',
+        `SELECT * FROM messages WHERE conversation_id = ? AND summarized_at IS NULL
+         ORDER BY created_at DESC, rowid DESC LIMIT ?`,
       )
       .all(conversationId, limit)
       .reverse()
       .map(toMessage);
+  }
+
+  /** Every message of a conversation not yet folded into a summary, oldest first. */
+  unsummarizedMessages(conversationId: string): Message[] {
+    return this.db
+      .prepare<[string], MessageRow>(
+        `SELECT * FROM messages WHERE conversation_id = ? AND summarized_at IS NULL ${ORDERED}`,
+      )
+      .all(conversationId)
+      .map(toMessage);
+  }
+
+  /** Marks messages as folded into a summary. Returns how many rows changed. */
+  markSummarized(ids: readonly string[], at: Date = new Date()): number {
+    const update = this.db.prepare<[string, string]>(
+      'UPDATE messages SET summarized_at = ? WHERE id = ? AND summarized_at IS NULL',
+    );
+    let changed = 0;
+    this.db.transaction(() => {
+      for (const id of ids) changed += update.run(at.toISOString(), id).changes;
+    })();
+    return changed;
   }
 }
 

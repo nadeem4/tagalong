@@ -285,3 +285,31 @@ describe('Settings.windowTextBudget', () => {
     expect(patch.captureExclusions).toBeUndefined();
   });
 });
+
+describe('Settings.summarizer', () => {
+  it('defaults to none, meaning each pet summarises with its own brain', () => {
+    expect(Settings.parse({}).summarizer).toBeNull();
+  });
+
+  it('keeps an explicit provider and model', () => {
+    const summarizer = { providerId: 'openrouter', model: 'anthropic/claude-haiku-4.5' };
+    expect(Settings.parse({ summarizer }).summarizer).toEqual(summarizer);
+    expect(SettingsPatch.parse({ summarizer: null }).summarizer).toBeNull();
+  });
+
+  it('rejects a summarizer with no model', () => {
+    expect(Settings.safeParse({ summarizer: { providerId: 'nebius', model: '' } }).success).toBe(
+      false,
+    );
+  });
+});
+
+describe('Settings.hiddenPets', () => {
+  it('shows every pet on the desktop by default', () => {
+    expect(Settings.parse({}).hiddenPets).toEqual([]);
+  });
+
+  it('keeps the pets the user hid', () => {
+    expect(SettingsPatch.parse({ hiddenPets: ['bolt'] }).hiddenPets).toEqual(['bolt']);
+  });
+});

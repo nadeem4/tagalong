@@ -112,7 +112,11 @@ describe('Engine.boot', () => {
 
     expect(result['protocolVersion']).toBe(PROTOCOL_VERSION);
     expect(result['engineVersion']).toBe('0.0.0-test');
-    expect(result['pets']).toHaveLength(1);
+    expect((result['pets'] as { id: string }[]).map((pet) => pet.id)).toEqual([
+      'bolt',
+      'ink',
+      'scout',
+    ]);
   });
 
   it('rejects a host presenting the wrong pairing token', async () => {
@@ -183,8 +187,9 @@ describe('per-pet providers', () => {
     await host.call('settings.set', {
       patch: { providerBaseUrls: { openrouter: 'http://127.0.0.1:9/v1' } },
     });
-    const scout = ((await host.call('pets.list'))['result'] as { pets: Record<string, unknown>[] })
-      .pets[0];
+    const scout = (
+      (await host.call('pets.list'))['result'] as { pets: Record<string, unknown>[] }
+    ).pets.find((pet) => pet['id'] === 'scout');
     await host.call('pets.upsert', {
       pet: { ...scout, providerId: 'openrouter', model: 'anthropic/claude-sonnet-5' },
     });
@@ -200,8 +205,9 @@ describe('per-pet providers', () => {
 
   it('answers each pet from the provider it names', async () => {
     const { host } = await bootWithoutFakes();
-    const scout = ((await host.call('pets.list'))['result'] as { pets: Record<string, unknown>[] })
-      .pets[0];
+    const scout = (
+      (await host.call('pets.list'))['result'] as { pets: Record<string, unknown>[] }
+    ).pets.find((pet) => pet['id'] === 'scout');
     await host.call('pets.upsert', {
       pet: { ...scout, id: 'ink', name: 'Ink', providerId: 'fake', model: 'fake-model' },
     });
@@ -354,8 +360,111 @@ describe('built-in perception tools', () => {
   });
 });
 
+describe('handoff over rpc', () => {
+  it('hands Scout’s thread to Ink when the user types @Ink, with the context intact', async () => {
+    const seen: { model: string; text: string }[] = [];
+    const fake = new FakeBrainProvider({ text: 'An answer.' });
+    const recording: BrainProvider = {
+      id: 'fake',
+      capabilities: fake.capabilities,
+      listModels: () => fake.listModels(),
+      complete: (req, handlers, signal) => {
+        seen.push({ model: req.model, text: JSON.stringify(req.messages) });
+        return fake.complete(req, handlers, signal);
+      },
+    };
+    const e = await boot(recording);
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+
+    await host.call('ask', { petId: 'scout', input: { text: 'Explain the release notes' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+    const started = host.notifications.find((n) => n.method === 'turn.started');
+    const conversationId = started?.params['conversationId'];
+
+    await host.call('ask', {
+      petId: 'scout',
+      conversationId,
+      input: { text: '@Ink draft a reply to this' },
+    });
+    await vi.waitFor(
+      () => expect(host.methods().filter((m) => m === 'turn.completed')).toHaveLength(2),
+      { timeout: 5000 },
+    );
+
+    const handoff = host.notifications.find((n) => n.method === 'pet.message');
+    expect(handoff?.params).toMatchObject({ kind: 'handoff', fromPetId: 'scout', toPetId: 'ink' });
+    const inkStart = host.notifications.filter((n) => n.method === 'turn.started')[1];
+    expect(inkStart?.params).toMatchObject({ petId: 'ink', model: 'anthropic/claude-sonnet-5' });
+    expect(inkStart?.params['conversationId']).not.toBe(conversationId);
+    expect(seen[1]?.model).toBe('anthropic/claude-sonnet-5');
+    expect(seen[1]?.text).toContain('Explain the release notes');
+    expect(seen[1]?.text).toContain('draft a reply to this');
+  });
+});
+
+describe('roundtable over rpc', () => {
+  it('runs /crew across the whole crew and ends with the asking pet’s synthesis', async () => {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+
+    await host.call('ask', { petId: 'ink', input: { text: '/crew Should the panel dock left?' } });
+    await vi.waitFor(
+      () =>
+        expect(
+          host.notifications.some(
+            (n) => n.method === 'crew.status' && n.params['state'] === 'done',
+          ),
+        ).toBe(true),
+      { timeout: 10000 },
+    );
+
+    const speakers = host.notifications
+      .filter((n) => n.method === 'turn.started')
+      .map((n) => n.params['petId']);
+    expect(speakers).toEqual(['ink', 'bolt', 'scout', 'ink']);
+    const done = host.notifications.find(
+      (n) => n.method === 'crew.status' && n.params['state'] === 'done',
+    );
+    expect(done?.params['modelCalls']).toBe(4);
+  });
+});
+
+describe('memory across a restart', () => {
+  it('remembers a stated preference after the engine restarts', async () => {
+    const systems: string[] = [];
+    const fake = new FakeBrainProvider({ text: 'Sure.' });
+    const recording: BrainProvider = {
+      id: 'fake',
+      capabilities: fake.capabilities,
+      listModels: () => fake.listModels(),
+      complete: (req, handlers, signal) => {
+        systems.push(req.system);
+        return fake.complete(req, handlers, signal);
+      },
+    };
+
+    const first = await boot(recording);
+    let host = await TestHost.connect(first.port);
+    await host.call('hello', helloParams(first.pairingToken));
+    await host.call('ask', { petId: 'scout', input: { text: 'I prefer short answers.' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+    await first.shutdown();
+    engine = undefined;
+
+    const second = await boot(recording);
+    host = await TestHost.connect(second.port);
+    await host.call('hello', helloParams(second.pairingToken));
+    await host.call('ask', { petId: 'scout', input: { text: 'Explain DNS.' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+
+    expect(systems.at(-1)).toContain('I prefer short answers.');
+  });
+});
+
 describe('pets and settings over rpc', () => {
-  it('lists the seeded pet', async () => {
+  it('lists the seeded crew', async () => {
     const e = await boot();
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
@@ -363,7 +472,35 @@ describe('pets and settings over rpc', () => {
     const res = await host.call('pets.list', {});
     const pets = (res['result'] as Record<string, unknown>)['pets'] as unknown[];
 
-    expect(pets).toHaveLength(1);
+    expect(pets).toHaveLength(3);
+  });
+
+  it('round-trips an upsert and a delete through rpc, and the delete survives a restart', async () => {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const pip = {
+      id: 'pip',
+      name: 'Pip',
+      avatar: '🐣',
+      persona: 'You are Pip.',
+      model: 'fake-model',
+      providerId: 'fake',
+      color: '#22c55e',
+      toolAllowlist: [],
+      replyStyle: 'text',
+    };
+
+    const saved = await host.call('pets.upsert', { pet: pip });
+    expect((saved['result'] as { pet: unknown }).pet).toEqual(pip);
+    const deleted = await host.call('pets.delete', { petId: 'ink' });
+    expect(deleted['result']).toEqual({ deleted: true });
+
+    await e.shutdown();
+    engine = undefined;
+    const again = await boot();
+    const ids = again.pets.map((pet) => pet.id);
+    expect(ids).toEqual(['bolt', 'pip', 'scout']);
   });
 
   it('round-trips a settings patch', async () => {

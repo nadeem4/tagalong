@@ -16,6 +16,11 @@ export interface Point {
   y: number;
 }
 
+/** The crew strip is one avatar wide per visible pet, and never narrower than one. */
+export function stripWidth(visiblePets: number): number {
+  return Math.max(1, visiblePets) * AVATAR_SIZE;
+}
+
 /** What settings remembers: null on either axis means "dock to the default edge". */
 export interface RememberedPosition {
   x: number | null;
@@ -29,8 +34,12 @@ export interface RememberedPosition {
  * who unplugs the monitor the pet was sitting on would otherwise restart into an avatar
  * parked off screen, with no visible way to get it back.
  */
-export function resolveAvatarPosition(saved: RememberedPosition, workArea: Rect): Point {
-  const maxX = workArea.x + workArea.width - AVATAR_SIZE;
+export function resolveAvatarPosition(
+  saved: RememberedPosition,
+  workArea: Rect,
+  width: number = AVATAR_SIZE,
+): Point {
+  const maxX = workArea.x + workArea.width - width;
   const maxY = workArea.y + workArea.height - AVATAR_SIZE;
 
   if (saved.x === null || saved.y === null) {

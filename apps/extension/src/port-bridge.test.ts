@@ -87,16 +87,23 @@ describe('createPortBridge', () => {
     await expect(stopped).resolves.toBeUndefined();
   });
 
-  it('turns turn notifications into the events the chat panel consumes', () => {
+  it('turns turn and crew notifications into the events the chat panel consumes', () => {
     const p = fakePort();
     const bridge = createPortBridge(p.port);
     const events: TurnEvent[] = [];
     const stop = bridge.onTurnEvent((event) => events.push(event));
     p.deliver({ type: 'notification', method: 'turn.delta', params: { turnId: 't', text: 'Hi' } });
-    p.deliver({ type: 'notification', method: 'pet.message', params: {} });
+    p.deliver({
+      type: 'notification',
+      method: 'pet.message',
+      params: { fromPetId: 'scout', toPetId: 'ink', kind: 'handoff', text: 'over' },
+    });
     stop();
     p.deliver({ type: 'notification', method: 'turn.delta', params: { turnId: 't', text: '!' } });
-    expect(events).toEqual([{ type: 'turn.delta', turnId: 't', text: 'Hi' }]);
+    expect(events).toEqual([
+      { type: 'turn.delta', turnId: 't', text: 'Hi' },
+      { type: 'pet.message', fromPetId: 'scout', toPetId: 'ink', kind: 'handoff', text: 'over' },
+    ]);
   });
 
   it('reports connection status and shortcut context to their subscribers', () => {

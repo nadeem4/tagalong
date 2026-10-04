@@ -124,7 +124,9 @@ describe('ConversationRunner.run', () => {
         .every((method) => method === 'turn.delta'),
     ).toBe(true);
     expect(methods().filter((m) => m === 'turn.delta')).toHaveLength(3);
-    expect(events.every((event) => event.params.turnId === turn.turnId)).toBe(true);
+    expect(
+      events.every((event) => 'turnId' in event.params && event.params.turnId === turn.turnId),
+    ).toBe(true);
     expect(outcome.text).toBe('hello there friend');
     expect(outcome.stopReason).toBe('end');
     expect(outcome.usage.outputTokens).toBeGreaterThan(0);

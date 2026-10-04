@@ -192,6 +192,14 @@ export const TurnStartedParams = z.object({
   turnId: z.uuid(),
   petId: z.string().min(1),
   conversationId: z.uuid(),
+  /**
+   * Phase 4. The brain answering, so a panel can say which pet and which model said what —
+   * a crew spans providers, and "Ink · anthropic/claude-sonnet-5" is the point of showing it.
+   */
+  providerId: z.string().min(1).optional(),
+  model: z.string().min(1).optional(),
+  /** Phase 4. Set when the turn is part of a crew run — a roundtable, or a handoff. */
+  runId: z.uuid().optional(),
 });
 export const TurnDeltaParams = z.object({ turnId: z.uuid(), text: z.string() });
 /** Phase 3. index orders chunks so the host can play them without gaps. */
@@ -222,6 +230,11 @@ export const TurnCompletedParams = z.object({
     inputTokens: z.number().int().nonnegative(),
     outputTokens: z.number().int().nonnegative(),
   }),
+  /**
+   * Phase 4. How many model calls this turn made, counting tool round trips and any pet it
+   * consulted. Crew features multiply calls; the panel footer adds these up.
+   */
+  modelCalls: z.number().int().nonnegative().optional(),
 });
 export const TurnErrorParams = z.object({
   turnId: z.uuid(),
@@ -241,12 +254,35 @@ export const TurnWarningParams = z.object({
   code: z.string().min(1),
   message: z.string(),
 });
-/** Phase 4. */
+/**
+ * Phase 4. One pet addressing another, shown as a bubble or a card.
+ *
+ * `handoff`: `text` is the summary the target received; `turnId` and `conversationId` are
+ * the target's new turn and conversation. `consult`: `text` is the question; `turnId` is
+ * the caller's turn. `roundtable`: `text` names the round; `toPetId` is who speaks next.
+ */
 export const PetMessageParams = z.object({
   fromPetId: z.string().min(1),
   toPetId: z.string().min(1),
   kind: z.enum(['handoff', 'consult', 'roundtable']),
   text: z.string(),
+  turnId: z.uuid().optional(),
+  conversationId: z.uuid().optional(),
+  runId: z.uuid().optional(),
+  round: z.number().int().positive().optional(),
+});
+
+/**
+ * Phase 4. Progress of a crew run, so a host can show it is still going, offer to stop it,
+ * and count what it cost. `round` and `rounds` count the synthesis as the last round.
+ */
+export const CrewStatusParams = z.object({
+  runId: z.uuid(),
+  kind: z.enum(['roundtable']),
+  state: z.enum(['running', 'done', 'stopped']),
+  round: z.number().int().nonnegative(),
+  rounds: z.number().int().positive(),
+  modelCalls: z.number().int().nonnegative(),
 });
 
 // ---------------------------------------------------------------------------
@@ -297,6 +333,7 @@ export const coreToHostNotifications = {
   'turn.error': { params: TurnErrorParams },
   'turn.warning': { params: TurnWarningParams },
   'pet.message': { params: PetMessageParams },
+  'crew.status': { params: CrewStatusParams },
 } as const satisfies Record<string, NotificationSpec>;
 
 export type HostToCoreMethod = keyof typeof hostToCoreMethods;

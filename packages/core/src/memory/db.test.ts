@@ -36,7 +36,19 @@ describe('openDatabase', () => {
   it('migrates a fresh database to the latest version', () => {
     const db = openDatabase(dataDir);
     try {
-      expect(tableNames(db)).toEqual(['conversations', 'messages', 'pets', 'schema_version']);
+      expect(tableNames(db)).toEqual([
+        'conversations',
+        'memories',
+        'memories_fts',
+        'memories_fts_config',
+        'memories_fts_data',
+        'memories_fts_docsize',
+        'memories_fts_idx',
+        'messages',
+        'pet_seeds',
+        'pets',
+        'schema_version',
+      ]);
       const row = db
         .prepare<[], { version: number }>('SELECT MAX(version) AS version FROM schema_version')
         .get();

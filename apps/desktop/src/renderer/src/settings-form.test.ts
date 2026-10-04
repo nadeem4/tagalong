@@ -154,3 +154,45 @@ describe('what a rejected save tells the user', () => {
     expect(message).toContain(String(MAX_WINDOW_TEXT_CHARS));
   });
 });
+
+describe('buildSettingsPatch crew settings', () => {
+  it('leaves crew settings out when the form does not carry them', () => {
+    const patch = buildSettingsPatch(values);
+    expect(patch).not.toHaveProperty('hiddenPets');
+    expect(patch).not.toHaveProperty('summarizer');
+  });
+
+  it('carries the pets hidden from the desktop', () => {
+    expect(buildSettingsPatch({ ...values, hiddenPets: ['bolt'] }).hiddenPets).toEqual(['bolt']);
+  });
+
+  it('sends no summarizer when both boxes are blank, meaning each pet’s own brain', () => {
+    const patch = buildSettingsPatch({
+      ...values,
+      summarizerProviderId: '',
+      summarizerModel: '  ',
+    });
+    expect(patch.summarizer).toBeNull();
+  });
+
+  it('carries a summarizer provider and model', () => {
+    const patch = buildSettingsPatch({
+      ...values,
+      summarizerProviderId: 'openrouter',
+      summarizerModel: ' anthropic/claude-haiku-4.5 ',
+    });
+    expect(patch.summarizer).toEqual({
+      providerId: 'openrouter',
+      model: 'anthropic/claude-haiku-4.5',
+    });
+  });
+
+  it('refuses a summarizer model with no provider, or a provider with no model', () => {
+    expect(() =>
+      buildSettingsPatch({ ...values, summarizerProviderId: '', summarizerModel: 'm' }),
+    ).toThrow(/summarizer/i);
+    expect(() =>
+      buildSettingsPatch({ ...values, summarizerProviderId: 'nebius', summarizerModel: '' }),
+    ).toThrow(/summarizer/i);
+  });
+});

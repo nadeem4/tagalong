@@ -8,6 +8,7 @@ import type {
 } from '@tagalong/protocol';
 import { MAX_SELECTION_CHARS } from '@tagalong/protocol';
 import type { BrainContent, BrainMessage, BrainRequest } from '../providers';
+import type { Memory } from '../memory/memories';
 import { renderInventory } from '../perception/inventory';
 
 export { MAX_SELECTION_CHARS };
@@ -56,8 +57,20 @@ const REPLY_STYLE_RULES: Record<ReplyStyle, string> = {
     'Your reply is spoken aloud in full. Write plain sentences: no markdown, no lists, no code fences.',
 };
 
+/** Heads the remembered notes in the system prompt. */
+export const MEMORY_HEADING = '## What you remember';
+
+/** The memory section never grows past this, heading included. */
+export const MAX_MEMORY_SECTION_CHARS = 2000;
+
+const MEMORY_PREAMBLE =
+  'Notes kept from earlier conversations. Follow remembered preferences; treat facts as ' +
+  'background, and trust the screen over a note when they disagree.';
+
 export interface AssembleInput {
   pet: Pet;
+  /** What the pet recalls for this turn, already ranked. Rendered into the system prompt. */
+  memories?: readonly Memory[] | undefined;
   /** Oldest first, ending with the question being asked. Trimmed to `historyMessages`. */
   history: Message[];
   snapshot?: ContextSnapshot | undefined;
@@ -81,7 +94,7 @@ export function assemblePrompt(input: AssembleInput): BrainRequest {
   return {
     model: pet.model,
     ...(pet.visionModel === undefined ? {} : { visionModel: pet.visionModel }),
-    system: systemPrompt(pet),
+    system: systemPrompt(pet, input.memories ?? []),
     messages,
     maxTokens: MAX_OUTPUT_TOKENS,
   };
@@ -120,10 +133,34 @@ function imagesToAttach(snapshot: ContextSnapshot, settings: Settings): BrainCon
   return images;
 }
 
-function systemPrompt(pet: Pet): string {
-  return [BASE_INSTRUCTIONS, pet.persona.trim(), REPLY_STYLE_RULES[pet.replyStyle]]
+function systemPrompt(pet: Pet, memories: readonly Memory[]): string {
+  return [
+    BASE_INSTRUCTIONS,
+    pet.persona.trim(),
+    REPLY_STYLE_RULES[pet.replyStyle],
+    memorySection(memories),
+  ]
     .filter((part) => part.length > 0)
     .join('\n\n');
+}
+
+/**
+ * The remembered notes, last in the system prompt so a remembered preference ("short
+ * answers") reads as overriding the generic style rule above it. Lines that would push the
+ * section past its budget are skipped whole.
+ */
+function memorySection(memories: readonly Memory[]): string {
+  if (memories.length === 0) return '';
+  const lines = [MEMORY_HEADING, MEMORY_PREAMBLE];
+  let length = lines.join('\n').length;
+  for (const memory of memories) {
+    const label = memory.scope === 'crew' ? `${memory.kind}, shared by the crew` : memory.kind;
+    const line = `- (${label}) ${memory.text}`;
+    if (length + 1 + line.length > MAX_MEMORY_SECTION_CHARS) continue;
+    lines.push(line);
+    length += 1 + line.length;
+  }
+  return lines.length > 2 ? lines.join('\n') : '';
 }
 
 /**

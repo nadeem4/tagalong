@@ -24,6 +24,10 @@ export const IPC = {
   getSightPaused: 'tagalong:get-sight-paused',
   toggleSightPause: 'tagalong:toggle-sight-pause',
   hotkeyProblemEvent: 'tagalong:hotkey-problem-event',
+  deletePet: 'tagalong:pets:delete',
+  selectPet: 'tagalong:pets:select',
+  activePetEvent: 'tagalong:active-pet-event',
+  resizeStrip: 'tagalong:avatar:resize-strip',
 } as const;
 
 /**
@@ -124,6 +128,14 @@ export interface TagalongHostApi {
   /** An empty key deletes the stored one. */
   saveApiKey(providerId: string, apiKey: string): Promise<void>;
   savePet(pet: Pet): Promise<Pet>;
+  /** Phase 4. Removes a pet for good; a deleted default pet is not re-seeded. */
+  deletePet(petId: string): Promise<boolean>;
+  /** Phase 4. A click on the crew strip: makes that pet the panel's and opens the panel. */
+  selectPet(petId: string): Promise<void>;
+  /** Phase 4. Fires in the panel when the strip picked a pet. */
+  onActivePet(handler: (petId: string) => void): () => void;
+  /** Phase 4. Sizes the avatar window to hold this many pets side by side. */
+  resizeStrip(visiblePets: number): Promise<void>;
   listModels(providerId: string): Promise<ModelList>;
   openSettings(): Promise<void>;
   hidePanel(): Promise<void>;

@@ -3,6 +3,10 @@ import type { ContextSnapshot, NotificationParamsOf, Pet, Settings } from '@taga
 import type { BrainContentBlock, BrainProvider, BrainResult } from '../providers';
 import { BrainError, modelForTurn } from '../providers';
 import type { ConversationStore } from '../memory/store';
+import type { MemoryStore } from '../memory/memories';
+import { recall, statedPreference } from '../memory/recall';
+import { rememberTool, type CrewTool } from './crew-tools';
+import { consultTool } from '../crew/consult';
 import type { SettingsStore } from '../settings/settings';
 import type { PerceptionToolset } from '../perception';
 import { mayPersistScreenshot } from '../perception';
@@ -19,7 +23,9 @@ export type TurnEvent =
   | { method: 'turn.toolResult'; params: NotificationParamsOf<'turn.toolResult'> }
   | { method: 'turn.completed'; params: NotificationParamsOf<'turn.completed'> }
   | { method: 'turn.warning'; params: NotificationParamsOf<'turn.warning'> }
-  | { method: 'turn.error'; params: NotificationParamsOf<'turn.error'> };
+  | { method: 'turn.error'; params: NotificationParamsOf<'turn.error'> }
+  | { method: 'pet.message'; params: NotificationParamsOf<'pet.message'> }
+  | { method: 'crew.status'; params: NotificationParamsOf<'crew.status'> };
 
 /** Injected rather than inherited from an EventEmitter: one sink, no subscription bookkeeping. */
 export type TurnEventSink = (event: TurnEvent) => void;
@@ -44,6 +50,21 @@ export interface ConversationRunnerOptions {
    * should not have to stand up a host to run.
    */
   tools?: PerceptionToolset | undefined;
+  /**
+   * Phase 4. The crew's memory: recalled into every prompt, written by the `remember`
+   * tool and by preferences the user states. Optional so turn-mechanics tests stay small.
+   */
+  memory?: MemoryStore | undefined;
+  /**
+   * Called after a turn that answered, without being awaited: the background summary job
+   * hangs off this, and nothing it does may slow the reply that just finished.
+   */
+  afterTurn?: ((turn: { pet: Pet; conversationId: string }) => void) | undefined;
+  /**
+   * Phase 4. Lets every pet consult another with `ask_pet`. `pets` is read per turn;
+   * `timeoutMs` exists for tests and defaults to sixty seconds.
+   */
+  consult?: { pets: () => readonly Pet[]; timeoutMs?: number | undefined } | undefined;
 }
 
 export interface RunAsk {
@@ -52,6 +73,15 @@ export interface RunAsk {
   /** Omitted for the first ask; the runner opens a conversation and reports its id. */
   conversationId?: string | undefined;
   snapshot?: ContextSnapshot | undefined;
+  /** Phase 4. Ties the turn to a crew run, and rides on its `turn.started`. */
+  runId?: string | undefined;
+  /**
+   * Called with the turn's ids just before `turn.started` goes out, so a crew feature can
+   * announce what is about to happen — a handoff bubble — ahead of the answer itself.
+   */
+  beforeStart?: ((ids: { turnId: string; conversationId: string }) => void) | undefined;
+  /** False keeps `ask_pet` off this turn. Roundtable turns already hear from every pet. */
+  allowConsult?: boolean | undefined;
 }
 
 export interface TurnOutcome {
@@ -61,6 +91,8 @@ export interface TurnOutcome {
   /** `error` is the runner's own reason: the provider never returned a stop reason. */
   stopReason: BrainResult['stopReason'] | 'error';
   usage: { inputTokens: number; outputTokens: number };
+  /** Model calls the turn made: the first, each tool round trip, each consult. */
+  modelCalls?: number;
   error?: { code: string; message: string };
 }
 
@@ -146,12 +178,31 @@ export class ConversationRunner {
       ...(stored ? { snapshot: stored } : {}),
     });
 
+    // Filed before the turn runs, so even a turn that fails still keeps what was said.
+    const preference = this.#options.memory ? statedPreference(ask.text) : null;
+    if (preference !== null) {
+      this.#options.memory?.addOnce({
+        scope: 'pet',
+        petId: ask.pet.id,
+        kind: 'preference',
+        text: preference,
+      });
+    }
+
     const turnId = randomUUID();
     const controller = new AbortController();
     this.#active.set(turnId, { petId: ask.pet.id, controller });
+    ask.beforeStart?.({ turnId, conversationId });
     this.#options.emit({
       method: 'turn.started',
-      params: { turnId, petId: ask.pet.id, conversationId },
+      params: {
+        turnId,
+        petId: ask.pet.id,
+        conversationId,
+        providerId: ask.pet.providerId,
+        model: ask.pet.model,
+        ...(ask.runId === undefined ? {} : { runId: ask.runId }),
+      },
     });
 
     const done = this.#stream(ask, turnId, conversationId, settings, controller.signal).finally(
@@ -226,17 +277,37 @@ export class ConversationRunner {
       });
     }
 
+    const memories = this.#options.memory
+      ? recall(
+          this.#options.memory,
+          ask.pet.id,
+          [ask.text, ask.snapshot?.selection ?? ''].join(' '),
+        )
+      : [];
+
     const base = assemblePrompt({
       pet: ask.pet,
       history,
       settings,
+      memories,
       ...(snapshot ? { snapshot } : {}),
     });
 
     // A provider without tool support is never sent tools: some reject the field outright,
     // and the rest would only be told about an ability they cannot use.
     const tools = provider.capabilities.tools ? this.#options.tools : undefined;
-    const request = tools ? { ...base, tools: [...tools.definitions] } : base;
+    // One for the first call; every tool round trip and every consult adds another.
+    let modelCalls = 1;
+    const crewTools = provider.capabilities.tools
+      ? this.#crewTools(ask, turnId, snapshot, signal, () => {
+          modelCalls += 1;
+        })
+      : [];
+    const definitions = [
+      ...(tools?.definitions ?? []),
+      ...crewTools.map((tool) => tool.definition),
+    ];
+    const request = definitions.length > 0 ? { ...base, tools: definitions } : base;
 
     try {
       const result = await provider.complete(
@@ -244,7 +315,9 @@ export class ConversationRunner {
         {
           onText: (text) => this.#options.emit({ method: 'turn.delta', params: { turnId, text } }),
           onToolUse: async (call) => {
-            if (!tools) return { content: NO_TOOLS_YET, isError: true };
+            const crewTool = crewTools.find((tool) => tool.definition.name === call.name);
+            if (!tools && !crewTool) return { content: NO_TOOLS_YET, isError: true };
+            modelCalls += 1;
             // Announced around the call, not after it. A tool that takes seconds —
             // enumerating windows walks an accessibility tree — leaves the user watching
             // a pet that looks hung, and a turn whose tool activity is never broadcast
@@ -254,7 +327,9 @@ export class ConversationRunner {
               method: 'turn.toolRequest',
               params: { turnId, approvalId: randomUUID(), tool: call.name, input: call.input },
             });
-            const outcome = await tools.run(call, { vision: canSee });
+            const outcome = crewTool
+              ? await crewTool.run(call.input, { pet: ask.pet, turnId, signal, snapshot })
+              : await (tools as PerceptionToolset).run(call, { vision: canSee });
             this.#options.emit({
               method: 'turn.toolResult',
               params: {
@@ -290,12 +365,63 @@ export class ConversationRunner {
           text: result.text,
           stopReason: result.stopReason,
           usage: result.usage,
+          modelCalls,
         },
       });
-      return { turnId, conversationId, ...result };
+      if (result.text.length > 0) {
+        this.#options.afterTurn?.({ pet: ask.pet, conversationId });
+      }
+      return { turnId, conversationId, ...result, modelCalls };
     } catch (error) {
       return this.#fail(turnId, conversationId, error);
     }
+  }
+
+  /** The tools the crew layer adds to a turn: remembering, and consulting another pet. */
+  #crewTools(
+    ask: RunAsk,
+    turnId: string,
+    snapshot: ContextSnapshot | undefined,
+    signal: AbortSignal,
+    countCall: () => void,
+  ): CrewTool[] {
+    const tools: CrewTool[] = [];
+    if (this.#options.memory) tools.push(rememberTool(this.#options.memory));
+    const consult = this.#options.consult;
+    const others = consult?.pets().filter((pet) => pet.id !== ask.pet.id) ?? [];
+    if (consult && ask.allowConsult !== false && others.length > 0) {
+      const option = this.#options.provider;
+      tools.push(
+        consultTool(
+          {
+            pets: consult.pets,
+            provider: (pet) => (typeof option === 'function' ? option(pet) : option),
+            settings: () => this.#options.settings.get(),
+            memory: this.#options.memory,
+            timeoutMs: consult.timeoutMs,
+          },
+          {
+            caller: ask.pet,
+            turnId,
+            signal,
+            snapshot,
+            countCall,
+            announce: (target, question) =>
+              this.#options.emit({
+                method: 'pet.message',
+                params: {
+                  fromPetId: ask.pet.id,
+                  toPetId: target.id,
+                  kind: 'consult',
+                  text: question,
+                  turnId,
+                },
+              }),
+          },
+        ),
+      );
+    }
+    return tools;
   }
 
   #fail(turnId: string, conversationId: string, error: unknown): TurnOutcome {

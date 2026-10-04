@@ -6,7 +6,7 @@
  */
 
 /** Bumped whenever the JSON-RPC method catalog changes shape. */
-export const PROTOCOL_VERSION = '0.1.0';
+export const PROTOCOL_VERSION = '0.2.0';
 
 /** The engine only ever binds to loopback. */
 export const ENGINE_HOST = '127.0.0.1';

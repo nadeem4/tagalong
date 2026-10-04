@@ -55,10 +55,11 @@ flowchart LR
 The diagram is the finished shape. What exists after Phase 1: the server (`server/ws-server.ts` plus
 `server/pairing.ts`), the runner (`conversation/runner.ts`), the prompt assembler
 (`conversation/prompt-assembler.ts`), memory as plain SQLite tables (`memory/db.ts`, `memory/store.ts` —
-FTS5 arrives with Phase 4 recall), the pet registry (`pets/registry.ts`), settings and the SecretStore
+FTS5 arrived with Phase 4 recall), the pet registry (`pets/registry.ts`), settings and the SecretStore
 interface (`settings/settings.ts`), and the brain providers (`providers/`). `Engine.boot` in `engine.ts`
-wires all of it together and is the only thing a host starts. `PetBus` (Phase 4), `McpManager` and
-`ApprovalPolicy` (Phase 5), and the STT and TTS providers (Phase 3) do not exist yet. The Chrome extension
+wires all of it together and is the only thing a host starts. The diagram's PetBus is not one class:
+Phase 4 built it as `crew/` (handoff, consult, roundtable) on top of the runner — see "The crew" below.
+`McpManager` and `ApprovalPolicy` (Phase 5), and the STT and TTS providers (Phase 3) do not exist yet. The Chrome extension
 landed in Phase 6, which ran fifth; see "The browser host" below.
 
 ## Package responsibilities
@@ -473,6 +474,148 @@ that the desktop is empty, and a pet told otherwise will reason from it.
 Since Phase 2B, a display is blanked when **any window on it that the user can see** is excluded, not
 only when the foreground window is. The foreground check remains as a floor beneath the inventory, so
 that a helper which cannot run does not silently remove the protection Phase 2 already shipped.
+
+## The crew (Phase 4)
+
+Phase 4 turns one companion into a crew. Everything below lives in `packages/core`; hosts only render
+what the engine broadcasts.
+
+### The registry and the default crew
+
+`pets/registry.ts` keeps each pet as a validated JSON blob in the `pets` table and exposes it through
+`pets.list`, `pets.upsert` and `pets.delete`. A fresh install is seeded with three pets that
+deliberately run on different brains, so the crew spans providers from the first boot:
+
+| Pet   | Role                 | Provider     | Model                                                |
+| ----- | -------------------- | ------------ | ---------------------------------------------------- |
+| Scout | Explainer and reader | `nebius`     | Nemotron 3 Super, Nemotron Nano 2 VL for pictures    |
+| Ink   | Writer               | `openrouter` | `anthropic/claude-sonnet-5`                          |
+| Bolt  | Coder                | `nebius`     | Nemotron Nano 2 VL (reads screenshots of errors too) |
+
+Seeding is remembered per pet in `pet_seeds` (migration 2). An install that predates the crew gains
+Ink and Bolt on its next boot, a pet the user edited is never overwritten, and a default the user
+deleted stays deleted. Each pet carries an optional `color` (`#rrggbb`) for the strip and the panel.
+
+### Memory
+
+`memory/memories.ts` is the crew's memory: `memories(id, scope, pet_id, kind, text, created_at)` with
+an external-content FTS5 index (`memories_fts`, porter stemming) kept in step by triggers (migration 3).
+`scope` is `pet` (private, `pet_id` set) or `crew` (the shared notebook, `pet_id` null); `kind` is
+`fact`, `preference` or `summary`. Every read — `recent(petId)` and `search(petId, text)` — filters on
+`scope = 'crew' OR pet_id = ?` in SQL, so no code path can load another pet's private memories. A
+question is turned into an FTS query by quoting each distinct word and OR-ing them (`ftsQuery`), so
+quotes, `*`, `NEAR(` and friends in a user's text are plain words rather than syntax errors, and BM25
+ranks the closest memory first.
+
+### Recall
+
+Every turn recalls before it assembles (`memory/recall.ts`): the pet's five newest visible memories,
+then up to five FTS matches against the question plus the selection that are not already listed,
+dropping whole memories past a 2,000-character budget. `assemblePrompt` renders them last in the system
+prompt under `## What you remember`, labelled `(preference)`, `(fact)` or `(fact, shared by the
+crew)`, and caps the whole section — heading included — at 2,000 characters. Last, so a remembered
+"short answers" reads as overriding the generic reply-style rule above it.
+
+Memories are written two ways. The `remember` tool (`conversation/crew-tools.ts`) is offered to every
+pet whose provider supports tools: `{ text, kind: fact | preference, shared? }`, filed under the
+calling pet or, with `shared: true`, in the crew notebook. Under it sits a deterministic safety net:
+when the user's own message states a lasting preference — "I prefer…", "from now on…", "remember
+that…", "always answer…" — the runner files that sentence as a private `preference` before the turn
+runs, so "Scout keeps answers short after a restart" does not hinge on a model choosing to call a tool.
+`addOnce` keeps the same sentence from filling five recall slots.
+
+### Summaries
+
+`memory/summarizer.ts` keeps long conversations short. After every turn that answered, the runner's
+`afterTurn` hook hands the conversation to `Summarizer.schedule` without awaiting it, so the job never
+sits on the request path. Once twenty messages have built up unsummarised, all but the newest four go
+to a brain as a `User: … / Scout: …` transcript with a one-paragraph instruction and no tools; the
+reply becomes a `summary` memory for the pet and those messages get `summarized_at` (migration 4).
+`ConversationStore.lastMessages` skips summarised rows, so the history replayed to the model shrinks
+while recall carries the gist. Rows stay on disk. A failure — no key, a timeout after 60 s, an empty
+reply — changes nothing and the next turn tries again; concurrent schedules share one job.
+
+The brain is `settings.summarizer` (`{ providerId, model }`) when set, and otherwise the pet's own
+provider and model. The phase page named `claude-haiku-4-5`; defaulting to the pet's own brain means a
+crew on Token Factory and OpenRouter never needs a third key for housekeeping.
+
+### Handoff
+
+`crew/commands.ts` reads the crew syntax at the start of an ask, in core, so every host gets it: a
+leading `@Name` (a pet's name or id, any case) other than the pet being asked is a handoff, and
+`/crew <question>` is a roundtable. A mention of the pet already being asked is stripped; an unknown
+mention, or one mid-sentence, is ordinary text.
+
+`crew/handoff.ts` builds the `HandoffPayload` — `{ fromPetId, toPetId, summary, request, snapshot }` —
+from the stored thread without a model call. The summary is two paragraphs: what the user asked (first
+and latest questions, and the page or app they were in), then the source pet's latest answer, clipped
+to 700 characters. The snapshot is the one attached to this ask, or else the latest one in the thread.
+`startHandoff` opens a new conversation for the target, whose first user message is the summary plus
+the request, and broadcasts `pet.message { kind: 'handoff', text: summary, turnId, conversationId }`
+through the runner's `beforeStart` hook — so it reaches hosts _before_ the target's `turn.started`
+and the panel draws the bubble ahead of the answer.
+
+`turn.started` now carries `providerId` and `model` (and `runId` for crew runs), so a panel can label
+every answer with who said it and on what.
+
+### Consult
+
+`crew/consult.ts` gives every pet an `ask_pet(petId, question)` tool whenever the crew has someone else
+to ask and the turn allows it (roundtable turns pass `allowConsult: false`). Its description lists the
+other pets by id with the first sentence of their persona. A call runs one nested turn for the target:
+its own persona, provider, model and recalled memories, the caller's question framed as "X is
+consulting you mid-answer", and the caller's screen context as text only — no pixels. The nested turn
+is offered **no tools**, which is the depth limit: a consulted pet cannot consult, and a nested
+`ask_pet` it invents anyway is answered with an error result. It has 60 seconds (`AbortSignal.any` of
+the caller's signal and a timeout); a timeout, a provider error or an empty reply comes back to the
+caller as an error tool result — "Ink did not answer within 60 seconds. Answer without it." — and the
+caller carries on. Nothing of the nested turn is stored. The consult is broadcast as `pet.message
+{ kind: 'consult', text: question, turnId: callerTurn }` before it runs, so the panel draws a small
+card above the caller's answer.
+
+`turn.completed.modelCalls` counts what a turn cost: one for the first call, one per tool round trip,
+one per consult. The panel footer shows "N model calls" whenever a run made more than one.
+
+### Roundtable
+
+`crew/roundtable.ts` runs `/crew <question>`. The asking pet speaks first and writes the synthesis; the
+rest of the crew follows in registry order. Rounds include the synthesis and are clamped to 2..3: the
+default is one discussion round and the synthesis, and three rounds adds a second pass in which each
+pet responds to the others. Every turn is an ordinary runner turn on the pet's own provider and model,
+tagged with the run's `runId` and with `allowConsult: false`, so a mixed crew — Nemotron 3 Super,
+Claude through OpenRouter, Nemotron Nano — takes turns on three brains. Each pet keeps one
+conversation for the run, and its prompt carries the transcript so far (each answer clipped to 800
+characters); the user's snapshot rides on each pet's first turn only, so a screenshot is not paid for
+twice per pet.
+
+Hosts follow the run through `pet.message { kind: 'roundtable', round, text: 'Round 1 of 2' |
+'Synthesis by Scout' }` — sent before the turn that opens the round — and `crew.status { runId,
+state: running | done | stopped, round, rounds, modelCalls }` after every turn. A pet that cannot
+answer is written into the transcript as "(Ink could not answer: …)" and the table carries on.
+Interrupting the turn in flight — the panel's Stop button — or `stop()` cancels every remaining turn.
+
+### The crew in the hosts
+
+`ChatPanel` in `packages/ui` is one timeline for the whole crew, in both hosts. It lists the crew
+(from the host, or `bridge.listPets()`), shows the active pet's name and colour with a `CrewStrip` to
+switch, threads each pet's follow-ups into the conversation `turn.started` reported for it, labels each
+answer `Name · model`, draws handoff bubbles, consult cards and round markers from `pet.message`, moves
+to the target pet on a handoff (and tells the host through `onPetChange`), offers a **Hand off…** menu
+under each answer that writes `@Name ` into the composer, and a **Crew** button that sends
+`/crew <text>`. While a roundtable runs (`crew.status` running) the composer waits and **Stop**
+interrupts the turn in flight, which ends the run. The footer shows `crew.status.modelCalls`, or a single
+turn's `modelCalls` when it was more than one. `HostBridge.onTurnEvent` now also delivers
+`pet.message` and `crew.status`; the desktop forwards every notification and the extension's port
+bridge lets these two through.
+
+The desktop avatar window became a strip: one `PetAvatar` button per visible pet, the default pet
+first, sized by `stripWidth(n)` and clamped on screen. The window background is still the drag handle,
+so the crew moves as one and its position is the existing `avatar` setting — one position for the
+strip rather than one per pet. A click calls `selectPet`, which opens the panel and sends it the pet.
+Each avatar's ring follows its own turns (`nextPetStates`), so a roundtable lights the pets in turn.
+`settings.hiddenPets` takes pets off the strip; they still answer in the panel. Settings edits every
+pet field, adds pets (on the fake brain until a provider is picked) and deletes them, and sets
+`settings.summarizer`.
 
 ## The browser host
 

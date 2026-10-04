@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BrowserWindow, Menu, Tray, app, dialog, ipcMain } from 'electron';
+import { BrowserWindow, Menu, Tray, app, dialog, ipcMain, screen } from 'electron';
 import { ContextSnapshot } from '@tagalong/protocol';
 import type { PerceptionTarget, Pet, Settings, SettingsPatch } from '@tagalong/protocol';
 import { SettingsStore } from '@tagalong/core';
@@ -23,6 +23,7 @@ import { SafeStorageSecretStore } from './secret-store';
 import { createTrayIcon } from './tray-icon';
 import { createAvatarWindow } from './windows/avatar';
 import { createPanelWindow, showPanelBeside } from './windows/panel';
+import { AVATAR_SIZE, resolveAvatarPosition, stripWidth } from './windows/position';
 import { createSettingsWindow } from './windows/settings';
 import { IPC } from '../shared/ipc';
 import type { CaptureNotice, HostView, ModelList } from '../shared/ipc';
@@ -200,6 +201,12 @@ function applyHotkeys(settings: Settings): string | null {
     if (!window.isDestroyed()) window.webContents.send(IPC.hotkeyProblemEvent, desktop.hotkeyError);
   }
   return desktop.hotkeyError;
+}
+
+/** Re-renders the crew strip after the crew or its visibility changed in Settings. */
+function refreshStrip(): void {
+  const avatar = desktop?.avatar;
+  if (avatar !== null && avatar !== undefined && !avatar.isDestroyed()) avatar.webContents.reload();
 }
 
 /** Turn notifications drive the UI, and main is the only thing holding the socket. */
@@ -390,14 +397,18 @@ function registerIpc(): void {
     return (await current.host.client.call('settings.get', {})).settings;
   };
 
-  ipcMain.handle(IPC.ask, async (_event, input: { petId: string; text?: string }) => {
-    const snapshot = required().pendingSnapshot;
-    return engine().client.call('ask', {
-      petId: input.petId,
-      input: { text: input.text ?? '' },
-      ...(snapshot !== null ? { snapshot } : {}),
-    });
-  });
+  ipcMain.handle(
+    IPC.ask,
+    async (_event, input: { petId: string; conversationId?: string; text?: string }) => {
+      const snapshot = required().pendingSnapshot;
+      return engine().client.call('ask', {
+        petId: input.petId,
+        ...(input.conversationId !== undefined ? { conversationId: input.conversationId } : {}),
+        input: { text: input.text ?? '' },
+        ...(snapshot !== null ? { snapshot } : {}),
+      });
+    },
+  );
 
   ipcMain.handle(IPC.interrupt, async (_event, turnId: string) => {
     await engine().client.call('interrupt', { turnId });
@@ -457,6 +468,7 @@ function registerIpc(): void {
     // not after a restart.
     current.settings = saved;
     if (patch.hotkeys !== undefined) applyHotkeys(saved);
+    if (patch.hiddenPets !== undefined) refreshStrip();
     return saved;
   });
 
@@ -469,7 +481,32 @@ function registerIpc(): void {
   });
 
   ipcMain.handle(IPC.savePet, async (_event, pet: Pet): Promise<Pet> => {
-    return (await engine().client.call('pets.upsert', { pet })).pet;
+    const saved = (await engine().client.call('pets.upsert', { pet })).pet;
+    refreshStrip();
+    return saved;
+  });
+
+  ipcMain.handle(IPC.deletePet, async (_event, petId: string): Promise<boolean> => {
+    const { deleted } = await engine().client.call('pets.delete', { petId });
+    refreshStrip();
+    return deleted;
+  });
+
+  // A click on the crew strip opens the panel on that pet, the way the chat button does.
+  ipcMain.handle(IPC.selectPet, async (_event, petId: string) => {
+    const current = required();
+    if (current.panel?.isVisible() !== true) await openPanelWithContext({ screenshot: false });
+    current.panel?.webContents.send(IPC.activePetEvent, petId);
+  });
+
+  ipcMain.handle(IPC.resizeStrip, (_event, visiblePets: number) => {
+    const avatar = required().avatar;
+    if (avatar === null || avatar.isDestroyed()) return;
+    const width = stripWidth(visiblePets);
+    const [x, y] = avatar.getPosition();
+    const area = screen.getDisplayMatching(avatar.getBounds()).workArea;
+    const at = resolveAvatarPosition({ x: x ?? null, y: y ?? null }, area, width);
+    avatar.setBounds({ x: at.x, y: at.y, width, height: AVATAR_SIZE });
   });
 
   ipcMain.handle(IPC.listModels, async (_event, providerId: string): Promise<ModelList> => {

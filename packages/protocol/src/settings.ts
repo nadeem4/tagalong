@@ -84,6 +84,8 @@ export const SETTINGS_DEFAULTS = {
    * every read, because the pet almost never names a smaller number itself.
    */
   windowTextBudget: DEFAULT_WINDOW_TEXT_CHARS,
+  summarizer: null,
+  hiddenPets: [] as string[],
 } as const;
 
 /** A non-blank, trimmed entry. A blank one would match every window and blind the pet. */
@@ -206,6 +208,14 @@ const settingsFields = {
    * can outweigh everything else in the prompt.
    */
   windowTextBudget: z.number().int().positive().max(MAX_WINDOW_TEXT_CHARS),
+  /**
+   * Phase 4. The brain that writes conversation summaries. Null means each pet summarises
+   * its own conversations with its own provider and model, so a crew on Token Factory and
+   * OpenRouter never needs a third key just for housekeeping.
+   */
+  summarizer: z.object({ providerId: z.string().min(1), model: z.string().min(1) }).nullable(),
+  /** Phase 4. Pets left off the desktop crew strip. They still answer in the panel. */
+  hiddenPets: z.array(z.string().min(1)),
 };
 
 export const Settings = z.object({
@@ -229,6 +239,8 @@ export const Settings = z.object({
   }),
   sightDetail: settingsFields.sightDetail.default(SETTINGS_DEFAULTS.sightDetail),
   windowTextBudget: settingsFields.windowTextBudget.default(SETTINGS_DEFAULTS.windowTextBudget),
+  summarizer: settingsFields.summarizer.default(SETTINGS_DEFAULTS.summarizer),
+  hiddenPets: settingsFields.hiddenPets.prefault([...SETTINGS_DEFAULTS.hiddenPets]),
 });
 export type Settings = z.infer<typeof Settings>;
 

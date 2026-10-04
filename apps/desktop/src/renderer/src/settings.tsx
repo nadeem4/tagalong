@@ -2,21 +2,33 @@ import { StrictMode, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MAX_WINDOW_TEXT_CHARS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
+import { DEFAULT_PET_COLOR } from '@tagalong/ui';
 import type { Pet } from '@tagalong/protocol';
 import './app.css';
-import { buildPet } from './pet-form';
+import { buildPet, newPet } from './pet-form';
 import { buildSettingsPatch } from './settings-form';
 import type { HostView, ModelList, ProviderChoice } from '../../shared/ipc';
 
 /**
- * One pet's brain: which provider, which model, and which model looks at pictures.
+ * One pet: who it is, which brain it runs on, how it replies, and whether it sits on the
+ * desktop strip.
  *
- * The provider is controlled so the suggestions follow it: picking OpenRouter fills the
- * model box's list from OpenRouter's own `GET /models` (or the built-in list, which the
- * note then admits). The boxes still take any id, because a list is a convenience and
+ * The provider is controlled so the model suggestions follow it: picking OpenRouter fills
+ * the model box's list from OpenRouter's own `GET /models` (or the built-in list, which
+ * the note then admits). The boxes still take any id, because a list is a convenience and
  * the service is the authority on what it serves.
  */
-function PetBrain({ pet, providers }: { pet: Pet; providers: readonly ProviderChoice[] }) {
+function PetEditor({
+  pet,
+  providers,
+  shown,
+  onDelete,
+}: {
+  pet: Pet;
+  providers: readonly ProviderChoice[];
+  shown: boolean;
+  onDelete: () => void;
+}) {
   const [providerId, setProviderId] = useState(pet.providerId);
   const [models, setModels] = useState<ModelList | null>(null);
 
@@ -37,15 +49,32 @@ function PetBrain({ pet, providers }: { pet: Pet; providers: readonly ProviderCh
 
   const listId = `models-${pet.id}`;
   const label = providers.find((choice) => choice.id === providerId)?.label ?? providerId;
+  const field = (name: string): string => `pet:${pet.id}:${name}`;
   return (
-    <fieldset className="settings__pet">
+    <fieldset className="settings__pet" style={{ borderColor: pet.color ?? DEFAULT_PET_COLOR }}>
       <legend>
         {pet.avatar} {pet.name}
       </legend>
       <label>
+        <span>Name</span>
+        <input name={field('name')} defaultValue={pet.name} />
+      </label>
+      <label>
+        <span>Emoji</span>
+        <input name={field('avatar')} defaultValue={pet.avatar} />
+      </label>
+      <label>
+        <span>Colour</span>
+        <input type="color" name={field('color')} defaultValue={pet.color ?? DEFAULT_PET_COLOR} />
+      </label>
+      <label>
+        <span>Persona (who this pet is and how it talks)</span>
+        <textarea name={field('persona')} defaultValue={pet.persona} rows={3} />
+      </label>
+      <label>
         <span>Provider</span>
         <select
-          name={`pet:${pet.id}:providerId`}
+          name={field('providerId')}
           value={providerId}
           onChange={(event) => setProviderId(event.target.value)}
         >
@@ -58,15 +87,11 @@ function PetBrain({ pet, providers }: { pet: Pet; providers: readonly ProviderCh
       </label>
       <label>
         <span>Model id</span>
-        <input name={`pet:${pet.id}:model`} defaultValue={pet.model} list={listId} />
+        <input name={field('model')} defaultValue={pet.model} list={listId} />
       </label>
       <label>
         <span>Vision model id (blank if the model above can see images)</span>
-        <input
-          name={`pet:${pet.id}:visionModel`}
-          defaultValue={pet.visionModel ?? ''}
-          list={listId}
-        />
+        <input name={field('visionModel')} defaultValue={pet.visionModel ?? ''} list={listId} />
       </label>
       <datalist id={listId}>
         {(models?.models ?? []).map((model) => (
@@ -80,6 +105,25 @@ function PetBrain({ pet, providers }: { pet: Pet; providers: readonly ProviderCh
             ? `${models.models.length} models from ${label}.`
             : `Built-in list for ${label}. Store a key and reopen Settings to see the live one.`}
       </p>
+      <label>
+        <span>Reply style</span>
+        <select name={field('replyStyle')} defaultValue={pet.replyStyle}>
+          <option value="text">Text</option>
+          <option value="voice-summary">Spoken summary (voice arrives with Phase 3)</option>
+          <option value="voice-full">Spoken in full (voice arrives with Phase 3)</option>
+        </select>
+      </label>
+      <label>
+        <span>Voice id (Phase 3; stored, not used yet)</span>
+        <input name={field('voiceId')} defaultValue={pet.voiceId ?? ''} />
+      </label>
+      <label className="settings__check">
+        <input type="checkbox" name={field('shown')} defaultChecked={shown} />
+        <span>Show on the desktop strip</span>
+      </label>
+      <button type="button" onClick={onDelete}>
+        Delete {pet.name}
+      </button>
     </fieldset>
   );
 }
@@ -103,6 +147,8 @@ function Settings() {
   // A refused save has to look refused. Rendering it in the same muted style as "Saved."
   // is how a user reads a rejection as a confirmation and walks away.
   const [statusIsError, setStatusIsError] = useState(false);
+  // Pets the user deleted in this window; they go when Save is pressed, not before.
+  const [removed, setRemoved] = useState<string[]>([]);
 
   useEffect(() => {
     window.tagalongHost
@@ -138,6 +184,8 @@ function Settings() {
   const presets = view.providers.filter((choice) => choice.defaultBaseUrl !== undefined);
   const keyed = view.providers.filter((choice) => choice.needsKey);
 
+  const kept = view.pets.filter((pet) => !removed.includes(pet.id));
+
   async function save(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (view === null) return;
@@ -158,16 +206,35 @@ function Settings() {
         pauseSightHotkey: field('pauseSightHotkey'),
         sightDetail: field('sightDetail'),
         windowTextBudget: field('windowTextBudget'),
+        // Only meaningful with the engine up: pets live in its database.
+        ...(view.pets.length > 0
+          ? {
+              hiddenPets: kept
+                .filter((pet) => form.get(`pet:${pet.id}:shown`) === null)
+                .map((pet) => pet.id),
+            }
+          : {}),
+        summarizerProviderId: field('summarizerProviderId'),
+        summarizerModel: field('summarizerModel'),
       });
-      const pets = view.pets.map((pet) =>
-        buildPet(pet, {
-          providerId: field(`pet:${pet.id}:providerId`),
-          model: field(`pet:${pet.id}:model`),
-          visionModel: field(`pet:${pet.id}:visionModel`),
-        }),
-      );
+      const pets = kept.map((pet) => {
+        const petField = (name: string): string => field(`pet:${pet.id}:${name}`);
+        return buildPet(pet, {
+          providerId: petField('providerId'),
+          model: petField('model'),
+          visionModel: petField('visionModel'),
+          name: petField('name'),
+          avatar: petField('avatar'),
+          persona: petField('persona'),
+          color: petField('color'),
+          voiceId: petField('voiceId'),
+          replyStyle: petField('replyStyle'),
+        });
+      });
 
       const saved = await window.tagalongHost.saveSettings(patch);
+      for (const petId of removed) await window.tagalongHost.deletePet(petId);
+      setRemoved([]);
       const savedPets = await Promise.all(pets.map((pet) => window.tagalongHost.savePet(pet)));
       const typed = Object.entries(keys).filter(([, value]) => value.length > 0);
       for (const [providerId, value] of typed) {
@@ -207,8 +274,62 @@ function Settings() {
             Pets appear here once the engine is running. Keys and base URLs can still be saved.
           </p>
         ) : (
-          view.pets.map((pet) => <PetBrain key={pet.id} pet={pet} providers={view.providers} />)
+          kept.map((pet) => (
+            <PetEditor
+              key={pet.id}
+              pet={pet}
+              providers={view.providers}
+              shown={!settings.hiddenPets.includes(pet.id)}
+              onDelete={() => setRemoved((current) => [...current, pet.id])}
+            />
+          ))
         )}
+        {view.pets.length > 0 && (
+          <button
+            type="button"
+            onClick={() =>
+              setView((current) =>
+                current === null
+                  ? current
+                  : { ...current, pets: [...current.pets, newPet(current.pets.map((p) => p.id))] },
+              )
+            }
+          >
+            Add a pet
+          </button>
+        )}
+        {removed.length > 0 && (
+          <p className="settings__note">
+            {removed.length} pet{removed.length === 1 ? '' : 's'} will be deleted when you save. A
+            deleted default pet does not come back.
+          </p>
+        )}
+
+        <fieldset>
+          <legend>Conversation summaries</legend>
+          <label>
+            <span>Summarizer provider (blank: each pet uses its own)</span>
+            <select
+              name="summarizerProviderId"
+              defaultValue={settings.summarizer?.providerId ?? ''}
+            >
+              <option value="">Each pet&apos;s own provider</option>
+              {view.providers.map((choice) => (
+                <option key={choice.id} value={choice.id}>
+                  {choice.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Summarizer model id (blank: each pet uses its own)</span>
+            <input name="summarizerModel" defaultValue={settings.summarizer?.model ?? ''} />
+          </label>
+          <p className="settings__note">
+            After twenty messages a conversation is folded into a short memory so the history sent
+            to the model stays small. Each summary is one model call.
+          </p>
+        </fieldset>
 
         {keyed.map((choice) => (
           <label key={choice.id}>

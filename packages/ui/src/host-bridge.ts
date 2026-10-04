@@ -8,8 +8,12 @@ import type {
   Pet,
 } from '@tagalong/protocol';
 
-/** The subset of core-to-host notifications that report on a turn in flight. */
-type TurnNotification = Extract<CoreToHostNotification, `turn.${string}`>;
+/**
+ * The core-to-host notifications a panel renders: everything about a turn in flight, plus
+ * the crew's own — one pet addressing another, and a crew run's progress.
+ */
+type TurnNotification =
+  Extract<CoreToHostNotification, `turn.${string}`> | 'pet.message' | 'crew.status';
 
 /**
  * Derived from the protocol catalog rather than restated, so a new turn.* notification
@@ -21,6 +25,8 @@ export type TurnEvent = {
 
 export interface AskInput {
   petId: string;
+  /** The conversation to continue. Absent opens a new one; turn.started reports its id. */
+  conversationId?: string;
   text?: string;
   snapshot?: ContextSnapshot;
 }
