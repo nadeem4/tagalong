@@ -275,6 +275,12 @@ the app is not in fake mode, sorted; anything else — no key, fake mode, a refu
 answers the preset's fallback list with `source: 'fallback'`. The key is read fresh for this call, so
 a key saved a moment ago fills the picker without a restart.
 
+**Keys without a restart.** Turns get their provider from `KeyedProviderResolver`
+(`providers/key-resolver.ts`). The engine calls its `refresh` before every `ask`, which re-reads the
+three keychain entries; `resolve` reuses the built provider until its key or base URL changes, then
+builds a new one. A key pasted into the onboarding wizard therefore answers the very next question,
+which is what lets a fresh install reach a first answer without a restart.
+
 How the provider-neutral blocks map onto the chat-completions
 format:
 

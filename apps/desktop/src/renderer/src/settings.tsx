@@ -156,9 +156,9 @@ function PetEditor({
  * saved secret cannot be recovered from a window someone left open.
  *
  * A pet's provider and model apply on its next ask, because the engine looks the pet up
- * per turn. Keys and base URLs are read when a provider is first built, so those two
- * need a restart, and the note under the button says so. Hotkeys are re-registered by
- * main on save, and the sight settings are read per capture.
+ * per turn. Keys are re-read by the engine before every ask and a provider is rebuilt when
+ * its key or base URL changed, so those apply on the next ask too. Hotkeys are
+ * re-registered by main on save, and the sight settings are read per capture.
  */
 function Settings() {
   const [view, setView] = useState<HostView | null>(null);
@@ -280,9 +280,7 @@ function Settings() {
               ),
             },
       );
-      setStatus(
-        'Saved. Pets, hotkeys and sight settings apply now; a new key or base URL needs a restart.',
-      );
+      setStatus('Saved. Everything applies from the next ask, keys and base URLs included.');
       setStatusIsError(false);
     } catch (error) {
       // The builders throw with the field named, so this reaches the user as

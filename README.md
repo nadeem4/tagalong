@@ -206,7 +206,8 @@ Nano VL. On OpenRouter every model is treated as seeing, so a Claude pet answers
 model and needs no vision model. A pet with no model that can see never sends pixels: the screenshot
 is dropped with a warning.
 
-A pet's provider and model apply on its next ask. A new key or base URL applies after a restart.
+A pet's provider and model apply on its next ask, and so does a new key or base URL: the engine
+re-reads the keychain before every ask, so no restart is needed.
 
 The Nemotron Nano 2 VL id (`nvidia/Nemotron-Nano-V2-12b`) and the OpenRouter fallback ids could not be
 checked when they were written; they live in `packages/core/src/providers/nebius-models.ts` and
