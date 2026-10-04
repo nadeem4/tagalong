@@ -38,6 +38,12 @@ describe('openDatabase', () => {
     try {
       expect(tableNames(db)).toEqual([
         'conversations',
+        'memories',
+        'memories_fts',
+        'memories_fts_config',
+        'memories_fts_data',
+        'memories_fts_docsize',
+        'memories_fts_idx',
         'messages',
         'pet_seeds',
         'pets',

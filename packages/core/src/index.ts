@@ -64,6 +64,14 @@ export {
 
 export { DB_FILENAME, LATEST_SCHEMA_VERSION, migrate, openDatabase } from './memory/db';
 export { ConversationStore } from './memory/store';
+export {
+  MemoryStore,
+  ftsQuery,
+  type Memory,
+  type MemoryKind,
+  type MemoryScope,
+  type NewMemory,
+} from './memory/memories';
 
 export {
   AnthropicProvider,

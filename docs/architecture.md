@@ -495,6 +495,17 @@ Seeding is remembered per pet in `pet_seeds` (migration 2). An install that pred
 Ink and Bolt on its next boot, a pet the user edited is never overwritten, and a default the user
 deleted stays deleted. Each pet carries an optional `color` (`#rrggbb`) for the strip and the panel.
 
+### Memory
+
+`memory/memories.ts` is the crew's memory: `memories(id, scope, pet_id, kind, text, created_at)` with
+an external-content FTS5 index (`memories_fts`, porter stemming) kept in step by triggers (migration 3).
+`scope` is `pet` (private, `pet_id` set) or `crew` (the shared notebook, `pet_id` null); `kind` is
+`fact`, `preference` or `summary`. Every read — `recent(petId)` and `search(petId, text)` — filters on
+`scope = 'crew' OR pet_id = ?` in SQL, so no code path can load another pet's private memories. A
+question is turned into an FTS query by quoting each distinct word and OR-ing them (`ftsQuery`), so
+quotes, `*`, `NEAR(` and friends in a user's text are plain words rather than syntax errors, and BM25
+ranks the closest memory first.
+
 ## The browser host
 
 `apps/extension` is a Manifest V3 extension built by Vite into `dist/`, the folder Chrome loads

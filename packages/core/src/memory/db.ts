@@ -20,6 +20,32 @@ const MIGRATIONS: readonly string[] = [
   // count as seeded: they came from an earlier seed or from the user.
   `CREATE TABLE pet_seeds (id TEXT PRIMARY KEY, seeded_at TEXT NOT NULL);
    INSERT INTO pet_seeds (id, seeded_at) SELECT id, updated_at FROM pets;`,
+  // Phase 4. Memories: private to one pet (`scope = 'pet'`) or shared by the crew
+  // (`scope = 'crew'`), searched through an external-content FTS5 index kept in step by
+  // triggers. Porter stemming so "answers" finds "answer".
+  `CREATE TABLE memories (
+     id TEXT PRIMARY KEY,
+     scope TEXT NOT NULL CHECK (scope IN ('pet', 'crew')),
+     pet_id TEXT,
+     kind TEXT NOT NULL CHECK (kind IN ('fact', 'preference', 'summary')),
+     text TEXT NOT NULL,
+     created_at TEXT NOT NULL,
+     CHECK ((scope = 'pet') = (pet_id IS NOT NULL))
+   );
+   CREATE INDEX memories_pet ON memories(pet_id, created_at);
+   CREATE VIRTUAL TABLE memories_fts USING fts5(
+     text, content = 'memories', content_rowid = 'rowid', tokenize = 'porter unicode61'
+   );
+   CREATE TRIGGER memories_ai AFTER INSERT ON memories BEGIN
+     INSERT INTO memories_fts (rowid, text) VALUES (new.rowid, new.text);
+   END;
+   CREATE TRIGGER memories_ad AFTER DELETE ON memories BEGIN
+     INSERT INTO memories_fts (memories_fts, rowid, text) VALUES ('delete', old.rowid, old.text);
+   END;
+   CREATE TRIGGER memories_au AFTER UPDATE ON memories BEGIN
+     INSERT INTO memories_fts (memories_fts, rowid, text) VALUES ('delete', old.rowid, old.text);
+     INSERT INTO memories_fts (rowid, text) VALUES (new.rowid, new.text);
+   END;`,
 ];
 
 /** Version a fully migrated database reports. */
