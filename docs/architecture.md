@@ -142,10 +142,11 @@ unauthenticated connection gets the same error.
 The catalog in `packages/protocol/src/methods.ts` is the whole surface:
 
 - **Host to core:** `hello`, `ask`, `interrupt`, `pets.list`, `pets.upsert`, `pets.delete`,
-  `settings.get`, `settings.set`, `tool.approve` (Phase 5).
-- **Core to host:** `perception.capture`, and from Phase 2B `perception.captureRegion`,
-  `perception.listWindows`, and `perception.readText`. Nothing for recall, diff, or watch — those belong
-  to Phase 3B, and a test asserts they have not crept in early.
+  `settings.get`, `settings.set`, `models.list`, `tool.approve` (Phase 5), and `watch.stop`
+  (Phase 3B).
+- **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
+  `perception.listWindows` and `perception.readText`, and from Phase 3B `perception.recall` and
+  `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
 - **Core to host notifications** gained `turn.toolRequest` and `turn.toolResult` in Phase 2B. They were
   in the catalog from Phase 1 and nothing emitted them, which left a tool call invisible twice over: the
   user watching the panel could not tell a working pet from a hung one, and no test could observe that a
@@ -154,7 +155,8 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   be megabytes of IPC to render one line.
 - **Core to host notifications:** `turn.started`, `turn.delta`, `turn.completed`, `turn.error`,
   `turn.warning`, plus `turn.audio` (Phase 3), `turn.toolRequest` and `turn.toolResult` (Phase 5),
-  and `pet.message` (Phase 4). `turn.warning` carries the same `{ code, message }` as `turn.error`
+  `pet.message` and `crew.status` (Phase 4), and `watch.fired` and `watch.status` (Phase 3B).
+  `turn.warning` carries the same `{ code, message }` as `turn.error`
   but does not end the turn — a host that aborts on it throws away a reply that is still coming.
 
 ## The ask flow
@@ -616,6 +618,30 @@ Each avatar's ring follows its own turns (`nextPetStates`), so a roundtable ligh
 `settings.hiddenPets` takes pets off the strip; they still answer in the panel. Settings edits every
 pet field, adds pets (on the fake brain until a provider is picked) and deletes them, and sets
 `settings.summarizer`.
+
+## Awareness (Phase 3B)
+
+The pet can remember the last few minutes of the desktop and watch for something to happen. Both
+live behind the `recall` capability, and both stay on the machine: frames are held in memory by the
+desktop host and only a frame the pet asks for, or the crop a watch shows its check model, ever
+reaches a model.
+
+### The wire
+
+`packages/protocol/src/awareness.ts` holds the shapes, because they share one idea the rest of the
+catalog does not have — time.
+
+- `perception.recall { secondsAgo, displayId? }` returns the buffered frame nearest that moment for
+  one display or every display, each with its `capturedAt`, plus the window list and focused window at
+  that time, whether recording is on, and `oldestAt`, how far back the buffer reaches.
+- `perception.diff { displayId, sinceSeconds, rect?, includeImages? }` compares the display (or a
+  region of it, in display pixels) now with the frame nearest `sinceSeconds` ago, and returns a
+  `changeRatio` from 0 to 1, the changed bounding box, and before and after crops of it. A watch polls
+  with `includeImages: false` and asks for the crops only when it is about to show them to a model.
+- `watch.fired { watchId, petId, message, displayId }` says a watch's condition came true; the watch is
+  over. `watch.status` reports `watching`, then exactly one final state — `fired`, `stopped`,
+  `timeout`, `capped` or `error` — with the checks spent, so a host can show a Watching chip and take
+  it down. `watch.stop { watchId }` is the chip's Stop button.
 
 ## The browser host
 

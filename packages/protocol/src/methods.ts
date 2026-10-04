@@ -8,6 +8,16 @@ import {
   PerceptionTarget,
   WindowEntry,
 } from './context';
+import {
+  PerceptionDiffParams,
+  PerceptionDiffResult,
+  PerceptionRecallParams,
+  PerceptionRecallResult,
+  WatchFiredParams,
+  WatchStatusParams,
+  WatchStopParams,
+  WatchStopResult,
+} from './awareness';
 import { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './limits';
 import { Pet } from './pet';
 import { CaptureBlock, Settings, SettingsPatch } from './settings';
@@ -25,6 +35,8 @@ export const HostCapability = z.enum([
   'displays',
   /** Phase 2B: can read a window's text without photographing it. */
   'textLayer',
+  /** Phase 3B: answers perception.recall and perception.diff from its in-memory frames. */
+  'recall',
 ]);
 export type HostCapability = z.infer<typeof HostCapability>;
 
@@ -308,6 +320,7 @@ export const hostToCoreMethods = {
   'settings.set': { params: SettingsSetParams, result: SettingsSetResult },
   'models.list': { params: ModelsListParams, result: ModelsListResult },
   'tool.approve': { params: ToolApproveParams, result: ToolApproveResult },
+  'watch.stop': { params: WatchStopParams, result: WatchStopResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostMethods = {
@@ -321,6 +334,8 @@ export const coreToHostMethods = {
     result: PerceptionListWindowsResult,
   },
   'perception.readText': { params: PerceptionReadTextParams, result: PerceptionReadTextResult },
+  'perception.recall': { params: PerceptionRecallParams, result: PerceptionRecallResult },
+  'perception.diff': { params: PerceptionDiffParams, result: PerceptionDiffResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostNotifications = {
@@ -334,6 +349,8 @@ export const coreToHostNotifications = {
   'turn.warning': { params: TurnWarningParams },
   'pet.message': { params: PetMessageParams },
   'crew.status': { params: CrewStatusParams },
+  'watch.fired': { params: WatchFiredParams },
+  'watch.status': { params: WatchStatusParams },
 } as const satisfies Record<string, NotificationSpec>;
 
 export type HostToCoreMethod = keyof typeof hostToCoreMethods;

@@ -29,6 +29,7 @@ const HOST_TO_CORE = [
   'settings.set',
   'models.list',
   'tool.approve',
+  'watch.stop',
 ] as const;
 
 const CORE_TO_HOST = ['perception.capture'] as const;
@@ -44,6 +45,8 @@ const CORE_TO_HOST_NOTIFICATIONS = [
   'turn.warning',
   'pet.message',
   'crew.status',
+  'watch.fired',
+  'watch.status',
 ] as const;
 
 describe('method catalog', () => {
@@ -296,26 +299,16 @@ describe('HostCapability, full view', () => {
   });
 });
 
-describe('the core-to-host catalog after 2B', () => {
-  it('carries the three new perception methods', () => {
+describe('the core-to-host catalog after 3B', () => {
+  it('carries the 2B perception methods plus recall and diff', () => {
     expect(Object.keys(coreToHostMethods).sort()).toEqual([
       'perception.capture',
       'perception.captureRegion',
+      'perception.diff',
       'perception.listWindows',
       'perception.readText',
+      'perception.recall',
     ]);
-  });
-
-  it('has no recall, diff or watch method, which belong to Phase 3B', () => {
-    // Asserted rather than assumed: awareness was split out of this phase on purpose, and
-    // a method sneaking in here is how a phase boundary quietly stops meaning anything.
-    const names = [...Object.keys(coreToHostMethods), ...Object.keys(coreToHostNotifications)];
-    for (const forbidden of ['recall', 'diff', 'watch']) {
-      expect(
-        names.filter((name) => name.toLowerCase().includes(forbidden)),
-        `${forbidden} belongs to Phase 3B`,
-      ).toEqual([]);
-    }
   });
 });
 
