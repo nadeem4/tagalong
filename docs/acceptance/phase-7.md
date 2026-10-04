@@ -87,8 +87,9 @@ Acceptance: "Installers build in CI artifacts; native modules load in the packag
 - [x] `pnpm package:win` (root and desktop); `scripts/fetch-native.mjs` downloads get-windows' win32
       N-API binary first, because pnpm skips its install script.
 - [x] better-sqlite3 loads from the packaged app on Electron 44 (Linux package, this container).
-- [~] CI builds the installer and uploads it as `tagalong-windows-installer`. The workflow runs on pull
-  requests to `main` only, so it first runs when this stack is retargeted to `main`.
+- [ ] Installers as CI artifacts. The branch could not change `.github/workflows/ci.yml` (the push was
+      refused: the app that pushes has no `workflows` permission), so the steps are below for the owner to
+      add. CI runs on pull requests to `main` only, so they first run once this stack is retargeted.
 - [~] dmg, AppImage and deb are configured, not verified (and the app has no macOS or Linux adapter).
 - [ ] Native modules in the installed Windows app — feature test 7.15.
 
@@ -104,3 +105,24 @@ On Windows, from a checkout of this branch:
 4. Feature test 7.6 with a Token Factory key, confirming the Nemotron Nano 2 VL and Nemotron 3 Nano ids
    against the live list.
 5. The demo run in `docs/testing/feature-test-guide.md`.
+6. Add the installer steps below to the end of the `build` job's `steps:` in `.github/workflows/ci.yml` (indented to match), after the
+   smoke test, and push them yourself.
+
+### CI steps for the installer
+
+```yaml
+# Phase 7: the Windows installer, built the way the owner builds it and kept as an
+# artifact so a reviewer can install exactly what this commit produces. Unsigned.
+- name: Package Windows installer
+  run: |
+    pnpm --filter @tagalong/extension build
+    pnpm --filter @tagalong/desktop package:win
+  timeout-minutes: 20
+
+- name: Upload Windows installer
+  uses: actions/upload-artifact@v6
+  with:
+    name: tagalong-windows-installer
+    path: apps/desktop/release/*.exe
+    if-no-files-found: error
+```

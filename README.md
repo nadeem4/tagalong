@@ -329,8 +329,10 @@ pnpm package:dir      # an unpacked app in release/, for checking what gets pack
   it first.
 - **macOS dmg and Linux AppImage/deb are configured but unverified**, and would not run anyway: there
   is no macOS or Linux platform adapter in this build.
-- CI builds the installer on `windows-latest` and uploads it as the `tagalong-windows-installer`
-  artifact.
+- CI does not build the installer yet. The two workflow steps that would (build it on
+  `windows-latest`, upload it as the `tagalong-windows-installer` artifact) are in
+  [docs/acceptance/phase-7.md](docs/acceptance/phase-7.md#ci-steps-for-the-installer), to be added to
+  `.github/workflows/ci.yml` by hand.
 
 Quit any running Tagalong before `pnpm test:e2e`. The main process takes a single-instance lock, so a
 second copy quits immediately and Playwright reports the confusing
