@@ -13,6 +13,8 @@ import { PAIRING_KEY, readPairing } from './pairing';
 import { PortHub } from './port-hub';
 import { PORT_NAME } from './port-messages';
 import { EXTENSION_CAPABILITIES } from './capabilities';
+import { COMMAND_OPEN_PANEL } from './manifest';
+import { PAGE_TARGETS } from './page-targets';
 import { captureSnapshot, captureTab } from './tab-capture';
 
 /** Wakes a stopped worker so it notices the desktop app coming back. */
@@ -48,6 +50,26 @@ chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== PORT_NAME) return;
   hub.add(port);
   void connection.start();
+});
+
+// The shortcut. Opening the panel has to happen inside the command's user gesture, so it
+// comes before anything awaited; the capture follows and reaches the panel when it connects.
+chrome.commands.onCommand.addListener((command, tab) => {
+  if (command !== COMMAND_OPEN_PANEL || tab?.windowId === undefined) return;
+  void chrome.sidePanel.open({ windowId: tab.windowId });
+  captureSnapshot(PAGE_TARGETS, chromeTabAccess)
+    .then((snapshot) => hub.publishContext(snapshot))
+    .catch(() => undefined);
+});
+
+// A panel stays open across tab switches, so it is told about the tab it now sits beside.
+// Without the optional all-sites grant the new tab usually cannot be read, and the chip is
+// cleared rather than left naming the previous page.
+chrome.tabs.onActivated.addListener(() => {
+  if (!hub.hasPages) return;
+  captureSnapshot(PAGE_TARGETS, chromeTabAccess)
+    .then((snapshot) => hub.publishContext(snapshot))
+    .catch(() => hub.publishContext(null));
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {

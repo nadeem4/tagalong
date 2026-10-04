@@ -35,6 +35,11 @@ export class PortHub {
     }
   }
 
+  /** True while any extension page is open — the side panel, usually. */
+  get hasPages(): boolean {
+    return this.#ports.size > 0;
+  }
+
   broadcast(message: WorkerMessage): void {
     for (const port of this.#ports) port.postMessage(message);
   }
@@ -43,8 +48,9 @@ export class PortHub {
    * Hands the shortcut's capture to the open panels — or, when the shortcut is what is
    * opening the panel, keeps it until that panel connects.
    */
-  publishContext(snapshot: ContextSnapshot): void {
+  publishContext(snapshot: ContextSnapshot | null): void {
     if (this.#ports.size === 0) {
+      if (snapshot === null) return;
       this.#undelivered = snapshot;
       return;
     }

@@ -118,4 +118,20 @@ describe('PortHub', () => {
     h.add(later);
     expect(later.posted.some((m) => m.type === 'context')).toBe(false);
   });
+
+  it('tells open panels when the tab they sit beside could not be read', () => {
+    const h = hub();
+    const port = fakePort();
+    h.add(port);
+    h.publishContext(null);
+    expect(port.posted.at(-1)).toEqual({ type: 'context', snapshot: null });
+  });
+
+  it('keeps no empty context for a panel that has not opened', () => {
+    const h = hub();
+    h.publishContext(null);
+    const port = fakePort();
+    h.add(port);
+    expect(port.posted.some((m) => m.type === 'context')).toBe(false);
+  });
 });

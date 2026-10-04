@@ -33,6 +33,13 @@ export const manifest = {
   /** Requested only if a later feature needs it; nothing in Phase 6 reads the clipboard. */
   optional_permissions: ['clipboardRead'],
   /**
+   * Off until the user turns it on from the options page. `activeTab` covers the tab the
+   * panel or shortcut was used on; this covers the rest — a tab switched to with the panel
+   * open, and the desktop hotkey pressed over a tab the extension was never clicked on.
+   * Still read only when the user asks: nothing is injected without an ask.
+   */
+  optional_host_permissions: ['<all_urls>'],
+  /**
    * Extension pages and the service worker may open sockets to the loopback engine and
    * nowhere else. MV3 leaves `connect-src` open by default; closing it means a bug or a
    * compromised dependency cannot ship page text off the machine.

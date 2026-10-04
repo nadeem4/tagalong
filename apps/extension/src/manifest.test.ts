@@ -18,6 +18,10 @@ describe('manifest', () => {
     expect('host_permissions' in manifest).toBe(false);
   });
 
+  it('offers reading any tab only as an optional grant the user switches on', () => {
+    expect(manifest.optional_host_permissions).toEqual(['<all_urls>']);
+  });
+
   it('points the side panel and options page at the built html', () => {
     expect(manifest.side_panel.default_path).toBe('sidepanel.html');
     expect(manifest.options_ui).toEqual({ page: 'options.html', open_in_tab: true });

@@ -44,3 +44,24 @@ const port = chrome.runtime.connect({ name: PORT_NAME });
 port.onMessage.addListener((raw: WorkerMessage) => {
   if (raw.type === 'status') statusLine.textContent = describeStatus(raw.status);
 });
+
+/** The optional all-sites grant. Requested from this click, which Chrome requires. */
+const ALL_SITES = { origins: ['<all_urls>'] };
+const allSitesButton = document.getElementById('all-sites') as HTMLButtonElement;
+const allSitesState = document.getElementById('all-sites-state') as HTMLElement;
+
+function showAllSites(granted: boolean): void {
+  allSitesState.textContent = granted ? ' On.' : ' Off.';
+  allSitesButton.textContent = granted
+    ? 'Stop reading other tabs'
+    : 'Allow reading any tab when I ask';
+}
+
+void chrome.permissions.contains(ALL_SITES).then(showAllSites);
+allSitesButton.addEventListener('click', () => {
+  void chrome.permissions.contains(ALL_SITES).then(async (granted) => {
+    if (granted) await chrome.permissions.remove(ALL_SITES);
+    else await chrome.permissions.request(ALL_SITES);
+    showAllSites(await chrome.permissions.contains(ALL_SITES));
+  });
+});

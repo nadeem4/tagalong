@@ -25,6 +25,16 @@
         <button type="button" id="forget">Forget pairing</button>
       </form>
       <p id="message" role="status"></p>
+      <h2>Reading tabs</h2>
+      <p>
+        By default the extension can read a tab only after you use it there — the toolbar button,
+        the shortcut, or the side panel. Turn this on to let it read whichever tab is in front when
+        you ask, including from the desktop hotkey. It still reads nothing until you ask.
+      </p>
+      <p>
+        <button type="button" id="all-sites">Allow reading any tab when I ask</button>
+        <span id="all-sites-state"></span>
+      </p>
       <p>Connection: <strong id="status">checking…</strong></p>
       <p class="note">
         The extension needs the Tagalong desktop app running on this computer. It talks only to

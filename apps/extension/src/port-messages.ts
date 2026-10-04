@@ -23,8 +23,12 @@ export type WorkerMessage =
   | { type: 'notification'; method: CoreToHostNotification; params: unknown }
   | { type: 'reply'; id: number; ok: true; result: unknown }
   | { type: 'reply'; id: number; ok: false; error: string }
-  /** What the shortcut captured, for the panel to attach to the next ask. */
-  | { type: 'context'; snapshot: ContextSnapshot };
+  /**
+   * What the shortcut captured, or the tab the user switched to, for the panel to attach to
+   * the next ask. Null when the new tab could not be read: a chip still naming the previous
+   * tab would send the wrong page.
+   */
+  | { type: 'context'; snapshot: ContextSnapshot | null };
 
 /** The slice of `chrome.runtime.Port` both ends use, so tests can pair two fakes. */
 export interface PortLike {
