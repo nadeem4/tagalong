@@ -403,6 +403,34 @@ describe('handoff over rpc', () => {
   });
 });
 
+describe('roundtable over rpc', () => {
+  it('runs /crew across the whole crew and ends with the asking pet’s synthesis', async () => {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+
+    await host.call('ask', { petId: 'ink', input: { text: '/crew Should the panel dock left?' } });
+    await vi.waitFor(
+      () =>
+        expect(
+          host.notifications.some(
+            (n) => n.method === 'crew.status' && n.params['state'] === 'done',
+          ),
+        ).toBe(true),
+      { timeout: 10000 },
+    );
+
+    const speakers = host.notifications
+      .filter((n) => n.method === 'turn.started')
+      .map((n) => n.params['petId']);
+    expect(speakers).toEqual(['ink', 'bolt', 'scout', 'ink']);
+    const done = host.notifications.find(
+      (n) => n.method === 'crew.status' && n.params['state'] === 'done',
+    );
+    expect(done?.params['modelCalls']).toBe(4);
+  });
+});
+
 describe('memory across a restart', () => {
   it('remembers a stated preference after the engine restarts', async () => {
     const systems: string[] = [];

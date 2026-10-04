@@ -575,6 +575,24 @@ card above the caller's answer.
 `turn.completed.modelCalls` counts what a turn cost: one for the first call, one per tool round trip,
 one per consult. The panel footer shows "N model calls" whenever a run made more than one.
 
+### Roundtable
+
+`crew/roundtable.ts` runs `/crew <question>`. The asking pet speaks first and writes the synthesis; the
+rest of the crew follows in registry order. Rounds include the synthesis and are clamped to 2..3: the
+default is one discussion round and the synthesis, and three rounds adds a second pass in which each
+pet responds to the others. Every turn is an ordinary runner turn on the pet's own provider and model,
+tagged with the run's `runId` and with `allowConsult: false`, so a mixed crew — Nemotron 3 Super,
+Claude through OpenRouter, Nemotron Nano — takes turns on three brains. Each pet keeps one
+conversation for the run, and its prompt carries the transcript so far (each answer clipped to 800
+characters); the user's snapshot rides on each pet's first turn only, so a screenshot is not paid for
+twice per pet.
+
+Hosts follow the run through `pet.message { kind: 'roundtable', round, text: 'Round 1 of 2' |
+'Synthesis by Scout' }` — sent before the turn that opens the round — and `crew.status { runId,
+state: running | done | stopped, round, rounds, modelCalls }` after every turn. A pet that cannot
+answer is written into the transcript as "(Ink could not answer: …)" and the table carries on.
+Interrupting the turn in flight — the panel's Stop button — or `stop()` cancels every remaining turn.
+
 ## The browser host
 
 `apps/extension` is a Manifest V3 extension built by Vite into `dist/`, the folder Chrome loads

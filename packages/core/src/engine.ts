@@ -22,6 +22,7 @@ import { ConversationRunner } from './conversation';
 import type { TurnEventSink } from './conversation/runner';
 import { parseCrewCommand } from './crew/commands';
 import { startHandoff } from './crew/handoff';
+import { startRoundtable } from './crew/roundtable';
 import { browserContextFor, createPerceptionToolset } from './perception';
 import type { PerceptionHost } from './perception';
 import { EngineServer } from './server/ws-server';
@@ -305,9 +306,17 @@ function buildHandlers(parts: {
         );
         return { turnId: handle.turnId };
       }
+      if (command.kind === 'roundtable') {
+        // The whole crew, the asked pet first; the run reports itself through crew.status.
+        const run = startRoundtable(
+          { runner, emit },
+          { starter: pet, pets: pets.list(), question: command.question, snapshot },
+        );
+        return { turnId: run.firstTurnId };
+      }
       const handle = runner.run({
         pet,
-        text: command.kind === 'ask' ? command.text : (params.input.text ?? ''),
+        text: command.text,
         conversationId: params.conversationId,
         snapshot,
       });

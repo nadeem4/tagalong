@@ -91,6 +91,8 @@ export interface TurnOutcome {
   /** `error` is the runner's own reason: the provider never returned a stop reason. */
   stopReason: BrainResult['stopReason'] | 'error';
   usage: { inputTokens: number; outputTokens: number };
+  /** Model calls the turn made: the first, each tool round trip, each consult. */
+  modelCalls?: number;
   error?: { code: string; message: string };
 }
 
@@ -369,7 +371,7 @@ export class ConversationRunner {
       if (result.text.length > 0) {
         this.#options.afterTurn?.({ pet: ask.pet, conversationId });
       }
-      return { turnId, conversationId, ...result };
+      return { turnId, conversationId, ...result, modelCalls };
     } catch (error) {
       return this.#fail(turnId, conversationId, error);
     }
