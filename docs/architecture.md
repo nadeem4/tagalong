@@ -557,6 +557,24 @@ and the panel draws the bubble ahead of the answer.
 `turn.started` now carries `providerId` and `model` (and `runId` for crew runs), so a panel can label
 every answer with who said it and on what.
 
+### Consult
+
+`crew/consult.ts` gives every pet an `ask_pet(petId, question)` tool whenever the crew has someone else
+to ask and the turn allows it (roundtable turns pass `allowConsult: false`). Its description lists the
+other pets by id with the first sentence of their persona. A call runs one nested turn for the target:
+its own persona, provider, model and recalled memories, the caller's question framed as "X is
+consulting you mid-answer", and the caller's screen context as text only — no pixels. The nested turn
+is offered **no tools**, which is the depth limit: a consulted pet cannot consult, and a nested
+`ask_pet` it invents anyway is answered with an error result. It has 60 seconds (`AbortSignal.any` of
+the caller's signal and a timeout); a timeout, a provider error or an empty reply comes back to the
+caller as an error tool result — "Ink did not answer within 60 seconds. Answer without it." — and the
+caller carries on. Nothing of the nested turn is stored. The consult is broadcast as `pet.message
+{ kind: 'consult', text: question, turnId: callerTurn }` before it runs, so the panel draws a small
+card above the caller's answer.
+
+`turn.completed.modelCalls` counts what a turn cost: one for the first call, one per tool round trip,
+one per consult. The panel footer shows "N model calls" whenever a run made more than one.
+
 ## The browser host
 
 `apps/extension` is a Manifest V3 extension built by Vite into `dist/`, the folder Chrome loads

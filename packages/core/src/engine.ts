@@ -189,6 +189,7 @@ export class Engine {
       memory,
       // Off the request path: the reply is already on screen when the summary starts.
       afterTurn: ({ pet, conversationId }) => void summarizer.schedule(conversationId, pet),
+      consult: { pets: () => pets.list() },
       // Both lookups are lazy: hosts connect and drop between turns, and the exclusion
       // list is edited while the app runs, so neither can be captured at boot.
       tools: createPerceptionToolset({

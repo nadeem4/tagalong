@@ -49,6 +49,9 @@ export function ChatPanel({
   const [activePetId, setActivePetId] = useState(petId);
   const [draft, setDraft] = useState('');
   const [streamingSpeaker, setStreamingSpeaker] = useState('');
+  // Model calls in the current crew run: consults and roundtables multiply them, so the
+  // footer shows the count whenever a run made more than the one call an ask costs.
+  const [modelCalls, setModelCalls] = useState<number | null>(null);
   // Which conversation each pet is in, so a follow-up continues the thread it answered in.
   const [conversations, setConversations] = useState<Record<string, string>>({});
   const turns = useRef(new Map<string, TurnInfo>());
@@ -135,6 +138,9 @@ export function ChatPanel({
       case 'turn.completed': {
         // The completed text is authoritative; deltas may have been dropped.
         const info = turns.current.get(event.turnId);
+        if (event.modelCalls !== undefined && event.modelCalls > 1) {
+          setModelCalls(event.modelCalls);
+        }
         settle({
           id: event.turnId,
           role: 'assistant',
@@ -162,6 +168,19 @@ export function ChatPanel({
           ]);
           selectPet(event.toPetId);
         }
+        if (event.kind === 'consult') {
+          setMessages((current) => [
+            ...current,
+            {
+              id: `consult:${current.length}`,
+              role: 'assistant',
+              kind: 'consult',
+              text: event.text,
+              fromPetId: event.fromPetId,
+              toPetId: event.toPetId,
+            },
+          ]);
+        }
         break;
       default:
         // Audio and tool events belong to later phases.
@@ -173,6 +192,7 @@ export function ChatPanel({
 
   function handleSend(text: string): void {
     setDraft('');
+    setModelCalls(null);
     setMessages((current) => [...current, { id: `ask:${current.length}`, role: 'user', text }]);
     const conversationId = conversations[activePetId];
     bridge
@@ -235,6 +255,14 @@ export function ChatPanel({
         value={draft}
         onValueChange={setDraft}
       />
+      {modelCalls !== null && (
+        <p
+          data-testid="model-calls"
+          className="border-t border-slate-100 px-3 py-1 text-right text-[11px] text-slate-500"
+        >
+          {modelCalls} model calls
+        </p>
+      )}
     </section>
   );
 }

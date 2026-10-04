@@ -182,4 +182,37 @@ describe('ChatPanel with a crew', () => {
 
     await waitFor(() => expect(changes).toEqual(['ink']));
   });
+
+  it('shows a small inline card when a pet consults another', async () => {
+    const bridge = renderCrew();
+    await screen.findByTestId('active-pet');
+    send('Write a commit message');
+
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: T1,
+        petId: 'scout',
+        conversationId: C1,
+        model: 'nvidia/nemotron-3-super-120b-a12b',
+      });
+      bridge.emit({
+        type: 'pet.message',
+        fromPetId: 'scout',
+        toPetId: 'ink',
+        kind: 'consult',
+        text: 'Polish: fix bug',
+        turnId: T1,
+      });
+      complete(bridge, T1, 'fix: correct the pagination off-by-one', { modelCalls: 3 });
+    });
+
+    expect(screen.getByTestId('consult')).toHaveTextContent('Scout consulted Ink: Polish: fix bug');
+    // The card sits above the answer it fed into.
+    const log = screen.getByRole('log');
+    expect(log.textContent?.indexOf('consulted')).toBeLessThan(
+      log.textContent?.indexOf('fix: correct') ?? -1,
+    );
+    expect(screen.getByTestId('model-calls')).toHaveTextContent('3 model calls');
+  });
 });
