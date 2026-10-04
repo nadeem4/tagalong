@@ -45,6 +45,8 @@ class TestHost {
   readonly notifications: { method: string; params: Record<string, unknown> }[] = [];
   /** Answers core-to-host requests such as perception.capture. */
   onRequest: ((method: string, params: unknown) => unknown) | undefined;
+  /** When set, requests are swallowed unanswered, like a stopped service worker. */
+  silent = false;
 
   private constructor(socket: WebSocket) {
     this.#socket = socket;
@@ -52,6 +54,7 @@ class TestHost {
       const msg = JSON.parse(String(raw)) as Record<string, unknown>;
       // A core-to-host request carries both an id and a method.
       if ('id' in msg && 'method' in msg) {
+        if (this.silent) return;
         const answer = this.onRequest?.(String(msg['method']), msg['params']);
         this.#socket.send(JSON.stringify({ jsonrpc: '2.0', id: msg['id'], result: answer }));
         return;
@@ -378,5 +381,119 @@ describe('pets and settings over rpc', () => {
     expect(settings['defaultModel']).toBe('claude-haiku-4-5');
     // A patch must not reset the fields it left out.
     expect(settings['defaultPetId']).toBe('scout');
+  });
+});
+
+describe('the browser host', () => {
+  /** Records every prompt so a test can read what reached the model. */
+  function recordingProvider(script: ConstructorParameters<typeof FakeBrainProvider>[0]) {
+    const prompts: string[] = [];
+    const inner = new FakeBrainProvider(script);
+    const provider: BrainProvider = {
+      id: inner.id,
+      capabilities: inner.capabilities,
+      listModels: () => inner.listModels(),
+      complete: (req, events, signal) => {
+        prompts.push(JSON.stringify(req));
+        return inner.complete(req, events, signal);
+      },
+    };
+    return { provider, prompts };
+  }
+
+  const CHROME = { name: 'chrome.exe', windowTitle: 'Release notes - Google Chrome' };
+  const PAGE = {
+    url: 'https://example.com/notes',
+    title: 'Release notes',
+    text: 'Version 2 ships the side panel.',
+  };
+
+  async function connectExtension(e: Engine): Promise<{ ext: TestHost; asked: unknown[] }> {
+    const ext = await TestHost.connect(e.port);
+    const asked: unknown[] = [];
+    ext.onRequest = (_method, params) => {
+      asked.push((params as Record<string, unknown>)['what']);
+      return {
+        snapshot: {
+          app: { name: 'chrome', windowTitle: 'Release notes' },
+          selection: 'the exact words',
+          page: PAGE,
+        },
+      };
+    };
+    await ext.call('hello', {
+      host: 'extension',
+      version: '0.0.0',
+      capabilities: ['selection', 'pageText', 'activeWindow'],
+      token: e.pairingToken,
+    });
+    return { ext, asked };
+  }
+
+  const desktopAsk = {
+    petId: 'scout',
+    input: { text: 'what does this say?' },
+    snapshot: {
+      id: '6f1c2f0e-2a4b-4c1d-9e8f-0a1b2c3d4e5f',
+      capturedAt: '2026-10-04T00:00:00.000Z',
+      host: 'desktop',
+      app: CHROME,
+      selection: 'clipboard-trick copy',
+    },
+  };
+
+  it('fills a desktop ask made in Chrome with the exact selection and the page text', async () => {
+    const { provider, prompts } = recordingProvider({ text: 'ok' });
+    const e = await boot(provider);
+    const desk = await TestHost.connect(e.port);
+    await desk.call('hello', helloParams(e.pairingToken));
+    const { asked } = await connectExtension(e);
+
+    await desk.call('ask', desktopAsk);
+    await vi.waitFor(() => expect(desk.methods()).toContain('turn.completed'), { timeout: 5000 });
+
+    expect(asked).toEqual([['selection', 'pageText', 'activeWindow']]);
+    expect(prompts[0]).toContain('the exact words');
+    expect(prompts[0]).toContain('Version 2 ships the side panel.');
+    expect(prompts[0]).not.toContain('clipboard-trick copy');
+  });
+
+  it('answers with the desktop capture when the extension does not reply within 500 ms', async () => {
+    const { provider, prompts } = recordingProvider({ text: 'ok' });
+    const e = await boot(provider);
+    const desk = await TestHost.connect(e.port);
+    await desk.call('hello', helloParams(e.pairingToken));
+    const { ext } = await connectExtension(e);
+    ext.silent = true;
+
+    const started = Date.now();
+    await desk.call('ask', desktopAsk);
+    expect(Date.now() - started).toBeLessThan(2_000);
+    await vi.waitFor(() => expect(desk.methods()).toContain('turn.completed'), { timeout: 5000 });
+    expect(prompts[0]).toContain('clipboard-trick copy');
+  });
+
+  it('routes get_selection to the extension when Chrome is in front', async () => {
+    const e = await boot(
+      new FakeBrainProvider({
+        text: 'got it',
+        toolCall: { id: 'call-1', name: 'get_selection', input: {} },
+      }),
+    );
+    const desk = await TestHost.connect(e.port);
+    const deskAsked: unknown[] = [];
+    desk.onRequest = (_method, params) => {
+      const what = (params as Record<string, unknown>)['what'] as string[];
+      deskAsked.push(what);
+      return { snapshot: what.includes('activeWindow') ? { app: CHROME } : { selection: 'x' } };
+    };
+    await desk.call('hello', helloParams(e.pairingToken));
+    const { asked } = await connectExtension(e);
+
+    await desk.call('ask', { petId: 'scout', input: { text: 'read my selection' } });
+    await vi.waitFor(() => expect(desk.methods()).toContain('turn.completed'), { timeout: 5000 });
+
+    expect(deskAsked).toEqual([['activeWindow']]);
+    expect(asked).toEqual([['selection']]);
   });
 });

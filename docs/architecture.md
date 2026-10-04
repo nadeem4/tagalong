@@ -58,8 +58,8 @@ The diagram is the finished shape. What exists after Phase 1: the server (`serve
 FTS5 arrives with Phase 4 recall), the pet registry (`pets/registry.ts`), settings and the SecretStore
 interface (`settings/settings.ts`), and the brain providers (`providers/`). `Engine.boot` in `engine.ts`
 wires all of it together and is the only thing a host starts. `PetBus` (Phase 4), `McpManager` and
-`ApprovalPolicy` (Phase 5), and the STT and TTS providers (Phase 3) do not exist yet; the extension is a
-stub until Phase 6.
+`ApprovalPolicy` (Phase 5), and the STT and TTS providers (Phase 3) do not exist yet. The Chrome extension
+landed in Phase 6, which ran fifth; see "The browser host" below.
 
 ## Package responsibilities
 
@@ -95,6 +95,33 @@ Hosts implement two contracts.
   reads that, picks a window, and pays for one. The absence is asserted by a test, not left to habit.
 
 - **Presentation** renders pets, streams replies, plays audio, and shows approval cards.
+
+### Routing between the desktop and the browser host
+
+The extension advertises `selection`, `pageText` and `activeWindow`, and nothing else. The engine tells
+the two hosts apart by `pageText`, which only the browser host can read, so connection order never
+decides who answers (`perception/browser-route.ts`):
+
+- **Window identity** always comes from the desktop host when one is connected. Exclusions are checked
+  against it before either host reads anything.
+- **`get_selection`** asks the extension first when the front window is a browser, and the desktop's
+  clipboard trick otherwise. The extension gets `BROWSER_HOST_TIMEOUT_MS` (500 ms); a refusal falls back
+  at once, a silence after 500 ms.
+- **A desktop hotkey ask made in a browser** is filled in by the engine before the turn starts:
+  `browserContextFor` asks the extension for the selection, the page and the tab, replaces the clipboard
+  copy with the exact selection when there is one, adds the page, and drops the lot if the tab it read is
+  excluded. Past 500 ms the ask goes out exactly as the desktop made it.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
+flowchart LR
+  H["Desktop hotkey in Chrome"] --> D["Desktop host: window + clipboard copy"]
+  D --> E{"Extension connected?"}
+  E -- "no" --> T["Turn"]
+  E -- "yes" --> X["Extension: selection + page, 500 ms"]
+  X -- "answered" --> T
+  X -- "refused or late" --> T
+```
 
 Adding a host or an OS never touches the core.
 

@@ -17,7 +17,8 @@ import {
 import type { BrainProvider } from './providers';
 import type { ProviderResolver } from './conversation/runner';
 import { ConversationRunner } from './conversation';
-import { createPerceptionToolset } from './perception';
+import { browserContextFor, createPerceptionToolset } from './perception';
+import type { PerceptionHost } from './perception';
 import { EngineServer } from './server/ws-server';
 import type { MethodHandlers } from './server/ws-server';
 import { readOrCreatePairingToken } from './server/pairing';
@@ -186,6 +187,7 @@ export class Engine {
       runner,
       pets,
       settings,
+      hosts: () => live.server?.sessions() ?? [],
       models: (providerId) =>
         listModels(providerId, options.secretStore, settings, options.env ?? process.env),
     });
@@ -248,20 +250,28 @@ function buildHandlers(parts: {
   runner: ConversationRunner;
   pets: PetRegistry;
   settings: SettingsStore;
+  /** Lazy, like the toolset's: the extension connects and drops while the app runs. */
+  hosts: () => readonly PerceptionHost[];
   models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
 }): MethodHandlers {
-  const { runner, pets, settings, models } = parts;
+  const { runner, pets, settings, models, hosts } = parts;
 
   return {
-    ask: (params) => {
+    ask: async (params) => {
       const pet = pets.get(params.petId);
       if (pet === null) throw new Error(`no pet with id '${params.petId}'`);
+      // A desktop hotkey pressed in a browser gets the extension's exact selection and the
+      // page text, when the extension answers within half a second.
+      const snapshot = await browserContextFor(params.snapshot, {
+        hosts: hosts(),
+        exclusions: settings.get().captureExclusions,
+      });
       // Phase 3 transcribes params.input.audio; Phase 1 is text only.
       const handle = runner.run({
         pet,
         text: params.input.text ?? '',
         conversationId: params.conversationId,
-        snapshot: params.snapshot,
+        snapshot,
       });
       // The turn keeps running after this resolves; progress arrives as notifications.
       return { turnId: handle.turnId };
