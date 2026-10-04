@@ -10,6 +10,7 @@ import { ConversationStore } from '../memory/store';
 import { SettingsStore } from '../settings/settings';
 import { FakeBrainProvider } from '../providers';
 import type { BrainProvider, BrainRequest, FakeScript } from '../providers';
+import { SUMMARY_KEEP_RECENT, Summarizer } from '../memory/summarizer';
 import { REMEMBER } from './crew-tools';
 import { MEMORY_HEADING } from './prompt-assembler';
 import { ConversationRunner, type TurnEvent } from './runner';
@@ -138,5 +139,40 @@ describe('recall in a turn', () => {
     await r.run({ pet: scout, text: 'I prefer short answers.' }).done;
 
     expect(memories.recent('scout', 5)).toHaveLength(1);
+  });
+});
+
+describe('the summary job after turns', () => {
+  it('shrinks the history sent to the model once twenty messages have built up', async () => {
+    const store = new ConversationStore(db);
+    const settings = new SettingsStore(dir);
+    const requests: BrainRequest[] = [];
+    const provider = recordingFake({ text: 'An answer about the topic.' }, requests);
+    const summarizer = new Summarizer({ store, memories, settings, provider: () => provider });
+    const jobs: Promise<boolean>[] = [];
+    const r = new ConversationRunner({
+      store,
+      settings,
+      provider,
+      emit: () => undefined,
+      memory: memories,
+      afterTurn: ({ pet, conversationId }) => jobs.push(summarizer.schedule(conversationId, pet)),
+    });
+
+    let conversationId: string | undefined;
+    for (let i = 0; i < 10; i += 1) {
+      const turn = r.run({ pet: scout, text: `question ${i}`, conversationId });
+      conversationId = turn.conversationId;
+      await turn.done;
+    }
+    await Promise.all(jobs);
+
+    await r.run({ pet: scout, text: 'question 10', conversationId }).done;
+    const turnRequests = requests.filter((req) => !req.system.startsWith('You condense'));
+
+    expect(turnRequests.at(-2)?.messages).toHaveLength(19);
+    expect(turnRequests.at(-1)?.messages).toHaveLength(SUMMARY_KEEP_RECENT + 1);
+    expect(memories.recent('scout', 5).some((memory) => memory.kind === 'summary')).toBe(true);
+    expect(turnRequests.at(-1)?.system).toContain('(summary)');
   });
 });

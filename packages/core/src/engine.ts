@@ -4,6 +4,7 @@ import type { Pet } from '@tagalong/protocol';
 import { openDatabase } from './memory/db';
 import { ConversationStore } from './memory/store';
 import { MemoryStore } from './memory/memories';
+import { Summarizer } from './memory/summarizer';
 import { PetRegistry } from './pets/registry';
 import { SettingsStore } from './settings/settings';
 import type { SecretStore } from './settings/settings';
@@ -162,6 +163,15 @@ export class Engine {
 
     const store = new ConversationStore(db);
     const memory = new MemoryStore(db);
+    const resolve: ProviderResolver =
+      typeof provider === 'function' ? provider : () => provider as BrainProvider;
+    const summarizer = new Summarizer({
+      store,
+      memories: memory,
+      settings,
+      provider: resolve,
+      onError: (error) => console.warn('[engine] a conversation summary failed:', error),
+    });
 
     // The runner needs an event sink before the server exists, and the server needs the
     // runner's handlers before it starts. The holder ties that knot without a mutable
@@ -173,6 +183,8 @@ export class Engine {
       provider,
       emit: (event) => live.server?.broadcast(event.method, event.params),
       memory,
+      // Off the request path: the reply is already on screen when the summary starts.
+      afterTurn: ({ pet, conversationId }) => void summarizer.schedule(conversationId, pet),
       // Both lookups are lazy: hosts connect and drop between turns, and the exclusion
       // list is edited while the app runs, so neither can be captured at boot.
       tools: createPerceptionToolset({

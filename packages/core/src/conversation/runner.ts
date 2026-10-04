@@ -52,6 +52,11 @@ export interface ConversationRunnerOptions {
    * tool and by preferences the user states. Optional so turn-mechanics tests stay small.
    */
   memory?: MemoryStore | undefined;
+  /**
+   * Called after a turn that answered, without being awaited: the background summary job
+   * hangs off this, and nothing it does may slow the reply that just finished.
+   */
+  afterTurn?: ((turn: { pet: Pet; conversationId: string }) => void) | undefined;
 }
 
 export interface RunAsk {
@@ -328,6 +333,9 @@ export class ConversationRunner {
           usage: result.usage,
         },
       });
+      if (result.text.length > 0) {
+        this.#options.afterTurn?.({ pet: ask.pet, conversationId });
+      }
       return { turnId, conversationId, ...result };
     } catch (error) {
       return this.#fail(turnId, conversationId, error);

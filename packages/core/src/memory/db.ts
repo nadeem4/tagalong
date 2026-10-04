@@ -46,6 +46,9 @@ const MIGRATIONS: readonly string[] = [
      INSERT INTO memories_fts (memories_fts, rowid, text) VALUES ('delete', old.rowid, old.text);
      INSERT INTO memories_fts (rowid, text) VALUES (new.rowid, new.text);
    END;`,
+  // Phase 4. Set when a background summary has folded a message into a summary memory, so
+  // the history replayed to the model stays short while the full thread stays on disk.
+  `ALTER TABLE messages ADD COLUMN summarized_at TEXT;`,
 ];
 
 /** Version a fully migrated database reports. */

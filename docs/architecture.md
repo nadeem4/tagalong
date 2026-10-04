@@ -523,6 +523,21 @@ that…", "always answer…" — the runner files that sentence as a private `pr
 runs, so "Scout keeps answers short after a restart" does not hinge on a model choosing to call a tool.
 `addOnce` keeps the same sentence from filling five recall slots.
 
+### Summaries
+
+`memory/summarizer.ts` keeps long conversations short. After every turn that answered, the runner's
+`afterTurn` hook hands the conversation to `Summarizer.schedule` without awaiting it, so the job never
+sits on the request path. Once twenty messages have built up unsummarised, all but the newest four go
+to a brain as a `User: … / Scout: …` transcript with a one-paragraph instruction and no tools; the
+reply becomes a `summary` memory for the pet and those messages get `summarized_at` (migration 4).
+`ConversationStore.lastMessages` skips summarised rows, so the history replayed to the model shrinks
+while recall carries the gist. Rows stay on disk. A failure — no key, a timeout after 60 s, an empty
+reply — changes nothing and the next turn tries again; concurrent schedules share one job.
+
+The brain is `settings.summarizer` (`{ providerId, model }`) when set, and otherwise the pet's own
+provider and model. The phase page named `claude-haiku-4-5`; defaulting to the pet's own brain means a
+crew on Token Factory and OpenRouter never needs a third key for housekeeping.
+
 ## The browser host
 
 `apps/extension` is a Manifest V3 extension built by Vite into `dist/`, the folder Chrome loads
