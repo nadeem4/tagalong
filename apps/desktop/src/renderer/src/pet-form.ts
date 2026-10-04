@@ -19,6 +19,8 @@ export interface PetFormValues {
   /** Phase 3. Empty means none. */
   voiceId?: string;
   replyStyle?: string;
+  /** Phase 3B. The watch check model. Empty means the provider default; absent, untouched. */
+  watchModel?: string;
 }
 
 /**
@@ -49,8 +51,14 @@ export function buildPet(pet: Pet, values: PetFormValues): Pet {
     throw new Error(`${pet.name} has a reply style this version does not know.`);
   }
   const voiceId = values.voiceId?.trim();
+  const watchModel = values.watchModel?.trim();
 
-  const { visionModel: _previous, voiceId: _previousVoice, ...rest } = pet;
+  const {
+    visionModel: _previous,
+    voiceId: _previousVoice,
+    watchModel: _previousWatch,
+    ...rest
+  } = pet;
   return Pet.parse({
     ...rest,
     providerId,
@@ -68,6 +76,14 @@ export function buildPet(pet: Pet, values: PetFormValues): Pet {
         : { voiceId: pet.voiceId }
       : voiceId.length > 0
         ? { voiceId }
+        : {}),
+    // The same rule for the watch check model: blank goes back to the provider default.
+    ...(watchModel === undefined
+      ? pet.watchModel === undefined
+        ? {}
+        : { watchModel: pet.watchModel }
+      : watchModel.length > 0
+        ? { watchModel }
         : {}),
   });
 }

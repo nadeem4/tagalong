@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Pet } from '@tagalong/protocol';
+import { Pet } from '@tagalong/protocol';
 import { buildPet, newPet, petIdFor } from './pet-form';
 
 const scout: Pet = {
@@ -98,5 +98,32 @@ describe('petIdFor', () => {
     expect(petIdFor('Sage Owl', [])).toBe('sage-owl');
     expect(petIdFor('Sage Owl', ['sage-owl'])).toBe('sage-owl-2');
     expect(petIdFor('!!!', [])).toBe('pet');
+  });
+});
+
+describe('buildPet watch model', () => {
+  const stored = Pet.parse({
+    id: 'scout',
+    name: 'Scout',
+    avatar: '🔎',
+    persona: '',
+    model: 'nvidia/nemotron-3-super-120b-a12b',
+    providerId: 'nebius',
+    watchModel: 'old-check-model',
+  });
+  const brain = { providerId: 'nebius', model: stored.model, visionModel: '' };
+
+  it('keeps a check model the user typed', () => {
+    expect(
+      buildPet(stored, { ...brain, watchModel: ' nvidia/nemotron-3-nano-30b-a3b ' }).watchModel,
+    ).toBe('nvidia/nemotron-3-nano-30b-a3b');
+  });
+
+  it('a blank check model means the provider default', () => {
+    expect(buildPet(stored, { ...brain, watchModel: '' }).watchModel).toBeUndefined();
+  });
+
+  it('a form that does not show the field leaves it alone', () => {
+    expect(buildPet(stored, brain).watchModel).toBe('old-check-model');
   });
 });

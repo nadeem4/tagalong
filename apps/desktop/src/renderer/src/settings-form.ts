@@ -1,4 +1,8 @@
-import { MAX_WINDOW_TEXT_CHARS, SettingsPatch } from '@tagalong/protocol';
+import {
+  MAX_ROLLING_MEMORY_MINUTES,
+  MAX_WINDOW_TEXT_CHARS,
+  SettingsPatch,
+} from '@tagalong/protocol';
 import type { SettingsPatch as SettingsPatchType } from '@tagalong/protocol';
 
 /**
@@ -22,6 +26,12 @@ export interface SettingsFormValues {
   /** Phase 4. Both blank means each pet summarises with its own brain. */
   summarizerProviderId?: string;
   summarizerModel?: string;
+  /** Phase 3B. Present together when the form shows the Awareness section. */
+  rollingMemoryEnabled?: boolean;
+  rollingMemoryMinutes?: string;
+  watchMaxChecks?: string;
+  watchMaxConcurrent?: string;
+  watchTimeoutMinutes?: string;
 }
 
 /**
@@ -52,7 +62,53 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
     ...(values.summarizerProviderId !== undefined || values.summarizerModel !== undefined
       ? { summarizer: parseSummarizer(values.summarizerProviderId, values.summarizerModel) }
       : {}),
+    ...(values.rollingMemoryMinutes !== undefined
+      ? {
+          rollingMemory: {
+            enabled: values.rollingMemoryEnabled === true,
+            minutes: wholeNumber(
+              values.rollingMemoryMinutes,
+              1,
+              MAX_ROLLING_MEMORY_MINUTES,
+              `Rolling memory must keep between 1 and ${MAX_ROLLING_MEMORY_MINUTES} minutes.`,
+            ),
+          },
+        }
+      : {}),
+    ...(values.watchMaxChecks !== undefined
+      ? {
+          watch: {
+            maxChecks: wholeNumber(
+              values.watchMaxChecks,
+              1,
+              500,
+              'Checks per watch must be a whole number between 1 and 500.',
+            ),
+            maxConcurrent: wholeNumber(
+              values.watchMaxConcurrent ?? '',
+              1,
+              10,
+              'Watches at once must be a whole number between 1 and 10.',
+            ),
+            defaultTimeoutMinutes: wholeNumber(
+              values.watchTimeoutMinutes ?? '',
+              1,
+              24 * 60,
+              'The watch timeout must be a whole number of minutes, at least 1.',
+            ),
+          },
+        }
+      : {}),
   });
+}
+
+/** A whole number in bounds, or the sentence the person needs to fix it. */
+function wholeNumber(raw: string, min: number, max: number, problem: string): number {
+  const value = Number(raw.trim());
+  if (raw.trim().length === 0 || !Number.isInteger(value) || value < min || value > max) {
+    throw new Error(problem);
+  }
+  return value;
 }
 
 /** Both boxes or neither: half a summarizer is a typo, not a choice. */
