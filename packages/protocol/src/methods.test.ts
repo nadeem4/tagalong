@@ -27,6 +27,7 @@ const HOST_TO_CORE = [
   'pets.delete',
   'settings.get',
   'settings.set',
+  'models.list',
   'tool.approve',
 ] as const;
 
@@ -442,5 +443,22 @@ describe('perception.readText notes', () => {
 
   it('rejects notes that are not strings', () => {
     expect(PerceptionReadTextResult.safeParse({ ...base, notes: [{ a: 1 }] }).success).toBe(false);
+  });
+});
+
+describe('models.list', () => {
+  it('takes a provider id and answers with models and where they came from', () => {
+    expect(paramsSchemaFor('models.list').safeParse({ providerId: 'openrouter' }).success).toBe(
+      true,
+    );
+    expect(paramsSchemaFor('models.list').safeParse({ providerId: '' }).success).toBe(false);
+    const result = resultSchemaFor('models.list').parse({
+      models: ['nvidia/nemotron-3-super-120b-a12b'],
+      source: 'fallback',
+    });
+    expect(result.source).toBe('fallback');
+    expect(resultSchemaFor('models.list').safeParse({ models: [], source: 'guess' }).success).toBe(
+      false,
+    );
   });
 });
