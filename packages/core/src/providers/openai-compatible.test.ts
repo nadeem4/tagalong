@@ -574,3 +574,96 @@ describe('OpenAiCompatibleProvider', () => {
     expect(result.stopReason).toBe('aborted');
   });
 });
+
+describe('OpenAiCompatibleProvider vision routing', () => {
+  function routed(replies: Reply[]) {
+    const fake = fakeFetch(replies);
+    const p = new OpenAiCompatibleProvider({
+      id: 'nebius',
+      apiKey: 'k',
+      fetch: fake.fetch,
+      maxRetries: 0,
+      visionModels: ['vl'],
+    });
+    return { provider: p, calls: fake.calls };
+  }
+
+  const withScreenshot: BrainRequest = {
+    ...request,
+    model: 'super',
+    visionModel: 'vl',
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'image', mime: 'image/png', base64: 'AAA' },
+          { type: 'text', text: 'what is this?' },
+        ],
+      },
+    ],
+  };
+
+  it('reports which models can see', () => {
+    const { provider: p } = routed([]);
+    expect(p.canSee('vl')).toBe(true);
+    expect(p.canSee('super')).toBe(false);
+  });
+
+  it('answers a text-only turn on the text model', async () => {
+    const { provider: p, calls } = routed([textReply(['ok'])]);
+    await p.complete(
+      { ...request, model: 'super', visionModel: 'vl' },
+      recorder().events,
+      signal(),
+    );
+    expect(calls[0]?.body.model).toBe('super');
+  });
+
+  it('answers a turn that carries a screenshot on the vision model', async () => {
+    const { provider: p, calls } = routed([textReply(['ok'])]);
+    await p.complete(withScreenshot, recorder().events, signal());
+    expect(calls[0]?.body.model).toBe('vl');
+  });
+
+  it('switches to the vision model once a tool hands back an image', async () => {
+    const { provider: p, calls } = routed([
+      sse([
+        chunk({
+          tool_calls: [
+            {
+              index: 0,
+              id: 'c1',
+              type: 'function',
+              function: { name: 'look_closer', arguments: '{}' },
+            },
+          ],
+        }),
+        chunk({}, 'tool_calls'),
+      ]),
+      textReply(['a chart']),
+    ]);
+    const { events } = recorder();
+    events.onToolUse = () =>
+      Promise.resolve({
+        content: [{ type: 'image' as const, mime: 'image/png' as const, base64: 'C' }],
+      });
+
+    await p.complete({ ...request, model: 'super', visionModel: 'vl' }, events, signal());
+
+    expect(calls.map((call) => call.body.model)).toEqual(['super', 'vl']);
+  });
+
+  it('never sends pixels to a model that cannot see them', async () => {
+    const { provider: p, calls } = routed([textReply(['ok'])]);
+    const { visionModel: _none, ...noVision } = withScreenshot;
+
+    await p.complete(noVision, recorder().events, signal());
+
+    expect(calls[0]?.body.model).toBe('super');
+    expect(JSON.stringify(calls[0]?.body.messages)).not.toContain('image_url');
+    expect(calls[0]?.body.messages[1]).toEqual({
+      role: 'user',
+      content: '[An image was attached, but super cannot see images.]\nwhat is this?',
+    });
+  });
+});

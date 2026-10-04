@@ -39,4 +39,16 @@ describe('Pet', () => {
     const { model: _model, ...withoutModel } = valid;
     expect(Pet.safeParse(withoutModel).success).toBe(false);
   });
+
+  it('leaves the vision model out when none is named', () => {
+    expect(Pet.parse(valid).visionModel).toBeUndefined();
+  });
+
+  it('keeps a vision model', () => {
+    expect(Pet.parse({ ...valid, visionModel: 'vl' }).visionModel).toBe('vl');
+  });
+
+  it('rejects an empty vision model', () => {
+    expect(Pet.safeParse({ ...valid, visionModel: '' }).success).toBe(false);
+  });
 });

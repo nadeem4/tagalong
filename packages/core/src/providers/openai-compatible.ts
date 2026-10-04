@@ -24,6 +24,7 @@ import type {
   BrainTool,
 } from './brain';
 import { BrainError } from './errors';
+import { modelForTurn } from './vision-routing';
 
 /** Nebius Token Factory's OpenAI-compatible endpoint. */
 export const NEBIUS_BASE_URL = 'https://api.tokenfactory.nebius.com/v1/';
@@ -38,6 +39,11 @@ export interface OpenAiCompatibleProviderOptions {
   label?: string | undefined;
   /** Models offered when nothing better is known. */
   models?: readonly string[] | undefined;
+  /**
+   * The models that accept images. Absent means all of them do. Token Factory serves
+   * text-only and vision models side by side, so the registry always passes this.
+   */
+  visionModels?: readonly string[] | undefined;
   /** Injected by tests, which answer with a canned event stream instead of the network. */
   fetch?: typeof fetch | undefined;
   /** Tests pass 0 so an error case does not sit through the SDK's back-off. */
@@ -193,6 +199,36 @@ function parseArguments(raw: string): unknown {
   }
 }
 
+function hasImages(messages: readonly ChatCompletionMessageParam[]): boolean {
+  return messages.some(
+    (m) => Array.isArray(m.content) && m.content.some((part) => part.type === 'image_url'),
+  );
+}
+
+/**
+ * The same conversation with every picture replaced by a line saying one was there.
+ *
+ * The last line of defence for a model that cannot see: the runner already drops a
+ * screenshot such a pet would be sent, but a tool can still hand back an image mid-turn.
+ * The note keeps the model from answering as if the look had come back empty.
+ */
+function withoutImages(
+  messages: readonly ChatCompletionMessageParam[],
+  model: string,
+): ChatCompletionMessageParam[] {
+  return messages.map((m) => {
+    if (m.role !== 'user' || !Array.isArray(m.content)) return m;
+    const images = m.content.filter((part) => part.type === 'image_url').length;
+    if (images === 0) return m;
+    const note =
+      images === 1
+        ? `[An image was attached, but ${model} cannot see images.]`
+        : `[${images} images were attached, but ${model} cannot see images.]`;
+    const texts = m.content.flatMap((part) => (part.type === 'text' ? [part.text] : []));
+    return { role: 'user', content: [note, ...texts].join('\n') };
+  });
+}
+
 interface PendingCall {
   id: string;
   name: string;
@@ -212,11 +248,13 @@ export class OpenAiCompatibleProvider implements BrainProvider {
   readonly #client: OpenAI;
   readonly #label: string;
   readonly #models: readonly string[];
+  readonly #visionModels: readonly string[] | undefined;
 
   constructor(options: OpenAiCompatibleProviderOptions) {
     this.id = options.id;
     this.#label = options.label ?? 'Token Factory';
     this.#models = options.models ?? [];
+    this.#visionModels = options.visionModels;
     this.#client = new OpenAI({
       apiKey: options.apiKey,
       baseURL: options.baseURL ?? NEBIUS_BASE_URL,
@@ -227,6 +265,10 @@ export class OpenAiCompatibleProvider implements BrainProvider {
 
   listModels(): Promise<string[]> {
     return Promise.resolve([...this.#models]);
+  }
+
+  canSee(model: string): boolean {
+    return this.#visionModels === undefined || this.#visionModels.includes(model);
   }
 
   async complete(
@@ -254,11 +296,16 @@ export class OpenAiCompatibleProvider implements BrainProvider {
       let finishReason: string | null = null;
       const pending = new Map<number, PendingCall>();
 
+      // Routed every round, not once per turn: an image a tool returns mid-turn moves
+      // the rest of the turn onto the vision model.
+      const routed = modelForTurn(this, req, hasImages(messages));
+      const model = routed ?? req.model;
+
       try {
         const stream = await this.#client.chat.completions.create(
           {
-            model: req.model,
-            messages,
+            model,
+            messages: routed === null ? withoutImages(messages, model) : messages,
             max_tokens: req.maxTokens,
             stream: true,
             stream_options: { include_usage: true },
@@ -292,7 +339,7 @@ export class OpenAiCompatibleProvider implements BrainProvider {
         }
       } catch (error) {
         if (error instanceof APIUserAbortError || signal.aborted) return finish('aborted');
-        throw this.#toBrainError(error, req.model);
+        throw this.#toBrainError(error, model);
       }
 
       // The SDK ends the iteration quietly when the signal fires mid-stream.

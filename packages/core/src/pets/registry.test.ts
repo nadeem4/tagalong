@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Database } from 'better-sqlite3';
 import { openDatabase } from '../memory/db';
+import { NEMOTRON_TEXT_MODEL, NEMOTRON_VISION_MODEL } from '../providers';
 import { PetRegistry, SCOUT } from './registry';
 
 let dir: string;
@@ -27,6 +28,12 @@ describe('PetRegistry seeding', () => {
     const pets = registry.list();
     expect(pets).toHaveLength(1);
     expect(pets[0]?.id).toBe('scout');
+  });
+
+  it('starts Scout on Nemotron through Token Factory, with Nano VL for pictures', () => {
+    expect(SCOUT.providerId).toBe('nebius');
+    expect(SCOUT.model).toBe(NEMOTRON_TEXT_MODEL);
+    expect(SCOUT.visionModel).toBe(NEMOTRON_VISION_MODEL);
   });
 
   it('is a no-op on second boot', () => {

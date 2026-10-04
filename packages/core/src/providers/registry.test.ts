@@ -3,6 +3,7 @@ import { BrainError } from './errors';
 import { FakeBrainProvider } from './fake';
 import { AnthropicProvider } from './anthropic';
 import { OpenAiCompatibleProvider } from './openai-compatible';
+import { NEMOTRON_TEXT_MODEL, NEMOTRON_VISION_MODEL } from './nebius-models';
 import { createProvider } from './registry';
 
 vi.mock('@anthropic-ai/sdk', () => ({
@@ -25,6 +26,12 @@ describe('createProvider', () => {
     const provider = createProvider({ providerId: 'nebius', apiKey: 'k', env: {} });
     expect(provider).toBeInstanceOf(OpenAiCompatibleProvider);
     expect(provider.id).toBe('nebius');
+  });
+
+  it('tells the runner that only the Nemotron VL model sees on Token Factory', () => {
+    const provider = createProvider({ providerId: 'nebius', apiKey: 'k', env: {} });
+    expect(provider.canSee?.(NEMOTRON_VISION_MODEL)).toBe(true);
+    expect(provider.canSee?.(NEMOTRON_TEXT_MODEL)).toBe(false);
   });
 
   it('refuses to build the Token Factory provider without an API key', () => {

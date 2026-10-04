@@ -20,3 +20,6 @@ export const NEBIUS_FALLBACK_MODELS: readonly string[] = [
   NEMOTRON_TEXT_MODEL,
   NEMOTRON_VISION_MODEL,
 ];
+
+/** The Token Factory models that accept images. Every other one is sent text only. */
+export const NEBIUS_VISION_MODELS: readonly string[] = [NEMOTRON_VISION_MODEL];

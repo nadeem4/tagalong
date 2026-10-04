@@ -2,7 +2,7 @@ import type { BrainProvider } from './brain';
 import { AnthropicProvider } from './anthropic';
 import { FakeBrainProvider } from './fake';
 import { BrainError } from './errors';
-import { NEBIUS_FALLBACK_MODELS } from './nebius-models';
+import { NEBIUS_FALLBACK_MODELS, NEBIUS_VISION_MODELS } from './nebius-models';
 import { OpenAiCompatibleProvider } from './openai-compatible';
 
 /** What the engine knows about the provider before it builds one. */
@@ -76,6 +76,7 @@ export function createProvider(config: ProviderConfig): BrainProvider {
         apiKey: config.apiKey,
         label: 'Token Factory',
         models: NEBIUS_FALLBACK_MODELS,
+        visionModels: NEBIUS_VISION_MODELS,
       });
     default:
       throw new BrainError(

@@ -23,7 +23,9 @@ export {
 } from './openai-compatible';
 export {
   NEBIUS_FALLBACK_MODELS,
+  NEBIUS_VISION_MODELS,
   NEMOTRON_TEXT_MODEL,
   NEMOTRON_VISION_MODEL,
 } from './nebius-models';
 export { createProvider, type ProviderConfig } from './registry';
+export { carriesImage, modelForTurn } from './vision-routing';
