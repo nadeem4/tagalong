@@ -51,9 +51,11 @@ export function createPortBridge(port: PortLike): PortBridge {
         for (const handler of contextHandlers) handler(message.snapshot);
         return;
       case 'notification': {
-        if (!message.method.startsWith('turn.') || !(message.method in coreToHostNotifications)) {
-          return;
-        }
+        const forPanel =
+          message.method.startsWith('turn.') ||
+          message.method === 'pet.message' ||
+          message.method === 'crew.status';
+        if (!forPanel || !(message.method in coreToHostNotifications)) return;
         const event = { type: message.method, ...(message.params as object) } as TurnEvent;
         for (const handler of turnHandlers) handler(event);
         return;
@@ -91,6 +93,7 @@ export function createPortBridge(port: PortLike): PortBridge {
     async ask(input) {
       const result = await call('ask', {
         petId: input.petId,
+        ...(input.conversationId !== undefined ? { conversationId: input.conversationId } : {}),
         input: { text: input.text ?? '' },
         ...(input.snapshot !== undefined ? { snapshot: input.snapshot } : {}),
       });

@@ -6,6 +6,8 @@ describe('ui package surface', () => {
     expect(Object.keys(ui).sort()).toEqual(
       [
         'ChatPanel',
+        'CrewStrip',
+        'DEFAULT_PET_COLOR',
         'Composer',
         'SightBar',
         'HostBridgeProvider',

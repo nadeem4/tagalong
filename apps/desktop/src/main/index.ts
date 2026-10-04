@@ -390,14 +390,18 @@ function registerIpc(): void {
     return (await current.host.client.call('settings.get', {})).settings;
   };
 
-  ipcMain.handle(IPC.ask, async (_event, input: { petId: string; text?: string }) => {
-    const snapshot = required().pendingSnapshot;
-    return engine().client.call('ask', {
-      petId: input.petId,
-      input: { text: input.text ?? '' },
-      ...(snapshot !== null ? { snapshot } : {}),
-    });
-  });
+  ipcMain.handle(
+    IPC.ask,
+    async (_event, input: { petId: string; conversationId?: string; text?: string }) => {
+      const snapshot = required().pendingSnapshot;
+      return engine().client.call('ask', {
+        petId: input.petId,
+        ...(input.conversationId !== undefined ? { conversationId: input.conversationId } : {}),
+        input: { text: input.text ?? '' },
+        ...(snapshot !== null ? { snapshot } : {}),
+      });
+    },
+  );
 
   ipcMain.handle(IPC.interrupt, async (_event, turnId: string) => {
     await engine().client.call('interrupt', { turnId });

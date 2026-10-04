@@ -68,23 +68,13 @@ export function SidePanelApp({ bridge, openOptions }: SidePanelAppProps) {
               Pair with the Tagalong app
             </button>
           )}
-          {activePet !== undefined && (
-            <label className="panel__pet">
-              <span>Pet</span>
-              <select value={activePet.id} onChange={(event) => setPetId(event.target.value)}>
-                {pets.map((pet) => (
-                  <option key={pet.id} value={pet.id}>
-                    {`${pet.avatar} ${pet.name}`}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
         </header>
         {activePet !== undefined && (
+          // One timeline for the whole crew: switching pets, or a handoff, keeps the thread.
           <ChatPanel
-            key={activePet.id}
             petId={activePet.id}
+            pets={pets}
+            onPetChange={setPetId}
             {...(snapshot !== undefined ? { snapshot } : {})}
             lookTargets={PAGE_TARGETS}
             lookLabel="Read this page"

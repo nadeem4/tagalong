@@ -72,8 +72,11 @@ describe('SidePanelApp', () => {
     const f = fakeBridge();
     render(<SidePanelApp bridge={f.bridge} openOptions={vi.fn()} />);
     f.setStatus(CONNECTED);
-    const picker = screen.getByLabelText('Pet') as HTMLSelectElement;
-    expect([...picker.options].map((o) => o.textContent)).toEqual(['🐣 Scout', '🐣 Fern']);
+    const strip = screen.getByRole('group', { name: 'Crew' });
+    expect([...strip.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'))).toEqual([
+      'Ask Scout',
+      'Ask Fern',
+    ]);
   });
 
   it('shows disconnected, with the reason, while the app is down', () => {
@@ -170,11 +173,11 @@ describe('SidePanelApp', () => {
     );
   });
 
-  it('asks the pet picked in the switcher', () => {
+  it('asks the pet picked in the crew strip', () => {
     const f = fakeBridge();
     render(<SidePanelApp bridge={f.bridge} openOptions={vi.fn()} />);
     f.setStatus(CONNECTED);
-    fireEvent.change(screen.getByLabelText('Pet'), { target: { value: 'fern' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Fern' }));
     send('hello');
     expect(f.bridge.asks.at(-1)?.petId).toBe('fern');
   });

@@ -19,6 +19,9 @@ export type { ComposerProps } from './composer';
 export { SightBar } from './sight-bar';
 export type { SightBarProps, SightProblem } from './sight-bar';
 
+export { CrewStrip, DEFAULT_PET_COLOR } from './crew-strip';
+export type { CrewStripProps } from './crew-strip';
+
 export { ChatPanel } from './chat-panel';
 export type { ChatPanelProps } from './chat-panel';
 

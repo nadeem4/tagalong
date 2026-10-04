@@ -46,11 +46,6 @@ body {
 [data-testid='connection'][data-state='rejected'] {
   color: #b91c1c;
 }
-.panel__pet {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
 section {
   display: flex;
   flex: 1;
