@@ -399,34 +399,48 @@ test('sight detail and the window text budget save and read back', async () => {
 
 test('the setup wizard opens on request, insists on a key, and Skip closes it for good', async () => {
   const panel = await windowFor('panel');
-  await panel.evaluate(() => window.tagalongHost.openOnboarding());
-  const wizard = await windowFor('onboarding');
+  // The suite runs on the developer's real profile: keys may be stored, and the wizard may
+  // already be done. Both are read first so the test neither assumes them nor leaves them changed.
+  const before = await panel.evaluate(() => window.tagalongHost.getHostView());
+  const keyStored = before.providers.some((choice) => choice.needsKey && choice.hasKey);
 
-  // Step one is the promise, before anything is asked of the user.
-  await expect(wizard.getByTestId('step-welcome')).toContainText('privacy promise');
-  await wizard.getByRole('button', { name: 'Next' }).click();
+  try {
+    await panel.evaluate(() => window.tagalongHost.openOnboarding());
+    const wizard = await windowFor('onboarding');
 
-  // Step two names all three providers and will not move on without a key. No key is
-  // typed here: one would be stored in this machine's real keychain.
-  const provider = wizard.getByTestId('step-provider');
-  await expect(provider).toContainText('OpenRouter');
-  await expect(provider).toContainText('Nebius Token Factory');
-  await expect(provider).toContainText('Anthropic');
-  await wizard.getByRole('button', { name: 'Next' }).click();
-  await expect(wizard.getByRole('alert')).toContainText('API key');
+    // Step one is the promise, before anything is asked of the user.
+    await expect(wizard.getByTestId('step-welcome')).toContainText('privacy promise');
+    await wizard.getByRole('button', { name: 'Next' }).click();
 
-  await wizard.getByRole('button', { name: 'Skip setup' }).click();
-  await expect
-    .poll(async () =>
-      (
-        await app.evaluate(({ BrowserWindow }) =>
-          BrowserWindow.getAllWindows().map((w) => w.webContents.getURL()),
-        )
-      ).some((url) => url.includes('onboarding.html')),
-    )
-    .toBe(false);
+    // Step two names all three providers. No key is typed here: one would be stored in this
+    // machine's real keychain.
+    const provider = wizard.getByTestId('step-provider');
+    await expect(provider).toContainText('OpenRouter');
+    await expect(provider).toContainText('Nebius Token Factory');
+    await expect(provider).toContainText('Anthropic');
+    if (!keyStored) {
+      await wizard.getByRole('button', { name: 'Next' }).click();
+      await expect(wizard.getByRole('alert')).toContainText('API key');
+    }
 
-  const view = await panel.evaluate(() => window.tagalongHost.getHostView());
-  expect(view.settings.onboarding.done).toBe(true);
-  expect(view.crewSuggestions.nebius?.scout).toContain('nemotron');
+    await wizard.getByRole('button', { name: 'Skip setup' }).click();
+    await expect
+      .poll(async () =>
+        (
+          await app.evaluate(({ BrowserWindow }) =>
+            BrowserWindow.getAllWindows().map((w) => w.webContents.getURL()),
+          )
+        ).some((url) => url.includes('onboarding.html')),
+      )
+      .toBe(false);
+
+    const view = await panel.evaluate(() => window.tagalongHost.getHostView());
+    expect(view.settings.onboarding.done).toBe(true);
+    expect(view.crewSuggestions.nebius?.scout).toContain('nemotron');
+  } finally {
+    await panel.evaluate(
+      (done) => window.tagalongHost.saveSettings({ onboarding: { done } }),
+      before.settings.onboarding.done,
+    );
+  }
 });
