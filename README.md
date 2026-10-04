@@ -84,7 +84,11 @@ tagalong/
       src/preload/index.ts          # exposes window.tagalong and window.tagalongHost
       src/renderer/                 # avatar/panel/settings HTML, src/*.tsx, app.css
       src/shared/ipc.ts             # IPC channel names and the host-only API type
-    extension/src/service-worker.ts # Chrome MV3 stub until Phase 6
+    extension/                      # Chrome MV3 host, built by Vite into dist/ (load unpacked)
+      src/manifest.ts               # the manifest as data; the build writes dist/manifest.json
+      src/service-worker.ts         # Chrome glue: engine socket, side panel, shortcut
+      src/sidepanel/, src/options/  # side panel (packages/ui) and the pairing page
+      src/content/page-reader.ts    # injected on demand: selection, URL, title, page text
 ```
 
 | Package             | Responsibility                                                                                                                                                                                                    |
@@ -93,7 +97,7 @@ tagalong/
 | `packages/core`     | The Tagalong Engine: pets, conversation runner, prompt assembly, SQLite memory, host protocol server, pairing, provider adapters. Pure Node. Voice, the inter-pet bus, and the MCP client arrive in later phases. |
 | `packages/ui`       | React components shared by hosts: `PetAvatar`, `MessageList`, `Composer`, `SightBar`, `ChatPanel`, and the `HostBridge` context.                                                                                  |
 | `apps/desktop`      | Electron host. Runs the engine in the main process, dials it over the loopback socket, and owns the avatar, panel, settings window, tray, hotkey, and secret storage.                                             |
-| `apps/extension`    | Chrome MV3 host. Connects to the running engine and speaks the protocol only. Stub until Phase 6.                                                                                                                 |
+| `apps/extension`    | Chrome MV3 host. Connects to the running engine and speaks the protocol only. Side panel, pairing page, on-demand page reader, and the open-panel shortcut.                                                       |
 
 ## How to run
 

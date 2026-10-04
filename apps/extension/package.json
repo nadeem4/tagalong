@@ -3,13 +3,24 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "./dist/service-worker.js",
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsc -b && vite build && vite build --config vite.content.config.ts",
     "clean": "tsc -b --clean"
   },
   "dependencies": {
+    "@mozilla/readability": "0.6.0",
     "@tagalong/protocol": "workspace:*",
-    "@tagalong/ui": "workspace:*"
+    "@tagalong/ui": "workspace:*",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@testing-library/react": "16.3.3",
+    "@types/chrome": "0.3.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "jsdom": "30.0.1",
+    "vite": "7.3.6",
+    "vitest": "5.0.0"
   }
 }
