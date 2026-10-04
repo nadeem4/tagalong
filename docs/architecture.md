@@ -727,6 +727,13 @@ flowchart LR
   a message from the pet and the avatar shows an alert. It is not spoken: Phase 3 (Voice) is not
   built, and speaking it is deferred there.
 
+### What an ask with pictures costs
+
+The sight bar shows `~N image tokens` beside what is attached, summing width × height ÷ 750 over every
+image the ask would carry — the screenshot, the composite and each display's own picture
+(`estimateImageTokens` in `packages/ui/src/sight-bar.tsx`). It is an estimate, labelled as one, so the
+user sees roughly what an ask costs before sending it.
+
 ## The browser host
 
 `apps/extension` is a Manifest V3 extension built by Vite into `dist/`, the folder Chrome loads

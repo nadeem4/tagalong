@@ -14,6 +14,7 @@ describe('ui package surface', () => {
         'MessageList',
         'PetAvatar',
         'createFakeHostBridge',
+        'estimateImageTokens',
         'useHostBridge',
       ].sort(),
     );

@@ -321,6 +321,10 @@ moment of each capture rather than at boot.
 | **What a see-everything look sends** | Composite plus the focused display | `Every screen` sends one picture per monitor, so a three-monitor desk pays roughly three times the image cost on every full-view look                                                   |
 | **Window text budget**               | 8,000 characters                   | How much of a window a read returns when the pet does not ask for less. Roughly one token per four characters, so the default is about 2,000 tokens per read, and the ceiling is 40,000 |
 
+Before you send, the sight bar shows roughly what the attached pictures cost — `~1,843 image tokens ·
+3 images` — at width × height ÷ 750 per image, so a see-everything look on three monitors is visibly
+dearer than a single screenshot.
+
 The budget is a ceiling, not a target — a pet that only needs the top of a terminal asks for less,
 and the number it does not ask for is the one set here.
 
