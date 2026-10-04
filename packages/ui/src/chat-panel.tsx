@@ -52,6 +52,9 @@ export function ChatPanel({
   // Model calls in the current crew run: consults and roundtables multiply them, so the
   // footer shows the count whenever a run made more than the one call an ask costs.
   const [modelCalls, setModelCalls] = useState<number | null>(null);
+  // The roundtable in progress, from crew.status; null when none is.
+  const [crewRun, setCrewRun] = useState<string | null>(null);
+  const [speakingPetId, setSpeakingPetId] = useState<string | null>(null);
   // Which conversation each pet is in, so a follow-up continues the thread it answered in.
   const [conversations, setConversations] = useState<Record<string, string>>({});
   const turns = useRef(new Map<string, TurnInfo>());
@@ -92,9 +95,18 @@ export function ChatPanel({
   }
 
   function settle(message: ChatMessage): void {
-    setMessages((current) => [...current, message]);
+    // An interrupted turn can end with nothing said; an empty bubble says nothing either.
+    if (message.text !== '') setMessages((current) => [...current, message]);
     setStreamingText('');
     setActiveTurnId(null);
+    setSpeakingPetId(null);
+  }
+
+  function note(text: string): void {
+    setMessages((current) => [
+      ...current,
+      { id: `round:${current.length}`, role: 'assistant', kind: 'round', text },
+    ]);
   }
 
   function handleLook(): void {
@@ -128,6 +140,7 @@ export function ChatPanel({
         turns.current.set(event.turnId, { petId: event.petId, speaker });
         setConversations((current) => ({ ...current, [event.petId]: event.conversationId }));
         setActiveTurnId(event.turnId);
+        setSpeakingPetId(event.petId);
         setStreamingSpeaker(speaker);
         setStreamingText('');
         break;
@@ -138,7 +151,8 @@ export function ChatPanel({
       case 'turn.completed': {
         // The completed text is authoritative; deltas may have been dropped.
         const info = turns.current.get(event.turnId);
-        if (event.modelCalls !== undefined && event.modelCalls > 1) {
+        // During a roundtable crew.status owns the count, summed across every turn.
+        if (crewRun === null && event.modelCalls !== undefined && event.modelCalls > 1) {
           setModelCalls(event.modelCalls);
         }
         settle({
@@ -153,7 +167,17 @@ export function ChatPanel({
       case 'turn.error':
         settle({ id: `${event.turnId}:error`, role: 'assistant', text: event.message });
         break;
+      case 'crew.status':
+        setModelCalls(event.modelCalls);
+        if (event.state === 'running') {
+          setCrewRun(event.runId);
+        } else {
+          setCrewRun(null);
+          if (event.state === 'stopped') note('Roundtable stopped');
+        }
+        break;
       case 'pet.message':
+        if (event.kind === 'roundtable') note(event.text);
         if (event.kind === 'handoff') {
           setMessages((current) => [
             ...current,
@@ -217,6 +241,23 @@ export function ChatPanel({
     if (target !== undefined) setDraft(`@${target.name} `);
   }
 
+  /** Puts the composer text to the whole crew, or starts a `/crew ` line to type into. */
+  function handleCrew(): void {
+    const question = draft.trim().replace(/^\/crew\b\s*/i, '');
+    if (question === '') {
+      setDraft('/crew ');
+      return;
+    }
+    handleSend(`/crew ${question}`);
+  }
+
+  /** Interrupting the turn in flight also ends a roundtable: the engine cancels the rest. */
+  function handleStop(): void {
+    if (activeTurnId !== null) void bridge.interrupt(activeTurnId);
+  }
+
+  // A roundtable is busy between its turns too, so the composer waits for the whole run.
+  const busy = activeTurnId !== null || crewRun !== null;
   const activePet = pets.find((pet) => pet.id === activePetId);
 
   return (
@@ -231,7 +272,12 @@ export function ChatPanel({
           >
             {activePet === undefined ? activePetId : `${activePet.avatar} ${activePet.name}`}
           </span>
-          <CrewStrip pets={pets} activePetId={activePetId} onSelect={selectPet} />
+          <CrewStrip
+            pets={pets}
+            activePetId={activePetId}
+            onSelect={selectPet}
+            speakingPetIds={speakingPetId === null ? [] : [speakingPetId]}
+          />
         </header>
       )}
       <SightBar
@@ -248,9 +294,34 @@ export function ChatPanel({
         {...(streamingSpeaker !== '' ? { streamingSpeaker } : {})}
         {...(pets.length > 1 ? { onHandoff: handleHandoff } : {})}
       />
+      {(pets.length > 1 || busy) && (
+        <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-2 pt-1.5">
+          {busy && (
+            <button
+              type="button"
+              onClick={handleStop}
+              className="rounded-md border border-slate-300 px-2 py-0.5 text-xs text-slate-700"
+            >
+              Stop
+            </button>
+          )}
+          {pets.length > 1 && (
+            <button
+              type="button"
+              aria-label="Ask the crew"
+              title="Put the question to every pet, then hear a synthesis"
+              onClick={handleCrew}
+              disabled={busy}
+              className="rounded-md bg-slate-800 px-2 py-0.5 text-xs font-medium text-white disabled:bg-slate-300"
+            >
+              Crew
+            </button>
+          )}
+        </div>
+      )}
       <Composer
         onSend={handleSend}
-        disabled={activeTurnId !== null}
+        disabled={busy}
         seeing={attached !== null}
         value={draft}
         onValueChange={setDraft}

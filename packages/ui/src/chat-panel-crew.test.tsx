@@ -216,3 +216,147 @@ describe('ChatPanel with a crew', () => {
     expect(screen.getByTestId('model-calls')).toHaveTextContent('3 model calls');
   });
 });
+
+describe('ChatPanel roundtable', () => {
+  const RUN = '30000000-0000-4000-8000-000000000001';
+
+  function startTable(bridge: FakeHostBridge): void {
+    act(() => {
+      bridge.emit({
+        type: 'crew.status',
+        runId: RUN,
+        kind: 'roundtable',
+        state: 'running',
+        round: 0,
+        rounds: 2,
+        modelCalls: 0,
+      });
+      bridge.emit({
+        type: 'pet.message',
+        fromPetId: 'scout',
+        toPetId: 'scout',
+        kind: 'roundtable',
+        text: 'Round 1 of 2',
+        runId: RUN,
+        round: 1,
+      });
+      bridge.emit({
+        type: 'turn.started',
+        turnId: T1,
+        petId: 'scout',
+        conversationId: C1,
+        model: 'nvidia/nemotron-3-super-120b-a12b',
+        runId: RUN,
+      });
+    });
+  }
+
+  it('puts the composer text to the whole crew with the Crew button', async () => {
+    const bridge = renderCrew();
+    await screen.findByTestId('active-pet');
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Dock left or right?' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ask the crew' }));
+
+    expect(bridge.asks.at(-1)).toMatchObject({ petId: 'scout', text: '/crew Dock left or right?' });
+    expect(screen.getByRole('textbox')).toHaveValue('');
+  });
+
+  it('starts a /crew line with the Crew button when the composer is empty', async () => {
+    renderCrew();
+    await screen.findByTestId('active-pet');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ask the crew' }));
+
+    expect(screen.getByRole('textbox')).toHaveValue('/crew ');
+  });
+
+  it('marks rounds, labels each speaker, counts calls, and offers Stop until the run ends', async () => {
+    const bridge = renderCrew();
+    await screen.findByTestId('active-pet');
+    send('/crew Dock left or right?');
+    startTable(bridge);
+
+    expect(screen.getByTestId('round')).toHaveTextContent('Round 1 of 2');
+    expect(screen.getByRole('button', { name: 'Ask Scout' })).toHaveAttribute(
+      'data-speaking',
+      'true',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Stop' }));
+    expect(bridge.interrupts).toEqual([T1]);
+
+    act(() => {
+      complete(bridge, T1, 'Left, by the code.', { modelCalls: 1 });
+      bridge.emit({
+        type: 'crew.status',
+        runId: RUN,
+        kind: 'roundtable',
+        state: 'running',
+        round: 1,
+        rounds: 2,
+        modelCalls: 1,
+      });
+      bridge.emit({
+        type: 'turn.started',
+        turnId: T2,
+        petId: 'ink',
+        conversationId: C2,
+        model: 'anthropic/claude-sonnet-5',
+        runId: RUN,
+      });
+    });
+
+    // Between and during turns the run is busy: Stop stays, the composer waits.
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
+    expect(screen.getByTestId('model-calls')).toHaveTextContent('1 model calls');
+
+    act(() => {
+      complete(bridge, T2, 'Right, for reading.', { modelCalls: 1 });
+      bridge.emit({
+        type: 'crew.status',
+        runId: RUN,
+        kind: 'roundtable',
+        state: 'done',
+        round: 2,
+        rounds: 2,
+        modelCalls: 4,
+      });
+    });
+
+    expect(screen.queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('model-calls')).toHaveTextContent('4 model calls');
+    expect(screen.getByRole('textbox')).toBeEnabled();
+    const speakers = screen.getAllByTestId('speaker').map((node) => node.textContent);
+    expect(speakers).toEqual([
+      'Scout · nvidia/nemotron-3-super-120b-a12b',
+      'Ink · anthropic/claude-sonnet-5',
+    ]);
+  });
+
+  it('says the roundtable was stopped', async () => {
+    const bridge = renderCrew();
+    await screen.findByTestId('active-pet');
+    startTable(bridge);
+
+    act(() => {
+      bridge.emit({
+        ...{ type: 'turn.completed' as const },
+        turnId: T1,
+        text: '',
+        stopReason: 'aborted',
+        usage: { inputTokens: 0, outputTokens: 0 },
+      });
+      bridge.emit({
+        type: 'crew.status',
+        runId: RUN,
+        kind: 'roundtable',
+        state: 'stopped',
+        round: 1,
+        rounds: 2,
+        modelCalls: 1,
+      });
+    });
+
+    expect(screen.getAllByTestId('round').at(-1)).toHaveTextContent('Roundtable stopped');
+  });
+});
