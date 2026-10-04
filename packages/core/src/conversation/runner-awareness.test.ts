@@ -11,6 +11,8 @@ import { FakeBrainProvider } from '../providers';
 import type { BrainContentBlock, BrainProvider, FakeScript } from '../providers';
 import { RECALL_SCREEN, WHAT_CHANGED, createPerceptionToolset } from '../perception';
 import type { PerceptionHost, ToolOutcome } from '../perception';
+import { FakeClock } from '../watch/fake-clock';
+import { WATCH_FOR, WatchManager } from '../watch';
 import { ConversationRunner, type TurnEvent } from './runner';
 
 const pet: Pet = {
@@ -173,5 +175,43 @@ describe('what_changed in a turn', () => {
     ]);
     expect(textOf(content!)).toContain(THEN);
     expect(textOf(content!)).toContain('2026-10-04T10:10:00.000Z');
+  });
+});
+
+describe('watch_for in a turn', () => {
+  it('is offered to a pet and starts a watch for the pet that called it', async () => {
+    const host = rememberingHost();
+    const manager = new WatchManager({
+      clock: new FakeClock(NOW),
+      hosts: () => [host],
+      provider: () => {
+        throw new Error('no check expected');
+      },
+      limits: () => ({ maxChecks: 60, maxConcurrent: 3, defaultTimeoutMinutes: 30 }),
+      emit: () => undefined,
+    });
+    const observed = observing({
+      text: 'Watching it for you.',
+      toolCall: {
+        id: 'call-3',
+        name: WATCH_FOR,
+        input: { condition: 'the build finishes', displayId: 1 },
+      },
+    });
+    const run = new ConversationRunner({
+      store: new ConversationStore(db),
+      settings: new SettingsStore(dir),
+      provider: observed.provider,
+      emit: (event) => events.push(event),
+      watch: { manager, hosts: () => [host] },
+    });
+
+    await run.run({ pet, text: 'tell me when this finishes' }).done;
+
+    expect(manager.active()).toEqual([
+      expect.objectContaining({ petId: 'scout', condition: 'the build finishes' }),
+    ]);
+    expect(textOf(observed.results[0]!.content)).toMatch(/Watching display 1/);
+    manager.stopAll();
   });
 });

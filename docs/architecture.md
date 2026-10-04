@@ -685,6 +685,48 @@ the screen now is the failure this feature invites.
 A blind pet gets the same facts as text and is told it has not seen the pictures. The panel's
 `turn.toolResult` summary counts images rather than forwarding them.
 
+### Watch mode
+
+`packages/core/src/watch/` holds it. `watch_for(condition, displayId?, rect?, timeoutMinutes?)` is a
+crew-style tool, because the watch belongs to the pet that called it; without a `displayId` it
+watches the display of the window in front and remembers that window for a text-only check. The
+`WatchManager` belongs to the engine, not the turn — a watch outlives the reply that started it — and
+runs on an injected clock, so every timing rule below is unit tested with a fake one.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
+flowchart LR
+  T["Tick every 5 s"] --> D["perception.diff x2, no images"]
+  D --> B{"Changed since the last check?"}
+  B -- "no" --> T
+  B -- "yes" --> S{"Still changing since the last tick?"}
+  S -- "yes" --> R["Tick again in 2 s"] --> D
+  S -- "no" --> C["Check model: yes or no"]
+  C -- "no: baseline moves to now" --> T
+  C -- "yes" --> F["watch.fired, watch ends"]
+```
+
+- **When a model is asked.** Each tick asks the host for two ratios with no images: the region
+  against the previous tick, and against the frame at the last check (or the watch start). A check
+  happens only when the baseline ratio is at least `WATCH_CHANGE_THRESHOLD` (0.5% of the region) and
+  the tick ratio is below it — the screen changed and then held still. Scrolling build output never
+  holds still, so it costs nothing until the build stops; a finished command is checked 2 to 7 s
+  after its last line. After a no, the baseline moves to now: one check per change.
+- **Which model.** `watchModelsFor(pet)`: the pet's `watchModel`, else its provider's default —
+  Nemotron 3 Nano on Token Factory, `anthropic/claude-haiku-4.5` on OpenRouter, `claude-haiku-4-5` on
+  Anthropic. If that model can see, it gets the native-resolution after crop and the condition. If it
+  cannot, it gets the last 4,000 characters of the watched window's text instead, which is how Nano
+  reads a terminal; with no text it gets the crop routed to the pet's vision model (Nemotron Nano 2
+  VL on Token Factory). The answer is JSON `{answer, reason}`; a plain "Yes, ..." also counts.
+- **Caps.** From `settings.watch`: at most `maxChecks` (60) checks a watch, then `capped`; at most
+  `maxConcurrent` (3) watches, and a fourth is refused with a sentence the pet repeats; the timeout
+  (`defaultTimeoutMinutes`, 30, unless the pet names one, at most 240) ends it with `timeout`.
+  `watch.stop` ends it with `stopped`. A host that refuses a diff for a while — paused sight, an
+  excluded window in front — skips ticks rather than ending the watch.
+- **Fired.** `watch.fired` carries the model's one-sentence reason as `message`. The panel shows it as
+  a message from the pet and the avatar shows an alert. It is not spoken: Phase 3 (Voice) is not
+  built, and speaking it is deferred there.
+
 ## The browser host
 
 `apps/extension` is a Manifest V3 extension built by Vite into `dist/`, the folder Chrome loads

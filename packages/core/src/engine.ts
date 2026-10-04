@@ -25,6 +25,7 @@ import { startHandoff } from './crew/handoff';
 import { startRoundtable } from './crew/roundtable';
 import { browserContextFor, createPerceptionToolset } from './perception';
 import type { PerceptionHost } from './perception';
+import { WatchManager, systemWatchClock } from './watch';
 import { EngineServer } from './server/ws-server';
 import type { MethodHandlers } from './server/ws-server';
 import { readOrCreatePairingToken } from './server/pairing';
@@ -137,6 +138,7 @@ export class Engine {
   readonly #pets: PetRegistry;
   readonly #settings: SettingsStore;
   readonly #token: string;
+  readonly #watches: WatchManager;
 
   private constructor(parts: {
     db: Database;
@@ -145,7 +147,9 @@ export class Engine {
     pets: PetRegistry;
     settings: SettingsStore;
     token: string;
+    watches: WatchManager;
   }) {
+    this.#watches = parts.watches;
     this.#db = parts.db;
     this.#server = parts.server;
     this.#runner = parts.runner;
@@ -182,6 +186,17 @@ export class Engine {
     // binding: no turn can run before boot returns, so the sink is never called empty.
     const live: { server?: EngineServer } = {};
     const emit: TurnEventSink = (event) => live.server?.broadcast(event.method, event.params);
+    const hosts = (): readonly PerceptionHost[] => live.server?.sessions() ?? [];
+    // Phase 3B. Watches outlive the turn that started them, so they belong to the engine.
+    const watches = new WatchManager({
+      clock: systemWatchClock,
+      hosts,
+      provider: resolve,
+      // Read when a watch starts, so limits saved in Settings apply to the next one.
+      limits: () => settings.get().watch,
+      emit: (event) => live.server?.broadcast(event.method, event.params),
+      log: (message) => console.warn(`[engine] ${message}`),
+    });
     const runner = new ConversationRunner({
       store,
       settings,
@@ -191,6 +206,7 @@ export class Engine {
       // Off the request path: the reply is already on screen when the summary starts.
       afterTurn: ({ pet, conversationId }) => void summarizer.schedule(conversationId, pet),
       consult: { pets: () => pets.list() },
+      watch: { manager: watches, hosts },
       // Both lookups are lazy: hosts connect and drop between turns, and the exclusion
       // list is edited while the app runs, so neither can be captured at boot.
       tools: createPerceptionToolset({
@@ -210,7 +226,8 @@ export class Engine {
       emit,
       pets,
       settings,
-      hosts: () => live.server?.sessions() ?? [],
+      hosts,
+      watches,
       models: (providerId) =>
         listModels(providerId, options.secretStore, settings, options.env ?? process.env),
     });
@@ -232,6 +249,7 @@ export class Engine {
       pets,
       settings,
       token: readOrCreatePairingToken(options.dataDir),
+      watches,
     });
   }
 
@@ -254,6 +272,7 @@ export class Engine {
   }
 
   async shutdown(): Promise<void> {
+    this.#watches.stopAll();
     this.#runner.interruptAll();
     await this.#server.close();
     this.#db.close();
@@ -277,9 +296,10 @@ function buildHandlers(parts: {
   settings: SettingsStore;
   /** Lazy, like the toolset's: the extension connects and drops while the app runs. */
   hosts: () => readonly PerceptionHost[];
+  watches: WatchManager;
   models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
 }): MethodHandlers {
-  const { runner, store, emit, pets, settings, models, hosts } = parts;
+  const { runner, store, emit, pets, settings, models, hosts, watches } = parts;
 
   return {
     ask: async (params) => {
@@ -333,5 +353,6 @@ function buildHandlers(parts: {
     'settings.get': () => ({ settings: settings.get() }),
     'settings.set': (params) => ({ settings: settings.set(params.patch) }),
     'models.list': (params) => models(params.providerId),
+    'watch.stop': (params) => ({ stopped: watches.stop(params.watchId) }),
   };
 }
