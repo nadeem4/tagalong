@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './methods';
 import {
+  MAX_ROLLING_MEMORY_MINUTES,
   MAX_SCREENSHOT_RETENTION_HOURS,
   SETTINGS_DEFAULTS,
   Settings,
@@ -311,5 +312,49 @@ describe('Settings.hiddenPets', () => {
 
   it('keeps the pets the user hid', () => {
     expect(SettingsPatch.parse({ hiddenPets: ['bolt'] }).hiddenPets).toEqual(['bolt']);
+  });
+});
+
+describe('Settings.rollingMemory', () => {
+  it('is off by default and holds ten minutes when turned on', () => {
+    expect(Settings.parse({}).rollingMemory).toEqual({ enabled: false, minutes: 10 });
+  });
+
+  it('accepts one to thirty minutes and nothing else', () => {
+    expect(Settings.safeParse({ rollingMemory: { enabled: true, minutes: 1 } }).success).toBe(true);
+    expect(
+      Settings.safeParse({ rollingMemory: { enabled: true, minutes: MAX_ROLLING_MEMORY_MINUTES } })
+        .success,
+    ).toBe(true);
+    expect(Settings.safeParse({ rollingMemory: { enabled: true, minutes: 0 } }).success).toBe(
+      false,
+    );
+    expect(Settings.safeParse({ rollingMemory: { enabled: true, minutes: 31 } }).success).toBe(
+      false,
+    );
+  });
+
+  it('rides in a patch alone', () => {
+    const patch = SettingsPatch.parse({ rollingMemory: { enabled: true, minutes: 5 } });
+    expect(patch.rollingMemory).toEqual({ enabled: true, minutes: 5 });
+    expect(patch.watch).toBeUndefined();
+  });
+});
+
+describe('Settings.watch', () => {
+  it('defaults to 60 checks a watch, 3 watches at once and a 30 minute timeout', () => {
+    expect(Settings.parse({}).watch).toEqual({
+      maxChecks: 60,
+      maxConcurrent: 3,
+      defaultTimeoutMinutes: 30,
+    });
+  });
+
+  it('refuses limits of zero', () => {
+    const watch = { maxChecks: 0, maxConcurrent: 3, defaultTimeoutMinutes: 30 };
+    expect(Settings.safeParse({ watch }).success).toBe(false);
+    expect(
+      Settings.safeParse({ watch: { ...watch, maxChecks: 5, maxConcurrent: 0 } }).success,
+    ).toBe(false);
   });
 });

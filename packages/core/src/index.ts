@@ -42,6 +42,8 @@ export {
 export {
   GET_SELECTION,
   LOOK_AT_SCREEN,
+  RECALL_SCREEN,
+  WHAT_CHANGED,
   buildInventory,
   createPerceptionToolset,
   THIN_TEXT_CHARS,
@@ -82,6 +84,9 @@ export {
   NEMOTRON_TEXT_MODEL,
   NEBIUS_VISION_MODELS,
   NEMOTRON_VISION_MODEL,
+  NEMOTRON_NANO_MODEL,
+  WATCH_MODEL_DEFAULTS,
+  watchModelsFor,
   OPENAI_COMPATIBLE_PRESETS,
   OpenAiCompatibleProvider,
   SECRET_KEYS,
@@ -112,6 +117,16 @@ export {
   type TurnHandle,
   type TurnOutcome,
 } from './conversation';
+
+export {
+  WATCH_CHANGE_THRESHOLD,
+  WATCH_FOR,
+  WATCH_POLL_MS,
+  WATCH_SETTLE_MS,
+  WatchManager,
+  type WatchEvent,
+  type WatchInfo,
+} from './watch';
 
 export { EngineServer, type HostSession, type MethodHandlers } from './server/ws-server';
 export { PAIRING_FILENAME, readOrCreatePairingToken } from './server/pairing';

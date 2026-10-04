@@ -315,3 +315,52 @@ describe('perception.readText', () => {
     expect(reading.text).toBe('');
   });
 });
+
+describe('perception.recall and perception.diff', () => {
+  it('asks the host for a remembered moment and validates the answer', async () => {
+    const s = await start();
+    const client = await TestClient.connect(s.port);
+    await client.call('hello', hello());
+    const asked: Array<{ method: string; params: unknown }> = [];
+    client.onRequest = (method, params) => {
+      asked.push({ method, params });
+      return { recording: false, frames: [], windows: [] };
+    };
+
+    const session = s.sessions()[0] as HostSession;
+    const result = await session.recall({ secondsAgo: 300 });
+
+    expect(asked).toEqual([{ method: 'perception.recall', params: { secondsAgo: 300 } }]);
+    expect(result.recording).toBe(false);
+  });
+
+  it('asks the host for a diff, defaulting to images', async () => {
+    const s = await start();
+    const client = await TestClient.connect(s.port);
+    await client.call('hello', hello());
+    const asked: Array<{ method: string; params: unknown }> = [];
+    client.onRequest = (method, params) => {
+      asked.push({ method, params });
+      return { changeRatio: 0.2, afterAt: '2026-10-04T10:00:00.000Z' };
+    };
+
+    const session = s.sessions()[0] as HostSession;
+    const result = await session.diff({ displayId: 1, sinceSeconds: 5 });
+
+    expect(asked[0]).toEqual({
+      method: 'perception.diff',
+      params: { displayId: 1, sinceSeconds: 5, includeImages: true },
+    });
+    expect(result.changeRatio).toBe(0.2);
+  });
+
+  it('refuses a malformed diff rather than handing it to a pet', async () => {
+    const s = await start();
+    const client = await TestClient.connect(s.port);
+    await client.call('hello', hello());
+    client.onRequest = () => ({ changeRatio: 7 });
+
+    const session = s.sessions()[0] as HostSession;
+    await expect(session.diff({ displayId: 1, sinceSeconds: 5 })).rejects.toThrow();
+  });
+});

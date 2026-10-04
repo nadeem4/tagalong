@@ -16,7 +16,7 @@ export type { ChatMessage, MessageListProps } from './message-list';
 export { Composer } from './composer';
 export type { ComposerProps } from './composer';
 
-export { SightBar } from './sight-bar';
+export { SightBar, estimateImageTokens } from './sight-bar';
 export type { SightBarProps, SightProblem } from './sight-bar';
 
 export { CrewStrip, DEFAULT_PET_COLOR } from './crew-strip';

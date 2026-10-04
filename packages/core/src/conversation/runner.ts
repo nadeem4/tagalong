@@ -7,6 +7,7 @@ import type { MemoryStore } from '../memory/memories';
 import { recall, statedPreference } from '../memory/recall';
 import { rememberTool, type CrewTool } from './crew-tools';
 import { consultTool } from '../crew/consult';
+import { watchTool, type WatchToolDeps } from '../watch/watch-tool';
 import type { SettingsStore } from '../settings/settings';
 import type { PerceptionToolset } from '../perception';
 import { mayPersistScreenshot } from '../perception';
@@ -65,6 +66,8 @@ export interface ConversationRunnerOptions {
    * `timeoutMs` exists for tests and defaults to sixty seconds.
    */
   consult?: { pets: () => readonly Pet[]; timeoutMs?: number | undefined } | undefined;
+  /** Phase 3B. Gives every pet `watch_for`, which starts a watch on its behalf. */
+  watch?: WatchToolDeps | undefined;
 }
 
 export interface RunAsk {
@@ -387,6 +390,7 @@ export class ConversationRunner {
   ): CrewTool[] {
     const tools: CrewTool[] = [];
     if (this.#options.memory) tools.push(rememberTool(this.#options.memory));
+    if (this.#options.watch) tools.push(watchTool(this.#options.watch));
     const consult = this.#options.consult;
     const others = consult?.pets().filter((pet) => pet.id !== ask.pet.id) ?? [];
     if (consult && ask.allowConsult !== false && others.length > 0) {

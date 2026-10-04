@@ -36,6 +36,8 @@ export function SightBar({
   // The composite stands in when there is no single screenshot: a full-view capture has
   // no one screen to show, and the map of the desk is the honest thumbnail for it.
   const screenshot = snapshot?.screenshot ?? snapshot?.composite;
+  const images = attachedImages(snapshot);
+  const imageTokens = estimateImageTokens(images);
 
   return (
     <div
@@ -58,6 +60,16 @@ export function SightBar({
         />
       )}
       {attached !== null && <span className="truncate text-slate-600">{attached}</span>}
+      {images.length > 0 && (
+        <span
+          data-testid="image-tokens"
+          title="Estimated input tokens for the attached images: width × height ÷ 750 each"
+          className="shrink-0 text-slate-500"
+        >
+          ~{imageTokens.toLocaleString('en-US')} image tokens
+          {images.length > 1 ? ` · ${images.length} images` : ''}
+        </span>
+      )}
       <span className="ml-auto flex shrink-0 gap-1.5">
         {seeing ? (
           <button
@@ -96,6 +108,29 @@ function describeDisplays(displays: NonNullable<ContextSnapshot['displays']>): s
     return display.focused ? `${ordinal}◂` : `${ordinal}`;
   });
   return `${displays.length} screens: ${marks.join(' ')}`;
+}
+
+/**
+ * Roughly what attached images cost as model input: width times height over 750 per image.
+ *
+ * Anthropic's published rule of thumb, and close enough for the other providers to say
+ * "this ask carries about two thousand tokens of pictures" before it is sent. An estimate,
+ * shown as one, not a bill.
+ */
+export function estimateImageTokens(images: readonly { width: number; height: number }[]): number {
+  return Math.round(images.reduce((sum, image) => sum + (image.width * image.height) / 750, 0));
+}
+
+/** Every picture an ask would carry: the screenshot, the composite and each display's own. */
+function attachedImages(snapshot: ContextSnapshot | null): { width: number; height: number }[] {
+  if (snapshot === null) return [];
+  return [
+    ...(snapshot.screenshot === undefined ? [] : [snapshot.screenshot]),
+    ...(snapshot.composite === undefined ? [] : [snapshot.composite]),
+    ...(snapshot.displays ?? []).flatMap((display) =>
+      display.image === undefined ? [] : [display.image],
+    ),
+  ];
 }
 
 const LABEL_BY_PROBLEM: Record<SightProblem | 'blind', string> = {

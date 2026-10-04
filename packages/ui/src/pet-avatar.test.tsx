@@ -135,3 +135,34 @@ describe('the paused eye', () => {
     expect(screen.getByTestId('paused-eye')).toBeInTheDocument();
   });
 });
+
+describe('the recording dot', () => {
+  it('shows while rolling memory is recording', () => {
+    render(<PetAvatar pet={sage} recording />);
+    expect(screen.getByTestId('recording-dot')).toBeInTheDocument();
+    expect(screen.getByRole('img').getAttribute('aria-label')).toMatch(/recording/i);
+  });
+
+  it('is absent when memory is off', () => {
+    render(<PetAvatar pet={sage} />);
+    expect(screen.queryByTestId('recording-dot')).toBeNull();
+  });
+
+  it('is absent while sight is paused, because nothing is being recorded', () => {
+    render(<PetAvatar pet={sage} recording sightPaused />);
+    expect(screen.queryByTestId('recording-dot')).toBeNull();
+  });
+});
+
+describe('the watch cue', () => {
+  it('shows a watching mark while a watch runs', () => {
+    render(<PetAvatar pet={sage} watching />);
+    expect(screen.getByTestId('watching-mark')).toBeInTheDocument();
+  });
+
+  it('shows an alert when a watch fired, and says so in the label', () => {
+    render(<PetAvatar pet={sage} alert />);
+    expect(screen.getByTestId('watch-alert')).toBeInTheDocument();
+    expect(screen.getByRole('img').getAttribute('aria-label')).toMatch(/something happened/i);
+  });
+});

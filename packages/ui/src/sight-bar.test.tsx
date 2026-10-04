@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ContextSnapshot } from '@tagalong/protocol';
-import { SightBar } from './sight-bar';
+import { SightBar, estimateImageTokens } from './sight-bar';
 
 const snapshot: ContextSnapshot = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -191,5 +191,65 @@ describe('SightBar, full view', () => {
     const bar = screen.getByTestId('sight-bar');
     expect(bar).toHaveTextContent('screen 1280×800');
     expect(bar).not.toHaveTextContent('screens');
+  });
+});
+
+describe('SightBar image token estimate', () => {
+  const image = (width: number, height: number) => ({
+    mime: 'image/png' as const,
+    base64: 'iVBORw0KGgo=',
+    width,
+    height,
+  });
+
+  it('estimates one image as width times height over 750', () => {
+    render(
+      <SightBar
+        snapshot={{ ...snapshot, screenshot: image(1500, 750) }}
+        problem={null}
+        onLook={noop}
+        onClear={noop}
+      />,
+    );
+    // 1500 × 750 / 750 = 1500.
+    expect(screen.getByTestId('image-tokens')).toHaveTextContent('~1,500 image tokens');
+  });
+
+  it('sums three images: the composite and two displays', () => {
+    const display = (id: number, width: number, height: number) => ({
+      id,
+      bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+      scaleFactor: 1,
+      primary: id === 1,
+      focused: id === 1,
+      image: image(width, height),
+    });
+    render(
+      <SightBar
+        snapshot={{
+          ...snapshot,
+          composite: image(1568, 441),
+          displays: [display(1, 1568, 882), display(2, 750, 750)],
+        }}
+        problem={null}
+        onLook={noop}
+        onClear={noop}
+      />,
+    );
+    // 1568×441/750 = 921.98, 1568×882/750 = 1843.97, 750×750/750 = 750: 3,516 rounded.
+    expect(screen.getByTestId('image-tokens')).toHaveTextContent('~3,516 image tokens');
+    expect(screen.getByTestId('image-tokens')).toHaveTextContent('3 images');
+  });
+
+  it('shows nothing when no image is attached', () => {
+    render(<SightBar snapshot={snapshot} problem={null} onLook={noop} onClear={noop} />);
+    expect(screen.queryByTestId('image-tokens')).toBeNull();
+  });
+});
+
+describe('estimateImageTokens', () => {
+  it('is width times height over 750, summed', () => {
+    expect(estimateImageTokens([{ width: 750, height: 1 }])).toBe(1);
+    expect(estimateImageTokens([])).toBe(0);
   });
 });

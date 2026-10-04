@@ -7,8 +7,12 @@ import {
   HelloParams,
   PROTOCOL_VERSION,
   PerceptionCaptureRegionResult,
+  PerceptionDiffParams,
+  PerceptionDiffResult,
   PerceptionListWindowsResult,
   PerceptionReadTextResult,
+  PerceptionRecallParams,
+  PerceptionRecallResult,
   RPC_ERROR_CODES,
   RpcRequest,
   hostToCoreMethods,
@@ -16,6 +20,10 @@ import {
   paramsSchemaFor,
 } from '@tagalong/protocol';
 import type {
+  PerceptionDiffParams as PerceptionDiffParamsType,
+  PerceptionDiffResult as PerceptionDiffResultType,
+  PerceptionRecallParams as PerceptionRecallParamsType,
+  PerceptionRecallResult as PerceptionRecallResultType,
   CoreToHostNotification,
   HostCapability,
   PerceptionCaptureRegionParams,
@@ -54,7 +62,16 @@ export interface HostSession {
   listWindows(): Promise<PerceptionListWindowsResultType>;
   /** Asks the host for a native-resolution crop of one display, for leaning in. */
   captureRegion(params: CaptureRegionParams): Promise<PerceptionCaptureRegionResultType>;
+  /** Phase 3B. The buffered frame nearest a moment ago, from rolling memory. */
+  recall(params: RecallParams): Promise<RecallResult>;
+  /** Phase 3B. How a display, or a region of it, changed since a moment ago. */
+  diff(params: DiffParams): Promise<DiffResult>;
 }
+
+export type RecallParams = PerceptionRecallParamsType;
+export type RecallResult = PerceptionRecallResultType;
+export type DiffParams = PerceptionDiffParamsType;
+export type DiffResult = PerceptionDiffResultType;
 
 /** What the engine asks for when a pet wants a closer look. */
 export type CaptureRegionParams = PerceptionCaptureRegionParams;
@@ -131,6 +148,19 @@ class SessionImpl implements HostSession {
     const id = `captureRegion-${this.#nextRequestId++}`;
     const raw = await this.#request(id, 'perception.captureRegion', params);
     return PerceptionCaptureRegionResult.parse(raw);
+  }
+
+  async recall(params: RecallParams): Promise<RecallResult> {
+    const id = `recall-${this.#nextRequestId++}`;
+    const raw = await this.#request(id, 'perception.recall', PerceptionRecallParams.parse(params));
+    return PerceptionRecallResult.parse(raw);
+  }
+
+  async diff(params: DiffParams): Promise<DiffResult> {
+    const id = `diff-${this.#nextRequestId++}`;
+    // Parsed on the way out too, so `includeImages` reaches the host with its default.
+    const raw = await this.#request(id, 'perception.diff', PerceptionDiffParams.parse(params));
+    return PerceptionDiffResult.parse(raw);
   }
 
   /** Resolves a core-to-host request the host has answered. */

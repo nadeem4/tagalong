@@ -142,10 +142,11 @@ unauthenticated connection gets the same error.
 The catalog in `packages/protocol/src/methods.ts` is the whole surface:
 
 - **Host to core:** `hello`, `ask`, `interrupt`, `pets.list`, `pets.upsert`, `pets.delete`,
-  `settings.get`, `settings.set`, `tool.approve` (Phase 5).
-- **Core to host:** `perception.capture`, and from Phase 2B `perception.captureRegion`,
-  `perception.listWindows`, and `perception.readText`. Nothing for recall, diff, or watch — those belong
-  to Phase 3B, and a test asserts they have not crept in early.
+  `settings.get`, `settings.set`, `models.list`, `tool.approve` (Phase 5), and `watch.stop`
+  (Phase 3B).
+- **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
+  `perception.listWindows` and `perception.readText`, and from Phase 3B `perception.recall` and
+  `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
 - **Core to host notifications** gained `turn.toolRequest` and `turn.toolResult` in Phase 2B. They were
   in the catalog from Phase 1 and nothing emitted them, which left a tool call invisible twice over: the
   user watching the panel could not tell a working pet from a hung one, and no test could observe that a
@@ -154,7 +155,8 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   be megabytes of IPC to render one line.
 - **Core to host notifications:** `turn.started`, `turn.delta`, `turn.completed`, `turn.error`,
   `turn.warning`, plus `turn.audio` (Phase 3), `turn.toolRequest` and `turn.toolResult` (Phase 5),
-  and `pet.message` (Phase 4). `turn.warning` carries the same `{ code, message }` as `turn.error`
+  `pet.message` and `crew.status` (Phase 4), and `watch.fired` and `watch.status` (Phase 3B).
+  `turn.warning` carries the same `{ code, message }` as `turn.error`
   but does not end the turn — a host that aborts on it throws away a reply that is still coming.
 
 ## The ask flow
@@ -616,6 +618,121 @@ Each avatar's ring follows its own turns (`nextPetStates`), so a roundtable ligh
 `settings.hiddenPets` takes pets off the strip; they still answer in the panel. Settings edits every
 pet field, adds pets (on the fake brain until a provider is picked) and deletes them, and sets
 `settings.summarizer`.
+
+## Awareness (Phase 3B)
+
+The pet can remember the last few minutes of the desktop and watch for something to happen. Both
+live behind the `recall` capability, and both stay on the machine: frames are held in memory by the
+desktop host and only a frame the pet asks for, or the crop a watch shows its check model, ever
+reaches a model.
+
+### The wire
+
+`packages/protocol/src/awareness.ts` holds the shapes, because they share one idea the rest of the
+catalog does not have — time.
+
+- `perception.recall { secondsAgo, displayId? }` returns the buffered frame nearest that moment for
+  one display or every display, each with its `capturedAt`, plus the window list and focused window at
+  that time, whether recording is on, and `oldestAt`, how far back the buffer reaches.
+- `perception.diff { displayId, sinceSeconds, rect?, includeImages? }` compares the display (or a
+  region of it, in display pixels) now with the frame nearest `sinceSeconds` ago, and returns a
+  `changeRatio` from 0 to 1, the changed bounding box, and before and after crops of it. A watch polls
+  with `includeImages: false` and asks for the crops only when it is about to show them to a model.
+- `watch.fired { watchId, petId, message, displayId }` says a watch's condition came true; the watch is
+  over. `watch.status` reports `watching`, then exactly one final state — `fired`, `stopped`,
+  `timeout`, `capped` or `error` — with the checks spent and the check model, so a host can show a Watching chip and take
+  it down. `watch.stop { watchId }` is the chip's Stop button.
+
+### Rolling memory
+
+`apps/desktop/src/main/awareness/` holds the desktop half. `RollingMemory` ticks every five seconds
+while it is on and sight is not paused: it asks for the focused window first and skips the frame if
+that window is on the exclusion list, then captures every display at 640 pixels through the
+sight-gated platform, lists the windows, and pushes the moment into a `FrameRing`. The ring is a time
+window, not a count — `minutes` from settings, ten by default — and frames are kept as PNGs, about a
+tenth of the raw bitmap. A blocked display's placeholder is never stored.
+
+Pausing sight stops the timer and clears the ring; turning memory off clears it; quitting disposes it.
+Nothing in the folder imports `fs`, and a test asserts that. While it records, every avatar shows a
+small red dot (`PetAvatar recording`), driven by `onRecordingChange` over IPC.
+
+`PerceptionMemory` answers the two methods. Recall reads the rolling ring. Diff takes a fresh frame —
+reusing one taken in the last second, since a watch asks twice per tick — and compares it with the
+frame nearest `sinceSeconds` ago from the rolling ring or, when memory is off, a scratch ring kept only
+for displays a diff asked about and dropped after 30 s without one. `pixel-diff.ts` does the
+comparison on BGRA buffers: a channel moving more than 24 levels counts, the ratio is changed pixels
+over the region's area, and frames of different sizes count as wholly changed. The after crop is taken
+again at native resolution through `captureRegion` (1024 px long side), so a check model can read text
+a 640-pixel frame turns into a smear.
+
+### The tools
+
+`packages/core/src/perception/recall-tools.ts` adds two built-ins to the perception toolset, after the
+full-view five. Both find a host that advertises `recall` and implements the method, and both name
+the moment they describe in every answer, because a pet describing a frame from five minutes ago as
+the screen now is the failure this feature invites.
+
+- `recall_screen(secondsAgo, displayId?)` calls `perception.recall`. A seeing pet gets each frame as
+  an image block followed by `Display 1 at <time>`, then a text block with the time in words, the
+  focused window and the window list of that moment. When the frame found is more than ten seconds
+  newer than the moment asked for, the text says how far back memory actually reaches. Memory off
+  and memory empty are two different sentences, so the pet can tell the user which.
+- `what_changed(displayId, sinceSeconds)` calls `perception.diff` with images. A seeing pet gets
+  `Before, at <time>`, the before crop, `After, at <time>`, the after crop, and the share of the
+  display that changed with the changed box. No earlier frame and nothing changed are answered in
+  words.
+
+A blind pet gets the same facts as text and is told it has not seen the pictures. The panel's
+`turn.toolResult` summary counts images rather than forwarding them.
+
+### Watch mode
+
+`packages/core/src/watch/` holds it. `watch_for(condition, displayId?, rect?, timeoutMinutes?)` is a
+crew-style tool, because the watch belongs to the pet that called it; without a `displayId` it
+watches the display of the window in front and remembers that window for a text-only check. The
+`WatchManager` belongs to the engine, not the turn — a watch outlives the reply that started it — and
+runs on an injected clock, so every timing rule below is unit tested with a fake one.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
+flowchart LR
+  T["Tick every 5 s"] --> D["perception.diff x2, no images"]
+  D --> B{"Changed since the last check?"}
+  B -- "no" --> T
+  B -- "yes" --> S{"Still changing since the last tick?"}
+  S -- "yes" --> R["Tick again in 2 s"] --> D
+  S -- "no" --> C["Check model: yes or no"]
+  C -- "no: baseline moves to now" --> T
+  C -- "yes" --> F["watch.fired, watch ends"]
+```
+
+- **When a model is asked.** Each tick asks the host for two ratios with no images: the region
+  against the previous tick, and against the frame at the last check (or the watch start). A check
+  happens only when the baseline ratio is at least `WATCH_CHANGE_THRESHOLD` (0.5% of the region) and
+  the tick ratio is below it — the screen changed and then held still. Scrolling build output never
+  holds still, so it costs nothing until the build stops; a finished command is checked 2 to 7 s
+  after its last line. After a no, the baseline moves to now: one check per change.
+- **Which model.** `watchModelsFor(pet)`: the pet's `watchModel`, else its provider's default —
+  Nemotron 3 Nano on Token Factory, `anthropic/claude-haiku-4.5` on OpenRouter, `claude-haiku-4-5` on
+  Anthropic. If that model can see, it gets the native-resolution after crop and the condition. If it
+  cannot, it gets the last 4,000 characters of the watched window's text instead, which is how Nano
+  reads a terminal; with no text it gets the crop routed to the pet's vision model (Nemotron Nano 2
+  VL on Token Factory). The answer is JSON `{answer, reason}`; a plain "Yes, ..." also counts.
+- **Caps.** From `settings.watch`: at most `maxChecks` (60) checks a watch, then `capped`; at most
+  `maxConcurrent` (3) watches, and a fourth is refused with a sentence the pet repeats; the timeout
+  (`defaultTimeoutMinutes`, 30, unless the pet names one, at most 240) ends it with `timeout`.
+  `watch.stop` ends it with `stopped`. A host that refuses a diff for a while — paused sight, an
+  excluded window in front — skips ticks rather than ending the watch.
+- **Fired.** `watch.fired` carries the model's one-sentence reason as `message`. The panel shows it as
+  a message from the pet and the avatar shows an alert. It is not spoken: Phase 3 (Voice) is not
+  built, and speaking it is deferred there.
+
+### What an ask with pictures costs
+
+The sight bar shows `~N image tokens` beside what is attached, summing width × height ÷ 750 over every
+image the ask would carry — the screenshot, the composite and each display's own picture
+(`estimateImageTokens` in `packages/ui/src/sight-bar.tsx`). It is an estimate, labelled as one, so the
+user sees roughly what an ask costs before sending it.
 
 ## The browser host
 

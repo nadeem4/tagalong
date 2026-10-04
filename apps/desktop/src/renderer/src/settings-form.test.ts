@@ -196,3 +196,40 @@ describe('buildSettingsPatch crew settings', () => {
     ).toThrow(/summarizer/i);
   });
 });
+
+describe('buildSettingsPatch awareness', () => {
+  const awareness = {
+    rollingMemoryEnabled: true,
+    rollingMemoryMinutes: '5',
+    watchMaxChecks: '40',
+    watchMaxConcurrent: '2',
+    watchTimeoutMinutes: '15',
+  };
+
+  it('carries rolling memory and the watch limits when the form shows them', () => {
+    const patch = buildSettingsPatch({ ...values, ...awareness });
+    expect(patch.rollingMemory).toEqual({ enabled: true, minutes: 5 });
+    expect(patch.watch).toEqual({ maxChecks: 40, maxConcurrent: 2, defaultTimeoutMinutes: 15 });
+  });
+
+  it('leaves both alone when the form does not show them', () => {
+    const patch = buildSettingsPatch(values);
+    expect(patch.rollingMemory).toBeUndefined();
+    expect(patch.watch).toBeUndefined();
+  });
+
+  it('refuses minutes outside one to thirty, saying the bounds', () => {
+    expect(() =>
+      buildSettingsPatch({ ...values, ...awareness, rollingMemoryMinutes: '45' }),
+    ).toThrow(/1 and 30/);
+  });
+
+  it('refuses a watch limit that is not a positive whole number', () => {
+    expect(() => buildSettingsPatch({ ...values, ...awareness, watchMaxChecks: '0' })).toThrow(
+      /checks/i,
+    );
+    expect(() =>
+      buildSettingsPatch({ ...values, ...awareness, watchMaxConcurrent: 'two' }),
+    ).toThrow(/at once/i);
+  });
+});

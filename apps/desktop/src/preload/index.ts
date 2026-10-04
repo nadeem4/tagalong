@@ -17,6 +17,7 @@ const bridge: HostBridge = {
     ipcRenderer.invoke(IPC.capture, targets) as Promise<ContextSnapshot | null>,
   interrupt: (turnId: string) => ipcRenderer.invoke(IPC.interrupt, turnId) as Promise<void>,
   listPets: () => ipcRenderer.invoke(IPC.listPets) as Promise<Pet[]>,
+  stopWatch: (watchId: string) => ipcRenderer.invoke(IPC.stopWatch, watchId) as Promise<void>,
   onTurnEvent: (handler: (event: TurnEvent) => void) => {
     const listener = (_event: IpcRendererEvent, turnEvent: TurnEvent): void => handler(turnEvent);
     ipcRenderer.on(IPC.turnEvent, listener);
@@ -48,6 +49,12 @@ const host: TagalongHostApi = {
     const listener = (_event: IpcRendererEvent, problem: string | null): void => handler(problem);
     ipcRenderer.on(IPC.hotkeyProblemEvent, listener);
     return () => void ipcRenderer.off(IPC.hotkeyProblemEvent, listener);
+  },
+  getRecording: () => ipcRenderer.invoke(IPC.getRecording) as Promise<boolean>,
+  onRecording: (handler) => {
+    const listener = (_event: IpcRendererEvent, recording: boolean): void => handler(recording);
+    ipcRenderer.on(IPC.recordingEvent, listener);
+    return () => void ipcRenderer.off(IPC.recordingEvent, listener);
   },
   getHostView: () => ipcRenderer.invoke(IPC.hostView) as Promise<HostView>,
   saveSettings: (patch: SettingsPatch) => ipcRenderer.invoke(IPC.saveSettings, patch),

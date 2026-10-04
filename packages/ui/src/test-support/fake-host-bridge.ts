@@ -6,6 +6,8 @@ export interface FakeHostBridge extends HostBridge {
   emit(event: TurnEvent): void;
   readonly asks: readonly AskInput[];
   readonly interrupts: readonly string[];
+  /** Every watch id the panel asked to stop, in order. */
+  readonly stoppedWatches: readonly string[];
   /** The targets of every capture() call, in order. */
   readonly captures: readonly (readonly PerceptionTarget[])[];
   /** What the next capture() resolves to; null stands in for a blocked window. */
@@ -22,12 +24,14 @@ export function createFakeHostBridge(
   const handlers = new Set<(event: TurnEvent) => void>();
   const asks: AskInput[] = [];
   const interrupts: string[] = [];
+  const stoppedWatches: string[] = [];
   const captures: (readonly PerceptionTarget[])[] = [];
   let turnCount = 0;
 
   const fake: FakeHostBridge = {
     asks,
     interrupts,
+    stoppedWatches,
     captures,
     nextCapture: options.capture ?? null,
     ask(input) {
@@ -49,6 +53,10 @@ export function createFakeHostBridge(
       return () => {
         handlers.delete(handler);
       };
+    },
+    stopWatch(watchId) {
+      stoppedWatches.push(watchId);
+      return Promise.resolve();
     },
     listPets() {
       return Promise.resolve(options.pets ?? []);

@@ -5,7 +5,14 @@ import type { PetState } from '@tagalong/ui';
 import type { Pet } from '@tagalong/protocol';
 import './app.css';
 import '../../shared/ipc';
-import { nextPetStates, visibleCrew } from './crew';
+import {
+  NO_WATCH_CUES,
+  clearAlert,
+  isWatching,
+  nextPetStates,
+  nextWatchCues,
+  visibleCrew,
+} from './crew';
 
 /**
  * The crew on the desktop: one avatar per visible pet, docked side by side in one window.
@@ -18,6 +25,8 @@ function Avatar() {
   const [pets, setPets] = useState<Pet[]>([]);
   const [states, setStates] = useState<Record<string, PetState>>({});
   const [sightPaused, setSightPaused] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [cues, setCues] = useState(NO_WATCH_CUES);
 
   useEffect(() => {
     Promise.all([window.tagalong.listPets(), window.tagalongHost.getHostView()])
@@ -40,9 +49,22 @@ function Avatar() {
     return window.tagalongHost.onSightPause(setSightPaused);
   }, []);
 
+  // The recording dot, read on mount for the same reason as the pause above.
+  useEffect(() => {
+    window.tagalongHost
+      .getRecording()
+      .then(setRecording)
+      .catch((error: unknown) => console.error('could not read rolling memory state', error));
+    return window.tagalongHost.onRecording(setRecording);
+  }, []);
+
   useEffect(
     () =>
       window.tagalong.onTurnEvent((event) => {
+        if (event.type === 'watch.status' || event.type === 'watch.fired') {
+          setCues((current) => nextWatchCues(current, event));
+          return;
+        }
         if (event.type.startsWith('turn.') && 'turnId' in event && event.turnId !== undefined) {
           const { turnId } = event;
           const petId = event.type === 'turn.started' ? event.petId : undefined;
@@ -64,9 +86,19 @@ function Avatar() {
           title={`${pet.name} · ${pet.model} — click to chat`}
           aria-label={`Chat with ${pet.name}`}
           style={{ borderBottomColor: pet.color ?? DEFAULT_PET_COLOR }}
-          onClick={() => void window.tagalongHost.selectPet(pet.id)}
+          onClick={() => {
+            setCues((current) => clearAlert(current, pet.id));
+            void window.tagalongHost.selectPet(pet.id);
+          }}
         >
-          <PetAvatar pet={pet} state={states[pet.id] ?? 'idle'} sightPaused={sightPaused} />
+          <PetAvatar
+            pet={pet}
+            state={states[pet.id] ?? 'idle'}
+            sightPaused={sightPaused}
+            recording={recording}
+            watching={isWatching(cues, pet.id)}
+            alert={cues.alerts.includes(pet.id)}
+          />
         </button>
       ))}
       {pets.length === 0 && (

@@ -15,7 +15,9 @@ export interface ChatMessage {
   petId?: string;
   /** "Ink · anthropic/claude-sonnet-5": who said it, on what. */
   speaker?: string;
-  kind?: 'handoff' | 'consult' | 'round';
+  kind?: 'handoff' | 'consult' | 'round' | 'watch';
+  /** For a fired watch: what the pet was watching for. */
+  condition?: string;
   /** For a handoff or consult: who addressed whom. */
   fromPetId?: string;
   toPetId?: string;
@@ -99,6 +101,26 @@ export function MessageList({
             >
               {nameOf(pets, message.fromPetId)} consulted {nameOf(pets, message.toPetId)}:{' '}
               {message.text}
+            </div>
+          );
+        }
+        if (message.kind === 'watch') {
+          return (
+            <div
+              key={message.id}
+              data-testid="watch-fired"
+              role="note"
+              className="self-start max-w-[90%] rounded-lg border-2 px-3 py-2 text-sm"
+              style={{ borderColor: colorOf(pets, message.petId) }}
+            >
+              <p
+                className="text-[11px] font-medium"
+                style={{ color: colorOf(pets, message.petId) }}
+              >
+                ⏰ {nameOf(pets, message.petId)}
+                {message.condition === undefined ? '' : ` — watching for “${message.condition}”`}
+              </p>
+              <p className="mt-1 whitespace-pre-wrap">{message.text}</p>
             </div>
           );
         }

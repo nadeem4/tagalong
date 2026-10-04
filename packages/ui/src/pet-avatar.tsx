@@ -39,6 +39,15 @@ export interface PetAvatarProps {
    * looked" and fades, this says "it cannot look" and stays until the user ends it.
    */
   sightPaused?: boolean;
+  /**
+   * Phase 3B. Rolling memory is holding the last minutes of the screen. A small red dot
+   * that stays as long as it does: recording is never allowed to be invisible.
+   */
+  recording?: boolean;
+  /** Phase 3B. A watch this pet started is running. */
+  watching?: boolean;
+  /** Phase 3B. A watch fired and the user has not looked at the panel yet. */
+  alert?: boolean;
 }
 
 export function PetAvatar({
@@ -46,6 +55,9 @@ export function PetAvatar({
   state = 'idle',
   captureCount = 0,
   sightPaused = false,
+  recording = false,
+  watching = false,
+  alert = false,
 }: PetAvatarProps) {
   // Which capture the badge has already been shown for. Derived visibility rather than
   // a flag set from an effect, so a re-render can never lose or duplicate the badge.
@@ -65,7 +77,9 @@ export function PetAvatar({
   return (
     <span
       role="img"
-      aria-label={`${pet.name} is ${state}${sightPaused ? ', sight paused' : ''}`}
+      aria-label={`${pet.name} is ${state}${sightPaused ? ', sight paused' : ''}${
+        recording && !sightPaused ? ', recording the screen' : ''
+      }${alert ? ', something happened' : watching ? ', watching' : ''}`}
       data-state={state}
       className={`relative inline-flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-slate-100 text-2xl ring-4 ${RING_BY_STATE[state]}`}
     >
@@ -77,6 +91,32 @@ export function PetAvatar({
         >
           👁
         </span>
+      )}
+      {recording && !sightPaused && (
+        <span
+          data-testid="recording-dot"
+          title="Rolling memory is on — Tagalong keeps the last few minutes of your screen in memory"
+          className="absolute bottom-0.5 left-0.5 h-2 w-2 rounded-full bg-red-500 ring-1 ring-white"
+        />
+      )}
+      {alert ? (
+        <span
+          data-testid="watch-alert"
+          title="A watch fired — open the panel to see what happened"
+          className="absolute -left-0.5 -top-0.5 rounded-full bg-rose-500 px-1 text-[10px] leading-4 text-white"
+        >
+          !
+        </span>
+      ) : (
+        watching && (
+          <span
+            data-testid="watching-mark"
+            title="Watching your screen for something"
+            className="absolute -left-0.5 -top-0.5 rounded-full bg-sky-500 px-1 text-[10px] leading-4 text-white"
+          >
+            ⏱
+          </span>
+        )
       )}
       {captured && (
         <span

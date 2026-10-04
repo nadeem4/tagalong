@@ -19,6 +19,9 @@ export const DESKTOP_CAPABILITIES = [
   // host cannot honour makes the engine call a method that fails, which reads to the user
   // as a broken pet rather than a missing feature.
   'textLayer',
+  // Phase 3B. Advertised whether or not rolling memory is on: recall then answers that it
+  // is not recording, which the pet can repeat, and diff works regardless for watches.
+  'recall',
 ] as const;
 
 /**

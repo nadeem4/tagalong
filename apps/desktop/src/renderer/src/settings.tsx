@@ -1,7 +1,11 @@
 import { StrictMode, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
-import { MAX_WINDOW_TEXT_CHARS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
+import {
+  MAX_ROLLING_MEMORY_MINUTES,
+  MAX_WINDOW_TEXT_CHARS,
+  SETTINGS_DEFAULTS,
+} from '@tagalong/protocol';
 import { DEFAULT_PET_COLOR } from '@tagalong/ui';
 import type { Pet } from '@tagalong/protocol';
 import './app.css';
@@ -23,11 +27,13 @@ function PetEditor({
   providers,
   shown,
   onDelete,
+  watchModelDefaults,
 }: {
   pet: Pet;
   providers: readonly ProviderChoice[];
   shown: boolean;
   onDelete: () => void;
+  watchModelDefaults: Record<string, string>;
 }) {
   const [providerId, setProviderId] = useState(pet.providerId);
   const [models, setModels] = useState<ModelList | null>(null);
@@ -104,6 +110,20 @@ function PetEditor({
           : models.source === 'live'
             ? `${models.models.length} models from ${label}.`
             : `Built-in list for ${label}. Store a key and reopen Settings to see the live one.`}
+      </p>
+      <label>
+        <span>Watch check model (the small model that answers “has it happened yet?”)</span>
+        <input
+          name={field('watchModel')}
+          defaultValue={pet.watchModel ?? ''}
+          placeholder={watchModelDefaults[providerId] ?? pet.model}
+          list={listId}
+        />
+      </label>
+      <p className="settings__note">
+        Blank uses {label}’s default, {watchModelDefaults[providerId] ?? 'the pet’s own model'}. A
+        watch can ask this model up to its check limit, so it should be small and cheap — Nemotron 3
+        Nano on Token Factory, Claude Haiku on OpenRouter or Anthropic.
       </p>
       <label>
         <span>Reply style</span>
@@ -216,6 +236,11 @@ function Settings() {
           : {}),
         summarizerProviderId: field('summarizerProviderId'),
         summarizerModel: field('summarizerModel'),
+        rollingMemoryEnabled: form.get('rollingMemoryEnabled') !== null,
+        rollingMemoryMinutes: field('rollingMemoryMinutes'),
+        watchMaxChecks: field('watchMaxChecks'),
+        watchMaxConcurrent: field('watchMaxConcurrent'),
+        watchTimeoutMinutes: field('watchTimeoutMinutes'),
       });
       const pets = kept.map((pet) => {
         const petField = (name: string): string => field(`pet:${pet.id}:${name}`);
@@ -229,6 +254,7 @@ function Settings() {
           color: petField('color'),
           voiceId: petField('voiceId'),
           replyStyle: petField('replyStyle'),
+          watchModel: petField('watchModel'),
         });
       });
 
@@ -281,6 +307,7 @@ function Settings() {
               providers={view.providers}
               shown={!settings.hiddenPets.includes(pet.id)}
               onDelete={() => setRemoved((current) => [...current, pet.id])}
+              watchModelDefaults={view.watchModelDefaults}
             />
           ))
         )}
@@ -423,6 +450,71 @@ function Settings() {
           {Math.round(SETTINGS_DEFAULTS.windowTextBudget / 4)} tokens per window read — raising it
           costs that much more every time, on every read.
         </p>
+
+        <fieldset>
+          <legend>Awareness</legend>
+          <label className="settings__check">
+            <input
+              type="checkbox"
+              name="rollingMemoryEnabled"
+              defaultChecked={settings.rollingMemory.enabled}
+            />
+            <span>Rolling memory: remember the last few minutes of the screen</span>
+          </label>
+          <label>
+            <span>Minutes to remember</span>
+            <input
+              name="rollingMemoryMinutes"
+              type="number"
+              min={1}
+              max={MAX_ROLLING_MEMORY_MINUTES}
+              defaultValue={settings.rollingMemory.minutes}
+            />
+          </label>
+          <p className="settings__note">
+            Every five seconds, a 640-pixel picture of each screen and the list of open windows,
+            kept in memory only — never written to disk. Pausing sight or quitting throws it all
+            away, and excluded apps are never recorded. A red dot on the pets shows while it
+            records. Lets you ask “what was I reading five minutes ago?”.
+          </p>
+          <label>
+            <span>Checks per watch (model calls one watch may make)</span>
+            <input
+              name="watchMaxChecks"
+              type="number"
+              min={1}
+              max={500}
+              defaultValue={settings.watch.maxChecks}
+            />
+          </label>
+          <label>
+            <span>Watches at once</span>
+            <input
+              name="watchMaxConcurrent"
+              type="number"
+              min={1}
+              max={10}
+              defaultValue={settings.watch.maxConcurrent}
+            />
+          </label>
+          <label>
+            <span>Watch timeout when the pet names none (minutes)</span>
+            <input
+              name="watchTimeoutMinutes"
+              type="number"
+              min={1}
+              max={24 * 60}
+              defaultValue={settings.watch.defaultTimeoutMinutes}
+            />
+          </label>
+          <p className="settings__note">
+            “Tell me when this finishes” starts a watch. Tagalong compares the screen on this
+            machine every five seconds and only asks the pet’s small check model when something
+            changed and settled, so most checks cost nothing. Defaults:{' '}
+            {SETTINGS_DEFAULTS.watch.maxChecks} checks, {SETTINGS_DEFAULTS.watch.maxConcurrent} at
+            once, {SETTINGS_DEFAULTS.watch.defaultTimeoutMinutes} minutes.
+          </p>
+        </fieldset>
 
         {view.hotkeyError !== undefined && <p className="settings__error">{view.hotkeyError}</p>}
 
