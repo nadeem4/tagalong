@@ -162,7 +162,8 @@ notifications.
    result is `{ turnId }` and nothing else. The stored snapshot loses its screenshot unless
    `screenshotRetention` allows keeping it, and the same call sweeps screenshots that have outlived
    the setting — the turn is the only moment the engine reliably wakes up, and Phase 4 owns timers.
-3. If the pet's provider reports `capabilities.vision === false` and the ask carried a screenshot, the
+3. If none of the pet's models can see (`modelForTurn` answers null — see
+   [Brain providers](#brain-providers)) and the ask carried a screenshot, the
    image is dropped before the request is assembled and a `turn.warning` with code
    `vision_unsupported` goes out. The turn continues without the picture.
 4. The runner reads back the last `settings.historyMessages` messages — after the question was stored,
@@ -206,17 +207,43 @@ the model through the snapshot attached to an ask.
 
 ## Brain providers
 
-`BrainProvider` (`providers/brain.ts`) is the only thing the runner talks to. Three implementations
-are registered in `providers/registry.ts` by id:
+`BrainProvider` (`providers/brain.ts`) is the only thing the runner talks to. Four ids are
+registered in `providers/registry.ts`:
 
-| id          | Class                      | Wire format                                                                      |
-| ----------- | -------------------------- | -------------------------------------------------------------------------------- |
-| `anthropic` | `AnthropicProvider`        | Anthropic Messages API through `@anthropic-ai/sdk`                               |
-| `nebius`    | `OpenAiCompatibleProvider` | OpenAI chat completions through the `openai` SDK, base URL Nebius Token Factory  |
-| `fake`      | `FakeBrainProvider`        | None: scripted words, for tests and demos; forced by `TAGALONG_FAKE_PROVIDERS=1` |
+| id           | Class                      | Wire format                                                                      |
+| ------------ | -------------------------- | -------------------------------------------------------------------------------- |
+| `openrouter` | `OpenAiCompatibleProvider` | OpenAI chat completions through the `openai` SDK, preset base URL OpenRouter     |
+| `nebius`     | `OpenAiCompatibleProvider` | The same, preset base URL Nebius Token Factory                                   |
+| `anthropic`  | `AnthropicProvider`        | Anthropic Messages API through `@anthropic-ai/sdk`                               |
+| `fake`       | `FakeBrainProvider`        | None: scripted words, for tests and demos; forced by `TAGALONG_FAKE_PROVIDERS=1` |
 
-`OpenAiCompatibleProvider` defaults its base URL to `https://api.tokenfactory.nebius.com/v1/` and
-takes another, so any chat-completions server works. How the provider-neutral blocks map onto that
+**Each pet picks its own.** `Pet.providerId`, `Pet.model` and the optional `Pet.visionModel` decide
+the brain; `Settings.providerId` and `defaultModel` are no longer read. The engine resolves a pet's
+provider on its first turn and caches it per id. Keys come from the SecretStore entries in
+`SECRET_KEYS` (`anthropic.apiKey`, `nebius.apiKey`, `openrouter.apiKey`), read at boot; base URLs come
+from `Settings.providerBaseUrls`, falling back to the preset's. A provider that cannot be built — no
+key, an unknown id — fails only that turn, as a `turn.error`, and boot never depends on a key.
+
+The two OpenAI-compatible ids are presets in `providers/presets.ts`: a label, a base URL, a fallback
+model list, and a vision list. Any other chat-completions server is configuration only — a base URL
+override, a key, a model id.
+
+**Vision routing** (`providers/vision-routing.ts`). `modelForTurn` returns the pet's model for a
+turn without an image; with one, the model if the provider says it can see (`canSee`, or every model
+when a provider has no `canSee`), else the vision model, else null. The runner uses it to decide
+whether to drop a screenshot (with the `vision_unsupported` warning) and passes the answer to the
+perception tools with every call, so a blind pet's `look_at_screen` answers in words. The
+OpenAI-compatible provider re-routes every request round, so an image a tool returns mid-turn moves the
+rest of the turn to the vision model, and as a last resort replaces images it may not send with a note
+saying one was attached. Token Factory lists only Nemotron Nano 2 VL as seeing; OpenRouter lists none,
+meaning all.
+
+**Model lists.** `models.list` answers with `GET /models` from the service when a key is stored and
+the app is not in fake mode, sorted; anything else — no key, fake mode, a refused key, a wrong URL —
+answers the preset's fallback list with `source: 'fallback'`. The key is read fresh for this call, so
+a key saved a moment ago fills the picker without a restart.
+
+How the provider-neutral blocks map onto the chat-completions
 format:
 
 - The system prompt is the first message, role `system`.
