@@ -14,6 +14,12 @@ import { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './limits';
  */
 export const MAX_SCREENSHOT_RETENTION_HOURS = 24;
 
+/**
+ * Ceiling on rolling memory. Thirty minutes of 640-pixel frames of two displays is already
+ * tens of megabytes of the user's screen in memory; the phase plan's default is ten.
+ */
+export const MAX_ROLLING_MEMORY_MINUTES = 30;
+
 /** Default value for every setting, in one place so the patch schema can stay defaults-free. */
 export const SETTINGS_DEFAULTS = {
   enginePort: 47321,
@@ -86,6 +92,13 @@ export const SETTINGS_DEFAULTS = {
   windowTextBudget: DEFAULT_WINDOW_TEXT_CHARS,
   summarizer: null,
   hiddenPets: [] as string[],
+  /**
+   * Phase 3B. Off by default: remembering the screen is the most a pet ever holds about
+   * the user, and it is the user's call to start it. Ten minutes when they do.
+   */
+  rollingMemory: { enabled: false, minutes: 10 },
+  /** Phase 3B. The phase plan's caps: 60 model checks a watch, 3 watches at once. */
+  watch: { maxChecks: 60, maxConcurrent: 3, defaultTimeoutMinutes: 30 },
 } as const;
 
 /** A non-blank, trimmed entry. A blank one would match every window and blind the pet. */
@@ -216,6 +229,25 @@ const settingsFields = {
   summarizer: z.object({ providerId: z.string().min(1), model: z.string().min(1) }).nullable(),
   /** Phase 4. Pets left off the desktop crew strip. They still answer in the panel. */
   hiddenPets: z.array(z.string().min(1)),
+  /** Phase 3B. Whether the desktop keeps its last few minutes in memory, and how many. */
+  rollingMemory: z.object({
+    enabled: z.boolean(),
+    minutes: z.number().int().min(1).max(MAX_ROLLING_MEMORY_MINUTES),
+  }),
+  /**
+   * Phase 3B. What one watch may spend. `maxChecks` bounds the model calls a watch makes,
+   * `maxConcurrent` how many run at once, and `defaultTimeoutMinutes` how long a watch
+   * runs when the pet names no timeout of its own.
+   */
+  watch: z.object({
+    maxChecks: z.number().int().min(1).max(500),
+    maxConcurrent: z.number().int().min(1).max(10),
+    defaultTimeoutMinutes: z
+      .number()
+      .int()
+      .min(1)
+      .max(24 * 60),
+  }),
 };
 
 export const Settings = z.object({
@@ -241,6 +273,8 @@ export const Settings = z.object({
   windowTextBudget: settingsFields.windowTextBudget.default(SETTINGS_DEFAULTS.windowTextBudget),
   summarizer: settingsFields.summarizer.default(SETTINGS_DEFAULTS.summarizer),
   hiddenPets: settingsFields.hiddenPets.prefault([...SETTINGS_DEFAULTS.hiddenPets]),
+  rollingMemory: settingsFields.rollingMemory.prefault({ ...SETTINGS_DEFAULTS.rollingMemory }),
+  watch: settingsFields.watch.prefault({ ...SETTINGS_DEFAULTS.watch }),
 });
 export type Settings = z.infer<typeof Settings>;
 
