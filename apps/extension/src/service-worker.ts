@@ -72,6 +72,11 @@ chrome.tabs.onActivated.addListener(() => {
     .catch(() => hub.publishContext(null));
 });
 
+// Pairing is the one setup step, so a fresh install lands on the page that does it.
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === 'install') void chrome.runtime.openOptionsPage();
+});
+
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && PAIRING_KEY in changes) void connection.restart();
 });

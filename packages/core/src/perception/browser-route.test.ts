@@ -191,6 +191,27 @@ describe('browserContextFor', () => {
     const e = extension();
     const own = { ...ASKED, host: 'extension' as const };
     expect(await browserContextFor(own, { hosts: [e], exclusions: NO_EXCLUSIONS })).toBe(own);
+    expect(e.asked).toEqual([]);
+  });
+
+  it('strips an extension ask made on an excluded tab down to the bare ask', async () => {
+    const own: ContextSnapshot = {
+      ...ASKED,
+      host: 'extension',
+      app: { name: 'chrome', windowTitle: 'My Bank — accounts' },
+      selection: 'balance 1,234',
+      page: PAGE,
+    };
+    const filled = await browserContextFor(own, {
+      hosts: [],
+      exclusions: { processNames: [], titlePatterns: ['*Bank*'] },
+    });
+    expect(filled).toEqual({
+      id: own.id,
+      capturedAt: own.capturedAt,
+      host: 'extension',
+      app: own.app,
+    });
   });
 
   it('drops what the extension read when the tab it read is excluded', async () => {

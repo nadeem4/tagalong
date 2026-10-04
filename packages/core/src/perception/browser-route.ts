@@ -84,8 +84,11 @@ export async function captureSelection(options: RouteOptions): Promise<Selection
 }
 
 /**
- * Fills a desktop hotkey ask made in a browser with what only the extension can read: the
- * exact selection and the page's readable text.
+ * Applies the browser rules to an ask before its turn starts.
+ *
+ * An ask from the side panel is checked against the exclusion list (see `unlessExcluded`).
+ * And a desktop hotkey ask made in a browser is filled in with what only the extension can
+ * read: the exact selection and the page's readable text.
  *
  * The desktop host captured the ask first — window identity and a clipboard-trick
  * selection — and already applied the exclusion list to that window. The extension then
@@ -97,7 +100,9 @@ export async function browserContextFor(
   snapshot: ContextSnapshot | undefined,
   options: RouteOptions,
 ): Promise<ContextSnapshot | undefined> {
-  if (snapshot === undefined || snapshot.host !== 'desktop') return snapshot;
+  if (snapshot === undefined) return snapshot;
+  if (snapshot.host === 'extension') return unlessExcluded(snapshot, options.exclusions);
+  if (snapshot.host !== 'desktop') return snapshot;
   if (snapshot.app === undefined || !isBrowserProcess(snapshot.app.name)) return snapshot;
   const browser = options.hosts.find(isBrowserHost);
   if (browser === undefined) return snapshot;
@@ -115,6 +120,21 @@ export async function browserContextFor(
       ? { selection: read.selection }
       : {}),
     ...(read.page !== undefined ? { page: read.page } : {}),
+  };
+}
+
+/**
+ * The side panel reads its tab itself, so the exclusion list is applied here, where the
+ * extension's snapshot first meets it: an excluded tab keeps only which tab it was, never
+ * what was on it.
+ */
+function unlessExcluded(snapshot: ContextSnapshot, exclusions: CaptureExclusions): ContextSnapshot {
+  if (findCaptureBlock(asActiveWindow(snapshot.app), exclusions) === null) return snapshot;
+  return {
+    id: snapshot.id,
+    capturedAt: snapshot.capturedAt,
+    host: snapshot.host,
+    ...(snapshot.app !== undefined ? { app: snapshot.app } : {}),
   };
 }
 
