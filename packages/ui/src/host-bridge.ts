@@ -13,7 +13,11 @@ import type {
  * the crew's own — one pet addressing another, and a crew run's progress.
  */
 type TurnNotification =
-  Extract<CoreToHostNotification, `turn.${string}`> | 'pet.message' | 'crew.status';
+  | Extract<CoreToHostNotification, `turn.${string}`>
+  | 'pet.message'
+  | 'crew.status'
+  | 'watch.fired'
+  | 'watch.status';
 
 /**
  * Derived from the protocol catalog rather than restated, so a new turn.* notification
@@ -48,6 +52,11 @@ export interface HostBridge {
   /** Returns an unsubscribe function. */
   onTurnEvent(handler: (event: TurnEvent) => void): () => void;
   listPets(): Promise<Pet[]>;
+  /**
+   * Phase 3B. Ends a watch from its Watching chip. Optional: a host that cannot start
+   * watches never shows a chip to stop.
+   */
+  stopWatch?(watchId: string): Promise<void>;
 }
 
 const HostBridgeContext = createContext<HostBridge | null>(null);

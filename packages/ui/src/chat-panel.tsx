@@ -24,6 +24,15 @@ export interface ChatPanelProps {
   lookLabel?: string;
 }
 
+/** A watch in progress, from its latest `watch.status`. */
+interface RunningWatch {
+  watchId: string;
+  petId: string;
+  condition: string;
+  checks: number;
+  maxChecks: number;
+}
+
 /** Who is answering a turn, from its `turn.started`. */
 interface TurnInfo {
   petId: string;
@@ -57,6 +66,8 @@ export function ChatPanel({
   const [speakingPetId, setSpeakingPetId] = useState<string | null>(null);
   // Which conversation each pet is in, so a follow-up continues the thread it answered in.
   const [conversations, setConversations] = useState<Record<string, string>>({});
+  // Phase 3B. Watches running now, shown as chips with a Stop button each.
+  const [watches, setWatches] = useState<readonly RunningWatch[]>([]);
   const turns = useRef(new Map<string, TurnInfo>());
   const pets = givenPets ?? fetchedPets;
 
@@ -206,6 +217,43 @@ export function ChatPanel({
           ]);
         }
         break;
+      case 'watch.status':
+        if (event.state === 'watching') {
+          const running: RunningWatch = {
+            watchId: event.watchId,
+            petId: event.petId,
+            condition: event.condition,
+            checks: event.checks,
+            maxChecks: event.maxChecks,
+          };
+          setWatches((current) => [
+            ...current.filter((watch) => watch.watchId !== event.watchId),
+            running,
+          ]);
+        } else {
+          setWatches((current) => current.filter((watch) => watch.watchId !== event.watchId));
+          // Fired says so with its own card, and Stop was the user's own doing; the other
+          // endings happened while nobody was looking, so the reason is put in the log.
+          if (event.state !== 'fired' && event.state !== 'stopped') {
+            note(event.detail ?? `Stopped watching for “${event.condition}”.`);
+          }
+        }
+        break;
+      case 'watch.fired': {
+        const condition = watches.find((watch) => watch.watchId === event.watchId)?.condition;
+        setMessages((current) => [
+          ...current,
+          {
+            id: `watch:${event.watchId}`,
+            role: 'assistant',
+            kind: 'watch',
+            text: event.message,
+            petId: event.petId,
+            ...(condition === undefined ? {} : { condition }),
+          },
+        ]);
+        break;
+      }
       default:
         // Audio and tool events belong to later phases.
         break;
@@ -287,6 +335,34 @@ export function ChatPanel({
         onClear={handleClear}
         {...(lookLabel !== undefined ? { lookLabel } : {})}
       />
+      {watches.map((watch) => {
+        const watcher = pets.find((pet) => pet.id === watch.petId);
+        return (
+          <div
+            key={watch.watchId}
+            data-testid="watching"
+            className="flex items-center gap-2 border-b border-sky-200 bg-sky-50 px-3 py-1 text-xs text-sky-900"
+          >
+            <span aria-hidden="true">⏱</span>
+            <span className="font-semibold">Watching</span>
+            <span className="truncate">
+              {watcher === undefined ? '' : `${watcher.name}: `}“{watch.condition}”
+            </span>
+            <span className="ml-auto shrink-0 text-sky-700" title="Model checks spent">
+              {watch.checks}/{watch.maxChecks}
+            </span>
+            {bridge.stopWatch !== undefined && (
+              <button
+                type="button"
+                onClick={() => void bridge.stopWatch?.(watch.watchId)}
+                className="shrink-0 rounded-md border border-sky-300 bg-white px-2 py-0.5 font-medium"
+              >
+                Stop
+              </button>
+            )}
+          </div>
+        );
+      })}
       <MessageList
         messages={messages}
         streamingText={streamingText}
