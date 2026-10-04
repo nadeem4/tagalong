@@ -35,6 +35,9 @@ test.beforeAll(async () => {
       // parser fixture output, so the perception.* methods between them are covered by
       // neither — and this phase has already shipped two dead paths through that gap.
       TAGALONG_FAKE_TOOL: 'list_windows',
+      // The setup wizard would open on a fresh profile and change the window count the
+      // first test asserts. Its own test below opens it on purpose.
+      TAGALONG_SKIP_ONBOARDING: '1',
     },
   });
 });
@@ -392,4 +395,38 @@ test('sight detail and the window text budget save and read back', async () => {
       },
     );
   }
+});
+
+test('the setup wizard opens on request, insists on a key, and Skip closes it for good', async () => {
+  const panel = await windowFor('panel');
+  await panel.evaluate(() => window.tagalongHost.openOnboarding());
+  const wizard = await windowFor('onboarding');
+
+  // Step one is the promise, before anything is asked of the user.
+  await expect(wizard.getByTestId('step-welcome')).toContainText('privacy promise');
+  await wizard.getByRole('button', { name: 'Next' }).click();
+
+  // Step two names all three providers and will not move on without a key. No key is
+  // typed here: one would be stored in this machine's real keychain.
+  const provider = wizard.getByTestId('step-provider');
+  await expect(provider).toContainText('OpenRouter');
+  await expect(provider).toContainText('Nebius Token Factory');
+  await expect(provider).toContainText('Anthropic');
+  await wizard.getByRole('button', { name: 'Next' }).click();
+  await expect(wizard.getByRole('alert')).toContainText('API key');
+
+  await wizard.getByRole('button', { name: 'Skip setup' }).click();
+  await expect
+    .poll(async () =>
+      (
+        await app.evaluate(({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows().map((w) => w.webContents.getURL()),
+        )
+      ).some((url) => url.includes('onboarding.html')),
+    )
+    .toBe(false);
+
+  const view = await panel.evaluate(() => window.tagalongHost.getHostView());
+  expect(view.settings.onboarding.done).toBe(true);
+  expect(view.crewSuggestions.nebius?.scout).toContain('nemotron');
 });

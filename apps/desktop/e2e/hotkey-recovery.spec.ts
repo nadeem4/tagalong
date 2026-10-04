@@ -50,7 +50,7 @@ test.beforeAll(async () => {
   app = await electron.launch({
     args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
-    env: { ...process.env, TAGALONG_FAKE_PROVIDERS: '1' },
+    env: { ...process.env, TAGALONG_FAKE_PROVIDERS: '1', TAGALONG_SKIP_ONBOARDING: '1' },
   });
 });
 

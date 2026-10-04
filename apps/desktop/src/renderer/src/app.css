@@ -190,3 +190,72 @@ button:disabled {
   color: #b91c1c;
   font-size: 12px;
 }
+
+/* The setup wizard: one step at a time, the buttons always in reach at the bottom. */
+.onboarding {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px 20px;
+}
+
+.onboarding h1 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.onboarding h2 {
+  font-size: 15px;
+}
+
+.onboarding__body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.onboarding__body label {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.onboarding__body label span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.onboarding__body input:not([type='radio']):not([type='checkbox']),
+.onboarding__body select {
+  width: 100%;
+}
+
+.onboarding__provider {
+  margin: 0 0 12px;
+  border: 1px solid var(--line);
+}
+
+.onboarding__provider.is-main {
+  border-color: var(--ink);
+}
+
+.onboarding__keys dt {
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.onboarding__keys dd {
+  margin: 2px 0 0;
+}
+
+.onboarding__nav {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.onboarding__nav button:first-child {
+  margin-right: auto;
+}
