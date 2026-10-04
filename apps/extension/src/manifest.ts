@@ -23,8 +23,13 @@ export const manifest = {
    * user has acted on it — the toolbar button, the shortcut, or the side panel. A standing
    * `<all_urls>` grant would let a pet read any tab at any moment, which is not what the
    * user agreed to by installing a side panel.
+   *
+   * `alarms` is the one addition to the phase's list. Chrome stops an idle service worker
+   * after thirty seconds, and with it the reconnect timer; an alarm wakes the worker so it
+   * notices the desktop app coming back even with no panel open. It shows the user no
+   * permission prompt.
    */
-  permissions: ['activeTab', 'scripting', 'sidePanel', 'storage'],
+  permissions: ['activeTab', 'alarms', 'scripting', 'sidePanel', 'storage'],
   /** Requested only if a later feature needs it; nothing in Phase 6 reads the clipboard. */
   optional_permissions: ['clipboardRead'],
   /**

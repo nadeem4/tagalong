@@ -76,6 +76,12 @@ export interface HostView {
   pets: Pet[];
   providers: ProviderChoice[];
   engineVersion: string;
+  /**
+   * The token the Chrome extension pastes once to pair. Absent while the engine is down:
+   * the engine owns the token file, and pairing against an engine that is not running
+   * would only fail later, on the socket.
+   */
+  pairingToken?: string;
   /** Set when the global hotkey could not be registered, so settings can say why. */
   hotkeyError?: string;
 }

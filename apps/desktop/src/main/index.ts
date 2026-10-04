@@ -441,6 +441,7 @@ function registerIpc(): void {
       pets,
       providers: providerChoices(stored),
       engineVersion: app.getVersion(),
+      ...(current.host !== null ? { pairingToken: current.host.engine.pairingToken } : {}),
       ...(problem !== null ? { hotkeyError: problem } : {}),
     };
   });

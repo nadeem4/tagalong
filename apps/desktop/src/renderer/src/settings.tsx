@@ -305,6 +305,8 @@ function Settings() {
 
         {view.hotkeyError !== undefined && <p className="settings__error">{view.hotkeyError}</p>}
 
+        {view.pairingToken !== undefined && <PairingToken token={view.pairingToken} />}
+
         <button type="submit">Save</button>
         <p className="settings__note">
           Engine {view.engineVersion} on 127.0.0.1:{settings.enginePort}. Keys are encrypted with
@@ -320,6 +322,41 @@ function Settings() {
         )}
       </form>
     </main>
+  );
+}
+
+/**
+ * The token the Chrome extension needs, once. Read-only and selectable, with a copy button,
+ * because the alternative is asking someone to find a file in their profile folder.
+ */
+function PairingToken({ token }: { token: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <fieldset>
+      <legend>Browser extension</legend>
+      <label>
+        <span>Pairing token</span>
+        <input
+          name="pairingToken"
+          readOnly
+          value={token}
+          onFocus={(event) => event.currentTarget.select()}
+          data-testid="pairing-token"
+        />
+      </label>
+      <button
+        type="button"
+        onClick={() => {
+          void navigator.clipboard.writeText(token).then(() => setCopied(true));
+        }}
+      >
+        {copied ? 'Copied' : 'Copy token'}
+      </button>
+      <p className="settings__note">
+        Paste it into the Tagalong extension&apos;s options page in Chrome. Anyone with this token
+        can drive your pets from this computer, so keep it to yourself.
+      </p>
+    </fieldset>
   );
 }
 

@@ -7,9 +7,9 @@ describe('manifest', () => {
     expect(manifest.background).toEqual({ service_worker: 'service-worker.js', type: 'module' });
   });
 
-  it('asks for exactly the permissions the phase names, with clipboard optional', () => {
+  it('asks for the permissions the phase names plus alarms, with clipboard optional', () => {
     expect([...manifest.permissions].sort()).toEqual(
-      ['activeTab', 'scripting', 'sidePanel', 'storage'].sort(),
+      ['activeTab', 'alarms', 'scripting', 'sidePanel', 'storage'].sort(),
     );
     expect(manifest.optional_permissions).toEqual(['clipboardRead']);
   });
