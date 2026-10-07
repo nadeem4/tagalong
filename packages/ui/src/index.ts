@@ -28,3 +28,7 @@ export type { ChatPanelProps } from './chat-panel';
 /** Exported so hosts can test their renderer wiring without booting an engine. */
 export { createFakeHostBridge } from './test-support/fake-host-bridge';
 export type { FakeHostBridge } from './test-support/fake-host-bridge';
+
+export { OfficeView } from './office/office-view';
+export { PixelSprite } from './office/pixel-sprite';
+export type { PixelSpriteProps } from './office/pixel-sprite';
