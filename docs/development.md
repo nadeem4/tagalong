@@ -28,6 +28,9 @@ tagalong/
       rpc.ts                        # JSON-RPC envelopes and error codes
       settings.ts                   # Settings, SettingsPatch, SETTINGS_DEFAULTS
       methods.ts                    # the method and notification catalog
+      roles.ts                      # Role, ModelTier
+    core/roles/                     # one Markdown file per role: YAML header plus instructions
+    core/scripts/gen-roles.mjs      # compiles core/roles/*.md into src/roles/library.generated.ts
     core/src/
       index.ts                      # the public facade hosts import
       engine.ts                     # Engine.boot: wires the parts together and listens
@@ -35,6 +38,7 @@ tagalong/
       perception/                   # exclusions, retention, tools, inventory
       memory/                       # db.ts (numbered migrations), store.ts (ConversationStore)
       pets/registry.ts              # PetRegistry, the default pet Scout
+      roles/                        # library.generated.ts, listRoles, getRole, recommendedModel, tiers.ts
       providers/                    # brain.ts, anthropic.ts, openai-compatible.ts, presets.ts, nebius-models.ts, vision-routing.ts, fake.ts, registry.ts, errors.ts
       server/                       # ws-server.ts (EngineServer), pairing.ts
       settings/settings.ts          # SettingsStore, SecretStore, InMemorySecretStore
@@ -117,6 +121,16 @@ pnpm ensure-electron  # fetch the Electron binary on its own
 pnpm package:win      # fetch-native, electron-vite build, electron-builder --win nsis
 pnpm package:dir      # an unpacked app in release/, for checking what gets packaged
 ```
+
+Inside `packages/core`:
+
+```bash
+pnpm gen:roles        # compile roles/*.md into src/roles/library.generated.ts (commit the result)
+```
+
+Run `pnpm --filter @tagalong/core gen:roles` from the root after editing any file in
+`packages/core/roles/`. It needs `packages/protocol` built first, because it validates each role
+against the protocol's `Role` schema. A test fails while the generated file is stale.
 
 ### Packaging
 
