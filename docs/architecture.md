@@ -176,7 +176,7 @@ sequenceDiagram
   U->>H: highlight text, press hotkey or hold push to talk
   H->>H: build ContextSnapshot
   H->>C: ask(petId, input, snapshot)
-  C->>C: assemble prompt: persona + memory + context
+  C->>C: assemble prompt: role + notes + memory + context
   C->>A: streaming request with tools
   A-->>C: text deltas and tool calls
   C-->>H: turn.delta
@@ -204,7 +204,7 @@ notifications.
    `vision_unsupported` goes out. The turn continues without the picture.
 4. The runner reads back the last `settings.historyMessages` messages — after the question was stored,
    so the prompt ends on what was asked — and `assemblePrompt` builds the provider-neutral request:
-   the base instructions, the pet's persona, the reply-style rule, the history, and a screen-context
+   the base instructions, the pet's role instructions and the user's notes for it, the reply-style rule, the history, and a screen-context
    block appended to the last user message rather than sent as its own turn.
 5. The provider streams. Every text delta becomes a `turn.delta` notification.
 6. The turn ends with exactly one of `turn.completed` — carrying the full text, a stop reason of `end`,
@@ -223,7 +223,7 @@ still running before closing the database, because a stream left in flight would
 database that is about to close.
 
 Tool calls are part of the contract already: the provider's `onToolUse` is awaited before the dependent
-text streams. Phase 2 fills it with two built-ins from `packages/core/src/perception/tools.ts` —
+text streams. Phase 2 fills it with two built-ins, now in `packages/core/src/tools/builtin/perception.ts` —
 `look_at_screen` and `get_selection` — offered to every pet whose provider advertises
 `capabilities.tools`, and to no other. A call that arrives with no toolset wired still gets the honest
 "no tools are available yet" error result rather than a pretend success.
@@ -498,15 +498,17 @@ what the engine broadcasts.
 `pets.list`, `pets.upsert` and `pets.delete`. A fresh install is seeded with three pets that
 deliberately run on different brains, so the crew spans providers from the first boot:
 
-| Pet   | Role                 | Provider     | Model                                                |
-| ----- | -------------------- | ------------ | ---------------------------------------------------- |
-| Scout | Explainer and reader | `nebius`     | Nemotron 3 Super, Nemotron Nano 2 VL for pictures    |
-| Ink   | Writer               | `openrouter` | `anthropic/claude-sonnet-5`                          |
-| Bolt  | Coder                | `nebius`     | Nemotron Nano 2 VL (reads screenshots of errors too) |
+| Pet   | Role             | Provider     | Model                                                |
+| ----- | ---------------- | ------------ | ---------------------------------------------------- |
+| Scout | Generalist       | `nebius`     | Nemotron 3 Super, Nemotron Nano 2 VL for pictures    |
+| Ink   | Writer           | `openrouter` | `anthropic/claude-sonnet-5`                          |
+| Bolt  | Backend engineer | `nebius`     | Nemotron Nano 2 VL (reads screenshots of errors too) |
 
-Seeding is remembered per pet in `pet_seeds` (migration 2). An install that predates the crew gains
-Ink and Bolt on its next boot, a pet the user edited is never overwritten, and a default the user
-deleted stays deleted. Each pet carries an optional `color` (`#rrggbb`) for the strip and the panel.
+Seeding is remembered per pet in `pet_seeds` (migration 2). Migration 5 gives every stored pet a
+role (Scout generalist, Ink writer, Bolt backend engineer, any other pet generalist) and keeps an
+edited persona as the pet's notes. An install that predates the crew gains Ink and Bolt on its next
+boot, a pet the user edited is never overwritten, and a default the user deleted stays deleted. Each
+pet carries an optional `color` (`#rrggbb`) for the strip and the panel.
 
 ### Memory
 
@@ -528,7 +530,7 @@ prompt under `## What you remember`, labelled `(preference)`, `(fact)` or `(fact
 crew)`, and caps the whole section — heading included — at 2,000 characters. Last, so a remembered
 "short answers" reads as overriding the generic reply-style rule above it.
 
-Memories are written two ways. The `remember` tool (`conversation/crew-tools.ts`) is offered to every
+Memories are written two ways. The `remember` tool (`tools/builtin/crew.ts`) is offered to every
 pet whose provider supports tools: `{ text, kind: fact | preference, shared? }`, filed under the
 calling pet or, with `shared: true`, in the crew notebook. Under it sits a deterministic safety net:
 when the user's own message states a lasting preference — "I prefer…", "from now on…", "remember
@@ -572,10 +574,10 @@ every answer with who said it and on what.
 
 ### Consult
 
-`crew/consult.ts` gives every pet an `ask_pet(petId, question)` tool whenever the crew has someone else
+`tools/builtin/crew.ts` gives every pet an `ask_pet(petId, question)` tool whenever the crew has someone else
 to ask and the turn allows it (roundtable turns pass `allowConsult: false`). Its description lists the
-other pets by id with the first sentence of their persona. A call runs one nested turn for the target:
-its own persona, provider, model and recalled memories, the caller's question framed as "X is
+other pets as directory cards: id, name, role, summary, good at and not for, never their notes or memories. A call runs one nested turn for the target:
+its own role instructions and notes, provider, model and recalled memories, the caller's question framed as "X is
 consulting you mid-answer", and the caller's screen context as text only — no pixels. The nested turn
 is offered **no tools**, which is the depth limit: a consulted pet cannot consult, and a nested
 `ask_pet` it invents anyway is answered with an error result. It has 60 seconds (`AbortSignal.any` of
@@ -717,7 +719,7 @@ a 640-pixel frame turns into a smear.
 
 ### The tools
 
-`packages/core/src/perception/recall-tools.ts` adds two built-ins to the perception toolset, after the
+`packages/core/src/tools/builtin/awareness.ts` adds two built-ins to the perception set, after the
 full-view five. Both find a host that advertises `recall` and implements the method, and both name
 the moment they describe in every answer, because a pet describing a frame from five minutes ago as
 the screen now is the failure this feature invites.

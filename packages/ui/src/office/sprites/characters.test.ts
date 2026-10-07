@@ -7,10 +7,11 @@ function pet(overrides: Partial<Pet>): Pet {
     id: 'pet',
     name: 'Pet',
     avatar: '🐾',
-    persona: '',
+    roleId: 'generalist',
+    roleVersion: 1,
     model: 'fake',
     providerId: 'fake',
-    toolAllowlist: [],
+    toolGrants: {},
     replyStyle: 'text',
     ...overrides,
   };

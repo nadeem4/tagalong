@@ -32,7 +32,7 @@ export interface ToolRegistryOptions {
   watch?: WatchToolDeps | undefined;
   /** Gives every pet `ask_pet`, when there is another pet to ask. */
   consult?: AskPetDeps | undefined;
-  /** Defaults to `toolsFor`, which keeps everything. */
+  /** Defaults to `toolsFor`: the tools its role lists, minus any its grants switch off. */
   toolsFor?: ToolFilter | undefined;
 }
 
