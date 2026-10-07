@@ -6,6 +6,7 @@ import WebSocket from 'ws';
 import { PROTOCOL_VERSION, RPC_ERROR_CODES } from '@tagalong/protocol';
 import { listRoles, recommendedModel, roleFor } from './roles';
 import { Engine } from './engine';
+import { openDatabase } from './memory/db';
 import { FakeBrainProvider, NEBIUS_FALLBACK_MODELS, SECRET_KEYS } from './providers';
 import type { BrainProvider } from './providers';
 import { InMemorySecretStore } from './settings/settings';
@@ -610,6 +611,62 @@ describe('roles over rpc', () => {
     expect((moved['result'] as { pet: Record<string, unknown> }).pet['roleVersion']).toBe(
       roleFor('researcher').version,
     );
+  });
+});
+
+describe('the roles notice over rpc', () => {
+  /** Leaves `dir` holding a database from before roles, with Ink's persona edited. */
+  function storePreRolesInstall(): void {
+    const db = openDatabase(dir);
+    db.prepare('DELETE FROM schema_version WHERE version >= 5').run();
+    db.exec('DROP TABLE notices');
+    const legacy = {
+      id: 'ink',
+      name: 'Ink',
+      avatar: '✒️',
+      model: 'fake-model',
+      providerId: 'fake',
+      persona: 'Write like a pirate.',
+      toolAllowlist: [],
+      replyStyle: 'text',
+    };
+    db.prepare('INSERT INTO pets (id, json, updated_at) VALUES (?, ?, ?)').run(
+      'ink',
+      JSON.stringify(legacy),
+      '2026-09-11T00:00:00.000Z',
+    );
+    db.prepare('INSERT INTO pet_seeds (id, seeded_at) VALUES (?, ?)').run('ink', '2026-09-11');
+    db.close();
+  }
+
+  async function connected(): Promise<TestHost> {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    return host;
+  }
+
+  it('has no notice on a fresh install', async () => {
+    const host = await connected();
+    const res = await host.call('notices.rolesUpgrade', {});
+    expect(res['result']).toEqual({ notice: null });
+  });
+
+  it('tells an upgraded install what the upgrade did, until it is dismissed', async () => {
+    storePreRolesInstall();
+    const host = await connected();
+
+    const res = await host.call('notices.rolesUpgrade', {});
+    expect(res['result']).toEqual({
+      notice: {
+        pets: [{ petId: 'ink', name: 'Ink', roleId: 'writer', keptNotes: true, madeByYou: false }],
+      },
+    });
+
+    const dismissed = await host.call('notices.dismiss', { notice: 'rolesUpgrade' });
+    expect(dismissed['result']).toEqual({ dismissed: true });
+    const after = await host.call('notices.rolesUpgrade', {});
+    expect(after['result']).toEqual({ notice: null });
   });
 });
 

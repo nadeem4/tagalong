@@ -19,6 +19,12 @@ import {
   WatchStopResult,
 } from './awareness';
 import { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './limits';
+import {
+  NoticesDismissParams,
+  NoticesDismissResult,
+  NoticesRolesUpgradeParams,
+  NoticesRolesUpgradeResult,
+} from './notices';
 import { Pet } from './pet';
 import {
   RolesListParams,
@@ -329,6 +335,8 @@ export const hostToCoreMethods = {
   'watch.stop': { params: WatchStopParams, result: WatchStopResult },
   'roles.list': { params: RolesListParams, result: RolesListResult },
   'roles.recommendModel': { params: RolesRecommendModelParams, result: RolesRecommendModelResult },
+  'notices.rolesUpgrade': { params: NoticesRolesUpgradeParams, result: NoticesRolesUpgradeResult },
+  'notices.dismiss': { params: NoticesDismissParams, result: NoticesDismissResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostMethods = {

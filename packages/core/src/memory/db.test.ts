@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import Database from 'better-sqlite3';
+import { rolesUpgradeNotice } from '../pets/roles-notice';
 import { DB_FILENAME, LATEST_SCHEMA_VERSION, migrate, openDatabase } from './db';
 
 let dataDir: string;
@@ -45,6 +46,7 @@ describe('openDatabase', () => {
         'memories_fts_docsize',
         'memories_fts_idx',
         'messages',
+        'notices',
         'pet_seeds',
         'pets',
         'schema_version',
@@ -116,6 +118,18 @@ describe('migrate', () => {
         roleId: 'generalist',
         notes: 'You are Pip.',
       });
+      // Migration 6 runs right after and records what 5 did, for the one-time notice.
+      expect(rolesUpgradeNotice(db)?.pets.map((pet) => pet.petId)).toEqual(['pip']);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('records no roles notice on a fresh database', () => {
+    const db = new Database(':memory:');
+    try {
+      migrate(db);
+      expect(rolesUpgradeNotice(db)).toBeNull();
     } finally {
       db.close();
     }

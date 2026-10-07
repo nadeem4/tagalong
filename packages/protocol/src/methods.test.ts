@@ -32,6 +32,8 @@ const HOST_TO_CORE = [
   'watch.stop',
   'roles.list',
   'roles.recommendModel',
+  'notices.rolesUpgrade',
+  'notices.dismiss',
 ] as const;
 
 const CORE_TO_HOST = ['perception.capture'] as const;
