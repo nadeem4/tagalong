@@ -39,7 +39,13 @@ export function OfficeFloor({ members, selectedId }: OfficeFloorProps) {
   return (
     <section
       aria-label="Office floor"
-      style={{ width: FLOOR.width, flex: 'none', overflow: 'auto', background: t.color.floor }}
+      style={{
+        width: FLOOR.width,
+        flex: 'none',
+        overflowX: 'hidden',
+        overflowY: 'auto',
+        background: t.color.floor,
+      }}
     >
       <div
         style={{
