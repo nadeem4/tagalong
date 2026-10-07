@@ -239,6 +239,23 @@ button:disabled {
   border-color: var(--ink);
 }
 
+/* Phase 8. A pet's role in the crew step, and the chip on a model its role recommends. */
+.onboarding__role {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.onboarding__chip {
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: #e6e9f2;
+  color: #4a5168;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .onboarding__keys dt {
   font-weight: 600;
   margin-top: 8px;

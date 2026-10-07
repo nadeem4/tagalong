@@ -118,6 +118,57 @@ export function initialCrewPicks(
   return picks;
 }
 
+/** Provider id → pet id → model. The shape of both the suggestions and the recommendations. */
+export type ModelsByProvider = Record<string, Record<string, string>>;
+
+/**
+ * The model each pet's role recommends on each keyed provider, asked of the engine once
+ * when the provider step is left. A pet whose answer is empty or fails is left out, and
+ * falls back to the built-in suggestion.
+ */
+export async function recommendationsFor(
+  pets: readonly Pet[],
+  keyed: readonly string[],
+  recommend: (roleId: string, providerId: string) => Promise<{ model?: string }>,
+): Promise<ModelsByProvider> {
+  const result: ModelsByProvider = Object.fromEntries(keyed.map((providerId) => [providerId, {}]));
+  await Promise.all(
+    keyed.flatMap((providerId) =>
+      pets.map(async (pet) => {
+        try {
+          const { model } = await recommend(pet.roleId, providerId);
+          if (model !== undefined) result[providerId]![pet.id] = model;
+        } catch {
+          // The built-in suggestion stands in; the wizard must not stall on the engine.
+        }
+      }),
+    ),
+  );
+  return result;
+}
+
+/** The built-in suggestions with every role recommendation laid over them. */
+export function withRecommendations(
+  suggestions: Readonly<Record<string, Readonly<Record<string, string>>>>,
+  recommended: Readonly<Record<string, Readonly<Record<string, string>>>>,
+): ModelsByProvider {
+  const merged: ModelsByProvider = {};
+  for (const providerId of new Set([...Object.keys(suggestions), ...Object.keys(recommended)])) {
+    merged[providerId] = { ...suggestions[providerId], ...recommended[providerId] };
+  }
+  return merged;
+}
+
+/** Whether a pet's pick is still the model its role recommends on that provider. */
+export function isRecommended(
+  petId: string,
+  pick: CrewPick,
+  recommended: Readonly<Record<string, Readonly<Record<string, string>>>>,
+): boolean {
+  const model = recommended[pick.providerId]?.[petId];
+  return model !== undefined && model === pick.model;
+}
+
 /** An Electron accelerator as the keyboard in front of the person prints it. */
 export function hotkeyLabel(accelerator: string, platform: string): string {
   const command = platform === 'darwin' ? 'Cmd' : 'Ctrl';

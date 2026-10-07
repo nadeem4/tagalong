@@ -38,3 +38,7 @@ export type { PetDraft, PetSettingsProps } from './settings/pet-settings';
 export type { ModelRecommendation } from './settings/brain-picker';
 export { CrewList } from './settings/crew-list';
 export { SETTINGS_CSS } from './settings/settings-styles';
+
+/** Phase 8. A role's label and class ink, for hosts that name a pet's role outside the office. */
+export { jobFor } from './office/job';
+export { officeTokens } from './office/tokens';
