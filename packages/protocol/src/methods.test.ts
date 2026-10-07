@@ -30,6 +30,8 @@ const HOST_TO_CORE = [
   'models.list',
   'tool.approve',
   'watch.stop',
+  'roles.list',
+  'roles.recommendModel',
 ] as const;
 
 const CORE_TO_HOST = ['perception.capture'] as const;

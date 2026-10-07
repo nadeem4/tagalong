@@ -41,6 +41,21 @@ import type {
 } from '@tagalong/protocol';
 import { tokensMatch } from './pairing';
 
+/**
+ * A handler's refusal that carries its own JSON-RPC code, such as `invalidParams` for a
+ * request that parsed but names something that does not exist. Any other throw is an
+ * `internalError`.
+ */
+export class RpcFailure extends Error {
+  constructor(
+    readonly code: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'RpcFailure';
+  }
+}
+
 /** A connected host, from the engine's point of view. */
 export interface HostSession {
   readonly id: string;
@@ -347,7 +362,8 @@ export class EngineServer {
       // A handler that throws must still produce a response; a silent drop leaves the
       // host waiting forever on a promise that never settles.
       const message = error instanceof Error ? error.message : String(error);
-      this.#fail(connection.socket, id, RPC_ERROR_CODES.internalError, message);
+      const code = error instanceof RpcFailure ? error.code : RPC_ERROR_CODES.internalError;
+      this.#fail(connection.socket, id, code, message);
     }
   }
 

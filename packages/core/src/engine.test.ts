@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
-import { PROTOCOL_VERSION } from '@tagalong/protocol';
+import { PROTOCOL_VERSION, RPC_ERROR_CODES } from '@tagalong/protocol';
+import { listRoles, recommendedModel, roleFor } from './roles';
 import { Engine } from './engine';
 import { FakeBrainProvider, NEBIUS_FALLBACK_MODELS, SECRET_KEYS } from './providers';
 import type { BrainProvider } from './providers';
@@ -520,6 +521,95 @@ describe('pets and settings over rpc', () => {
     expect(settings['defaultModel']).toBe('claude-haiku-4-5');
     // A patch must not reset the fields it left out.
     expect(settings['defaultPetId']).toBe('scout');
+  });
+});
+
+describe('roles over rpc', () => {
+  async function connected(): Promise<{ e: Engine; host: TestHost }> {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    return { e, host };
+  }
+
+  const draft = (overrides: Record<string, unknown> = {}) => ({
+    id: 'pip',
+    name: 'Pip',
+    avatar: '🐣',
+    model: 'fake-model',
+    providerId: 'fake',
+    roleId: 'writer',
+    roleVersion: 99,
+    toolGrants: {},
+    replyStyle: 'text',
+    ...overrides,
+  });
+
+  it('lists the whole role library', async () => {
+    const { host } = await connected();
+    const res = await host.call('roles.list', {});
+    expect(res['result']).toEqual({ roles: listRoles() });
+  });
+
+  it('recommends the role’s model, and a vision model when the role needs to see', async () => {
+    const { host } = await connected();
+    for (const roleId of ['writer', 'frontend-engineer']) {
+      const res = await host.call('roles.recommendModel', { roleId, providerId: 'nebius' });
+      expect(res['result']).toEqual(recommendedModel(roleFor(roleId), 'nebius'));
+    }
+    const sees = await host.call('roles.recommendModel', {
+      roleId: 'frontend-engineer',
+      providerId: 'nebius',
+    });
+    expect((sees['result'] as Record<string, unknown>)['visionModel']).toBeDefined();
+  });
+
+  it('recommends nothing on a provider without a tier table', async () => {
+    const { host } = await connected();
+    const res = await host.call('roles.recommendModel', { roleId: 'writer', providerId: 'fake' });
+    expect(res['result']).toEqual({});
+  });
+
+  it('refuses to recommend for a role that does not exist', async () => {
+    const { host } = await connected();
+    const res = await host.call('roles.recommendModel', {
+      roleId: 'wizard',
+      providerId: 'nebius',
+    });
+    const error = res['error'] as Record<string, unknown>;
+    expect(error['code']).toBe(RPC_ERROR_CODES.invalidParams);
+    expect(String(error['message'])).toContain('wizard');
+  });
+
+  it('refuses a pet whose role is not in the library, and saves nothing', async () => {
+    const { e, host } = await connected();
+    const res = await host.call('pets.upsert', { pet: draft({ roleId: 'wizard' }) });
+    const error = res['error'] as Record<string, unknown>;
+    expect(error['code']).toBe(RPC_ERROR_CODES.invalidParams);
+    expect(String(error['message'])).toContain('wizard');
+    expect(e.pets.map((pet) => pet.id)).not.toContain('pip');
+  });
+
+  it('stamps a new pet with its role’s library version', async () => {
+    const { host } = await connected();
+    const res = await host.call('pets.upsert', { pet: draft() });
+    const pet = (res['result'] as { pet: Record<string, unknown> }).pet;
+    expect(pet['roleVersion']).toBe(roleFor('writer').version);
+  });
+
+  it('keeps an existing pet’s role version, and restamps it when the role changes', async () => {
+    const { host } = await connected();
+    await host.call('pets.upsert', { pet: draft() });
+
+    const kept = await host.call('pets.upsert', { pet: draft({ name: 'Pippa', roleVersion: 7 }) });
+    expect((kept['result'] as { pet: Record<string, unknown> }).pet['roleVersion']).toBe(7);
+
+    const moved = await host.call('pets.upsert', {
+      pet: draft({ roleId: 'researcher', roleVersion: 7 }),
+    });
+    expect((moved['result'] as { pet: Record<string, unknown> }).pet['roleVersion']).toBe(
+      roleFor('researcher').version,
+    );
   });
 });
 

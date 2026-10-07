@@ -20,6 +20,12 @@ import {
 } from './awareness';
 import { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './limits';
 import { Pet } from './pet';
+import {
+  RolesListParams,
+  RolesListResult,
+  RolesRecommendModelParams,
+  RolesRecommendModelResult,
+} from './roles';
 import { CaptureBlock, Settings, SettingsPatch } from './settings';
 
 /** What a host tells the engine it is able to perceive or play. */
@@ -321,6 +327,8 @@ export const hostToCoreMethods = {
   'models.list': { params: ModelsListParams, result: ModelsListResult },
   'tool.approve': { params: ToolApproveParams, result: ToolApproveResult },
   'watch.stop': { params: WatchStopParams, result: WatchStopResult },
+  'roles.list': { params: RolesListParams, result: RolesListResult },
+  'roles.recommendModel': { params: RolesRecommendModelParams, result: RolesRecommendModelResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostMethods = {
