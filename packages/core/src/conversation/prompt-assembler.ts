@@ -10,6 +10,7 @@ import { MAX_SELECTION_CHARS } from '@tagalong/protocol';
 import type { BrainContent, BrainMessage, BrainRequest } from '../providers';
 import type { Memory } from '../memory/memories';
 import { renderInventory } from '../perception/inventory';
+import { roleFor } from '../roles';
 
 export { MAX_SELECTION_CHARS };
 
@@ -56,6 +57,9 @@ const REPLY_STYLE_RULES: Record<ReplyStyle, string> = {
   'voice-full':
     'Your reply is spoken aloud in full. Write plain sentences: no markdown, no lists, no code fences.',
 };
+
+/** Heads the user's own notes for the pet in the system prompt. */
+export const NOTES_HEADING = "## The user's notes for you";
 
 /** Heads the remembered notes in the system prompt. */
 export const MEMORY_HEADING = '## What you remember';
@@ -133,10 +137,17 @@ function imagesToAttach(snapshot: ContextSnapshot, settings: Settings): BrainCon
   return images;
 }
 
+/**
+ * Base rules, then who the pet is: its role's instructions, its name, and the user's notes
+ * for it when there are any. Then the reply style and the memories, as before roles.
+ */
 function systemPrompt(pet: Pet, memories: readonly Memory[]): string {
+  const notes = pet.notes?.trim() ?? '';
   return [
     BASE_INSTRUCTIONS,
-    pet.persona.trim(),
+    roleFor(pet.roleId).instructions.trim(),
+    `Your name is ${pet.name}.`,
+    notes.length > 0 ? `${NOTES_HEADING}\n${notes}` : '',
     REPLY_STYLE_RULES[pet.replyStyle],
     memorySection(memories),
   ]

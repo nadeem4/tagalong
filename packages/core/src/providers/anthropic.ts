@@ -167,7 +167,7 @@ export class AnthropicProvider implements BrainProvider {
             model: req.model,
             max_tokens: req.maxTokens,
             // The cache breakpoint sits at the end of the stable prefix — tools and
-            // persona — so only the volatile context snapshot is re-read each turn.
+            // system prompt — so only the volatile context snapshot is re-read each turn.
             system: [{ type: 'text', text: req.system, cache_control: { type: 'ephemeral' } }],
             messages,
             thinking: { type: 'adaptive' },

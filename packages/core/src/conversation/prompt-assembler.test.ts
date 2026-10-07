@@ -6,18 +6,22 @@ import {
   CONTEXT_LABELS,
   MAX_SELECTION_CHARS,
   MEMORY_HEADING,
+  NOTES_HEADING,
   TRUNCATION_MARKER,
   assemblePrompt,
 } from './prompt-assembler';
+import { getRole } from '../roles';
 
 const pet: Pet = {
   id: 'scout',
   name: 'Scout',
   avatar: '🐾',
-  persona: 'You are Scout, a terse field guide.',
+  notes: 'You are Scout, a terse field guide.',
   model: 'claude-opus-5',
   providerId: 'anthropic',
-  toolAllowlist: [],
+  roleId: 'generalist',
+  roleVersion: 1,
+  toolGrants: {},
   replyStyle: 'text',
 };
 
@@ -60,14 +64,51 @@ function lastText(request: ReturnType<typeof assemblePrompt>): string {
 }
 
 describe('assemblePrompt system prompt', () => {
-  it('states the base rules, the persona, and the reply style', () => {
+  it('states the base rules, the role, the name, the notes, and the reply style', () => {
     const { system } = assemblePrompt({ pet, history: [userMessage('hi')], settings });
 
     expect(system).toContain('screen');
     expect(system.toLowerCase()).toContain('concise');
     expect(system).toMatch(/never claim/i);
     expect(system).toMatch(/clicked|typed/i);
-    expect(system).toContain(pet.persona);
+    expect(system).toContain(getRole('generalist')!.instructions);
+    expect(system).toContain('Your name is Scout.');
+    expect(system).toContain(`${NOTES_HEADING}\n${pet.notes}`);
+  });
+
+  it('orders the role instructions, then the name, then the notes, then the reply style', () => {
+    const { system } = assemblePrompt({
+      pet: { ...pet, roleId: 'writer' },
+      history: [userMessage('hi')],
+      settings,
+    });
+
+    const role = system.indexOf(getRole('writer')!.instructions);
+    const name = system.indexOf('Your name is Scout.');
+    const notes = system.indexOf(NOTES_HEADING);
+    const style = system.indexOf('Your reply is read on screen.');
+    expect(system.indexOf('You are a Tagalong companion')).toBe(0);
+    expect(role).toBeGreaterThan(0);
+    expect(name).toBeGreaterThan(role);
+    expect(notes).toBeGreaterThan(name);
+    expect(style).toBeGreaterThan(notes);
+  });
+
+  it('leaves the notes section out when the pet has none or they are blank', () => {
+    const { notes: _notes, ...plain } = pet;
+    for (const subject of [plain, { ...pet, notes: '  ' }]) {
+      const { system } = assemblePrompt({ pet: subject, history: [userMessage('hi')], settings });
+      expect(system).not.toContain(NOTES_HEADING);
+    }
+  });
+
+  it("falls back to the generalist's instructions for a role the library does not have", () => {
+    const { system } = assemblePrompt({
+      pet: { ...pet, roleId: 'astronaut' },
+      history: [userMessage('hi')],
+      settings,
+    });
+    expect(system).toContain(getRole('generalist')!.instructions);
   });
 
   it('swaps in the reply-style rule the pet asked for', () => {

@@ -22,10 +22,12 @@ const pet = (id: string, providerId: string, model: string): Pet => ({
   id,
   name: id[0]!.toUpperCase() + id.slice(1),
   avatar: '🔎',
-  persona: 'p',
+  notes: 'p',
   model,
   providerId,
-  toolAllowlist: [],
+  roleId: 'generalist',
+  roleVersion: 1,
+  toolGrants: {},
   replyStyle: 'text',
 });
 

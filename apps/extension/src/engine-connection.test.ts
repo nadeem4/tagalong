@@ -12,10 +12,12 @@ const PET: Pet = {
   id: 'pip',
   name: 'Pip',
   avatar: '🐣',
-  persona: 'A cheerful helper.',
+  notes: 'A cheerful helper.',
   providerId: 'fake',
   model: 'fake-1',
-  toolAllowlist: [],
+  roleId: 'generalist',
+  roleVersion: 1,
+  toolGrants: {},
   replyStyle: 'text',
 };
 

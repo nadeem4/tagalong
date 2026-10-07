@@ -146,7 +146,7 @@ describe('AnthropicProvider', () => {
     expect(body.max_tokens).toBe(2048);
   });
 
-  it('puts the persona and tools in a cached system block', async () => {
+  it('puts the system prompt and tools in a cached system block', async () => {
     sdk.stream.mockReturnValue(streamOf(textMessage('ok')));
     const tools = [
       { name: 'search', description: 'find things', inputSchema: { type: 'object' as const } },

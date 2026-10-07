@@ -284,7 +284,7 @@ function Onboarding() {
         })}
         <p className="settings__note">
           On Token Factory, a pet on a text-only Nemotron model reads screenshots with Nemotron Nano
-          2 VL automatically. Names, personas and colours are in Settings.
+          2 VL automatically. Names, notes and colours are in Settings.
         </p>
       </>
     ),

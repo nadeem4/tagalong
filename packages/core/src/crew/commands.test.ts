@@ -4,10 +4,11 @@ import { parseCrewCommand } from './commands';
 
 const base = {
   avatar: '*',
-  persona: '',
   model: 'fake-model',
   providerId: 'fake',
-  toolAllowlist: [],
+  roleId: 'generalist',
+  roleVersion: 1,
+  toolGrants: {},
   replyStyle: 'text' as const,
 };
 const crew: Pet[] = [

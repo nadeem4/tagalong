@@ -97,6 +97,30 @@ describe('migrate', () => {
     }
   });
 
+  it('gives pets stored before roles a role in migration 5', () => {
+    const db = new Database(':memory:');
+    try {
+      migrate(db);
+      // Roll the record back to version 4, as an install from before roles would be.
+      db.prepare('DELETE FROM schema_version WHERE version >= 5').run();
+      db.prepare('INSERT INTO pets (id, json, updated_at) VALUES (?, ?, ?)').run(
+        'pip',
+        JSON.stringify({ id: 'pip', persona: 'You are Pip.', toolAllowlist: [] }),
+        '2026-09-11T00:00:00.000Z',
+      );
+
+      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+
+      const row = db.prepare<[], { json: string }>("SELECT json FROM pets WHERE id = 'pip'").get();
+      expect(JSON.parse(row?.json ?? '{}')).toMatchObject({
+        roleId: 'generalist',
+        notes: 'You are Pip.',
+      });
+    } finally {
+      db.close();
+    }
+  });
+
   it('survives reopening the same file', () => {
     openDatabase(dataDir).close();
     const db = openDatabase(dataDir);

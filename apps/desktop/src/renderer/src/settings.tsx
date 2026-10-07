@@ -74,8 +74,8 @@ function PetEditor({
         <input type="color" name={field('color')} defaultValue={pet.color ?? DEFAULT_PET_COLOR} />
       </label>
       <label>
-        <span>Persona (who this pet is and how it talks)</span>
-        <textarea name={field('persona')} defaultValue={pet.persona} rows={3} />
+        <span>Notes (optional, private)</span>
+        <textarea name={field('notes')} defaultValue={pet.notes ?? ''} rows={3} />
       </label>
       <label>
         <span>Provider</span>
@@ -250,7 +250,7 @@ function Settings() {
           visionModel: petField('visionModel'),
           name: petField('name'),
           avatar: petField('avatar'),
-          persona: petField('persona'),
+          notes: petField('notes'),
           color: petField('color'),
           voiceId: petField('voiceId'),
           replyStyle: petField('replyStyle'),

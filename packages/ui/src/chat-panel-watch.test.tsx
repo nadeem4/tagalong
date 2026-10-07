@@ -9,10 +9,11 @@ const scout: Pet = {
   id: 'scout',
   name: 'Scout',
   avatar: '🔎',
-  persona: '',
   model: 'anthropic/claude-sonnet-5',
   providerId: 'openrouter',
-  toolAllowlist: [],
+  roleId: 'generalist',
+  roleVersion: 1,
+  toolGrants: {},
   replyStyle: 'text',
 };
 
