@@ -1,8 +1,9 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Pet } from '@tagalong/protocol';
 import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
+import { OFFICE_CSS } from './office-styles';
 import { OfficeView } from './office-view';
 
 const pet = (id: string, name: string, color?: string): Pet => ({
@@ -123,5 +124,54 @@ describe('OfficeView', () => {
       </HostBridgeProvider>,
     );
     expect(await screen.findByRole('alert')).toHaveTextContent('could not reach the crew');
+  });
+});
+
+describe('the Still office toggle', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  const still = () => screen.getByRole('button', { name: 'Still office' });
+  const root = () => screen.getByRole('navigation', { name: 'Party' }).closest('.office');
+
+  it('stops the bob and the cursor hop, and remembers the choice', async () => {
+    await renderOffice();
+    expect(still()).toHaveAttribute('aria-pressed', 'false');
+    expect(root()).not.toHaveClass('office-still');
+
+    fireEvent.click(still());
+    expect(still()).toHaveAttribute('aria-pressed', 'true');
+    expect(root()).toHaveClass('office-still');
+    expect(localStorage.getItem('tagalong.office.still')).toBe('1');
+
+    fireEvent.click(still());
+    expect(root()).not.toHaveClass('office-still');
+    expect(localStorage.getItem('tagalong.office.still')).toBe('0');
+  });
+
+  it('opens still when the choice was remembered', async () => {
+    localStorage.setItem('tagalong.office.still', '1');
+    await renderOffice();
+    expect(still()).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('still toggles when storage is unavailable', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    await renderOffice();
+    fireEvent.click(still());
+    expect(still()).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('switches the animations off in the stylesheet', () => {
+    expect(OFFICE_CSS).toMatch(
+      /\.office-still \.office-bob,\s*\.office-still \.office-hop\s*\{\s*animation: none;/,
+    );
   });
 });

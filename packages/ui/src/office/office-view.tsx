@@ -10,6 +10,7 @@ import { PartyList } from './party-list';
 import { PixelSprite } from './pixel-sprite';
 import { CHARACTERS, characterFor } from './sprites/characters';
 import { NO_ACTIVITY, nextActivity, statusOf } from './status';
+import { readStill, writeStill } from './still';
 import { officeTokens as t } from './tokens';
 
 const NOT_YET = 'Task assignment arrives in a later update';
@@ -25,6 +26,11 @@ export function OfficeView() {
   const [failed, setFailed] = useState(false);
   const [activity, setActivity] = useState(NO_ACTIVITY);
   const [picked, setPicked] = useState<string | null>(null);
+  const [still, setStill] = useState(readStill);
+  const toggleStill = () => {
+    writeStill(!still);
+    setStill(!still);
+  };
 
   useEffect(() => {
     let live = true;
@@ -73,7 +79,7 @@ export function OfficeView() {
 
   return (
     <div
-      className="office"
+      className={still ? 'office office-still' : 'office'}
       style={{
         height: '100%',
         display: 'flex',
@@ -85,7 +91,7 @@ export function OfficeView() {
       }}
     >
       <style>{OFFICE_CSS}</style>
-      <TopBar />
+      <TopBar still={still} onToggleStill={toggleStill} />
       <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
         <PartyList
           members={members}
@@ -100,7 +106,7 @@ export function OfficeView() {
   );
 }
 
-function TopBar() {
+function TopBar({ still, onToggleStill }: { still: boolean; onToggleStill: () => void }) {
   const logo = CHARACTERS['scout'];
   return (
     <header
@@ -151,6 +157,15 @@ function TopBar() {
       </label>
       <button type="button" className="office-btn" disabled title={NOT_YET}>
         Assign
+      </button>
+      <button
+        type="button"
+        className="office-toggle"
+        aria-pressed={still}
+        title="Stop the crew's idle animation"
+        onClick={onToggleStill}
+      >
+        Still office
       </button>
       <span
         style={{
