@@ -24,11 +24,11 @@ import { SummariesSection } from './settings/summaries-section';
 import type { HostView } from '../../shared/ipc';
 
 /**
- * The role library and the recommended model come over the host bridge once the engine
- * serves them; until then the pet editor shows each pet's role id and recommends nothing.
+ * The model a role would like on a provider, from the engine's tier table. Stable, so the
+ * editors' recommendation effect runs only when a pet's role or provider changes.
  */
-const NO_ROLES: readonly Role[] = [];
-const recommendNothing: Recommend = () => Promise.resolve({});
+const recommend: Recommend = (roleId, providerId) =>
+  window.tagalong.recommendModel(roleId, providerId);
 
 /**
  * Each pet's role and brain, the provider keys and base URLs, the four hotkeys, and the
@@ -49,7 +49,16 @@ function Settings() {
   // Pets the user deleted in this window; they go when Save is pressed, not before.
   const [removed, setRemoved] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const roles = NO_ROLES;
+  // Empty until the engine answers: the editors say the roles are loading, and a save keeps
+  // each pet's role as it is.
+  const [roles, setRoles] = useState<readonly Role[]>([]);
+
+  useEffect(() => {
+    window.tagalong
+      .listRoles()
+      .then(setRoles)
+      .catch(() => setRoles([]));
+  }, []);
 
   useEffect(() => {
     window.tagalongHost
@@ -230,7 +239,7 @@ function Settings() {
           hiddenPets={settings.hiddenPets}
           selectedId={shownId}
           removedCount={removed.length}
-          recommend={recommendNothing}
+          recommend={recommend}
           watchModelDefaults={view.watchModelDefaults}
           onDelete={(petId) => setRemoved((current) => [...current, petId])}
         />

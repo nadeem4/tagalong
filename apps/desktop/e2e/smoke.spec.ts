@@ -464,7 +464,31 @@ test('Settings opens on the crew, with the selected pet editor and its sections'
     'aria-pressed',
     'true',
   );
-  await expect(settings.getByTestId(`pet-editor-${first.id}`)).toBeVisible();
+  const editor = settings.getByTestId(`pet-editor-${first.id}`);
+  await expect(editor).toBeVisible();
+
+  // The role picker offers the engine's whole library, by name, with the pet's own role
+  // chosen, and the crew nav and the directory card name that role, never its id.
+  const roles = await panel.evaluate(() => window.tagalong.listRoles());
+  expect(roles.map((role) => role.id).sort()).toEqual([
+    'backend-engineer',
+    'frontend-engineer',
+    'generalist',
+    'researcher',
+    'writer',
+  ]);
+  await expect(editor.getByRole('radio')).toHaveCount(5);
+  for (const role of roles) {
+    await expect(editor.getByRole('radio', { name: role.name })).toHaveCount(1);
+  }
+  const own = roles.find((role) => role.id === first.roleId);
+  if (own === undefined) throw new Error(`${first.name}'s role is not in the library`);
+  await expect(editor.getByRole('radio', { name: own.name })).toBeChecked();
+  await expect(nav.getByRole('button', { name: new RegExp(first.name) })).toContainText(own.name);
+  await expect(
+    editor.getByRole('region', { name: `How teammates see ${first.name}` }),
+  ).toContainText(own.summary);
+  await expect(editor.getByRole('switch')).toHaveCount(own.tools.length);
   for (const section of ['Pets', 'Keys and services', 'Hotkeys', 'Awareness']) {
     await expect(settings.getByRole('region', { name: section })).toBeVisible();
   }
