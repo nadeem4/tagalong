@@ -15,6 +15,9 @@ export const officeTokens = {
     avatarTile: '#222845',
     field: '#1A1F3A',
     fieldLine: '#2E3558',
+    /** A disabled control's label and border: dimmer than muted text, still 3:1 on the page. */
+    disabledInk: '#6B7290',
+    disabledLine: '#2A3050',
     gold: '#F2C14E',
     goldInk: '#12162B',
     // The office floor.

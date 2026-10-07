@@ -105,7 +105,9 @@ describe('OfficeView', () => {
     await renderOffice();
     const field = screen.getByLabelText('Assign a task');
     expect(field).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Assign' })).toBeDisabled();
+    const assign = screen.getByRole('button', { name: 'Assign' });
+    expect(assign).toBeDisabled();
+    expect(assign).toHaveAttribute('title', 'Task assignment arrives in a later update');
     expect(field.closest('[title]')).toHaveAttribute(
       'title',
       'Task assignment arrives in a later update',

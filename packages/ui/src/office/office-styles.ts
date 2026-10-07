@@ -41,6 +41,6 @@ export const OFFICE_CSS = `
 }
 .office-field:disabled, .office-btn:disabled { cursor: not-allowed; }
 .office-btn:disabled {
-  background: transparent; border-color: ${t.color.fieldLine}; color: ${t.color.textMuted};
+  background: transparent; border-color: ${t.color.disabledLine}; color: ${t.color.disabledInk};
 }
 `;
