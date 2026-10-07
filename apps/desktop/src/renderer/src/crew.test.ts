@@ -13,10 +13,11 @@ const pet = (id: string): Pet => ({
   id,
   name: id,
   avatar: '*',
-  persona: '',
   model: 'm',
   providerId: 'fake',
-  toolAllowlist: [],
+  roleId: 'generalist',
+  roleVersion: 1,
+  toolGrants: {},
   replyStyle: 'text',
 });
 const crew = [pet('bolt'), pet('ink'), pet('scout')];

@@ -12,12 +12,18 @@ import type { BrainProvider, BrainRequest } from '../providers';
 import { ConversationRunner, type TurnEvent } from '../conversation/runner';
 import { MAX_ROUNDS, startRoundtable } from './roundtable';
 
-const base = { avatar: '*', toolAllowlist: [], replyStyle: 'text' as const };
+const base = {
+  avatar: '*',
+  roleId: 'generalist',
+  roleVersion: 1,
+  toolGrants: {},
+  replyStyle: 'text' as const,
+};
 const scout: Pet = {
   ...base,
   id: 'scout',
   name: 'Scout',
-  persona: 'You are Scout.',
+  notes: 'You are Scout.',
   providerId: 'nebius',
   model: 'nvidia/nemotron-3-super-120b-a12b',
 };
@@ -25,7 +31,7 @@ const ink: Pet = {
   ...base,
   id: 'ink',
   name: 'Ink',
-  persona: 'You are Ink.',
+  notes: 'You are Ink.',
   providerId: 'openrouter',
   model: 'anthropic/claude-sonnet-5',
 };
@@ -33,7 +39,7 @@ const bolt: Pet = {
   ...base,
   id: 'bolt',
   name: 'Bolt',
-  persona: 'You are Bolt.',
+  notes: 'You are Bolt.',
   providerId: 'nebius',
   model: 'nvidia/Nemotron-Nano-V2-12b',
 };

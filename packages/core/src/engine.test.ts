@@ -483,11 +483,13 @@ describe('pets and settings over rpc', () => {
       id: 'pip',
       name: 'Pip',
       avatar: '🐣',
-      persona: 'You are Pip.',
+      notes: 'You are Pip.',
       model: 'fake-model',
       providerId: 'fake',
       color: '#22c55e',
-      toolAllowlist: [],
+      roleId: 'generalist',
+      roleVersion: 1,
+      toolGrants: {},
       replyStyle: 'text',
     };
 

@@ -10,7 +10,7 @@ import {
   parseRoleFile,
   renderLibrary,
 } from '../../scripts/gen-roles.mjs';
-import { getRole, listRoles } from './index';
+import { getRole, listRoles, roleFor } from './index';
 import { ROLE_LIBRARY } from './library.generated';
 
 /** Every built-in tool a role may name. Update when a built-in tool is added or renamed. */
@@ -141,5 +141,12 @@ describe('getRole', () => {
 
   it('answers undefined for an unknown id', () => {
     expect(getRole('astronaut')).toBeUndefined();
+  });
+});
+
+describe('roleFor', () => {
+  it("returns the pet's role, or the generalist for an id the library does not have", () => {
+    expect(roleFor('writer').id).toBe('writer');
+    expect(roleFor('astronaut').id).toBe('generalist');
   });
 });

@@ -7,8 +7,9 @@ import { WatchManager } from '../watch/watch-manager';
 import { FAKE_TURN_PET, fakeTurn } from './fake-turn';
 import { ToolRegistry, toolsFor, type ToolRegistryOptions } from './registry';
 import type { Tool } from './tool';
+import { getRole } from '../roles';
 
-const ink: Pet = { ...FAKE_TURN_PET, id: 'ink', name: 'Ink', persona: 'You polish prose.' };
+const ink: Pet = { ...FAKE_TURN_PET, id: 'ink', name: 'Ink', notes: 'You polish prose.' };
 
 /** Only `addOnce` is reached by the tools; the rest of the store is not under test here. */
 function fakeMemory(): MemoryStore & { saved: NewMemory[] } {
@@ -134,9 +135,52 @@ describe('ToolRegistry.forTurn', () => {
 });
 
 describe('toolsFor', () => {
-  it('hands a pet every tool, for now', () => {
+  const ids = (pet: Pet): string[] =>
+    new ToolRegistry(everything()).forTurn(fakeTurn({ pet })).tools.map((tool) => tool.id);
+
+  it('hands a generalist every tool, since its role lists all twelve', () => {
     const tools = new ToolRegistry(everything()).forTurn(fakeTurn()).tools;
     expect(toolsFor(FAKE_TURN_PET, tools)).toEqual(tools);
+  });
+
+  it('gives a pet exactly the tools its role lists, in the registry order', () => {
+    const writer = getRole('writer')!;
+    expect(ids({ ...FAKE_TURN_PET, roleId: 'writer' })).toEqual(
+      ALL_TWELVE.filter((id) => writer.tools.includes(id)),
+    );
+  });
+
+  it('never offers or runs a tool outside the role', async () => {
+    const memory = fakeMemory();
+    const turn = new ToolRegistry(everything({ memory })).forTurn(
+      fakeTurn({ pet: { ...FAKE_TURN_PET, roleId: 'writer' } }),
+    );
+    const offered = turn.definitions.map((definition) => definition.name);
+    for (const name of offered) expect(getRole('writer')!.tools).toContain(name);
+    expect(offered).not.toContain('watch_for');
+
+    const outcome = await turn.run({ name: 'watch_for', input: { condition: 'a build ends' } });
+    expect(outcome.isError).toBe(true);
+  });
+
+  it("takes away a role's tool the pet's grants turn off", () => {
+    const granted = ids({
+      ...FAKE_TURN_PET,
+      roleId: 'backend-engineer',
+      toolGrants: { watch_for: 'off', remember: 'allowed' },
+    });
+    expect(granted).not.toContain('watch_for');
+    expect(granted).toContain('remember');
+  });
+
+  it('cannot grant a tool the role does not list', () => {
+    expect(
+      ids({ ...FAKE_TURN_PET, roleId: 'writer', toolGrants: { watch_for: 'allowed' } }),
+    ).not.toContain('watch_for');
+  });
+
+  it("gives a pet with a role the library does not have the generalist's tools", () => {
+    expect(ids({ ...FAKE_TURN_PET, roleId: 'astronaut' })).toEqual(ALL_TWELVE);
   });
 
   it('is the one place a turn is narrowed: what it drops is neither offered nor run', async () => {

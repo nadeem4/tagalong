@@ -10,10 +10,11 @@ const pet = (id: string, name: string, avatar: string, color: string, model: str
   name,
   avatar,
   color,
-  persona: '',
   model,
   providerId: id === 'ink' ? 'openrouter' : 'nebius',
-  toolAllowlist: [],
+  roleId: 'generalist',
+  roleVersion: 1,
+  toolGrants: {},
   replyStyle: 'text',
 });
 

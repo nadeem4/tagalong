@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Database } from 'better-sqlite3';
 import { openDatabase } from '../memory/db';
 import { NEMOTRON_TEXT_MODEL, NEMOTRON_VISION_MODEL } from '../providers';
+import { getRole } from '../roles';
 import { BOLT, DEFAULT_CREW, INK, PetRegistry, SCOUT } from './registry';
 
 let dir: string;
@@ -44,7 +45,7 @@ describe('PetRegistry seeding', () => {
     db.prepare('DELETE FROM pet_seeds').run();
     db.prepare('INSERT INTO pets (id, json, updated_at) VALUES (?, ?, ?)').run(
       'scout',
-      JSON.stringify({ ...SCOUT, persona: 'Kept.' }),
+      JSON.stringify({ ...SCOUT, notes: 'Kept.' }),
       new Date().toISOString(),
     );
     db.prepare('INSERT INTO pet_seeds (id, seeded_at) VALUES (?, ?)').run(
@@ -56,7 +57,7 @@ describe('PetRegistry seeding', () => {
     registry.seedDefaults();
 
     expect(registry.list().map((pet) => pet.id)).toEqual(['bolt', 'ink', 'scout']);
-    expect(registry.get('scout')?.persona).toBe('Kept.');
+    expect(registry.get('scout')?.notes).toBe('Kept.');
   });
 
   it('does not bring back a default pet the user deleted', () => {
@@ -67,6 +68,19 @@ describe('PetRegistry seeding', () => {
     registry.seedDefaults();
 
     expect(registry.get('ink')).toBeNull();
+  });
+
+  it('gives Scout, Ink and Bolt a role at its current version and no notes', () => {
+    expect(DEFAULT_CREW.map((pet) => [pet.id, pet.roleId])).toEqual([
+      ['scout', 'generalist'],
+      ['ink', 'writer'],
+      ['bolt', 'backend-engineer'],
+    ]);
+    for (const pet of DEFAULT_CREW) {
+      expect(pet.roleVersion).toBe(getRole(pet.roleId)?.version);
+      expect(pet.notes).toBeUndefined();
+      expect(pet.toolGrants).toEqual({});
+    }
   });
 
   it('starts Scout on Nemotron through Token Factory, with Nano VL for pictures', () => {
@@ -86,11 +100,11 @@ describe('PetRegistry seeding', () => {
   it('does not overwrite a pet the user edited', () => {
     const registry = new PetRegistry(db);
     registry.seedDefaults();
-    registry.upsert({ ...SCOUT, persona: 'Answer only in haiku.' });
+    registry.upsert({ ...SCOUT, notes: 'Answer only in haiku.' });
 
     registry.seedDefaults();
 
-    expect(registry.get('scout')?.persona).toBe('Answer only in haiku.');
+    expect(registry.get('scout')?.notes).toBe('Answer only in haiku.');
   });
 });
 
@@ -101,10 +115,12 @@ describe('PetRegistry CRUD', () => {
       id: 'bolt',
       name: 'Bolt',
       avatar: '⚡',
-      persona: 'You read code.',
+      notes: 'You read code.',
       model: 'claude-opus-5',
       providerId: 'anthropic',
-      toolAllowlist: [],
+      roleId: 'generalist',
+      roleVersion: 1,
+      toolGrants: {},
       replyStyle: 'text' as const,
     };
 
@@ -140,10 +156,11 @@ describe('PetRegistry CRUD', () => {
     const registry = new PetRegistry(db);
     const base = {
       avatar: '*',
-      persona: '',
       model: 'claude-opus-5',
       providerId: 'anthropic',
-      toolAllowlist: [],
+      roleId: 'generalist',
+      roleVersion: 1,
+      toolGrants: {},
       replyStyle: 'text' as const,
     };
     registry.upsert({ ...base, id: 'zed', name: 'Zed' });

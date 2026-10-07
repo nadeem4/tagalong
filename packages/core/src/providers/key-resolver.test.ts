@@ -11,10 +11,12 @@ const pet = (providerId: string): Pet => ({
   id: 'scout',
   name: 'Scout',
   avatar: '🔎',
-  persona: 'p',
+  notes: 'p',
   model: 'm',
   providerId,
-  toolAllowlist: [],
+  roleId: 'generalist',
+  roleVersion: 1,
+  toolGrants: {},
   replyStyle: 'text',
 });
 

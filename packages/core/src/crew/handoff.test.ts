@@ -15,14 +15,15 @@ import { buildHandoff, startHandoff } from './handoff';
 
 const base = {
   avatar: '*',
-  persona: '',
   model: 'fake-model',
   providerId: 'fake',
-  toolAllowlist: [],
+  roleId: 'generalist',
+  roleVersion: 1,
+  toolGrants: {},
   replyStyle: 'text' as const,
 };
-const scout: Pet = { ...base, id: 'scout', name: 'Scout', persona: 'You are Scout.' };
-const ink: Pet = { ...base, id: 'ink', name: 'Ink', persona: 'You are Ink.', model: 'ink-model' };
+const scout: Pet = { ...base, id: 'scout', name: 'Scout', notes: 'You are Scout.' };
+const ink: Pet = { ...base, id: 'ink', name: 'Ink', notes: 'You are Ink.', model: 'ink-model' };
 
 const pageSnapshot: ContextSnapshot = {
   id: randomUUID(),

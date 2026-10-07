@@ -51,8 +51,8 @@ which is what makes the isolation rules in [context-isolation.md](context-isolat
 
 A turn contains, in order:
 
-1. The pet's role instructions and notes (see [roles-and-tools.md](roles-and-tools.md)).
-2. The teammate directory: the pets this pet can reach.
+1. The pet's role instructions, its name, and its notes (see [roles-and-tools.md](roles-and-tools.md)).
+2. The teammate directory: the pets this pet can reach, in the `ask_pet` tool's description.
 3. Recalled memories, within a budget (below).
 4. The thread: the last `historyMessages` messages of this conversation or meeting.
 5. The context the user attached: selection, window, screenshot, page text.

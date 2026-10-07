@@ -11,10 +11,11 @@ const pet = (id: string, name: string, color?: string): Pet => ({
   name,
   avatar: '🐾',
   ...(color !== undefined ? { color } : {}),
-  persona: '',
+  roleId: 'generalist',
+  roleVersion: 1,
   model: 'fake',
   providerId: 'fake',
-  toolAllowlist: [],
+  toolGrants: {},
   replyStyle: 'text',
 });
 

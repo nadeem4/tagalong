@@ -7,10 +7,12 @@ const sage: Pet = {
   id: 'sage',
   name: 'Sage',
   avatar: '🦊',
-  persona: 'a calm explainer',
+  notes: 'a calm explainer',
   model: 'claude-opus-5',
   providerId: 'anthropic',
-  toolAllowlist: [],
+  roleId: 'generalist',
+  roleVersion: 1,
+  toolGrants: {},
   replyStyle: 'text',
 };
 

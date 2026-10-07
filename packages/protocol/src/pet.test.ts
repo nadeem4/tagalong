@@ -5,7 +5,8 @@ const valid = {
   id: 'scout',
   name: 'Scout',
   avatar: '🔎',
-  persona: 'You explain things plainly.',
+  roleId: 'generalist',
+  roleVersion: 1,
   model: 'claude-sonnet-5',
   providerId: 'anthropic',
 };
@@ -13,18 +14,39 @@ const valid = {
 describe('Pet', () => {
   it('parses a minimal pet and fills defaults', () => {
     const parsed = Pet.parse(valid);
-    expect(parsed.toolAllowlist).toEqual([]);
+    expect(parsed.toolGrants).toEqual({});
     expect(parsed.replyStyle).toBe('text');
+    expect(parsed.notes).toBeUndefined();
   });
 
-  it('keeps an explicit reply style and allowlist', () => {
+  it('keeps an explicit reply style, grants and notes', () => {
     const parsed = Pet.parse({
       ...valid,
       replyStyle: 'voice-summary',
-      toolAllowlist: ['notion__search'],
+      toolGrants: { watch_for: 'off', remember: 'allowed' },
+      notes: 'Answer in haiku.',
     });
     expect(parsed.replyStyle).toBe('voice-summary');
-    expect(parsed.toolAllowlist).toEqual(['notion__search']);
+    expect(parsed.toolGrants).toEqual({ watch_for: 'off', remember: 'allowed' });
+    expect(parsed.notes).toBe('Answer in haiku.');
+  });
+
+  it('rejects a grant other than off or allowed', () => {
+    expect(Pet.safeParse({ ...valid, toolGrants: { watch_for: 'ask' } }).success).toBe(false);
+  });
+
+  it('carries a role and its version', () => {
+    const parsed = Pet.parse(valid);
+    expect(parsed.roleId).toBe('generalist');
+    expect(parsed.roleVersion).toBe(1);
+    const { roleId: _roleId, ...withoutRole } = valid;
+    expect(Pet.safeParse(withoutRole).success).toBe(false);
+  });
+
+  it('still parses stored JSON carrying the legacy persona and allowlist keys', () => {
+    const parsed = Pet.parse({ ...valid, persona: 'You are Scout.', toolAllowlist: [] });
+    expect(parsed).not.toHaveProperty('persona');
+    expect(parsed).not.toHaveProperty('toolAllowlist');
   });
 
   it('rejects an unknown reply style', () => {
@@ -66,7 +88,8 @@ describe('Pet.watchModel', () => {
     id: 'scout',
     name: 'Scout',
     avatar: 'S',
-    persona: '',
+    roleId: 'generalist',
+    roleVersion: 1,
     model: 'nvidia/nemotron-3-super-120b-a12b',
     providerId: 'nebius',
   };

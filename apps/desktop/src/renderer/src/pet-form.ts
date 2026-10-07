@@ -13,7 +13,8 @@ export interface PetFormValues {
   visionModel: string;
   name?: string;
   avatar?: string;
-  persona?: string;
+  /** The user's private notes for the pet. Empty means none. */
+  notes?: string;
   /** `#rrggbb`, any case. */
   color?: string;
   /** Phase 3. Empty means none. */
@@ -51,12 +52,14 @@ export function buildPet(pet: Pet, values: PetFormValues): Pet {
     throw new Error(`${pet.name} has a reply style this version does not know.`);
   }
   const voiceId = values.voiceId?.trim();
+  const notes = values.notes?.trim();
   const watchModel = values.watchModel?.trim();
 
   const {
     visionModel: _previous,
     voiceId: _previousVoice,
     watchModel: _previousWatch,
+    notes: _previousNotes,
     ...rest
   } = pet;
   return Pet.parse({
@@ -66,7 +69,6 @@ export function buildPet(pet: Pet, values: PetFormValues): Pet {
     ...(visionModel.length > 0 ? { visionModel } : {}),
     ...(name !== undefined ? { name } : {}),
     ...(avatar !== undefined ? { avatar } : {}),
-    ...(values.persona !== undefined ? { persona: values.persona.trim() } : {}),
     ...(color !== undefined ? { color } : {}),
     ...(replyStyle !== undefined ? { replyStyle } : {}),
     // An untouched voice survives a brain-only save; a cleared one is removed.
@@ -76,6 +78,14 @@ export function buildPet(pet: Pet, values: PetFormValues): Pet {
         : { voiceId: pet.voiceId }
       : voiceId.length > 0
         ? { voiceId }
+        : {}),
+    // The same rule for the notes: untouched survive, cleared are removed.
+    ...(notes === undefined
+      ? pet.notes === undefined
+        ? {}
+        : { notes: pet.notes }
+      : notes.length > 0
+        ? { notes }
         : {}),
     // The same rule for the watch check model: blank goes back to the provider default.
     ...(watchModel === undefined
@@ -112,7 +122,9 @@ export function newPet(taken: readonly string[]): Pet {
     name: 'New pet',
     avatar: '🐾',
     color: '#64748b',
-    persona: '',
+    // Every new pet starts as a generalist until a role picker exists.
+    roleId: 'generalist',
+    roleVersion: 1,
     model: 'fake-model',
     providerId: 'fake',
   });

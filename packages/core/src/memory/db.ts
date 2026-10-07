@@ -1,16 +1,20 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
+import { upgradePetsToRoles } from '../pets/roles-upgrade';
 
 /** The SQLite file a host finds in its data dir. */
 export const DB_FILENAME = 'tagalong.db';
+
+/** SQL, or a function for a change SQL cannot express, such as rewriting pet JSON. */
+type Migration = string | ((db: Database.Database) => void);
 
 /**
  * Numbered migrations, applied in order and never edited once shipped: an installed
  * database has already run them, so a change here would only ever reach fresh installs.
  * Add a new entry instead.
  */
-const MIGRATIONS: readonly string[] = [
+const MIGRATIONS: readonly Migration[] = [
   `CREATE TABLE pets (id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at TEXT NOT NULL);
    CREATE TABLE conversations (id TEXT PRIMARY KEY, pet_id TEXT NOT NULL, title TEXT, created_at TEXT NOT NULL);
    CREATE TABLE messages (id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, role TEXT NOT NULL, content_json TEXT NOT NULL, snapshot_json TEXT, created_at TEXT NOT NULL);
@@ -49,6 +53,8 @@ const MIGRATIONS: readonly string[] = [
   // Phase 4. Set when a background summary has folded a message into a summary memory, so
   // the history replayed to the model stays short while the full thread stays on disk.
   `ALTER TABLE messages ADD COLUMN summarized_at TEXT;`,
+  // Phase 8. Every stored pet gets a role; an edited persona becomes the pet's notes.
+  upgradePetsToRoles,
 ];
 
 /** Version a fully migrated database reports. */
@@ -69,11 +75,12 @@ export function migrate(db: Database.Database): number {
 
   const record = db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (?, ?)');
   for (let version = current + 1; version <= MIGRATIONS.length; version += 1) {
-    const sql = MIGRATIONS[version - 1];
-    if (sql === undefined) continue;
+    const migration = MIGRATIONS[version - 1];
+    if (migration === undefined) continue;
     // One transaction per migration so a failure leaves the previous version intact.
     db.transaction(() => {
-      db.exec(sql);
+      if (typeof migration === 'string') db.exec(migration);
+      else migration(db);
       record.run(version, new Date().toISOString());
     })();
   }

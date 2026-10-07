@@ -1,9 +1,10 @@
 # Roles, directory and tools
 
 **Status: partly built** for Phase 8 (Roles). The role files, the generated role library, the tier
-table and its lookup helpers, and [the tools module](#the-tools-module) are **built**. Giving a pet a
-role, the directory and tool grants are still **design**. The design page with the full task list
-lives in the Notion plan.
+table and its lookup helpers, [the tools module](#the-tools-module), giving a pet a role, the
+directory, and filtering a turn's tools by role and grants are **built**. Editing grants and picking
+a role in Settings are still **design**. The design page with the full task list lives in the Notion
+plan.
 
 ## Roles
 
@@ -54,25 +55,43 @@ camelCase (`good_at` becomes `goodAt`, `model.needs_vision` becomes `model.needs
 body becomes `instructions`.
 
 `packages/core/src/roles/` reads the library: `listRoles()`, `getRole(id)` (undefined for an
-unknown id) and `recommendedModel(role, providerId)`. No pet uses a role yet; that wiring is
-still design.
+unknown id), `roleFor(id)` (the generalist for an unknown id) and
+`recommendedModel(role, providerId)`. `listRoles`, `getRole` and `recommendedModel` are exported from
+`@tagalong/core` for hosts.
+
+### What the role decides
+
+**Built.** A pet's role sets two things on every turn:
+
+- **Its instructions.** The system prompt is the base rules, then the role's `instructions`, then
+  `Your name is <name>.`, then the pet's `notes` under the heading "The user's notes for you" when
+  there are any, then the reply-style rule and the recalled memories as before.
+- **Its tools.** `toolsFor` gives the pet exactly the tools its role lists, minus any its
+  `toolGrants` set to `off`. A grant cannot add a tool the role does not list.
+
+A pet whose `roleId` is not in the library works as a generalist, for both.
 
 ## The directory: how pets know who can do what
 
-Like colleagues reading a team directory, each pet sees a card for every teammate it can reach:
+**Built**, except the last three card fields, which are still design.
 
-| Card field       | Comes from                                       |
-| ---------------- | ------------------------------------------------ |
-| Name             | The pet                                          |
-| Role and summary | The role file                                    |
-| Good at, not for | The role file                                    |
-| Can reach        | The pet's granted tools                          |
-| Sees pictures    | The pet's model                                  |
-| Brain            | The pet's model: fast, balanced, deep, or custom |
+Like colleagues reading a team directory, each pet sees a card for every teammate it can reach. The
+cards are one line each in the `ask_pet` tool's description, after the pet's id (what `petId`
+takes):
 
-A pet's persona and memories are never on its card.
+| Card field       | Comes from                                       | Status |
+| ---------------- | ------------------------------------------------ | ------ |
+| Name             | The pet                                          | Built  |
+| Role and summary | The role file                                    | Built  |
+| Good at, not for | The role file                                    | Built  |
+| Can reach        | The pet's granted tools                          | Design |
+| Sees pictures    | The pet's model                                  | Design |
+| Brain            | The pet's model: fast, balanced, deep, or custom | Design |
 
-To decide who to ask, a pet is told to apply, in order:
+A pet's notes and memories are never on its card.
+
+To decide who to ask, a pet is told, in one short paragraph of the same description, to apply in
+order:
 
 1. **Access first.** Only a pet with the tool the job needs can do it.
 2. **Best role match** among those.
@@ -105,22 +124,39 @@ providers. The role only recommends.
 
 ## What a pet stores
 
-The pet is stored as JSON in the `pets` table of `tagalong.db`:
+**Built.** The pet is stored as JSON in the `pets` table of `tagalong.db`, validated by the `Pet`
+schema in `packages/protocol/src/pet.ts`:
 
-| Field                                              | Change in Phase 8                                                        |
-| -------------------------------------------------- | ------------------------------------------------------------------------ |
-| `roleId`, `roleVersion`                            | New                                                                      |
-| `toolGrants`                                       | New: tool id → `off` or `allowed`; defaults to the role's tools, allowed |
-| `toolAllowlist`                                    | Removed: never read                                                      |
-| `persona`                                          | Becomes optional `notes`; a persona the user edited is kept as notes     |
-| `name`, `avatar`, `color`                          | Unchanged                                                                |
-| `providerId`, `model`, `visionModel`, `watchModel` | Unchanged                                                                |
+| Field                                              | Change in Phase 8                                                                    |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `roleId`, `roleVersion`                            | New                                                                                  |
+| `toolGrants`                                       | New: tool id → `off` or `allowed`; the default `{}` allows every tool the role lists |
+| `toolAllowlist`                                    | Removed: never read                                                                  |
+| `persona`                                          | Becomes optional `notes`; a persona the user edited is kept as notes                 |
+| `name`, `avatar`, `color`                          | Unchanged                                                                            |
+| `providerId`, `model`, `visionModel`, `watchModel` | Unchanged                                                                            |
+
+The default crew ships with roles: Scout is a Generalist, Ink a Writer and Bolt a Backend engineer,
+none with notes. Settings edits the notes as "Notes (optional, private)"; a new pet starts as a
+Generalist.
+
+Database migration 5 (`packages/core/src/pets/roles-upgrade.ts`) upgrades pets stored before roles.
+For every pet without a `roleId` it:
+
+- gives Scout, Ink and Bolt (by id) their roles above, and any other pet the Generalist role;
+- sets `roleVersion` from the role library and `toolGrants` to `{}`;
+- drops `toolAllowlist`;
+- moves `persona` to `notes`, unless it is blank or is that default pet's shipped persona unchanged.
+  A pet the user created always keeps a non-blank persona as notes.
+
+A stored pet that still carries a `persona` or `toolAllowlist` key parses: the schema drops keys it
+does not know.
 
 Logins and API keys stay encrypted in `secrets.json`, never in the pet.
 
 ## The tools module
 
-**Status: built.** Roles and grants on top of it are still design.
+**Status: built**, with roles and grants filtering each turn's tools.
 
 All 12 built-in tools live in one module, in one shape, and reach a turn one way:
 
@@ -146,8 +182,8 @@ packages/core/src/tools/
 - **Which tools a turn gets.** The registry builds what the engine is wired for, in a fixed order,
   and returns none when the pet's provider cannot call tools. `ask_pet` is left off roundtable
   turns and off a crew of one. An unknown name is refused by name.
-- **`toolsFor(pet, tools)`** is the single place a turn's tools are narrowed. Today it returns every
-  tool; Phase 8 plugs the role's tools and the pet's grants in here.
+- **`toolsFor(pet, tools)`** is the single place a turn's tools are narrowed: the tools the pet's
+  role lists, minus any its grants turn off (see [What the role decides](#what-the-role-decides)).
 
 The runner asks the registry for a turn's tools and dispatches through it. An ESLint rule keeps
 `conversation/` and `engine.ts` importing tools only from `tools/registry` or the `tools` index,

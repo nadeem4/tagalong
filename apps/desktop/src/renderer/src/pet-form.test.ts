@@ -6,11 +6,13 @@ const scout: Pet = {
   id: 'scout',
   name: 'Scout',
   avatar: '🔎',
-  persona: 'You explain.',
+  notes: 'You explain.',
   model: 'nvidia/nemotron-3-super-120b-a12b',
   visionModel: 'nvidia/Nemotron-Nano-V2-12b',
   providerId: 'nebius',
-  toolAllowlist: [],
+  roleId: 'generalist',
+  roleVersion: 1,
+  toolGrants: {},
   replyStyle: 'text',
 };
 
@@ -28,7 +30,8 @@ describe('buildPet', () => {
 
   it('keeps everything the form does not show', () => {
     const pet = buildPet(scout, { providerId: 'nebius', model: scout.model, visionModel: 'vl' });
-    expect(pet.persona).toBe('You explain.');
+    expect(pet.notes).toBe('You explain.');
+    expect(pet.roleId).toBe('generalist');
     expect(pet.avatar).toBe('🔎');
     expect(pet.visionModel).toBe('vl');
   });
@@ -53,7 +56,7 @@ describe('buildPet, the whole editor', () => {
     visionModel: '',
     name: ' Inky ',
     avatar: '🖋️',
-    persona: '  You write. ',
+    notes: '  You write. ',
     color: '#A855F7',
     voiceId: '',
     replyStyle: 'voice-summary',
@@ -65,11 +68,15 @@ describe('buildPet, the whole editor', () => {
       id: 'scout',
       name: 'Inky',
       avatar: '🖋️',
-      persona: 'You write.',
+      notes: 'You write.',
       color: '#a855f7',
       replyStyle: 'voice-summary',
     });
     expect(pet).not.toHaveProperty('voiceId');
+  });
+
+  it('removes the notes when they are cleared', () => {
+    expect(buildPet(scout, { ...full, notes: '  ' })).not.toHaveProperty('notes');
   });
 
   it('keeps a voice id for Phase 3 when one is typed', () => {
@@ -90,6 +97,8 @@ describe('newPet', () => {
     expect(pet.id).toBe('pet-3');
     expect(pet.providerId).toBe('fake');
     expect(pet.name).toBe('New pet');
+    expect(pet.roleId).toBe('generalist');
+    expect(pet).not.toHaveProperty('notes');
   });
 });
 
@@ -106,9 +115,10 @@ describe('buildPet watch model', () => {
     id: 'scout',
     name: 'Scout',
     avatar: '🔎',
-    persona: '',
     model: 'nvidia/nemotron-3-super-120b-a12b',
     providerId: 'nebius',
+    roleId: 'generalist',
+    roleVersion: 1,
     watchModel: 'old-check-model',
   });
   const brain = { providerId: 'nebius', model: stored.model, visionModel: '' };

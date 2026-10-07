@@ -84,10 +84,11 @@ describe('applyCrewChoice', () => {
     expect(pet.watchModel).toBe('nvidia/custom-nano');
   });
 
-  it('keeps who the pet is: name, persona and colour survive a brain change', () => {
+  it('keeps who the pet is: name, role, notes and colour survive a brain change', () => {
     const pet = applyCrewChoice(scout, { providerId: 'anthropic', model: 'claude-sonnet-5' });
     expect(pet.name).toBe(scout.name);
-    expect(pet.persona).toBe(scout.persona);
+    expect(pet.roleId).toBe(scout.roleId);
+    expect(pet.notes).toBe(scout.notes);
     expect(pet.color).toBe(scout.color);
   });
 

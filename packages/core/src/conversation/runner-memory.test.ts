@@ -19,10 +19,12 @@ const scout: Pet = {
   id: 'scout',
   name: 'Scout',
   avatar: '🔎',
-  persona: 'You are Scout.',
+  notes: 'You are Scout.',
   model: 'fake-model',
   providerId: 'fake',
-  toolAllowlist: [],
+  roleId: 'generalist',
+  roleVersion: 1,
+  toolGrants: {},
   replyStyle: 'text',
 };
 

@@ -295,7 +295,7 @@ with the pet and the model that wrote it (`Ink · anthropic/claude-sonnet-5`), a
 
 Crew features multiply model calls, so the panel footer shows **N model calls** for any run that made
 more than one. A roundtable of three pets costs four calls by default. Settings edits every pet — name,
-emoji, colour, persona, provider, model, reply style, voice id (stored for Phase 3) — adds and deletes
+emoji, colour, notes, provider, model, reply style, voice id (stored for Phase 3) — adds and deletes
 pets, and chooses which pets show on the desktop strip.
 
 Pets remember. Tell one "I prefer short answers" and it keeps that across restarts; a pet can also

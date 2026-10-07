@@ -11,19 +11,21 @@ import { BrainError, FakeBrainProvider } from '../../providers';
 import type { BrainProvider, BrainRequest, FakeScript } from '../../providers';
 import { ConversationRunner, type TurnEvent } from '../../conversation/runner';
 import type { ToolOutcome } from '../tool';
+import { getRole } from '../../roles';
 import { ASK_PET } from './crew';
 
 const base = {
   avatar: '*',
-  persona: '',
-  toolAllowlist: [],
+  roleId: 'generalist',
+  roleVersion: 1,
+  toolGrants: {},
   replyStyle: 'text' as const,
 };
 const bolt: Pet = {
   ...base,
   id: 'bolt',
   name: 'Bolt',
-  persona: 'You are Bolt.',
+  notes: 'You are Bolt.',
   model: 'bolt-model',
   providerId: 'nebius',
 };
@@ -31,7 +33,8 @@ const ink: Pet = {
   ...base,
   id: 'ink',
   name: 'Ink',
-  persona: 'You are Ink, the writer.',
+  roleId: 'writer',
+  notes: 'You are Ink, the writer.',
   model: 'ink-model',
   providerId: 'openrouter',
 };
@@ -130,6 +133,33 @@ describe('ask_pet', () => {
     expect(JSON.stringify(inkBrain.requests[0]?.messages)).toContain('Polish this commit message');
     expect(boltBrain.toolResults[0]).toEqual({ content: 'Fix the off-by-one in pagination.' });
     expect(outcome.text).toBe('Here is the polished fix note.');
+  });
+
+  it('describes each teammate by a card from its role, never by its notes', async () => {
+    const boltBrain = brain({ text: 'ok' });
+    const crewOfThree = [bolt, ink, { ...ink, id: 'pip', name: 'Pip', roleId: 'astronaut' }];
+
+    await new ConversationRunner({
+      store: new ConversationStore(db),
+      settings: new SettingsStore(dir),
+      provider: () => boltBrain.provider,
+      emit: () => undefined,
+      consult: { pets: () => crewOfThree },
+    }).run({ pet: { ...bolt, providerId: 'nebius' }, text: 'hi' }).done;
+
+    const description =
+      boltBrain.requests[0]?.tools?.find((tool) => tool.name === ASK_PET)?.description ?? '';
+    const writer = getRole('writer')!;
+    expect(description).toContain(
+      `ink: Ink, ${writer.name}. ${writer.summary} Good at: ${writer.goodAt.join(', ')}. ` +
+        `Not for: ${writer.notFor.join(', ')}.`,
+    );
+    expect(description).toContain(`pip: Pip, ${getRole('generalist')!.name}.`);
+    expect(description).not.toContain('bolt:');
+    expect(description).not.toContain('You are Ink');
+    expect(description).toMatch(/only a pet that can reach the tool/i);
+    expect(description).toMatch(/cheaper brain/i);
+    expect(description).toMatch(/no one fits/i);
   });
 
   it('announces the consult as a pet.message tied to the caller’s turn, and counts the calls', async () => {

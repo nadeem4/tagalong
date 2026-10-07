@@ -32,6 +32,8 @@ export { ANTHROPIC_KEY, Engine, type EngineOptions } from './engine';
 
 export { BOLT, DEFAULT_CREW, INK, INK_MODEL, PetRegistry, SCOUT } from './pets/registry';
 
+export { getRole, listRoles, recommendedModel, type RecommendedModel } from './roles';
+
 export {
   InMemorySecretStore,
   SETTINGS_FILENAME,

@@ -270,7 +270,7 @@ any tab.
 1. **Setup:** at least two pets (the default crew has three); side panel open and connected.
 2. **Action:** click the second avatar in the crew strip at the top of the chat (its tooltip names
    the pet) and ask "Who are you?".
-3. **Expected:** the header names that pet in its colour; the answer comes in its persona and is
+3. **Expected:** the header names that pet in its colour; the answer comes in its role and is
    labelled with its name and model. Earlier messages stay on screen: the crew shares one timeline.
 
 ## Phase 4: Crew
@@ -462,7 +462,7 @@ add next?`.
 
 1. **Setup:** Settings open.
 2. **Action:** for Bolt change **Name** to `Sparky`, **Emoji** to `🔧`, **Colour** to green, and add
-   "Always answer in British English." to **Persona**. Save.
+   "Always answer in British English." to **Notes (optional, private)**. Save.
 3. **Expected:** the desktop strip re-draws with 🔧 and a green underline; the panel header reads
    **🔧 Sparky** in green; a new question to Sparky is answered in British spelling. **Reply style**
    and **Voice id** save without error but change nothing audible (voice is Phase 3).

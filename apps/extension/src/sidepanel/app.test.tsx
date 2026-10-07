@@ -13,10 +13,11 @@ const pet = (id: string, name: string): Pet => ({
   id,
   name,
   avatar: '🐣',
-  persona: '',
   providerId: 'fake',
   model: 'fake-model',
-  toolAllowlist: [],
+  roleId: 'generalist',
+  roleVersion: 1,
+  toolGrants: {},
   replyStyle: 'text',
 });
 

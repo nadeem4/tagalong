@@ -11,10 +11,11 @@ const SCOUT: Pet = {
   id: 'scout',
   name: 'Scout',
   avatar: '🔎',
-  persona: '',
   model: 'claude-sonnet-5',
   providerId: 'anthropic',
-  toolAllowlist: [],
+  roleId: 'generalist',
+  roleVersion: 1,
+  toolGrants: {},
   replyStyle: 'text',
 };
 

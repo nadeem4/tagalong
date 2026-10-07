@@ -16,6 +16,19 @@ export function getRole(id: string): Role | undefined {
   return ROLE_LIBRARY.find((role) => role.id === id);
 }
 
+/** The role every pet falls back to when its own is missing from the library. */
+export const FALLBACK_ROLE_ID = 'generalist';
+
+/**
+ * The role a pet with this role id works as: its own, or the generalist when the library
+ * has no such role (a role removed in a later version, or a hand-edited database).
+ */
+export function roleFor(roleId: string): Role {
+  const role = getRole(roleId) ?? getRole(FALLBACK_ROLE_ID);
+  if (role === undefined) throw new Error(`the role library has no "${FALLBACK_ROLE_ID}"`);
+  return role;
+}
+
 export interface RecommendedModel {
   model: string;
   /** Set only when the role needs pictures and `model` cannot see them. */

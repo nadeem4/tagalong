@@ -1,19 +1,27 @@
 import type { Pet } from '@tagalong/protocol';
 import type { BrainTool } from '../providers';
 import type { MemoryStore } from '../memory/memories';
+import { roleFor } from '../roles';
 import { recallTools, watchForTool, type WatchToolDeps } from './builtin/awareness';
 import { askPetTool, rememberTool, type AskPetDeps } from './builtin/crew';
 import { perceptionTools, type PerceptionToolsOptions } from './builtin/perception';
 import type { Tool, ToolContext, ToolOutcome } from './tool';
 
 /**
- * Narrows the tools a pet gets on a turn. The single place that happens: Phase 8 roles
- * and grants plug in here, and nothing else in the engine decides which tools a pet has.
+ * Narrows the tools a pet gets on a turn. The single place that happens: nothing else in
+ * the engine decides which tools a pet has.
  */
 export type ToolFilter = (pet: Pet, tools: readonly Tool[]) => readonly Tool[];
 
-/** The default filter: every pet gets every tool, as it always has. */
-export const toolsFor: ToolFilter = (_pet, tools) => tools;
+/**
+ * The default filter: exactly the tools the pet's role lists (the generalist's for a role
+ * the library does not have), minus any the pet's grants turn off. A grant cannot add a
+ * tool the role does not list. Registry order is kept.
+ */
+export const toolsFor: ToolFilter = (pet, tools) => {
+  const listed = roleFor(pet.roleId).tools;
+  return tools.filter((tool) => listed.includes(tool.id) && pet.toolGrants[tool.id] !== 'off');
+};
 
 export interface ToolRegistryOptions {
   /** Hosts, exclusions and budgets for the perception and recall tools. Absent: neither. */
@@ -24,7 +32,7 @@ export interface ToolRegistryOptions {
   watch?: WatchToolDeps | undefined;
   /** Gives every pet `ask_pet`, when there is another pet to ask. */
   consult?: AskPetDeps | undefined;
-  /** Defaults to `toolsFor`, which keeps everything. */
+  /** Defaults to `toolsFor`: the tools its role lists, minus any its grants switch off. */
   toolsFor?: ToolFilter | undefined;
 }
 

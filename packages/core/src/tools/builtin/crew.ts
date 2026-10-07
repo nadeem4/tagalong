@@ -5,6 +5,7 @@ import { BrainError } from '../../providers';
 import type { MemoryKind, MemoryStore } from '../../memory/memories';
 import { recall } from '../../memory/recall';
 import { assemblePrompt } from '../../conversation/prompt-assembler';
+import { roleFor } from '../../roles';
 import { defineTool, type Tool, type ToolOutcome } from '../tool';
 
 /**
@@ -79,17 +80,39 @@ export interface AskPetDeps {
   announce?: ((from: Pet, to: Pet, question: string, turnId: string) => void) | undefined;
 }
 
+/**
+ * How a pet picks who to ask, from the directory design. Rules apply in order, so a
+ * better role match never beats a pet that cannot reach the tool the job needs.
+ */
+const CHOOSING_RULES =
+  'To choose: only a pet that can reach the tool the job needs can do it; among those, ask ' +
+  'the best role match; a task needing two roles means asking both; on a tie, ask the one ' +
+  'on the cheaper brain; if no one fits, say so rather than ask the wrong pet.';
+
+/**
+ * A teammate's directory card: name, role, summary, good at, not for. Built from the role
+ * only, so the pet's private notes and memories never reach another pet's prompt. The id
+ * leads because it is what the tool's `petId` takes.
+ */
+function card(pet: Pet): string {
+  const role = roleFor(pet.roleId);
+  return (
+    `${pet.id}: ${pet.name}, ${role.name}. ${role.summary} ` +
+    `Good at: ${role.goodAt.join(', ')}. Not for: ${role.notFor.join(', ')}.`
+  );
+}
+
 function definitionFor(caller: Pet, crew: readonly Pet[]): BrainTool {
-  const others = crew
+  const cards = crew
     .filter((pet) => pet.id !== caller.id)
-    .map((pet) => `${pet.id} (${pet.name}: ${firstSentence(pet.persona)})`)
-    .join('; ');
+    .map((pet) => `- ${card(pet)}`)
+    .join('\n');
   return {
     name: ASK_PET,
     description:
       'Ask another pet of the crew a question mid-answer and get its reply back, for when ' +
-      'it is better at part of the job — polishing prose, reading code. The user sees that ' +
-      `you asked. Ask one focused question; it answers once. Pets you can ask: ${others}.`,
+      'its role fits part of the job better. The user sees that you asked. Ask one focused ' +
+      `question; it answers once. ${CHOOSING_RULES}\nPets you can ask:\n${cards}`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -102,11 +125,6 @@ function definitionFor(caller: Pet, crew: readonly Pet[]): BrainTool {
   };
 }
 
-function firstSentence(persona: string): string {
-  const sentence = persona.split(/(?<=[.!?])\s/, 1)[0] ?? '';
-  return sentence.length > 80 ? `${sentence.slice(0, 79)}…` : sentence;
-}
-
 /** The context a consulted pet gets: the words on screen, never the pixels. */
 function textOnly(snapshot: ContextSnapshot | undefined): ContextSnapshot | undefined {
   if (snapshot === undefined) return undefined;
@@ -116,7 +134,7 @@ function textOnly(snapshot: ContextSnapshot | undefined): ContextSnapshot | unde
 
 /**
  * The `ask_pet` tool for one caller; its description lists the pets that caller can ask.
- * Runs a single nested turn for the consulted pet — its own persona, provider, model and
+ * Runs a single nested turn for the consulted pet — its own role, notes, provider, model and
  * memories — with no tools at all, so a consulted pet cannot consult in turn (depth limit 1)
  * and a nested call it invents is refused. The nested turn has 60 seconds; past that, or on
  * any failure, the caller gets an error result and carries on answering alone. Nothing is

@@ -1,6 +1,14 @@
 import type { Database } from 'better-sqlite3';
 import { Pet } from '@tagalong/protocol';
 import { NEMOTRON_TEXT_MODEL, NEMOTRON_VISION_MODEL } from '../providers/nebius-models';
+import { getRole } from '../roles';
+
+/** The library version of a role a default pet ships with. */
+function roleVersion(roleId: string): number {
+  const role = getRole(roleId);
+  if (role === undefined) throw new Error(`no role "${roleId}" in the role library`);
+  return role.version;
+}
 
 /**
  * The explainer, and the pet a fresh install opens on.
@@ -15,14 +23,12 @@ export const SCOUT: Pet = {
   name: 'Scout',
   avatar: '🔎',
   color: '#0ea5e9',
-  persona:
-    'You are Scout. You explain what the user is looking at, plainly and briefly. ' +
-    'Prefer a direct answer over a preamble. When something on screen is ambiguous, ' +
-    'say what you see and ask one short question rather than guessing.',
+  roleId: 'generalist',
+  roleVersion: roleVersion('generalist'),
   model: NEMOTRON_TEXT_MODEL,
   visionModel: NEMOTRON_VISION_MODEL,
   providerId: 'nebius',
-  toolAllowlist: [],
+  toolGrants: {},
   replyStyle: 'text',
 };
 
@@ -39,13 +45,11 @@ export const INK: Pet = {
   name: 'Ink',
   avatar: '✒️',
   color: '#a855f7',
-  persona:
-    'You are Ink, the writer of the crew. You draft replies and rewrite text so it reads ' +
-    "well while keeping the user's own voice. Ask about tone once if it is unclear, then " +
-    'commit to a draft rather than offering a menu of options.',
+  roleId: 'writer',
+  roleVersion: roleVersion('writer'),
   model: INK_MODEL,
   providerId: 'openrouter',
-  toolAllowlist: [],
+  toolGrants: {},
   replyStyle: 'text',
 };
 
@@ -58,13 +62,11 @@ export const BOLT: Pet = {
   name: 'Bolt',
   avatar: '⚡',
   color: '#f59e0b',
-  persona:
-    'You are Bolt, the coder of the crew. You read errors, stack traces and diffs, and ' +
-    'propose the smallest fix that works. Cite the file and line when they are visible. ' +
-    'Be direct; skip the pleasantries.',
+  roleId: 'backend-engineer',
+  roleVersion: roleVersion('backend-engineer'),
   model: NEMOTRON_VISION_MODEL,
   providerId: 'nebius',
-  toolAllowlist: [],
+  toolGrants: {},
   replyStyle: 'text',
 };
 

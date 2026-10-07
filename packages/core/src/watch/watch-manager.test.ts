@@ -15,10 +15,11 @@ const pet: Pet = {
   id: 'scout',
   name: 'Scout',
   avatar: '🐾',
-  persona: '',
   model: 'claude-opus-5',
   providerId: 'anthropic',
-  toolAllowlist: [],
+  roleId: 'generalist',
+  roleVersion: 1,
+  toolGrants: {},
   replyStyle: 'text',
 };
 
