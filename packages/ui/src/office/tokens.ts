@@ -39,6 +39,8 @@ export const officeTokens = {
     panelTile: '#E6E9F2',
     meterOff: '#E0E3EC',
     scrollbarThumb: '#CDD2DE',
+    /** Behind a modal notice: the page navy, mostly opaque, so the office recedes. */
+    scrim: 'rgba(18, 22, 43, 0.72)',
   },
   /**
    * One label ink per job class, keyed by role id (The One Colour Per Class Rule). Each reads
@@ -78,6 +80,8 @@ export const officeTokens = {
     focusOffset: 2,
     meterHeight: 10,
     emptyTextWidth: 300,
+    /** The roles notice dialog. */
+    noticeWidth: 660,
   },
   letterSpacing: { pixel: 1, title: 0.5 },
   /** Integer multipliers for sprites: a 16px pet drawn at 3 is 48px on screen. */

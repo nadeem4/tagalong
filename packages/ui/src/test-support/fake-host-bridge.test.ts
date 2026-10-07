@@ -76,4 +76,18 @@ describe('createFakeHostBridge', () => {
       model: 'writer@nebius',
     });
   });
+
+  it('answers the roles notice it was seeded with until it is dismissed', async () => {
+    await expect(createFakeHostBridge().rolesNotice()).resolves.toBeNull();
+    const notice = {
+      pets: [{ petId: 'ink', name: 'Ink', roleId: 'writer', keptNotes: false, madeByYou: false }],
+    };
+    const bridge = createFakeHostBridge({ rolesNotice: notice });
+
+    await expect(bridge.rolesNotice()).resolves.toEqual(notice);
+    await bridge.dismissRolesNotice();
+
+    expect(bridge.dismissedNotices).toBe(1);
+    await expect(bridge.rolesNotice()).resolves.toBeNull();
+  });
 });

@@ -7,6 +7,7 @@ import type {
   PerceptionTarget,
   Pet,
   Role,
+  RolesUpgradeNotice,
 } from '@tagalong/protocol';
 
 /**
@@ -63,6 +64,13 @@ export interface HostBridge {
     roleId: string,
     providerId: string,
   ): Promise<{ model?: string; visionModel?: string }>;
+  /**
+   * Phase 8. What the upgrade to roles did to this install, while the one-time notice is
+   * unseen; null once dismissed, and always null on a fresh install.
+   */
+  rolesNotice(): Promise<RolesUpgradeNotice | null>;
+  /** Phase 8. Marks the roles notice seen, so no window shows it again. */
+  dismissRolesNotice(): Promise<void>;
   /**
    * Phase 3B. Ends a watch from its Watching chip. Optional: a host that cannot start
    * watches never shows a chip to stop.

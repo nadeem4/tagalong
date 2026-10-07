@@ -434,6 +434,11 @@
           "oklch(95% 0.017 267.8)"
         ]
       },
+      "scrim": {
+        "role": "neutral",
+        "displayName": "Scrim",
+        "canonical": "rgba(18, 22, 43, 0.72)"
+      },
       "job-generalist": {
         "role": "secondary",
         "displayName": "Generalist Teal",

@@ -1,4 +1,10 @@
-import type { ContextSnapshot, PerceptionTarget, Pet, Role } from '@tagalong/protocol';
+import type {
+  ContextSnapshot,
+  PerceptionTarget,
+  Pet,
+  Role,
+  RolesUpgradeNotice,
+} from '@tagalong/protocol';
 import type { AskInput, HostBridge, TurnEvent } from '../host-bridge';
 
 export interface FakeHostBridge extends HostBridge {
@@ -12,6 +18,8 @@ export interface FakeHostBridge extends HostBridge {
   readonly captures: readonly (readonly PerceptionTarget[])[];
   /** What the next capture() resolves to; null stands in for a blocked window. */
   nextCapture: ContextSnapshot | null;
+  /** How many times the roles notice was dismissed. */
+  dismissedNotices: number;
 }
 
 /**
@@ -25,6 +33,8 @@ export function createFakeHostBridge(
     roles?: Role[];
     /** What recommendModel answers; absent answers `{}`, like a provider with no tiers. */
     recommend?: (roleId: string, providerId: string) => { model?: string; visionModel?: string };
+    /** The unseen roles notice; absent means none, as on a fresh install. */
+    rolesNotice?: RolesUpgradeNotice | null;
   } = {},
 ): FakeHostBridge {
   const handlers = new Set<(event: TurnEvent) => void>();
@@ -33,6 +43,7 @@ export function createFakeHostBridge(
   const stoppedWatches: string[] = [];
   const captures: (readonly PerceptionTarget[])[] = [];
   let turnCount = 0;
+  let notice = options.rolesNotice ?? null;
 
   const fake: FakeHostBridge = {
     asks,
@@ -72,6 +83,15 @@ export function createFakeHostBridge(
     },
     recommendModel(roleId, providerId) {
       return Promise.resolve(options.recommend?.(roleId, providerId) ?? {});
+    },
+    dismissedNotices: 0,
+    rolesNotice() {
+      return Promise.resolve(notice);
+    },
+    dismissRolesNotice() {
+      notice = null;
+      fake.dismissedNotices += 1;
+      return Promise.resolve();
     },
     emit(event) {
       // Copied first so a handler that unsubscribes mid-emit cannot skip its neighbours.
