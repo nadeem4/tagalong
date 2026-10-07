@@ -445,6 +445,35 @@ test('the setup wizard opens on request, insists on a key, and Skip closes it fo
   }
 });
 
+test('Settings opens on the crew, with the selected pet editor and its sections', async () => {
+  const panel = await windowFor('panel');
+  await panel.evaluate(() => window.tagalongHost.openSettings());
+  const settings = await windowFor('settings');
+
+  const nav = settings.getByRole('navigation', { name: 'Settings' });
+  const pets = await panel.evaluate(() => window.tagalong.listPets());
+  expect(pets.length).toBeGreaterThan(0);
+  const [first] = pets;
+  if (first === undefined) throw new Error('no pet to edit');
+  for (const pet of pets.slice(0, 8)) {
+    await expect(nav.getByRole('button', { name: new RegExp(pet.name) })).toBeVisible({
+      timeout: 15_000,
+    });
+  }
+  await expect(nav.getByRole('button', { name: new RegExp(first.name) })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(settings.getByTestId(`pet-editor-${first.id}`)).toBeVisible();
+  for (const section of ['Pets', 'Keys and services', 'Hotkeys', 'Awareness']) {
+    await expect(settings.getByRole('region', { name: section })).toBeVisible();
+  }
+
+  // A screenshot for design review, in the gitignored test-results folder.
+  await settings.screenshot({ path: join(appDir, 'test-results', 'settings.png') });
+  await settings.close();
+});
+
 test('the Crew Office opens with the real crew in its party list', async () => {
   const panel = await windowFor('panel');
   // The tray's Open office item calls the same main-process function as this host call;

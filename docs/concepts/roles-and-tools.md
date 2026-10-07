@@ -2,10 +2,10 @@
 
 **Status: partly built** for Phase 8 (Roles). The role files, the generated role library, the tier
 table and its lookup helpers, [the tools module](#the-tools-module), giving a pet a role, the
-directory, filtering a turn's tools by role and grants, [roles over RPC](#roles-over-rpc) and the
-office's job labels are **built**. Editing grants and picking a role in Settings are still
-**design**. The design page with the full task list lives in the Notion
-plan.
+directory, filtering a turn's tools by role and grants, [roles over RPC](#roles-over-rpc), the
+office's job labels, and picking a role, the recommended model, the tool switches and the directory
+card preview in Settings (see [The Settings window](../architecture.md#the-settings-window)) are
+**built**. The design page with the full task list lives in the Notion plan.
 
 ## Roles
 
