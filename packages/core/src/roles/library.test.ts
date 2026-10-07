@@ -105,7 +105,7 @@ describe('parseRoleFile', () => {
   });
 
   it('reads a file an editor saved with a byte-order mark', () => {
-    const source = '﻿---\nid: tester\n---\nBody.';
+    const source = String.fromCharCode(0xfeff) + ['---', 'id: tester', '---', 'Body.'].join('\n');
     expect(parseRoleFile(source)).toMatchObject({ id: 'tester', instructions: 'Body.' });
   });
 

@@ -26,7 +26,8 @@ const FRONT_MATTER = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/;
 
 /** One role file's header and body as a Role-shaped object, not yet validated. */
 export function parseRoleFile(source) {
-  const match = FRONT_MATTER.exec(source.replace(/^﻿/, '').replace(/\r\n/g, '\n'));
+  const text = source.charCodeAt(0) === 0xfeff ? source.slice(1) : source; // byte-order mark
+  const match = FRONT_MATTER.exec(text.replace(/\r\n/g, '\n'));
   if (!match) throw new Error('A role file starts with a YAML front-matter header.');
   const header = parse(match[1]) ?? {};
   return {
