@@ -29,7 +29,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
 ## Constraints
 
-2D only, no 3D or WebGL. Sprites at integer scale on one canvas, 8–12 fps, paused when the window is hidden; a still-office setting and reduced-motion support.
+2D only, no 3D or WebGL. Sprites are DOM elements drawn with box-shadow at integer scale, animated by stepped CSS animation (no per-frame JavaScript); a Still office toggle and reduced-motion support stop it.
 
 ## Unresolved
 

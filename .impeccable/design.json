@@ -1,0 +1,707 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-07T15:14:13.734Z",
+  "title": "Design System: Tagalong",
+  "extensions": {
+    "colorMeta": {
+      "shell-navy": {
+        "role": "neutral",
+        "displayName": "Ink Navy",
+        "canonical": "#12162B",
+        "tonalRamp": [
+          "oklch(15% 0.042 274.0)",
+          "oklch(26% 0.042 274.0)",
+          "oklch(37% 0.042 274.0)",
+          "oklch(48% 0.042 274.0)",
+          "oklch(60% 0.042 274.0)",
+          "oklch(72% 0.042 274.0)",
+          "oklch(84% 0.042 274.0)",
+          "oklch(95% 0.042 274.0)"
+        ]
+      },
+      "shell-text": {
+        "role": "neutral",
+        "displayName": "Frost Text",
+        "canonical": "#E9ECF5",
+        "tonalRamp": [
+          "oklch(15% 0.013 271.3)",
+          "oklch(26% 0.013 271.3)",
+          "oklch(37% 0.013 271.3)",
+          "oklch(48% 0.013 271.3)",
+          "oklch(60% 0.013 271.3)",
+          "oklch(72% 0.013 271.3)",
+          "oklch(84% 0.013 271.3)",
+          "oklch(95% 0.013 271.3)"
+        ]
+      },
+      "shell-muted": {
+        "role": "neutral",
+        "displayName": "Shell Muted",
+        "canonical": "#A3AAC4",
+        "tonalRamp": [
+          "oklch(15% 0.038 273.5)",
+          "oklch(26% 0.038 273.5)",
+          "oklch(37% 0.038 273.5)",
+          "oklch(48% 0.038 273.5)",
+          "oklch(60% 0.038 273.5)",
+          "oklch(72% 0.038 273.5)",
+          "oklch(84% 0.038 273.5)",
+          "oklch(95% 0.038 273.5)"
+        ]
+      },
+      "shell-line": {
+        "role": "neutral",
+        "displayName": "Shell Line",
+        "canonical": "#262C4A",
+        "tonalRamp": [
+          "oklch(15% 0.055 274.1)",
+          "oklch(26% 0.055 274.1)",
+          "oklch(37% 0.055 274.1)",
+          "oklch(48% 0.055 274.1)",
+          "oklch(60% 0.055 274.1)",
+          "oklch(72% 0.055 274.1)",
+          "oklch(84% 0.055 274.1)",
+          "oklch(95% 0.055 274.1)"
+        ]
+      },
+      "sidebar-navy": {
+        "role": "neutral",
+        "displayName": "Sidebar Navy",
+        "canonical": "#171C33",
+        "tonalRamp": [
+          "oklch(15% 0.045 273.2)",
+          "oklch(26% 0.045 273.2)",
+          "oklch(37% 0.045 273.2)",
+          "oklch(48% 0.045 273.2)",
+          "oklch(60% 0.045 273.2)",
+          "oklch(72% 0.045 273.2)",
+          "oklch(84% 0.045 273.2)",
+          "oklch(95% 0.045 273.2)"
+        ]
+      },
+      "row-active": {
+        "role": "neutral",
+        "displayName": "Active Row Navy",
+        "canonical": "#1E2442",
+        "tonalRamp": [
+          "oklch(15% 0.056 273.5)",
+          "oklch(26% 0.056 273.5)",
+          "oklch(37% 0.056 273.5)",
+          "oklch(48% 0.056 273.5)",
+          "oklch(60% 0.056 273.5)",
+          "oklch(72% 0.056 273.5)",
+          "oklch(84% 0.056 273.5)",
+          "oklch(95% 0.056 273.5)"
+        ]
+      },
+      "avatar-tile": {
+        "role": "neutral",
+        "displayName": "Avatar Tile",
+        "canonical": "#222845",
+        "tonalRamp": [
+          "oklch(15% 0.054 273.7)",
+          "oklch(26% 0.054 273.7)",
+          "oklch(37% 0.054 273.7)",
+          "oklch(48% 0.054 273.7)",
+          "oklch(60% 0.054 273.7)",
+          "oklch(72% 0.054 273.7)",
+          "oklch(84% 0.054 273.7)",
+          "oklch(95% 0.054 273.7)"
+        ]
+      },
+      "field-navy": {
+        "role": "neutral",
+        "displayName": "Field Navy",
+        "canonical": "#1A1F3A",
+        "tonalRamp": [
+          "oklch(15% 0.052 274.1)",
+          "oklch(26% 0.052 274.1)",
+          "oklch(37% 0.052 274.1)",
+          "oklch(48% 0.052 274.1)",
+          "oklch(60% 0.052 274.1)",
+          "oklch(72% 0.052 274.1)",
+          "oklch(84% 0.052 274.1)",
+          "oklch(95% 0.052 274.1)"
+        ]
+      },
+      "field-line": {
+        "role": "neutral",
+        "displayName": "Field Line",
+        "canonical": "#2E3558",
+        "tonalRamp": [
+          "oklch(15% 0.062 274.1)",
+          "oklch(26% 0.062 274.1)",
+          "oklch(37% 0.062 274.1)",
+          "oklch(48% 0.062 274.1)",
+          "oklch(60% 0.062 274.1)",
+          "oklch(72% 0.062 274.1)",
+          "oklch(84% 0.062 274.1)",
+          "oklch(95% 0.062 274.1)"
+        ]
+      },
+      "disabled-ink": {
+        "role": "neutral",
+        "displayName": "Disabled Ink",
+        "canonical": "#6B7290",
+        "tonalRamp": [
+          "oklch(15% 0.047 274.5)",
+          "oklch(26% 0.047 274.5)",
+          "oklch(37% 0.047 274.5)",
+          "oklch(48% 0.047 274.5)",
+          "oklch(60% 0.047 274.5)",
+          "oklch(72% 0.047 274.5)",
+          "oklch(84% 0.047 274.5)",
+          "oklch(95% 0.047 274.5)"
+        ]
+      },
+      "disabled-line": {
+        "role": "neutral",
+        "displayName": "Disabled Line",
+        "canonical": "#2A3050",
+        "tonalRamp": [
+          "oklch(15% 0.058 274.6)",
+          "oklch(26% 0.058 274.6)",
+          "oklch(37% 0.058 274.6)",
+          "oklch(48% 0.058 274.6)",
+          "oklch(60% 0.058 274.6)",
+          "oklch(72% 0.058 274.6)",
+          "oklch(84% 0.058 274.6)",
+          "oklch(95% 0.058 274.6)"
+        ]
+      },
+      "gold": {
+        "role": "primary",
+        "displayName": "Party Gold",
+        "canonical": "#F2C14E",
+        "tonalRamp": [
+          "oklch(15% 0.141 85.4)",
+          "oklch(26% 0.141 85.4)",
+          "oklch(37% 0.141 85.4)",
+          "oklch(48% 0.141 85.4)",
+          "oklch(60% 0.141 85.4)",
+          "oklch(72% 0.141 85.4)",
+          "oklch(84% 0.141 85.4)",
+          "oklch(95% 0.141 85.4)"
+        ]
+      },
+      "gold-ink": {
+        "role": "primary",
+        "displayName": "Gold Ink",
+        "canonical": "#12162B",
+        "tonalRamp": [
+          "oklch(15% 0.042 274.0)",
+          "oklch(26% 0.042 274.0)",
+          "oklch(37% 0.042 274.0)",
+          "oklch(48% 0.042 274.0)",
+          "oklch(60% 0.042 274.0)",
+          "oklch(72% 0.042 274.0)",
+          "oklch(84% 0.042 274.0)",
+          "oklch(95% 0.042 274.0)"
+        ]
+      },
+      "concrete-floor": {
+        "role": "neutral",
+        "displayName": "Pale Concrete",
+        "canonical": "#DCDBD7",
+        "tonalRamp": [
+          "oklch(15% 0.006 95.1)",
+          "oklch(26% 0.006 95.1)",
+          "oklch(37% 0.006 95.1)",
+          "oklch(48% 0.006 95.1)",
+          "oklch(60% 0.006 95.1)",
+          "oklch(72% 0.006 95.1)",
+          "oklch(84% 0.006 95.1)",
+          "oklch(95% 0.006 95.1)"
+        ]
+      },
+      "floor-grid": {
+        "role": "neutral",
+        "displayName": "Floor Grid",
+        "canonical": "#D0CFCA",
+        "tonalRamp": [
+          "oklch(15% 0.007 97.4)",
+          "oklch(26% 0.007 97.4)",
+          "oklch(37% 0.007 97.4)",
+          "oklch(48% 0.007 97.4)",
+          "oklch(60% 0.007 97.4)",
+          "oklch(72% 0.007 97.4)",
+          "oklch(84% 0.007 97.4)",
+          "oklch(95% 0.007 97.4)"
+        ]
+      },
+      "wall": {
+        "role": "neutral",
+        "displayName": "Wall Navy",
+        "canonical": "#2B3150",
+        "tonalRamp": [
+          "oklch(15% 0.056 274.5)",
+          "oklch(26% 0.056 274.5)",
+          "oklch(37% 0.056 274.5)",
+          "oklch(48% 0.056 274.5)",
+          "oklch(60% 0.056 274.5)",
+          "oklch(72% 0.056 274.5)",
+          "oklch(84% 0.056 274.5)",
+          "oklch(95% 0.056 274.5)"
+        ]
+      },
+      "room-glass": {
+        "role": "neutral",
+        "displayName": "Room Glass",
+        "canonical": "#9FCBE0",
+        "tonalRamp": [
+          "oklch(15% 0.055 228.7)",
+          "oklch(26% 0.055 228.7)",
+          "oklch(37% 0.055 228.7)",
+          "oklch(48% 0.055 228.7)",
+          "oklch(60% 0.055 228.7)",
+          "oklch(72% 0.055 228.7)",
+          "oklch(84% 0.055 228.7)",
+          "oklch(95% 0.055 228.7)"
+        ]
+      },
+      "room-fill": {
+        "role": "neutral",
+        "displayName": "Room Fill",
+        "canonical": "rgba(176, 214, 232, 0.22)"
+      },
+      "room-shine": {
+        "role": "neutral",
+        "displayName": "Room Shine",
+        "canonical": "rgba(255, 255, 255, 0.55)"
+      },
+      "room-label": {
+        "role": "neutral",
+        "displayName": "Room Label",
+        "canonical": "#2B3150",
+        "tonalRamp": [
+          "oklch(15% 0.056 274.5)",
+          "oklch(26% 0.056 274.5)",
+          "oklch(37% 0.056 274.5)",
+          "oklch(48% 0.056 274.5)",
+          "oklch(60% 0.056 274.5)",
+          "oklch(72% 0.056 274.5)",
+          "oklch(84% 0.056 274.5)",
+          "oklch(95% 0.056 274.5)"
+        ]
+      },
+      "chip-free": {
+        "role": "neutral",
+        "displayName": "Free Chip",
+        "canonical": "#E6E9F2",
+        "tonalRamp": [
+          "oklch(15% 0.013 271.3)",
+          "oklch(26% 0.013 271.3)",
+          "oklch(37% 0.013 271.3)",
+          "oklch(48% 0.013 271.3)",
+          "oklch(60% 0.013 271.3)",
+          "oklch(72% 0.013 271.3)",
+          "oklch(84% 0.013 271.3)",
+          "oklch(95% 0.013 271.3)"
+        ]
+      },
+      "chip-free-ink": {
+        "role": "neutral",
+        "displayName": "Free Chip Ink",
+        "canonical": "#4A5168",
+        "tonalRamp": [
+          "oklch(15% 0.039 271.5)",
+          "oklch(26% 0.039 271.5)",
+          "oklch(37% 0.039 271.5)",
+          "oklch(48% 0.039 271.5)",
+          "oklch(60% 0.039 271.5)",
+          "oklch(72% 0.039 271.5)",
+          "oklch(84% 0.039 271.5)",
+          "oklch(95% 0.039 271.5)"
+        ]
+      },
+      "name-plate": {
+        "role": "neutral",
+        "displayName": "Name Plate",
+        "canonical": "#3F465C",
+        "tonalRamp": [
+          "oklch(15% 0.038 270.9)",
+          "oklch(26% 0.038 270.9)",
+          "oklch(37% 0.038 270.9)",
+          "oklch(48% 0.038 270.9)",
+          "oklch(60% 0.038 270.9)",
+          "oklch(72% 0.038 270.9)",
+          "oklch(84% 0.038 270.9)",
+          "oklch(95% 0.038 270.9)"
+        ]
+      },
+      "panel-white": {
+        "role": "neutral",
+        "displayName": "Panel White",
+        "canonical": "#F6F7FB",
+        "tonalRamp": [
+          "oklch(15% 0.005 275.0)",
+          "oklch(26% 0.005 275.0)",
+          "oklch(37% 0.005 275.0)",
+          "oklch(48% 0.005 275.0)",
+          "oklch(60% 0.005 275.0)",
+          "oklch(72% 0.005 275.0)",
+          "oklch(84% 0.005 275.0)",
+          "oklch(95% 0.005 275.0)"
+        ]
+      },
+      "panel-text": {
+        "role": "neutral",
+        "displayName": "Panel Text",
+        "canonical": "#12162B",
+        "tonalRamp": [
+          "oklch(15% 0.042 274.0)",
+          "oklch(26% 0.042 274.0)",
+          "oklch(37% 0.042 274.0)",
+          "oklch(48% 0.042 274.0)",
+          "oklch(60% 0.042 274.0)",
+          "oklch(72% 0.042 274.0)",
+          "oklch(84% 0.042 274.0)",
+          "oklch(95% 0.042 274.0)"
+        ]
+      },
+      "panel-muted": {
+        "role": "neutral",
+        "displayName": "Panel Muted",
+        "canonical": "#5A6178",
+        "tonalRamp": [
+          "oklch(15% 0.038 271.7)",
+          "oklch(26% 0.038 271.7)",
+          "oklch(37% 0.038 271.7)",
+          "oklch(48% 0.038 271.7)",
+          "oklch(60% 0.038 271.7)",
+          "oklch(72% 0.038 271.7)",
+          "oklch(84% 0.038 271.7)",
+          "oklch(95% 0.038 271.7)"
+        ]
+      },
+      "panel-line": {
+        "role": "neutral",
+        "displayName": "Panel Line",
+        "canonical": "#E0E3EC",
+        "tonalRamp": [
+          "oklch(15% 0.013 271.3)",
+          "oklch(26% 0.013 271.3)",
+          "oklch(37% 0.013 271.3)",
+          "oklch(48% 0.013 271.3)",
+          "oklch(60% 0.013 271.3)",
+          "oklch(72% 0.013 271.3)",
+          "oklch(84% 0.013 271.3)",
+          "oklch(95% 0.013 271.3)"
+        ]
+      },
+      "panel-tile": {
+        "role": "neutral",
+        "displayName": "Panel Tile",
+        "canonical": "#E6E9F2",
+        "tonalRamp": [
+          "oklch(15% 0.013 271.3)",
+          "oklch(26% 0.013 271.3)",
+          "oklch(37% 0.013 271.3)",
+          "oklch(48% 0.013 271.3)",
+          "oklch(60% 0.013 271.3)",
+          "oklch(72% 0.013 271.3)",
+          "oklch(84% 0.013 271.3)",
+          "oklch(95% 0.013 271.3)"
+        ]
+      },
+      "meter-off": {
+        "role": "neutral",
+        "displayName": "Meter Off",
+        "canonical": "#E0E3EC",
+        "tonalRamp": [
+          "oklch(15% 0.013 271.3)",
+          "oklch(26% 0.013 271.3)",
+          "oklch(37% 0.013 271.3)",
+          "oklch(48% 0.013 271.3)",
+          "oklch(60% 0.013 271.3)",
+          "oklch(72% 0.013 271.3)",
+          "oklch(84% 0.013 271.3)",
+          "oklch(95% 0.013 271.3)"
+        ]
+      },
+      "scrollbar-thumb": {
+        "role": "neutral",
+        "displayName": "Scrollbar Thumb",
+        "canonical": "#CDD2DE",
+        "tonalRamp": [
+          "oklch(15% 0.017 267.8)",
+          "oklch(26% 0.017 267.8)",
+          "oklch(37% 0.017 267.8)",
+          "oklch(48% 0.017 267.8)",
+          "oklch(60% 0.017 267.8)",
+          "oklch(72% 0.017 267.8)",
+          "oklch(84% 0.017 267.8)",
+          "oklch(95% 0.017 267.8)"
+        ]
+      },
+      "job-generalist": {
+        "role": "secondary",
+        "displayName": "Generalist Teal",
+        "canonical": "#4FD1C1",
+        "tonalRamp": [
+          "oklch(15% 0.116 183.8)",
+          "oklch(26% 0.116 183.8)",
+          "oklch(37% 0.116 183.8)",
+          "oklch(48% 0.116 183.8)",
+          "oklch(60% 0.116 183.8)",
+          "oklch(72% 0.116 183.8)",
+          "oklch(84% 0.116 183.8)",
+          "oklch(95% 0.116 183.8)"
+        ]
+      },
+      "job-writer": {
+        "role": "secondary",
+        "displayName": "Writer Violet",
+        "canonical": "#A996F5",
+        "tonalRamp": [
+          "oklch(15% 0.136 291.8)",
+          "oklch(26% 0.136 291.8)",
+          "oklch(37% 0.136 291.8)",
+          "oklch(48% 0.136 291.8)",
+          "oklch(60% 0.136 291.8)",
+          "oklch(72% 0.136 291.8)",
+          "oklch(84% 0.136 291.8)",
+          "oklch(95% 0.136 291.8)"
+        ]
+      },
+      "job-backend": {
+        "role": "secondary",
+        "displayName": "Backend Amber",
+        "canonical": "#F6B85A",
+        "tonalRamp": [
+          "oklch(15% 0.132 75.4)",
+          "oklch(26% 0.132 75.4)",
+          "oklch(37% 0.132 75.4)",
+          "oklch(48% 0.132 75.4)",
+          "oklch(60% 0.132 75.4)",
+          "oklch(72% 0.132 75.4)",
+          "oklch(84% 0.132 75.4)",
+          "oklch(95% 0.132 75.4)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "office-title": {
+        "displayName": "Office title",
+        "purpose": "The office name in the top bar."
+      },
+      "pet-name": {
+        "displayName": "Pet name",
+        "purpose": "A pet's name in the party list; pixel empty-state lines."
+      },
+      "panel-heading-pixel": {
+        "displayName": "Panel heading (pixel)",
+        "purpose": "Short uppercase panel headings such as PARTY · 3."
+      },
+      "room-label": {
+        "displayName": "Room label",
+        "purpose": "Meeting room names on the floor."
+      },
+      "job-class": {
+        "displayName": "Job class",
+        "purpose": "Job labels in the class ink; desk name plates."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Buttons, inputs and the meetings panel heading."
+      },
+      "body-lead": {
+        "displayName": "Body lead",
+        "purpose": "Explanatory paragraphs, max 300px."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Header meta, toggle label, notices."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Status lines, panel sublines, meter labels."
+      },
+      "label-min": {
+        "displayName": "Label min",
+        "purpose": "Room status chips; the 11px floor."
+      }
+    },
+    "shadows": [
+      {
+        "name": "sprite-pixel",
+        "value": "<x>px <y>px 0 0 <colour>",
+        "purpose": "One unblurred 1px shadow per painted sprite pixel, on a 1px element scaled by a whole number."
+      },
+      {
+        "name": "glass-shine",
+        "value": "inset 0 0 0 2px rgba(255, 255, 255, 0.55)",
+        "purpose": "The inner highlight of a meeting room's glass wall."
+      }
+    ],
+    "motion": [
+      {
+        "name": "idle-bob",
+        "value": "1.1s steps(1) infinite; translateY(-3px) at 50%",
+        "purpose": "Seated pets' two-frame idle. Never eased."
+      },
+      {
+        "name": "bob-stagger",
+        "value": "0.23s",
+        "purpose": "Animation delay between neighbouring pets so the crew does not move in lockstep."
+      },
+      {
+        "name": "cursor-hop",
+        "value": "0.7s steps(1) infinite; translateY(3px) at 50%",
+        "purpose": "The gold cursor above the selected pet."
+      },
+      {
+        "name": "stillness",
+        "value": "animation: none",
+        "purpose": "Applied under prefers-reduced-motion: reduce and when the Still office toggle is on."
+      }
+    ],
+    "focus": {
+      "value": "2px solid #F2C14E, offset 2px",
+      "purpose": "Every focusable element."
+    },
+    "spriteScale": {
+      "logo": 2,
+      "party": 3,
+      "floor": 3,
+      "furniture": 3,
+      "plant": 3,
+      "cursor": 2,
+      "tile": 2
+    },
+    "sizes": {
+      "headerHeight": "64px",
+      "partyWidth": "280px",
+      "fieldHeight": "40px",
+      "meterHeight": "10px",
+      "emptyTextWidth": "300px",
+      "scrollbar": "8px"
+    },
+    "source": "packages/ui/src/office/tokens.ts"
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one gold action on a surface (Assign), shown enabled and disabled.",
+      "html": "<button class=\"ds-btn-primary\">Assign</button> <button class=\"ds-btn-primary\" disabled>Assign</button>",
+      "css": ".ds-btn-primary { height: 40px; padding: 0 16px; border-radius: 8px; font-family: 'Onest', system-ui, sans-serif; font-size: 14px; font-weight: 600; border: 1px solid #F2C14E; background: #F2C14E; color: #12162B; cursor: pointer; } .ds-btn-primary:focus-visible { outline: 2px solid #F2C14E; outline-offset: 2px; } .ds-btn-primary:disabled { background: transparent; border-color: #2A3050; color: #6B7290; cursor: not-allowed; }"
+    },
+    {
+      "name": "Toggle",
+      "kind": "button",
+      "refersTo": "toggle",
+      "description": "A pressed or unpressed setting in the chrome (Still office).",
+      "html": "<div class=\"ds-shell\"><button class=\"ds-toggle\" aria-pressed=\"false\">Still office</button><button class=\"ds-toggle\" aria-pressed=\"true\">Still office</button></div>",
+      "css": ".ds-shell { background: #12162B; padding: 12px; display: flex; gap: 8px; } .ds-toggle { height: 40px; padding: 0 12px; border-radius: 8px; font-family: 'Onest', system-ui, sans-serif; font-size: 13px; font-weight: 600; border: 1px solid #2E3558; background: transparent; color: #A3AAC4; cursor: pointer; white-space: nowrap; } .ds-toggle:hover { color: #E9ECF5; } .ds-toggle:focus-visible { outline: 2px solid #F2C14E; outline-offset: 2px; } .ds-toggle[aria-pressed='true'] { border-color: #F2C14E; color: #F2C14E; }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Text input on the navy chrome.",
+      "html": "<div class=\"ds-shell-f\"><input class=\"ds-field\" placeholder=\"Assign a task\" /></div>",
+      "css": ".ds-shell-f { background: #12162B; padding: 12px; } .ds-field { height: 40px; width: 320px; box-sizing: border-box; padding: 0 12px; border-radius: 8px; font-family: 'Onest', system-ui, sans-serif; font-size: 14px; background: #1A1F3A; border: 1px solid #2E3558; color: #E9ECF5; } .ds-field::placeholder { color: #A3AAC4; opacity: 1; } .ds-field:focus-visible { outline: 2px solid #F2C14E; outline-offset: 2px; }"
+    },
+    {
+      "name": "Party Row",
+      "kind": "nav",
+      "refersTo": "party-row",
+      "description": "A pet in the party list: sprite tile, pixel name, job class in its class ink, status icon plus word. Selected is ringed gold.",
+      "html": "<nav class=\"ds-party\" aria-label=\"Party\"><div class=\"ds-party-h\">PARTY · 2</div><button class=\"ds-row\" aria-pressed=\"true\"><span class=\"ds-tile\"></span><span class=\"ds-txt\"><span class=\"ds-name\">Bolt</span><span class=\"ds-job\" style=\"color:#F6B85A\">BACKEND ENGINEER</span><span class=\"ds-status\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" aria-hidden=\"true\"><path d=\"M5 2v7h7M5 9v5M12 9v5M5 6h5\"/></svg>At desk</span></span></button><button class=\"ds-row\" aria-pressed=\"false\"><span class=\"ds-tile\"></span><span class=\"ds-txt\"><span class=\"ds-name\">Scout</span><span class=\"ds-job\" style=\"color:#4FD1C1\">GENERALIST</span><span class=\"ds-status\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" aria-hidden=\"true\"><rect x=\"1.5\" y=\"3.5\" width=\"13\" height=\"9\" rx=\"1.5\"/><path d=\"M4.5 6.5h1M7.5 6.5h1M10.5 6.5h1M5 9.5h6\"/></svg>Working</span></span></button></nav>",
+      "css": ".ds-party { width: 280px; box-sizing: border-box; padding: 16px 14px; background: #171C33; display: flex; flex-direction: column; gap: 6px; } .ds-party-h { font-family: 'Pixelify Sans', 'Onest', sans-serif; font-size: 15px; font-weight: 600; letter-spacing: 1px; color: #A3AAC4; padding: 0 6px 8px; } .ds-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px; border: 2px solid transparent; border-radius: 10px; background: transparent; cursor: pointer; text-align: left; font-family: 'Onest', system-ui, sans-serif; color: #E9ECF5; } .ds-row:hover { background: #1E2442; } .ds-row[aria-pressed='true'] { background: #1E2442; border-color: #F2C14E; } .ds-row:focus-visible { outline: 2px solid #F2C14E; outline-offset: 2px; } .ds-tile { width: 48px; height: 48px; padding: 4px; border-radius: 10px; background: #222845; flex: none; } .ds-txt { display: flex; flex-direction: column; gap: 3px; } .ds-name { font-family: 'Pixelify Sans', 'Onest', sans-serif; font-size: 17px; font-weight: 600; } .ds-job { font-family: 'Pixelify Sans', 'Onest', sans-serif; font-size: 11px; letter-spacing: 1px; } .ds-status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #A3AAC4; }"
+    },
+    {
+      "name": "Room Chip",
+      "kind": "chip",
+      "refersTo": "room-chip-free",
+      "description": "A meeting room's pixel label with its status chip, on the concrete floor.",
+      "html": "<div class=\"ds-floor\"><span class=\"ds-room\">ROOM 1</span><span class=\"ds-chip\">Free</span></div>",
+      "css": ".ds-floor { background: #DCDBD7; padding: 16px; display: flex; align-items: center; gap: 8px; } .ds-room { font-family: 'Pixelify Sans', 'Onest', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1px; color: #2B3150; } .ds-chip { font-family: 'Onest', system-ui, sans-serif; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: #E6E9F2; color: #4A5168; }"
+    },
+    {
+      "name": "Meetings Panel",
+      "kind": "card",
+      "refersTo": "meetings-panel",
+      "description": "The off-white reading panel: heading block, thread, segmented call meter.",
+      "html": "<aside class=\"ds-panel\"><div class=\"ds-ph\"><span class=\"ds-pt\">Meetings</span><span class=\"ds-pm\">None yet</span></div><div class=\"ds-body\"><p class=\"ds-empty\">No meetings yet</p><p class=\"ds-lead\">When pets meet, their meetings appear here.</p></div><div class=\"ds-meter\"><span class=\"ds-pm\">Calls</span><span class=\"ds-segs\"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class=\"ds-pm\">None yet</span></div></aside>",
+      "css": ".ds-panel { width: 400px; background: #F6F7FB; color: #12162B; font-family: 'Onest', system-ui, sans-serif; display: flex; flex-direction: column; } .ds-ph { display: flex; flex-direction: column; gap: 2px; padding: 10px 20px; border-bottom: 1px solid #E0E3EC; } .ds-pt { font-size: 14px; font-weight: 600; } .ds-pm { font-size: 12px; color: #5A6178; } .ds-body { padding: 24px 32px; text-align: center; } .ds-empty { font-family: 'Pixelify Sans', 'Onest', sans-serif; font-size: 17px; font-weight: 600; margin: 0 0 12px; } .ds-lead { font-size: 14px; line-height: 1.5; color: #5A6178; max-width: 300px; margin: 0 auto; } .ds-meter { display: flex; align-items: center; gap: 10px; padding: 12px 16px 16px; border-top: 1px solid #E0E3EC; } .ds-segs { flex: 1; display: flex; gap: 3px; } .ds-segs i { flex: 1; height: 10px; background: #E0E3EC; }"
+    },
+    {
+      "name": "Pixel Sprite Cursor",
+      "kind": "custom",
+      "refersTo": "avatar-tile",
+      "description": "A sprite drawn as box-shadow pixels on a 1px element at integer scale: the gold cursor, hopping in two stepped frames.",
+      "html": "<div class=\"ds-stage\"><span class=\"ds-cursor\"></span></div>",
+      "css": ".ds-stage { background: #DCDBD7; padding: 24px; height: 40px; } .ds-cursor { display: block; width: 1px; height: 1px; transform-origin: 0 0; transform: scale(2); box-shadow: 0px 0px 0 0 #F2C14E, 1px 0px 0 0 #F2C14E, 2px 0px 0 0 #F2C14E, 3px 0px 0 0 #F2C14E, 4px 0px 0 0 #F2C14E, 5px 0px 0 0 #F2C14E, 6px 0px 0 0 #F2C14E, 1px 1px 0 0 #F2C14E, 2px 1px 0 0 #F2C14E, 3px 1px 0 0 #F2C14E, 4px 1px 0 0 #F2C14E, 5px 1px 0 0 #F2C14E, 2px 2px 0 0 #F2C14E, 3px 2px 0 0 #F2C14E, 4px 2px 0 0 #F2C14E, 3px 3px 0 0 #F2C14E; animation: ds-hop 0.7s steps(1) infinite; } @keyframes ds-hop { 0% { translate: 0 0; } 50% { translate: 0 3px; } } @media (prefers-reduced-motion: reduce) { .ds-cursor { animation: none; } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Party in the Glass Office",
+    "overview": "Tagalong's crew is a 16-bit party with job classes, working in a contemporary office drawn in pixel art. The characters are expressive game sprites; the room they sit in is modern (pale concrete floor, white desks with monitors, glass-walled meeting rooms, plants, a small lounge); the interface around them is crisp, modern product chrome. The game lives inside the frame, never on the frame: the shell is a deep ink-navy app with clean sans type, off-white panels and one gold accent, and the pixel world is the picture it holds.\n\nEvery colour, font, size, spacing step, radius and timing comes from one source, `packages/ui/src/office/tokens.ts` (`officeTokens`); components read only from there. Sprite palettes are character and furniture art and live with the sprites, not in the tokens. Sprites are plain data (a map of rows, a palette, optional overlay pixels) rendered as a CSS `box-shadow` on a single 1px element and scaled up by a whole number. No images, no canvas, no 3D.\n\nThe surface is dense but calm: a 64px top bar, a 280px party list, the office floor in the centre and a light meetings panel on the right. Status is always an icon plus a word. Motion is a stepped two-frame idle, off whenever the user asks for stillness.",
+    "keyCharacteristics": [
+      "Ink-navy shell, off-white panels, pale concrete floor: three grounds, one per job.",
+      "Gold (`gold`) means selection and attention, and nothing else.",
+      "One colour per job class, used only on that class's label.",
+      "Pixel type for names and short labels; Onest for everything you read.",
+      "Sprites as data, drawn at integer scale only.",
+      "Stepped, never eased, motion; stops for reduced motion and the Still office toggle."
+    ],
+    "rules": [
+      {
+        "name": "The Gold Means You Rule",
+        "body": "Gold marks what is selected, focused or needs the user: the selected row, the cursor, the focus ring, the primary action, a pressed toggle. It never decorates, never fills a panel, and never names a job class.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Colour Per Class Rule",
+        "body": "Each job class owns exactly one label ink, defined with its character (`labelInk`), used only on that class's job label. Adding a class means adding one ink that reads on the sidebar navy and stays clearly distinct from gold.",
+        "section": "colors"
+      },
+      {
+        "name": "The Three Grounds Rule",
+        "body": "Navy is chrome (bar, party list), off-white is reading (panels, threads), pale concrete is the world (the floor). A new surface picks the ground for its job; it does not invent a fourth.",
+        "section": "colors"
+      },
+      {
+        "name": "The Pixel Is A Name Rule",
+        "body": "Pixelify Sans is for names and short labels only: pet names, job classes, room labels, desk plates, the office title and short panel headings. Sentences, controls, inputs, statuses and numbers are Onest.",
+        "section": "typography"
+      },
+      {
+        "name": "The 11px Floor Rule",
+        "body": "No functional text below 11px (`fontSize.min`).",
+        "section": "typography"
+      },
+      {
+        "name": "The Integer Scale Rule",
+        "body": "A sprite is drawn at a whole-number scale (`spriteScale`) and nothing else. Pixel art scaled by a fraction smears.",
+        "section": "layout"
+      },
+      {
+        "name": "The No Lift Rule",
+        "body": "Chrome never floats: no drop shadows on panels, rows, buttons or cards. Hierarchy is tone and hairlines.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** take every colour, size, space, radius and timing from `officeTokens`; add a token before adding a value.",
+      "**Do** draw characters and furniture as sprite data (rows, palette, overlay) through `PixelSprite`, at a whole-number `spriteScale`.",
+      "**Do** reserve gold for selection, focus, the cursor and the one primary action on a surface.",
+      "**Do** give each job class one label ink, and pair every status with an icon and a word.",
+      "**Do** keep pixel type to names and short labels; set sentences, controls and numbers in Onest.",
+      "**Do** make every idle animation stepped and stop it for `prefers-reduced-motion` and the Still office setting.",
+      "**Do** build Hire a pet, Pet settings and the chat panel from these tokens: navy chrome, off-white reading panels, 40px gold primary button, 8px fields, the gold focus ring, party-row selection for choosing a pet or class, sprites at scale 3 for previews and 2 for small marks, and character ink for job labels."
+    ],
+    "donts": [
+      "**Don't** scale a sprite by a fraction, smooth it, or replace it with an image or icon.",
+      "**Don't** use gold for decoration, job classes, or fills larger than a button.",
+      "**Don't** signal state by colour alone.",
+      "**Don't** set body copy, inputs, errors or any sentence in Pixelify Sans, or any text below 11px.",
+      "**Don't** ease the idle motion or add motion that cannot be stopped.",
+      "**Don't** add drop shadows to chrome; separate with tone and hairlines.",
+      "**Don't** reintroduce the wooden, old-RPG office or the generic chat-sidebar assistant look."
+    ]
+  }
+}
