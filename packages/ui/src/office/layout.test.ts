@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { FLOOR, MAX_DESKS, ROOMS, ROOM_COUNT, deskFootprint, deskLayout } from './layout';
+import {
+  FLOOR,
+  MAX_DESKS,
+  PROPS,
+  ROOMS,
+  ROOM_COUNT,
+  deskFootprint,
+  deskLayout,
+  monitorAt,
+  seatAt,
+} from './layout';
+import { FURNITURE } from './sprites/furniture';
+import { spriteSize } from './sprites/sprite';
+import { officeTokens } from './tokens';
 
 interface Rect {
   x: number;
@@ -47,5 +60,35 @@ describe('ROOMS', () => {
   it('has two rooms for now', () => {
     expect(ROOM_COUNT).toBe(2);
     expect(ROOMS).toHaveLength(ROOM_COUNT);
+  });
+});
+
+describe('desk furniture', () => {
+  it('stands the monitor beside the pet, so its screen faces the viewer uncovered', () => {
+    for (const desk of deskLayout(MAX_DESKS)) {
+      const pet = seatAt(desk);
+      const monitor = monitorAt(desk);
+      const petWidth = 16 * officeTokens.spriteScale.floor;
+      expect(monitor.x).toBeGreaterThanOrEqual(pet.x + petWidth);
+      const deskWidth = spriteSize(FURNITURE.desk).width * officeTokens.spriteScale.furniture;
+      expect(monitor.x + monitor.width).toBeLessThanOrEqual(desk.x + deskWidth);
+    }
+  });
+});
+
+describe('PROPS', () => {
+  it('furnish the floor without touching a desk, a room or the walls', () => {
+    const desks = deskLayout(MAX_DESKS).map(deskFootprint);
+    for (const prop of PROPS) {
+      const { width, height } = spriteSize(FURNITURE[prop.sprite]);
+      const scale = officeTokens.spriteScale.furniture;
+      const rect = { x: prop.x, y: prop.y, width: width * scale, height: height * scale };
+      expect(rect.x).toBeGreaterThanOrEqual(0);
+      expect(rect.y).toBeGreaterThanOrEqual(FLOOR.wallHeight);
+      expect(rect.x + rect.width).toBeLessThanOrEqual(FLOOR.width);
+      expect(rect.y + rect.height).toBeLessThanOrEqual(FLOOR.height);
+      for (const desk of desks) expect(overlaps(rect, desk)).toBe(false);
+      for (const room of ROOMS) expect(overlaps(rect, room)).toBe(false);
+    }
   });
 });

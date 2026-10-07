@@ -24,6 +24,18 @@ describe('office tokens', () => {
     expect(contrast(color.textMuted, color.sidebar)).toBeGreaterThanOrEqual(4.5);
   });
 
+  it('paints the floor a neutral pale concrete, with readable desk plates and room labels', () => {
+    for (const hex of [color.floor, color.floorGrid]) {
+      const [r, , b] = [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16));
+      // No blue bias, and no cream either: the channels stay within a few steps.
+      expect(b).toBeLessThanOrEqual(r ?? 0);
+      expect((r ?? 0) - (b ?? 0)).toBeLessThanOrEqual(8);
+    }
+    expect(luminance(color.floorGrid)).toBeLessThan(luminance(color.floor));
+    expect(contrast(color.plate, color.floor)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(color.roomLabel, color.floor)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('dims a disabled control’s label below normal text but keeps it at 3:1 or better', () => {
     const disabled = contrast(color.disabledInk, color.page);
     expect(disabled).toBeGreaterThanOrEqual(3);

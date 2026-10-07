@@ -1,3 +1,8 @@
+import { FURNITURE, monitorSprite } from './sprites/furniture';
+import { spriteSize } from './sprites/sprite';
+import type { Sprite } from './sprites/sprite';
+import { officeTokens } from './tokens';
+
 /**
  * Where things stand on the office floor, as data. Every coordinate is in floor pixels
  * from the top-left corner; components place things here and decide nothing themselves.
@@ -17,12 +22,19 @@ export const FLOOR = { width: 600, height: 736, wallHeight: 28 } as const;
 
 /** The windows along the top wall. */
 export const WINDOW_XS: readonly number[] = [24, 120, 216, 312, 408, 504];
-export const WINDOW_SIZE = { y: 7, width: 64, height: 14 } as const;
+/** How far below the ceiling the windows hang. */
+export const WINDOW_Y = 7;
 
 export const PLANTS: readonly Point[] = [
   { x: 252, y: 40 },
   { x: 16, y: 680 },
   { x: 252, y: 680 },
+];
+
+/** Furniture along the bottom wall, below the last row of desks. */
+export const PROPS: readonly (Point & { sprite: 'shelf' | 'waterCooler' })[] = [
+  { sprite: 'shelf', x: 60, y: 676 },
+  { sprite: 'waterCooler', x: 196, y: 682 },
 ];
 
 export interface Room extends Rect {
@@ -39,8 +51,6 @@ export const ROOMS: readonly Room[] = [
   { name: 'ROOM 2', x: 300, y: 332, width: 272, height: 330, tableOffset: 150 },
 ];
 
-export const TABLE_SIZE = { width: 132, height: 58 } as const;
-export const CHAIR_SIZE = { width: 20, height: 14 } as const;
 export const DOOR = { width: 8, height: 52, fromBottom: 80 } as const;
 
 /** A meeting room's table and its four chairs. */
@@ -55,7 +65,14 @@ export function roomFurniture(room: Room): { table: Point; chairs: Point[] } {
   return { table, chairs };
 }
 
-export const DESK_SIZE = { width: 84, height: 40, plateWidth: 88 } as const;
+/** Furniture sprites, scaled: what a piece covers on the floor. */
+function scaled(sprite: Sprite): { width: number; height: number } {
+  const { width, height } = spriteSize(sprite);
+  const scale = officeTokens.spriteScale.furniture;
+  return { width: width * scale, height: height * scale };
+}
+
+export const DESK_SIZE = scaled(FURNITURE.desk);
 
 /** Two columns of desks to the left of the rooms. */
 const DESK_COLUMNS = [44, 176] as const;
@@ -74,9 +91,9 @@ export function deskLayout(petCount: number): Point[] {
   }));
 }
 
-/** Where a pet sits at its desk: behind it, head above the monitor. */
+/** Where a pet sits at its desk: behind its left half, head and shoulders above the top. */
 export function seatAt(desk: Point): Point {
-  return { x: desk.x + 30, y: desk.y - 36 };
+  return { x: desk.x + 8, y: desk.y - 36 };
 }
 
 /** Where the selection cursor hops, centred above a pet. */
@@ -84,9 +101,10 @@ export function cursorAbove(seat: Point): Point {
   return { x: seat.x + 17, y: seat.y - 14 };
 }
 
-/** The monitor on a desk. */
+/** The monitor on a desk's right half, beside the pet, its screen facing the viewer. */
 export function monitorAt(desk: Point): Rect {
-  return { x: desk.x + 4, y: desk.y - 16, width: 26, height: 18 };
+  const { width, height } = scaled(monitorSprite(false));
+  return { x: desk.x + 56, y: desk.y + 6 - height, width, height };
 }
 
 /** The name plate under a desk. */
@@ -101,5 +119,5 @@ export function plateAt(desk: Point): Point {
 export function deskFootprint(desk: Point): Rect {
   const top = cursorAbove(seatAt(desk)).y;
   const bottom = plateAt(desk).y + 14;
-  return { x: desk.x, y: top, width: DESK_SIZE.plateWidth, height: bottom - top };
+  return { x: desk.x, y: top, width: DESK_SIZE.width, height: bottom - top };
 }

@@ -1,13 +1,13 @@
+import type { CSSProperties } from 'react';
 import {
-  CHAIR_SIZE,
   DESK_SIZE,
   DOOR,
   FLOOR,
   PLANTS,
+  PROPS,
   ROOMS,
-  TABLE_SIZE,
-  WINDOW_SIZE,
   WINDOW_XS,
+  WINDOW_Y,
   cursorAbove,
   deskLayout,
   monitorAt,
@@ -15,10 +15,11 @@ import {
   roomFurniture,
   seatAt,
 } from './layout';
-import type { Room } from './layout';
+import type { Point, Room } from './layout';
 import type { OfficeMember } from './member';
 import { PixelSprite } from './pixel-sprite';
 import { CURSOR, PLANT } from './sprites/characters';
+import { FURNITURE, monitorSprite } from './sprites/furniture';
 import { officeTokens as t } from './tokens';
 
 export interface OfficeFloorProps {
@@ -26,15 +27,22 @@ export interface OfficeFloorProps {
   selectedId: string | null;
 }
 
+/** Absolute placement on the floor. */
+function at({ x, y }: Point): CSSProperties {
+  return { position: 'absolute', left: x, top: y };
+}
+
 /**
- * The office seen from above: desks on the left, glass meeting rooms on the right. Every
- * position comes from the layout module; this component only draws.
+ * The office seen from the front: desks on the left, glass meeting rooms on the right.
+ * Every position comes from the layout module and every piece of furniture is a sprite;
+ * this component only draws.
  */
 export function OfficeFloor({ members, selectedId }: OfficeFloorProps) {
   const desks = deskLayout(members.length);
   const seated = desks.map((desk, index) => ({ desk, member: members[index] }));
   const selectedDesk = seated.find(({ member }) => member?.pet.id === selectedId)?.desk;
   const cursor = selectedDesk === undefined ? undefined : cursorAbove(seatAt(selectedDesk));
+  const furniture = t.spriteScale.furniture;
 
   return (
     <section
@@ -68,17 +76,11 @@ export function OfficeFloor({ members, selectedId }: OfficeFloorProps) {
           }}
         />
         {WINDOW_XS.map((x) => (
-          <div
+          <PixelSprite
             key={x}
-            style={{
-              position: 'absolute',
-              left: x,
-              top: WINDOW_SIZE.y,
-              width: WINDOW_SIZE.width,
-              height: WINDOW_SIZE.height,
-              background: t.color.window,
-              boxShadow: `inset 0 -4px 0 ${t.color.windowSill}`,
-            }}
+            sprite={FURNITURE.window}
+            scale={furniture}
+            style={at({ x, y: WINDOW_Y })}
           />
         ))}
 
@@ -91,69 +93,49 @@ export function OfficeFloor({ members, selectedId }: OfficeFloorProps) {
             key={`${plant.x},${plant.y}`}
             sprite={PLANT}
             scale={t.spriteScale.plant}
-            style={{ position: 'absolute', left: plant.x, top: plant.y }}
+            style={at(plant)}
+          />
+        ))}
+        {PROPS.map((prop) => (
+          <PixelSprite
+            key={prop.sprite}
+            sprite={FURNITURE[prop.sprite]}
+            scale={furniture}
+            style={at(prop)}
           />
         ))}
 
         {seated.map(({ desk, member }, index) => {
           if (member === undefined) return null;
-          const seat = seatAt(desk);
           return (
             <PixelSprite
               key={member.pet.id}
               sprite={member.character.sprite}
               scale={t.spriteScale.floor}
               className="office-bob"
-              style={{
-                position: 'absolute',
-                left: seat.x,
-                top: seat.y,
-                animationDelay: `${index * t.timing.bobStagger}s`,
-              }}
+              style={{ ...at(seatAt(desk)), animationDelay: `${index * t.timing.bobStagger}s` }}
             />
           );
         })}
 
         {seated.map(({ desk, member }) => {
           if (member === undefined) return null;
-          const monitor = monitorAt(desk);
-          const plate = plateAt(desk);
           const lit = member.status === 'working';
           return (
             <div key={member.pet.id}>
-              <div
+              <PixelSprite sprite={FURNITURE.desk} scale={furniture} style={at(desk)} />
+              <span
                 data-testid={`monitor-${member.pet.id}`}
                 data-lit={lit}
-                style={{
-                  position: 'absolute',
-                  left: monitor.x,
-                  top: monitor.y,
-                  width: monitor.width,
-                  height: monitor.height,
-                  boxSizing: 'border-box',
-                  border: `2px solid ${t.color.monitor}`,
-                  background: lit ? t.color.screenOn : t.color.screenOff,
-                }}
-              />
-              <div
-                style={{
-                  position: 'absolute',
-                  left: desk.x,
-                  top: desk.y,
-                  width: DESK_SIZE.width,
-                  height: DESK_SIZE.height,
-                  background: t.color.desk,
-                  border: `2px solid ${t.color.furnitureLine}`,
-                  boxShadow: `0 5px 0 ${t.color.furnitureShadow}`,
-                }}
-              />
+                style={at(monitorAt(desk))}
+              >
+                <PixelSprite sprite={monitorSprite(lit)} scale={furniture} />
+              </span>
               <div
                 className="office-px"
                 style={{
-                  position: 'absolute',
-                  left: plate.x,
-                  top: plate.y,
-                  width: DESK_SIZE.plateWidth,
+                  ...at(plateAt(desk)),
+                  width: DESK_SIZE.width,
                   textAlign: 'center',
                   fontSize: t.fontSize.min,
                   letterSpacing: t.letterSpacing.pixel,
@@ -174,7 +156,7 @@ export function OfficeFloor({ members, selectedId }: OfficeFloorProps) {
             data-testid="office-cursor"
             data-pet-id={selectedId}
             className="office-hop"
-            style={{ position: 'absolute', left: cursor.x, top: cursor.y }}
+            style={at(cursor)}
           >
             <PixelSprite sprite={CURSOR} scale={t.spriteScale.cursor} />
           </span>
@@ -187,13 +169,22 @@ export function OfficeFloor({ members, selectedId }: OfficeFloorProps) {
 /** A glass meeting room. Meetings arrive in a later phase, so every room is free. */
 function MeetingRoom({ room }: { room: Room }) {
   const { table, chairs } = roomFurniture(room);
+  // Chairs behind the table are drawn before it, chairs in front after it.
+  const behind = chairs.filter((chair) => chair.y < table.y);
+  const inFront = chairs.filter((chair) => chair.y >= table.y);
+  const chair = (point: Point) => (
+    <PixelSprite
+      key={`${point.x},${point.y}`}
+      sprite={FURNITURE.chair}
+      scale={t.spriteScale.furniture}
+      style={at(point)}
+    />
+  );
   return (
     <>
       <div
         style={{
-          position: 'absolute',
-          left: room.x,
-          top: room.y,
+          ...at(room),
           width: room.width,
           height: room.height,
           boxSizing: 'border-box',
@@ -204,9 +195,7 @@ function MeetingRoom({ room }: { room: Room }) {
       />
       <div
         style={{
-          position: 'absolute',
-          left: room.x - 2,
-          top: room.y + room.height - DOOR.fromBottom,
+          ...at({ x: room.x - 2, y: room.y + room.height - DOOR.fromBottom }),
           width: DOOR.width,
           height: DOOR.height,
           background: t.color.floor,
@@ -214,9 +203,7 @@ function MeetingRoom({ room }: { room: Room }) {
       />
       <div
         style={{
-          position: 'absolute',
-          left: room.x + 14,
-          top: room.y + 12,
+          ...at({ x: room.x + 14, y: room.y + 12 }),
           display: 'flex',
           alignItems: 'center',
           gap: t.space.md,
@@ -246,32 +233,13 @@ function MeetingRoom({ room }: { room: Room }) {
           Free
         </span>
       </div>
-      <div
-        style={{
-          position: 'absolute',
-          left: table.x,
-          top: table.y,
-          width: TABLE_SIZE.width,
-          height: TABLE_SIZE.height,
-          background: t.color.table,
-          border: `2px solid ${t.color.furnitureLine}`,
-          boxShadow: `0 4px 0 ${t.color.furnitureShadow}`,
-        }}
+      {behind.map(chair)}
+      <PixelSprite
+        sprite={FURNITURE.meetingTable}
+        scale={t.spriteScale.furniture}
+        style={at(table)}
       />
-      {chairs.map((chair) => (
-        <div
-          key={`${chair.x},${chair.y}`}
-          style={{
-            position: 'absolute',
-            left: chair.x,
-            top: chair.y,
-            width: CHAIR_SIZE.width,
-            height: CHAIR_SIZE.height,
-            background: t.color.chair,
-            boxShadow: `0 3px 0 ${t.color.chairShadow}`,
-          }}
-        />
-      ))}
+      {inFront.map(chair)}
     </>
   );
 }

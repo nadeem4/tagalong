@@ -20,27 +20,16 @@ export const officeTokens = {
     disabledLine: '#2A3050',
     gold: '#F2C14E',
     goldInk: '#12162B',
-    // The office floor.
-    floor: '#DDE1E8',
-    floorGrid: '#D3D8E0',
+    // The office floor. Furniture colours live in the furniture sprites.
+    floor: '#DCDBD7',
+    floorGrid: '#D0CFCA',
     wall: '#2B3150',
-    window: '#9FD3EA',
-    windowSill: '#7DBFD9',
     roomGlass: '#9FCBE0',
     roomFill: 'rgba(176, 214, 232, 0.22)',
     roomShine: 'rgba(255, 255, 255, 0.55)',
     roomLabel: '#2B3150',
     chipFree: '#E6E9F2',
     chipFreeInk: '#4A5168',
-    table: '#FBFCFD',
-    desk: '#F7F8FB',
-    furnitureLine: '#B9C0CD',
-    furnitureShadow: '#A9B0BF',
-    chair: '#3E4560',
-    chairShadow: '#2B3150',
-    monitor: '#23283A',
-    screenOff: '#3A4057',
-    screenOn: '#4FD1C1',
     plate: '#3F465C',
     // The light meetings panel.
     panel: '#F6F7FB',
@@ -81,7 +70,7 @@ export const officeTokens = {
   },
   letterSpacing: { pixel: 1, title: 0.5 },
   /** Integer multipliers for sprites: a 16px pet drawn at 3 is 48px on screen. */
-  spriteScale: { logo: 2, party: 3, floor: 3, plant: 3, cursor: 2, tile: 2 },
+  spriteScale: { logo: 2, party: 3, floor: 3, furniture: 3, plant: 3, cursor: 2, tile: 2 },
   timing: {
     /** The idle bob is stepped, never eased: two frames, like a 16-bit sprite. */
     bob: '1.1s',
