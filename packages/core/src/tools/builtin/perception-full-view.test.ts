@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WINDOW_TEXT_CHARS } from '@tagalong/protocol';
 import type { CaptureExclusions } from '@tagalong/protocol';
-import type { BrainContentBlock } from '../providers';
+import type { BrainContentBlock } from '../../providers';
+import type { PerceptionHost } from '../../perception/host';
+import { fakeTurnTools } from '../fake-turn';
+import type { TurnTools } from '../registry';
+import type { ToolOutcome } from '../tool';
 import {
   GET_SELECTION,
   LIST_DISPLAYS,
@@ -10,10 +14,7 @@ import {
   LOOK_AT_SCREEN,
   LOOK_CLOSER,
   READ_WINDOW_TEXT,
-  createPerceptionToolset,
-  type PerceptionHost,
-  type ToolOutcome,
-} from './tools';
+} from './perception';
 
 const NO_EXCLUSIONS: CaptureExclusions = { processNames: [], titlePatterns: [] };
 const PNG = 'iVBORw0KGgo=';
@@ -112,12 +113,14 @@ function toolset(
   hosts: readonly PerceptionHost[],
   vision = true,
   windowTextBudget?: () => number,
-): ReturnType<typeof createPerceptionToolset> {
-  return createPerceptionToolset({
-    hosts: () => hosts,
-    exclusions: () => NO_EXCLUSIONS,
-    vision: () => vision,
-    ...(windowTextBudget === undefined ? {} : { windowTextBudget }),
+): TurnTools {
+  return fakeTurnTools({
+    perception: {
+      hosts: () => hosts,
+      exclusions: () => NO_EXCLUSIONS,
+      vision: () => vision,
+      ...(windowTextBudget === undefined ? {} : { windowTextBudget }),
+    },
   });
 }
 

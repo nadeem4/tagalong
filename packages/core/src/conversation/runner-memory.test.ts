@@ -11,7 +11,7 @@ import { SettingsStore } from '../settings/settings';
 import { FakeBrainProvider } from '../providers';
 import type { BrainProvider, BrainRequest, FakeScript } from '../providers';
 import { SUMMARY_KEEP_RECENT, Summarizer } from '../memory/summarizer';
-import { REMEMBER } from './crew-tools';
+import { REMEMBER } from '../tools';
 import { MEMORY_HEADING } from './prompt-assembler';
 import { ConversationRunner, type TurnEvent } from './runner';
 

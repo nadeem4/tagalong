@@ -35,7 +35,8 @@ tagalong/
       index.ts                      # the public facade hosts import
       engine.ts                     # Engine.boot: wires the parts together and listens
       conversation/                 # ConversationRunner, prompt-assembler
-      perception/                   # exclusions, retention, tools, inventory
+      perception/                   # exclusions, retention, inventory, text layer, browser routing
+      tools/                        # tool.ts (the Tool shape), registry.ts, builtin/ (the 12 built-ins)
       memory/                       # db.ts (numbered migrations), store.ts (ConversationStore)
       pets/registry.ts              # PetRegistry, the default pet Scout
       roles/                        # library.generated.ts, listRoles, getRole, recommendedModel, tiers.ts
@@ -483,6 +484,14 @@ than one planned implementation.
 Implement `BrainProvider`, register it in `packages/core/src/providers/registry.ts`, give it a
 `SECRET_KEYS` entry if it takes a key, and select it per pet in settings. Do not widen the interface for a provider that is not being built.
 
+## How to add a tool
+
+Every built-in tool lives in `packages/core/src/tools/builtin/`, in one `Tool` shape (id, definition,
+`read` or `write`, run), and reaches a turn through `ToolRegistry` in `tools/registry.ts`. The repo
+skill [`.claude/skills/tagalong-add-tool/SKILL.md`](../.claude/skills/tagalong-add-tool/SKILL.md)
+walks through it: which file, read versus write, testing with `fakeTurnTools`, registering, and the
+docs to update. The design is in [concepts/roles-and-tools.md](concepts/roles-and-tools.md#the-tools-module).
+
 ## Conventions
 
 - **Test first.** Write the failing test, make it pass, refactor. No production code without a test that
@@ -491,6 +500,8 @@ Implement `BrainProvider`, register it in `packages/core/src/providers/registry.
   implementation is already planned.
 - **Core stays pure.** `packages/core` and `packages/protocol` must not import `electron`, `react`, or
   browser globals. An ESLint `no-restricted-imports` rule enforces it.
+- **Tools go through the registry.** `conversation/` and `engine.ts` import tools only from
+  `tools/registry` or the `tools` index, never from `tools/builtin/*`. ESLint enforces it too.
 - **Docs are part of done.** Update `README.md`, `docs/architecture.md`, and the relevant
   `docs/acceptance/phase-N.md` with every change.
 - **Commits** use Conventional Commits, for example `feat(core): add PromptAssembler`.

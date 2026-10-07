@@ -11,7 +11,7 @@ import {
   captureSelection,
   isBrowserHost,
 } from './browser-route';
-import type { PerceptionHost } from './tools';
+import type { PerceptionHost } from './host';
 
 const NO_EXCLUSIONS: CaptureExclusions = { processNames: [], titlePatterns: [] };
 

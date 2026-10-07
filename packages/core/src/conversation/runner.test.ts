@@ -11,14 +11,16 @@ import { SettingsStore } from '../settings/settings';
 import { BrainError, FakeBrainProvider } from '../providers';
 import type { FakeScript } from '../providers';
 import type { BrainEvents, BrainProvider, BrainRequest, BrainResult } from '../providers';
+import type { PerceptionHost } from '../perception';
 import {
   GET_SELECTION,
   LOOK_AT_SCREEN,
-  createPerceptionToolset,
-  type PerceptionHost,
-  type PerceptionToolset,
+  defineTool,
+  type PerceptionToolsOptions,
+  type Tool,
+  type ToolFilter,
   type ToolOutcome,
-} from '../perception';
+} from '../tools';
 import { ConversationRunner, type TurnEvent } from './runner';
 
 const pet: Pet = {
@@ -58,14 +60,27 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-function makeRunner(provider: BrainProvider, tools?: PerceptionToolset): ConversationRunner {
+function makeRunner(
+  provider: BrainProvider,
+  perception?: PerceptionToolsOptions,
+  toolsFor?: ToolFilter,
+): ConversationRunner {
   return new ConversationRunner({
     store,
     settings,
     provider,
     emit: (event) => events.push(event),
-    ...(tools ? { tools } : {}),
+    ...(perception ? { perception } : {}),
+    ...(toolsFor ? { toolsFor } : {}),
   });
+}
+
+/**
+ * Hands a turn exactly these tools, through the one hook that decides a turn's tools.
+ * How the runner treats a tool is under test here, not what any built-in does.
+ */
+function only(...tools: Tool[]): ToolFilter {
+  return () => tools;
 }
 
 /** A host that answers perception.capture from a canned snapshot. No socket, no screen. */
@@ -189,12 +204,12 @@ describe('ConversationRunner perception tools', () => {
     hosts: readonly PerceptionHost[],
     exclusions = NO_EXCLUSIONS,
     vision = false,
-  ): PerceptionToolset {
-    return createPerceptionToolset({
+  ): PerceptionToolsOptions {
+    return {
       hosts: () => hosts,
       exclusions: () => exclusions,
       vision: () => vision,
-    });
+    };
   }
 
   it('offers the built-in tools to a provider that supports them', async () => {
@@ -217,6 +232,25 @@ describe('ConversationRunner perception tools', () => {
     await runner.run({ pet, text: 'hi' }).done;
 
     expect(seen[0]?.tools).toBeUndefined();
+  });
+
+  it('takes a turn tools only through the toolsFor hook, which sees the pet', async () => {
+    const observed = observing({
+      text: 'ok',
+      toolCall: { id: 'call-f', name: LOOK_AT_SCREEN, input: {} },
+    });
+    const asked: string[] = [];
+    const runner = makeRunner(observed.provider, toolsFor([host]), (forPet, tools) => {
+      asked.push(forPet.id);
+      return tools.filter((tool) => tool.id === GET_SELECTION);
+    });
+    await runner.run({ pet, text: 'hi' }).done;
+
+    expect(asked).toEqual([pet.id]);
+    expect(observed.requests[0]?.tools?.map((tool) => tool.name)).toEqual([GET_SELECTION]);
+    // A tool the hook dropped is refused by name, never run.
+    expect(observed.toolResults[0]?.isError).toBe(true);
+    expect(observed.toolResults[0]?.content).toContain(LOOK_AT_SCREEN);
   });
 
   it('describes look_at_screen in words when the pet cannot see images', async () => {
@@ -606,11 +640,14 @@ describe('tool notifications', () => {
    * call reached the host at all — which is the seam that shipped dead twice in this
    * phase, once on the PowerShell transport and once on the displays capture path.
    */
-  function toolset(outcome: ToolOutcome): PerceptionToolset {
-    return {
-      definitions: [{ name: 'list_windows', description: 'x'.repeat(50), inputSchema: {} }],
-      run: () => Promise.resolve(outcome),
-    };
+  function toolset(outcome: ToolOutcome): ToolFilter {
+    return only(
+      defineTool(
+        { name: 'list_windows', description: 'x'.repeat(50), inputSchema: {} },
+        'read',
+        () => Promise.resolve(outcome),
+      ),
+    );
   }
 
   function callingProvider(): BrainProvider {
@@ -621,7 +658,7 @@ describe('tool notifications', () => {
   }
 
   it('announces the request before the result', async () => {
-    const runner = makeRunner(callingProvider(), toolset({ content: 'two windows' }));
+    const runner = makeRunner(callingProvider(), undefined, toolset({ content: 'two windows' }));
     await runner.run({ pet, text: 'hi' }).done;
 
     const methods = events.map((event) => event.method);
@@ -631,7 +668,7 @@ describe('tool notifications', () => {
   });
 
   it('names the tool in both, so the panel can say which one', async () => {
-    const runner = makeRunner(callingProvider(), toolset({ content: 'two windows' }));
+    const runner = makeRunner(callingProvider(), undefined, toolset({ content: 'two windows' }));
     await runner.run({ pet, text: 'hi' }).done;
 
     const request = events.find((event) => event.method === 'turn.toolRequest');
@@ -646,6 +683,7 @@ describe('tool notifications', () => {
     // leaves the user watching a pet that appears to be ignoring them.
     const runner = makeRunner(
       callingProvider(),
+      undefined,
       toolset({ content: 'no host could answer', isError: true }),
     );
     await runner.run({ pet, text: 'hi' }).done;
@@ -671,13 +709,13 @@ describe('ConversationRunner per-pet providers', () => {
     };
   }
 
-  function runnerFor(resolve: (pet: Pet) => BrainProvider, tools?: PerceptionToolset) {
+  function runnerFor(resolve: (pet: Pet) => BrainProvider, toolsFor?: ToolFilter) {
     return new ConversationRunner({
       store,
       settings,
       provider: resolve,
       emit: (event) => events.push(event),
-      ...(tools ? { tools } : {}),
+      ...(toolsFor ? { toolsFor } : {}),
     });
   }
 
@@ -734,13 +772,16 @@ describe('ConversationRunner per-pet providers', () => {
 
   it('tells the tools whether this pet can see', async () => {
     const asked: (boolean | undefined)[] = [];
-    const tools: PerceptionToolset = {
-      definitions: [],
-      run: (_call, turn) => {
-        asked.push(turn?.vision);
-        return Promise.resolve({ content: 'ok' });
-      },
-    };
+    const tools = only(
+      defineTool(
+        { name: LOOK_AT_SCREEN, description: 'x'.repeat(50), inputSchema: {} },
+        'read',
+        (_input, ctx) => {
+          asked.push(ctx.vision);
+          return Promise.resolve({ content: 'ok' });
+        },
+      ),
+    );
     const fake = new FakeBrainProvider({
       text: 'ok',
       toolCall: { id: 't1', name: LOOK_AT_SCREEN, input: {} },

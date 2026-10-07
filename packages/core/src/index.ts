@@ -40,12 +40,7 @@ export {
 } from './settings/settings';
 
 export {
-  GET_SELECTION,
-  LOOK_AT_SCREEN,
-  RECALL_SCREEN,
-  WHAT_CHANGED,
   buildInventory,
-  createPerceptionToolset,
   THIN_TEXT_CHARS,
   findCaptureBlock,
   textLayerNotes,
@@ -58,11 +53,28 @@ export {
   type TextLayerReading,
   type ObservedWindow,
   type PerceptionHost,
-  type PerceptionToolset,
-  type PerceptionToolsetOptions,
-  type ToolOutcome,
-  type ToolTurn,
 } from './perception';
+
+export {
+  GET_SELECTION,
+  LOOK_AT_SCREEN,
+  RECALL_SCREEN,
+  WATCH_FOR,
+  WHAT_CHANGED,
+  ToolRegistry,
+  toolsFor,
+  type PerceptionToolsOptions,
+  type Tool,
+  type ToolContext,
+  type ToolFilter,
+  type ToolKind,
+  type ToolOutcome,
+  type TurnTools,
+} from './tools';
+/** @deprecated Renamed to `PerceptionToolsOptions` when the tools moved to one module. */
+export type { PerceptionToolsOptions as PerceptionToolsetOptions } from './tools';
+/** @deprecated The per-turn tool set is `TurnTools`, from `ToolRegistry.forTurn`. */
+export type { TurnTools as PerceptionToolset } from './tools';
 
 export { DB_FILENAME, LATEST_SCHEMA_VERSION, migrate, openDatabase } from './memory/db';
 export { ConversationStore } from './memory/store';
@@ -120,7 +132,6 @@ export {
 
 export {
   WATCH_CHANGE_THRESHOLD,
-  WATCH_FOR,
   WATCH_POLL_MS,
   WATCH_SETTLE_MS,
   WatchManager,
