@@ -1,7 +1,9 @@
 # Roles, directory and tools
 
-**Status: design** for Phase 8 (Roles). The design page with the full task list lives in the Notion
-plan.
+**Status: partly built** for Phase 8 (Roles). The role files, the generated role library, the tier
+table and its lookup helpers are **built**. Everything else on this page, including giving a pet a
+role, the directory, tool grants and the tools module, is still **design**. The design page with the
+full task list lives in the Notion plan.
 
 ## Roles
 
@@ -20,7 +22,7 @@ The first five:
 
 ### The role file
 
-One Markdown file per role in `packages/core/roles/`. The YAML header is data; the body is the
+**Built.** One Markdown file per role in `packages/core/roles/`. The YAML header is data; the body is the
 role's instructions.
 
 ```markdown
@@ -43,7 +45,17 @@ You are a backend engineer. Read the error first, name the cause in one line, th
 A script compiles the files into `packages/core/src/roles/library.generated.ts`, which is
 committed: core is compiled with `tsc` and bundled into Electron, so reading `.md` files at runtime
 would break after bundling. A test fails when the generated file is stale, a role file is invalid,
-or a role names a tool that does not exist.
+a role's id does not match its file name, or a role names a tool that does not exist.
+
+The script is `packages/core/scripts/gen-roles.mjs`. After editing a role file, regenerate with
+`pnpm --filter @tagalong/core gen:roles` and commit both files. Each file is validated against the
+`Role` schema in `packages/protocol/src/roles.ts`, where the header's snake_case keys become
+camelCase (`good_at` becomes `goodAt`, `model.needs_vision` becomes `model.needsVision`) and the
+body becomes `instructions`.
+
+`packages/core/src/roles/` reads the library: `listRoles()`, `getRole(id)` (undefined for an
+unknown id) and `recommendedModel(role, providerId)`. No pet uses a role yet; that wiring is
+still design.
 
 ## The directory: how pets know who can do what
 
@@ -74,8 +86,19 @@ The model is a pet setting, not a role setting: two Backend engineers can run on
 providers. The role only recommends.
 
 - Each role names a `tier` (fast, balanced, deep) and whether it needs pictures.
-- A table next to the provider presets maps tiers to models for each provider.
-- Creating a pet prefills the model from that table for the chosen provider; the user can pick any
+- **Built:** a table in `packages/core/src/roles/tiers.ts` maps tiers to models for each provider,
+  and `recommendedModel(role, providerId)` reads it:
+
+  | Provider   | Fast                             | Balanced                            | Deep                                |
+  | ---------- | -------------------------------- | ----------------------------------- | ----------------------------------- |
+  | OpenRouter | `anthropic/claude-haiku-4.5`     | `anthropic/claude-sonnet-5`         | `anthropic/claude-opus-5`           |
+  | Anthropic  | `claude-haiku-4-5`               | `claude-sonnet-5`                   | `claude-opus-5`                     |
+  | Nebius     | `nvidia/nemotron-3-nano-30b-a3b` | `nvidia/nemotron-3-super-120b-a12b` | `nvidia/nemotron-3-super-120b-a12b` |
+
+  On Nebius, a role that needs pictures also gets `nvidia/Nemotron-Nano-V2-12b` as its vision
+  model, because the tier model cannot see. OpenRouter and Anthropic models see on their own.
+
+- Design from here on. Creating a pet prefills the model from that table for the chosen provider; the user can pick any
   model on the provider's live list.
 - When the role needs pictures and the model cannot see, a vision model is set automatically, using
   the existing vision routing.

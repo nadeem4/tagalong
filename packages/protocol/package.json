@@ -13,6 +13,10 @@
     "./limits": {
       "types": "./dist/limits.d.ts",
       "default": "./dist/limits.js"
+    },
+    "./roles": {
+      "types": "./dist/roles.d.ts",
+      "default": "./dist/roles.js"
     }
   },
   "scripts": {
