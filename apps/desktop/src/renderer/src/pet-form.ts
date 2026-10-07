@@ -22,6 +22,39 @@ export interface PetFormValues {
   replyStyle?: string;
   /** Phase 3B. The watch check model. Empty means the provider default; absent, untouched. */
   watchModel?: string;
+  /** Phase 8. The role picked; absent leaves the pet's role alone. */
+  roleId?: string;
+  /** Phase 8. Goes with `roleId`: see `roleVersionFor`. */
+  roleVersion?: number;
+  /** Phase 8. The tool switches as JSON, tool id to `off` or `allowed`. */
+  toolGrants?: string;
+}
+
+/**
+ * The role version a pet saves with: the one it took its role at while the role is
+ * unchanged, the library's current one for a newly picked role.
+ */
+export function roleVersionFor(
+  pet: Pet,
+  roleId: string,
+  roles: readonly { id: string; version: number }[],
+): number {
+  if (roleId === pet.roleId) return pet.roleVersion;
+  return roles.find((role) => role.id === roleId)?.version ?? 1;
+}
+
+/** The tool switches, or a sentence saying they could not be read. */
+function parseGrants(pet: Pet, raw: string): Pet['toolGrants'] {
+  const problem = `${pet.name}'s tool switches could not be read. Reopen Settings and try again.`;
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw new Error(problem);
+  }
+  const parsed = Pet.shape.toolGrants.safeParse(value);
+  if (!parsed.success) throw new Error(problem);
+  return parsed.data;
 }
 
 /**
@@ -54,6 +87,8 @@ export function buildPet(pet: Pet, values: PetFormValues): Pet {
   const voiceId = values.voiceId?.trim();
   const notes = values.notes?.trim();
   const watchModel = values.watchModel?.trim();
+  const toolGrants =
+    values.toolGrants === undefined ? undefined : parseGrants(pet, values.toolGrants);
 
   const {
     visionModel: _previous,
@@ -71,6 +106,10 @@ export function buildPet(pet: Pet, values: PetFormValues): Pet {
     ...(avatar !== undefined ? { avatar } : {}),
     ...(color !== undefined ? { color } : {}),
     ...(replyStyle !== undefined ? { replyStyle } : {}),
+    ...(values.roleId !== undefined
+      ? { roleId: values.roleId, roleVersion: values.roleVersion ?? pet.roleVersion }
+      : {}),
+    ...(toolGrants !== undefined ? { toolGrants } : {}),
     // An untouched voice survives a brain-only save; a cleared one is removed.
     ...(voiceId === undefined
       ? pet.voiceId === undefined
