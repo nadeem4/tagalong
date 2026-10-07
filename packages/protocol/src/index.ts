@@ -27,3 +27,4 @@ export * from './rpc';
 export * from './settings';
 export * from './awareness';
 export * from './methods';
+export * from './roles';
