@@ -493,8 +493,8 @@ test('the Crew Office opens with the real crew in its party list', async () => {
   if (opened.fits) expect([opened.width, opened.height]).toEqual([1280, 800]);
   else expect(opened.height).toBeGreaterThan(0);
 
-  // A screenshot for design review, in the gitignored test-results folder, at the default
-  // size: when this display is too small for it, the window moves to the tallest display.
+  // The review screenshot below is taken at the default size: when this display is too
+  // small for it, the window moves to the tallest display first.
   await app.evaluate(({ BrowserWindow, screen }) => {
     const window = BrowserWindow.getAllWindows().find((w) =>
       w.webContents.getURL().includes('office.html'),
@@ -507,7 +507,43 @@ test('the Crew Office opens with the real crew in its party list', async () => {
     window.setContentSize(1280, 800);
   });
   await office.waitForTimeout(300);
+
+  // The working state, proven on the real wire. The suite's fake pet is scripted to call
+  // list_windows before it answers (TAGALONG_FAKE_TOOL), so the turn stays in flight while
+  // the real host enumerates this machine's windows. The office logs every turn event so
+  // the test can prove the capture happened before the turn ended.
+  const worker = pets.find((pet) => pet.id === 'scout') ?? pets[0];
+  if (worker === undefined) throw new Error('no pet to put to work');
+  await office.evaluate(() => {
+    const log: { type: string; at: number }[] = [];
+    (window as unknown as { officeTurns: typeof log }).officeTurns = log;
+    window.tagalong.onTurnEvent((event) => log.push({ type: event.type, at: performance.now() }));
+  });
+  await office.evaluate(
+    (petId) => window.tagalong.ask({ petId, text: 'what windows do I have open?' }),
+    worker.id,
+  );
+
+  const row = party.getByRole('button', { name: new RegExp(worker.name) });
+  await expect(row).toContainText('Working', { timeout: 10_000 });
+  await expect(office.getByTestId(`monitor-${worker.id}`)).toHaveAttribute('data-lit', 'true');
+
+  // A screenshot for design review, in the gitignored test-results folder.
   await office.screenshot({ path: join(appDir, 'test-results', 'office.png') });
+  const shotAt = await office.evaluate(() => performance.now());
+  const endedBeforeShot = await office.evaluate(
+    (at) =>
+      (window as unknown as { officeTurns: { type: string; at: number }[] }).officeTurns.some(
+        (event) =>
+          (event.type === 'turn.completed' || event.type === 'turn.error') && event.at < at,
+      ),
+    shotAt,
+  );
+  expect(endedBeforeShot, 'the screenshot must show the turn still in flight').toBe(false);
+
+  // The turn ends and the pet goes back to its desk, monitor dark.
+  await expect(row).toContainText('At desk', { timeout: 30_000 });
+  await expect(office.getByTestId(`monitor-${worker.id}`)).toHaveAttribute('data-lit', 'false');
 
   await office.close();
 });
