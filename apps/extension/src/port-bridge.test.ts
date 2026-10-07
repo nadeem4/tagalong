@@ -104,6 +104,24 @@ describe('createPortBridge', () => {
     await expect(recommended).resolves.toEqual({ model: 'nemotron' });
   });
 
+  it('relays the roles notice and its dismissal to the engine', async () => {
+    const p = fakePort();
+    const bridge = createPortBridge(p.port);
+
+    const notice = bridge.rolesNotice();
+    expect(p.sent.at(-1)).toMatchObject({ method: 'notices.rolesUpgrade', params: {} });
+    reply(p, { notice: null });
+    await expect(notice).resolves.toBeNull();
+
+    const dismissed = bridge.dismissRolesNotice();
+    expect(p.sent.at(-1)).toMatchObject({
+      method: 'notices.dismiss',
+      params: { notice: 'rolesUpgrade' },
+    });
+    reply(p, { dismissed: true });
+    await expect(dismissed).resolves.toBeUndefined();
+  });
+
   it('turns turn and crew notifications into the events the chat panel consumes', () => {
     const p = fakePort();
     const bridge = createPortBridge(p.port);

@@ -125,6 +125,12 @@ export function createPortBridge(port: PortLike): PortBridge {
         providerId,
       })) as Awaited<ReturnType<HostBridge['recommendModel']>>;
     },
+    async rolesNotice() {
+      return ((await call('notices.rolesUpgrade', {})) as ResultOf<'notices.rolesUpgrade'>).notice;
+    },
+    async dismissRolesNotice() {
+      await call('notices.dismiss', { notice: 'rolesUpgrade' });
+    },
     onTurnEvent: (handler) => subscribe(turnHandlers, handler),
     onStatus(handler) {
       if (lastStatus !== null) handler(lastStatus);

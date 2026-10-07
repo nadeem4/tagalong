@@ -240,6 +240,15 @@ async function start(): Promise<void> {
   // A fresh install starts in the wizard: provider, key, crew, hotkeys, then a first
   // question, all without a terminal. Finishing or skipping it is remembered in settings.
   if (shouldOpenOnboarding(settings, process.env)) openOnboarding();
+
+  // An install just upgraded to roles opens the office once, where the notice explains
+  // what changed. Dismissing it there marks it seen, so the next launch stays quiet.
+  void host.client
+    .call('notices.rolesUpgrade', {})
+    .then(({ notice }) => {
+      if (notice !== null) openOffice();
+    })
+    .catch((error: unknown) => console.warn('[main] could not read the roles notice', error));
 }
 
 /**
@@ -551,6 +560,15 @@ function registerIpc(): void {
   ipcMain.handle(IPC.recommendModel, async (_event, roleId: string, providerId: string) =>
     engine().client.call('roles.recommendModel', { roleId, providerId }),
   );
+
+  ipcMain.handle(IPC.rolesNotice, async () => {
+    const result = await engine().client.call('notices.rolesUpgrade', {});
+    return result.notice;
+  });
+
+  ipcMain.handle(IPC.dismissRolesNotice, async (): Promise<void> => {
+    await engine().client.call('notices.dismiss', { notice: 'rolesUpgrade' });
+  });
 
   ipcMain.handle(IPC.getContext, () => required().pendingSnapshot);
   // A window that opened after the last toggle has missed the event, and an avatar that

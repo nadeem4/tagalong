@@ -5,6 +5,7 @@ import type {
   PerceptionTarget,
   Pet,
   Role,
+  RolesUpgradeNotice,
   SettingsPatch,
 } from '@tagalong/protocol';
 import type { AskInput, HostBridge, TurnEvent } from '@tagalong/ui';
@@ -35,6 +36,8 @@ const bridge: HostBridge = {
       model?: string;
       visionModel?: string;
     }>,
+  rolesNotice: () => ipcRenderer.invoke(IPC.rolesNotice) as Promise<RolesUpgradeNotice | null>,
+  dismissRolesNotice: () => ipcRenderer.invoke(IPC.dismissRolesNotice) as Promise<void>,
   stopWatch: (watchId: string) => ipcRenderer.invoke(IPC.stopWatch, watchId) as Promise<void>,
   onTurnEvent: (handler: (event: TurnEvent) => void) => {
     const listener = (_event: IpcRendererEvent, turnEvent: TurnEvent): void => handler(turnEvent);

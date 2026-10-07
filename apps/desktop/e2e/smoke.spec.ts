@@ -1,3 +1,5 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { _electron as electron, expect, test } from '@playwright/test';
@@ -22,7 +24,9 @@ test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
   app = await electron.launch({
-    args: ['.'],
+    // A fresh profile every run, so a developer's own crew (and a pending roles notice that
+    // would open the office at launch) never changes what this suite sees.
+    args: ['.', `--user-data-dir=${mkdtempSync(join(tmpdir(), 'tagalong-smoke-'))}`],
     cwd: appDir,
     // Fake providers keep the smoke test offline and deterministic: no API key, no
     // network, and a scripted answer that always streams the same way.

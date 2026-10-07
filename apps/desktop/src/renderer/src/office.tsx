@@ -12,14 +12,15 @@ import '../../shared/ipc';
 
 /**
  * The Crew Office window. Everything it draws comes from OfficeView in @tagalong/ui; this
- * entry only hands it the preload bridge, which already receives every turn event.
+ * entry only hands it the preload bridge, which already receives every turn event, and
+ * sends Review my crew on the roles notice to the Settings window.
  */
 const container = document.getElementById('root');
 if (container !== null) {
   createRoot(container).render(
     <StrictMode>
       <HostBridgeProvider bridge={window.tagalong}>
-        <OfficeView />
+        <OfficeView onReviewCrew={() => void window.tagalongHost.openSettings()} />
       </HostBridgeProvider>
     </StrictMode>,
   );
