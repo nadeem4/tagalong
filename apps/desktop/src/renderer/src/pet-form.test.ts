@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Pet } from '@tagalong/protocol';
-import { buildPet, newPet, petIdFor } from './pet-form';
+import { buildPet, newPet, petIdFor, roleVersionFor } from './pet-form';
 
 const scout: Pet = {
   id: 'scout',
@@ -135,5 +135,52 @@ describe('buildPet watch model', () => {
 
   it('a form that does not show the field leaves it alone', () => {
     expect(buildPet(stored, brain).watchModel).toBe('old-check-model');
+  });
+});
+
+describe('buildPet role and tools', () => {
+  const brain = { providerId: 'nebius', model: scout.model, visionModel: '' };
+
+  it('applies a new role, its version and the tool grants', () => {
+    const pet = buildPet(scout, {
+      ...brain,
+      roleId: 'backend-engineer',
+      roleVersion: 2,
+      toolGrants: '{"watch_for":"off","remember":"allowed"}',
+    });
+    expect(pet.roleId).toBe('backend-engineer');
+    expect(pet.roleVersion).toBe(2);
+    expect(pet.toolGrants).toEqual({ watch_for: 'off', remember: 'allowed' });
+  });
+
+  it('a form that does not show them leaves role and grants alone', () => {
+    const pet = buildPet({ ...scout, toolGrants: { remember: 'off' } }, brain);
+    expect(pet.roleId).toBe('generalist');
+    expect(pet.toolGrants).toEqual({ remember: 'off' });
+  });
+
+  it('refuses grants that are not tool id to off or allowed', () => {
+    expect(() => buildPet(scout, { ...brain, toolGrants: '{"remember":"maybe"}' })).toThrow(
+      "Scout's tool switches could not be read. Reopen Settings and try again.",
+    );
+    expect(() => buildPet(scout, { ...brain, toolGrants: 'not json' })).toThrow(
+      "Scout's tool switches",
+    );
+  });
+});
+
+describe('roleVersionFor', () => {
+  const roles = [{ id: 'backend-engineer', version: 3 }];
+
+  it('keeps the version the pet took its role at while the role is unchanged', () => {
+    expect(roleVersionFor(scout, 'generalist', roles)).toBe(1);
+  });
+
+  it('takes the library version of a newly picked role', () => {
+    expect(roleVersionFor(scout, 'backend-engineer', roles)).toBe(3);
+  });
+
+  it('falls back to 1 for a role the library does not list', () => {
+    expect(roleVersionFor(scout, 'mystery', roles)).toBe(1);
   });
 });

@@ -7,8 +7,11 @@ import { PRELOAD_PATH, loadPage } from './page';
  */
 export function createSettingsWindow(): BrowserWindow {
   const window = new BrowserWindow({
-    width: 480,
-    height: 460,
+    // Room for the crew nav, a pet's editor and its directory card side by side.
+    width: 1080,
+    height: 760,
+    minWidth: 860,
+    minHeight: 560,
     show: false,
     title: 'Tagalong Settings',
     webPreferences: {

@@ -678,6 +678,48 @@ the page's `localStorage`. The two typefaces, Onest and
 Pixelify Sans, are bundled from `@fontsource` packages (Latin subset) so the window makes no network
 request.
 
+### The Settings window
+
+Settings (`windows/settings.ts`, the `settings` renderer page, 1080x760) is drawn in the office's
+world: a navy top bar with the Save button, a navy nav with the crew and links to each section, and
+off-white panels for the sections. Its sheet is `SETTINGS_CSS` in `@tagalong/ui`
+(`packages/ui/src/settings/settings-styles.ts`), built from `officeTokens`, so Settings has no palette
+of its own.
+
+The renderer entry `settings.tsx` holds the window state and the save; each section is one file
+under `apps/desktop/src/renderer/src/settings/`:
+
+| File                    | Section                                                                      |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| `pets-section.tsx`      | Every pet's editor, the selected one shown; look, reply style, strip, delete |
+| `keys-section.tsx`      | Provider API keys and OpenAI-compatible base URLs                            |
+| `summaries-section.tsx` | The summarizer provider and model                                            |
+| `hotkeys-section.tsx`   | The four global hotkeys and the hotkey problem, if any                       |
+| `sight-section.tsx`     | What a see-everything look sends, and the window text budget                 |
+| `awareness-section.tsx` | Rolling memory and the watch limits                                          |
+| `browser-section.tsx`   | The Chrome extension's pairing token                                         |
+| `section.tsx`           | The section list the nav links to, and the panel every section sits in       |
+
+The role-shaped part of a pet is pure components in `packages/ui/src/settings/`, which take the role
+library and the recommended model as props: `CrewList` (each pet's sprite, name and role),
+`RolePicker` (one role, its summary and good-at, and a warning that a role change replaces
+instructions and tools while name, look, notes and memories stay), `BrainPicker` (provider and model,
+a **Recommended** or **Your choice** chip and **Use recommended**), `ToolToggles` (one switch per tool
+the role lists, stored as `toolGrants`), and `DirectoryCard` (the card teammates read: name, role,
+summary, good at, not for, the tools it can reach, and its brain tier or custom). `PetSettings`
+composes them with the name and notes. The desktop editor keeps the edits in state and hands them to
+the one `FormData` save as hidden inputs; `buildPet` validates them and `roleVersionFor` keeps the
+pet's role version unless the role changed. Every pet's editor stays mounted while another is shown,
+so switching pets before saving loses nothing.
+
+The window loads the role library once with `window.tagalong.listRoles()` and asks
+`window.tagalong.recommendModel(roleId, providerId)` whenever a pet's role or provider changes. Role
+names, never ids, appear in the crew nav, the picker and the card; until the library arrives the
+editor says the roles are loading and a save keeps each pet's role. Role labels take their colour
+from `officeTokens.roleInk` by role id, through the office's `jobFor`, so a role reads the same in
+Settings and the office. Saving goes through `pets.upsert`, which refuses an unknown role and sets
+`roleVersion` for a new pet or a changed role.
+
 ## Awareness (Phase 3B)
 
 The pet can remember the last few minutes of the desktop and watch for something to happen. Both

@@ -2,10 +2,10 @@
 
 **Status: partly built** for Phase 8 (Roles). The role files, the generated role library, the tier
 table and its lookup helpers, [the tools module](#the-tools-module), giving a pet a role, the
-directory, filtering a turn's tools by role and grants, [roles over RPC](#roles-over-rpc) and the
-office's job labels are **built**. Editing grants and picking a role in Settings are still
-**design**. The design page with the full task list lives in the Notion
-plan.
+directory, filtering a turn's tools by role and grants, [roles over RPC](#roles-over-rpc), the
+office's job labels, and picking a role, the recommended model, the tool switches and the directory
+card preview in Settings (see [The Settings window](../architecture.md#the-settings-window)) are
+**built**. The design page with the full task list lives in the Notion plan.
 
 ## Roles
 
@@ -148,10 +148,12 @@ providers. The role only recommends.
   model, because the tier model cannot see. OpenRouter and Anthropic models see on their own.
 
 - **Built:** `roles.recommendModel` answers that lookup over RPC, so a form can prefill the model.
-- Design from here on. Creating a pet in Settings prefills the model from that table for the chosen
-  provider; the user can pick any model on the provider's live list.
-- When the role needs pictures and the model cannot see, a vision model is set automatically, using
-  the existing vision routing.
+- **Built:** Settings shows each pet's model as **Recommended** when it is the one that lookup gives
+  for the pet's role and provider, and **Your choice** otherwise. **Use recommended** sets the
+  recommended model and its vision model (clearing the vision model when the recommendation needs
+  none). The user can still type or pick any model on the provider's live list.
+- Design from here on. Prefilling the recommended model when a pet is added, and setting a vision
+  model automatically when the role needs pictures and the chosen model cannot see.
 
 ## What a pet stores
 

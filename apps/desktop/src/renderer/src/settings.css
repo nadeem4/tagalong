@@ -1,0 +1,11 @@
+/*
+ * Settings draws itself from @tagalong/ui's SETTINGS_CSS, built from the office tokens; the
+ * page only has to give it the whole window.
+ */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}

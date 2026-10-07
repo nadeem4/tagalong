@@ -128,7 +128,9 @@ A fresh install has three pets. Click one on the strip to talk to it.
 - **Memory.** Tell a pet "I prefer short answers" and it remembers across restarts.
 
 Settings edits every pet (name, emoji, colour, notes, provider, model), adds and deletes pets, and
-chooses which ones sit on the desktop.
+chooses which ones sit on the desktop. Pick a pet in Settings to choose its role (Generalist, Backend
+engineer, Frontend engineer, Writer or Researcher) and switch its tools on or off; the card beside it
+shows how its teammates see it.
 
 To see the whole crew at work, right-click the tray icon and choose **Open office**.
 

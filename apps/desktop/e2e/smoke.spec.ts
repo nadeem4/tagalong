@@ -445,6 +445,59 @@ test('the setup wizard opens on request, insists on a key, and Skip closes it fo
   }
 });
 
+test('Settings opens on the crew, with the selected pet editor and its sections', async () => {
+  const panel = await windowFor('panel');
+  await panel.evaluate(() => window.tagalongHost.openSettings());
+  const settings = await windowFor('settings');
+
+  const nav = settings.getByRole('navigation', { name: 'Settings' });
+  const pets = await panel.evaluate(() => window.tagalong.listPets());
+  expect(pets.length).toBeGreaterThan(0);
+  const [first] = pets;
+  if (first === undefined) throw new Error('no pet to edit');
+  for (const pet of pets.slice(0, 8)) {
+    await expect(nav.getByRole('button', { name: new RegExp(pet.name) })).toBeVisible({
+      timeout: 15_000,
+    });
+  }
+  await expect(nav.getByRole('button', { name: new RegExp(first.name) })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  const editor = settings.getByTestId(`pet-editor-${first.id}`);
+  await expect(editor).toBeVisible();
+
+  // The role picker offers the engine's whole library, by name, with the pet's own role
+  // chosen, and the crew nav and the directory card name that role, never its id.
+  const roles = await panel.evaluate(() => window.tagalong.listRoles());
+  expect(roles.map((role) => role.id).sort()).toEqual([
+    'backend-engineer',
+    'frontend-engineer',
+    'generalist',
+    'researcher',
+    'writer',
+  ]);
+  await expect(editor.getByRole('radio')).toHaveCount(5);
+  for (const role of roles) {
+    await expect(editor.getByRole('radio', { name: role.name })).toHaveCount(1);
+  }
+  const own = roles.find((role) => role.id === first.roleId);
+  if (own === undefined) throw new Error(`${first.name}'s role is not in the library`);
+  await expect(editor.getByRole('radio', { name: own.name })).toBeChecked();
+  await expect(nav.getByRole('button', { name: new RegExp(first.name) })).toContainText(own.name);
+  await expect(
+    editor.getByRole('region', { name: `How teammates see ${first.name}` }),
+  ).toContainText(own.summary);
+  await expect(editor.getByRole('switch')).toHaveCount(own.tools.length);
+  for (const section of ['Pets', 'Keys and services', 'Hotkeys', 'Awareness']) {
+    await expect(settings.getByRole('region', { name: section })).toBeVisible();
+  }
+
+  // A screenshot for design review, in the gitignored test-results folder.
+  await settings.screenshot({ path: join(appDir, 'test-results', 'settings.png') });
+  await settings.close();
+});
+
 test('the Crew Office opens with the real crew in its party list', async () => {
   const panel = await windowFor('panel');
   // The tray's Open office item calls the same main-process function as this host call;
