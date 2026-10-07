@@ -22,6 +22,10 @@ export const SETTINGS_CSS = `
 .tg-settings ::-webkit-scrollbar-track { background: transparent; }
 .tg-settings ::-webkit-scrollbar-thumb { background: ${t.color.scrollbarThumb}; border-radius: 4px; }
 .tg-px { font-family: ${t.font.pixel}; letter-spacing: ${t.letterSpacing.pixel}px; }
+.tg-sr {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
 .tg-bar {
   grid-column: 1 / -1; display: flex; align-items: center; gap: ${t.space.lg}px;
   padding: 0 ${t.space.xxl}px; border-bottom: 1px solid ${t.color.line}; background: ${t.color.page};

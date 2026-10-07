@@ -3,7 +3,8 @@ import type { Pet, Role, ToolGrant } from '@tagalong/protocol';
 import { PixelSprite } from '../office/pixel-sprite';
 import { characterFor } from '../office/sprites/characters';
 import { officeTokens as t } from '../office/tokens';
-import { reachableTools, roleInk, toolLabel } from './roles-view';
+import { jobFor } from '../office/job';
+import { reachableTools, toolLabel } from './roles-view';
 
 export interface DirectoryCardProps {
   pet: Pet;
@@ -35,7 +36,7 @@ export function DirectoryCard({ pet, name, role, grants, brain }: DirectoryCardP
         </span>
         <span>
           <span className="tg-px tg-name">{name}</span>
-          <span className="tg-px tg-job" style={{ color: roleInk(role.name) }}>
+          <span className="tg-px tg-job" style={{ color: jobFor(role.id, [role]).ink }}>
             {role.name}
           </span>
         </span>

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { Pet, Role } from '@tagalong/protocol';
 import { FIXTURE_ROLES } from '../test-support/fixture-roles';
+import { officeTokens } from '../office/tokens';
 import { BrainPicker } from './brain-picker';
 import { CrewList } from './crew-list';
 import { DirectoryCard } from './directory-card';
@@ -48,9 +49,28 @@ describe('CrewList', () => {
     expect(onSelect).toHaveBeenCalledWith('bolt');
   });
 
-  it('falls back to the role id while the role library is not loaded', () => {
+  it('colours each role label with the ink officeTokens keeps for that role id', () => {
+    render(<CrewList pets={crew} roles={FIXTURE_ROLES} selectedId={null} onSelect={() => {}} />);
+    expect(screen.getByText('Backend engineer')).toHaveStyle({
+      color: officeTokens.roleInk['backend-engineer'],
+    });
+  });
+
+  it('shows no role, never the raw id, while the role library is loading', () => {
     render(<CrewList pets={crew} roles={[]} selectedId={null} onSelect={() => {}} />);
-    expect(screen.getByRole('button', { name: /Bolt/ })).toHaveTextContent('backend-engineer');
+    expect(screen.getByRole('button', { name: /Bolt/ })).not.toHaveTextContent('backend-engineer');
+  });
+
+  it('reads a role the library does not have as Generalist, as the engine runs it', () => {
+    render(
+      <CrewList
+        pets={[pet('sage', 'Sage', 'retired-role')]}
+        roles={FIXTURE_ROLES}
+        selectedId={null}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /Sage/ })).toHaveTextContent('Generalist');
   });
 });
 
@@ -123,7 +143,8 @@ describe('RolePicker', () => {
       />,
     );
     expect(screen.queryByRole('radio')).not.toBeInTheDocument();
-    expect(screen.getByText(/Roles load from the engine/)).toBeInTheDocument();
+    expect(screen.getByText('Loading roles…')).toBeInTheDocument();
+    expect(screen.queryByText(/backend-engineer/)).not.toBeInTheDocument();
   });
 });
 

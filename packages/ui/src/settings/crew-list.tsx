@@ -2,7 +2,7 @@ import type { Pet, Role } from '@tagalong/protocol';
 import { PixelSprite } from '../office/pixel-sprite';
 import { characterFor } from '../office/sprites/characters';
 import { officeTokens as t } from '../office/tokens';
-import { roleInk } from './roles-view';
+import { jobFor } from '../office/job';
 
 export interface CrewListProps {
   pets: readonly Pet[];
@@ -16,7 +16,11 @@ export function CrewList({ pets, roles, selectedId, onSelect }: CrewListProps) {
   return (
     <ul>
       {pets.map((pet) => {
-        const roleName = roles.find((role) => role.id === pet.roleId)?.name ?? pet.roleId;
+        // A role the library lacks works as a generalist, so it reads as one (as in the office);
+        // nothing is shown until the library has loaded.
+        const role =
+          roles.find((r) => r.id === pet.roleId) ?? roles.find((r) => r.id === 'generalist');
+        const roleName = roles.length === 0 ? '' : (role?.name ?? 'Generalist');
         return (
           <li key={pet.id}>
             <button
@@ -30,7 +34,7 @@ export function CrewList({ pets, roles, selectedId, onSelect }: CrewListProps) {
               </span>
               <span>
                 <span className="tg-px tg-name">{pet.name}</span>
-                <span className="tg-px tg-job" style={{ color: roleInk(roleName) }}>
+                <span className="tg-px tg-job" style={{ color: jobFor(pet.roleId, roles).ink }}>
                   {roleName}
                 </span>
               </span>

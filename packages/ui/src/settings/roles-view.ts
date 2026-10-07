@@ -1,6 +1,4 @@
 import type { Role, ToolGrant } from '@tagalong/protocol';
-import { CHARACTERS } from '../office/sprites/characters';
-import { officeTokens } from '../office/tokens';
 
 /** Each built-in tool in words a person reads in Settings. */
 const TOOL_NAMES: Readonly<Record<string, string>> = {
@@ -45,14 +43,4 @@ export function reachableTools(role: Role, grants: Readonly<Record<string, ToolG
 /** The brain on a directory card: the role's tier on the recommended model, else custom. */
 export function brainLabel(role: Role, model: string, recommended: string | undefined): string {
   return recommended !== undefined && model === recommended ? role.model.tier : 'custom';
-}
-
-/**
- * A role's one label ink: the ink of the character whose job label names it (One Colour Per
- * Class), or the muted shell text for a role no character carries yet.
- */
-export function roleInk(roleName: string): string {
-  const upper = roleName.toUpperCase();
-  const match = Object.values(CHARACTERS).find((character) => character.jobLabel === upper);
-  return match?.labelInk ?? officeTokens.color.textMuted;
 }

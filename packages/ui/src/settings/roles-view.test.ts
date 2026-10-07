@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Role } from '@tagalong/protocol';
 import { FIXTURE_ROLES } from '../test-support/fixture-roles';
-import { officeTokens } from '../office/tokens';
-import { brainLabel, reachableTools, roleInk, toolLabel } from './roles-view';
+import { brainLabel, reachableTools, toolLabel } from './roles-view';
 
 const [generalist, backend] = FIXTURE_ROLES as [Role, Role];
 
@@ -42,16 +41,5 @@ describe('brainLabel', () => {
   it('is custom when the model is anything else, or nothing is recommended', () => {
     expect(brainLabel(backend, 'haiku', 'opus')).toBe('custom');
     expect(brainLabel(backend, 'opus', undefined)).toBe('custom');
-  });
-});
-
-describe('roleInk', () => {
-  it('takes a class ink from the character whose job label names the role', () => {
-    expect(roleInk('Backend engineer')).toBe('#F6B85A');
-    expect(roleInk('Writer')).toBe('#A996F5');
-  });
-
-  it('falls back to the muted shell text for a role with no ink', () => {
-    expect(roleInk('Researcher')).toBe(officeTokens.color.textMuted);
   });
 });

@@ -15,13 +15,13 @@ export interface RolePickerProps {
 export function RolePicker({ petName, roles, roleId, savedRoleId, onChange }: RolePickerProps) {
   const group = useId();
   if (roles.length === 0) {
-    return <p className="tg-note">Roles load from the engine. This pet does: {roleId}.</p>;
+    return <p className="tg-note">Loading roles…</p>;
   }
   const chosen = roles.find((role) => role.id === roleId);
   return (
     <div>
       <fieldset className="tg-choices">
-        <legend className="tg-note">Role</legend>
+        <legend className="tg-sr">Role</legend>
         {roles.map((role) => (
           <label key={role.id} className="tg-choice">
             <input
