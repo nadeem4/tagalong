@@ -1,0 +1,227 @@
+{
+  "title": "Choose Tagalong's visual world",
+  "question": "The roll assigned Pocket Pet. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Pocket Pet",
+      "kicker": "THE ROLL",
+      "lineage": "1990s egg-shaped LCD virtual pets",
+      "thesis": "Every pet lives in its own little LCD window; the app is the candy-coloured shell around them.",
+      "palette": [
+        "#E8505B",
+        "#CAD7B0",
+        "#26301F",
+        "#2E2A3A",
+        "#F4C542"
+      ],
+      "materials": [
+        "LCD dot-matrix screens",
+        "translucent candy plastic",
+        "1-bit pixel sprites"
+      ],
+      "viewport": "Crew Office: crew rail left, the office as one recessed LCD scene with pets at desks and rooms, meetings panel right.",
+      "risk": "Reads as a toy to technical users if the LCD spreads from the pets into the controls.",
+      "raised": [
+        {
+          "from": "challenger-exposure-record",
+          "raise": "Pet state is an LCD icon plus a word, never colour alone."
+        },
+        {
+          "from": "challenger-design-annual",
+          "raise": "One UI face with a strict five-step scale; pixel type only on pet names and LCD readouts."
+        },
+        {
+          "from": "challenger-labanotation",
+          "raise": "A meeting reads as a time column whose length is its model calls."
+        },
+        {
+          "from": "challenger-cassette",
+          "raise": "A meeting's call cap is a visible meter that fills, like a tape that must not overflow."
+        }
+      ],
+      "comp": ".impeccable/mocks/decision/assigned.png"
+    },
+    {
+      "id": "model-pick",
+      "label": "Party Menu",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "16-bit RPG party and job-class menus",
+      "thesis": "Your crew is an adventuring party: one job class each, abilities equipped, a top-down office map.",
+      "palette": [
+        "#1C2A7A",
+        "#F2C14E",
+        "#FFFFFF",
+        "#0E1230"
+      ],
+      "materials": [
+        "bordered menu windows",
+        "16-bit sprites",
+        "top-down tile map"
+      ],
+      "viewport": "Party list with job classes on the left, the office as a 16-bit map, meeting log in a bordered window.",
+      "risk": "The blue RPG window is the most familiar retro move there is; it reads as pastiche if overused.",
+      "comp": ".impeccable/mocks/decision/model-pick.png"
+    },
+    {
+      "id": "challenger-character-catalog",
+      "label": "Character Goods Catalog",
+      "verdict": "competitive",
+      "lineage": "character merchandise catalogs",
+      "thesis": "The crew as a cast of mascots, each with a name plate, a role and a one-line note.",
+      "palette": [
+        "#FCE4EC",
+        "#E3F2FD",
+        "#FFF3C4",
+        "#FFFFFF",
+        "#FF6F91"
+      ],
+      "materials": [
+        "white keylines",
+        "flat pastel fills",
+        "one ribbon colour per pet"
+      ],
+      "viewport": "A roster grid of pets with name plates and role notes; the office opens from a pet's cell.",
+      "case": "Fuses well: the directory card becomes a name plate. Wins clarity on crew screens, loses identity on the office.",
+      "risk": "Can tip into kawaii merchandise and away from a working tool.",
+      "comp": ".impeccable/mocks/decision/challenger-character-catalog.png",
+      "hero": "https://impeccable.style/worlds/cards/pop-culture-shelf-character-goods-catalog-hero.webp"
+    },
+    {
+      "id": "challenger-zoo-map",
+      "label": "Zoo Guide Map",
+      "verdict": "competitive",
+      "lineage": "printed zoo and garden guide maps",
+      "thesis": "The office as a guide map: desks and meeting rooms are flat colour lobes, pets stand on the coastlines.",
+      "palette": [
+        "#8ED462",
+        "#F5F1E4",
+        "#2C2E2A",
+        "#FF705D",
+        "#2BA0FF"
+      ],
+      "materials": [
+        "flat unmodulated colour",
+        "capsule labels",
+        "one geometry for rooms"
+      ],
+      "viewport": "The office floor as a map of lobes, each room a colour, with capsule labels for live meetings.",
+      "case": "Rooms read instantly as places; flat vector fights the pinned pixel-art feel.",
+      "risk": "Loses the pixel game feel the brand asked for.",
+      "hero": "https://impeccable.style/worlds/cards/aww2-zoo-gardens-guide-map-hero.webp"
+    },
+    {
+      "id": "challenger-exposure-record",
+      "label": "Darkroom Exposure Record",
+      "verdict": "declined",
+      "lineage": "darkroom printing records",
+      "thesis": "State as hatch density on stacked translucent sheets.",
+      "palette": [
+        "#EDEDED",
+        "#8A8A8A",
+        "#1A1A1A",
+        "#C2185B"
+      ],
+      "materials": [
+        "tracing paper",
+        "zone ramp"
+      ],
+      "viewport": "Overlapping sheets over a zone wedge.",
+      "case": "Neither audience recognises a darkroom record.",
+      "risk": "Cold and specialist.",
+      "kept": "State readable without colour.",
+      "hero": "https://impeccable.style/worlds/cards/operate-b-exposure-record-zone-sheets-hero.webp"
+    },
+    {
+      "id": "challenger-design-annual",
+      "label": "Design Annual Plates",
+      "verdict": "declined",
+      "lineage": "design annual plate sections",
+      "thesis": "Registration marks and hairlines on near-white stock.",
+      "palette": [
+        "#F5F4F6",
+        "#16181A",
+        "#DCDDF3"
+      ],
+      "materials": [
+        "hairlines",
+        "registration crosses"
+      ],
+      "viewport": "A plate grid with one grotesque.",
+      "case": "Too austere for warm and playful.",
+      "risk": "Reads as a portfolio, not a crew.",
+      "kept": "One face, strict scale.",
+      "hero": "https://impeccable.style/worlds/cards/design-annual-s-plate-section-hero.webp"
+    },
+    {
+      "id": "challenger-labanotation",
+      "label": "Dance Score",
+      "verdict": "declined",
+      "lineage": "labanotation scores",
+      "thesis": "Time runs up a centre staff; length is duration.",
+      "palette": [
+        "#FFFFFF",
+        "#000000",
+        "#D9D9D9"
+      ],
+      "materials": [
+        "symbol blocks",
+        "hatching"
+      ],
+      "viewport": "A vertical staff of meeting turns.",
+      "case": "Nobody in either audience reads a dance score.",
+      "risk": "Opaque notation.",
+      "kept": "Time as a measurable column.",
+      "hero": "https://impeccable.style/worlds/cards/notation-diagram-systems-labanotation-hero.webp"
+    },
+    {
+      "id": "challenger-cassette",
+      "label": "Mixtape J-Card",
+      "verdict": "declined",
+      "lineage": "hand-lettered cassette inlays",
+      "thesis": "Two sides, timed to fit the tape exactly.",
+      "palette": [
+        "#FFFFFF",
+        "#1F3A93",
+        "#C0392B"
+      ],
+      "materials": [
+        "ballpoint",
+        "lined inlay"
+      ],
+      "viewport": "A folded card of meetings.",
+      "case": "Charming, but says music, not a working crew.",
+      "risk": "Nostalgia without function.",
+      "kept": "A hard limit made visible.",
+      "hero": "https://impeccable.style/worlds/cards/vernacular-ephemera-cassette-j-card-hero.webp"
+    }
+  ],
+  "reroll": {
+    "registers": [
+      "safer",
+      "bolder"
+    ]
+  },
+  "buildPath": {
+    "value": "comp",
+    "toggle": true
+  },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "A clean modern desktop tool, with pixel pets only as avatars.",
+    "palette": [
+      "#FFFFFF",
+      "#111827",
+      "#6366F1"
+    ],
+    "materials": [
+      "neutral panels",
+      "system type",
+      "pixel avatars"
+    ],
+    "viewport": "Sidebar, office canvas and meetings panel, executed like the best productivity apps.",
+    "risk": "Indistinguishable from other AI assistants by design."
+  },
+  "steer": true
+}

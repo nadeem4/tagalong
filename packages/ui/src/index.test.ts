@@ -12,6 +12,8 @@ describe('ui package surface', () => {
         'SightBar',
         'HostBridgeProvider',
         'MessageList',
+        'OfficeView',
+        'PixelSprite',
         'PetAvatar',
         'createFakeHostBridge',
         'estimateImageTokens',

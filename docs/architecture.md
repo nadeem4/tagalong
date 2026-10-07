@@ -333,7 +333,7 @@ The preload exposes exactly two globals, and the split between them is deliberat
 Keeping them apart means a shared UI component can never grow a dependency on something the Chrome host
 will not have: if it compiles against `HostBridge`, it runs in both hosts.
 
-Every window — avatar, panel, settings — is created with `contextIsolation: true`,
+Every window — avatar, panel, settings, onboarding, office — is created with `contextIsolation: true`,
 `nodeIntegration: false`, and `sandbox: true`. Nothing from node or electron crosses the preload
 boundary; only plain data over the IPC channels named in `src/shared/ipc.ts`. Because a sandboxed
 preload can only be CommonJS while the package is ESM, the preload is built to `dist/preload/index.cjs`.
@@ -628,6 +628,46 @@ Each avatar's ring follows its own turns (`nextPetStates`), so a roundtable ligh
 `settings.hiddenPets` takes pets off the strip; they still answer in the panel. Settings edits every
 pet field, adds pets (on the fake brain until a provider is picked) and deletes them, and sets
 `settings.summarizer`.
+
+### The Crew Office
+
+The office is a framed desktop window (`windows/office.ts`, the `office` renderer page) opened from the
+tray's **Open office** item or `tagalongHost.openOffice()`, with a 1280x800 page (`useContentSize`) so
+the floor fits without scrolling; a screen too small for that clamps the window and the floor scrolls. It shows the crew as 16-bit pixel characters
+at desks on an office floor, with a party list on the left and a meetings panel on the right. The
+renderer entry only wraps `OfficeView` from `@tagalong/ui` in the preload's `HostBridge`; everything
+it draws is in `packages/ui/src/office`, so the browser host can reuse it.
+
+It is split so the look can change without touching component logic:
+
+- **Tokens** — `office/tokens.ts` holds every colour, font, font size, spacing value, radius, sprite
+  scale and timing. Components read only from it; `office-styles.ts` builds the few rules inline
+  styles cannot express (hover, focus ring, `::selection`, scrollbar, the stepped idle bob and its
+  `prefers-reduced-motion` switch-off) from the same tokens, scoped under `.office`.
+- **Sprites as data** — `office/sprites/` keeps each character as a pixel map (rows of characters),
+  a palette and optional overlay pixels. `spriteShadow` turns a sprite into a CSS `box-shadow` (one
+  1px shadow per pixel) and `PixelSprite` draws it on one pixel scaled by a whole number. No images,
+  no canvas. `characterFor(pet)` is the one mapping from a pet to a character: Scout, Ink and Bolt get
+  their own; any other pet gets the shared body recoloured from its `color`.
+  The furniture is sprites too (`sprites/furniture.ts`: desk, monitor, chair, meeting table, wall
+  window, a shelf, a water cooler, and a lounge of rug, sofa, coffee table and plant that
+  `loungeAt(n)` places below the desks until a seventh pet needs that band), drawn at the pets' 3x scale with shading painted into the
+  pixels. Each desk's monitor stands beside its pet facing the viewer, lit teal while the pet works.
+- **Layout as data** — `office/layout.ts` holds the floor size, the two meeting rooms (`ROOM_COUNT`),
+  windows, plants and props, and pure functions for desk positions (`deskLayout(n)`, two columns of up to
+  eight desks), seats, monitors and the selection cursor.
+- **Small components** — `PartyList`, `OfficeFloor`, `MeetingsPanel` and `PixelSprite`, composed by
+  `OfficeView`.
+
+Status comes from the turn notifications main already forwards to every window: `nextActivity` keeps
+the turns in flight, so a pet reads **Working** (and its monitor lights) from `turn.started` until that
+turn completes or errors, and **At desk** otherwise — always an icon and a word. Meetings, task
+assignment and office settings are later phases: the rooms read **Free**, the meetings panel shows an
+empty state, and the assign field is disabled with a tooltip saying so. A **Still office** toggle in the
+top bar stops the idle bob and the cursor hop (as `prefers-reduced-motion` does) and is remembered in
+the page's `localStorage`. The two typefaces, Onest and
+Pixelify Sans, are bundled from `@fontsource` packages (Latin subset) so the window makes no network
+request.
 
 ## Awareness (Phase 3B)
 

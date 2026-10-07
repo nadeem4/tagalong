@@ -444,3 +444,106 @@ test('the setup wizard opens on request, insists on a key, and Skip closes it fo
     );
   }
 });
+
+test('the Crew Office opens with the real crew in its party list', async () => {
+  const panel = await windowFor('panel');
+  // The tray's Open office item calls the same main-process function as this host call;
+  // a tray menu cannot be clicked from Playwright.
+  await panel.evaluate(() => window.tagalongHost.openOffice());
+  const office = await windowFor('office');
+
+  const party = office.getByRole('navigation', { name: 'Party' });
+  const pets = await panel.evaluate(() => window.tagalong.listPets());
+  expect(pets.length).toBeGreaterThan(0);
+  for (const pet of pets.slice(0, 8)) {
+    await expect(party.getByRole('button', { name: new RegExp(pet.name) })).toBeVisible({
+      timeout: 15_000,
+    });
+  }
+  await expect(office.getByRole('complementary', { name: 'Meetings' })).toContainText(
+    'No meetings yet',
+  );
+
+  // The bundled typefaces must load under the page's CSP, or the office falls back to
+  // system fonts without saying so.
+  const fontsLoaded = await office.evaluate(async () => ({
+    onest: (await document.fonts.load("14px 'Onest'")).length,
+    pixel: (await document.fonts.load("17px 'Pixelify Sans'")).length,
+  }));
+  expect(fontsLoaded.onest).toBeGreaterThan(0);
+  expect(fontsLoaded.pixel).toBeGreaterThan(0);
+
+  // The window opens with a 1280x800 page whenever its display has room for that plus the
+  // frame. A smaller screen is allowed to clamp it; the floor scrolls there instead.
+  const opened = await app.evaluate(({ BrowserWindow, screen }) => {
+    const window = BrowserWindow.getAllWindows().find((w) =>
+      w.webContents.getURL().includes('office.html'),
+    );
+    if (window === undefined) return null;
+    const [width = 0, height = 0] = window.getContentSize();
+    const [frameWidth = 0, frameHeight = 0] = window.getSize();
+    const area = screen.getDisplayMatching(window.getBounds()).workArea;
+    return {
+      width,
+      height,
+      fits: area.width >= 1280 + frameWidth - width && area.height >= 800 + frameHeight - height,
+    };
+  });
+  if (opened === null) throw new Error('the office window is not open');
+  if (opened.fits) expect([opened.width, opened.height]).toEqual([1280, 800]);
+  else expect(opened.height).toBeGreaterThan(0);
+
+  // The review screenshot below is taken at the default size: when this display is too
+  // small for it, the window moves to the tallest display first.
+  await app.evaluate(({ BrowserWindow, screen }) => {
+    const window = BrowserWindow.getAllWindows().find((w) =>
+      w.webContents.getURL().includes('office.html'),
+    );
+    const tallest = [...screen.getAllDisplays()].sort(
+      (a, b) => b.workArea.height - a.workArea.height,
+    )[0];
+    if (window === undefined || tallest === undefined) return;
+    window.setPosition(tallest.workArea.x, tallest.workArea.y);
+    window.setContentSize(1280, 800);
+  });
+  await office.waitForTimeout(300);
+
+  // The working state, proven on the real wire. The suite's fake pet is scripted to call
+  // list_windows before it answers (TAGALONG_FAKE_TOOL), so the turn stays in flight while
+  // the real host enumerates this machine's windows. The office logs every turn event so
+  // the test can prove the capture happened before the turn ended.
+  const worker = pets.find((pet) => pet.id === 'scout') ?? pets[0];
+  if (worker === undefined) throw new Error('no pet to put to work');
+  await office.evaluate(() => {
+    const log: { type: string; at: number }[] = [];
+    (window as unknown as { officeTurns: typeof log }).officeTurns = log;
+    window.tagalong.onTurnEvent((event) => log.push({ type: event.type, at: performance.now() }));
+  });
+  await office.evaluate(
+    (petId) => window.tagalong.ask({ petId, text: 'what windows do I have open?' }),
+    worker.id,
+  );
+
+  const row = party.getByRole('button', { name: new RegExp(worker.name) });
+  await expect(row).toContainText('Working', { timeout: 10_000 });
+  await expect(office.getByTestId(`monitor-${worker.id}`)).toHaveAttribute('data-lit', 'true');
+
+  // A screenshot for design review, in the gitignored test-results folder.
+  await office.screenshot({ path: join(appDir, 'test-results', 'office.png') });
+  const shotAt = await office.evaluate(() => performance.now());
+  const endedBeforeShot = await office.evaluate(
+    (at) =>
+      (window as unknown as { officeTurns: { type: string; at: number }[] }).officeTurns.some(
+        (event) =>
+          (event.type === 'turn.completed' || event.type === 'turn.error') && event.at < at,
+      ),
+    shotAt,
+  );
+  expect(endedBeforeShot, 'the screenshot must show the turn still in flight').toBe(false);
+
+  // The turn ends and the pet goes back to its desk, monitor dark.
+  await expect(row).toContainText('At desk', { timeout: 30_000 });
+  await expect(office.getByTestId(`monitor-${worker.id}`)).toHaveAttribute('data-lit', 'false');
+
+  await office.close();
+});

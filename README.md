@@ -130,6 +130,8 @@ A fresh install has three pets. Click one on the strip to talk to it.
 Settings edits every pet (name, emoji, colour, persona, provider, model), adds and deletes pets, and
 chooses which ones sit on the desktop.
 
+To see the whole crew at work, right-click the tray icon and choose **Open office**.
+
 ## The Chrome extension
 
 The extension puts the same crew in Chrome's side panel and lets a pet read the exact page you are

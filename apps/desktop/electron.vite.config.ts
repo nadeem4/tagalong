@@ -76,6 +76,7 @@ export default defineConfig({
           panel: 'src/renderer/panel.html',
           settings: 'src/renderer/settings.html',
           onboarding: 'src/renderer/onboarding.html',
+          office: 'src/renderer/office.html',
         },
       },
     },

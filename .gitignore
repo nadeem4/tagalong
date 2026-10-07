@@ -35,3 +35,8 @@ Thumbs.db
 
 # local agent history
 .remember/
+
+# design tool scratch (local only)
+.impeccable/questions/
+.impeccable/review/
+.claude/worktrees/

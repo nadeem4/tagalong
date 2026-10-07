@@ -38,9 +38,11 @@ import { SightPause } from './sight-pause';
 import type { Platform } from './platform/index';
 import { SafeStorageSecretStore } from './secret-store';
 import { createTrayIcon } from './tray-icon';
+import { trayMenuTemplate } from './tray-menu';
 import { createAvatarWindow } from './windows/avatar';
 import { createPanelWindow, showPanelBeside } from './windows/panel';
 import { AVATAR_SIZE, resolveAvatarPosition, stripWidth } from './windows/position';
+import { createOfficeWindow } from './windows/office';
 import { createOnboardingWindow } from './windows/onboarding';
 import { createSettingsWindow } from './windows/settings';
 import { IPC } from '../shared/ipc';
@@ -62,6 +64,8 @@ interface Desktop {
   settingsWindow: BrowserWindow | null;
   /** Phase 7: the setup wizard, while it is open. */
   onboardingWindow: BrowserWindow | null;
+  /** The Crew Office, while it is open. */
+  officeWindow: BrowserWindow | null;
   /** The snapshot the last hotkey captured, handed to the panel and sent with the ask. */
   pendingSnapshot: ContextSnapshot | null;
   /** Turn ids in flight: the panel must not vanish on focus loss mid-answer. */
@@ -174,6 +178,7 @@ async function start(): Promise<void> {
     tray: createTray(),
     settingsWindow: null,
     onboardingWindow: null,
+    officeWindow: null,
     pendingSnapshot: null,
     activeTurns: new Set(),
     hotkeys: new HotkeyManager({
@@ -330,30 +335,27 @@ function toggleSightPause(): boolean {
 
 /** Rebuilt whenever pause flips, so the checkmark cannot drift from the real state. */
 function buildTrayMenu(): Menu {
-  return Menu.buildFromTemplate([
-    {
-      label: 'Show or hide pets',
-      click: () => {
-        if (desktop?.avatar === null || desktop === null) return;
-        if (desktop.avatar?.isVisible() === true) {
-          desktop.avatar.hide();
-          desktop.panel?.hide();
-        } else {
-          desktop.avatar?.show();
-        }
+  return Menu.buildFromTemplate(
+    trayMenuTemplate(
+      {
+        togglePets: () => {
+          if (desktop?.avatar === null || desktop === null) return;
+          if (desktop.avatar?.isVisible() === true) {
+            desktop.avatar.hide();
+            desktop.panel?.hide();
+          } else {
+            desktop.avatar?.show();
+          }
+        },
+        toggleSightPause: () => void toggleSightPause(),
+        openOffice,
+        openSettings,
+        openOnboarding,
+        quit: () => app.quit(),
       },
-    },
-    {
-      label: 'Pause sight',
-      type: 'checkbox',
-      checked: desktop?.sightPause.paused ?? false,
-      click: () => toggleSightPause(),
-    },
-    { label: 'Settings', click: openSettings },
-    { label: 'Setup wizard', click: openOnboarding },
-    { type: 'separator' },
-    { label: 'Quit', click: () => app.quit() },
-  ]);
+      { sightPaused: desktop?.sightPause.paused ?? false },
+    ),
+  );
 }
 
 function createTray(): Tray {
@@ -375,6 +377,20 @@ function openSettings(): void {
     if (desktop !== null) desktop.settingsWindow = null;
   });
   desktop.settingsWindow = window;
+}
+
+/** Opens the Crew Office, or brings the open one forward. */
+function openOffice(): void {
+  if (desktop === null) return;
+  if (desktop.officeWindow !== null && !desktop.officeWindow.isDestroyed()) {
+    desktop.officeWindow.focus();
+    return;
+  }
+  const window = createOfficeWindow();
+  window.on('closed', () => {
+    if (desktop !== null) desktop.officeWindow = null;
+  });
+  desktop.officeWindow = window;
 }
 
 /** Opens the setup wizard, or brings the open one forward. */
@@ -634,6 +650,7 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.openSettings, () => openSettings());
   ipcMain.handle(IPC.openOnboarding, () => openOnboarding());
+  ipcMain.handle(IPC.openOffice, () => openOffice());
 
   ipcMain.handle(IPC.finishOnboarding, async (_event, openPanel: boolean) => {
     const current = required();

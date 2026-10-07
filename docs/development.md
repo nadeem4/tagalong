@@ -46,6 +46,7 @@ tagalong/
     ui/src/
       index.ts, host-bridge.ts      # HostBridge contract and its React context
       pet-avatar.tsx, message-list.tsx, composer.tsx, sight-bar.tsx, chat-panel.tsx
+      office/                       # the Crew Office: tokens, sprites/, layout, status, components
       test-support/fake-host-bridge.ts
   apps/
     desktop/
@@ -56,12 +57,13 @@ tagalong/
       scripts/fetch-native.mjs      # fetches get-windows' prebuilt binding before packaging
       e2e/smoke.spec.ts
       src/main/                     # index.ts, engine-host.ts, engine-client.ts, context.ts,
-                                    # hotkeys.ts, secret-store.ts, tray-icon.ts, onboarding.ts,
+                                    # hotkeys.ts, secret-store.ts, tray-icon.ts, tray-menu.ts,
+                                    # onboarding.ts,
                                     # links.ts, platform/, windows/
       src/main/platform/            # capture, downscale, composite, canvas, label, displays,
                                     # window-helper, window-list, selection, win32
       src/preload/index.ts          # exposes window.tagalong and window.tagalongHost
-      src/renderer/                 # avatar/panel/settings/onboarding HTML, src/*.tsx, app.css
+      src/renderer/                 # avatar/panel/settings/onboarding/office HTML, src/*.tsx
       src/shared/ipc.ts             # IPC channel names and the host-only API type
     extension/                      # Chrome MV3 host, built by Vite into dist/ (load unpacked)
       src/manifest.ts               # the manifest as data; the build writes dist/manifest.json
@@ -74,7 +76,7 @@ tagalong/
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/protocol` | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC, plus the method catalog. Depends only on zod.                                                                                          |
 | `packages/core`     | The Tagalong Engine: pets, conversation runner, prompt assembly, SQLite memory, host protocol server, pairing, provider adapters. Pure Node. Voice, the inter-pet bus, and the MCP client arrive in later phases. |
-| `packages/ui`       | React components shared by hosts: `PetAvatar`, `MessageList`, `Composer`, `SightBar`, `ChatPanel`, and the `HostBridge` context.                                                                                  |
+| `packages/ui`       | React components shared by hosts: `PetAvatar`, `MessageList`, `Composer`, `SightBar`, `ChatPanel`, the Crew Office `OfficeView`, and the `HostBridge` context.                                                    |
 | `apps/desktop`      | Electron host. Runs the engine in the main process, dials it over the loopback socket, and owns the avatar, panel, settings window, tray, hotkey, and secret storage.                                             |
 | `apps/extension`    | Chrome MV3 host. Connects to the running engine and speaks the protocol only. Side panel, pairing page, on-demand page reader, and the open-panel shortcut.                                                       |
 
@@ -164,6 +166,10 @@ Quit any running Tagalong before `pnpm test:e2e`. The main process takes a singl
 second copy quits immediately and Playwright reports the confusing
 `electron.launch: Target page, context or browser has been closed` instead of naming the real cause.
 
+The Crew Office smoke test saves a screenshot of the office to `apps/desktop/test-results/office.png`
+(gitignored) for design review. When the primary display is too small for the office's 1280x800 page,
+the test moves the window to the tallest display before taking it.
+
 ## Running the desktop app
 
 PowerShell (the primary dev shell on Windows):
@@ -185,7 +191,7 @@ PowerShell has no inline `VAR=value command` prefix; pasting the bash line into 
 `TAGALONG_FAKE_PROVIDERS=1 : The term ... is not recognized`.
 
 On a fresh profile the setup wizard opens first; **Skip setup** closes it for good, and the tray's
-**Setup wizard** item brings it back. Two more things are worth knowing before the first run.
+**Setup wizard** item brings it back. The tray's **Open office** item opens the Crew Office window. Two more things are worth knowing before the first run.
 
 **`ensure-electron`.** Electron 44.3.0 publishes no npm install script, so `pnpm install` unpacks the
 package without ever downloading the platform binary, and the first launch dies with an error that

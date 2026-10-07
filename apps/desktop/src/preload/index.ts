@@ -80,6 +80,7 @@ const host: TagalongHostApi = {
     ipcRenderer.invoke(IPC.listModels, providerId) as Promise<ModelList>,
   openSettings: () => ipcRenderer.invoke(IPC.openSettings) as Promise<void>,
   openOnboarding: () => ipcRenderer.invoke(IPC.openOnboarding) as Promise<void>,
+  openOffice: () => ipcRenderer.invoke(IPC.openOffice) as Promise<void>,
   finishOnboarding: (openPanel: boolean) =>
     ipcRenderer.invoke(IPC.finishOnboarding, openPanel) as Promise<void>,
   applyCrew: (choices: Record<string, CrewChoice>) =>
