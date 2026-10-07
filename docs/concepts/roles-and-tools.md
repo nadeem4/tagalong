@@ -1,9 +1,9 @@
 # Roles, directory and tools
 
 **Status: partly built** for Phase 8 (Roles). The role files, the generated role library, the tier
-table and its lookup helpers are **built**. Everything else on this page, including giving a pet a
-role, the directory, tool grants and the tools module, is still **design**. The design page with the
-full task list lives in the Notion plan.
+table and its lookup helpers, and [the tools module](#the-tools-module) are **built**. Giving a pet a
+role, the directory and tool grants are still **design**. The design page with the full task list
+lives in the Notion plan.
 
 ## Roles
 
@@ -120,14 +120,17 @@ Logins and API keys stay encrypted in `secrets.json`, never in the pet.
 
 ## The tools module
 
-Today 12 built-in tools live in six files across four folders, in two shapes (`PerceptionToolset`
-and `CrewTool`), and every pet gets every tool. Phase 8 moves them into one module with no change in
-behaviour:
+**Status: built.** Roles and grants on top of it are still design.
+
+All 12 built-in tools live in one module, in one shape, and reach a turn one way:
 
 ```text
 packages/core/src/tools/
-  tool.ts          one Tool shape: id, definition, kind (read | write), run
-  registry.ts      toolsFor(pet): the role's tools, filtered by the pet's grants
+  tool.ts          one Tool shape: id (the tool name), definition, kind (read | write), run(input, ctx)
+  registry.ts      ToolRegistry.forTurn: builds a turn's tools, filters them through toolsFor(pet),
+                   and dispatches every call
+  index.ts         what the rest of core imports
+  fake-turn.ts     fakeTurn and fakeTurnTools, for testing tools without a runner
   builtin/
     perception.ts  look_at_screen, get_selection, list_displays, look_at_display,
                    look_closer, list_windows, read_window_text
@@ -135,7 +138,21 @@ packages/core/src/tools/
     crew.ts        remember, ask_pet
 ```
 
-The runner asks the registry for a pet's tools and dispatches them one way. An ESLint rule keeps
-the runner and engine importing tools only through the registry. Tools that need a login (GitHub,
-Notion and others) arrive with Hands: the user connects a service once in Settings, then grants it
-per pet as off, ask me, or allowed.
+- **Kind.** A tool is `write` when it leaves stored state behind after the turn: `remember` files a
+  memory, `watch_for` starts a watch. The other ten are `read`; `ask_pet` costs a model call but
+  stores nothing.
+- **Context.** Every tool runs with the turn's pet, turn id, abort signal, snapshot, whether the
+  pet's brain can see, and a counter for nested model calls.
+- **Which tools a turn gets.** The registry builds what the engine is wired for, in a fixed order,
+  and returns none when the pet's provider cannot call tools. `ask_pet` is left off roundtable
+  turns and off a crew of one. An unknown name is refused by name.
+- **`toolsFor(pet, tools)`** is the single place a turn's tools are narrowed. Today it returns every
+  tool; Phase 8 plugs the role's tools and the pet's grants in here.
+
+The runner asks the registry for a turn's tools and dispatches through it. An ESLint rule keeps
+`conversation/` and `engine.ts` importing tools only from `tools/registry` or the `tools` index,
+never from `tools/builtin/*`. To add a built-in, follow the repo skill
+`.claude/skills/tagalong-add-tool/SKILL.md`.
+
+Tools that need a login (GitHub, Notion and others) arrive with Hands: the user connects a service
+once in Settings, then grants it per pet as off, ask me, or allowed.

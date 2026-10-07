@@ -81,6 +81,26 @@ Fetch the phase page before starting the phase. Fetch the task rows before start
   legal-and-compliance note about Claude Max in `docs/specs/` all stay. The test is authorship,
   not the word: say who built it, never that an AI did.
 
+## Where code goes in packages/core
+
+| Folder          | Holds                                                                    |
+| --------------- | ------------------------------------------------------------------------ |
+| `conversation/` | `ConversationRunner` and the prompt assembler: one turn, start to finish |
+| `tools/`        | the `Tool` shape, `ToolRegistry`, and every built-in tool in `builtin/`  |
+| `perception/`   | capture policy: exclusions, retention, inventory, text layer, routing    |
+| `crew/`         | handoff, roundtable, crew commands                                       |
+| `watch/`        | `WatchManager`, the poll behind `watch_for`                              |
+| `memory/`       | the database, conversation store, memories, recall, summaries            |
+| `providers/`    | `BrainProvider` and its implementations                                  |
+| `server/`       | the WebSocket server and pairing                                         |
+| `pets/`         | `PetRegistry` and the default crew                                       |
+| `settings/`     | `SettingsStore` and the secret store                                     |
+| `engine.ts`     | boots and wires the parts                                                |
+
+**The import rule:** `conversation/` and `engine.ts` import tools only from `tools/registry` or the
+`tools` index, never from `tools/builtin/*`. ESLint enforces it. Adding a tool: use the
+`tagalong-add-tool` skill.
+
 ## Commit sizing
 
 Keep each commit between roughly 500 and 800 changed lines. When a task produces more, split it
