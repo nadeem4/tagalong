@@ -17,7 +17,7 @@ Technical and non-technical people watching their crew work, assigning tasks, jo
 
 THESIS: The crew is a 16-bit party with job classes, working in a modern pixel-art office. It refuses both the generic chat-sidebar assistant and the wooden, old-RPG office the first comp showed.
 
-OWN-WORLD: Expressive 16-bit pixel characters. A contemporary office drawn in pixel art: pale concrete floor, glass-walled meeting rooms, white desks with monitors, plants. Interface chrome is crisp and modern: deep ink navy shell, off-white panels, gold for selection and attention, one colour per job class. Pixel type only on pet names, job classes and room labels; everything else in a clean sans.
+OWN-WORLD: Expressive 16-bit pixel characters. A contemporary office drawn in pixel art: pale concrete floor, glass-walled meeting rooms, white desks with monitors, plants. Interface chrome is crisp and modern: deep ink navy shell, off-white panels, gold for selection and attention, one colour per job class. Pixel type on pet names, job classes, room labels, the office title and short panel headings; everything else in a clean sans.
 
 STORY: The user sees at a glance who is free, working, in a room, or needing them; reads any meeting; assigns a task; joins a meeting.
 
@@ -33,4 +33,4 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 
 ## Unresolved
 
-Comp round pending: image generation quota exhausted for the day.
+Built code-led for this surface at the owner's request on 2026-10-07: 'go with C, build it in code' (image generation quota was exhausted). The standing default in .impeccable/config.json stays comp.
