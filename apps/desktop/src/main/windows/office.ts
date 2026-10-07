@@ -12,8 +12,10 @@ export function createOfficeWindow(): BrowserWindow {
     height: 800,
     // The size of the page, not the frame: the office floor is drawn for a full 800px.
     useContentSize: true,
-    minWidth: 1100,
-    minHeight: 560,
+    // Room for the party list, the 600px floor and a readable meetings panel. A screen
+    // smaller than the default still gets a smaller window; the floor then scrolls.
+    minWidth: 1200,
+    minHeight: 600,
     show: false,
     center: true,
     title: 'Crew Office',

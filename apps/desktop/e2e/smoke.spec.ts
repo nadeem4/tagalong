@@ -473,7 +473,40 @@ test('the Crew Office opens with the real crew in its party list', async () => {
   expect(fontsLoaded.onest).toBeGreaterThan(0);
   expect(fontsLoaded.pixel).toBeGreaterThan(0);
 
-  // A screenshot for design review, in the gitignored test-results folder.
+  // The window opens with a 1280x800 page whenever its display has room for that plus the
+  // frame. A smaller screen is allowed to clamp it; the floor scrolls there instead.
+  const opened = await app.evaluate(({ BrowserWindow, screen }) => {
+    const window = BrowserWindow.getAllWindows().find((w) =>
+      w.webContents.getURL().includes('office.html'),
+    );
+    if (window === undefined) return null;
+    const [width = 0, height = 0] = window.getContentSize();
+    const [frameWidth = 0, frameHeight = 0] = window.getSize();
+    const area = screen.getDisplayMatching(window.getBounds()).workArea;
+    return {
+      width,
+      height,
+      fits: area.width >= 1280 + frameWidth - width && area.height >= 800 + frameHeight - height,
+    };
+  });
+  if (opened === null) throw new Error('the office window is not open');
+  if (opened.fits) expect([opened.width, opened.height]).toEqual([1280, 800]);
+  else expect(opened.height).toBeGreaterThan(0);
+
+  // A screenshot for design review, in the gitignored test-results folder, at the default
+  // size: when this display is too small for it, the window moves to the tallest display.
+  await app.evaluate(({ BrowserWindow, screen }) => {
+    const window = BrowserWindow.getAllWindows().find((w) =>
+      w.webContents.getURL().includes('office.html'),
+    );
+    const tallest = [...screen.getAllDisplays()].sort(
+      (a, b) => b.workArea.height - a.workArea.height,
+    )[0];
+    if (window === undefined || tallest === undefined) return;
+    window.setPosition(tallest.workArea.x, tallest.workArea.y);
+    window.setContentSize(1280, 800);
+  });
+  await office.waitForTimeout(300);
   await office.screenshot({ path: join(appDir, 'test-results', 'office.png') });
 
   await office.close();

@@ -632,7 +632,8 @@ pet field, adds pets (on the fake brain until a provider is picked) and deletes 
 ### The Crew Office
 
 The office is a framed desktop window (`windows/office.ts`, the `office` renderer page) opened from the
-tray's **Open office** item or `tagalongHost.openOffice()`. It shows the crew as 16-bit pixel characters
+tray's **Open office** item or `tagalongHost.openOffice()`, with a 1280x800 page (`useContentSize`) so
+the floor fits without scrolling; a screen too small for that clamps the window and the floor scrolls. It shows the crew as 16-bit pixel characters
 at desks on an office floor, with a party list on the left and a meetings panel on the right. The
 renderer entry only wraps `OfficeView` from `@tagalong/ui` in the preload's `HostBridge`; everything
 it draws is in `packages/ui/src/office`, so the browser host can reuse it.

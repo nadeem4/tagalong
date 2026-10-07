@@ -167,7 +167,8 @@ second copy quits immediately and Playwright reports the confusing
 `electron.launch: Target page, context or browser has been closed` instead of naming the real cause.
 
 The Crew Office smoke test saves a screenshot of the office to `apps/desktop/test-results/office.png`
-(gitignored) for design review.
+(gitignored) for design review. When the primary display is too small for the office's 1280x800 page,
+the test moves the window to the tallest display before taking it.
 
 ## Running the desktop app
 
