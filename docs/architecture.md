@@ -712,6 +712,14 @@ the one `FormData` save as hidden inputs; `buildPet` validates them and `roleVer
 pet's role version unless the role changed. Every pet's editor stays mounted while another is shown,
 so switching pets before saving loses nothing.
 
+The window loads the role library once with `window.tagalong.listRoles()` and asks
+`window.tagalong.recommendModel(roleId, providerId)` whenever a pet's role or provider changes. Role
+names, never ids, appear in the crew nav, the picker and the card; until the library arrives the
+editor says the roles are loading and a save keeps each pet's role. Role labels take their colour
+from `officeTokens.roleInk` by role id, through the office's `jobFor`, so a role reads the same in
+Settings and the office. Saving goes through `pets.upsert`, which refuses an unknown role and sets
+`roleVersion` for a new pet or a changed role.
+
 ## Awareness (Phase 3B)
 
 The pet can remember the last few minutes of the desktop and watch for something to happen. Both
