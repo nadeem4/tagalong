@@ -61,8 +61,9 @@ Every step can be skipped with **Skip setup**, and you can run the wizard again 
 2. **Choose a provider.** Pick OpenRouter, Nebius Token Factory or Anthropic, click **Get an API key** to
    open that provider's key page in your browser, and paste the key. You can paste keys for more than
    one; the crew can mix providers. Keys go straight into the operating system's keychain.
-3. **Meet your crew.** Scout explains, Ink writes, Bolt reads errors and code. Pick a provider and a
-   model for each one. The model box lists the provider's live models as soon as the key is stored.
+3. **Meet your crew.** Scout is a Generalist, Ink a Writer, Bolt a Backend engineer. Pick a provider
+   for each one; the model starts on the one its role recommends there (marked **Recommended**), and
+   you can change it. The model box lists the provider's live models as soon as the key is stored.
 4. **Hotkeys.** The four keys to remember, and the crew commands.
 5. **Rolling memory (optional).** Let Tagalong remember the last few minutes of the screen, in memory
    only.
@@ -131,6 +132,10 @@ Settings edits every pet (name, emoji, colour, notes, provider, model), adds and
 chooses which ones sit on the desktop. Pick a pet in Settings to choose its role (Generalist, Backend
 engineer, Frontend engineer, Writer or Researcher) and switch its tools on or off; the card beside it
 shows how its teammates see it.
+
+Upgrading from a version before roles? Tagalong opens the Crew Office once with a short notice saying
+which role each pet got and whether your own persona was kept as notes. **Got it** closes it for good;
+**Review my crew** opens Settings.
 
 To see the whole crew at work, right-click the tray icon and choose **Open office**.
 
