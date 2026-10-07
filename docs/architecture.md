@@ -146,8 +146,9 @@ unauthenticated connection gets the same error.
 The catalog in `packages/protocol/src/methods.ts` is the whole surface:
 
 - **Host to core:** `hello`, `ask`, `interrupt`, `pets.list`, `pets.upsert`, `pets.delete`,
-  `settings.get`, `settings.set`, `models.list`, `tool.approve` (Phase 5), and `watch.stop`
-  (Phase 3B).
+  `settings.get`, `settings.set`, `models.list`, `tool.approve` (Phase 5), `watch.stop`
+  (Phase 3B), and from Phase 8 `roles.list` and `roles.recommendModel` (see
+  [Roles over RPC](concepts/roles-and-tools.md#roles-over-rpc)). Protocol 0.4.0.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
   `perception.listWindows` and `perception.readText`, and from Phase 3B `perception.recall` and
   `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
@@ -324,7 +325,7 @@ every window, and what makes the two hosts interchangeable.
 The preload exposes exactly two globals, and the split between them is deliberate:
 
 - `window.tagalong` is precisely the `HostBridge` interface that `@tagalong/ui` consumes — `ask`,
-  `capture`, `interrupt`, `listPets`, `onTurnEvent`. Nothing more. `capture` is how the panel's
+  `capture`, `interrupt`, `listPets`, `listRoles`, `recommendModel`, `onTurnEvent`. Nothing more. `capture` is how the panel's
   Look button reaches the screen; it resolves to null when the window is excluded, so the sight bar
   can say capture is blocked here instead of quietly showing nothing.
 - `window.tagalongHost` carries everything specific to this host — the captured snapshot, the settings
@@ -495,7 +496,9 @@ what the engine broadcasts.
 ### The registry and the default crew
 
 `pets/registry.ts` keeps each pet as a validated JSON blob in the `pets` table and exposes it through
-`pets.list`, `pets.upsert` and `pets.delete`. A fresh install is seeded with three pets that
+`pets.list`, `pets.upsert` and `pets.delete`. `pets.upsert` refuses a `roleId` the role library does
+not have with RPC error `-32602`, and stamps a new pet (or one changing role) with that role's
+library `version`. A fresh install is seeded with three pets that
 deliberately run on different brains, so the crew spans providers from the first boot:
 
 | Pet   | Role             | Provider     | Model                                                |
@@ -651,6 +654,10 @@ It is split so the look can change without touching component logic:
   1px shadow per pixel) and `PixelSprite` draws it on one pixel scaled by a whole number. No images,
   no canvas. `characterFor(pet)` is the one mapping from a pet to a character: Scout, Ink and Bolt get
   their own; any other pet gets the shared body recoloured from its `color`.
+- **Job labels from roles** — the party list's job label is the pet's role name in capitals, from
+  `bridge.listRoles()` by `pet.roleId` (`office/job.ts`, `jobFor`); an unknown role reads
+  `GENERALIST`. Its colour is `officeTokens.roleInk[roleId]`, one ink per class. The office lists
+  pets and roles together; if only the roles fail, the crew still shows, labelled as generalists.
   The furniture is sprites too (`sprites/furniture.ts`: desk, monitor, chair, meeting table, wall
   window, a shelf, a water cooler, and a lounge of rug, sofa, coffee table and plant that
   `loungeAt(n)` places below the desks until a seventh pet needs that band), drawn at the pets' 3x scale with shading painted into the

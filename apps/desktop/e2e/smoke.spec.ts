@@ -460,6 +460,24 @@ test('the Crew Office opens with the real crew in its party list', async () => {
       timeout: 15_000,
     });
   }
+
+  // Each job label is the pet's role, by name, from the engine's own role library.
+  const roles = await panel.evaluate(() => window.tagalong.listRoles());
+  expect(roles.map((role) => role.id)).toContain('generalist');
+  for (const pet of pets.slice(0, 8)) {
+    const role = roles.find((r) => r.id === pet.roleId);
+    const label = role === undefined ? 'GENERALIST' : role.name.toUpperCase();
+    await expect(party.getByRole('button', { name: new RegExp(pet.name) })).toContainText(label);
+  }
+  // The model prefill crosses the same bridge: a tiered provider recommends, fake does not.
+  const recommended = await panel.evaluate(() =>
+    Promise.all([
+      window.tagalong.recommendModel('writer', 'nebius'),
+      window.tagalong.recommendModel('writer', 'fake'),
+    ]),
+  );
+  expect(recommended[0].model).toBeTruthy();
+  expect(recommended[1]).toEqual({});
   await expect(office.getByRole('complementary', { name: 'Meetings' })).toContainText(
     'No meetings yet',
   );

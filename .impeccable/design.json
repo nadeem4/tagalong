@@ -478,6 +478,36 @@
           "oklch(84% 0.132 75.4)",
           "oklch(95% 0.132 75.4)"
         ]
+      },
+      "job-frontend": {
+        "role": "secondary",
+        "displayName": "Frontend Pink",
+        "canonical": "#F28DB8",
+        "tonalRamp": [
+          "oklch(15% 0.132 353.7)",
+          "oklch(26% 0.132 353.7)",
+          "oklch(37% 0.132 353.7)",
+          "oklch(48% 0.132 353.7)",
+          "oklch(60% 0.132 353.7)",
+          "oklch(72% 0.132 353.7)",
+          "oklch(84% 0.132 353.7)",
+          "oklch(95% 0.132 353.7)"
+        ]
+      },
+      "job-researcher": {
+        "role": "secondary",
+        "displayName": "Researcher Green",
+        "canonical": "#7DD87F",
+        "tonalRamp": [
+          "oklch(15% 0.151 144.5)",
+          "oklch(26% 0.151 144.5)",
+          "oklch(37% 0.151 144.5)",
+          "oklch(48% 0.151 144.5)",
+          "oklch(60% 0.151 144.5)",
+          "oklch(72% 0.151 144.5)",
+          "oklch(84% 0.151 144.5)",
+          "oklch(95% 0.151 144.5)"
+        ]
       }
     },
     "typographyMeta": {
@@ -656,7 +686,7 @@
       },
       {
         "name": "The One Colour Per Class Rule",
-        "body": "Each job class owns exactly one label ink, defined with its character (`labelInk`), used only on that class's job label. Adding a class means adding one ink that reads on the sidebar navy and stays clearly distinct from gold.",
+        "body": "Each job class owns exactly one label ink, keyed by role id in the office tokens (`roleInk`), used only on that class's job label. The ink belongs to the role, never to a pet, so two pets with the same role share it. Adding a class means adding one ink that reads on the sidebar navy and stays clearly distinct from gold.",
         "section": "colors"
       },
       {

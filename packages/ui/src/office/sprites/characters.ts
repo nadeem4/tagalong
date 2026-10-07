@@ -48,13 +48,9 @@ export const CURSOR: Sprite = {
   palette: { G: officeTokens.color.gold },
 };
 
-/** How one pet looks in the office. */
+/** How one pet looks in the office. Its job label comes from its role, not from here. */
 export interface Character {
   readonly sprite: Sprite;
-  /** The small caps line under the name in the party list. */
-  readonly jobLabel: string;
-  /** The job label's colour, chosen to read on the dark party list. */
-  readonly labelInk: string;
 }
 
 /**
@@ -62,8 +58,6 @@ export interface Character {
  */
 export const CHARACTERS: Readonly<Record<string, Character>> = {
   scout: {
-    jobLabel: 'GENERALIST',
-    labelInk: '#4FD1C1',
     sprite: {
       rows: BODY,
       palette: {
@@ -80,8 +74,6 @@ export const CHARACTERS: Readonly<Record<string, Character>> = {
     },
   },
   ink: {
-    jobLabel: 'WRITER',
-    labelInk: '#A996F5',
     sprite: {
       rows: BODY,
       palette: {
@@ -98,8 +90,6 @@ export const CHARACTERS: Readonly<Record<string, Character>> = {
     },
   },
   bolt: {
-    jobLabel: 'BACKEND ENGINEER',
-    labelInk: '#F6B85A',
     sprite: {
       rows: BODY,
       palette: {
@@ -157,8 +147,6 @@ export function characterFor(pet: Pet): Character {
   if (known !== undefined) return known;
   const color = pet.color ?? DEFAULT_PET_COLOR;
   return {
-    jobLabel: 'CREW',
-    labelInk: officeTokens.color.textMuted,
     sprite: {
       rows: BODY,
       palette: {

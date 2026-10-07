@@ -1,4 +1,5 @@
 import type { Pet } from '@tagalong/protocol';
+import type { Job } from './job';
 import type { Character } from './sprites/characters';
 import type { OfficeStatus } from './status';
 
@@ -6,5 +7,6 @@ import type { OfficeStatus } from './status';
 export interface OfficeMember {
   pet: Pet;
   character: Character;
+  job: Job;
   status: OfficeStatus;
 }

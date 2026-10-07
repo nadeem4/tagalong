@@ -1,17 +1,17 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Pet } from '@tagalong/protocol';
+import type { Pet, Role } from '@tagalong/protocol';
 import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
 import { OFFICE_CSS } from './office-styles';
 import { OfficeView } from './office-view';
 
-const pet = (id: string, name: string, color?: string): Pet => ({
+const pet = (id: string, name: string, roleId: string, color?: string): Pet => ({
   id,
   name,
   avatar: '🐾',
   ...(color !== undefined ? { color } : {}),
-  roleId: 'generalist',
+  roleId,
   roleVersion: 1,
   model: 'fake',
   providerId: 'fake',
@@ -20,14 +20,35 @@ const pet = (id: string, name: string, color?: string): Pet => ({
 });
 
 const CREW: Pet[] = [
-  pet('scout', 'Scout'),
-  pet('ink', 'Ink'),
-  pet('bolt', 'Bolt'),
-  pet('sage', 'Sage', '#5dbb63'),
+  pet('scout', 'Scout', 'generalist'),
+  pet('ink', 'Ink', 'writer'),
+  pet('bolt', 'Bolt', 'backend-engineer'),
+  pet('sage', 'Sage', 'wizard', '#5dbb63'),
+];
+
+const role = (id: string, name: string): Role => ({
+  id,
+  name,
+  version: 1,
+  summary: `${name}.`,
+  goodAt: ['things'],
+  notFor: ['other things'],
+  tools: [],
+  model: { tier: 'balanced', needsVision: false },
+  instructions: `You are a ${name}.`,
+});
+
+const ROLES: Role[] = [
+  role('generalist', 'Generalist'),
+  role('writer', 'Writer'),
+  role('backend-engineer', 'Backend engineer'),
+  role('researcher', 'Researcher'),
 ];
 const T1 = '10000000-0000-4000-8000-000000000001';
 
-async function renderOffice(bridge: FakeHostBridge = createFakeHostBridge({ pets: CREW })) {
+async function renderOffice(
+  bridge: FakeHostBridge = createFakeHostBridge({ pets: CREW, roles: ROLES }),
+) {
   render(
     <HostBridgeProvider bridge={bridge}>
       <OfficeView />
@@ -51,10 +72,29 @@ describe('OfficeView', () => {
     expect(partyRow('Scout')).toHaveTextContent('GENERALIST');
     expect(partyRow('Ink')).toHaveTextContent('WRITER');
     expect(partyRow('Bolt')).toHaveTextContent('BACKEND ENGINEER');
-    expect(partyRow('Sage')).toHaveTextContent('CREW');
+    // Sage's role is not in the library, so it works as a generalist.
+    expect(partyRow('Sage')).toHaveTextContent('GENERALIST');
     for (const name of ['Scout', 'Ink', 'Bolt', 'Sage']) {
       expect(partyRow(name)).toHaveTextContent('At desk');
     }
+  });
+
+  it('labels a pet by its role, not its id', async () => {
+    const crew = [pet('scout', 'Scout', 'researcher'), pet('pip', 'Pip', 'writer')];
+    await renderOffice(createFakeHostBridge({ pets: crew, roles: ROLES }));
+    expect(partyRow('Scout')).toHaveTextContent('RESEARCHER');
+    expect(partyRow('Scout')).not.toHaveTextContent('GENERALIST');
+    expect(partyRow('Pip')).toHaveTextContent('WRITER');
+  });
+
+  it('still shows the crew when the roles cannot be listed', async () => {
+    const bridge = createFakeHostBridge({ pets: CREW, roles: ROLES });
+    bridge.listRoles = () => Promise.reject(new Error('old engine'));
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await renderOffice(bridge);
+    expect(partyRow('Ink')).toHaveTextContent('GENERALIST');
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
   });
 
   it('puts every pet at a named desk on the office floor', async () => {
@@ -117,7 +157,7 @@ describe('OfficeView', () => {
   });
 
   it('says so when the crew cannot be reached', async () => {
-    const bridge = createFakeHostBridge({ pets: CREW });
+    const bridge = createFakeHostBridge({ pets: CREW, roles: ROLES });
     bridge.listPets = () => Promise.reject(new Error('engine down'));
     render(
       <HostBridgeProvider bridge={bridge}>

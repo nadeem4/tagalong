@@ -47,4 +47,20 @@ describe('office tokens', () => {
     expect(rule).toContain(`color: ${color.disabledInk}`);
     expect(rule).toContain(`border-color: ${color.disabledLine}`);
   });
+
+  it('gives each role class an ink that reads on the party list and is never gold', () => {
+    const inks = Object.values(officeTokens.roleInk);
+    expect(Object.keys(officeTokens.roleInk).sort()).toEqual([
+      'backend-engineer',
+      'frontend-engineer',
+      'generalist',
+      'researcher',
+      'writer',
+    ]);
+    for (const ink of inks) {
+      expect(contrast(ink, color.sidebar)).toBeGreaterThanOrEqual(4.5);
+      expect(ink.toUpperCase()).not.toBe(color.gold.toUpperCase());
+    }
+    expect(new Set(inks.map((ink) => ink.toUpperCase())).size).toBe(inks.length);
+  });
 });

@@ -35,6 +35,8 @@ colors:
   job-generalist: '#4FD1C1'
   job-writer: '#A996F5'
   job-backend: '#F6B85A'
+  job-frontend: '#F28DB8'
+  job-researcher: '#7DD87F'
 typography:
   office-title:
     fontFamily: "'Pixelify Sans', 'Onest', sans-serif"
@@ -193,7 +195,7 @@ A cool ink-navy shell and cool off-white panels frame a warm-grey concrete floor
 
 ### Secondary
 
-- **Job-class inks** (job-generalist teal, job-writer violet, job-backend amber): each job class's small-caps label in the party list. Chosen to read on the sidebar navy. A pet whose class is unknown falls back to the shell muted text with the label "CREW".
+- **Job-class inks** (job-generalist teal, job-writer violet, job-backend amber, job-frontend pink, job-researcher green): each job class's small-caps label in the party list. Chosen to read on the sidebar navy. The class is the pet's role: the label is the role's name and the ink is keyed by role id in `officeTokens.roleInk`. A pet whose role is unknown reads "GENERALIST" in the generalist ink; a role without an ink of its own uses the shell muted text.
 
 ### Neutral
 
@@ -217,7 +219,7 @@ A cool ink-navy shell and cool off-white panels frame a warm-grey concrete floor
 
 **The Gold Means You Rule.** Gold marks what is selected, focused or needs the user: the selected row, the cursor, the focus ring, the primary action, a pressed toggle. It never decorates, never fills a panel, and never names a job class.
 
-**The One Colour Per Class Rule.** Each job class owns exactly one label ink, defined with its character (`labelInk`), used only on that class's job label. Adding a class means adding one ink that reads on the sidebar navy and stays clearly distinct from gold.
+**The One Colour Per Class Rule.** Each job class owns exactly one label ink, keyed by role id in the office tokens (`roleInk`), used only on that class's job label. The ink belongs to the role, never to a pet, so two pets with the same role share it. Adding a class means adding one ink that reads on the sidebar navy and stays clearly distinct from gold.
 
 **The Three Grounds Rule.** Navy is chrome (bar, party list), off-white is reading (panels, threads), pale concrete is the world (the floor). A new surface picks the ground for its job; it does not invent a fourth.
 

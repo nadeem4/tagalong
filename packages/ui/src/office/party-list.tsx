@@ -50,7 +50,7 @@ export function PartyList({ members, selectedId, onSelect, notice }: PartyListPr
           gap: t.space.sm,
         }}
       >
-        {members.map(({ pet, character, status }) => (
+        {members.map(({ pet, character, job, status }) => (
           <li key={pet.id}>
             <button
               type="button"
@@ -88,10 +88,10 @@ export function PartyList({ members, selectedId, onSelect, notice }: PartyListPr
                   style={{
                     fontSize: t.fontSize.min,
                     letterSpacing: t.letterSpacing.pixel,
-                    color: character.labelInk,
+                    color: job.ink,
                   }}
                 >
-                  {character.jobLabel}
+                  {job.label}
                 </span>
                 <StatusLine status={status} />
               </span>

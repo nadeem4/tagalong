@@ -12,7 +12,7 @@ import {
   shell,
 } from 'electron';
 import { ContextSnapshot } from '@tagalong/protocol';
-import type { PerceptionTarget, Pet, Settings, SettingsPatch } from '@tagalong/protocol';
+import type { PerceptionTarget, Pet, Role, Settings, SettingsPatch } from '@tagalong/protocol';
 import { SettingsStore, WATCH_MODEL_DEFAULTS } from '@tagalong/core';
 import { systemClock } from './awareness/clock';
 import { nativeCodec } from './awareness/native-codec';
@@ -542,6 +542,15 @@ function registerIpc(): void {
     const result = await engine().client.call('pets.list', {});
     return result.pets;
   });
+
+  ipcMain.handle(IPC.listRoles, async (): Promise<Role[]> => {
+    const result = await engine().client.call('roles.list', {});
+    return result.roles;
+  });
+
+  ipcMain.handle(IPC.recommendModel, async (_event, roleId: string, providerId: string) =>
+    engine().client.call('roles.recommendModel', { roleId, providerId }),
+  );
 
   ipcMain.handle(IPC.getContext, () => required().pendingSnapshot);
   // A window that opened after the last toggle has missed the event, and an avatar that

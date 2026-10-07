@@ -87,6 +87,23 @@ describe('createPortBridge', () => {
     await expect(stopped).resolves.toBeUndefined();
   });
 
+  it('lists roles and asks for a recommended model through engine calls', async () => {
+    const p = fakePort();
+    const bridge = createPortBridge(p.port);
+    const roles = bridge.listRoles();
+    expect(p.sent.at(-1)).toMatchObject({ method: 'roles.list', params: {} });
+    reply(p, { roles: [] });
+    await expect(roles).resolves.toEqual([]);
+
+    const recommended = bridge.recommendModel('writer', 'nebius');
+    expect(p.sent.at(-1)).toMatchObject({
+      method: 'roles.recommendModel',
+      params: { roleId: 'writer', providerId: 'nebius' },
+    });
+    reply(p, { model: 'nemotron' });
+    await expect(recommended).resolves.toEqual({ model: 'nemotron' });
+  });
+
   it('turns turn and crew notifications into the events the chat panel consumes', () => {
     const p = fakePort();
     const bridge = createPortBridge(p.port);

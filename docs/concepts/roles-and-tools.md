@@ -2,8 +2,9 @@
 
 **Status: partly built** for Phase 8 (Roles). The role files, the generated role library, the tier
 table and its lookup helpers, [the tools module](#the-tools-module), giving a pet a role, the
-directory, and filtering a turn's tools by role and grants are **built**. Editing grants and picking
-a role in Settings are still **design**. The design page with the full task list lives in the Notion
+directory, filtering a turn's tools by role and grants, [roles over RPC](#roles-over-rpc) and the
+office's job labels are **built**. Editing grants and picking a role in Settings are still
+**design**. The design page with the full task list lives in the Notion
 plan.
 
 ## Roles
@@ -58,6 +59,35 @@ body becomes `instructions`.
 unknown id), `roleFor(id)` (the generalist for an unknown id) and
 `recommendedModel(role, providerId)`. `listRoles`, `getRole` and `recommendedModel` are exported from
 `@tagalong/core` for hosts.
+
+### Roles over RPC
+
+**Built.** Two host-to-core methods put the library on the wire, so a host never bundles it:
+
+| Method                 | Params                   | Result                                             |
+| ---------------------- | ------------------------ | -------------------------------------------------- |
+| `roles.list`           | `{}`                     | `{ roles: Role[] }`, the whole library             |
+| `roles.recommendModel` | `{ roleId, providerId }` | `{ model?, visionModel? }` from `recommendedModel` |
+
+`roles.recommendModel` answers `{}` for a provider with no tier table, such as `fake`, and refuses an
+unknown role with RPC error `-32602` (invalid params). `pets.upsert` refuses a pet whose `roleId` is
+not in the library the same way, and saves nothing. A new pet, or one whose role changed, is saved
+with that role's library `version` as its `roleVersion`; an existing pet keeping its role keeps the
+`roleVersion` it was sent with.
+
+The `HostBridge` in `@tagalong/ui` carries both as `listRoles()` and
+`recommendModel(roleId, providerId)`. The desktop wires them through IPC and the preload like
+`listPets`; the extension relays them over its port like any other engine call; the fake bridge
+takes `roles` and a `recommend` function.
+
+### Job labels in the office
+
+**Built.** The Crew Office labels each pet with its role's name in capitals, looked up in
+`listRoles()` by `pet.roleId`; a pet whose role is not in the library reads `GENERALIST`, as it
+works. Each label's colour comes from `officeTokens.roleInk`, keyed by role id (generalist teal,
+writer violet, backend engineer amber, frontend engineer pink, researcher green), so two pets with
+the same role share a colour whatever their ids. A role with no ink of its own uses the muted text
+colour.
 
 ### What the role decides
 
@@ -117,8 +147,9 @@ providers. The role only recommends.
   On Nebius, a role that needs pictures also gets `nvidia/Nemotron-Nano-V2-12b` as its vision
   model, because the tier model cannot see. OpenRouter and Anthropic models see on their own.
 
-- Design from here on. Creating a pet prefills the model from that table for the chosen provider; the user can pick any
-  model on the provider's live list.
+- **Built:** `roles.recommendModel` answers that lookup over RPC, so a form can prefill the model.
+- Design from here on. Creating a pet in Settings prefills the model from that table for the chosen
+  provider; the user can pick any model on the provider's live list.
 - When the role needs pictures and the model cannot see, a vision model is set automatically, using
   the existing vision routing.
 
