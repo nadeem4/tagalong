@@ -148,7 +148,9 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
 - **Host to core:** `hello`, `ask`, `interrupt`, `pets.list`, `pets.upsert`, `pets.delete`,
   `settings.get`, `settings.set`, `models.list`, `tool.approve` (Phase 5), `watch.stop`
   (Phase 3B), and from Phase 8 `roles.list` and `roles.recommendModel` (see
-  [Roles over RPC](concepts/roles-and-tools.md#roles-over-rpc)). Protocol 0.4.0.
+  [Roles over RPC](concepts/roles-and-tools.md#roles-over-rpc)), `notices.rolesUpgrade` and
+  `notices.dismiss` (see [The roles notice](concepts/roles-and-tools.md#the-roles-notice)).
+  Protocol 0.5.0.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
   `perception.listWindows` and `perception.readText`, and from Phase 3B `perception.recall` and
   `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
@@ -325,7 +327,8 @@ every window, and what makes the two hosts interchangeable.
 The preload exposes exactly two globals, and the split between them is deliberate:
 
 - `window.tagalong` is precisely the `HostBridge` interface that `@tagalong/ui` consumes — `ask`,
-  `capture`, `interrupt`, `listPets`, `listRoles`, `recommendModel`, `onTurnEvent`. Nothing more. `capture` is how the panel's
+  `capture`, `interrupt`, `listPets`, `listRoles`, `recommendModel`, `rolesNotice`,
+  `dismissRolesNotice`, `onTurnEvent`. Nothing more. `capture` is how the panel's
   Look button reaches the screen; it resolves to null when the window is excluded, so the sight bar
   can say capture is blocked here instead of quietly showing nothing.
 - `window.tagalongHost` carries everything specific to this host — the captured snapshot, the settings
@@ -667,6 +670,14 @@ It is split so the look can change without touching component logic:
   eight desks), seats, monitors and the selection cursor.
 - **Small components** — `PartyList`, `OfficeFloor`, `MeetingsPanel` and `PixelSprite`, composed by
   `OfficeView`.
+- **The roles notice (Phase 8)** — `OfficeView` reads `bridge.rolesNotice()` with the crew and, while
+  it is unseen, shows `RolesNotice` (`office/roles-notice.tsx`): a modal `<dialog>` over the office with
+  a row per upgraded pet (sprite, name, the new role in its ink, what happened to its persona), a
+  **What changed?** disclosure, **Review my crew** and **Got it**. Both buttons and Escape call
+  `bridge.dismissRolesNotice()`; Review my crew then calls the `onReviewCrew` prop, which the desktop
+  wires to `tagalongHost.openSettings()`. At launch, main asks `notices.rolesUpgrade` once the engine
+  is up and opens the office when a notice is pending, so an upgraded user sees it without looking
+  for it. See [The roles notice](concepts/roles-and-tools.md#the-roles-notice).
 
 Status comes from the turn notifications main already forwards to every window: `nextActivity` keeps
 the turns in flight, so a pet reads **Working** (and its monitor lights) from `turn.started` until that
@@ -908,8 +919,15 @@ flowchart LR
 - **The wizard's decisions are pure functions.** `renderer/src/onboarding-flow.ts` holds the steps,
   the gate on the provider step (a key stored or typed for at least one of OpenRouter, Token Factory
   and Anthropic), and each pet's starting pick; `main/onboarding.ts` holds the per-provider model
-  suggestions and `applyCrewChoice`. Both are unit tested in Node; the markup is covered by one
-  Electron smoke test.
+  suggestions and `applyCrewChoice`. Both are unit tested in Node; the markup is covered by two
+  Electron smoke tests.
+- **Roles in the crew step (Phase 8).** Each pet shows its role's name in its class ink
+  (`jobFor` and `officeTokens` from `@tagalong/ui`) and the role's summary, from
+  `window.tagalong.listRoles()`. Leaving the provider step asks `recommendModel(roleId, providerId)`
+  for every pet on every keyed provider (`recommendationsFor`), and `withRecommendations` lays the
+  answers over main's suggestions, so a pet moving provider starts on its role's model, marked
+  **Recommended** until it is edited (`isRecommended`). A pet already on a keyed provider keeps its
+  model, as before.
 - **Crew picks are applied in main**, because the rules need core's constants: a pet put on a
   text-only Token Factory model gets Nemotron Nano 2 VL as its vision model, a pet moved to Claude
   loses any Token Factory vision model, and a watch model is dropped when the provider changes.

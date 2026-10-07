@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
+import { recordRolesNotice } from '../pets/roles-notice';
 import { upgradePetsToRoles } from '../pets/roles-upgrade';
 
 /** The SQLite file a host finds in its data dir. */
@@ -55,6 +56,8 @@ const MIGRATIONS: readonly Migration[] = [
   `ALTER TABLE messages ADD COLUMN summarized_at TEXT;`,
   // Phase 8. Every stored pet gets a role; an edited persona becomes the pet's notes.
   upgradePetsToRoles,
+  // Phase 8. Records what migration 5 did, for the one-time "Your crew has roles now" notice.
+  recordRolesNotice,
 ];
 
 /** Version a fully migrated database reports. */

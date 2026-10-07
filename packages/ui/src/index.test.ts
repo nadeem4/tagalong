@@ -21,6 +21,8 @@ describe('ui package surface', () => {
         'createFakeHostBridge',
         'estimateImageTokens',
         'useHostBridge',
+        'jobFor',
+        'officeTokens',
       ].sort(),
     );
   });

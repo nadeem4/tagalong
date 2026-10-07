@@ -1,3 +1,5 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { _electron as electron, expect, test } from '@playwright/test';
@@ -22,7 +24,9 @@ test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
   app = await electron.launch({
-    args: ['.'],
+    // A fresh profile every run, so a developer's own crew (and a pending roles notice that
+    // would open the office at launch) never changes what this suite sees.
+    args: ['.', `--user-data-dir=${mkdtempSync(join(tmpdir(), 'tagalong-smoke-'))}`],
     cwd: appDir,
     // Fake providers keep the smoke test offline and deterministic: no API key, no
     // network, and a scripted answer that always streams the same way.
@@ -443,6 +447,39 @@ test('the setup wizard opens on request, insists on a key, and Skip closes it fo
       before.settings.onboarding.done,
     );
   }
+});
+
+test("the wizard's crew step shows each role and prefills its recommended model", async () => {
+  const panel = await windowFor('panel');
+  await panel.evaluate(() => window.tagalongHost.openOnboarding());
+  const wizard = await windowFor('onboarding');
+  await wizard.getByRole('button', { name: 'Next' }).click();
+
+  // This suite runs on a throwaway profile and fake providers, so a typed key is stored only
+  // there and no model list is fetched from the network.
+  await wizard.getByTestId('key-nebius').fill('nb-e2e-not-a-real-key');
+  await wizard.getByRole('radio').nth(1).check();
+  await wizard.getByRole('button', { name: 'Next' }).click();
+
+  const crew = wizard.getByTestId('step-crew');
+  await expect(crew.getByTestId('role-generalist')).toContainText('GENERALIST');
+  await expect(crew.getByTestId('role-writer')).toContainText('WRITER');
+  await expect(crew.getByTestId('role-backend-engineer')).toContainText('BACKEND ENGINEER');
+
+  const expected = await wizard.evaluate(() => window.tagalong.recommendModel('writer', 'nebius'));
+  // Ink starts on OpenRouter, which has no key here, so it moves to Token Factory on the
+  // writer's recommended model. A pet already on a keyed provider keeps its model.
+  const ink = crew.locator('fieldset', { hasText: 'Ink' });
+  expect(expected.model).toBeTruthy();
+  await expect(ink.getByTestId('model-ink')).toHaveValue(expected.model ?? '');
+  await expect(ink.getByText('Recommended')).toBeVisible();
+  await wizard.screenshot({ path: join(appDir, 'test-results', 'wizard-crew.png') });
+
+  // Still editable: a different model drops the chip.
+  await ink.getByTestId('model-ink').fill('nvidia/something-else');
+  await expect(ink.getByText('Recommended')).toHaveCount(0);
+
+  await wizard.getByRole('button', { name: 'Skip setup' }).click();
 });
 
 test('Settings opens on the crew, with the selected pet editor and its sections', async () => {

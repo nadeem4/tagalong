@@ -9,6 +9,8 @@ export const IPC = {
   listPets: 'tagalong:pets:list',
   listRoles: 'tagalong:roles:list',
   recommendModel: 'tagalong:roles:recommend-model',
+  rolesNotice: 'tagalong:notices:roles-upgrade',
+  dismissRolesNotice: 'tagalong:notices:dismiss-roles-upgrade',
   turnEvent: 'tagalong:turn-event',
   getContext: 'tagalong:context:get',
   capture: 'tagalong:capture',

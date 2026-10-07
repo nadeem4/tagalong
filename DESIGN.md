@@ -32,6 +32,7 @@ colors:
   panel-tile: '#E6E9F2'
   meter-off: '#E0E3EC'
   scrollbar-thumb: '#CDD2DE'
+  scrim: 'rgba(18, 22, 43, 0.72)'
   job-generalist: '#4FD1C1'
   job-writer: '#A996F5'
   job-backend: '#F6B85A'
@@ -162,6 +163,12 @@ components:
   meetings-panel:
     backgroundColor: '{colors.panel-white}'
     textColor: '{colors.panel-text}'
+  roles-notice:
+    backgroundColor: '{colors.sidebar-navy}'
+    textColor: '{colors.shell-text}'
+    rounded: '{rounded.tile}'
+    width: '660px'
+    padding: '24px 28px'
 ---
 
 # Design System: Tagalong
@@ -214,6 +221,7 @@ A cool ink-navy shell and cool off-white panels frame a warm-grey concrete floor
 - **Name Plate** (name-plate): a pet's name under its desk.
 - **Panel White** (panel-white), **Panel Text** (panel-text), **Panel Muted** (panel-muted), **Panel Line** (panel-line), **Panel Tile** (panel-tile): the light meetings panel and its dividers.
 - **Meter Off** (meter-off): an unlit call-meter segment. **Scrollbar Thumb** (scrollbar-thumb): the 8px scrollbar.
+- **Scrim** (scrim): the page navy at 72% behind a modal dialog, such as the roles notice.
 
 ### Named Rules
 
@@ -311,6 +319,10 @@ Status is an icon and a word, never colour alone: a 14px stroked SVG plus "Worki
 ### Meetings Panel
 
 Off-white reading surface: a heading block (Onest 600 14px plus a 12px muted subline) over a Panel Line divider, the thread area, and a call meter of 12 square 10px-tall segments (Meter Off when unlit) between "Calls" and a count. Empty state: two crew sprites at 3x, a pixel "No meetings yet" line and a 300px Onest paragraph.
+
+### Roles Notice
+
+The one-time "Your crew has roles now" dialog over the office, shown after an install from before roles is upgraded. A modal `<dialog>` on Sidebar Navy (it is chrome, and the job-class inks are tuned for that navy), 660px wide, 10px radius, a 1px Field Line border and no shadow, over a Scrim (`scrim`, the page navy at 72%) that keeps the office visible but receded. The title is the office-title style; one Body lead sentence in Shell Muted; then a table, one row per upgraded pet: avatar tile with the sprite at 2x and the pet name (pixel 17px), a muted arrow, the new role as a job-class label in its class ink, and what happened in Onest 13px. A "What changed?" text button (Onest 600 13px, underlined, `aria-expanded`) opens a Field Navy box of three short lines. The footer ends on "Review my crew" (toggle style, opens Settings) and "Got it" (primary gold, focused on open); both, and Escape, mark the notice seen.
 
 ### Pixel Sprite (signature)
 

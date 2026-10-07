@@ -4,8 +4,10 @@
 table and its lookup helpers, [the tools module](#the-tools-module), giving a pet a role, the
 directory, filtering a turn's tools by role and grants, [roles over RPC](#roles-over-rpc), the
 office's job labels, and picking a role, the recommended model, the tool switches and the directory
-card preview in Settings (see [The Settings window](../architecture.md#the-settings-window)) are
-**built**. The design page with the full task list lives in the Notion plan.
+card preview in Settings (see [The Settings window](../architecture.md#the-settings-window)),
+[the one-time roles notice](#the-roles-notice) for upgraded installs and
+[roles in the setup wizard](#roles-in-the-setup-wizard) are **built**. The design page with the full
+task list lives in the Notion plan.
 
 ## Roles
 
@@ -152,6 +154,8 @@ providers. The role only recommends.
   for the pet's role and provider, and **Your choice** otherwise. **Use recommended** sets the
   recommended model and its vision model (clearing the vision model when the recommendation needs
   none). The user can still type or pick any model on the provider's live list.
+- **Built:** the setup wizard prefills each pet's recommended model when it moves to a provider (see
+  [Roles in the setup wizard](#roles-in-the-setup-wizard)).
 - Design from here on. Prefilling the recommended model when a pet is added, and setting a vision
   model automatically when the role needs pictures and the chosen model cannot see.
 
@@ -186,6 +190,38 @@ A stored pet that still carries a `persona` or `toolAllowlist` key parses: the s
 does not know.
 
 Logins and API keys stay encrypted in `secrets.json`, never in the pet.
+
+### The roles notice
+
+**Built.** An install upgraded to roles is told once what changed, over the Crew Office.
+
+- **What is recorded.** Database migration 6 (`packages/core/src/pets/roles-notice.ts`) runs in the
+  same `migrate` call as migration 5 and records, in a `notices` table, one row per stored pet:
+  `{ petId, name, roleId, keptNotes, madeByYou }`. `keptNotes` is true when migration 5 kept the
+  persona as notes; `madeByYou` is true for any pet that is not Scout, Ink or Bolt. A fresh install has
+  no pets while the migrations run (the crew is seeded after), so it records nothing and never sees the
+  notice. Migration 5 itself was left as shipped, because it had already run on existing databases.
+- **Over RPC.** `notices.rolesUpgrade` (`{}` → `{ notice: { pets } | null }`) answers the notice while
+  it is unseen; `notices.dismiss` (`{ notice: 'rolesUpgrade' }` → `{ dismissed }`) marks it seen for
+  good. The `HostBridge` carries them as `rolesNotice()` and `dismissRolesNotice()`; the desktop wires
+  them through IPC and the preload, the extension relays them over its port, and the fake bridge takes
+  a `rolesNotice` option.
+- **Where it shows.** At launch the desktop opens the Crew Office when a notice is pending, and the
+  office shows it as a modal dialog: "Your crew has roles now", one sentence, a row per pet (sprite,
+  name, arrow, the role in its ink, and "Default persona replaced by the role", "Your edited persona is
+  kept as notes" or, for a pet the user made, "Your persona is kept as notes; pick a better role any
+  time"), a **What changed?** disclosure, **Review my crew** (opens Settings) and **Got it**. Either
+  button, or Escape, dismisses it.
+
+### Roles in the setup wizard
+
+**Built.** The wizard's **Meet your crew** step shows each pet's role: its name in the role's ink and
+its summary. When the provider step is left, the wizard asks `roles.recommendModel` for each pet's role
+on every keyed provider. A pet moving to a provider starts on its role's recommended model, with a
+**Recommended** chip that goes away once the model is edited; the model stays editable, with the
+provider's live list beside it. A pet already on a provider with a key keeps its model, so a rerun of
+the wizard does not undo a choice made in Settings. There is no hiring step: the wizard keeps its seven
+steps.
 
 ## The tools module
 

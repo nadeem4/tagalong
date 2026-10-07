@@ -49,6 +49,13 @@ export const OFFICE_CSS = `
 .office-toggle:hover { color: ${t.color.text}; }
 .office-toggle[aria-pressed='true'] { border-color: ${t.color.gold}; color: ${t.color.gold}; }
 .office-field:disabled, .office-btn:disabled { cursor: not-allowed; }
+.office-notice::backdrop { background: ${t.color.scrim}; }
+.office-notice strong { font-weight: ${t.fontWeight.semibold}; }
+.office-link {
+  height: ${t.size.fieldHeight}px; padding: 0; border: 0; background: transparent;
+  font-family: ${t.font.ui}; font-size: ${t.fontSize.body}px; font-weight: ${t.fontWeight.semibold};
+  color: ${t.color.text}; text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
 .office-btn:disabled {
   background: transparent; border-color: ${t.color.disabledLine}; color: ${t.color.disabledInk};
 }

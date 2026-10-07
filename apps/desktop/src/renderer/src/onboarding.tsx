@@ -2,17 +2,23 @@ import { StrictMode, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MAX_ROLLING_MEMORY_MINUTES, SETTINGS_DEFAULTS } from '@tagalong/protocol';
-import { DEFAULT_PET_COLOR } from '@tagalong/ui';
+import type { Role } from '@tagalong/protocol';
+import { DEFAULT_PET_COLOR, jobFor, officeTokens } from '@tagalong/ui';
+// Bundled, not fetched: the role label uses the office's pixel face, Latin subset only.
+import '@fontsource/pixelify-sans/latin-400.css';
 import './app.css';
 import {
   ONBOARDING_STEPS,
   WIZARD_PROVIDERS,
   hotkeyLabel,
   initialCrewPicks,
+  isRecommended,
   keyedProviders,
   providerStepProblem,
+  recommendationsFor,
+  withRecommendations,
 } from './onboarding-flow';
-import type { CrewPick } from './onboarding-flow';
+import type { CrewPick, ModelsByProvider } from './onboarding-flow';
 import type { HostView, ModelList } from '../../shared/ipc';
 
 /**
@@ -31,6 +37,8 @@ function Onboarding() {
   const [mainProvider, setMainProvider] = useState<string>(WIZARD_PROVIDERS[0]!.id);
   const [picks, setPicks] = useState<Record<string, CrewPick>>({});
   const [models, setModels] = useState<Record<string, ModelList>>({});
+  const [roles, setRoles] = useState<readonly Role[]>([]);
+  const [recommended, setRecommended] = useState<ModelsByProvider>({});
   const [memory, setMemory] = useState<{ enabled: boolean; minutes: string }>({
     enabled: false,
     minutes: String(SETTINGS_DEFAULTS.rollingMemory.minutes),
@@ -53,6 +61,11 @@ function Onboarding() {
         if (stored !== undefined) setMainProvider(stored.id);
       })
       .catch((error: unknown) => setProblem(String(error)));
+    // Roles only label the crew step; without them each pet still shows, unlabelled.
+    window.tagalong
+      .listRoles()
+      .then(setRoles)
+      .catch(() => setRoles([]));
   }, []);
 
   if (view === null) {
@@ -92,7 +105,13 @@ function Onboarding() {
         ),
       });
       const main = keyed.includes(mainProvider) ? mainProvider : keyed[0]!;
-      setPicks(initialCrewPicks(view.pets, keyed, main, view.crewSuggestions));
+      const byRole = await recommendationsFor(view.pets, keyed, (roleId, providerId) =>
+        window.tagalong.recommendModel(roleId, providerId),
+      );
+      setRecommended(byRole);
+      setPicks(
+        initialCrewPicks(view.pets, keyed, main, withRecommendations(view.crewSuggestions, byRole)),
+      );
       for (const providerId of keyed) loadModels(providerId);
     }
     if (current.id === 'crew' && view.pets.length > 0) {
@@ -132,6 +151,7 @@ function Onboarding() {
       .catch((error: unknown) => setProblem(String(error)));
   };
 
+  const suggestions = withRecommendations(view.crewSuggestions, recommended);
   const hotkeys = view.settings.hotkeys;
   const key = (accelerator: string | undefined, fallback: string): string =>
     hotkeyLabel(accelerator ?? fallback, view.platform);
@@ -210,8 +230,9 @@ function Onboarding() {
     crew: (
       <>
         <p>
-          Three pets start with you. Scout explains what is on screen, Ink writes, and Bolt reads
-          errors and code. Give each one a model; the list comes live from the provider.
+          Three pets start with you, each with a role: the job it does, the tools it uses, and how
+          teammates ask it for help. Each role recommends a model on the provider you pick; keep it
+          or choose another from the live list.
         </p>
         {view.pets.length === 0 && (
           <p className="settings__error">
@@ -235,6 +256,7 @@ function Onboarding() {
               <legend>
                 {pet.avatar} {pet.name}
               </legend>
+              <RoleLine roleId={pet.roleId} roles={roles} />
               <label>
                 <span>Provider</span>
                 <select
@@ -243,9 +265,7 @@ function Onboarding() {
                     const providerId = event.target.value;
                     loadModels(providerId);
                     const suggested =
-                      view.crewSuggestions[providerId]?.[pet.id] ??
-                      view.crewSuggestions[providerId]?.scout ??
-                      '';
+                      suggestions[providerId]?.[pet.id] ?? suggestions[providerId]?.scout ?? '';
                     setPicks({ ...picks, [pet.id]: { providerId, model: suggested } });
                   }}
                 >
@@ -257,7 +277,12 @@ function Onboarding() {
                 </select>
               </label>
               <label>
-                <span>Model</span>
+                <span>
+                  Model{' '}
+                  {isRecommended(pet.id, pick, recommended) && (
+                    <span className="onboarding__chip">Recommended</span>
+                  )}
+                </span>
                 <input
                   list={listId}
                   data-testid={`model-${pet.id}`}
@@ -437,6 +462,32 @@ function Onboarding() {
         )}
       </footer>
     </main>
+  );
+}
+
+/** A pet's role: its name in the class ink on the party navy, then the role's summary. */
+function RoleLine({ roleId, roles }: { roleId: string; roles: readonly Role[] }) {
+  const role = roles.find((candidate) => candidate.id === roleId);
+  if (role === undefined) return null;
+  const job = jobFor(roleId, roles);
+  const t = officeTokens;
+  return (
+    <p className="onboarding__role" data-testid={`role-${roleId}`}>
+      <span
+        style={{
+          background: t.color.sidebar,
+          color: job.ink,
+          fontFamily: t.font.pixel,
+          fontSize: t.fontSize.min,
+          letterSpacing: t.letterSpacing.pixel,
+          padding: `${t.space.xxs}px ${t.space.md}px`,
+          borderRadius: t.radius.small,
+        }}
+      >
+        {job.label}
+      </span>{' '}
+      {role.summary}
+    </p>
   );
 }
 

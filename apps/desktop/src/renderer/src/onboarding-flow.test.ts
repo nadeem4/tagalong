@@ -5,8 +5,11 @@ import {
   WIZARD_PROVIDERS,
   hotkeyLabel,
   initialCrewPicks,
+  isRecommended,
   keyedProviders,
   providerStepProblem,
+  recommendationsFor,
+  withRecommendations,
 } from './onboarding-flow';
 import type { ProviderChoice } from '../../shared/ipc';
 
@@ -113,6 +116,77 @@ describe('initialCrewPicks', () => {
       suggestions,
     );
     expect(picks.pip).toEqual({ providerId: 'openrouter', model: 'anthropic/claude-sonnet-5' });
+  });
+});
+
+describe('recommendationsFor', () => {
+  it("asks for each pet's role on each keyed provider and keeps the models it gets", async () => {
+    const writer = { ...pet('ink', 'nebius', 'x'), roleId: 'writer' };
+    const asked: string[] = [];
+    const recommended = await recommendationsFor(
+      [pet('scout', 'nebius', 'x'), writer],
+      ['nebius', 'anthropic'],
+      (roleId, providerId) => {
+        asked.push(`${roleId}@${providerId}`);
+        // Token Factory knows the generalist; Anthropic answers nothing for the writer.
+        if (providerId === 'anthropic' && roleId === 'writer') return Promise.resolve({});
+        return Promise.resolve({ model: `${roleId}-on-${providerId}` });
+      },
+    );
+    expect(asked.sort()).toEqual([
+      'generalist@anthropic',
+      'generalist@nebius',
+      'writer@anthropic',
+      'writer@nebius',
+    ]);
+    expect(recommended).toEqual({
+      nebius: { scout: 'generalist-on-nebius', ink: 'writer-on-nebius' },
+      anthropic: { scout: 'generalist-on-anthropic' },
+    });
+  });
+
+  it('leaves out a pet whose recommendation failed, so the wizard still opens', async () => {
+    const recommended = await recommendationsFor([pet('scout', 'nebius', 'x')], ['nebius'], () =>
+      Promise.reject(new Error('engine down')),
+    );
+    expect(recommended).toEqual({ nebius: {} });
+  });
+});
+
+describe('withRecommendations', () => {
+  it("prefers the role's recommended model over the built-in suggestion", () => {
+    const merged = withRecommendations(suggestions, { nebius: { scout: 'nvidia/role-pick' } });
+    expect(merged.nebius).toEqual({
+      scout: 'nvidia/role-pick',
+      ink: 'nvidia/super',
+      bolt: 'nvidia/vl',
+    });
+    expect(merged.openrouter).toEqual(suggestions.openrouter);
+  });
+
+  it('feeds initialCrewPicks, so a moved pet starts on its role model', () => {
+    const merged = withRecommendations(suggestions, { nebius: { ink: 'nvidia/writer' } });
+    const picks = initialCrewPicks([pet('ink', 'anthropic', 'm')], ['nebius'], 'nebius', merged);
+    expect(picks.ink).toEqual({ providerId: 'nebius', model: 'nvidia/writer' });
+  });
+});
+
+describe('isRecommended', () => {
+  const recommended = { nebius: { ink: 'nvidia/writer' } };
+
+  it('is true while the pick is the role model for its provider', () => {
+    expect(
+      isRecommended('ink', { providerId: 'nebius', model: 'nvidia/writer' }, recommended),
+    ).toBe(true);
+  });
+
+  it('is false once the model is edited, or on a provider with no recommendation', () => {
+    expect(isRecommended('ink', { providerId: 'nebius', model: 'nvidia/other' }, recommended)).toBe(
+      false,
+    );
+    expect(
+      isRecommended('ink', { providerId: 'anthropic', model: 'nvidia/writer' }, recommended),
+    ).toBe(false);
   });
 });
 

@@ -27,6 +27,7 @@ import { startRoundtable } from './crew/roundtable';
 import { browserContextFor } from './perception';
 import type { PerceptionHost } from './perception';
 import { WatchManager, systemWatchClock } from './watch';
+import { dismissRolesNotice, rolesUpgradeNotice } from './pets/roles-notice';
 import { getRole, listRoles, recommendedModel } from './roles';
 import { EngineServer, RpcFailure } from './server/ws-server';
 import type { MethodHandlers } from './server/ws-server';
@@ -218,6 +219,7 @@ export class Engine {
     });
 
     const handlers = buildHandlers({
+      db,
       runner,
       store,
       emit,
@@ -287,6 +289,8 @@ export class Engine {
 }
 
 function buildHandlers(parts: {
+  /** For the one-time notices; everything else reaches it through its own store. */
+  db: Database;
   runner: ConversationRunner;
   store: ConversationStore;
   emit: TurnEventSink;
@@ -299,7 +303,8 @@ function buildHandlers(parts: {
   /** Re-reads provider keys, so a key saved since the last ask is used by this one. */
   refreshProviders: () => Promise<void>;
 }): MethodHandlers {
-  const { runner, store, emit, pets, settings, models, hosts, watches, refreshProviders } = parts;
+  const { db, runner, store, emit, pets, settings, models, hosts, watches, refreshProviders } =
+    parts;
 
   return {
     ask: async (params) => {
@@ -361,5 +366,9 @@ function buildHandlers(parts: {
     'roles.list': () => ({ roles: [...listRoles()] }),
     'roles.recommendModel': (params) =>
       recommendedModel(knownRole(params.roleId), params.providerId) ?? {},
+
+    'notices.rolesUpgrade': () => ({ notice: rolesUpgradeNotice(db) }),
+    // `rolesUpgrade` is the only notice so far; the params schema refuses any other name.
+    'notices.dismiss': () => ({ dismissed: dismissRolesNotice(db) }),
   };
 }

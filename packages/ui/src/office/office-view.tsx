@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Pet, Role } from '@tagalong/protocol';
+import type { Pet, Role, RolesUpgradeNotice } from '@tagalong/protocol';
 import { useHostBridge } from '../host-bridge';
 import { ROOM_COUNT } from './layout';
 import { jobFor } from './job';
@@ -9,6 +9,7 @@ import { OFFICE_CSS } from './office-styles';
 import { OfficeFloor } from './office-floor';
 import { PartyList } from './party-list';
 import { PixelSprite } from './pixel-sprite';
+import { RolesNotice } from './roles-notice';
 import { CHARACTERS, characterFor } from './sprites/characters';
 import { NO_ACTIVITY, nextActivity, statusOf } from './status';
 import { readStill, writeStill } from './still';
@@ -21,9 +22,15 @@ const NOT_YET = 'Task assignment arrives in a later update';
  * and the meeting rooms they will use later. Host-agnostic — it reads the crew and the
  * turn events through the HostBridge, like the chat panel.
  */
-export function OfficeView() {
+export interface OfficeViewProps {
+  /** Opens where the crew is edited. The roles notice offers it as Review my crew. */
+  onReviewCrew?: () => void;
+}
+
+export function OfficeView({ onReviewCrew }: OfficeViewProps = {}) {
   const bridge = useHostBridge();
   const [pets, setPets] = useState<Pet[] | null>(null);
+  const [rolesNotice, setRolesNotice] = useState<RolesUpgradeNotice | null>(null);
   const [roles, setRoles] = useState<readonly Role[]>([]);
   const [failed, setFailed] = useState(false);
   const [activity, setActivity] = useState(NO_ACTIVITY);
@@ -42,11 +49,17 @@ export function OfficeView() {
       console.error('could not list roles', error);
       return [];
     });
-    Promise.all([bridge.listPets(), listed])
-      .then(([list, library]) => {
+    // The notice is a courtesy: if it cannot be read, the office opens without it.
+    const unseen = bridge.rolesNotice().catch((error: unknown) => {
+      console.error('could not read the roles notice', error);
+      return null;
+    });
+    Promise.all([bridge.listPets(), listed, unseen])
+      .then(([list, library, notice]) => {
         if (!live) return;
         setRoles(library);
         setPets(list);
+        setRolesNotice(notice);
       })
       .catch((error: unknown) => {
         console.error('could not list pets', error);
@@ -72,6 +85,14 @@ export function OfficeView() {
       })),
     [pets, roles, activity],
   );
+  /** Seen: closed here at once, and marked seen in the engine so it never comes back. */
+  const dismissNotice = (): void => {
+    setRolesNotice(null);
+    bridge
+      .dismissRolesNotice()
+      .catch((error: unknown) => console.error('could not dismiss the roles notice', error));
+  };
+
   const selectedId = members.some((m) => m.pet.id === picked)
     ? picked
     : (members[0]?.pet.id ?? null);
@@ -112,6 +133,22 @@ export function OfficeView() {
         <OfficeFloor members={members} selectedId={selectedId} />
         <MeetingsPanel />
       </div>
+      {rolesNotice !== null && (
+        <RolesNotice
+          notice={rolesNotice}
+          roles={roles}
+          members={members}
+          onDismiss={dismissNotice}
+          {...(onReviewCrew !== undefined
+            ? {
+                onReview: () => {
+                  dismissNotice();
+                  onReviewCrew();
+                },
+              }
+            : {})}
+        />
+      )}
     </div>
   );
 }
