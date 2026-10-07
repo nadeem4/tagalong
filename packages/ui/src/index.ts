@@ -32,3 +32,9 @@ export type { FakeHostBridge } from './test-support/fake-host-bridge';
 export { OfficeView } from './office/office-view';
 export { PixelSprite } from './office/pixel-sprite';
 export type { PixelSpriteProps } from './office/pixel-sprite';
+
+export { PetSettings } from './settings/pet-settings';
+export type { PetDraft, PetSettingsProps } from './settings/pet-settings';
+export type { ModelRecommendation } from './settings/brain-picker';
+export { CrewList } from './settings/crew-list';
+export { SETTINGS_CSS } from './settings/settings-styles';
