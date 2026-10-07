@@ -5,3 +5,5 @@ coverage/
 pnpm-lock.yaml
 .remember/
 release/
+# Written by packages/core/scripts/gen-roles.mjs; a test keeps it in step with the role files.
+packages/core/src/roles/library.generated.ts

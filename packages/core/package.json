@@ -13,7 +13,8 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "clean": "tsc -b --clean"
+    "clean": "tsc -b --clean",
+    "gen:roles": "node scripts/gen-roles.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.125.0",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "9.6.0",
-    "@types/ws": "8.18.1"
+    "@types/ws": "8.18.1",
+    "yaml": "2.9.1"
   }
 }
