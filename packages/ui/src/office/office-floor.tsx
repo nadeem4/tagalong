@@ -10,6 +10,7 @@ import {
   WINDOW_Y,
   cursorAbove,
   deskLayout,
+  loungeAt,
   monitorAt,
   plateAt,
   roomFurniture,
@@ -102,6 +103,15 @@ export function OfficeFloor({ members, selectedId }: OfficeFloorProps) {
             sprite={FURNITURE[prop.sprite]}
             scale={furniture}
             style={at(prop)}
+          />
+        ))}
+
+        {loungeAt(members.length).map((piece) => (
+          <PixelSprite
+            key={`lounge-${piece.x},${piece.y}`}
+            sprite={piece.sprite}
+            scale={furniture}
+            style={at(piece)}
           />
         ))}
 

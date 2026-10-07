@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   FLOOR,
   MAX_DESKS,
+  PLANTS,
   PROPS,
   ROOMS,
   ROOM_COUNT,
   deskFootprint,
   deskLayout,
+  loungeAt,
   monitorAt,
   seatAt,
 } from './layout';
@@ -91,4 +93,42 @@ describe('PROPS', () => {
       for (const room of ROOMS) expect(overlaps(rect, room)).toBe(false);
     }
   });
+});
+
+describe('loungeAt', () => {
+  const scale = officeTokens.spriteScale.furniture;
+  const rectOf = (piece: { x: number; y: number; sprite: Parameters<typeof spriteSize>[0] }) => {
+    const { width, height } = spriteSize(piece.sprite);
+    return { x: piece.x, y: piece.y, width: width * scale, height: height * scale };
+  };
+
+  it('furnishes the free band below the desks for the default crew', () => {
+    expect(loungeAt(3).length).toBeGreaterThan(0);
+    const pieces = loungeAt(3).map(rectOf);
+    expect(Math.min(...pieces.map((piece) => piece.y))).toBeGreaterThanOrEqual(420);
+    expect(Math.max(...pieces.map((piece) => piece.y + piece.height))).toBeLessThanOrEqual(730);
+  });
+
+  it('gives the band back when the desks need it', () => {
+    expect(loungeAt(MAX_DESKS)).toEqual([]);
+  });
+
+  for (let count = 0; count <= MAX_DESKS; count += 1) {
+    it(`stays clear of ${count} desk(s), the rooms, the walls and the other props`, () => {
+      const desks = deskLayout(count).map(deskFootprint);
+      const others = [
+        ...PROPS.map((prop) => rectOf({ ...prop, sprite: FURNITURE[prop.sprite] })),
+        ...PLANTS.map((plant) => ({ ...plant, width: 24, height: 30 })),
+      ];
+      for (const rect of loungeAt(count).map(rectOf)) {
+        expect(rect.x).toBeGreaterThanOrEqual(0);
+        expect(rect.y).toBeGreaterThanOrEqual(FLOOR.wallHeight);
+        expect(rect.x + rect.width).toBeLessThanOrEqual(FLOOR.width);
+        expect(rect.y + rect.height).toBeLessThanOrEqual(FLOOR.height);
+        for (const desk of desks) expect(overlaps(rect, desk)).toBe(false);
+        for (const room of ROOMS) expect(overlaps(rect, room)).toBe(false);
+        for (const other of others) expect(overlaps(rect, other)).toBe(false);
+      }
+    });
+  }
 });

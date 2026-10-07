@@ -1,3 +1,4 @@
+import { PLANT } from './sprites/characters';
 import { FURNITURE, monitorSprite } from './sprites/furniture';
 import { spriteSize } from './sprites/sprite';
 import type { Sprite } from './sprites/sprite';
@@ -30,6 +31,27 @@ export const PLANTS: readonly Point[] = [
   { x: 16, y: 680 },
   { x: 252, y: 680 },
 ];
+
+/** A small lounge: a rug, a sofa, a coffee table and a plant, offsets from its corner. */
+const LOUNGE: readonly { sprite: Sprite; dx: number; dy: number }[] = [
+  { sprite: FURNITURE.rug, dx: 0, dy: 24 },
+  { sprite: FURNITURE.sofa, dx: 15, dy: 0 },
+  { sprite: FURNITURE.coffeeTable, dx: 39, dy: 54 },
+  { sprite: PLANT, dx: 126, dy: 2 },
+];
+const LOUNGE_CORNER: Point = { x: 44, y: 520 };
+/** The lounge sits where the fourth row of desks would go, so it gives way to a seventh pet. */
+const LOUNGE_MAX_PETS = 6;
+
+/** The lounge's pieces on the floor, or none when the desks need its band. */
+export function loungeAt(petCount: number): (Point & { sprite: Sprite })[] {
+  if (petCount > LOUNGE_MAX_PETS) return [];
+  return LOUNGE.map(({ sprite, dx, dy }) => ({
+    sprite,
+    x: LOUNGE_CORNER.x + dx,
+    y: LOUNGE_CORNER.y + dy,
+  }));
+}
 
 /** Furniture along the bottom wall, below the last row of desks. */
 export const PROPS: readonly (Point & { sprite: 'shelf' | 'waterCooler' })[] = [

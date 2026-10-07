@@ -650,7 +650,8 @@ It is split so the look can change without touching component logic:
   no canvas. `characterFor(pet)` is the one mapping from a pet to a character: Scout, Ink and Bolt get
   their own; any other pet gets the shared body recoloured from its `color`.
   The furniture is sprites too (`sprites/furniture.ts`: desk, monitor, chair, meeting table, wall
-  window, a shelf and a water cooler), drawn at the pets' 3x scale with shading painted into the
+  window, a shelf, a water cooler, and a lounge of rug, sofa, coffee table and plant that
+  `loungeAt(n)` places below the desks until a seventh pet needs that band), drawn at the pets' 3x scale with shading painted into the
   pixels. Each desk's monitor stands beside its pet facing the viewer, lit teal while the pet works.
 - **Layout as data** — `office/layout.ts` holds the floor size, the two meeting rooms (`ROOM_COUNT`),
   windows, plants and props, and pure functions for desk positions (`deskLayout(n)`, two columns of up to

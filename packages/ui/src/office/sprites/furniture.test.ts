@@ -9,9 +9,19 @@ const ALL: [string, Sprite][] = [
 ];
 
 describe('furniture sprites', () => {
-  it('includes the desk, monitor, chair, meeting table, window and floor props', () => {
+  it('includes the desk, monitor, chair, meeting table, window, floor props and the lounge', () => {
     expect(Object.keys(FURNITURE).sort()).toEqual(
-      ['chair', 'desk', 'meetingTable', 'shelf', 'waterCooler', 'window'].sort(),
+      [
+        'chair',
+        'coffeeTable',
+        'desk',
+        'meetingTable',
+        'rug',
+        'shelf',
+        'sofa',
+        'waterCooler',
+        'window',
+      ].sort(),
     );
   });
 
