@@ -3,6 +3,10 @@
 Adapted from the project home in Notion:
 <https://app.notion.com/p/3d809730490481a4be8ac5bd000b8bfc>
 
+This page describes how the engine and its hosts are built today. How pets remember, meet and talk
+to each other, including designs not built yet, is in [concepts/](concepts/README.md). Building and
+running from source is in [development.md](development.md).
+
 ## Core engine, thin hosts
 
 One core engine, many thin hosts. The core never knows which OS or which host it is talking to.
