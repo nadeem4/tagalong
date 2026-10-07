@@ -66,8 +66,8 @@ crew, or a pending notice, cannot change what it sees.
       "pick a better role any time"); Got it closes it, and after a restart nothing opens.
 - [x] **A fresh install never sees it.** `roles-notice.test.ts`, `db.test.ts`, `engine.test.ts`, and the
       smoke suite's first test, which still sees only the avatar and the panel on a fresh profile.
-- [x] **The wizard names each pet's role and recommends a model.** Smoke test `the wizard's crew step
-    shows each role and prefills its recommended model`.
+- [x] **The wizard names each pet's role and recommends a model.** The smoke test for the
+      wizard's crew step: each role is shown, and Ink's recommended model is prefilled.
 - [x] **Roles decide tools and instructions; Settings edits the role.** Unit-tested in #32 to #34
       (`tools/registry.test.ts`, `conversation/prompt-assembler.test.ts`, `settings/pet-settings.test.tsx`) and in the Settings smoke test.
 - [~] **A pet consults a teammate by role.** The directory cards and the `ask_pet` routing are unit
