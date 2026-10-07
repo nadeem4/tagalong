@@ -649,8 +649,11 @@ It is split so the look can change without touching component logic:
   1px shadow per pixel) and `PixelSprite` draws it on one pixel scaled by a whole number. No images,
   no canvas. `characterFor(pet)` is the one mapping from a pet to a character: Scout, Ink and Bolt get
   their own; any other pet gets the shared body recoloured from its `color`.
+  The furniture is sprites too (`sprites/furniture.ts`: desk, monitor, chair, meeting table, wall
+  window, a shelf and a water cooler), drawn at the pets' 3x scale with shading painted into the
+  pixels. Each desk's monitor stands beside its pet facing the viewer, lit teal while the pet works.
 - **Layout as data** — `office/layout.ts` holds the floor size, the two meeting rooms (`ROOM_COUNT`),
-  windows and plants, and pure functions for desk positions (`deskLayout(n)`, two columns of up to
+  windows, plants and props, and pure functions for desk positions (`deskLayout(n)`, two columns of up to
   eight desks), seats, monitors and the selection cursor.
 - **Small components** — `PartyList`, `OfficeFloor`, `MeetingsPanel` and `PixelSprite`, composed by
   `OfficeView`.
@@ -659,7 +662,9 @@ Status comes from the turn notifications main already forwards to every window: 
 the turns in flight, so a pet reads **Working** (and its monitor lights) from `turn.started` until that
 turn completes or errors, and **At desk** otherwise — always an icon and a word. Meetings, task
 assignment and office settings are later phases: the rooms read **Free**, the meetings panel shows an
-empty state, and the assign field is disabled with a tooltip saying so. The two typefaces, Onest and
+empty state, and the assign field is disabled with a tooltip saying so. A **Still office** toggle in the
+top bar stops the idle bob and the cursor hop (as `prefers-reduced-motion` does) and is remembered in
+the page's `localStorage`. The two typefaces, Onest and
 Pixelify Sans, are bundled from `@fontsource` packages (Latin subset) so the window makes no network
 request.
 
