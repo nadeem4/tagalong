@@ -1,6 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron';
-import type { ContextSnapshot, PerceptionTarget, Pet, SettingsPatch } from '@tagalong/protocol';
+import type {
+  ContextSnapshot,
+  PerceptionTarget,
+  Pet,
+  Role,
+  SettingsPatch,
+} from '@tagalong/protocol';
 import type { AskInput, HostBridge, TurnEvent } from '@tagalong/ui';
 import { IPC } from '../shared/ipc';
 import type {
@@ -23,6 +29,12 @@ const bridge: HostBridge = {
     ipcRenderer.invoke(IPC.capture, targets) as Promise<ContextSnapshot | null>,
   interrupt: (turnId: string) => ipcRenderer.invoke(IPC.interrupt, turnId) as Promise<void>,
   listPets: () => ipcRenderer.invoke(IPC.listPets) as Promise<Pet[]>,
+  listRoles: () => ipcRenderer.invoke(IPC.listRoles) as Promise<Role[]>,
+  recommendModel: (roleId: string, providerId: string) =>
+    ipcRenderer.invoke(IPC.recommendModel, roleId, providerId) as Promise<{
+      model?: string;
+      visionModel?: string;
+    }>,
   stopWatch: (watchId: string) => ipcRenderer.invoke(IPC.stopWatch, watchId) as Promise<void>,
   onTurnEvent: (handler: (event: TurnEvent) => void) => {
     const listener = (_event: IpcRendererEvent, turnEvent: TurnEvent): void => handler(turnEvent);

@@ -6,6 +6,7 @@ import type {
   NotificationParamsOf,
   PerceptionTarget,
   Pet,
+  Role,
 } from '@tagalong/protocol';
 
 /**
@@ -52,6 +53,16 @@ export interface HostBridge {
   /** Returns an unsubscribe function. */
   onTurnEvent(handler: (event: TurnEvent) => void): () => void;
   listPets(): Promise<Pet[]>;
+  /** Phase 8. Every role in the engine's library: the office labels and the role picker. */
+  listRoles(): Promise<Role[]>;
+  /**
+   * Phase 8. The model a pet with this role would start on, on this provider, for a form to
+   * prefill. Both fields are absent when the provider has no tier table, such as `fake`.
+   */
+  recommendModel(
+    roleId: string,
+    providerId: string,
+  ): Promise<{ model?: string; visionModel?: string }>;
   /**
    * Phase 3B. Ends a watch from its Watching chip. Optional: a host that cannot start
    * watches never shows a chip to stop.

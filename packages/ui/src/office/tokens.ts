@@ -40,6 +40,17 @@ export const officeTokens = {
     meterOff: '#E0E3EC',
     scrollbarThumb: '#CDD2DE',
   },
+  /**
+   * One label ink per job class, keyed by role id (The One Colour Per Class Rule). Each reads
+   * on the sidebar navy and stays clear of gold.
+   */
+  roleInk: {
+    generalist: '#4FD1C1',
+    writer: '#A996F5',
+    'backend-engineer': '#F6B85A',
+    'frontend-engineer': '#F28DB8',
+    researcher: '#7DD87F',
+  },
   font: {
     ui: "'Onest', system-ui, sans-serif",
     pixel: "'Pixelify Sans', 'Onest', sans-serif",

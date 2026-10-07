@@ -1,4 +1,4 @@
-import type { ContextSnapshot, PerceptionTarget, Pet } from '@tagalong/protocol';
+import type { ContextSnapshot, PerceptionTarget, Pet, Role } from '@tagalong/protocol';
 import type { AskInput, HostBridge, TurnEvent } from '../host-bridge';
 
 export interface FakeHostBridge extends HostBridge {
@@ -19,7 +19,13 @@ export interface FakeHostBridge extends HostBridge {
  * same bridge double to test its renderer without booting an engine.
  */
 export function createFakeHostBridge(
-  options: { pets?: Pet[]; capture?: ContextSnapshot | null } = {},
+  options: {
+    pets?: Pet[];
+    capture?: ContextSnapshot | null;
+    roles?: Role[];
+    /** What recommendModel answers; absent answers `{}`, like a provider with no tiers. */
+    recommend?: (roleId: string, providerId: string) => { model?: string; visionModel?: string };
+  } = {},
 ): FakeHostBridge {
   const handlers = new Set<(event: TurnEvent) => void>();
   const asks: AskInput[] = [];
@@ -60,6 +66,12 @@ export function createFakeHostBridge(
     },
     listPets() {
       return Promise.resolve(options.pets ?? []);
+    },
+    listRoles() {
+      return Promise.resolve(options.roles ?? []);
+    },
+    recommendModel(roleId, providerId) {
+      return Promise.resolve(options.recommend?.(roleId, providerId) ?? {});
     },
     emit(event) {
       // Copied first so a handler that unsubscribes mid-emit cannot skip its neighbours.

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { Role } from './roles';
+import {
+  Role,
+  RolesListParams,
+  RolesListResult,
+  RolesRecommendModelParams,
+  RolesRecommendModelResult,
+} from './roles';
 
 const valid = {
   id: 'backend-engineer',
@@ -40,5 +46,33 @@ describe('Role', () => {
 
   it('rejects a missing vision flag', () => {
     expect(Role.safeParse({ ...valid, model: { tier: 'deep' } }).success).toBe(false);
+  });
+});
+
+describe('roles.list', () => {
+  it('takes no params and returns whole roles', () => {
+    expect(RolesListParams.parse({})).toEqual({});
+    expect(RolesListResult.parse({ roles: [valid] })).toEqual({ roles: [valid] });
+  });
+
+  it('rejects a result whose role is malformed', () => {
+    expect(RolesListResult.safeParse({ roles: [{ ...valid, version: 0 }] }).success).toBe(false);
+  });
+});
+
+describe('roles.recommendModel', () => {
+  it('names a role and a provider', () => {
+    const params = { roleId: 'writer', providerId: 'openrouter' };
+    expect(RolesRecommendModelParams.parse(params)).toEqual(params);
+    expect(RolesRecommendModelParams.safeParse({ roleId: '', providerId: 'x' }).success).toBe(
+      false,
+    );
+    expect(RolesRecommendModelParams.safeParse({ roleId: 'writer' }).success).toBe(false);
+  });
+
+  it('answers with a model and a vision model, or neither for a provider with no tiers', () => {
+    const both = { model: 'nemotron', visionModel: 'nemotron-vl' };
+    expect(RolesRecommendModelResult.parse(both)).toEqual(both);
+    expect(RolesRecommendModelResult.parse({})).toEqual({});
   });
 });

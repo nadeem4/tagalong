@@ -50,4 +50,30 @@ describe('createFakeHostBridge', () => {
     await bridge.interrupt('t1');
     expect(bridge.interrupts).toEqual(['t1']);
   });
+
+  it('lists the roles it was seeded with, and none by default', async () => {
+    const writer = {
+      id: 'writer',
+      name: 'Writer',
+      version: 1,
+      summary: 'Drafts and rewrites text.',
+      goodAt: ['drafts'],
+      notFor: ['code'],
+      tools: ['remember'],
+      model: { tier: 'balanced' as const, needsVision: false },
+      instructions: 'You are a writer.',
+    };
+    await expect(createFakeHostBridge().listRoles()).resolves.toEqual([]);
+    await expect(createFakeHostBridge({ roles: [writer] }).listRoles()).resolves.toEqual([writer]);
+  });
+
+  it('recommends what the test asks for, and nothing by default', async () => {
+    await expect(createFakeHostBridge().recommendModel('writer', 'fake')).resolves.toEqual({});
+    const bridge = createFakeHostBridge({
+      recommend: (roleId, providerId) => ({ model: `${roleId}@${providerId}` }),
+    });
+    await expect(bridge.recommendModel('writer', 'nebius')).resolves.toEqual({
+      model: 'writer@nebius',
+    });
+  });
 });

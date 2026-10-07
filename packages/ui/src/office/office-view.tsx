@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Pet } from '@tagalong/protocol';
+import type { Pet, Role } from '@tagalong/protocol';
 import { useHostBridge } from '../host-bridge';
 import { ROOM_COUNT } from './layout';
+import { jobFor } from './job';
 import type { OfficeMember } from './member';
 import { MeetingsPanel } from './meetings-panel';
 import { OFFICE_CSS } from './office-styles';
@@ -23,6 +24,7 @@ const NOT_YET = 'Task assignment arrives in a later update';
 export function OfficeView() {
   const bridge = useHostBridge();
   const [pets, setPets] = useState<Pet[] | null>(null);
+  const [roles, setRoles] = useState<readonly Role[]>([]);
   const [failed, setFailed] = useState(false);
   const [activity, setActivity] = useState(NO_ACTIVITY);
   const [picked, setPicked] = useState<string | null>(null);
@@ -34,10 +36,17 @@ export function OfficeView() {
 
   useEffect(() => {
     let live = true;
-    bridge
-      .listPets()
-      .then((list) => {
-        if (live) setPets(list);
+    // Roles only name the jobs: without them every pet reads as a generalist, but the crew
+    // still shows, so a roles failure is logged rather than shown as an outage.
+    const listed = bridge.listRoles().catch((error: unknown) => {
+      console.error('could not list roles', error);
+      return [];
+    });
+    Promise.all([bridge.listPets(), listed])
+      .then(([list, library]) => {
+        if (!live) return;
+        setRoles(library);
+        setPets(list);
       })
       .catch((error: unknown) => {
         console.error('could not list pets', error);
@@ -58,9 +67,10 @@ export function OfficeView() {
       (pets ?? []).map((pet) => ({
         pet,
         character: characterFor(pet),
+        job: jobFor(pet.roleId, roles),
         status: statusOf(activity, pet.id),
       })),
-    [pets, activity],
+    [pets, roles, activity],
   );
   const selectedId = members.some((m) => m.pet.id === picked)
     ? picked

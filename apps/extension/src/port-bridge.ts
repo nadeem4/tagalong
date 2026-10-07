@@ -1,5 +1,10 @@
 import { coreToHostNotifications } from '@tagalong/protocol';
-import type { ContextSnapshot, HostToCoreMethod, PerceptionTarget } from '@tagalong/protocol';
+import type {
+  ContextSnapshot,
+  HostToCoreMethod,
+  PerceptionTarget,
+  ResultOf,
+} from '@tagalong/protocol';
 import type { HostBridge, TurnEvent } from '@tagalong/ui';
 import type { ConnectionStatus } from './engine-connection';
 import type { PageMessage, PortLike, WorkerMessage } from './port-messages';
@@ -110,6 +115,15 @@ export function createPortBridge(port: PortLike): PortBridge {
         pets: Awaited<ReturnType<HostBridge['listPets']>>;
       };
       return result.pets;
+    },
+    async listRoles() {
+      return ((await call('roles.list', {})) as ResultOf<'roles.list'>).roles;
+    },
+    async recommendModel(roleId, providerId) {
+      return (await call('roles.recommendModel', {
+        roleId,
+        providerId,
+      })) as Awaited<ReturnType<HostBridge['recommendModel']>>;
     },
     onTurnEvent: (handler) => subscribe(turnHandlers, handler),
     onStatus(handler) {

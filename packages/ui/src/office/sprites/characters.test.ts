@@ -36,7 +36,11 @@ describe('characterFor', () => {
     expect(character.sprite.rows).toBe(BODY);
     expect(character.sprite.palette['f']).toBe('#5dbb63');
     expect(character.sprite.palette['o']).toBe(shade('#5dbb63', -0.6));
-    expect(character.jobLabel).toBe('CREW');
+  });
+
+  it('draws the character only: the job label comes from the pet’s role, not its id', () => {
+    expect(Object.keys(characterFor(pet({ id: 'scout' })))).toEqual(['sprite']);
+    expect(Object.keys(characterFor(pet({ id: 'sage' })))).toEqual(['sprite']);
   });
 
   it('falls back to a neutral colour for a pet saved without one', () => {

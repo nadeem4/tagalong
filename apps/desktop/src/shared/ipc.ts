@@ -7,6 +7,8 @@ export const IPC = {
   ask: 'tagalong:ask',
   interrupt: 'tagalong:interrupt',
   listPets: 'tagalong:pets:list',
+  listRoles: 'tagalong:roles:list',
+  recommendModel: 'tagalong:roles:recommend-model',
   turnEvent: 'tagalong:turn-event',
   getContext: 'tagalong:context:get',
   capture: 'tagalong:capture',

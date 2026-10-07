@@ -1,6 +1,6 @@
 import type { Database } from 'better-sqlite3';
-import { DEFAULT_ENGINE_PORT, Settings } from '@tagalong/protocol';
-import type { Pet } from '@tagalong/protocol';
+import { DEFAULT_ENGINE_PORT, RPC_ERROR_CODES, Settings } from '@tagalong/protocol';
+import type { Pet, Role } from '@tagalong/protocol';
 import { openDatabase } from './memory/db';
 import { ConversationStore } from './memory/store';
 import { MemoryStore } from './memory/memories';
@@ -27,7 +27,8 @@ import { startRoundtable } from './crew/roundtable';
 import { browserContextFor } from './perception';
 import type { PerceptionHost } from './perception';
 import { WatchManager, systemWatchClock } from './watch';
-import { EngineServer } from './server/ws-server';
+import { getRole, listRoles, recommendedModel } from './roles';
+import { EngineServer, RpcFailure } from './server/ws-server';
 import type { MethodHandlers } from './server/ws-server';
 import { readOrCreatePairingToken } from './server/pairing';
 
@@ -76,6 +77,25 @@ async function listModels(
   if (providerId === 'anthropic') return { models: [...ANTHROPIC_MODELS], source: 'fallback' };
   if (providerId === 'fake') return { models: [...FAKE_MODELS], source: 'fallback' };
   throw new Error(`no provider with id '${providerId}'`);
+}
+
+/** The library role with this id, or an invalidParams refusal naming the id. */
+function knownRole(roleId: string): Role {
+  const role = getRole(roleId);
+  if (role === undefined) {
+    throw new RpcFailure(RPC_ERROR_CODES.invalidParams, `no role '${roleId}' in the role library`);
+  }
+  return role;
+}
+
+/**
+ * A pet about to be saved, with its role checked. A new pet, or one moving to another role,
+ * takes on that role's library version; an existing pet keeps the version it was sent with.
+ */
+function withRole(pet: Pet, existing: Pet | null): Pet {
+  const role = knownRole(pet.roleId);
+  if (existing !== null && existing.roleId === pet.roleId) return pet;
+  return { ...pet, roleVersion: role.version };
 }
 
 export interface EngineOptions {
@@ -328,12 +348,18 @@ function buildHandlers(parts: {
     interrupt: (params) => ({ aborted: runner.interrupt(params.turnId) }),
 
     'pets.list': () => ({ pets: pets.list() }),
-    'pets.upsert': (params) => ({ pet: pets.upsert(params.pet) }),
+    'pets.upsert': (params) => ({
+      pet: pets.upsert(withRole(params.pet, pets.get(params.pet.id))),
+    }),
     'pets.delete': (params) => ({ deleted: pets.delete(params.petId) }),
 
     'settings.get': () => ({ settings: settings.get() }),
     'settings.set': (params) => ({ settings: settings.set(params.patch) }),
     'models.list': (params) => models(params.providerId),
     'watch.stop': (params) => ({ stopped: watches.stop(params.watchId) }),
+
+    'roles.list': () => ({ roles: [...listRoles()] }),
+    'roles.recommendModel': (params) =>
+      recommendedModel(knownRole(params.roleId), params.providerId) ?? {},
   };
 }

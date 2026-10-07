@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 import { PROTOCOL_VERSION, RPC_ERROR_CODES } from '@tagalong/protocol';
 import type { Pet } from '@tagalong/protocol';
-import { EngineServer } from './ws-server';
+import { EngineServer, RpcFailure } from './ws-server';
 import type { EngineServerOptions, HostSession } from './ws-server';
 
 const TOKEN = 'a'.repeat(64);
@@ -218,6 +218,25 @@ describe('rpc routing', () => {
 
     expect(error['code']).toBe(RPC_ERROR_CODES.internalError);
     expect(String(error['message'])).toContain('database on fire');
+  });
+
+  it('answers a handler that refuses with an RpcFailure with that failure’s own code', async () => {
+    const s = await start({
+      handlers: {
+        'pets.list': () => {
+          throw new RpcFailure(RPC_ERROR_CODES.invalidParams, 'no role "wizard"');
+        },
+      },
+    });
+    const client = await TestClient.connect(s.port);
+    await client.call('hello', hello());
+
+    const res = await client.call('pets.list', {});
+
+    expect(res['error']).toEqual({
+      code: RPC_ERROR_CODES.invalidParams,
+      message: 'no role "wizard"',
+    });
   });
 
   it('answers malformed JSON with parseError', async () => {
