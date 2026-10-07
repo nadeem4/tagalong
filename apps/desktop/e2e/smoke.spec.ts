@@ -444,3 +444,37 @@ test('the setup wizard opens on request, insists on a key, and Skip closes it fo
     );
   }
 });
+
+test('the Crew Office opens with the real crew in its party list', async () => {
+  const panel = await windowFor('panel');
+  // The tray's Open office item calls the same main-process function as this host call;
+  // a tray menu cannot be clicked from Playwright.
+  await panel.evaluate(() => window.tagalongHost.openOffice());
+  const office = await windowFor('office');
+
+  const party = office.getByRole('navigation', { name: 'Party' });
+  const pets = await panel.evaluate(() => window.tagalong.listPets());
+  expect(pets.length).toBeGreaterThan(0);
+  for (const pet of pets.slice(0, 8)) {
+    await expect(party.getByRole('button', { name: new RegExp(pet.name) })).toBeVisible({
+      timeout: 15_000,
+    });
+  }
+  await expect(office.getByRole('complementary', { name: 'Meetings' })).toContainText(
+    'No meetings yet',
+  );
+
+  // The bundled typefaces must load under the page's CSP, or the office falls back to
+  // system fonts without saying so.
+  const fontsLoaded = await office.evaluate(async () => ({
+    onest: (await document.fonts.load("14px 'Onest'")).length,
+    pixel: (await document.fonts.load("17px 'Pixelify Sans'")).length,
+  }));
+  expect(fontsLoaded.onest).toBeGreaterThan(0);
+  expect(fontsLoaded.pixel).toBeGreaterThan(0);
+
+  // A screenshot for design review, in the gitignored test-results folder.
+  await office.screenshot({ path: join(appDir, 'test-results', 'office.png') });
+
+  await office.close();
+});

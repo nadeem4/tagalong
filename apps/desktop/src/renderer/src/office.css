@@ -1,0 +1,11 @@
+/*
+ * The office draws everything itself from @tagalong/ui's office tokens; the page only has
+ * to give it the whole window.
+ */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}

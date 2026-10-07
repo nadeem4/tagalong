@@ -32,6 +32,7 @@ export const IPC = {
   getRecording: 'tagalong:get-recording',
   stopWatch: 'tagalong:watch:stop',
   openOnboarding: 'tagalong:onboarding:open',
+  openOffice: 'tagalong:office:open',
   finishOnboarding: 'tagalong:onboarding:finish',
   applyCrew: 'tagalong:onboarding:crew',
   openLink: 'tagalong:link:open',
@@ -166,6 +167,8 @@ export interface TagalongHostApi {
   openSettings(): Promise<void>;
   /** Phase 7. Opens the setup wizard, from Settings or the tray. */
   openOnboarding(): Promise<void>;
+  /** Opens the Crew Office, or focuses it. The tray is the shipped way in. */
+  openOffice(): Promise<void>;
   /**
    * Phase 7. Marks the wizard done (finished or skipped) and closes it. `openPanel` brings
    * the panel up beside the pets, so the last step can end on a first question.

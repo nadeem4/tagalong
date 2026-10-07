@@ -23,6 +23,8 @@
     "get-windows": "9.3.0"
   },
   "devDependencies": {
+    "@fontsource/onest": "5.3.1",
+    "@fontsource/pixelify-sans": "5.3.0",
     "@playwright/test": "1.63.0",
     "@tagalong/core": "workspace:*",
     "@tagalong/protocol": "workspace:*",
