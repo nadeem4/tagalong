@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { CaptureExclusions, ContextSnapshotPatch, PerceptionTarget } from '@tagalong/protocol';
-import {
-  GET_SELECTION,
-  LOOK_AT_SCREEN,
-  createPerceptionToolset,
-  type PerceptionHost,
-  type ToolOutcome,
-} from './tools';
+import type { PerceptionHost } from '../../perception/host';
+import { fakeTurnTools } from '../fake-turn';
+import type { TurnTools } from '../registry';
+import type { ToolOutcome } from '../tool';
+import { GET_SELECTION, LOOK_AT_SCREEN } from './perception';
 
 /**
  * Asserts the result is prose before reading it as prose. `content` widened to blocks when
@@ -49,12 +47,18 @@ function toolset(
   hosts: readonly PerceptionHost[],
   exclusions: CaptureExclusions = NO_EXCLUSIONS,
   vision = true,
-): ReturnType<typeof createPerceptionToolset> {
-  return createPerceptionToolset({
-    hosts: () => hosts,
-    exclusions: () => exclusions,
-    vision: () => vision,
-  });
+  turnVision?: boolean,
+): TurnTools {
+  return fakeTurnTools(
+    {
+      perception: {
+        hosts: () => hosts,
+        exclusions: () => exclusions,
+        vision: () => vision,
+      },
+    },
+    turnVision === undefined ? {} : { vision: turnVision },
+  );
 }
 
 function screenshotHost(): ReturnType<typeof fakeHost> {
@@ -115,9 +119,8 @@ describe('look_at_screen', () => {
 
   it('assumes no vision when the caller does not say, so pixels are never sent blind', async () => {
     const host = screenshotHost();
-    const blind = createPerceptionToolset({
-      hosts: () => [host],
-      exclusions: () => NO_EXCLUSIONS,
+    const blind = fakeTurnTools({
+      perception: { hosts: () => [host], exclusions: () => NO_EXCLUSIONS },
     });
 
     const result = await blind.run({ name: LOOK_AT_SCREEN });
@@ -229,27 +232,25 @@ describe('unknown tools', () => {
 
 describe('per-turn vision', () => {
   it('sends pixels when the turn says its brain can see and the host sets no ceiling', async () => {
-    const tools = createPerceptionToolset({
-      hosts: () => [screenshotHost()],
-      exclusions: () => NO_EXCLUSIONS,
-    });
-    const outcome = await tools.run({ name: LOOK_AT_SCREEN }, { vision: true });
+    const tools = fakeTurnTools(
+      { perception: { hosts: () => [screenshotHost()], exclusions: () => NO_EXCLUSIONS } },
+      { vision: true },
+    );
+    const outcome = await tools.run({ name: LOOK_AT_SCREEN });
     expect(Array.isArray(outcome.content)).toBe(true);
   });
 
   it('answers in words when this turn cannot see, even though the toolset could', async () => {
-    const outcome = await toolset([screenshotHost()]).run(
-      { name: LOOK_AT_SCREEN },
-      { vision: false },
-    );
+    const outcome = await toolset([screenshotHost()], NO_EXCLUSIONS, true, false).run({
+      name: LOOK_AT_SCREEN,
+    });
     expect(typeof outcome.content).toBe('string');
   });
 
   it('never lets a turn widen a toolset that was built blind', async () => {
-    const outcome = await toolset([screenshotHost()], NO_EXCLUSIONS, false).run(
-      { name: LOOK_AT_SCREEN },
-      { vision: true },
-    );
+    const outcome = await toolset([screenshotHost()], NO_EXCLUSIONS, false, true).run({
+      name: LOOK_AT_SCREEN,
+    });
     expect(typeof outcome.content).toBe('string');
   });
 });

@@ -6,7 +6,7 @@ import type {
 } from '@tagalong/protocol';
 import { findCaptureBlock, type CaptureBlock } from './exclusions';
 import { isBrowserProcess } from './inventory';
-import type { PerceptionHost } from './tools';
+import type { PerceptionHost } from './host';
 
 /**
  * How long the engine waits for the browser host before using the desktop's answer.

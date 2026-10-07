@@ -6,9 +6,11 @@ import type {
   PerceptionRecallParams,
   PerceptionRecallResult,
 } from '@tagalong/protocol';
-import type { BrainContentBlock } from '../providers';
-import { RECALL_SCREEN, WHAT_CHANGED, createPerceptionToolset } from './tools';
-import type { PerceptionHost, ToolOutcome } from './tools';
+import type { BrainContentBlock } from '../../providers';
+import type { PerceptionHost } from '../../perception/host';
+import { fakeTurnTools } from '../fake-turn';
+import type { ToolOutcome } from '../tool';
+import { RECALL_SCREEN, WHAT_CHANGED } from './awareness';
 
 const NO_EXCLUSIONS: CaptureExclusions = { processNames: [], titlePatterns: [] };
 const IMAGE = { mime: 'image/png' as const, base64: 'iVBORw0KGgo=', width: 640, height: 360 };
@@ -48,11 +50,13 @@ function recallHost(
 }
 
 function toolset(hosts: readonly PerceptionHost[], vision = true) {
-  return createPerceptionToolset({
-    hosts: () => hosts,
-    exclusions: () => NO_EXCLUSIONS,
-    vision: () => vision,
-    now: () => NOW,
+  return fakeTurnTools({
+    perception: {
+      hosts: () => hosts,
+      exclusions: () => NO_EXCLUSIONS,
+      vision: () => vision,
+      now: () => NOW,
+    },
   });
 }
 

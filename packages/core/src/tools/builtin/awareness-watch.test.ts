@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Pet } from '@tagalong/protocol';
-import type { PerceptionHost } from '../perception';
-import { FakeClock } from './fake-clock';
-import { WatchManager } from './watch-manager';
-import { WATCH_FOR, watchTool } from './watch-tool';
+import type { PerceptionHost } from '../../perception/host';
+import { FakeClock } from '../../watch/fake-clock';
+import { WatchManager } from '../../watch/watch-manager';
+import { fakeTurn } from '../fake-turn';
+import { WATCH_FOR, watchForTool } from './awareness';
 
 const pet: Pet = {
   id: 'scout',
@@ -55,8 +56,8 @@ function setup(hosts: PerceptionHost[] = [host()]) {
     limits: () => ({ maxChecks: 60, maxConcurrent: 3, defaultTimeoutMinutes: 30 }),
     emit: () => undefined,
   });
-  const tool = watchTool({ manager, hosts: () => hosts });
-  const turn = { pet, turnId: 't1', signal: new AbortController().signal };
+  const tool = watchForTool({ manager, hosts: () => hosts });
+  const turn = fakeTurn({ pet, turnId: 't1' });
   return { manager, tool, turn };
 }
 

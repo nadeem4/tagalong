@@ -9,10 +9,10 @@ import { ConversationStore } from '../memory/store';
 import { SettingsStore } from '../settings/settings';
 import { FakeBrainProvider } from '../providers';
 import type { BrainContentBlock, BrainProvider, FakeScript } from '../providers';
-import { RECALL_SCREEN, WHAT_CHANGED, createPerceptionToolset } from '../perception';
-import type { PerceptionHost, ToolOutcome } from '../perception';
+import type { PerceptionHost } from '../perception';
+import { RECALL_SCREEN, WATCH_FOR, WHAT_CHANGED, type ToolOutcome } from '../tools';
 import { FakeClock } from '../watch/fake-clock';
-import { WATCH_FOR, WatchManager } from '../watch';
+import { WatchManager } from '../watch';
 import { ConversationRunner, type TurnEvent } from './runner';
 
 const pet: Pet = {
@@ -116,11 +116,11 @@ function runner(provider: BrainProvider, host: PerceptionHost): ConversationRunn
     settings: new SettingsStore(dir),
     provider,
     emit: (event) => events.push(event),
-    tools: createPerceptionToolset({
+    perception: {
       hosts: () => [host],
       exclusions: () => ({ processNames: [], titlePatterns: [] }),
       now: () => NOW,
-    }),
+    },
   });
 }
 

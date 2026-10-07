@@ -24,7 +24,7 @@ import type { TurnEventSink } from './conversation/runner';
 import { parseCrewCommand } from './crew/commands';
 import { startHandoff } from './crew/handoff';
 import { startRoundtable } from './crew/roundtable';
-import { browserContextFor, createPerceptionToolset } from './perception';
+import { browserContextFor } from './perception';
 import type { PerceptionHost } from './perception';
 import { WatchManager, systemWatchClock } from './watch';
 import { EngineServer } from './server/ws-server';
@@ -186,7 +186,7 @@ export class Engine {
       watch: { manager: watches, hosts },
       // Both lookups are lazy: hosts connect and drop between turns, and the exclusion
       // list is edited while the app runs, so neither can be captured at boot.
-      tools: createPerceptionToolset({
+      perception: {
         hosts: () => live.server?.sessions() ?? [],
         exclusions: () => settings.get().captureExclusions,
         // Lazy for the same reason: the cap is a cost control the user edits in Settings,
@@ -194,7 +194,7 @@ export class Engine {
         windowTextBudget: () => settings.get().windowTextBudget,
         // No `vision` here: whether a look returns pixels depends on the pet asking, so
         // the runner passes it with every tool call.
-      }),
+      },
     });
 
     const handlers = buildHandlers({

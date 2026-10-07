@@ -1,13 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import type { ContextSnapshot, Pet, Settings } from '@tagalong/protocol';
-import type { BrainProvider, BrainTool } from '../providers';
-import { BrainError } from '../providers';
-import type { MemoryStore } from '../memory/memories';
-import { recall } from '../memory/recall';
-import { assemblePrompt } from '../conversation/prompt-assembler';
-import type { CrewTool } from '../conversation/crew-tools';
-import type { ToolOutcome } from '../perception';
+import type { BrainProvider, BrainTool } from '../../providers';
+import { BrainError } from '../../providers';
+import type { MemoryKind, MemoryStore } from '../../memory/memories';
+import { recall } from '../../memory/recall';
+import { assemblePrompt } from '../../conversation/prompt-assembler';
+import { defineTool, type Tool, type ToolOutcome } from '../tool';
 
+/**
+ * The crew tools: the ones that need to know which pet is asking. `remember` files a
+ * memory under it (`write`); `ask_pet` consults another pet and stores nothing (`read`).
+ */
+
+export const REMEMBER = 'remember';
 export const ASK_PET = 'ask_pet';
 
 /** How long a consulted pet has to answer before the caller is told to carry on alone. */
@@ -17,24 +22,61 @@ export const CONSULT_TIMEOUT_MS = 60_000;
 export const NESTED_CONSULT_REFUSED =
   'A consulted pet cannot consult another pet. Answer from what you know.';
 
-export interface ConsultDeps {
+// ---------------------------------------------------------------------------------------
+// remember.
+
+const REMEMBER_DEFINITION: BrainTool = {
+  name: REMEMBER,
+  description:
+    'Save something worth knowing in later conversations: a preference the user states ' +
+    '("I prefer short answers"), or a lasting fact about them or their work. Do not save ' +
+    'what is only on screen right now. Set shared to true to write it in the crew notebook ' +
+    'so every pet knows it; otherwise only you remember it.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      text: { type: 'string', description: 'One short sentence, in your own words.' },
+      kind: { type: 'string', enum: ['fact', 'preference'] },
+      shared: { type: 'boolean' },
+    },
+    required: ['text'],
+    additionalProperties: false,
+  },
+};
+
+const SAVABLE_KINDS: readonly MemoryKind[] = ['fact', 'preference'];
+
+/** The `remember` tool, filing under the pet that called it. */
+export function rememberTool(memories: MemoryStore): Tool {
+  return defineTool(REMEMBER_DEFINITION, 'write', (input, ctx): Promise<ToolOutcome> => {
+    const fields = (input ?? {}) as { text?: unknown; kind?: unknown; shared?: unknown };
+    const text = typeof fields.text === 'string' ? fields.text.trim() : '';
+    if (text.length === 0) {
+      return Promise.resolve({ content: 'Nothing saved: text is required.', isError: true });
+    }
+    const kind = SAVABLE_KINDS.find((candidate) => candidate === fields.kind) ?? 'fact';
+    const shared = fields.shared === true;
+    memories.addOnce(
+      shared ? { scope: 'crew', kind, text } : { scope: 'pet', petId: ctx.pet.id, kind, text },
+    );
+    return Promise.resolve({
+      content: shared ? 'Saved to the crew notebook.' : 'Saved to your memory.',
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------------------
+// ask_pet.
+
+export interface AskPetDeps {
   /** The whole crew, read per call so a pet added in Settings can be asked at once. */
   pets: () => readonly Pet[];
   provider: (pet: Pet) => BrainProvider;
   settings: () => Settings;
   memory?: MemoryStore | undefined;
   timeoutMs?: number | undefined;
-}
-
-export interface ConsultTurn {
-  caller: Pet;
-  turnId: string;
-  signal: AbortSignal;
-  snapshot?: ContextSnapshot | undefined;
   /** Announces the consult so the panel can draw its card. */
-  announce: (target: Pet, question: string) => void;
-  /** Counts the nested model call toward the caller's turn. */
-  countCall: () => void;
+  announce?: ((from: Pet, to: Pet, question: string, turnId: string) => void) | undefined;
 }
 
 function definitionFor(caller: Pet, crew: readonly Pet[]): BrainTool {
@@ -73,20 +115,21 @@ function textOnly(snapshot: ContextSnapshot | undefined): ContextSnapshot | unde
 }
 
 /**
- * The `ask_pet` tool for one caller. Runs a single nested turn for the consulted pet —
- * its own persona, provider, model and memories — with no tools at all, so a consulted pet
- * cannot consult in turn (depth limit 1) and a nested call it invents is refused. The
- * nested turn has 60 seconds; past that, or on any failure, the caller gets an error result
- * and carries on answering alone. Nothing is stored: the caller's answer is the record.
+ * The `ask_pet` tool for one caller; its description lists the pets that caller can ask.
+ * Runs a single nested turn for the consulted pet — its own persona, provider, model and
+ * memories — with no tools at all, so a consulted pet cannot consult in turn (depth limit 1)
+ * and a nested call it invents is refused. The nested turn has 60 seconds; past that, or on
+ * any failure, the caller gets an error result and carries on answering alone. Nothing is
+ * stored: the caller's answer is the record.
  */
-export function consultTool(deps: ConsultDeps, turn: ConsultTurn): CrewTool {
-  const crew = deps.pets();
-  return {
-    definition: definitionFor(turn.caller, crew),
-    async run(input): Promise<ToolOutcome> {
+export function askPetTool(deps: AskPetDeps, caller: Pet): Tool {
+  return defineTool(
+    definitionFor(caller, deps.pets()),
+    'read',
+    async (input, ctx): Promise<ToolOutcome> => {
       const fields = (input ?? {}) as { petId?: unknown; question?: unknown };
       const question = typeof fields.question === 'string' ? fields.question.trim() : '';
-      const askable = deps.pets().filter((pet) => pet.id !== turn.caller.id);
+      const askable = deps.pets().filter((pet) => pet.id !== ctx.pet.id);
       const target = askable.find((pet) => pet.id === fields.petId);
       if (target === undefined) {
         return {
@@ -96,14 +139,14 @@ export function consultTool(deps: ConsultDeps, turn: ConsultTurn): CrewTool {
       }
       if (question.length === 0) return { content: 'Ask a question.', isError: true };
 
-      turn.announce(target, question);
-      turn.countCall();
+      deps.announce?.(ctx.pet, target, question, ctx.turnId);
+      ctx.countCall();
 
       const timeoutMs = deps.timeoutMs ?? CONSULT_TIMEOUT_MS;
       const timeout = AbortSignal.timeout(timeoutMs);
-      const signal = AbortSignal.any([turn.signal, timeout]);
+      const signal = AbortSignal.any([ctx.signal, timeout]);
       const settings = deps.settings();
-      const asked = `${turn.caller.name} is consulting you mid-answer. Your reply goes back to ${turn.caller.name}, not to the user, so answer the question directly and briefly.\n\nQuestion: ${question}`;
+      const asked = `${ctx.pet.name} is consulting you mid-answer. Your reply goes back to ${ctx.pet.name}, not to the user, so answer the question directly and briefly.\n\nQuestion: ${question}`;
       const request = assemblePrompt({
         pet: target,
         history: [
@@ -117,7 +160,7 @@ export function consultTool(deps: ConsultDeps, turn: ConsultTurn): CrewTool {
         ],
         settings,
         memories: deps.memory ? recall(deps.memory, target.id, question) : [],
-        snapshot: textOnly(turn.snapshot),
+        snapshot: textOnly(ctx.snapshot),
       });
 
       try {
@@ -135,7 +178,7 @@ export function consultTool(deps: ConsultDeps, turn: ConsultTurn): CrewTool {
           signal,
         );
         if (timeout.aborted) return timedOut(target, timeoutMs);
-        if (turn.signal.aborted) return { content: 'The consult was stopped.', isError: true };
+        if (ctx.signal.aborted) return { content: 'The consult was stopped.', isError: true };
         if (result.text.trim().length === 0) {
           return { content: `${target.name} gave no answer.`, isError: true };
         }
@@ -147,7 +190,7 @@ export function consultTool(deps: ConsultDeps, turn: ConsultTurn): CrewTool {
         return { content: `${target.name} could not answer: ${message}`, isError: true };
       }
     },
-  };
+  );
 }
 
 function timedOut(target: Pet, timeoutMs: number): ToolOutcome {

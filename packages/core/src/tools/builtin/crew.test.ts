@@ -4,14 +4,14 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Database } from 'better-sqlite3';
 import type { Pet } from '@tagalong/protocol';
-import { openDatabase } from '../memory/db';
-import { ConversationStore } from '../memory/store';
-import { SettingsStore } from '../settings/settings';
-import { BrainError, FakeBrainProvider } from '../providers';
-import type { BrainProvider, BrainRequest, FakeScript } from '../providers';
-import { ConversationRunner, type TurnEvent } from '../conversation/runner';
-import type { ToolOutcome } from '../perception';
-import { ASK_PET } from './consult';
+import { openDatabase } from '../../memory/db';
+import { ConversationStore } from '../../memory/store';
+import { SettingsStore } from '../../settings/settings';
+import { BrainError, FakeBrainProvider } from '../../providers';
+import type { BrainProvider, BrainRequest, FakeScript } from '../../providers';
+import { ConversationRunner, type TurnEvent } from '../../conversation/runner';
+import type { ToolOutcome } from '../tool';
+import { ASK_PET } from './crew';
 
 const base = {
   avatar: '*',

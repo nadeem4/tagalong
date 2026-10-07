@@ -19,15 +19,4 @@ export {
 } from './browser-route';
 export { mayPersistScreenshot } from './retention';
 export { THIN_TEXT_CHARS, textLayerNotes, type TextLayerReading } from './text-layer';
-export {
-  GET_SELECTION,
-  LOOK_AT_SCREEN,
-  RECALL_SCREEN,
-  WHAT_CHANGED,
-  createPerceptionToolset,
-  type PerceptionHost,
-  type PerceptionToolset,
-  type PerceptionToolsetOptions,
-  type ToolOutcome,
-  type ToolTurn,
-} from './tools';
+export type { PerceptionHost } from './host';

@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import { EngineServer, type HostSession } from './ws-server';
-import { createPerceptionToolset, type PerceptionHost } from '../perception';
+import type { PerceptionHost } from '../perception';
+import { fakeTurnTools } from '../tools/fake-turn';
+import type { TurnTools } from '../tools';
 
 /**
  * The seam the last two bugs lived in.
@@ -105,13 +107,13 @@ async function engineWithHost(
 }
 
 /** The toolset, bound to the real sessions of a real server. */
-function toolsetOver(
-  sessions: () => readonly HostSession[],
-): ReturnType<typeof createPerceptionToolset> {
-  return createPerceptionToolset({
-    hosts: () => sessions() as unknown as readonly PerceptionHost[],
-    exclusions: () => ({ processNames: [], titlePatterns: [] }),
-    vision: () => true,
+function toolsetOver(sessions: () => readonly HostSession[]): TurnTools {
+  return fakeTurnTools({
+    perception: {
+      hosts: () => sessions() as unknown as readonly PerceptionHost[],
+      exclusions: () => ({ processNames: [], titlePatterns: [] }),
+      vision: () => true,
+    },
   });
 }
 

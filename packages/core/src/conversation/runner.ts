@@ -5,12 +5,14 @@ import { BrainError, modelForTurn } from '../providers';
 import type { ConversationStore } from '../memory/store';
 import type { MemoryStore } from '../memory/memories';
 import { recall, statedPreference } from '../memory/recall';
-import { rememberTool, type CrewTool } from './crew-tools';
-import { consultTool } from '../crew/consult';
-import { watchTool, type WatchToolDeps } from '../watch/watch-tool';
 import type { SettingsStore } from '../settings/settings';
-import type { PerceptionToolset } from '../perception';
 import { mayPersistScreenshot } from '../perception';
+import {
+  ToolRegistry,
+  type PerceptionToolsOptions,
+  type ToolFilter,
+  type WatchToolDeps,
+} from '../tools';
 import { assemblePrompt } from './prompt-assembler';
 
 /**
@@ -46,11 +48,11 @@ export interface ConversationRunnerOptions {
   provider: BrainProvider | ProviderResolver;
   emit: TurnEventSink;
   /**
-   * The built-in perception tools. Optional because the runner has to work before any
-   * host is connected — and because the tests that are about turn mechanics, not sight,
-   * should not have to stand up a host to run.
+   * Wires the perception and recall tools. Optional because the runner has to work before
+   * any host is connected — and because the tests that are about turn mechanics, not
+   * sight, should not have to stand up a host to run.
    */
-  tools?: PerceptionToolset | undefined;
+  perception?: PerceptionToolsOptions | undefined;
   /**
    * Phase 4. The crew's memory: recalled into every prompt, written by the `remember`
    * tool and by preferences the user states. Optional so turn-mechanics tests stay small.
@@ -68,6 +70,8 @@ export interface ConversationRunnerOptions {
   consult?: { pets: () => readonly Pet[]; timeoutMs?: number | undefined } | undefined;
   /** Phase 3B. Gives every pet `watch_for`, which starts a watch on its behalf. */
   watch?: WatchToolDeps | undefined;
+  /** Narrows a pet's tools for a turn. Absent: every pet gets every tool. Phase 8 roles. */
+  toolsFor?: ToolFilter | undefined;
 }
 
 export interface RunAsk {
@@ -112,9 +116,10 @@ interface ActiveTurn {
 }
 
 /**
- * Answered when a model calls a tool it was never offered — a provider that hallucinates
- * one, or a turn running before any host connected. Honest beats silent: an empty result
- * teaches the model the tool worked and returned nothing.
+ * Answered when a model calls a tool on a turn that was offered none — a provider that
+ * hallucinates one, or a turn running before any tool is wired up. A turn that has tools
+ * refuses an unknown name through the registry instead. Honest beats silent: an empty
+ * result teaches the model the tool worked and returned nothing.
  */
 const NO_TOOLS_YET = 'No tools are available yet. Answer from the context you already have.';
 
@@ -143,9 +148,30 @@ function withoutScreenshot(snapshot: ContextSnapshot): ContextSnapshot {
 export class ConversationRunner {
   readonly #options: ConversationRunnerOptions;
   readonly #active = new Map<string, ActiveTurn>();
+  readonly #tools: ToolRegistry;
 
   constructor(options: ConversationRunnerOptions) {
     this.#options = options;
+    const consult = options.consult;
+    const provider = options.provider;
+    this.#tools = new ToolRegistry({
+      perception: options.perception,
+      memory: options.memory,
+      watch: options.watch,
+      toolsFor: options.toolsFor,
+      consult: consult && {
+        pets: consult.pets,
+        provider: (pet) => (typeof provider === 'function' ? provider(pet) : provider),
+        settings: () => options.settings.get(),
+        memory: options.memory,
+        timeoutMs: consult.timeoutMs,
+        announce: (from, to, question, turnId) =>
+          options.emit({
+            method: 'pet.message',
+            params: { fromPetId: from.id, toPetId: to.id, kind: 'consult', text: question, turnId },
+          }),
+      },
+    });
   }
 
   /**
@@ -296,21 +322,24 @@ export class ConversationRunner {
       ...(snapshot ? { snapshot } : {}),
     });
 
-    // A provider without tool support is never sent tools: some reject the field outright,
-    // and the rest would only be told about an ability they cannot use.
-    const tools = provider.capabilities.tools ? this.#options.tools : undefined;
     // One for the first call; every tool round trip and every consult adds another.
     let modelCalls = 1;
-    const crewTools = provider.capabilities.tools
-      ? this.#crewTools(ask, turnId, snapshot, signal, () => {
-          modelCalls += 1;
-        })
-      : [];
-    const definitions = [
-      ...(tools?.definitions ?? []),
-      ...crewTools.map((tool) => tool.definition),
-    ];
-    const request = definitions.length > 0 ? { ...base, tools: definitions } : base;
+    const tools = this.#tools.forTurn({
+      pet: ask.pet,
+      turnId,
+      signal,
+      snapshot,
+      vision: canSee,
+      countCall: () => {
+        modelCalls += 1;
+      },
+      // A provider without tool support is never sent tools: some reject the field
+      // outright, and the rest would only be told about an ability they cannot use.
+      toolSupport: provider.capabilities.tools,
+      allowConsult: ask.allowConsult,
+    });
+    const request =
+      tools.definitions.length > 0 ? { ...base, tools: [...tools.definitions] } : base;
 
     try {
       const result = await provider.complete(
@@ -318,8 +347,7 @@ export class ConversationRunner {
         {
           onText: (text) => this.#options.emit({ method: 'turn.delta', params: { turnId, text } }),
           onToolUse: async (call) => {
-            const crewTool = crewTools.find((tool) => tool.definition.name === call.name);
-            if (!tools && !crewTool) return { content: NO_TOOLS_YET, isError: true };
+            if (tools.definitions.length === 0) return { content: NO_TOOLS_YET, isError: true };
             modelCalls += 1;
             // Announced around the call, not after it. A tool that takes seconds —
             // enumerating windows walks an accessibility tree — leaves the user watching
@@ -330,9 +358,7 @@ export class ConversationRunner {
               method: 'turn.toolRequest',
               params: { turnId, approvalId: randomUUID(), tool: call.name, input: call.input },
             });
-            const outcome = crewTool
-              ? await crewTool.run(call.input, { pet: ask.pet, turnId, signal, snapshot })
-              : await (tools as PerceptionToolset).run(call, { vision: canSee });
+            const outcome = await tools.run(call);
             this.#options.emit({
               method: 'turn.toolResult',
               params: {
@@ -378,54 +404,6 @@ export class ConversationRunner {
     } catch (error) {
       return this.#fail(turnId, conversationId, error);
     }
-  }
-
-  /** The tools the crew layer adds to a turn: remembering, and consulting another pet. */
-  #crewTools(
-    ask: RunAsk,
-    turnId: string,
-    snapshot: ContextSnapshot | undefined,
-    signal: AbortSignal,
-    countCall: () => void,
-  ): CrewTool[] {
-    const tools: CrewTool[] = [];
-    if (this.#options.memory) tools.push(rememberTool(this.#options.memory));
-    if (this.#options.watch) tools.push(watchTool(this.#options.watch));
-    const consult = this.#options.consult;
-    const others = consult?.pets().filter((pet) => pet.id !== ask.pet.id) ?? [];
-    if (consult && ask.allowConsult !== false && others.length > 0) {
-      const option = this.#options.provider;
-      tools.push(
-        consultTool(
-          {
-            pets: consult.pets,
-            provider: (pet) => (typeof option === 'function' ? option(pet) : option),
-            settings: () => this.#options.settings.get(),
-            memory: this.#options.memory,
-            timeoutMs: consult.timeoutMs,
-          },
-          {
-            caller: ask.pet,
-            turnId,
-            signal,
-            snapshot,
-            countCall,
-            announce: (target, question) =>
-              this.#options.emit({
-                method: 'pet.message',
-                params: {
-                  fromPetId: ask.pet.id,
-                  toPetId: target.id,
-                  kind: 'consult',
-                  text: question,
-                  turnId,
-                },
-              }),
-          },
-        ),
-      );
-    }
-    return tools;
   }
 
   #fail(turnId: string, conversationId: string, error: unknown): TurnOutcome {

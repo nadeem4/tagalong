@@ -1,4 +1,4 @@
-/** Phase 3B watch mode: a local poll, a cheap yes-or-no check, and the tool that starts it. */
+/** Phase 3B watch mode: a local poll and a cheap yes-or-no check, behind `watch_for`. */
 export {
   WATCH_CHANGE_THRESHOLD,
   WATCH_POLL_MS,
@@ -13,4 +13,3 @@ export {
   type WatchInfo,
   type WatchManagerOptions,
 } from './watch-manager';
-export { WATCH_FOR, watchTool, type WatchToolDeps } from './watch-tool';
