@@ -11,6 +11,7 @@ import {
   ToolRegistry,
   type PerceptionToolsOptions,
   type ToolFilter,
+  type AskPetDeps,
   type WatchToolDeps,
 } from '../tools';
 import { assemblePrompt } from './prompt-assembler';
@@ -65,9 +66,16 @@ export interface ConversationRunnerOptions {
   afterTurn?: ((turn: { pet: Pet; conversationId: string }) => void) | undefined;
   /**
    * Phase 4. Lets every pet consult another with `ask_pet`. `pets` is read per turn;
-   * `timeoutMs` exists for tests and defaults to sixty seconds.
+   * `timeoutMs` exists for tests and defaults to sixty seconds. `answered` hears each
+   * consult's reply, or why there was none, for Home's activity record.
    */
-  consult?: { pets: () => readonly Pet[]; timeoutMs?: number | undefined } | undefined;
+  consult?:
+    | {
+        pets: () => readonly Pet[];
+        timeoutMs?: number | undefined;
+        answered?: AskPetDeps['answered'];
+      }
+    | undefined;
   /** Phase 3B. Gives every pet `watch_for`, which starts a watch on its behalf. */
   watch?: WatchToolDeps | undefined;
   /** Narrows a pet's tools for a turn. Absent: every pet gets every tool. Phase 8 roles. */
@@ -165,6 +173,7 @@ export class ConversationRunner {
         settings: () => options.settings.get(),
         memory: options.memory,
         timeoutMs: consult.timeoutMs,
+        answered: consult.answered,
         announce: (from, to, question, turnId) =>
           options.emit({
             method: 'pet.message',

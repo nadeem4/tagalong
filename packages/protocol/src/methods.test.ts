@@ -34,6 +34,7 @@ const HOST_TO_CORE = [
   'roles.recommendModel',
   'notices.rolesUpgrade',
   'notices.dismiss',
+  'activity.list',
 ] as const;
 
 const CORE_TO_HOST = ['perception.capture'] as const;

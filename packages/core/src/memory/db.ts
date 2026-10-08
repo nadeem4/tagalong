@@ -58,6 +58,29 @@ const MIGRATIONS: readonly Migration[] = [
   upgradePetsToRoles,
   // Phase 8. Records what migration 5 did, for the one-time "Your crew has roles now" notice.
   recordRolesNotice,
+  // Home. What the crew did — turns, consults, handoffs, roundtables — for the activity
+  // view. Written by ActivityLog; rowid orders the rows, newest last. IF NOT EXISTS so a
+  // database rolled back past it (the roles tests rewind to version 4) migrates again.
+  `CREATE TABLE IF NOT EXISTS activity (
+     id TEXT PRIMARY KEY,
+     kind TEXT NOT NULL CHECK (kind IN ('turn', 'consult', 'handoff', 'roundtable')),
+     state TEXT NOT NULL CHECK (state IN ('running', 'done', 'error', 'stopped')),
+     pet_id TEXT NOT NULL,
+     to_pet_id TEXT,
+     turn_id TEXT,
+     conversation_id TEXT,
+     run_id TEXT,
+     provider_id TEXT,
+     model TEXT,
+     text TEXT,
+     answer TEXT,
+     error TEXT,
+     model_calls INTEGER,
+     started_at TEXT NOT NULL,
+     finished_at TEXT
+   );
+   CREATE INDEX IF NOT EXISTS activity_turn ON activity(turn_id);
+   CREATE INDEX IF NOT EXISTS activity_run ON activity(run_id);`,
 ];
 
 /** Version a fully migrated database reports. */
