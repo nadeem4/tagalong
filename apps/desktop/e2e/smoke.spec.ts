@@ -701,7 +701,11 @@ function panelVisible(): Promise<boolean | undefined> {
   );
 }
 
+// Diagnosing a CI-only hang (2026-10-08): the smoke step freezes the Windows runner since this
+// test arrived, past both the step cap and Playwright's global timeout. Skipped on CI only, to
+// learn whether it is the cause; it still runs locally.
 test('sight Always looks with every ask, still behind the pause; When I ask does not', async () => {
+  test.skip(process.env.CI === 'true', 'isolating a CI-only hang');
   const avatar = await windowFor('avatar');
   // Saving sight reloads the companion window, so host calls go through the panel, whose
   // page stays put; the companion is only read through locators, which wait out a reload.
