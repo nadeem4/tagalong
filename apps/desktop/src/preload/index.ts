@@ -89,8 +89,6 @@ const host: TagalongHostApi = {
     ipcRenderer.on(IPC.activePetEvent, listener);
     return () => void ipcRenderer.off(IPC.activePetEvent, listener);
   },
-  resizeStrip: (visiblePets: number) =>
-    ipcRenderer.invoke(IPC.resizeStrip, visiblePets) as Promise<void>,
   listModels: (providerId: string) =>
     ipcRenderer.invoke(IPC.listModels, providerId) as Promise<ModelList>,
   openSettings: () => ipcRenderer.invoke(IPC.openSettings) as Promise<void>,

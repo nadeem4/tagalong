@@ -655,3 +655,119 @@ test('the Crew Office opens with the real crew in its party list', async () => {
 
   await office.close();
 });
+
+// The desktop companion and the sight permission.
+
+test('the desktop shows one pixel companion that opens the chat on it', async () => {
+  const avatar = await windowFor('avatar');
+  const settings = (await avatar.evaluate(() => window.tagalongHost.getHostView())).settings;
+  const pets = await avatar.evaluate(() => window.tagalong.listPets());
+  const companion = pets.find((pet) => pet.id === settings.defaultPetId) ?? pets[0];
+  if (companion === undefined) throw new Error('no crew to put on the desktop');
+
+  // One pet, drawn as a sprite with its name on a plate: no strip, no emoji.
+  const pet = avatar.getByRole('button', { name: /^Chat with / });
+  await expect(pet).toHaveCount(1);
+  await expect(pet).toHaveAccessibleName(`Chat with ${companion.name}`);
+  await expect(avatar.getByTestId('companion-plate')).toHaveText(companion.name);
+  const text = await avatar.evaluate(
+    () => document.querySelector('.companion button')?.textContent ?? '',
+  );
+  expect(text).not.toMatch(/\p{Extended_Pictographic}/u);
+
+  // The window is sized for the one pet and its badges.
+  const size = await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()
+      .find((w) => w.webContents.getURL().includes('avatar.html'))
+      ?.getSize(),
+  );
+  expect(size).toEqual([96, 96]);
+
+  // Clicking the pet opens the panel on it.
+  await avatar.evaluate(() => window.tagalongHost.hidePanel());
+  await pet.click();
+  await expect.poll(() => panelVisible()).toBe(true);
+  await avatar.evaluate(() => window.tagalongHost.hidePanel());
+});
+
+/** Whether the chat panel is showing. */
+function panelVisible(): Promise<boolean | undefined> {
+  return app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()
+      .find((w) => w.webContents.getURL().includes('panel.html'))
+      ?.isVisible(),
+  );
+}
+
+test('sight Always looks with every ask, still behind the pause; When I ask does not', async () => {
+  const avatar = await windowFor('avatar');
+  // Saving sight reloads the companion window, so host calls go through the panel, whose
+  // page stays put; the companion is only read through locators, which wait out a reload.
+  const host = await windowFor('panel');
+  const before = (await host.evaluate(() => window.tagalongHost.getHostView())).settings;
+
+  /** Opens the panel the way the ask key and a click on the pet do; returns what it captured. */
+  async function plainAsk() {
+    await host.evaluate(() => window.tagalongHost.hidePanel());
+    await host.evaluate(() => window.tagalongHost.togglePanel());
+    return host.evaluate(() => window.tagalongHost.getContext());
+  }
+
+  try {
+    // The Settings control saves the permission the moment it is chosen.
+    await host.evaluate(() => window.tagalongHost.openSettings());
+    const settingsWindow = await windowFor('settings');
+    const group = settingsWindow.getByRole('radiogroup', { name: 'Sight permission' });
+    await expect(group.getByRole('radio', { name: /When I ask/ })).toBeChecked({
+      timeout: 15_000,
+    });
+    await group.getByRole('radio', { name: /Always/ }).check();
+    await expect
+      .poll(async () => (await host.evaluate(() => window.tagalongHost.getHostView())).settings)
+      .toMatchObject({ sight: 'always' });
+    await settingsWindow.close();
+
+    // Always keeps rolling memory running and shows its calm eye on the companion.
+    await expect.poll(() => host.evaluate(() => window.tagalongHost.getRecording())).toBe(true);
+    await expect(avatar.getByTestId('always-eye')).toBeVisible({ timeout: 15_000 });
+    await expect(avatar.getByTestId('recording-dot')).toBeVisible();
+
+    // A plain ask, with no look key, carries a picture of the active window.
+    const always = await plainAsk();
+    expect(always?.screenshot, 'sight Always must attach a look to a plain ask').toBeDefined();
+
+    // The pause still wins: nothing is read, and the eye says so.
+    await host.evaluate(() => window.tagalongHost.toggleSightPause());
+    const paused = await plainAsk();
+    expect(paused?.screenshot, 'a paused Always must not look').toBeUndefined();
+    await expect(avatar.getByTestId('paused-eye')).toBeVisible();
+    await host.evaluate(() => window.tagalongHost.toggleSightPause());
+
+    // The working state with sight Always on, for the design review screenshot. The fake
+    // pet calls list_windows first, which keeps the turn in flight while the host looks.
+    await host.evaluate(
+      (petId) => window.tagalong.ask({ petId, text: 'what windows do I have open?' }),
+      before.defaultPetId,
+    );
+    await expect(avatar.getByTestId('working-mark')).toBeVisible({ timeout: 10_000 });
+    await avatar.screenshot({ path: join(appDir, 'test-results', 'companion.png') });
+    await expect(avatar.getByTestId('working-mark')).toHaveCount(0, { timeout: 30_000 });
+  } finally {
+    // Persisted settings: a suite that leaves sight on Always changes every later run.
+    await host.evaluate(
+      (previous) =>
+        window.tagalongHost.saveSettings({
+          sight: previous.sight,
+          rollingMemory: previous.rolling,
+        }),
+      { sight: before.sight, rolling: before.rollingMemory },
+    );
+    await host.evaluate(() => window.tagalongHost.hidePanel());
+  }
+
+  // When I ask is exactly as before: a plain ask carries no picture.
+  const asked = await plainAsk();
+  expect(asked?.screenshot, 'When I ask must not look on a plain ask').toBeUndefined();
+  await expect(avatar.getByTestId('always-eye')).toHaveCount(0, { timeout: 15_000 });
+  await host.evaluate(() => window.tagalongHost.hidePanel());
+});

@@ -1,45 +1,78 @@
 import type { Pet } from '@tagalong/protocol';
-import type { PetState } from '@tagalong/ui';
-
-/** The pets on the desktop strip: the default one first, the hidden ones left out. */
-export function visibleCrew(
-  pets: readonly Pet[],
-  hiddenPets: readonly string[],
-  defaultPetId: string,
-): Pet[] {
-  const shown = pets.filter((pet) => !hiddenPets.includes(pet.id));
-  const first = shown.find((pet) => pet.id === defaultPetId);
-  return first === undefined ? shown : [first, ...shown.filter((pet) => pet !== first)];
-}
-
-/** The slice of a turn event the strip reads. */
-export interface StripEvent {
-  type: string;
-  turnId: string;
-  petId?: string;
-}
-
-const turnOwners = new Map<string, string>();
+import type { CaptureNotice } from '../../shared/ipc';
 
 /**
- * Each pet's ring state after one event: thinking from its `turn.started` until that turn
- * completes or fails. Keyed by turn so a roundtable — one pet after another — lights each
- * avatar in turn. Returns the same object when nothing changed, so React skips the render.
+ * The one pet on the desktop: the default pet, or the first one when the default is gone.
+ *
+ * `hiddenPets` is not read here. It chose which pets the old multi-pet strip showed; with a
+ * single companion there is nothing left for it to hide.
  */
-export function nextPetStates(
-  states: Readonly<Record<string, PetState>>,
-  event: StripEvent,
-): Record<string, PetState> {
+export function companionFor(pets: readonly Pet[], defaultPetId: string): Pet | undefined {
+  return pets.find((pet) => pet.id === defaultPetId) ?? pets[0];
+}
+
+/** The slice of a turn or crew event the companion reads. */
+export interface ActivityEvent {
+  type: string;
+  turnId?: string | undefined;
+  petId?: string | undefined;
+  kind?: string | undefined;
+  fromPetId?: string | undefined;
+  toPetId?: string | undefined;
+}
+
+/** Turns in flight, each with the pet answering it and the pets it consulted. */
+export interface Activity {
+  readonly turns: Readonly<Record<string, { petId: string; helpers: readonly string[] }>>;
+}
+
+export const NO_ACTIVITY: Activity = { turns: {} };
+
+/**
+ * The activity after one event: a turn counts from its `turn.started` until it completes or
+ * fails, and a consult adds the consulted pet to the asking turn until that turn ends.
+ * Returns the same object when nothing changed, so React skips the render.
+ */
+export function nextActivity(activity: Activity, event: ActivityEvent): Activity {
+  const { turnId } = event;
+  if (turnId === undefined) return activity;
   if (event.type === 'turn.started' && event.petId !== undefined) {
-    turnOwners.set(event.turnId, event.petId);
-    return { ...states, [event.petId]: 'thinking' };
+    const helpers = activity.turns[turnId]?.helpers ?? [];
+    return { turns: { ...activity.turns, [turnId]: { petId: event.petId, helpers } } };
+  }
+  if (event.type === 'pet.message' && event.kind === 'consult' && event.toPetId !== undefined) {
+    const turn = activity.turns[turnId] ?? { petId: event.fromPetId ?? '', helpers: [] };
+    if (turn.helpers.includes(event.toPetId)) return activity;
+    const helpers = [...turn.helpers, event.toPetId];
+    return { turns: { ...activity.turns, [turnId]: { ...turn, helpers } } };
   }
   if (event.type === 'turn.completed' || event.type === 'turn.error') {
-    const owner = turnOwners.get(event.turnId);
-    turnOwners.delete(event.turnId);
-    return owner === undefined ? states : { ...states, [owner]: 'idle' };
+    if (!Object.hasOwn(activity.turns, turnId)) return activity;
+    const turns = { ...activity.turns };
+    delete turns[turnId];
+    return { turns };
   }
-  return states;
+  return activity;
+}
+
+/** Any turn in flight: the crew is at work, and the companion shows it. */
+export function isWorking(activity: Activity): boolean {
+  return Object.keys(activity.turns).length > 0;
+}
+
+/**
+ * The pets helping right now: everyone consulted on a turn in flight, and any other pet
+ * answering a turn of its own, each once and never the companion itself.
+ */
+export function helpersOf(activity: Activity, companionId: string): string[] {
+  const ids = new Set<string>();
+  for (const turn of Object.values(activity.turns)) {
+    ids.add(turn.petId);
+    for (const helper of turn.helpers) ids.add(helper);
+  }
+  ids.delete(companionId);
+  ids.delete('');
+  return [...ids];
 }
 
 /** Phase 3B. Which pets are watching, and which have a fired watch nobody has looked at. */
@@ -50,7 +83,7 @@ export interface WatchCues {
 
 export const NO_WATCH_CUES: WatchCues = { watching: {}, alerts: [] };
 
-/** The slice of a watch event the strip reads. */
+/** The slice of a watch event the companion reads. */
 export interface WatchCueEvent {
   type: string;
   watchId?: string;
@@ -71,13 +104,17 @@ export function nextWatchCues(cues: WatchCues, event: WatchCueEvent): WatchCues 
   return { ...cues, watching: { ...cues.watching, [petId]: ids } };
 }
 
-export function isWatching(cues: WatchCues, petId: string): boolean {
-  return (cues.watching[petId]?.length ?? 0) > 0;
+/** One pet stands for the crew on the desktop, so any pet's watch shows on it. */
+export function anyWatching(cues: WatchCues): boolean {
+  return Object.values(cues.watching).some((ids) => ids.length > 0);
 }
 
-/** Clicking the pet is looking: its alert goes. */
-export function clearAlert(cues: WatchCues, petId: string): WatchCues {
-  return cues.alerts.includes(petId)
-    ? { ...cues, alerts: cues.alerts.filter((id) => id !== petId) }
-    : cues;
+/** Clicking the companion is looking: every alert goes. */
+export function clearAlerts(cues: WatchCues): WatchCues {
+  return cues.alerts.length === 0 ? cues : { ...cues, alerts: [] };
+}
+
+/** A capture the badge announces: a picture that was really taken. */
+export function isLook(notice: CaptureNotice): boolean {
+  return notice.screenshot && notice.blocked === undefined && notice.paused !== true;
 }

@@ -1,11 +1,48 @@
+import { useState } from 'react';
 import { MAX_WINDOW_TEXT_CHARS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import type { Settings } from '@tagalong/protocol';
+import { SightPermission } from '@tagalong/ui';
 import { Section } from './section';
 
-/** The two controls over what looking costs. Both are read per capture. */
+/**
+ * The sight permission, then the two controls over what looking costs.
+ *
+ * The permission is saved the moment it is chosen rather than with the form: it is a
+ * permission, and a choice that only took effect after a Save further down the page would
+ * leave the user believing the pet could not see when it could, or the reverse.
+ */
 export function SightSection({ settings }: { settings: Settings }) {
+  const [sight, setSight] = useState(settings.sight);
+  const [saving, setSaving] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  function choose(mode: Settings['sight']): void {
+    const before = sight;
+    setSight(mode);
+    setSaving(true);
+    setProblem(null);
+    window.tagalongHost
+      .saveSettings({ sight: mode })
+      .then((saved) => setSight(saved.sight))
+      .catch((error: unknown) => {
+        setSight(before);
+        setProblem(error instanceof Error ? error.message : 'The sight permission was not saved.');
+      })
+      .finally(() => setSaving(false));
+  }
+
   return (
     <Section id="sight">
+      <SightPermission value={sight} onChange={choose} disabled={saving} />
+      <p className="tg-note">
+        Applies as soon as you choose. In both, excluded apps are never read, and pausing sight from
+        its hotkey or the tray stops all looking.
+      </p>
+      {problem !== null && (
+        <p className="settings__error" role="alert">
+          {problem}
+        </p>
+      )}
       <label>
         <span>What a see-everything look sends</span>
         <select name="sightDetail" defaultValue={settings.sightDetail}>

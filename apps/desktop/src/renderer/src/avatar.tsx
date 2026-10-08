@@ -1,46 +1,63 @@
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { DEFAULT_PET_COLOR, PetAvatar } from '@tagalong/ui';
-import type { PetState } from '@tagalong/ui';
-import type { Pet } from '@tagalong/protocol';
+import { DesktopCompanion, jobFor } from '@tagalong/ui';
+import type { Pet, Role } from '@tagalong/protocol';
+// Bundled, not fetched: the name plate is set in the pixel face.
+import '@fontsource/pixelify-sans/latin-400.css';
 import './app.css';
 import '../../shared/ipc';
 import {
+  NO_ACTIVITY,
   NO_WATCH_CUES,
-  clearAlert,
-  isWatching,
-  nextPetStates,
+  anyWatching,
+  clearAlerts,
+  companionFor,
+  helpersOf,
+  isLook,
+  isWorking,
+  nextActivity,
   nextWatchCues,
-  visibleCrew,
 } from './crew';
 
 /**
- * The crew on the desktop: one avatar per visible pet, docked side by side in one window.
+ * The desktop companion: one pet, docked where the user left it, answering beside their
+ * work while the rest of the crew helps behind it.
  *
- * The window background is the drag handle, so the strip moves as one; each avatar is its
- * own no-drag button, because a plain click on a drag region never arrives. Clicking a pet
- * opens the panel on it. During a roundtable each pet's ring lights as it takes its turn.
+ * The window background is the drag handle; the pet is its own no-drag button, because a
+ * plain click on a drag region never arrives. Clicking it opens the chat on it.
  */
 function Avatar() {
   const [pets, setPets] = useState<Pet[]>([]);
-  const [states, setStates] = useState<Record<string, PetState>>({});
+  const [companion, setCompanion] = useState<Pet | null>(null);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [sightAlways, setSightAlways] = useState(false);
   const [sightPaused, setSightPaused] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [captures, setCaptures] = useState(0);
+  const [activity, setActivity] = useState(NO_ACTIVITY);
   const [cues, setCues] = useState(NO_WATCH_CUES);
+  // Meetings will raise this when a pet is waiting on the user; nothing does yet.
+  const [needsYou] = useState(false);
 
+  // This window is reloaded when the default pet or the sight permission changes, so
+  // reading both once on mount is enough.
   useEffect(() => {
     Promise.all([window.tagalong.listPets(), window.tagalongHost.getHostView()])
       .then(([all, view]) => {
-        const shown = visibleCrew(all, view.settings.hiddenPets, view.settings.defaultPetId);
-        setPets(shown);
-        void window.tagalongHost.resizeStrip(shown.length);
+        setPets(all);
+        setCompanion(companionFor(all, view.settings.defaultPetId) ?? null);
+        setSightAlways(view.settings.sight === 'always');
       })
       .catch((error: unknown) => console.error('could not list pets', error));
+    window.tagalong
+      .listRoles()
+      .then(setRoles)
+      // No roles reads every pet as a generalist, which still draws the companion.
+      .catch((error: unknown) => console.error('could not list roles', error));
   }, []);
 
-  // Asked for on mount as well as subscribed to: this window is recreated on show, so
-  // one that opened after the last toggle would otherwise render sight as running while
-  // it is paused — the one lie this indicator cannot afford to tell.
+  // Asked for on mount as well as subscribed to: a window that opened after the last
+  // toggle would otherwise show sight running while it is paused.
   useEffect(() => {
     window.tagalongHost
       .getSightPaused()
@@ -58,6 +75,15 @@ function Avatar() {
     return window.tagalongHost.onRecording(setRecording);
   }, []);
 
+  // Every look badges the pet for a second: nothing read from the screen is unannounced.
+  useEffect(
+    () =>
+      window.tagalongHost.onCapture((notice) => {
+        if (isLook(notice)) setCaptures((count) => count + 1);
+      }),
+    [],
+  );
+
   useEffect(
     () =>
       window.tagalong.onTurnEvent((event) => {
@@ -65,43 +91,14 @@ function Avatar() {
           setCues((current) => nextWatchCues(current, event));
           return;
         }
-        if (event.type.startsWith('turn.') && 'turnId' in event && event.turnId !== undefined) {
-          const { turnId } = event;
-          const petId = event.type === 'turn.started' ? event.petId : undefined;
-          setStates((current) =>
-            nextPetStates(current, { type: event.type, turnId, ...(petId ? { petId } : {}) }),
-          );
-        }
+        setActivity((current) => nextActivity(current, event));
       }),
     [],
   );
 
-  return (
-    <div className="avatar">
-      {pets.map((pet) => (
-        <button
-          key={pet.id}
-          type="button"
-          className="avatar__pet"
-          title={`${pet.name} · ${pet.model} — click to chat`}
-          aria-label={`Chat with ${pet.name}`}
-          style={{ borderBottomColor: pet.color ?? DEFAULT_PET_COLOR }}
-          onClick={() => {
-            setCues((current) => clearAlert(current, pet.id));
-            void window.tagalongHost.selectPet(pet.id);
-          }}
-        >
-          <PetAvatar
-            pet={pet}
-            state={states[pet.id] ?? 'idle'}
-            sightPaused={sightPaused}
-            recording={recording}
-            watching={isWatching(cues, pet.id)}
-            alert={cues.alerts.includes(pet.id)}
-          />
-        </button>
-      ))}
-      {pets.length === 0 && (
+  if (companion === null) {
+    return (
+      <div className="avatar">
         <button
           type="button"
           className="avatar__open"
@@ -109,8 +106,32 @@ function Avatar() {
         >
           chat
         </button>
-      )}
-    </div>
+      </div>
+    );
+  }
+
+  const helpers = helpersOf(activity, companion.id)
+    .map((id) => pets.find((pet) => pet.id === id))
+    .filter((pet): pet is Pet => pet !== undefined);
+
+  return (
+    <DesktopCompanion
+      pet={companion}
+      job={jobFor(companion.roleId, roles)}
+      working={isWorking(activity)}
+      captureCount={captures}
+      sightPaused={sightPaused}
+      sightAlways={sightAlways}
+      recording={recording}
+      watching={anyWatching(cues)}
+      alert={cues.alerts.length > 0}
+      needsYou={needsYou}
+      helpers={helpers}
+      onSelect={() => {
+        setCues(clearAlerts);
+        void window.tagalongHost.selectPet(companion.id);
+      }}
+    />
   );
 }
 

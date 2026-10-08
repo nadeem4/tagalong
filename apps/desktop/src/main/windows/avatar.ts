@@ -10,11 +10,14 @@ export interface AvatarWindowOptions {
 }
 
 /**
- * The pet itself: a transparent, frameless square that floats over everything.
+ * The desktop companion: a transparent, frameless square that floats over everything, one
+ * pet with its name plate and badges.
  *
  * skipTaskbar keeps it out of Alt+Tab — it is an ornament on the desktop, not a window
- * the user manages — and the renderer marks its body as a drag region so the whole pet
- * can be picked up and moved.
+ * the user manages — and the renderer marks its background as a drag region so the pet
+ * can be picked up and moved. It never takes focus: clicking the pet must leave the
+ * user's own window in front, because that is the window a look (and sight on Always)
+ * photographs.
  */
 export function createAvatarWindow(options: AvatarWindowOptions): BrowserWindow {
   const { x, y } = resolveAvatarPosition(
@@ -36,6 +39,7 @@ export function createAvatarWindow(options: AvatarWindowOptions): BrowserWindow 
     minimizable: false,
     fullscreenable: false,
     hasShadow: false,
+    focusable: false,
     webPreferences: {
       preload: PRELOAD_PATH,
       contextIsolation: true,

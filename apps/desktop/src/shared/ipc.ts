@@ -31,7 +31,6 @@ export const IPC = {
   deletePet: 'tagalong:pets:delete',
   selectPet: 'tagalong:pets:select',
   activePetEvent: 'tagalong:active-pet-event',
-  resizeStrip: 'tagalong:avatar:resize-strip',
   recordingEvent: 'tagalong:recording-event',
   getRecording: 'tagalong:get-recording',
   stopWatch: 'tagalong:watch:stop',
@@ -161,12 +160,10 @@ export interface TagalongHostApi {
   savePet(pet: Pet): Promise<Pet>;
   /** Phase 4. Removes a pet for good; a deleted default pet is not re-seeded. */
   deletePet(petId: string): Promise<boolean>;
-  /** Phase 4. A click on the crew strip: makes that pet the panel's and opens the panel. */
+  /** Phase 4. A click on the desktop pet: makes that pet the panel's and opens the panel. */
   selectPet(petId: string): Promise<void>;
-  /** Phase 4. Fires in the panel when the strip picked a pet. */
+  /** Phase 4. Fires in the panel when the desktop pet was clicked. */
   onActivePet(handler: (petId: string) => void): () => void;
-  /** Phase 4. Sizes the avatar window to hold this many pets side by side. */
-  resizeStrip(visiblePets: number): Promise<void>;
   listModels(providerId: string): Promise<ModelList>;
   openSettings(): Promise<void>;
   /** Phase 7. Opens the setup wizard, from Settings or the tray. */

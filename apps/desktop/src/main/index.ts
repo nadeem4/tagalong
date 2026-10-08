@@ -1,16 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import {
-  BrowserWindow,
-  Menu,
-  Notification,
-  Tray,
-  app,
-  dialog,
-  ipcMain,
-  screen,
-  shell,
-} from 'electron';
+import { BrowserWindow, Menu, Notification, Tray, app, dialog, ipcMain, shell } from 'electron';
 import { ContextSnapshot } from '@tagalong/protocol';
 import type { PerceptionTarget, Pet, Role, Settings, SettingsPatch } from '@tagalong/protocol';
 import { SettingsStore, WATCH_MODEL_DEFAULTS } from '@tagalong/core';
@@ -19,7 +9,8 @@ import { nativeCodec } from './awareness/native-codec';
 import { PerceptionMemory } from './awareness/perception-memory';
 import { RollingMemory } from './awareness/rolling-memory';
 import { captureNotice, captureTooltip } from './capture-notice';
-import { captureAskSnapshot, capturePatch } from './context';
+import { capturePatch } from './context';
+import { captureForAsk, lookFor, rollingMemoryFor } from './sight-mode';
 import { startEngineHost } from './engine-host';
 import { extensionFolder, isAllowedLink } from './links';
 import { applyCrewChoice, crewSuggestions, shouldOpenOnboarding } from './onboarding';
@@ -41,7 +32,6 @@ import { createTrayIcon } from './tray-icon';
 import { trayMenuTemplate } from './tray-menu';
 import { createAvatarWindow } from './windows/avatar';
 import { createPanelWindow, showPanelBeside } from './windows/panel';
-import { AVATAR_SIZE, resolveAvatarPosition, stripWidth } from './windows/position';
 import { createOfficeWindow } from './windows/office';
 import { createOnboardingWindow } from './windows/onboarding';
 import { createSettingsWindow } from './windows/settings';
@@ -193,7 +183,8 @@ async function start(): Promise<void> {
     perceptionMemory,
   };
 
-  rolling.configure(settings.rollingMemory);
+  // Sight on Always keeps rolling memory running whatever the Awareness box says.
+  rolling.configure(rollingMemoryFor(settings));
 
   // The avatar greys its eye and the tray shows a checkmark, so both follow one state
   // rather than each remembering to ask.
@@ -278,7 +269,7 @@ function applyHotkeys(settings: Settings): string | null {
   return desktop.hotkeyError;
 }
 
-/** Re-renders the crew strip after the crew or its visibility changed in Settings. */
+/** Re-renders the desktop companion after the crew, the default pet or sight changed. */
 function refreshStrip(): void {
   const avatar = desktop?.avatar;
   if (avatar !== null && avatar !== undefined && !avatar.isDestroyed()) avatar.webContents.reload();
@@ -453,11 +444,16 @@ async function openPanelWithContext(options: {
 }): Promise<void> {
   if (desktop === null || desktop.panel === null || desktop.avatar === null) return;
 
-  const { snapshot, blocked, paused } = await captureAskSnapshot(desktop.platform, {
-    screenshot: options.screenshot,
-    ...(options.fullView === undefined ? {} : { fullView: options.fullView }),
-    exclusions: desktop.settings.captureExclusions,
-  });
+  // Sight on Always makes every ask a look at the window the user is in, taken here before
+  // the panel takes focus, exactly as the look hotkey does. Exclusions and the pause still
+  // refuse it inside the capture.
+  const look = lookFor(desktop.settings.sight, options);
+  const { snapshot, blocked, paused } = await captureForAsk(
+    desktop.platform,
+    desktop.settings.sight,
+    options,
+    desktop.settings.captureExclusions,
+  );
   desktop.pendingSnapshot = snapshot;
 
   // A full-view capture is a capture: the eye badge and the tray tooltip have to fire for
@@ -465,7 +461,7 @@ async function openPanelWithContext(options: {
   announceCapture(
     captureNotice({
       at: new Date(),
-      screenshot: options.screenshot || options.fullView === true,
+      screenshot: look.screenshot || look.fullView === true,
       blocked,
       paused,
     }),
@@ -625,9 +621,12 @@ function registerIpc(): void {
     // not after a restart.
     current.settings = saved;
     if (patch.hotkeys !== undefined) applyHotkeys(saved);
-    if (patch.hiddenPets !== undefined) refreshStrip();
+    // The companion is the default pet and shows the sight permission, so either redraws it.
+    if (patch.defaultPetId !== undefined || patch.sight !== undefined) refreshStrip();
     // Rolling memory starts, stops or trims the moment the user saves, not after a restart.
-    if (patch.rollingMemory !== undefined) current.rolling.configure(saved.rollingMemory);
+    if (patch.rollingMemory !== undefined || patch.sight !== undefined) {
+      current.rolling.configure(rollingMemoryFor(saved));
+    }
     return saved;
   });
 
@@ -651,21 +650,11 @@ function registerIpc(): void {
     return deleted;
   });
 
-  // A click on the crew strip opens the panel on that pet, the way the chat button does.
+  // A click on the desktop pet opens the panel on it, the way the chat button does.
   ipcMain.handle(IPC.selectPet, async (_event, petId: string) => {
     const current = required();
     if (current.panel?.isVisible() !== true) await openPanelWithContext({ screenshot: false });
     current.panel?.webContents.send(IPC.activePetEvent, petId);
-  });
-
-  ipcMain.handle(IPC.resizeStrip, (_event, visiblePets: number) => {
-    const avatar = required().avatar;
-    if (avatar === null || avatar.isDestroyed()) return;
-    const width = stripWidth(visiblePets);
-    const [x, y] = avatar.getPosition();
-    const area = screen.getDisplayMatching(avatar.getBounds()).workArea;
-    const at = resolveAvatarPosition({ x: x ?? null, y: y ?? null }, area, width);
-    avatar.setBounds({ x: at.x, y: at.y, width, height: AVATAR_SIZE });
   });
 
   ipcMain.handle(IPC.listModels, async (_event, providerId: string): Promise<ModelList> => {

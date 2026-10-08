@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { Pet } from '@tagalong/protocol';
 import {
-  nextPetStates,
-  visibleCrew,
+  NO_ACTIVITY,
   NO_WATCH_CUES,
-  clearAlert,
-  isWatching,
+  anyWatching,
+  clearAlerts,
+  companionFor,
+  helpersOf,
+  isLook,
+  isWorking,
+  nextActivity,
   nextWatchCues,
 } from './crew';
 
@@ -22,59 +26,110 @@ const pet = (id: string): Pet => ({
 });
 const crew = [pet('bolt'), pet('ink'), pet('scout')];
 
-describe('visibleCrew', () => {
-  it('puts the default pet first and leaves out the hidden ones', () => {
-    expect(visibleCrew(crew, ['ink'], 'scout').map((p) => p.id)).toEqual(['scout', 'bolt']);
+const T1 = '10000000-0000-4000-8000-000000000001';
+const T2 = '10000000-0000-4000-8000-000000000002';
+
+describe('companionFor', () => {
+  it('is the default pet', () => {
+    expect(companionFor(crew, 'scout')?.id).toBe('scout');
   });
 
-  it('keeps registry order when the default pet is missing', () => {
-    expect(visibleCrew(crew, [], 'nobody').map((p) => p.id)).toEqual(['bolt', 'ink', 'scout']);
+  it('falls back to the first pet when the default one is gone', () => {
+    expect(companionFor(crew, 'nobody')?.id).toBe('bolt');
+  });
+
+  it('is nobody when there is no crew', () => {
+    expect(companionFor([], 'scout')).toBeUndefined();
   });
 });
 
-describe('nextPetStates', () => {
-  it('marks the pet whose turn started as thinking, and idles it when the turn ends', () => {
-    let states = nextPetStates({}, { type: 'turn.started', turnId: 't1', petId: 'ink' });
-    expect(states).toEqual({ ink: 'thinking' });
+describe('nextActivity', () => {
+  it('works from turn.started until that turn completes or fails', () => {
+    let activity = nextActivity(NO_ACTIVITY, { type: 'turn.started', turnId: T1, petId: 'scout' });
+    expect(isWorking(activity)).toBe(true);
 
-    states = nextPetStates(states, { type: 'turn.started', turnId: 't2', petId: 'bolt' });
-    states = nextPetStates(states, { type: 'turn.completed', turnId: 't1' });
-    expect(states).toEqual({ ink: 'idle', bolt: 'thinking' });
+    activity = nextActivity(activity, { type: 'turn.completed', turnId: T1 });
+    expect(isWorking(activity)).toBe(false);
 
-    states = nextPetStates(states, { type: 'turn.error', turnId: 't2' });
-    expect(states).toEqual({ ink: 'idle', bolt: 'idle' });
+    activity = nextActivity(activity, { type: 'turn.started', turnId: T2, petId: 'scout' });
+    activity = nextActivity(activity, { type: 'turn.error', turnId: T2 });
+    expect(isWorking(activity)).toBe(false);
   });
 
-  it('ignores events it does not track', () => {
-    const states = { ink: 'thinking' as const };
-    expect(nextPetStates(states, { type: 'turn.delta', turnId: 't1' })).toBe(states);
+  it('badges a consulted pet as a helper until the asking turn ends', () => {
+    let activity = nextActivity(NO_ACTIVITY, { type: 'turn.started', turnId: T1, petId: 'scout' });
+    activity = nextActivity(activity, {
+      type: 'pet.message',
+      kind: 'consult',
+      turnId: T1,
+      fromPetId: 'scout',
+      toPetId: 'ink',
+    });
+    expect(helpersOf(activity, 'scout')).toEqual(['ink']);
+
+    activity = nextActivity(activity, { type: 'turn.completed', turnId: T1 });
+    expect(helpersOf(activity, 'scout')).toEqual([]);
+  });
+
+  it('counts another pet answering on its own turn as a helper, once', () => {
+    let activity = nextActivity(NO_ACTIVITY, { type: 'turn.started', turnId: T1, petId: 'scout' });
+    activity = nextActivity(activity, {
+      type: 'pet.message',
+      kind: 'consult',
+      turnId: T1,
+      fromPetId: 'scout',
+      toPetId: 'bolt',
+    });
+    activity = nextActivity(activity, { type: 'turn.started', turnId: T2, petId: 'bolt' });
+    expect(helpersOf(activity, 'scout')).toEqual(['bolt']);
+  });
+
+  it('never lists the companion as its own helper', () => {
+    const activity = nextActivity(NO_ACTIVITY, {
+      type: 'turn.started',
+      turnId: T1,
+      petId: 'scout',
+    });
+    expect(helpersOf(activity, 'scout')).toEqual([]);
+  });
+
+  it('returns the same object for events it does not track', () => {
+    expect(nextActivity(NO_ACTIVITY, { type: 'turn.delta', turnId: T1 })).toBe(NO_ACTIVITY);
+    expect(
+      nextActivity(NO_ACTIVITY, {
+        type: 'pet.message',
+        kind: 'handoff',
+        fromPetId: 'scout',
+        toPetId: 'ink',
+      }),
+    ).toBe(NO_ACTIVITY);
   });
 });
 
 describe('nextWatchCues', () => {
   const W = '30000000-0000-4000-8000-000000000001';
 
-  it('marks a pet as watching while any of its watches runs', () => {
+  it('is watching while any watch of any pet runs', () => {
     let cues = nextWatchCues(NO_WATCH_CUES, {
       type: 'watch.status',
       watchId: W,
-      petId: 'scout',
+      petId: 'ink',
       state: 'watching',
     });
-    expect(isWatching(cues, 'scout')).toBe(true);
+    expect(anyWatching(cues)).toBe(true);
     cues = nextWatchCues(cues, {
       type: 'watch.status',
       watchId: W,
-      petId: 'scout',
+      petId: 'ink',
       state: 'stopped',
     });
-    expect(isWatching(cues, 'scout')).toBe(false);
+    expect(anyWatching(cues)).toBe(false);
   });
 
-  it('raises an alert on the pet whose watch fired, until it is cleared', () => {
+  it('raises an alert when a watch fired, until the pet is clicked', () => {
     let cues = nextWatchCues(NO_WATCH_CUES, { type: 'watch.fired', watchId: W, petId: 'scout' });
     expect(cues.alerts).toEqual(['scout']);
-    cues = clearAlert(cues, 'scout');
+    cues = clearAlerts(cues);
     expect(cues.alerts).toEqual([]);
   });
 
@@ -82,5 +137,26 @@ describe('nextWatchCues', () => {
     expect(nextWatchCues(NO_WATCH_CUES, { type: 'turn.started', petId: 'scout' })).toBe(
       NO_WATCH_CUES,
     );
+  });
+});
+
+describe('isLook', () => {
+  const at = '2026-10-07T10:00:00.000Z';
+
+  it('is a screenshot that was taken', () => {
+    expect(isLook({ at, screenshot: true, message: '' })).toBe(true);
+  });
+
+  it('is not a selection read, a refused capture or a paused one', () => {
+    expect(isLook({ at, screenshot: false, message: '' })).toBe(false);
+    expect(
+      isLook({
+        at,
+        screenshot: true,
+        message: '',
+        blocked: { rule: 'processName', entry: 'x.exe' },
+      }),
+    ).toBe(false);
+    expect(isLook({ at, screenshot: true, message: '', paused: true })).toBe(false);
   });
 });

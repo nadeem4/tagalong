@@ -34,7 +34,10 @@ body {
   height: 100%;
 }
 
-/* The avatar window is transparent and the whole pet is the drag handle. */
+/*
+ * The companion window is transparent and its background is the drag handle. The companion
+ * itself brings its own styles; these cover the empty window shown before there is a crew.
+ */
 .avatar-body {
   background: transparent;
 }
@@ -48,27 +51,13 @@ body {
   user-select: none;
 }
 
-.avatar__pet {
-  -webkit-app-region: no-drag;
-  width: 96px;
-  height: 96px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-bottom: 3px solid transparent;
-  background: transparent;
-  cursor: pointer;
-  padding: 0;
-}
-
 .avatar__open {
   -webkit-app-region: no-drag;
   position: absolute;
   right: 2px;
   bottom: 2px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 8px;
   background: var(--ink);
   color: #fff;
   cursor: pointer;
