@@ -149,8 +149,8 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   `settings.get`, `settings.set`, `models.list`, `tool.approve` (Phase 5), `watch.stop`
   (Phase 3B), and from Phase 8 `roles.list` and `roles.recommendModel` (see
   [Roles over RPC](concepts/roles-and-tools.md#roles-over-rpc)), `notices.rolesUpgrade` and
-  `notices.dismiss` (see [The roles notice](concepts/roles-and-tools.md#the-roles-notice)).
-  Protocol 0.5.0.
+  `notices.dismiss` (see [The roles notice](concepts/roles-and-tools.md#the-roles-notice)), and
+  for Home `activity.list` (see [Activity](#activity)). Protocol 0.6.0.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
   `perception.listWindows` and `perception.readText`, and from Phase 3B `perception.recall` and
   `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
@@ -633,103 +633,167 @@ first, sized by `stripWidth(n)` and clamped on screen. The window background is 
 so the crew moves as one and its position is the existing `avatar` setting — one position for the
 strip rather than one per pet. A click calls `selectPet`, which opens the panel and sends it the pet.
 Each avatar's ring follows its own turns (`nextPetStates`), so a roundtable lights the pets in turn.
-`settings.hiddenPets` takes pets off the strip; they still answer in the panel. Settings edits every
-pet field, adds pets (on the fake brain until a provider is picked) and deletes them, and sets
-`settings.summarizer`.
+`settings.hiddenPets` takes pets off the strip; they still answer in the panel. Home edits and deletes
+pets (see [Home](#home)); Settings sets `settings.summarizer`.
 
-### The Crew Office
+### Home
 
-The office is a framed desktop window (`windows/office.ts`, the `office` renderer page) opened from the
-tray's **Open office** item or `tagalongHost.openOffice()`, with a 1280x800 page (`useContentSize`) so
-the floor fits without scrolling; a screen too small for that clamps the window and the floor scrolls. It shows the crew as 16-bit pixel characters
-at desks on an office floor, with a party list on the left and a meetings panel on the right. The
-renderer entry only wraps `OfficeView` from `@tagalong/ui` in the preload's `HostBridge`; everything
-it draws is in `packages/ui/src/office`, so the browser host can reuse it.
+Home is the control centre: one window where you see every agent, what it is doing, every handoff,
+consult and roundtable, and where you set each agent's role, model, tools and notes. It is the layer
+between the single desktop companion and the themes: one engine and one pet configuration, shown on
+the desktop as one pet and in Home as the whole crew.
 
-It is split so the look can change without touching component logic:
+It is a framed desktop window (`windows/office.ts`, the `office` renderer page; both keep their old
+names, the window and the page are titled **Home**) opened from the tray's **Open Home** item or
+`tagalongHost.openOffice()`, with a 1440x800 page (`useContentSize`); a screen too small for that clamps
+the window and the scene scrolls. The renderer entry wraps `HomeView` from `@tagalong/ui` in the
+preload's `HostBridge` and hands it an `AgentHost` built from the desktop's host calls; everything it
+draws is in `packages/ui/src/home` and `packages/ui/src/office`, so the browser host can reuse it.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%
+flowchart LR
+  subgraph Chrome["Home chrome (the same in every theme)"]
+    Bar[Top bar]
+    List[Agent list]
+    Side["Right panel: Activity, the agent's controls, Meetings"]
+  end
+  Scene["Centre scene (the theme)"]
+  Engine[(Engine)] -- "pets.list, roles.list, turn.* and crew notifications" --> List
+  Engine -- "activity.list" --> Side
+  List -- "pick an agent" --> Side
+  Side -- "pets.upsert, settings.defaultPetId" --> Engine
+  List -- "placeAgents(theme.layout, agents)" --> Scene
+```
+
+**Chrome and themes.** Home's chrome — the top bar, the agent list (`PartyList`, labelled **Agents**),
+the right panel and every control — is fixed. The centre scene is a `Theme`
+(`home/theme.ts`): an id, a name, a `ThemeLayout` (stations, rooms with seats, where the needs-you
+marker hangs), its sprites, its scene tokens and one `Scene` component. `placeAgents(layout, agents)`
+is the one pure mapping from engine concepts to scene positions: an agent working alone gets its own
+station, an agent in a meeting the next free seat of its room (its station stays its own), an agent
+that needs you a marker above its station, and an agent past the scene's capacity no spot. Meetings
+and needs-you do not exist in the engine yet, so Home passes every agent as working alone. The theme
+registry (`home/themes.ts`) has one entry, `office`, built from today's floor; `themeById` falls back
+to it. A unit test renders Home with a second, fake theme and checks the chrome is identical.
+
+**The Office theme** is the floor as it was:
 
 - **Tokens** — `office/tokens.ts` holds every colour, font, font size, spacing value, radius, sprite
-  scale and timing. Components read only from it; `office-styles.ts` builds the few rules inline
-  styles cannot express (hover, focus ring, `::selection`, scrollbar, the stepped idle bob and its
-  `prefers-reduced-motion` switch-off) from the same tokens, scoped under `.office`.
+  scale and timing. Components read only from it; `office-styles.ts` and `home/home-styles.ts` build
+  the few rules inline styles cannot express (hover, focus ring, `::selection`, scrollbar, tabs, the
+  stepped idle bob and its `prefers-reduced-motion` switch-off) from the same tokens.
 - **Sprites as data** — `office/sprites/` keeps each character as a pixel map (rows of characters),
   a palette and optional overlay pixels. `spriteShadow` turns a sprite into a CSS `box-shadow` (one
   1px shadow per pixel) and `PixelSprite` draws it on one pixel scaled by a whole number. No images,
   no canvas. `characterFor(pet)` is the one mapping from a pet to a character: Scout, Ink and Bolt get
-  their own; any other pet gets the shared body recoloured from its `color`.
-- **Job labels from roles** — the party list's job label is the pet's role name in capitals, from
-  `bridge.listRoles()` by `pet.roleId` (`office/job.ts`, `jobFor`); an unknown role reads
-  `GENERALIST`. Its colour is `officeTokens.roleInk[roleId]`, one ink per class. The office lists
-  pets and roles together; if only the roles fail, the crew still shows, labelled as generalists.
-  The furniture is sprites too (`sprites/furniture.ts`: desk, monitor, chair, meeting table, wall
-  window, a shelf, a water cooler, and a lounge of rug, sofa, coffee table and plant that
-  `loungeAt(n)` places below the desks until a seventh pet needs that band), drawn at the pets' 3x scale with shading painted into the
-  pixels. Each desk's monitor stands beside its pet facing the viewer, lit teal while the pet works.
+  their own; any other pet gets the shared body recoloured from its `color`. The furniture is sprites
+  too (`sprites/furniture.ts`: desk, monitor, chair, meeting table, wall window, a shelf, a water
+  cooler, and a lounge of rug, sofa, coffee table and plant that `loungeAt(n)` places below the desks
+  until a seventh pet needs that band), drawn at the pets' 3x scale. Each desk's monitor stands beside
+  its pet facing the viewer, lit teal while the pet works.
 - **Layout as data** — `office/layout.ts` holds the floor size, the two meeting rooms (`ROOM_COUNT`),
-  windows, plants and props, and pure functions for desk positions (`deskLayout(n)`, two columns of up to
-  eight desks), seats, monitors and the selection cursor.
-- **Small components** — `PartyList`, `OfficeFloor`, `MeetingsPanel` and `PixelSprite`, composed by
-  `OfficeView`.
-- **The roles notice (Phase 8)** — `OfficeView` reads `bridge.rolesNotice()` with the crew and, while
-  it is unseen, shows `RolesNotice` (`office/roles-notice.tsx`): a modal `<dialog>` over the office with
-  a row per upgraded pet (sprite, name, the new role in its ink, what happened to its persona), a
-  **What changed?** disclosure, **Review my crew** and **Got it**. Both buttons and Escape call
-  `bridge.dismissRolesNotice()`; Review my crew then calls the `onReviewCrew` prop, which the desktop
-  wires to `tagalongHost.openSettings()`. At launch, main asks `notices.rolesUpgrade` once the engine
-  is up and opens the office when a notice is pending, so an upgraded user sees it without looking
-  for it. See [The roles notice](concepts/roles-and-tools.md#the-roles-notice).
+  windows, plants and props, and pure functions for desk positions (`deskLayout(n)`, two columns of up
+  to eight desks), seats, monitors and the selection cursor. `home/office-theme.ts` turns them into the
+  theme's layout; `OfficeFloor` draws from the placements it is given.
+- **Job labels from roles** — the agent list's job label is the pet's role name in capitals, from
+  `bridge.listRoles()` by `pet.roleId` (`office/job.ts`, `jobFor`); an unknown role reads
+  `GENERALIST`. Its colour is `officeTokens.roleInk[roleId]`. If only the roles fail to load, the crew
+  still shows, labelled as generalists.
 
-Status comes from the turn notifications main already forwards to every window: `nextActivity` keeps
-the turns in flight, so a pet reads **Working** (and its monitor lights) from `turn.started` until that
-turn completes or errors, and **At desk** otherwise — always an icon and a word. Meetings, task
-assignment and office settings are later phases: the rooms read **Free**, the meetings panel shows an
-empty state, and the assign field is disabled with a tooltip saying so. A **Still office** toggle in the
-top bar stops the idle bob and the cursor hop (as `prefers-reduced-motion` does) and is remembered in
-the page's `localStorage`. The two typefaces, Onest and
-Pixelify Sans, are bundled from `@fontsource` packages (Latin subset) so the window makes no network
-request.
+**Status** comes from the turn notifications main already forwards to every window: `nextActivity`
+keeps the turns in flight, so an agent reads **Working** (and its monitor lights) from `turn.started`
+until that turn completes or errors, and **At desk** otherwise — always an icon and a word. Picking an
+agent moves the gold cursor above it. Task assignment and office settings are later phases: the rooms
+read **Free** and the assign field is disabled with a tooltip saying so. A **Still office** toggle in
+the top bar stops the idle bob and the cursor hop (as `prefers-reduced-motion` does) and is remembered
+in the page's `localStorage`. Onest and Pixelify Sans are bundled from `@fontsource` (Latin subset), so
+the window makes no network request.
+
+**The right panel** has three tabs (arrow keys move between them; every panel stays mounted):
+
+- **Activity** (`home/activity-view.tsx`) lists what the crew did, newest first: each turn (the agent,
+  working or done, the model, the number of model calls, the time), each consult (who asked whom, the
+  question and the answer), each handoff and each roundtable. A click opens the thread: a turn's
+  question and answer, a consult's question and answer, a handoff's summary and the answer the other
+  agent gave, a roundtable's turns in order. It reads `bridge.listActivity()` (thirty at a time, **Show
+  older** pages back) and re-reads the first page whenever `turn.started`, `turn.completed`,
+  `turn.error`, `pet.message`, `crew.status` or an `ask_pet` `turn.toolResult` arrives. See
+  [Activity](#activity).
+- **The picked agent** (`home/agent-controls.tsx`, the tab is named after it) shows its controls:
+  the Settings components unchanged (`PetSettings`: name, `RolePicker`, `BrainPicker` with
+  **Recommended** or **Your choice**, `ToolToggles`, notes and the `DirectoryCard`), then its emoji,
+  colour, reply style and watch check model, a **Desktop pet** control that sets
+  `settings.defaultPetId` (the one pet the desktop shows), **Save Name** and **Delete Name** (which
+  asks once more). Picking an agent in the list opens this tab. Saving builds the pet and calls
+  `AgentHost.savePet`, which on the desktop is `tagalongHost.savePet`, so it is still `pets.upsert`;
+  the engine refuses an unknown role and stamps a changed role's version. A host without an
+  `AgentHost` shows the agents read-only. Adding a pet is not here: hiring is a later flow.
+- **Meetings** keeps the empty state (`MeetingsPanel`) where meetings will appear. Meetings do not
+  exist in the engine yet, and nothing here invents them.
+
+**The roles notice (Phase 8)** — `HomeView` reads `bridge.rolesNotice()` with the crew and, while it
+is unseen, shows `RolesNotice` (`office/roles-notice.tsx`): a modal `<dialog>` over Home with a row per
+upgraded pet, a **What changed?** disclosure, **Review my crew** and **Got it**. Both buttons and
+Escape call `bridge.dismissRolesNotice()`; Review my crew then opens the first agent's controls in the
+right panel. At launch, main asks `notices.rolesUpgrade` once the engine is up and opens Home when a
+notice is pending. See [The roles notice](concepts/roles-and-tools.md#the-roles-notice).
+
+### Activity
+
+`memory/activity.ts` is the durable record behind the activity view: `activity(id, kind, state,
+pet_id, to_pet_id, turn_id, conversation_id, run_id, provider_id, model, text, answer, error,
+model_calls, started_at, finished_at)` (migration 7), ordered by rowid. `kind` is `turn`, `consult`,
+`handoff` or `roundtable`; `state` is `running`, `done`, `error` or `stopped`. `ActivityLog.observe`
+sits in the engine's event sink in front of the broadcast, so a host that re-reads on a notification
+already finds the row, and writes everything from the notifications the engine already sends:
+
+| Notification                       | Recorded                                                           |
+| ---------------------------------- | ------------------------------------------------------------------ |
+| `turn.started`                     | a `turn` row: pet, model, run, and the question just stored        |
+| `turn.completed` / `turn.error`    | the turn's answer and calls, or its error; a handoff to it is done |
+| `pet.message` `consult`            | a `consult` row: who asked whom, and the question                  |
+| `pet.message` `handoff`            | a `handoff` row: from, to, the summary, the target's turn          |
+| `pet.message` `roundtable` (first) | one `roundtable` row per run, started by the asking pet            |
+| `crew.status`                      | the roundtable's state and model calls                             |
+
+A consult's full answer is in no notification (`turn.toolResult` carries a 120-character summary), so
+the consult tool reports it through one hook, `AskPetDeps.answered`, which the runner passes through
+from `consult.answered` and the engine wires to `ActivityLog.consultAnswered`. Text is clipped at 4,000
+characters. `activity.list { before?, limit = 30 (max 100) }` answers `{ entries, next? }`, newest
+first; `next` is the id to pass as `before` for the page after. Meetings are not recorded: they do not
+exist yet.
 
 ### The Settings window
 
-Settings (`windows/settings.ts`, the `settings` renderer page, 1080x760) is drawn in the office's
-world: a navy top bar with the Save button, a navy nav with the crew and links to each section, and
-off-white panels for the sections. Its sheet is `SETTINGS_CSS` in `@tagalong/ui`
-(`packages/ui/src/settings/settings-styles.ts`), built from `officeTokens`, so Settings has no palette
-of its own.
+Settings (`windows/settings.ts`, the `settings` renderer page, 1080x760) holds app-level settings
+only; agents live in Home. It is drawn in the office's world: a navy top bar with the Save button, a
+navy nav with an **Open Home** button and links to each section, and off-white panels for the
+sections. Its sheet is `SETTINGS_CSS` in `@tagalong/ui` (`packages/ui/src/settings/settings-styles.ts`),
+built from `officeTokens`, so Settings has no palette of its own.
 
 The renderer entry `settings.tsx` holds the window state and the save; each section is one file
 under `apps/desktop/src/renderer/src/settings/`:
 
-| File                    | Section                                                                      |
-| ----------------------- | ---------------------------------------------------------------------------- |
-| `pets-section.tsx`      | Every pet's editor, the selected one shown; look, reply style, strip, delete |
-| `keys-section.tsx`      | Provider API keys and OpenAI-compatible base URLs                            |
-| `summaries-section.tsx` | The summarizer provider and model                                            |
-| `hotkeys-section.tsx`   | The four global hotkeys and the hotkey problem, if any                       |
-| `sight-section.tsx`     | What a see-everything look sends, and the window text budget                 |
-| `awareness-section.tsx` | Rolling memory and the watch limits                                          |
-| `browser-section.tsx`   | The Chrome extension's pairing token                                         |
-| `section.tsx`           | The section list the nav links to, and the panel every section sits in       |
+| File                    | Section                                                       |
+| ----------------------- | ------------------------------------------------------------- |
+| `keys-section.tsx`      | Provider API keys and OpenAI-compatible base URLs             |
+| `summaries-section.tsx` | The summarizer provider and model                             |
+| `hotkeys-section.tsx`   | The four global hotkeys and the hotkey problem, if any        |
+| `sight-section.tsx`     | What a see-everything look sends, and the window text budget  |
+| `awareness-section.tsx` | Rolling memory and the watch limits                           |
+| `browser-section.tsx`   | The Chrome extension's pairing token                          |
+| `section.tsx`           | The section list the nav links to, and the panel each sits in |
 
 The role-shaped part of a pet is pure components in `packages/ui/src/settings/`, which take the role
-library and the recommended model as props: `CrewList` (each pet's sprite, name and role),
-`RolePicker` (one role, its summary and good-at, and a warning that a role change replaces
-instructions and tools while name, look, notes and memories stay), `BrainPicker` (provider and model,
-a **Recommended** or **Your choice** chip and **Use recommended**), `ToolToggles` (one switch per tool
-the role lists, stored as `toolGrants`), and `DirectoryCard` (the card teammates read: name, role,
-summary, good at, not for, the tools it can reach, and its brain tier or custom). `PetSettings`
-composes them with the name and notes. The desktop editor keeps the edits in state and hands them to
-the one `FormData` save as hidden inputs; `buildPet` validates them and `roleVersionFor` keeps the
-pet's role version unless the role changed. Every pet's editor stays mounted while another is shown,
-so switching pets before saving loses nothing.
-
-The window loads the role library once with `window.tagalong.listRoles()` and asks
-`window.tagalong.recommendModel(roleId, providerId)` whenever a pet's role or provider changes. Role
-names, never ids, appear in the crew nav, the picker and the card; until the library arrives the
-editor says the roles are loading and a save keeps each pet's role. Role labels take their colour
-from `officeTokens.roleInk` by role id, through the office's `jobFor`, so a role reads the same in
-Settings and the office. Saving goes through `pets.upsert`, which refuses an unknown role and sets
-`roleVersion` for a new pet or a changed role.
+library and the recommended model as props and are now composed in Home: `RolePicker` (one role, its
+summary and good-at, and a warning that a role change replaces instructions and tools while name,
+look, notes and memories stay), `BrainPicker` (provider and model, a **Recommended** or **Your
+choice** chip and **Use recommended**), `ToolToggles` (one switch per tool the role lists, stored as
+`toolGrants`), and `DirectoryCard` (the card teammates read: name, role, summary, good at, not for,
+the tools it can reach, and its brain tier or custom). `PetSettings` composes them with the name and
+notes. Role labels take their colour from `officeTokens.roleInk` by role id, through `jobFor`, so a
+role reads the same everywhere.
 
 ## Awareness (Phase 3B)
 

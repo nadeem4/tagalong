@@ -47,8 +47,10 @@ your mouse or keyboard.
   beside the pet on a hotkey and hides on Escape.
 - Hotkeys: `Ctrl+Shift+Space` ask, `Ctrl+Shift+S` look, `Ctrl+Shift+Alt+S` see everything,
   `Ctrl+Shift+Alt+P` pause sight.
-- The Crew Office window: desks, meeting rooms, live meetings, task cards.
-- Settings and first-run ("Open your office") configure the office, the crew, providers and keys.
+- Home, the control centre: every agent, what it is doing, every handoff, consult and meeting, and
+  each agent's role, model, tools and notes. Its centre scene is a theme (the Office first); the
+  controls never move between themes.
+- Settings and first-run ("Open your office") configure providers, keys and app-wide behaviour.
 - The Chrome extension shows the same crew in Chrome's side panel.
 
 ## Capabilities and Constraints

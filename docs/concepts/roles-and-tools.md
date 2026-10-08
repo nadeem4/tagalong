@@ -4,7 +4,7 @@
 table and its lookup helpers, [the tools module](#the-tools-module), giving a pet a role, the
 directory, filtering a turn's tools by role and grants, [roles over RPC](#roles-over-rpc), the
 office's job labels, and picking a role, the recommended model, the tool switches and the directory
-card preview in Settings (see [The Settings window](../architecture.md#the-settings-window)),
+card preview, now in each agent's controls in Home (see [Home](../architecture.md#home)),
 [the one-time roles notice](#the-roles-notice) for upgraded installs and
 [roles in the setup wizard](#roles-in-the-setup-wizard) are **built**. The design page with the full
 task list lives in the Notion plan.
@@ -84,7 +84,7 @@ takes `roles` and a `recommend` function.
 
 ### Job labels in the office
 
-**Built.** The Crew Office labels each pet with its role's name in capitals, looked up in
+**Built.** Home's agent list labels each pet with its role's name in capitals, looked up in
 `listRoles()` by `pet.roleId`; a pet whose role is not in the library reads `GENERALIST`, as it
 works. Each label's colour comes from `officeTokens.roleInk`, keyed by role id (generalist teal,
 writer violet, backend engineer amber, frontend engineer pink, researcher green), so two pets with
@@ -150,7 +150,7 @@ providers. The role only recommends.
   model, because the tier model cannot see. OpenRouter and Anthropic models see on their own.
 
 - **Built:** `roles.recommendModel` answers that lookup over RPC, so a form can prefill the model.
-- **Built:** Settings shows each pet's model as **Recommended** when it is the one that lookup gives
+- **Built:** Home's agent controls show each pet's model as **Recommended** when it is the one that lookup gives
   for the pet's role and provider, and **Your choice** otherwise. **Use recommended** sets the
   recommended model and its vision model (clearing the vision model when the recommendation needs
   none). The user can still type or pick any model on the provider's live list.
@@ -174,7 +174,7 @@ schema in `packages/protocol/src/pet.ts`:
 | `providerId`, `model`, `visionModel`, `watchModel` | Unchanged                                                                            |
 
 The default crew ships with roles: Scout is a Generalist, Ink a Writer and Bolt a Backend engineer,
-none with notes. Settings edits the notes as "Notes (optional, private)"; a new pet starts as a
+none with notes. Home's agent controls edit the notes as "Notes (optional, private)"; a new pet starts as a
 Generalist.
 
 Database migration 5 (`packages/core/src/pets/roles-upgrade.ts`) upgrades pets stored before roles.
@@ -193,7 +193,7 @@ Logins and API keys stay encrypted in `secrets.json`, never in the pet.
 
 ### The roles notice
 
-**Built.** An install upgraded to roles is told once what changed, over the Crew Office.
+**Built.** An install upgraded to roles is told once what changed, over Home.
 
 - **What is recorded.** Database migration 6 (`packages/core/src/pets/roles-notice.ts`) runs in the
   same `migrate` call as migration 5 and records, in a `notices` table, one row per stored pet:
@@ -206,11 +206,11 @@ Logins and API keys stay encrypted in `secrets.json`, never in the pet.
   good. The `HostBridge` carries them as `rolesNotice()` and `dismissRolesNotice()`; the desktop wires
   them through IPC and the preload, the extension relays them over its port, and the fake bridge takes
   a `rolesNotice` option.
-- **Where it shows.** At launch the desktop opens the Crew Office when a notice is pending, and the
-  office shows it as a modal dialog: "Your crew has roles now", one sentence, a row per pet (sprite,
+- **Where it shows.** At launch the desktop opens Home when a notice is pending, and Home
+  shows it as a modal dialog: "Your crew has roles now", one sentence, a row per pet (sprite,
   name, arrow, the role in its ink, and "Default persona replaced by the role", "Your edited persona is
   kept as notes" or, for a pet the user made, "Your persona is kept as notes; pick a better role any
-  time"), a **What changed?** disclosure, **Review my crew** (opens Settings) and **Got it**. Either
+  time"), a **What changed?** disclosure, **Review my crew** (opens the first agent's controls in Home) and **Got it**. Either
   button, or Escape, dismisses it.
 
 ### Roles in the setup wizard
