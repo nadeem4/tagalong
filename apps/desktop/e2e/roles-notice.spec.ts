@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import type {} from '../src/shared/ipc';
+import { closeApp } from './close-app';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -27,7 +28,12 @@ function launch(): Promise<ElectronApplication> {
   return electron.launch({
     args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
-    env: { ...process.env, TAGALONG_FAKE_PROVIDERS: '1', TAGALONG_SKIP_ONBOARDING: '1' },
+    env: {
+      ...process.env,
+      TAGALONG_FAKE_PROVIDERS: '1',
+      TAGALONG_SKIP_ONBOARDING: '1',
+      TAGALONG_E2E: '1',
+    },
   });
 }
 
@@ -91,12 +97,12 @@ test.beforeAll(async () => {
   // real database rather than a hand-written schema.
   const first = await launch();
   await windowFor(first, 'avatar');
-  await first.close();
+  await closeApp(first);
   rewindToBeforeRoles();
 });
 
 test.afterAll(async () => {
-  await app?.close();
+  await closeApp(app);
   rmSync(dataDir, { recursive: true, force: true });
 });
 
@@ -130,7 +136,7 @@ test('an upgraded install opens the office on the roles notice, once', async () 
 });
 
 test('a dismissed notice stays dismissed after a restart', async () => {
-  await app?.close();
+  await closeApp(app);
   app = await launch();
   const avatar = await windowFor(app, 'avatar');
   await expect.poll(() => avatar.evaluate(() => window.tagalong.rolesNotice())).toBeNull();

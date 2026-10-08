@@ -9,6 +9,7 @@ import { nativeCodec } from './awareness/native-codec';
 import { PerceptionMemory } from './awareness/perception-memory';
 import { RollingMemory } from './awareness/rolling-memory';
 import { captureNotice, captureTooltip } from './capture-notice';
+import { installCrashGuard } from './crash-guard';
 import { capturePatch } from './context';
 import { captureForAsk, lookFor, rollingMemoryFor } from './sight-mode';
 import { startEngineHost } from './engine-host';
@@ -78,6 +79,15 @@ let desktop: Desktop | null = null;
  * Two engines would fight over the same port and the same SQLite file, so the lock is
  * taken before anything else happens.
  */
+// End-to-end runs only: an uncaught error fails the suite with its stack instead of opening a
+// modal dialog that nobody can click, which hangs the CI job without saying why.
+installCrashGuard({
+  enabled: process.env.TAGALONG_E2E === '1',
+  process,
+  log: (message) => console.error(message),
+  exit: (code) => app.exit(code),
+});
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {

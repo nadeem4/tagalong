@@ -7,6 +7,7 @@ import type { ElectronApplication, Page } from '@playwright/test';
 // Imported only for the `declare global` it carries: it is what types `window.tagalongHost`
 // inside the page evaluate below, so a renamed host method fails the typecheck, not the run.
 import type {} from '../src/shared/ipc';
+import { closeApp } from './close-app';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -33,6 +34,7 @@ test.beforeAll(async () => {
     env: {
       ...process.env,
       TAGALONG_FAKE_PROVIDERS: '1',
+      TAGALONG_E2E: '1',
       // Scripts the fake pet to reach for list_windows before it answers, which is the
       // only way a tool call travels the real socket to the real host in this suite.
       // Every tool test feeds the toolset a fake host and every host test feeds the
@@ -47,7 +49,7 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  await app.close();
+  await closeApp(app);
 });
 
 /** Waits for the renderer window whose URL names the given entry point. */

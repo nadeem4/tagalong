@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import type {} from '../src/shared/ipc';
+import { closeApp } from './close-app';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -50,12 +51,17 @@ test.beforeAll(async () => {
   app = await electron.launch({
     args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
-    env: { ...process.env, TAGALONG_FAKE_PROVIDERS: '1', TAGALONG_SKIP_ONBOARDING: '1' },
+    env: {
+      ...process.env,
+      TAGALONG_FAKE_PROVIDERS: '1',
+      TAGALONG_SKIP_ONBOARDING: '1',
+      TAGALONG_E2E: '1',
+    },
   });
 });
 
 test.afterAll(async () => {
-  await app.close();
+  await closeApp(app);
   rmSync(dataDir, { recursive: true, force: true });
 });
 
