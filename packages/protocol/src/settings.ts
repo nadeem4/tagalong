@@ -83,6 +83,13 @@ export const SETTINGS_DEFAULTS = {
    */
   sightDetail: 'focused',
   /**
+   * The sight permission. `when-asked` reads the screen only when the user presses a look
+   * key. `always` keeps rolling memory running and attaches a look at the active window to
+   * every question, still behind the exclusions and the sight pause. Nothing leaves the
+   * machine in either mode until the user asks something.
+   */
+  sight: 'when-asked',
+  /**
    * How much text one `read_window_text` returns when the pet does not say.
    *
    * A cost control, not a quality one. Eight thousand characters is roughly 2,000 tokens;
@@ -218,6 +225,8 @@ const settingsFields = {
   screenshotRetention: ScreenshotRetention,
   /** Whether a full-view capture attaches every display or only the focused one. */
   sightDetail: z.enum(['focused', 'all']),
+  /** The sight permission: look only when asked, or always look with every question. */
+  sight: z.enum(['when-asked', 'always']),
   /**
    * Default character cap for one window text read.
    *
@@ -277,6 +286,7 @@ export const Settings = z.object({
     ...SETTINGS_DEFAULTS.screenshotRetention,
   }),
   sightDetail: settingsFields.sightDetail.default(SETTINGS_DEFAULTS.sightDetail),
+  sight: settingsFields.sight.default(SETTINGS_DEFAULTS.sight),
   windowTextBudget: settingsFields.windowTextBudget.default(SETTINGS_DEFAULTS.windowTextBudget),
   summarizer: settingsFields.summarizer.default(SETTINGS_DEFAULTS.summarizer),
   hiddenPets: settingsFields.hiddenPets.prefault([...SETTINGS_DEFAULTS.hiddenPets]),

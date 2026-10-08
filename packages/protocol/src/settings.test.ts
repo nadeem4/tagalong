@@ -373,3 +373,19 @@ describe('Settings.onboarding', () => {
     expect(patch).toEqual({ onboarding: { done: true } });
   });
 });
+
+describe('Settings.sight', () => {
+  it('reads the screen only when asked, by default', () => {
+    expect(Settings.parse({}).sight).toBe('when-asked');
+  });
+
+  it('accepts always, and nothing else', () => {
+    expect(Settings.parse({ sight: 'always' }).sight).toBe('always');
+    expect(SettingsPatch.parse({ sight: 'always' }).sight).toBe('always');
+    expect(Settings.safeParse({ sight: 'sometimes' }).success).toBe(false);
+  });
+
+  it('leaves sight alone in a patch that does not name it', () => {
+    expect(SettingsPatch.parse({ sightDetail: 'all' })).not.toHaveProperty('sight');
+  });
+});
