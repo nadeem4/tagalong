@@ -664,6 +664,22 @@
       "css": ".ds-panel { width: 400px; background: #F6F7FB; color: #12162B; font-family: 'Onest', system-ui, sans-serif; display: flex; flex-direction: column; } .ds-ph { display: flex; flex-direction: column; gap: 2px; padding: 10px 20px; border-bottom: 1px solid #E0E3EC; } .ds-pt { font-size: 14px; font-weight: 600; } .ds-pm { font-size: 12px; color: #5A6178; } .ds-body { padding: 24px 32px; text-align: center; } .ds-empty { font-family: 'Pixelify Sans', 'Onest', sans-serif; font-size: 17px; font-weight: 600; margin: 0 0 12px; } .ds-lead { font-size: 14px; line-height: 1.5; color: #5A6178; max-width: 300px; margin: 0 auto; } .ds-meter { display: flex; align-items: center; gap: 10px; padding: 12px 16px 16px; border-top: 1px solid #E0E3EC; } .ds-segs { flex: 1; display: flex; gap: 3px; } .ds-segs i { flex: 1; height: 10px; background: #E0E3EC; }"
     },
     {
+      "name": "Home Tab",
+      "kind": "custom",
+      "refersTo": "home-tab",
+      "description": "A tab in Home's right panel (Activity, the picked agent's name, Meetings): Onest 600 13px in Panel Muted on Panel White, 40px tall; the selected tab reads Panel Text over a 2px gold underline. Arrow keys move between tabs.",
+      "html": "<div class=\"ds-tabs\"><button class=\"ds-tab\" aria-selected=\"true\">Activity</button><button class=\"ds-tab\" aria-selected=\"false\">Scout</button><button class=\"ds-tab\" aria-selected=\"false\">Meetings</button></div>",
+      "css": ".ds-tabs { display: flex; gap: 4px; padding: 0 12px; background: #F6F7FB; border-bottom: 1px solid #E0E3EC; } .ds-tab { height: 40px; padding: 0 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; font-family: 'Onest', system-ui, sans-serif; font-size: 13px; font-weight: 600; color: #5A6178; } .ds-tab[aria-selected='true'] { color: #12162B; border-bottom-color: #F2C14E; }"
+    },
+    {
+      "name": "Activity Entry",
+      "kind": "custom",
+      "refersTo": "activity-entry",
+      "description": "One thing the crew did, in Home's activity view: the pet's sprite at 2x, a headline (\"Scout asked Bolt\"), a state icon and word with the model, calls and time, and a one-line preview. A real button with aria-expanded; open, it shows the thread under a Panel Line rule.",
+      "html": "<button class=\"ds-entry\" aria-expanded=\"false\"><span class=\"ds-entry__title\">Scout answered</span><span class=\"ds-entry__meta\">Done · fake-model · 2 calls · 11:27</span><span class=\"ds-entry__preview\">what windows do I have open?</span></button>",
+      "css": ".ds-entry { display: flex; flex-direction: column; gap: 2px; width: 320px; padding: 8px; border: 2px solid transparent; border-radius: 10px; background: #F6F7FB; text-align: left; font-family: 'Onest', system-ui, sans-serif; color: #12162B; } .ds-entry:hover { background: #E6E9F2; } .ds-entry__title { font-size: 14px; font-weight: 600; } .ds-entry__meta { font-size: 12px; color: #5A6178; } .ds-entry__preview { font-size: 13px; color: #5A6178; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }"
+    },
+    {
       "name": "Pixel Sprite Cursor",
       "kind": "custom",
       "refersTo": "avatar-tile",
@@ -718,6 +734,11 @@
         "name": "The No Lift Rule",
         "body": "Chrome never floats: no drop shadows on panels, rows, buttons or cards. Hierarchy is tone and hairlines.",
         "section": "elevation"
+      },
+      {
+        "name": "The Chrome Never Moves Rule",
+        "body": "Home is fixed chrome around one themed scene. The top bar, the agent list, the right panel (Activity, the picked agent's controls, Meetings) and every control keep the same place, size and look in every theme; a theme (Office today) only changes the centre scene: its layout, sprites and scene colours. A theme never adds a control, and the chrome never reads a theme's tokens.",
+        "section": "layout"
       }
     ],
     "dos": [

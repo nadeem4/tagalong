@@ -2,6 +2,7 @@ import type { Database } from 'better-sqlite3';
 import { DEFAULT_ENGINE_PORT, RPC_ERROR_CODES, Settings } from '@tagalong/protocol';
 import type { Pet, Role } from '@tagalong/protocol';
 import { openDatabase } from './memory/db';
+import { ActivityLog } from './memory/activity';
 import { ConversationStore } from './memory/store';
 import { MemoryStore } from './memory/memories';
 import { Summarizer } from './memory/summarizer';
@@ -183,7 +184,13 @@ export class Engine {
     // runner's handlers before it starts. The holder ties that knot without a mutable
     // binding: no turn can run before boot returns, so the sink is never called empty.
     const live: { server?: EngineServer } = {};
-    const emit: TurnEventSink = (event) => live.server?.broadcast(event.method, event.params);
+    // Home's activity record is written before the broadcast, so a host that re-reads
+    // activity.list on a notification already finds the row.
+    const activity = new ActivityLog(db, store);
+    const emit: TurnEventSink = (event) => {
+      activity.observe(event);
+      live.server?.broadcast(event.method, event.params);
+    };
     const hosts = (): readonly PerceptionHost[] => live.server?.sessions() ?? [];
     // Phase 3B. Watches outlive the turn that started them, so they belong to the engine.
     const watches = new WatchManager({
@@ -203,7 +210,10 @@ export class Engine {
       memory,
       // Off the request path: the reply is already on screen when the summary starts.
       afterTurn: ({ pet, conversationId }) => void summarizer.schedule(conversationId, pet),
-      consult: { pets: () => pets.list() },
+      consult: {
+        pets: () => pets.list(),
+        answered: (turnId, toPetId, outcome) => activity.consultAnswered(turnId, toPetId, outcome),
+      },
       watch: { manager: watches, hosts },
       // Both lookups are lazy: hosts connect and drop between turns, and the exclusion
       // list is edited while the app runs, so neither can be captured at boot.
@@ -220,6 +230,7 @@ export class Engine {
 
     const handlers = buildHandlers({
       db,
+      activity,
       runner,
       store,
       emit,
@@ -291,6 +302,7 @@ export class Engine {
 function buildHandlers(parts: {
   /** For the one-time notices; everything else reaches it through its own store. */
   db: Database;
+  activity: ActivityLog;
   runner: ConversationRunner;
   store: ConversationStore;
   emit: TurnEventSink;
@@ -303,8 +315,8 @@ function buildHandlers(parts: {
   /** Re-reads provider keys, so a key saved since the last ask is used by this one. */
   refreshProviders: () => Promise<void>;
 }): MethodHandlers {
-  const { db, runner, store, emit, pets, settings, models, hosts, watches, refreshProviders } =
-    parts;
+  const { db, activity, runner, store, emit, pets, settings, models, hosts, watches } = parts;
+  const { refreshProviders } = parts;
 
   return {
     ask: async (params) => {
@@ -370,5 +382,7 @@ function buildHandlers(parts: {
     'notices.rolesUpgrade': () => ({ notice: rolesUpgradeNotice(db) }),
     // `rolesUpgrade` is the only notice so far; the params schema refuses any other name.
     'notices.dismiss': () => ({ dismissed: dismissRolesNotice(db) }),
+
+    'activity.list': (params) => activity.list(params),
   };
 }

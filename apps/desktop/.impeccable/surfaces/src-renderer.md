@@ -7,7 +7,7 @@ related_targets: []
 
 ## Scope
 
-Crew Office window and the surfaces that share its world: Hire a pet, Pet settings, the roles upgrade notice, the chat panel. Mode: Operate.
+Home (formerly the Crew Office: fixed chrome around a themed centre scene, the Office first) and the surfaces that share its world: the activity view, agent controls, the roles upgrade notice, the chat panel. Mode: Operate.
 
 ## Audience and task
 

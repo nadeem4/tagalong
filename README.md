@@ -128,16 +128,30 @@ A fresh install has three pets. Click one on the strip to talk to it.
   calls; the panel footer counts them.
 - **Memory.** Tell a pet "I prefer short answers" and it remembers across restarts.
 
-Settings edits every pet (name, emoji, colour, notes, provider, model), adds and deletes pets, and
-chooses which ones sit on the desktop. Pick a pet in Settings to choose its role (Generalist, Backend
-engineer, Frontend engineer, Writer or Researcher) and switch its tools on or off; the card beside it
-shows how its teammates see it.
+### Home: see and control your agents
 
-Upgrading from a version before roles? Tagalong opens the Crew Office once with a short notice saying
-which role each pet got and whether your own persona was kept as notes. **Got it** closes it for good;
-**Review my crew** opens Settings.
+Right-click the tray icon and choose **Open Home**. Home is where the whole crew lives:
 
-To see the whole crew at work, right-click the tray icon and choose **Open office**.
+- **The agent list** on the left shows every agent, its role and whether it is working or at its desk.
+- **The scene** in the middle shows them at work. Its look is a theme; the first theme is the
+  **Office** (desks, glass meeting rooms, a lounge). Themes only change the picture, never where the
+  controls are.
+- **Activity** on the right lists what the crew did, newest first: every answer (with the model and
+  how many model calls it took), every question one agent asked another, every handoff and every
+  roundtable. Click one to read it.
+- **Add agent** under the list creates a new Generalist and opens its controls.
+- **Pick an agent** in the list to change it: its role (Generalist, Backend engineer, Frontend
+  engineer, Writer or Researcher), its provider and model (**Recommended** for its role, or your own
+  choice), its tools, its private notes, its look, and whether it is the pet on your desktop. The card
+  beside it shows how its teammates see it. **Save** applies from the next question.
+- **Meetings** will appear in their own tab once agents can meet.
+
+Settings keeps the app-wide things: keys, hotkeys, summaries, sight, awareness and the browser
+extension.
+
+Upgrading from a version before roles? Tagalong opens Home once with a short notice saying which role
+each pet got and whether your own persona was kept as notes. **Got it** closes it for good; **Review
+my crew** opens the first agent's controls.
 
 ## The Chrome extension
 

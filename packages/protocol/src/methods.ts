@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ActivityListParams, ActivityListResult } from './activity';
 import {
   CapturedImage,
   ContextSnapshot,
@@ -337,6 +338,7 @@ export const hostToCoreMethods = {
   'roles.recommendModel': { params: RolesRecommendModelParams, result: RolesRecommendModelResult },
   'notices.rolesUpgrade': { params: NoticesRolesUpgradeParams, result: NoticesRolesUpgradeResult },
   'notices.dismiss': { params: NoticesDismissParams, result: NoticesDismissResult },
+  'activity.list': { params: ActivityListParams, result: ActivityListResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostMethods = {

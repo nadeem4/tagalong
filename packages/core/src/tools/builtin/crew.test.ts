@@ -93,6 +93,9 @@ function brain(script: FakeScript | (() => Promise<never>)): Brain {
   };
 }
 
+/** Every consult answer the runner reported, for Home's activity record. */
+let answers: { turnId: string; toPetId: string; ok: boolean; text: string }[] = [];
+
 function runnerWith(brains: Record<string, Brain>, timeoutMs?: number): ConversationRunner {
   return new ConversationRunner({
     store: new ConversationStore(db),
@@ -103,7 +106,11 @@ function runnerWith(brains: Record<string, Brain>, timeoutMs?: number): Conversa
       return found.provider;
     },
     emit: (event) => events.push(event),
-    consult: { pets: () => crew, ...(timeoutMs === undefined ? {} : { timeoutMs }) },
+    consult: {
+      pets: () => crew,
+      ...(timeoutMs === undefined ? {} : { timeoutMs }),
+      answered: (turnId, toPetId, outcome) => answers.push({ turnId, toPetId, ...outcome }),
+    },
   });
 }
 
@@ -180,6 +187,29 @@ describe('ask_pet', () => {
     const completed = events.find((event) => event.method === 'turn.completed');
     // Bolt's first call, Ink's nested call, and Bolt's call after the tool result.
     expect(completed?.params).toMatchObject({ modelCalls: 3 });
+  });
+
+  it('reports the answer, or why there was none, so the activity view can show it', async () => {
+    answers = [];
+    const answered = runnerWith({
+      nebius: brain({ text: 'Done.', toolCall: askInk('Is this clear?') }),
+      openrouter: brain({ text: 'Yes, very.' }),
+    }).run({ pet: bolt, text: 'hi' });
+    await answered.done;
+    const failed = runnerWith({
+      nebius: brain({ text: 'ok', toolCall: askInk('q') }),
+      openrouter: brain(() => Promise.reject(new BrainError('auth', 'No OpenRouter key.'))),
+    }).run({ pet: bolt, text: 'hi' });
+    await failed.done;
+
+    expect(answers[0]).toEqual({
+      turnId: answered.turnId,
+      toPetId: 'ink',
+      ok: true,
+      text: 'Yes, very.',
+    });
+    expect(answers[1]).toMatchObject({ turnId: failed.turnId, toPetId: 'ink', ok: false });
+    expect(answers[1]?.text).toContain('No OpenRouter key.');
   });
 
   it('never offers a consulted pet the consult tool, and refuses a nested consult it invents', async () => {

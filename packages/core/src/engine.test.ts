@@ -433,6 +433,58 @@ describe('roundtable over rpc', () => {
   });
 });
 
+describe('activity over rpc', () => {
+  it('lists each turn, the handoff and the roundtable, newest first, and pages', async () => {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const completedCount = () => host.methods().filter((m) => m === 'turn.completed').length;
+
+    await host.call('ask', { petId: 'scout', input: { text: 'Explain the release notes' } });
+    await vi.waitFor(() => expect(completedCount()).toBe(1), { timeout: 5000 });
+    await host.call('ask', { petId: 'scout', input: { text: '@Ink draft a reply' } });
+    await vi.waitFor(() => expect(completedCount()).toBe(2), { timeout: 5000 });
+    await host.call('ask', { petId: 'ink', input: { text: '/crew Dock left?' } });
+    await vi.waitFor(
+      () =>
+        expect(
+          host.notifications.some(
+            (n) => n.method === 'crew.status' && n.params['state'] === 'done',
+          ),
+        ).toBe(true),
+      { timeout: 10000 },
+    );
+
+    const res = await host.call('activity.list', {});
+    const entries = (res['result'] as { entries: Record<string, unknown>[] }).entries;
+    const kinds = entries.map((entry) => entry['kind']);
+    // Newest first: the roundtable's four turns and the run itself, then the handoff, then
+    // the turns before it.
+    expect(kinds.at(-1)).toBe('turn');
+    expect(entries.at(-1)).toMatchObject({
+      petId: 'scout',
+      state: 'done',
+      text: 'Explain the release notes',
+      model: expect.any(String) as string,
+    });
+    expect(entries.find((entry) => entry['kind'] === 'handoff')).toMatchObject({
+      petId: 'scout',
+      toPetId: 'ink',
+      state: 'done',
+    });
+    expect(entries.find((entry) => entry['kind'] === 'roundtable')).toMatchObject({
+      petId: 'ink',
+      state: 'done',
+      modelCalls: 4,
+    });
+
+    const page = await host.call('activity.list', { limit: 2 });
+    const first = page['result'] as { entries: unknown[]; next?: string };
+    expect(first.entries).toHaveLength(2);
+    expect(first.next).toBeDefined();
+  });
+});
+
 describe('memory across a restart', () => {
   it('remembers a stated preference after the engine restarts', async () => {
     const systems: string[] = [];

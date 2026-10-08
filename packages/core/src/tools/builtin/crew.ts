@@ -6,7 +6,7 @@ import type { MemoryKind, MemoryStore } from '../../memory/memories';
 import { recall } from '../../memory/recall';
 import { assemblePrompt } from '../../conversation/prompt-assembler';
 import { roleFor } from '../../roles';
-import { defineTool, type Tool, type ToolOutcome } from '../tool';
+import { defineTool, type Tool, type ToolContext, type ToolOutcome } from '../tool';
 
 /**
  * The crew tools: the ones that need to know which pet is asking. `remember` files a
@@ -78,6 +78,9 @@ export interface AskPetDeps {
   timeoutMs?: number | undefined;
   /** Announces the consult so the panel can draw its card. */
   announce?: ((from: Pet, to: Pet, question: string, turnId: string) => void) | undefined;
+  /** Home. The consulted pet's reply, or why there was none, for the activity record. */
+  answered?:
+    ((turnId: string, toPetId: string, outcome: { ok: boolean; text: string }) => void) | undefined;
 }
 
 /**
@@ -159,56 +162,70 @@ export function askPetTool(deps: AskPetDeps, caller: Pet): Tool {
 
       deps.announce?.(ctx.pet, target, question, ctx.turnId);
       ctx.countCall();
-
-      const timeoutMs = deps.timeoutMs ?? CONSULT_TIMEOUT_MS;
-      const timeout = AbortSignal.timeout(timeoutMs);
-      const signal = AbortSignal.any([ctx.signal, timeout]);
-      const settings = deps.settings();
-      const asked = `${ctx.pet.name} is consulting you mid-answer. Your reply goes back to ${ctx.pet.name}, not to the user, so answer the question directly and briefly.\n\nQuestion: ${question}`;
-      const request = assemblePrompt({
-        pet: target,
-        history: [
-          {
-            id: randomUUID(),
-            conversationId: randomUUID(),
-            role: 'user',
-            content: [{ type: 'text', text: asked }],
-            createdAt: new Date().toISOString(),
-          },
-        ],
-        settings,
-        memories: deps.memory ? recall(deps.memory, target.id, question) : [],
-        snapshot: textOnly(ctx.snapshot),
+      const outcome = await consult(deps, ctx, target, question);
+      deps.answered?.(ctx.turnId, target.id, {
+        ok: outcome.isError !== true,
+        text: typeof outcome.content === 'string' ? outcome.content : '',
       });
-
-      try {
-        const provider = deps.provider(target);
-        const result = await provider.complete(
-          request,
-          {
-            onText: () => undefined,
-            onToolUse: (call) =>
-              Promise.resolve({
-                content: call.name === ASK_PET ? NESTED_CONSULT_REFUSED : 'No tools in a consult.',
-                isError: true,
-              }),
-          },
-          signal,
-        );
-        if (timeout.aborted) return timedOut(target, timeoutMs);
-        if (ctx.signal.aborted) return { content: 'The consult was stopped.', isError: true };
-        if (result.text.trim().length === 0) {
-          return { content: `${target.name} gave no answer.`, isError: true };
-        }
-        return { content: result.text };
-      } catch (error) {
-        if (timeout.aborted) return timedOut(target, timeoutMs);
-        const message =
-          error instanceof BrainError || error instanceof Error ? error.message : String(error);
-        return { content: `${target.name} could not answer: ${message}`, isError: true };
-      }
+      return outcome;
     },
   );
+}
+
+/** The nested turn itself: the consulted pet's one answer, or an error result. */
+async function consult(
+  deps: AskPetDeps,
+  ctx: ToolContext,
+  target: Pet,
+  question: string,
+): Promise<ToolOutcome> {
+  const timeoutMs = deps.timeoutMs ?? CONSULT_TIMEOUT_MS;
+  const timeout = AbortSignal.timeout(timeoutMs);
+  const signal = AbortSignal.any([ctx.signal, timeout]);
+  const settings = deps.settings();
+  const asked = `${ctx.pet.name} is consulting you mid-answer. Your reply goes back to ${ctx.pet.name}, not to the user, so answer the question directly and briefly.\n\nQuestion: ${question}`;
+  const request = assemblePrompt({
+    pet: target,
+    history: [
+      {
+        id: randomUUID(),
+        conversationId: randomUUID(),
+        role: 'user',
+        content: [{ type: 'text', text: asked }],
+        createdAt: new Date().toISOString(),
+      },
+    ],
+    settings,
+    memories: deps.memory ? recall(deps.memory, target.id, question) : [],
+    snapshot: textOnly(ctx.snapshot),
+  });
+
+  try {
+    const provider = deps.provider(target);
+    const result = await provider.complete(
+      request,
+      {
+        onText: () => undefined,
+        onToolUse: (call) =>
+          Promise.resolve({
+            content: call.name === ASK_PET ? NESTED_CONSULT_REFUSED : 'No tools in a consult.',
+            isError: true,
+          }),
+      },
+      signal,
+    );
+    if (timeout.aborted) return timedOut(target, timeoutMs);
+    if (ctx.signal.aborted) return { content: 'The consult was stopped.', isError: true };
+    if (result.text.trim().length === 0) {
+      return { content: `${target.name} gave no answer.`, isError: true };
+    }
+    return { content: result.text };
+  } catch (error) {
+    if (timeout.aborted) return timedOut(target, timeoutMs);
+    const message =
+      error instanceof BrainError || error instanceof Error ? error.message : String(error);
+    return { content: `${target.name} could not answer: ${message}`, isError: true };
+  }
 }
 
 function timedOut(target: Pet, timeoutMs: number): ToolOutcome {

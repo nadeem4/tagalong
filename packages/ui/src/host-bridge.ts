@@ -1,6 +1,7 @@
 import { createContext, createElement, useContext } from 'react';
 import type { ReactNode } from 'react';
 import type {
+  ActivityListResult,
   ContextSnapshot,
   CoreToHostNotification,
   NotificationParamsOf,
@@ -76,6 +77,12 @@ export interface HostBridge {
    * watches never shows a chip to stop.
    */
   stopWatch?(watchId: string): Promise<void>;
+  /**
+   * Home. What the crew did — turns, consults, handoffs, roundtables — newest first, a page
+   * at a time (`before` is the previous page's `next`). Optional: a host without Home never
+   * shows the activity view.
+   */
+  listActivity?(params?: { before?: string; limit?: number }): Promise<ActivityListResult>;
 }
 
 const HostBridgeContext = createContext<HostBridge | null>(null);

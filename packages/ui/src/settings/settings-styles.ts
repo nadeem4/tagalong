@@ -40,6 +40,10 @@ export const SETTINGS_CSS = `
   font-size: ${t.fontSize.partyHeading}px; font-weight: ${t.fontWeight.semibold};
   color: ${t.color.textMuted}; padding: 0 ${t.space.sm}px; margin: 0;
 }
+.tg-nav__note {
+  color: ${t.color.textMuted}; font-size: ${t.fontSize.small}px; line-height: 1.5;
+  padding: 0 ${t.space.sm}px; margin: ${t.space.md}px 0 ${t.space.lg}px;
+}
 .tg-nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: ${t.space.sm}px; }
 .tg-nav a {
   display: block; padding: ${t.space.sm}px ${t.space.md}px; border-radius: ${t.radius.row}px;

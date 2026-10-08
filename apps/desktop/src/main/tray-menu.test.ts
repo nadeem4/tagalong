@@ -20,13 +20,13 @@ function click(template: ReturnType<typeof trayMenuTemplate>, label: string): vo
 }
 
 describe('trayMenuTemplate', () => {
-  it('lists the items in order, with Open office after the pets', () => {
+  it('lists the items in order, with Open Home after the pets', () => {
     const labels = trayMenuTemplate(actions(), { sightPaused: false }).map(
       (entry) => entry.label ?? entry.type,
     );
     expect(labels).toEqual([
       'Show or hide pets',
-      'Open office',
+      'Open Home',
       'Pause sight',
       'Settings',
       'Setup wizard',
@@ -35,9 +35,9 @@ describe('trayMenuTemplate', () => {
     ]);
   });
 
-  it('opens the office from Open office', () => {
+  it('opens Home from Open Home', () => {
     const handlers = actions();
-    click(trayMenuTemplate(handlers, { sightPaused: false }), 'Open office');
+    click(trayMenuTemplate(handlers, { sightPaused: false }), 'Open Home');
     expect(handlers.openOffice).toHaveBeenCalledOnce();
   });
 

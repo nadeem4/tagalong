@@ -163,6 +163,28 @@ components:
   meetings-panel:
     backgroundColor: '{colors.panel-white}'
     textColor: '{colors.panel-text}'
+  home-tab:
+    backgroundColor: 'transparent'
+    textColor: '{colors.panel-muted}'
+    typography: '{typography.body}'
+    height: '40px'
+    padding: '0 12px'
+  home-tab-selected:
+    backgroundColor: 'transparent'
+    textColor: '{colors.panel-text}'
+    typography: '{typography.body}'
+    height: '40px'
+    padding: '0 12px'
+  activity-entry:
+    backgroundColor: 'transparent'
+    textColor: '{colors.panel-text}'
+    rounded: '{rounded.row}'
+    padding: '8px'
+  activity-entry-open:
+    backgroundColor: '{colors.panel-tile}'
+    textColor: '{colors.panel-text}'
+    rounded: '{rounded.row}'
+    padding: '8px'
   roles-notice:
     backgroundColor: '{colors.sidebar-navy}'
     textColor: '{colors.shell-text}'
@@ -181,7 +203,7 @@ Tagalong's crew is a 16-bit party with job classes, working in a contemporary of
 
 Every colour, font, size, spacing step, radius and timing comes from one source, `packages/ui/src/office/tokens.ts` (`officeTokens`); components read only from there. Sprite palettes are character and furniture art and live with the sprites, not in the tokens. Sprites are plain data (a map of rows, a palette, optional overlay pixels) rendered as a CSS `box-shadow` on a single 1px element and scaled up by a whole number. No images, no canvas, no 3D.
 
-The surface is dense but calm: a 64px top bar, a 280px party list, the office floor in the centre and a light meetings panel on the right. Status is always an icon plus a word. Motion is a stepped two-frame idle, off whenever the user asks for stillness.
+The main surface is **Home**, the control centre: a 64px top bar, a 280px agent list, the themed scene in the centre (the Office floor today) and a light right panel with three tabs: Activity, the picked agent's controls, and Meetings. Status is always an icon plus a word. Motion is a stepped two-frame idle, off whenever the user asks for stillness.
 
 **Key Characteristics:**
 
@@ -202,12 +224,12 @@ A cool ink-navy shell and cool off-white panels frame a warm-grey concrete floor
 
 ### Secondary
 
-- **Job-class inks** (job-generalist teal, job-writer violet, job-backend amber, job-frontend pink, job-researcher green): each job class's small-caps label in the party list. Chosen to read on the sidebar navy. The class is the pet's role: the label is the role's name and the ink is keyed by role id in `officeTokens.roleInk`. A pet whose role is unknown reads "GENERALIST" in the generalist ink; a role without an ink of its own uses the shell muted text.
+- **Job-class inks** (job-generalist teal, job-writer violet, job-backend amber, job-frontend pink, job-researcher green): each job class's small-caps label in the agent list. Chosen to read on the sidebar navy. The class is the pet's role: the label is the role's name and the ink is keyed by role id in `officeTokens.roleInk`. A pet whose role is unknown reads "GENERALIST" in the generalist ink; a role without an ink of its own uses the shell muted text.
 
 ### Neutral
 
 - **Ink Navy** (shell-navy): the page and top bar; the darkest ground.
-- **Sidebar Navy** (sidebar-navy): the party list, one step lighter than the page.
+- **Sidebar Navy** (sidebar-navy): the agent list, one step lighter than the page.
 - **Active Row Navy** (row-active): a hovered or selected party row.
 - **Avatar Tile** (avatar-tile): the square behind each party sprite.
 - **Field Navy** (field-navy) with **Field Line** (field-line): text inputs and the unpressed toggle border.
@@ -229,7 +251,7 @@ A cool ink-navy shell and cool off-white panels frame a warm-grey concrete floor
 
 **The One Colour Per Class Rule.** Each job class owns exactly one label ink, keyed by role id in the office tokens (`roleInk`), used only on that class's job label. The ink belongs to the role, never to a pet, so two pets with the same role share it. Adding a class means adding one ink that reads on the sidebar navy and stays clearly distinct from gold.
 
-**The Three Grounds Rule.** Navy is chrome (bar, party list), off-white is reading (panels, threads), pale concrete is the world (the floor). A new surface picks the ground for its job; it does not invent a fourth.
+**The Three Grounds Rule.** Navy is chrome (bar, agent list), off-white is reading (panels, threads, the activity view, agent controls), pale concrete is the world (the floor). A new surface picks the ground for its job; it does not invent a fourth.
 
 ## Typography
 
@@ -243,8 +265,8 @@ Both are bundled from `@fontsource` (Latin subset) so the window makes no networ
 ### Hierarchy
 
 - **Office title** (Pixelify 700, 20px, 0.5px tracking): the office name in the top bar, beside a 2x pet sprite.
-- **Pet name** (Pixelify 600, 17px): a pet's name in the party list; also the empty-state line in the meetings panel.
-- **Panel heading, pixel** (Pixelify 600, 15px, 1px tracking, uppercase): short panel headings such as "PARTY · 3".
+- **Pet name** (Pixelify 600, 17px): a pet's name in the agent list; also the empty-state line in the meetings panel.
+- **Panel heading, pixel** (Pixelify 600, 15px, 1px tracking, uppercase): short panel headings such as "AGENTS · 3".
 - **Room label** (Pixelify 700, 13px, 1px tracking, uppercase): meeting room names on the floor.
 - **Job class** (Pixelify 400, 11px, 1px tracking, uppercase): the job label under a pet name, in its class ink; desk name plates use the same style in Name Plate.
 - **Title** (Onest 600, 14px): buttons, inputs and the meetings panel's heading.
@@ -261,7 +283,9 @@ Both are bundled from `@fontsource` (Latin subset) so the window makes no networ
 
 ## Layout
 
-A fixed three-column desktop window under a 64px top bar. The party list is a fixed 280px column on Sidebar Navy; the office floor sits in the centre at its natural pixel size; the meetings panel takes the remaining width. The top bar aligns its title block to the party column, then runs the assign field (flexible), the Assign button, the Still office toggle and the rooms-free meta.
+Home is a fixed three-column desktop window (1440x800 by default) under a 64px top bar. The agent list is a fixed 280px column on Sidebar Navy; the theme's scene sits in the centre at its natural pixel size; the right panel takes the remaining width, with its tabs (Activity, the picked agent's name, Meetings) across the top. The top bar aligns its title block ("Home") to the agent column, then runs the assign field (flexible), the Assign button, the Still office toggle and the rooms-free meta.
+
+**The Chrome Never Moves Rule.** Home is fixed chrome around one themed scene. The top bar, the agent list, the right panel and every control keep the same place, size and look in every theme; a theme (`Theme` in `packages/ui/src/home/theme.ts`: an id, a name, a layout, sprites, scene tokens and one Scene renderer) only changes the centre scene. A theme never adds a control, and the chrome never reads a theme's scene tokens. The Office is the only theme today; a Restaurant or a Factory would be one more registry entry.
 
 Spacing runs on a small 2-to-24px scale (xxs 2, hair 3, xs 4, sm 6, md 8, lg 12, xl 16, xxl 20, xxxl 24). Controls are 40px tall. Party rows gap 6px; inside a row the sprite and text gap 12px.
 
@@ -302,9 +326,9 @@ Calm and solid; gold only where the action is primary.
 - **Focus:** the shared 2px gold outline.
 - **Disabled:** not-allowed cursor; a title explains why.
 
-### Navigation: Party List
+### Navigation: Agent List
 
-- **Style:** a `nav` on Sidebar Navy, 280px wide, headed by a pixel panel heading with the crew count.
+- **Style:** a `nav` ("Agents") on Sidebar Navy, 280px wide, headed by a pixel panel heading with the crew count ("AGENTS · 3"). Picking a row selects that agent in the scene and opens its controls in the right panel. A full-width **Add agent** button (toggle style) sits under the rows.
 - **Row:** a real button (`aria-pressed`) with a 2px transparent border, 10px radius and 8px padding: avatar tile (Avatar Tile, 4px padding, sprite at 3x), then pet name (pixel 17px), job class (pixel 11px in its class ink) and status line.
 - **Hover:** Active Row Navy fill. **Selected:** Active Row Navy fill and a gold border.
 
@@ -316,13 +340,25 @@ Status is an icon and a word, never colour alone: a 14px stroked SVG plus "Worki
 
 - **Room status:** Free Chip fill, Free Chip Ink label, Onest 600 11px, 2px 8px padding, 10px radius, beside the room's pixel label.
 
+### Right Panel Tabs
+
+Off-white, under the top bar's right side: Activity, the picked agent's name, Meetings. Each tab is Onest 600 13px in Panel Muted, 40px tall, with a 2px transparent bottom border; the selected tab is Panel Text over a 2px gold underline (gold is selection). Left and right arrows move between tabs; every panel stays mounted.
+
+### Activity View
+
+The Activity tab lists what the crew did, newest first, on Panel White. Each entry is a real button (`aria-expanded`) with a 10px radius and 8px padding: the pet's sprite at 2x, a headline in Onest 600 14px ("Scout answered", "Scout asked Bolt", "Scout handed off to Ink", "Ink started a roundtable"), a meta line in Onest 12px Panel Muted (a 14px state icon and its word, Working, Done, Failed or Stopped, then the model, the call count and the time), and a one-line Onest 13px preview. Hover and open fill Panel Tile. Open, the thread sits below, indented past the sprite behind a 2px Panel Line rule: small Onest 600 12px labels ("Asked", "Bolt answered") over Onest 13px text at 1.5 line height. "Show older" (quiet button) pages back.
+
+### Agent Controls
+
+The picked agent's tab is the Settings pet editor in one column on Panel White: role picker, brain with the Recommended or Your choice chip, tool switches, notes, the directory card (static, not sticky), look and reply, a **Desktop pet** group, then "Save Name" (primary gold) and a quiet "Delete Name" that asks once more.
+
 ### Meetings Panel
 
 Off-white reading surface: a heading block (Onest 600 14px plus a 12px muted subline) over a Panel Line divider, the thread area, and a call meter of 12 square 10px-tall segments (Meter Off when unlit) between "Calls" and a count. Empty state: two crew sprites at 3x, a pixel "No meetings yet" line and a 300px Onest paragraph.
 
 ### Roles Notice
 
-The one-time "Your crew has roles now" dialog over the office, shown after an install from before roles is upgraded. A modal `<dialog>` on Sidebar Navy (it is chrome, and the job-class inks are tuned for that navy), 660px wide, 10px radius, a 1px Field Line border and no shadow, over a Scrim (`scrim`, the page navy at 72%) that keeps the office visible but receded. The title is the office-title style; one Body lead sentence in Shell Muted; then a table, one row per upgraded pet: avatar tile with the sprite at 2x and the pet name (pixel 17px), a muted arrow, the new role as a job-class label in its class ink, and what happened in Onest 13px. A "What changed?" text button (Onest 600 13px, underlined, `aria-expanded`) opens a Field Navy box of three short lines. The footer ends on "Review my crew" (toggle style, opens Settings) and "Got it" (primary gold, focused on open); both, and Escape, mark the notice seen.
+The one-time "Your crew has roles now" dialog over the office, shown after an install from before roles is upgraded. A modal `<dialog>` on Sidebar Navy (it is chrome, and the job-class inks are tuned for that navy), 660px wide, 10px radius, a 1px Field Line border and no shadow, over a Scrim (`scrim`, the page navy at 72%) that keeps the office visible but receded. The title is the office-title style; one Body lead sentence in Shell Muted; then a table, one row per upgraded pet: avatar tile with the sprite at 2x and the pet name (pixel 17px), a muted arrow, the new role as a job-class label in its class ink, and what happened in Onest 13px. A "What changed?" text button (Onest 600 13px, underlined, `aria-expanded`) opens a Field Navy box of three short lines. The footer ends on "Review my crew" (toggle style, opens the first agent's controls in Home's right panel) and "Got it" (primary gold, focused on open); both, and Escape, mark the notice seen.
 
 ### Pixel Sprite (signature)
 

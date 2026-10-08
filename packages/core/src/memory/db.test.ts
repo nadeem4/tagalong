@@ -38,6 +38,7 @@ describe('openDatabase', () => {
     const db = openDatabase(dataDir);
     try {
       expect(tableNames(db)).toEqual([
+        'activity',
         'conversations',
         'memories',
         'memories_fts',
