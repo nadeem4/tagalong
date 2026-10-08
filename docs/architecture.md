@@ -72,7 +72,7 @@ landed in Phase 6, which ran fifth; see "The browser host" below.
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
 | packages/protocol | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC envelopes, plus the method and notification catalog                                                                                                                                                           | anything except zod                              |
 | packages/core     | Engine facade, conversation runner, prompt assembler, SQLite memory, pet registry, settings and SecretStore, pairing, websocket server, brain providers                                                                                                                                 | electron, react, DOM globals                     |
-| packages/ui       | React components — `PetAvatar`, `MessageList`, `Composer`, `SightBar`, `ChatPanel` — plus the `HostBridge` contract and its context, and a fake bridge for host tests                                                                                                                   | electron, sockets, node APIs                     |
+| packages/ui       | React components — `DesktopCompanion`, `MessageList`, `Composer`, `SightBar`, `ChatPanel` — plus the `HostBridge` contract and its context, and a fake bridge for host tests                                                                                                            | electron, sockets, node APIs                     |
 | apps/desktop      | Electron host. Runs the engine in the main process, dials it over the loopback socket, owns avatar, panel and settings windows, the tray, the two global hotkeys (text-only and look), perception with exclusions and capture announcements, and safeStorage secrets, one folder per OS | nothing from core internals, only its public API |
 | apps/extension    | Chrome MV3 host. Connects to the running engine from its service worker, supplies the exact selection and page text on demand, renders pets in the side panel, pairs from its options page                                                                                              | core at all; it speaks the protocol only         |
 
@@ -387,6 +387,30 @@ re-throws this one specifically. A refusal is not a failure and must not be trea
 Phase 3B's rolling memory needs no change here to be covered: it will read the screen through the
 same adapter, so the gate refuses it on the same flag without that code knowing pause exists.
 
+### The sight permission
+
+`settings.sight` is a user permission with two values. `when-asked` (the default) is everything
+above: the screen is read only when a look key is pressed, the panel's own capture is used, or a pet
+reaches for a sight tool during a turn the user started. `always` changes two things in the desktop
+host, both in `apps/desktop/src/main/sight-mode.ts`:
+
+- **Every ask is a look.** `lookFor(sight, request)` turns a plain ask (the ask key, the tray, a
+  click on the companion) into the same active-window screenshot `Ctrl+Shift+S` takes;
+  `openPanelWithContext` captures it through `captureForAsk` before the panel takes focus, so the
+  picture is of the user's window rather than of Tagalong. A see-everything capture is left as it is.
+  Follow-up questions in the same panel reuse that capture, exactly as they reuse a look today; the
+  panel hides on focus loss, so coming back to it captures again.
+- **Rolling memory runs.** `rollingMemoryFor(settings)` turns rolling memory on whatever the
+  Awareness box says, and main reconfigures it the moment either setting is saved.
+
+Exclusions and the pause still win, because neither is checked here: the screenshot goes through
+`captureAskSnapshot`, which asks `findCaptureBlock` before it takes the picture, on the sight-gated
+platform, which throws while paused. Nothing leaves the machine until the user sends a question; the
+capture badge fires for every look as before. The companion window is created `focusable: false` so
+that clicking the pet leaves the user's own window active, which is the window the look photographs.
+The Sight section saves the permission the moment it is chosen (`SightPermission` in
+`@tagalong/ui`), and saving it reloads the companion so its eye matches.
+
 ### Settings that take effect without a restart
 
 Three of the sight settings are read at the moment they are used rather than at boot, and that is
@@ -628,14 +652,42 @@ turn's `modelCalls` when it was more than one. `HostBridge.onTurnEvent` now also
 `pet.message` and `crew.status`; the desktop forwards every notification and the extension's port
 bridge lets these two through.
 
-The desktop avatar window became a strip: one `PetAvatar` button per visible pet, the default pet
-first, sized by `stripWidth(n)` and clamped on screen. The window background is still the drag handle,
-so the crew moves as one and its position is the existing `avatar` setting — one position for the
-strip rather than one per pet. A click calls `selectPet`, which opens the panel and sends it the pet.
-Each avatar's ring follows its own turns (`nextPetStates`), so a roundtable lights the pets in turn.
-`settings.hiddenPets` takes pets off the strip; they still answer in the panel. Settings edits every
-pet field, adds pets (on the fake brain until a provider is picked) and deletes them, and sets
-`settings.summarizer`.
+Settings edits every pet field, adds pets (on the fake brain until a provider is picked) and deletes
+them, and sets `settings.summarizer`.
+
+### The desktop companion
+
+The desktop shows one pet, not the crew: the pet named by `settings.defaultPetId`, or the first pet
+when that one is gone (`companionFor` in `renderer/src/crew.ts`). It answers beside the user's work
+while the rest of the crew helps behind it. `DesktopCompanion` (`packages/ui/src/companion/`) draws it
+with `PixelSprite` and `characterFor` at the party scale (3x, 48px) on a 96px transparent window
+(`AVATAR_SIZE`), with a name plate underlined in its role ink (`jobFor`, `officeTokens.roleInk`). The
+window background is the drag handle and its position is the `avatar` setting; the pet and its plate
+are one no-drag button whose click calls `selectPet`, which opens the panel on it.
+
+Each state is its own pixel mark (`companion/badges.ts`), named in a tooltip and in the pet's
+accessible label, so none is told by colour alone:
+
+| State                  | Mark                                                       |
+| ---------------------- | ---------------------------------------------------------- |
+| Working                | a stepped bob and a speech bubble with three dots          |
+| Looking                | a wide-open eye with rays, for one second after each look  |
+| Sight paused           | a grey eye with a slash, for as long as the pause lasts    |
+| Sight Always           | a small, calm open eye                                     |
+| Rolling memory on      | a red dot with a light rim                                 |
+| Watching / watch fired | an hourglass / an exclamation mark on a red tile           |
+| Needs you              | the gold cursor, hopping above the pet (wired, unused yet) |
+
+Working follows the turn notifications main forwards (`nextActivity`): from any `turn.started` until
+that turn completes or errors. A consult (`pet.message` with `kind: consult`) adds the consulted pet
+to the asking turn, and any other pet answering a turn of its own counts too; each such helper shows
+as a 16px sprite badge beside the companion, named in its tooltip, until the turn ends
+(`helpersOf`). Any pet's watch shows on the companion, and clicking it clears the alerts. The bob and
+the cursor hop are stepped and stop under `prefers-reduced-motion` and when the office's Still
+preference (`tagalong.office.still` in `localStorage`) is on. Saving the default pet or the sight
+permission reloads the window. `settings.hiddenPets` is no longer read by the desktop: it chose
+which pets the old strip showed, and a single companion has nothing to hide; the setting stays so
+existing files parse.
 
 ### The Crew Office
 
@@ -706,7 +758,7 @@ under `apps/desktop/src/renderer/src/settings/`:
 | `keys-section.tsx`      | Provider API keys and OpenAI-compatible base URLs                            |
 | `summaries-section.tsx` | The summarizer provider and model                                            |
 | `hotkeys-section.tsx`   | The four global hotkeys and the hotkey problem, if any                       |
-| `sight-section.tsx`     | What a see-everything look sends, and the window text budget                 |
+| `sight-section.tsx`     | The sight permission, what a see-everything look sends, the text budget      |
 | `awareness-section.tsx` | Rolling memory and the watch limits                                          |
 | `browser-section.tsx`   | The Chrome extension's pairing token                                         |
 | `section.tsx`           | The section list the nav links to, and the panel every section sits in       |
@@ -765,8 +817,9 @@ window, not a count — `minutes` from settings, ten by default — and frames a
 tenth of the raw bitmap. A blocked display's placeholder is never stored.
 
 Pausing sight stops the timer and clears the ring; turning memory off clears it; quitting disposes it.
-Nothing in the folder imports `fs`, and a test asserts that. While it records, every avatar shows a
-small red dot (`PetAvatar recording`), driven by `onRecordingChange` over IPC.
+Nothing in the folder imports `fs`, and a test asserts that. While it records, the desktop companion
+shows a small red dot (`DesktopCompanion recording`), driven by `onRecordingChange` over IPC. Sight on
+Always keeps it running regardless of the Awareness box (see [The sight permission](#the-sight-permission)).
 
 `PerceptionMemory` answers the two methods. Recall reads the rolling ring. Diff takes a fresh frame —
 reusing one taken in the last second, since a watch asks twice per tick — and compares it with the
@@ -836,7 +889,7 @@ flowchart LR
   `watch.stop` ends it with `stopped`. A host that refuses a diff for a while — paused sight, an
   excluded window in front — skips ticks rather than ending the watch.
 - **Fired.** `watch.fired` carries the model's one-sentence reason as `message`. The panel shows it as
-  a message from the pet and the avatar shows an alert. It is not spoken: Phase 3 (Voice) is not
+  a message from the pet and the desktop companion shows an alert. It is not spoken: Phase 3 (Voice) is not
   built, and speaking it is deferred there.
 
 ### What an ask with pictures costs

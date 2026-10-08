@@ -43,8 +43,8 @@ your mouse or keyboard.
 
 ## Operating Context
 
-- Runs all day in the background: tray icon, pets docked on the desktop, a chat panel that opens
-  beside the pet on a hotkey and hides on Escape.
+- Runs all day in the background: tray icon, one pet docked on the desktop (the rest of the crew
+  helps behind it), a chat panel that opens beside the pet on a hotkey and hides on Escape.
 - Hotkeys: `Ctrl+Shift+Space` ask, `Ctrl+Shift+S` look, `Ctrl+Shift+Alt+S` see everything,
   `Ctrl+Shift+Alt+P` pause sight.
 - The Crew Office window: desks, meeting rooms, live meetings, task cards.

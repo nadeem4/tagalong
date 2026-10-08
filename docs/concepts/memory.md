@@ -55,10 +55,12 @@ A turn contains, in order:
 2. The teammate directory: the pets this pet can reach, in the `ask_pet` tool's description.
 3. Recalled memories, within a budget (below).
 4. The thread: the last `historyMessages` messages of this conversation or meeting.
-5. The context the user attached: selection, window, screenshot, page text.
+5. The context the user attached: selection, window, screenshot, page text. With sight on **Always**
+   every question attaches a screenshot of the active window, so this slot carries a picture on
+   every turn rather than only after a look key; exclusions and the sight pause still remove it.
 
-Screen memory is never placed in a prompt automatically. A pet reaches it only by calling
-`recall_screen` or `what_changed`, which the user can see in the panel.
+Screen memory is never placed in a prompt automatically, in either sight mode. A pet reaches it only
+by calling `recall_screen` or `what_changed`, which the user can see in the panel.
 
 ## Recall: which memories ride along
 
@@ -133,7 +135,8 @@ the extra model, extension and cost are not justified.
 
 ## Screen memory
 
-Built in the desktop host (`apps/desktop/src/main/awareness/`), off by default:
+Built in the desktop host (`apps/desktop/src/main/awareness/`), off by default, and kept on while
+sight is set to **Always**:
 
 - One small frame per display every five seconds, kept in RAM for the last ten minutes.
 - Never written to disk and never sent anywhere unless a pet calls a recall tool inside a turn the

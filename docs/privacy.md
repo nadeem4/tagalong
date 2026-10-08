@@ -2,12 +2,32 @@
 
 What Tagalong reads, when, and what it never reads. The short version is in the [README](../README.md#privacy).
 
+## Sight: When I ask, or Always
+
+Sight is a permission you choose in Settings, under **Sight**. It applies the moment you pick it.
+
+- **When I ask** (the default). Tagalong reads your screen only when you press a look key. A plain
+  question carries your selected text and the window's title, and no picture.
+- **Always**. Every question you ask carries a picture of the window you are in, the same picture
+  `Ctrl+Shift+S` takes, without pressing that key. Rolling memory (below) also runs, so the last few
+  minutes of your screen are held in memory. A small open eye on your desktop pet shows while
+  Always is on.
+
+In both:
+
+- **Nothing is sent until you ask a question.** Always keeps a view in memory on your computer; it
+  leaves the machine only with a question you send, and is billed as one picture on that question.
+- **Excluded apps are never read**, and **pausing sight stops everything**, Always included.
+- **Every look is shown**: the eye on your pet flashes each time the screen is read.
+
 ## What is captured, and when
 
-Nothing is read until you press a key, with two exceptions you switch on yourself: **rolling memory**
-and a **watch** a pet started at your request (both below). Otherwise there is no background watching,
-no polling loop, and no capture between one question and the next — each hotkey reads once, sends
-that, and stops.
+With sight on **When I ask**, nothing is read until you press a key, with two exceptions you switch
+on yourself: **rolling memory** and a **watch** a pet started at your request (both below). Otherwise
+there is no background watching, no polling loop, and no capture between one question and the next —
+each hotkey reads once, sends that, and stops. With sight on **Always**, opening the chat (the ask
+key, the tray, or a click on your pet) reads the window you are in, as if you had pressed
+`Ctrl+Shift+S`.
 
 | You press          | It reads                                                                                                    |
 | ------------------ | ----------------------------------------------------------------------------------------------------------- |
@@ -86,7 +106,7 @@ page you did not ask about, and the capture exclusion list applies to tab titles
 
 ## Rolling memory: what the buffer holds
 
-Off until you tick it in Settings. While it is on:
+Off until you tick it in Settings, or choose sight **Always**, which keeps it on. While it is on:
 
 - Every five seconds the desktop takes a **640-pixel picture of each screen**, the **list of open
   windows** (titles and positions, never their text) and which window was in front.
@@ -96,10 +116,11 @@ Off until you tick it in Settings. While it is on:
 - A frame is **skipped** while an app on your exclusion list is in front, and a screen showing one is
   never stored. Excluded apps are never remembered.
 - **Pausing sight clears it.** Pressing the pause key stops recording and throws away every frame it
-  held, and the red dot on the pets disappears. Resume starts an empty buffer.
+  held, and the red dot on your pet disappears. Resume starts an empty buffer.
 - **Quitting clears it.** After a restart there is nothing to recall from before it; the pet says how
   far back memory actually reaches.
-- **Turning it off clears it**, at once, without a restart.
+- **Turning it off clears it**, at once, without a restart. With sight on Always it stays on until
+  you switch sight back to When I ask.
 
 Only the frame a pet asks for with `recall_screen` or `what_changed` is ever sent to a model.
 
@@ -125,8 +146,9 @@ While paused:
 - Every screenshot, display capture, crop, window enumeration and window text read is **refused
   before it runs**. The refusal happens above the adapter, so nothing is captured and then
   discarded — the same ordering the exclusion list uses, for the same reason.
-- The avatar wears a grey eye for as long as it lasts. The amber eye that marks a capture cannot
-  appear, because nothing was read.
+- Your desktop pet wears a grey eye with a slash through it for as long as it lasts. The bright eye
+  that marks a capture cannot appear, because nothing was read. With sight on Always, the pause
+  still wins: no picture is attached to any question until you resume.
 - The pet is told sight is paused rather than that a capture failed, so it says "you turned sight
   off" rather than inventing a reason or claiming a window is empty.
 - The selection and the clipboard still work. Pausing blinds the pet; it does not refuse what you

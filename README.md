@@ -48,8 +48,12 @@ pnpm install
 pnpm dev:desktop
 ```
 
-Tagalong lives in the system tray. Its pets sit on the desktop as a small strip of avatars you can
-drag anywhere.
+Tagalong lives in the system tray. One pet sits on your desktop, your default pet, drawn as a small
+pixel character you can drag anywhere. It answers beside your work while the rest of the crew helps
+behind it: when it asks a teammate, that pet's tiny sprite appears beside it until the answer is
+done. Small marks on the pet show what it is doing: a speech bubble while it works, a flashing eye
+when it reads your screen, a grey slashed eye while sight is paused, a red dot while rolling memory
+records, and an hourglass while it watches for something.
 
 ## First run: the setup wizard
 
@@ -110,7 +114,8 @@ works at once. The bigger the look, the more it costs: a screenshot adds roughly
 
 ## Pets and the crew
 
-A fresh install has three pets. Click one on the strip to talk to it.
+A fresh install has three pets. Click the pet on your desktop to talk to it; the panel switches to
+any other pet.
 
 | Pet      | Good at                               |
 | -------- | ------------------------------------- |
@@ -128,8 +133,8 @@ A fresh install has three pets. Click one on the strip to talk to it.
   calls; the panel footer counts them.
 - **Memory.** Tell a pet "I prefer short answers" and it remembers across restarts.
 
-Settings edits every pet (name, emoji, colour, notes, provider, model), adds and deletes pets, and
-chooses which ones sit on the desktop. Pick a pet in Settings to choose its role (Generalist, Backend
+Settings edits every pet (name, emoji, colour, notes, provider, model) and adds and deletes pets; the
+default pet is the one on your desktop. Pick a pet in Settings to choose its role (Generalist, Backend
 engineer, Frontend engineer, Writer or Researcher) and switch its tools on or off; the card beside it
 shows how its teammates see it.
 
@@ -164,13 +169,18 @@ Then click the toolbar button, or select text and press `Alt+Shift+Space`. More 
   **Stop**.
 - **Rolling memory** (off by default; turn it on in the wizard or **Settings → Awareness**). Tagalong
   keeps a small picture of each screen every five seconds, in memory only, for the last ten minutes,
-  so you can ask "what was I reading five minutes ago?". A red dot on the pets shows while it
+  so you can ask "what was I reading five minutes ago?". A red dot on your pet shows while it
   records.
+- **Sight: When I ask or Always** (**Settings → Sight**). **When I ask** (the default) reads your
+  screen only when you press a look key. **Always** adds a picture of the window you are in to every
+  question, with no extra key, and keeps rolling memory on; a small open eye on your pet shows it.
+  Nothing is sent until you ask, and excluded apps and the sight pause still apply.
 
 ## Privacy
 
 - Nothing is read until you press a hotkey or ask, except rolling memory and watches, which you turn
-  on. Every look badges the pets and the tray says what was read and when.
+  on. Sight on **Always** makes every question a look; nothing is sent until you ask. Every look
+  badges your pet and the tray says what was read and when.
 - Password managers, the Windows security prompt and the lock screen are never captured. The list is
   editable.
 - Screenshots are not written to disk. Rolling memory and watches live in memory only and are thrown
