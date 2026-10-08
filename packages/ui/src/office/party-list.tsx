@@ -12,11 +12,11 @@ export interface PartyListProps {
   notice?: ReactNode;
 }
 
-/** The crew down the left side. Each row is a real button; the selected one is ringed gold. */
+/** Home's agent list down the left side. Each row is a real button; the selected one is ringed gold. */
 export function PartyList({ members, selectedId, onSelect, notice }: PartyListProps) {
   return (
     <nav
-      aria-label="Party"
+      aria-label="Agents"
       style={{
         width: t.size.partyWidth,
         flex: 'none',
@@ -36,7 +36,7 @@ export function PartyList({ members, selectedId, onSelect, notice }: PartyListPr
             color: t.color.textMuted,
           }}
         >
-          PARTY · {members.length}
+          AGENTS · {members.length}
         </span>
       </div>
       {notice}

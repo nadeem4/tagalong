@@ -1,4 +1,5 @@
 import type {
+  ActivityEntry,
   ContextSnapshot,
   PerceptionTarget,
   Pet,
@@ -20,6 +21,10 @@ export interface FakeHostBridge extends HostBridge {
   nextCapture: ContextSnapshot | null;
   /** How many times the roles notice was dismissed. */
   dismissedNotices: number;
+  /** Home's activity, newest first; a test pushes or edits entries, then emits an event. */
+  activity: ActivityEntry[];
+  /** How many times the activity was listed. */
+  activityReads: number;
 }
 
 /**
@@ -35,6 +40,8 @@ export function createFakeHostBridge(
     recommend?: (roleId: string, providerId: string) => { model?: string; visionModel?: string };
     /** The unseen roles notice; absent means none, as on a fresh install. */
     rolesNotice?: RolesUpgradeNotice | null;
+    /** Home's activity, newest first. */
+    activity?: ActivityEntry[];
   } = {},
 ): FakeHostBridge {
   const handlers = new Set<(event: TurnEvent) => void>();
@@ -85,6 +92,20 @@ export function createFakeHostBridge(
       return Promise.resolve(options.recommend?.(roleId, providerId) ?? {});
     },
     dismissedNotices: 0,
+    activity: [...(options.activity ?? [])],
+    activityReads: 0,
+    listActivity(params = {}) {
+      fake.activityReads += 1;
+      const limit = params.limit ?? 30;
+      const start =
+        params.before === undefined
+          ? 0
+          : fake.activity.findIndex((entry) => entry.id === params.before) + 1;
+      const entries = fake.activity.slice(start, start + limit);
+      const last = entries.at(-1);
+      const more = start + limit < fake.activity.length && last !== undefined;
+      return Promise.resolve(more ? { entries, next: last.id } : { entries });
+    },
     rolesNotice() {
       return Promise.resolve(notice);
     },

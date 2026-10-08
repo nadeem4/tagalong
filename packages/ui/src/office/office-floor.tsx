@@ -9,7 +9,6 @@ import {
   WINDOW_XS,
   WINDOW_Y,
   cursorAbove,
-  deskLayout,
   loungeAt,
   monitorAt,
   plateAt,
@@ -17,15 +16,18 @@ import {
   seatAt,
 } from './layout';
 import type { Point, Room } from './layout';
-import type { OfficeMember } from './member';
+import type { SceneProps } from '../home/theme';
+import type { Placement } from '../home/theme';
 import { PixelSprite } from './pixel-sprite';
 import { CURSOR, PLANT } from './sprites/characters';
 import { FURNITURE, monitorSprite } from './sprites/furniture';
 import { officeTokens as t } from './tokens';
 
-export interface OfficeFloorProps {
-  members: readonly OfficeMember[];
-  selectedId: string | null;
+export type OfficeFloorProps = SceneProps;
+
+/** Where an agent's sprite stands: in its meeting seat, or behind its own desk. */
+function spotOf(placement: Placement): Point {
+  return placement.where === 'room' ? placement.seat : seatAt(placement.station);
 }
 
 /** Absolute placement on the floor. */
@@ -34,15 +36,19 @@ function at({ x, y }: Point): CSSProperties {
 }
 
 /**
- * The office seen from the front: desks on the left, glass meeting rooms on the right.
- * Every position comes from the layout module and every piece of furniture is a sprite;
- * this component only draws.
+ * The Office theme's scene, seen from the front: desks on the left, glass meeting rooms on
+ * the right. Where each agent stands comes in as placements (Home maps engine state to
+ * them), every other position comes from the layout module and every piece of furniture is
+ * a sprite; this component only draws.
  */
-export function OfficeFloor({ members, selectedId }: OfficeFloorProps) {
-  const desks = deskLayout(members.length);
-  const seated = desks.map((desk, index) => ({ desk, member: members[index] }));
-  const selectedDesk = seated.find(({ member }) => member?.pet.id === selectedId)?.desk;
-  const cursor = selectedDesk === undefined ? undefined : cursorAbove(seatAt(selectedDesk));
+export function OfficeFloor({ members, selectedId, placements }: OfficeFloorProps) {
+  const byId = new Map(members.map((member) => [member.pet.id, member]));
+  const seated = placements.flatMap((placement) => {
+    const member = byId.get(placement.agentId);
+    return member === undefined ? [] : [{ placement, desk: placement.station, member }];
+  });
+  const selected = seated.find(({ member }) => member.pet.id === selectedId);
+  const cursor = selected === undefined ? undefined : cursorAbove(spotOf(selected.placement));
   const furniture = t.spriteScale.furniture;
 
   return (
@@ -115,21 +121,17 @@ export function OfficeFloor({ members, selectedId }: OfficeFloorProps) {
           />
         ))}
 
-        {seated.map(({ desk, member }, index) => {
-          if (member === undefined) return null;
-          return (
-            <PixelSprite
-              key={member.pet.id}
-              sprite={member.character.sprite}
-              scale={t.spriteScale.floor}
-              className="office-bob"
-              style={{ ...at(seatAt(desk)), animationDelay: `${index * t.timing.bobStagger}s` }}
-            />
-          );
-        })}
+        {seated.map(({ placement, member }, index) => (
+          <PixelSprite
+            key={member.pet.id}
+            sprite={member.character.sprite}
+            scale={t.spriteScale.floor}
+            className="office-bob"
+            style={{ ...at(spotOf(placement)), animationDelay: `${index * t.timing.bobStagger}s` }}
+          />
+        ))}
 
-        {seated.map(({ desk, member }) => {
-          if (member === undefined) return null;
+        {seated.map(({ placement, desk, member }) => {
           const lit = member.status === 'working';
           return (
             <div key={member.pet.id}>
@@ -157,6 +159,23 @@ export function OfficeFloor({ members, selectedId }: OfficeFloorProps) {
               >
                 {member.pet.name.toUpperCase()}
               </div>
+              {placement.where === 'marker' && (
+                <span
+                  data-testid={`needs-you-${member.pet.id}`}
+                  style={{
+                    ...at(placement.marker),
+                    fontSize: t.fontSize.min,
+                    fontWeight: t.fontWeight.semibold,
+                    padding: `${t.space.xxs}px ${t.space.md}px`,
+                    borderRadius: t.radius.chip,
+                    background: t.color.gold,
+                    color: t.color.goldInk,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Needs you
+                </span>
+              )}
             </div>
           );
         })}

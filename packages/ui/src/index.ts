@@ -29,7 +29,12 @@ export type { ChatPanelProps } from './chat-panel';
 export { createFakeHostBridge } from './test-support/fake-host-bridge';
 export type { FakeHostBridge } from './test-support/fake-host-bridge';
 
-export { OfficeView } from './office/office-view';
+/** Home: the control centre. Its centre scene is a theme; everything else is fixed chrome. */
+export { HomeView } from './home/home-view';
+export type { HomeViewProps } from './home/home-view';
+export type { AgentHost } from './home/agent-controls';
+export { THEMES, themeById } from './home/themes';
+export type { Placement, SceneProps, Theme, ThemeLayout, Whereabouts } from './home/theme';
 export { PixelSprite } from './office/pixel-sprite';
 export type { PixelSpriteProps } from './office/pixel-sprite';
 

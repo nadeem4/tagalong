@@ -1,11 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Pet, Role, RolesUpgradeNotice } from '@tagalong/protocol';
 import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
-import { OfficeView } from './office-view';
-import { whatHappened } from './roles-notice';
-import { officeTokens } from './tokens';
+import { HomeView } from './home-view';
+import { whatHappened } from '../office/roles-notice';
+import { officeTokens } from '../office/tokens';
 
 const pet = (id: string, name: string, roleId: string): Pet => ({
   id,
@@ -46,13 +46,13 @@ const NOTICE: RolesUpgradeNotice = {
   ],
 };
 
-async function renderOffice(bridge: FakeHostBridge, onReviewCrew?: () => void) {
+async function renderOffice(bridge: FakeHostBridge) {
   render(
     <HostBridgeProvider bridge={bridge}>
-      <OfficeView {...(onReviewCrew !== undefined ? { onReviewCrew } : {})} />
+      <HomeView />
     </HostBridgeProvider>,
   );
-  await screen.findByText('PARTY · 3');
+  await screen.findByText('AGENTS · 3');
 }
 
 const withNotice = () => createFakeHostBridge({ pets: CREW, roles: ROLES, rolesNotice: NOTICE });
@@ -71,14 +71,14 @@ describe('whatHappened', () => {
   });
 });
 
-describe('the roles notice in the office', () => {
+describe('the roles notice in Home', () => {
   it('stays away on a fresh install', async () => {
     await renderOffice(createFakeHostBridge({ pets: CREW, roles: ROLES }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('opens over the office with a row per upgraded pet', async () => {
-    await renderOffice(withNotice(), () => {});
+    await renderOffice(withNotice());
     const dialog = await screen.findByRole('dialog', { name: 'Your crew has roles now' });
 
     expect(dialog).toHaveTextContent(/Every pet now has one job/);
@@ -144,22 +144,15 @@ describe('the roles notice in the office', () => {
     expect(bridge.dismissedNotices).toBe(1);
   });
 
-  it('Review my crew dismisses it and hands over to the host', async () => {
+  it('Review my crew dismisses it and opens the first agent’s controls in Home', async () => {
     const bridge = withNotice();
-    const review = vi.fn();
-    await renderOffice(bridge, review);
+    await renderOffice(bridge);
     const dialog = await screen.findByRole('dialog');
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Review my crew' }));
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(review).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('tab', { name: 'Scout' })).toHaveAttribute('aria-selected', 'true');
     expect(bridge.dismissedNotices).toBe(1);
-  });
-
-  it('offers no Review button when the host has nowhere to send the user', async () => {
-    await renderOffice(withNotice());
-    const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).queryByRole('button', { name: 'Review my crew' })).toBeNull();
   });
 });
