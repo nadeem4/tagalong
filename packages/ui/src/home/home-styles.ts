@@ -11,6 +11,7 @@ export const HOME_CSS = `
   background: ${t.color.page}; color: ${t.color.text}; font-family: ${t.font.ui};
 }
 .home-body { flex: 1; min-height: 0; display: flex; }
+.home-add { width: 100%; margin-top: ${t.space.lg}px; }
 .home-bar {
   height: ${t.size.headerHeight}px; flex: none; display: flex; align-items: center;
   gap: ${t.space.xl}px; padding: 0 ${t.space.xxl}px; border-bottom: 1px solid ${t.color.line};

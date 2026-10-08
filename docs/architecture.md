@@ -728,7 +728,11 @@ the window makes no network request.
   asks once more). Picking an agent in the list opens this tab. Saving builds the pet and calls
   `AgentHost.savePet`, which on the desktop is `tagalongHost.savePet`, so it is still `pets.upsert`;
   the engine refuses an unknown role and stamps a changed role's version. A host without an
-  `AgentHost` shows the agents read-only. Adding a pet is not here: hiring is a later flow.
+  `AgentHost` shows the agents read-only. **Add agent**, under the agent list, creates a Generalist (`home/new-agent.ts`: "New agent",
+  numbered when taken, the library's role version, the base character recoloured slate) on the first
+  provider with a stored key, else `settings.providerId`, with that role's recommended model (or the
+  provider's first listed model), saves it through `pets.upsert` and opens its controls. A hiring flow
+  is a later phase.
 - **Meetings** keeps the empty state (`MeetingsPanel`) where meetings will appear. Meetings do not
   exist in the engine yet, and nothing here invents them.
 

@@ -139,6 +139,7 @@ Right-click the tray icon and choose **Open Home**. Home is where the whole crew
 - **Activity** on the right lists what the crew did, newest first: every answer (with the model and
   how many model calls it took), every question one agent asked another, every handoff and every
   roundtable. Click one to read it.
+- **Add agent** under the list creates a new Generalist and opens its controls.
 - **Pick an agent** in the list to change it: its role (Generalist, Backend engineer, Frontend
   engineer, Writer or Researcher), its provider and model (**Recommended** for its role, or your own
   choice), its tools, its private notes, its look, and whether it is the pet on your desktop. The card

@@ -21,6 +21,10 @@ const agentHost: AgentHost = {
     return {
       providers: view.providers.map(({ id, label }) => ({ id, label })),
       desktopPetId: view.settings.defaultPetId,
+      // A new agent starts where a key is already stored, else on the default provider.
+      newAgentProviderId:
+        view.providers.find((choice) => choice.needsKey && choice.hasKey)?.id ??
+        view.settings.providerId,
     };
   },
   listModels: (providerId) => window.tagalongHost.listModels(providerId),

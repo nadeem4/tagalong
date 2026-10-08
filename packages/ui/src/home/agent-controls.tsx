@@ -16,6 +16,8 @@ export interface AgentHost {
   setup(): Promise<{
     providers: readonly { id: string; label: string }[];
     desktopPetId: string;
+    /** The provider a new agent starts on: the first with a key, or the default one. */
+    newAgentProviderId: string;
   }>;
   listModels(providerId: string): Promise<{ models: string[]; source: 'live' | 'fallback' }>;
   savePet(pet: Pet): Promise<Pet>;

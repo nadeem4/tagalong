@@ -328,7 +328,7 @@ Calm and solid; gold only where the action is primary.
 
 ### Navigation: Agent List
 
-- **Style:** a `nav` ("Agents") on Sidebar Navy, 280px wide, headed by a pixel panel heading with the crew count ("AGENTS · 3"). Picking a row selects that agent in the scene and opens its controls in the right panel.
+- **Style:** a `nav` ("Agents") on Sidebar Navy, 280px wide, headed by a pixel panel heading with the crew count ("AGENTS · 3"). Picking a row selects that agent in the scene and opens its controls in the right panel. A full-width **Add agent** button (toggle style) sits under the rows.
 - **Row:** a real button (`aria-pressed`) with a 2px transparent border, 10px radius and 8px padding: avatar tile (Avatar Tile, 4px padding, sprite at 3x), then pet name (pixel 17px), job class (pixel 11px in its class ink) and status line.
 - **Hover:** Active Row Navy fill. **Selected:** Active Row Navy fill and a gold border.
 

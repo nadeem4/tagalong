@@ -45,7 +45,8 @@ function fakeHost(): AgentHost & {
     saved: [] as Pet[],
     deleted: [] as string[],
     desktop: [] as string[],
-    setup: () => Promise.resolve({ providers: PROVIDERS, desktopPetId: 'ink' }),
+    setup: () =>
+      Promise.resolve({ providers: PROVIDERS, desktopPetId: 'ink', newAgentProviderId: 'fake' }),
     listModels: () => Promise.resolve({ models: ['fake-model'], source: 'fallback' as const }),
     savePet: (pet: Pet) => {
       host.saved.push(pet);

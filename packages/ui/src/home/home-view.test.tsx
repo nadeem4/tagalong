@@ -49,12 +49,19 @@ const ROLES: Role[] = [
 ];
 const T1 = '10000000-0000-4000-8000-000000000001';
 
-function fakeAgentHost(): AgentHost {
+function fakeAgentHost(saves: Pet[] = []): AgentHost {
   return {
     setup: () =>
-      Promise.resolve({ providers: [{ id: 'fake', label: 'Fake' }], desktopPetId: 'scout' }),
-    listModels: () => Promise.resolve({ models: [], source: 'fallback' }),
-    savePet: (saved) => Promise.resolve(saved),
+      Promise.resolve({
+        providers: [{ id: 'fake', label: 'Fake' }],
+        desktopPetId: 'scout',
+        newAgentProviderId: 'fake',
+      }),
+    listModels: () => Promise.resolve({ models: ['fake-model'], source: 'fallback' }),
+    savePet: (saved) => {
+      saves.push(saved);
+      return Promise.resolve(saved);
+    },
     deletePet: () => Promise.resolve(true),
     setDesktopPet: () => Promise.resolve(),
   };
@@ -223,6 +230,29 @@ describe('Home’s side panel', () => {
     expect(tab('Scout')).toHaveFocus();
     fireEvent.keyDown(tab('Scout'), { key: 'ArrowLeft' });
     expect(tab('Activity')).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('adds a new generalist agent and opens its controls', async () => {
+    const saves: Pet[] = [];
+    await renderHome(undefined, { agentHost: fakeAgentHost(saves) });
+    fireEvent.click(await screen.findByRole('button', { name: 'Add agent' }));
+    const agents = screen.getByRole('navigation', { name: 'Agents' });
+    expect(await within(agents).findByText('New agent')).toBeInTheDocument();
+    expect(saves[0]).toMatchObject({
+      id: 'new-agent',
+      roleId: 'generalist',
+      providerId: 'fake',
+      model: 'fake-model',
+    });
+    expect(tab('New agent')).toHaveAttribute('aria-selected', 'true');
+    const panel = screen.getByRole('tabpanel', { name: 'New agent' });
+    expect(await within(panel).findByRole('radio', { name: 'Generalist' })).toBeChecked();
+    expect(agents).toHaveTextContent('AGENTS · 5');
+  });
+
+  it('offers no Add agent where agents cannot be changed', async () => {
+    await renderHome();
+    expect(screen.queryByRole('button', { name: 'Add agent' })).toBeNull();
   });
 
   it('renames an agent in the list once its controls are saved', async () => {

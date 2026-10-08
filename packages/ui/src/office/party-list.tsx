@@ -10,10 +10,12 @@ export interface PartyListProps {
   onSelect: (petId: string) => void;
   /** Shown under the heading instead of rows: loading, or a reason the crew is missing. */
   notice?: ReactNode;
+  /** Under the rows: Home's Add agent button. */
+  footer?: ReactNode;
 }
 
 /** Home's agent list down the left side. Each row is a real button; the selected one is ringed gold. */
-export function PartyList({ members, selectedId, onSelect, notice }: PartyListProps) {
+export function PartyList({ members, selectedId, onSelect, notice, footer }: PartyListProps) {
   return (
     <nav
       aria-label="Agents"
@@ -99,6 +101,7 @@ export function PartyList({ members, selectedId, onSelect, notice }: PartyListPr
           </li>
         ))}
       </ul>
+      {footer}
     </nav>
   );
 }

@@ -664,5 +664,19 @@ test('Home opens with the real crew, each agent’s controls, and the activity v
   await home.waitForTimeout(200);
   await home.screenshot({ path: join(appDir, 'test-results', 'home.png') });
 
+  // Add agent creates a generalist through the real pets.upsert and opens its controls.
+  await agents.getByRole('button', { name: 'Add agent' }).click();
+  await expect(agents.getByRole('button', { name: /New agent/ })).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(home.getByRole('tab', { name: 'New agent' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  const added = home.getByRole('tabpanel', { name: 'New agent' });
+  await expect(added.getByRole('radio', { name: 'Generalist' })).toBeChecked();
+  const crew = await panel.evaluate(() => window.tagalong.listPets());
+  expect(crew.find((pet) => pet.name === 'New agent')).toMatchObject({ roleId: 'generalist' });
+
   await home.close();
 });

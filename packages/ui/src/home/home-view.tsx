@@ -19,6 +19,7 @@ import { ActivityView } from './activity-view';
 import { AgentControls } from './agent-controls';
 import type { AgentHost } from './agent-controls';
 import { HOME_CSS } from './home-styles';
+import { newAgent } from './new-agent';
 import { placeAgents } from './theme';
 import type { Theme } from './theme';
 import { DEFAULT_THEME } from './themes';
@@ -139,6 +140,29 @@ export function HomeView({ theme = DEFAULT_THEME, agentHost }: HomeViewProps = {
     setTab('agent');
   };
 
+  /** A new generalist on the host's default brain, saved, then picked so its controls open. */
+  const addAgent = async (): Promise<void> => {
+    if (agentHost === undefined || setup === null) return;
+    const providerId = setup.newAgentProviderId;
+    const recommended = await bridge.recommendModel('generalist', providerId).catch(() => ({}));
+    const model =
+      'model' in recommended && recommended.model !== undefined
+        ? recommended.model
+        : (await agentHost.listModels(providerId)).models[0];
+    if (model === undefined) throw new Error(`no model to start a new agent on ${providerId}`);
+    const saved = await agentHost.savePet(
+      newAgent({
+        pets: pets ?? [],
+        roles,
+        providerId,
+        model,
+        visionModel: 'visionModel' in recommended ? recommended.visionModel : undefined,
+      }),
+    );
+    setPets((current) => [...(current ?? []), saved]);
+    pickAgent(saved.id);
+  };
+
   const notice = failed ? (
     <p role="alert" style={{ margin: t.space.sm, fontSize: t.fontSize.body }}>
       Tagalong could not reach the crew. Check that the app finished starting, then reopen Home.
@@ -162,6 +186,23 @@ export function HomeView({ theme = DEFAULT_THEME, agentHost }: HomeViewProps = {
           selectedId={selectedId}
           onSelect={pickAgent}
           {...(notice !== undefined ? { notice } : {})}
+          {...(agentHost !== undefined && setup !== null && pets !== null
+            ? {
+                footer: (
+                  <button
+                    type="button"
+                    className="office-toggle home-add"
+                    onClick={() =>
+                      void addAgent().catch((error: unknown) =>
+                        console.error('could not add an agent', error),
+                      )
+                    }
+                  >
+                    Add agent
+                  </button>
+                ),
+              }
+            : {})}
         />
         <Scene members={members} selectedId={selectedId} placements={placements} />
         <SidePanel
