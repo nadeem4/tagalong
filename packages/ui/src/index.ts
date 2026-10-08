@@ -7,8 +7,11 @@
 export { HostBridgeProvider, useHostBridge } from './host-bridge';
 export type { AskInput, HostBridge, HostBridgeProviderProps, TurnEvent } from './host-bridge';
 
-export { PetAvatar } from './pet-avatar';
-export type { PetAvatarProps, PetState } from './pet-avatar';
+/** The one pet docked on the desktop, with its state marks and helper badges. */
+export { DesktopCompanion, COMPANION_SIZE } from './companion/desktop-companion';
+export type { DesktopCompanionProps } from './companion/desktop-companion';
+export { SightPermission } from './sight-permission';
+export type { SightPermissionProps } from './sight-permission';
 
 export { MessageList } from './message-list';
 export type { ChatMessage, MessageListProps } from './message-list';
