@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron';
 import type {
+  ActivityListResult,
   ContextSnapshot,
   PerceptionTarget,
   Pet,
@@ -39,6 +40,9 @@ const bridge: HostBridge = {
   rolesNotice: () => ipcRenderer.invoke(IPC.rolesNotice) as Promise<RolesUpgradeNotice | null>,
   dismissRolesNotice: () => ipcRenderer.invoke(IPC.dismissRolesNotice) as Promise<void>,
   stopWatch: (watchId: string) => ipcRenderer.invoke(IPC.stopWatch, watchId) as Promise<void>,
+  // Home.
+  listActivity: (params: { before?: string; limit?: number } = {}) =>
+    ipcRenderer.invoke(IPC.listActivity, params) as Promise<ActivityListResult>,
   onTurnEvent: (handler: (event: TurnEvent) => void) => {
     const listener = (_event: IpcRendererEvent, turnEvent: TurnEvent): void => handler(turnEvent);
     ipcRenderer.on(IPC.turnEvent, listener);

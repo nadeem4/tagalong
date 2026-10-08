@@ -11,6 +11,8 @@ export const IPC = {
   recommendModel: 'tagalong:roles:recommend-model',
   rolesNotice: 'tagalong:notices:roles-upgrade',
   dismissRolesNotice: 'tagalong:notices:dismiss-roles-upgrade',
+  // Home.
+  listActivity: 'tagalong:activity:list',
   turnEvent: 'tagalong:turn-event',
   getContext: 'tagalong:context:get',
   capture: 'tagalong:capture',
@@ -171,7 +173,7 @@ export interface TagalongHostApi {
   openSettings(): Promise<void>;
   /** Phase 7. Opens the setup wizard, from Settings or the tray. */
   openOnboarding(): Promise<void>;
-  /** Opens the Crew Office, or focuses it. The tray is the shipped way in. */
+  /** Opens Home, or focuses it. The tray's Open Home is the shipped way in. */
   openOffice(): Promise<void>;
   /**
    * Phase 7. Marks the wizard done (finished or skipped) and closes it. `openPanel` brings

@@ -1,7 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { HostBridgeProvider, OfficeView } from '@tagalong/ui';
-// Bundled, not fetched: the office's two typefaces ship inside the app, Latin subset only.
+import { HomeView, HostBridgeProvider } from '@tagalong/ui';
+import type { AgentHost } from '@tagalong/ui';
+// Bundled, not fetched: Home's two typefaces ship inside the app, Latin subset only.
 import '@fontsource/onest/latin-400.css';
 import '@fontsource/onest/latin-600.css';
 import '@fontsource/pixelify-sans/latin-400.css';
@@ -11,16 +12,36 @@ import './office.css';
 import '../../shared/ipc';
 
 /**
- * The Crew Office window. Everything it draws comes from OfficeView in @tagalong/ui; this
- * entry only hands it the preload bridge, which already receives every turn event, and
- * sends Review my crew on the roles notice to the Settings window.
+ * How Home changes an agent on the desktop: the same host calls Settings used, so saving is
+ * still `pets.upsert` in main, and the desktop pet is `settings.defaultPetId`.
+ */
+const agentHost: AgentHost = {
+  setup: async () => {
+    const view = await window.tagalongHost.getHostView();
+    return {
+      providers: view.providers.map(({ id, label }) => ({ id, label })),
+      desktopPetId: view.settings.defaultPetId,
+    };
+  },
+  listModels: (providerId) => window.tagalongHost.listModels(providerId),
+  savePet: (pet) => window.tagalongHost.savePet(pet),
+  deletePet: (petId) => window.tagalongHost.deletePet(petId),
+  setDesktopPet: async (petId) => {
+    await window.tagalongHost.saveSettings({ defaultPetId: petId });
+  },
+};
+
+/**
+ * The Home window (the page keeps its old `office` name). Everything it draws comes from
+ * HomeView in @tagalong/ui; this entry hands it the preload bridge, which already receives
+ * every turn event, and the host calls that change an agent.
  */
 const container = document.getElementById('root');
 if (container !== null) {
   createRoot(container).render(
     <StrictMode>
       <HostBridgeProvider bridge={window.tagalong}>
-        <OfficeView onReviewCrew={() => void window.tagalongHost.openSettings()} />
+        <HomeView agentHost={agentHost} />
       </HostBridgeProvider>
     </StrictMode>,
   );

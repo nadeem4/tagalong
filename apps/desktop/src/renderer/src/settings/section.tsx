@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 
 /** The sections in the order the window shows them; the nav links to each by id. */
 export const SECTIONS = [
-  { id: 'pets', title: 'Pets' },
   { id: 'keys', title: 'Keys and services' },
   { id: 'summaries', title: 'Summaries' },
   { id: 'hotkeys', title: 'Hotkeys' },

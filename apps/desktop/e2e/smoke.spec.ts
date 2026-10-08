@@ -482,30 +482,45 @@ test("the wizard's crew step shows each role and prefills its recommended model"
   await wizard.getByRole('button', { name: 'Skip setup' }).click();
 });
 
-test('Settings opens on the crew, with the selected pet editor and its sections', async () => {
+test('Settings keeps the app-level sections and sends agents to Home', async () => {
   const panel = await windowFor('panel');
   await panel.evaluate(() => window.tagalongHost.openSettings());
   const settings = await windowFor('settings');
 
-  const nav = settings.getByRole('navigation', { name: 'Settings' });
-  const pets = await panel.evaluate(() => window.tagalong.listPets());
-  expect(pets.length).toBeGreaterThan(0);
-  const [first] = pets;
-  if (first === undefined) throw new Error('no pet to edit');
-  for (const pet of pets.slice(0, 8)) {
-    await expect(nav.getByRole('button', { name: new RegExp(pet.name) })).toBeVisible({
+  for (const section of ['Keys and services', 'Summaries', 'Hotkeys', 'Awareness']) {
+    await expect(settings.getByRole('region', { name: section })).toBeVisible({
       timeout: 15_000,
     });
   }
-  await expect(nav.getByRole('button', { name: new RegExp(first.name) })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  const editor = settings.getByTestId(`pet-editor-${first.id}`);
-  await expect(editor).toBeVisible();
+  // Agents live in Home now: no Pets section, no crew list, one way across.
+  await expect(settings.getByRole('region', { name: 'Pets' })).toHaveCount(0);
+  const nav = settings.getByRole('navigation', { name: 'Settings' });
+  await expect(nav.getByRole('link', { name: 'Pets' })).toHaveCount(0);
+  await expect(nav.getByRole('button', { name: 'Open Home' })).toBeVisible();
 
-  // The role picker offers the engine's whole library, by name, with the pet's own role
-  // chosen, and the crew nav and the directory card name that role, never its id.
+  // A screenshot for design review, in the gitignored test-results folder.
+  await settings.screenshot({ path: join(appDir, 'test-results', 'settings.png') });
+  await settings.close();
+});
+
+test('Home opens with the real crew, each agent’s controls, and the activity view', async () => {
+  const panel = await windowFor('panel');
+  // The tray's Open Home item calls the same main-process function as this host call;
+  // a tray menu cannot be clicked from Playwright.
+  await panel.evaluate(() => window.tagalongHost.openOffice());
+  const home = await windowFor('office');
+  await expect(home).toHaveTitle('Home');
+
+  const agents = home.getByRole('navigation', { name: 'Agents' });
+  const pets = await panel.evaluate(() => window.tagalong.listPets());
+  expect(pets.length).toBeGreaterThan(0);
+  for (const pet of pets.slice(0, 8)) {
+    await expect(agents.getByRole('button', { name: new RegExp(pet.name) })).toBeVisible({
+      timeout: 15_000,
+    });
+  }
+
+  // Each job label is the pet's role, by name, from the engine's own role library.
   const roles = await panel.evaluate(() => window.tagalong.listRoles());
   expect(roles.map((role) => role.id).sort()).toEqual([
     'backend-engineer',
@@ -514,50 +529,10 @@ test('Settings opens on the crew, with the selected pet editor and its sections'
     'researcher',
     'writer',
   ]);
-  await expect(editor.getByRole('radio')).toHaveCount(5);
-  for (const role of roles) {
-    await expect(editor.getByRole('radio', { name: role.name })).toHaveCount(1);
-  }
-  const own = roles.find((role) => role.id === first.roleId);
-  if (own === undefined) throw new Error(`${first.name}'s role is not in the library`);
-  await expect(editor.getByRole('radio', { name: own.name })).toBeChecked();
-  await expect(nav.getByRole('button', { name: new RegExp(first.name) })).toContainText(own.name);
-  await expect(
-    editor.getByRole('region', { name: `How teammates see ${first.name}` }),
-  ).toContainText(own.summary);
-  await expect(editor.getByRole('switch')).toHaveCount(own.tools.length);
-  for (const section of ['Pets', 'Keys and services', 'Hotkeys', 'Awareness']) {
-    await expect(settings.getByRole('region', { name: section })).toBeVisible();
-  }
-
-  // A screenshot for design review, in the gitignored test-results folder.
-  await settings.screenshot({ path: join(appDir, 'test-results', 'settings.png') });
-  await settings.close();
-});
-
-test('the Crew Office opens with the real crew in its party list', async () => {
-  const panel = await windowFor('panel');
-  // The tray's Open office item calls the same main-process function as this host call;
-  // a tray menu cannot be clicked from Playwright.
-  await panel.evaluate(() => window.tagalongHost.openOffice());
-  const office = await windowFor('office');
-
-  const party = office.getByRole('navigation', { name: 'Party' });
-  const pets = await panel.evaluate(() => window.tagalong.listPets());
-  expect(pets.length).toBeGreaterThan(0);
-  for (const pet of pets.slice(0, 8)) {
-    await expect(party.getByRole('button', { name: new RegExp(pet.name) })).toBeVisible({
-      timeout: 15_000,
-    });
-  }
-
-  // Each job label is the pet's role, by name, from the engine's own role library.
-  const roles = await panel.evaluate(() => window.tagalong.listRoles());
-  expect(roles.map((role) => role.id)).toContain('generalist');
   for (const pet of pets.slice(0, 8)) {
     const role = roles.find((r) => r.id === pet.roleId);
     const label = role === undefined ? 'GENERALIST' : role.name.toUpperCase();
-    await expect(party.getByRole('button', { name: new RegExp(pet.name) })).toContainText(label);
+    await expect(agents.getByRole('button', { name: new RegExp(pet.name) })).toContainText(label);
   }
   // The model prefill crosses the same bridge: a tiered provider recommends, fake does not.
   const recommended = await panel.evaluate(() =>
@@ -568,21 +543,46 @@ test('the Crew Office opens with the real crew in its party list', async () => {
   );
   expect(recommended[0].model).toBeTruthy();
   expect(recommended[1]).toEqual({});
-  await expect(office.getByRole('complementary', { name: 'Meetings' })).toContainText(
+
+  // The right panel opens on the activity view; meetings keep their empty state.
+  await expect(home.getByRole('tab', { name: 'Activity' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(home.getByRole('tabpanel', { name: 'Activity' })).toBeVisible();
+  await home.getByRole('tab', { name: 'Meetings' }).click();
+  await expect(home.getByRole('complementary', { name: 'Meetings' })).toContainText(
     'No meetings yet',
   );
 
-  // The bundled typefaces must load under the page's CSP, or the office falls back to
-  // system fonts without saying so.
-  const fontsLoaded = await office.evaluate(async () => ({
+  // Picking an agent shows its controls: the whole role library, its own role chosen, its
+  // tool switches, the directory card and the desktop pet control.
+  const worker = pets.find((pet) => pet.id === 'scout') ?? pets[0];
+  if (worker === undefined) throw new Error('no pet to put to work');
+  await agents.getByRole('button', { name: new RegExp(worker.name) }).click();
+  const controls = home.getByRole('tabpanel', { name: worker.name });
+  await expect(controls.getByRole('radio')).toHaveCount(5, { timeout: 15_000 });
+  const own = roles.find((role) => role.id === worker.roleId);
+  if (own === undefined) throw new Error(`${worker.name}'s role is not in the library`);
+  await expect(controls.getByRole('radio', { name: own.name })).toBeChecked();
+  await expect(controls.getByRole('switch')).toHaveCount(own.tools.length);
+  await expect(
+    controls.getByRole('region', { name: `How teammates see ${worker.name}` }),
+  ).toContainText(own.summary);
+  await expect(controls.getByRole('group', { name: 'Desktop pet' })).toBeVisible();
+  await expect(controls.getByRole('button', { name: `Save ${worker.name}` })).toBeVisible();
+
+  // The bundled typefaces must load under the page's CSP, or Home falls back to system
+  // fonts without saying so.
+  const fontsLoaded = await home.evaluate(async () => ({
     onest: (await document.fonts.load("14px 'Onest'")).length,
     pixel: (await document.fonts.load("17px 'Pixelify Sans'")).length,
   }));
   expect(fontsLoaded.onest).toBeGreaterThan(0);
   expect(fontsLoaded.pixel).toBeGreaterThan(0);
 
-  // The window opens with a 1280x800 page whenever its display has room for that plus the
-  // frame. A smaller screen is allowed to clamp it; the floor scrolls there instead.
+  // The window opens with a 1440x800 page whenever its display has room for that plus the
+  // frame. A smaller screen is allowed to clamp it; the scene scrolls there instead.
   const opened = await app.evaluate(({ BrowserWindow, screen }) => {
     const window = BrowserWindow.getAllWindows().find((w) =>
       w.webContents.getURL().includes('office.html'),
@@ -594,14 +594,14 @@ test('the Crew Office opens with the real crew in its party list', async () => {
     return {
       width,
       height,
-      fits: area.width >= 1280 + frameWidth - width && area.height >= 800 + frameHeight - height,
+      fits: area.width >= 1440 + frameWidth - width && area.height >= 800 + frameHeight - height,
     };
   });
-  if (opened === null) throw new Error('the office window is not open');
-  if (opened.fits) expect([opened.width, opened.height]).toEqual([1280, 800]);
+  if (opened === null) throw new Error('the Home window is not open');
+  if (opened.fits) expect([opened.width, opened.height]).toEqual([1440, 800]);
   else expect(opened.height).toBeGreaterThan(0);
 
-  // The review screenshot below is taken at the default size: when this display is too
+  // The review screenshots below are taken at the default size: when this display is too
   // small for it, the window moves to the tallest display first.
   await app.evaluate(({ BrowserWindow, screen }) => {
     const window = BrowserWindow.getAllWindows().find((w) =>
@@ -612,36 +612,35 @@ test('the Crew Office opens with the real crew in its party list', async () => {
     )[0];
     if (window === undefined || tallest === undefined) return;
     window.setPosition(tallest.workArea.x, tallest.workArea.y);
-    window.setContentSize(1280, 800);
+    window.setContentSize(1440, 800);
   });
-  await office.waitForTimeout(300);
+  await home.getByRole('tab', { name: 'Activity' }).click();
+  await home.waitForTimeout(300);
 
   // The working state, proven on the real wire. The suite's fake pet is scripted to call
   // list_windows before it answers (TAGALONG_FAKE_TOOL), so the turn stays in flight while
-  // the real host enumerates this machine's windows. The office logs every turn event so
-  // the test can prove the capture happened before the turn ended.
-  const worker = pets.find((pet) => pet.id === 'scout') ?? pets[0];
-  if (worker === undefined) throw new Error('no pet to put to work');
-  await office.evaluate(() => {
+  // the real host enumerates this machine's windows. Home logs every turn event so the
+  // test can prove the capture happened before the turn ended.
+  await home.evaluate(() => {
     const log: { type: string; at: number }[] = [];
-    (window as unknown as { officeTurns: typeof log }).officeTurns = log;
+    (window as unknown as { homeTurns: typeof log }).homeTurns = log;
     window.tagalong.onTurnEvent((event) => log.push({ type: event.type, at: performance.now() }));
   });
-  await office.evaluate(
+  await home.evaluate(
     (petId) => window.tagalong.ask({ petId, text: 'what windows do I have open?' }),
     worker.id,
   );
 
-  const row = party.getByRole('button', { name: new RegExp(worker.name) });
+  const row = agents.getByRole('button', { name: new RegExp(worker.name) });
   await expect(row).toContainText('Working', { timeout: 10_000 });
-  await expect(office.getByTestId(`monitor-${worker.id}`)).toHaveAttribute('data-lit', 'true');
+  await expect(home.getByTestId(`monitor-${worker.id}`)).toHaveAttribute('data-lit', 'true');
 
   // A screenshot for design review, in the gitignored test-results folder.
-  await office.screenshot({ path: join(appDir, 'test-results', 'office.png') });
-  const shotAt = await office.evaluate(() => performance.now());
-  const endedBeforeShot = await office.evaluate(
+  await home.screenshot({ path: join(appDir, 'test-results', 'office.png') });
+  const shotAt = await home.evaluate(() => performance.now());
+  const endedBeforeShot = await home.evaluate(
     (at) =>
-      (window as unknown as { officeTurns: { type: string; at: number }[] }).officeTurns.some(
+      (window as unknown as { homeTurns: { type: string; at: number }[] }).homeTurns.some(
         (event) =>
           (event.type === 'turn.completed' || event.type === 'turn.error') && event.at < at,
       ),
@@ -651,7 +650,19 @@ test('the Crew Office opens with the real crew in its party list', async () => {
 
   // The turn ends and the pet goes back to its desk, monitor dark.
   await expect(row).toContainText('At desk', { timeout: 30_000 });
-  await expect(office.getByTestId(`monitor-${worker.id}`)).toHaveAttribute('data-lit', 'false');
+  await expect(home.getByTestId(`monitor-${worker.id}`)).toHaveAttribute('data-lit', 'false');
 
-  await office.close();
+  // The activity view recorded the turn, from the engine's own record, and opens its thread.
+  const activity = home.getByRole('list', { name: 'Activity' });
+  const entry = activity.getByRole('button', { name: new RegExp(`${worker.name} answered`) });
+  await expect(entry.first()).toBeVisible({ timeout: 10_000 });
+  await expect(entry.first()).toContainText('call');
+  await entry.first().click();
+  await expect(home.getByRole('region', { name: `${worker.name} answered` }).first()).toContainText(
+    'what windows do I have open?',
+  );
+  await home.waitForTimeout(200);
+  await home.screenshot({ path: join(appDir, 'test-results', 'home.png') });
+
+  await home.close();
 });

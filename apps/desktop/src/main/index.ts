@@ -388,7 +388,7 @@ function openSettings(): void {
   desktop.settingsWindow = window;
 }
 
-/** Opens the Crew Office, or brings the open one forward. */
+/** Opens Home, or brings the open one forward. */
 function openOffice(): void {
   if (desktop === null) return;
   if (desktop.officeWindow !== null && !desktop.officeWindow.isDestroyed()) {
@@ -570,6 +570,14 @@ function registerIpc(): void {
     await engine().client.call('notices.dismiss', { notice: 'rolesUpgrade' });
   });
 
+  // Home's activity view.
+  ipcMain.handle(IPC.listActivity, async (_event, params: { before?: string; limit?: number }) =>
+    engine().client.call('activity.list', {
+      limit: params.limit ?? 30,
+      ...(params.before === undefined ? {} : { before: params.before }),
+    }),
+  );
+
   ipcMain.handle(IPC.getContext, () => required().pendingSnapshot);
   // A window that opened after the last toggle has missed the event, and an avatar that
   // shows sight running while it is paused is the one lie this feature cannot afford.
@@ -626,6 +634,8 @@ function registerIpc(): void {
     current.settings = saved;
     if (patch.hotkeys !== undefined) applyHotkeys(saved);
     if (patch.hiddenPets !== undefined) refreshStrip();
+    // Home's Desktop pet control: the desktop redraws on the pet it now shows.
+    if (patch.defaultPetId !== undefined) refreshStrip();
     // Rolling memory starts, stops or trims the moment the user saves, not after a restart.
     if (patch.rollingMemory !== undefined) current.rolling.configure(saved.rollingMemory);
     return saved;

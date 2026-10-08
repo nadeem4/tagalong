@@ -14,7 +14,7 @@ const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
  *
  * Unit tests cover the migration, the RPC and the dialog apart. Only here does an install
  * from before roles go through the real migrations in the real engine, and the desktop open
- * the office on its own at launch to show what happened.
+ * Home on its own at launch to show what happened.
  */
 let dataDir: string;
 let app: ElectronApplication | undefined;
@@ -100,7 +100,7 @@ test.afterAll(async () => {
   rmSync(dataDir, { recursive: true, force: true });
 });
 
-test('an upgraded install opens the office on the roles notice, once', async () => {
+test('an upgraded install opens Home on the roles notice, once', async () => {
   app = await launch();
   const office = await windowFor(app, 'office');
 
@@ -134,7 +134,7 @@ test('a dismissed notice stays dismissed after a restart', async () => {
   app = await launch();
   const avatar = await windowFor(app, 'avatar');
   await expect.poll(() => avatar.evaluate(() => window.tagalong.rolesNotice())).toBeNull();
-  // No office opens on its own when there is nothing to tell.
+  // Home does not open on its own when there is nothing to tell.
   await avatar.waitForTimeout(1_000);
   expect(app.windows().some((page) => page.url().includes('office.html'))).toBe(false);
 });

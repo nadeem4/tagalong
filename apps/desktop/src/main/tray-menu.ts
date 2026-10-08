@@ -17,7 +17,7 @@ export function trayMenuTemplate(
 ): MenuItemConstructorOptions[] {
   return [
     { label: 'Show or hide pets', click: () => actions.togglePets() },
-    { label: 'Open office', click: () => actions.openOffice() },
+    { label: 'Open Home', click: () => actions.openOffice() },
     {
       label: 'Pause sight',
       type: 'checkbox',
