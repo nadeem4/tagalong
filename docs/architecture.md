@@ -60,7 +60,7 @@ The diagram is the finished shape. What exists after Phase 1: the server (`serve
 `server/pairing.ts`), the runner (`conversation/runner.ts`), the prompt assembler
 (`conversation/prompt-assembler.ts`), memory as plain SQLite tables (`memory/db.ts`, `memory/store.ts` —
 FTS5 arrived with Phase 4 recall), the pet registry (`pets/registry.ts`), settings and the SecretStore
-interface (`settings/settings.ts`), and the brain providers (`providers/`). `Engine.boot` in `engine.ts`
+interface (`settings/settings.ts`), the brain providers (`providers/`) and the expert connectors (`experts/`). `Engine.boot` in `engine.ts`
 wires all of it together and is the only thing a host starts. The diagram's PetBus is not one class:
 Phase 4 built it as `crew/` (handoff, consult, roundtable) on top of the runner — see "The crew" below.
 `McpManager` and `ApprovalPolicy` (Phase 5), and the STT and TTS providers (Phase 3) do not exist yet. The Chrome extension
@@ -312,6 +312,39 @@ format:
 
 The unit tests feed the real SDK a fake `fetch` that answers with canned server-sent events, so the
 parsing path is the production one and nothing reaches the network.
+
+## Experts and connectors
+
+The companion on screen never does the work. It writes a `Brief` and hands it to an expert's
+`Connector` (`experts/connector.ts`), which carries it to the real tool and brings back a
+`ConnectorResult`. `send(brief, onProgress, signal)` never throws: a failure, a cancel or a missing
+tool all come back as `{ ok: false, error }`. `renderBrief` turns a brief into plain text: the ask
+first, then the app and window, the selection, the files that matter, and what a good answer is.
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000'}}}%%
+flowchart LR
+  C[Companion] -- Brief --> K[Connector]
+  K -- stdin --> P["claude -p (expert folder)"]
+  P -- stream-json --> K
+  K -- progress steps --> C
+  K -- ConnectorResult --> C
+```
+
+Two connectors exist so far:
+
+- **`ClaudeCodeConnector`** (`experts/claude-code.ts`) runs `claude -p --output-format stream-json
+--verbose` in the expert's folder and writes the brief to stdin, so a long brief needs no quoting
+  and hits no command-line limit. Read-only is the default: `--permission-mode dontAsk` with only
+  `Read`, `Glob` and `Grep` allowed, so anything else is refused without a prompt. An expert that may
+  edit runs with `acceptEdits` and adds `Edit` and `Write`. Tool calls become progress steps
+  ("Reading src/main.ts"), edited paths become `changedFiles`, and the `result` event is the answer.
+  A run that ends without a result reports what claude printed on stderr. Aborting kills the process.
+- **`FakeConnector`** (`experts/fake.ts`) replays scripted steps and an answer or an error. Tests use
+  it, and the claude tests inject a fake `spawn`, so no test starts a real claude.
+
+Expert storage, the hand-off RPC, the brief builder and the Home screens come next; see the
+"Experts and connectors" design in Notion.
 
 ## The desktop host's shape
 
