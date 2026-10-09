@@ -556,6 +556,11 @@ test('Home opens with the real crew, each agent’s controls, and the activity v
     'No meetings yet',
   );
 
+  // The Experts tab lists the tools the companion hands work to; a fresh install has none.
+  await home.getByRole('tab', { name: 'Experts' }).click();
+  await expect(home.getByText(/No experts yet/)).toBeVisible();
+  await expect(home.getByRole('button', { name: 'Add expert' })).toBeVisible();
+
   // Picking an agent shows its controls: the whole role library, its own role chosen, its
   // tool switches, the directory card and the desktop pet control.
   const worker = pets.find((pet) => pet.id === 'scout') ?? pets[0];

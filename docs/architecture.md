@@ -715,19 +715,31 @@ the window and the scene scrolls. The renderer entry wraps `HomeView` from `@tag
 preload's `HostBridge` and hands it an `AgentHost` built from the desktop's host calls; everything it
 draws is in `packages/ui/src/home` and `packages/ui/src/office`, so the browser host can reuse it.
 
+**Experts tab.** `ExpertsPanel` (`home/experts-panel.tsx`) lists the experts and adds or edits one:
+name, good at, folder (typed, or picked with the host's `pickFolder`, Electron's folder dialog), may
+edit files, on or off, and an optional command under Advanced. **Save and test** saves through
+`saveExpert` (`experts.upsert`) and then runs `testExpert` (`experts.test`), so a wrong folder or a
+missing `claude` shows at once while the expert stays saved. A new expert's id is its name in
+kebab-case, made unique. The expert calls on the `HostBridge` are optional; a host without them shows a
+note instead. The desktop forwards every engine notification to its windows, and `handoff.progress`
+and `handoff.finished` are part of the UI's `TurnEvent`, so Activity re-reads when a hand-off ends. The
+main process also shows a system notification for a finished or failed hand-off (`handoffNotice` in
+`main/handoff-notice.ts`), until the companion's bubble carries the result (step 4 of the experts plan).
+
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%
 flowchart LR
   subgraph Chrome["Home chrome (the same in every theme)"]
     Bar[Top bar]
     List[Agent list]
-    Side["Right panel: Activity, the agent's controls, Meetings"]
+    Side["Right panel: Activity, the agent's controls, Experts, Meetings"]
   end
   Scene["Centre scene (the theme)"]
   Engine[(Engine)] -- "pets.list, roles.list, turn.* and crew notifications" --> List
   Engine -- "activity.list" --> Side
   List -- "pick an agent" --> Side
   Side -- "pets.upsert, settings.defaultPetId" --> Engine
+  Side -- "experts.list, experts.upsert, experts.delete, experts.test" --> Engine
   List -- "placeAgents(theme.layout, agents)" --> Scene
 ```
 

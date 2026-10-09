@@ -18,6 +18,7 @@ function changesActivity(event: TurnEvent): boolean {
     case 'turn.error':
     case 'pet.message':
     case 'crew.status':
+    case 'handoff.finished':
       return true;
     case 'turn.toolResult':
       return event.tool === 'ask_pet';

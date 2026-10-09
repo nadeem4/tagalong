@@ -13,6 +13,11 @@ export const IPC = {
   dismissRolesNotice: 'tagalong:notices:dismiss-roles-upgrade',
   // Home.
   listActivity: 'tagalong:activity:list',
+  listExperts: 'tagalong:experts:list',
+  saveExpert: 'tagalong:experts:save',
+  deleteExpert: 'tagalong:experts:delete',
+  testExpert: 'tagalong:experts:test',
+  pickFolder: 'tagalong:dialog:pick-folder',
   turnEvent: 'tagalong:turn-event',
   getContext: 'tagalong:context:get',
   capture: 'tagalong:capture',

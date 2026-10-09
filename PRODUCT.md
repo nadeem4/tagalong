@@ -28,7 +28,9 @@ the way.
 
 Tagalong is a crew of AI companions that live on your screen. You highlight something, press a
 key, and a pet that already sees what you are looking at answers, remembers, and works with its
-teammates. It removes the copy, switch app, paste, ask, switch back loop.
+teammates. It removes the copy, switch app, paste, ask, switch back loop: the companion on screen sees what you
+are doing, writes a brief, and hands it to the right expert (Claude Code first, then model APIs and
+tool servers you set up yourself), then brings the answer back. The companion never does the work.
 
 Success: people keep it running all day, ask it things they would otherwise not bother to ask, and
 trust it with their screen.

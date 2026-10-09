@@ -3,6 +3,7 @@ import type { IpcRendererEvent } from 'electron';
 import type {
   ActivityListResult,
   ContextSnapshot,
+  Expert,
   PerceptionTarget,
   Pet,
   Role,
@@ -43,6 +44,13 @@ const bridge: HostBridge = {
   // Home.
   listActivity: (params: { before?: string; limit?: number } = {}) =>
     ipcRenderer.invoke(IPC.listActivity, params) as Promise<ActivityListResult>,
+  listExperts: () => ipcRenderer.invoke(IPC.listExperts) as Promise<Expert[]>,
+  saveExpert: (expert: Expert) => ipcRenderer.invoke(IPC.saveExpert, expert) as Promise<Expert>,
+  deleteExpert: (expertId: string) =>
+    ipcRenderer.invoke(IPC.deleteExpert, expertId) as Promise<boolean>,
+  testExpert: (expertId: string) =>
+    ipcRenderer.invoke(IPC.testExpert, expertId) as Promise<{ ok: boolean; error?: string }>,
+  pickFolder: () => ipcRenderer.invoke(IPC.pickFolder) as Promise<string | null>,
   onTurnEvent: (handler: (event: TurnEvent) => void) => {
     const listener = (_event: IpcRendererEvent, turnEvent: TurnEvent): void => handler(turnEvent);
     ipcRenderer.on(IPC.turnEvent, listener);

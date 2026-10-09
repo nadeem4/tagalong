@@ -11,10 +11,18 @@ import {
   screen,
   shell,
 } from 'electron';
-import { ContextSnapshot } from '@tagalong/protocol';
-import type { PerceptionTarget, Pet, Role, Settings, SettingsPatch } from '@tagalong/protocol';
+import { ContextSnapshot, HandoffFinishedParams } from '@tagalong/protocol';
+import type {
+  Expert,
+  PerceptionTarget,
+  Pet,
+  Role,
+  Settings,
+  SettingsPatch,
+} from '@tagalong/protocol';
 import { SettingsStore, WATCH_MODEL_DEFAULTS } from '@tagalong/core';
 import { systemClock } from './awareness/clock';
+import { handoffNotice } from './handoff-notice';
 import { nativeCodec } from './awareness/native-codec';
 import { PerceptionMemory } from './awareness/perception-memory';
 import { RollingMemory } from './awareness/rolling-memory';
@@ -298,6 +306,7 @@ function forwardToRenderers(notification: { method: string; params: unknown }): 
   }
 
   if (notification.method === 'watch.fired') announceWatch(notification.params);
+  if (notification.method === 'handoff.finished') announceHandoff(notification.params);
 
   // The renderer speaks the UI package's TurnEvent shape: the wire params plus the
   // method as a discriminant.
@@ -321,6 +330,14 @@ function announceWatch(params: unknown): void {
   if (desktop?.panel != null && desktop.avatar != null && !desktop.panel.isVisible()) {
     showPanelBeside(desktop.panel, desktop.avatar);
   }
+}
+
+/** An expert finished a hand-off: a system notification, until the companion's bubble says it. */
+function announceHandoff(params: unknown): void {
+  const parsed = HandoffFinishedParams.safeParse(params);
+  if (!parsed.success || !Notification.isSupported()) return;
+  const notice = handoffNotice(parsed.data);
+  if (notice !== null) new Notification({ ...notice, silent: false }).show();
 }
 
 function showPets(): void {
@@ -577,6 +594,34 @@ function registerIpc(): void {
       ...(params.before === undefined ? {} : { before: params.before }),
     }),
   );
+
+  // Home's Experts tab.
+  ipcMain.handle(IPC.listExperts, async (): Promise<Expert[]> => {
+    const result = await engine().client.call('experts.list', {});
+    return result.experts;
+  });
+  ipcMain.handle(IPC.saveExpert, async (_event, expert: Expert): Promise<Expert> => {
+    const result = await engine().client.call('experts.upsert', { expert });
+    return result.expert;
+  });
+  ipcMain.handle(IPC.deleteExpert, async (_event, expertId: string): Promise<boolean> => {
+    const result = await engine().client.call('experts.delete', { expertId });
+    return result.deleted;
+  });
+  ipcMain.handle(IPC.testExpert, async (_event, expertId: string) =>
+    engine().client.call('experts.test', { expertId }),
+  );
+  ipcMain.handle(IPC.pickFolder, async (event): Promise<string | null> => {
+    const owner = BrowserWindow.fromWebContents(event.sender);
+    const options = {
+      title: 'The folder this expert works in',
+      properties: ['openDirectory' as const],
+    };
+    const picked = owner
+      ? await dialog.showOpenDialog(owner, options)
+      : await dialog.showOpenDialog(options);
+    return picked.canceled ? null : (picked.filePaths[0] ?? null);
+  });
 
   ipcMain.handle(IPC.getContext, () => required().pendingSnapshot);
   // A window that opened after the last toggle has missed the event, and an avatar that

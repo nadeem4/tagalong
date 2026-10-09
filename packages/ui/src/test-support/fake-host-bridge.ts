@@ -1,6 +1,7 @@
 import type {
   ActivityEntry,
   ContextSnapshot,
+  Expert,
   PerceptionTarget,
   Pet,
   Role,
@@ -25,6 +26,10 @@ export interface FakeHostBridge extends HostBridge {
   activity: ActivityEntry[];
   /** How many times the activity was listed. */
   activityReads: number;
+  /** Home's experts, as saved; a test reads them back after a save. */
+  experts: Expert[];
+  /** Every expert id tested, in order. */
+  readonly testedExperts: readonly string[];
 }
 
 /**
@@ -42,6 +47,11 @@ export function createFakeHostBridge(
     rolesNotice?: RolesUpgradeNotice | null;
     /** Home's activity, newest first. */
     activity?: ActivityEntry[];
+    experts?: Expert[];
+    /** What testing an expert answers; absent answers ready. */
+    testExpert?: (expertId: string) => { ok: boolean; error?: string };
+    /** What the folder picker answers; absent means the host has no picker. */
+    pickFolder?: () => string | null;
   } = {},
 ): FakeHostBridge {
   const handlers = new Set<(event: TurnEvent) => void>();
@@ -51,6 +61,7 @@ export function createFakeHostBridge(
   const captures: (readonly PerceptionTarget[])[] = [];
   let turnCount = 0;
   let notice = options.rolesNotice ?? null;
+  const testedExperts: string[] = [];
 
   const fake: FakeHostBridge = {
     asks,
@@ -106,6 +117,29 @@ export function createFakeHostBridge(
       const more = start + limit < fake.activity.length && last !== undefined;
       return Promise.resolve(more ? { entries, next: last.id } : { entries });
     },
+    experts: [...(options.experts ?? [])],
+    testedExperts,
+    listExperts() {
+      return Promise.resolve([...fake.experts]);
+    },
+    saveExpert(expert) {
+      const index = fake.experts.findIndex((e) => e.id === expert.id);
+      if (index === -1) fake.experts.push(expert);
+      else fake.experts[index] = expert;
+      return Promise.resolve(expert);
+    },
+    deleteExpert(expertId) {
+      const before = fake.experts.length;
+      fake.experts = fake.experts.filter((e) => e.id !== expertId);
+      return Promise.resolve(fake.experts.length < before);
+    },
+    testExpert(expertId) {
+      testedExperts.push(expertId);
+      return Promise.resolve(options.testExpert?.(expertId) ?? { ok: true });
+    },
+    ...(options.pickFolder === undefined
+      ? {}
+      : { pickFolder: () => Promise.resolve(options.pickFolder?.() ?? null) }),
     rolesNotice() {
       return Promise.resolve(notice);
     },
