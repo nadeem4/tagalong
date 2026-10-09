@@ -524,6 +524,7 @@ test('Home opens with the real crew, each agent’s controls, and the activity v
   const roles = await panel.evaluate(() => window.tagalong.listRoles());
   expect(roles.map((role) => role.id).sort()).toEqual([
     'backend-engineer',
+    'companion',
     'frontend-engineer',
     'generalist',
     'researcher',
@@ -561,7 +562,7 @@ test('Home opens with the real crew, each agent’s controls, and the activity v
   if (worker === undefined) throw new Error('no pet to put to work');
   await agents.getByRole('button', { name: new RegExp(worker.name) }).click();
   const controls = home.getByRole('tabpanel', { name: worker.name });
-  await expect(controls.getByRole('radio')).toHaveCount(5, { timeout: 15_000 });
+  await expect(controls.getByRole('radio')).toHaveCount(roles.length, { timeout: 15_000 });
   const own = roles.find((role) => role.id === worker.roleId);
   if (own === undefined) throw new Error(`${worker.name}'s role is not in the library`);
   await expect(controls.getByRole('radio', { name: own.name })).toBeChecked();

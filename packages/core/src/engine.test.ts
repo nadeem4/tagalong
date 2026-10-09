@@ -977,3 +977,48 @@ describe('experts and hand-offs', () => {
     expect(res['error']).toMatchObject({ code: RPC_ERROR_CODES.invalidParams });
   });
 });
+
+describe('a companion handing work to an expert', () => {
+  it('turns a hand_to_expert call into a hand-off and remembers the route', async () => {
+    const provider = new FakeBrainProvider({
+      text: 'Claude Code has it.',
+      toolCall: {
+        id: 'call-1',
+        name: 'hand_to_expert',
+        input: { ask: 'Why does the build fail?', task_kind: 'fix-code' },
+      },
+    });
+    const e = await boot(provider);
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('experts.upsert', {
+      expert: {
+        id: 'claude-code',
+        name: 'Claude Code',
+        connection: { type: 'claude-code', folder: 'C:\\projects\\ai_pet' },
+      },
+    });
+    const listed = await host.call('pets.list', {});
+    const scout = (listed['result'] as { pets: Record<string, unknown>[] }).pets.find(
+      (pet) => pet['id'] === 'scout',
+    );
+    await host.call('pets.upsert', { pet: { ...scout, roleId: 'companion' } });
+
+    await host.call('ask', { petId: 'scout', input: { text: 'Why does the build fail?' } });
+    await vi.waitFor(
+      () =>
+        expect(host.methods()).toEqual(
+          expect.arrayContaining(['handoff.finished', 'turn.completed']),
+        ),
+      { timeout: 5000 },
+    );
+    expect(host.methods()).not.toContain('turn.error');
+
+    const res = await host.call('activity.list', {});
+    const handed = (res['result'] as { entries: Record<string, unknown>[] }).entries.find(
+      (entry) => entry['kind'] === 'expert',
+    );
+    expect(handed).toMatchObject({ petId: 'scout', expertName: 'Claude Code', state: 'done' });
+    expect(String(handed?.['text'])).toContain('Why does the build fail?');
+  });
+});

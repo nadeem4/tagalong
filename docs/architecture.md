@@ -366,8 +366,17 @@ writes to a closed database. `experts.test` runs the connector's `check()`.
 In fake mode (`TAGALONG_FAKE_PROVIDERS=1`) every expert is a `FakeConnector`, so a test or a demo
 never starts a real Claude Code. `EngineOptions.connectorFor` overrides the choice for tests.
 
-The brief builder, the companion's routing and the Home screens come next; see the "Experts and
-connectors" design in Notion.
+**The companion's side.** A pet with the Companion role gets `hand_to_expert`
+(`tools/builtin/experts.ts`). It builds the brief from the model's `ask`, `files` and `good_answer`
+plus what the turn's snapshot says the user was looking at (app, window title, selection), starts the
+hand-off through `HandoffManager`, and tells the model the answer will arrive on its own. The expert
+is chosen in this order: one the user chose for that `task_kind`, the one the model named, the one
+remembered for that kind, then the only expert switched on; otherwise the tool asks the model to name
+one. `RouteMemory` (`experts/routes.ts`, table `expert_routes`, migration 9) remembers task kind to
+expert; the companion's own picks never overwrite the user's, and deleting an expert forgets its
+routes.
+
+Brief review and the Home screens come next; see the "Experts and connectors" design in Notion.
 
 ## The desktop host's shape
 

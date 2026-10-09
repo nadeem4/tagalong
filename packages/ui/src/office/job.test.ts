@@ -21,6 +21,7 @@ const ROLES = [
   role('backend-engineer', 'Backend engineer'),
   role('frontend-engineer', 'Frontend engineer'),
   role('researcher', 'Researcher'),
+  role('companion', 'Companion'),
   role('astronaut', 'Astronaut'),
 ];
 
@@ -34,7 +35,14 @@ describe('jobFor', () => {
   });
 
   it('gives every library class its own ink', () => {
-    const ids = ['generalist', 'writer', 'backend-engineer', 'frontend-engineer', 'researcher'];
+    const ids = [
+      'generalist',
+      'writer',
+      'backend-engineer',
+      'frontend-engineer',
+      'researcher',
+      'companion',
+    ];
     for (const id of ids) {
       expect(jobFor(id, ROLES).ink).toBe(
         officeTokens.roleInk[id as keyof typeof officeTokens.roleInk],

@@ -141,7 +141,7 @@ Right-click the tray icon and choose **Open Home**. Home is where the whole crew
   roundtable. Click one to read it.
 - **Add agent** under the list creates a new Generalist and opens its controls.
 - **Pick an agent** in the list to change it: its role (Generalist, Backend engineer, Frontend
-  engineer, Writer or Researcher), its provider and model (**Recommended** for its role, or your own
+  engineer, Writer, Researcher or Companion, which hands work to your experts instead of doing it), its provider and model (**Recommended** for its role, or your own
   choice), its tools, its private notes, its look, and whether it is the pet on your desktop. The card
   beside it shows how its teammates see it. **Save** applies from the next question.
 - **Meetings** will appear in their own tab once agents can meet.

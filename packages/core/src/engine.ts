@@ -36,6 +36,7 @@ import {
   ExpertStore,
   FakeConnector,
   HandoffManager,
+  RouteMemory,
   type Connector,
 } from './experts';
 import type { MethodHandlers } from './server/ws-server';
@@ -239,6 +240,7 @@ export class Engine {
       connectorFor,
       emit: (event) => live.server?.broadcast(event.method, event.params),
     });
+    const routes = new RouteMemory(db);
     const runner = new ConversationRunner({
       store,
       settings,
@@ -252,6 +254,12 @@ export class Engine {
         answered: (turnId, toPetId, outcome) => activity.consultAnswered(turnId, toPetId, outcome),
       },
       watch: { manager: watches, hosts },
+      // Read per turn: experts are added and switched off while the app runs.
+      experts: {
+        experts: () => experts.list(),
+        routes,
+        start: (params) => handoffs.start(params),
+      },
       // Both lookups are lazy: hosts connect and drop between turns, and the exclusion
       // list is edited while the app runs, so neither can be captured at boot.
       perception: {
@@ -276,6 +284,7 @@ export class Engine {
       hosts,
       watches,
       experts,
+      routes,
       handoffs,
       connectorFor,
       refreshProviders: async () => keyed?.refresh(),
@@ -354,6 +363,7 @@ function buildHandlers(parts: {
   hosts: () => readonly PerceptionHost[];
   watches: WatchManager;
   experts: ExpertStore;
+  routes: RouteMemory;
   handoffs: HandoffManager;
   connectorFor: (expert: Expert) => Connector;
   models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
@@ -361,7 +371,7 @@ function buildHandlers(parts: {
   refreshProviders: () => Promise<void>;
 }): MethodHandlers {
   const { db, activity, runner, store, emit, pets, settings, models, hosts, watches } = parts;
-  const { refreshProviders, experts, handoffs, connectorFor } = parts;
+  const { refreshProviders, experts, routes, handoffs, connectorFor } = parts;
 
   return {
     ask: async (params) => {
@@ -432,7 +442,10 @@ function buildHandlers(parts: {
 
     'experts.list': () => ({ experts: experts.list() }),
     'experts.upsert': (params) => ({ expert: experts.upsert(params.expert) }),
-    'experts.delete': (params) => ({ deleted: experts.delete(params.expertId) }),
+    'experts.delete': (params) => {
+      routes.forgetExpert(params.expertId);
+      return { deleted: experts.delete(params.expertId) };
+    },
     'experts.test': async (params) => {
       const expert = experts.get(params.expertId);
       if (expert === null) {

@@ -15,3 +15,4 @@ export {
 export { FakeConnector, type FakeConnectorScript } from './fake';
 export { HandoffManager, type HandoffEvent, type HandoffManagerOptions } from './handoffs';
 export { ExpertStore } from './store';
+export { RouteMemory, type Route, type RoutedBy } from './routes';

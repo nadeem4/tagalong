@@ -14,7 +14,7 @@ task list lives in the Notion plan.
 Every pet has exactly one role. A user who wants more roles creates more pets. Tagalong ships the
 roles; custom roles are parked for later, and the file format already allows them.
 
-The first five:
+The first six:
 
 | Role              | Good at                                     | Recommended brain       |
 | ----------------- | ------------------------------------------- | ----------------------- |
@@ -23,6 +23,11 @@ The first five:
 | Frontend engineer | UI code, CSS, browser bugs, accessibility   | Balanced, sees pictures |
 | Writer            | Emails, docs, rewrites, release notes       | Balanced                |
 | Researcher        | Reading pages and papers, comparing sources | Deep                    |
+| Companion         | Working out what you need, briefing experts | Fast                    |
+
+The Companion never does the work itself. Its tools are only the ones that look (screen, selection,
+windows), `remember`, and `hand_to_expert`, which writes a brief and hands it to an expert such as
+Claude Code; it has no `ask_pet` and nothing that writes files or runs code.
 
 ### The role file
 
@@ -227,7 +232,7 @@ steps.
 
 **Status: built**, with roles and grants filtering each turn's tools.
 
-All 12 built-in tools live in one module, in one shape, and reach a turn one way:
+All 13 built-in tools live in one module, in one shape, and reach a turn one way:
 
 ```text
 packages/core/src/tools/
@@ -241,16 +246,19 @@ packages/core/src/tools/
                    look_closer, list_windows, read_window_text
     awareness.ts   recall_screen, what_changed, watch_for
     crew.ts        remember, ask_pet
+    experts.ts     hand_to_expert
 ```
 
 - **Kind.** A tool is `write` when it leaves stored state behind after the turn: `remember` files a
-  memory, `watch_for` starts a watch. The other ten are `read`; `ask_pet` costs a model call but
-  stores nothing.
+  memory, `watch_for` starts a watch, `hand_to_expert` starts a hand-off and remembers which expert
+  took that kind of task. The other ten are `read`; `ask_pet` costs a model call but stores nothing.
 - **Context.** Every tool runs with the turn's pet, turn id, abort signal, snapshot, whether the
   pet's brain can see, and a counter for nested model calls.
 - **Which tools a turn gets.** The registry builds what the engine is wired for, in a fixed order,
   and returns none when the pet's provider cannot call tools. `ask_pet` is left off roundtable
-  turns and off a crew of one. An unknown name is refused by name.
+  turns and off a crew of one. `hand_to_expert` is built only when an expert is switched on, and
+  lists every such expert and what it is good at in its description. An unknown name is refused by
+  name.
 - **`toolsFor(pet, tools)`** is the single place a turn's tools are narrowed: the tools the pet's
   role lists, minus any its grants turn off (see [What the role decides](#what-the-role-decides)).
 

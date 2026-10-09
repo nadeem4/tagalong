@@ -499,6 +499,21 @@
           "oklch(95% 0.132 353.7)"
         ]
       },
+      "job-companion": {
+        "role": "secondary",
+        "displayName": "Companion Sky",
+        "canonical": "#7CB8F2",
+        "tonalRamp": [
+          "oklch(15% 0.098 250)",
+          "oklch(26% 0.098 250)",
+          "oklch(37% 0.098 250)",
+          "oklch(48% 0.098 250)",
+          "oklch(60% 0.098 250)",
+          "oklch(72% 0.098 250)",
+          "oklch(84% 0.098 250)",
+          "oklch(95% 0.098 250)"
+        ]
+      },
       "job-researcher": {
         "role": "secondary",
         "displayName": "Researcher Green",
