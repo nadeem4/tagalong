@@ -124,6 +124,25 @@ describe('ActivityView', () => {
     expect(thread.textContent).toMatch(/Bolt.*Dock it right\..*Ink.*Dock it left\./);
   });
 
+  it('shows a brief handed to an expert, its answer and the files it changed', async () => {
+    const handed = entry({
+      id: 'x1',
+      kind: 'expert',
+      expertId: 'claude-code',
+      expertName: 'Claude Code',
+      text: 'Fix the failing test',
+      answer: 'Fixed the import.',
+      changedFiles: ['src/a.ts'],
+    });
+    await renderActivity(createFakeHostBridge({ activity: [handed] }));
+    fireEvent.click(row(/Scout handed off to Claude Code/));
+    const thread = screen.getByRole('region', { name: 'Scout handed off to Claude Code' });
+    expect(thread).toHaveTextContent('Fix the failing test');
+    expect(thread).toHaveTextContent('Claude Code answered');
+    expect(thread).toHaveTextContent('Fixed the import.');
+    expect(thread).toHaveTextContent('src/a.ts');
+  });
+
   it('pairs every state with a word: working, done, failed', async () => {
     await renderActivity(
       createFakeHostBridge({

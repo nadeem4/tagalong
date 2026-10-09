@@ -43,6 +43,8 @@ function headline(entry: ActivityEntry, name: (petId: string) => string): string
       return `${who} handed off to ${to}`;
     case 'roundtable':
       return `${who} started a roundtable`;
+    case 'expert':
+      return `${who} handed off to ${entry.expertName ?? 'an expert'}`;
     case 'turn':
       return {
         running: `${who} is answering`,
@@ -325,6 +327,19 @@ function Thread({
               text={turn.answer ?? turn.error ?? WORDS[turn.state]}
             />
           ))}
+        </>
+      );
+    }
+    case 'expert': {
+      const expert = entry.expertName ?? 'The expert';
+      return (
+        <>
+          {entry.text !== undefined && <Said who={`What ${expert} was told`} text={entry.text} />}
+          {entry.answer !== undefined && <Said who={`${expert} answered`} text={entry.answer} />}
+          {entry.changedFiles !== undefined && (
+            <Said who="Files changed" text={entry.changedFiles.join('\n')} />
+          )}
+          {failure}
         </>
       );
     }

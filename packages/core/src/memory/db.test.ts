@@ -40,6 +40,7 @@ describe('openDatabase', () => {
       expect(tableNames(db)).toEqual([
         'activity',
         'conversations',
+        'experts',
         'memories',
         'memories_fts',
         'memories_fts_config',

@@ -81,7 +81,55 @@ const MIGRATIONS: readonly Migration[] = [
    );
    CREATE INDEX IF NOT EXISTS activity_turn ON activity(turn_id);
    CREATE INDEX IF NOT EXISTS activity_run ON activity(run_id);`,
+  addExperts,
 ];
+
+/** The columns migration 7 gave `activity`, in order. */
+const ACTIVITY_V7_COLUMNS = `id, kind, state, pet_id, to_pet_id, turn_id, conversation_id, run_id,
+  provider_id, model, text, answer, error, model_calls, started_at, finished_at`;
+
+/**
+ * Migration 8. Experts, and hand-offs to them in the activity log. SQLite cannot change a
+ * CHECK constraint, so `activity` is rebuilt with `expert` among its kinds and three new
+ * columns, keeping every row and its rowid order. Skipped when the columns are already
+ * there, so a database rolled back past it migrates again.
+ */
+function addExperts(db: Database.Database): void {
+  db.exec(`CREATE TABLE IF NOT EXISTS experts (
+     id TEXT PRIMARY KEY,
+     json TEXT NOT NULL,
+     updated_at TEXT NOT NULL
+   )`);
+  const columns = db.prepare<[], { name: string }>('PRAGMA table_info(activity)').all();
+  if (columns.some((column) => column.name === 'expert_id')) return;
+  db.exec(`CREATE TABLE activity_v8 (
+     id TEXT PRIMARY KEY,
+     kind TEXT NOT NULL CHECK (kind IN ('turn', 'consult', 'handoff', 'roundtable', 'expert')),
+     state TEXT NOT NULL CHECK (state IN ('running', 'done', 'error', 'stopped')),
+     pet_id TEXT NOT NULL,
+     to_pet_id TEXT,
+     turn_id TEXT,
+     conversation_id TEXT,
+     run_id TEXT,
+     provider_id TEXT,
+     model TEXT,
+     text TEXT,
+     answer TEXT,
+     error TEXT,
+     model_calls INTEGER,
+     started_at TEXT NOT NULL,
+     finished_at TEXT,
+     expert_id TEXT,
+     expert_name TEXT,
+     changed_files TEXT
+   );
+   INSERT INTO activity_v8 (rowid, ${ACTIVITY_V7_COLUMNS})
+     SELECT rowid, ${ACTIVITY_V7_COLUMNS} FROM activity ORDER BY rowid;
+   DROP TABLE activity;
+   ALTER TABLE activity_v8 RENAME TO activity;
+   CREATE INDEX activity_turn ON activity(turn_id);
+   CREATE INDEX activity_run ON activity(run_id);`);
+}
 
 /** Version a fully migrated database reports. */
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;

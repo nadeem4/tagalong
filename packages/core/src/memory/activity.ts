@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { ActivityEntry } from '@tagalong/protocol';
 import type { ActivityKind, ActivityListResult, ActivityState } from '@tagalong/protocol';
+import type { ConnectorResult } from '../experts/connector';
 import type { TurnEvent } from '../conversation/runner';
 import type { ConversationStore } from './store';
 
@@ -25,6 +26,9 @@ interface ActivityRow {
   model_calls: number | null;
   started_at: string;
   finished_at: string | null;
+  expert_id: string | null;
+  expert_name: string | null;
+  changed_files: string | null;
 }
 
 interface NewEntry {
@@ -147,6 +151,41 @@ export class ActivityLog {
       );
   }
 
+  /** A companion handed a brief to an expert. Returns the entry's id, for `expertFinished`. */
+  expertStarted(entry: {
+    petId: string;
+    expertId: string;
+    expertName: string;
+    text: string;
+  }): string {
+    const id = randomUUID();
+    this.db
+      .prepare(
+        `INSERT INTO activity (id, kind, state, pet_id, expert_id, expert_name, text, started_at)
+         VALUES (?, 'expert', 'running', ?, ?, ?, ?, ?)`,
+      )
+      .run(id, entry.petId, entry.expertId, entry.expertName, clip(entry.text), now());
+    return id;
+  }
+
+  /** The expert's answer, or why there was none. A cancel is `stopped` and keeps no error. */
+  expertFinished(id: string, result: ConnectorResult, state?: 'stopped'): void {
+    const done = state ?? (result.ok ? 'done' : 'error');
+    this.db
+      .prepare(
+        `UPDATE activity SET state = ?, answer = ?, error = ?, changed_files = ?, finished_at = ?
+         WHERE id = ? AND kind = 'expert'`,
+      )
+      .run(
+        done,
+        result.ok ? clip(result.text) : null,
+        !result.ok && done === 'error' ? clip(result.error) : null,
+        result.ok && result.changedFiles.length > 0 ? JSON.stringify(result.changedFiles) : null,
+        now(),
+        id,
+      );
+  }
+
   /** Newest first; `before` is the `next` of the page before. */
   list(params: { before?: string | undefined; limit?: number | undefined }): ActivityListResult {
     const limit = params.limit ?? 30;
@@ -231,6 +270,11 @@ function toEntry(row: ActivityRow): ActivityEntry {
     ...optional('answer', row.answer),
     ...optional('error', row.error),
     ...optional('modelCalls', row.model_calls),
+    ...optional('expertId', row.expert_id),
+    ...optional('expertName', row.expert_name),
+    ...(row.changed_files === null
+      ? {}
+      : { changedFiles: JSON.parse(row.changed_files) as unknown }),
     startedAt: row.started_at,
     ...optional('finishedAt', row.finished_at),
   });

@@ -1,4 +1,10 @@
-import { CANCELLED, type Brief, type Connector, type ConnectorResult } from './connector';
+import {
+  CANCELLED,
+  type Brief,
+  type CheckResult,
+  type Connector,
+  type ConnectorResult,
+} from './connector';
 
 export interface FakeConnectorScript {
   steps?: string[];
@@ -6,6 +12,8 @@ export interface FakeConnectorScript {
   changedFiles?: string[];
   /** When set, the hand-off fails with this message instead of answering. */
   error?: string;
+  /** When set, `check` fails with this message. */
+  checkError?: string;
 }
 
 /** Scripted expert for tests and `TAGALONG_FAKE_PROVIDERS=1`: no process, no network. */
@@ -13,6 +21,11 @@ export class FakeConnector implements Connector {
   readonly sent: Brief[] = [];
 
   constructor(private readonly script: FakeConnectorScript) {}
+
+  check(): Promise<CheckResult> {
+    const error = this.script.checkError;
+    return Promise.resolve(error === undefined ? { ok: true } : { ok: false, error });
+  }
 
   async send(
     brief: Brief,

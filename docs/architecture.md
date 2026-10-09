@@ -150,10 +150,13 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   (Phase 3B), and from Phase 8 `roles.list` and `roles.recommendModel` (see
   [Roles over RPC](concepts/roles-and-tools.md#roles-over-rpc)), `notices.rolesUpgrade` and
   `notices.dismiss` (see [The roles notice](concepts/roles-and-tools.md#the-roles-notice)), and
-  for Home `activity.list` (see [Activity](#activity)). Protocol 0.6.0.
+  for Home `activity.list` (see [Activity](#activity)), and for experts `experts.list`,
+  `experts.upsert`, `experts.delete`, `experts.test`, `handoffs.start` and `handoffs.cancel` (see
+  [Experts and connectors](#experts-and-connectors)). Protocol 0.7.0.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
   `perception.listWindows` and `perception.readText`, and from Phase 3B `perception.recall` and
   `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
+  Hand-offs report back with the `handoff.progress` and `handoff.finished` notifications.
 - **Core to host notifications** gained `turn.toolRequest` and `turn.toolResult` in Phase 2B. They were
   in the catalog from Phase 1 and nothing emitted them, which left a tool call invisible twice over: the
   user watching the panel could not tell a working pet from a hung one, and no test could observe that a
@@ -343,8 +346,28 @@ Two connectors exist so far:
 - **`FakeConnector`** (`experts/fake.ts`) replays scripted steps and an answer or an error. Tests use
   it, and the claude tests inject a fake `spawn`, so no test starts a real claude.
 
-Expert storage, the hand-off RPC, the brief builder and the Home screens come next; see the
-"Experts and connectors" design in Notion.
+Each connector also has `check()`, which says whether the expert can be reached without spending
+anything: Claude Code's checks that the folder exists and runs `claude --version` in it.
+
+**Storage.** `ExpertStore` (`experts/store.ts`) keeps one JSON row per expert in the `experts` table
+(migration 8), in the order they were added. An expert is `{ id, name, goodAt, enabled, connection }`
+(`packages/protocol/src/experts.ts`); the only connection so far is `{ type: 'claude-code', folder,
+canEdit = false, command? }`. Nothing secret is stored: Claude Code signs itself in, and keys for
+later connectors go to the host's keychain.
+
+**Hand-offs.** `HandoffManager` (`experts/handoffs.ts`) runs them. `handoffs.start { expertId, petId,
+brief }` refuses an unknown or switched-off expert with `-32602`, writes an `expert` row to the
+activity log, and returns `{ handoffId }` at once (the row's id). The expert's steps arrive as
+`handoff.progress { handoffId, expertId, step }` and the end as `handoff.finished { handoffId,
+expertId, state: done | error | stopped, text?, changedFiles?, error? }`. `handoffs.cancel` aborts a
+running one; shutdown cancels all of them and waits until each has written how it ended, so nothing
+writes to a closed database. `experts.test` runs the connector's `check()`.
+
+In fake mode (`TAGALONG_FAKE_PROVIDERS=1`) every expert is a `FakeConnector`, so a test or a demo
+never starts a real Claude Code. `EngineOptions.connectorFor` overrides the choice for tests.
+
+The brief builder, the companion's routing and the Home screens come next; see the "Experts and
+connectors" design in Notion.
 
 ## The desktop host's shape
 
@@ -780,8 +803,9 @@ notice is pending. See [The roles notice](concepts/roles-and-tools.md#the-roles-
 
 `memory/activity.ts` is the durable record behind the activity view: `activity(id, kind, state,
 pet_id, to_pet_id, turn_id, conversation_id, run_id, provider_id, model, text, answer, error,
-model_calls, started_at, finished_at)` (migration 7), ordered by rowid. `kind` is `turn`, `consult`,
-`handoff` or `roundtable`; `state` is `running`, `done`, `error` or `stopped`. `ActivityLog.observe`
+model_calls, started_at, finished_at, expert_id, expert_name, changed_files)` (migration 7, rebuilt by
+migration 8 to add the expert columns), ordered by rowid. `kind` is `turn`, `consult`, `handoff`,
+`roundtable` or `expert`; `state` is `running`, `done`, `error` or `stopped`. `ActivityLog.observe`
 sits in the engine's event sink in front of the broadcast, so a host that re-reads on a notification
 already finds the row, and writes everything from the notifications the engine already sends:
 
@@ -798,7 +822,9 @@ A consult's full answer is in no notification (`turn.toolResult` carries a 120-c
 the consult tool reports it through one hook, `AskPetDeps.answered`, which the runner passes through
 from `consult.answered` and the engine wires to `ActivityLog.consultAnswered`. Text is clipped at 4,000
 characters. `activity.list { before?, limit = 30 (max 100) }` answers `{ entries, next? }`, newest
-first; `next` is the id to pass as `before` for the page after. Meetings are not recorded: they do not
+first; `next` is the id to pass as `before` for the page after. An `expert` row is written by
+`HandoffManager` through `expertStarted` and `expertFinished`, not from a notification: it keeps the
+expert's name at the time, the brief as text, the answer and the files changed. Meetings are not recorded: they do not
 exist yet.
 
 ### The Settings window
