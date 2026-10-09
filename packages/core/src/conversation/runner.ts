@@ -13,6 +13,7 @@ import {
   type ToolFilter,
   type AskPetDeps,
   type WatchToolDeps,
+  type ExpertToolDeps,
 } from '../tools';
 import { assemblePrompt } from './prompt-assembler';
 
@@ -78,6 +79,8 @@ export interface ConversationRunnerOptions {
     | undefined;
   /** Phase 3B. Gives every pet `watch_for`, which starts a watch on its behalf. */
   watch?: WatchToolDeps | undefined;
+  /** Gives a companion `hand_to_expert`, which briefs an expert and hands the work over. */
+  experts?: ExpertToolDeps | undefined;
   /** Narrows a pet's tools for a turn. Absent: every pet gets every tool. Phase 8 roles. */
   toolsFor?: ToolFilter | undefined;
 }
@@ -166,6 +169,7 @@ export class ConversationRunner {
       perception: options.perception,
       memory: options.memory,
       watch: options.watch,
+      experts: options.experts,
       toolsFor: options.toolsFor,
       consult: consult && {
         pets: consult.pets,

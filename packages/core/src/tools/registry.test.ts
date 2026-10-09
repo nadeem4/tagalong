@@ -84,6 +84,34 @@ describe('ToolRegistry.forTurn', () => {
     expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(10);
   });
 
+  it('gives a companion its tools, ending with hand_to_expert, which is write', () => {
+    const experts = {
+      experts: () => [
+        {
+          id: 'claude-code',
+          name: 'Claude Code',
+          goodAt: '',
+          enabled: true,
+          connection: { type: 'claude-code' as const, folder: 'C:\\r', canEdit: false },
+        },
+      ],
+      routes: { get: () => null, remember: () => undefined },
+      start: () => ({ handoffId: '7c9e6679-7425-40de-944b-e07fc1f90ae7' }),
+    };
+    const tools = new ToolRegistry(everything({ experts })).forTurn(
+      fakeTurn({ pet: { ...FAKE_TURN_PET, roleId: 'companion' } }),
+    ).tools;
+    expect(tools.map((tool) => tool.id)).toEqual([
+      'look_at_screen',
+      'get_selection',
+      'list_windows',
+      'read_window_text',
+      'remember',
+      'hand_to_expert',
+    ]);
+    expect(tools.find((tool) => tool.id === 'hand_to_expert')?.kind).toBe('write');
+  });
+
   it('builds only what is wired: no perception options, no perception tools', () => {
     const turn = new ToolRegistry({ memory: fakeMemory() }).forTurn(fakeTurn());
     expect(turn.tools.map((tool) => tool.id)).toEqual(['remember']);

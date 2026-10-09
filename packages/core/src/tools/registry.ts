@@ -4,6 +4,7 @@ import type { MemoryStore } from '../memory/memories';
 import { roleFor } from '../roles';
 import { recallTools, watchForTool, type WatchToolDeps } from './builtin/awareness';
 import { askPetTool, rememberTool, type AskPetDeps } from './builtin/crew';
+import { enabledExperts, handToExpertTool, type ExpertToolDeps } from './builtin/experts';
 import { perceptionTools, type PerceptionToolsOptions } from './builtin/perception';
 import type { Tool, ToolContext, ToolOutcome } from './tool';
 
@@ -32,6 +33,8 @@ export interface ToolRegistryOptions {
   watch?: WatchToolDeps | undefined;
   /** Gives every pet `ask_pet`, when there is another pet to ask. */
   consult?: AskPetDeps | undefined;
+  /** Gives a pet whose role lists it `hand_to_expert`, when an expert is switched on. */
+  experts?: ExpertToolDeps | undefined;
   /** Defaults to `toolsFor`: the tools its role lists, minus any its grants switch off. */
   toolsFor?: ToolFilter | undefined;
 }
@@ -95,7 +98,7 @@ export class ToolRegistry {
 
   /** Every built-in this engine is wired for, in the order the model has always seen. */
   #all(turn: TurnRequest): Tool[] {
-    const { perception, memory, watch, consult } = this.#options;
+    const { perception, memory, watch, consult, experts } = this.#options;
     const tools: Tool[] = [];
     if (perception) tools.push(...perceptionTools(perception), ...recallTools(perception));
     if (memory) tools.push(rememberTool(memory));
@@ -104,6 +107,8 @@ export class ToolRegistry {
     if (consult && turn.allowConsult !== false && others.length > 0) {
       tools.push(askPetTool(consult, turn.pet));
     }
+    const switchedOn = experts ? enabledExperts(experts) : [];
+    if (experts && switchedOn.length > 0) tools.push(handToExpertTool(experts, switchedOn));
     return tools;
   }
 }

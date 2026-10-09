@@ -31,3 +31,4 @@ export {
   REMEMBER,
   type AskPetDeps,
 } from './builtin/crew';
+export { HAND_TO_EXPERT, type ExpertToolDeps } from './builtin/experts';
