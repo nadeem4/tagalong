@@ -524,6 +524,7 @@ test('Home opens with the real crew, each agent’s controls, and the activity v
   const roles = await panel.evaluate(() => window.tagalong.listRoles());
   expect(roles.map((role) => role.id).sort()).toEqual([
     'backend-engineer',
+    'companion',
     'frontend-engineer',
     'generalist',
     'researcher',
