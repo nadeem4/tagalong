@@ -123,6 +123,15 @@ export {
 } from './providers';
 
 export {
+  ClaudeCodeConnector,
+  FakeConnector,
+  renderBrief,
+  type Brief,
+  type Connector,
+  type ConnectorResult,
+} from './experts';
+
+export {
   ConversationRunner,
   assemblePrompt,
   type RunAsk,
