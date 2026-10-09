@@ -38,6 +38,7 @@ colors:
   job-backend: '#F6B85A'
   job-frontend: '#F28DB8'
   job-researcher: '#7DD87F'
+  job-companion: '#7CB8F2'
 typography:
   office-title:
     fontFamily: "'Pixelify Sans', 'Onest', sans-serif"
@@ -224,7 +225,7 @@ A cool ink-navy shell and cool off-white panels frame a warm-grey concrete floor
 
 ### Secondary
 
-- **Job-class inks** (job-generalist teal, job-writer violet, job-backend amber, job-frontend pink, job-researcher green): each job class's small-caps label in the agent list. Chosen to read on the sidebar navy. The class is the pet's role: the label is the role's name and the ink is keyed by role id in `officeTokens.roleInk`. A pet whose role is unknown reads "GENERALIST" in the generalist ink; a role without an ink of its own uses the shell muted text.
+- **Job-class inks** (job-generalist teal, job-writer violet, job-backend amber, job-frontend pink, job-researcher green, job-companion sky): each job class's small-caps label in the agent list. Chosen to read on the sidebar navy. The class is the pet's role: the label is the role's name and the ink is keyed by role id in `officeTokens.roleInk`. A pet whose role is unknown reads "GENERALIST" in the generalist ink; a role without an ink of its own uses the shell muted text.
 
 ### Neutral
 

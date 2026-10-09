@@ -52,6 +52,7 @@ export const officeTokens = {
     'backend-engineer': '#F6B85A',
     'frontend-engineer': '#F28DB8',
     researcher: '#7DD87F',
+    companion: '#7CB8F2',
   },
   font: {
     ui: "'Onest', system-ui, sans-serif",

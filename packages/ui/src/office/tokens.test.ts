@@ -52,6 +52,7 @@ describe('office tokens', () => {
     const inks = Object.values(officeTokens.roleInk);
     expect(Object.keys(officeTokens.roleInk).sort()).toEqual([
       'backend-engineer',
+      'companion',
       'frontend-engineer',
       'generalist',
       'researcher',
