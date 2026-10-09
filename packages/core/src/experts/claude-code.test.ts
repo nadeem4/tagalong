@@ -191,3 +191,48 @@ describe('ClaudeCodeConnector', () => {
     expect(calls[0]?.killed).toBe(true);
   });
 });
+
+describe('ClaudeCodeConnector.check', () => {
+  it('asks claude for its version in the folder, which costs nothing', async () => {
+    const { spawn, calls } = fakeSpawn(['2.1.0 (Claude Code)']);
+    const connector = new ClaudeCodeConnector({ folder: 'C:\\r', spawn, folderExists: () => true });
+    expect(await connector.check()).toEqual({ ok: true });
+    expect(calls[0]?.args).toEqual(['--version']);
+    expect(calls[0]?.cwd).toBe('C:\\r');
+  });
+
+  it('names a folder that is not there', async () => {
+    const { spawn, calls } = fakeSpawn([]);
+    const connector = new ClaudeCodeConnector({
+      folder: 'C:\\gone',
+      spawn,
+      folderExists: () => false,
+    });
+    expect(await connector.check()).toEqual({
+      ok: false,
+      error: 'The folder C:\\gone does not exist.',
+    });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('says when claude is missing or fails', async () => {
+    const missing: SpawnFn = () => {
+      throw Object.assign(new Error('spawn claude ENOENT'), { code: 'ENOENT' });
+    };
+    expect(
+      await new ClaudeCodeConnector({
+        folder: 'C:\\r',
+        spawn: missing,
+        folderExists: () => true,
+      }).check(),
+    ).toEqual({
+      ok: false,
+      error: 'Claude Code is not installed, or "claude" is not on the PATH.',
+    });
+
+    const { spawn } = fakeSpawn(['x'], 2, 'boom');
+    expect(
+      await new ClaudeCodeConnector({ folder: 'C:\\r', spawn, folderExists: () => true }).check(),
+    ).toEqual({ ok: false, error: 'Claude Code did not start: boom' });
+  });
+});

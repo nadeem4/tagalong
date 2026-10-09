@@ -235,3 +235,48 @@ describe('ActivityLog.list', () => {
     expect(entry?.answer?.length).toBeLessThanOrEqual(4_000);
   });
 });
+
+describe('expert hand-offs', () => {
+  it('records the brief, then the answer and the files changed', () => {
+    const id = log.expertStarted({
+      petId: 'scout',
+      expertId: 'claude-code',
+      expertName: 'Claude Code',
+      text: 'Fix the failing test',
+    });
+    expect(log.list({}).entries[0]).toMatchObject({
+      id,
+      kind: 'expert',
+      state: 'running',
+      petId: 'scout',
+      expertId: 'claude-code',
+      expertName: 'Claude Code',
+      text: 'Fix the failing test',
+    });
+
+    log.expertFinished(id, { ok: true, text: 'Fixed.', changedFiles: ['a.ts'] });
+    expect(log.list({}).entries[0]).toMatchObject({
+      state: 'done',
+      answer: 'Fixed.',
+      changedFiles: ['a.ts'],
+      finishedAt: expect.any(String) as string,
+    });
+  });
+
+  it('records why a hand-off failed, and a cancel as stopped', () => {
+    const failed = log.expertStarted({ petId: 'scout', expertId: 'x', expertName: 'X', text: 'a' });
+    log.expertFinished(failed, { ok: false, error: 'not signed in' });
+    const stopped = log.expertStarted({
+      petId: 'scout',
+      expertId: 'x',
+      expertName: 'X',
+      text: 'b',
+    });
+    log.expertFinished(stopped, { ok: false, error: 'Cancelled.' }, 'stopped');
+
+    const [second, first] = log.list({}).entries;
+    expect(first).toMatchObject({ state: 'error', error: 'not signed in' });
+    expect(second?.state).toBe('stopped');
+    expect(second?.error).toBeUndefined();
+  });
+});

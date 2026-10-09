@@ -32,3 +32,13 @@ describe('FakeConnector', () => {
     expect(result).toEqual({ ok: false, error: 'Cancelled.' });
   });
 });
+
+describe('FakeConnector.check', () => {
+  it('passes unless scripted not to', async () => {
+    expect(await new FakeConnector({}).check()).toEqual({ ok: true });
+    expect(await new FakeConnector({ checkError: 'gone' }).check()).toEqual({
+      ok: false,
+      error: 'gone',
+    });
+  });
+});

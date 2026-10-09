@@ -1,6 +1,6 @@
 import type { Database } from 'better-sqlite3';
 import { DEFAULT_ENGINE_PORT, RPC_ERROR_CODES, Settings } from '@tagalong/protocol';
-import type { Pet, Role } from '@tagalong/protocol';
+import type { Expert, Pet, Role } from '@tagalong/protocol';
 import { openDatabase } from './memory/db';
 import { ActivityLog } from './memory/activity';
 import { ConversationStore } from './memory/store';
@@ -31,6 +31,13 @@ import { WatchManager, systemWatchClock } from './watch';
 import { dismissRolesNotice, rolesUpgradeNotice } from './pets/roles-notice';
 import { getRole, listRoles, recommendedModel } from './roles';
 import { EngineServer, RpcFailure } from './server/ws-server';
+import {
+  ClaudeCodeConnector,
+  ExpertStore,
+  FakeConnector,
+  HandoffManager,
+  type Connector,
+} from './experts';
 import type { MethodHandlers } from './server/ws-server';
 import { readOrCreatePairingToken } from './server/pairing';
 
@@ -111,6 +118,25 @@ export interface EngineOptions {
   env?: Record<string, string | undefined> | undefined;
   /** Skips the registry entirely. Only tests that script a provider need this. */
   provider?: BrainProvider | undefined;
+  /** How an expert is reached. Defaults to its real connector, or a fake one in fake mode. */
+  connectorFor?: ((expert: Expert) => Connector) | undefined;
+}
+
+/**
+ * The connector behind an expert. Fake mode never starts a real tool, the same rule the
+ * brain providers follow, so a test or a demo cannot spend the user's Claude Code usage.
+ */
+function defaultConnectorFor(env: Record<string, string | undefined>) {
+  return (expert: Expert): Connector => {
+    if (env.TAGALONG_FAKE_PROVIDERS === '1') {
+      return new FakeConnector({
+        steps: ['Reading the brief'],
+        text: `${expert.name} (fake) read the brief and has nothing to change.`,
+      });
+    }
+    const { folder, canEdit, command } = expert.connection;
+    return new ClaudeCodeConnector({ folder, canEdit, ...(command ? { command } : {}) });
+  };
 }
 
 /**
@@ -128,6 +154,7 @@ export class Engine {
   readonly #settings: SettingsStore;
   readonly #token: string;
   readonly #watches: WatchManager;
+  readonly #handoffs: HandoffManager;
 
   private constructor(parts: {
     db: Database;
@@ -137,8 +164,10 @@ export class Engine {
     settings: SettingsStore;
     token: string;
     watches: WatchManager;
+    handoffs: HandoffManager;
   }) {
     this.#watches = parts.watches;
+    this.#handoffs = parts.handoffs;
     this.#db = parts.db;
     this.#server = parts.server;
     this.#runner = parts.runner;
@@ -202,6 +231,14 @@ export class Engine {
       emit: (event) => live.server?.broadcast(event.method, event.params),
       log: (message) => console.warn(`[engine] ${message}`),
     });
+    const experts = new ExpertStore(db);
+    const connectorFor = options.connectorFor ?? defaultConnectorFor(options.env ?? process.env);
+    const handoffs = new HandoffManager({
+      experts,
+      activity,
+      connectorFor,
+      emit: (event) => live.server?.broadcast(event.method, event.params),
+    });
     const runner = new ConversationRunner({
       store,
       settings,
@@ -238,6 +275,9 @@ export class Engine {
       settings,
       hosts,
       watches,
+      experts,
+      handoffs,
+      connectorFor,
       refreshProviders: async () => keyed?.refresh(),
       models: (providerId) =>
         listModels(providerId, options.secretStore, settings, options.env ?? process.env),
@@ -261,6 +301,7 @@ export class Engine {
       settings,
       token: readOrCreatePairingToken(options.dataDir),
       watches,
+      handoffs,
     });
   }
 
@@ -284,6 +325,7 @@ export class Engine {
 
   async shutdown(): Promise<void> {
     this.#watches.stopAll();
+    await this.#handoffs.stopAll();
     this.#runner.interruptAll();
     await this.#server.close();
     this.#db.close();
@@ -311,12 +353,15 @@ function buildHandlers(parts: {
   /** Lazy, like the toolset's: the extension connects and drops while the app runs. */
   hosts: () => readonly PerceptionHost[];
   watches: WatchManager;
+  experts: ExpertStore;
+  handoffs: HandoffManager;
+  connectorFor: (expert: Expert) => Connector;
   models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
   /** Re-reads provider keys, so a key saved since the last ask is used by this one. */
   refreshProviders: () => Promise<void>;
 }): MethodHandlers {
   const { db, activity, runner, store, emit, pets, settings, models, hosts, watches } = parts;
-  const { refreshProviders } = parts;
+  const { refreshProviders, experts, handoffs, connectorFor } = parts;
 
   return {
     ask: async (params) => {
@@ -384,5 +429,21 @@ function buildHandlers(parts: {
     'notices.dismiss': () => ({ dismissed: dismissRolesNotice(db) }),
 
     'activity.list': (params) => activity.list(params),
+
+    'experts.list': () => ({ experts: experts.list() }),
+    'experts.upsert': (params) => ({ expert: experts.upsert(params.expert) }),
+    'experts.delete': (params) => ({ deleted: experts.delete(params.expertId) }),
+    'experts.test': async (params) => {
+      const expert = experts.get(params.expertId);
+      if (expert === null) {
+        throw new RpcFailure(
+          RPC_ERROR_CODES.invalidParams,
+          `no expert with id '${params.expertId}'`,
+        );
+      }
+      return connectorFor(expert).check();
+    },
+    'handoffs.start': (params) => handoffs.start(params),
+    'handoffs.cancel': (params) => ({ cancelled: handoffs.cancel(params.handoffId) }),
   };
 }

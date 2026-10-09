@@ -1,9 +1,11 @@
 import { spawn as nodeSpawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import {
   CANCELLED,
   renderBrief,
   type Brief,
+  type CheckResult,
   type Connector,
   type ConnectorResult,
 } from './connector';
@@ -29,7 +31,10 @@ export interface ClaudeCodeOptions {
   canEdit?: boolean;
   command?: string;
   spawn?: SpawnFn;
+  folderExists?: (folder: string) => boolean;
 }
+
+const NOT_INSTALLED = 'Claude Code is not installed, or "claude" is not on the PATH.';
 
 const READ_TOOLS = ['Read', 'Glob', 'Grep'];
 const EDIT_TOOLS = ['Edit', 'Write'];
@@ -45,6 +50,29 @@ export class ClaudeCodeConnector implements Connector {
 
   constructor(private readonly options: ClaudeCodeOptions) {
     this.spawn = options.spawn ?? spawnChild;
+  }
+
+  async check(): Promise<CheckResult> {
+    const { folder } = this.options;
+    if (!(this.options.folderExists ?? existsSync)(folder)) {
+      return { ok: false, error: `The folder ${folder} does not exist.` };
+    }
+    let child: ChildRun;
+    try {
+      child = this.spawn(this.options.command ?? 'claude', ['--version'], { cwd: folder });
+    } catch (error) {
+      if ((error as { code?: string }).code === 'ENOENT')
+        return { ok: false, error: NOT_INSTALLED };
+      return { ok: false, error: `Claude Code did not start: ${(error as Error).message}` };
+    }
+    child.write('');
+    for await (const line of child.lines) void line;
+    const code = await child.exit;
+    if (code === 0) return { ok: true };
+    return {
+      ok: false,
+      error: `Claude Code did not start: ${child.stderr().trim() || `exit code ${code}`}`,
+    };
   }
 
   async send(

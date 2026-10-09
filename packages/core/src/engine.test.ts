@@ -906,3 +906,74 @@ describe('watch limits without a restart', () => {
     expect(status.params['maxChecks']).toBe(7);
   });
 });
+
+describe('experts and hand-offs', () => {
+  const expert = {
+    id: 'claude-code',
+    name: 'Claude Code',
+    goodAt: 'Code',
+    connection: { type: 'claude-code', folder: 'C:\\projects\\ai_pet' },
+  };
+
+  it('saves an expert, keeps it across a restart, and deletes it', async () => {
+    let e = await boot();
+    let host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const saved = await host.call('experts.upsert', { expert });
+    expect(saved['result']).toMatchObject({ expert: { id: 'claude-code', enabled: true } });
+
+    await e.shutdown();
+    e = await boot();
+    host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const listed = await host.call('experts.list', {});
+    expect((listed['result'] as { experts: unknown[] }).experts).toHaveLength(1);
+
+    expect((await host.call('experts.delete', { expertId: 'claude-code' }))['result']).toEqual({
+      deleted: true,
+    });
+  });
+
+  it('tests an expert and runs a hand-off on the fake connector, logging it', async () => {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('experts.upsert', { expert });
+
+    expect((await host.call('experts.test', { expertId: 'claude-code' }))['result']).toEqual({
+      ok: true,
+    });
+
+    const started = await host.call('handoffs.start', {
+      expertId: 'claude-code',
+      petId: 'scout',
+      brief: { ask: 'Explain engine.ts' },
+    });
+    const { handoffId } = started['result'] as { handoffId: string };
+    await vi.waitFor(() => expect(host.methods()).toContain('handoff.finished'));
+    expect(host.notifications.find((n) => n.method === 'handoff.finished')?.params).toMatchObject({
+      handoffId,
+      state: 'done',
+    });
+
+    const res = await host.call('activity.list', {});
+    expect((res['result'] as { entries: unknown[] }).entries[0]).toMatchObject({
+      id: handoffId,
+      kind: 'expert',
+      expertName: 'Claude Code',
+      state: 'done',
+    });
+  });
+
+  it('refuses a hand-off to an expert that does not exist', async () => {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const res = await host.call('handoffs.start', {
+      expertId: 'nobody',
+      petId: 'scout',
+      brief: { ask: 'x' },
+    });
+    expect(res['error']).toMatchObject({ code: RPC_ERROR_CODES.invalidParams });
+  });
+});

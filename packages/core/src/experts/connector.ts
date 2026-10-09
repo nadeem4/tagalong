@@ -5,21 +5,19 @@
  * which carries it to whatever the expert really is (a command-line agent, a model API,
  * a tool server) and brings back a `ConnectorResult`. Each kind of expert is one adapter.
  */
+import type { Brief } from '@tagalong/protocol';
 
-/** What the companion sends: the ask in the user's words and what they were looking at. */
-export interface Brief {
-  ask: string;
-  context?: { app?: string; windowTitle?: string; selection?: string };
-  /** Paths the companion thinks matter, relative to the expert's folder where it can. */
-  files?: string[];
-  /** What a good answer looks like, so the expert knows when it is done. */
-  goodAnswer?: string;
-}
+export type { Brief };
 
 export type ConnectorResult =
   { ok: true; text: string; changedFiles: string[] } | { ok: false; error: string };
 
+export type CheckResult = { ok: true } | { ok: false; error: string };
+
 export interface Connector {
+  /** Whether the expert can be reached, without spending anything. */
+  check(): Promise<CheckResult>;
+
   /**
    * Sends one brief and resolves with the expert's answer. `onProgress` gets short
    * human-readable steps ("Reading src/main.ts") while the expert works. Never throws:
