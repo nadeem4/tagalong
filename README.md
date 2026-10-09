@@ -144,6 +144,13 @@ Right-click the tray icon and choose **Open Home**. Home is where the whole crew
   engineer, Writer, Researcher or Companion, which hands work to your experts instead of doing it), its provider and model (**Recommended** for its role, or your own
   choice), its tools, its private notes, its look, and whether it is the pet on your desktop. The card
   beside it shows how its teammates see it. **Save** applies from the next question.
+- **Experts** are the tools your companion hands work to, so you stop copying, switching and
+  pasting. Open the **Experts** tab and choose **Add expert**: give it a name, say what it is good at,
+  and pick the folder it works in. Claude Code is the first kind; it must be installed and signed in
+  on this computer. It only reads and searches unless you tick **Let it edit files in this folder**.
+  **Save and test** checks that Claude Code starts in that folder, which costs nothing. A pet with the
+  Companion role then briefs the right expert for you; the hand-off and the expert's answer appear in
+  Activity, and a Windows notification tells you when it is done.
 - **Meetings** will appear in their own tab once agents can meet.
 
 Settings keeps the app-wide things: keys, hotkeys, summaries, sight, awareness and the browser
