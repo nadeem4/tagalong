@@ -27,6 +27,7 @@ const BUILT_IN_TOOLS = [
   'watch_for',
   'remember',
   'ask_pet',
+  'hand_to_expert',
 ];
 
 const roleFiles = readdirSync(ROLES_DIR)
@@ -36,9 +37,10 @@ const roleFiles = readdirSync(ROLES_DIR)
 const lf = (text: string): string => text.replace(/\r\n/g, '\n');
 
 describe('the role files', () => {
-  it('include the five shipped roles', () => {
+  it('include the six shipped roles', () => {
     expect(roleFiles.map((file) => basename(file, '.md')).sort()).toEqual([
       'backend-engineer',
+      'companion',
       'frontend-engineer',
       'generalist',
       'researcher',
@@ -61,9 +63,20 @@ describe('the role files', () => {
     expect(role.tools.filter((tool) => !BUILT_IN_TOOLS.includes(tool))).toEqual([]);
   });
 
-  it.each(roleFiles)('%s gives its pet remember and ask_pet', (file) => {
-    const role = Role.parse(parseRoleFile(readFileSync(file, 'utf8')));
-    expect(role.tools).toEqual(expect.arrayContaining(['remember', 'ask_pet']));
+  // The companion hands work to experts rather than consulting other pets.
+  it.each(roleFiles.filter((file) => basename(file, '.md') !== 'companion'))(
+    '%s gives its pet remember and ask_pet',
+    (file) => {
+      const role = Role.parse(parseRoleFile(readFileSync(file, 'utf8')));
+      expect(role.tools).toEqual(expect.arrayContaining(['remember', 'ask_pet']));
+    },
+  );
+
+  it('give the companion hand_to_expert and nothing that writes files or runs code', () => {
+    const tools = getRole('companion')?.tools ?? [];
+    expect(tools).toContain('hand_to_expert');
+    expect(tools).not.toContain('ask_pet');
+    expect(tools).not.toContain('watch_for');
   });
 
   it('use unique ids', () => {
