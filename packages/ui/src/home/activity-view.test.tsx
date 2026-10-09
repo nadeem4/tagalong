@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ActivityEntry, Pet } from '@tagalong/protocol';
 import { HostBridgeProvider } from '../host-bridge';
@@ -166,6 +166,31 @@ describe('ActivityView', () => {
     });
     expect(await screen.findByRole('button', { name: /Ink is answering/ })).toBeInTheDocument();
     expect(row(/Scout answered/)).toBeInTheDocument();
+  });
+
+  it('updates live when an expert finishes a hand-off', async () => {
+    const running = entry({
+      id: 'x',
+      kind: 'expert',
+      state: 'running',
+      expertId: 'claude-code',
+      expertName: 'Claude Code',
+    });
+    const bridge = createFakeHostBridge({ activity: [running] });
+    await renderActivity(bridge);
+    expect(row(/Scout handed off to Claude Code/)).toHaveTextContent('Working');
+    bridge.activity[0] = { ...running, state: 'done', answer: 'Done.' };
+    await act(async () => {
+      bridge.emit({
+        type: 'handoff.finished',
+        handoffId: '7c9e6679-7425-40de-944b-e07fc1f90ae7',
+        expertId: 'claude-code',
+        state: 'done',
+        text: 'Done.',
+      });
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(row(/Scout handed off to Claude Code/)).toHaveTextContent('Done'));
   });
 
   it('pages back through older activity', async () => {

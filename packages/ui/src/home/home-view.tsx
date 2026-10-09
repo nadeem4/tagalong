@@ -17,6 +17,7 @@ import { officeTokens as t } from '../office/tokens';
 import { SETTINGS_CSS } from '../settings/settings-styles';
 import { ActivityView } from './activity-view';
 import { AgentControls } from './agent-controls';
+import { ExpertsPanel } from './experts-panel';
 import type { AgentHost } from './agent-controls';
 import { HOME_CSS } from './home-styles';
 import { newAgent } from './new-agent';
@@ -26,8 +27,8 @@ import { DEFAULT_THEME } from './themes';
 
 const NOT_YET = 'Task assignment arrives in a later update';
 
-type Tab = 'activity' | 'agent' | 'meetings';
-const TABS: readonly Tab[] = ['activity', 'agent', 'meetings'];
+type Tab = 'activity' | 'agent' | 'experts' | 'meetings';
+const TABS: readonly Tab[] = ['activity', 'agent', 'experts', 'meetings'];
 
 export interface HomeViewProps {
   /** The centre scene's theme. Only the scene changes with it; the chrome never does. */
@@ -39,7 +40,7 @@ export interface HomeViewProps {
 /**
  * Home, the control centre: every agent in a fixed list on the left, what each is doing in
  * the themed scene in the centre, and on the right what the crew did (activity), the picked
- * agent's controls and the meetings. The top bar, the list and the right panel are Home's
+ * agent's controls, the experts the companion hands work to, and the meetings. The top bar, the list and the right panel are Home's
  * chrome and are identical in every theme. Host-agnostic: the crew, the roles and the turn
  * events come through the HostBridge, agent edits through `agentHost`.
  */
@@ -259,10 +260,11 @@ export function HomeView({ theme = DEFAULT_THEME, agentHost }: HomeViewProps = {
 const TAB_NAMES: Record<Tab, (agent: string) => string> = {
   activity: () => 'Activity',
   agent: (agent) => agent,
+  experts: () => 'Experts',
   meetings: () => 'Meetings',
 };
 
-/** The right-hand panel: Activity, the picked agent's controls, Meetings. */
+/** The right-hand panel: Activity, the picked agent's controls, Experts, Meetings. */
 function SidePanel({
   tab,
   onTab,
@@ -290,6 +292,7 @@ function SidePanel({
   const panels: Record<Tab, ReactNode> = {
     activity,
     agent,
+    experts: <ExpertsPanel />,
     meetings: <MeetingsPanel />,
   };
   return (

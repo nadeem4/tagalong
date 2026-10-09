@@ -349,3 +349,22 @@ describe('the Still office toggle', () => {
     );
   });
 });
+
+describe('Home’s Experts tab', () => {
+  it('sits between the agent and Meetings, and opens the experts', async () => {
+    render(
+      <HostBridgeProvider bridge={createFakeHostBridge({ pets: CREW, roles: ROLES })}>
+        <HomeView />
+      </HostBridgeProvider>,
+    );
+    const tabs = await screen.findAllByRole('tab');
+    expect(tabs.map((tab) => tab.textContent)).toEqual([
+      'Activity',
+      'Scout',
+      'Experts',
+      'Meetings',
+    ]);
+    fireEvent.click(screen.getByRole('tab', { name: 'Experts' }));
+    expect(await screen.findByText(/No experts yet/)).toBeVisible();
+  });
+});

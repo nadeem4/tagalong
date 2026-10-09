@@ -4,6 +4,7 @@ import type {
   ActivityListResult,
   ContextSnapshot,
   CoreToHostNotification,
+  Expert,
   NotificationParamsOf,
   PerceptionTarget,
   Pet,
@@ -13,14 +14,17 @@ import type {
 
 /**
  * The core-to-host notifications a panel renders: everything about a turn in flight, plus
- * the crew's own — one pet addressing another, and a crew run's progress.
+ * the crew's own — one pet addressing another, and a crew run's progress — and a hand-off
+ * to an expert as it goes.
  */
 type TurnNotification =
   | Extract<CoreToHostNotification, `turn.${string}`>
   | 'pet.message'
   | 'crew.status'
   | 'watch.fired'
-  | 'watch.status';
+  | 'watch.status'
+  | 'handoff.progress'
+  | 'handoff.finished';
 
 /**
  * Derived from the protocol catalog rather than restated, so a new turn.* notification
@@ -83,6 +87,17 @@ export interface HostBridge {
    * shows the activity view.
    */
   listActivity?(params?: { before?: string; limit?: number }): Promise<ActivityListResult>;
+  /**
+   * Home's Experts tab: the tools a companion hands work to. All optional: a host without
+   * Home, such as the browser extension, never shows the tab.
+   */
+  listExperts?(): Promise<Expert[]>;
+  saveExpert?(expert: Expert): Promise<Expert>;
+  deleteExpert?(expertId: string): Promise<boolean>;
+  /** Whether the expert can be reached, at no cost: Claude Code's `--version`. */
+  testExpert?(expertId: string): Promise<{ ok: boolean; error?: string }>;
+  /** The host's folder picker; null when the user cancelled. */
+  pickFolder?(): Promise<string | null>;
 }
 
 const HostBridgeContext = createContext<HostBridge | null>(null);
