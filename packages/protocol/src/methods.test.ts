@@ -35,6 +35,12 @@ const HOST_TO_CORE = [
   'notices.rolesUpgrade',
   'notices.dismiss',
   'activity.list',
+  'experts.list',
+  'experts.upsert',
+  'experts.delete',
+  'experts.test',
+  'handoffs.start',
+  'handoffs.cancel',
 ] as const;
 
 const CORE_TO_HOST = ['perception.capture'] as const;
@@ -52,6 +58,8 @@ const CORE_TO_HOST_NOTIFICATIONS = [
   'crew.status',
   'watch.fired',
   'watch.status',
+  'handoff.progress',
+  'handoff.finished',
 ] as const;
 
 describe('method catalog', () => {

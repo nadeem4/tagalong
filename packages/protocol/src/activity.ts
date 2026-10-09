@@ -2,10 +2,11 @@ import { z } from 'zod';
 
 /**
  * What the crew did, as Home's activity view lists it: each turn, each consult (`ask_pet`),
- * each handoff (`@Name`) and each roundtable (`/crew`). Meetings are not here: they do not
+ * each handoff (`@Name`), each roundtable (`/crew`), and each brief a companion handed
+ * to an expert. Meetings are not here: they do not
  * exist in the engine yet, and the view keeps their empty state instead.
  */
-export const ActivityKind = z.enum(['turn', 'consult', 'handoff', 'roundtable']);
+export const ActivityKind = z.enum(['turn', 'consult', 'handoff', 'roundtable', 'expert']);
 export type ActivityKind = z.infer<typeof ActivityKind>;
 
 export const ActivityState = z.enum(['running', 'done', 'error', 'stopped']);
@@ -29,6 +30,12 @@ export const ActivityEntry = z.object({
   text: z.string().optional(),
   /** A turn's or a consult's answer. */
   answer: z.string().optional(),
+  /** An `expert` entry: the expert, and its name when the brief went, so a rename or a
+   * deletion later does not rewrite the log. */
+  expertId: z.string().min(1).optional(),
+  expertName: z.string().min(1).optional(),
+  /** An `expert` entry: the files the expert edited. */
+  changedFiles: z.array(z.string()).optional(),
   /** Why it failed, when `state` is `error`. */
   error: z.string().optional(),
   modelCalls: z.number().int().nonnegative().optional(),

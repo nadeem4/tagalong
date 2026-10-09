@@ -1,6 +1,22 @@
 import { z } from 'zod';
 import { ActivityListParams, ActivityListResult } from './activity';
 import {
+  ExpertsDeleteParams,
+  ExpertsDeleteResult,
+  ExpertsListParams,
+  ExpertsListResult,
+  ExpertsTestParams,
+  ExpertsTestResult,
+  ExpertsUpsertParams,
+  ExpertsUpsertResult,
+  HandoffFinishedParams,
+  HandoffProgressParams,
+  HandoffsCancelParams,
+  HandoffsCancelResult,
+  HandoffsStartParams,
+  HandoffsStartResult,
+} from './experts';
+import {
   CapturedImage,
   ContextSnapshot,
   ContextSnapshotPatch,
@@ -339,6 +355,12 @@ export const hostToCoreMethods = {
   'notices.rolesUpgrade': { params: NoticesRolesUpgradeParams, result: NoticesRolesUpgradeResult },
   'notices.dismiss': { params: NoticesDismissParams, result: NoticesDismissResult },
   'activity.list': { params: ActivityListParams, result: ActivityListResult },
+  'experts.list': { params: ExpertsListParams, result: ExpertsListResult },
+  'experts.upsert': { params: ExpertsUpsertParams, result: ExpertsUpsertResult },
+  'experts.delete': { params: ExpertsDeleteParams, result: ExpertsDeleteResult },
+  'experts.test': { params: ExpertsTestParams, result: ExpertsTestResult },
+  'handoffs.start': { params: HandoffsStartParams, result: HandoffsStartResult },
+  'handoffs.cancel': { params: HandoffsCancelParams, result: HandoffsCancelResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostMethods = {
@@ -369,6 +391,8 @@ export const coreToHostNotifications = {
   'crew.status': { params: CrewStatusParams },
   'watch.fired': { params: WatchFiredParams },
   'watch.status': { params: WatchStatusParams },
+  'handoff.progress': { params: HandoffProgressParams },
+  'handoff.finished': { params: HandoffFinishedParams },
 } as const satisfies Record<string, NotificationSpec>;
 
 export type HostToCoreMethod = keyof typeof hostToCoreMethods;
