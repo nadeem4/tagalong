@@ -120,6 +120,7 @@ Inside `apps/desktop`:
 ```bash
 pnpm build            # ensure-electron, then electron-vite build into dist/
 pnpm start            # ensure-electron, then electron-vite preview against the built output
+pnpm start:fresh      # the same, on a new temp data folder: Welcome and the first hello, every time
 pnpm test:e2e         # ensure-electron, electron-vite build, then the Playwright smoke suite
 pnpm ensure-electron  # fetch the Electron binary on its own
 pnpm package:win      # fetch-native, electron-vite build, electron-builder --win nsis
@@ -192,7 +193,10 @@ PowerShell has no inline `VAR=value command` prefix; pasting the bash line into 
 `TAGALONG_FAKE_PROVIDERS=1 : The term ... is not recognized`.
 
 On a fresh profile Welcome opens first; **Start** finishes it, and **Home → Settings → Open Welcome
-again** brings it back. The tray's **Open Tagalong** item opens Home. Two more things are worth knowing before the first run.
+again** brings it back. To see what a new user sees, run `pnpm --filter @tagalong/desktop
+start:fresh`: it starts on a new folder in the temp directory (`--user-data-dir`), so Welcome and
+Scout's first hello show every time and your own `%APPDATA%\Tagalong` is never touched. Quit any
+running Tagalong first; the fresh copy has no saved keys. The tray's **Open Tagalong** item opens Home. Two more things are worth knowing before the first run.
 
 **`ensure-electron`.** Electron 44.3.0 publishes no npm install script, so `pnpm install` unpacks the
 package without ever downloading the platform binary, and the first launch dies with an error that
