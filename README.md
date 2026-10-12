@@ -14,15 +14,15 @@ each other, and can watch the screen for you. They never take over your mouse or
 
 ## What is in this build
 
-| In this build                                                                                       | Not in this build                                                   |
-| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Windows desktop app with a Welcome window and an NSIS installer                                     | macOS and Linux (the installer configs exist but are unverified)    |
-| Three providers: OpenRouter (Claude), Nebius Token Factory (NVIDIA Nemotron), Anthropic             | Voice: push to talk and spoken answers                              |
-| Sight: selection, screenshot, every display, every open window, window text, capture exclusions     | Hands: MCP tools and approval cards                                 |
-| Vision routing: a text-only Nemotron pet reads pictures with Nemotron Nano 2 VL                     | A cost dashboard                                                    |
-| The crew: Scout, Ink and Bolt, handoff with `@Name`, pets consulting each other, `/crew` roundtable | Data export and delete-all in Settings                              |
-| Memory across restarts, rolling screen memory (opt-in), watches ("tell me when this finishes")      | Code signing (the installer is unsigned) and an app icon of its own |
-| The Chrome extension: the same crew in Chrome's side panel, reading the page you are on             |                                                                     |
+| In this build                                                                                   | Not in this build                                                   |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Windows desktop app with a Welcome window and an NSIS installer                                 | macOS and Linux (the installer configs exist but are unverified)    |
+| Three providers: OpenRouter (Claude), Nebius Token Factory (NVIDIA Nemotron), Anthropic         | Voice: push to talk and spoken answers                              |
+| Sight: selection, screenshot, every display, every open window, window text, capture exclusions | Hands: MCP tools and approval cards                                 |
+| Vision routing: a text-only Nemotron pet reads pictures with Nemotron Nano 2 VL                 | A cost dashboard                                                    |
+| One companion, Scout, that hands work to experts and brings the answer back                     | Data export and delete-all in Settings                              |
+| Memory across restarts, rolling screen memory (opt-in), watches ("tell me when this finishes")  | Code signing (the installer is unsigned) and an app icon of its own |
+| The Chrome extension: the same crew in Chrome's side panel, reading the page you are on         |                                                                     |
 
 # Using Tagalong
 
@@ -63,8 +63,8 @@ The first time Tagalong starts, one Welcome window opens on the screen you are u
    needs no key. Otherwise pick OpenRouter, Nebius Token Factory or Anthropic and paste a key; it goes
    straight into the operating system's keychain.
 4. **One key to remember.** Ctrl+Shift+Space asks Scout about whatever is on your screen.
-5. **Start.** Scout becomes your companion, docks alone on your screen and says hello in a bubble.
-   Ink and Bolt are hidden, not deleted: Home brings them back.
+5. **Start.** Scout becomes your companion, docks on your screen and says hello in a bubble. If
+   Claude Code is installed it becomes Scout's first expert, so hand-offs work straight away.
 
 After that, press Ctrl+Shift+Space (or click Scout) to open Scout's bubble. It shows what Scout can
 see as chips (the app and window, selected text, a screenshot); remove any chip you do not want
@@ -117,24 +117,14 @@ boxes, store its key there, and type its model id on the pet.
 Escape or clicking elsewhere hides the panel. Every key can be changed in Settings, and the change
 works at once. The bigger the look, the more it costs: a screenshot adds roughly 1,500 input tokens.
 
-## Pets and the crew
+## Scout, your companion
 
-A fresh install has three pets. Click one on the strip to talk to it.
+A fresh install has one pet: Scout, the companion. Scout does not do the work itself. It sees what
+you are doing (when you press the key), writes a brief and hands it to the right expert, follows it
+and brings the answer back. It thinks through your Claude Code sign-in, or a provider key if Claude
+Code is not installed. Earlier versions shipped a crew of three (Scout, Ink and Bolt); Ink and Bolt
+are removed on upgrade, and their conversations stay on disk.
 
-| Pet      | Good at                               |
-| -------- | ------------------------------------- |
-| 🔎 Scout | Explaining what is on your screen     |
-| ✒️ Ink   | Writing and rewriting in your voice   |
-| ⚡ Bolt  | Reading errors, stack traces and code |
-
-- **Hand off.** Start a message with `@Ink` (or any pet's name) and that pet takes over, with a
-  summary of the conversation so far. **Hand off…** under an answer does the same.
-- **Ask another pet.** A pet may consult another one mid-answer when it knows better; a small card in
-  the panel says who it asked.
-- **The roundtable.** Start a message with `/crew` (or press **Crew**) and every pet answers in turn,
-  seeing the others' answers, and the pet you asked closes with a summary. Pets on different
-  providers and models think differently, which is the point. A roundtable of three costs four model
-  calls; the panel footer counts them.
 - **Memory.** Tell a pet "I prefer short answers" and it remembers across restarts.
 
 ### Home: see and control your agents

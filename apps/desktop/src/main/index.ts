@@ -31,7 +31,7 @@ import { captureAskSnapshot, capturePatch } from './context';
 import { startEngineHost } from './engine-host';
 import { extensionFolder, isAllowedLink } from './links';
 import { providerChoices, secretKeyFor } from './provider-choices';
-import { findAgents, shouldOpenWelcome, welcomeCrew } from './welcome';
+import { findAgents, shouldOpenWelcome, welcomeCrew, welcomeExperts } from './welcome';
 import type { EngineHost } from './engine-host';
 import {
   DEFAULT_LOOK_HOTKEY,
@@ -781,6 +781,11 @@ function registerIpc(): void {
     const { defaultPetId } = current.settings;
     const { scout, hiddenPets } = welcomeCrew(pets, defaultPetId, providerId, companion);
     await client.call('pets.upsert', { pet: scout });
+    // Claude Code, when it is here, becomes the first expert, so a hand-off works at once.
+    const { experts } = await client.call('experts.list', {});
+    for (const expert of welcomeExperts(await findAgents(), experts)) {
+      await client.call('experts.upsert', { expert });
+    }
     const patch: SettingsPatch = { hiddenPets, welcome: { done: true } };
     current.settings = (await client.call('settings.set', { patch })).settings;
     refreshStrip();

@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { recommendedModel } from '@tagalong/core';
 import { Pet } from '@tagalong/protocol';
-import type { Role, Settings } from '@tagalong/protocol';
+import type { Expert, Role, Settings } from '@tagalong/protocol';
 import type { FoundAgent } from '../shared/ipc';
 
 /**
@@ -80,4 +80,27 @@ export function welcomeCrew(
     ...(recommended?.visionModel === undefined ? {} : { visionModel: recommended.visionModel }),
   });
   return { scout, hiddenPets: pets.filter((pet) => pet.id !== defaultPetId).map((pet) => pet.id) };
+}
+
+/**
+ * The experts finishing Welcome adds: Claude Code when it is installed and no Claude Code
+ * expert exists yet. It gets no folder, since each task names its own project, and stays
+ * read-only until a task allows edits.
+ */
+export function welcomeExperts(
+  agents: readonly FoundAgent[],
+  existing: readonly Expert[],
+): Expert[] {
+  const claude = agents.find((agent) => agent.id === 'claude-code');
+  if (claude?.found !== true) return [];
+  if (existing.some((expert) => expert.connection.type === 'claude-code')) return [];
+  return [
+    {
+      id: 'claude-code',
+      name: 'Claude Code',
+      goodAt: 'Code: reading, explaining, debugging and changing code in a project.',
+      enabled: true,
+      connection: { type: 'claude-code', canEdit: false },
+    },
+  ];
 }

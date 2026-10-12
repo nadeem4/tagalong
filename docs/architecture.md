@@ -597,19 +597,16 @@ what the engine broadcasts.
 `pets/registry.ts` keeps each pet as a validated JSON blob in the `pets` table and exposes it through
 `pets.list`, `pets.upsert` and `pets.delete`. `pets.upsert` refuses a `roleId` the role library does
 not have with RPC error `-32602`, and stamps a new pet (or one changing role) with that role's
-library `version`. A fresh install is seeded with three pets that
-deliberately run on different brains, so the crew spans providers from the first boot:
+library `version`. A fresh install is seeded with one pet: Scout, the Companion, on
+`claude-code` with the `haiku` model, so it thinks through the person's Claude Code sign-in and needs
+no key (Welcome moves it to a keyed provider when Claude Code is missing).
 
-| Pet   | Role             | Provider     | Model                                                |
-| ----- | ---------------- | ------------ | ---------------------------------------------------- |
-| Scout | Generalist       | `nebius`     | Nemotron 3 Super, Nemotron Nano 2 VL for pictures    |
-| Ink   | Writer           | `openrouter` | `anthropic/claude-sonnet-5`                          |
-| Bolt  | Backend engineer | `nebius`     | Nemotron Nano 2 VL (reads screenshots of errors too) |
-
-Seeding is remembered per pet in `pet_seeds` (migration 2). Migration 5 gives every stored pet a
-role (Scout generalist, Ink writer, Bolt backend engineer, any other pet generalist) and keeps an
-edited persona as the pet's notes. An install that predates the crew gains Ink and Bolt on its next
-boot, a pet the user edited is never overwritten, and a default the user deleted stays deleted. Each
+Seeding is remembered per pet in `pet_seeds` (migration 2), so a pet the user edited is never
+overwritten and a default the user deleted stays deleted. Migration 5 gives every stored pet a role
+and keeps an edited persona as the pet's notes. Migration 11 deletes Ink and Bolt, the crew's other
+two defaults from before the one-companion design; their conversations stay, and `pet_seeds` keeps
+them from being seeded again. The crew machinery (hand-offs between pets, consults, `/crew`) still
+works for any pets a database holds, but a fresh install has only the companion. Each
 pet carries an optional `color` (`#rrggbb`) for the strip and the panel.
 
 ### Memory
@@ -1105,7 +1102,8 @@ flowchart LR
   a brain provider and setting `brain` on their entry in `AGENTS`.
 - **Start** (`finishWelcome(providerId)`) makes the default pet the Companion on that provider, on
   the model its role's tier recommends there (`welcomeCrew`, using `recommendedModel`), hides every
-  other pet (they stay in Home), sets `welcome.done`, closes Welcome, and sends the panel `greetEvent` and shows it without
+  other pet (they stay in Home), adds Claude Code as an expert when it is installed and none exists
+  (`welcomeExperts`: no folder, read-only), sets `welcome.done`, closes Welcome, and sends the panel `greetEvent` and shows it without
   focus (`showPanelQuietly`): Scout says hello in its bubble, which tucks itself away after 12
   seconds, on **Got it**, or when the hotkey asks a question.
 - **A new key answers the next question.** `KeyedProviderResolver` re-reads the keychain before every

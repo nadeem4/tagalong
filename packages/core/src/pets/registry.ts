@@ -1,6 +1,5 @@
 import type { Database } from 'better-sqlite3';
 import { Pet } from '@tagalong/protocol';
-import { NEMOTRON_TEXT_MODEL, NEMOTRON_VISION_MODEL } from '../providers/nebius-models';
 import { getRole } from '../roles';
 
 /** The library version of a role a default pet ships with. */
@@ -11,67 +10,27 @@ function roleVersion(roleId: string): number {
 }
 
 /**
- * The explainer, and the pet a fresh install opens on.
- *
- * Scout runs on NVIDIA Nemotron through Nebius Token Factory: Nemotron 3 Super for words,
- * switching to Nemotron Nano 2 VL whenever a turn carries a picture, since Super cannot
- * see. Claude stays one Settings change away. Only a fresh install gets this; seeding never
- * overwrites a pet that already exists, so an install that started on Claude stays there.
+ * The companion, and the only pet a fresh install has. Scout sees what you are doing,
+ * writes a brief and hands it to the right expert; it thinks through the person's own
+ * Claude Code sign-in on the fast model, so a fresh install needs no key. Welcome moves it
+ * to a keyed provider when Claude Code is not installed. Seeding never overwrites a pet
+ * that already exists.
  */
 export const SCOUT: Pet = {
   id: 'scout',
   name: 'Scout',
-  avatar: '🔎',
-  color: '#0ea5e9',
-  roleId: 'generalist',
-  roleVersion: roleVersion('generalist'),
-  model: NEMOTRON_TEXT_MODEL,
-  visionModel: NEMOTRON_VISION_MODEL,
-  providerId: 'nebius',
+  avatar: '🦊',
+  color: '#E8873A',
+  roleId: 'companion',
+  roleVersion: roleVersion('companion'),
+  model: 'haiku',
+  providerId: 'claude-code',
   toolGrants: {},
   replyStyle: 'text',
 };
 
-/** OpenRouter's id for the Claude model Ink starts on. Any OpenRouter model id works. */
-export const INK_MODEL = 'anthropic/claude-sonnet-5';
-
-/**
- * The writer. Ink runs on Claude through OpenRouter so a fresh crew already spans two
- * providers and three models — the point of a crew whose members think differently.
- * Claude sees images itself, so Ink needs no separate vision model.
- */
-export const INK: Pet = {
-  id: 'ink',
-  name: 'Ink',
-  avatar: '✒️',
-  color: '#a855f7',
-  roleId: 'writer',
-  roleVersion: roleVersion('writer'),
-  model: INK_MODEL,
-  providerId: 'openrouter',
-  toolGrants: {},
-  replyStyle: 'text',
-};
-
-/**
- * The coder. Bolt runs on Nemotron Nano 2 VL through Token Factory: a smaller, faster
- * Nemotron that also reads screenshots, which is most of what reading an error is.
- */
-export const BOLT: Pet = {
-  id: 'bolt',
-  name: 'Bolt',
-  avatar: '⚡',
-  color: '#f59e0b',
-  roleId: 'backend-engineer',
-  roleVersion: roleVersion('backend-engineer'),
-  model: NEMOTRON_VISION_MODEL,
-  providerId: 'nebius',
-  toolGrants: {},
-  replyStyle: 'text',
-};
-
-/** The crew a fresh install starts with, in the order the strip shows them. */
-export const DEFAULT_CREW: readonly Pet[] = [SCOUT, INK, BOLT];
+/** What a fresh install starts with: one companion. */
+export const DEFAULT_CREW: readonly Pet[] = [SCOUT];
 
 interface PetRow {
   readonly id: string;

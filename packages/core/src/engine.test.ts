@@ -41,6 +41,31 @@ async function boot(provider?: BrainProvider): Promise<Engine> {
   return engine;
 }
 
+/**
+ * The crew machinery (hand-offs between pets, /crew, watches) still works with more than
+ * one pet; a fresh install has only Scout, the Companion. These tests add the crew they
+ * need: Scout as a Generalist, Ink a Writer, Bolt a Backend engineer, all on the fake.
+ */
+async function addCrew(host: TestHost): Promise<void> {
+  const base = {
+    avatar: '*',
+    model: 'fake-model',
+    providerId: 'fake',
+    roleVersion: 1,
+    toolGrants: {},
+    replyStyle: 'text' as const,
+  };
+  await host.call('pets.upsert', {
+    pet: { ...base, id: 'scout', name: 'Scout', roleId: 'generalist' },
+  });
+  await host.call('pets.upsert', {
+    pet: { ...base, id: 'ink', name: 'Ink', roleId: 'writer', model: 'anthropic/claude-sonnet-5' },
+  });
+  await host.call('pets.upsert', {
+    pet: { ...base, id: 'bolt', name: 'Bolt', roleId: 'backend-engineer' },
+  });
+}
+
 /** Minimal host: speaks the real wire format so the test exercises the real server. */
 class TestHost {
   #socket: WebSocket;
@@ -116,11 +141,7 @@ describe('Engine.boot', () => {
 
     expect(result['protocolVersion']).toBe(PROTOCOL_VERSION);
     expect(result['engineVersion']).toBe('0.0.0-test');
-    expect((result['pets'] as { id: string }[]).map((pet) => pet.id)).toEqual([
-      'bolt',
-      'ink',
-      'scout',
-    ]);
+    expect((result['pets'] as { id: string }[]).map((pet) => pet.id)).toEqual(['scout']);
   });
 
   it('rejects a host presenting the wrong pairing token', async () => {
@@ -165,6 +186,12 @@ describe('per-pet providers', () => {
 
   it('boots without any key, and a Nemotron pet with no key fails its turn readably', async () => {
     const { host } = await bootWithoutFakes();
+    // Never Scout's own Claude Code sign-in: a test must not start a real claude.
+    const listed = await host.call('pets.list', {});
+    const [scout] = (listed['result'] as { pets: Record<string, unknown>[] }).pets;
+    await host.call('pets.upsert', {
+      pet: { ...scout, providerId: 'nebius', model: 'nvidia/nemotron-3-super-120b-a12b' },
+    });
 
     await host.call('ask', { petId: 'scout', input: { text: 'hi' } });
     await vi.waitFor(() => expect(host.methods()).toContain('turn.error'), { timeout: 5000 });
@@ -380,6 +407,7 @@ describe('handoff over rpc', () => {
     const e = await boot(recording);
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
+    await addCrew(host);
 
     await host.call('ask', { petId: 'scout', input: { text: 'Explain the release notes' } });
     await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
@@ -412,6 +440,7 @@ describe('roundtable over rpc', () => {
     const e = await boot();
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
+    await addCrew(host);
 
     await host.call('ask', { petId: 'ink', input: { text: '/crew Should the panel dock left?' } });
     await vi.waitFor(
@@ -440,6 +469,7 @@ describe('activity over rpc', () => {
     const e = await boot();
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
+    await addCrew(host);
     const completedCount = () => host.methods().filter((m) => m === 'turn.completed').length;
 
     await host.call('ask', { petId: 'scout', input: { text: 'Explain the release notes' } });
@@ -528,7 +558,7 @@ describe('pets and settings over rpc', () => {
     const res = await host.call('pets.list', {});
     const pets = (res['result'] as Record<string, unknown>)['pets'] as unknown[];
 
-    expect(pets).toHaveLength(3);
+    expect(pets).toHaveLength(1);
   });
 
   it('round-trips an upsert and a delete through rpc, and the delete survives a restart', async () => {
@@ -551,14 +581,14 @@ describe('pets and settings over rpc', () => {
 
     const saved = await host.call('pets.upsert', { pet: pip });
     expect((saved['result'] as { pet: unknown }).pet).toEqual(pip);
-    const deleted = await host.call('pets.delete', { petId: 'ink' });
+    const deleted = await host.call('pets.delete', { petId: 'scout' });
     expect(deleted['result']).toEqual({ deleted: true });
 
     await e.shutdown();
     engine = undefined;
     const again = await boot();
     const ids = again.pets.map((pet) => pet.id);
-    expect(ids).toEqual(['bolt', 'pip', 'scout']);
+    expect(ids).toEqual(['pip']);
   });
 
   it('round-trips a settings patch', async () => {
@@ -861,6 +891,7 @@ describe('watch mode over rpc', () => {
       capabilities: ['activeWindow', 'displays', 'recall'] as const,
     });
 
+    await addCrew(host);
     await host.call('ask', { petId: 'scout', input: { text: 'tell me when it finishes' } });
     await vi.waitFor(() => expect(host.methods()).toContain('watch.status'), { timeout: 5000 });
 
@@ -901,6 +932,7 @@ describe('watch limits without a restart', () => {
     await host.call('settings.set', {
       patch: { watch: { maxChecks: 7, maxConcurrent: 1, defaultTimeoutMinutes: 5 } },
     });
+    await addCrew(host);
     await host.call('ask', { petId: 'scout', input: { text: 'tell me when it is done' } });
     await vi.waitFor(() => expect(host.methods()).toContain('watch.status'), { timeout: 5000 });
 
