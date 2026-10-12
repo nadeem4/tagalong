@@ -123,6 +123,11 @@ const host: TagalongHostApi = {
   openSettings: () => ipcRenderer.invoke(IPC.openSettings) as Promise<void>,
   openOnboarding: () => ipcRenderer.invoke(IPC.openOnboarding) as Promise<void>,
   openOffice: () => ipcRenderer.invoke(IPC.openOffice) as Promise<void>,
+  onHomePage: (handler) => {
+    const listener = (_event: IpcRendererEvent, page: string): void => handler(page);
+    ipcRenderer.on(IPC.homePageEvent, listener);
+    return () => void ipcRenderer.off(IPC.homePageEvent, listener);
+  },
   findAgents: () => ipcRenderer.invoke(IPC.findAgents) as Promise<FoundAgent[]>,
   finishWelcome: (providerId: string) =>
     ipcRenderer.invoke(IPC.finishWelcome, providerId) as Promise<void>,

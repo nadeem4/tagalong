@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { OFFICE_CSS } from './office-styles';
 import { officeTokens } from './tokens';
 
 /** WCAG relative luminance of a `#rrggbb` colour. */
@@ -40,12 +39,6 @@ describe('office tokens', () => {
     const disabled = contrast(color.disabledInk, color.page);
     expect(disabled).toBeGreaterThanOrEqual(3);
     expect(disabled).toBeLessThan(contrast(color.textMuted, color.page));
-  });
-
-  it('styles disabled buttons from the disabled tokens', () => {
-    const rule = /^\.office-btn:disabled\s*\{([^}]*)\}/m.exec(OFFICE_CSS)?.[1] ?? '';
-    expect(rule).toContain(`color: ${color.disabledInk}`);
-    expect(rule).toContain(`border-color: ${color.disabledLine}`);
   });
 
   it('gives each role class an ink that reads on the party list and is never gold', () => {

@@ -7,46 +7,49 @@ import { officeTokens as t } from '../office/tokens';
  */
 export const HOME_CSS = `
 .home {
-  height: 100%; display: flex; flex-direction: column; overflow: hidden;
-  background: ${t.color.page}; color: ${t.color.text}; font-family: ${t.font.ui};
+  height: 100%; display: flex; overflow: hidden;
+  background: ${t.color.panel}; color: ${t.color.panelText}; font-family: ${t.font.ui};
 }
-.home-body { flex: 1; min-height: 0; display: flex; }
-.home-add { width: 100%; margin-top: ${t.space.lg}px; }
-.home-bar {
-  height: ${t.size.headerHeight}px; flex: none; display: flex; align-items: center;
-  gap: ${t.space.xl}px; padding: 0 ${t.space.xxl}px; border-bottom: 1px solid ${t.color.line};
+.home-nav {
+  width: 232px; flex: none; display: flex; flex-direction: column; gap: ${t.space.xs}px;
+  padding: ${t.space.xxl}px ${t.space.lg}px; background: ${t.color.sidebar}; color: ${t.color.text};
 }
-.home-bar__title {
-  display: flex; align-items: center; gap: ${t.space.md + 2}px;
-  width: ${t.size.partyWidth - t.space.xxl - t.space.xl}px;
+.home-nav__who { display: flex; align-items: center; gap: ${t.space.lg}px; padding: 0 ${t.space.sm}px ${t.space.xl}px; }
+.home-nav__who span:last-child { display: flex; flex-direction: column; gap: 2px; }
+.home-nav__who strong { font-family: ${t.font.pixel}; font-size: 18px; letter-spacing: 0.5px; }
+.home-nav__who small { font-size: ${t.fontSize.small}px; color: #7CB8F2; }
+.home-nav__tile {
+  width: 56px; height: 56px; flex: none; display: flex; align-items: center; justify-content: center;
+  border-radius: ${t.radius.tile}px; background: #222845;
 }
-.home-bar__title h1 {
-  margin: 0; font-size: ${t.fontSize.title}px; font-weight: ${t.fontWeight.bold};
-  letter-spacing: ${t.letterSpacing.title}px;
+.home-nav__item {
+  height: ${t.size.fieldHeight}px; padding: 0 ${t.space.lg}px; border: 0; border-radius: ${t.radius.field}px;
+  background: transparent; color: ${t.color.textMuted}; text-align: left; cursor: pointer;
+  font-family: ${t.font.ui}; font-size: ${t.fontSize.field}px;
 }
-.home-bar__meta {
-  display: flex; align-items: center; gap: ${t.space.sm}px; margin-left: ${t.space.md}px;
-  font-size: ${t.fontSize.body}px; color: ${t.color.textMuted}; white-space: nowrap;
+.home-nav__item:hover { color: ${t.color.text}; }
+.home-nav__item[aria-current='page'] { background: #1E2442; color: ${t.color.text}; font-weight: ${t.fontWeight.semibold}; }
+.home-main {
+  flex: 1; min-width: 0; overflow-y: auto; display: flex; flex-direction: column;
+  gap: ${t.space.xxl}px; padding: ${t.space.xxxl}px 32px;
 }
-.home-side {
-  flex: 1; min-width: 0; display: flex; flex-direction: column;
-  background: ${t.color.panel}; color: ${t.color.panelText};
+.home-title { margin: 0; font-size: 20px; font-weight: ${t.fontWeight.semibold}; }
+.home-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: ${t.space.xl}px; }
+.home-card {
+  display: flex; flex-direction: column; gap: ${t.space.md}px; padding: ${t.space.xl}px ${t.space.xxl}px;
+  border: 1px solid ${t.color.panelLine}; border-radius: 12px; background: #fff;
 }
-.home-tabs {
-  flex: none; display: flex; gap: ${t.space.xs}px; padding: 0 ${t.space.lg}px;
-  border-bottom: 1px solid ${t.color.panelLine};
+.home-card p { margin: 0; font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; }
+.home-card .tg-btn-quiet { align-self: flex-start; }
+.home-card__label {
+  margin: 0; font-family: ${t.font.pixel}; font-size: 12px; font-weight: 400;
+  letter-spacing: 1px; color: ${t.color.panelMuted};
 }
-.home-tab {
-  height: ${t.size.fieldHeight}px; padding: 0 ${t.space.lg}px; border: 0;
-  border-bottom: 2px solid transparent; background: transparent; cursor: pointer;
-  font-family: ${t.font.ui}; font-size: ${t.fontSize.body}px; font-weight: ${t.fontWeight.semibold};
-  color: ${t.color.panelMuted}; max-width: 200px; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.home-tab:hover { color: ${t.color.panelText}; }
-.home-tab[aria-selected='true'] { color: ${t.color.panelText}; border-bottom-color: ${t.color.gold}; }
-.home-panel { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
-.home-panel[hidden] { display: none; }
+.home-card__lead { display: flex; align-items: center; gap: ${t.space.md}px; }
+.home-card p.home-card__lead { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; }
+.home-card p.home-card__row { display: flex; justify-content: space-between; gap: ${t.space.lg}px; color: ${t.color.panelText}; }
+.home-card__row span:last-child { flex: none; color: ${t.color.panelMuted}; }
+.home-dot { width: 8px; height: 8px; border-radius: 50%; background: #2F9E44; }
 .home-note {
   margin: 0; padding: ${t.space.xxl}px; font-size: ${t.fontSize.field}px; line-height: 1.5;
   color: ${t.color.panelMuted};

@@ -191,8 +191,8 @@ TAGALONG_FAKE_PROVIDERS=1 pnpm dev:desktop
 PowerShell has no inline `VAR=value command` prefix; pasting the bash line into PowerShell fails with
 `TAGALONG_FAKE_PROVIDERS=1 : The term ... is not recognized`.
 
-On a fresh profile Welcome opens first; **Start** finishes it, and the tray's **Welcome** item
-brings it back. The tray's **Open Home** item opens the Home window. Two more things are worth knowing before the first run.
+On a fresh profile Welcome opens first; **Start** finishes it, and **Home → Settings → Open Welcome
+again** brings it back. The tray's **Open Tagalong** item opens Home. Two more things are worth knowing before the first run.
 
 **`ensure-electron`.** Electron 44.3.0 publishes no npm install script, so `pnpm install` unpacks the
 package without ever downloading the platform binary, and the first launch dies with an error that

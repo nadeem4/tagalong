@@ -77,7 +77,7 @@ When Scout hands work to an expert, the bubble shows a card first: the agent, th
 edits** lets this one task change files; **Send** (or **Cancel**) decides. While the expert works the
 bubble lists its steps with **Stop**, and its answer comes back to the bubble when it is done.
 
-Open Welcome again from the tray (**Welcome**) or **Settings → Open Welcome again**. A key saved in
+Open Welcome again from **Home → Settings → Open Welcome again**. A key saved in
 Welcome or in Settings works on the very next question. No restart is needed.
 
 ## Providers and keys
@@ -127,39 +127,24 @@ are removed on upgrade, and their conversations stay on disk.
 
 - **Memory.** Tell a pet "I prefer short answers" and it remembers across restarts.
 
-### Home: see and control your agents
+### Home: one window for everything
 
-Right-click the tray icon and choose **Open Home**. Home is where the whole crew lives:
+Right-click the tray icon and choose **Open Tagalong**. The tray has only four items: **Open
+Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in five pages:
 
-- **The agent list** on the left shows every agent, its role and whether it is working or at its desk.
-- **The scene** in the middle shows them at work. Its look is a theme; the first theme is the
-  **Office** (desks, glass meeting rooms, a lounge). Themes only change the picture, never where the
-  controls are.
-- **Activity** on the right lists what the crew did, newest first: every answer (with the model and
-  how many model calls it took), every question one agent asked another, every handoff and every
-  roundtable. Click one to read it.
-- **Add agent** under the list creates a new Generalist and opens its controls.
-- **Pick an agent** in the list to change it: its role (Generalist, Backend engineer, Frontend
-  engineer, Writer, Researcher or Companion, which hands work to your experts instead of doing it), its provider and model (**Recommended** for its role, or your own
-  choice), its tools, its private notes, its look, and whether it is the pet on your desktop. The card
-  beside it shows how its teammates see it. **Save** applies from the next question.
-- **Experts** are the tools your companion hands work to, so you stop copying, switching and
-  pasting. Open the **Experts** tab and choose **Add expert**: give it a name, say what it is good at,
-  and, if you like, a default project folder. Claude Code is the first kind; it must be installed and
-  signed in on this computer. It only reads and searches unless you tick **Let it edit files by
-  default** or allow edits when you send a task. **Save and test** checks that Claude Code starts,
-  which costs nothing. Each task asks which project to work in: Tagalong guesses from the window
-  you are in and from the projects you used before, and you confirm before anything is sent. A pet with the
-  Companion role then briefs the right expert for you; the hand-off and the expert's answer appear in
-  Activity, and a Windows notification tells you when it is done.
-- **Meetings** will appear in their own tab once agents can meet.
-
-Settings keeps the app-wide things: keys, hotkeys, summaries, sight, awareness and the browser
-extension.
-
-Upgrading from a version before roles? Tagalong opens Home once with a short notice saying which role
-each pet got and whether your own persona was kept as notes. **Got it** closes it for good; **Review
-my crew** opens the first agent's controls.
+- **Overview**: whether Scout is ready and what it thinks with, your experts, and the latest
+  activity.
+- **Scout**: how Scout thinks, a provider and a model. **Save** applies from the next question.
+- **Experts** are the tools Scout hands work to, so you stop copying, switching and pasting. Choose
+  **Add expert**: give it a name, say what it is good at, and, if you like, a default project folder.
+  Claude Code is the first kind; it must be installed and signed in on this computer, and Welcome adds
+  it for you when it is. It only reads and searches unless you tick **Let it edit files by default**
+  or allow edits when you send a task. **Save and test** checks that Claude Code starts, which costs
+  nothing. Each task asks which project to work in, guessed from your window and the projects you used
+  before, and you confirm before anything is sent.
+- **Activity**: every answer and every hand-off, newest first. Click one to read it.
+- **Settings**: keys, hotkeys, summaries, sight, awareness, the browser extension, and **Open
+  Welcome again**.
 
 ## The Chrome extension
 
@@ -170,7 +155,7 @@ on. It needs the desktop app running.
 2. Click **Load unpacked** and choose the extension folder. The installer ships it in
    `%LOCALAPPDATA%\Programs\Tagalong\resources\extension`. From source, build it with `pnpm --filter @tagalong/extension build` and choose
    `apps/extension/dist`.
-3. Copy the pairing token from **Settings → Browser extension**, paste it into the
+3. Copy the pairing token from **Home → Settings → Browser extension**, paste it into the
    extension's options page, and click **Save and connect**.
 
 Then click the toolbar button, or select text and press `Alt+Shift+Space`. More in
@@ -183,7 +168,7 @@ Then click the toolbar button, or select text and press `Alt+Shift+Space`. More 
   Nano on Token Factory, Claude Haiku elsewhere) once something changed and settled. When it happens
   you get a notification and a card in the panel. A **Watching** chip shows the checks spent and has
   **Stop**.
-- **Rolling memory** (off by default; turn it on in **Settings → Awareness**). Tagalong
+- **Rolling memory** (off by default; turn it on in **Home → Settings → Awareness**). Tagalong
   keeps a small picture of each screen every five seconds, in memory only, for the last ten minutes,
   so you can ask "what was I reading five minutes ago?". A red dot on the pets shows while it
   records.
@@ -212,7 +197,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 | A hotkey does nothing                                          | Settings and the panel name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).            |
 | The Chrome side panel says "Disconnected"                      | The desktop app must be running. If it is, copy the pairing token again from Settings and paste it into the extension's options.                |
 | "Windows protected your PC" when installing                    | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                            |
-| You want Welcome again                                         | Tray → **Welcome**, or Settings → **Open Welcome again**.                                                                                       |
+| You want Welcome again                                         | Home → Settings → **Open Welcome again**.                                                                                                       |
 | You want to start over                                         | Quit Tagalong and delete `%APPDATA%\Tagalong`. That removes settings, conversations, memories and stored keys; Welcome opens on the next start. |
 | From source, a look always captures the whole screen           | The active-window helper was not downloaded: run `node apps/desktop/scripts/fetch-native.mjs`. The installer already includes it.               |
 | It does not start on macOS or Linux                            | Not in this build: only Windows has a platform adapter so far.                                                                                  |

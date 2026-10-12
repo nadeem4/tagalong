@@ -5,27 +5,26 @@ export interface TrayActions {
   togglePets: () => void;
   toggleSightPause: () => void;
   openOffice: () => void;
-  openSettings: () => void;
-  openOnboarding: () => void;
   quit: () => void;
 }
 
-/** The tray menu, rebuilt whenever pause flips so the checkmark cannot drift. */
+/**
+ * The tray menu, rebuilt whenever pause flips so the checkmark cannot drift. Four items:
+ * Home holds everything else (Scout, experts, activity, settings, Welcome).
+ */
 export function trayMenuTemplate(
   actions: TrayActions,
   state: { sightPaused: boolean },
 ): MenuItemConstructorOptions[] {
   return [
-    { label: 'Show or hide pets', click: () => actions.togglePets() },
-    { label: 'Open Home', click: () => actions.openOffice() },
+    { label: 'Open Tagalong', click: () => actions.openOffice() },
     {
       label: 'Pause sight',
       type: 'checkbox',
       checked: state.sightPaused,
       click: () => actions.toggleSightPause(),
     },
-    { label: 'Settings', click: () => actions.openSettings() },
-    { label: 'Welcome', click: () => actions.openOnboarding() },
+    { label: 'Show or hide Scout', click: () => actions.togglePets() },
     { type: 'separator' },
     { label: 'Quit', click: () => actions.quit() },
   ];

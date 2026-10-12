@@ -14,6 +14,9 @@ export const SETTINGS_CSS = `
   font-family: ${t.font.ui}; font-size: ${t.fontSize.body}px;
 }
 .tg-settings * { box-sizing: border-box; }
+/* Inside Home: no bar and no side menu of its own, just the sections in Home's page. */
+.tg-settings--embedded { display: block; height: auto; background: transparent; }
+.tg-settings--embedded .tg-main { padding: 0; overflow: visible; }
 .tg-settings ::selection { background: ${t.color.gold}; color: ${t.color.goldInk}; }
 .tg-settings :focus-visible {
   outline: ${t.size.focusRing}px solid ${t.color.gold}; outline-offset: ${t.size.focusOffset}px;
