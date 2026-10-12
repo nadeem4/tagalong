@@ -28,6 +28,10 @@ export function createOfficeWindow(): BrowserWindow {
     },
   });
 
+  // Escape closes it, like every other Tagalong window.
+  window.webContents.on('before-input-event', (_event, input) => {
+    if (input.type === 'keyDown' && input.key === 'Escape') window.close();
+  });
   window.setMenuBarVisibility(false);
   window.once('ready-to-show', () => window.show());
   loadPage(window, 'office');

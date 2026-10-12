@@ -48,7 +48,13 @@ import { SafeStorageSecretStore } from './secret-store';
 import { createTrayIcon } from './tray-icon';
 import { trayMenuTemplate } from './tray-menu';
 import { createAvatarWindow } from './windows/avatar';
-import { createPanelWindow, fitPanel, showPanelBeside, showPanelQuietly } from './windows/panel';
+import {
+  createPanelWindow,
+  fitPanel,
+  placePanel,
+  showPanelBeside,
+  showPanelQuietly,
+} from './windows/panel';
 import { AVATAR_SIZE, resolveAvatarPosition, stripWidth } from './windows/position';
 import { createOfficeWindow } from './windows/office';
 import { createOnboardingWindow } from './windows/onboarding';
@@ -228,7 +234,10 @@ async function start(): Promise<void> {
     return;
   }
 
-  desktop.panel = createPanelWindow({ isStreaming: () => (desktop?.activeTurns.size ?? 0) > 0 });
+  desktop.panel = createPanelWindow({
+    isStreaming: () => (desktop?.activeTurns.size ?? 0) > 0,
+    pet: () => desktop?.avatar ?? null,
+  });
   desktop.avatar = createAvatarWindow({
     position: settings.avatar,
     onMoved: (position) => {
@@ -751,7 +760,10 @@ function registerIpc(): void {
   // A click on the crew strip opens the panel on that pet, the way the chat button does.
   ipcMain.handle(IPC.selectPet, async (_event, petId: string) => {
     const current = required();
+    // A click on the pet opens its bubble, or keeps the open one and gives it the keyboard
+    // back (the click focused the pet's window). It never closes it.
     if (current.panel?.isVisible() !== true) await openPanelWithContext({ screenshot: false });
+    else if (current.avatar !== null) showPanelBeside(current.panel, current.avatar);
     current.panel?.webContents.send(IPC.activePetEvent, petId);
   });
 
@@ -805,6 +817,24 @@ function registerIpc(): void {
     }
   });
 
+  // The pet is dragged by hand (a drag region would swallow its clicks), and its bubble
+  // moves with it, so it keeps speaking from the pet.
+  ipcMain.handle(IPC.dragAvatar, (_event, dx: number, dy: number) => {
+    const { panel, avatar } = required();
+    if (avatar === null || !Number.isFinite(dx) || !Number.isFinite(dy)) return;
+    const [x = 0, y = 0] = avatar.getPosition();
+    avatar.setPosition(Math.round(x + dx), Math.round(y + dy));
+    if (panel !== null && panel.isVisible()) placePanel(panel, avatar);
+  });
+  ipcMain.handle(IPC.dropAvatar, () => {
+    const { host, avatar } = required();
+    if (avatar === null || host === null) return;
+    const [x, y] = avatar.getPosition();
+    void host.client
+      .call('settings.set', { patch: { avatar: { x: x ?? null, y: y ?? null } } })
+      .catch((error: unknown) => console.warn('[main] could not persist avatar position', error));
+  });
+
   ipcMain.handle(IPC.fitPanel, (_event, height: number) => {
     const { panel, avatar } = required();
     if (panel === null || avatar === null || !Number.isFinite(height)) return;
@@ -825,7 +855,8 @@ function registerIpc(): void {
   ipcMain.handle(IPC.hidePanel, () => required().panel?.hide());
   ipcMain.handle(IPC.togglePanel, async () => {
     const current = required();
-    if (current.panel?.isVisible() === true) current.panel.hide();
-    else await openPanelWithContext({ screenshot: false });
+    if (current.panel?.isVisible() === true) {
+      current.panel.hide();
+    } else await openPanelWithContext({ screenshot: false });
   });
 }

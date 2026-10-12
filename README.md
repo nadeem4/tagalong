@@ -66,7 +66,8 @@ The first time Tagalong starts, one Welcome window opens on the screen you are u
 5. **Start.** Scout becomes your companion, docks on your screen and says hello in a bubble. If
    Claude Code is installed it becomes Scout's first expert, so hand-offs work straight away.
 
-After that, press Ctrl+Shift+Space (or click Scout) to open Scout's bubble. It shows what Scout can
+After that, press Ctrl+Shift+Space (or click Scout) to open Scout's bubble, which speaks from
+Scout's side. Drag Scout anywhere on your screen; the bubble follows. Escape or the × closes it. It shows what Scout can
 see as chips (the app and window, selected text, a screenshot); remove any chip you do not want
 sent, type the question and press Enter. The answer appears in the bubble, the next question
 continues the same conversation, and **Open full chat** shows the whole conversation in a taller

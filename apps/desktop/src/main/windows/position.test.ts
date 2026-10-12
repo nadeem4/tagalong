@@ -59,15 +59,20 @@ describe('panelPosition', () => {
 
   it('sits beside the pet with its bottom level with the pet’s, on the side with room', () => {
     // The pet is at the right edge, so the panel goes to its left.
+    // No gap: the bubble's tail reaches across to the pet, so it reads as the pet speaking.
     expect(panelPosition(pet, { width: 420, height: 200 }, area)).toEqual({
-      x: 1800 - 420 - 12,
+      x: 1800 - 420,
       y: 500 + 96 - 200,
+      side: 'left',
     });
   });
 
   it('goes to the right of a pet near the left edge', () => {
     const left = { ...pet, x: 20 };
-    expect(panelPosition(left, { width: 420, height: 200 }, area).x).toBe(20 + 96 + 12);
+    expect(panelPosition(left, { width: 420, height: 200 }, area)).toMatchObject({
+      x: 20 + 96,
+      side: 'right',
+    });
   });
 
   it('stays inside the work area when it is taller than the space above the pet', () => {

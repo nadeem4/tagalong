@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Pet } from '@tagalong/protocol';
 import { PixelSprite } from './office/pixel-sprite';
 import { characterFor } from './office/sprites/characters';
-import { withMood, type DockMood } from './office/sprites/expressions';
+import { withBlink, withMood, type DockMood } from './office/sprites/expressions';
 import { officeTokens as t } from './office/tokens';
 
 export interface DockPetProps {
@@ -12,7 +12,20 @@ export interface DockPetProps {
   sightPaused?: boolean;
   /** Rolling memory holds the last minutes of the screen: never allowed to be invisible. */
   recording?: boolean;
+  /** How often it blinks. Left out, every three to six seconds, never in step. */
+  blinkEveryMs?: number;
 }
+
+/** How long the eyes stay shut. */
+const BLINK_MS = 140;
+
+/** The body's motion per mood; all of it stops when the system asks for reduced motion. */
+const MOTION: Readonly<Record<DockMood, string>> = {
+  idle: 'breathe',
+  listening: 'breathe',
+  working: 'busy',
+  done: 'hop',
+};
 
 const TAGS: Readonly<Record<Exclude<DockMood, 'idle'>, { text: string; color: string }>> = {
   listening: { text: 'Seeing', color: '#7CB8F2' },
@@ -31,8 +44,45 @@ const WORDS: Readonly<Record<DockMood, string>> = {
  * The companion on the dock: its pixel character, with a face and a small tag for what it
  * is doing (seeing, working, done), plus the sight-paused and recording marks.
  */
-export function DockPet({ pet, mood, sightPaused = false, recording = false }: DockPetProps) {
-  const sprite = useMemo(() => withMood(characterFor(pet).sprite, mood), [pet, mood]);
+export function DockPet({
+  pet,
+  mood,
+  sightPaused = false,
+  recording = false,
+  blinkEveryMs,
+}: DockPetProps) {
+  const [blinking, setBlinking] = useState(false);
+  // Blinks in moods with open eyes; working looks down at the task and done squints.
+  const canBlink = mood === 'idle' || mood === 'listening';
+
+  useEffect(() => {
+    if (!canBlink) return;
+    let open: ReturnType<typeof setTimeout> | undefined;
+    let next: ReturnType<typeof setTimeout>;
+    const schedule = (): void => {
+      next = setTimeout(
+        () => {
+          setBlinking(true);
+          open = setTimeout(() => {
+            setBlinking(false);
+            schedule();
+          }, BLINK_MS);
+        },
+        blinkEveryMs ?? 3000 + Math.random() * 3000,
+      );
+    };
+    schedule();
+    return () => {
+      clearTimeout(next);
+      clearTimeout(open);
+      setBlinking(false);
+    };
+  }, [canBlink, blinkEveryMs]);
+
+  const sprite = useMemo(() => {
+    const faced = withMood(characterFor(pet).sprite, mood);
+    return blinking && canBlink ? withBlink(faced) : faced;
+  }, [pet, mood, blinking, canBlink]);
   const tag = mood === 'idle' ? undefined : TAGS[mood];
   const label = `${pet.name} ${WORDS[mood]}${sightPaused ? ', sight paused' : ''}${
     recording && !sightPaused ? ', recording the screen' : ''
@@ -42,9 +92,13 @@ export function DockPet({ pet, mood, sightPaused = false, recording = false }: D
       role="img"
       aria-label={label}
       data-mood={mood}
+      data-blink={String(blinking && canBlink)}
       style={{ position: 'relative', display: 'inline-flex', padding: '20px 4px 4px' }}
     >
-      <PixelSprite sprite={sprite} scale={4} />
+      <style>{DOCK_CSS}</style>
+      <span data-testid="dock-body" data-motion={MOTION[mood]} className="dock-body">
+        <PixelSprite sprite={sprite} scale={4} />
+      </span>
       {tag !== undefined && (
         <span
           data-testid="dock-tag"
@@ -103,3 +157,14 @@ export function DockPet({ pet, mood, sightPaused = false, recording = false }: D
     </span>
   );
 }
+
+const DOCK_CSS = `
+.dock-body { display: block; transform-origin: 50% 100%; }
+.dock-body[data-motion='breathe'] { animation: dock-breathe 2.8s ease-in-out infinite; }
+.dock-body[data-motion='busy'] { animation: dock-busy 0.9s ease-in-out infinite; }
+.dock-body[data-motion='hop'] { animation: dock-hop 0.7s ease-out 3; }
+@keyframes dock-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1px); } }
+@keyframes dock-busy { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+@keyframes dock-hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-8px); } }
+@media (prefers-reduced-motion: reduce) { .dock-body { animation: none !important; } }
+`;

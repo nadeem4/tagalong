@@ -68,3 +68,38 @@ export function dockMood(state: DockState): DockMood {
   if (state.turns.size > 0 || state.handoffs.size > 0) return 'working';
   return state.done ? 'done' : 'idle';
 }
+
+/** How far the pointer moves before a press on the pet becomes a drag instead of a click. */
+export const DRAG_THRESHOLD = 4;
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export interface DragState {
+  start: Point;
+  last: Point;
+  dragging: boolean;
+}
+
+export function startDrag(at: Point): DragState {
+  return { start: at, last: at, dragging: false };
+}
+
+/**
+ * One pointer move during a press on the pet. Below the threshold it is still a click and
+ * nothing moves; past it, each move returns the step to move the pet by, in screen pixels.
+ */
+export function moveDrag(
+  state: DragState,
+  at: Point,
+): { state: DragState; step: { dx: number; dy: number } | null } {
+  const dragging =
+    state.dragging || Math.hypot(at.x - state.start.x, at.y - state.start.y) > DRAG_THRESHOLD;
+  if (!dragging) return { state, step: null };
+  return {
+    state: { start: state.start, last: at, dragging: true },
+    step: { dx: at.x - state.last.x, dy: at.y - state.last.y },
+  };
+}

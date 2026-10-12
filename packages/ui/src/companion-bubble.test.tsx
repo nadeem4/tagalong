@@ -220,3 +220,39 @@ describe('CompanionBubble, expanded into the full chat', () => {
     expect(onCollapse).toHaveBeenCalledOnce();
   });
 });
+
+describe('CompanionBubble, attached to the pet', () => {
+  it('closes from its × button, in the bubble and in the full chat', () => {
+    const onClose = vi.fn();
+    const bridge = createFakeHostBridge();
+    const { rerender } = render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" onClose={onClose} />
+      </HostBridgeProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    rerender(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" expanded onClose={onClose} />
+      </HostBridgeProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it('points its tail at the pet, on whichever side the pet is', () => {
+    const bridge = createFakeHostBridge();
+    const { container, rerender } = render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" tail="right" />
+      </HostBridgeProvider>,
+    );
+    expect(container.querySelector('[data-tail]')).toHaveAttribute('data-tail', 'right');
+    rerender(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" tail="left" greeting />
+      </HostBridgeProvider>,
+    );
+    expect(container.querySelector('[data-tail]')).toHaveAttribute('data-tail', 'left');
+  });
+});

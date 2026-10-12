@@ -1,6 +1,8 @@
 import { BrowserWindow, screen } from 'electron';
 import { PRELOAD_PATH, loadPage } from './page';
+import { hidesOnBlur } from './bubble-focus';
 import { panelPosition } from './position';
+import { IPC } from '../../shared/ipc';
 
 export const PANEL_WIDTH = 420;
 /** The full chat's height. The bubble asks for its own, which is usually far less. */
@@ -11,6 +13,8 @@ const BUBBLE_HEIGHT = 180;
 export interface PanelWindowOptions {
   /** Focus loss must not close the panel mid-answer, so the caller says when a turn is live. */
   isStreaming: () => boolean;
+  /** The pet's window: focus moving there (a click or a drag on the pet) keeps the bubble. */
+  pet: () => BrowserWindow | null;
 }
 
 /**
@@ -45,33 +49,48 @@ export function createPanelWindow(options: PanelWindowOptions): BrowserWindow {
     if (input.type === 'keyDown' && input.key === 'Escape') window.hide();
   });
 
+  // Whether an answer is streaming is read at the blur itself: a fast answer can finish
+  // before the check below, and a blur during an answer must still not hide it. Where the
+  // focus went is only known a moment later, once it has settled on the new window.
   window.on('blur', () => {
-    if (!options.isStreaming()) window.hide();
+    const streaming = options.isStreaming();
+    setTimeout(() => {
+      const focused = BrowserWindow.getFocusedWindow();
+      const pet = options.pet();
+      const focusWentToPet = focused !== null && pet !== null && focused === pet;
+      if (hidesOnBlur({ streaming, focusWentToPet, focusedAgain: window.isFocused() })) {
+        window.hide();
+      }
+    }, 60);
   });
 
   loadPage(window, 'panel');
   return window;
 }
 
-/** Puts the panel beside the pet at its current size; see `panelPosition`. */
-function place(panel: BrowserWindow, avatar: BrowserWindow): void {
+/**
+ * Puts the panel against the pet at its current size (see `panelPosition`) and tells the
+ * bubble which side of the pet it is on, so its tail points at the pet.
+ */
+export function placePanel(panel: BrowserWindow, avatar: BrowserWindow): void {
   const pet = avatar.getBounds();
   const [width = PANEL_WIDTH, height = BUBBLE_HEIGHT] = panel.getSize();
   const workArea = screen.getDisplayNearestPoint({ x: pet.x, y: pet.y }).workArea;
-  const { x, y } = panelPosition(pet, { width, height }, workArea);
+  const { x, y, side } = panelPosition(pet, { width, height }, workArea);
   panel.setPosition(x, y);
+  panel.webContents.send(IPC.panelSideEvent, side);
 }
 
 /** Shows the panel beside the pet and gives it the keyboard, for a question. */
 export function showPanelBeside(panel: BrowserWindow, avatar: BrowserWindow): void {
-  place(panel, avatar);
+  placePanel(panel, avatar);
   panel.show();
   panel.focus();
 }
 
 /** Shows the panel beside the pet without taking the keyboard, for the hello. */
 export function showPanelQuietly(panel: BrowserWindow, avatar: BrowserWindow): void {
-  place(panel, avatar);
+  placePanel(panel, avatar);
   panel.showInactive();
 }
 
@@ -79,5 +98,5 @@ export function showPanelQuietly(panel: BrowserWindow, avatar: BrowserWindow): v
 export function fitPanel(panel: BrowserWindow, avatar: BrowserWindow, height: number): void {
   const clamped = Math.round(Math.min(Math.max(height, 80), PANEL_HEIGHT));
   panel.setSize(PANEL_WIDTH, clamped);
-  place(panel, avatar);
+  placePanel(panel, avatar);
 }
