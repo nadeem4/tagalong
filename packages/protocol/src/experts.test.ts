@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { Brief, Expert, HandoffFinishedParams, HandoffsStartParams } from './experts';
+import {
+  Brief,
+  Expert,
+  HandoffFinishedParams,
+  HandoffProposedParams,
+  HandoffsConfirmParams,
+  HandoffsStartParams,
+  ProjectsSearchResult,
+} from './experts';
 
 const claudeCode = {
   id: 'claude-code',
@@ -21,7 +29,10 @@ describe('Expert', () => {
     expect(Expert.safeParse({ ...claudeCode, id: 'Claude Code' }).success).toBe(false);
   });
 
-  it('refuses a Claude Code expert without a folder', () => {
+  it('needs no folder: the project is chosen per task', () => {
+    expect(Expert.safeParse({ ...claudeCode, connection: { type: 'claude-code' } }).success).toBe(
+      true,
+    );
     expect(
       Expert.safeParse({ ...claudeCode, connection: { type: 'claude-code', folder: '' } }).success,
     ).toBe(false);
@@ -67,5 +78,46 @@ describe('hand-off wire', () => {
         error: 'not signed in',
       }).success,
     ).toBe(true);
+  });
+});
+
+describe('proposals', () => {
+  const proposalId = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+  const project = { name: 'ai_pet', path: 'C:\\projects\\ai_pet', reason: 'screen' as const };
+
+  it('starts a hand-off in a chosen project, read-only or allowed to edit', () => {
+    expect(
+      HandoffsStartParams.parse({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief: { ask: 'x' },
+        folder: 'C:\\projects\\ai_pet',
+        canEdit: true,
+      }),
+    ).toMatchObject({ folder: 'C:\\projects\\ai_pet', canEdit: true });
+  });
+
+  it('proposes a brief with the best project guess and the others', () => {
+    const proposed = HandoffProposedParams.parse({
+      proposalId,
+      petId: 'scout',
+      expertId: 'claude-code',
+      expertName: 'Claude Code',
+      brief: { ask: 'Why does this test fail?' },
+      projects: [project],
+      canEdit: false,
+    });
+    expect(proposed.projects[0]?.reason).toBe('screen');
+  });
+
+  it('confirms with the folder the person settled on', () => {
+    expect(
+      HandoffsConfirmParams.parse({ proposalId, folder: 'D:\\code\\site', canEdit: false }),
+    ).toEqual({ proposalId, folder: 'D:\\code\\site', canEdit: false });
+    expect(HandoffsConfirmParams.safeParse({ proposalId, canEdit: false }).success).toBe(false);
+  });
+
+  it('answers a project search with candidates', () => {
+    expect(ProjectsSearchResult.parse({ projects: [project] }).projects).toHaveLength(1);
   });
 });

@@ -1,5 +1,6 @@
 import { spawn as nodeSpawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { createInterface } from 'node:readline';
 import {
   CANCELLED,
@@ -25,8 +26,8 @@ export interface ChildRun {
 export type SpawnFn = (command: string, args: string[], options: { cwd: string }) => ChildRun;
 
 export interface ClaudeCodeOptions {
-  /** The one folder this expert may work in. */
-  folder: string;
+  /** The one folder this expert may work in. A hand-off always names one. */
+  folder?: string;
   /** False (the default) keeps it to reading and searching; true also lets it edit files there. */
   canEdit?: boolean;
   command?: string;
@@ -54,12 +55,14 @@ export class ClaudeCodeConnector implements Connector {
 
   async check(): Promise<CheckResult> {
     const { folder } = this.options;
-    if (!(this.options.folderExists ?? existsSync)(folder)) {
+    if (folder !== undefined && !(this.options.folderExists ?? existsSync)(folder)) {
       return { ok: false, error: `The folder ${folder} does not exist.` };
     }
     let child: ChildRun;
     try {
-      child = this.spawn(this.options.command ?? 'claude', ['--version'], { cwd: folder });
+      child = this.spawn(this.options.command ?? 'claude', ['--version'], {
+        cwd: folder ?? tmpdir(),
+      });
     } catch (error) {
       if ((error as { code?: string }).code === 'ENOENT')
         return { ok: false, error: NOT_INSTALLED };
@@ -81,6 +84,8 @@ export class ClaudeCodeConnector implements Connector {
     signal?: AbortSignal,
   ): Promise<ConnectorResult> {
     if (signal?.aborted) return CANCELLED;
+    const { folder } = this.options;
+    if (folder === undefined) return { ok: false, error: 'No project folder was chosen.' };
     const canEdit = this.options.canEdit === true;
     const args = [
       '-p',
@@ -96,7 +101,7 @@ export class ClaudeCodeConnector implements Connector {
 
     let child: ChildRun;
     try {
-      child = this.spawn(this.options.command ?? 'claude', args, { cwd: this.options.folder });
+      child = this.spawn(this.options.command ?? 'claude', args, { cwd: folder });
     } catch (error) {
       if ((error as { code?: string }).code === 'ENOENT') {
         return {

@@ -149,9 +149,11 @@ Right-click the tray icon and choose **Open Home**. Home is where the whole crew
   beside it shows how its teammates see it. **Save** applies from the next question.
 - **Experts** are the tools your companion hands work to, so you stop copying, switching and
   pasting. Open the **Experts** tab and choose **Add expert**: give it a name, say what it is good at,
-  and pick the folder it works in. Claude Code is the first kind; it must be installed and signed in
-  on this computer. It only reads and searches unless you tick **Let it edit files in this folder**.
-  **Save and test** checks that Claude Code starts in that folder, which costs nothing. A pet with the
+  and, if you like, a default project folder. Claude Code is the first kind; it must be installed and
+  signed in on this computer. It only reads and searches unless you tick **Let it edit files by
+  default** or allow edits when you send a task. **Save and test** checks that Claude Code starts,
+  which costs nothing. Each task asks which project to work in: Tagalong guesses from the window
+  you are in and from the projects you used before, and you confirm before anything is sent. A pet with the
   Companion role then briefs the right expert for you; the hand-off and the expert's answer appear in
   Activity, and a Windows notification tells you when it is done.
 - **Meetings** will appear in their own tab once agents can meet.

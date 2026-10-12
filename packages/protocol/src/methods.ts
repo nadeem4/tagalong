@@ -15,6 +15,13 @@ import {
   HandoffsCancelResult,
   HandoffsStartParams,
   HandoffsStartResult,
+  HandoffProposedParams,
+  HandoffsConfirmParams,
+  HandoffsConfirmResult,
+  HandoffsDismissParams,
+  HandoffsDismissResult,
+  ProjectsSearchParams,
+  ProjectsSearchResult,
 } from './experts';
 import {
   CapturedImage,
@@ -361,6 +368,9 @@ export const hostToCoreMethods = {
   'experts.test': { params: ExpertsTestParams, result: ExpertsTestResult },
   'handoffs.start': { params: HandoffsStartParams, result: HandoffsStartResult },
   'handoffs.cancel': { params: HandoffsCancelParams, result: HandoffsCancelResult },
+  'handoffs.confirm': { params: HandoffsConfirmParams, result: HandoffsConfirmResult },
+  'handoffs.dismiss': { params: HandoffsDismissParams, result: HandoffsDismissResult },
+  'projects.search': { params: ProjectsSearchParams, result: ProjectsSearchResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostMethods = {
@@ -391,6 +401,7 @@ export const coreToHostNotifications = {
   'crew.status': { params: CrewStatusParams },
   'watch.fired': { params: WatchFiredParams },
   'watch.status': { params: WatchStatusParams },
+  'handoff.proposed': { params: HandoffProposedParams },
   'handoff.progress': { params: HandoffProgressParams },
   'handoff.finished': { params: HandoffFinishedParams },
 } as const satisfies Record<string, NotificationSpec>;

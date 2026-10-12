@@ -39,6 +39,13 @@ import {
   RouteMemory,
   type Connector,
 } from './experts';
+import {
+  ProjectFinder,
+  ProjectMemory,
+  defaultProjectRoots,
+  listChildDirs,
+  looksLikeProject,
+} from './projects/finder';
 import type { MethodHandlers } from './server/ws-server';
 import { readOrCreatePairingToken } from './server/pairing';
 
@@ -121,6 +128,8 @@ export interface EngineOptions {
   provider?: BrainProvider | undefined;
   /** How an expert is reached. Defaults to its real connector, or a fake one in fake mode. */
   connectorFor?: ((expert: Expert) => Connector) | undefined;
+  /** Where the project finder looks for code. Tests point it at a temporary folder. */
+  projectRoots?: (() => string[]) | undefined;
 }
 
 /**
@@ -136,7 +145,11 @@ function defaultConnectorFor(env: Record<string, string | undefined>) {
       });
     }
     const { folder, canEdit, command } = expert.connection;
-    return new ClaudeCodeConnector({ folder, canEdit, ...(command ? { command } : {}) });
+    return new ClaudeCodeConnector({
+      canEdit,
+      ...(folder !== undefined ? { folder } : {}),
+      ...(command ? { command } : {}),
+    });
   };
 }
 
@@ -234,11 +247,18 @@ export class Engine {
     });
     const experts = new ExpertStore(db);
     const connectorFor = options.connectorFor ?? defaultConnectorFor(options.env ?? process.env);
+    const projects = new ProjectFinder({
+      memory: new ProjectMemory(db),
+      roots: options.projectRoots ?? defaultProjectRoots,
+      listDirs: listChildDirs,
+      isProject: looksLikeProject,
+    });
     const handoffs = new HandoffManager({
       experts,
       activity,
       connectorFor,
       emit: (event) => live.server?.broadcast(event.method, event.params),
+      projects,
     });
     const routes = new RouteMemory(db);
     const runner = new ConversationRunner({
@@ -258,7 +278,7 @@ export class Engine {
       experts: {
         experts: () => experts.list(),
         routes,
-        start: (params) => handoffs.start(params),
+        propose: (params) => handoffs.propose(params),
       },
       // Both lookups are lazy: hosts connect and drop between turns, and the exclusion
       // list is edited while the app runs, so neither can be captured at boot.
@@ -286,6 +306,7 @@ export class Engine {
       experts,
       routes,
       handoffs,
+      projects,
       connectorFor,
       refreshProviders: async () => keyed?.refresh(),
       models: (providerId) =>
@@ -365,13 +386,14 @@ function buildHandlers(parts: {
   experts: ExpertStore;
   routes: RouteMemory;
   handoffs: HandoffManager;
+  projects: ProjectFinder;
   connectorFor: (expert: Expert) => Connector;
   models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
   /** Re-reads provider keys, so a key saved since the last ask is used by this one. */
   refreshProviders: () => Promise<void>;
 }): MethodHandlers {
   const { db, activity, runner, store, emit, pets, settings, models, hosts, watches } = parts;
-  const { refreshProviders, experts, routes, handoffs, connectorFor } = parts;
+  const { refreshProviders, experts, routes, handoffs, projects, connectorFor } = parts;
 
   return {
     ask: async (params) => {
@@ -458,5 +480,8 @@ function buildHandlers(parts: {
     },
     'handoffs.start': (params) => handoffs.start(params),
     'handoffs.cancel': (params) => ({ cancelled: handoffs.cancel(params.handoffId) }),
+    'handoffs.confirm': (params) => handoffs.confirm(params),
+    'handoffs.dismiss': (params) => ({ dismissed: handoffs.dismiss(params.proposalId) }),
+    'projects.search': (params) => ({ projects: projects.search(params.query) }),
   };
 }

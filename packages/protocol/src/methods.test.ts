@@ -41,6 +41,9 @@ const HOST_TO_CORE = [
   'experts.test',
   'handoffs.start',
   'handoffs.cancel',
+  'handoffs.confirm',
+  'handoffs.dismiss',
+  'projects.search',
 ] as const;
 
 const CORE_TO_HOST = ['perception.capture'] as const;
@@ -58,6 +61,7 @@ const CORE_TO_HOST_NOTIFICATIONS = [
   'crew.status',
   'watch.fired',
   'watch.status',
+  'handoff.proposed',
   'handoff.progress',
   'handoff.finished',
 ] as const;

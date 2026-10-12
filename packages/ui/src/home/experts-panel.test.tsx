@@ -52,7 +52,9 @@ describe('ExpertsPanel', () => {
     fireEvent.change(screen.getByLabelText('Good at'), {
       target: { value: 'Code changes and tests' },
     });
-    fireEvent.change(screen.getByLabelText('Folder'), { target: { value: 'C:\\work\\app' } });
+    fireEvent.change(screen.getByLabelText(/Default project folder/), {
+      target: { value: 'C:\\work\\app' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Save and test' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent('Saved. Claude Code is ready.');
@@ -74,7 +76,9 @@ describe('ExpertsPanel', () => {
     });
     renderPanel(bridge);
     fireEvent.click(await screen.findByRole('button', { name: 'Add expert' }));
-    fireEvent.change(screen.getByLabelText('Folder'), { target: { value: 'C:\\nope' } });
+    fireEvent.change(screen.getByLabelText(/Default project folder/), {
+      target: { value: 'C:\\nope' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Save and test' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -83,13 +87,25 @@ describe('ExpertsPanel', () => {
     expect(bridge.experts).toHaveLength(1);
   });
 
-  it('needs a folder before it saves', async () => {
+  it('saves without a folder: the project is chosen for each task', async () => {
     const bridge = createFakeHostBridge();
     renderPanel(bridge);
     fireEvent.click(await screen.findByRole('button', { name: 'Add expert' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save and test' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Choose the folder');
-    expect(bridge.experts).toEqual([]);
+    expect(await screen.findByRole('status')).toHaveTextContent('Saved. Claude Code is ready.');
+    expect(bridge.experts[0]?.connection).toEqual({ type: 'claude-code', canEdit: false });
+  });
+
+  it('says in the list when an expert has no default project', async () => {
+    renderPanel(
+      createFakeHostBridge({
+        experts: [{ ...CLAUDE, connection: { type: 'claude-code', canEdit: false } }],
+      }),
+    );
+    const list = await screen.findByRole('list', { name: 'Experts' });
+    expect(within(list).getAllByRole('button')[0]).toHaveTextContent(
+      'Asks which project for each task',
+    );
   });
 
   it('fills the folder from the folder picker', async () => {
@@ -97,7 +113,9 @@ describe('ExpertsPanel', () => {
     renderPanel(bridge);
     fireEvent.click(await screen.findByRole('button', { name: 'Add expert' }));
     fireEvent.click(screen.getByRole('button', { name: 'Choose…' }));
-    await waitFor(() => expect(screen.getByLabelText('Folder')).toHaveValue('D:\\code\\site'));
+    await waitFor(() =>
+      expect(screen.getByLabelText(/Default project folder/)).toHaveValue('D:\\code\\site'),
+    );
   });
 
   it('edits an expert: lets it edit files and switches it off', async () => {

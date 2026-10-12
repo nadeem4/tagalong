@@ -34,6 +34,8 @@ async function boot(provider?: BrainProvider): Promise<Engine> {
     // Port 0 lets the OS pick, so a real engine on 47321 never collides with a test.
     port: 0,
     env: { TAGALONG_FAKE_PROVIDERS: '1' },
+    // The project finder never scans this machine's real code folders in a test.
+    projectRoots: () => [],
     ...(provider ? { provider } : {}),
   });
   return engine;
@@ -979,7 +981,7 @@ describe('experts and hand-offs', () => {
 });
 
 describe('a companion handing work to an expert', () => {
-  it('turns a hand_to_expert call into a hand-off and remembers the route', async () => {
+  it('turns a hand_to_expert call into a proposal that runs once confirmed', async () => {
     const provider = new FakeBrainProvider({
       text: 'Claude Code has it.',
       toolCall: {
@@ -1008,11 +1010,32 @@ describe('a companion handing work to an expert', () => {
     await vi.waitFor(
       () =>
         expect(host.methods()).toEqual(
-          expect.arrayContaining(['handoff.finished', 'turn.completed']),
+          expect.arrayContaining(['handoff.proposed', 'turn.completed']),
         ),
       { timeout: 5000 },
     );
     expect(host.methods()).not.toContain('turn.error');
+    // Nothing runs until the person confirms, with the project to work in.
+    expect(host.methods()).not.toContain('handoff.finished');
+    const proposed = host.notifications.find((n) => n.method === 'handoff.proposed')!;
+    expect(proposed.params).toMatchObject({
+      expertName: 'Claude Code',
+      projects: [{ path: 'C:\\projects\\ai_pet', reason: 'remembered' }],
+    });
+
+    const confirmed = await host.call('handoffs.confirm', {
+      proposalId: proposed.params['proposalId'],
+      folder: 'C:\\projects\\ai_pet',
+      canEdit: false,
+    });
+    expect(confirmed['result']).toMatchObject({ handoffId: expect.any(String) });
+    await vi.waitFor(() => expect(host.methods()).toContain('handoff.finished'));
+
+    // The confirmed project is remembered and found by search.
+    const found = await host.call('projects.search', { query: 'ai_pet' });
+    expect(found['result']).toEqual({
+      projects: [{ name: 'ai_pet', path: 'C:\\projects\\ai_pet', reason: 'remembered' }],
+    });
 
     const res = await host.call('activity.list', {});
     const handed = (res['result'] as { entries: Record<string, unknown>[] }).entries.find(
