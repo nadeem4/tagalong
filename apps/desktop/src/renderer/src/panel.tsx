@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { ChatPanel, CompanionBubble, HostBridgeProvider } from '@tagalong/ui';
+import { CompanionBubble, HostBridgeProvider } from '@tagalong/ui';
 import type { ContextSnapshot } from '@tagalong/protocol';
 import './app.css';
 import '../../shared/ipc';
@@ -110,7 +110,7 @@ function Panel() {
 
   return (
     <HostBridgeProvider bridge={window.tagalong}>
-      <div ref={root} className={mode === 'chat' ? 'panel-chat' : undefined}>
+      <div ref={root}>
         {hotkeyProblem !== null && (
           <p className="settings__error" role="status" data-testid="hotkey-problem">
             {hotkeyProblem}{' '}
@@ -119,23 +119,17 @@ function Panel() {
             </button>
           </p>
         )}
-        {mode === 'chat' ? (
-          <ChatPanel
-            petId={petId}
-            onPetChange={setPetId}
-            {...(snapshot !== null ? { snapshot } : {})}
-          />
-        ) : (
-          <CompanionBubble
-            petId={petId}
-            petName={petName}
-            greeting={greeting}
-            hotkeyLabel={hotkeyLabel}
-            onDismiss={dismissGreeting}
-            onOpenChat={() => setMode('chat')}
-            {...(snapshot !== null ? { snapshot } : {})}
-          />
-        )}
+        <CompanionBubble
+          petId={petId}
+          petName={petName}
+          greeting={greeting}
+          hotkeyLabel={hotkeyLabel}
+          expanded={mode === 'chat'}
+          onDismiss={dismissGreeting}
+          onOpenChat={() => setMode('chat')}
+          onCollapse={() => setMode('bubble')}
+          {...(snapshot !== null ? { snapshot } : {})}
+        />
       </div>
     </HostBridgeProvider>
   );

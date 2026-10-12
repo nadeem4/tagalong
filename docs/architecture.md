@@ -1055,8 +1055,12 @@ flowchart LR
 
 ## The companion's bubble
 
-The panel window (`panel.html`) shows `CompanionBubble` (`@tagalong/ui`) by default, with the full
-`ChatPanel` one click behind it (**Open full chat**).
+The panel window (`panel.html`) shows `CompanionBubble` (`@tagalong/ui`). **Open full chat** shows
+the same component `expanded`: a header with the companion's name and **Back to bubble**, the whole
+conversation (each question on the right, each answer below it, hand-off cards inline) and the chips
+above a **Message** box. It is the same component, so it is the same conversation. The old
+`ChatPanel`, with the crew strip, `@` hand-offs and `/crew`, is now only used by the Chrome
+extension's side panel.
 
 - **What it can see, as chips.** The hotkey's snapshot becomes chips: the app and window title,
   selected text, a screenshot. Removing a chip drops that part from the ask (`without`); a new

@@ -164,3 +164,59 @@ describe('CompanionBubble', () => {
     expect(onOpenChat).toHaveBeenCalledOnce();
   });
 });
+
+describe('CompanionBubble, expanded into the full chat', () => {
+  async function twoExchanges(bridge: FakeHostBridge) {
+    await act(async () => ask('first question'));
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'turn-1',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      });
+      bridge.emit(done('turn-1', 'First answer.'));
+    });
+    await act(async () => ask('second question'));
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'turn-2',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      });
+      bridge.emit(done('turn-2', 'Second answer.'));
+    });
+  }
+
+  it('shows only the latest exchange as a bubble', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    await twoExchanges(bridge);
+    expect(screen.queryByText('First answer.')).toBeNull();
+    expect(screen.getByText('Second answer.')).toBeVisible();
+  });
+
+  it('shows the whole conversation when expanded, with a way back to the bubble', async () => {
+    const bridge = createFakeHostBridge();
+    const onCollapse = vi.fn();
+    const { rerender } = render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" onOpenChat={() => undefined} />
+      </HostBridgeProvider>,
+    );
+    await twoExchanges(bridge);
+    rerender(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" expanded onCollapse={onCollapse} />
+      </HostBridgeProvider>,
+    );
+    const thread = screen.getByRole('log', { name: 'Conversation with Scout' });
+    expect(thread.textContent).toMatch(
+      /first question.*First answer\..*second question.*Second answer\./,
+    );
+    expect(screen.getByLabelText('Message Scout')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to bubble' }));
+    expect(onCollapse).toHaveBeenCalledOnce();
+  });
+});

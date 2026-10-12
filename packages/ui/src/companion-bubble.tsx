@@ -16,6 +16,17 @@ export interface CompanionBubbleProps {
   hotkeyLabel?: string;
   onDismiss?: () => void;
   onOpenChat?: () => void;
+  /** The full chat: the whole conversation, not just the latest answer. */
+  expanded?: boolean;
+  /** Back from the full chat to the bubble. */
+  onCollapse?: () => void;
+}
+
+/** A question and how it was answered, once it is over. */
+interface Exchange {
+  question: string;
+  answer: string;
+  failed: boolean;
 }
 
 /** One removable part of what the companion can see. */
@@ -75,12 +86,16 @@ export function CompanionBubble({
   hotkeyLabel = 'Ctrl+Shift+Space',
   onDismiss,
   onOpenChat,
+  expanded = false,
+  onCollapse,
 }: CompanionBubbleProps) {
   const bridge = useHostBridge();
   const [draft, setDraft] = useState('');
   const [removed, setRemoved] = useState<ReadonlySet<Chip['id']>>(new Set());
   const [reply, setReply] = useState<Reply>({ state: 'idle' });
   const [handoff, setHandoff] = useState<Handoff | null>(null);
+  const [past, setPast] = useState<Exchange[]>([]);
+  const [question, setQuestion] = useState<string | null>(null);
   const conversation = useRef<string | undefined>(undefined);
   const mine = useRef<string | null>(null);
 
@@ -169,6 +184,11 @@ export function CompanionBubble({
     const text = draft.trim();
     if (text === '' || reply.state === 'running') return;
     setDraft('');
+    if (question !== null && (reply.state === 'done' || reply.state === 'failed')) {
+      const answered = { question, answer: reply.text, failed: reply.state === 'failed' };
+      setPast((current) => [...current, answered]);
+    }
+    setQuestion(text);
     setReply({ state: 'running', turnId: null, text: '' });
     const context = snapshot === undefined ? undefined : without(snapshot, removed);
     bridge
@@ -194,27 +214,24 @@ export function CompanionBubble({
   };
 
   const chips = chipsOf(snapshot).filter((chip) => !removed.has(chip.id));
-  return (
-    <div className="bubble">
-      <style>{BUBBLE_CSS}</style>
-      <style>{HANDOFF_CSS}</style>
-      {chips.length > 0 && (
-        <ul className="bubble-chips" aria-label={`What ${petName} can see`}>
-          {chips.map((chip) => (
-            <li key={chip.id} className="bubble-chip">
-              <span>{chip.label}</span>
-              <button
-                type="button"
-                aria-label={`Do not send ${chip.label}`}
-                onClick={() => setRemoved(new Set([...removed, chip.id]))}
-              >
-                ×
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
+  const chipList = chips.length > 0 && (
+    <ul className="bubble-chips" aria-label={`What ${petName} can see`}>
+      {chips.map((chip) => (
+        <li key={chip.id} className="bubble-chip">
+          <span>{chip.label}</span>
+          <button
+            type="button"
+            aria-label={`Do not send ${chip.label}`}
+            onClick={() => setRemoved(new Set([...removed, chip.id]))}
+          >
+            ×
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+  const answer = (
+    <>
       {reply.state === 'running' && (
         <div className="bubble-answer" aria-live="polite">
           <p className="bubble-text">
@@ -226,6 +243,15 @@ export function CompanionBubble({
         </div>
       )}
       {reply.state === 'done' && <p className="bubble-text bubble-answer">{reply.text}</p>}
+      {reply.state === 'failed' && (
+        <p role="alert" className="bubble-error">
+          {reply.text}
+        </p>
+      )}
+    </>
+  );
+  const handoffCard = (
+    <>
       {handoff?.phase === 'proposed' && (
         <ProposalCard
           key={handoff.proposal.proposalId}
@@ -245,24 +271,70 @@ export function CompanionBubble({
           onDismiss={() => setHandoff(null)}
         />
       )}
-      {reply.state === 'failed' && (
-        <p role="alert" className="bubble-error">
-          {reply.text}
-        </p>
-      )}
+    </>
+  );
+  const field = (label: string) => (
+    <label className="bubble-field">
+      <span>{label}</span>
+      <input
+        value={draft}
+        autoFocus
+        disabled={reply.state === 'running'}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') send();
+        }}
+      />
+    </label>
+  );
 
-      <label className="bubble-field">
-        <span>Ask {petName}</span>
-        <input
-          value={draft}
-          autoFocus
-          disabled={reply.state === 'running'}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') send();
-          }}
-        />
-      </label>
+  if (expanded) {
+    return (
+      <div className="bubble bubble--chat">
+        <style>{BUBBLE_CSS}</style>
+        <style>{HANDOFF_CSS}</style>
+        <header className="bubble-head">
+          <strong>{petName}</strong>
+          {onCollapse !== undefined && (
+            <button type="button" className="bubble-quiet" onClick={onCollapse}>
+              Back to bubble
+            </button>
+          )}
+        </header>
+        <div className="bubble-log" role="log" aria-label={`Conversation with ${petName}`}>
+          {past.length === 0 && question === null && (
+            <p className="bubble-hints">Ask {petName} anything about what is on your screen.</p>
+          )}
+          {past.map((exchange, index) => (
+            <div key={index} className="bubble-exchange">
+              <p className="bubble-mine">{exchange.question}</p>
+              <p className={exchange.failed ? 'bubble-error' : 'bubble-text'}>{exchange.answer}</p>
+            </div>
+          ))}
+          {question !== null && (
+            <div className="bubble-exchange">
+              <p className="bubble-mine">{question}</p>
+              {answer}
+            </div>
+          )}
+          {handoffCard}
+        </div>
+        <footer className="bubble-foot">
+          {chipList}
+          {field(`Message ${petName}`)}
+        </footer>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bubble">
+      <style>{BUBBLE_CSS}</style>
+      <style>{HANDOFF_CSS}</style>
+      {chipList}
+      {answer}
+      {handoffCard}
+      {field(`Ask ${petName}`)}
       <div className="bubble-row bubble-hints">
         <span>Enter to ask</span>
         <span>Esc to close</span>
@@ -282,6 +354,20 @@ const BUBBLE_CSS = `
   padding: 14px 16px; background: ${t.color.page}; color: ${t.color.text};
   border: 1px solid ${t.color.fieldLine}; border-radius: 12px; font-family: ${t.font.ui};
 }
+.bubble--chat { height: 100vh; padding: 0; gap: 0; overflow: hidden; }
+.bubble-head {
+  flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px 10px 16px; border-bottom: 1px solid #262C4A; background: ${t.color.sidebar};
+}
+.bubble-head strong { font-family: ${t.font.pixel}; font-size: 16px; letter-spacing: 0.5px; }
+.bubble-head .bubble-quiet { align-self: center; }
+.bubble-log { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 16px; }
+.bubble-exchange { display: flex; flex-direction: column; gap: 8px; }
+.bubble-mine {
+  align-self: flex-end; max-width: 80%; margin: 0; padding: 8px 12px; border-radius: 12px 12px 4px 12px;
+  background: #222845; font-size: 13px; line-height: 1.5; white-space: pre-wrap;
+}
+.bubble-foot { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-top: 1px solid #262C4A; }
 .bubble-text { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
 .bubble-answer { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
 .bubble-error { margin: 0; padding: 8px 12px; border-radius: 6px; background: #3a1d2a; color: #ffb4c0; font-size: 13px; }
