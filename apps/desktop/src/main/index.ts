@@ -51,7 +51,6 @@ import { createAvatarWindow } from './windows/avatar';
 import {
   createPanelWindow,
   fitPanel,
-  noteHide,
   placePanel,
   showPanelBeside,
   showPanelQuietly,
@@ -391,7 +390,6 @@ function buildTrayMenu(): Menu {
           if (desktop?.avatar === null || desktop === null) return;
           if (desktop.avatar?.isVisible() === true) {
             desktop.avatar.hide();
-            noteHide('togglePets');
             desktop.panel?.hide();
           } else {
             desktop.avatar?.show();
@@ -854,14 +852,10 @@ function registerIpc(): void {
     const problem = await shell.openPath(folder);
     if (problem.length > 0) throw new Error(problem);
   });
-  ipcMain.handle(IPC.hidePanel, (event) => {
-    noteHide(`hidePanel from ${event.sender.getURL().replace(/^.*\//, '')}`);
-    required().panel?.hide();
-  });
+  ipcMain.handle(IPC.hidePanel, () => required().panel?.hide());
   ipcMain.handle(IPC.togglePanel, async () => {
     const current = required();
     if (current.panel?.isVisible() === true) {
-      noteHide('togglePanel');
       current.panel.hide();
     } else await openPanelWithContext({ screenshot: false });
   });

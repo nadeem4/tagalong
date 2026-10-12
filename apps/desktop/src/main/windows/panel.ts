@@ -46,10 +46,7 @@ export function createPanelWindow(options: PanelWindowOptions): BrowserWindow {
   window.setAlwaysOnTop(true, 'floating');
 
   window.webContents.on('before-input-event', (_event, input) => {
-    if (input.type === 'keyDown' && input.key === 'Escape') {
-      noteHide('escape');
-      window.hide();
-    }
+    if (input.type === 'keyDown' && input.key === 'Escape') window.hide();
   });
 
   // Whether an answer is streaming is read at the blur itself: a fast answer can finish
@@ -62,7 +59,6 @@ export function createPanelWindow(options: PanelWindowOptions): BrowserWindow {
       const pet = options.pet();
       const focusWentToPet = focused !== null && pet !== null && focused === pet;
       if (hidesOnBlur({ streaming, focusWentToPet, focusedAgain: window.isFocused() })) {
-        noteHide(`blur (focused: ${focused?.webContents.getURL().replace(/^.*\//, '') ?? 'none'})`);
         window.hide();
       }
     }, 60);
@@ -103,10 +99,4 @@ export function fitPanel(panel: BrowserWindow, avatar: BrowserWindow, height: nu
   const clamped = Math.round(Math.min(Math.max(height, 80), PANEL_HEIGHT));
   panel.setSize(PANEL_WIDTH, clamped);
   placePanel(panel, avatar);
-}
-
-/** TEMPORARY diagnostic: why the bubble was last hidden, read by the e2e smoke test. */
-export function noteHide(reason: string): void {
-  const store = globalThis as { __tagalongPanelHides?: string[] };
-  store.__tagalongPanelHides = [...(store.__tagalongPanelHides ?? []), reason].slice(-10);
 }
