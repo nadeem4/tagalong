@@ -194,3 +194,11 @@ button:disabled {
   color: #b91c1c;
   font-size: 12px;
 }
+
+/* The bubble sits at the bottom of its transparent window, where the pet is. */
+.panel-anchor {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}

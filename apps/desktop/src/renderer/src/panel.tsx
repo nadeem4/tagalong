@@ -114,28 +114,32 @@ function Panel() {
 
   return (
     <HostBridgeProvider bridge={window.tagalong}>
-      <div ref={root}>
-        {hotkeyProblem !== null && (
-          <p className="settings__error" role="status" data-testid="hotkey-problem">
-            {hotkeyProblem}{' '}
-            <button type="button" onClick={() => void window.tagalongHost.openSettings()}>
-              Open Settings
-            </button>
-          </p>
-        )}
-        <CompanionBubble
-          petId={petId}
-          petName={petName}
-          greeting={greeting}
-          hotkeyLabel={hotkeyLabel}
-          expanded={mode === 'chat'}
-          onDismiss={dismissGreeting}
-          onOpenChat={() => setMode('chat')}
-          onCollapse={() => setMode('bubble')}
-          onClose={() => void window.tagalongHost.hidePanel()}
-          tail={side === 'left' ? 'right' : 'left'}
-          {...(snapshot !== null ? { snapshot } : {})}
-        />
+      {/* Pinned to the bottom of the window, level with the pet, whatever the window's height:
+          a window still at the full chat's height must not leave the bubble floating above. */}
+      <div className="panel-anchor">
+        <div ref={root}>
+          {hotkeyProblem !== null && (
+            <p className="settings__error" role="status" data-testid="hotkey-problem">
+              {hotkeyProblem}{' '}
+              <button type="button" onClick={() => void window.tagalongHost.openSettings()}>
+                Open Settings
+              </button>
+            </p>
+          )}
+          <CompanionBubble
+            petId={petId}
+            petName={petName}
+            greeting={greeting}
+            hotkeyLabel={hotkeyLabel}
+            expanded={mode === 'chat'}
+            onDismiss={dismissGreeting}
+            onOpenChat={() => setMode('chat')}
+            onCollapse={() => setMode('bubble')}
+            onClose={() => void window.tagalongHost.hidePanel()}
+            tail={side === 'left' ? 'right' : 'left'}
+            {...(snapshot !== null ? { snapshot } : {})}
+          />
+        </div>
       </div>
     </HostBridgeProvider>
   );

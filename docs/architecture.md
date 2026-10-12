@@ -1093,6 +1093,11 @@ extension's side panel.
   tail on the side facing the pet, so it reads as the pet speaking. It moves with the pet when the
   pet is dragged. An × (**Close**) in the bubble and in the full chat hides it, as Escape does; Home
   and Welcome close on Escape too.
+- **Mixed screen scales.** A window moved between displays with different scale factors (a laptop
+  at 150% beside a monitor at 100%) lands far from where it was sent in one move, so `moveWindow`
+  (`windows/move.ts`) moves the bubble, and the pet while it is dragged, a second time when the move
+  `crossesScale`. Inside its window the bubble is pinned to the bottom (`.panel-anchor`), so even a
+  window still at the full chat's height shows it beside the pet, not above it.
 - **The window fits the bubble.** It is transparent and frameless; a `ResizeObserver` reports the
   bubble's height through `fitPanel`, and main resizes the window and places it with
   `panelPosition`: beside the pet on the side with room, its bottom level with the pet's, clamped to

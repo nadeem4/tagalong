@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AVATAR_EDGE_MARGIN,
   AVATAR_SIZE,
+  crossesScale,
   panelPosition,
   resolveAvatarPosition,
   stripWidth,
@@ -78,5 +79,12 @@ describe('panelPosition', () => {
   it('stays inside the work area when it is taller than the space above the pet', () => {
     const high = { ...pet, y: 10 };
     expect(panelPosition(high, { width: 420, height: 520 }, area).y).toBe(0);
+  });
+});
+
+describe('crossesScale', () => {
+  it('says when a move goes to a display with another scale, which needs a second pass', () => {
+    expect(crossesScale({ scaleFactor: 1.5 }, { scaleFactor: 1 })).toBe(true);
+    expect(crossesScale({ scaleFactor: 1 }, { scaleFactor: 1 })).toBe(false);
   });
 });

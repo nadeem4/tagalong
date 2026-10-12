@@ -99,6 +99,25 @@ test('clicking Scout opens its bubble, and clicking again keeps it open', async 
   await pet.click();
   await expect.poll(panelVisible, { timeout: 10_000 }).toBe(true);
 
+  // It opens against the pet, as if the pet were speaking: touching it on one side, its
+  // bottom level with the pet's.
+  const gap = await app.evaluate(({ BrowserWindow }) => {
+    const all = BrowserWindow.getAllWindows();
+    const of = (page: string) =>
+      all.find((w) => w.webContents.getURL().includes(page))?.getBounds();
+    const bubble = of('panel.html');
+    const dock = of('avatar.html');
+    if (bubble === undefined || dock === undefined) return null;
+    return {
+      side: Math.min(
+        Math.abs(bubble.x + bubble.width - dock.x),
+        Math.abs(dock.x + dock.width - bubble.x),
+      ),
+      bottom: Math.abs(bubble.y + bubble.height - (dock.y + dock.height)),
+    };
+  });
+  expect(gap).toEqual({ side: 0, bottom: 0 });
+
   // A second click lands on the pet's own window, which takes the focus from the bubble:
   // that must not hide it.
   await pet.click();

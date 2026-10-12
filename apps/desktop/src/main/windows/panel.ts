@@ -1,6 +1,7 @@
 import { BrowserWindow, screen } from 'electron';
 import { PRELOAD_PATH, loadPage } from './page';
 import { hidesOnBlur } from './bubble-focus';
+import { moveWindow } from './move';
 import { panelPosition } from './position';
 import { IPC } from '../../shared/ipc';
 
@@ -72,12 +73,15 @@ export function createPanelWindow(options: PanelWindowOptions): BrowserWindow {
  * Puts the panel against the pet at its current size (see `panelPosition`) and tells the
  * bubble which side of the pet it is on, so its tail points at the pet.
  */
-export function placePanel(panel: BrowserWindow, avatar: BrowserWindow): void {
+export function placePanel(
+  panel: BrowserWindow,
+  avatar: BrowserWindow,
+  height: number = panel.getSize()[1] ?? BUBBLE_HEIGHT,
+): void {
   const pet = avatar.getBounds();
-  const [width = PANEL_WIDTH, height = BUBBLE_HEIGHT] = panel.getSize();
   const workArea = screen.getDisplayNearestPoint({ x: pet.x, y: pet.y }).workArea;
-  const { x, y, side } = panelPosition(pet, { width, height }, workArea);
-  panel.setPosition(x, y);
+  const { x, y, side } = panelPosition(pet, { width: PANEL_WIDTH, height }, workArea);
+  moveWindow(panel, { x, y, width: PANEL_WIDTH, height });
   panel.webContents.send(IPC.panelSideEvent, side);
 }
 
@@ -96,7 +100,5 @@ export function showPanelQuietly(panel: BrowserWindow, avatar: BrowserWindow): v
 
 /** The renderer measured its content: resize to it, keeping the bottom level with the pet. */
 export function fitPanel(panel: BrowserWindow, avatar: BrowserWindow, height: number): void {
-  const clamped = Math.round(Math.min(Math.max(height, 80), PANEL_HEIGHT));
-  panel.setSize(PANEL_WIDTH, clamped);
-  placePanel(panel, avatar);
+  placePanel(panel, avatar, Math.round(Math.min(Math.max(height, 80), PANEL_HEIGHT)));
 }
