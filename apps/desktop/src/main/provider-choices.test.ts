@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { providerChoices } from './provider-choices';
 
 describe('providerChoices', () => {
-  it('offers the two OpenAI-compatible presets first, then Anthropic and the fake', () => {
+  it('offers the Claude Code sign-in first, then the presets, Anthropic and the fake', () => {
     const choices = providerChoices(new Set());
     expect(choices.map((choice) => choice.id)).toEqual([
+      'claude-code',
       'openrouter',
       'nebius',
       'anthropic',
@@ -13,7 +14,7 @@ describe('providerChoices', () => {
   });
 
   it('carries each preset default base URL and key variable for the form', () => {
-    const [openrouter, nebius] = providerChoices(new Set());
+    const [, openrouter, nebius] = providerChoices(new Set());
     expect(openrouter).toMatchObject({
       label: 'OpenRouter',
       defaultBaseUrl: 'https://openrouter.ai/api/v1',
@@ -32,6 +33,16 @@ describe('providerChoices', () => {
     expect(choices.find((c) => c.id === 'nebius')?.hasKey).toBe(true);
     expect(choices.find((c) => c.id === 'openrouter')?.hasKey).toBe(false);
     expect(JSON.stringify(choices)).not.toContain('apiKey');
+  });
+
+  it('asks for no key for Claude Code: it thinks through the Claude Code sign-in', () => {
+    const claude = providerChoices(new Set()).find((c) => c.id === 'claude-code');
+    expect(claude).toEqual({
+      id: 'claude-code',
+      label: 'Claude Code (your sign-in, no key)',
+      needsKey: false,
+      hasKey: false,
+    });
   });
 
   it('asks for no key and no URL for the fake provider', () => {

@@ -188,7 +188,7 @@ function describeTool(name: string, input: ToolInput | undefined): string | unde
   }
 }
 
-function spawnChild(command: string, args: string[], { cwd }: { cwd: string }): ChildRun {
+export function spawnChild(command: string, args: string[], { cwd }: { cwd: string }): ChildRun {
   const child = nodeSpawn(command, args, { cwd, windowsHide: true });
   let stderr = '';
   child.stderr.setEncoding('utf8');

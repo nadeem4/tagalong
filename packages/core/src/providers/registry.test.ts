@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { BrainError } from './errors';
 import { FakeBrainProvider } from './fake';
 import { AnthropicProvider } from './anthropic';
+import { ClaudeCodeBrain } from './claude-code-brain';
 import { OpenAiCompatibleProvider } from './openai-compatible';
 import { NEMOTRON_TEXT_MODEL, NEMOTRON_VISION_MODEL } from './nebius-models';
 import { createProvider } from './registry';
@@ -20,6 +21,12 @@ describe('createProvider', () => {
     const provider = createProvider({ providerId: 'anthropic', apiKey: 'k', env: {} });
     expect(provider).toBeInstanceOf(AnthropicProvider);
     expect(provider.id).toBe('anthropic');
+  });
+
+  it('builds the Claude Code provider with no key: it uses the Claude Code sign-in', () => {
+    const provider = createProvider({ providerId: 'claude-code', env: {} });
+    expect(provider).toBeInstanceOf(ClaudeCodeBrain);
+    expect(provider.id).toBe('claude-code');
   });
 
   it('builds the Token Factory provider as nebius', () => {

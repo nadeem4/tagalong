@@ -20,6 +20,11 @@ export {
   REFUSAL_MESSAGE,
   type AnthropicProviderOptions,
 } from './anthropic';
+export {
+  CLAUDE_CODE_MODELS,
+  ClaudeCodeBrain,
+  type ClaudeCodeBrainOptions,
+} from './claude-code-brain';
 export { FAKE_MODELS, FakeBrainProvider, type FakeScript } from './fake';
 export {
   NEBIUS_BASE_URL,

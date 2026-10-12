@@ -1,5 +1,6 @@
 import type { BrainProvider } from './brain';
 import { AnthropicProvider } from './anthropic';
+import { ClaudeCodeBrain } from './claude-code-brain';
 import { FakeBrainProvider } from './fake';
 import { BrainError } from './errors';
 import { OpenAiCompatibleProvider } from './openai-compatible';
@@ -7,7 +8,7 @@ import { openAiPreset } from './presets';
 
 /** What the engine knows about the provider before it builds one. */
 export interface ProviderConfig {
-  /** Matches `Pet.providerId`: 'anthropic', 'nebius', 'openrouter' or 'fake'. */
+  /** Matches `Pet.providerId`: 'claude-code', 'anthropic', 'nebius', 'openrouter' or 'fake'. */
   providerId: string;
   /** Read from the host's SecretStore; never stored in settings. */
   apiKey?: string | undefined;
@@ -76,6 +77,9 @@ export function createProvider(config: ProviderConfig): BrainProvider {
   switch (config.providerId) {
     case 'fake':
       return new FakeBrainProvider(fakeScriptFrom(env));
+    case 'claude-code':
+      // No key: it thinks through the person's own Claude Code sign-in.
+      return new ClaudeCodeBrain();
     case 'anthropic':
       if (!config.apiKey) {
         throw new BrainError('auth', 'No Anthropic API key is stored. Add one in Settings.');
@@ -84,7 +88,7 @@ export function createProvider(config: ProviderConfig): BrainProvider {
     default:
       throw new BrainError(
         'config',
-        `Unknown provider id '${config.providerId}'. Supported: 'nebius', 'openrouter', 'anthropic' and 'fake'.`,
+        `Unknown provider id '${config.providerId}'. Supported: 'claude-code', 'nebius', 'openrouter', 'anthropic' and 'fake'.`,
       );
   }
 }

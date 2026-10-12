@@ -27,6 +27,13 @@ export function providerChoices(stored: ReadonlySet<string>): ProviderChoice[] {
     ];
   });
   return [
+    // First, because it needs nothing: it thinks through the person's own Claude Code sign-in.
+    {
+      id: 'claude-code',
+      label: 'Claude Code (your sign-in, no key)',
+      needsKey: false,
+      hasKey: false,
+    },
     ...presets,
     { id: 'anthropic', label: 'Anthropic', needsKey: true, hasKey: stored.has('anthropic') },
     { id: 'fake', label: 'Fake (offline demo)', needsKey: false, hasKey: false },
