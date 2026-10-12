@@ -724,13 +724,14 @@ turn's `modelCalls` when it was more than one. `HostBridge.onTurnEvent` now also
 `pet.message` and `crew.status`; the desktop forwards every notification and the extension's port
 bridge lets these two through.
 
-The desktop avatar window became a strip: one `PetAvatar` button per visible pet, the default pet
-first, sized by `stripWidth(n)` and clamped on screen. The window background is still the drag handle,
-so the crew moves as one and its position is the existing `avatar` setting — one position for the
-strip rather than one per pet. A click calls `selectPet`, which opens the panel and sends it the pet.
-Each avatar's ring follows its own turns (`nextPetStates`), so a roundtable lights the pets in turn.
-`settings.hiddenPets` takes pets off the strip; they still answer in the panel. Home edits and deletes
-pets (see [Home](#home)); Settings sets `settings.summarizer`.
+The desktop avatar window holds the companion alone: `DockPet` (`@tagalong/ui`) draws its pixel
+character (`characterFor`) at 4x, with a face and a tag per mood (`withMood`,
+`office/sprites/expressions.ts`): idle; **Seeing** for 2.5 s after a capture, eyes up; **Working**
+while the companion answers or an expert has a task, eyes down; **Done** when a hand-off finishes, a
+happy squint, until the pet is clicked. The mood comes from `dockMood(nextDock(...))`
+(`renderer/src/dock.ts`), a pure reducer over turn and hand-off notifications and capture notices.
+The sight-paused mark and the recording dot stay. The window background is the drag handle and its
+position is the `avatar` setting; a click calls `selectPet`, which opens the bubble.
 
 ### Home
 

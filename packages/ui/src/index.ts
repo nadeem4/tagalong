@@ -30,6 +30,9 @@ export type { CrewStripProps } from './crew-strip';
 
 export { ChatPanel } from './chat-panel';
 export { CompanionBubble } from './companion-bubble';
+export { DockPet } from './dock-pet';
+export type { DockPetProps } from './dock-pet';
+export type { DockMood } from './office/sprites/expressions';
 export type { CompanionBubbleProps } from './companion-bubble';
 export type { ChatPanelProps } from './chat-panel';
 
