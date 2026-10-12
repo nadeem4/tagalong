@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Pet, Settings } from '@tagalong/protocol';
 import type { Role } from '@tagalong/protocol';
-import { findAgents, shouldOpenWelcome, welcomeCrew } from './welcome';
+import { findAgents, shouldOpenWelcome, welcomeCrew, welcomeExperts } from './welcome';
 
 const pet = (id: string, extra: Partial<Pet> = {}): Pet =>
   Pet.parse({
@@ -84,5 +84,39 @@ describe('welcomeCrew', () => {
 
   it('refuses a crew without the default pet', () => {
     expect(() => welcomeCrew([pet('ink')], 'scout', 'claude-code', COMPANION)).toThrow(/no scout/);
+  });
+});
+
+describe('welcomeExperts', () => {
+  const found = (claude: boolean) => [
+    { id: 'claude-code', label: 'Claude Code', found: claude, canThink: true },
+    { id: 'codex', label: 'Codex', found: true, canThink: false },
+  ];
+
+  it('adds Claude Code as an expert when it is installed, with no folder: each task picks one', () => {
+    expect(welcomeExperts(found(true), [])).toEqual([
+      {
+        id: 'claude-code',
+        name: 'Claude Code',
+        goodAt: 'Code: reading, explaining, debugging and changing code in a project.',
+        enabled: true,
+        connection: { type: 'claude-code', canEdit: false },
+      },
+    ]);
+  });
+
+  it('adds nothing when Claude Code is missing or already an expert', () => {
+    expect(welcomeExperts(found(false), [])).toEqual([]);
+    expect(
+      welcomeExperts(found(true), [
+        {
+          id: 'my-claude',
+          name: 'Mine',
+          goodAt: '',
+          enabled: true,
+          connection: { type: 'claude-code', canEdit: true },
+        },
+      ]),
+    ).toEqual([]);
   });
 });

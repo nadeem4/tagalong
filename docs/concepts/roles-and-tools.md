@@ -178,8 +178,8 @@ schema in `packages/protocol/src/pet.ts`:
 | `name`, `avatar`, `color`                          | Unchanged                                                                            |
 | `providerId`, `model`, `visionModel`, `watchModel` | Unchanged                                                                            |
 
-The default crew ships with roles: Scout is a Generalist, Ink a Writer and Bolt a Backend engineer,
-none with notes. Home's agent controls edit the notes as "Notes (optional, private)"; a new pet starts as a
+A fresh install has one pet, Scout, as the Companion, with no notes. (Before the one-companion
+design the crew also had Ink, a Writer, and Bolt, a Backend engineer; migration 11 removes them.) Home's agent controls edit the notes as "Notes (optional, private)"; a new pet starts as a
 Generalist.
 
 Database migration 5 (`packages/core/src/pets/roles-upgrade.ts`) upgrades pets stored before roles.

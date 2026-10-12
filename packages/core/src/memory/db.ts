@@ -97,6 +97,9 @@ const MIGRATIONS: readonly Migration[] = [
      name TEXT NOT NULL,
      last_used TEXT NOT NULL
    )`,
+  // One companion. Ink and Bolt came from the crew design and are gone; their conversations
+  // stay on disk. pet_seeds still lists them, so they are never seeded again.
+  `DELETE FROM pets WHERE id IN ('ink', 'bolt')`,
 ];
 
 /** The columns migration 7 gave `activity`, in order. */

@@ -129,6 +129,32 @@ describe('migrate', () => {
     }
   });
 
+  it('removes Ink and Bolt in migration 11, keeping their conversations', () => {
+    const db = new Database(':memory:');
+    try {
+      migrate(db);
+      db.prepare('DELETE FROM schema_version WHERE version >= 11').run();
+      const add = db.prepare('INSERT INTO pets (id, json, updated_at) VALUES (?, ?, ?)');
+      for (const id of ['scout', 'ink', 'bolt', 'pip']) {
+        add.run(id, JSON.stringify({ id }), '2026-10-01T00:00:00.000Z');
+      }
+      db.prepare(
+        "INSERT INTO conversations (id, pet_id, created_at) VALUES ('c1', 'ink', 'x')",
+      ).run();
+
+      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+
+      const ids = db
+        .prepare<[], { id: string }>('SELECT id FROM pets ORDER BY id')
+        .all()
+        .map((row) => row.id);
+      expect(ids).toEqual(['pip', 'scout']);
+      expect(db.prepare("SELECT id FROM conversations WHERE id = 'c1'").get()).toBeDefined();
+    } finally {
+      db.close();
+    }
+  });
+
   it('records no roles notice on a fresh database', () => {
     const db = new Database(':memory:');
     try {
