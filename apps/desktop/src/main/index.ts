@@ -56,6 +56,7 @@ import {
   showPanelQuietly,
 } from './windows/panel';
 import { AVATAR_SIZE, resolveAvatarPosition, stripWidth } from './windows/position';
+import { moveWindow } from './windows/move';
 import { createOfficeWindow } from './windows/office';
 import { createOnboardingWindow } from './windows/onboarding';
 import { createSettingsWindow } from './windows/settings';
@@ -822,8 +823,8 @@ function registerIpc(): void {
   ipcMain.handle(IPC.dragAvatar, (_event, dx: number, dy: number) => {
     const { panel, avatar } = required();
     if (avatar === null || !Number.isFinite(dx) || !Number.isFinite(dy)) return;
-    const [x = 0, y = 0] = avatar.getPosition();
-    avatar.setPosition(Math.round(x + dx), Math.round(y + dy));
+    const bounds = avatar.getBounds();
+    moveWindow(avatar, { ...bounds, x: Math.round(bounds.x + dx), y: Math.round(bounds.y + dy) });
     if (panel !== null && panel.isVisible()) placePanel(panel, avatar);
   });
   ipcMain.handle(IPC.dropAvatar, () => {

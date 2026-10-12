@@ -76,3 +76,12 @@ export function panelPosition(
     side: right ? 'right' : 'left',
   };
 }
+
+/**
+ * Whether moving a window between these two displays crosses a scale factor. Electron
+ * places such a move with the old display's scale, landing the window far from where it
+ * was asked to go; a second, identical move once it is on the new display corrects it.
+ */
+export function crossesScale(from: { scaleFactor: number }, to: { scaleFactor: number }): boolean {
+  return from.scaleFactor !== to.scaleFactor;
+}
