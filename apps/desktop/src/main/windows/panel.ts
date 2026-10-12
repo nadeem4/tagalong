@@ -49,13 +49,16 @@ export function createPanelWindow(options: PanelWindowOptions): BrowserWindow {
     if (input.type === 'keyDown' && input.key === 'Escape') window.hide();
   });
 
-  // Focus has settled on the new window a moment after the blur, not at it.
+  // Whether an answer is streaming is read at the blur itself: a fast answer can finish
+  // before the check below, and a blur during an answer must still not hide it. Where the
+  // focus went is only known a moment later, once it has settled on the new window.
   window.on('blur', () => {
+    const streaming = options.isStreaming();
     setTimeout(() => {
       const focused = BrowserWindow.getFocusedWindow();
       const pet = options.pet();
       const focusWentToPet = focused !== null && pet !== null && focused === pet;
-      if (hidesOnBlur({ streaming: options.isStreaming(), focusWentToPet })) window.hide();
+      if (hidesOnBlur({ streaming, focusWentToPet })) window.hide();
     }, 60);
   });
 
