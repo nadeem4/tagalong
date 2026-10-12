@@ -63,8 +63,10 @@ The first time Tagalong starts, one Welcome window opens on the screen you are u
    needs no key. Otherwise pick OpenRouter, Nebius Token Factory or Anthropic and paste a key; it goes
    straight into the operating system's keychain.
 4. **One key to remember.** Ctrl+Shift+Space asks Scout about whatever is on your screen.
-5. **Start.** Scout becomes your companion, docks on your screen and says hello in a bubble. If
-   Claude Code is installed it becomes Scout's first expert, so hand-offs work straight away.
+5. **Start.** Scout becomes your companion, docks on your screen and says hello in a bubble: how
+   you work together and the key to press. **Try it now** has Scout look at your screen and say
+   what it could hand to an expert; **Got it** sends it back to the dock. If Claude Code is
+   installed it becomes Scout's first expert, so hand-offs work straight away.
 
 After that, press Ctrl+Shift+Space (or click Scout) to open Scout's bubble, which speaks from
 Scout's side. Drag Scout anywhere on your screen; the bubble follows. Escape or the × closes it. It shows what Scout can

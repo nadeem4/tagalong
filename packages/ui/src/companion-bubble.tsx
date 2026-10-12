@@ -71,6 +71,9 @@ function without(snapshot: ContextSnapshot, removed: ReadonlySet<Chip['id']>): C
   };
 }
 
+/** What Try it now asks, from the hello: a first look at the screen. */
+const TRY_IT = 'What am I working on, and what could you hand to an expert?';
+
 type Reply =
   | { state: 'idle' }
   | { state: 'running'; turnId: string | null; text: string }
@@ -103,6 +106,8 @@ export function CompanionBubble({
   const [handoff, setHandoff] = useState<Handoff | null>(null);
   const [past, setPast] = useState<Exchange[]>([]);
   const [question, setQuestion] = useState<string | null>(null);
+  // Try it now ends the hello here, even when the screen could not be seen.
+  const [tried, setTried] = useState(false);
   const conversation = useRef<string | undefined>(undefined);
   const mine = useRef<string | null>(null);
 
@@ -171,35 +176,14 @@ export function CompanionBubble({
   });
   useEffect(() => bridge.onTurnEvent(onTurnEvent), [bridge]);
 
-  if (greeting) {
-    return (
-      <Speech tail={tail}>
-        <div className="bubble">
-          <style>{BUBBLE_CSS}</style>
-          <p role="status" className="bubble-text">
-            I’m here. Press {hotkeyLabel} whenever you want me, or click me.
-          </p>
-          <div className="bubble-row">
-            <button type="button" className="bubble-primary" onClick={onDismiss}>
-              Got it
-            </button>
-          </div>
-        </div>
-      </Speech>
-    );
-  }
-
-  const send = (): void => {
-    const text = draft.trim();
-    if (text === '' || reply.state === 'running') return;
-    setDraft('');
+  /** Asks one question, with what the companion can see, and keeps the last answer above. */
+  const submit = (text: string, context: ContextSnapshot | undefined): void => {
     if (question !== null && (reply.state === 'done' || reply.state === 'failed')) {
       const answered = { question, answer: reply.text, failed: reply.state === 'failed' };
       setPast((current) => [...current, answered]);
     }
     setQuestion(text);
     setReply({ state: 'running', turnId: null, text: '' });
-    const context = snapshot === undefined ? undefined : without(snapshot, removed);
     bridge
       .ask({
         petId,
@@ -217,6 +201,44 @@ export function CompanionBubble({
         }),
       );
   };
+
+  const send = (): void => {
+    const text = draft.trim();
+    if (text === '' || reply.state === 'running') return;
+    setDraft('');
+    submit(text, snapshot === undefined ? undefined : without(snapshot, removed));
+  };
+
+  const tryIt = async (): Promise<void> => {
+    setTried(true);
+    const seen = await bridge.capture(['activeWindow', 'screenshot']).catch(() => null);
+    submit(TRY_IT, seen ?? undefined);
+  };
+
+  if (greeting && !tried) {
+    return (
+      <Speech tail={tail}>
+        <div className="bubble">
+          <style>{BUBBLE_CSS}</style>
+          <div role="status" className="bubble-hello">
+            <p className="bubble-text">
+              <strong>Hi, I’m {petName}.</strong> You show me what you’re on, I brief the right
+              expert, and I bring the answer back.
+            </p>
+            <p className="bubble-text">Press {hotkeyLabel} whenever you want me, or click me.</p>
+          </div>
+          <div className="bubble-row">
+            <button type="button" className="bubble-primary" onClick={() => void tryIt()}>
+              Try it now
+            </button>
+            <button type="button" className="bubble-quiet" onClick={onDismiss}>
+              Got it
+            </button>
+          </div>
+        </div>
+      </Speech>
+    );
+  }
 
   const stop = (): void => {
     if (mine.current !== null) void bridge.interrupt(mine.current);
@@ -443,6 +465,7 @@ const BUBBLE_CSS = `
   border-radius: 8px; background: ${t.color.field}; color: ${t.color.text}; font: inherit; font-size: 14px;
 }
 .bubble-row { display: flex; align-items: center; gap: 12px; }
+.bubble-hello { display: grid; gap: 6px; }
 .bubble-hints { font-size: 11px; color: ${t.color.textMuted}; }
 .bubble-hints .bubble-quiet { margin-left: auto; }
 .bubble-primary {

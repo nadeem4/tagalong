@@ -1050,8 +1050,11 @@ flowchart LR
   the model its role's tier recommends there (`welcomeCrew`, using `recommendedModel`), hides every
   other pet (they stay in Home), adds Claude Code as an expert when it is installed and none exists
   (`welcomeExperts`: no folder, read-only), sets `welcome.done`, closes Welcome, and sends the panel `greetEvent` and shows it without
-  focus (`showPanelQuietly`): Scout says hello in its bubble, which tucks itself away after 12
-  seconds, on **Got it**, or when the hotkey asks a question.
+  focus (`showPanelQuietly`): Scout says hello in its bubble. The hello says how it works (you
+  show it, it briefs an expert, it brings the answer back) and the key to press, and stays until
+  **Got it** or a hotkey question. **Try it now** captures the active window and a screenshot
+  (`capture(['activeWindow', 'screenshot'])`) and asks "What am I working on, and what could you
+  hand to an expert?" in the same bubble; when the screen cannot be seen it asks without it.
 - **A new key answers the next question.** `KeyedProviderResolver` re-reads the keychain before every
   `ask` and rebuilds a provider only when its key or base URL changed, so a key pasted in Welcome is
   used without a restart.

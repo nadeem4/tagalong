@@ -7,8 +7,6 @@ import '../../shared/ipc';
 
 /** The full chat's height; the bubble measures its own. Matches main's PANEL_HEIGHT. */
 const CHAT_HEIGHT = 520;
-/** How long the hello after Welcome stays before it tucks itself away. */
-const GREETING_MS = 12_000;
 
 /** The ask key as a person reads it on this platform. */
 function readable(accelerator: string, platform: string): string {
@@ -48,12 +46,6 @@ function Panel() {
       }),
     [],
   );
-
-  useEffect(() => {
-    if (!greeting) return;
-    const timer = setTimeout(() => dismissGreeting(), GREETING_MS);
-    return () => clearTimeout(timer);
-  }, [greeting]);
 
   // The window follows what is shown: the chat at its full height, the bubble at its own.
   useEffect(() => {

@@ -13,6 +13,8 @@ const SNAPSHOT: ContextSnapshot = {
   selection: 'shuts down while a turn is running',
 };
 
+const TRY_IT = 'What am I working on, and what could you hand to an expert?';
+
 const CONVERSATION = '10000000-0000-4000-8000-0000000000c1';
 
 function renderBubble(
@@ -42,18 +44,42 @@ const ask = (text: string) => {
 };
 
 describe('CompanionBubble', () => {
-  it('greets once after Welcome: where it is, the key to press, and Got it', () => {
+  it('greets once after Welcome: how it works, the key to press, and Got it', () => {
     const onDismiss = vi.fn();
     renderBubble(createFakeHostBridge(), {
       greeting: true,
       hotkeyLabel: 'Ctrl+Shift+Space',
       onDismiss,
     });
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'I’m here. Press Ctrl+Shift+Space whenever you want me, or click me.',
+    const hello = screen.getByRole('status');
+    expect(hello).toHaveTextContent('Hi, I’m Scout.');
+    expect(hello).toHaveTextContent(
+      'You show me what you’re on, I brief the right expert, and I bring the answer back.',
     );
+    expect(hello).toHaveTextContent('Press Ctrl+Shift+Space whenever you want me, or click me.');
     fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
     expect(onDismiss).toHaveBeenCalledOnce();
+  });
+
+  it('tries it at once from the hello: looks at the screen and asks about it', async () => {
+    const bridge = createFakeHostBridge({ capture: SNAPSHOT });
+    const onDismiss = vi.fn();
+    renderBubble(bridge, { greeting: true, onDismiss });
+
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Try it now' })));
+
+    expect(bridge.captures).toEqual([['activeWindow', 'screenshot']]);
+    expect(bridge.asks).toEqual([{ petId: 'scout', text: TRY_IT, snapshot: SNAPSHOT }]);
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Try it now' })).toBeNull();
+    expect(screen.getByText('Scout is thinking…')).toBeVisible();
+  });
+
+  it('still tries it when it cannot see the screen, without a snapshot', async () => {
+    const bridge = createFakeHostBridge({ capture: null });
+    renderBubble(bridge, { greeting: true });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Try it now' })));
+    expect(bridge.asks).toEqual([{ petId: 'scout', text: TRY_IT }]);
   });
 
   it('shows what it can see as chips, and asks with that context on Enter', async () => {
