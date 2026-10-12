@@ -86,7 +86,7 @@ test('the app launches with its avatar and its panel', async () => {
   expect(windows.find((w) => w.url.includes('panel.html'))?.visible).toBe(false);
 });
 
-test('ask streams an answer and completes the turn', async () => {
+test('the bubble asks, shows the answer, and opens the full chat', async () => {
   const avatar = await windowFor('avatar');
 
   // Global hotkeys are unreliable on a CI desktop, so the panel is opened through the host
@@ -94,31 +94,21 @@ test('ask streams an answer and completes the turn', async () => {
   await avatar.evaluate(() => window.tagalongHost.togglePanel());
 
   const panel = await windowFor('panel');
-  // The panel shows "Waking the crew…" until pets.list answers, so the composer is not in
-  // the DOM the moment the window appears.
-  const composer = panel.getByLabel('Message');
-  await composer.waitFor({ state: 'visible', timeout: 30_000 });
+  // The panel shows "Waking the crew…" until pets.list answers, so the bubble's field is
+  // not in the DOM the moment the window appears.
+  const field = panel.getByLabel(/^Ask /);
+  await field.waitFor({ state: 'visible', timeout: 30_000 });
 
-  await composer.fill('what is on my screen?');
-  await composer.press('Enter');
+  await field.fill('what is on my screen?');
+  await field.press('Enter');
 
-  // The question is echoed back as a settled user message.
-  await expect(panel.locator('[data-role="user"]').first()).toContainText('what is on my screen?', {
-    timeout: 15_000,
-  });
+  // The settled answer replaces "is thinking…"; the fake provider's words are fixed.
+  await expect(panel.getByText(/This is the fake pet/)).toBeVisible({ timeout: 30_000 });
+  await expect(panel.getByRole('button', { name: 'Stop' })).toHaveCount(0, { timeout: 30_000 });
 
-  // The streaming bubble is deliberately NOT asserted here. It exists only between the
-  // first turn.delta and turn.completed, and the fake provider streams with no delay, so
-  // the whole turn can finish between two Playwright polls — the bubble may never be
-  // observable. Its incremental growth is covered deterministically in
-  // packages/ui/src/chat-panel.test.tsx, which drives the deltas through a fake bridge.
-  //
-  // What this test asserts is the settled end state. The streaming bubble also carries
-  // data-role="assistant", so it has to be excluded or this assertion could pass mid-stream.
-  const settled = panel.locator('[data-role="assistant"]:not([data-testid="streaming-message"])');
-  await expect(settled.first()).toBeVisible({ timeout: 30_000 });
-  await expect(settled.first()).not.toBeEmpty();
-  await expect(panel.getByTestId('streaming-message')).toHaveCount(0, { timeout: 30_000 });
+  // The full chat is one click behind the bubble.
+  await panel.getByRole('button', { name: 'Open full chat' }).click();
+  await expect(panel.getByLabel('Message')).toBeVisible({ timeout: 15_000 });
 });
 
 test('capture takes a real, downscaled PNG of the screen', async () => {

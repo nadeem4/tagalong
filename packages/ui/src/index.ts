@@ -23,6 +23,8 @@ export { CrewStrip, DEFAULT_PET_COLOR } from './crew-strip';
 export type { CrewStripProps } from './crew-strip';
 
 export { ChatPanel } from './chat-panel';
+export { CompanionBubble } from './companion-bubble';
+export type { CompanionBubbleProps } from './companion-bubble';
 export type { ChatPanelProps } from './chat-panel';
 
 /** Exported so hosts can test their renderer wiring without booting an engine. */

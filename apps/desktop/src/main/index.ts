@@ -48,7 +48,7 @@ import { SafeStorageSecretStore } from './secret-store';
 import { createTrayIcon } from './tray-icon';
 import { trayMenuTemplate } from './tray-menu';
 import { createAvatarWindow } from './windows/avatar';
-import { createPanelWindow, showPanelBeside } from './windows/panel';
+import { createPanelWindow, fitPanel, showPanelBeside, showPanelQuietly } from './windows/panel';
 import { AVATAR_SIZE, resolveAvatarPosition, stripWidth } from './windows/position';
 import { createOfficeWindow } from './windows/office';
 import { createOnboardingWindow } from './windows/onboarding';
@@ -736,7 +736,7 @@ function registerIpc(): void {
   ipcMain.handle(IPC.findAgents, () => findAgents());
 
   // Scout becomes the Companion on the chosen brain and docks alone; the others are hidden,
-  // not deleted. Then Welcome closes and the panel opens beside Scout, ready for a question.
+  // not deleted. Then Welcome closes and Scout says hello in its bubble, without taking focus.
   ipcMain.handle(IPC.finishWelcome, async (_event, providerId: string) => {
     const current = required();
     const client = engine().client;
@@ -752,8 +752,15 @@ function registerIpc(): void {
     current.onboardingWindow?.close();
     if (current.panel !== null && current.avatar !== null) {
       current.avatar.show();
-      showPanelBeside(current.panel, current.avatar);
+      current.panel.webContents.send(IPC.greetEvent);
+      showPanelQuietly(current.panel, current.avatar);
     }
+  });
+
+  ipcMain.handle(IPC.fitPanel, (_event, height: number) => {
+    const { panel, avatar } = required();
+    if (panel === null || avatar === null || !Number.isFinite(height)) return;
+    fitPanel(panel, avatar, height);
   });
 
   ipcMain.handle(IPC.openLink, async (_event, url: string) => {

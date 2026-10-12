@@ -54,3 +54,27 @@ export function resolveAvatarPosition(
     y: Math.min(Math.max(saved.y, workArea.y), maxY),
   };
 }
+
+/** Gap between the pet and its panel, so the pet is not covered by its own bubble. */
+export const PANEL_GAP = 12;
+
+/**
+ * Where the panel goes: beside the pet, on whichever side has room, with its bottom level
+ * with the pet's so a short bubble reads as the pet speaking. Clamped to the work area.
+ */
+export function panelPosition(
+  pet: Rect,
+  panel: { width: number; height: number },
+  workArea: Rect,
+): Point {
+  const toTheRight = pet.x + pet.width + PANEL_GAP;
+  const x =
+    toTheRight + panel.width <= workArea.x + workArea.width
+      ? toTheRight
+      : pet.x - panel.width - PANEL_GAP;
+  const y = pet.y + pet.height - panel.height;
+  return {
+    x: Math.max(x, workArea.x),
+    y: Math.min(Math.max(y, workArea.y), workArea.y + workArea.height - panel.height),
+  };
+}

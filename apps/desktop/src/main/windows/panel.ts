@@ -1,11 +1,12 @@
 import { BrowserWindow, screen } from 'electron';
 import { PRELOAD_PATH, loadPage } from './page';
+import { panelPosition } from './position';
 
 export const PANEL_WIDTH = 420;
+/** The full chat's height. The bubble asks for its own, which is usually far less. */
 export const PANEL_HEIGHT = 520;
-
-/** Gap between the avatar and the panel so the pet is not covered by its own chat. */
-const PANEL_GAP = 12;
+/** The bubble's first height, before it has measured itself. */
+const BUBBLE_HEIGHT = 180;
 
 export interface PanelWindowOptions {
   /** Focus loss must not close the panel mid-answer, so the caller says when a turn is live. */
@@ -13,7 +14,8 @@ export interface PanelWindowOptions {
 }
 
 /**
- * The chat panel: frameless, always on top, and deliberately easy to dismiss.
+ * The companion's bubble, and the full chat behind it: frameless, transparent around the
+ * bubble's rounded corners, always on top, and deliberately easy to dismiss.
  *
  * Escape and focus loss both hide it rather than closing it, so reopening on the next
  * hotkey is instant and the conversation in the renderer survives.
@@ -21,9 +23,11 @@ export interface PanelWindowOptions {
 export function createPanelWindow(options: PanelWindowOptions): BrowserWindow {
   const window = new BrowserWindow({
     width: PANEL_WIDTH,
-    height: PANEL_HEIGHT,
+    height: BUBBLE_HEIGHT,
     show: false,
     frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
     resizable: false,
     alwaysOnTop: true,
     skipTaskbar: true,
@@ -49,25 +53,31 @@ export function createPanelWindow(options: PanelWindowOptions): BrowserWindow {
   return window;
 }
 
-/**
- * Puts the panel beside the avatar, flipping to its other side and clamping to the work
- * area so a pet docked at the right edge does not open a panel off screen.
- */
+/** Puts the panel beside the pet at its current size; see `panelPosition`. */
+function place(panel: BrowserWindow, avatar: BrowserWindow): void {
+  const pet = avatar.getBounds();
+  const [width = PANEL_WIDTH, height = BUBBLE_HEIGHT] = panel.getSize();
+  const workArea = screen.getDisplayNearestPoint({ x: pet.x, y: pet.y }).workArea;
+  const { x, y } = panelPosition(pet, { width, height }, workArea);
+  panel.setPosition(x, y);
+}
+
+/** Shows the panel beside the pet and gives it the keyboard, for a question. */
 export function showPanelBeside(panel: BrowserWindow, avatar: BrowserWindow): void {
-  const [avatarX, avatarY] = avatar.getPosition();
-  const [avatarWidth] = avatar.getSize();
-  const anchorX = avatarX ?? 0;
-  const anchorY = avatarY ?? 0;
-  const workArea = screen.getDisplayNearestPoint({ x: anchorX, y: anchorY }).workArea;
-
-  const toTheRight = anchorX + (avatarWidth ?? 0) + PANEL_GAP;
-  const x =
-    toTheRight + PANEL_WIDTH <= workArea.x + workArea.width
-      ? toTheRight
-      : anchorX - PANEL_WIDTH - PANEL_GAP;
-  const y = Math.min(Math.max(anchorY, workArea.y), workArea.y + workArea.height - PANEL_HEIGHT);
-
-  panel.setPosition(Math.max(x, workArea.x), y);
+  place(panel, avatar);
   panel.show();
   panel.focus();
+}
+
+/** Shows the panel beside the pet without taking the keyboard, for the hello. */
+export function showPanelQuietly(panel: BrowserWindow, avatar: BrowserWindow): void {
+  place(panel, avatar);
+  panel.showInactive();
+}
+
+/** The renderer measured its content: resize to it, keeping the bottom level with the pet. */
+export function fitPanel(panel: BrowserWindow, avatar: BrowserWindow, height: number): void {
+  const clamped = Math.round(Math.min(Math.max(height, 80), PANEL_HEIGHT));
+  panel.setSize(PANEL_WIDTH, clamped);
+  place(panel, avatar);
 }
