@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { ContextSnapshot } from '@tagalong/protocol';
+import { HANDOFF_CSS, HandoffStatus, ProposalCard, type Handoff } from './handoff-card';
 import { useHostBridge } from './host-bridge';
 import type { TurnEvent } from './host-bridge';
 import { officeTokens as t } from './office/tokens';
@@ -79,6 +80,7 @@ export function CompanionBubble({
   const [draft, setDraft] = useState('');
   const [removed, setRemoved] = useState<ReadonlySet<Chip['id']>>(new Set());
   const [reply, setReply] = useState<Reply>({ state: 'idle' });
+  const [handoff, setHandoff] = useState<Handoff | null>(null);
   const conversation = useRef<string | undefined>(undefined);
   const mine = useRef<string | null>(null);
 
@@ -112,6 +114,34 @@ export function CompanionBubble({
         if (event.turnId !== mine.current) return;
         mine.current = null;
         setReply({ state: 'failed', text: event.message });
+        return;
+      case 'handoff.proposed':
+        if (event.petId === petId) setHandoff({ phase: 'proposed', proposal: event });
+        return;
+      case 'handoff.progress':
+        setHandoff((current) =>
+          current?.phase === 'working' &&
+          current.expertId === event.expertId &&
+          (current.handoffId === null || current.handoffId === event.handoffId)
+            ? { ...current, steps: [...current.steps, event.step] }
+            : current,
+        );
+        return;
+      case 'handoff.finished':
+        setHandoff((current) =>
+          current?.phase === 'working' &&
+          current.expertId === event.expertId &&
+          (current.handoffId === null || current.handoffId === event.handoffId)
+            ? {
+                phase: 'finished',
+                expertName: current.expertName,
+                state: event.state,
+                text: event.text,
+                changedFiles: event.changedFiles,
+                error: event.error,
+              }
+            : current,
+        );
         return;
       default:
         return;
@@ -167,6 +197,7 @@ export function CompanionBubble({
   return (
     <div className="bubble">
       <style>{BUBBLE_CSS}</style>
+      <style>{HANDOFF_CSS}</style>
       {chips.length > 0 && (
         <ul className="bubble-chips" aria-label={`What ${petName} can see`}>
           {chips.map((chip) => (
@@ -195,6 +226,25 @@ export function CompanionBubble({
         </div>
       )}
       {reply.state === 'done' && <p className="bubble-text bubble-answer">{reply.text}</p>}
+      {handoff?.phase === 'proposed' && (
+        <ProposalCard
+          key={handoff.proposal.proposalId}
+          proposal={handoff.proposal}
+          onSent={setHandoff}
+          onCancelled={() => setHandoff(null)}
+        />
+      )}
+      {handoff !== null && handoff.phase !== 'proposed' && (
+        <HandoffStatus
+          handoff={handoff}
+          onStop={() => {
+            if (handoff.phase === 'working' && handoff.handoffId !== null) {
+              void bridge.cancelHandoff?.(handoff.handoffId);
+            }
+          }}
+          onDismiss={() => setHandoff(null)}
+        />
+      )}
       {reply.state === 'failed' && (
         <p role="alert" className="bubble-error">
           {reply.text}

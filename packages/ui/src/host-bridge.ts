@@ -2,12 +2,14 @@ import { createContext, createElement, useContext } from 'react';
 import type { ReactNode } from 'react';
 import type {
   ActivityListResult,
+  Brief,
   ContextSnapshot,
   CoreToHostNotification,
   Expert,
   NotificationParamsOf,
   PerceptionTarget,
   Pet,
+  ProjectCandidate,
   Role,
   RolesUpgradeNotice,
 } from '@tagalong/protocol';
@@ -23,6 +25,7 @@ type TurnNotification =
   | 'crew.status'
   | 'watch.fired'
   | 'watch.status'
+  | 'handoff.proposed'
   | 'handoff.progress'
   | 'handoff.finished';
 
@@ -98,6 +101,19 @@ export interface HostBridge {
   testExpert?(expertId: string): Promise<{ ok: boolean; error?: string }>;
   /** The host's folder picker; null when the user cancelled. */
   pickFolder?(): Promise<string | null>;
+  /** Sends a proposed hand-off, in the folder the person settled on. */
+  confirmHandoff?(params: ConfirmHandoff): Promise<{ handoffId: string }>;
+  dismissHandoff?(proposalId: string): Promise<void>;
+  cancelHandoff?(handoffId: string): Promise<void>;
+  /** Projects on this computer matching a name or path, for "Change project". */
+  searchProjects?(query: string): Promise<ProjectCandidate[]>;
+}
+
+export interface ConfirmHandoff {
+  proposalId: string;
+  folder: string;
+  canEdit: boolean;
+  brief?: Brief;
 }
 
 const HostBridgeContext = createContext<HostBridge | null>(null);

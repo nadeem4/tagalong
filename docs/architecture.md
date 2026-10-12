@@ -406,8 +406,8 @@ one. `RouteMemory` (`experts/routes.ts`, table `expert_routes`, migration 9) rem
 expert; the companion's own picks never overwrite the user's, and deleting an expert forgets its
 routes.
 
-The card that shows a proposal in the companion's bubble comes next; see the "Experts and
-connectors" design in Notion.
+The companion's bubble shows proposals and their progress; see
+[The companion's bubble](#the-companions-bubble).
 
 ## The desktop host's shape
 
@@ -1128,6 +1128,17 @@ The panel window (`panel.html`) shows `CompanionBubble` (`@tagalong/ui`) by defa
 - **One question, one answer, in place.** Enter asks; the answer streams into the bubble with
   **Stop**; the next question continues the conversation `turn.started` reported. Turns of other
   pets are ignored. Errors say what went wrong in a `role="alert"` line.
+- **Hand-offs in the bubble** (`handoff-card.tsx`), mockup screens 4 to 6. A `handoff.proposed` for
+  this pet shows `ProposalCard`: the agent, the guessed project (name and path), the access and the
+  brief. **Change project** lists the other guesses, a search box (`searchProjects`, the engine's
+  `projects.search`) and **Browse…** (`pickFolder`); with no guess the picker is open and **Send**
+  waits for a project. **Allow edits** lets this one task change files; **Edit brief** edits the ask.
+  **Send** calls `confirmHandoff` and the card becomes `HandoffStatus`: the expert's steps as
+  `handoff.progress` arrives, with **Stop** (`cancelHandoff`), then on `handoff.finished` its answer,
+  the files it changed, or what went wrong. **Cancel** calls `dismissHandoff`. Main brings the
+  bubble up with focus for a proposal, and without focus for a finished hand-off; only when the
+  pets are hidden does a finished hand-off become a Windows notification instead. The folder dialog
+  takes focus and hides the bubble, so main shows it again after the dialog closes.
 - **The window fits the bubble.** It is transparent and frameless; a `ResizeObserver` reports the
   bubble's height through `fitPanel`, and main resizes the window and places it with
   `panelPosition`: beside the pet on the side with room, its bottom level with the pet's, clamped to

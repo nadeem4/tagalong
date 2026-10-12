@@ -55,6 +55,7 @@ import { createOnboardingWindow } from './windows/onboarding';
 import { createSettingsWindow } from './windows/settings';
 import { IPC } from '../shared/ipc';
 import type { CaptureNotice, HostView, ModelList } from '../shared/ipc';
+import type { ConfirmHandoff } from '@tagalong/ui';
 
 /** Everything the app owns once it is up. Assembled in `start`, torn down on quit. */
 interface Desktop {
@@ -307,6 +308,8 @@ function forwardToRenderers(notification: { method: string; params: unknown }): 
 
   if (notification.method === 'watch.fired') announceWatch(notification.params);
   if (notification.method === 'handoff.finished') announceHandoff(notification.params);
+  // A brief to check: the bubble comes up beside the pet with the card in it.
+  if (notification.method === 'handoff.proposed') bringUpBubble(true);
 
   // The renderer speaks the UI package's TurnEvent shape: the wire params plus the
   // method as a discriminant.
@@ -332,12 +335,31 @@ function announceWatch(params: unknown): void {
   }
 }
 
-/** An expert finished a hand-off: a system notification, until the companion's bubble says it. */
+/**
+ * An expert finished a hand-off: the bubble comes up beside the pet with the answer,
+ * without taking the keyboard. A system notification says so too when the pets are hidden,
+ * since then there is no bubble to see.
+ */
 function announceHandoff(params: unknown): void {
   const parsed = HandoffFinishedParams.safeParse(params);
-  if (!parsed.success || !Notification.isSupported()) return;
+  if (!parsed.success) return;
+  if (desktop?.avatar?.isVisible() === true) {
+    bringUpBubble(false);
+    return;
+  }
   const notice = handoffNotice(parsed.data);
-  if (notice !== null) new Notification({ ...notice, silent: false }).show();
+  if (notice !== null && Notification.isSupported()) {
+    new Notification({ ...notice, silent: false }).show();
+  }
+}
+
+/** Shows the bubble if it is hidden; `focus` gives it the keyboard, for something to answer. */
+function bringUpBubble(focus: boolean): void {
+  const panel = desktop?.panel;
+  const avatar = desktop?.avatar;
+  if (panel == null || avatar == null || panel.isVisible()) return;
+  if (focus) showPanelBeside(panel, avatar);
+  else showPanelQuietly(panel, avatar);
 }
 
 function showPets(): void {
@@ -613,14 +635,27 @@ function registerIpc(): void {
   );
   ipcMain.handle(IPC.pickFolder, async (event): Promise<string | null> => {
     const owner = BrowserWindow.fromWebContents(event.sender);
-    const options = {
-      title: 'The folder this expert works in',
-      properties: ['openDirectory' as const],
-    };
+    const options = { title: 'Choose a project folder', properties: ['openDirectory' as const] };
     const picked = owner
       ? await dialog.showOpenDialog(owner, options)
       : await dialog.showOpenDialog(options);
+    // The dialog took focus, which hides the bubble; bring it back with the folder in it.
+    const { panel, avatar } = required();
+    if (owner !== null && owner === panel && avatar !== null) showPanelBeside(panel, avatar);
     return picked.canceled ? null : (picked.filePaths[0] ?? null);
+  });
+  ipcMain.handle(IPC.confirmHandoff, async (_event, params: ConfirmHandoff) =>
+    engine().client.call('handoffs.confirm', params),
+  );
+  ipcMain.handle(IPC.dismissHandoff, async (_event, proposalId: string) => {
+    await engine().client.call('handoffs.dismiss', { proposalId });
+  });
+  ipcMain.handle(IPC.cancelHandoff, async (_event, handoffId: string) => {
+    await engine().client.call('handoffs.cancel', { handoffId });
+  });
+  ipcMain.handle(IPC.searchProjects, async (_event, query: string) => {
+    const { projects } = await engine().client.call('projects.search', { query });
+    return projects;
   });
 
   ipcMain.handle(IPC.getContext, () => required().pendingSnapshot);
