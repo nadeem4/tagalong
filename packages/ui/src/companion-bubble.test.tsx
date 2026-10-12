@@ -126,6 +126,25 @@ describe('CompanionBubble', () => {
     expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
   });
 
+  it('formats the answer: bullets and bold, not raw Markdown', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge, { snapshot: SNAPSHOT });
+    await act(async () => ask('what now?'));
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'turn-1',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      });
+      bridge.emit(done('turn-1', '**Two things:**\n\n- fix the test\n- run it again'));
+    });
+    expect(screen.getByText('Two things:').tagName).toBe('STRONG');
+    expect(screen.getByText('fix the test').tagName).toBe('LI');
+    expect(screen.getByText('run it again').tagName).toBe('LI');
+    expect(screen.queryByText(/\*\*/)).toBeNull();
+  });
+
   it('continues the same conversation on the next question', async () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge);

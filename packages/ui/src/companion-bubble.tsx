@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ContextSnapshot } from '@tagalong/protocol';
+import { ANSWER_CSS, Answer } from './answer';
 import { HANDOFF_CSS, HandoffStatus, ProposalCard, type Handoff } from './handoff-card';
 import { useHostBridge } from './host-bridge';
 import type { TurnEvent } from './host-bridge';
@@ -220,6 +221,7 @@ export function CompanionBubble({
       <Speech tail={tail}>
         <div className="bubble">
           <style>{BUBBLE_CSS}</style>
+          <style>{ANSWER_CSS}</style>
           <div role="status" className="bubble-hello">
             <p className="bubble-text">
               <strong>Hi, I’m {petName}.</strong> You show me what you’re on, I brief the right
@@ -265,15 +267,21 @@ export function CompanionBubble({
     <>
       {reply.state === 'running' && (
         <div className="bubble-answer" aria-live="polite">
-          <p className="bubble-text">
-            {reply.text === '' ? `${petName} is thinking…` : reply.text}
-          </p>
+          {reply.text === '' ? (
+            <p className="bubble-text">{petName} is thinking…</p>
+          ) : (
+            <Answer text={reply.text} />
+          )}
           <button type="button" className="bubble-quiet" onClick={stop}>
             Stop
           </button>
         </div>
       )}
-      {reply.state === 'done' && <p className="bubble-text bubble-answer">{reply.text}</p>}
+      {reply.state === 'done' && (
+        <div className="bubble-answer">
+          <Answer text={reply.text} />
+        </div>
+      )}
       {reply.state === 'failed' && (
         <p role="alert" className="bubble-error">
           {reply.text}
@@ -330,6 +338,7 @@ export function CompanionBubble({
       <Speech tail={tail}>
         <div className="bubble bubble--chat">
           <style>{BUBBLE_CSS}</style>
+          <style>{ANSWER_CSS}</style>
           <style>{HANDOFF_CSS}</style>
           <header className="bubble-head">
             <strong>{petName}</strong>
@@ -349,9 +358,11 @@ export function CompanionBubble({
             {past.map((exchange, index) => (
               <div key={index} className="bubble-exchange">
                 <p className="bubble-mine">{exchange.question}</p>
-                <p className={exchange.failed ? 'bubble-error' : 'bubble-text'}>
-                  {exchange.answer}
-                </p>
+                {exchange.failed ? (
+                  <p className="bubble-error">{exchange.answer}</p>
+                ) : (
+                  <Answer text={exchange.answer} />
+                )}
               </div>
             ))}
             {question !== null && (
@@ -375,6 +386,7 @@ export function CompanionBubble({
     <Speech tail={tail}>
       <div className="bubble">
         <style>{BUBBLE_CSS}</style>
+        <style>{ANSWER_CSS}</style>
         <style>{HANDOFF_CSS}</style>
         <div className="bubble-top">
           {chipList || <span />}
