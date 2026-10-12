@@ -86,6 +86,28 @@ test('the app launches with its avatar and its panel', async () => {
   expect(windows.find((w) => w.url.includes('panel.html'))?.visible).toBe(false);
 });
 
+test('clicking Scout opens its bubble, and clicking again keeps it open', async () => {
+  const avatar = await windowFor('avatar');
+  const panelVisible = () =>
+    app.evaluate(
+      ({ BrowserWindow }) =>
+        BrowserWindow.getAllWindows()
+          .find((w) => w.webContents.getURL().includes('panel.html'))
+          ?.isVisible() ?? false,
+    );
+  const pet = avatar.getByRole('button', { name: /^Ask / });
+  await pet.click();
+  await expect.poll(panelVisible, { timeout: 10_000 }).toBe(true);
+
+  // A second click lands on the pet's own window, which takes the focus from the bubble:
+  // that must not hide it.
+  await pet.click();
+  await avatar.waitForTimeout(400);
+  expect(await panelVisible()).toBe(true);
+
+  await avatar.evaluate(() => window.tagalongHost.hidePanel());
+});
+
 test('the bubble asks, shows the answer, and opens the full chat', async () => {
   const avatar = await windowFor('avatar');
 

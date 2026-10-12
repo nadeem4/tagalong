@@ -1,5 +1,6 @@
 import { BrowserWindow, screen } from 'electron';
 import { PRELOAD_PATH, loadPage } from './page';
+import { hidesOnBlur } from './bubble-focus';
 import { panelPosition } from './position';
 import { IPC } from '../../shared/ipc';
 
@@ -12,6 +13,8 @@ const BUBBLE_HEIGHT = 180;
 export interface PanelWindowOptions {
   /** Focus loss must not close the panel mid-answer, so the caller says when a turn is live. */
   isStreaming: () => boolean;
+  /** The pet's window: focus moving there (a click or a drag on the pet) keeps the bubble. */
+  pet: () => BrowserWindow | null;
 }
 
 /**
@@ -46,8 +49,14 @@ export function createPanelWindow(options: PanelWindowOptions): BrowserWindow {
     if (input.type === 'keyDown' && input.key === 'Escape') window.hide();
   });
 
+  // Focus has settled on the new window a moment after the blur, not at it.
   window.on('blur', () => {
-    if (!options.isStreaming()) window.hide();
+    setTimeout(() => {
+      const focused = BrowserWindow.getFocusedWindow();
+      const pet = options.pet();
+      const focusWentToPet = focused !== null && pet !== null && focused === pet;
+      if (hidesOnBlur({ streaming: options.isStreaming(), focusWentToPet })) window.hide();
+    }, 60);
   });
 
   loadPage(window, 'panel');

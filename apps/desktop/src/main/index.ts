@@ -234,7 +234,10 @@ async function start(): Promise<void> {
     return;
   }
 
-  desktop.panel = createPanelWindow({ isStreaming: () => (desktop?.activeTurns.size ?? 0) > 0 });
+  desktop.panel = createPanelWindow({
+    isStreaming: () => (desktop?.activeTurns.size ?? 0) > 0,
+    pet: () => desktop?.avatar ?? null,
+  });
   desktop.avatar = createAvatarWindow({
     position: settings.avatar,
     onMoved: (position) => {
@@ -757,7 +760,10 @@ function registerIpc(): void {
   // A click on the crew strip opens the panel on that pet, the way the chat button does.
   ipcMain.handle(IPC.selectPet, async (_event, petId: string) => {
     const current = required();
+    // A click on the pet opens its bubble, or keeps the open one and gives it the keyboard
+    // back (the click focused the pet's window). It never closes it.
     if (current.panel?.isVisible() !== true) await openPanelWithContext({ screenshot: false });
+    else if (current.avatar !== null) showPanelBeside(current.panel, current.avatar);
     current.panel?.webContents.send(IPC.activePetEvent, petId);
   });
 
