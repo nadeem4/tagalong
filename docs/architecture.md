@@ -734,8 +734,10 @@ faster while working and hops three times when done; `prefers-reduced-motion` st
 The pet is dragged by hand, since a drag region would swallow its clicks: a press that moves past
 4 px (`startDrag`, `moveDrag` in `renderer/src/dock.ts`) sends each step to main (`dragAvatar`),
 which moves the window and the open bubble with it; `dropAvatar` saves the position to the `avatar`
-setting. A press that does not move is a click: `selectPet` opens the bubble, or keeps an open one
-and gives it the keyboard back; it never closes it. The bubble hides when it loses focus, except
+setting. A press that does not move is a click: `selectPet` opens the bubble at once (`openPanelNow`),
+or keeps an open one and gives it the keyboard back; it never closes it. A click captures nothing:
+it has just put the pet's own window in front, so a selection copy or a window read would wait on
+the keyboard and the clipboard only to find Tagalong itself. The hotkeys still capture. The bubble hides when it loses focus, except
 when the focus went to the pet's own window (`hidesOnBlur`, `windows/bubble-focus.ts`), so clicking
 or dragging the pet never hides its bubble.
 

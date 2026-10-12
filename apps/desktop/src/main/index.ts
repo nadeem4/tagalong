@@ -545,6 +545,19 @@ async function openPanelWithContext(options: {
 }
 
 /**
+ * A click on the pet: the bubble opens at once, with nothing captured. The click has just
+ * put the pet's own window in front, so a selection copy or a window read would wait on
+ * the keyboard and the clipboard only to find Tagalong itself. The hotkeys still capture.
+ */
+function openPanelNow(current: Desktop): void {
+  if (current.panel === null || current.avatar === null) return;
+  current.pendingSnapshot = null;
+  current.panel.webContents.send(IPC.contextEvent, null);
+  current.avatar.show();
+  showPanelBeside(current.panel, current.avatar);
+}
+
+/**
  * The panel's own capture button. Null means refused, which is how the panel learns to
  * say capture is blocked here rather than silently staying blind.
  */
@@ -771,11 +784,11 @@ function registerIpc(): void {
   });
 
   // A click on the crew strip opens the panel on that pet, the way the chat button does.
-  ipcMain.handle(IPC.selectPet, async (_event, petId: string) => {
+  ipcMain.handle(IPC.selectPet, (_event, petId: string) => {
     const current = required();
     // A click on the pet opens its bubble, or keeps the open one and gives it the keyboard
     // back (the click focused the pet's window). It never closes it.
-    if (current.panel?.isVisible() !== true) await openPanelWithContext({ screenshot: false });
+    if (current.panel?.isVisible() !== true) openPanelNow(current);
     else if (current.avatar !== null) showPanelBeside(current.panel, current.avatar);
     current.panel?.webContents.send(IPC.activePetEvent, petId);
   });
@@ -866,10 +879,10 @@ function registerIpc(): void {
     if (problem.length > 0) throw new Error(problem);
   });
   ipcMain.handle(IPC.hidePanel, () => required().panel?.hide());
-  ipcMain.handle(IPC.togglePanel, async () => {
+  ipcMain.handle(IPC.togglePanel, () => {
     const current = required();
     if (current.panel?.isVisible() === true) {
       current.panel.hide();
-    } else await openPanelWithContext({ screenshot: false });
+    } else openPanelNow(current);
   });
 }

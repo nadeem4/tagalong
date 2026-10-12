@@ -70,7 +70,8 @@ waits until you are done with it, then arrives on your screen.
    installed it becomes Scout's first expert, so hand-offs work straight away.
 
 After that, press Ctrl+Shift+Space (or click Scout) to open Scout's bubble, which speaks from
-Scout's side. Drag Scout anywhere on your screen; the bubble follows. Escape or the × closes it. It shows what Scout can
+Scout's side. A click opens it at once without looking; the key also brings what you are on.
+Drag Scout anywhere on your screen; the bubble follows. Escape or the × closes it. It shows what Scout can
 see as chips (the app and window, selected text, a screenshot); remove any chip you do not want
 sent, type the question and press Enter. The answer appears in the bubble, the next question
 continues the same conversation, and **Open full chat** shows the whole conversation in a taller
