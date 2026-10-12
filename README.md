@@ -16,7 +16,7 @@ each other, and can watch the screen for you. They never take over your mouse or
 
 | In this build                                                                                       | Not in this build                                                   |
 | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Windows desktop app with a setup wizard and an NSIS installer                                       | macOS and Linux (the installer configs exist but are unverified)    |
+| Windows desktop app with a Welcome window and an NSIS installer                                     | macOS and Linux (the installer configs exist but are unverified)    |
 | Three providers: OpenRouter (Claude), Nebius Token Factory (NVIDIA Nemotron), Anthropic             | Voice: push to talk and spoken answers                              |
 | Sight: selection, screenshot, every display, every open window, window text, capture exclusions     | Hands: MCP tools and approval cards                                 |
 | Vision routing: a text-only Nemotron pet reads pictures with Nemotron Nano 2 VL                     | A cost dashboard                                                    |
@@ -51,36 +51,33 @@ pnpm dev:desktop
 Tagalong lives in the system tray. Its pets sit on the desktop as a small strip of avatars you can
 drag anywhere.
 
-## First run: the setup wizard
+## First run: Welcome
 
-The first time Tagalong starts, a setup wizard walks you through everything, one step at a time.
-Every step can be skipped with **Skip setup**, and you can run the wizard again from the tray menu
-(**Setup wizard**) or from **Settings → Run the setup wizard again**.
+The first time Tagalong starts, one Welcome window opens on the screen you are using.
 
-1. **Welcome.** What Tagalong does and the privacy promise (also below, in [Privacy](#privacy)).
-2. **Choose a provider.** Pick OpenRouter, Nebius Token Factory or Anthropic, click **Get an API key** to
-   open that provider's key page in your browser, and paste the key. You can paste keys for more than
-   one; the crew can mix providers. Keys go straight into the operating system's keychain.
-3. **Meet your crew.** Scout is a Generalist, Ink a Writer, Bolt a Backend engineer. Pick a provider
-   for each one; the model starts on the one its role recommends there (marked **Recommended**), and
-   you can change it. The model box lists the provider's live models as soon as the key is stored.
-4. **Hotkeys.** The four keys to remember, and the crew commands.
-5. **Rolling memory (optional).** Let Tagalong remember the last few minutes of the screen, in memory
-   only.
-6. **Chrome extension (optional).** Where the extension is and the pairing token to paste into it.
-7. **Done.** Press **Ask Scout something** to open the panel and ask your first question.
+1. **Hi, I'm Scout.** What Tagalong does: Scout sits on your screen, sees what you are working on,
+   hands the work to the right agent and tells you what came back.
+2. **Found on this computer.** The coding agents Tagalong found (Claude Code, Gemini CLI, Codex), with
+   a **How to add** link for the missing ones.
+3. **How I think.** If Claude Code is installed, Scout thinks through your Claude Code sign-in and
+   needs no key. Otherwise pick OpenRouter, Nebius Token Factory or Anthropic and paste a key; it goes
+   straight into the operating system's keychain.
+4. **One key to remember.** Ctrl+Shift+Space asks Scout about whatever is on your screen.
+5. **Start.** Scout becomes your companion and docks alone on your screen; the panel opens beside it.
+   Ink and Bolt are hidden, not deleted: Home brings them back.
 
-A key saved in the wizard or in Settings works on the very next question. No restart is needed.
+Open Welcome again from the tray (**Welcome**) or **Settings → Open Welcome again**. A key saved in
+Welcome or in Settings works on the very next question. No restart is needed.
 
 ## Providers and keys
 
 Each pet runs on one provider and one model, and each provider needs its own API key. Keys are
-entered in the wizard or in Settings, encrypted with the OS keychain, and only ever sent to the
+entered in Welcome or in Settings, encrypted with the OS keychain, and only ever sent to the
 provider they belong to.
 
 | Setup                               | Where to get the key                                                                                                       | Model ids                                                                                                                                                                                                                                                                                                                     |
 | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **OpenRouter + Claude**             | [openrouter.ai/keys](https://openrouter.ai/keys)                                                                           | OpenRouter's catalog at [openrouter.ai/models](https://openrouter.ai/models), for example `anthropic/claude-sonnet-5` or `anthropic/claude-haiku-4.5`. The wizard and Settings list them live.                                                                                                                                |
+| **OpenRouter + Claude**             | [openrouter.ai/keys](https://openrouter.ai/keys)                                                                           | OpenRouter's catalog at [openrouter.ai/models](https://openrouter.ai/models), for example `anthropic/claude-sonnet-5` or `anthropic/claude-haiku-4.5`. Settings lists them live.                                                                                                                                              |
 | **Nebius Token Factory + Nemotron** | [tokenfactory.nebius.com](https://tokenfactory.nebius.com/), under API keys                                                | Token Factory's model list (`GET https://api.tokenfactory.nebius.com/v1/models`, shown live once the key is stored): `nvidia/nemotron-3-super-120b-a12b` (Nemotron 3 Super, text), `nvidia/Nemotron-Nano-V2-12b` (Nemotron Nano 2 VL, sees pictures), `nvidia/nemotron-3-nano-30b-a3b` (Nemotron 3 Nano, cheap watch checks). |
 | **Claude Code sign-in**             | Nothing: install [Claude Code](https://claude.com/claude-code) and sign in. The pet thinks through `claude -p`.            | `haiku`, `sonnet`, `opus`.                                                                                                                                                                                                                                                                                                    |
 | **Anthropic**                       | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) (an API key, not a Claude subscription) | `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5`.                                                                                                                                                                                                                                                                       |
@@ -168,10 +165,9 @@ on. It needs the desktop app running.
 
 1. Open `chrome://extensions` and turn on **Developer mode**.
 2. Click **Load unpacked** and choose the extension folder. The installer ships it in
-   `%LOCALAPPDATA%\Programs\Tagalong\resources\extension` (the wizard's **Show folder** button opens
-   it). From source, build it with `pnpm --filter @tagalong/extension build` and choose
+   `%LOCALAPPDATA%\Programs\Tagalong\resources\extension`. From source, build it with `pnpm --filter @tagalong/extension build` and choose
    `apps/extension/dist`.
-3. Copy the pairing token from the wizard or from **Settings → Browser extension**, paste it into the
+3. Copy the pairing token from **Settings → Browser extension**, paste it into the
    extension's options page, and click **Save and connect**.
 
 Then click the toolbar button, or select text and press `Alt+Shift+Space`. More in
@@ -184,7 +180,7 @@ Then click the toolbar button, or select text and press `Alt+Shift+Space`. More 
   Nano on Token Factory, Claude Haiku elsewhere) once something changed and settled. When it happens
   you get a notification and a card in the panel. A **Watching** chip shows the checks spent and has
   **Stop**.
-- **Rolling memory** (off by default; turn it on in the wizard or **Settings → Awareness**). Tagalong
+- **Rolling memory** (off by default; turn it on in **Settings → Awareness**). Tagalong
   keeps a small picture of each screen every five seconds, in memory only, for the last ten minutes,
   so you can ask "what was I reading five minutes ago?". A red dot on the pets shows while it
   records.
@@ -205,18 +201,18 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 
 ## Troubleshooting
 
-| Problem                                                        | What to do                                                                                                                                         |
-| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A pet says "No … API key is stored"                            | Paste that provider's key in the wizard or Settings. It works on the next question.                                                                |
-| A pet says the model was not found, or the provider refused it | Open Settings and pick the model from the live list next to the pet's model box.                                                                   |
-| The pet ignores the screenshot, or warns it cannot see         | Its model is text-only. Give it a vision model in Settings (Nemotron Nano 2 VL on Token Factory) or move it to Claude.                             |
-| A hotkey does nothing                                          | Settings and the panel name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).               |
-| The Chrome side panel says "Disconnected"                      | The desktop app must be running. If it is, copy the pairing token again from Settings and paste it into the extension's options.                   |
-| "Windows protected your PC" when installing                    | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                               |
-| You want the wizard again                                      | Tray → **Setup wizard**, or Settings → **Run the setup wizard again**.                                                                             |
-| You want to start over                                         | Quit Tagalong and delete `%APPDATA%\Tagalong`. That removes settings, conversations, memories and stored keys; the wizard opens on the next start. |
-| From source, a look always captures the whole screen           | The active-window helper was not downloaded: run `node apps/desktop/scripts/fetch-native.mjs`. The installer already includes it.                  |
-| It does not start on macOS or Linux                            | Not in this build: only Windows has a platform adapter so far.                                                                                     |
+| Problem                                                        | What to do                                                                                                                                      |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| A pet says "No … API key is stored"                            | Paste that provider's key in Welcome or Settings. It works on the next question.                                                                |
+| A pet says the model was not found, or the provider refused it | Open Settings and pick the model from the live list next to the pet's model box.                                                                |
+| The pet ignores the screenshot, or warns it cannot see         | Its model is text-only. Give it a vision model in Settings (Nemotron Nano 2 VL on Token Factory) or move it to Claude.                          |
+| A hotkey does nothing                                          | Settings and the panel name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).            |
+| The Chrome side panel says "Disconnected"                      | The desktop app must be running. If it is, copy the pairing token again from Settings and paste it into the extension's options.                |
+| "Windows protected your PC" when installing                    | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                            |
+| You want Welcome again                                         | Tray → **Welcome**, or Settings → **Open Welcome again**.                                                                                       |
+| You want to start over                                         | Quit Tagalong and delete `%APPDATA%\Tagalong`. That removes settings, conversations, memories and stored keys; Welcome opens on the next start. |
+| From source, a look always captures the whole screen           | The active-window helper was not downloaded: run `node apps/desktop/scripts/fetch-native.mjs`. The installer already includes it.               |
+| It does not start on macOS or Linux                            | Not in this build: only Windows has a platform adapter so far.                                                                                  |
 
 ## No computer control
 

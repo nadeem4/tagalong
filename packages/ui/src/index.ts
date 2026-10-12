@@ -36,6 +36,7 @@ export type { AgentHost } from './home/agent-controls';
 export { THEMES, themeById } from './home/themes';
 export type { Placement, SceneProps, Theme, ThemeLayout, Whereabouts } from './home/theme';
 export { PixelSprite } from './office/pixel-sprite';
+export { characterFor } from './office/sprites/characters';
 export type { PixelSpriteProps } from './office/pixel-sprite';
 
 export { PetSettings } from './settings/pet-settings';

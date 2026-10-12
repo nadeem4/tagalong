@@ -298,7 +298,7 @@ a key saved a moment ago fills the picker without a restart.
 **Keys without a restart.** Turns get their provider from `KeyedProviderResolver`
 (`providers/key-resolver.ts`). The engine calls its `refresh` before every `ask`, which re-reads the
 three keychain entries; `resolve` reuses the built provider until its key or base URL changes, then
-builds a new one. A key pasted into the onboarding wizard therefore answers the very next question,
+builds a new one. A key pasted into Welcome therefore answers the very next question,
 which is what lets a fresh install reach a first answer without a restart.
 
 How the provider-neutral blocks map onto the chat-completions
@@ -1053,49 +1053,45 @@ and are inside `dist/main.js` afterwards. That keeps the desktop's `dependencies
 alone, which matters to packaging: electron-builder copies exactly the `dependencies` tree into the
 installer, and listing the workspace packages there would ship their whole trees a second time.
 
-## Onboarding (Phase 7)
+## Welcome (first run)
 
-A fresh install opens the setup wizard, a fourth renderer page (`onboarding.html`) in an ordinary
-framed window. Main opens it from `start` when `shouldOpenOnboarding(settings, env)` says so: the
-protocol setting `onboarding.done` is false (its default, so a settings file from before the wizard
-reads as not done) and `TAGALONG_SKIP_ONBOARDING` is not `1`.
+A fresh install opens Welcome, a renderer page (`onboarding.html`) in an ordinary framed window
+centred on the screen under the cursor. Main opens it from `start` when `shouldOpenWelcome(settings,
+env)` says so: the protocol setting `welcome.done` is false and `TAGALONG_SKIP_ONBOARDING` is not
+`1`. Welcome replaced the Phase 7 setup wizard, so an install that finished the wizard
+(`onboarding.done`) still sees Welcome once. The tray's **Welcome** item and Settings open it again.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000'}}}%%
 flowchart LR
-  W[Welcome and privacy] --> P[Provider and key]
-  P -->|saveApiKey| C[Crew models]
-  C -->|applyCrew| H[Hotkeys]
-  H --> M[Rolling memory]
-  M -->|saveSettings| E[Chrome extension]
-  E --> F[Done]
-  F -->|finishOnboarding| X[Panel on Scout]
+  O[Open] -->|findAgents| A[Agents found here]
+  A --> B[How Scout thinks]
+  B -->|saveApiKey, only for a keyed provider| S[Start]
+  S -->|finishWelcome| D[Scout, the Companion, docked alone]
+  D --> P[Panel beside Scout]
 ```
 
-- **Each step saves when it is left**, not at the end, so closing the window halfway keeps a pasted
-  key. Skip setup and the last step both call `finishOnboarding`, which sets `onboarding.done`.
-- **The wizard's decisions are pure functions.** `renderer/src/onboarding-flow.ts` holds the steps,
-  the gate on the provider step (a key stored or typed for at least one of OpenRouter, Token Factory
-  and Anthropic), and each pet's starting pick; `main/onboarding.ts` holds the per-provider model
-  suggestions and `applyCrewChoice`. Both are unit tested in Node; the markup is covered by two
-  Electron smoke tests.
-- **Roles in the crew step (Phase 8).** Each pet shows its role's name in its class ink
-  (`jobFor` and `officeTokens` from `@tagalong/ui`) and the role's summary, from
-  `window.tagalong.listRoles()`. Leaving the provider step asks `recommendModel(roleId, providerId)`
-  for every pet on every keyed provider (`recommendationsFor`), and `withRecommendations` lays the
-  answers over main's suggestions, so a pet moving provider starts on its role's model, marked
-  **Recommended** until it is edited (`isRecommended`). A pet already on a keyed provider keeps its
-  model, as before.
-- **Crew picks are applied in main**, because the rules need core's constants: a pet put on a
-  text-only Token Factory model gets Nemotron Nano 2 VL as its vision model, a pet moved to Claude
-  loses any Token Factory vision model, and a watch model is dropped when the provider changes.
+- **Agents found here.** `main/welcome.ts#findAgents` looks for `claude`, `gemini` and `codex` on the
+  PATH with `where` (or `which`), which also finds npm's `.cmd` shims. Nothing is run and nothing is
+  sent. Each agent says whether the companion can think through its sign-in (`canThink`); only Claude
+  Code can so far.
+- **How Scout thinks.** `renderer/src/welcome-flow.ts#brainOptions` offers each found sign-in first,
+  then every provider that takes a key; `defaultBrain` picks a sign-in, else a provider whose key is
+  stored, else the first provider. A sign-in needs nothing typed, so on a computer with Claude Code
+  the whole of Welcome is one click. Other providers' sign-ins (Gemini CLI, Codex) slot in by adding
+  a brain provider and setting `brain` on their entry in `AGENTS`.
+- **Start** (`finishWelcome(providerId)`) makes the default pet the Companion on that provider, on
+  the model its role's tier recommends there (`welcomeCrew`, using `recommendedModel`), hides every
+  other pet (they stay in Home), sets `welcome.done`, closes Welcome and opens the panel beside Scout.
 - **A new key answers the next question.** `KeyedProviderResolver` re-reads the keychain before every
-  `ask` and rebuilds a provider only when its key or base URL changed, so a key pasted in the wizard is
-  used without a restart. `models.list` already read the key fresh, so the crew step's live model list
-  appears as soon as the provider step saves.
-- **Links leave through an allowlist.** "Get a key" asks main to open the provider's key page; main
-  opens only `https://openrouter.ai`, `https://tokenfactory.nebius.com` and
-  `https://console.anthropic.com` (`isAllowedLink`), so a renderer cannot make it open anything else.
+  `ask` and rebuilds a provider only when its key or base URL changed, so a key pasted in Welcome is
+  used without a restart.
+- **Links leave through an allowlist.** Main opens only the provider key pages
+  (`https://openrouter.ai`, `https://tokenfactory.nebius.com`, `https://console.anthropic.com`) and
+  Welcome's three install pages, exactly (`isAllowedLink`), so a renderer cannot make it open anything
+  else.
+- **Where the pet appears.** A pet never moved docks on the screen under the cursor, and a moved pet
+  on the screen it was left on (`windows/avatar.ts`), never simply the primary display.
 
 ## Packaging (Phase 7)
 
@@ -1113,7 +1109,7 @@ matters for the hackathon, and carries best-effort, unverified dmg, AppImage and
   `package:win`; without it the active-window lookup answers "no window" and a look captures the whole
   screen.
 - `extraResources` copies `apps/extension/dist` to `resources/extension`, and `HostView.extensionFolder`
-  points the wizard at it (`main/links.ts#extensionFolder`: the resources folder when packaged, the
+  points Settings at it (`main/links.ts#extensionFolder`: the resources folder when packaged, the
   extension's build in a checkout).
 - `publish: null`: there is no auto-update channel, and electron-builder otherwise crashes writing
   update metadata for one.

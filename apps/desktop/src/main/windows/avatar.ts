@@ -17,9 +17,20 @@ export interface AvatarWindowOptions {
  * can be picked up and moved.
  */
 export function createAvatarWindow(options: AvatarWindowOptions): BrowserWindow {
+  // The screen the pet was left on, or for a pet never moved the one the person is using:
+  // never simply the primary display, where a pet on a laptop's own screen goes unseen
+  // by someone working on a monitor.
+  const { x: savedX, y: savedY } = options.position;
+  const near =
+    savedX !== null && savedY !== null ? { x: savedX, y: savedY } : screen.getCursorScreenPoint();
   const { x, y } = resolveAvatarPosition(
     options.position,
-    screen.getPrimaryDisplay().workArea as { x: number; y: number; width: number; height: number },
+    screen.getDisplayNearestPoint(near).workArea as {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    },
   );
 
   const window = new BrowserWindow({

@@ -16,6 +16,7 @@ describe('ui package surface', () => {
         'THEMES',
         'themeById',
         'PixelSprite',
+        'characterFor',
         'PetAvatar',
         'PetSettings',
         'CrewList',

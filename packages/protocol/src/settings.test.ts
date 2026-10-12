@@ -373,3 +373,17 @@ describe('Settings.onboarding', () => {
     expect(patch).toEqual({ onboarding: { done: true } });
   });
 });
+
+describe('Settings.welcome', () => {
+  it('starts not done, so a fresh install opens the Welcome window', () => {
+    expect(Settings.parse({}).welcome).toEqual({ done: false });
+  });
+
+  it('reads as not done on an install that finished the old wizard, so it sees Welcome once', () => {
+    expect(Settings.parse({ onboarding: { done: true } }).welcome.done).toBe(false);
+  });
+
+  it('rides in a patch alone', () => {
+    expect(SettingsPatch.parse({ welcome: { done: true } })).toEqual({ welcome: { done: true } });
+  });
+});

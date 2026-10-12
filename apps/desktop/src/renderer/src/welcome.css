@@ -1,0 +1,218 @@
+/* Welcome: the first window. The office's navy shell (DESIGN.md), one gold action. */
+
+body:has(.welcome) {
+  background: #12162b;
+}
+
+.welcome {
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 28px 36px 24px;
+  background: #12162b;
+  color: #e9ecf5;
+  font-family: 'Onest', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+}
+
+.welcome__hello {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.welcome__tile {
+  width: 84px;
+  height: 84px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: #222845;
+}
+
+.welcome h1 {
+  margin: 0 0 6px;
+  font-family: 'Pixelify Sans', 'Onest', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.welcome__hello p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #c9cee0;
+}
+
+.welcome section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.welcome h2 {
+  margin: 0;
+  font-family: 'Pixelify Sans', 'Onest', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #a3aac4;
+}
+
+.welcome__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid #2e3558;
+  border-radius: 8px;
+  background: #1a1f3a;
+}
+
+.welcome__list > li,
+.welcome__choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #2e3558;
+}
+
+.welcome__list > :last-child {
+  border-bottom: 0;
+}
+
+.welcome__choice {
+  cursor: pointer;
+}
+
+.welcome__choice input {
+  accent-color: #f2c14e;
+  margin: 0;
+}
+
+.welcome__name {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.welcome__name small {
+  font-size: 12px;
+  font-weight: 400;
+  color: #a3aac4;
+}
+
+.welcome__dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border: 2px solid #6b7290;
+  border-radius: 50%;
+}
+
+.welcome__dot.is-found {
+  border-color: #7dd87f;
+  background: #7dd87f;
+}
+
+.welcome button.welcome__link {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid #2e3558;
+  border-radius: 6px;
+  background: transparent;
+  color: #7cb8f2;
+  font-size: 12px;
+}
+
+.welcome__key {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #a3aac4;
+}
+
+.welcome__key input {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #2e3558;
+  border-radius: 6px;
+  background: #1a1f3a;
+  color: #e9ecf5;
+}
+
+.welcome__keys {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: #c9cee0;
+}
+
+.welcome__keys kbd {
+  padding: 5px 10px;
+  border: 1px solid #3a4270;
+  border-bottom-width: 3px;
+  border-radius: 6px;
+  background: #222845;
+  color: #e9ecf5;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.welcome__keys span {
+  margin-left: 8px;
+}
+
+.welcome__footer {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.welcome button.welcome__start {
+  height: 44px;
+  padding: 0 28px;
+  border: 0;
+  border-radius: 8px;
+  background: #f2c14e;
+  color: #12162b;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.welcome button.welcome__start:disabled {
+  background: #2a3050;
+  color: #6b7290;
+}
+
+.welcome__note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #a3aac4;
+}
+
+.welcome__error {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #3a1d2a;
+  color: #ffb4c0;
+  font-size: 13px;
+}

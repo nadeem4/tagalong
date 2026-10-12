@@ -104,6 +104,11 @@ export const SETTINGS_DEFAULTS = {
    * file from before the wizard reads as not done, so an existing install sees it once.
    */
   onboarding: { done: false },
+  /**
+   * Whether the Welcome window has been finished. It replaced the setup wizard, so an
+   * install that finished the wizard still sees Welcome once.
+   */
+  welcome: { done: false },
 } as const;
 
 /** A non-blank, trimmed entry. A blank one would match every window and blind the pet. */
@@ -255,6 +260,8 @@ const settingsFields = {
   }),
   /** Phase 7. Set when the setup wizard is finished or skipped; Settings can rerun it. */
   onboarding: z.object({ done: z.boolean() }),
+  /** Set when the Welcome window is finished; the tray can open it again. */
+  welcome: z.object({ done: z.boolean() }),
 };
 
 export const Settings = z.object({
@@ -283,6 +290,7 @@ export const Settings = z.object({
   rollingMemory: settingsFields.rollingMemory.prefault({ ...SETTINGS_DEFAULTS.rollingMemory }),
   watch: settingsFields.watch.prefault({ ...SETTINGS_DEFAULTS.watch }),
   onboarding: settingsFields.onboarding.prefault({ ...SETTINGS_DEFAULTS.onboarding }),
+  welcome: settingsFields.welcome.prefault({ ...SETTINGS_DEFAULTS.welcome }),
 });
 export type Settings = z.infer<typeof Settings>;
 

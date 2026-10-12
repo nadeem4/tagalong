@@ -191,8 +191,8 @@ TAGALONG_FAKE_PROVIDERS=1 pnpm dev:desktop
 PowerShell has no inline `VAR=value command` prefix; pasting the bash line into PowerShell fails with
 `TAGALONG_FAKE_PROVIDERS=1 : The term ... is not recognized`.
 
-On a fresh profile the setup wizard opens first; **Skip setup** closes it for good, and the tray's
-**Setup wizard** item brings it back. The tray's **Open Home** item opens the Home window. Two more things are worth knowing before the first run.
+On a fresh profile Welcome opens first; **Start** finishes it, and the tray's **Welcome** item
+brings it back. The tray's **Open Home** item opens the Home window. Two more things are worth knowing before the first run.
 
 **`ensure-electron`.** Electron 44.3.0 publishes no npm install script, so `pnpm install` unpacks the
 package without ever downloading the platform binary, and the first launch dies with an error that
@@ -446,7 +446,7 @@ in `packages/core/src/providers/registry.ts`, and `TAGALONG_SKIP_ONBOARDING` in
 | Variable                     | Status today                                                                                                                                            |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TAGALONG_FAKE_PROVIDERS=1`  | **Read.** Forces the fake brain provider, for tests and demos. No keys or network needed. Must be set in the shell environment.                         |
-| `TAGALONG_SKIP_ONBOARDING=1` | **Read.** Keeps the setup wizard shut. The Electron smoke tests set it; a person uses **Skip setup** instead.                                           |
+| `TAGALONG_SKIP_ONBOARDING=1` | **Read.** Keeps Welcome shut. The Electron smoke tests set it.                                                                                          |
 | `ANTHROPIC_API_KEY`          | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment. |
 | `OPENROUTER_API_KEY`         | **Not read.** The key for the `openrouter` provider, entered in Settings and stored like the Anthropic key.                                             |
 | `NEBIUS_API_KEY`             | **Not read.** The key for the `nebius` provider (Token Factory), entered in Settings and stored like the Anthropic key.                                 |
@@ -538,7 +538,7 @@ What is still standing, recorded here so nobody rediscovers it.
 - **The installer is unsigned and uses Electron's default icon.** SmartScreen warns on first run.
 - **Windows only.** The macOS and Linux installers are configured, but there is no platform adapter for
   either, so the app stops at launch there.
-- **No microphone or speaker step in the setup wizard.** Voice (Phase 3) is not in this build.
+- **No microphone or speaker step in Welcome.** Voice (Phase 3) is not in this build.
 - **Watch alerts are shown, not spoken.** Phase 3 (Voice) is not built; when it lands, `watch.fired`
   should be spoken in the pet's voice.
 

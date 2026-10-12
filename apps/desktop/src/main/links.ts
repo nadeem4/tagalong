@@ -11,10 +11,17 @@ const ALLOWED_LINK_ORIGINS: ReadonlySet<string> = new Set([
   'https://console.anthropic.com',
 ]);
 
-/** Whether a link is one of the key pages the setup wizard offers. */
+/** Where Welcome sends someone to install a coding agent: these pages exactly, no others. */
+const ALLOWED_LINKS: ReadonlySet<string> = new Set([
+  'https://claude.com/claude-code',
+  'https://github.com/google-gemini/gemini-cli',
+  'https://github.com/openai/codex',
+]);
+
+/** Whether a link is a provider key page or one of Welcome's install pages. */
 export function isAllowedLink(url: string): boolean {
   if (!URL.canParse(url)) return false;
-  return ALLOWED_LINK_ORIGINS.has(new URL(url).origin);
+  return ALLOWED_LINK_ORIGINS.has(new URL(url).origin) || ALLOWED_LINKS.has(url);
 }
 
 export interface ExtensionFolderOptions {

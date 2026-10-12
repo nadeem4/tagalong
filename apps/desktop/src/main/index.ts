@@ -20,7 +20,7 @@ import type {
   Settings,
   SettingsPatch,
 } from '@tagalong/protocol';
-import { SettingsStore, WATCH_MODEL_DEFAULTS } from '@tagalong/core';
+import { SettingsStore, WATCH_MODEL_DEFAULTS, getRole } from '@tagalong/core';
 import { systemClock } from './awareness/clock';
 import { handoffNotice } from './handoff-notice';
 import { nativeCodec } from './awareness/native-codec';
@@ -30,8 +30,8 @@ import { captureNotice, captureTooltip } from './capture-notice';
 import { captureAskSnapshot, capturePatch } from './context';
 import { startEngineHost } from './engine-host';
 import { extensionFolder, isAllowedLink } from './links';
-import { applyCrewChoice, crewSuggestions, shouldOpenOnboarding } from './onboarding';
 import { providerChoices, secretKeyFor } from './provider-choices';
+import { findAgents, shouldOpenWelcome, welcomeCrew } from './welcome';
 import type { EngineHost } from './engine-host';
 import {
   DEFAULT_LOOK_HOTKEY,
@@ -54,7 +54,7 @@ import { createOfficeWindow } from './windows/office';
 import { createOnboardingWindow } from './windows/onboarding';
 import { createSettingsWindow } from './windows/settings';
 import { IPC } from '../shared/ipc';
-import type { CaptureNotice, CrewChoice, HostView, ModelList } from '../shared/ipc';
+import type { CaptureNotice, HostView, ModelList } from '../shared/ipc';
 
 /** Everything the app owns once it is up. Assembled in `start`, torn down on quit. */
 interface Desktop {
@@ -245,9 +245,9 @@ async function start(): Promise<void> {
   // and in Settings, where there is something to do about it.
   applyHotkeys(settings);
 
-  // A fresh install starts in the wizard: provider, key, crew, hotkeys, then a first
-  // question, all without a terminal. Finishing or skipping it is remembered in settings.
-  if (shouldOpenOnboarding(settings, process.env)) openOnboarding();
+  // A fresh install starts in Welcome: the agents found here, how Scout thinks, one key.
+  // Finishing it is remembered in settings; the tray opens it again.
+  if (shouldOpenWelcome(settings, process.env)) openOnboarding();
 
   // An install just upgraded to roles opens the office once, where the notice explains
   // what changed. Dismissing it there marks it seen, so the next launch stays quiet.
@@ -659,7 +659,6 @@ function registerIpc(): void {
       providers: providerChoices(stored),
       engineVersion: app.getVersion(),
       watchModelDefaults: { ...WATCH_MODEL_DEFAULTS },
-      crewSuggestions: crewSuggestions(),
       platform: process.platform,
       ...(folder !== undefined ? { extensionFolder: folder } : {}),
       ...(current.host !== null ? { pairingToken: current.host.engine.pairingToken } : {}),
@@ -734,32 +733,27 @@ function registerIpc(): void {
   ipcMain.handle(IPC.openOnboarding, () => openOnboarding());
   ipcMain.handle(IPC.openOffice, () => openOffice());
 
-  ipcMain.handle(IPC.finishOnboarding, async (_event, openPanel: boolean) => {
+  ipcMain.handle(IPC.findAgents, () => findAgents());
+
+  // Scout becomes the Companion on the chosen brain and docks alone; the others are hidden,
+  // not deleted. Then Welcome closes and the panel opens beside Scout, ready for a question.
+  ipcMain.handle(IPC.finishWelcome, async (_event, providerId: string) => {
     const current = required();
-    const patch: SettingsPatch = { onboarding: { done: true } };
-    current.settings =
-      current.host === null
-        ? current.settingsStore.set(patch)
-        : (await current.host.client.call('settings.set', { patch })).settings;
+    const client = engine().client;
+    const companion = getRole('companion');
+    if (companion === undefined) throw new Error('The role library has no Companion.');
+    const { pets } = await client.call('pets.list', {});
+    const { defaultPetId } = current.settings;
+    const { scout, hiddenPets } = welcomeCrew(pets, defaultPetId, providerId, companion);
+    await client.call('pets.upsert', { pet: scout });
+    const patch: SettingsPatch = { hiddenPets, welcome: { done: true } };
+    current.settings = (await client.call('settings.set', { patch })).settings;
+    refreshStrip();
     current.onboardingWindow?.close();
-    if (openPanel && current.panel !== null && current.avatar !== null) {
+    if (current.panel !== null && current.avatar !== null) {
       current.avatar.show();
       showPanelBeside(current.panel, current.avatar);
     }
-  });
-
-  // Every pick is validated before any pet is written, so one bad model id cannot leave
-  // half the crew moved.
-  ipcMain.handle(IPC.applyCrew, async (_event, choices: Record<string, CrewChoice>) => {
-    const client = engine().client;
-    const { pets } = await client.call('pets.list', {});
-    const moved = pets.map((pet) => {
-      const choice = Object.hasOwn(choices, pet.id) ? choices[pet.id] : undefined;
-      return choice === undefined ? null : applyCrewChoice(pet, choice);
-    });
-    for (const pet of moved) if (pet !== null) await client.call('pets.upsert', { pet });
-    refreshStrip();
-    return (await client.call('pets.list', {})).pets;
   });
 
   ipcMain.handle(IPC.openLink, async (_event, url: string) => {

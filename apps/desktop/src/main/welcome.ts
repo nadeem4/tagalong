@@ -1,0 +1,83 @@
+import { execFile } from 'node:child_process';
+import { recommendedModel } from '@tagalong/core';
+import { Pet } from '@tagalong/protocol';
+import type { Role, Settings } from '@tagalong/protocol';
+import type { FoundAgent } from '../shared/ipc';
+
+/**
+ * The Welcome window's main-process half: which coding agents are on this computer, when
+ * Welcome opens, and how finishing it sets up the crew. Pure but for `isOnPath`, so it is
+ * tested without Electron.
+ */
+
+/**
+ * The coding agents Welcome looks for, in the order it lists them. `brain` names the
+ * provider through which the companion itself can think on that agent's sign-in; only
+ * Claude Code has one so far. Gemini CLI and Codex get theirs the same way later.
+ */
+const AGENTS = [
+  { id: 'claude-code', label: 'Claude Code', command: 'claude', brain: 'claude-code' },
+  { id: 'gemini-cli', label: 'Gemini CLI', command: 'gemini' },
+  { id: 'codex', label: 'Codex', command: 'codex' },
+] as const;
+
+export async function findAgents(
+  onPath: (command: string) => Promise<boolean> = isOnPath,
+): Promise<FoundAgent[]> {
+  return Promise.all(
+    AGENTS.map(async (agent) => ({
+      id: agent.id,
+      label: agent.label,
+      found: await onPath(agent.command).catch(() => false),
+      canThink: 'brain' in agent,
+    })),
+  );
+}
+
+/** Whether a command is on the PATH. Finds npm's .cmd shims too, which spawning would miss. */
+export function isOnPath(command: string): Promise<boolean> {
+  const finder = process.platform === 'win32' ? 'where' : 'which';
+  return new Promise((resolve) => {
+    execFile(finder, [command], { windowsHide: true, timeout: 5000 }, (error) => resolve(!error));
+  });
+}
+
+/**
+ * Opens until Welcome is finished. It replaced the setup wizard, so an install that
+ * finished the wizard still sees it once. `TAGALONG_SKIP_ONBOARDING=1` keeps it shut for
+ * the end-to-end smoke test, which drives the panel, not Welcome.
+ */
+export function shouldOpenWelcome(
+  settings: Settings,
+  env: Record<string, string | undefined>,
+): boolean {
+  if (env.TAGALONG_SKIP_ONBOARDING === '1') return false;
+  return !settings.welcome.done;
+}
+
+/**
+ * What finishing Welcome does to the crew: the default pet becomes the Companion on the
+ * chosen brain, on the model its role's tier recommends there, and docks alone. The other
+ * pets are hidden, not deleted, so Home can bring them back. Vision and watch models are
+ * dropped: they named the old provider's models.
+ */
+export function welcomeCrew(
+  pets: readonly Pet[],
+  defaultPetId: string,
+  providerId: string,
+  companion: Role,
+): { scout: Pet; hiddenPets: string[] } {
+  const current = pets.find((pet) => pet.id === defaultPetId);
+  if (current === undefined) throw new Error(`The crew has no ${defaultPetId} to welcome.`);
+  const recommended = recommendedModel(companion, providerId);
+  const { visionModel: _vision, watchModel: _watch, ...rest } = current;
+  const scout = Pet.parse({
+    ...rest,
+    roleId: companion.id,
+    roleVersion: companion.version,
+    providerId,
+    model: recommended?.model ?? current.model,
+    ...(recommended?.visionModel === undefined ? {} : { visionModel: recommended.visionModel }),
+  });
+  return { scout, hiddenPets: pets.filter((pet) => pet.id !== defaultPetId).map((pet) => pet.id) };
+}
