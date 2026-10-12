@@ -1068,7 +1068,7 @@ flowchart LR
   A --> B[How Scout thinks]
   B -->|saveApiKey, only for a keyed provider| S[Start]
   S -->|finishWelcome| D[Scout, the Companion, docked alone]
-  D --> P[Panel beside Scout]
+  D --> P[Hello in Scout's bubble]
 ```
 
 - **Agents found here.** `main/welcome.ts#findAgents` looks for `claude`, `gemini` and `codex` on the
@@ -1082,7 +1082,9 @@ flowchart LR
   a brain provider and setting `brain` on their entry in `AGENTS`.
 - **Start** (`finishWelcome(providerId)`) makes the default pet the Companion on that provider, on
   the model its role's tier recommends there (`welcomeCrew`, using `recommendedModel`), hides every
-  other pet (they stay in Home), sets `welcome.done`, closes Welcome and opens the panel beside Scout.
+  other pet (they stay in Home), sets `welcome.done`, closes Welcome, and sends the panel `greetEvent` and shows it without
+  focus (`showPanelQuietly`): Scout says hello in its bubble, which tucks itself away after 12
+  seconds, on **Got it**, or when the hotkey asks a question.
 - **A new key answers the next question.** `KeyedProviderResolver` re-reads the keychain before every
   `ask` and rebuilds a provider only when its key or base URL changed, so a key pasted in Welcome is
   used without a restart.
@@ -1092,6 +1094,22 @@ flowchart LR
   else.
 - **Where the pet appears.** A pet never moved docks on the screen under the cursor, and a moved pet
   on the screen it was left on (`windows/avatar.ts`), never simply the primary display.
+
+## The companion's bubble
+
+The panel window (`panel.html`) shows `CompanionBubble` (`@tagalong/ui`) by default, with the full
+`ChatPanel` one click behind it (**Open full chat**).
+
+- **What it can see, as chips.** The hotkey's snapshot becomes chips: the app and window title,
+  selected text, a screenshot. Removing a chip drops that part from the ask (`without`); a new
+  capture brings them all back.
+- **One question, one answer, in place.** Enter asks; the answer streams into the bubble with
+  **Stop**; the next question continues the conversation `turn.started` reported. Turns of other
+  pets are ignored. Errors say what went wrong in a `role="alert"` line.
+- **The window fits the bubble.** It is transparent and frameless; a `ResizeObserver` reports the
+  bubble's height through `fitPanel`, and main resizes the window and places it with
+  `panelPosition`: beside the pet on the side with room, its bottom level with the pet's, clamped to
+  the work area. The full chat asks for 520 px.
 
 ## Packaging (Phase 7)
 

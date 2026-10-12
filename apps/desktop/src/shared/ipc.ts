@@ -29,6 +29,8 @@ export const IPC = {
   listModels: 'tagalong:models:list',
   openSettings: 'tagalong:settings:open',
   hidePanel: 'tagalong:panel:hide',
+  fitPanel: 'tagalong:panel:fit',
+  greetEvent: 'tagalong:panel:greet',
   togglePanel: 'tagalong:panel:toggle',
   captureEvent: 'tagalong:capture-event',
   sightPauseEvent: 'tagalong:sight-pause-event',
@@ -193,6 +195,10 @@ export interface TagalongHostApi {
   /** Phase 7. Shows the unpacked extension's folder in the file manager. */
   showExtensionFolder(): Promise<void>;
   hidePanel(): Promise<void>;
+  /** The panel measured its content; main resizes it, keeping it level with the pet. */
+  fitPanel(height: number): Promise<void>;
+  /** Main asks the bubble for its one-time hello, right after Welcome. */
+  onGreet(handler: () => void): () => void;
   togglePanel(): Promise<void>;
 }
 

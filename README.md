@@ -2,7 +2,7 @@
 
 Tagalong is a desktop screen companion: a crew of AI pets that tag along on your screen. Press a key
 and the pet you are talking to reads what you selected, looks at your screen, or reads the page you
-are on in Chrome, then answers in a panel beside it. Pets remember what you tell them, hand work to
+are on in Chrome, then answers in a bubble beside it. Pets remember what you tell them, hand work to
 each other, and can watch the screen for you. They never take over your mouse or keyboard.
 
 - [Using Tagalong](#using-tagalong): install it, set it up, and use it. Start here.
@@ -63,8 +63,13 @@ The first time Tagalong starts, one Welcome window opens on the screen you are u
    needs no key. Otherwise pick OpenRouter, Nebius Token Factory or Anthropic and paste a key; it goes
    straight into the operating system's keychain.
 4. **One key to remember.** Ctrl+Shift+Space asks Scout about whatever is on your screen.
-5. **Start.** Scout becomes your companion and docks alone on your screen; the panel opens beside it.
+5. **Start.** Scout becomes your companion, docks alone on your screen and says hello in a bubble.
    Ink and Bolt are hidden, not deleted: Home brings them back.
+
+After that, press Ctrl+Shift+Space (or click Scout) to open Scout's bubble. It shows what Scout can
+see as chips (the app and window, selected text, a screenshot); remove any chip you do not want
+sent, type the question and press Enter. The answer appears in the bubble, the next question
+continues the same conversation, and **Open full chat** opens the full chat panel.
 
 Open Welcome again from the tray (**Welcome**) or **Settings → Open Welcome again**. A key saved in
 Welcome or in Settings works on the very next question. No restart is needed.
