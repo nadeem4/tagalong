@@ -1027,6 +1027,11 @@ env)` says so: the protocol setting `welcome.done` is false and `TAGALONG_SKIP_O
 (`onboarding.done`) still sees Welcome once. **Open Welcome again** on Home's Settings page opens it
 again.
 
+Welcome is alone on screen: the pet's window is created hidden (`createAvatarWindow({ hidden })`)
+and `scoutWaits` is set. Scout arrives on **Start**, or when Welcome is closed without it, so an
+install never ends with nothing on screen. Only that first Welcome hides Scout; closing a Welcome
+opened again from Home leaves the pet as it was.
+
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000'}}}%%
 flowchart LR
