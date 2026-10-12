@@ -43,6 +43,9 @@ export function createAvatarWindow(options: AvatarWindowOptions): BrowserWindow 
     resizable: false,
     alwaysOnTop: true,
     skipTaskbar: true,
+    // Never takes focus: pressing or dragging the pet must not blur its open bubble, which
+    // hides on blur. Clicks still arrive; the hotkey is the keyboard's way in.
+    focusable: false,
     maximizable: false,
     minimizable: false,
     fullscreenable: false,

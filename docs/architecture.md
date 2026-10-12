@@ -727,8 +727,15 @@ character (`characterFor`) at 4x, with a face and a tag per mood (`withMood`,
 while the companion answers or an expert has a task, eyes down; **Done** when a hand-off finishes, a
 happy squint, until the pet is clicked. The mood comes from `dockMood(nextDock(...))`
 (`renderer/src/dock.ts`), a pure reducer over turn and hand-off notifications and capture notices.
-The sight-paused mark and the recording dot stay. The window background is the drag handle and its
-position is the `avatar` setting; a click calls `selectPet`, which opens the bubble.
+The sight-paused mark and the recording dot stay. The pet is alive: it blinks every three to six
+seconds (`withBlink`) in moods with open eyes, breathes with a 1 px rise when idle or seeing, bobs
+faster while working and hops three times when done; `prefers-reduced-motion` stops all of it.
+
+The pet is dragged by hand, since a drag region would swallow its clicks: a press that moves past
+4 px (`startDrag`, `moveDrag` in `renderer/src/dock.ts`) sends each step to main (`dragAvatar`),
+which moves the window and the open bubble with it; `dropAvatar` saves the position to the `avatar`
+setting. A press that does not move is a click: `selectPet`, which opens the bubble. The window is
+`focusable: false`, so pressing or dragging the pet never blurs, and so hides, its bubble.
 
 ### Home
 
@@ -1079,6 +1086,11 @@ extension's side panel.
   bubble up with focus for a proposal, and without focus for a finished hand-off; only when the
   pets are hidden does a finished hand-off become a Windows notification instead. The folder dialog
   takes focus and hides the bubble, so main shows it again after the dialog closes.
+- **Attached to the pet.** `panelPosition` puts the window right against the pet (no gap) and
+  reports which side it is on; main sends that as `panelSideEvent`, and the bubble draws a speech
+  tail on the side facing the pet, so it reads as the pet speaking. It moves with the pet when the
+  pet is dragged. An × (**Close**) in the bubble and in the full chat hides it, as Escape does; Home
+  and Welcome close on Escape too.
 - **The window fits the bubble.** It is transparent and frameless; a `ResizeObserver` reports the
   bubble's height through `fitPanel`, and main resizes the window and places it with
   `panelPosition`: beside the pet on the side with room, its bottom level with the pet's, clamped to

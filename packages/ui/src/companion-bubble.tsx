@@ -1,4 +1,5 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { ContextSnapshot } from '@tagalong/protocol';
 import { HANDOFF_CSS, HandoffStatus, ProposalCard, type Handoff } from './handoff-card';
 import { useHostBridge } from './host-bridge';
@@ -20,6 +21,10 @@ export interface CompanionBubbleProps {
   expanded?: boolean;
   /** Back from the full chat to the bubble. */
   onCollapse?: () => void;
+  /** Hides the bubble; Escape does the same. */
+  onClose?: () => void;
+  /** Which side of the bubble the pet is on: the speech tail points there. */
+  tail?: 'left' | 'right';
 }
 
 /** A question and how it was answered, once it is over. */
@@ -88,6 +93,8 @@ export function CompanionBubble({
   onOpenChat,
   expanded = false,
   onCollapse,
+  onClose,
+  tail,
 }: CompanionBubbleProps) {
   const bridge = useHostBridge();
   const [draft, setDraft] = useState('');
@@ -166,17 +173,19 @@ export function CompanionBubble({
 
   if (greeting) {
     return (
-      <div className="bubble">
-        <style>{BUBBLE_CSS}</style>
-        <p role="status" className="bubble-text">
-          I’m here. Press {hotkeyLabel} whenever you want me, or click me.
-        </p>
-        <div className="bubble-row">
-          <button type="button" className="bubble-primary" onClick={onDismiss}>
-            Got it
-          </button>
+      <Speech tail={tail}>
+        <div className="bubble">
+          <style>{BUBBLE_CSS}</style>
+          <p role="status" className="bubble-text">
+            I’m here. Press {hotkeyLabel} whenever you want me, or click me.
+          </p>
+          <div className="bubble-row">
+            <button type="button" className="bubble-primary" onClick={onDismiss}>
+              Got it
+            </button>
+          </div>
         </div>
-      </div>
+      </Speech>
     );
   }
 
@@ -288,65 +297,106 @@ export function CompanionBubble({
     </label>
   );
 
+  const closeButton = onClose !== undefined && (
+    <button type="button" className="bubble-close" aria-label="Close" onClick={onClose}>
+      ×
+    </button>
+  );
+
   if (expanded) {
     return (
-      <div className="bubble bubble--chat">
-        <style>{BUBBLE_CSS}</style>
-        <style>{HANDOFF_CSS}</style>
-        <header className="bubble-head">
-          <strong>{petName}</strong>
-          {onCollapse !== undefined && (
-            <button type="button" className="bubble-quiet" onClick={onCollapse}>
-              Back to bubble
-            </button>
-          )}
-        </header>
-        <div className="bubble-log" role="log" aria-label={`Conversation with ${petName}`}>
-          {past.length === 0 && question === null && (
-            <p className="bubble-hints">Ask {petName} anything about what is on your screen.</p>
-          )}
-          {past.map((exchange, index) => (
-            <div key={index} className="bubble-exchange">
-              <p className="bubble-mine">{exchange.question}</p>
-              <p className={exchange.failed ? 'bubble-error' : 'bubble-text'}>{exchange.answer}</p>
-            </div>
-          ))}
-          {question !== null && (
-            <div className="bubble-exchange">
-              <p className="bubble-mine">{question}</p>
-              {answer}
-            </div>
-          )}
-          {handoffCard}
+      <Speech tail={tail}>
+        <div className="bubble bubble--chat">
+          <style>{BUBBLE_CSS}</style>
+          <style>{HANDOFF_CSS}</style>
+          <header className="bubble-head">
+            <strong>{petName}</strong>
+            <span className="bubble-row">
+              {onCollapse !== undefined && (
+                <button type="button" className="bubble-quiet" onClick={onCollapse}>
+                  Back to bubble
+                </button>
+              )}
+              {closeButton}
+            </span>
+          </header>
+          <div className="bubble-log" role="log" aria-label={`Conversation with ${petName}`}>
+            {past.length === 0 && question === null && (
+              <p className="bubble-hints">Ask {petName} anything about what is on your screen.</p>
+            )}
+            {past.map((exchange, index) => (
+              <div key={index} className="bubble-exchange">
+                <p className="bubble-mine">{exchange.question}</p>
+                <p className={exchange.failed ? 'bubble-error' : 'bubble-text'}>
+                  {exchange.answer}
+                </p>
+              </div>
+            ))}
+            {question !== null && (
+              <div className="bubble-exchange">
+                <p className="bubble-mine">{question}</p>
+                {answer}
+              </div>
+            )}
+            {handoffCard}
+          </div>
+          <footer className="bubble-foot">
+            {chipList}
+            {field(`Message ${petName}`)}
+          </footer>
         </div>
-        <footer className="bubble-foot">
-          {chipList}
-          {field(`Message ${petName}`)}
-        </footer>
-      </div>
+      </Speech>
     );
   }
 
   return (
-    <div className="bubble">
-      <style>{BUBBLE_CSS}</style>
-      <style>{HANDOFF_CSS}</style>
-      {chipList}
-      {answer}
-      {handoffCard}
-      {field(`Ask ${petName}`)}
-      <div className="bubble-row bubble-hints">
-        <span>Enter to ask</span>
-        <span>Esc to close</span>
-        {onOpenChat !== undefined && (
-          <button type="button" className="bubble-quiet" onClick={onOpenChat}>
-            Open full chat
-          </button>
-        )}
+    <Speech tail={tail}>
+      <div className="bubble">
+        <style>{BUBBLE_CSS}</style>
+        <style>{HANDOFF_CSS}</style>
+        <div className="bubble-top">
+          {chipList || <span />}
+          {closeButton}
+        </div>
+        {answer}
+        {handoffCard}
+        {field(`Ask ${petName}`)}
+        <div className="bubble-row bubble-hints">
+          <span>Enter to ask</span>
+          <span>Esc to close</span>
+          {onOpenChat !== undefined && (
+            <button type="button" className="bubble-quiet" onClick={onOpenChat}>
+              Open full chat
+            </button>
+          )}
+        </div>
       </div>
+    </Speech>
+  );
+}
+
+/** The bubble with a speech tail on the side the pet is on, so it reads as the pet talking. */
+function Speech({ tail, children }: { tail: 'left' | 'right' | undefined; children: ReactNode }) {
+  return (
+    <div className="speech" data-tail={tail ?? 'none'}>
+      <style>{SPEECH_CSS}</style>
+      {children}
+      {tail !== undefined && <span className="speech-tail" aria-hidden="true" />}
     </div>
   );
 }
+
+const SPEECH_CSS = `
+.speech { position: relative; box-sizing: border-box; }
+.speech[data-tail='left'] { padding-left: 10px; }
+.speech[data-tail='right'] { padding-right: 10px; }
+.speech-tail {
+  position: absolute; bottom: 34px; width: 14px; height: 14px; background: ${t.color.page};
+  border: 1px solid ${t.color.fieldLine}; transform: rotate(45deg);
+}
+.speech[data-tail='left'] .speech-tail { left: 4px; border-top: 0; border-right: 0; }
+.speech[data-tail='right'] .speech-tail { right: 4px; border-bottom: 0; border-left: 0; }
+`;
 
 const BUBBLE_CSS = `
 .bubble {
@@ -368,6 +418,12 @@ const BUBBLE_CSS = `
   background: #222845; font-size: 13px; line-height: 1.5; white-space: pre-wrap;
 }
 .bubble-foot { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-top: 1px solid #262C4A; }
+.bubble-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.bubble-close {
+  flex: none; width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent;
+  color: ${t.color.textMuted}; font-size: 18px; line-height: 1; cursor: pointer;
+}
+.bubble-close:hover { background: #222845; color: ${t.color.text}; }
 .bubble-text { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
 .bubble-answer { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
 .bubble-error { margin: 0; padding: 8px 12px; border-radius: 6px; background: #3a1d2a; color: #ffb4c0; font-size: 13px; }

@@ -1,9 +1,10 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Pet } from '@tagalong/protocol';
 import { DockPet } from './dock-pet';
 import { CHARACTERS } from './office/sprites/characters';
-import { withMood } from './office/sprites/expressions';
+import { withBlink, withMood } from './office/sprites/expressions';
 
 const SCOUT: Pet = {
   id: 'scout',
@@ -65,5 +66,37 @@ describe('DockPet', () => {
     rerender(<DockPet pet={SCOUT} mood="idle" recording />);
     expect(screen.getByTestId('recording-dot')).toBeInTheDocument();
     expect(screen.getByRole('img')).toHaveAccessibleName('Scout is idle, recording the screen');
+  });
+});
+
+describe('a living pet', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('closes its eyes for a blink, and changes nothing else', () => {
+    const base = CHARACTERS['scout']!.sprite;
+    const blink = withBlink(base);
+    expect(blink.rows).not.toEqual(base.rows);
+    expect(blink.rows.slice(0, 5)).toEqual(base.rows.slice(0, 5));
+    expect(blink.rows.slice(7)).toEqual(base.rows.slice(7));
+  });
+
+  it('blinks now and then, briefly', () => {
+    vi.useFakeTimers();
+    render(<DockPet pet={SCOUT} mood="idle" blinkEveryMs={3000} />);
+    const pet = screen.getByRole('img');
+    expect(pet).toHaveAttribute('data-blink', 'false');
+    act(() => vi.advanceTimersByTime(3000));
+    expect(pet).toHaveAttribute('data-blink', 'true');
+    act(() => vi.advanceTimersByTime(200));
+    expect(pet).toHaveAttribute('data-blink', 'false');
+  });
+
+  it('breathes when idle, bobs faster when working, and hops when done', () => {
+    const { rerender } = render(<DockPet pet={SCOUT} mood="idle" />);
+    expect(screen.getByTestId('dock-body')).toHaveAttribute('data-motion', 'breathe');
+    rerender(<DockPet pet={SCOUT} mood="working" />);
+    expect(screen.getByTestId('dock-body')).toHaveAttribute('data-motion', 'busy');
+    rerender(<DockPet pet={SCOUT} mood="done" />);
+    expect(screen.getByTestId('dock-body')).toHaveAttribute('data-motion', 'hop');
   });
 });

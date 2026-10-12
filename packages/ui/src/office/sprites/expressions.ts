@@ -23,3 +23,11 @@ export function withMood(sprite: Sprite, mood: DockMood): Sprite {
   rows.splice(4, 4, ...FACES[mood]);
   return { ...sprite, rows };
 }
+
+/** The eyes shut for a blink: a line where the eyes were. Other moods keep their own blink. */
+export function withBlink(sprite: Sprite): Sprite {
+  if (sprite.rows.length !== 16) return sprite;
+  const rows = [...sprite.rows];
+  rows.splice(5, 2, 'offffffffffffffo', 'offeeffffffeeffo'.replace(/e/g, 'o'));
+  return { ...sprite, rows };
+}

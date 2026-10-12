@@ -55,26 +55,24 @@ export function resolveAvatarPosition(
   };
 }
 
-/** Gap between the pet and its panel, so the pet is not covered by its own bubble. */
-export const PANEL_GAP = 12;
-
 /**
- * Where the panel goes: beside the pet, on whichever side has room, with its bottom level
- * with the pet's so a short bubble reads as the pet speaking. Clamped to the work area.
+ * Where the panel goes: right against the pet, on whichever side has room, with its bottom
+ * level with the pet's. There is no gap because the bubble draws a tail across its own
+ * edge to the pet, so it reads as the pet speaking. `side` says which side of the pet the
+ * panel is on, so the bubble knows where to draw the tail. Clamped to the work area.
  */
 export function panelPosition(
   pet: Rect,
   panel: { width: number; height: number },
   workArea: Rect,
-): Point {
-  const toTheRight = pet.x + pet.width + PANEL_GAP;
-  const x =
-    toTheRight + panel.width <= workArea.x + workArea.width
-      ? toTheRight
-      : pet.x - panel.width - PANEL_GAP;
+): Point & { side: 'left' | 'right' } {
+  const toTheRight = pet.x + pet.width;
+  const right = toTheRight + panel.width <= workArea.x + workArea.width;
+  const x = right ? toTheRight : pet.x - panel.width;
   const y = pet.y + pet.height - panel.height;
   return {
     x: Math.max(x, workArea.x),
     y: Math.min(Math.max(y, workArea.y), workArea.y + workArea.height - panel.height),
+    side: right ? 'right' : 'left',
   };
 }

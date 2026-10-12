@@ -111,6 +111,14 @@ const host: TagalongHostApi = {
     return () => void ipcRenderer.off(IPC.activePetEvent, listener);
   },
   fitPanel: (height: number) => ipcRenderer.invoke(IPC.fitPanel, height) as Promise<void>,
+  onPanelSide: (handler) => {
+    const listener = (_event: IpcRendererEvent, side: 'left' | 'right'): void => handler(side);
+    ipcRenderer.on(IPC.panelSideEvent, listener);
+    return () => void ipcRenderer.off(IPC.panelSideEvent, listener);
+  },
+  dragAvatar: (dx: number, dy: number) =>
+    ipcRenderer.invoke(IPC.dragAvatar, dx, dy) as Promise<void>,
+  dropAvatar: () => ipcRenderer.invoke(IPC.dropAvatar) as Promise<void>,
   onGreet: (handler) => {
     const listener = (): void => handler();
     ipcRenderer.on(IPC.greetEvent, listener);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { IDLE_DOCK, dockMood, nextDock } from './dock';
+import { IDLE_DOCK, dockMood, moveDrag, nextDock, startDrag } from './dock';
 
 const T = '10000000-0000-4000-8000-000000000001';
 const H = '10000000-0000-4000-8000-0000000000a1';
@@ -39,5 +39,23 @@ describe('the dock', () => {
 
   it('returns the same state for events it does not read', () => {
     expect(nextDock(IDLE_DOCK, { type: 'watch.status' })).toBe(IDLE_DOCK);
+  });
+});
+
+describe('dragging the pet', () => {
+  it('stays a click until the pointer moves past the threshold', () => {
+    const start = startDrag({ x: 100, y: 100 });
+    const small = moveDrag(start, { x: 102, y: 101 });
+    expect(small.step).toBeNull();
+    expect(small.state.dragging).toBe(false);
+  });
+
+  it('then moves the pet by each step, from where it was', () => {
+    const start = startDrag({ x: 100, y: 100 });
+    const first = moveDrag(start, { x: 110, y: 95 });
+    expect(first.state.dragging).toBe(true);
+    expect(first.step).toEqual({ dx: 10, dy: -5 });
+    const second = moveDrag(first.state, { x: 113, y: 95 });
+    expect(second.step).toEqual({ dx: 3, dy: 0 });
   });
 });

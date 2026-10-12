@@ -29,12 +29,16 @@ function Panel() {
   const [hotkeyProblem, setHotkeyProblem] = useState<string | null>(null);
   const [mode, setMode] = useState<'bubble' | 'chat'>('bubble');
   const [greeting, setGreeting] = useState(false);
+  // Which side of the pet this window sits on; the speech tail points the other way, at it.
+  const [side, setSide] = useState<'left' | 'right'>('left');
   const root = useRef<HTMLDivElement>(null);
 
   // Transparent around the bubble's rounded corners; the window itself is transparent.
   useEffect(() => {
     document.body.style.background = 'transparent';
   }, []);
+
+  useEffect(() => window.tagalongHost.onPanelSide(setSide), []);
 
   useEffect(
     () =>
@@ -128,6 +132,8 @@ function Panel() {
           onDismiss={dismissGreeting}
           onOpenChat={() => setMode('chat')}
           onCollapse={() => setMode('bubble')}
+          onClose={() => void window.tagalongHost.hidePanel()}
+          tail={side === 'left' ? 'right' : 'left'}
           {...(snapshot !== null ? { snapshot } : {})}
         />
       </div>
