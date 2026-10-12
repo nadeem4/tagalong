@@ -71,6 +71,12 @@ see as chips (the app and window, selected text, a screenshot); remove any chip 
 sent, type the question and press Enter. The answer appears in the bubble, the next question
 continues the same conversation, and **Open full chat** opens the full chat panel.
 
+When Scout hands work to an expert, the bubble shows a card first: the agent, the project it guessed
+(from your window, or the projects you used before), whether it may change files, and the brief.
+**Change project** picks another guess, searches your code folders or browses for a folder; **Allow
+edits** lets this one task change files; **Send** (or **Cancel**) decides. While the expert works the
+bubble lists its steps with **Stop**, and its answer comes back to the bubble when it is done.
+
 Open Welcome again from the tray (**Welcome**) or **Settings → Open Welcome again**. A key saved in
 Welcome or in Settings works on the very next question. No restart is needed.
 

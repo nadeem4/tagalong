@@ -5,7 +5,13 @@
  * HostBridge and the components talk to nothing else.
  */
 export { HostBridgeProvider, useHostBridge } from './host-bridge';
-export type { AskInput, HostBridge, HostBridgeProviderProps, TurnEvent } from './host-bridge';
+export type {
+  AskInput,
+  ConfirmHandoff,
+  HostBridge,
+  HostBridgeProviderProps,
+  TurnEvent,
+} from './host-bridge';
 
 export { PetAvatar } from './pet-avatar';
 export type { PetAvatarProps, PetState } from './pet-avatar';

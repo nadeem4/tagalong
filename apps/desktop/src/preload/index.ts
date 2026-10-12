@@ -6,6 +6,7 @@ import type {
   Expert,
   PerceptionTarget,
   Pet,
+  ProjectCandidate,
   Role,
   RolesUpgradeNotice,
   SettingsPatch,
@@ -51,6 +52,14 @@ const bridge: HostBridge = {
   testExpert: (expertId: string) =>
     ipcRenderer.invoke(IPC.testExpert, expertId) as Promise<{ ok: boolean; error?: string }>,
   pickFolder: () => ipcRenderer.invoke(IPC.pickFolder) as Promise<string | null>,
+  confirmHandoff: (params) =>
+    ipcRenderer.invoke(IPC.confirmHandoff, params) as Promise<{ handoffId: string }>,
+  dismissHandoff: (proposalId: string) =>
+    ipcRenderer.invoke(IPC.dismissHandoff, proposalId) as Promise<void>,
+  cancelHandoff: (handoffId: string) =>
+    ipcRenderer.invoke(IPC.cancelHandoff, handoffId) as Promise<void>,
+  searchProjects: (query: string) =>
+    ipcRenderer.invoke(IPC.searchProjects, query) as Promise<ProjectCandidate[]>,
   onTurnEvent: (handler: (event: TurnEvent) => void) => {
     const listener = (_event: IpcRendererEvent, turnEvent: TurnEvent): void => handler(turnEvent);
     ipcRenderer.on(IPC.turnEvent, listener);

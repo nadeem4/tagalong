@@ -4,10 +4,11 @@ import type {
   Expert,
   PerceptionTarget,
   Pet,
+  ProjectCandidate,
   Role,
   RolesUpgradeNotice,
 } from '@tagalong/protocol';
-import type { AskInput, HostBridge, TurnEvent } from '../host-bridge';
+import type { AskInput, ConfirmHandoff, HostBridge, TurnEvent } from '../host-bridge';
 
 export interface FakeHostBridge extends HostBridge {
   /** Delivers an event to every subscriber synchronously, so tests need no timers. */
@@ -30,6 +31,10 @@ export interface FakeHostBridge extends HostBridge {
   experts: Expert[];
   /** Every expert id tested, in order. */
   readonly testedExperts: readonly string[];
+  /** Every hand-off the person sent, dismissed or stopped, in order. */
+  readonly confirmedHandoffs: readonly ConfirmHandoff[];
+  readonly dismissedHandoffs: readonly string[];
+  readonly cancelledHandoffs: readonly string[];
 }
 
 /**
@@ -52,6 +57,8 @@ export function createFakeHostBridge(
     testExpert?: (expertId: string) => { ok: boolean; error?: string };
     /** What the folder picker answers; absent means the host has no picker. */
     pickFolder?: () => string | null;
+    /** What a project search answers; absent answers nothing found. */
+    searchProjects?: (query: string) => ProjectCandidate[];
   } = {},
 ): FakeHostBridge {
   const handlers = new Set<(event: TurnEvent) => void>();
@@ -62,6 +69,9 @@ export function createFakeHostBridge(
   let turnCount = 0;
   let notice = options.rolesNotice ?? null;
   const testedExperts: string[] = [];
+  const confirmedHandoffs: ConfirmHandoff[] = [];
+  const dismissedHandoffs: string[] = [];
+  const cancelledHandoffs: string[] = [];
 
   const fake: FakeHostBridge = {
     asks,
@@ -140,6 +150,24 @@ export function createFakeHostBridge(
     ...(options.pickFolder === undefined
       ? {}
       : { pickFolder: () => Promise.resolve(options.pickFolder?.() ?? null) }),
+    confirmedHandoffs,
+    dismissedHandoffs,
+    cancelledHandoffs,
+    confirmHandoff(params) {
+      confirmedHandoffs.push(params);
+      return Promise.resolve({ handoffId: `handoff-${confirmedHandoffs.length}` });
+    },
+    dismissHandoff(proposalId) {
+      dismissedHandoffs.push(proposalId);
+      return Promise.resolve();
+    },
+    cancelHandoff(handoffId) {
+      cancelledHandoffs.push(handoffId);
+      return Promise.resolve();
+    },
+    searchProjects(query) {
+      return Promise.resolve(options.searchProjects?.(query) ?? []);
+    },
     rolesNotice() {
       return Promise.resolve(notice);
     },
