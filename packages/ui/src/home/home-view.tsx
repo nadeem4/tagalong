@@ -1,398 +1,305 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent, ReactNode } from 'react';
-import type { Pet, Role, RolesUpgradeNotice } from '@tagalong/protocol';
+import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import type { ActivityEntry, Expert, Pet } from '@tagalong/protocol';
 import { useHostBridge } from '../host-bridge';
-import { ROOM_COUNT } from '../office/layout';
-import { jobFor } from '../office/job';
-import type { OfficeMember } from '../office/member';
-import { MeetingsPanel } from '../office/meetings-panel';
-import { OFFICE_CSS } from '../office/office-styles';
-import { PartyList } from '../office/party-list';
 import { PixelSprite } from '../office/pixel-sprite';
-import { RolesNotice } from '../office/roles-notice';
-import { CHARACTERS, characterFor } from '../office/sprites/characters';
-import { NO_ACTIVITY, nextActivity, statusOf } from '../office/status';
-import { readStill, writeStill } from '../office/still';
-import { officeTokens as t } from '../office/tokens';
+import { characterFor } from '../office/sprites/characters';
 import { SETTINGS_CSS } from '../settings/settings-styles';
 import { ActivityView } from './activity-view';
-import { AgentControls } from './agent-controls';
 import { ExpertsPanel } from './experts-panel';
-import type { AgentHost } from './agent-controls';
 import { HOME_CSS } from './home-styles';
-import { newAgent } from './new-agent';
-import { placeAgents } from './theme';
-import type { Theme } from './theme';
-import { DEFAULT_THEME } from './themes';
 
-const NOT_YET = 'Task assignment arrives in a later update';
+export type HomePage = 'overview' | 'scout' | 'experts' | 'activity' | 'settings';
 
-type Tab = 'activity' | 'agent' | 'experts' | 'meetings';
-const TABS: readonly Tab[] = ['activity', 'agent', 'experts', 'meetings'];
+const PAGES: readonly { id: HomePage; label: (name: string) => string }[] = [
+  { id: 'overview', label: () => 'Overview' },
+  { id: 'scout', label: (name) => name },
+  { id: 'experts', label: () => 'Experts' },
+  { id: 'activity', label: () => 'Activity' },
+  { id: 'settings', label: () => 'Settings' },
+];
+
+/** What Home needs from its host beyond the bridge: the companion and how it can think. */
+export interface HomeHost {
+  setup(): Promise<{
+    companionId: string;
+    providers: readonly { id: string; label: string }[];
+  }>;
+  listModels(providerId: string): Promise<{ models: string[]; source: 'live' | 'fallback' }>;
+  savePet(pet: Pet): Promise<Pet>;
+}
 
 export interface HomeViewProps {
-  /** The centre scene's theme. Only the scene changes with it; the chrome never does. */
-  theme?: Theme;
-  /** How this host changes an agent. Absent, Home shows the agents and their work only. */
-  agentHost?: AgentHost;
+  host: HomeHost;
+  /** The host's settings form: keys, hotkey, sight, memory, the browser extension. */
+  settings: ReactNode;
+  /** The page to show; the host sets it when the tray or the bubble opens a page. */
+  page?: HomePage;
+  onPage?: (page: HomePage) => void;
 }
 
 /**
- * Home, the control centre: every agent in a fixed list on the left, what each is doing in
- * the themed scene in the centre, and on the right what the crew did (activity), the picked
- * agent's controls, the experts the companion hands work to, and the meetings. The top bar, the list and the right panel are Home's
- * chrome and are identical in every theme. Host-agnostic: the crew, the roles and the turn
- * events come through the HostBridge, agent edits through `agentHost`.
+ * Home: the one window for everything. The companion in the corner, and five pages: an
+ * overview, how the companion thinks, the experts it hands work to, what happened, and
+ * the app's settings.
  */
-export function HomeView({ theme = DEFAULT_THEME, agentHost }: HomeViewProps = {}) {
+export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps) {
   const bridge = useHostBridge();
-  const [pets, setPets] = useState<Pet[] | null>(null);
-  const [rolesNotice, setRolesNotice] = useState<RolesUpgradeNotice | null>(null);
-  const [roles, setRoles] = useState<readonly Role[]>([]);
-  const [failed, setFailed] = useState(false);
-  const [activity, setActivity] = useState(NO_ACTIVITY);
-  const [picked, setPicked] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>('activity');
-  const [setup, setSetup] = useState<Awaited<ReturnType<AgentHost['setup']>> | null>(null);
-  const [still, setStill] = useState(readStill);
-  const toggleStill = () => {
-    writeStill(!still);
-    setStill(!still);
-  };
+  const [page, setPage] = useState<HomePage>(asked ?? 'overview');
+  const [pets, setPets] = useState<Pet[]>([]);
+  const [setup, setSetup] = useState<Awaited<ReturnType<HomeHost['setup']>> | null>(null);
+
+  const [lastAsked, setLastAsked] = useState(asked);
+  if (asked !== lastAsked) {
+    setLastAsked(asked);
+    if (asked !== undefined) setPage(asked);
+  }
 
   useEffect(() => {
-    let live = true;
-    // Roles only name the jobs: without them every pet reads as a generalist, but the crew
-    // still shows, so a roles failure is logged rather than shown as an outage.
-    const listed = bridge.listRoles().catch((error: unknown) => {
-      console.error('could not list roles', error);
-      return [];
+    void Promise.all([bridge.listPets(), host.setup()]).then(([listed, loaded]) => {
+      setPets(listed);
+      setSetup(loaded);
     });
-    // The notice is a courtesy: if it cannot be read, Home opens without it.
-    const unseen = bridge.rolesNotice().catch((error: unknown) => {
-      console.error('could not read the roles notice', error);
-      return null;
-    });
-    Promise.all([bridge.listPets(), listed, unseen])
-      .then(([list, library, notice]) => {
-        if (!live) return;
-        setRoles(library);
-        setPets(list);
-        setRolesNotice(notice);
-      })
-      .catch((error: unknown) => {
-        console.error('could not list pets', error);
-        if (live) setFailed(true);
-      });
-    return () => {
-      live = false;
-    };
-  }, [bridge]);
+  }, [bridge, host]);
 
-  useEffect(() => {
-    if (agentHost === undefined) return;
-    let live = true;
-    agentHost
-      .setup()
-      .then((next) => live && setSetup(next))
-      .catch((error: unknown) => console.error('could not read the agent setup', error));
-    return () => {
-      live = false;
-    };
-  }, [agentHost]);
-
-  useEffect(
-    () => bridge.onTurnEvent((event) => setActivity((current) => nextActivity(current, event))),
-    [bridge],
-  );
-
-  const members = useMemo<OfficeMember[]>(
-    () =>
-      (pets ?? []).map((pet) => ({
-        pet,
-        character: characterFor(pet),
-        job: jobFor(pet.roleId, roles),
-        status: statusOf(activity, pet.id),
-      })),
-    [pets, roles, activity],
-  );
-  // Meetings and needs-you do not exist in the engine yet, so every agent works alone.
-  const placements = useMemo(
-    () =>
-      placeAgents(
-        theme.layout,
-        members.map((member) => ({ id: member.pet.id, whereabouts: { kind: 'alone' } })),
-      ),
-    [theme, members],
-  );
-
-  /** Seen: closed here at once, and marked seen in the engine so it never comes back. */
-  const dismissNotice = (): void => {
-    setRolesNotice(null);
-    bridge
-      .dismissRolesNotice()
-      .catch((error: unknown) => console.error('could not dismiss the roles notice', error));
+  const companion =
+    pets.find((pet) => pet.id === setup?.companionId) ?? pets[0] ?? (undefined as Pet | undefined);
+  const name = companion?.name ?? 'Scout';
+  const go = (next: HomePage): void => {
+    setPage(next);
+    onPage?.(next);
   };
 
-  const selected = members.find((m) => m.pet.id === picked) ?? members[0];
-  const selectedId = selected?.pet.id ?? null;
-  const pickAgent = (petId: string): void => {
-    setPicked(petId);
-    setTab('agent');
-  };
-
-  /** A new generalist on the host's default brain, saved, then picked so its controls open. */
-  const addAgent = async (): Promise<void> => {
-    if (agentHost === undefined || setup === null) return;
-    const providerId = setup.newAgentProviderId;
-    const recommended = await bridge.recommendModel('generalist', providerId).catch(() => ({}));
-    const model =
-      'model' in recommended && recommended.model !== undefined
-        ? recommended.model
-        : (await agentHost.listModels(providerId)).models[0];
-    if (model === undefined) throw new Error(`no model to start a new agent on ${providerId}`);
-    const saved = await agentHost.savePet(
-      newAgent({
-        pets: pets ?? [],
-        roles,
-        providerId,
-        model,
-        visionModel: 'visionModel' in recommended ? recommended.visionModel : undefined,
-      }),
-    );
-    setPets((current) => [...(current ?? []), saved]);
-    pickAgent(saved.id);
-  };
-
-  const notice = failed ? (
-    <p role="alert" style={{ margin: t.space.sm, fontSize: t.fontSize.body }}>
-      Tagalong could not reach the crew. Check that the app finished starting, then reopen Home.
-    </p>
-  ) : pets === null ? (
-    <p style={{ margin: t.space.sm, fontSize: t.fontSize.body, color: t.color.textMuted }}>
-      Waking the crew…
-    </p>
-  ) : undefined;
-
-  const { Scene } = theme;
   return (
-    <div className={still ? 'office home office-still' : 'office home'}>
-      <style>{OFFICE_CSS}</style>
+    <div className="home">
       <style>{SETTINGS_CSS}</style>
       <style>{HOME_CSS}</style>
-      <TopBar still={still} onToggleStill={toggleStill} />
-      <div className="home-body">
-        <PartyList
-          members={members}
-          selectedId={selectedId}
-          onSelect={pickAgent}
-          {...(notice !== undefined ? { notice } : {})}
-          {...(agentHost !== undefined && setup !== null && pets !== null
-            ? {
-                footer: (
-                  <button
-                    type="button"
-                    className="office-toggle home-add"
-                    onClick={() =>
-                      void addAgent().catch((error: unknown) =>
-                        console.error('could not add an agent', error),
-                      )
-                    }
-                  >
-                    Add agent
-                  </button>
-                ),
-              }
-            : {})}
-        />
-        <Scene members={members} selectedId={selectedId} placements={placements} />
-        <SidePanel
-          tab={tab}
-          onTab={setTab}
-          agentLabel={selected?.pet.name ?? 'Agent'}
-          activity={<ActivityView pets={pets ?? []} />}
-          agent={
-            selected === undefined ? (
-              <p className="home-note">No agent to show yet.</p>
-            ) : agentHost === undefined ? (
-              <p className="home-note">Agents can be changed in the Tagalong desktop app.</p>
-            ) : setup === null ? (
-              <p className="home-note">Loading {selected.pet.name}’s controls…</p>
-            ) : (
-              <AgentControls
-                key={selected.pet.id}
-                pet={selected.pet}
-                roles={roles}
-                providers={setup.providers}
-                host={agentHost}
-                desktopPetId={setup.desktopPetId}
-                onDesktopPet={(desktopPetId) => setSetup({ ...setup, desktopPetId })}
-                onSaved={(saved) =>
-                  setPets((current) =>
-                    (current ?? []).map((pet) => (pet.id === saved.id ? saved : pet)),
-                  )
-                }
-                onDeleted={(petId) => {
-                  setPets((current) => (current ?? []).filter((pet) => pet.id !== petId));
-                  setTab('activity');
-                }}
-              />
-            )
-          }
-        />
-      </div>
-      {rolesNotice !== null && (
-        <RolesNotice
-          notice={rolesNotice}
-          roles={roles}
-          members={members}
-          onDismiss={dismissNotice}
-          onReview={() => {
-            dismissNotice();
-            setTab('agent');
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-const TAB_NAMES: Record<Tab, (agent: string) => string> = {
-  activity: () => 'Activity',
-  agent: (agent) => agent,
-  experts: () => 'Experts',
-  meetings: () => 'Meetings',
-};
-
-/** The right-hand panel: Activity, the picked agent's controls, Experts, Meetings. */
-function SidePanel({
-  tab,
-  onTab,
-  agentLabel,
-  activity,
-  agent,
-}: {
-  tab: Tab;
-  onTab: (tab: Tab) => void;
-  agentLabel: string;
-  activity: ReactNode;
-  agent: ReactNode;
-}) {
-  const base = useId();
-  const tabs = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({});
-  const id = (which: Tab, part: 'tab' | 'panel') => `${base}-${which}-${part}`;
-  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>): void => {
-    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-    if (step === 0) return;
-    event.preventDefault();
-    const next = TABS[(TABS.indexOf(tab) + step + TABS.length) % TABS.length] ?? 'activity';
-    onTab(next);
-    tabs.current[next]?.focus();
-  };
-  const panels: Record<Tab, ReactNode> = {
-    activity,
-    agent,
-    experts: <ExpertsPanel />,
-    meetings: <MeetingsPanel />,
-  };
-  return (
-    <div className="home-side">
-      <div role="tablist" aria-label="Home" className="home-tabs">
-        {TABS.map((which) => (
+      <nav aria-label="Tagalong" className="home-nav">
+        <div className="home-nav__who">
+          <span className="home-nav__tile">
+            {companion !== undefined && (
+              <PixelSprite sprite={characterFor(companion).sprite} scale={3} />
+            )}
+          </span>
+          <span>
+            <strong>{name}</strong>
+            <small>Your companion</small>
+          </span>
+        </div>
+        {PAGES.map((item) => (
           <button
-            key={which}
-            ref={(node) => {
-              tabs.current[which] = node;
-            }}
+            key={item.id}
             type="button"
-            role="tab"
-            id={id(which, 'tab')}
-            className="home-tab"
-            aria-selected={tab === which}
-            aria-controls={id(which, 'panel')}
-            tabIndex={tab === which ? 0 : -1}
-            onClick={() => onTab(which)}
-            onKeyDown={onKeyDown}
+            className="home-nav__item"
+            aria-current={page === item.id ? 'page' : undefined}
+            onClick={() => go(item.id)}
           >
-            {TAB_NAMES[which](agentLabel)}
+            {item.label(name)}
           </button>
         ))}
-      </div>
-      {TABS.map((which) => (
-        // Every panel stays mounted, so the activity keeps listening and an agent's unsaved
-        // edits survive a look at the activity.
-        <div
-          key={which}
-          role="tabpanel"
-          id={id(which, 'panel')}
-          aria-labelledby={id(which, 'tab')}
-          hidden={tab !== which}
-          className="home-panel"
-        >
-          {panels[which]}
-        </div>
-      ))}
+      </nav>
+      <main className="home-main">
+        {page === 'overview' && <Overview companion={companion} setup={setup} onGo={go} />}
+        {page === 'scout' && companion !== undefined && setup !== null && (
+          <ScoutPanel
+            key={companion.id}
+            pet={companion}
+            providers={setup.providers}
+            host={host}
+            onSaved={(saved) =>
+              setPets((current) => current.map((pet) => (pet.id === saved.id ? saved : pet)))
+            }
+          />
+        )}
+        {page === 'experts' && <ExpertsPanel />}
+        {page === 'activity' && <ActivityView pets={pets} />}
+        {page === 'settings' && settings}
+      </main>
     </div>
   );
 }
 
-function TopBar({ still, onToggleStill }: { still: boolean; onToggleStill: () => void }) {
-  const logo = CHARACTERS['scout'];
+function providerLabel(
+  setup: Awaited<ReturnType<HomeHost['setup']>> | null,
+  providerId: string,
+): string {
+  return setup?.providers.find((p) => p.id === providerId)?.label ?? providerId;
+}
+
+function Overview({
+  companion,
+  setup,
+  onGo,
+}: {
+  companion: Pet | undefined;
+  setup: Awaited<ReturnType<HomeHost['setup']>> | null;
+  onGo: (page: HomePage) => void;
+}) {
+  const bridge = useHostBridge();
+  const [experts, setExperts] = useState<Expert[] | null>(null);
+  const [recent, setRecent] = useState<ActivityEntry[]>([]);
+
+  useEffect(() => {
+    void bridge.listExperts?.().then(setExperts);
+    void bridge.listActivity?.({ limit: 3 }).then((page) => setRecent(page.entries));
+  }, [bridge]);
+
+  const name = companion?.name ?? 'Scout';
   return (
-    <header className="home-bar">
-      <div className="home-bar__title">
-        {logo !== undefined && <PixelSprite sprite={logo.sprite} scale={t.spriteScale.logo} />}
-        <h1 className="office-px">Home</h1>
+    <>
+      <h1 className="home-title">Overview</h1>
+      <div className="home-cards">
+        <section className="home-card" aria-label={name}>
+          <h2 className="home-card__label">{name.toUpperCase()}</h2>
+          <p className="home-card__lead">
+            <span className="home-dot" aria-hidden="true" /> Ready
+          </p>
+          {companion !== undefined && (
+            <p>
+              Thinks with {providerLabel(setup, companion.providerId)} · {companion.model}
+            </p>
+          )}
+          <p>Looks at your screen only when you press the key.</p>
+          <button type="button" className="tg-btn-quiet" onClick={() => onGo('scout')}>
+            Change how {name} thinks
+          </button>
+        </section>
+        <section className="home-card" aria-label="Experts">
+          <h2 className="home-card__label">EXPERTS</h2>
+          {experts !== null && experts.length === 0 && (
+            <p>No experts yet. {name} answers by itself until you add one.</p>
+          )}
+          {(experts ?? []).map((expert) => (
+            <p key={expert.id} className="home-card__row">
+              <strong>{expert.name}</strong>
+              <span>
+                {expert.enabled ? 'Ready' : 'Off'} ·{' '}
+                {expert.connection.canEdit ? 'can edit' : 'reads only'}
+              </span>
+            </p>
+          ))}
+          <button type="button" className="tg-btn-quiet" onClick={() => onGo('experts')}>
+            Manage experts
+          </button>
+        </section>
       </div>
-      <label title={NOT_YET} style={{ flex: 1, display: 'flex' }}>
-        <span style={VISUALLY_HIDDEN}>Assign a task</span>
-        <input
-          className="office-field"
-          disabled
-          placeholder={NOT_YET}
-          style={{
-            flex: 1,
-            background: t.color.field,
-            border: `1px solid ${t.color.fieldLine}`,
-            color: t.color.text,
-          }}
-        />
-      </label>
-      <button type="button" className="office-btn" disabled title={NOT_YET}>
-        Assign
-      </button>
-      <button
-        type="button"
-        className="office-toggle"
-        aria-pressed={still}
-        title="Stop the crew's idle animation"
-        onClick={onToggleStill}
-      >
-        Still office
-      </button>
-      <span className="home-bar__meta">
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          aria-hidden="true"
-        >
-          <path d="M4 14V2h7v12M2.5 14h11M8.5 8h.01" />
-        </svg>
-        {`${ROOM_COUNT} of ${ROOM_COUNT} rooms free`}
-      </span>
-    </header>
+      <section className="home-card" aria-label="Recent">
+        <h2 className="home-card__label">RECENT</h2>
+        {recent.length === 0 && <p>Nothing yet. Press the key and ask {name} something.</p>}
+        {recent.map((entry) => (
+          <p key={entry.id} className="home-card__row">
+            <span>
+              <strong>{entry.kind === 'expert' ? (entry.expertName ?? 'Expert') : name}</strong>
+              {entry.text !== undefined ? ` · ${entry.text}` : ''}
+            </span>
+            <span>{STATE_WORDS[entry.state]}</span>
+          </p>
+        ))}
+        <button type="button" className="tg-btn-quiet" onClick={() => onGo('activity')}>
+          See all activity
+        </button>
+      </section>
+    </>
   );
 }
 
-const VISUALLY_HIDDEN = {
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  overflow: 'hidden',
-  clip: 'rect(0 0 0 0)',
-  whiteSpace: 'nowrap',
-} as const;
+const STATE_WORDS: Record<ActivityEntry['state'], string> = {
+  running: 'Working',
+  done: 'Done',
+  error: 'Failed',
+  stopped: 'Stopped',
+};
+
+/** How the companion thinks: the provider and the model. Its role is always the Companion. */
+function ScoutPanel({
+  pet,
+  providers,
+  host,
+  onSaved,
+}: {
+  pet: Pet;
+  providers: readonly { id: string; label: string }[];
+  host: HomeHost;
+  onSaved: (pet: Pet) => void;
+}) {
+  const [providerId, setProviderId] = useState(pet.providerId);
+  const [model, setModel] = useState(pet.model);
+  const [models, setModels] = useState<string[]>([]);
+  const [status, setStatus] = useState<{ text: string; error: boolean } | null>(null);
+
+  useEffect(() => {
+    let current = true;
+    void host.listModels(providerId).then((list) => {
+      if (!current) return;
+      setModels(list.models);
+      // A provider change starts on that provider's first model, unless the pet's fits.
+      setModel((chosen) => (list.models.includes(chosen) ? chosen : (list.models[0] ?? chosen)));
+    });
+    return () => {
+      current = false;
+    };
+  }, [host, providerId]);
+
+  const save = async (): Promise<void> => {
+    try {
+      const { visionModel: _vision, watchModel: _watch, ...rest } = pet;
+      const changed = providerId !== pet.providerId;
+      const saved = await host.savePet({
+        ...(changed ? rest : pet),
+        providerId,
+        model,
+      });
+      onSaved(saved);
+      setStatus({
+        text: `Saved. ${saved.name} thinks this way from the next question.`,
+        error: false,
+      });
+    } catch (error) {
+      setStatus({ text: error instanceof Error ? error.message : String(error), error: true });
+    }
+  };
+
+  return (
+    <section className="tg-panel home-controls" aria-label={`How ${pet.name} thinks`}>
+      <h1 className="home-title">{pet.name}</h1>
+      <p className="tg-note">
+        {pet.name} is your companion: it sees what you are doing when you press the key, writes a
+        brief and hands it to the right expert. This is the model it does that with.
+      </p>
+      <label>
+        <span>Thinks with</span>
+        <select value={providerId} onChange={(event) => setProviderId(event.target.value)}>
+          {providers.map((provider) => (
+            <option key={provider.id} value={provider.id}>
+              {provider.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        <span>Model</span>
+        <select value={model} onChange={(event) => setModel(event.target.value)}>
+          {(models.includes(model) ? models : [model, ...models]).map((id) => (
+            <option key={id} value={id}>
+              {id}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="tg-note">Keys for providers are in Settings.</p>
+      <div className="tg-footer home-controls__footer">
+        <button type="button" className="tg-btn" onClick={() => void save()}>
+          Save
+        </button>
+        {status !== null && (
+          <p
+            className={status.error ? 'tg-error' : undefined}
+            role={status.error ? 'alert' : 'status'}
+          >
+            {status.error ? `Not saved. ${status.text}` : status.text}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}

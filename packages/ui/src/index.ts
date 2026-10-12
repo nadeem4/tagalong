@@ -40,22 +40,12 @@ export type { ChatPanelProps } from './chat-panel';
 export { createFakeHostBridge } from './test-support/fake-host-bridge';
 export type { FakeHostBridge } from './test-support/fake-host-bridge';
 
-/** Home: the control centre. Its centre scene is a theme; everything else is fixed chrome. */
+/** Home: the one window for the companion, its experts, activity and settings. */
 export { HomeView } from './home/home-view';
-export type { HomeViewProps } from './home/home-view';
-export type { AgentHost } from './home/agent-controls';
-export { THEMES, themeById } from './home/themes';
-export type { Placement, SceneProps, Theme, ThemeLayout, Whereabouts } from './home/theme';
+export type { HomeHost, HomePage, HomeViewProps } from './home/home-view';
 export { PixelSprite } from './office/pixel-sprite';
 export { characterFor } from './office/sprites/characters';
 export type { PixelSpriteProps } from './office/pixel-sprite';
 
-export { PetSettings } from './settings/pet-settings';
-export type { PetDraft, PetSettingsProps } from './settings/pet-settings';
-export type { ModelRecommendation } from './settings/brain-picker';
-export { CrewList } from './settings/crew-list';
 export { SETTINGS_CSS } from './settings/settings-styles';
-
-/** Phase 8. A role's label and class ink, for hosts that name a pet's role outside the office. */
-export { jobFor } from './office/job';
 export { officeTokens } from './office/tokens';

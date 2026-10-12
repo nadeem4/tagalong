@@ -249,15 +249,6 @@ async function start(): Promise<void> {
   // A fresh install starts in Welcome: the agents found here, how Scout thinks, one key.
   // Finishing it is remembered in settings; the tray opens it again.
   if (shouldOpenWelcome(settings, process.env)) openOnboarding();
-
-  // An install just upgraded to roles opens the office once, where the notice explains
-  // what changed. Dismissing it there marks it seen, so the next launch stays quiet.
-  void host.client
-    .call('notices.rolesUpgrade', {})
-    .then(({ notice }) => {
-      if (notice !== null) openOffice();
-    })
-    .catch((error: unknown) => console.warn('[main] could not read the roles notice', error));
 }
 
 /**
@@ -396,9 +387,7 @@ function buildTrayMenu(): Menu {
           }
         },
         toggleSightPause: () => void toggleSightPause(),
-        openOffice,
-        openSettings,
-        openOnboarding,
+        openOffice: () => openOffice(),
         quit: () => app.quit(),
       },
       { sightPaused: desktop?.sightPause.paused ?? false },
@@ -427,18 +416,37 @@ function openSettings(): void {
   desktop.settingsWindow = window;
 }
 
-/** Opens Home, or brings the open one forward. */
-function openOffice(): void {
+/**
+ * Opens Home, or brings the open one forward, on `page` when one is named (Settings, say).
+ * A fresh window is told its page once it has loaded.
+ */
+function openOffice(page?: string): void {
   if (desktop === null) return;
-  if (desktop.officeWindow !== null && !desktop.officeWindow.isDestroyed()) {
-    desktop.officeWindow.focus();
+  const open = desktop.officeWindow;
+  if (open !== null && !open.isDestroyed()) {
+    if (page !== undefined) open.webContents.send(IPC.homePageEvent, page);
+    open.focus();
     return;
   }
   const window = createOfficeWindow();
   window.on('closed', () => {
     if (desktop !== null) desktop.officeWindow = null;
   });
+  if (page !== undefined) {
+    window.webContents.once('did-finish-load', () =>
+      window.webContents.send(IPC.homePageEvent, page),
+    );
+  }
   desktop.officeWindow = window;
+}
+
+/**
+ * Settings is a page of Home. The standalone Settings window only opens when the engine
+ * failed to start, since Home cannot work without it.
+ */
+function openSettingsPage(): void {
+  if (desktop?.host === null) openSettings();
+  else openOffice('settings');
 }
 
 /** Opens the setup wizard, or brings the open one forward. */
@@ -764,7 +772,7 @@ function registerIpc(): void {
     return current.host.client.call('models.list', { providerId });
   });
 
-  ipcMain.handle(IPC.openSettings, () => openSettings());
+  ipcMain.handle(IPC.openSettings, () => openSettingsPage());
   ipcMain.handle(IPC.openOnboarding, () => openOnboarding());
   ipcMain.handle(IPC.openOffice, () => openOffice());
 

@@ -50,6 +50,7 @@ export const IPC = {
   stopWatch: 'tagalong:watch:stop',
   openOnboarding: 'tagalong:onboarding:open',
   openOffice: 'tagalong:office:open',
+  homePageEvent: 'tagalong:office:page',
   findAgents: 'tagalong:welcome:agents',
   finishWelcome: 'tagalong:welcome:finish',
   openLink: 'tagalong:link:open',
@@ -185,8 +186,10 @@ export interface TagalongHostApi {
   openSettings(): Promise<void>;
   /** Opens the Welcome window, from Settings or the tray. */
   openOnboarding(): Promise<void>;
-  /** Opens Home, or focuses it. The tray's Open Home is the shipped way in. */
+  /** Opens Home, or focuses it. The tray's Open Tagalong is the shipped way in. */
   openOffice(): Promise<void>;
+  /** Main names the Home page to show, when the tray or the bubble opens a particular one. */
+  onHomePage(handler: (page: string) => void): () => void;
   /** The coding agents on this computer, for Welcome's list. */
   findAgents(): Promise<FoundAgent[]>;
   /**

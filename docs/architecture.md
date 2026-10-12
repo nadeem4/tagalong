@@ -732,17 +732,29 @@ position is the `avatar` setting; a click calls `selectPet`, which opens the bub
 
 ### Home
 
-Home is the control centre: one window where you see every agent, what it is doing, every handoff,
-consult and roundtable, and where you set each agent's role, model, tools and notes. It is the layer
-between the single desktop companion and the themes: one engine and one pet configuration, shown on
-the desktop as one pet and in Home as the whole crew.
+Home is the one window for everything: the companion, its experts, what happened, and the app's
+settings. There is no crew and no office scene any more; the tray's **Open Tagalong** opens it, and
+anything that used to open Settings opens Home on its Settings page.
 
 It is a framed desktop window (`windows/office.ts`, the `office` renderer page; both keep their old
-names, the window and the page are titled **Home**) opened from the tray's **Open Home** item or
-`tagalongHost.openOffice()`, with a 1440x800 page (`useContentSize`); a screen too small for that clamps
-the window and the scene scrolls. The renderer entry wraps `HomeView` from `@tagalong/ui` in the
-preload's `HostBridge` and hands it an `AgentHost` built from the desktop's host calls; everything it
-draws is in `packages/ui/src/home` and `packages/ui/src/office`, so the browser host can reuse it.
+names, the window and the page are titled **Home**) opened with `tagalongHost.openOffice()`. Main
+names a page by sending `homePageEvent` (`openOffice('settings')`), to an open window at once and to
+a new one once it has loaded. The renderer entry wraps `HomeView` (`packages/ui/src/home/home-view.tsx`)
+in the preload's `HostBridge` and hands it a `HomeHost` (the companion's id, the providers it can think
+on, the model list, `savePet`) and the settings form as a slot.
+
+`HomeView` is a navy side menu, with the companion's pixel character and name, and five pages:
+
+- **Overview**: the companion (ready, the provider and model it thinks with), the experts (on or
+  off, read-only or allowed to edit) and the three most recent activity entries, each with a button
+  to its page.
+- **Scout** (the companion's name): how it thinks, a provider and a model, saved with `savePet`.
+  Changing provider drops the vision and watch models, which named the old provider's models. Its
+  role is always the Companion.
+- **Experts**: `ExpertsPanel`, below.
+- **Activity**: `ActivityView`; see [Activity](#activity).
+- **Settings**: the host's settings form (`SettingsPage embedded`), described under
+  [The Settings window](#the-settings-window).
 
 **Experts tab.** `ExpertsPanel` (`home/experts-panel.tsx`) lists the experts and adds or edits one:
 name, good at, an optional default project folder (typed, or picked with the host's `pickFolder`,
@@ -753,102 +765,26 @@ missing `claude` shows at once while the expert stays saved. A new expert's id i
 kebab-case, made unique. The expert calls on the `HostBridge` are optional; a host without them shows a
 note instead. The desktop forwards every engine notification to its windows, and `handoff.progress`
 and `handoff.finished` are part of the UI's `TurnEvent`, so Activity re-reads when a hand-off ends. The
-main process also shows a system notification for a finished or failed hand-off (`handoffNotice` in
-`main/handoff-notice.ts`), until the companion's bubble carries the result (step 4 of the experts plan).
+main process shows a system notification for a finished or failed hand-off (`handoffNotice` in
+`main/handoff-notice.ts`) only when the pets are hidden; otherwise the bubble carries the result.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%
 flowchart LR
-  subgraph Chrome["Home chrome (the same in every theme)"]
-    Bar[Top bar]
-    List[Agent list]
-    Side["Right panel: Activity, the agent's controls, Experts, Meetings"]
+  Tray["Tray: Open Tagalong"] --> Home
+  Bubble["Bubble: Open Settings"] -- "openOffice('settings')" --> Home
+  subgraph Home["Home (one window)"]
+    Overview
+    Scout["Scout: how it thinks"]
+    Experts
+    Activity
+    Settings
   end
-  Scene["Centre scene (the theme)"]
-  Engine[(Engine)] -- "pets.list, roles.list, turn.* and crew notifications" --> List
-  Engine -- "activity.list" --> Side
-  List -- "pick an agent" --> Side
-  Side -- "pets.upsert, settings.defaultPetId" --> Engine
-  Side -- "experts.list, experts.upsert, experts.delete, experts.test" --> Engine
-  List -- "placeAgents(theme.layout, agents)" --> Scene
+  Engine[(Engine)] -- "pets.list, experts.list, activity.list" --> Home
+  Scout -- "pets.upsert" --> Engine
+  Experts -- "experts.upsert, experts.delete, experts.test" --> Engine
+  Settings -- "settings.set, keys to the keychain" --> Engine
 ```
-
-**Chrome and themes.** Home's chrome — the top bar, the agent list (`PartyList`, labelled **Agents**),
-the right panel and every control — is fixed. The centre scene is a `Theme`
-(`home/theme.ts`): an id, a name, a `ThemeLayout` (stations, rooms with seats, where the needs-you
-marker hangs), its sprites, its scene tokens and one `Scene` component. `placeAgents(layout, agents)`
-is the one pure mapping from engine concepts to scene positions: an agent working alone gets its own
-station, an agent in a meeting the next free seat of its room (its station stays its own), an agent
-that needs you a marker above its station, and an agent past the scene's capacity no spot. Meetings
-and needs-you do not exist in the engine yet, so Home passes every agent as working alone. The theme
-registry (`home/themes.ts`) has one entry, `office`, built from today's floor; `themeById` falls back
-to it. A unit test renders Home with a second, fake theme and checks the chrome is identical.
-
-**The Office theme** is the floor as it was:
-
-- **Tokens** — `office/tokens.ts` holds every colour, font, font size, spacing value, radius, sprite
-  scale and timing. Components read only from it; `office-styles.ts` and `home/home-styles.ts` build
-  the few rules inline styles cannot express (hover, focus ring, `::selection`, scrollbar, tabs, the
-  stepped idle bob and its `prefers-reduced-motion` switch-off) from the same tokens.
-- **Sprites as data** — `office/sprites/` keeps each character as a pixel map (rows of characters),
-  a palette and optional overlay pixels. `spriteShadow` turns a sprite into a CSS `box-shadow` (one
-  1px shadow per pixel) and `PixelSprite` draws it on one pixel scaled by a whole number. No images,
-  no canvas. `characterFor(pet)` is the one mapping from a pet to a character: Scout, Ink and Bolt get
-  their own; any other pet gets the shared body recoloured from its `color`. The furniture is sprites
-  too (`sprites/furniture.ts`: desk, monitor, chair, meeting table, wall window, a shelf, a water
-  cooler, and a lounge of rug, sofa, coffee table and plant that `loungeAt(n)` places below the desks
-  until a seventh pet needs that band), drawn at the pets' 3x scale. Each desk's monitor stands beside
-  its pet facing the viewer, lit teal while the pet works.
-- **Layout as data** — `office/layout.ts` holds the floor size, the two meeting rooms (`ROOM_COUNT`),
-  windows, plants and props, and pure functions for desk positions (`deskLayout(n)`, two columns of up
-  to eight desks), seats, monitors and the selection cursor. `home/office-theme.ts` turns them into the
-  theme's layout; `OfficeFloor` draws from the placements it is given.
-- **Job labels from roles** — the agent list's job label is the pet's role name in capitals, from
-  `bridge.listRoles()` by `pet.roleId` (`office/job.ts`, `jobFor`); an unknown role reads
-  `GENERALIST`. Its colour is `officeTokens.roleInk[roleId]`. If only the roles fail to load, the crew
-  still shows, labelled as generalists.
-
-**Status** comes from the turn notifications main already forwards to every window: `nextActivity`
-keeps the turns in flight, so an agent reads **Working** (and its monitor lights) from `turn.started`
-until that turn completes or errors, and **At desk** otherwise — always an icon and a word. Picking an
-agent moves the gold cursor above it. Task assignment and office settings are later phases: the rooms
-read **Free** and the assign field is disabled with a tooltip saying so. A **Still office** toggle in
-the top bar stops the idle bob and the cursor hop (as `prefers-reduced-motion` does) and is remembered
-in the page's `localStorage`. Onest and Pixelify Sans are bundled from `@fontsource` (Latin subset), so
-the window makes no network request.
-
-**The right panel** has three tabs (arrow keys move between them; every panel stays mounted):
-
-- **Activity** (`home/activity-view.tsx`) lists what the crew did, newest first: each turn (the agent,
-  working or done, the model, the number of model calls, the time), each consult (who asked whom, the
-  question and the answer), each handoff and each roundtable. A click opens the thread: a turn's
-  question and answer, a consult's question and answer, a handoff's summary and the answer the other
-  agent gave, a roundtable's turns in order. It reads `bridge.listActivity()` (thirty at a time, **Show
-  older** pages back) and re-reads the first page whenever `turn.started`, `turn.completed`,
-  `turn.error`, `pet.message`, `crew.status` or an `ask_pet` `turn.toolResult` arrives. See
-  [Activity](#activity).
-- **The picked agent** (`home/agent-controls.tsx`, the tab is named after it) shows its controls:
-  the Settings components unchanged (`PetSettings`: name, `RolePicker`, `BrainPicker` with
-  **Recommended** or **Your choice**, `ToolToggles`, notes and the `DirectoryCard`), then its emoji,
-  colour, reply style and watch check model, a **Desktop pet** control that sets
-  `settings.defaultPetId` (the one pet the desktop shows), **Save Name** and **Delete Name** (which
-  asks once more). Picking an agent in the list opens this tab. Saving builds the pet and calls
-  `AgentHost.savePet`, which on the desktop is `tagalongHost.savePet`, so it is still `pets.upsert`;
-  the engine refuses an unknown role and stamps a changed role's version. A host without an
-  `AgentHost` shows the agents read-only. **Add agent**, under the agent list, creates a Generalist (`home/new-agent.ts`: "New agent",
-  numbered when taken, the library's role version, the base character recoloured slate) on the first
-  provider with a stored key, else `settings.providerId`, with that role's recommended model (or the
-  provider's first listed model), saves it through `pets.upsert` and opens its controls. A hiring flow
-  is a later phase.
-- **Meetings** keeps the empty state (`MeetingsPanel`) where meetings will appear. Meetings do not
-  exist in the engine yet, and nothing here invents them.
-
-**The roles notice (Phase 8)** — `HomeView` reads `bridge.rolesNotice()` with the crew and, while it
-is unseen, shows `RolesNotice` (`office/roles-notice.tsx`): a modal `<dialog>` over Home with a row per
-upgraded pet, a **What changed?** disclosure, **Review my crew** and **Got it**. Both buttons and
-Escape call `bridge.dismissRolesNotice()`; Review my crew then opens the first agent's controls in the
-right panel. At launch, main asks `notices.rolesUpgrade` once the engine is up and opens Home when a
-notice is pending. See [The roles notice](concepts/roles-and-tools.md#the-roles-notice).
 
 ### Activity
 
@@ -880,14 +816,14 @@ exist yet.
 
 ### The Settings window
 
-Settings (`windows/settings.ts`, the `settings` renderer page, 1080x760) holds app-level settings
-only; agents live in Home. It is drawn in the office's world: a navy top bar with the Save button, a
-navy nav with an **Open Home** button and links to each section, and off-white panels for the
-sections. Its sheet is `SETTINGS_CSS` in `@tagalong/ui` (`packages/ui/src/settings/settings-styles.ts`),
+The settings form (`settings/settings-page.tsx`, `SettingsPage`) holds app-level settings and is
+Home's Settings page (`embedded`: no bar or side menu of its own). The standalone Settings window
+(`windows/settings.ts`, the `settings` page) only opens when the engine failed to start, since Home
+needs the engine; it adds a navy top bar with Save and a nav with links to each section. Its sheet is `SETTINGS_CSS` in `@tagalong/ui` (`packages/ui/src/settings/settings-styles.ts`),
 built from `officeTokens`, so Settings has no palette of its own.
 
-The renderer entry `settings.tsx` holds the window state and the save; each section is one file
-under `apps/desktop/src/renderer/src/settings/`:
+`SettingsPage` holds the form state and the save, and ends with **Open Welcome again**; each section
+is one file under `apps/desktop/src/renderer/src/settings/`:
 
 | File                    | Section                                                       |
 | ----------------------- | ------------------------------------------------------------- |
@@ -1079,7 +1015,8 @@ A fresh install opens Welcome, a renderer page (`onboarding.html`) in an ordinar
 centred on the screen under the cursor. Main opens it from `start` when `shouldOpenWelcome(settings,
 env)` says so: the protocol setting `welcome.done` is false and `TAGALONG_SKIP_ONBOARDING` is not
 `1`. Welcome replaced the Phase 7 setup wizard, so an install that finished the wizard
-(`onboarding.done`) still sees Welcome once. The tray's **Welcome** item and Settings open it again.
+(`onboarding.done`) still sees Welcome once. **Open Welcome again** on Home's Settings page opens it
+again.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000'}}}%%

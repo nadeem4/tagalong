@@ -1,7 +1,7 @@
-import { StrictMode } from 'react';
+import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HomeView, HostBridgeProvider } from '@tagalong/ui';
-import type { AgentHost } from '@tagalong/ui';
+import type { HomeHost, HomePage } from '@tagalong/ui';
 // Bundled, not fetched: Home's two typefaces ship inside the app, Latin subset only.
 import '@fontsource/onest/latin-400.css';
 import '@fontsource/onest/latin-600.css';
@@ -10,43 +10,49 @@ import '@fontsource/pixelify-sans/latin-600.css';
 import '@fontsource/pixelify-sans/latin-700.css';
 import './office.css';
 import '../../shared/ipc';
+import { SettingsPage } from './settings/settings-page';
 
-/**
- * How Home changes an agent on the desktop: the same host calls Settings used, so saving is
- * still `pets.upsert` in main, and the desktop pet is `settings.defaultPetId`.
- */
-const agentHost: AgentHost = {
+/** How Home reads and changes the companion on the desktop: the same host calls as before. */
+const homeHost: HomeHost = {
   setup: async () => {
     const view = await window.tagalongHost.getHostView();
     return {
-      providers: view.providers.map(({ id, label }) => ({ id, label })),
-      desktopPetId: view.settings.defaultPetId,
-      // A new agent starts where a key is already stored, else on the default provider.
-      newAgentProviderId:
-        view.providers.find((choice) => choice.needsKey && choice.hasKey)?.id ??
-        view.settings.providerId,
+      companionId: view.settings.defaultPetId,
+      // The fake provider is for tests and demos, never offered.
+      providers: view.providers
+        .filter((choice) => choice.id !== 'fake')
+        .map(({ id, label }) => ({ id, label })),
     };
   },
   listModels: (providerId) => window.tagalongHost.listModels(providerId),
   savePet: (pet) => window.tagalongHost.savePet(pet),
-  deletePet: (petId) => window.tagalongHost.deletePet(petId),
-  setDesktopPet: async (petId) => {
-    await window.tagalongHost.saveSettings({ defaultPetId: petId });
-  },
 };
 
 /**
- * The Home window (the page keeps its old `office` name). Everything it draws comes from
- * HomeView in @tagalong/ui; this entry hands it the preload bridge, which already receives
- * every turn event, and the host calls that change an agent.
+ * The Home window (the page keeps its old `office` name): the one window for the companion,
+ * its experts, activity and settings. Main names a page when the tray or the bubble opens a
+ * particular one, such as Settings.
  */
+function Home() {
+  const [page, setPage] = useState<HomePage | undefined>(undefined);
+  useEffect(() => window.tagalongHost.onHomePage((next) => setPage(next as HomePage)), []);
+  return (
+    <HostBridgeProvider bridge={window.tagalong}>
+      <HomeView
+        host={homeHost}
+        settings={<SettingsPage embedded />}
+        {...(page === undefined ? {} : { page })}
+        onPage={setPage}
+      />
+    </HostBridgeProvider>
+  );
+}
+
 const container = document.getElementById('root');
 if (container !== null) {
   createRoot(container).render(
     <StrictMode>
-      <HostBridgeProvider bridge={window.tagalong}>
-        <HomeView agentHost={agentHost} />
-      </HostBridgeProvider>
+      <Home />
     </StrictMode>,
   );
 }
