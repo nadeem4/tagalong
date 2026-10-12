@@ -61,7 +61,7 @@ export function createPanelWindow(options: PanelWindowOptions): BrowserWindow {
       const focused = BrowserWindow.getFocusedWindow();
       const pet = options.pet();
       const focusWentToPet = focused !== null && pet !== null && focused === pet;
-      if (hidesOnBlur({ streaming, focusWentToPet })) {
+      if (hidesOnBlur({ streaming, focusWentToPet, focusedAgain: window.isFocused() })) {
         noteHide(`blur (focused: ${focused?.webContents.getURL().replace(/^.*\//, '') ?? 'none'})`);
         window.hide();
       }
