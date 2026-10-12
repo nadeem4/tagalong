@@ -1,6 +1,7 @@
 import type { Role } from '@tagalong/protocol';
 import { describe, expect, it } from 'vitest';
 import { ANTHROPIC_MODELS } from '../providers/anthropic';
+import { CLAUDE_CODE_MODELS } from '../providers/claude-code-brain';
 import { NEBIUS_FALLBACK_MODELS } from '../providers/nebius-models';
 import { recommendedModel } from './index';
 import { MODEL_TIERS } from './tiers';
@@ -19,7 +20,12 @@ const role = (tier: Role['model']['tier'], needsVision = false): Role => ({
 
 describe('MODEL_TIERS', () => {
   it('covers every tier for every provider', () => {
-    expect(Object.keys(MODEL_TIERS).sort()).toEqual(['anthropic', 'nebius', 'openrouter']);
+    expect(Object.keys(MODEL_TIERS).sort()).toEqual([
+      'anthropic',
+      'claude-code',
+      'nebius',
+      'openrouter',
+    ]);
     for (const tiers of Object.values(MODEL_TIERS)) {
       expect(tiers.fast).toBeTruthy();
       expect(tiers.balanced).toBeTruthy();
@@ -29,6 +35,8 @@ describe('MODEL_TIERS', () => {
 
   it('names only models the providers already list', () => {
     const { anthropic, nebius } = MODEL_TIERS;
+    const claudeCode = MODEL_TIERS['claude-code'];
+    expect(CLAUDE_CODE_MODELS).toEqual([claudeCode?.fast, claudeCode?.balanced, claudeCode?.deep]);
     expect(ANTHROPIC_MODELS).toEqual(
       expect.arrayContaining([anthropic?.fast, anthropic?.balanced, anthropic?.deep]),
     );
