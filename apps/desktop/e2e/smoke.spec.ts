@@ -128,6 +128,18 @@ test('the bubble asks, shows the answer, and opens the full chat', async () => {
   await expect(panel.getByText(/This is the fake pet/)).toBeVisible({ timeout: 30_000 });
   await expect(panel.getByRole('button', { name: 'Stop' })).toHaveCount(0, { timeout: 30_000 });
 
+  // The bubble is still up after the answer: nothing during the turn may have hidden it.
+  const state = await app.evaluate(({ BrowserWindow }) => {
+    const all = BrowserWindow.getAllWindows();
+    const bubble = all.find((w) => w.webContents.getURL().includes('panel.html'));
+    return {
+      visible: bubble?.isVisible() ?? false,
+      focused: BrowserWindow.getFocusedWindow()?.webContents.getURL().replace(/^.*\//, '') ?? null,
+    };
+  });
+  console.log('bubble after the answer:', JSON.stringify(state));
+  expect(state.visible).toBe(true);
+
   // The full chat is one click behind the bubble.
   await panel.getByRole('button', { name: 'Open full chat' }).click();
   await expect(panel.getByLabel('Message')).toBeVisible({ timeout: 15_000 });
