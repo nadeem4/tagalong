@@ -27,7 +27,9 @@ The first six:
 
 The Companion never does the work itself. Its tools are only the ones that look (screen, selection,
 windows), `remember`, and `hand_to_expert`, which writes a brief and hands it to an expert such as
-Claude Code; it has no `ask_pet` and nothing that writes files or runs code.
+Claude Code; it has no `ask_pet` and nothing that writes files or runs code. Its own figure and
+bubble show up in its screenshots, so its instructions tell it to look past them and never mention
+itself or Tagalong unless asked.
 
 ### The role file
 

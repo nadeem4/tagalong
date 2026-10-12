@@ -79,6 +79,12 @@ describe('the role files', () => {
     expect(tools).not.toContain('watch_for');
   });
 
+  it('tell the companion to leave itself out of what it sees, unless asked', () => {
+    const instructions = getRole('companion')?.instructions ?? '';
+    expect(instructions).toContain('Your own figure and bubble show up in screenshots.');
+    expect(instructions).toContain('never mention yourself or Tagalong unless the person asks');
+  });
+
   it('use unique ids', () => {
     const ids = loadRoles().map((role) => role.id);
     expect(new Set(ids).size).toBe(ids.length);
