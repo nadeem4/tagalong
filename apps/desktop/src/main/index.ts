@@ -80,6 +80,8 @@ interface Desktop {
   settingsWindow: BrowserWindow | null;
   /** Phase 7: the setup wizard, while it is open. */
   onboardingWindow: BrowserWindow | null;
+  /** Scout is hidden until the first Welcome is done. */
+  scoutWaits: boolean;
   /** The Crew Office, while it is open. */
   officeWindow: BrowserWindow | null;
   /** The snapshot the last hotkey captured, handed to the panel and sent with the ask. */
@@ -194,6 +196,7 @@ async function start(): Promise<void> {
     tray: createTray(),
     settingsWindow: null,
     onboardingWindow: null,
+    scoutWaits: false,
     officeWindow: null,
     pendingSnapshot: null,
     activeTurns: new Set(),
@@ -239,7 +242,11 @@ async function start(): Promise<void> {
     isStreaming: () => (desktop?.activeTurns.size ?? 0) > 0,
     pet: () => desktop?.avatar ?? null,
   });
+  // A new install starts in Welcome alone; Scout arrives when Welcome is done.
+  const welcoming = shouldOpenWelcome(settings, process.env);
+  desktop.scoutWaits = welcoming;
   desktop.avatar = createAvatarWindow({
+    hidden: welcoming,
     position: settings.avatar,
     onMoved: (position) => {
       void host.client
@@ -257,8 +264,8 @@ async function start(): Promise<void> {
   applyHotkeys(settings);
 
   // A fresh install starts in Welcome: the agents found here, how Scout thinks, one key.
-  // Finishing it is remembered in settings; the tray opens it again.
-  if (shouldOpenWelcome(settings, process.env)) openOnboarding();
+  // Finishing it is remembered in settings; Home opens it again.
+  if (welcoming) openOnboarding();
 }
 
 /**
@@ -468,7 +475,12 @@ function openOnboarding(): void {
   }
   const window = createOnboardingWindow();
   window.on('closed', () => {
-    if (desktop !== null) desktop.onboardingWindow = null;
+    if (desktop === null) return;
+    desktop.onboardingWindow = null;
+    // Closed without Start, Scout still arrives: an install never ends with nothing on screen.
+    // Only the first Welcome hides it, so this never undoes the tray's Hide Scout.
+    if (desktop.scoutWaits) desktop.avatar?.show();
+    desktop.scoutWaits = false;
   });
   desktop.onboardingWindow = window;
 }

@@ -53,7 +53,8 @@ drag anywhere.
 
 ## First run: Welcome
 
-The first time Tagalong starts, one Welcome window opens on the screen you are using.
+The first time Tagalong starts, one Welcome window opens on the screen you are using. Scout
+waits until you are done with it, then arrives on your screen.
 
 1. **Hi, I'm Scout.** What Tagalong does: Scout sits on your screen, sees what you are working on,
    hands the work to the right agent and tells you what came back.
