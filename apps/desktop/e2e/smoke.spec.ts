@@ -39,8 +39,8 @@ test.beforeAll(async () => {
       // parser fixture output, so the perception.* methods between them are covered by
       // neither — and this phase has already shipped two dead paths through that gap.
       TAGALONG_FAKE_TOOL: 'list_windows',
-      // The setup wizard would open on a fresh profile and change the window count the
-      // first test asserts. Its own test below opens it on purpose.
+      // Welcome would open on a fresh profile and change the window count the first test
+      // asserts. Its own test below opens it on purpose.
       TAGALONG_SKIP_ONBOARDING: '1',
     },
   });
@@ -401,85 +401,29 @@ test('sight detail and the window text budget save and read back', async () => {
   }
 });
 
-test('the setup wizard opens on request, insists on a key, and Skip closes it for good', async () => {
-  const panel = await windowFor('panel');
-  // The suite runs on the developer's real profile: keys may be stored, and the wizard may
-  // already be done. Both are read first so the test neither assumes them nor leaves them changed.
-  const before = await panel.evaluate(() => window.tagalongHost.getHostView());
-  const keyStored = before.providers.some((choice) => choice.needsKey && choice.hasKey);
-
-  try {
-    await panel.evaluate(() => window.tagalongHost.openOnboarding());
-    const wizard = await windowFor('onboarding');
-
-    // Step one is the promise, before anything is asked of the user.
-    await expect(wizard.getByTestId('step-welcome')).toContainText('privacy promise');
-    await wizard.getByRole('button', { name: 'Next' }).click();
-
-    // Step two names all three providers. No key is typed here: one would be stored in this
-    // machine's real keychain.
-    const provider = wizard.getByTestId('step-provider');
-    await expect(provider).toContainText('OpenRouter');
-    await expect(provider).toContainText('Nebius Token Factory');
-    await expect(provider).toContainText('Anthropic');
-    if (!keyStored) {
-      await wizard.getByRole('button', { name: 'Next' }).click();
-      await expect(wizard.getByRole('alert')).toContainText('API key');
-    }
-
-    await wizard.getByRole('button', { name: 'Skip setup' }).click();
-    await expect
-      .poll(async () =>
-        (
-          await app.evaluate(({ BrowserWindow }) =>
-            BrowserWindow.getAllWindows().map((w) => w.webContents.getURL()),
-          )
-        ).some((url) => url.includes('onboarding.html')),
-      )
-      .toBe(false);
-
-    const view = await panel.evaluate(() => window.tagalongHost.getHostView());
-    expect(view.settings.onboarding.done).toBe(true);
-    expect(view.crewSuggestions.nebius?.scout).toContain('nemotron');
-  } finally {
-    await panel.evaluate(
-      (done) => window.tagalongHost.saveSettings({ onboarding: { done } }),
-      before.settings.onboarding.done,
-    );
-  }
-});
-
-test("the wizard's crew step shows each role and prefills its recommended model", async () => {
+test('Welcome opens on request: the agents found here, how Scout thinks, one key', async () => {
   const panel = await windowFor('panel');
   await panel.evaluate(() => window.tagalongHost.openOnboarding());
-  const wizard = await windowFor('onboarding');
-  await wizard.getByRole('button', { name: 'Next' }).click();
+  const welcome = await windowFor('onboarding');
 
-  // This suite runs on a throwaway profile and fake providers, so a typed key is stored only
-  // there and no model list is fetched from the network.
-  await wizard.getByTestId('key-nebius').fill('nb-e2e-not-a-real-key');
-  await wizard.getByRole('radio').nth(1).check();
-  await wizard.getByRole('button', { name: 'Next' }).click();
+  await expect(welcome.getByRole('heading', { level: 1 })).toContainText('Hi, I’m');
+  const found = welcome.getByRole('region', { name: 'Found on this computer' });
+  await expect(found).toContainText('Claude Code');
+  await expect(found).toContainText('Gemini CLI');
+  await expect(found).toContainText('Codex');
+  // Whatever is installed on the runner, Scout always has a way to think on offer.
+  await expect(welcome.getByRole('radiogroup', { name: 'How Scout thinks' })).toContainText(
+    'API key',
+  );
+  await expect(welcome.getByRole('button', { name: 'Start' })).toBeVisible();
 
-  const crew = wizard.getByTestId('step-crew');
-  await expect(crew.getByTestId('role-generalist')).toContainText('GENERALIST');
-  await expect(crew.getByTestId('role-writer')).toContainText('WRITER');
-  await expect(crew.getByTestId('role-backend-engineer')).toContainText('BACKEND ENGINEER');
-
-  const expected = await wizard.evaluate(() => window.tagalong.recommendModel('writer', 'nebius'));
-  // Ink starts on OpenRouter, which has no key here, so it moves to Token Factory on the
-  // writer's recommended model. A pet already on a keyed provider keeps its model.
-  const ink = crew.locator('fieldset', { hasText: 'Ink' });
-  expect(expected.model).toBeTruthy();
-  await expect(ink.getByTestId('model-ink')).toHaveValue(expected.model ?? '');
-  await expect(ink.getByText('Recommended')).toBeVisible();
-  await wizard.screenshot({ path: join(appDir, 'test-results', 'wizard-crew.png') });
-
-  // Still editable: a different model drops the chip.
-  await ink.getByTestId('model-ink').fill('nvidia/something-else');
-  await expect(ink.getByText('Recommended')).toHaveCount(0);
-
-  await wizard.getByRole('button', { name: 'Skip setup' }).click();
+  // Start is not pressed: it would make Scout the Companion and hide the crew the rest of
+  // the suite talks to.
+  await app.evaluate(({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (w.webContents.getURL().includes('onboarding.html')) w.close();
+    }
+  });
 });
 
 test('Settings keeps the app-level sections and sends agents to Home', async () => {

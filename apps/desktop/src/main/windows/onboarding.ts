@@ -1,16 +1,22 @@
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, screen } from 'electron';
 import { PRELOAD_PATH, loadPage } from './page';
 
+const WIDTH = 640;
+const HEIGHT = 700;
+
 /**
- * The first-run setup wizard. A framed window like Settings, sized for one step at a time,
- * and centred: it is the first thing a new user sees, so it should not open in a corner.
+ * Welcome. A framed window like Settings, centred on the screen the person is using: it
+ * is the first thing a new user sees, so it must not open on a screen they are not
+ * looking at.
  */
 export function createOnboardingWindow(): BrowserWindow {
+  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   const window = new BrowserWindow({
-    width: 620,
-    height: 640,
+    width: WIDTH,
+    height: HEIGHT,
+    x: Math.round(area.x + (area.width - WIDTH) / 2),
+    y: Math.round(area.y + Math.max(0, (area.height - HEIGHT) / 2)),
     show: false,
-    center: true,
     title: 'Welcome to Tagalong',
     webPreferences: {
       preload: PRELOAD_PATH,

@@ -14,7 +14,7 @@ import type { AskInput, HostBridge, TurnEvent } from '@tagalong/ui';
 import { IPC } from '../shared/ipc';
 import type {
   CaptureNotice,
-  CrewChoice,
+  FoundAgent,
   HostView,
   ModelList,
   TagalongHostApi,
@@ -108,10 +108,9 @@ const host: TagalongHostApi = {
   openSettings: () => ipcRenderer.invoke(IPC.openSettings) as Promise<void>,
   openOnboarding: () => ipcRenderer.invoke(IPC.openOnboarding) as Promise<void>,
   openOffice: () => ipcRenderer.invoke(IPC.openOffice) as Promise<void>,
-  finishOnboarding: (openPanel: boolean) =>
-    ipcRenderer.invoke(IPC.finishOnboarding, openPanel) as Promise<void>,
-  applyCrew: (choices: Record<string, CrewChoice>) =>
-    ipcRenderer.invoke(IPC.applyCrew, choices) as Promise<Pet[]>,
+  findAgents: () => ipcRenderer.invoke(IPC.findAgents) as Promise<FoundAgent[]>,
+  finishWelcome: (providerId: string) =>
+    ipcRenderer.invoke(IPC.finishWelcome, providerId) as Promise<void>,
   openLink: (url: string) => ipcRenderer.invoke(IPC.openLink, url) as Promise<void>,
   showExtensionFolder: () => ipcRenderer.invoke(IPC.showExtensionFolder) as Promise<void>,
   hidePanel: () => ipcRenderer.invoke(IPC.hidePanel) as Promise<void>,

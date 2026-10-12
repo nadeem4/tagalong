@@ -187,7 +187,7 @@ function Settings() {
             className="tg-btn-quiet"
             onClick={() => void window.tagalongHost.openOnboarding()}
           >
-            Run the setup wizard again
+            Open Welcome again
           </button>
           {status !== '' && (
             <p

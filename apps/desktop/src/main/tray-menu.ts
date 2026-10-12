@@ -25,7 +25,7 @@ export function trayMenuTemplate(
       click: () => actions.toggleSightPause(),
     },
     { label: 'Settings', click: () => actions.openSettings() },
-    { label: 'Setup wizard', click: () => actions.openOnboarding() },
+    { label: 'Welcome', click: () => actions.openOnboarding() },
     { type: 'separator' },
     { label: 'Quit', click: () => actions.quit() },
   ];

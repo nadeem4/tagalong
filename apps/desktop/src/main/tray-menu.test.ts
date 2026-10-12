@@ -29,7 +29,7 @@ describe('trayMenuTemplate', () => {
       'Open Home',
       'Pause sight',
       'Settings',
-      'Setup wizard',
+      'Welcome',
       'separator',
       'Quit',
     ]);
@@ -54,7 +54,7 @@ describe('trayMenuTemplate', () => {
     click(template, 'Show or hide pets');
     click(template, 'Pause sight');
     click(template, 'Settings');
-    click(template, 'Setup wizard');
+    click(template, 'Welcome');
     click(template, 'Quit');
     expect(handlers.togglePets).toHaveBeenCalledOnce();
     expect(handlers.toggleSightPause).toHaveBeenCalledOnce();
