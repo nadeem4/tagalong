@@ -135,6 +135,7 @@ test('the bubble asks, shows the answer, and opens the full chat', async () => {
     return {
       visible: bubble?.isVisible() ?? false,
       focused: BrowserWindow.getFocusedWindow()?.webContents.getURL().replace(/^.*\//, '') ?? null,
+      hides: (globalThis as { __tagalongPanelHides?: string[] }).__tagalongPanelHides ?? [],
     };
   });
   console.log('bubble after the answer:', JSON.stringify(state));
