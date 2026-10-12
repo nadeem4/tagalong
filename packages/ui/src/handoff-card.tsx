@@ -1,3 +1,4 @@
+import { Answer } from './answer';
 import { useState } from 'react';
 import type { HandoffProposedParams, ProjectCandidate } from '@tagalong/protocol';
 import { useHostBridge } from './host-bridge';
@@ -240,7 +241,11 @@ export function HandoffStatus({
   return (
     <section className="handoff" aria-label={title}>
       <p className="bubble-hints">{title}</p>
-      {handoff.text !== undefined && <p className="bubble-text bubble-answer">{handoff.text}</p>}
+      {handoff.text !== undefined && (
+        <div className="bubble-answer">
+          <Answer text={handoff.text} />
+        </div>
+      )}
       {handoff.error !== undefined && (
         <p role="alert" className="bubble-error">
           {handoff.error}

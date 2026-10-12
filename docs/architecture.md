@@ -1085,6 +1085,10 @@ extension's side panel.
 - **One question, one answer, in place.** Enter asks; the answer streams into the bubble with
   **Stop**; the next question continues the conversation `turn.started` reported. Turns of other
   pets are ignored. Errors say what went wrong in a `role="alert"` line.
+- **Answers are formatted, not raw Markdown.** `Answer` (`@tagalong/ui`) renders every answer, in
+  the bubble, the full chat and an expert's result, with `react-markdown` and `remark-gfm`: bold,
+  lists, headings, code, tables. HTML in an answer is skipped, and a link shows as text with its
+  address on hover, because a click would navigate the bubble's own window.
 - **Hand-offs in the bubble** (`handoff-card.tsx`), mockup screens 4 to 6. A `handoff.proposed` for
   this pet shows `ProposalCard`: the agent, the guessed project (name and path), the access and the
   brief. **Change project** lists the other guesses, a search box (`searchProjects`, the engine's
