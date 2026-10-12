@@ -7,8 +7,11 @@ import { z } from 'zod';
  */
 export const ClaudeCodeConnection = z.object({
   type: z.literal('claude-code'),
-  /** The one folder the expert may work in. */
-  folder: z.string().min(1),
+  /**
+   * A default project folder. Optional: each hand-off names its own project, which the
+   * person confirms before it goes; this is only the fallback when nothing better is known.
+   */
+  folder: z.string().min(1).optional(),
   /** False keeps it to reading and searching. */
   canEdit: z.boolean().default(false),
   /** Defaults to `claude` on the PATH. */
@@ -68,6 +71,10 @@ export const HandoffsStartParams = z.object({
   /** The companion handing off. */
   petId: z.string().min(1),
   brief: Brief,
+  /** The project to work in; overrides the expert's default folder. */
+  folder: z.string().min(1).optional(),
+  /** Overrides the expert's own setting for this one hand-off. */
+  canEdit: z.boolean().optional(),
 });
 export const HandoffsStartResult = z.object({ handoffId: z.uuid() });
 
@@ -90,3 +97,44 @@ export const HandoffFinishedParams = z.object({
   error: z.string().optional(),
 });
 export type HandoffFinishedParams = z.infer<typeof HandoffFinishedParams>;
+
+/** A folder that may be the project a task is about, and why it was suggested. */
+export const ProjectCandidate = z.object({
+  name: z.string().min(1),
+  path: z.string().min(1),
+  /** screen: named in the window; remembered: used before; found: a project on this computer. */
+  reason: z.enum(['screen', 'remembered', 'found']),
+});
+export type ProjectCandidate = z.infer<typeof ProjectCandidate>;
+
+/**
+ * A companion wrote a brief for an expert. Nothing runs until the person confirms it, with
+ * the project it should work in: `projects` holds the guesses, best first.
+ */
+export const HandoffProposedParams = z.object({
+  proposalId: z.uuid(),
+  petId: z.string().min(1),
+  expertId: z.string().min(1),
+  expertName: z.string().min(1),
+  brief: Brief,
+  projects: z.array(ProjectCandidate),
+  canEdit: z.boolean(),
+});
+export type HandoffProposedParams = z.infer<typeof HandoffProposedParams>;
+
+/** The person sends a proposed hand-off, in the folder they settled on. */
+export const HandoffsConfirmParams = z.object({
+  proposalId: z.uuid(),
+  folder: z.string().min(1),
+  canEdit: z.boolean(),
+  /** The brief as the person edited it, if they did. */
+  brief: Brief.optional(),
+});
+export const HandoffsConfirmResult = z.object({ handoffId: z.uuid() });
+
+export const HandoffsDismissParams = z.object({ proposalId: z.uuid() });
+export const HandoffsDismissResult = z.object({ dismissed: z.boolean() });
+
+/** Projects on this computer whose name or path matches, for "Change project". */
+export const ProjectsSearchParams = z.object({ query: z.string().max(200) });
+export const ProjectsSearchResult = z.object({ projects: z.array(ProjectCandidate) });

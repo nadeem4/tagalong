@@ -16,8 +16,11 @@ export interface ExpertToolDeps {
     get(taskKind: string): { expertId: string; by: 'companion' | 'user' } | null;
     remember(taskKind: string, expertId: string, by: 'companion'): void;
   };
-  /** Starts the hand-off; the answer comes back on its own, outside this turn. */
-  start(params: { expertId: string; petId: string; brief: Brief }): { handoffId: string };
+  /**
+   * Shows the brief to the person, who confirms it with a project folder; the answer then
+   * comes back on its own, outside this turn.
+   */
+  propose(params: { expertId: string; petId: string; brief: Brief }): { proposalId: string };
 }
 
 /** The experts a turn can hand to: only those switched on. */
@@ -121,18 +124,18 @@ export function handToExpertTool(deps: ExpertToolDeps, experts: readonly Expert[
     }
 
     try {
-      deps.start({ expertId: expert.id, petId: ctx.pet.id, brief: briefFrom(parsed, ctx) });
+      deps.propose({ expertId: expert.id, petId: ctx.pet.id, brief: briefFrom(parsed, ctx) });
     } catch (error) {
       return Promise.resolve({
-        content: `The hand-off to ${expert.name} did not start: ${(error as Error).message}`,
+        content: `The brief for ${expert.name} could not be shown: ${(error as Error).message}`,
         isError: true,
       });
     }
     deps.routes.remember(parsed.task_kind, expert.id, 'companion');
     return Promise.resolve({
       content:
-        `${expert.name} has it. Tell the user in one line that ${expert.name} is on it; ` +
-        'the answer will arrive on its own.',
+        `The brief for ${expert.name} is in front of the user to check, with the project to ` +
+        'work in. Tell them in one line to check it and press Send; the answer arrives on its own.',
     });
   });
 }

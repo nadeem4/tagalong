@@ -27,9 +27,9 @@ function deps(experts: Expert[]) {
         routes.set(kind, { expertId, by });
       },
     },
-    start: (params) => {
+    propose: (params) => {
       started.push(params);
-      return { handoffId: '7c9e6679-7425-40de-944b-e07fc1f90ae7' };
+      return { proposalId: '7c9e6679-7425-40de-944b-e07fc1f90ae7' };
     },
   };
   return { value, started, routes };
@@ -89,7 +89,8 @@ describe(HAND_TO_EXPERT, () => {
         },
       },
     ]);
-    expect(outcome.content).toContain('Claude Code');
+    // Nothing runs yet: the person checks the brief and the project first.
+    expect(outcome.content).toContain('check');
     expect(d.routes.get('fix-code')).toEqual({ expertId: 'claude-code', by: 'companion' });
   });
 
@@ -146,9 +147,9 @@ describe(HAND_TO_EXPERT, () => {
     expect(d.started).toEqual([]);
   });
 
-  it('reports a hand-off that could not start', async () => {
+  it('reports a hand-off that could not be proposed', async () => {
     const d = deps([CLAUDE]);
-    d.value.start = () => {
+    d.value.propose = () => {
       throw new Error('Claude Code is switched off');
     };
     const outcome = await fakeTurnTools({ experts: d.value }).run({
@@ -156,7 +157,7 @@ describe(HAND_TO_EXPERT, () => {
       input: { task_kind: 'x', ask: 'x' },
     });
     expect(outcome).toEqual({
-      content: 'The hand-off to Claude Code did not start: Claude Code is switched off',
+      content: 'The brief for Claude Code could not be shown: Claude Code is switched off',
       isError: true,
     });
   });

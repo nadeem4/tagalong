@@ -1,10 +1,18 @@
-import { RPC_ERROR_CODES, type Expert, type HandoffFinishedParams } from '@tagalong/protocol';
+import { randomUUID } from 'node:crypto';
+import {
+  RPC_ERROR_CODES,
+  type Expert,
+  type HandoffFinishedParams,
+  type HandoffProposedParams,
+  type ProjectCandidate,
+} from '@tagalong/protocol';
 import type { ActivityLog } from '../memory/activity';
 import { RpcFailure } from '../server/ws-server';
 import { renderBrief, type Brief, type Connector } from './connector';
 import type { ExpertStore } from './store';
 
 export type HandoffEvent =
+  | { method: 'handoff.proposed'; params: HandoffProposedParams }
   | { method: 'handoff.progress'; params: { handoffId: string; expertId: string; step: string } }
   | { method: 'handoff.finished'; params: HandoffFinishedParams };
 
@@ -13,28 +21,123 @@ export interface HandoffManagerOptions {
   activity: ActivityLog;
   connectorFor: (expert: Expert) => Connector;
   emit: (event: HandoffEvent) => void;
+  /** Guesses the project a brief is about, and remembers the one the person confirmed. */
+  projects?: {
+    suggest(windowTitle: string | undefined): ProjectCandidate[];
+    remember(path: string): void;
+  };
+}
+
+export interface StartParams {
+  expertId: string;
+  petId: string;
+  brief: Brief;
+  /** The project to work in; overrides the expert's default folder. */
+  folder?: string | undefined;
+  canEdit?: boolean | undefined;
+}
+
+/** A brief waiting for the person to confirm it. */
+interface Proposal {
+  expertId: string;
+  petId: string;
+  brief: Brief;
+}
+
+function nameOf(path: string): string {
+  return (
+    path
+      .split(/[\\/]/)
+      .filter((part) => part !== '')
+      .pop() ?? path
+  );
 }
 
 /**
- * Runs hand-offs from companions to experts. `start` returns at once; the expert's steps
- * and its answer arrive as `handoff.progress` and `handoff.finished`, and every hand-off is
- * written to the activity log, so Home shows it whether or not a window was open.
+ * Runs hand-offs from companions to experts. A companion `propose`s: the brief and the
+ * project guesses go to the person as `handoff.proposed`, and nothing runs until they
+ * `confirm` it with a folder. `start` returns at once; the expert's steps and its answer
+ * arrive as `handoff.progress` and `handoff.finished`, and every hand-off is written to the
+ * activity log, so Home shows it whether or not a window was open.
  */
 export class HandoffManager {
+  readonly #proposals = new Map<string, Proposal>();
   readonly #running = new Map<string, AbortController>();
   /** Every unfinished run, so shutdown can wait for its last write before the database closes. */
   readonly #runs = new Set<Promise<void>>();
 
   constructor(private readonly options: HandoffManagerOptions) {}
 
-  start(params: { expertId: string; petId: string; brief: Brief }): { handoffId: string } {
-    const expert = this.options.experts.get(params.expertId);
-    if (expert === null) {
-      throw new RpcFailure(RPC_ERROR_CODES.invalidParams, `no expert with id '${params.expertId}'`);
+  /** Shows the brief to the person, with the project guesses best first. Nothing runs yet. */
+  propose(params: { expertId: string; petId: string; brief: Brief }): { proposalId: string } {
+    const expert = this.#expert(params.expertId);
+    const guesses = this.options.projects?.suggest(params.brief.context?.windowTitle) ?? [];
+    const fallback = expert.connection.folder;
+    const projects =
+      fallback === undefined || guesses.some((p) => p.path === fallback)
+        ? guesses
+        : [...guesses, { name: nameOf(fallback), path: fallback, reason: 'remembered' as const }];
+    const proposalId = randomUUID();
+    this.#proposals.set(proposalId, params);
+    this.options.emit({
+      method: 'handoff.proposed',
+      params: {
+        proposalId,
+        petId: params.petId,
+        expertId: expert.id,
+        expertName: expert.name,
+        brief: params.brief,
+        projects,
+        canEdit: expert.connection.canEdit,
+      },
+    });
+    return { proposalId };
+  }
+
+  /** The person sent it: starts the hand-off in their folder and remembers the folder. */
+  confirm(params: {
+    proposalId: string;
+    folder: string;
+    canEdit: boolean;
+    brief?: Brief | undefined;
+  }): { handoffId: string } {
+    const proposal = this.#proposals.get(params.proposalId);
+    if (proposal === undefined) {
+      throw new RpcFailure(RPC_ERROR_CODES.invalidParams, 'that hand-off is no longer waiting');
     }
-    if (!expert.enabled) {
-      throw new RpcFailure(RPC_ERROR_CODES.invalidParams, `${expert.name} is switched off`);
+    const started = this.start({
+      ...proposal,
+      brief: params.brief ?? proposal.brief,
+      folder: params.folder,
+      canEdit: params.canEdit,
+    });
+    this.#proposals.delete(params.proposalId);
+    this.options.projects?.remember(params.folder);
+    return started;
+  }
+
+  /** True when a waiting proposal was dropped. */
+  dismiss(proposalId: string): boolean {
+    return this.#proposals.delete(proposalId);
+  }
+
+  start(params: StartParams): { handoffId: string } {
+    const stored = this.#expert(params.expertId);
+    const folder = params.folder ?? stored.connection.folder;
+    if (folder === undefined) {
+      throw new RpcFailure(
+        RPC_ERROR_CODES.invalidParams,
+        `Choose a project folder for ${stored.name} to work in.`,
+      );
     }
+    const expert: Expert = {
+      ...stored,
+      connection: {
+        ...stored.connection,
+        folder,
+        canEdit: params.canEdit ?? stored.connection.canEdit,
+      },
+    };
     const handoffId = this.options.activity.expertStarted({
       petId: params.petId,
       expertId: expert.id,
@@ -63,6 +166,17 @@ export class HandoffManager {
   async stopAll(): Promise<void> {
     for (const handoffId of [...this.#running.keys()]) this.cancel(handoffId);
     await Promise.all([...this.#runs]);
+  }
+
+  #expert(expertId: string): Expert {
+    const expert = this.options.experts.get(expertId);
+    if (expert === null) {
+      throw new RpcFailure(RPC_ERROR_CODES.invalidParams, `no expert with id '${expertId}'`);
+    }
+    if (!expert.enabled) {
+      throw new RpcFailure(RPC_ERROR_CODES.invalidParams, `${expert.name} is switched off`);
+    }
+    return expert;
   }
 
   async #run(handoffId: string, expert: Expert, brief: Brief, signal: AbortSignal): Promise<void> {

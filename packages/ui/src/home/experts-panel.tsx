@@ -35,7 +35,7 @@ const NEW_DRAFT: Draft = {
 const draftOf = (expert: Expert): Draft => ({
   name: expert.name,
   goodAt: expert.goodAt,
-  folder: expert.connection.folder,
+  folder: expert.connection.folder ?? '',
   canEdit: expert.connection.canEdit,
   enabled: expert.enabled,
   command: expert.connection.command ?? '',
@@ -46,7 +46,7 @@ type Status = { text: string; error: boolean } | null;
 /**
  * Home's Experts tab: the tools the companion hands work to. Claude Code is the only kind so
  * far. Saving also tests the connection, which costs nothing (`claude --version`), so the user
- * learns straight away whether the folder and the command are right.
+ * learns straight away whether the command is right.
  */
 export function ExpertsPanel() {
   const bridge = useHostBridge();
@@ -101,7 +101,9 @@ export function ExpertsPanel() {
                     <span>{expert.connection.canEdit ? 'Can edit files' : 'Reads only'}</span>
                   </span>
                   <span className="home-entry__preview">
-                    Claude Code in {expert.connection.folder}
+                    {expert.connection.folder === undefined
+                      ? 'Asks which project for each task'
+                      : `Claude Code, by default in ${expert.connection.folder}`}
                   </span>
                 </span>
               </button>
@@ -142,9 +144,6 @@ function ExpertForm({
   const save = async (): Promise<void> => {
     if (draft.name.trim() === '')
       return setStatus({ text: 'Give the expert a name.', error: true });
-    if (draft.folder.trim() === '') {
-      return setStatus({ text: 'Choose the folder it works in.', error: true });
-    }
     const next: Expert = {
       id: id ?? expertIdFor(draft.name, taken),
       name: draft.name.trim(),
@@ -152,7 +151,7 @@ function ExpertForm({
       enabled: draft.enabled,
       connection: {
         type: 'claude-code',
-        folder: draft.folder.trim(),
+        ...(draft.folder.trim() ? { folder: draft.folder.trim() } : {}),
         canEdit: draft.canEdit,
         ...(draft.command.trim() ? { command: draft.command.trim() } : {}),
       },
@@ -213,7 +212,7 @@ function ExpertForm({
         More kinds (Gemini, OpenAI and tool servers) arrive later.
       </p>
       <label>
-        <span>Folder</span>
+        <span>Default project folder (optional)</span>
         <input
           value={draft.folder}
           placeholder="C:\projects\my-app"
@@ -225,17 +224,20 @@ function ExpertForm({
           Choose…
         </button>
       )}
-      <p className="tg-note">It works in this folder and nowhere else.</p>
+      <p className="tg-note">
+        Each task asks which project to work in, guessed from your screen. This folder is only
+        offered when nothing better is known.
+      </p>
       <label className="tg-check">
         <input
           type="checkbox"
           checked={draft.canEdit}
           onChange={(event) => set({ canEdit: event.target.checked })}
         />
-        <span>Let it edit files in this folder</span>
+        <span>Let it edit files by default</span>
       </label>
       <p className="tg-note">
-        Off, it only reads and searches. On, it can change files here without asking each time.
+        Off, it only reads and searches. You can still allow edits for one task when you send it.
       </p>
       <label className="tg-check">
         <input

@@ -52,6 +52,7 @@ describe('openDatabase', () => {
         'notices',
         'pet_seeds',
         'pets',
+        'projects',
         'schema_version',
       ]);
       const row = db

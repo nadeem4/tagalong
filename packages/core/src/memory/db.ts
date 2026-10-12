@@ -90,6 +90,13 @@ const MIGRATIONS: readonly Migration[] = [
      chosen_by TEXT NOT NULL CHECK (chosen_by IN ('companion', 'user')),
      updated_at TEXT NOT NULL
    )`,
+  // The projects the person confirmed for hand-offs, so the next suggestion starts there.
+  // Written by ProjectMemory; paths and names only.
+  `CREATE TABLE IF NOT EXISTS projects (
+     path TEXT PRIMARY KEY,
+     name TEXT NOT NULL,
+     last_used TEXT NOT NULL
+   )`,
 ];
 
 /** The columns migration 7 gave `activity`, in order. */

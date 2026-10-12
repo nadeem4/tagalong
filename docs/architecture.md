@@ -151,8 +151,9 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   [Roles over RPC](concepts/roles-and-tools.md#roles-over-rpc)), `notices.rolesUpgrade` and
   `notices.dismiss` (see [The roles notice](concepts/roles-and-tools.md#the-roles-notice)), and
   for Home `activity.list` (see [Activity](#activity)), and for experts `experts.list`,
-  `experts.upsert`, `experts.delete`, `experts.test`, `handoffs.start` and `handoffs.cancel` (see
-  [Experts and connectors](#experts-and-connectors)). Protocol 0.7.0.
+  `experts.upsert`, `experts.delete`, `experts.test`, `handoffs.start`, `handoffs.cancel`,
+  `handoffs.confirm`, `handoffs.dismiss` and `projects.search` (see
+  [Experts and connectors](#experts-and-connectors)). Protocol 0.8.0.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
   `perception.listWindows` and `perception.readText`, and from Phase 3B `perception.recall` and
   `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
@@ -357,16 +358,34 @@ Two connectors exist so far:
   it, and the claude tests inject a fake `spawn`, so no test starts a real claude.
 
 Each connector also has `check()`, which says whether the expert can be reached without spending
-anything: Claude Code's checks that the folder exists and runs `claude --version` in it.
+anything: Claude Code's checks that its default folder exists, when it has one, and runs
+`claude --version`.
 
 **Storage.** `ExpertStore` (`experts/store.ts`) keeps one JSON row per expert in the `experts` table
 (migration 8), in the order they were added. An expert is `{ id, name, goodAt, enabled, connection }`
-(`packages/protocol/src/experts.ts`); the only connection so far is `{ type: 'claude-code', folder,
-canEdit = false, command? }`. Nothing secret is stored: Claude Code signs itself in, and keys for
+(`packages/protocol/src/experts.ts`); the only connection so far is `{ type: 'claude-code', folder?,
+canEdit = false, command? }`. The folder is only a default: each hand-off names its own project. Nothing secret is stored: Claude Code signs itself in, and keys for
 later connectors go to the host's keychain.
 
+**Proposals.** A companion never starts a hand-off itself; it proposes one.
+`HandoffManager.propose` asks the project finder for guesses from the brief's window title, adds the
+expert's default folder after them, keeps the proposal in memory and emits `handoff.proposed
+{ proposalId, petId, expertId, expertName, brief, projects, canEdit }`. Nothing runs until the person
+sends it: `handoffs.confirm { proposalId, folder, canEdit, brief? }` starts it in that folder (with
+the brief as they edited it) and remembers the folder; `handoffs.dismiss` drops it. Proposals do not
+survive a restart.
+
+**Projects.** `ProjectFinder` (`projects/finder.ts`) guesses which project a task is about, on this
+computer only, reading folder names and never file contents. `suggest(windowTitle)` puts a project
+named in the window title first (editors write `file - folder - App`), then the projects confirmed
+before, most recent first (`ProjectMemory`, table `projects`, migration 10). `search(query)`
+(`projects.search`) also covers a light scan, two levels deep, of the usual code folders (`~/projects`,
+`~/source/repos`, `~/code`, `C:\projects` and similar), where a folder with `.git`, `package.json`,
+`pyproject.toml`, `Cargo.toml` or `go.mod` is a project. The scan is cached for ten minutes and capped
+at 2,000 projects. `EngineOptions.projectRoots` points it elsewhere in tests.
+
 **Hand-offs.** `HandoffManager` (`experts/handoffs.ts`) runs them. `handoffs.start { expertId, petId,
-brief }` refuses an unknown or switched-off expert with `-32602`, writes an `expert` row to the
+brief, folder?, canEdit? }` refuses a hand-off with no folder at all, and an unknown or switched-off expert with `-32602`, writes an `expert` row to the
 activity log, and returns `{ handoffId }` at once (the row's id). The expert's steps arrive as
 `handoff.progress { handoffId, expertId, step }` and the end as `handoff.finished { handoffId,
 expertId, state: done | error | stopped, text?, changedFiles?, error? }`. `handoffs.cancel` aborts a
@@ -378,15 +397,17 @@ never starts a real Claude Code. `EngineOptions.connectorFor` overrides the choi
 
 **The companion's side.** A pet with the Companion role gets `hand_to_expert`
 (`tools/builtin/experts.ts`). It builds the brief from the model's `ask`, `files` and `good_answer`
-plus what the turn's snapshot says the user was looking at (app, window title, selection), starts the
-hand-off through `HandoffManager`, and tells the model the answer will arrive on its own. The expert
+plus what the turn's snapshot says the user was looking at (app, window title, selection), proposes
+the hand-off through `HandoffManager`, and tells the model to ask the user to check it and press
+Send; the answer arrives on its own. The expert
 is chosen in this order: one the user chose for that `task_kind`, the one the model named, the one
 remembered for that kind, then the only expert switched on; otherwise the tool asks the model to name
 one. `RouteMemory` (`experts/routes.ts`, table `expert_routes`, migration 9) remembers task kind to
 expert; the companion's own picks never overwrite the user's, and deleting an expert forgets its
 routes.
 
-Brief review and the Home screens come next; see the "Experts and connectors" design in Notion.
+The card that shows a proposal in the companion's bubble comes next; see the "Experts and
+connectors" design in Notion.
 
 ## The desktop host's shape
 
@@ -726,9 +747,10 @@ preload's `HostBridge` and hands it an `AgentHost` built from the desktop's host
 draws is in `packages/ui/src/home` and `packages/ui/src/office`, so the browser host can reuse it.
 
 **Experts tab.** `ExpertsPanel` (`home/experts-panel.tsx`) lists the experts and adds or edits one:
-name, good at, folder (typed, or picked with the host's `pickFolder`, Electron's folder dialog), may
-edit files, on or off, and an optional command under Advanced. **Save and test** saves through
-`saveExpert` (`experts.upsert`) and then runs `testExpert` (`experts.test`), so a wrong folder or a
+name, good at, an optional default project folder (typed, or picked with the host's `pickFolder`,
+Electron's folder dialog), may edit files by default, on or off, and an optional command under
+Advanced. An expert with no default folder says so in the list: it asks which project for each task. **Save and test** saves through
+`saveExpert` (`experts.upsert`) and then runs `testExpert` (`experts.test`), so a missing folder or a
 missing `claude` shows at once while the expert stays saved. A new expert's id is its name in
 kebab-case, made unique. The expert calls on the `HostBridge` are optional; a host without them shows a
 note instead. The desktop forwards every engine notification to its windows, and `handoff.progress`

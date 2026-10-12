@@ -150,3 +150,115 @@ describe('HandoffManager', () => {
     expect(events.filter((e) => e.method === 'handoff.finished')).toHaveLength(2);
   });
 });
+
+describe('proposals', () => {
+  const projects = {
+    suggest: vi.fn((title?: string) =>
+      title?.includes('ai_pet')
+        ? [{ name: 'ai_pet', path: 'C:\\projects\\ai_pet', reason: 'screen' as const }]
+        : [],
+    ),
+    remember: vi.fn(),
+  };
+
+  function proposing(connector: Connector, folder?: string) {
+    const noFolder = Expert.parse({
+      id: 'claude-code',
+      name: 'Claude Code',
+      connection: { type: 'claude-code', ...(folder === undefined ? {} : { folder }) },
+    });
+    experts.upsert(noFolder);
+    const seen: Expert[] = [];
+    const handoffs = new HandoffManager({
+      experts,
+      activity,
+      connectorFor: (expert) => {
+        seen.push(expert);
+        return connector;
+      },
+      emit: (event) => events.push(event),
+      projects,
+    });
+    return { handoffs, seen };
+  }
+
+  const brief: Brief = {
+    ask: 'Why does this test fail?',
+    context: { windowTitle: 'engine.test.ts - ai_pet - Visual Studio Code' },
+  };
+
+  it('proposes instead of starting: the brief and the project guesses go to the person', () => {
+    const connector = new FakeConnector({ text: 'x' });
+    const { handoffs } = proposing(connector);
+    const { proposalId } = handoffs.propose({ expertId: 'claude-code', petId: 'scout', brief });
+
+    expect(connector.sent).toEqual([]);
+    expect(events).toEqual([
+      {
+        method: 'handoff.proposed',
+        params: {
+          proposalId,
+          petId: 'scout',
+          expertId: 'claude-code',
+          expertName: 'Claude Code',
+          brief,
+          projects: [{ name: 'ai_pet', path: 'C:\\projects\\ai_pet', reason: 'screen' }],
+          canEdit: false,
+        },
+      },
+    ]);
+  });
+
+  it('adds the expert’s own default folder after the guesses', () => {
+    const { handoffs } = proposing(new FakeConnector({ text: 'x' }), 'D:\\default');
+    handoffs.propose({ expertId: 'claude-code', petId: 'scout', brief });
+    const proposed = events[0];
+    expect(proposed?.method === 'handoff.proposed' && proposed.params.projects).toEqual([
+      { name: 'ai_pet', path: 'C:\\projects\\ai_pet', reason: 'screen' },
+      { name: 'default', path: 'D:\\default', reason: 'remembered' },
+    ]);
+  });
+
+  it('starts on confirm, in the folder the person chose, and remembers it', async () => {
+    const connector = new FakeConnector({ text: 'Found it.' });
+    const { handoffs, seen } = proposing(connector);
+    const { proposalId } = handoffs.propose({ expertId: 'claude-code', petId: 'scout', brief });
+
+    const { handoffId } = handoffs.confirm({
+      proposalId,
+      folder: 'C:\\projects\\ai_pet',
+      canEdit: true,
+    });
+
+    await vi.waitFor(() => expect(finished()).toBeDefined());
+    expect(finished()?.params).toMatchObject({ handoffId, state: 'done', text: 'Found it.' });
+    expect(seen[0]?.connection).toMatchObject({ folder: 'C:\\projects\\ai_pet', canEdit: true });
+    expect(projects.remember).toHaveBeenCalledWith('C:\\projects\\ai_pet');
+    expect(() => handoffs.confirm({ proposalId, folder: 'C:\\x', canEdit: false })).toThrow(
+      /no longer waiting/,
+    );
+  });
+
+  it('sends the brief as the person edited it', async () => {
+    const connector = new FakeConnector({ text: 'ok' });
+    const { handoffs } = proposing(connector);
+    const { proposalId } = handoffs.propose({ expertId: 'claude-code', petId: 'scout', brief });
+    handoffs.confirm({ proposalId, folder: 'C:\\r', canEdit: false, brief: { ask: 'Edited.' } });
+    await vi.waitFor(() => expect(finished()).toBeDefined());
+    expect(connector.sent).toEqual([{ ask: 'Edited.' }]);
+  });
+
+  it('drops a dismissed proposal', () => {
+    const { handoffs } = proposing(new FakeConnector({ text: 'x' }));
+    const { proposalId } = handoffs.propose({ expertId: 'claude-code', petId: 'scout', brief });
+    expect(handoffs.dismiss(proposalId)).toBe(true);
+    expect(handoffs.dismiss(proposalId)).toBe(false);
+  });
+
+  it('refuses to start with no folder at all', () => {
+    const { handoffs } = proposing(new FakeConnector({ text: 'x' }));
+    expect(() => handoffs.start({ expertId: 'claude-code', petId: 'scout', brief })).toThrow(
+      /project folder/,
+    );
+  });
+});

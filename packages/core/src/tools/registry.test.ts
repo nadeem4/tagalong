@@ -96,7 +96,7 @@ describe('ToolRegistry.forTurn', () => {
         },
       ],
       routes: { get: () => null, remember: () => undefined },
-      start: () => ({ handoffId: '7c9e6679-7425-40de-944b-e07fc1f90ae7' }),
+      propose: () => ({ proposalId: '7c9e6679-7425-40de-944b-e07fc1f90ae7' }),
     };
     const tools = new ToolRegistry(everything({ experts })).forTurn(
       fakeTurn({ pet: { ...FAKE_TURN_PET, roleId: 'companion' } }),
