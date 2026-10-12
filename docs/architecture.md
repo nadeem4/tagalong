@@ -249,15 +249,25 @@ the model through the snapshot attached to an ask.
 
 ## Brain providers
 
-`BrainProvider` (`providers/brain.ts`) is the only thing the runner talks to. Four ids are
+`BrainProvider` (`providers/brain.ts`) is the only thing the runner talks to. Five ids are
 registered in `providers/registry.ts`:
 
-| id           | Class                      | Wire format                                                                      |
-| ------------ | -------------------------- | -------------------------------------------------------------------------------- |
-| `openrouter` | `OpenAiCompatibleProvider` | OpenAI chat completions through the `openai` SDK, preset base URL OpenRouter     |
-| `nebius`     | `OpenAiCompatibleProvider` | The same, preset base URL Nebius Token Factory                                   |
-| `anthropic`  | `AnthropicProvider`        | Anthropic Messages API through `@anthropic-ai/sdk`                               |
-| `fake`       | `FakeBrainProvider`        | None: scripted words, for tests and demos; forced by `TAGALONG_FAKE_PROVIDERS=1` |
+| id            | Class                      | Wire format                                                                          |
+| ------------- | -------------------------- | ------------------------------------------------------------------------------------ |
+| `openrouter`  | `OpenAiCompatibleProvider` | OpenAI chat completions through the `openai` SDK, preset base URL OpenRouter         |
+| `nebius`      | `OpenAiCompatibleProvider` | The same, preset base URL Nebius Token Factory                                       |
+| `anthropic`   | `AnthropicProvider`        | Anthropic Messages API through `@anthropic-ai/sdk`                                   |
+| `claude-code` | `ClaudeCodeBrain`          | `claude -p` with stream-json in and out, on the person's Claude Code sign-in: no key |
+| `fake`        | `FakeBrainProvider`        | None: scripted words, for tests and demos; forced by `TAGALONG_FAKE_PROVIDERS=1`     |
+
+**Claude Code as a brain** (`providers/claude-code-brain.ts`). A pet on `claude-code` needs no
+key. Each step runs `claude -p` once in a neutral folder, with its own tools off (`--tools ""`), no
+MCP servers (`--strict-mcp-config`) and a short system prompt. The pet's real prompt, its tools and
+the conversation go in one stream-json user message, screenshots as image blocks. The model calls a
+tool by replying with one `<tool_call>{"name", "input"}</tool_call>` tag; the provider runs it
+through `onToolUse` and starts the next step with the result, up to 8 steps. It is slower than an
+API (a process per step) and is the default for a fresh install where Claude Code is signed in.
+Other sign-ins (Gemini CLI, Codex) are meant to follow the same shape under their own ids.
 
 **Each pet picks its own.** `Pet.providerId`, `Pet.model` and the optional `Pet.visionModel` decide
 the brain; `Settings.providerId` and `defaultModel` are no longer read. The engine resolves a pet's

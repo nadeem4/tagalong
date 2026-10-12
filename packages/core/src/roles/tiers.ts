@@ -20,6 +20,7 @@ export const MODEL_TIERS: Readonly<Record<string, ProviderTiers>> = {
     deep: 'anthropic/claude-opus-5',
   },
   anthropic: { fast: 'claude-haiku-4-5', balanced: 'claude-sonnet-5', deep: 'claude-opus-5' },
+  'claude-code': { fast: 'haiku', balanced: 'sonnet', deep: 'opus' },
   nebius: {
     fast: NEMOTRON_NANO_MODEL,
     balanced: NEMOTRON_TEXT_MODEL,
