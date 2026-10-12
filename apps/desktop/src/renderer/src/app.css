@@ -190,11 +190,3 @@ button:disabled {
   color: #b91c1c;
   font-size: 12px;
 }
-
-/* The full chat behind the companion's bubble: an opaque card in the transparent window. */
-.panel-chat {
-  height: 100vh;
-  overflow: hidden;
-  border-radius: 12px;
-  background: var(--surface);
-}

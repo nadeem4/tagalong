@@ -69,7 +69,8 @@ The first time Tagalong starts, one Welcome window opens on the screen you are u
 After that, press Ctrl+Shift+Space (or click Scout) to open Scout's bubble. It shows what Scout can
 see as chips (the app and window, selected text, a screenshot); remove any chip you do not want
 sent, type the question and press Enter. The answer appears in the bubble, the next question
-continues the same conversation, and **Open full chat** opens the full chat panel.
+continues the same conversation, and **Open full chat** shows the whole conversation in a taller
+window (**Back to bubble** returns).
 
 When Scout hands work to an expert, the bubble shows a card first: the agent, the project it guessed
 (from your window, or the projects you used before), whether it may change files, and the brief.
