@@ -99,6 +99,10 @@ test('clicking Scout opens its bubble, and clicking again keeps it open', async 
   await pet.click();
   await expect.poll(panelVisible, { timeout: 10_000 }).toBe(true);
 
+  // A click opens at once, with nothing captured: the click has just put the pet's own
+  // window in front, so a selection copy or a window read would only find Tagalong itself.
+  expect(await avatar.evaluate(() => window.tagalongHost.getContext())).toBeNull();
+
   // It opens against the pet, as if the pet were speaking: touching it on one side, its
   // bottom level with the pet's.
   const gap = await app.evaluate(({ BrowserWindow }) => {
