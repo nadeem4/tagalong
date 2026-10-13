@@ -145,7 +145,8 @@ app's own client is `apps/desktop/src/main/engine-client.ts`. Read
 | In this build                                                                                                                 | Not in this build                                                   |
 | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | Windows desktop app with a Welcome window and an NSIS installer                                                               | macOS and Linux (the installer configs exist but are unverified)    |
-| One companion, Scout, that hands work to experts (Claude Code) and brings the answer back                                     | Voice: push to talk and spoken answers                              |
+| One companion, Scout, that hands work to experts (Claude Code) and brings the answer back                                     | Voice input: push to talk                                           |
+| Scout talks: answers read aloud in a calm British voice, made on this computer, or through ElevenLabs with your own key       |                                                                     |
 | Scout thinks through your Claude Code sign-in, or OpenRouter, Nebius Token Factory, Anthropic or an OpenAI-compatible service | Hands: MCP tools and approval cards                                 |
 | Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                             | A cost dashboard                                                    |
 | Vision routing: a text-only Nemotron model reads pictures with Nemotron Nano 2 VL                                             | Data export and delete-all in Settings                              |
@@ -210,6 +211,13 @@ without taking the keyboard: a build that failed and why, say. It follows window
 one window when you settle on it or its title reads like trouble, and most of the time says
 nothing. **Not now** on the line quiets it for an hour; when it offers help, **Hand it over** opens
 the hand-off card, and nothing is sent until you press **Send**. See [Privacy](#privacy).
+**Scout talks.** Scout reads its answers aloud, so you can look away: the answer, its hello, a
+line it says on its own, a watch that fires and an expert that finished. It never reads code, lists or long text; it says the
+first sentence or two and "The rest is in the bubble." Bars beside the × show while it speaks;
+click them, close the bubble or press `Ctrl+Shift+Alt+M` to stop it at once. The voice is
+Kokoro, made on this computer: the first time Scout speaks it downloads the voice model (about
+90 MB) and uses the Windows voice until that is done. Turn it off, pick a voice, preview it or
+change the speed in **Home → Settings → Voice**.
 
 **Memory.** Tell Scout "I prefer short answers" and it remembers across restarts.
 
@@ -222,6 +230,7 @@ upgrade, and their conversations stay on disk.
 | ------------------ | -------------------------------------------------------------------------------------- |
 | `Ctrl+Shift+Space` | **Ask.** Opens the bubble with the text you have selected and the active window's name |
 | `Ctrl+Shift+Alt+P` | **Pause sight.** Nothing is read until you press it again (also in the tray)           |
+| `Ctrl+Shift+Alt+M` | **Stop speaking.** Scout stops talking at once and drops what it was about to say      |
 | `Alt+Shift+Space`  | In Chrome, with the extension: opens the side panel with your selection                |
 
 Every key can be changed in **Home → Settings → Shortcuts**, and the change works at once.
@@ -241,16 +250,19 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   Code starts, which costs nothing. There is no default project folder: each task picks its
   project, and you confirm before anything is sent.
 - **Activity**: every answer and every hand-off, newest first. Click one to read it.
-- **Settings**, in five sections. Press ⓘ beside a setting for the longer story.
+- **Settings**, in six sections. Press ⓘ beside a setting for the longer story.
   - **How Scout thinks**: Scout's real brain, and whether your Claude Code sign-in works (checked
     locally with `claude auth status`). Without Claude Code you pick a service and paste its key,
     and saving moves Scout to it.
   - **Privacy**: the hello when Tagalong opens, keeping an eye on things, screen memory, and what
     Scout never looks at.
-  - **Shortcuts**: the ask and pause keys.
+  - **Voice**: **Scout talks** (on by default), the voice (George or Fable) with **▶ Preview**, and
+    the speed.
+  - **Shortcuts**: the ask, pause and stop-speaking keys.
   - **Browser extension (optional)**: the pairing token for the Chrome extension.
   - **Advanced**, closed by default: summaries, API keys (add, replace or remove, and a base URL),
-    sight detail, screen memory and watches, and **Open Welcome again**.
+    the ElevenLabs voice (your key and a voice ID from your ElevenLabs library), sight detail,
+    screen memory and watches, and **Open Welcome again**.
 
 ## Providers and keys
 
@@ -319,6 +331,8 @@ Then click the toolbar button, or select text and press `Alt+Shift+Space`. More 
 - Screenshots are not written to disk. Screen memory and watches live in memory only and are thrown
   away when you pause sight or quit.
 - What you ask goes only to the provider Scout runs on. There is no Tagalong server.
+- Scout's voice is made on your computer. With an ElevenLabs key and voice, only the words Scout
+  says are sent to ElevenLabs, never your screen or your questions.
 - API keys are encrypted with the OS keychain.
 - `Ctrl+Shift+Alt+P` pauses all sight at once.
 - Tagalong never moves your mouse or types for you. Scout does not click, type or drive other
@@ -335,6 +349,8 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 | Scout says the model was not found, or the provider refused it | Open Settings and pick the model from the live list next to the model box.                                                                      |
 | Scout ignores the screenshot, or warns it cannot see           | Its model is text-only. Give it a vision model in Settings (Nemotron Nano 2 VL on Token Factory) or move it to Claude.                          |
 | A hotkey does nothing                                          | Settings and the bubble name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).           |
+| Scout is silent                                                | Check **Scout talks** in Home → Settings → Voice, and your sound output. The stop key only silences the current answer.                         |
+| Scout's voice changes after the first answers                  | The first time it speaks, Scout downloads its voice (about 90 MB) and uses the Windows voice until then. Offline, it keeps the Windows voice.   |
 | The Chrome side panel says "Disconnected"                      | The desktop app must be running. If it is, copy the pairing token again from Settings and paste it into the extension's options.                |
 | "Windows protected your PC" when installing                    | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                            |
 | You want Welcome again                                         | Home → Settings → Advanced → **Open Welcome again**.                                                                                            |

@@ -48,13 +48,18 @@ window titles only and speaks up rarely, and never takes over your mouse or keyb
 - Runs all day in the background: tray icon, pets docked on the desktop, a chat panel that opens
   beside the pet on a hotkey and hides on Escape.
 - Hotkeys: `Ctrl+Shift+Space` ask (brings the selected text and the window you are on),
-  `Ctrl+Shift+Alt+P` pause sight. Scout takes screenshots and reads other windows itself.
+  `Ctrl+Shift+Alt+P` pause sight, `Ctrl+Shift+Alt+M` stop speaking. Scout takes screenshots and
+  reads other windows itself.
+- Scout talks: the person may not be looking at the screen, so Scout says its bubble lines aloud
+  (answers, the hello, a watch that fires, an expert that finished), in a calm, refined, dry
+  British voice. Only the first sentence or two; code, lists and long text stay in the bubble.
 - Home, the control centre: every agent, what it is doing, every handoff, consult and meeting, and
   each agent's role, model, tools and notes. Its centre scene is a theme (the Office first); the
   controls never move between themes.
 - Settings and first-run configure providers, keys and app-wide behaviour. Settings leads with how
-  Scout thinks (its real brain and whether the Claude sign-in works), then privacy, shortcuts and the
-  browser extension; the tuning knobs (summaries, API keys, sight detail, watches) sit under
+  Scout thinks (its real brain and whether the Claude sign-in works), then privacy, voice, shortcuts
+  and the browser extension; the tuning knobs (summaries, API keys, the ElevenLabs voice, sight
+  detail, watches) sit under
   Advanced, closed by default, with a short line visible and the longer story behind ⓘ.
 - The Chrome extension shows the same crew in Chrome's side panel.
 
@@ -68,8 +73,10 @@ window titles only and speaks up rarely, and never takes over your mouse or keyb
 - Scout introduces itself once, in three handwritten beats after Welcome. Each later launch it says
   one short line (time of day, time away, a finished hand-off) and fades; it reads no screen for
   this, and Settings turns it off.
-- Not built yet: voice, MCP tools (Hands), meetings and the office window, cost dashboard, macOS and
-  Linux. Designs for those are agreed but unbuilt.
+- Speech runs on the computer (Kokoro, downloaded on first use); ElevenLabs is an optional
+  bring-your-own-key voice that receives only the words spoken.
+- Not built yet: voice input (push to talk), MCP tools (Hands), meetings and the office window,
+  cost dashboard, macOS and Linux. Designs for those are agreed but unbuilt.
 - Undecided: whether users can configure the pets' personality and tone beyond the default voice.
 
 ## Brand Commitments
