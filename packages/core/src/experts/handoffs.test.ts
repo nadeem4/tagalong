@@ -53,6 +53,7 @@ describe('HandoffManager', () => {
       expertId: 'claude-code',
       petId: 'scout',
       brief: { ask: 'Fix the test' },
+      folder: 'C:\\r',
     });
 
     await vi.waitFor(() => expect(finished()).toBeDefined());
@@ -89,6 +90,7 @@ describe('HandoffManager', () => {
       expertId: 'claude-code',
       petId: 'scout',
       brief: { ask: 'x' },
+      folder: 'C:\\r',
     });
     await vi.waitFor(() => expect(finished()).toBeDefined());
     expect(finished()?.params).toEqual({
@@ -114,6 +116,7 @@ describe('HandoffManager', () => {
       expertId: 'claude-code',
       petId: 'scout',
       brief: { ask: 'x' },
+      folder: 'C:\\r',
     });
 
     expect(handoffs.cancel(handoffId)).toBe(true);
@@ -131,7 +134,12 @@ describe('HandoffManager', () => {
     ).toThrow("no expert with id 'nobody'");
     experts.upsert({ ...claudeCode, enabled: false });
     expect(() =>
-      handoffs.start({ expertId: 'claude-code', petId: 'scout', brief: { ask: 'x' } }),
+      handoffs.start({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief: { ask: 'x' },
+        folder: 'C:\\r',
+      }),
     ).toThrow('Claude Code is switched off');
   });
 
@@ -144,8 +152,8 @@ describe('HandoffManager', () => {
         ),
     };
     const handoffs = manager(hanging);
-    handoffs.start({ expertId: 'claude-code', petId: 'scout', brief: { ask: 'a' } });
-    handoffs.start({ expertId: 'claude-code', petId: 'scout', brief: { ask: 'b' } });
+    handoffs.start({ expertId: 'claude-code', petId: 'scout', brief: { ask: 'a' }, folder: 'C:\\r' });
+    handoffs.start({ expertId: 'claude-code', petId: 'scout', brief: { ask: 'b' }, folder: 'C:\\r' });
     await handoffs.stopAll();
     expect(events.filter((e) => e.method === 'handoff.finished')).toHaveLength(2);
   });
@@ -209,13 +217,12 @@ describe('proposals', () => {
     ]);
   });
 
-  it('adds the expert’s own default folder after the guesses', () => {
+  it('ignores an old expert’s default folder: only the guesses are offered', () => {
     const { handoffs } = proposing(new FakeConnector({ text: 'x' }), 'D:\\default');
     handoffs.propose({ expertId: 'claude-code', petId: 'scout', brief });
     const proposed = events[0];
     expect(proposed?.method === 'handoff.proposed' && proposed.params.projects).toEqual([
       { name: 'ai_pet', path: 'C:\\projects\\ai_pet', reason: 'screen' },
-      { name: 'default', path: 'D:\\default', reason: 'remembered' },
     ]);
   });
 
@@ -255,8 +262,8 @@ describe('proposals', () => {
     expect(handoffs.dismiss(proposalId)).toBe(false);
   });
 
-  it('refuses to start with no folder at all', () => {
-    const { handoffs } = proposing(new FakeConnector({ text: 'x' }));
+  it('refuses to start with no folder, even when an old expert carries a default one', () => {
+    const { handoffs } = proposing(new FakeConnector({ text: 'x' }), 'D:\\default');
     expect(() => handoffs.start({ expertId: 'claude-code', petId: 'scout', brief })).toThrow(
       /project folder/,
     );

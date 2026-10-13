@@ -7,7 +7,12 @@ import { PROTOCOL_VERSION, RPC_ERROR_CODES } from '@tagalong/protocol';
 import { listRoles, recommendedModel, roleFor } from './roles';
 import { Engine } from './engine';
 import { openDatabase } from './memory/db';
-import { FakeBrainProvider, NEBIUS_FALLBACK_MODELS, SECRET_KEYS } from './providers';
+import {
+  CLAUDE_CODE_MODELS,
+  FakeBrainProvider,
+  NEBIUS_FALLBACK_MODELS,
+  SECRET_KEYS,
+} from './providers';
 import type { BrainProvider } from './providers';
 import { InMemorySecretStore } from './settings/settings';
 
@@ -289,6 +294,12 @@ describe('models.list', () => {
     const fake = await host.call('models.list', { providerId: 'fake' });
     expect((anthropic['result'] as { models: string[] }).models).toContain('claude-opus-5');
     expect((fake['result'] as { models: string[] }).models).toEqual(['fake-model']);
+  });
+
+  it('lists the Claude sign-in models without a key', async () => {
+    const host = await connected({});
+    const res = await host.call('models.list', { providerId: 'claude-code' });
+    expect(res['result']).toEqual({ models: [...CLAUDE_CODE_MODELS], source: 'fallback' });
   });
 
   it('answers an unknown provider with an error', async () => {
@@ -982,6 +993,7 @@ describe('experts and hand-offs', () => {
       expertId: 'claude-code',
       petId: 'scout',
       brief: { ask: 'Explain engine.ts' },
+      folder: process.cwd(),
     });
     const { handoffId } = started['result'] as { handoffId: string };
     await vi.waitFor(() => expect(host.methods()).toContain('handoff.finished'));
@@ -1050,10 +1062,8 @@ describe('a companion handing work to an expert', () => {
     // Nothing runs until the person confirms, with the project to work in.
     expect(host.methods()).not.toContain('handoff.finished');
     const proposed = host.notifications.find((n) => n.method === 'handoff.proposed')!;
-    expect(proposed.params).toMatchObject({
-      expertName: 'Claude Code',
-      projects: [{ path: 'C:\\projects\\ai_pet', reason: 'remembered' }],
-    });
+    // An old expert's default folder is ignored: with no guess, the card opens the picker.
+    expect(proposed.params).toMatchObject({ expertName: 'Claude Code', projects: [] });
 
     const confirmed = await host.call('handoffs.confirm', {
       proposalId: proposed.params['proposalId'],

@@ -32,7 +32,7 @@ export interface StartParams {
   expertId: string;
   petId: string;
   brief: Brief;
-  /** The project to work in; overrides the expert's default folder. */
+  /** The project to work in. Required: an old expert's default folder is ignored. */
   folder?: string | undefined;
   canEdit?: boolean | undefined;
 }
@@ -42,15 +42,6 @@ interface Proposal {
   expertId: string;
   petId: string;
   brief: Brief;
-}
-
-function nameOf(path: string): string {
-  return (
-    path
-      .split(/[\\/]/)
-      .filter((part) => part !== '')
-      .pop() ?? path
-  );
 }
 
 /**
@@ -71,12 +62,9 @@ export class HandoffManager {
   /** Shows the brief to the person, with the project guesses best first. Nothing runs yet. */
   propose(params: { expertId: string; petId: string; brief: Brief }): { proposalId: string } {
     const expert = this.#expert(params.expertId);
-    const guesses = this.options.projects?.suggest(params.brief.context?.windowTitle) ?? [];
-    const fallback = expert.connection.folder;
-    const projects =
-      fallback === undefined || guesses.some((p) => p.path === fallback)
-        ? guesses
-        : [...guesses, { name: nameOf(fallback), path: fallback, reason: 'remembered' as const }];
+    // Only the guesses: an old expert's default folder is ignored, and with no guess at all
+    // the hand-off card opens the folder picker.
+    const projects = this.options.projects?.suggest(params.brief.context?.windowTitle) ?? [];
     const proposalId = randomUUID();
     this.#proposals.set(proposalId, params);
     this.options.emit({
@@ -123,7 +111,7 @@ export class HandoffManager {
 
   start(params: StartParams): { handoffId: string } {
     const stored = this.#expert(params.expertId);
-    const folder = params.folder ?? stored.connection.folder;
+    const folder = params.folder;
     if (folder === undefined) {
       throw new RpcFailure(
         RPC_ERROR_CODES.invalidParams,

@@ -8,8 +8,8 @@ import { z } from 'zod';
 export const ClaudeCodeConnection = z.object({
   type: z.literal('claude-code'),
   /**
-   * A default project folder. Optional: each hand-off names its own project, which the
-   * person confirms before it goes; this is only the fallback when nothing better is known.
+   * The project a running hand-off works in, filled in when the person confirms it. No
+   * longer a saved setting: an old expert's default folder still parses but is ignored.
    */
   folder: z.string().min(1).optional(),
   /** False keeps it to reading and searching. */
@@ -71,7 +71,7 @@ export const HandoffsStartParams = z.object({
   /** The companion handing off. */
   petId: z.string().min(1),
   brief: Brief,
-  /** The project to work in; overrides the expert's default folder. */
+  /** The project to work in. Without one the hand-off is refused. */
   folder: z.string().min(1).optional(),
   /** Overrides the expert's own setting for this one hand-off. */
   canEdit: z.boolean().optional(),
