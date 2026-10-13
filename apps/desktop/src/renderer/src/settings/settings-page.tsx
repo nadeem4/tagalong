@@ -12,7 +12,7 @@ import { SummariesSection } from './summaries-section';
 import type { HostView } from '../../../shared/ipc';
 
 /**
- * App-level settings: the provider keys and base URLs, summaries, the four hotkeys, sight,
+ * App-level settings: the provider keys and base URLs, summaries, the two hotkeys, sight,
  * awareness and the browser extension, one section per file under `settings/`. It is Home's
  * Settings page (`embedded`, no header or side menu of its own); the standalone window only
  * opens when the engine failed to start, since Home needs the engine.
@@ -83,8 +83,6 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
           value: field(`baseUrl:${choice.id}`),
         })),
         askHotkey: field('askHotkey'),
-        lookHotkey: field('lookHotkey'),
-        seeEverythingHotkey: field('seeEverythingHotkey'),
         pauseSightHotkey: field('pauseSightHotkey'),
         sightDetail: field('sightDetail'),
         windowTextBudget: field('windowTextBudget'),

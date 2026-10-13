@@ -68,13 +68,13 @@ landed in Phase 6, which ran fifth; see "The browser host" below.
 
 ## Package responsibilities
 
-| Package           | Responsibility                                                                                                                                                                                                                                                                          | Must never import                                |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| packages/protocol | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC envelopes, plus the method and notification catalog                                                                                                                                                           | anything except zod                              |
-| packages/core     | Engine facade, conversation runner, prompt assembler, SQLite memory, pet registry, settings and SecretStore, pairing, websocket server, brain providers                                                                                                                                 | electron, react, DOM globals                     |
-| packages/ui       | React components — `PetAvatar`, `MessageList`, `Composer`, `SightBar`, `ChatPanel` — plus the `HostBridge` contract and its context, and a fake bridge for host tests                                                                                                                   | electron, sockets, node APIs                     |
-| apps/desktop      | Electron host. Runs the engine in the main process, dials it over the loopback socket, owns avatar, panel and settings windows, the tray, the two global hotkeys (text-only and look), perception with exclusions and capture announcements, and safeStorage secrets, one folder per OS | nothing from core internals, only its public API |
-| apps/extension    | Chrome MV3 host. Connects to the running engine from its service worker, supplies the exact selection and page text on demand, renders pets in the side panel, pairs from its options page                                                                                              | core at all; it speaks the protocol only         |
+| Package           | Responsibility                                                                                                                                                                                                                                                                           | Must never import                                |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| packages/protocol | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC envelopes, plus the method and notification catalog                                                                                                                                                            | anything except zod                              |
+| packages/core     | Engine facade, conversation runner, prompt assembler, SQLite memory, pet registry, settings and SecretStore, pairing, websocket server, brain providers                                                                                                                                  | electron, react, DOM globals                     |
+| packages/ui       | React components — `PetAvatar`, `MessageList`, `Composer`, `SightBar`, `ChatPanel` — plus the `HostBridge` contract and its context, and a fake bridge for host tests                                                                                                                    | electron, sockets, node APIs                     |
+| apps/desktop      | Electron host. Runs the engine in the main process, dials it over the loopback socket, owns avatar, panel and settings windows, the tray, the two global hotkeys (ask and pause sight), perception with exclusions and capture announcements, and safeStorage secrets, one folder per OS | nothing from core internals, only its public API |
+| apps/extension    | Chrome MV3 host. Connects to the running engine from its service worker, supplies the exact selection and page text on demand, renders pets in the side panel, pairs from its options page                                                                                               | core at all; it speaks the protocol only         |
 
 ## Host contracts
 
@@ -737,7 +737,7 @@ which moves the window and the open bubble with it; `dropAvatar` saves the posit
 setting. A press that does not move is a click: `selectPet` opens the bubble at once (`openPanelNow`),
 or keeps an open one and gives it the keyboard back; it never closes it. A click captures nothing:
 it has just put the pet's own window in front, so a selection copy or a window read would wait on
-the keyboard and the clipboard only to find Tagalong itself. The hotkeys still capture. The bubble hides when it loses focus, except
+the keyboard and the clipboard only to find Tagalong itself. The ask hotkey still captures the selection and the active window; screenshots, the window list and other monitors are the pet's own tools, taken only when a question needs them. The bubble hides when it loses focus, except
 when the focus went to the pet's own window (`hidesOnBlur`, `windows/bubble-focus.ts`), so clicking
 or dragging the pet never hides its bubble.
 
@@ -840,8 +840,8 @@ is one file under `apps/desktop/src/renderer/src/settings/`:
 | ----------------------- | ------------------------------------------------------------- |
 | `keys-section.tsx`      | Provider API keys and OpenAI-compatible base URLs             |
 | `summaries-section.tsx` | The summarizer provider and model                             |
-| `hotkeys-section.tsx`   | The four global hotkeys and the hotkey problem, if any        |
-| `sight-section.tsx`     | What a see-everything look sends, and the window text budget  |
+| `hotkeys-section.tsx`   | The two global hotkeys and the hotkey problem, if any         |
+| `sight-section.tsx`     | What a look at every screen sends, and the window text budget |
 | `awareness-section.tsx` | Rolling memory and the watch limits                           |
 | `browser-section.tsx`   | The Chrome extension's pairing token                          |
 | `section.tsx`           | The section list the nav links to, and the panel each sits in |

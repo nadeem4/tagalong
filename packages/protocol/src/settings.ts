@@ -32,8 +32,6 @@ export const SETTINGS_DEFAULTS = {
   historyMessages: 20,
   hotkeys: {
     ask: 'CommandOrControl+Shift+Space',
-    look: 'CommandOrControl+Shift+S',
-    seeEverything: 'CommandOrControl+Shift+Alt+S',
     pauseSight: 'CommandOrControl+Shift+Alt+P',
   },
   avatar: { x: null, y: null },
@@ -196,22 +194,19 @@ const settingsFields = {
   /** How many past messages are replayed to the model. */
   historyMessages: z.number().int().positive(),
   /**
-   * `look` is optional so a settings file written before the looking hotkey existed still
-   * parses — and because a patch replaces the whole `hotkeys` object, so a caller that only
-   * rebinds `ask` must not be forced to resend a key it never touched. The host falls back
-   * to its own default when it is absent.
+   * Two keys: the ask, and the pause. The look and see-everything keys of older settings
+   * files are dropped on parse: Scout takes screenshots and reads other windows itself now.
    */
   hotkeys: z.object({
     ask: z.string().min(1),
-    look: z.string().min(1).optional(),
-    /** Optional for the same reason as `look`, and for the same settings files. */
-    seeEverything: z.string().min(1).optional(),
     /**
-     * Turns all sight off and on again. Optional for the same reason as its neighbours.
+     * Turns all sight off and on again. Optional so a settings file written before it still
+     * parses, and because a patch replaces the whole `hotkeys` object, so a caller that only
+     * rebinds `ask` must not be forced to resend it. The host falls back to its default.
      *
      * The tray carries the same action, so a settings file that never names this key, or
      * an accelerator another application already owns, still leaves the user a way to
-     * blind the pet. That matters more here than for the other three.
+     * blind the pet.
      */
     pauseSight: z.string().min(1).optional(),
   }),

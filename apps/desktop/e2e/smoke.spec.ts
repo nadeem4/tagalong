@@ -376,8 +376,6 @@ test('a rebound hotkey is applied on save, without a restart', async () => {
 
   const original = {
     ask: before.settings.hotkeys.ask,
-    look: before.settings.hotkeys.look ?? 'CommandOrControl+Shift+S',
-    seeEverything: before.settings.hotkeys.seeEverything ?? 'CommandOrControl+Shift+Alt+S',
     pauseSight: before.settings.hotkeys.pauseSight ?? 'CommandOrControl+Shift+Alt+P',
   };
 

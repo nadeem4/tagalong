@@ -7,7 +7,7 @@ export function SightSection({ settings }: { settings: Settings }) {
   return (
     <Section id="sight">
       <label>
-        <span>What a see-everything look sends</span>
+        <span>What a look at every screen sends</span>
         <select name="sightDetail" defaultValue={settings.sightDetail}>
           <option value="focused">
             The composite and the screen you are on (cheaper, recommended)

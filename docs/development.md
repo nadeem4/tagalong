@@ -248,28 +248,22 @@ selection and the active window and opens the chat panel beside it, Escape or fo
 panel (unless a turn is still streaming), and the tray menu shows or hides the pets, opens settings,
 and quits.
 
-`Ctrl+Shift+S` does the same but also takes a screenshot of the active window, and
-`Ctrl+Shift+Alt+S` captures everything: one picture per display, a composite laid out by monitor
-geometry, and a list of every window that is open.
+| Hotkey             | What rides along                            | Roughly what it costs |
+| ------------------ | ------------------------------------------- | --------------------- |
+| `Ctrl+Shift+Space` | Selection and the active window             | text only             |
+| `Ctrl+Shift+Alt+P` | Nothing — turns all sight off, and on again | nothing               |
 
-| Hotkey             | What rides along                                            | Roughly what it costs                       |
-| ------------------ | ----------------------------------------------------------- | ------------------------------------------- |
-| `Ctrl+Shift+Space` | Selection and the active window                             | text only                                   |
-| `Ctrl+Shift+S`     | Plus a screenshot of the active window                      | about 1,500 extra input tokens              |
-| `Ctrl+Shift+Alt+S` | Plus the composite, the focused display and the window list | about 3,200, and a few seconds to enumerate |
-| `Ctrl+Shift+Alt+P` | Nothing — turns all sight off, and on again                 | nothing                                     |
+The ask key exists for the one thing only a key can do: read the selection and the window you are on
+before the bubble takes the focus. A click on the pet captures nothing, because it has just put the
+pet's own window in front. Screenshots (about 1,500 extra input tokens), the window list (a few
+seconds to enumerate) and other monitors are the pet's own tools, taken only when a question needs
+them. The pause key takes sight away entirely — see [Pausing sight](privacy.md#pausing-sight).
+**What a look at every screen sends** in the settings window decides whether a capture of every
+display attaches only the composite and the focused display, or every display.
 
-Three capture keys rather than one with modifiers, because they differ in what they cost and the
-user is choosing the bill. The fourth takes sight away entirely — see
-[Pausing sight](privacy.md#pausing-sight). A full-view capture attaches two pictures by default — the composite, which is
-the map of how the monitors sit, and the display being worked on — and names the others in text so
-the pet can fetch one by tool rather than everything by default. Three monitors must not mean three
-images on every ask. **What a see-everything look sends** in the settings window overrides that and
-attaches every display, for someone who would rather pay than ask twice.
-
-All four accelerators are editable in the settings window and rebind while the app runs — no
+Both accelerators are editable in the settings window and rebind while the app runs — no
 restart — and an accelerator another application already owns is reported rather than silently
-dropped, without costing the other three.
+dropped, without costing the other.
 
 **A hotkey that cannot be registered never stops Tagalong from starting.** The only way to store an
 accelerator Windows refuses is to type it into Settings, so an app that refused to open because of
@@ -349,13 +343,13 @@ the Settings picker shows the live one once a key is stored.
 Both live in the settings window and both take effect on save, with no restart: they are read at the
 moment of each capture rather than at boot.
 
-| Setting                              | Default                            | What raising it costs                                                                                                                                                                   |
-| ------------------------------------ | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **What a see-everything look sends** | Composite plus the focused display | `Every screen` sends one picture per monitor, so a three-monitor desk pays roughly three times the image cost on every full-view look                                                   |
-| **Window text budget**               | 8,000 characters                   | How much of a window a read returns when the pet does not ask for less. Roughly one token per four characters, so the default is about 2,000 tokens per read, and the ceiling is 40,000 |
+| Setting                               | Default                            | What raising it costs                                                                                                                                                                   |
+| ------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **What a look at every screen sends** | Composite plus the focused display | `Every screen` sends one picture per monitor, so a three-monitor desk pays roughly three times the image cost on every look at every screen                                             |
+| **Window text budget**                | 8,000 characters                   | How much of a window a read returns when the pet does not ask for less. Roughly one token per four characters, so the default is about 2,000 tokens per read, and the ceiling is 40,000 |
 
 Before you send, the sight bar shows roughly what the attached pictures cost — `~1,843 image tokens ·
-3 images` — at width × height ÷ 750 per image, so a see-everything look on three monitors is visibly
+3 images` — at width × height ÷ 750 per image, so a look at every screen on three monitors is visibly
 dearer than a single screenshot.
 
 The budget is a ceiling, not a target — a pet that only needs the top of a terminal asks for less,

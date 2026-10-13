@@ -34,9 +34,7 @@ import { providerChoices, secretKeyFor } from './provider-choices';
 import { findAgents, shouldOpenWelcome, welcomeCrew, welcomeExperts } from './welcome';
 import type { EngineHost } from './engine-host';
 import {
-  DEFAULT_LOOK_HOTKEY,
   DEFAULT_PAUSE_SIGHT_HOTKEY,
-  DEFAULT_SEE_EVERYTHING_HOTKEY,
   HotkeyManager,
   describeHotkeyProblems,
 } from './hotkeys';
@@ -201,9 +199,7 @@ async function start(): Promise<void> {
     pendingSnapshot: null,
     activeTurns: new Set(),
     hotkeys: new HotkeyManager({
-      onAsk: () => void openPanelWithContext({ screenshot: false }),
-      onLook: () => void openPanelWithContext({ screenshot: true }),
-      onSeeEverything: () => void openPanelWithContext({ screenshot: false, fullView: true }),
+      onAsk: () => void openPanelWithContext(),
       onPauseSight: () => toggleSightPause(),
     }),
     hotkeyError: null,
@@ -278,8 +274,6 @@ function applyHotkeys(settings: Settings): string | null {
   if (desktop === null) return null;
   const outcomes = desktop.hotkeys.apply({
     ask: settings.hotkeys.ask,
-    look: settings.hotkeys.look ?? DEFAULT_LOOK_HOTKEY,
-    seeEverything: settings.hotkeys.seeEverything ?? DEFAULT_SEE_EVERYTHING_HOTKEY,
     pauseSight: settings.hotkeys.pauseSight ?? DEFAULT_PAUSE_SIGHT_HOTKEY,
   });
 
@@ -416,7 +410,7 @@ function createTray(): Tray {
   const tray = new Tray(createTrayIcon());
   tray.setToolTip('Tagalong');
   tray.setContextMenu(buildTrayMenu());
-  tray.on('click', () => void openPanelWithContext({ screenshot: false }));
+  tray.on('click', () => void openPanelWithContext());
   return tray;
 }
 
@@ -509,36 +503,20 @@ function announceCapture(notice: CaptureNotice): void {
 }
 
 /**
- * The hotkey path: perceive, announce it, then open the panel with what was found.
- *
- * What is captured separates the three hotkeys, and each costs more than the last. The
- * text-only one carries no picture. The looking one carries a screenshot, roughly 1,500
- * extra input tokens. The full-view one carries the composite, the focused display and a
- * list of everything open.
+ * The ask hotkey: read the selection and the window you are on before the bubble takes the
+ * focus, announce it, then open the bubble with what was found. No picture rides along:
+ * Scout takes a screenshot or reads other windows itself, when a question needs them.
  */
-async function openPanelWithContext(options: {
-  screenshot: boolean;
-  fullView?: boolean;
-}): Promise<void> {
+async function openPanelWithContext(): Promise<void> {
   if (desktop === null || desktop.panel === null || desktop.avatar === null) return;
 
   const { snapshot, blocked, paused } = await captureAskSnapshot(desktop.platform, {
-    screenshot: options.screenshot,
-    ...(options.fullView === undefined ? {} : { fullView: options.fullView }),
+    screenshot: false,
     exclusions: desktop.settings.captureExclusions,
   });
   desktop.pendingSnapshot = snapshot;
 
-  // A full-view capture is a capture: the eye badge and the tray tooltip have to fire for
-  // it too, or the loudest kind of look is the only silent one.
-  announceCapture(
-    captureNotice({
-      at: new Date(),
-      screenshot: options.screenshot || options.fullView === true,
-      blocked,
-      paused,
-    }),
-  );
+  announceCapture(captureNotice({ at: new Date(), screenshot: false, blocked, paused }));
   desktop.panel.webContents.send(IPC.contextEvent, snapshot);
   desktop.avatar.show();
   showPanelBeside(desktop.panel, desktop.avatar);

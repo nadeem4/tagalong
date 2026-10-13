@@ -29,7 +29,7 @@ let app: ElectronApplication;
 let dataDir: string;
 
 const BAD = 'Ctrl+Shift+Nonsense';
-const GOOD_LOOK = 'CommandOrControl+Shift+S';
+const GOOD_PAUSE = 'CommandOrControl+Shift+Alt+P';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -42,7 +42,7 @@ test.beforeAll(async () => {
     join(dataDir, 'settings.json'),
     JSON.stringify({
       providerId: 'fake',
-      hotkeys: { ask: BAD, look: GOOD_LOOK },
+      hotkeys: { ask: BAD, pauseSight: GOOD_PAUSE },
     }),
     'utf8',
   );
@@ -87,16 +87,14 @@ test('the failure names the binding that broke, and says the rest still work', a
   const view = await panel.evaluate(() => window.tagalongHost.getHostView());
 
   expect(view.hotkeyError, 'a refused accelerator must be reported somewhere').toBeDefined();
-  // Named in words the settings window uses, not only as an accelerator string: four
-  // hotkeys do four different things, and the user needs to know which one they lost.
+  // Named in words the settings window uses, not only as an accelerator string: the two
+  // hotkeys do different things, and the user needs to know which one they lost.
   expect(view.hotkeyError).toContain('Ask');
   expect(view.hotkeyError).toContain(BAD);
   expect(view.hotkeyError?.toLowerCase()).toContain('other');
 
-  // The three valid bindings must not be dragged down with the broken one. If they were,
-  // this message would name them too.
-  expect(view.hotkeyError).not.toContain('Look');
-  expect(view.hotkeyError).not.toContain('See everything');
+  // The valid pause binding must not be dragged down with the broken one. If it were,
+  // this message would name it too.
   expect(view.hotkeyError).not.toContain('Pause sight');
 });
 
@@ -118,7 +116,7 @@ test('the app works: the other hotkeys are bound and capture still runs', async 
   // not being locked out: the user can recover without restarting.
   await panel.evaluate((keys) => window.tagalongHost.saveSettings({ hotkeys: keys }), {
     ask: 'CommandOrControl+Shift+Space',
-    look: GOOD_LOOK,
+    pauseSight: GOOD_PAUSE,
   });
 
   const fixed = await panel.evaluate(() => window.tagalongHost.getHostView());
