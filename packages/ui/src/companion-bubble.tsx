@@ -26,6 +26,14 @@ export interface CompanionBubbleProps {
   onClose?: () => void;
   /** Which side of the bubble the pet is on: the speech tail points there. */
   tail?: 'left' | 'right';
+  /**
+   * A line the bubble says, for the host to speak aloud: each finished answer, the hello,
+   * and an expert's finish. Called once per line, with the text as shown.
+   */
+  onSay?: (text: string) => void;
+  /** Whether the host is speaking now: the bubble shows it, with a way to stop. */
+  speaking?: boolean;
+  onStopSpeaking?: () => void;
 }
 
 /** A question and how it was answered, once it is over. */
@@ -99,6 +107,9 @@ export function CompanionBubble({
   onCollapse,
   onClose,
   tail,
+  onSay,
+  speaking = false,
+  onStopSpeaking,
 }: CompanionBubbleProps) {
   const bridge = useHostBridge();
   const [draft, setDraft] = useState('');
@@ -137,6 +148,7 @@ export function CompanionBubble({
         if (event.turnId !== mine.current) return;
         mine.current = null;
         setReply({ state: 'done', text: event.text });
+        onSay?.(event.text);
         return;
       case 'turn.error':
         if (event.turnId !== mine.current) return;
@@ -156,6 +168,17 @@ export function CompanionBubble({
         );
         return;
       case 'handoff.finished':
+        if (
+          handoff?.phase === 'working' &&
+          handoff.expertId === event.expertId &&
+          (handoff.handoffId === null || handoff.handoffId === event.handoffId)
+        ) {
+          onSay?.(
+            event.state === 'done'
+              ? `${handoff.expertName} has finished. ${event.text ?? ''}`.trim()
+              : `${handoff.expertName} stopped without finishing.`,
+          );
+        }
         setHandoff((current) =>
           current?.phase === 'working' &&
           current.expertId === event.expertId &&
@@ -176,6 +199,20 @@ export function CompanionBubble({
     }
   });
   useEffect(() => bridge.onTurnEvent(onTurnEvent), [bridge]);
+
+  const speakingIndicator = speaking && onStopSpeaking !== undefined && (
+    <button
+      type="button"
+      className="bubble-speaking"
+      aria-label="Stop speaking"
+      title="Stop speaking"
+      onClick={onStopSpeaking}
+    >
+      <span aria-hidden="true" />
+      <span aria-hidden="true" />
+      <span aria-hidden="true" />
+    </button>
+  );
 
   /** Asks one question, with what the companion can see, and keeps the last answer above. */
   const submit = (text: string, context: ContextSnapshot | undefined): void => {
@@ -224,6 +261,8 @@ export function CompanionBubble({
           hotkeyLabel={hotkeyLabel}
           onTry={() => void tryIt()}
           {...(onDismiss !== undefined ? { onDismiss } : {})}
+          {...(onSay !== undefined ? { onSay } : {})}
+          indicator={speakingIndicator}
         />
       </Speech>
     );
@@ -330,6 +369,7 @@ export function CompanionBubble({
           <header className="bubble-head">
             <strong>{petName}</strong>
             <span className="bubble-row">
+              {speakingIndicator}
               {onCollapse !== undefined && (
                 <button type="button" className="bubble-quiet" onClick={onCollapse}>
                   Back to bubble
@@ -377,7 +417,10 @@ export function CompanionBubble({
         <style>{HANDOFF_CSS}</style>
         <div className="bubble-top">
           {chipList || <span />}
-          {closeButton}
+          <span className="bubble-row">
+            {speakingIndicator}
+            {closeButton}
+          </span>
         </div>
         {answer}
         {handoffCard}
@@ -440,11 +483,17 @@ function Intro({
   hotkeyLabel,
   onTry,
   onDismiss,
+  onSay,
+  indicator,
 }: {
   petName: string;
   hotkeyLabel: string;
   onTry: () => void;
   onDismiss?: () => void;
+  /** Each beat is said aloud once, as it appears. */
+  onSay?: (text: string) => void;
+  /** The speaking indicator, while Scout speaks. */
+  indicator?: ReactNode;
 }) {
   const beats = [
     `Hi, I’m ${petName}. I sit in the corner of your screen and keep an eye on what you’re working on, never on passwords or private windows.`,
@@ -456,6 +505,13 @@ function Intro({
   const typed = useTyped(text);
   const last = beat === beats.length - 1;
   const primary = useRef<HTMLButtonElement>(null);
+  const said = useRef(-1);
+  const say = useEffectEvent(() => {
+    if (said.current >= beat) return;
+    said.current = beat;
+    onSay?.(text);
+  });
+  useEffect(() => say(), [beat]);
   useEffect(() => {
     if (last) primary.current?.focus();
   }, [last]);
@@ -496,6 +552,7 @@ function Intro({
             Next
           </button>
         )}
+        {indicator}
       </div>
     </div>
   );
@@ -653,6 +710,21 @@ const BUBBLE_CSS = `
   color: ${t.color.textMuted}; font-size: 18px; line-height: 1; cursor: pointer;
 }
 .bubble-close:hover { background: #222845; color: ${t.color.text}; }
+.bubble-speaking {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 3px;
+  width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent;
+  cursor: pointer;
+}
+.bubble-speaking:hover { background: #222845; }
+/* The host sets --tg-voice-level (0 to 1) from the audio as it plays. */
+.bubble-speaking span {
+  width: 3px; height: 14px; border-radius: 2px; background: ${t.color.gold};
+  transform: scaleY(calc(0.3 + var(--tg-voice-level, 0.4) * 0.7)); transition: transform 90ms linear;
+}
+.bubble-speaking span:nth-child(2) { transform: scaleY(calc(0.3 + var(--tg-voice-level, 0.4))); }
+@media (prefers-reduced-motion: reduce) {
+  .bubble-speaking span, .bubble-speaking span:nth-child(2) { transform: scaleY(0.6); transition: none; }
+}
 .bubble-text { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
 .bubble-answer { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
 .bubble-error { margin: 0; padding: 8px 12px; border-radius: 6px; background: #3a1d2a; color: #ffb4c0; font-size: 13px; }

@@ -49,4 +49,9 @@ export { characterFor } from './office/sprites/characters';
 export type { PixelSpriteProps } from './office/pixel-sprite';
 
 export { SETTINGS_CSS } from './settings/settings-styles';
+
+/** Scout talks: what a bubble line sounds like, and the queue that says one at a time. */
+export { SpeechQueue } from './voice/speech-queue';
+export type { SpeechQueueOptions } from './voice/speech-queue';
+export { toSpeakable } from './voice/speakable';
 export { officeTokens } from './office/tokens';

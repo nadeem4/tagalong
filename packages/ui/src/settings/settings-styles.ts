@@ -199,6 +199,8 @@ export const SETTINGS_CSS = `
 .tg-inline label { flex: 1 1 320px; }
 .tg-actions { display: flex; flex-wrap: wrap; align-items: center; gap: ${t.space.md}px; }
 .tg-setting { display: flex; align-items: flex-start; gap: ${t.space.xxl}px; }
+.tg-panel input[type='range'] { width: 100%; min-height: ${t.size.fieldHeight}px; accent-color: ${t.color.gold}; }
+.tg-voice-pick select { flex: 1; width: auto; }
 .tg-setting__text { flex: 1; display: flex; flex-direction: column; gap: ${t.space.xs}px; }
 .tg-divider { margin: 0; height: 1px; border: 0; background: ${t.color.panelLine}; }
 .tg-kbd {

@@ -429,3 +429,55 @@ describe('GreetingLine', () => {
     expect(onAccept).toHaveBeenCalledOnce();
   });
 });
+
+describe('CompanionBubble voice', () => {
+  it('hands each finished answer to be spoken, once', async () => {
+    const bridge = createFakeHostBridge();
+    const onSay = vi.fn();
+    renderBubble(bridge, { onSay });
+    await act(async () => ask('why?'));
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'turn-1',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      });
+      bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: 'Because' });
+    });
+    expect(onSay).not.toHaveBeenCalled();
+
+    act(() => bridge.emit(done('turn-1', 'Because the database closed first.')));
+    expect(onSay).toHaveBeenCalledExactlyOnceWith('Because the database closed first.');
+  });
+
+  it('does not speak another pet’s answer', () => {
+    const bridge = createFakeHostBridge();
+    const onSay = vi.fn();
+    renderBubble(bridge, { onSay });
+    act(() => bridge.emit(done('someone-else', 'Not for this bubble.')));
+    expect(onSay).not.toHaveBeenCalled();
+  });
+
+  it('says each beat of the hello aloud, once, as it appears', () => {
+    const onSay = vi.fn();
+    renderBubble(createFakeHostBridge(), { greeting: true, onSay });
+    expect(onSay).toHaveBeenCalledOnce();
+    expect(onSay.mock.calls[0]?.[0]).toMatch(/^Hi, I’m Scout\./);
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(onSay).toHaveBeenCalledTimes(2);
+    expect(onSay.mock.calls[1]?.[0]).toMatch(/^Ask me about whatever/);
+  });
+
+  it('shows that it is speaking, and stops when asked', () => {
+    const onStopSpeaking = vi.fn();
+    renderBubble(createFakeHostBridge(), { speaking: true, onStopSpeaking });
+    fireEvent.click(screen.getByRole('button', { name: 'Stop speaking' }));
+    expect(onStopSpeaking).toHaveBeenCalledOnce();
+  });
+
+  it('shows no speaking indicator while quiet', () => {
+    renderBubble(createFakeHostBridge(), { speaking: false, onStopSpeaking: vi.fn() });
+    expect(screen.queryByRole('button', { name: 'Stop speaking' })).toBeNull();
+  });
+});

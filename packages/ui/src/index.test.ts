@@ -26,6 +26,8 @@ describe('ui package surface', () => {
         'estimateImageTokens',
         'useHostBridge',
         'officeTokens',
+        'SpeechQueue',
+        'toSpeakable',
       ].sort(),
     );
   });
