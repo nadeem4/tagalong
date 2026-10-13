@@ -16,7 +16,7 @@ Two audiences, served by the same product:
 
 - **Technical people** who live at their computer: developers and engineers reading errors,
   reviewing code, fixing builds, writing docs. They are the first to install it and will use the
-  depth (models, tools, roles).
+  depth (models, experts, settings).
 - **Non-technical people**: anyone who reads, writes and researches at a computer and wants help
   without learning a tool.
 
@@ -26,86 +26,87 @@ the way.
 
 ## Product Purpose
 
-Tagalong is a crew of AI companions that live on your screen. You highlight something, press a
-key, and a pet that already sees what you are looking at answers, remembers, and works with its
-teammates. It removes the copy, switch app, paste, ask, switch back loop: the companion on screen sees what you
-are doing, writes a brief, and hands it to the right expert (Claude Code first, then model APIs and
-tool servers you set up yourself), then brings the answer back. The companion never does the work.
+Tagalong puts **Scout**, one AI companion, on your screen. Scout sees what you are working on,
+answers, and when something needs real work it writes a brief and hands it to the right
+**expert** (Claude Code first; other AI tools later), then brings the answer back. It removes the
+copy, switch app, paste, ask, switch back loop. Scout never does the expert's work itself, and
+never hands anything over without you pressing Send.
 
 Success: people keep it running all day, ask it things they would otherwise not bother to ask, and
 trust it with their screen.
 
 ## Positioning
 
-Not a chat window you go to: a team that sits with you. Each pet is a colleague with one role, a
-desk, and its own memory, in a small simulated office. Pets meet in meeting rooms to work things
-out and go back to their desks to do the work, and you can watch it happen, join a meeting, or
-just take the final answer. It sees your screen locally when you ask, otherwise keeps an eye on
-window titles only and speaks up rarely, and never takes over your mouse or keyboard.
+Not a chat window you go to: a companion that sits with you. Scout keeps an eye on window titles,
+reads or photographs a window only when it matters, speaks up rarely, and never takes over your
+mouse or keyboard. Experts do the heavy lifting in the background; Home shows every hand-off and
+its result.
 
 ## Operating Context
 
-- Runs all day in the background: tray icon, pets docked on the desktop, a chat panel that opens
-  beside the pet on a hotkey and hides on Escape.
+- Runs all day in the background: tray icon, Scout docked on the desktop, a bubble that opens
+  beside it on a hotkey and hides on Escape.
 - Hotkeys: `Ctrl+Shift+Space` ask (brings the selected text and the window you are on),
-  `Ctrl+Shift+Alt+P` pause sight, `Ctrl+Shift+Alt+M` stop speaking. Scout takes screenshots and
-  reads other windows itself.
-- Scout talks: the person may not be looking at the screen, so Scout says its bubble lines aloud
-  (answers, the hello, a watch that fires, an expert that finished), in a calm, refined, dry
-  British voice. Only the first sentence or two; code, lists and long text stay in the bubble.
-- Home, the control centre: every agent, what it is doing, every handoff, consult and meeting, and
-  each agent's role, model, tools and notes. Its centre scene is a theme (the Office first); the
-  controls never move between themes.
-- Settings and first-run configure providers, keys and app-wide behaviour. Settings leads with how
-  Scout thinks (its real brain and whether the Claude sign-in works), then privacy, voice, shortcuts
-  and the browser extension; the tuning knobs (summaries, API keys, the ElevenLabs voice, sight
-  detail, watches) sit under
-  Advanced, closed by default, with a short line visible and the longer story behind ⓘ.
-- The Chrome extension shows the same crew in Chrome's side panel.
+  `Ctrl+Shift+Alt+P` pause sight, `Ctrl+Shift+Alt+M` stop speaking.
+- "What do you see?" is answered per screen from the window list, without a screenshot. Scout
+  reads one window, or photographs it, only when you ask about it.
+- Keep an eye on things: every few seconds Scout looks at window titles only. After you settle on
+  something new, or a title looks like an error, it may read that window and say one short line,
+  at most once every 10 minutes, never during calls or full screen.
+- Scout talks: you may not be looking at the screen, so Scout says its bubble lines aloud
+  (answers, the hello, a remark, an expert that finished), in a calm, refined, dry British voice.
+  Only the first sentence or two; code, lists and long text stay in the bubble.
+- Home, the control centre: Overview, Scout (how it thinks), Experts, Activity (every hand-off and
+  its thread), Settings.
+- Settings leads with how Scout thinks (its real brain and whether the Claude sign-in works), then
+  privacy, voice, shortcuts and the browser extension; the tuning knobs (summaries, API keys, the
+  ElevenLabs voice, sight detail, watches) sit under Advanced, closed by default, with a short line
+  visible and the longer story behind ⓘ.
+- The Chrome extension hands Scout the page and selection from Chrome's side panel.
 
 ## Capabilities and Constraints
 
-- Pets have exactly one role each (Generalist, Backend engineer, Frontend engineer, Writer,
-  Researcher at launch). Users rename pets and choose their look.
-- Each pet picks its own provider and model (OpenRouter, Nebius Token Factory, Anthropic); the user
-  brings their own API keys.
+- Scout thinks with the Claude sign-in when available, or an API key for Anthropic, OpenRouter or
+  Nebius Token Factory. A cheaper model can be set for summaries, greetings and remarks.
+- Experts are added from Home; Claude Code is the first kind. Each task asks which project to work
+  in, guessed from the screen.
+- Built-in blind spots (password managers, sign-in prompts, secret files, private windows,
+  authenticator apps, remote desktop) are never seen, titles included; your own exclusions add to
+  them.
 - Everything is stored locally. Screenshots are not kept by default.
 - Scout introduces itself once, in three handwritten beats after Welcome. Each later launch it says
   one short line (time of day, time away, a finished hand-off) and fades; it reads no screen for
   this, and Settings turns it off.
 - Speech runs on the computer (Kokoro, downloaded on first use); ElevenLabs is an optional
   bring-your-own-key voice that receives only the words spoken.
-- Not built yet: voice input (push to talk), MCP tools (Hands), meetings and the office window,
-  cost dashboard, macOS and Linux. Designs for those are agreed but unbuilt.
-- Undecided: whether users can configure the pets' personality and tone beyond the default voice.
+- Not built yet: voice input (push to talk), connecting apps (Notion, GitHub, calendar) over MCP,
+  routines, expert templates, cost dashboard, macOS and Linux. The roadmap lives in Notion.
 
 ## Brand Commitments
 
-- Name: **Tagalong**.
-- Voice: **warm and playful**. Companions with personality, friendly and a little fun, never
+- Name: **Tagalong**. The companion: **Scout** (a default the user can rename).
+- Voice: **warm and playful**. A companion with personality, friendly and a little fun, never
   childish. Anything about privacy, keys, cost or errors stays plain and exact.
-- Look: a **pixel-art game feel** for the pets and the office. No logo, colours or fonts are fixed
-  yet; the current mockups are placeholders.
-- Default crew names (Scout, Ink, Bolt) are defaults, not commitments.
+- Look: a **pixel-art feel** for Scout's figure. No logo, colours or fonts are fixed yet.
 
 ## Evidence on Hand
 
-- Working Windows build with the crew, sight, awareness, Chrome extension and setup wizard.
+- Working Windows build with Scout, sight, keep an eye, voice, experts (Claude Code), Home and the
+  Chrome extension.
 - No users, testimonials, metrics or press yet. Do not invent any.
 
 ## Product Principles
 
-1. **Present, never intrusive.** Always one key away, never in the way; nothing is read until you
-   ask.
+1. **Present, never intrusive.** Always one key away, never in the way; it speaks up rarely and
+   never takes over your mouse or keyboard.
 2. **Plain by default, deep on request.** The first layer is for anyone; detail is one step in.
-3. **Show the work.** Every capture, consultation and meeting is visible, and the full story is
-   always one click from the answer.
-4. **A team, not a tool.** Pets are colleagues with roles, desks and memory; the office makes
-   their work legible.
+3. **Ask before acting.** Nothing is handed to an expert, written or sent without your OK.
+4. **Show the work.** Every hand-off and its result is visible in Activity, one click from the
+   answer.
 5. **Your machine, your keys, your data.** Local first, honest about cost and what leaves the
-   computer.
+   computer; blind spots are never seen.
 
 ## Accessibility & Inclusion
 
-Keyboard-first throughout. Animation in the office must respect reduced-motion. Status must never
-rely on colour alone.
+Keyboard-first throughout. Animation must respect reduced-motion. Status must never rely on colour
+alone. Spoken lines always appear in the bubble too.

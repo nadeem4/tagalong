@@ -1,6 +1,6 @@
 ---
 name: Tagalong
-description: A 16-bit crew of AI companions at work in a modern pixel-art office.
+description: Scout, a pixel-art AI companion on your screen, with Home as its calm control centre.
 colors:
   shell-navy: '#12162B'
   shell-text: '#E9ECF5'
