@@ -55,7 +55,16 @@ export async function startEngineHost(options: StartEngineHostOptions): Promise<
     token: engine.pairingToken,
     hostVersion: app.getVersion(),
     capabilities: DESKTOP_CAPABILITIES,
-    readText: (params) => options.platform.readWindowText(params, options.captureExclusions()),
+    readText: async (params) => {
+      const reading = await options.platform.readWindowText(params, options.captureExclusions());
+      // Read from a picture means a picture was taken: announced like any screenshot.
+      if (reading.source === 'ocr') {
+        options.onCapture(
+          captureNotice({ at: new Date(), screenshot: true, blocked: null, paused: false }),
+        );
+      }
+      return reading;
+    },
     listWindows: async () => ({
       windows: (await options.platform.listWindows(options.captureExclusions())).windows,
     }),

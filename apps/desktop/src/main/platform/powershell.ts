@@ -49,6 +49,10 @@ export function spawnPowerShell(encoded: string): HelperChild {
  * transport test drives. Never rejects: `runWindowHelper` turns a missing interpreter, a
  * policy block or an overrun into the output collected so far.
  */
-export function runPowerShellScript(script: string, timeoutMs: number): Promise<string> {
-  return runWindowHelper(spawnPowerShell, script, timeoutMs);
+export function runPowerShellScript(
+  script: string,
+  timeoutMs: number,
+  input?: string,
+): Promise<string> {
+  return runWindowHelper(spawnPowerShell, script, timeoutMs, input);
 }

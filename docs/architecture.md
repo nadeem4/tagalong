@@ -90,7 +90,11 @@ Hosts implement two contracts.
 - Phase 2B adds three more core-to-host methods and two capabilities behind them. `perception.listWindows`
   returns the window inventory — what each window is and where, never what is in it. `perception.readText`
   returns the text of **exactly one** window, named by id or defaulting to the foreground one, capped and
-  flagged when truncated. `perception.captureRegion` returns a native-resolution crop of one display.
+  flagged when truncated. When the text layer gives fewer than `THIN_TEXT_CHARS` and the window is not
+  minimized, the desktop reads it from a picture instead (`source: 'ocr'`): `readWindowTextWith` takes a
+  `readPicture` port, which captures the window by handle and passes the PNG on stdin to Windows' own
+  recogniser (`OCR_SCRIPT` in `platform/ocr.ts`, through `runPowerShellScript`), so nothing is written to
+  disk. The host announces that read as a screenshot. `perception.captureRegion` returns a native-resolution crop of one display.
   `perception.captureWindow` returns a screenshot of one listed window, in front or behind others; a
   minimized window or a blind spot comes back without an image and with notes saying why. A host that
   can do the first, third and fourth advertises `displays`; one that can do the second advertises

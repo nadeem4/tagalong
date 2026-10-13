@@ -1,4 +1,4 @@
-import { textLayerNotes } from '@tagalong/core';
+import { THIN_TEXT_CHARS, textLayerNotes } from '@tagalong/core';
 import type { WindowEntry } from '@tagalong/protocol';
 
 import type { TextLayerProvider } from './text-layer';
@@ -18,6 +18,11 @@ export interface ReadWindowTextDeps {
   textLayer: TextLayerProvider;
   /** The inventory, already classified against the exclusion list. */
   listWindows: () => Promise<readonly WindowEntry[]>;
+  /**
+   * The text in a picture of the window, for apps that draw their own text (terminals,
+   * editors) and publish little to the text layer. Absent where there is no recogniser.
+   */
+  readPicture?: (handle: number) => Promise<string>;
 }
 
 export interface ReadWindowTextParams {
@@ -108,6 +113,30 @@ export async function readWindowTextWith(
       }. This says nothing about what is in the window — do not describe it as empty. Trying ` +
         `again may work.`,
     ]);
+  }
+
+  // Thin text from a window that is on screen: read what it shows instead. Terminals and
+  // editors draw their own text, so the picture often holds far more than the text layer.
+  if (
+    deps.readPicture !== undefined &&
+    reading.text.length < THIN_TEXT_CHARS &&
+    target.state !== 'minimized'
+  ) {
+    const seen = (await deps.readPicture(handle).catch(() => '')).trim();
+    if (seen.length > reading.text.length) {
+      const truncated = seen.length > params.maxChars;
+      return {
+        windowId: target.id,
+        text: seen.slice(0, params.maxChars),
+        truncated,
+        source: 'ocr',
+        notes: [
+          'Read from a picture of the window, because it publishes little text otherwise. It ' +
+            'covers only what the window shows on screen, and words may be misread.',
+          ...(truncated ? ['This is the beginning of what was read, not all of it.'] : []),
+        ],
+      };
+    }
   }
 
   const notes = textLayerNotes({

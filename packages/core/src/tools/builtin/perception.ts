@@ -176,10 +176,11 @@ const READ_WINDOW_TEXT_DEFINITION: BrainTool = {
     'Read the text of one window, named by its id. Works on a window behind another ' +
     `and on a minimized one. Call ${LIST_WINDOWS} first and name the single window you ` +
     'need; there is no way to read them all at once, and asking for the wrong one ' +
-    'costs the user tokens for nothing. Some applications — editors, terminals, ' +
-    'drawing tools — draw their own text and publish almost none of it, so a short ' +
-    'result may mean you could not read inside the window rather than that it is ' +
-    'empty. The result says so when that happens; repeat it rather than guessing.',
+    'costs the user tokens for nothing. Editors and terminals draw their own text, so ' +
+    'for those the text is read from a picture of the window instead: it covers only ' +
+    'what is on screen and words may be misread. A short result may mean you could not ' +
+    'read inside the window rather than that it is empty. The result says so when that ' +
+    'happens; repeat it rather than guessing.',
   inputSchema: {
     type: 'object',
     properties: {
