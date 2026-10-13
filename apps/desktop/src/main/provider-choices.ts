@@ -30,7 +30,7 @@ export function providerChoices(stored: ReadonlySet<string>): ProviderChoice[] {
     // First, because it needs nothing: it thinks through the person's own Claude Code sign-in.
     {
       id: 'claude-code',
-      label: 'Claude Code (your sign-in, no key)',
+      label: 'Your Claude sign-in',
       needsKey: false,
       hasKey: false,
     },

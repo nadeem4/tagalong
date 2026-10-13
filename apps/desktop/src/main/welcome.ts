@@ -69,9 +69,19 @@ export function welcomeCrew(
 ): { scout: Pet; hiddenPets: string[] } {
   const current = pets.find((pet) => pet.id === defaultPetId);
   if (current === undefined) throw new Error(`The crew has no ${defaultPetId} to welcome.`);
+  const scout = companionOn(current, providerId, companion);
+  return { scout, hiddenPets: pets.filter((pet) => pet.id !== defaultPetId).map((pet) => pet.id) };
+}
+
+/**
+ * The pet as the Companion thinking on `providerId`, on the model its role's tier recommends
+ * there. Vision and watch models are dropped: they named the old provider's models. Used by
+ * Welcome and by Settings when a key is saved because no Claude sign-in was found.
+ */
+export function companionOn(current: Pet, providerId: string, companion: Role): Pet {
   const recommended = recommendedModel(companion, providerId);
   const { visionModel: _vision, watchModel: _watch, ...rest } = current;
-  const scout = Pet.parse({
+  return Pet.parse({
     ...rest,
     roleId: companion.id,
     roleVersion: companion.version,
@@ -79,7 +89,6 @@ export function welcomeCrew(
     model: recommended?.model ?? current.model,
     ...(recommended?.visionModel === undefined ? {} : { visionModel: recommended.visionModel }),
   });
-  return { scout, hiddenPets: pets.filter((pet) => pet.id !== defaultPetId).map((pet) => pet.id) };
 }
 
 /**

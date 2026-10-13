@@ -31,7 +31,8 @@ import { captureAskSnapshot, capturePatch } from './context';
 import { startEngineHost } from './engine-host';
 import { extensionFolder, isAllowedLink } from './links';
 import { providerChoices, secretKeyFor } from './provider-choices';
-import { findAgents, shouldOpenWelcome, welcomeCrew, welcomeExperts } from './welcome';
+import { checkClaudeSignIn } from './claude-sign-in';
+import { companionOn, findAgents, shouldOpenWelcome, welcomeCrew, welcomeExperts } from './welcome';
 import type { EngineHost } from './engine-host';
 import { DEFAULT_PAUSE_SIGHT_HOTKEY, HotkeyManager, describeHotkeyProblems } from './hotkeys';
 import { createPlatform } from './platform/index';
@@ -789,6 +790,23 @@ function registerIpc(): void {
   ipcMain.handle(IPC.openOffice, () => openOffice());
 
   ipcMain.handle(IPC.findAgents, () => findAgents());
+  ipcMain.handle(IPC.checkClaudeSignIn, () => checkClaudeSignIn());
+
+  // Settings' "no sign-in found": the key is stored first, then Scout moves to that service.
+  ipcMain.handle(IPC.switchScout, async (_event, providerId: string): Promise<Pet> => {
+    const client = engine().client;
+    const companion = getRole('companion');
+    if (companion === undefined) throw new Error('The role library has no Companion.');
+    const { pets } = await client.call('pets.list', {});
+    const { defaultPetId } = required().settings;
+    const current = pets.find((pet) => pet.id === defaultPetId);
+    if (current === undefined) throw new Error(`There is no ${defaultPetId} to switch.`);
+    const saved = (
+      await client.call('pets.upsert', { pet: companionOn(current, providerId, companion) })
+    ).pet;
+    refreshStrip();
+    return saved;
+  });
 
   // Scout becomes the Companion on the chosen brain and docks alone; the others are hidden,
   // not deleted. Then Welcome closes and Scout says hello in its bubble, without taking focus.

@@ -39,7 +39,7 @@ describe('providerChoices', () => {
     const claude = providerChoices(new Set()).find((c) => c.id === 'claude-code');
     expect(claude).toEqual({
       id: 'claude-code',
-      label: 'Claude Code (your sign-in, no key)',
+      label: 'Your Claude sign-in',
       needsKey: false,
       hasKey: false,
     });
