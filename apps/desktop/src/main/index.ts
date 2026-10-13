@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   BrowserWindow,
   Menu,
@@ -31,7 +32,11 @@ import { captureAskSnapshot, capturePatch } from './context';
 import { startEngineHost } from './engine-host';
 import { keepAnEyeAllowed, startKeepAnEye } from './keep-an-eye';
 import { extensionFolder, isAllowedLink } from './links';
-import { providerChoices, secretKeyFor } from './provider-choices';
+import { ELEVENLABS_SECRET_KEY, providerChoices, secretKeyFor } from './provider-choices';
+import { elevenLabsTts } from './voice/elevenlabs';
+import { loadKokoro } from './voice/kokoro';
+import { LazyLocalVoice, createVoiceService } from './voice/voice';
+import type { VoiceService } from './voice/voice';
 import { checkClaudeSignIn } from './claude-sign-in';
 import {
   companionOn,
@@ -42,7 +47,12 @@ import {
   welcomeExperts,
 } from './welcome';
 import type { EngineHost } from './engine-host';
-import { DEFAULT_PAUSE_SIGHT_HOTKEY, HotkeyManager, describeHotkeyProblems } from './hotkeys';
+import {
+  DEFAULT_PAUSE_SIGHT_HOTKEY,
+  DEFAULT_STOP_VOICE_HOTKEY,
+  HotkeyManager,
+  describeHotkeyProblems,
+} from './hotkeys';
 import { createPlatform } from './platform/index';
 import { gateSight } from './platform/sight-gate';
 import { SightPause } from './sight-pause';
@@ -64,7 +74,7 @@ import { createOfficeWindow } from './windows/office';
 import { createOnboardingWindow } from './windows/onboarding';
 import { createSettingsWindow } from './windows/settings';
 import { IPC } from '../shared/ipc';
-import type { CaptureNotice, HostView, ModelList } from '../shared/ipc';
+import type { CaptureNotice, HostView, ModelList, SpeakPreview } from '../shared/ipc';
 import type { ConfirmHandoff } from '@tagalong/ui';
 
 /** Everything the app owns once it is up. Assembled in `start`, torn down on quit. */
@@ -99,6 +109,8 @@ interface Desktop {
   rolling: RollingMemory;
   /** Phase 3B: answers perception.recall and perception.diff. */
   perceptionMemory: PerceptionMemory;
+  /** Turns Scout's lines into audio for the panel to play. */
+  voice: VoiceService;
 }
 
 let desktop: Desktop | null = null;
@@ -207,11 +219,20 @@ async function start(): Promise<void> {
     hotkeys: new HotkeyManager({
       onAsk: () => void openPanelWithContext(),
       onPauseSight: () => toggleSightPause(),
+      onStopVoice: () => stopVoice(),
     }),
     hotkeyError: null,
     sightPause,
     rolling,
     perceptionMemory,
+    voice: createVoiceService({
+      env: process.env,
+      settings: () => (desktop?.settings ?? settings).voice,
+      elevenLabsKey: () => secrets.get(ELEVENLABS_SECRET_KEY).catch(() => null),
+      // The model downloads into the data dir on first use, never at start.
+      local: new LazyLocalVoice(() => loadKokoro(join(dataDir, 'voice'))),
+      elevenLabs: (apiKey, voiceId) => elevenLabsTts(apiKey, voiceId),
+    }),
   };
 
   rolling.configure(settings.rollingMemory);
@@ -298,7 +319,8 @@ function showRemark(params: unknown): void {
   if (panel == null || avatar == null || !avatar.isVisible() || panel.isVisible()) return;
   panel.webContents.send(IPC.remarkEvent, params);
   showPanelQuietly(panel, avatar);
-  // Voice: when spoken replies land, the remark's text is spoken here like any bubble line.
+  // The panel says the remark aloud like any bubble line: shortened, one at a time, and
+  // silent when Scout talks is off. Speech lives in the panel, which owns the queue and stop.
 }
 
 /**
@@ -345,6 +367,7 @@ function applyHotkeys(settings: Settings): string | null {
   const outcomes = desktop.hotkeys.apply({
     ask: settings.hotkeys.ask,
     pauseSight: settings.hotkeys.pauseSight ?? DEFAULT_PAUSE_SIGHT_HOTKEY,
+    stopVoice: settings.hotkeys.stopVoice ?? DEFAULT_STOP_VOICE_HOTKEY,
   });
 
   desktop.hotkeyError = describeHotkeyProblems(outcomes);
@@ -357,6 +380,13 @@ function applyHotkeys(settings: Settings): string | null {
     if (!window.isDestroyed()) window.webContents.send(IPC.hotkeyProblemEvent, desktop.hotkeyError);
   }
   return desktop.hotkeyError;
+}
+
+/** The stop key: every window that is speaking stops at once and drops what it had queued. */
+function stopVoice(): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send(IPC.stopVoiceEvent);
+  }
 }
 
 /** Re-renders the crew strip after the crew or its visibility changed in Settings. */
@@ -395,8 +425,7 @@ function forwardToRenderers(notification: { method: string; params: unknown }): 
 /**
  * A watch fired: say so where the user will see it. The panel gets the message as a card
  * through the ordinary event forward; this adds a system toast and brings the panel up
- * beside the avatar. Not spoken — Phase 3 (Voice) is not built, and speaking it is
- * deferred there.
+ * beside the avatar. The panel says the message aloud when Scout talks is on.
  */
 function announceWatch(params: unknown): void {
   const { message } = (params ?? {}) as { message?: string };
@@ -780,7 +809,9 @@ function registerIpc(): void {
       current.host === null ? [] : (await current.host.client.call('pets.list', {})).pets;
     const problem = current.hotkeyError ?? current.bootError;
     const folder = localExtensionFolder();
+    const elevenLabsKey = await current.secrets.get(ELEVENLABS_SECRET_KEY).catch(() => null);
     return {
+      elevenLabsKeyStored: elevenLabsKey !== null && elevenLabsKey.length > 0,
       settings,
       pets,
       providers: providerChoices(stored),
@@ -819,6 +850,11 @@ function registerIpc(): void {
     if (apiKey.length === 0) await secrets.delete(secretKey);
     else await secrets.set(secretKey, apiKey);
   });
+
+  // Only the line itself reaches a speech engine: never the screen or the conversation.
+  ipcMain.handle(IPC.speak, (_event, text: string, preview?: SpeakPreview) =>
+    required().voice.speak(String(text), preview),
+  );
 
   ipcMain.handle(IPC.savePet, async (_event, pet: Pet): Promise<Pet> => {
     const saved = (await engine().client.call('pets.upsert', { pet })).pet;

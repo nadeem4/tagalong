@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { providerChoices } from './provider-choices';
+import { ELEVENLABS_SECRET_KEY, providerChoices, secretKeyFor } from './provider-choices';
 
 describe('providerChoices', () => {
   it('offers the Claude Code sign-in first, then the presets, Anthropic and the fake', () => {
@@ -53,5 +53,17 @@ describe('providerChoices', () => {
       needsKey: false,
       hasKey: false,
     });
+  });
+});
+
+describe('secretKeyFor', () => {
+  it('stores the ElevenLabs key like any other, though it is not a brain', () => {
+    expect(secretKeyFor('elevenlabs')).toBe(ELEVENLABS_SECRET_KEY);
+    expect(ELEVENLABS_SECRET_KEY).toBe('elevenlabs.apiKey');
+    expect(providerChoices(new Set()).some((choice) => choice.id === 'elevenlabs')).toBe(false);
+  });
+
+  it('refuses a provider that takes no key', () => {
+    expect(secretKeyFor('fake')).toBeUndefined();
   });
 });

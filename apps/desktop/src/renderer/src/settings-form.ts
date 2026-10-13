@@ -1,6 +1,8 @@
 import {
   MAX_ROLLING_MEMORY_MINUTES,
+  MAX_VOICE_SPEED,
   MAX_WINDOW_TEXT_CHARS,
+  MIN_VOICE_SPEED,
   SettingsPatch,
 } from '@tagalong/protocol';
 import type { SettingsPatch as SettingsPatchType } from '@tagalong/protocol';
@@ -18,6 +20,7 @@ export interface SettingsFormValues {
   baseUrls: readonly { providerId: string; label: string; value: string }[];
   askHotkey: string;
   pauseSightHotkey: string;
+  stopVoiceHotkey: string;
   sightDetail: string;
   windowTextBudget: string;
   /** Phase 4. The pets unticked under "Show on desktop". Absent leaves the setting alone. */
@@ -34,6 +37,11 @@ export interface SettingsFormValues {
   watchMaxChecks?: string;
   watchMaxConcurrent?: string;
   watchTimeoutMinutes?: string;
+  /** Voice. Present together when the form shows the Voice section. */
+  voiceEnabled?: boolean;
+  voice?: string;
+  voiceSpeed?: string;
+  elevenLabsVoiceId?: string;
 }
 
 /**
@@ -59,6 +67,7 @@ const ADVANCED_FIELDS = new Set([
   'watchMaxChecks',
   'watchMaxConcurrent',
   'watchTimeoutMinutes',
+  'elevenLabsVoiceId',
 ]);
 
 export function isAdvancedField(field: string): boolean {
@@ -83,7 +92,18 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
     hotkeys: {
       ask: values.askHotkey.trim(),
       pauseSight: values.pauseSightHotkey.trim(),
+      stopVoice: values.stopVoiceHotkey.trim(),
     },
+    ...(values.voice !== undefined
+      ? {
+          voice: {
+            enabled: values.voiceEnabled === true,
+            voice: values.voice,
+            speed: parseSpeed(values.voiceSpeed ?? ''),
+            elevenLabsVoiceId: (values.elevenLabsVoiceId ?? '').trim(),
+          },
+        }
+      : {}),
     sightDetail: values.sightDetail,
     windowTextBudget: parseBudget(values.windowTextBudget),
     ...(values.hiddenPets !== undefined ? { hiddenPets: [...values.hiddenPets] } : {}),
@@ -132,6 +152,23 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
         }
       : {}),
   });
+}
+
+/** The speaking speed, within what still sounds like speech. */
+function parseSpeed(raw: string): number {
+  const speed = Number(raw.trim());
+  if (
+    raw.trim() === '' ||
+    !Number.isFinite(speed) ||
+    speed < MIN_VOICE_SPEED ||
+    speed > MAX_VOICE_SPEED
+  ) {
+    throw new SettingsFieldError(
+      'voiceSpeed',
+      `Speaking speed must be between ${MIN_VOICE_SPEED} and ${MAX_VOICE_SPEED}.`,
+    );
+  }
+  return speed;
 }
 
 /** A whole number in bounds, or the sentence the person needs to fix it. */

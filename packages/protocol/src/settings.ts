@@ -33,6 +33,7 @@ export const SETTINGS_DEFAULTS = {
   hotkeys: {
     ask: 'CommandOrControl+Shift+Space',
     pauseSight: 'CommandOrControl+Shift+Alt+P',
+    stopVoice: 'CommandOrControl+Shift+Alt+M',
   },
   avatar: { x: null, y: null },
   /**
@@ -112,7 +113,22 @@ export const SETTINGS_DEFAULTS = {
    * tracking at all.
    */
   keepAnEye: true,
+  /**
+   * Scout reads its bubble aloud, because the person may not be looking at the screen.
+   * On by default, in a calm British voice slightly slower than normal. The ElevenLabs
+   * voice id is empty until the person picks one from their own library: with a key and
+   * an id, ElevenLabs speaks instead of the local voice.
+   */
+  voice: { enabled: true, voice: 'bm_george', speed: 0.95, elevenLabsVoiceId: '' },
 } as const;
+
+/** The local voices Scout can speak in: two British male voices of the Kokoro model. */
+export const VOICE_IDS = ['bm_george', 'bm_fable'] as const;
+export type VoiceId = (typeof VOICE_IDS)[number];
+
+/** Bounds on the speaking speed. Outside them speech stops sounding like speech. */
+export const MIN_VOICE_SPEED = 0.7;
+export const MAX_VOICE_SPEED = 1.3;
 
 /** A non-blank, trimmed entry. A blank one would match every window and blind the pet. */
 const exclusionEntry = z.string().trim().min(1);
@@ -214,6 +230,8 @@ const settingsFields = {
      * blind the pet.
      */
     pauseSight: z.string().min(1).optional(),
+    /** Stops Scout speaking at once. Optional for the same reasons as `pauseSight`. */
+    stopVoice: z.string().min(1).optional(),
   }),
   /** Remembered avatar position; null means "dock to the default edge". */
   avatar: z.object({ x: z.number().nullable(), y: z.number().nullable() }),
@@ -268,6 +286,14 @@ const settingsFields = {
   lastOpenedAt: z.iso.datetime().nullable(),
   /** Whether Scout follows window titles and now and then says one useful line. */
   keepAnEye: z.boolean(),
+  /** Whether Scout speaks its bubble, in which voice and how fast. */
+  voice: z.object({
+    enabled: z.boolean(),
+    voice: z.enum(VOICE_IDS),
+    speed: z.number().min(MIN_VOICE_SPEED).max(MAX_VOICE_SPEED),
+    /** A voice from the person's ElevenLabs library. Empty: ElevenLabs is not used. */
+    elevenLabsVoiceId: z.string().trim(),
+  }),
 };
 
 export const Settings = z.object({
@@ -300,6 +326,7 @@ export const Settings = z.object({
   greeting: settingsFields.greeting.default(SETTINGS_DEFAULTS.greeting),
   lastOpenedAt: settingsFields.lastOpenedAt.default(SETTINGS_DEFAULTS.lastOpenedAt),
   keepAnEye: settingsFields.keepAnEye.default(SETTINGS_DEFAULTS.keepAnEye),
+  voice: settingsFields.voice.prefault({ ...SETTINGS_DEFAULTS.voice }),
 });
 export type Settings = z.infer<typeof Settings>;
 

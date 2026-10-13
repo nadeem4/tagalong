@@ -41,7 +41,10 @@
       "better-sqlite3",
       "electron-winstaller",
       "esbuild",
-      "get-windows"
+      "get-windows",
+      "onnxruntime-node",
+      "protobufjs",
+      "sharp"
     ]
   }
 }

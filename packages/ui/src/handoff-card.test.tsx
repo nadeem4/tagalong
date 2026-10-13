@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ProjectCandidate } from '@tagalong/protocol';
 import { CompanionBubble } from './companion-bubble';
 import { HostBridgeProvider } from './host-bridge';
@@ -176,5 +176,29 @@ describe('the hand-off card', () => {
       }),
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Claude Code is not signed in.');
+  });
+
+  it('announces aloud that the expert finished, with its answer', async () => {
+    const bridge = createFakeHostBridge();
+    const onSay = vi.fn();
+    render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" onSay={onSay} />
+      </HostBridgeProvider>,
+    );
+    propose(bridge);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Send' })));
+    act(() =>
+      bridge.emit({
+        type: 'handoff.finished',
+        handoffId: 'handoff-1',
+        expertId: 'claude-code',
+        state: 'done',
+        text: 'The engine closes the database first.',
+      }),
+    );
+    expect(onSay).toHaveBeenCalledExactlyOnceWith(
+      'Claude Code has finished. The engine closes the database first.',
+    );
   });
 });

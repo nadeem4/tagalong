@@ -74,13 +74,13 @@ tagalong/
       src/content/page-reader.ts    # injected on demand: selection, URL, title, page text
 ```
 
-| Package             | Responsibility                                                                                                                                                                                                    |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol` | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC, plus the method catalog. Depends only on zod.                                                                                          |
-| `packages/core`     | The Tagalong Engine: pets, conversation runner, prompt assembly, SQLite memory, host protocol server, pairing, provider adapters. Pure Node. Voice, the inter-pet bus, and the MCP client arrive in later phases. |
-| `packages/ui`       | React components shared by hosts: `PetAvatar`, `MessageList`, `Composer`, `SightBar`, `ChatPanel`, Home's `HomeView` (with its themes), and the `HostBridge` context.                                             |
-| `apps/desktop`      | Electron host. Runs the engine in the main process, dials it over the loopback socket, and owns the avatar, panel, settings window, tray, hotkey, and secret storage.                                             |
-| `apps/extension`    | Chrome MV3 host. Connects to the running engine and speaks the protocol only. Side panel, pairing page, on-demand page reader, and the open-panel shortcut.                                                       |
+| Package             | Responsibility                                                                                                                                                                                                             |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/protocol` | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC, plus the method catalog. Depends only on zod.                                                                                                   |
+| `packages/core`     | The Tagalong Engine: pets, conversation runner, prompt assembly, SQLite memory, host protocol server, pairing, provider adapters. Pure Node. Speech to text, the inter-pet bus, and the MCP client arrive in later phases. |
+| `packages/ui`       | React components shared by hosts: `PetAvatar`, `MessageList`, `Composer`, `SightBar`, `ChatPanel`, Home's `HomeView` (with its themes), and the `HostBridge` context.                                                      |
+| `apps/desktop`      | Electron host. Runs the engine in the main process, dials it over the loopback socket, and owns the avatar, panel, settings window, tray, hotkey, secret storage and Scout's voice.                                        |
+| `apps/extension`    | Chrome MV3 host. Connects to the running engine and speaks the protocol only. Side panel, pairing page, on-demand page reader, and the open-panel shortcut.                                                                |
 
 ## How to run
 
@@ -320,8 +320,8 @@ watches**. Both take effect on save.
   screen on this machine every five seconds and asks a model nothing until the watched region has
   changed and then held still; then one small, cheap model answers yes or no. On yes the panel shows
   the result as a card from the pet, a system notification pops up, and the pet's avatar shows an
-  alert. A **Watching** chip in the panel counts the checks spent and has a **Stop** button. Watches are
-  shown, not spoken, until Phase 3 (Voice) lands.
+  alert. A **Watching** chip in the panel counts the checks spent and has a **Stop** button. While
+  **Scout talks** is on, the panel also says the watch's message aloud.
 
 The check model is configurable per pet (Settings → the pet → **Watch check model**). Blank uses the
 pet's provider's default, chosen to be small and cheap because a watch may ask it many times:
@@ -448,18 +448,20 @@ public privacy policy is [docs/chrome-web-store/privacy-policy.md](chrome-web-st
 Nothing reads `.env.local` today: there is no dotenv dependency, and no code in `packages/` or `apps/`
 opens a `.env` file. Copying it therefore changes nothing at runtime.
 
-Two environment variables are read today, both straight from `process.env`: `TAGALONG_FAKE_PROVIDERS`
-in `packages/core/src/providers/registry.ts`, and `TAGALONG_SKIP_ONBOARDING` in
-`apps/desktop/src/main/onboarding.ts`. **Set them in the shell you launch from**, as shown above.
+Three environment variables are read today, all straight from `process.env`:
+`TAGALONG_FAKE_PROVIDERS` in `packages/core/src/providers/registry.ts`, `TAGALONG_SKIP_ONBOARDING`
+in `apps/desktop/src/main/welcome.ts`, and `TAGALONG_FAKE_TTS` in
+`apps/desktop/src/main/voice/voice.ts`. **Set them in the shell you launch from**, as shown above.
 
 | Variable                     | Status today                                                                                                                                            |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TAGALONG_FAKE_PROVIDERS=1`  | **Read.** Forces the fake brain provider, for tests and demos. No keys or network needed. Must be set in the shell environment.                         |
 | `TAGALONG_SKIP_ONBOARDING=1` | **Read.** Keeps Welcome shut. The Electron smoke tests set it.                                                                                          |
+| `TAGALONG_FAKE_TTS=1`        | **Read.** Scout's voice becomes a short silent clip: no model download, no ElevenLabs call, no sound. Every Electron suite sets it.                     |
 | `ANTHROPIC_API_KEY`          | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment. |
 | `OPENROUTER_API_KEY`         | **Not read.** The key for the `openrouter` provider, entered in Settings and stored like the Anthropic key.                                             |
 | `NEBIUS_API_KEY`             | **Not read.** The key for the `nebius` provider (Token Factory), entered in Settings and stored like the Anthropic key.                                 |
-| `ELEVENLABS_API_KEY`         | **Not used yet.** Text to speech through the ElevenLabs TtsProvider, from Phase 3.                                                                      |
+| `ELEVENLABS_API_KEY`         | **Not read.** The optional ElevenLabs voice's key is entered in Settings → Advanced and stored like the others (`elevenlabs.apiKey`).                   |
 | `OPENAI_API_KEY`             | **Not used yet.** Whisper speech to text only, from Phase 3.                                                                                            |
 
 Secrets never enter git. In the app they live in the OS keychain through Electron `safeStorage`, written
@@ -494,8 +496,11 @@ than one planned implementation.
   is planned after Phase 5. Another OpenAI-format service needs no code — see
   [Choosing a pet's brain](#choosing-a-pets-brain); a new named preset is one entry in
   `packages/core/src/providers/presets.ts`.
-- **SttProvider** for speech to text and **TtsProvider** for text to speech arrive in Phase 3; neither
-  interface exists yet.
+- **Text to speech** lives in the desktop host, not in core: `Tts` in
+  `apps/desktop/src/main/voice/voice.ts` (`speak(text, { voice, speed })` returns encoded audio),
+  with Kokoro (`LazyLocalVoice` over `kokoro.ts`), ElevenLabs (`elevenlabs.ts`) and `fakeTts`.
+  `createVoiceService` picks one; see [Scout talks](architecture.md#scout-talks). Speech to text
+  (push to talk) does not exist yet.
 
 Implement `BrainProvider`, register it in `packages/core/src/providers/registry.ts`, give it a
 `SECRET_KEYS` entry if it takes a key, and select it per pet in settings. Do not widen the interface for a provider that is not being built.
@@ -547,9 +552,10 @@ What is still standing, recorded here so nobody rediscovers it.
 - **The installer is unsigned and uses Electron's default icon.** SmartScreen warns on first run.
 - **Windows only.** The macOS and Linux installers are configured, but there is no platform adapter for
   either, so the app stops at launch there.
-- **No microphone or speaker step in Welcome.** Voice (Phase 3) is not in this build.
-- **Watch alerts are shown, not spoken.** Phase 3 (Voice) is not built; when it lands, `watch.fired`
-  should be spoken in the pet's voice.
+- **No voice input.** Scout talks, but push to talk (speech to text) is not built, and Welcome has
+  no microphone or speaker step.
+- **The local voice is not checked end to end in CI.** Tests and the Electron suites run on
+  `TAGALONG_FAKE_TTS=1`, so the Kokoro download and synthesis are only exercised on a real run.
 
 ## Delivery phases
 
@@ -559,9 +565,10 @@ order; each one ends with something testable end to end.
 0. **Setup** — monorepo, CI, conventions, keys. _(complete)_
 1. **Foundation** — protocol, core engine, text-only ask with one pet on Windows. _(complete)_
 2. **Sight** — screenshots, vision, exclusions, capture indicator. _(complete)_
-3. **Voice** — push to talk, streaming speech, interruption.
-   3B. **Awareness** — rolling memory, `recall_screen` and `what_changed`, watch mode. _(built; spoken
-   watch alerts wait for Phase 3)_
+3. **Voice** — push to talk, streaming speech, interruption. _(Scout talks, with stop, is built;
+   push to talk is not)_
+   3B. **Awareness** — rolling memory, `recall_screen` and `what_changed`, watch mode. _(built; watch
+   alerts are spoken)_
 4. **Crew** — multiple pets, memory, handoff, consult, roundtable. _(built)_
 5. **Hands** — MCP client, allowlists, approval cards, action log.
 6. **Browser Host** — Chrome extension on the same engine. _(built; runs fifth, after 2B)_

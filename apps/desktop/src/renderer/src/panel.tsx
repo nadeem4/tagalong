@@ -1,9 +1,10 @@
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { CompanionBubble, GreetingLine, HostBridgeProvider } from '@tagalong/ui';
+import { CompanionBubble, GreetingLine, HostBridgeProvider, SpeechQueue } from '@tagalong/ui';
 import type { ContextSnapshot, PetRemarkParams } from '@tagalong/protocol';
 import './app.css';
 import '../../shared/ipc';
+import { playLine } from './voice-player';
 
 /** The full chat's height; the bubble measures its own. Matches main's PANEL_HEIGHT. */
 const CHAT_HEIGHT = 520;
@@ -33,6 +34,19 @@ function Panel() {
   // Which side of the pet this window sits on; the speech tail points the other way, at it.
   const [side, setSide] = useState<'left' | 'right'>('left');
   const root = useRef<HTMLDivElement>(null);
+  // Scout talks: one line at a time; main decides who says it, or that it stays quiet.
+  const [speaking, setSpeaking] = useState(false);
+  const [voice] = useState(() => new SpeechQueue({ play: playLine, onSpeaking: setSpeaking }));
+
+  // The stop key cuts Scout off mid-sentence, and a watch that fires is said aloud.
+  useEffect(() => window.tagalongHost.onStopVoice(() => voice.stop()), [voice]);
+  useEffect(
+    () =>
+      window.tagalong.onTurnEvent((event) => {
+        if (event.type === 'watch.fired') voice.say(event.message);
+      }),
+    [voice],
+  );
 
   // Transparent around the bubble's rounded corners; the window itself is transparent.
   useEffect(() => {
@@ -57,8 +71,9 @@ function Panel() {
       window.tagalongHost.onGreetLine((text) => {
         setMode('bubble');
         setLine(text);
+        voice.say(text);
       }),
-    [],
+    [voice],
   );
 
   useEffect(
@@ -67,8 +82,9 @@ function Panel() {
         setMode('bubble');
         setLine(null);
         setRemark(next);
+        voice.say(next.text);
       }),
-    [],
+    [voice],
   );
 
   // The window follows what is shown: the chat at its full height, the bubble at its own.
@@ -88,6 +104,7 @@ function Panel() {
 
   function dismissGreeting(): void {
     setGreeting(false);
+    voice.stop();
     void window.tagalongHost.hidePanel();
   }
 
@@ -152,6 +169,7 @@ function Panel() {
               holdMs={12_000}
               onDone={() => {
                 setRemark(null);
+                voice.stop();
                 void window.tagalongHost.hidePanel();
               }}
               onOpen={() => setRemark(null)}
@@ -176,6 +194,7 @@ function Panel() {
               tail={side === 'left' ? 'right' : 'left'}
               onDone={() => {
                 setLine(null);
+                voice.stop();
                 void window.tagalongHost.hidePanel();
               }}
               onOpen={() => setLine(null)}
@@ -190,8 +209,14 @@ function Panel() {
               onDismiss={dismissGreeting}
               onOpenChat={() => setMode('chat')}
               onCollapse={() => setMode('bubble')}
-              onClose={() => void window.tagalongHost.hidePanel()}
+              onClose={() => {
+                voice.stop();
+                void window.tagalongHost.hidePanel();
+              }}
               tail={side === 'left' ? 'right' : 'left'}
+              onSay={(said) => voice.say(said)}
+              speaking={speaking}
+              onStopSpeaking={() => voice.stop()}
               {...(snapshot !== null ? { snapshot } : {})}
             />
           )}

@@ -41,6 +41,7 @@ describe('Settings', () => {
     expect(s.hotkeys).toEqual({
       ask: 'CommandOrControl+Shift+Space',
       pauseSight: 'CommandOrControl+Shift+Alt+P',
+      stopVoice: 'CommandOrControl+Shift+Alt+M',
     });
     expect(s.avatar).toEqual({ x: null, y: null });
   });
@@ -396,5 +397,49 @@ describe('Settings.keepAnEye', () => {
 
   it('can be switched off in a patch alone', () => {
     expect(SettingsPatch.parse({ keepAnEye: false })).toEqual({ keepAnEye: false });
+  });
+});
+
+describe('Settings.voice', () => {
+  const voiceWith = (change: object) => ({ voice: { ...SETTINGS_DEFAULTS.voice, ...change } });
+
+  it('talks by default, in the calm British voice, a touch slower than normal', () => {
+    expect(Settings.parse({}).voice).toEqual({
+      enabled: true,
+      voice: 'bm_george',
+      speed: 0.95,
+      elevenLabsVoiceId: '',
+    });
+  });
+
+  it('parses a settings file written before Scout could talk', () => {
+    expect(Settings.parse({ welcome: { done: true } }).voice.enabled).toBe(true);
+  });
+
+  it('offers the two British male voices only', () => {
+    expect(Settings.safeParse(voiceWith({ voice: 'bm_fable' })).success).toBe(true);
+    expect(Settings.safeParse(voiceWith({ voice: 'af_heart' })).success).toBe(false);
+  });
+
+  it('keeps the speed within what still sounds like speech', () => {
+    expect(Settings.safeParse(voiceWith({ speed: 0.2 })).success).toBe(false);
+    expect(Settings.safeParse(voiceWith({ speed: 3 })).success).toBe(false);
+  });
+
+  it('rides in a patch alone', () => {
+    const { voice } = voiceWith({ enabled: false });
+    expect(SettingsPatch.parse({ voice })).toEqual({ voice });
+  });
+});
+
+describe('Settings.hotkeys.stopVoice', () => {
+  it('defaults to a key of its own, distinct from the others', () => {
+    const { hotkeys } = Settings.parse({});
+    expect(hotkeys.stopVoice).toBe('CommandOrControl+Shift+Alt+M');
+    expect(new Set(Object.values(hotkeys)).size).toBe(3);
+  });
+
+  it('is optional in a patch, like the pause key', () => {
+    expect(SettingsPatch.parse({ hotkeys: { ask: 'A' } })).toEqual({ hotkeys: { ask: 'A' } });
   });
 });

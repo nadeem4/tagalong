@@ -13,6 +13,7 @@ import { AdvancedSection } from './advanced-section';
 import { scoutBrain } from './brain';
 import { BrainSection } from './brain-section';
 import { BrowserSection } from './browser-section';
+import { ElevenLabsSection } from './elevenlabs-section';
 import { KeysSection } from './keys-section';
 import { PrivacySection } from './privacy-section';
 import { SECTIONS, SettingsUiContext } from './section';
@@ -20,13 +21,15 @@ import type { SettingsUi } from './section';
 import { ShortcutsSection } from './shortcuts-section';
 import { SightSection } from './sight-section';
 import { SummariesSection } from './summaries-section';
+import { VoiceSection } from './voice-section';
 import { WatchesSection } from './watches-section';
 import type { ClaudeSignIn, HostView } from '../../../shared/ipc';
 
 /**
  * App-level settings, one section per file under `settings/`, in the order the design
- * gives them: how Scout thinks, privacy, shortcuts, the browser extension, then Advanced
- * (summaries, keys, sight detail, screen memory and watches), closed by default. It is
+ * gives them: how Scout thinks, privacy, voice, shortcuts, the browser extension, then
+ * Advanced (summaries, keys, the ElevenLabs voice, sight detail, screen memory and
+ * watches), closed by default. It is
  * Home's Settings page (`embedded`, no header or side menu of its own); the standalone
  * window only opens when the engine failed to start, since Home needs the engine.
  *
@@ -166,11 +169,19 @@ export function SettingsPage({
   };
 
   const removeKey = async (providerId: string): Promise<void> => {
-    const label = view.providers.find((choice) => choice.id === providerId)?.label ?? providerId;
+    const label =
+      providerId === 'elevenlabs'
+        ? 'ElevenLabs'
+        : (view.providers.find((choice) => choice.id === providerId)?.label ?? providerId);
     try {
       // An empty key deletes the stored one.
       await window.tagalongHost.saveApiKey(providerId, '');
       markProviders(providerId, false);
+      if (providerId === 'elevenlabs') {
+        setView((current) =>
+          current === null ? current : { ...current, elevenLabsKeyStored: false },
+        );
+      }
       setStatus(`${label} key removed.`);
       setStatusIsError(false);
     } catch (error) {
@@ -195,6 +206,11 @@ export function SettingsPage({
         })),
         askHotkey: field('askHotkey'),
         pauseSightHotkey: field('pauseSightHotkey'),
+        stopVoiceHotkey: field('stopVoiceHotkey'),
+        voiceEnabled: form.get('voiceEnabled') !== null,
+        voice: field('voice'),
+        voiceSpeed: field('voiceSpeed'),
+        elevenLabsVoiceId: field('elevenLabsVoiceId'),
         sightDetail: field('sightDetail'),
         windowTextBudget: field('windowTextBudget'),
         summarizer: field('summarizer'),
@@ -223,6 +239,7 @@ export function SettingsPage({
               providers: current.providers.map((choice) =>
                 newlyStored.has(choice.id) ? { ...choice, hasKey: true } : choice,
               ),
+              elevenLabsKeyStored: current.elevenLabsKeyStored || newlyStored.has('elevenlabs'),
             },
       );
       setInvalid(null);
@@ -296,6 +313,7 @@ export function SettingsPage({
             onOpenScout={onOpenScout}
           />
           <PrivacySection settings={settings} platform={view.platform} />
+          <VoiceSection settings={settings} />
           <ShortcutsSection settings={settings} hotkeyError={view.hotkeyError} />
           <BrowserSection token={view.pairingToken} />
           <AdvancedSection open={advanced} onToggle={() => setAdvanced((open) => !open)}>
@@ -315,6 +333,13 @@ export function SettingsPage({
               keys={keys}
               onKeysChange={setKeys}
               onRemove={(providerId) => void removeKey(providerId)}
+            />
+            <ElevenLabsSection
+              settings={settings}
+              keyStored={view.elevenLabsKeyStored}
+              typed={keys.elevenlabs ?? ''}
+              onType={(value) => setKeys({ ...keys, elevenlabs: value })}
+              onRemove={() => void removeKey('elevenlabs')}
             />
             <SightSection settings={settings} />
             <WatchesSection settings={settings} />

@@ -33,6 +33,7 @@ test.beforeAll(async () => {
     env: {
       ...process.env,
       TAGALONG_FAKE_PROVIDERS: '1',
+      TAGALONG_FAKE_TTS: '1',
       // Scripts the fake pet to reach for list_windows before it answers, which is the
       // only way a tool call travels the real socket to the real host in this suite.
       // Every tool test feeds the toolset a fake host and every host test feeds the

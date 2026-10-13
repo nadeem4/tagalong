@@ -15,6 +15,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Phase 4: Crew](#phase-4-crew)
 - [Phase 3B: Awareness](#phase-3b-awareness)
 - [Phase 7: onboarding and installer](#phase-7-onboarding-and-installer)
+- [Voice: Scout talks](#voice-scout-talks)
 - [Demo run: the hackathon story](#demo-run-the-hackathon-story)
 - [Not in this build](#not-in-this-build)
 
@@ -284,7 +285,7 @@ Covers the default crew, memory and recall, conversation summaries, handoff, con
 the crew strip, the pet editor and the model-call counter (tasks 44–51).
 
 **Test configuration.** [OpenRouter + Claude](#openrouter--claude-the-default-for-this-guide). One test, 4.13,
-uses a mixed crew on OpenRouter and Nebius Token Factory. Voice (Phase 3) is not built, so nothing in
+uses a mixed crew on OpenRouter and Nebius Token Factory. Per-pet voices are not built, so nothing in
 this phase speaks; every "voice" in the phase page is checked as text.
 
 **Before you start:**
@@ -471,7 +472,7 @@ add next?`.
    "Always answer in British English." to **Notes (optional, private)**. Save.
 3. **Expected:** the desktop strip re-draws with 🔧 and a green underline; the panel header reads
    **🔧 Sparky** in green; a new question to Sparky is answered in British spelling. **Reply style**
-   and **Voice id** save without error but change nothing audible (voice is Phase 3).
+   and **Voice id** save without error but change nothing audible (Scout's voice is set in Settings → Voice).
 
 ### 4.19. Add, hide and delete pets
 
@@ -983,6 +984,55 @@ On by default. Not active under `TAGALONG_FAKE_PROVIDERS=1` unless `TAGALONG_KEE
 3. **Expected:** the hand-off card opens with the task and the window title; nothing runs until you
    press **Send**.
 
+## Voice: Scout talks
+
+Run from source **without** `TAGALONG_FAKE_TTS` (it makes every line silent), with speakers on. The
+fake brain is fine: `TAGALONG_FAKE_PROVIDERS=1` keeps the answers free. The first line downloads the
+voice model (about 90 MB) into `%APPDATA%\Tagalong\voice`; ElevenLabs (V.6) bills your own account.
+
+### V.1. Scout reads an answer aloud
+
+1. **Setup:** a fresh profile, so the voice model is not downloaded yet.
+2. **Action:** ask Scout anything in the bubble.
+3. **Expected:** the answer is spoken by the system voice (a British male voice such as Microsoft
+   George if installed) while the model downloads; three bars beside × move with the voice. A
+   later answer is spoken by the Kokoro voice. With Windows' reduce-animations setting on, the bars
+   hold still.
+
+### V.2. Only a short form is spoken
+
+1. **Action:** ask for "a bulleted list of five fruits, then a code sample".
+2. **Expected:** Scout says the sentence before the list and "The rest is in the bubble." No list
+   item or code is read.
+
+### V.3. Stopping
+
+1. **Action:** while Scout speaks, press `Ctrl+Shift+Alt+M`; on the next answer click the bars; on the
+   next press Escape.
+2. **Expected:** speech stops at once each time, and nothing queued is spoken afterwards.
+
+### V.4. The hello, an expert finishing and a watch
+
+1. **Action:** finish Welcome and step through the intro with **Next**; restart Tagalong; hand a
+   task to Claude Code; start a watch ("tell me when this finishes").
+2. **Expected:** each intro beat is spoken as it appears; the line on a later launch is spoken;
+   "Claude Code has finished." and the start of its answer are spoken; the watch's message is
+   spoken when it fires; a line from keeping an eye on things (K.1) is spoken, and its × stops it.
+
+### V.5. Settings → Voice
+
+1. **Action:** pick Fable and press **▶ Preview**; move the speed slider and preview again; switch
+   **Scout talks** off, Save, and ask a question.
+2. **Expected:** each preview plays in the chosen voice and speed before saving; with Scout talks off
+   the answer is silent, and Preview still plays.
+
+### V.6. ElevenLabs (your own key)
+
+1. **Action:** in Settings → Advanced → ElevenLabs voice, paste your key and a voice ID from your
+   ElevenLabs library; Save; ask a question. Then remove the key.
+2. **Expected:** the answer is spoken in that voice (the ElevenLabs history shows only the spoken
+   words). With the key removed, or a wrong voice ID, Scout speaks with the local voice again.
+
 ## Demo run: the hackathon story
 
 A short end-to-end run of the story the hackathon demo tells. Run it on the installed app, with an
@@ -1015,8 +1065,8 @@ OpenRouter key and a Token Factory key at hand. Tick each line.
 
 These appear in the plan but are not built; do not test them here.
 
-- **Voice (Phase 3).** No push to talk, no spoken answers, no microphone or speaker step in the
-  wizard. Reply style and voice id save but change nothing; watch alerts are shown, not spoken.
+- **Voice input (Phase 3).** No push to talk and no microphone or speaker step in the wizard. A
+  pet's reply style and voice id save but change nothing; Scout's voice is set in Settings → Voice.
 - **Hands (Phase 5).** No MCP tools, no tool allowlists beyond the built-in perception and crew tools,
   no approval cards, no action log.
 - **macOS and Linux platform code (tasks 67, 68).** The app stops at launch on both; the dmg, AppImage

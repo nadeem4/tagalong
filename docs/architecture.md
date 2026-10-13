@@ -63,7 +63,9 @@ FTS5 arrived with Phase 4 recall), the pet registry (`pets/registry.ts`), settin
 interface (`settings/settings.ts`), the brain providers (`providers/`) and the expert connectors (`experts/`). `Engine.boot` in `engine.ts`
 wires all of it together and is the only thing a host starts. The diagram's PetBus is not one class:
 Phase 4 built it as `crew/` (handoff, consult, roundtable) on top of the runner — see "The crew" below.
-`McpManager` and `ApprovalPolicy` (Phase 5), and the STT and TTS providers (Phase 3) do not exist yet. The Chrome extension
+`McpManager` and `ApprovalPolicy` (Phase 5), and the STT provider (Phase 3) do not exist yet. Text
+to speech was built in the desktop host rather than in core, because the local voice is a native
+ONNX runtime the pure core must not load; see "Scout talks" below. The Chrome extension
 landed in Phase 6, which ran fifth; see "The browser host" below.
 
 ## Package responsibilities
@@ -193,18 +195,17 @@ sequenceDiagram
   participant H as Host
   participant C as Core engine
   participant A as Claude
-  participant T as Text to speech
-  U->>H: highlight text, press hotkey or hold push to talk
+  participant T as Text to speech, in the host
+  U->>H: highlight text, press hotkey
   H->>H: build ContextSnapshot
   H->>C: ask(petId, input, snapshot)
   C->>C: assemble prompt: role + notes + memory + context
   C->>A: streaming request with tools
   A-->>C: text deltas and tool calls
-  C-->>H: turn.delta
-  C->>T: complete sentences
-  T-->>C: audio chunks
-  C-->>H: turn.audio
-  H-->>U: streamed text and speech, interruptible
+  C-->>H: turn.delta, then turn.completed
+  H->>T: the first sentence or two, shortened for speech
+  T-->>H: audio
+  H-->>U: streamed text, then speech, stoppable
 ```
 
 ## The turn lifecycle, as implemented
@@ -873,18 +874,20 @@ built from `officeTokens`, so Settings has no palette of its own.
 `SettingsPage` holds the form state and the save. The sections come in the design's order, and each
 is one file under `apps/desktop/src/renderer/src/settings/`:
 
-| File                    | Section                                                                                                                                                  |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `brain-section.tsx`     | How Scout thinks: Scout's own provider and model (`brain.ts#scoutBrain`) with a status chip, or a service picker and key when no Claude sign-in is found |
-| `privacy-section.tsx`   | The rolling memory switch, the blind spots as chips from `BLIND_SPOTS` labels, and the pause sight key                                                   |
-| `shortcuts-section.tsx` | The two global hotkeys; a `hotkeyError` marks the field whose combination it names                                                                       |
-| `browser-section.tsx`   | The Chrome extension's pairing token                                                                                                                     |
-| `advanced-section.tsx`  | Advanced: a disclosure button (`aria-expanded`), closed by default, holding the four below and **Open Welcome again**                                    |
-| `summaries-section.tsx` | One grouped list: Same as Scout, Haiku and Sonnet on the Claude sign-in, then each keyed service that has a key                                          |
-| `keys-section.tsx`      | One row per keyed service: Key stored or No key, add or replace, base URL, and Remove key (an empty key deletes the stored one)                          |
-| `sight-section.tsx`     | What a look at several monitors sends, and the window text budget                                                                                        |
-| `watches-section.tsx`   | Minutes of screen to remember and the watch limits                                                                                                       |
-| `section.tsx`           | The section list, the panel, the ⓘ button and its inline note (one open at a time), and `useInvalid` for a refused field                                 |
+| File                     | Section                                                                                                                                                  |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `brain-section.tsx`      | How Scout thinks: Scout's own provider and model (`brain.ts#scoutBrain`) with a status chip, or a service picker and key when no Claude sign-in is found |
+| `privacy-section.tsx`    | The rolling memory switch, the blind spots as chips from `BLIND_SPOTS` labels, and the pause sight key                                                   |
+| `voice-section.tsx`      | Scout talks (a switch), the voice (George or Fable) with ▶ Preview (`voice-player.ts#playLine` with the form's voice and speed), and the speed slider    |
+| `shortcuts-section.tsx`  | The three global hotkeys (ask, pause sight, stop speaking); a `hotkeyError` marks the field whose combination it names                                   |
+| `browser-section.tsx`    | The Chrome extension's pairing token                                                                                                                     |
+| `advanced-section.tsx`   | Advanced: a disclosure button (`aria-expanded`), closed by default, holding the five below and **Open Welcome again**                                    |
+| `summaries-section.tsx`  | One grouped list: Same as Scout, Haiku and Sonnet on the Claude sign-in, then each keyed service that has a key                                          |
+| `keys-section.tsx`       | One row per keyed service: Key stored or No key, add or replace, base URL, and Remove key (an empty key deletes the stored one)                          |
+| `elevenlabs-section.tsx` | The ElevenLabs key (stored as `elevenlabs.apiKey`, never read back) and the voice ID from the person's library                                           |
+| `sight-section.tsx`      | What a look at several monitors sends, and the window text budget                                                                                        |
+| `watches-section.tsx`    | Minutes of screen to remember and the watch limits                                                                                                       |
+| `section.tsx`            | The section list, the panel, the ⓘ button and its inline note (one open at a time), and `useInvalid` for a refused field                                 |
 
 **How Scout thinks** reads the companion pet (`settings.defaultPetId`), never `settings.providerId`,
 which the engine ignores. Whether the Claude sign-in works comes from `main/claude-sign-in.ts`:
@@ -1236,6 +1239,59 @@ extension's side panel.
   bubble's height through `fitPanel`, and main resizes the window and places it with
   `panelPosition`: beside the pet on the side with room, its bottom level with the pet's, clamped to
   the work area. The full chat asks for 520 px.
+
+## Scout talks
+
+Scout says its bubble lines aloud, because the person may not be looking at the screen. The style
+is a calm, refined, dry British voice. It lives in the desktop host, not in core: the local voice
+is a native ONNX runtime, and core stays pure.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
+flowchart LR
+  subgraph Panel["Panel renderer"]
+    CB["CompanionBubble onSay"] --> Q["SpeechQueue: toSpeakable, merge short lines, one at a time"]
+    Q --> PL["voice-player playLine"]
+    PL --> WA["WebAudio + AnalyserNode"]
+    PL --> SS["speechSynthesis fallback"]
+  end
+  subgraph Main["Main process"]
+    VS["createVoiceService"] --> EL["elevenLabsTts"]
+    VS --> KO["LazyLocalVoice: Kokoro"]
+    VS --> FK["fakeTts"]
+  end
+  PL -- "IPC speak(text)" --> VS
+```
+
+- **What is said** (`@tagalong/ui`). `CompanionBubble` calls `onSay` with each finished answer
+  (`turn.completed` for its own turn), each intro beat once as it appears, and `handoff.finished` for the
+  hand-off it is showing ("Claude Code has finished. …"). The panel adds the launch line
+  (`GreetingLine`), remarks from keeping an eye on things (`remarkEvent`, sent by `showRemark`)
+  and `watch.fired` messages.
+  `SpeechQueue` shapes each line with `toSpeakable` (markdown stripped; code blocks, lists, tables
+  and URLs left out; at most two sentences or 200 characters, then "The rest is in the bubble."),
+  merges short lines waiting together (`mergeShortLines`, because Kokoro says a lone "Done." badly),
+  and plays one line at a time. `stop()` aborts the line playing and drops the rest: the bubble's ×,
+  Got it, the speaking indicator and the stop key (`hotkeys.stopVoice`, default
+  `Ctrl+Shift+Alt+M`, broadcast as `IPC.stopVoiceEvent`) all call it.
+- **Who says it** (`main/voice/voice.ts`, `createVoiceService`). `TAGALONG_FAKE_TTS=1` means
+  `fakeTts`, a short silent WAV: no download, no network. Otherwise ElevenLabs when an
+  `elevenlabs.apiKey` is stored and `voice.elevenLabsVoiceId` is set (`elevenlabs.ts`: the
+  streaming endpoint, `eleven_flash_v2_5`, only the text and a speed sent); on failure, Kokoro.
+  Kokoro (`kokoro.ts`, `kokoro-js` with `@huggingface/transformers`, `onnx-community/Kokoro-82M-v1.0-ONNX`,
+  q8, CPU) is `LazyLocalVoice`: the first line starts the download into `<userData>/voice` and
+  answers `fallback`; once loaded every line is a WAV. A failed load is tried again on the next
+  line. With **Scout talks** off, `speak` answers `off`, except for a Settings preview.
+- **How it plays** (`renderer/src/voice-player.ts`). Audio is decoded with `AudioContext` and played
+  through an `AnalyserNode`, whose level is written to the CSS variable `--tg-voice-level` each
+  frame; the bubble's speaking indicator (three bars beside ×, a **Stop speaking** button) scales
+  with it, and holds still under `prefers-reduced-motion`. `fallback` speaks through
+  `speechSynthesis`, choosing an en-GB male voice (`pickSystemVoice`: Microsoft George first) or
+  the default.
+- **Packaging.** `kokoro-js` and `@huggingface/transformers` are runtime dependencies of the
+  desktop app, external to the main bundle and imported only when Scout first speaks.
+  `onnxruntime-node`'s DLLs and sharp's `@img` binaries are unpacked from `app.asar`. The model is
+  not bundled.
 
 ## Packaging (Phase 7)
 

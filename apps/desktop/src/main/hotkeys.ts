@@ -17,6 +17,9 @@ export const DEFAULT_ASK_HOTKEY = 'CommandOrControl+Shift+Space';
  */
 export const DEFAULT_PAUSE_SIGHT_HOTKEY = 'CommandOrControl+Shift+Alt+P';
 
+/** Stops Scout speaking at once and drops whatever it was about to say. */
+export const DEFAULT_STOP_VOICE_HOTKEY = 'CommandOrControl+Shift+Alt+M';
+
 /** The part of Electron globalShortcut this module uses, so tests can supply their own. */
 export interface HotkeyRegistrar {
   register(accelerator: string, callback: () => void): boolean;
@@ -37,6 +40,7 @@ export interface HotkeyOutcome {
 export interface HotkeyBindings {
   ask: string;
   pauseSight: string;
+  stopVoice: string;
 }
 
 export interface RegisterHotkeyOptions {
@@ -55,6 +59,7 @@ export interface RegisterHotkeyOptions {
 const ACTION_LABELS: { readonly [K in keyof HotkeyBindings]: string } = {
   ask: 'Ask',
   pauseSight: 'Pause sight',
+  stopVoice: 'Stop speaking',
 };
 
 /**
@@ -121,6 +126,7 @@ export function registerHotkey(options: RegisterHotkeyOptions): HotkeyOutcome {
 export interface HotkeyManagerOptions {
   onAsk: () => void;
   onPauseSight: () => void;
+  onStopVoice: () => void;
   registrar?: HotkeyRegistrar;
 }
 
@@ -140,6 +146,7 @@ export class HotkeyManager {
   readonly #triggers: {
     ask: () => void;
     pauseSight: () => void;
+    stopVoice: () => void;
   };
   /** Accelerators currently held by this process, keyed by action. */
   readonly #bound = new Map<keyof HotkeyBindings, string>();
@@ -149,12 +156,15 @@ export class HotkeyManager {
     this.#triggers = {
       ask: options.onAsk,
       pauseSight: options.onPauseSight,
+      stopVoice: options.onStopVoice,
     };
   }
 
-  /** Applies the bindings, one outcome per action in ask, pause order. */
+  /** Applies the bindings, one outcome per action in ask, pause, stop voice order. */
   apply(bindings: HotkeyBindings): HotkeyOutcome[] {
-    return (['ask', 'pauseSight'] as const).map((action) => this.#bind(action, bindings[action]));
+    return (['ask', 'pauseSight', 'stopVoice'] as const).map((action) =>
+      this.#bind(action, bindings[action]),
+    );
   }
 
   /** Releases everything this manager holds, for quit. */

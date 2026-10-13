@@ -5,6 +5,7 @@ import type {
   PetRemarkParams,
   Settings,
   SettingsPatch,
+  VoiceId,
 } from '@tagalong/protocol';
 import type { HostBridge } from '@tagalong/ui';
 
@@ -70,7 +71,23 @@ export const IPC = {
   showExtensionFolder: 'tagalong:extension:show',
   checkClaudeSignIn: 'tagalong:claude:sign-in',
   switchScout: 'tagalong:pets:switch-scout',
+  speak: 'tagalong:voice:speak',
+  stopVoiceEvent: 'tagalong:voice:stop',
 } as const;
+
+/** Settings' ▶ Preview: the voice and speed the form shows, not yet saved. */
+export interface SpeakPreview {
+  voice?: VoiceId;
+  speed?: number;
+}
+
+/**
+ * What main hands back for one line: encoded audio to play, the word to use the system
+ * voice instead (the local model is downloading, or every engine failed), or nothing at
+ * all because Scout talks is switched off.
+ */
+export type SpeakResult =
+  { kind: 'audio'; audio: Uint8Array; mime: string } | { kind: 'fallback' } | { kind: 'off' };
 
 /**
  * What the host announces the moment it looks at the screen — or refuses to.
@@ -151,6 +168,8 @@ export interface HostView {
   platform: string;
   /** Phase 7. The unpacked Chrome extension's folder, when it is on this machine. */
   extensionFolder?: string;
+  /** Whether an ElevenLabs key is stored. The key itself never comes back out. */
+  elevenLabsKeyStored: boolean;
 }
 
 /**
@@ -249,6 +268,10 @@ export interface TagalongHostApi {
   /** The drag ended: remember where the pet was left. */
   dropAvatar(): Promise<void>;
   togglePanel(): Promise<void>;
+  /** Turns one line into audio in main. Only this text leaves the window. */
+  speak(text: string, preview?: SpeakPreview): Promise<SpeakResult>;
+  /** Fires when the stop key is pressed: Scout stops speaking at once. */
+  onStopVoice(handler: () => void): () => void;
 }
 
 declare global {

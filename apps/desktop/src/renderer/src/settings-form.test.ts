@@ -18,6 +18,7 @@ const values: SettingsFormValues = {
   ],
   askHotkey: 'CommandOrControl+Shift+Space',
   pauseSightHotkey: 'CommandOrControl+Shift+Alt+P',
+  stopVoiceHotkey: 'CommandOrControl+Shift+Alt+M',
   sightDetail: 'focused',
   windowTextBudget: '8000',
 };
@@ -63,6 +64,7 @@ describe('buildSettingsPatch', () => {
     expect(patch.hotkeys).toEqual({
       ask: 'CommandOrControl+Shift+Space',
       pauseSight: 'CommandOrControl+Shift+Alt+P',
+      stopVoice: 'CommandOrControl+Shift+Alt+M',
     });
   });
 
@@ -336,5 +338,45 @@ describe('buildSettingsPatch awareness', () => {
     expect(() =>
       buildSettingsPatch({ ...values, ...awareness, watchMaxConcurrent: 'two' }),
     ).toThrow(/at once/i);
+  });
+});
+
+describe('buildSettingsPatch voice', () => {
+  const voice = {
+    voiceEnabled: true,
+    voice: 'bm_fable',
+    voiceSpeed: '1.05',
+    elevenLabsVoiceId: '  abc123  ',
+  };
+
+  it('carries the switch, the voice, the speed and a trimmed ElevenLabs voice', () => {
+    expect(buildSettingsPatch({ ...values, ...voice }).voice).toEqual({
+      enabled: true,
+      voice: 'bm_fable',
+      speed: 1.05,
+      elevenLabsVoiceId: 'abc123',
+    });
+  });
+
+  it('turns Scout quiet when the switch is off', () => {
+    expect(buildSettingsPatch({ ...values, ...voice, voiceEnabled: false }).voice?.enabled).toBe(
+      false,
+    );
+  });
+
+  it('leaves the voice alone when the form does not show it', () => {
+    expect(buildSettingsPatch(values)).not.toHaveProperty('voice');
+  });
+
+  it('refuses a speed outside what still sounds like speech, naming the field', () => {
+    expect(() => buildSettingsPatch({ ...values, ...voice, voiceSpeed: '2' })).toThrow(
+      expect.objectContaining({ field: 'voiceSpeed' }),
+    );
+  });
+
+  it('opens Advanced for a refused ElevenLabs field', () => {
+    expect(isAdvancedField('elevenLabsVoiceId')).toBe(true);
+    expect(isAdvancedField('key:elevenlabs')).toBe(true);
+    expect(isAdvancedField('voiceSpeed')).toBe(false);
   });
 });

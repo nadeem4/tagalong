@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_ASK_HOTKEY,
   DEFAULT_PAUSE_SIGHT_HOTKEY,
+  DEFAULT_STOP_VOICE_HOTKEY,
   HotkeyManager,
   describeHotkeyProblems,
   registerHotkey,
@@ -97,21 +98,26 @@ describe('registerHotkey', () => {
   });
 });
 
-const BOTH = { ask: DEFAULT_ASK_HOTKEY, pauseSight: DEFAULT_PAUSE_SIGHT_HOTKEY };
+const BOTH = {
+  ask: DEFAULT_ASK_HOTKEY,
+  pauseSight: DEFAULT_PAUSE_SIGHT_HOTKEY,
+  stopVoice: DEFAULT_STOP_VOICE_HOTKEY,
+};
 
 describe('HotkeyManager', () => {
   function manager(
     registrarToUse: HotkeyRegistrar,
-    triggers: { onAsk?: () => void; onPauseSight?: () => void } = {},
+    triggers: { onAsk?: () => void; onPauseSight?: () => void; onStopVoice?: () => void } = {},
   ): HotkeyManager {
     return new HotkeyManager({
       onAsk: triggers.onAsk ?? (() => {}),
       onPauseSight: triggers.onPauseSight ?? (() => {}),
+      onStopVoice: triggers.onStopVoice ?? (() => {}),
       registrar: registrarToUse,
     });
   }
 
-  it('binds the two hotkeys, ask and pause, and reports each as registered', () => {
+  it('binds the three hotkeys, ask, pause and stop voice, and reports each as registered', () => {
     const reg = recordingRegistrar();
 
     const outcomes = manager(reg).apply(BOTH);
@@ -121,8 +127,13 @@ describe('HotkeyManager', () => {
     expect(outcomes).toEqual([
       { accelerator: DEFAULT_ASK_HOTKEY, action: 'ask', registered: true },
       { accelerator: DEFAULT_PAUSE_SIGHT_HOTKEY, action: 'pauseSight', registered: true },
+      { accelerator: DEFAULT_STOP_VOICE_HOTKEY, action: 'stopVoice', registered: true },
     ]);
-    expect([...reg.bound.keys()]).toEqual([DEFAULT_ASK_HOTKEY, DEFAULT_PAUSE_SIGHT_HOTKEY]);
+    expect([...reg.bound.keys()]).toEqual([
+      DEFAULT_ASK_HOTKEY,
+      DEFAULT_PAUSE_SIGHT_HOTKEY,
+      DEFAULT_STOP_VOICE_HOTKEY,
+    ]);
   });
 
   it('has defaults that do not collide', () => {
@@ -155,7 +166,9 @@ describe('HotkeyManager', () => {
     // Only the key that changed is touched: the other is never briefly dead.
     expect(reg.unregistered).toEqual([DEFAULT_ASK_HOTKEY]);
     expect(registerAfter).toHaveBeenCalledExactlyOnceWith('Alt+Space', expect.any(Function));
-    expect([...reg.bound.keys()].sort()).toEqual(['Alt+Space', DEFAULT_PAUSE_SIGHT_HOTKEY].sort());
+    expect([...reg.bound.keys()].sort()).toEqual(
+      ['Alt+Space', DEFAULT_PAUSE_SIGHT_HOTKEY, DEFAULT_STOP_VOICE_HOTKEY].sort(),
+    );
   });
 
   it('reports the rejected accelerator and still binds the other one', () => {
@@ -189,6 +202,29 @@ describe('HotkeyManager', () => {
     held.dispose();
 
     expect(reg.bound.size).toBe(0);
+  });
+});
+
+describe('the stop voice hotkey', () => {
+  it('defaults to Ctrl+Shift+Alt+M and stops Scout speaking when pressed', () => {
+    expect(DEFAULT_STOP_VOICE_HOTKEY).toBe('CommandOrControl+Shift+Alt+M');
+    const reg = recordingRegistrar();
+    const onStopVoice = vi.fn();
+    new HotkeyManager({
+      onAsk: () => {},
+      onPauseSight: () => {},
+      onStopVoice,
+      registrar: reg,
+    }).apply(BOTH);
+    reg.bound.get(DEFAULT_STOP_VOICE_HOTKEY)?.();
+    expect(onStopVoice).toHaveBeenCalledOnce();
+  });
+
+  it('is named in words when it cannot be registered', () => {
+    const problem = describeHotkeyProblems([
+      { accelerator: 'X', action: 'stopVoice', registered: false },
+    ]);
+    expect(problem).toContain('Stop speaking (X)');
   });
 });
 

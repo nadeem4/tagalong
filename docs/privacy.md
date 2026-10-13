@@ -114,10 +114,43 @@ The extension's public privacy policy, for the Chrome Web Store, is
 - A pet whose provider cannot see images never receives the screenshot: it is dropped before the
   request is built and the host is told with a `turn.warning` (`code: "vision_unsupported"`), so the
   turn still answers instead of failing.
-- API keys live in the OS keychain through Electron safe storage.
+- API keys live in the OS keychain through Electron safe storage, the ElevenLabs key included.
 - The hello Scout says as Tagalong opens reads nothing on screen. The summaries model is sent only
   the time of day, how long since Tagalong last opened, and the names and briefs of expert hand-offs
   that finished meanwhile. Turn it off under Settings → Privacy → **Say hello when Tagalong opens**.
+  While Scout talks is on, the hello is also spoken (below).
+
+## Scout's voice: what is spoken, and where it goes
+
+Scout says its bubble lines aloud while **Scout talks** is on (Settings → Voice, on by default).
+What reaches a speech engine is only the line being spoken, after it is shortened in the panel:
+markdown stripped, code blocks, lists, tables and URLs left out, and at most two sentences. Never
+the screen, the window list, the question or the conversation.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%
+flowchart LR
+  B["Bubble line"] --> S["Shortened in the panel"]
+  S --> M["Main process"]
+  M -->|"your key and a voice ID set"| E["ElevenLabs: the spoken words only"]
+  M -->|"default"| K["Kokoro on this computer"]
+  M -->|"model still downloading, or failed"| W["System voice in the panel"]
+  E --> P["Played in the panel"]
+  K --> P
+```
+
+- **Kokoro, on this computer (default).** The Kokoro-82M model (Apache-2.0, quantised, about
+  90 MB) is downloaded from Hugging Face the first time Scout speaks, into the `voice` folder of
+  the app's data directory (`%APPDATA%\Tagalong\voice` on Windows), and read from there afterwards.
+  The download fetches the model only; no text is sent. Speech is made on the CPU.
+- **The system voice.** While the model downloads, or if it cannot load, the panel speaks through
+  the operating system's own voice (a British male voice such as Microsoft George when installed).
+- **ElevenLabs (optional).** Only with your own key and a voice ID you picked from your ElevenLabs
+  library, both under Settings → Advanced. Each spoken line is sent to ElevenLabs' Flash model and
+  billed to your account. The key is encrypted with the OS keychain like the others. If ElevenLabs
+  fails, Scout uses Kokoro.
+- Nothing spoken is recorded or stored. Closing the bubble or `Ctrl+Shift+Alt+M` stops speech at
+  once.
 
 ## Keeping an eye on things
 
