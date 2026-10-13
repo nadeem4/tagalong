@@ -99,6 +99,13 @@ export const SETTINGS_DEFAULTS = {
    * install that finished the wizard still sees Welcome once.
    */
   welcome: { done: false },
+  /**
+   * Whether Scout says one short line when Tagalong opens, after the first time. On by
+   * default; the line reads no screen, only the time and the hand-offs that finished.
+   */
+  greeting: true,
+  /** When Tagalong last opened, so the greeting can say how long you were away. */
+  lastOpenedAt: null,
 } as const;
 
 /** A non-blank, trimmed entry. A blank one would match every window and blind the pet. */
@@ -249,6 +256,10 @@ const settingsFields = {
   onboarding: z.object({ done: z.boolean() }),
   /** Set when the Welcome window is finished; the tray can open it again. */
   welcome: z.object({ done: z.boolean() }),
+  /** Whether Scout greets you on a launch after the first; Welcome's intro shows regardless. */
+  greeting: z.boolean(),
+  /** When Tagalong last opened; null before the first launch that recorded it. */
+  lastOpenedAt: z.iso.datetime().nullable(),
 };
 
 export const Settings = z.object({
@@ -278,6 +289,8 @@ export const Settings = z.object({
   watch: settingsFields.watch.prefault({ ...SETTINGS_DEFAULTS.watch }),
   onboarding: settingsFields.onboarding.prefault({ ...SETTINGS_DEFAULTS.onboarding }),
   welcome: settingsFields.welcome.prefault({ ...SETTINGS_DEFAULTS.welcome }),
+  greeting: settingsFields.greeting.default(SETTINGS_DEFAULTS.greeting),
+  lastOpenedAt: settingsFields.lastOpenedAt.default(SETTINGS_DEFAULTS.lastOpenedAt),
 });
 export type Settings = z.infer<typeof Settings>;
 

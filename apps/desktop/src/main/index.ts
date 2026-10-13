@@ -32,7 +32,14 @@ import { startEngineHost } from './engine-host';
 import { extensionFolder, isAllowedLink } from './links';
 import { providerChoices, secretKeyFor } from './provider-choices';
 import { checkClaudeSignIn } from './claude-sign-in';
-import { companionOn, findAgents, shouldOpenWelcome, welcomeCrew, welcomeExperts } from './welcome';
+import {
+  companionOn,
+  findAgents,
+  shouldGreetOnLaunch,
+  shouldOpenWelcome,
+  welcomeCrew,
+  welcomeExperts,
+} from './welcome';
 import type { EngineHost } from './engine-host';
 import { DEFAULT_PAUSE_SIGHT_HOTKEY, HotkeyManager, describeHotkeyProblems } from './hotkeys';
 import { createPlatform } from './platform/index';
@@ -259,6 +266,40 @@ async function start(): Promise<void> {
   // A fresh install starts in Welcome: the agents found here, how Scout thinks, one key.
   // Finishing it is remembered in settings; Home opens it again.
   if (welcoming) openOnboarding();
+  else void greetOnLaunch(host);
+}
+
+/**
+ * A later launch: Scout says one line beside itself without taking the keyboard, and the
+ * launch is remembered so the next one knows how long you were away. The line reads no
+ * screen, and the engine falls back to a handwritten one, so this never waits on a brain.
+ */
+async function greetOnLaunch(host: EngineHost): Promise<void> {
+  const current = desktop;
+  if (current === null) return;
+  try {
+    if (shouldGreetOnLaunch(current.settings)) {
+      const { text } = await host.client.call('greeting.compose', {
+        petId: current.settings.defaultPetId,
+      });
+      const { panel, avatar } = current;
+      if (panel !== null && avatar !== null && avatar.isVisible() && !panel.isVisible()) {
+        if (panel.webContents.isLoading()) {
+          await new Promise<void>((resolve) => panel.webContents.once('did-finish-load', resolve));
+        }
+        panel.webContents.send(IPC.greetLineEvent, text);
+        showPanelQuietly(panel, avatar);
+      }
+    }
+  } catch (error) {
+    console.warn('[main] the greeting did not run:', error);
+  }
+  try {
+    const patch: SettingsPatch = { lastOpenedAt: new Date().toISOString() };
+    current.settings = (await host.client.call('settings.set', { patch })).settings;
+  } catch (error) {
+    console.warn('[main] could not remember this launch:', error);
+  }
 }
 
 /**

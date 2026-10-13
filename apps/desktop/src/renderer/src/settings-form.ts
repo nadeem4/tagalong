@@ -24,6 +24,8 @@ export interface SettingsFormValues {
   hiddenPets?: readonly string[];
   /** The summarizer list's value: blank for "Same as Scout", else `summarizerValue(…)`. */
   summarizer?: string;
+  /** Whether Scout greets you on a later launch. Absent leaves the setting alone. */
+  greeting?: boolean;
   /** Phase 3B. Present together when the form shows rolling memory and the watches. */
   rollingMemoryEnabled?: boolean;
   rollingMemoryMinutes?: string;
@@ -84,6 +86,7 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
     windowTextBudget: parseBudget(values.windowTextBudget),
     ...(values.hiddenPets !== undefined ? { hiddenPets: [...values.hiddenPets] } : {}),
     ...(values.summarizer !== undefined ? { summarizer: parseSummarizer(values.summarizer) } : {}),
+    ...(values.greeting !== undefined ? { greeting: values.greeting } : {}),
     ...(values.rollingMemoryMinutes !== undefined
       ? {
           rollingMemory: {

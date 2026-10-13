@@ -167,10 +167,16 @@ waits until you are done with it, then arrives on your screen.
    needs no key. Otherwise pick OpenRouter, Nebius Token Factory or Anthropic and paste a key; it goes
    straight into the operating system's keychain.
 4. **One key to remember.** Ctrl+Shift+Space asks Scout about whatever is on your screen.
-5. **Start.** Scout docks on your screen and says hello in a bubble: how you work together and the
-   key to press. **Try it now** has Scout look at your screen and say what it could hand to an
-   expert; **Got it** sends it back to the dock. If Claude Code is installed it becomes Scout's
-   first expert, so hand-offs work straight away.
+5. **Start.** Scout docks on your screen and introduces itself in its bubble in three short beats
+   (**Next** between them): where it lives, how it hands real work to an expert, and the key to
+   press. **Try it now** has Scout look at your screen and say what it could hand to an expert;
+   **Got it** sends it back to the dock. If Claude Code is installed it becomes Scout's first
+   expert, so hand-offs work straight away.
+
+After that, each time Tagalong opens Scout says one short line beside itself, without taking the
+keyboard, and it fades after a few seconds: the time of day, how long you were away, or a hand-off
+that finished meanwhile. It reads nothing on your screen. Turn it off under **Settings → Privacy →
+Say hello when Tagalong opens**.
 
 Open Welcome again from **Home → Settings → Advanced → Open Welcome again**. A key saved in Welcome
 or in Settings works on the very next question. No restart is needed.
@@ -233,7 +239,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   - **How Scout thinks**: Scout's real brain, and whether your Claude Code sign-in works (checked
     locally with `claude auth status`). Without Claude Code you pick a service and paste its key,
     and saving moves Scout to it.
-  - **Privacy**: screen memory, and what Scout never looks at.
+  - **Privacy**: the hello when Tagalong opens, screen memory, and what Scout never looks at.
   - **Shortcuts**: the ask and pause keys.
   - **Browser extension (optional)**: the pairing token for the Chrome extension.
   - **Advanced**, closed by default: summaries, API keys (add, replace or remove, and a base URL),

@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { Pet, Settings } from '@tagalong/protocol';
 import type { Role } from '@tagalong/protocol';
-import { companionOn, findAgents, shouldOpenWelcome, welcomeCrew, welcomeExperts } from './welcome';
+import {
+  companionOn,
+  findAgents,
+  shouldGreetOnLaunch,
+  shouldOpenWelcome,
+  welcomeCrew,
+  welcomeExperts,
+} from './welcome';
 
 const pet = (id: string, extra: Partial<Pet> = {}): Pet =>
   Pet.parse({
@@ -54,6 +61,22 @@ describe('shouldOpenWelcome', () => {
 
   it('stays shut for the end-to-end smoke test', () => {
     expect(shouldOpenWelcome(Settings.parse({}), { TAGALONG_SKIP_ONBOARDING: '1' })).toBe(false);
+  });
+});
+
+describe('shouldGreetOnLaunch', () => {
+  it('greets on every launch after Welcome, by default', () => {
+    expect(shouldGreetOnLaunch(Settings.parse({ welcome: { done: true } }))).toBe(true);
+  });
+
+  it('stays quiet before Welcome is done: the intro after Welcome is the first hello', () => {
+    expect(shouldGreetOnLaunch(Settings.parse({}))).toBe(false);
+  });
+
+  it('stays quiet when the greeting is switched off', () => {
+    expect(shouldGreetOnLaunch(Settings.parse({ welcome: { done: true }, greeting: false }))).toBe(
+      false,
+    );
   });
 });
 

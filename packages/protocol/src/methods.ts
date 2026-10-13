@@ -356,6 +356,17 @@ export const CrewStatusParams = z.object({
   modelCalls: z.number().int().nonnegative(),
 });
 
+/**
+ * The line a pet says when the app opens, after the first time. `model` when the summaries
+ * model wrote it, `fallback` when a handwritten line stood in. It reads no screen.
+ */
+export const GreetingComposeParams = z.object({ petId: z.string().min(1) });
+export const GreetingComposeResult = z.object({
+  text: z.string().min(1),
+  source: z.enum(['model', 'fallback']),
+});
+export type GreetingComposeResult = z.infer<typeof GreetingComposeResult>;
+
 // ---------------------------------------------------------------------------
 // The catalog
 // ---------------------------------------------------------------------------
@@ -394,6 +405,7 @@ export const hostToCoreMethods = {
   'handoffs.confirm': { params: HandoffsConfirmParams, result: HandoffsConfirmResult },
   'handoffs.dismiss': { params: HandoffsDismissParams, result: HandoffsDismissResult },
   'projects.search': { params: ProjectsSearchParams, result: ProjectsSearchResult },
+  'greeting.compose': { params: GreetingComposeParams, result: GreetingComposeResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostMethods = {

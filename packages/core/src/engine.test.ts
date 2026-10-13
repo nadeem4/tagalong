@@ -1112,3 +1112,21 @@ describe('the built-in blind spots', () => {
     expect(prompts.join('')).toContain('[hidden: API key]');
   });
 });
+
+describe('greeting.compose', () => {
+  it('returns the line the brain wrote for the opening app', async () => {
+    const e = await boot(new FakeBrainProvider({ text: 'Morning. Good to see you again.' }));
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const res = await host.call('greeting.compose', { petId: 'scout' });
+    expect(res['result']).toEqual({ text: 'Morning. Good to see you again.', source: 'model' });
+  });
+
+  it('refuses a pet that does not exist', async () => {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const res = await host.call('greeting.compose', { petId: 'nobody' });
+    expect(res['error']).toBeDefined();
+  });
+});

@@ -219,25 +219,12 @@ export function CompanionBubble({
   if (greeting && !tried) {
     return (
       <Speech tail={tail}>
-        <div className="bubble">
-          <style>{BUBBLE_CSS}</style>
-          <style>{ANSWER_CSS}</style>
-          <div role="status" className="bubble-hello">
-            <p className="bubble-text">
-              <strong>Hi, I’m {petName}.</strong> You show me what you’re on, I brief the right
-              expert, and I bring the answer back.
-            </p>
-            <p className="bubble-text">Press {hotkeyLabel} whenever you want me, or click me.</p>
-          </div>
-          <div className="bubble-row">
-            <button type="button" className="bubble-primary" onClick={() => void tryIt()}>
-              Try it now
-            </button>
-            <button type="button" className="bubble-quiet" onClick={onDismiss}>
-              Got it
-            </button>
-          </div>
-        </div>
+        <Intro
+          petName={petName}
+          hotkeyLabel={hotkeyLabel}
+          onTry={() => void tryIt()}
+          {...(onDismiss !== undefined ? { onDismiss } : {})}
+        />
       </Speech>
     );
   }
@@ -409,6 +396,186 @@ export function CompanionBubble({
   );
 }
 
+/** Whether the person asked the system for less motion. */
+function reducedMotion(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
+/** How fast a beat types in: quick enough to read along, slow enough to feel spoken. */
+const TYPE_MS = 22;
+
+/** `text` revealed a character at a time, or whole at once when motion is reduced. */
+function useTyped(text: string): string {
+  const [still] = useState(reducedMotion);
+  const [shown, setShown] = useState(still ? text.length : 0);
+  const [typing, setTyping] = useState(text);
+  if (typing !== text) {
+    setTyping(text);
+    setShown(still ? text.length : 0);
+  }
+  useEffect(() => {
+    if (still) return;
+    const timer = setInterval(() => {
+      setShown((count) => {
+        if (count + 1 >= text.length) clearInterval(timer);
+        return Math.min(count + 1, text.length);
+      });
+    }, TYPE_MS);
+    return () => clearInterval(timer);
+  }, [text, still]);
+  return text.slice(0, shown);
+}
+
+/**
+ * The first hello, once, after Welcome: three short beats typed into the bubble, with Next
+ * between them, ending on the key to press. Handwritten, so it works before any brain does.
+ * A screen reader hears each beat whole; the typing is for the eyes only.
+ */
+function Intro({
+  petName,
+  hotkeyLabel,
+  onTry,
+  onDismiss,
+}: {
+  petName: string;
+  hotkeyLabel: string;
+  onTry: () => void;
+  onDismiss?: () => void;
+}) {
+  const beats = [
+    `Hi, I’m ${petName}. I sit in the corner of your screen and keep an eye on what you’re working on, never on passwords or private windows.`,
+    'Ask me about whatever you’re on. When it needs real work, I brief an expert, like Claude Code, and bring the answer back.',
+    `Press ${hotkeyLabel} anytime.`,
+  ];
+  const [beat, setBeat] = useState(0);
+  const text = beats[beat] ?? '';
+  const typed = useTyped(text);
+  const last = beat === beats.length - 1;
+  const primary = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (last) primary.current?.focus();
+  }, [last]);
+  return (
+    <div className="bubble bubble--intro">
+      <style>{BUBBLE_CSS}</style>
+      <div className="bubble-hello">
+        <p className="bubble-text bubble-typed" aria-hidden="true">
+          <span data-testid="intro-typed">{typed}</span>
+          {/* Holds the bubble at the beat's full height, so it does not grow as it types. */}
+          <span className="bubble-ghost">{text.slice(typed.length)}</span>
+        </p>
+        <p role="status" className="bubble-sr">
+          {text}
+        </p>
+      </div>
+      <div className="bubble-row">
+        <span className="bubble-steps" aria-hidden="true">
+          {beats.map((_, index) => (
+            <span key={index} className="bubble-step" data-on={index === beat} />
+          ))}
+        </span>
+        {last ? (
+          <>
+            <button ref={primary} type="button" className="bubble-primary" onClick={onTry}>
+              Try it now
+            </button>
+            <button type="button" className="bubble-quiet" onClick={onDismiss}>
+              Got it
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            className="bubble-quiet bubble-next"
+            onClick={() => setBeat((index) => index + 1)}
+          >
+            Next
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export interface GreetingLineProps {
+  petName: string;
+  /** The one line the pet says as the app opens. */
+  text: string;
+  /** It left: the time ran out, or the person closed it. */
+  onDone: () => void;
+  /** The person clicked it: open the bubble to ask. */
+  onOpen?: () => void;
+  tail?: 'left' | 'right';
+  /** How long it stays when nobody touches it. */
+  holdMs?: number;
+}
+
+/** How long the fade out takes before the line is gone. */
+const LEAVE_MS = 300;
+
+/**
+ * The quiet hello on a later launch: one line beside the pet that fades after a few seconds.
+ * Pointing at it or tabbing into it keeps it there; clicking it opens the bubble to ask.
+ */
+export function GreetingLine({
+  petName,
+  text,
+  onDone,
+  onOpen,
+  tail,
+  holdMs = 7_000,
+}: GreetingLineProps) {
+  const [held, setHeld] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const done = useEffectEvent(onDone);
+  useEffect(() => {
+    if (held) return;
+    const fade = setTimeout(() => setLeaving(true), holdMs);
+    const gone = setTimeout(() => done(), holdMs + LEAVE_MS);
+    return () => {
+      clearTimeout(fade);
+      clearTimeout(gone);
+    };
+  }, [held, holdMs]);
+  const hold = (): void => {
+    setHeld(true);
+    setLeaving(false);
+  };
+  return (
+    <Speech tail={tail}>
+      <div
+        className="bubble bubble--line"
+        data-leaving={leaving}
+        onMouseEnter={hold}
+        onMouseLeave={() => setHeld(false)}
+        onFocus={hold}
+        onBlur={() => setHeld(false)}
+      >
+        <style>{BUBBLE_CSS}</style>
+        <div className="bubble-top">
+          <button
+            type="button"
+            className="bubble-say"
+            aria-label={`Ask ${petName} something`}
+            onClick={onOpen}
+          >
+            <span role="status" aria-live="polite" className="bubble-text">
+              {text}
+            </span>
+          </button>
+          <button type="button" className="bubble-close" aria-label="Close" onClick={onDone}>
+            ×
+          </button>
+        </div>
+      </div>
+    </Speech>
+  );
+}
+
 /** The bubble with a speech tail on the side the pet is on, so it reads as the pet talking. */
 function Speech({ tail, children }: { tail: 'left' | 'right' | undefined; children: ReactNode }) {
   return (
@@ -487,5 +654,31 @@ const BUBBLE_CSS = `
 .bubble-quiet {
   align-self: flex-start; min-height: 28px; padding: 0 10px; border: 1px solid ${t.color.fieldLine};
   border-radius: 6px; background: transparent; color: #C9CEE0; font: inherit; font-size: 12px; cursor: pointer;
+}
+.bubble-primary:focus-visible, .bubble-quiet:focus-visible, .bubble-close:focus-visible, .bubble-say:focus-visible {
+  outline: 2px solid #7CB8F2; outline-offset: 2px;
+}
+.bubble--intro, .bubble--line { animation: bubble-in 220ms ease-out both; }
+.bubble-typed { min-height: 3em; }
+.bubble-ghost { visibility: hidden; }
+.bubble-sr {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.bubble-steps { display: inline-flex; gap: 6px; margin-right: auto; }
+.bubble-step { width: 6px; height: 6px; border-radius: 50%; background: ${t.color.fieldLine}; }
+.bubble-step[data-on='true'] { background: ${t.color.gold}; }
+.bubble-next { align-self: center; }
+.bubble--line { padding: 10px 8px 10px 14px; transition: opacity ${LEAVE_MS}ms ease, transform ${LEAVE_MS}ms ease; }
+.bubble--line[data-leaving='true'] { opacity: 0; transform: translateY(4px); }
+.bubble--line .bubble-top { align-items: center; }
+.bubble-say {
+  flex: 1; padding: 0; border: 0; border-radius: 6px; background: transparent; color: inherit;
+  font: inherit; text-align: left; cursor: pointer;
+}
+@keyframes bubble-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .bubble--intro, .bubble--line { animation: none; transition: none; }
+  .bubble--line[data-leaving='true'] { transform: none; }
 }
 `;

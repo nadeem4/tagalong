@@ -114,6 +114,9 @@ The extension's public privacy policy, for the Chrome Web Store, is
   request is built and the host is told with a `turn.warning` (`code: "vision_unsupported"`), so the
   turn still answers instead of failing.
 - API keys live in the OS keychain through Electron safe storage.
+- The hello Scout says as Tagalong opens reads nothing on screen. The summaries model is sent only
+  the time of day, how long since Tagalong last opened, and the names and briefs of expert hand-offs
+  that finished meanwhile. Turn it off under Settings → Privacy → **Say hello when Tagalong opens**.
 
 ## Rolling memory: what the buffer holds
 

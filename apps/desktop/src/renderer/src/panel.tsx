@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { CompanionBubble, HostBridgeProvider } from '@tagalong/ui';
+import { CompanionBubble, GreetingLine, HostBridgeProvider } from '@tagalong/ui';
 import type { ContextSnapshot } from '@tagalong/protocol';
 import './app.css';
 import '../../shared/ipc';
@@ -27,6 +27,7 @@ function Panel() {
   const [hotkeyProblem, setHotkeyProblem] = useState<string | null>(null);
   const [mode, setMode] = useState<'bubble' | 'chat'>('bubble');
   const [greeting, setGreeting] = useState(false);
+  const [line, setLine] = useState<string | null>(null);
   // Which side of the pet this window sits on; the speech tail points the other way, at it.
   const [side, setSide] = useState<'left' | 'right'>('left');
   const root = useRef<HTMLDivElement>(null);
@@ -42,7 +43,18 @@ function Panel() {
     () =>
       window.tagalongHost.onGreet(() => {
         setMode('bubble');
+        setLine(null);
         setGreeting(true);
+      }),
+    [],
+  );
+
+  // A later launch: one quiet line, which fades and hides the window unless touched.
+  useEffect(
+    () =>
+      window.tagalongHost.onGreetLine((text) => {
+        setMode('bubble');
+        setLine(text);
       }),
     [],
   );
@@ -73,6 +85,7 @@ function Panel() {
     return window.tagalongHost.onContext((next) => {
       setSnapshot(next);
       setGreeting(false);
+      setLine(null);
     });
   }, []);
 
@@ -118,19 +131,32 @@ function Panel() {
               </button>
             </p>
           )}
-          <CompanionBubble
-            petId={petId}
-            petName={petName}
-            greeting={greeting}
-            hotkeyLabel={hotkeyLabel}
-            expanded={mode === 'chat'}
-            onDismiss={dismissGreeting}
-            onOpenChat={() => setMode('chat')}
-            onCollapse={() => setMode('bubble')}
-            onClose={() => void window.tagalongHost.hidePanel()}
-            tail={side === 'left' ? 'right' : 'left'}
-            {...(snapshot !== null ? { snapshot } : {})}
-          />
+          {line !== null ? (
+            <GreetingLine
+              petName={petName}
+              text={line}
+              tail={side === 'left' ? 'right' : 'left'}
+              onDone={() => {
+                setLine(null);
+                void window.tagalongHost.hidePanel();
+              }}
+              onOpen={() => setLine(null)}
+            />
+          ) : (
+            <CompanionBubble
+              petId={petId}
+              petName={petName}
+              greeting={greeting}
+              hotkeyLabel={hotkeyLabel}
+              expanded={mode === 'chat'}
+              onDismiss={dismissGreeting}
+              onOpenChat={() => setMode('chat')}
+              onCollapse={() => setMode('bubble')}
+              onClose={() => void window.tagalongHost.hidePanel()}
+              tail={side === 'left' ? 'right' : 'left'}
+              {...(snapshot !== null ? { snapshot } : {})}
+            />
+          )}
         </div>
       </div>
     </HostBridgeProvider>

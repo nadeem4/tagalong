@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ContextSnapshot } from '@tagalong/protocol';
-import { CompanionBubble } from './companion-bubble';
+import { CompanionBubble, GreetingLine } from './companion-bubble';
 import { HostBridgeProvider } from './host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from './test-support/fake-host-bridge';
 
@@ -43,28 +43,81 @@ const ask = (text: string) => {
   fireEvent.keyDown(input, { key: 'Enter' });
 };
 
-describe('CompanionBubble', () => {
-  it('greets once after Welcome: how it works, the key to press, and Got it', () => {
+const BEAT_ONE =
+  'Hi, I’m Scout. I sit in the corner of your screen and keep an eye on what you’re working on, never on passwords or private windows.';
+const BEAT_TWO =
+  'Ask me about whatever you’re on. When it needs real work, I brief an expert, like Claude Code, and bring the answer back.';
+
+/** Says whether the person asked for reduced motion; jsdom has no matchMedia of its own. */
+function prefersReducedMotion(reduce: boolean): void {
+  vi.stubGlobal(
+    'matchMedia',
+    (query: string) => ({ matches: reduce && query.includes('reduce'), media: query }) as never,
+  );
+}
+
+/** Steps through the intro's first two beats to the last one. */
+function toLastBeat(): void {
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+}
+
+describe('CompanionBubble intro', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it('introduces itself in three beats after Welcome, with Next between them', () => {
+    prefersReducedMotion(true);
     const onDismiss = vi.fn();
     renderBubble(createFakeHostBridge(), {
       greeting: true,
       hotkeyLabel: 'Ctrl+Shift+Space',
       onDismiss,
     });
-    const hello = screen.getByRole('status');
-    expect(hello).toHaveTextContent('Hi, I’m Scout.');
-    expect(hello).toHaveTextContent(
-      'You show me what you’re on, I brief the right expert, and I bring the answer back.',
-    );
-    expect(hello).toHaveTextContent('Press Ctrl+Shift+Space whenever you want me, or click me.');
+
+    expect(screen.getByRole('status')).toHaveTextContent(BEAT_ONE);
+    expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+    expect(screen.getByRole('status')).toHaveTextContent(BEAT_TWO);
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+    expect(screen.getByRole('status')).toHaveTextContent('Press Ctrl+Shift+Space anytime.');
+    expect(screen.queryByRole('button', { name: 'Next' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Try it now' })).toHaveFocus();
     fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
     expect(onDismiss).toHaveBeenCalledOnce();
   });
 
+  it('types each beat in, while a screen reader hears the whole line at once', () => {
+    prefersReducedMotion(false);
+    vi.useFakeTimers();
+    renderBubble(createFakeHostBridge(), { greeting: true });
+
+    const shown = screen.getByTestId('intro-typed');
+    expect(shown.closest('[aria-hidden="true"]')).not.toBeNull();
+    expect(shown.textContent!.length).toBeLessThan(BEAT_ONE.length);
+    expect(screen.getByRole('status')).toHaveTextContent(BEAT_ONE);
+
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(shown).toHaveTextContent(BEAT_ONE);
+  });
+
+  it('shows each beat whole, with no typing, when motion is reduced', () => {
+    prefersReducedMotion(true);
+    renderBubble(createFakeHostBridge(), { greeting: true });
+    expect(screen.getByTestId('intro-typed')).toHaveTextContent(BEAT_ONE);
+  });
+});
+
+describe('CompanionBubble', () => {
   it('tries it at once from the hello: looks at the screen and asks about it', async () => {
     const bridge = createFakeHostBridge({ capture: SNAPSHOT });
     const onDismiss = vi.fn();
     renderBubble(bridge, { greeting: true, onDismiss });
+    toLastBeat();
 
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Try it now' })));
 
@@ -78,6 +131,7 @@ describe('CompanionBubble', () => {
   it('still tries it when it cannot see the screen, without a snapshot', async () => {
     const bridge = createFakeHostBridge({ capture: null });
     renderBubble(bridge, { greeting: true });
+    toLastBeat();
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Try it now' })));
     expect(bridge.asks).toEqual([{ petId: 'scout', text: TRY_IT }]);
   });
@@ -299,5 +353,45 @@ describe('CompanionBubble, attached to the pet', () => {
       </HostBridgeProvider>,
     );
     expect(container.querySelector('[data-tail]')).toHaveAttribute('data-tail', 'left');
+  });
+});
+
+describe('GreetingLine', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('says one line politely, then leaves on its own after a few seconds', () => {
+    vi.useFakeTimers();
+    const onDone = vi.fn();
+    render(
+      <GreetingLine petName="Scout" text="Morning. I’m here when you need me." onDone={onDone} />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Morning. I’m here when you need me.');
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(onDone).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(5_000));
+    expect(onDone).toHaveBeenCalledOnce();
+  });
+
+  it('stays while the pointer is on it, and leaves after it moves away', () => {
+    vi.useFakeTimers();
+    const onDone = vi.fn();
+    render(<GreetingLine petName="Scout" text="Evening." onDone={onDone} />);
+    const line = screen.getByRole('status').closest('.bubble')!;
+    fireEvent.mouseEnter(line);
+    act(() => vi.advanceTimersByTime(30_000));
+    expect(onDone).not.toHaveBeenCalled();
+    fireEvent.mouseLeave(line);
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(onDone).toHaveBeenCalledOnce();
+  });
+
+  it('opens the bubble to ask on a click, and closes from its button', () => {
+    const onDone = vi.fn();
+    const onOpen = vi.fn();
+    render(<GreetingLine petName="Scout" text="Evening." onDone={onDone} onOpen={onOpen} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Scout something' }));
+    expect(onOpen).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onDone).toHaveBeenCalledOnce();
   });
 });

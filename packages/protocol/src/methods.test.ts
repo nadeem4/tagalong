@@ -46,6 +46,7 @@ const HOST_TO_CORE = [
   'handoffs.confirm',
   'handoffs.dismiss',
   'projects.search',
+  'greeting.compose',
 ] as const;
 
 const CORE_TO_HOST = ['perception.capture'] as const;
@@ -115,6 +116,22 @@ describe('schema lookup helpers', () => {
   it('rejects an unknown host capability', () => {
     const bad = { host: 'desktop', version: '0.0.0', capabilities: ['mind-reading'], token: 'x' };
     expect(paramsSchemaFor('hello').safeParse(bad).success).toBe(false);
+  });
+});
+
+describe('greeting.compose', () => {
+  it('names the pet that says hello, and returns one line and where it came from', () => {
+    expect(paramsSchemaFor('greeting.compose').parse({ petId: 'scout' })).toEqual({
+      petId: 'scout',
+    });
+    const line = { text: 'Morning. I’m here when you need me.', source: 'fallback' };
+    expect(resultSchemaFor('greeting.compose').parse(line)).toEqual(line);
+  });
+
+  it('refuses an empty line', () => {
+    expect(
+      resultSchemaFor('greeting.compose').safeParse({ text: '', source: 'model' }).success,
+    ).toBe(false);
   });
 });
 

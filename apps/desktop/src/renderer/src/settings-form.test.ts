@@ -280,6 +280,17 @@ describe('keyCaps', () => {
   });
 });
 
+describe('buildSettingsPatch greeting', () => {
+  it('carries the greeting switch when the form shows it', () => {
+    expect(buildSettingsPatch({ ...values, greeting: false }).greeting).toBe(false);
+    expect(buildSettingsPatch({ ...values, greeting: true }).greeting).toBe(true);
+  });
+
+  it('leaves it alone when the form does not show it', () => {
+    expect(buildSettingsPatch(values).greeting).toBeUndefined();
+  });
+});
+
 describe('buildSettingsPatch awareness', () => {
   const awareness = {
     rollingMemoryEnabled: true,
