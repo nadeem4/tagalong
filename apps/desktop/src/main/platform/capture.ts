@@ -15,6 +15,8 @@ export interface CaptureImagePort {
 
 /** One capturable surface. The snake_case `display_id` is Electron's own spelling. */
 export interface CaptureSource {
+  /** On Windows `window:<handle>:0` for a window, which is how a listed window is found. */
+  id?: string;
   name: string;
   display_id: string;
   thumbnail: CaptureImagePort;
@@ -109,14 +111,43 @@ export async function captureActiveWindowImageWith(
     return null;
   }
 
+  const image = encode(source, maxLongSide);
+  log(`captureActiveWindowImage: '${source.name}' ${image.width}x${image.height}`);
+  return image;
+}
+
+/**
+ * Captures one window by its handle, as `list_windows` named it, whether it is in front or
+ * behind others. A minimized window has nothing drawn, so it comes back null.
+ *
+ * Exclusions are the caller's to check, against the classified window list, before this
+ * runs: the pixels of a blind spot are never read at all.
+ */
+export async function captureWindowImageWith(
+  deps: Pick<WindowCaptureDeps, 'desktopCapturer' | 'log'>,
+  handle: number,
+  maxLongSide: number,
+): Promise<CapturedImage | null> {
+  const sources = await deps.desktopCapturer.getSources({
+    types: ['window'],
+    thumbnailSize: { width: maxLongSide, height: maxLongSide },
+  });
+  const source = sources.find((s) => s.id?.startsWith(`window:${handle}:`) === true && usable(s));
+  if (source === undefined) {
+    deps.log?.(`captureWindowImage: nothing capturable for window ${handle}`);
+    return null;
+  }
+  return encode(source, maxLongSide);
+}
+
+/** The source's thumbnail as a PNG inside the bound. */
+function encode(source: CaptureSource, maxLongSide: number): CapturedImage {
   const size = source.thumbnail.getSize();
   const target = fitWithin(size.width, size.height, maxLongSide);
   const resized =
     target.width === size.width && target.height === size.height
       ? source.thumbnail
       : source.thumbnail.resize(target);
-
-  log(`captureActiveWindowImage: '${source.name}' ${target.width}x${target.height}`);
   return {
     base64: resized.toPNG().toString('base64'),
     width: target.width,

@@ -12,6 +12,7 @@ import {
   LIST_WINDOWS,
   LOOK_AT_DISPLAY,
   LOOK_AT_SCREEN,
+  LOOK_AT_WINDOW,
   LOOK_CLOSER,
   READ_WINDOW_TEXT,
 } from './perception';
@@ -71,6 +72,7 @@ interface FullViewCalls {
   captureRegion: Array<{ displayId: number; rect: unknown; maxLongSide: number }>;
   listWindows: number;
   readText: Array<{ windowId?: string; maxChars: number }>;
+  captureWindow: Array<{ windowId: string; maxLongSide: number }>;
 }
 
 /** A host answering the three full-view methods, recording exactly what it was asked. */
@@ -82,7 +84,12 @@ function fullViewHost(
     'textLayer',
   ],
 ): PerceptionHost & { calls: FullViewCalls } {
-  const calls: FullViewCalls = { captureRegion: [], listWindows: 0, readText: [] };
+  const calls: FullViewCalls = {
+    captureRegion: [],
+    listWindows: 0,
+    readText: [],
+    captureWindow: [],
+  };
   return {
     capabilities,
     calls,
@@ -105,6 +112,10 @@ function fullViewHost(
         truncated: false,
         source: 'uia' as const,
       });
+    },
+    captureWindow: (params) => {
+      calls.captureWindow.push(params);
+      return Promise.resolve({ windowId: params.windowId, image: IMAGE });
     },
   };
 }
@@ -134,6 +145,7 @@ describe('the full-view toolset', () => {
       LOOK_CLOSER,
       LIST_WINDOWS,
       READ_WINDOW_TEXT,
+      LOOK_AT_WINDOW,
       'recall_screen',
       'what_changed',
     ]);
@@ -442,5 +454,45 @@ describe('the read_window_text description', () => {
     const wording = JSON.stringify(tool).toLowerCase();
     expect(wording).not.toMatch(/\b\d{3,}\b/);
     expect(wording).toContain('settings');
+  });
+});
+
+describe('look_at_window', () => {
+  it('photographs one listed window, even one behind others, and hands back the pixels', async () => {
+    const host = fullViewHost();
+    const result = await toolset([host]).run({ name: LOOK_AT_WINDOW, input: { windowId: 'w-1' } });
+
+    expect(host.calls.captureWindow).toEqual([{ windowId: 'w-1', maxLongSide: 1568 }]);
+    const blocks = imageBlocks(result.content);
+    expect(blocks[0]).toEqual({ type: 'image', mime: 'image/png', base64: PNG });
+  });
+
+  it('needs a window id', async () => {
+    const result = await toolset([fullViewHost()]).run({ name: LOOK_AT_WINDOW, input: {} });
+    expect(result.isError).toBe(true);
+    expect(asText(result.content)).toMatch(/list_windows/);
+  });
+
+  it('repeats why there is no picture: a blind spot, or a minimized window', async () => {
+    const host = fullViewHost();
+    host.captureWindow = (params) =>
+      Promise.resolve({
+        windowId: params.windowId,
+        blocked: { rule: 'titlePattern', entry: '.env' },
+        notes: ['This window is a blind spot.'],
+      });
+
+    const result = await toolset([host]).run({ name: LOOK_AT_WINDOW, input: { windowId: 'w-1' } });
+
+    expect(result.isError).toBe(true);
+    expect(asText(result.content)).toContain('This window is a blind spot.');
+  });
+
+  it('says it cannot see images rather than pretending to', async () => {
+    const result = await toolset([fullViewHost()], false).run({
+      name: LOOK_AT_WINDOW,
+      input: { windowId: 'w-1' },
+    });
+    expect(asText(result.content)).toMatch(/cannot look at images/);
   });
 });

@@ -178,6 +178,22 @@ export const PerceptionCaptureRegionParams = z.object({
 });
 export const PerceptionCaptureRegionResult = z.object({ image: CapturedImage });
 
+/**
+ * A screenshot of one listed window, in front or behind others. A minimized window has
+ * nothing drawn, and a blind spot is refused: both come back without an image, with notes
+ * saying why, so the pet can repeat the reason instead of guessing.
+ */
+export const PerceptionCaptureWindowParams = z.object({
+  windowId: z.string().min(1),
+  maxLongSide: z.number().int().positive(),
+});
+export const PerceptionCaptureWindowResult = z.object({
+  windowId: z.string().min(1),
+  image: CapturedImage.optional(),
+  blocked: CaptureBlock.optional(),
+  notes: z.array(z.string()).optional(),
+});
+
 /** Phase 2B. Every top-level window: what and where, never what is inside. */
 export const PerceptionListWindowsParams = Empty;
 export const PerceptionListWindowsResult = z.object({ windows: z.array(WindowEntry) });
@@ -231,6 +247,8 @@ export type PerceptionReadTextResult = z.infer<typeof PerceptionReadTextResult>;
 export type PerceptionListWindowsResult = z.infer<typeof PerceptionListWindowsResult>;
 export type PerceptionCaptureRegionResult = z.infer<typeof PerceptionCaptureRegionResult>;
 export type PerceptionCaptureRegionParams = z.infer<typeof PerceptionCaptureRegionParams>;
+export type PerceptionCaptureWindowParams = z.infer<typeof PerceptionCaptureWindowParams>;
+export type PerceptionCaptureWindowResult = z.infer<typeof PerceptionCaptureWindowResult>;
 
 // ---------------------------------------------------------------------------
 // Core to host notifications (no result; the host must not answer)
@@ -378,6 +396,10 @@ export const coreToHostMethods = {
   'perception.captureRegion': {
     params: PerceptionCaptureRegionParams,
     result: PerceptionCaptureRegionResult,
+  },
+  'perception.captureWindow': {
+    params: PerceptionCaptureWindowParams,
+    result: PerceptionCaptureWindowResult,
   },
   'perception.listWindows': {
     params: PerceptionListWindowsParams,

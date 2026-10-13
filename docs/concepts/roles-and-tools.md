@@ -245,7 +245,7 @@ packages/core/src/tools/
   fake-turn.ts     fakeTurn and fakeTurnTools, for testing tools without a runner
   builtin/
     perception.ts  look_at_screen, get_selection, list_displays, look_at_display,
-                   look_closer, list_windows, read_window_text
+                   look_closer, list_windows, read_window_text, look_at_window
     awareness.ts   recall_screen, what_changed, watch_for
     crew.ts        remember, ask_pet
     experts.ts     hand_to_expert
@@ -253,7 +253,7 @@ packages/core/src/tools/
 
 - **Kind.** A tool is `write` when it leaves stored state behind after the turn: `remember` files a
   memory, `watch_for` starts a watch, `hand_to_expert` starts a hand-off and remembers which expert
-  took that kind of task. The other ten are `read`; `ask_pet` costs a model call but stores nothing.
+  took that kind of task. The other eleven are `read`; `ask_pet` costs a model call but stores nothing.
 - **Context.** Every tool runs with the turn's pet, turn id, abort signal, snapshot, whether the
   pet's brain can see, and a counter for nested model calls.
 - **Which tools a turn gets.** The registry builds what the engine is wired for, in a fixed order,

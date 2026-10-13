@@ -68,6 +68,19 @@ export async function startEngineHost(options: StartEngineHostOptions): Promise<
       }
       return { image: { mime: 'image/png', ...image } };
     },
+    captureWindow: async (params) => {
+      const shot = await options.platform.lookAtWindow(params, options.captureExclusions());
+      // A window screenshot is a capture like any other: the badge and the tray say so.
+      options.onCapture(
+        captureNotice({
+          at: new Date(),
+          screenshot: true,
+          blocked: shot.blocked ?? null,
+          paused: false,
+        }),
+      );
+      return shot;
+    },
     capture: async (what) => {
       const { patch, blocked, paused } = await capturePatch(options.platform, what, {
         exclusions: options.captureExclusions(),

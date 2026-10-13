@@ -11,6 +11,7 @@ tools:
   - look_closer
   - list_windows
   - read_window_text
+  - look_at_window
   - recall_screen
   - what_changed
   - remember

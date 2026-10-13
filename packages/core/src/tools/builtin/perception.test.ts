@@ -76,8 +76,9 @@ describe('perception tool definitions', () => {
     // answers to "what is the user looking at". The full-view set has its own test.
     const names = toolset([]).definitions.map((tool) => tool.name);
     expect(names.slice(0, 2)).toEqual([LOOK_AT_SCREEN, GET_SELECTION]);
-    // Seven since Phase 2B; nine since Phase 3B added recall_screen and what_changed.
-    expect(names).toHaveLength(9);
+    // Seven since Phase 2B; nine since Phase 3B added recall_screen and what_changed; ten
+    // with look_at_window.
+    expect(names).toHaveLength(10);
   });
 
   it('describes each tool so a model knows when to reach for it', () => {
