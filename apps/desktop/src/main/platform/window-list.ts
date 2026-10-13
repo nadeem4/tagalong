@@ -110,7 +110,18 @@ export interface EnumeratedWindow extends ObservedWindow {
 }
 
 export interface DisplayLookup {
-  getDisplayMatching(bounds: WindowBounds): { id: number };
+  /** Electron's Display carries its bounds; a lookup without them never marks full screen. */
+  getDisplayMatching(bounds: WindowBounds): { id: number; bounds?: WindowBounds };
+}
+
+/** The window covers the whole display, taskbar included: a game, a film, a slideshow. */
+function covers(window: WindowBounds, display: WindowBounds): boolean {
+  return (
+    window.x <= display.x &&
+    window.y <= display.y &&
+    window.x + window.width >= display.x + display.width &&
+    window.y + window.height >= display.y + display.height
+  );
 }
 
 /**
@@ -127,7 +138,9 @@ export function placeOnDisplays(
   return windows.map(({ bounds, ...window }) => {
     if (!onScreen(bounds)) return window;
     try {
-      return { ...window, displayId: screen.getDisplayMatching(bounds).id };
+      const display = screen.getDisplayMatching(bounds);
+      const fullScreen = display.bounds !== undefined && covers(bounds, display.bounds);
+      return { ...window, displayId: display.id, ...(fullScreen ? { fullScreen } : {}) };
     } catch {
       return window;
     }
