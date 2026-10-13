@@ -1,5 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import type { Brief, Expert, Pet, PetRemarkParams, Settings, WindowEntry } from '@tagalong/protocol';
+import type {
+  Brief,
+  Expert,
+  Pet,
+  PetRemarkParams,
+  Settings,
+  WindowEntry,
+} from '@tagalong/protocol';
 import type { BrainProvider } from '../providers';
 import type { PerceptionHost } from '../perception';
 import { Lookout } from './lookout';

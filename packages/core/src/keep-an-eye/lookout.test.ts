@@ -11,11 +11,7 @@ import {
 
 const NONE: CaptureExclusions = { processNames: [], titlePatterns: [] };
 
-function win(
-  id: string,
-  title: string,
-  extra: Partial<WindowEntry> = {},
-): WindowEntry {
+function win(id: string, title: string, extra: Partial<WindowEntry> = {}): WindowEntry {
   return {
     id,
     processName: 'Code.exe',

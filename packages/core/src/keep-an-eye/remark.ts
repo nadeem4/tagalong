@@ -45,7 +45,10 @@ export function parseRemark(raw: string): Remark | null {
   if (/\p{Extended_Pictographic}/u.test(first)) return null;
 
   const offerLine = lines.slice(1).find((line) => /^offer:/i.test(line));
-  const offer = offerLine?.replace(/^offer:\s*/i, '').trim().slice(0, MAX_OFFER_CHARS);
+  const offer = offerLine
+    ?.replace(/^offer:\s*/i, '')
+    .trim()
+    .slice(0, MAX_OFFER_CHARS);
   return offer === undefined || offer.length === 0 ? { text: first } : { text: first, offer };
 }
 

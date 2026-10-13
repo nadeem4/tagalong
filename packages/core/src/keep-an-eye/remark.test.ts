@@ -36,7 +36,11 @@ function brain(reply: string | Error, stopReason: BrainResult['stopReason'] = 'e
     complete: (request) => {
       requests.push(request);
       if (reply instanceof Error) return Promise.reject(reply);
-      return Promise.resolve({ text: reply, stopReason, usage: { inputTokens: 1, outputTokens: 1 } });
+      return Promise.resolve({
+        text: reply,
+        stopReason,
+        usage: { inputTokens: 1, outputTokens: 1 },
+      });
     },
   };
   return {
@@ -65,7 +69,9 @@ describe('parseRemark', () => {
 
   it('reads an offer from a second line', () => {
     expect(
-      parseRemark('That test fails on a missing import.\nOFFER: Add the missing import to parser.ts'),
+      parseRemark(
+        'That test fails on a missing import.\nOFFER: Add the missing import to parser.ts',
+      ),
     ).toEqual({
       text: 'That test fails on a missing import.',
       offer: 'Add the missing import to parser.ts',
@@ -121,11 +127,23 @@ describe('composeRemark', () => {
   it('says nothing when the brain fails or stops early', async () => {
     const failed = brain(new Error('offline'));
     expect(
-      await composeRemark({ pet: scout, summarizer: null, provider: failed.resolve, window, text: '' }),
+      await composeRemark({
+        pet: scout,
+        summarizer: null,
+        provider: failed.resolve,
+        window,
+        text: '',
+      }),
     ).toBeNull();
     const cut = brain('That test fails', 'max_tokens');
     expect(
-      await composeRemark({ pet: scout, summarizer: null, provider: cut.resolve, window, text: '' }),
+      await composeRemark({
+        pet: scout,
+        summarizer: null,
+        provider: cut.resolve,
+        window,
+        text: '',
+      }),
     ).toBeNull();
   });
 });

@@ -87,7 +87,9 @@ function setup(options: { reply?: string; settings?: Partial<Settings>; experts?
 
 describe('KeepAnEye', () => {
   it('reads the window the person settled on, asks once, and says the line', async () => {
-    const { at, reads, requests, remarks } = setup({ reply: 'parser.ts imports a missing ./lexer.' });
+    const { at, reads, requests, remarks } = setup({
+      reply: 'parser.ts imports a missing ./lexer.',
+    });
     const code = win('w-1', 'parser.test.ts - Code');
     await at(0, [code]);
     expect(reads).toEqual([]);
@@ -95,7 +97,11 @@ describe('KeepAnEye', () => {
     expect(reads).toEqual(['w-1']);
     expect(requests).toHaveLength(1);
     expect(remarks).toEqual([
-      { remarkId: expect.any(String), petId: 'scout', text: 'parser.ts imports a missing ./lexer.' },
+      {
+        remarkId: expect.any(String),
+        petId: 'scout',
+        text: 'parser.ts imports a missing ./lexer.',
+      },
     ]);
   });
 
