@@ -2,7 +2,7 @@
   "name": "tagalong",
   "version": "0.0.0",
   "private": true,
-  "description": "A crew of AI companions that tag along on your screen.",
+  "description": "Scout, an AI companion that sees what you are working on and hands work to experts.",
   "license": "UNLICENSED",
   "type": "module",
   "packageManager": "pnpm@10.34.5",
