@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Section } from './section';
+import { Section, Tip } from './section';
 
 /**
  * The token the Chrome extension needs, once. Read-only and selectable, with a copy button,
@@ -8,11 +8,20 @@ import { Section } from './section';
 export function BrowserSection({ token }: { token: string | undefined }) {
   const [copied, setCopied] = useState(false);
   return (
-    <Section id="browser">
+    <Section id="browser" info={{ tip: 'browser', label: 'About the browser extension' }}>
+      <p className="tg-help">
+        Gives Scout the exact text you highlight in Chrome and the whole page you are on.
+      </p>
+      <Tip tip="browser">
+        Scout already sees Chrome without it, through screenshots and the window&apos;s text. The
+        extension adds exact selections, full page text and a Scout panel inside Chrome. It talks
+        only to Tagalong on this computer. Paste the token into the extension&apos;s options page
+        once. Anyone with the token can talk to Scout from this computer, so keep it to yourself.
+      </Tip>
       {token === undefined ? (
-        <p className="tg-note">The pairing token appears once the engine is running.</p>
+        <p className="tg-help">The pairing token appears once the engine is running.</p>
       ) : (
-        <>
+        <div className="tg-inline">
           <label>
             <span>Pairing token</span>
             <input
@@ -30,13 +39,9 @@ export function BrowserSection({ token }: { token: string | undefined }) {
               void navigator.clipboard.writeText(token).then(() => setCopied(true));
             }}
           >
-            {copied ? 'Copied' : 'Copy token'}
+            {copied ? 'Copied' : 'Copy'}
           </button>
-          <p className="tg-note" style={{ marginTop: 12 }}>
-            Paste it into the Tagalong extension&apos;s options page in Chrome. Anyone with this
-            token can drive your pets from this computer, so keep it to yourself.
-          </p>
-        </>
+        </div>
       )}
     </Section>
   );

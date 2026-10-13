@@ -152,8 +152,18 @@ describe('HandoffManager', () => {
         ),
     };
     const handoffs = manager(hanging);
-    handoffs.start({ expertId: 'claude-code', petId: 'scout', brief: { ask: 'a' }, folder: 'C:\\r' });
-    handoffs.start({ expertId: 'claude-code', petId: 'scout', brief: { ask: 'b' }, folder: 'C:\\r' });
+    handoffs.start({
+      expertId: 'claude-code',
+      petId: 'scout',
+      brief: { ask: 'a' },
+      folder: 'C:\\r',
+    });
+    handoffs.start({
+      expertId: 'claude-code',
+      petId: 'scout',
+      brief: { ask: 'b' },
+      folder: 'C:\\r',
+    });
     await handoffs.stopAll();
     expect(events.filter((e) => e.method === 'handoff.finished')).toHaveLength(2);
   });

@@ -490,9 +490,14 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
 
   // Settings is a page of Home now: opening Settings anywhere lands here.
   await panel.evaluate(() => window.tagalongHost.openSettings());
-  for (const section of ['Keys and services', 'Summaries', 'Hotkeys', 'Awareness']) {
+  for (const section of ['How Scout thinks', 'Privacy', 'Shortcuts', 'Advanced']) {
     await expect(home.getByRole('region', { name: section })).toBeVisible({ timeout: 15_000 });
   }
+  // Advanced is closed until asked for; it holds keys, summaries, sight detail and Welcome.
+  const advanced = home.getByRole('button', { name: /Advanced/ });
+  await expect(advanced).toHaveAttribute('aria-expanded', 'false');
+  await advanced.click();
+  await expect(home.getByRole('list', { name: 'API keys' })).toBeVisible();
   await expect(home.getByRole('button', { name: 'Open Welcome again' })).toBeVisible();
 
   // The Experts page lists the tools the companion hands work to.

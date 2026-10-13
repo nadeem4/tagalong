@@ -1,36 +1,58 @@
-import type { Settings } from '@tagalong/protocol';
-import type { ProviderChoice } from '../../../shared/ipc';
-import { Section } from './section';
+import type { SummarizerGroup } from '../settings-form';
+import { Info, Tip, useInvalid } from './section';
 
-/** Which brain folds long conversations into a short memory. */
+/**
+ * Which brain folds long conversations into a short memory note: "Same as Scout", or one
+ * model from a service that can be used now. Controlled, because the lists arrive after
+ * the page does and an uncontrolled select would lose the saved choice.
+ */
 export function SummariesSection({
-  providers,
-  settings,
+  groups,
+  value,
+  onChange,
 }: {
-  providers: readonly ProviderChoice[];
-  settings: Settings;
+  groups: readonly SummarizerGroup[];
+  value: string;
+  onChange: (value: string) => void;
 }) {
+  const invalid = useInvalid('summarizer');
   return (
-    <Section id="summaries">
-      <label>
-        <span>Summarizer provider (blank: each pet uses its own)</span>
-        <select name="summarizerProviderId" defaultValue={settings.summarizer?.providerId ?? ''}>
-          <option value="">Each pet&apos;s own provider</option>
-          {providers.map((choice) => (
-            <option key={choice.id} value={choice.id}>
-              {choice.label}
-            </option>
+    <div className="tg-group">
+      <div className="tg-titlerow">
+        <h3 className="tg-sub">Summaries</h3>
+        <Info tip="summaries" label="About summaries" />
+      </div>
+      <p className="tg-help">
+        Long chats are condensed into a short note so every ask stays quick.
+      </p>
+      <Tip tip="summaries">
+        After 20 messages, everything but the newest four is condensed into a short memory note, and
+        that note is sent in their place from then on. Each summary is one extra model call. On your
+        Claude sign-in it costs no money but counts toward your plan&apos;s usage, so a smaller
+        model uses less of it. &ldquo;Same as Scout&rdquo; is right for most people. Only services
+        that can be used now are listed.
+      </Tip>
+      <label className="tg-narrow" htmlFor={invalid.props.id}>
+        <span>Summarize with</span>
+        <select
+          name="summarizer"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          {...invalid.props}
+        >
+          <option value="">Same as Scout (default)</option>
+          {groups.map((group) => (
+            <optgroup key={group.label} label={group.label}>
+              {group.options.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </label>
-      <label>
-        <span>Summarizer model id (blank: each pet uses its own)</span>
-        <input name="summarizerModel" defaultValue={settings.summarizer?.model ?? ''} />
-      </label>
-      <p className="tg-note">
-        After twenty messages a conversation is folded into a short memory so the history sent to
-        the model stays small. Each summary is one model call.
-      </p>
-    </Section>
+      {invalid.message}
+    </div>
   );
 }

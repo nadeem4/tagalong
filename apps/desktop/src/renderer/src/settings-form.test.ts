@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { BLIND_SPOTS, MAX_WINDOW_TEXT_CHARS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
+import { MAX_WINDOW_TEXT_CHARS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
 
-import { blindSpotExamples, buildSettingsPatch } from './settings-form';
+import {
+  SettingsFieldError,
+  buildSettingsPatch,
+  isAdvancedField,
+  keyCaps,
+  summarizerGroups,
+  summarizerValue,
+} from './settings-form';
 import type { SettingsFormValues } from './settings-form';
 
 const values: SettingsFormValues = {
@@ -160,34 +167,116 @@ describe('buildSettingsPatch crew settings', () => {
     expect(buildSettingsPatch({ ...values, hiddenPets: ['bolt'] }).hiddenPets).toEqual(['bolt']);
   });
 
-  it('sends no summarizer when both boxes are blank, meaning each pet’s own brain', () => {
-    const patch = buildSettingsPatch({
-      ...values,
-      summarizerProviderId: '',
-      summarizerModel: '  ',
-    });
-    expect(patch.summarizer).toBeNull();
+  it('sends no summarizer for "Same as Scout"', () => {
+    expect(buildSettingsPatch({ ...values, summarizer: '' }).summarizer).toBeNull();
   });
 
-  it('carries a summarizer provider and model', () => {
+  it('carries the summarizer picked from the list as a provider and a model', () => {
     const patch = buildSettingsPatch({
       ...values,
-      summarizerProviderId: 'openrouter',
-      summarizerModel: ' anthropic/claude-haiku-4.5 ',
+      summarizer: summarizerValue('openrouter', 'anthropic/claude-haiku-4.5:free'),
     });
     expect(patch.summarizer).toEqual({
       providerId: 'openrouter',
-      model: 'anthropic/claude-haiku-4.5',
+      model: 'anthropic/claude-haiku-4.5:free',
     });
   });
 
-  it('refuses a summarizer model with no provider, or a provider with no model', () => {
+  it('refuses a summarizer choice it cannot read, naming the field', () => {
+    expect(() => buildSettingsPatch({ ...values, summarizer: 'openrouter' })).toThrow(
+      expect.objectContaining({ field: 'summarizer' }),
+    );
+  });
+});
+
+describe('summarizerGroups', () => {
+  const providers = [
+    { id: 'claude-code', label: 'Your Claude sign-in', needsKey: false, hasKey: false },
+    { id: 'openrouter', label: 'OpenRouter', needsKey: true, hasKey: true },
+    { id: 'nebius', label: 'Token Factory', needsKey: true, hasKey: false },
+  ];
+  const models = { openrouter: ['anthropic/claude-haiku-4.5', 'nvidia/nemotron'] };
+
+  it('offers Haiku and Sonnet on the Claude sign-in, then each keyed service that has a key', () => {
+    expect(summarizerGroups({ providers, signIn: 'signed-in', models, current: null })).toEqual([
+      {
+        label: 'Claude sign-in',
+        options: [
+          { value: summarizerValue('claude-code', 'haiku'), label: 'Haiku' },
+          { value: summarizerValue('claude-code', 'sonnet'), label: 'Sonnet' },
+        ],
+      },
+      {
+        label: 'OpenRouter',
+        options: [
+          {
+            value: summarizerValue('openrouter', 'anthropic/claude-haiku-4.5'),
+            label: 'anthropic/claude-haiku-4.5',
+          },
+          { value: summarizerValue('openrouter', 'nvidia/nemotron'), label: 'nvidia/nemotron' },
+        ],
+      },
+    ]);
+  });
+
+  it('leaves the Claude sign-in out when it was not found', () => {
+    const groups = summarizerGroups({ providers, signIn: 'not-installed', models, current: null });
+    expect(groups.map((group) => group.label)).toEqual(['OpenRouter']);
+  });
+
+  it('keeps the saved summarizer listed even when its service is no longer offered', () => {
+    const groups = summarizerGroups({
+      providers,
+      signIn: 'not-installed',
+      models: {},
+      current: { providerId: 'nebius', model: 'meta/llama' },
+    });
+    expect(groups).toContainEqual({
+      label: 'Token Factory',
+      options: [{ value: summarizerValue('nebius', 'meta/llama'), label: 'meta/llama' }],
+    });
+  });
+});
+
+describe('advanced field errors', () => {
+  it('names the field a refused value belongs to, so Settings can open Advanced on it', () => {
+    let caught: unknown;
+    try {
+      buildSettingsPatch({
+        ...values,
+        rollingMemoryEnabled: false,
+        rollingMemoryMinutes: '10',
+        watchMaxChecks: '60',
+        watchMaxConcurrent: '40',
+        watchTimeoutMinutes: '30',
+      });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(SettingsFieldError);
+    expect(caught).toMatchObject({ field: 'watchMaxConcurrent' });
+    expect(isAdvancedField('watchMaxConcurrent')).toBe(true);
+    expect(isAdvancedField('baseUrl:openrouter')).toBe(true);
+    expect(isAdvancedField('askHotkey')).toBe(false);
+  });
+
+  it('names the base URL box and the budget box too', () => {
     expect(() =>
-      buildSettingsPatch({ ...values, summarizerProviderId: '', summarizerModel: 'm' }),
-    ).toThrow(/summarizer/i);
-    expect(() =>
-      buildSettingsPatch({ ...values, summarizerProviderId: 'nebius', summarizerModel: '' }),
-    ).toThrow(/summarizer/i);
+      buildSettingsPatch({
+        ...values,
+        baseUrls: [{ providerId: 'openrouter', label: 'OpenRouter', value: 'nope' }],
+      }),
+    ).toThrow(expect.objectContaining({ field: 'baseUrl:openrouter' }));
+    expect(() => buildSettingsPatch({ ...values, windowTextBudget: 'x' })).toThrow(
+      expect.objectContaining({ field: 'windowTextBudget' }),
+    );
+  });
+});
+
+describe('keyCaps', () => {
+  it('shows an accelerator as the keys to press on this computer', () => {
+    expect(keyCaps('CommandOrControl+Shift+Alt+P', 'win32')).toEqual(['Ctrl', 'Shift', 'Alt', 'P']);
+    expect(keyCaps('CommandOrControl+Shift+Space', 'darwin')).toEqual(['Cmd', 'Shift', 'Space']);
   });
 });
 
@@ -225,18 +314,5 @@ describe('buildSettingsPatch awareness', () => {
     expect(() =>
       buildSettingsPatch({ ...values, ...awareness, watchMaxConcurrent: 'two' }),
     ).toThrow(/at once/i);
-  });
-});
-
-describe('blindSpotExamples', () => {
-  it('names the apps without .exe, and the files as they are', () => {
-    const [passwords, , files] = BLIND_SPOTS;
-    expect(blindSpotExamples(passwords!)).toMatch(/^1Password, Bitwarden, KeePass, /);
-    expect(blindSpotExamples(files!)).toMatch(/^\.env, \.env\.\*, \*\.pem, /);
-  });
-
-  it('falls back to the title patterns when a group has no apps or files', () => {
-    const privateBrowsing = BLIND_SPOTS.find((spot) => spot.label === 'Private browsing');
-    expect(blindSpotExamples(privateBrowsing!)).toBe('InPrivate, Incognito, Private Browsing');
   });
 });

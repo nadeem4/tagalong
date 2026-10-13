@@ -21,7 +21,7 @@ const homeHost: HomeHost = {
       // The fake provider is for tests and demos, never offered.
       providers: view.providers
         .filter((choice) => choice.id !== 'fake')
-        .map(({ id, label }) => ({ id, label })),
+        .map(({ id, label, needsKey }) => ({ id, label, needsKey })),
     };
   },
   listModels: (providerId) => window.tagalongHost.listModels(providerId),
@@ -40,7 +40,7 @@ function Home() {
     <HostBridgeProvider bridge={window.tagalong}>
       <HomeView
         host={homeHost}
-        settings={<SettingsPage embedded />}
+        settings={<SettingsPage embedded onOpenScout={() => setPage('scout')} />}
         {...(page === undefined ? {} : { page })}
         onPage={setPage}
       />
