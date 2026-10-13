@@ -3,7 +3,8 @@ import {
   MAX_WINDOW_TEXT_CHARS,
   SettingsPatch,
 } from '@tagalong/protocol';
-import type { BlindSpot, SettingsPatch as SettingsPatchType } from '@tagalong/protocol';
+import type { SettingsPatch as SettingsPatchType } from '@tagalong/protocol';
+import type { ClaudeSignIn, ProviderChoice } from '../../shared/ipc';
 
 /**
  * The settings form's raw values, as `FormData` hands them over: every field a string.
@@ -21,15 +22,43 @@ export interface SettingsFormValues {
   windowTextBudget: string;
   /** Phase 4. The pets unticked under "Show on desktop". Absent leaves the setting alone. */
   hiddenPets?: readonly string[];
-  /** Phase 4. Both blank means each pet summarises with its own brain. */
-  summarizerProviderId?: string;
-  summarizerModel?: string;
-  /** Phase 3B. Present together when the form shows the Awareness section. */
+  /** The summarizer list's value: blank for "Same as Scout", else `summarizerValue(…)`. */
+  summarizer?: string;
+  /** Phase 3B. Present together when the form shows rolling memory and the watches. */
   rollingMemoryEnabled?: boolean;
   rollingMemoryMinutes?: string;
   watchMaxChecks?: string;
   watchMaxConcurrent?: string;
   watchTimeoutMinutes?: string;
+}
+
+/**
+ * A value Settings refused, with the form field it came from, so the page can open the
+ * part it sits in and mark that field rather than only printing the sentence.
+ */
+export class SettingsFieldError extends Error {
+  constructor(
+    readonly field: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'SettingsFieldError';
+  }
+}
+
+/** The fields that live under Advanced: a refusal on one of them opens it. */
+const ADVANCED_FIELDS = new Set([
+  'summarizer',
+  'sightDetail',
+  'windowTextBudget',
+  'rollingMemoryMinutes',
+  'watchMaxChecks',
+  'watchMaxConcurrent',
+  'watchTimeoutMinutes',
+]);
+
+export function isAdvancedField(field: string): boolean {
+  return ADVANCED_FIELDS.has(field) || field.startsWith('baseUrl:') || field.startsWith('key:');
 }
 
 /**
@@ -54,14 +83,13 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
     sightDetail: values.sightDetail,
     windowTextBudget: parseBudget(values.windowTextBudget),
     ...(values.hiddenPets !== undefined ? { hiddenPets: [...values.hiddenPets] } : {}),
-    ...(values.summarizerProviderId !== undefined || values.summarizerModel !== undefined
-      ? { summarizer: parseSummarizer(values.summarizerProviderId, values.summarizerModel) }
-      : {}),
+    ...(values.summarizer !== undefined ? { summarizer: parseSummarizer(values.summarizer) } : {}),
     ...(values.rollingMemoryMinutes !== undefined
       ? {
           rollingMemory: {
             enabled: values.rollingMemoryEnabled === true,
             minutes: wholeNumber(
+              'rollingMemoryMinutes',
               values.rollingMemoryMinutes,
               1,
               MAX_ROLLING_MEMORY_MINUTES,
@@ -74,18 +102,21 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
       ? {
           watch: {
             maxChecks: wholeNumber(
+              'watchMaxChecks',
               values.watchMaxChecks,
               1,
               500,
               'Checks per watch must be a whole number between 1 and 500.',
             ),
             maxConcurrent: wholeNumber(
+              'watchMaxConcurrent',
               values.watchMaxConcurrent ?? '',
               1,
               10,
               'Watches at once must be a whole number between 1 and 10.',
             ),
             defaultTimeoutMinutes: wholeNumber(
+              'watchTimeoutMinutes',
               values.watchTimeoutMinutes ?? '',
               1,
               24 * 60,
@@ -98,28 +129,100 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
 }
 
 /** A whole number in bounds, or the sentence the person needs to fix it. */
-function wholeNumber(raw: string, min: number, max: number, problem: string): number {
+function wholeNumber(
+  field: string,
+  raw: string,
+  min: number,
+  max: number,
+  problem: string,
+): number {
   const value = Number(raw.trim());
   if (raw.trim().length === 0 || !Number.isInteger(value) || value < min || value > max) {
-    throw new Error(problem);
+    throw new SettingsFieldError(field, problem);
   }
   return value;
 }
 
-/** Both boxes or neither: half a summarizer is a typo, not a choice. */
-function parseSummarizer(
-  rawProvider: string | undefined,
-  rawModel: string | undefined,
-): { providerId: string; model: string } | null {
-  const providerId = (rawProvider ?? '').trim();
-  const model = (rawModel ?? '').trim();
-  if (providerId.length === 0 && model.length === 0) return null;
+/** Joins a provider and a model into one summarizer list value. Provider ids hold no `|`. */
+export function summarizerValue(providerId: string, model: string): string {
+  return `${providerId}|${model}`;
+}
+
+/** Blank is "Same as Scout"; anything else must be `provider|model`. */
+function parseSummarizer(raw: string): { providerId: string; model: string } | null {
+  if (raw.trim().length === 0) return null;
+  const split = raw.indexOf('|');
+  const providerId = split < 0 ? '' : raw.slice(0, split).trim();
+  const model = split < 0 ? '' : raw.slice(split + 1).trim();
   if (providerId.length === 0 || model.length === 0) {
-    throw new Error(
-      'The summarizer needs both a provider and a model — or leave both blank to use each pet’s own.',
-    );
+    throw new SettingsFieldError('summarizer', 'Pick a summarizer from the list.');
   }
   return { providerId, model };
+}
+
+/** One `<optgroup>` of the summarizer list. */
+export interface SummarizerGroup {
+  label: string;
+  options: { value: string; label: string }[];
+}
+
+/** The Claude sign-in models a summary may use. Opus is left out: a summary is small work. */
+const SIGN_IN_SUMMARY_MODELS = ['haiku', 'sonnet'] as const;
+
+/**
+ * The summarizer list's groups after "Same as Scout": Haiku and Sonnet on the Claude
+ * sign-in when it is signed in, then each keyed service that has a key, with its models.
+ * The saved choice is always listed, so opening Settings and saving cannot drop it.
+ */
+export function summarizerGroups({
+  providers,
+  signIn,
+  models,
+  current,
+}: {
+  providers: readonly ProviderChoice[];
+  signIn: ClaudeSignIn | null;
+  models: Readonly<Record<string, readonly string[]>>;
+  current: { providerId: string; model: string } | null;
+}): SummarizerGroup[] {
+  const option = (providerId: string, model: string, label = model) => ({
+    value: summarizerValue(providerId, model),
+    label,
+  });
+  const groups: SummarizerGroup[] = [];
+  if (signIn === 'signed-in') {
+    groups.push({
+      label: 'Claude sign-in',
+      options: SIGN_IN_SUMMARY_MODELS.map((model) =>
+        option('claude-code', model, model[0]!.toUpperCase() + model.slice(1)),
+      ),
+    });
+  }
+  for (const provider of providers) {
+    const list = models[provider.id] ?? [];
+    if (!provider.needsKey || !provider.hasKey || list.length === 0) continue;
+    groups.push({
+      label: provider.label,
+      options: list.map((model) => option(provider.id, model)),
+    });
+  }
+  if (current !== null) {
+    const value = summarizerValue(current.providerId, current.model);
+    if (!groups.some((group) => group.options.some((listed) => listed.value === value))) {
+      const label =
+        current.providerId === 'claude-code'
+          ? 'Claude sign-in'
+          : (providers.find((p) => p.id === current.providerId)?.label ?? current.providerId);
+      groups.push({ label, options: [option(current.providerId, current.model)] });
+    }
+  }
+  return groups;
+}
+
+/** An accelerator as the keys to press: `CommandOrControl` is Cmd on a Mac, Ctrl elsewhere. */
+export function keyCaps(accelerator: string, platform: string): string[] {
+  const command = platform === 'darwin' ? 'Cmd' : 'Ctrl';
+  return accelerator.split('+').map((part) => (part === 'CommandOrControl' ? command : part));
 }
 
 /**
@@ -133,12 +236,14 @@ function parseSummarizer(
 function parseBudget(raw: string): number {
   const budget = Number(raw.trim());
   if (!Number.isInteger(budget) || budget < 1 || raw.trim().length === 0) {
-    throw new Error(
+    throw new SettingsFieldError(
+      'windowTextBudget',
       `Window text budget must be a whole number between 1 and ${MAX_WINDOW_TEXT_CHARS}.`,
     );
   }
   if (budget > MAX_WINDOW_TEXT_CHARS) {
-    throw new Error(
+    throw new SettingsFieldError(
+      'windowTextBudget',
       `Window text budget cannot be more than ${MAX_WINDOW_TEXT_CHARS} characters — past that ` +
         'one window outweighs everything else in the prompt.',
     );
@@ -159,23 +264,12 @@ function parseBaseUrls(boxes: SettingsFormValues['baseUrls']): Record<string, st
     const value = box.value.trim();
     if (value.length === 0) continue;
     if (!URL.canParse(value)) {
-      throw new Error(
+      throw new SettingsFieldError(
+        `baseUrl:${box.providerId}`,
         `${box.label} base URL must be a full URL, such as https://example.com/v1 — or blank for the default.`,
       );
     }
     overrides[box.providerId] = value;
   }
   return overrides;
-}
-
-/**
- * What one built-in blind spot covers, as Settings lists it: the apps by name, or the
- * files, or failing both the window titles it matches.
- */
-export function blindSpotExamples(spot: BlindSpot): string {
-  if (spot.processNames.length > 0) {
-    return spot.processNames.map((name) => name.replace(/\.exe$/i, '')).join(', ');
-  }
-  if (spot.files.length > 0) return spot.files.join(', ');
-  return spot.titlePatterns.map((pattern) => pattern.replace(/\*/g, '')).join(', ');
 }

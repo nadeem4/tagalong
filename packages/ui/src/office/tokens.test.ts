@@ -18,6 +18,14 @@ function contrast(a: string, b: string): number {
 describe('office tokens', () => {
   const { color } = officeTokens;
 
+  it('keeps status chips, links and errors readable on the light page', () => {
+    expect(contrast(color.okInk, color.okFill)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(color.warnInk, color.warnFill)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(color.errInk, color.errFill)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(color.errInk, color.panel)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(color.link, color.panel)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it('keeps body text on the dark chrome at 4.5:1 or better', () => {
     expect(contrast(color.text, color.page)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(color.textMuted, color.sidebar)).toBeGreaterThanOrEqual(4.5);

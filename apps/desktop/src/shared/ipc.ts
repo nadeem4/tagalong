@@ -58,6 +58,8 @@ export const IPC = {
   finishWelcome: 'tagalong:welcome:finish',
   openLink: 'tagalong:link:open',
   showExtensionFolder: 'tagalong:extension:show',
+  checkClaudeSignIn: 'tagalong:claude:sign-in',
+  switchScout: 'tagalong:pets:switch-scout',
 } as const;
 
 /**
@@ -96,6 +98,12 @@ export interface ProviderChoice {
   /** Whether a key is stored. The key itself never comes back out. */
   hasKey: boolean;
 }
+
+/**
+ * Whether Claude Code is signed in on this computer, from `claude auth status`.
+ * `unknown` when claude ran but the answer could not be read (a timeout, odd output).
+ */
+export type ClaudeSignIn = 'signed-in' | 'signed-out' | 'not-installed' | 'unknown';
 
 /** A coding agent Welcome looked for on this computer. */
 export interface FoundAgent {
@@ -200,6 +208,13 @@ export interface TagalongHostApi {
    * Welcome closes and the panel opens beside Scout.
    */
   finishWelcome(providerId: string): Promise<void>;
+  /** Asks Claude Code, locally and with no model call, whether it is signed in. */
+  checkClaudeSignIn(): Promise<ClaudeSignIn>;
+  /**
+   * Scout becomes the Companion thinking on `providerId`, on that provider's recommended
+   * model. Settings calls it after storing a key when no Claude sign-in was found.
+   */
+  switchScout(providerId: string): Promise<Pet>;
   /** Phase 7. Opens a provider's key page in the browser. Main refuses any other URL. */
   openLink(url: string): Promise<void>;
   /** Phase 7. Shows the unpacked extension's folder in the file manager. */

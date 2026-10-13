@@ -12,6 +12,7 @@ import { SettingsStore } from './settings/settings';
 import type { SecretStore } from './settings/settings';
 import {
   ANTHROPIC_MODELS,
+  CLAUDE_CODE_MODELS,
   FAKE_MODELS,
   KeyedProviderResolver,
   OpenAiCompatibleProvider,
@@ -94,6 +95,8 @@ async function listModels(
   }
   if (providerId === 'anthropic') return { models: [...ANTHROPIC_MODELS], source: 'fallback' };
   if (providerId === 'fake') return { models: [...FAKE_MODELS], source: 'fallback' };
+  // The Claude sign-in names its models by alias; there is no list to fetch.
+  if (providerId === 'claude-code') return { models: [...CLAUDE_CODE_MODELS], source: 'fallback' };
   throw new Error(`no provider with id '${providerId}'`);
 }
 

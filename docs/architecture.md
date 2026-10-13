@@ -317,7 +317,9 @@ meaning all.
 **Model lists.** `models.list` answers with `GET /models` from the service when a key is stored and
 the app is not in fake mode, sorted; anything else — no key, fake mode, a refused key, a wrong URL —
 answers the preset's fallback list with `source: 'fallback'`. The key is read fresh for this call, so
-a key saved a moment ago fills the picker without a restart.
+a key saved a moment ago fills the picker without a restart. `claude-code` answers its fixed
+aliases (`haiku`, `sonnet`, `opus`) with `source: 'fallback'`; it needs no key and has nothing to
+fetch.
 
 **Keys without a restart.** Turns get their provider from `KeyedProviderResolver`
 (`providers/key-resolver.ts`). The engine calls its `refresh` before every `ask`, which re-reads the
@@ -381,18 +383,18 @@ Two connectors exist so far:
   it, and the claude tests inject a fake `spawn`, so no test starts a real claude.
 
 Each connector also has `check()`, which says whether the expert can be reached without spending
-anything: Claude Code's checks that its default folder exists, when it has one, and runs
-`claude --version`.
+anything: Claude Code's runs `claude --version`.
 
 **Storage.** `ExpertStore` (`experts/store.ts`) keeps one JSON row per expert in the `experts` table
 (migration 8), in the order they were added. An expert is `{ id, name, goodAt, enabled, connection }`
 (`packages/protocol/src/experts.ts`); the only connection so far is `{ type: 'claude-code', folder?,
-canEdit = false, command? }`. The folder is only a default: each hand-off names its own project. Nothing secret is stored: Claude Code signs itself in, and keys for
+canEdit = false, command? }`. `folder` is no longer a setting: each hand-off names its own project
+and the running hand-off carries it there. An old expert's saved folder still parses and is ignored. Nothing secret is stored: Claude Code signs itself in, and keys for
 later connectors go to the host's keychain.
 
 **Proposals.** A companion never starts a hand-off itself; it proposes one.
-`HandoffManager.propose` asks the project finder for guesses from the brief's window title, adds the
-expert's default folder after them, keeps the proposal in memory and emits `handoff.proposed
+`HandoffManager.propose` asks the project finder for guesses from the brief's window title (no
+expert default is added; with no guess the hand-off card opens the folder picker), keeps the proposal in memory and emits `handoff.proposed
 { proposalId, petId, expertId, expertName, brief, projects, canEdit }`. Nothing runs until the person
 sends it: `handoffs.confirm { proposalId, folder, canEdit, brief? }` starts it in that folder (with
 the brief as they edited it) and remembers the folder; `handoffs.dismiss` drops it. Proposals do not
@@ -791,11 +793,11 @@ on, the model list, `savePet`) and the settings form as a slot.
   [The Settings window](#the-settings-window).
 
 **Experts tab.** `ExpertsPanel` (`home/experts-panel.tsx`) lists the experts and adds or edits one:
-name, good at, an optional default project folder (typed, or picked with the host's `pickFolder`,
-Electron's folder dialog), may edit files by default, on or off, and an optional command under
-Advanced. An expert with no default folder says so in the list: it asks which project for each task. **Save and test** saves through
-`saveExpert` (`experts.upsert`) and then runs `testExpert` (`experts.test`), so a missing folder or a
-missing `claude` shows at once while the expert stays saved. A new expert's id is its name in
+name, good at, two switches (`role="switch"`): may edit files by default, and on or off, and an
+optional command under Advanced. There is no default project folder. Each row shows **Reads only**
+or **Can edit** and **On** or **Off** as labels, and says it asks which project for each task; Delete
+sits apart from Save. **Save and test** saves through `saveExpert` (`experts.upsert`) and then runs
+`testExpert` (`experts.test`), so a missing shows at once while the expert stays saved. A new expert's id is its name in
 kebab-case, made unique. The expert calls on the `HostBridge` are optional; a host without them shows a
 note instead. The desktop forwards every engine notification to its windows, and `handoff.progress`
 and `handoff.finished` are part of the UI's `TurnEvent`, so Activity re-reads when a hand-off ends. The
@@ -856,19 +858,37 @@ Home's Settings page (`embedded`: no bar or side menu of its own). The standalon
 needs the engine; it adds a navy top bar with Save and a nav with links to each section. Its sheet is `SETTINGS_CSS` in `@tagalong/ui` (`packages/ui/src/settings/settings-styles.ts`),
 built from `officeTokens`, so Settings has no palette of its own.
 
-`SettingsPage` holds the form state and the save, and ends with **Open Welcome again**; each section
+`SettingsPage` holds the form state and the save. The sections come in the design's order, and each
 is one file under `apps/desktop/src/renderer/src/settings/`:
 
-| File                      | Section                                                       |
-| ------------------------- | ------------------------------------------------------------- |
-| `keys-section.tsx`        | Provider API keys and OpenAI-compatible base URLs             |
-| `summaries-section.tsx`   | The summarizer provider and model                             |
-| `hotkeys-section.tsx`     | The two global hotkeys and the hotkey problem, if any         |
-| `sight-section.tsx`       | What a look at every screen sends, and the window text budget |
-| `blind-spots-section.tsx` | The built-in blind spots, read-only                           |
-| `awareness-section.tsx`   | Rolling memory and the watch limits                           |
-| `browser-section.tsx`     | The Chrome extension's pairing token                          |
-| `section.tsx`             | The section list the nav links to, and the panel each sits in |
+| File                    | Section                                                                                                                                                  |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `brain-section.tsx`     | How Scout thinks: Scout's own provider and model (`brain.ts#scoutBrain`) with a status chip, or a service picker and key when no Claude sign-in is found |
+| `privacy-section.tsx`   | The rolling memory switch, the blind spots as chips from `BLIND_SPOTS` labels, and the pause sight key                                                   |
+| `shortcuts-section.tsx` | The two global hotkeys; a `hotkeyError` marks the field whose combination it names                                                                       |
+| `browser-section.tsx`   | The Chrome extension's pairing token                                                                                                                     |
+| `advanced-section.tsx`  | Advanced: a disclosure button (`aria-expanded`), closed by default, holding the four below and **Open Welcome again**                                    |
+| `summaries-section.tsx` | One grouped list: Same as Scout, Haiku and Sonnet on the Claude sign-in, then each keyed service that has a key                                          |
+| `keys-section.tsx`      | One row per keyed service: Key stored or No key, add or replace, base URL, and Remove key (an empty key deletes the stored one)                          |
+| `sight-section.tsx`     | What a look at several monitors sends, and the window text budget                                                                                        |
+| `watches-section.tsx`   | Minutes of screen to remember and the watch limits                                                                                                       |
+| `section.tsx`           | The section list, the panel, the ⓘ button and its inline note (one open at a time), and `useInvalid` for a refused field                                 |
+
+**How Scout thinks** reads the companion pet (`settings.defaultPetId`), never `settings.providerId`,
+which the engine ignores. Whether the Claude sign-in works comes from `main/claude-sign-in.ts`:
+`checkClaudeSignIn` runs `claude auth status --json` (local, no model call, five-second timeout)
+and reads `loggedIn`, giving `signed-in`, `signed-out`, `not-installed` (claude cannot be
+started) or `unknown` (anything else). The renderer asks through `checkClaudeSignIn` on the host
+API, and **Check again** asks again. With no Claude Code, a service is picked and its key pasted;
+Save stores it with `saveApiKey` and calls `switchScout`, which makes Scout the Companion on that
+service with its recommended model (`welcome.ts#companionOn`, the same step Welcome finishes with).
+A key the service refused is not shown: nothing records that cheaply yet.
+
+A save the form refuses throws `SettingsFieldError` with the field's name
+(`renderer/src/settings-form.ts`); a field under Advanced opens Advanced, and the field gets
+`aria-invalid` and the message under it. With no engine (no Scout to read), the brain card says the
+engine did not start and that sign-in status, model lists and the pairing token come back once it
+runs.
 
 The role-shaped part of a pet is pure components in `packages/ui/src/settings/`, which take the role
 library and the recommended model as props and are now composed in Home: `RolePicker` (one role, its

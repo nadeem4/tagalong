@@ -15,6 +15,7 @@ import type { AskInput, HostBridge, TurnEvent } from '@tagalong/ui';
 import { IPC } from '../shared/ipc';
 import type {
   CaptureNotice,
+  ClaudeSignIn,
   FoundAgent,
   HostView,
   ModelList,
@@ -139,6 +140,9 @@ const host: TagalongHostApi = {
   findAgents: () => ipcRenderer.invoke(IPC.findAgents) as Promise<FoundAgent[]>,
   finishWelcome: (providerId: string) =>
     ipcRenderer.invoke(IPC.finishWelcome, providerId) as Promise<void>,
+  checkClaudeSignIn: () => ipcRenderer.invoke(IPC.checkClaudeSignIn) as Promise<ClaudeSignIn>,
+  switchScout: (providerId: string) =>
+    ipcRenderer.invoke(IPC.switchScout, providerId) as Promise<Pet>,
   openLink: (url: string) => ipcRenderer.invoke(IPC.openLink, url) as Promise<void>,
   showExtensionFolder: () => ipcRenderer.invoke(IPC.showExtensionFolder) as Promise<void>,
   hidePanel: () => ipcRenderer.invoke(IPC.hidePanel) as Promise<void>,

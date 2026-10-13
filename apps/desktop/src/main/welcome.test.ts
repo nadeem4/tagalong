@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Pet, Settings } from '@tagalong/protocol';
 import type { Role } from '@tagalong/protocol';
-import { findAgents, shouldOpenWelcome, welcomeCrew, welcomeExperts } from './welcome';
+import { companionOn, findAgents, shouldOpenWelcome, welcomeCrew, welcomeExperts } from './welcome';
 
 const pet = (id: string, extra: Partial<Pet> = {}): Pet =>
   Pet.parse({
@@ -84,6 +84,24 @@ describe('welcomeCrew', () => {
 
   it('refuses a crew without the default pet', () => {
     expect(() => welcomeCrew([pet('ink')], 'scout', 'claude-code', COMPANION)).toThrow(/no scout/);
+  });
+});
+
+describe('companionOn', () => {
+  it('moves Scout to a keyed service on its recommended model, dropping old vision and watch models', () => {
+    const scout = companionOn(
+      pet('scout', {
+        roleId: 'companion',
+        providerId: 'claude-code',
+        model: 'haiku',
+        watchModel: 'x',
+      }),
+      'openrouter',
+      COMPANION,
+    );
+    expect(scout).toMatchObject({ id: 'scout', providerId: 'openrouter', roleId: 'companion' });
+    expect(scout.model).not.toBe('haiku');
+    expect(scout.watchModel).toBeUndefined();
   });
 });
 

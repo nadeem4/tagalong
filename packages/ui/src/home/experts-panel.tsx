@@ -17,7 +17,6 @@ export function expertIdFor(name: string, taken: readonly string[]): string {
 interface Draft {
   name: string;
   goodAt: string;
-  folder: string;
   canEdit: boolean;
   enabled: boolean;
   command: string;
@@ -26,7 +25,6 @@ interface Draft {
 const NEW_DRAFT: Draft = {
   name: 'Claude Code',
   goodAt: '',
-  folder: '',
   canEdit: false,
   enabled: true,
   command: '',
@@ -35,7 +33,6 @@ const NEW_DRAFT: Draft = {
 const draftOf = (expert: Expert): Draft => ({
   name: expert.name,
   goodAt: expert.goodAt,
-  folder: expert.connection.folder ?? '',
   canEdit: expert.connection.canEdit,
   enabled: expert.enabled,
   command: expert.connection.command ?? '',
@@ -95,16 +92,13 @@ export function ExpertsPanel() {
               <button type="button" className="home-entry" onClick={() => setOpen(expert.id)}>
                 <span className="home-entry__body">
                   <span className="home-entry__title">{expert.name}</span>
-                  <span className="home-entry__meta">
-                    <span>{expert.enabled ? 'On' : 'Off'}</span>
-                    <span aria-hidden="true">·</span>
-                    <span>{expert.connection.canEdit ? 'Can edit files' : 'Reads only'}</span>
-                  </span>
-                  <span className="home-entry__preview">
-                    {expert.connection.folder === undefined
-                      ? 'Asks which project for each task'
-                      : `Claude Code, by default in ${expert.connection.folder}`}
-                  </span>
+                  <span className="home-entry__preview">Asks which project for each task</span>
+                </span>
+                <span className="tg-chip">
+                  {expert.connection.canEdit ? 'Can edit' : 'Reads only'}
+                </span>
+                <span className={expert.enabled ? 'tg-chip tg-chip--ok' : 'tg-chip'}>
+                  {expert.enabled ? 'On' : 'Off'}
                 </span>
               </button>
             </li>
@@ -149,9 +143,9 @@ function ExpertForm({
       name: draft.name.trim(),
       goodAt: draft.goodAt.trim(),
       enabled: draft.enabled,
+      // An old expert's default folder is dropped: each task picks its project.
       connection: {
         type: 'claude-code',
-        ...(draft.folder.trim() ? { folder: draft.folder.trim() } : {}),
         canEdit: draft.canEdit,
         ...(draft.command.trim() ? { command: draft.command.trim() } : {}),
       },
@@ -182,10 +176,6 @@ function ExpertForm({
     }
   };
 
-  const choose = (): void => {
-    void bridge.pickFolder?.().then((folder) => folder !== null && set({ folder }));
-  };
-
   const remove = (): void => {
     if (id === undefined) return onDone();
     void bridge.deleteExpert?.(id).then(onDone);
@@ -208,45 +198,25 @@ function ExpertForm({
         />
       </label>
       <p className="tg-note">
-        The companion reads this when it picks who gets a task. Kind: Claude Code, on this computer.
-        More kinds (Gemini, OpenAI and tool servers) arrive later.
+        Your companion reads this when it picks who gets a task. Kind: Claude Code, on this
+        computer. More kinds (Gemini, OpenAI and tool servers) arrive later.
       </p>
-      <label>
-        <span>Default project folder (optional)</span>
-        <input
-          value={draft.folder}
-          placeholder="C:\projects\my-app"
-          onChange={(event) => set({ folder: event.target.value })}
-        />
-      </label>
-      {bridge.pickFolder !== undefined && (
-        <button type="button" className="tg-btn-quiet" onClick={choose}>
-          Choose…
-        </button>
-      )}
       <p className="tg-note">
-        Each task asks which project to work in, guessed from your screen. This folder is only
-        offered when nothing better is known.
+        Each task asks which project to work in, guessed from your screen. When your companion
+        can&apos;t tell, you pick it on the hand-off card.
       </p>
-      <label className="tg-check">
-        <input
-          type="checkbox"
-          checked={draft.canEdit}
-          onChange={(event) => set({ canEdit: event.target.checked })}
-        />
-        <span>Let it edit files by default</span>
-      </label>
-      <p className="tg-note">
-        Off, it only reads and searches. You can still allow edits for one task when you send it.
-      </p>
-      <label className="tg-check">
-        <input
-          type="checkbox"
-          checked={draft.enabled}
-          onChange={(event) => set({ enabled: event.target.checked })}
-        />
-        <span>On: the companion can hand work to {name}</span>
-      </label>
+      <Switch
+        label="Let it edit files by default"
+        help="Off, it only reads and searches. You can still allow edits for one task when you send it."
+        checked={draft.canEdit}
+        onChange={(canEdit) => set({ canEdit })}
+      />
+      <Switch
+        label="On"
+        help={`Your companion can hand work to ${name}.`}
+        checked={draft.enabled}
+        onChange={(enabled) => set({ enabled })}
+      />
       <details>
         <summary className="tg-note">Advanced</summary>
         <label>
@@ -267,18 +237,20 @@ function ExpertForm({
         </button>
         {expert !== undefined &&
           (confirming ? (
-            <>
+            <span className="home-danger">
               <button type="button" className="tg-btn-quiet" onClick={remove}>
                 Delete {expert.name} for good
               </button>
               <button type="button" className="tg-btn-quiet" onClick={() => setConfirming(false)}>
                 Keep {expert.name}
               </button>
-            </>
+            </span>
           ) : (
-            <button type="button" className="tg-btn-quiet" onClick={() => setConfirming(true)}>
-              Delete {expert.name}
-            </button>
+            <span className="home-danger">
+              <button type="button" className="tg-btn-quiet" onClick={() => setConfirming(true)}>
+                Delete {expert.name}
+              </button>
+            </span>
           ))}
         {status !== null && (
           <p
@@ -290,5 +262,40 @@ function ExpertForm({
         )}
       </div>
     </section>
+  );
+}
+
+/** An on/off switch with its label and one line of help; the state reads as text too. */
+function Switch({
+  label,
+  help,
+  checked,
+  onChange,
+}: {
+  label: string;
+  help: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  const id = useId();
+  return (
+    <div className="home-switch">
+      <span>
+        <span id={id} className="home-switch__label">
+          {label}
+        </span>
+        <span className="tg-note">{help}</span>
+      </span>
+      <button
+        type="button"
+        role="switch"
+        className="tg-switch"
+        aria-checked={checked}
+        aria-labelledby={id}
+        onClick={() => onChange(!checked)}
+      >
+        {checked ? 'On' : 'Off'}
+      </button>
+    </div>
   );
 }

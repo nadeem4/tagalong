@@ -1,30 +1,55 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
+import type { Pet } from '@tagalong/protocol';
 import { SETTINGS_CSS } from '@tagalong/ui';
-import { buildSettingsPatch } from '../settings-form';
-import { AwarenessSection } from './awareness-section';
+import {
+  SettingsFieldError,
+  buildSettingsPatch,
+  isAdvancedField,
+  summarizerGroups,
+  summarizerValue,
+} from '../settings-form';
+import { AdvancedSection } from './advanced-section';
+import { scoutBrain } from './brain';
+import { BrainSection } from './brain-section';
 import { BrowserSection } from './browser-section';
-import { BlindSpotsSection } from './blind-spots-section';
-import { HotkeysSection } from './hotkeys-section';
 import { KeysSection } from './keys-section';
-import { SECTIONS } from './section';
+import { PrivacySection } from './privacy-section';
+import { SECTIONS, SettingsUiContext } from './section';
+import type { SettingsUi } from './section';
+import { ShortcutsSection } from './shortcuts-section';
 import { SightSection } from './sight-section';
 import { SummariesSection } from './summaries-section';
-import type { HostView } from '../../../shared/ipc';
+import { WatchesSection } from './watches-section';
+import type { ClaudeSignIn, HostView } from '../../../shared/ipc';
 
 /**
- * App-level settings: the provider keys and base URLs, summaries, the two hotkeys, sight,
- * awareness and the browser extension, one section per file under `settings/`. It is Home's
- * Settings page (`embedded`, no header or side menu of its own); the standalone window only
- * opens when the engine failed to start, since Home needs the engine.
+ * App-level settings, one section per file under `settings/`, in the order the design
+ * gives them: how Scout thinks, privacy, shortcuts, the browser extension, then Advanced
+ * (summaries, keys, sight detail, screen memory and watches), closed by default. It is
+ * Home's Settings page (`embedded`, no header or side menu of its own); the standalone
+ * window only opens when the engine failed to start, since Home needs the engine.
  *
  * Keys are re-read by the engine before every ask and a provider is rebuilt when its key or
  * base URL changed, so those apply on the next ask. Hotkeys are re-registered by main on
  * save, and the sight settings are read per capture.
  */
-export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
+export function SettingsPage({
+  embedded = false,
+  onOpenScout,
+}: {
+  embedded?: boolean;
+  /** Home's Scout page, where Scout's brain is changed. Absent in the standalone window. */
+  onOpenScout?: () => void;
+}) {
   const [view, setView] = useState<HostView | null>(null);
+  const [signIn, setSignIn] = useState<ClaudeSignIn | null>(null);
+  const [models, setModels] = useState<Record<string, string[]>>({});
   const [keys, setKeys] = useState<Record<string, string>>({});
+  const [summarizer, setSummarizer] = useState('');
+  const [advanced, setAdvanced] = useState(false);
+  const [tip, setTip] = useState<string | null>(null);
+  const [invalid, setInvalid] = useState<SettingsUi['invalid']>(null);
   const [status, setStatus] = useState('');
   // A refused save has to look refused. Rendering it in the same muted style as "Saved."
   // is how a user reads a rejection as a confirmation and walks away.
@@ -33,12 +58,46 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
   useEffect(() => {
     window.tagalongHost
       .getHostView()
-      .then(setView)
+      .then((loaded) => {
+        setView(loaded);
+        const chosen = loaded.settings.summarizer;
+        setSummarizer(chosen === null ? '' : summarizerValue(chosen.providerId, chosen.model));
+      })
       .catch((error: unknown) => {
         setStatus(String(error));
         setStatusIsError(true);
       });
   }, []);
+
+  const checkSignIn = useCallback(() => {
+    setSignIn(null);
+    window.tagalongHost
+      .checkClaudeSignIn()
+      .then(setSignIn)
+      .catch(() => setSignIn('unknown'));
+  }, []);
+  useEffect(checkSignIn, [checkSignIn]);
+
+  // The summarizer list offers each keyed service's models once it has a key.
+  const keyedWithKey = (view?.providers ?? [])
+    .filter((choice) => choice.needsKey && choice.hasKey)
+    .map((choice) => choice.id)
+    .join(',');
+  useEffect(() => {
+    if (keyedWithKey === '') return;
+    let current = true;
+    for (const providerId of keyedWithKey.split(',')) {
+      window.tagalongHost
+        .listModels(providerId)
+        .then((list) => {
+          if (current) setModels((known) => ({ ...known, [providerId]: list.models }));
+        })
+        .catch(() => undefined);
+    }
+    return () => {
+      current = false;
+    };
+  }, [keyedWithKey]);
 
   // Saving a fixed accelerator re-registers it in main, which is where the outcome is
   // known. Without this the window would keep showing the old failure next to the very
@@ -57,17 +116,68 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
     [],
   );
 
+  // A refused field is focused once it is on screen, Advanced opened if need be.
+  useEffect(() => {
+    if (invalid !== null) document.getElementById(`f-${invalid.field}`)?.focus();
+  }, [invalid]);
+
+  const ui = useMemo<SettingsUi>(
+    () => ({
+      tip,
+      toggleTip: (id) => setTip((open) => (open === id ? null : id)),
+      invalid,
+    }),
+    [tip, invalid],
+  );
+
   if (view === null) {
     return (
       <main className="tg-settings">
         <style>{SETTINGS_CSS}</style>
-        <p style={{ padding: 20 }}>Loading…</p>
+        <p style={{ padding: 20 }}>{status === '' ? 'Loading…' : status}</p>
       </main>
     );
   }
 
   const { settings } = view;
   const presets = view.providers.filter((choice) => choice.defaultBaseUrl !== undefined);
+  const scout = view.pets.find((pet) => pet.id === settings.defaultPetId);
+  const brain = scoutBrain(scout, view.providers, signIn);
+
+  const markProviders = (providerId: string, hasKey: boolean): void =>
+    setView((current) =>
+      current === null
+        ? current
+        : {
+            ...current,
+            providers: current.providers.map((choice) =>
+              choice.id === providerId ? { ...choice, hasKey } : choice,
+            ),
+          },
+    );
+
+  const switched = (pet: Pet, providerId: string): void => {
+    markProviders(providerId, true);
+    setView((current) =>
+      current === null
+        ? current
+        : { ...current, pets: current.pets.map((known) => (known.id === pet.id ? pet : known)) },
+    );
+  };
+
+  const removeKey = async (providerId: string): Promise<void> => {
+    const label = view.providers.find((choice) => choice.id === providerId)?.label ?? providerId;
+    try {
+      // An empty key deletes the stored one.
+      await window.tagalongHost.saveApiKey(providerId, '');
+      markProviders(providerId, false);
+      setStatus(`${label} key removed.`);
+      setStatusIsError(false);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+      setStatusIsError(true);
+    }
+  };
 
   async function save(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -87,8 +197,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
         pauseSightHotkey: field('pauseSightHotkey'),
         sightDetail: field('sightDetail'),
         windowTextBudget: field('windowTextBudget'),
-        summarizerProviderId: field('summarizerProviderId'),
-        summarizerModel: field('summarizerModel'),
+        summarizer: field('summarizer'),
         rollingMemoryEnabled: form.get('rollingMemoryEnabled') !== null,
         rollingMemoryMinutes: field('rollingMemoryMinutes'),
         watchMaxChecks: field('watchMaxChecks'),
@@ -96,9 +205,10 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
         watchTimeoutMinutes: field('watchTimeoutMinutes'),
       });
       const saved = await window.tagalongHost.saveSettings(patch);
-      const typed = Object.entries(keys).filter(([, value]) => value.length > 0);
+      // Empty boxes are left alone: removing a key is the Remove key button's job.
+      const typed = Object.entries(keys).filter(([, value]) => value.trim().length > 0);
       for (const [providerId, value] of typed) {
-        await window.tagalongHost.saveApiKey(providerId, value);
+        await window.tagalongHost.saveApiKey(providerId, value.trim());
       }
       setKeys({});
       const newlyStored = new Set(typed.map(([providerId]) => providerId));
@@ -113,92 +223,117 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
               ),
             },
       );
-      setStatus('Saved. Everything applies from the next ask, keys and base URLs included.');
+      setInvalid(null);
+      setStatus('Saved. Scout uses it from the next ask.');
       setStatusIsError(false);
     } catch (error) {
       // The builders throw with the field named, so this reaches the user as
-      // "Scout needs a model id." rather than a bare validation complaint.
-      setStatus(error instanceof Error ? error.message : String(error));
+      // "Watches at once must be…" beside that very field, Advanced opened if it is there.
+      const message = error instanceof Error ? error.message : String(error);
+      if (error instanceof SettingsFieldError) {
+        if (isAdvancedField(error.field)) setAdvanced(true);
+        setInvalid({ field: error.field, message });
+      } else {
+        setInvalid(null);
+      }
+      setStatus(message);
       setStatusIsError(true);
     }
   }
 
   return (
-    <form
-      className={embedded ? 'tg-settings tg-settings--embedded' : 'tg-settings'}
-      onSubmit={(event) => void save(event)}
-    >
-      <style>{SETTINGS_CSS}</style>
-      {!embedded && (
-        <>
-          <header className="tg-bar">
-            <h1 className="tg-px tg-bar__title">Settings</h1>
-            <span className="tg-bar__meta">
-              Engine {view.engineVersion} on 127.0.0.1:{settings.enginePort}
-            </span>
+    <SettingsUiContext.Provider value={ui}>
+      <form
+        className={embedded ? 'tg-settings tg-settings--embedded' : 'tg-settings'}
+        onSubmit={(event) => void save(event)}
+      >
+        <style>{SETTINGS_CSS}</style>
+        {!embedded && (
+          <>
+            <header className="tg-bar">
+              <h1 className="tg-px tg-bar__title">Settings</h1>
+              <span className="tg-bar__meta">
+                Engine {view.engineVersion} on 127.0.0.1:{settings.enginePort}
+              </span>
+              <button type="submit" className="tg-btn">
+                Save
+              </button>
+            </header>
+            <nav className="tg-nav" aria-label="Settings">
+              <ul>
+                {SECTIONS.map((section) => (
+                  <li key={section.id}>
+                    <a href={`#${section.id}`}>{section.title}</a>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          </>
+        )}
+        <main className="tg-main">
+          {embedded && (
+            <div className="tg-intro">
+              <div className="tg-intro__text">
+                <h1 className="tg-intro__title">Settings</h1>
+                <p className="tg-help">
+                  Everything works out of the box. Change only what you need. Press{' '}
+                  <span aria-hidden="true">ⓘ</span>
+                  <span className="tg-sr">the information button</span> for more on any setting.
+                </p>
+              </div>
+              <button type="submit" className="tg-btn">
+                Save
+              </button>
+            </div>
+          )}
+          <BrainSection
+            brain={brain}
+            providers={view.providers}
+            onCheckAgain={checkSignIn}
+            onSwitched={switched}
+            onOpenScout={onOpenScout}
+          />
+          <PrivacySection settings={settings} platform={view.platform} />
+          <ShortcutsSection settings={settings} hotkeyError={view.hotkeyError} />
+          <BrowserSection token={view.pairingToken} />
+          <AdvancedSection open={advanced} onToggle={() => setAdvanced((open) => !open)}>
+            <SummariesSection
+              groups={summarizerGroups({
+                providers: view.providers,
+                signIn,
+                models,
+                current: settings.summarizer,
+              })}
+              value={summarizer}
+              onChange={setSummarizer}
+            />
+            <KeysSection
+              providers={view.providers}
+              settings={settings}
+              keys={keys}
+              onKeysChange={setKeys}
+              onRemove={(providerId) => void removeKey(providerId)}
+            />
+            <SightSection settings={settings} />
+            <WatchesSection settings={settings} />
+          </AdvancedSection>
+          <div className="tg-footer">
             <button type="submit" className="tg-btn">
               Save
             </button>
-          </header>
-          <nav className="tg-nav" aria-label="Settings">
-            <div>
-              <p className="tg-px tg-nav__heading">AGENTS</p>
-              <p className="tg-nav__note">
-                Each agent&apos;s role, brain, tools and notes live in Home.
-              </p>
-              <button
-                type="button"
-                className="tg-btn-quiet"
-                style={{ width: '100%' }}
-                onClick={() => void window.tagalongHost.openOffice()}
+            {status === '' ? (
+              <p>Changes apply from the next ask.</p>
+            ) : (
+              <p
+                className={statusIsError ? 'tg-error' : 'tg-saved'}
+                role={statusIsError ? 'alert' : 'status'}
               >
-                Open Home
-              </button>
-            </div>
-            <ul>
-              {SECTIONS.map((section) => (
-                <li key={section.id}>
-                  <a href={`#${section.id}`}>{section.title}</a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </>
-      )}
-      <main className="tg-main">
-        <KeysSection
-          providers={view.providers}
-          settings={settings}
-          keys={keys}
-          onKeysChange={setKeys}
-        />
-        <SummariesSection providers={view.providers} settings={settings} />
-        <HotkeysSection settings={settings} hotkeyError={view.hotkeyError} />
-        <SightSection settings={settings} />
-        <BlindSpotsSection />
-        <AwarenessSection settings={settings} />
-        <BrowserSection token={view.pairingToken} />
-        <div className="tg-footer">
-          <button type="submit" className="tg-btn">
-            Save
-          </button>
-          <button
-            type="button"
-            className="tg-btn-quiet"
-            onClick={() => void window.tagalongHost.openOnboarding()}
-          >
-            Open Welcome again
-          </button>
-          {status !== '' && (
-            <p
-              className={statusIsError ? 'tg-error' : undefined}
-              role={statusIsError ? 'alert' : 'status'}
-            >
-              {statusIsError ? `Not saved. ${status}` : status}
-            </p>
-          )}
-        </div>
-      </main>
-    </form>
+                {statusIsError ? `Not saved. ${status}` : status}
+              </p>
+            )}
+          </div>
+        </main>
+      </form>
+    </SettingsUiContext.Provider>
   );
 }

@@ -62,8 +62,8 @@ The extension's public privacy policy, for the Chrome Web Store, is
 
 ## What is never read
 
-- **The built-in blind spots.** Always on, listed read-only in Settings under **Scout never looks
-  at**, and kept apart from your own exclusion list so clearing that list never removes them
+- **The built-in blind spots.** Always on, listed read-only in Settings → Privacy under **Scout never looks
+  at**, as chips built from the `BLIND_SPOTS` labels, and kept apart from your own exclusion list so clearing that list never removes them
   (`BLIND_SPOTS` in `packages/protocol/src/blind-spots.ts`):
   - password managers: 1Password, Bitwarden, KeePass, KeePassXC, LastPass, Dashlane, Keeper, Proton
     Pass, Enpass;
@@ -117,7 +117,8 @@ The extension's public privacy policy, for the Chrome Web Store, is
 
 ## Rolling memory: what the buffer holds
 
-Off until you tick it in Settings. While it is on:
+Off until you switch on **Remember the last few minutes of the screen** in Settings → Privacy. While
+it is on:
 
 - Every five seconds the desktop takes a **640-pixel picture of each screen**, the **list of open
   windows** (titles and positions, never their text) and which window was in front.

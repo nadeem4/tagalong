@@ -83,7 +83,7 @@ When Scout hands work to an expert, the bubble shows a card first: the agent, th
 edits** lets this one task change files; **Send** (or **Cancel**) decides. While the expert works the
 bubble lists its steps with **Stop**, and its answer comes back to the bubble when it is done.
 
-Open Welcome again from **Home → Settings → Open Welcome again**. A key saved in
+Open Welcome again from **Home → Settings → Advanced → Open Welcome again**. A key saved in
 Welcome or in Settings works on the very next question. No restart is needed.
 
 ## Providers and keys
@@ -107,8 +107,8 @@ live list next to the model box: it is the authority.
 (Nemotron Nano 2 VL by default), and any turn that carries a screenshot goes there instead. Claude sees
 on its own and needs no vision model.
 
-Any other OpenAI-compatible service also works: in Settings, put its base URL in one of the base URL
-boxes, store its key there, and type its model id on the pet.
+Any other OpenAI-compatible service also works: in **Settings → Advanced → API keys**, put its base
+URL in one of the base URL boxes, store its key there, and pick its model on the Scout page.
 
 ## Hotkeys
 
@@ -147,15 +147,20 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   activity.
 - **Scout**: how Scout thinks, a provider and a model. **Save** applies from the next question.
 - **Experts** are the tools Scout hands work to, so you stop copying, switching and pasting. Choose
-  **Add expert**: give it a name, say what it is good at, and, if you like, a default project folder.
+  **Add expert**: give it a name and say what it is good at. There is no default project folder: each
+  task picks its project, and when Scout can't tell, the hand-off card opens the folder picker.
   Claude Code is the first kind; it must be installed and signed in on this computer, and Welcome adds
-  it for you when it is. It only reads and searches unless you tick **Let it edit files by default**
+  it for you when it is. It only reads and searches unless you switch on **Let it edit files by default**
   or allow edits when you send a task. **Save and test** checks that Claude Code starts, which costs
   nothing. Each task asks which project to work in, guessed from your window and the projects you used
   before, and you confirm before anything is sent.
 - **Activity**: every answer and every hand-off, newest first. Click one to read it.
-- **Settings**: keys, hotkeys, summaries, sight, awareness, the browser extension, and **Open
-  Welcome again**.
+- **Settings**: **How Scout thinks** (Scout's real brain and whether your Claude Code sign-in is
+  signed in, checked locally with `claude auth status`; with no Claude Code you pick a service and
+  paste its key, and Saving moves Scout to it), **Privacy** (screen memory and what Scout never looks
+  at), **Shortcuts**, the **Browser extension**, and **Advanced**, closed by default: summaries, API
+  keys (add, replace or remove, and a base URL), sight detail, screen memory and watches, and **Open
+  Welcome again**. Press ⓘ beside a setting for the longer story.
 
 ## The Chrome extension
 
@@ -211,7 +216,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 | A hotkey does nothing                                          | Settings and the panel name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).            |
 | The Chrome side panel says "Disconnected"                      | The desktop app must be running. If it is, copy the pairing token again from Settings and paste it into the extension's options.                |
 | "Windows protected your PC" when installing                    | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                            |
-| You want Welcome again                                         | Home → Settings → **Open Welcome again**.                                                                                                       |
+| You want Welcome again                                         | Home → Settings → Advanced → **Open Welcome again**.                                                                                            |
 | You want to start over                                         | Quit Tagalong and delete `%APPDATA%\Tagalong`. That removes settings, conversations, memories and stored keys; Welcome opens on the next start. |
 | From source, a look always captures the whole screen           | The active-window helper was not downloaded: run `node apps/desktop/scripts/fetch-native.mjs`. The installer already includes it.               |
 | It does not start on macOS or Linux                            | Not in this build: only Windows has a platform adapter so far.                                                                                  |

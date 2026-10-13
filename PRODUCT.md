@@ -52,7 +52,10 @@ your mouse or keyboard.
 - Home, the control centre: every agent, what it is doing, every handoff, consult and meeting, and
   each agent's role, model, tools and notes. Its centre scene is a theme (the Office first); the
   controls never move between themes.
-- Settings and first-run ("Open your office") configure providers, keys and app-wide behaviour.
+- Settings and first-run configure providers, keys and app-wide behaviour. Settings leads with how
+  Scout thinks (its real brain and whether the Claude sign-in works), then privacy, shortcuts and the
+  browser extension; the tuning knobs (summaries, API keys, sight detail, watches) sit under
+  Advanced, closed by default, with a short line visible and the longer story behind ⓘ.
 - The Chrome extension shows the same crew in Chrome's side panel.
 
 ## Capabilities and Constraints

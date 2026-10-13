@@ -39,6 +39,15 @@ export const officeTokens = {
     panelTile: '#E6E9F2',
     meterOff: '#E0E3EC',
     scrollbarThumb: '#CDD2DE',
+    /** A link on the light panel. */
+    link: '#3D4A8A',
+    /** Status chips and messages on the light panel: done, needs attention, failed. */
+    okFill: '#E3F1E6',
+    okInk: '#1F5A2E',
+    warnFill: '#FFF4D6',
+    warnInk: '#5C4600',
+    errFill: '#FDE7E5',
+    errInk: '#8A1C12',
     /** Behind a modal notice: the page navy, mostly opaque, so the office recedes. */
     scrim: 'rgba(18, 22, 43, 0.72)',
   },
