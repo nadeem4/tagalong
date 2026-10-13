@@ -29,6 +29,7 @@ import { RollingMemory } from './awareness/rolling-memory';
 import { captureNotice, captureTooltip } from './capture-notice';
 import { captureAskSnapshot, capturePatch } from './context';
 import { startEngineHost } from './engine-host';
+import { keepAnEyeAllowed, startKeepAnEye } from './keep-an-eye';
 import { extensionFolder, isAllowedLink } from './links';
 import { providerChoices, secretKeyFor } from './provider-choices';
 import { checkClaudeSignIn } from './claude-sign-in';
@@ -128,6 +129,7 @@ app.on('window-all-closed', () => {});
 
 app.on('before-quit', () => {
   desktop?.hotkeys.dispose();
+  stopKeepAnEye();
   // Memory only, and gone on quit: nothing here was ever written anywhere to clean up.
   desktop?.rolling.dispose();
   desktop?.perceptionMemory.clear();
@@ -267,6 +269,36 @@ async function start(): Promise<void> {
   // Finishing it is remembered in settings; Home opens it again.
   if (welcoming) openOnboarding();
   else void greetOnLaunch(host);
+
+  // Keep an eye on things: window titles go to the engine every five seconds, never a
+  // picture. Off in Settings, or while sight is paused, nothing is listed at all.
+  if (keepAnEyeAllowed(process.env)) {
+    stopKeepAnEye = startKeepAnEye({
+      enabled: () => (desktop?.settings.keepAnEye ?? false) && !sightPause.paused,
+      list: async () => {
+        const exclusions = desktop?.settings.captureExclusions ?? settings.captureExclusions;
+        return (await platform.listWindows(exclusions, { countText: false })).windows;
+      },
+      send: (windows) => host.client.call('keepAnEye.observe', { windows }),
+    });
+  }
+}
+
+/** Stops the keep-an-eye timer on quit. */
+let stopKeepAnEye = (): void => undefined;
+
+/**
+ * Scout has one thing to say from keeping an eye on things: one quiet line beside the pet,
+ * without taking the keyboard. Not while the bubble is already open: the person is busy
+ * with it, and a remark is never worth interrupting them for.
+ */
+function showRemark(params: unknown): void {
+  const panel = desktop?.panel;
+  const avatar = desktop?.avatar;
+  if (panel == null || avatar == null || !avatar.isVisible() || panel.isVisible()) return;
+  panel.webContents.send(IPC.remarkEvent, params);
+  showPanelQuietly(panel, avatar);
+  // Voice: when spoken replies land, the remark's text is spoken here like any bubble line.
 }
 
 /**
@@ -348,6 +380,7 @@ function forwardToRenderers(notification: { method: string; params: unknown }): 
 
   if (notification.method === 'watch.fired') announceWatch(notification.params);
   if (notification.method === 'handoff.finished') announceHandoff(notification.params);
+  if (notification.method === 'pet.remark') showRemark(notification.params);
   // A brief to check: the bubble comes up beside the pet with the card in it.
   if (notification.method === 'handoff.proposed') bringUpBubble(true);
 
@@ -912,6 +945,14 @@ function registerIpc(): void {
     if (problem.length > 0) throw new Error(problem);
   });
   ipcMain.handle(IPC.hidePanel, () => required().panel?.hide());
+  // A remark's two buttons. Not now quiets Scout for an hour; taking the offer sends its
+  // brief to the hand-off card, where nothing runs until the person presses Send.
+  ipcMain.handle(IPC.remarkNotNow, async () => {
+    await required().host?.client.call('keepAnEye.notNow', {});
+  });
+  ipcMain.handle(IPC.remarkAccept, async (_event, remarkId: string) => {
+    await required().host?.client.call('keepAnEye.accept', { remarkId });
+  });
   ipcMain.handle(IPC.togglePanel, () => {
     const current = required();
     if (current.panel?.isVisible() === true) {

@@ -1,5 +1,11 @@
 import type { CaptureBlock } from '@tagalong/core';
-import type { ContextSnapshot, Pet, Settings, SettingsPatch } from '@tagalong/protocol';
+import type {
+  ContextSnapshot,
+  Pet,
+  PetRemarkParams,
+  Settings,
+  SettingsPatch,
+} from '@tagalong/protocol';
 import type { HostBridge } from '@tagalong/ui';
 
 /** Channel names, in one place so main and preload cannot drift apart. */
@@ -36,6 +42,9 @@ export const IPC = {
   fitPanel: 'tagalong:panel:fit',
   greetEvent: 'tagalong:panel:greet',
   greetLineEvent: 'tagalong:panel:greet-line',
+  remarkEvent: 'tagalong:panel:remark',
+  remarkNotNow: 'tagalong:remark:not-now',
+  remarkAccept: 'tagalong:remark:accept',
   panelSideEvent: 'tagalong:panel:side',
   dragAvatar: 'tagalong:avatar:drag',
   dropAvatar: 'tagalong:avatar:drop',
@@ -227,6 +236,12 @@ export interface TagalongHostApi {
   onGreet(handler: () => void): () => void;
   /** Main hands the bubble one line to say quietly as the app opens, on a later launch. */
   onGreetLine(handler: (text: string) => void): () => void;
+  /** Main hands the bubble one line Scout says on its own, from keeping an eye on things. */
+  onRemark(handler: (remark: PetRemarkParams) => void): () => void;
+  /** "Not now" on a remark: Scout stays quiet for an hour. */
+  remarkNotNow(): Promise<void>;
+  /** The person took a remark's offer: its brief goes to the hand-off card, unsent. */
+  remarkAccept(remarkId: string): Promise<void>;
   /** Which side of the pet the bubble sits on, so its tail points at the pet. */
   onPanelSide(handler: (side: 'left' | 'right') => void): () => void;
   /** Moves the pet by a drag's step; the bubble follows. */

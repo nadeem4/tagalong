@@ -6,6 +6,7 @@ import type {
   Expert,
   PerceptionTarget,
   Pet,
+  PetRemarkParams,
   ProjectCandidate,
   Role,
   RolesUpgradeNotice,
@@ -142,6 +143,14 @@ const host: TagalongHostApi = {
     ipcRenderer.on(IPC.greetLineEvent, listener);
     return () => void ipcRenderer.off(IPC.greetLineEvent, listener);
   },
+  onRemark: (handler) => {
+    const listener = (_event: IpcRendererEvent, remark: PetRemarkParams): void => handler(remark);
+    ipcRenderer.on(IPC.remarkEvent, listener);
+    return () => void ipcRenderer.off(IPC.remarkEvent, listener);
+  },
+  remarkNotNow: () => ipcRenderer.invoke(IPC.remarkNotNow) as Promise<void>,
+  remarkAccept: (remarkId: string) =>
+    ipcRenderer.invoke(IPC.remarkAccept, remarkId) as Promise<void>,
   resizeStrip: (visiblePets: number) =>
     ipcRenderer.invoke(IPC.resizeStrip, visiblePets) as Promise<void>,
   listModels: (providerId: string) =>

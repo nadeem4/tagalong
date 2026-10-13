@@ -394,4 +394,38 @@ describe('GreetingLine', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onDone).toHaveBeenCalledOnce();
   });
+
+  it('a remark carries Not now, which quiets Scout and closes the line', () => {
+    const onDone = vi.fn();
+    const onNotNow = vi.fn();
+    render(
+      <GreetingLine
+        petName="Scout"
+        text="That build broke on a missing import."
+        onDone={onDone}
+        onNotNow={onNotNow}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /hand/i })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
+    expect(onNotNow).toHaveBeenCalledOnce();
+    expect(onDone).toHaveBeenCalledOnce();
+  });
+
+  it('a remark with an offer opens the hand-off card only when the person takes it', () => {
+    const onDone = vi.fn();
+    const onAccept = vi.fn();
+    render(
+      <GreetingLine
+        petName="Scout"
+        text="That build broke on a missing import."
+        onDone={onDone}
+        onNotNow={() => undefined}
+        offer={{ label: 'Hand it over', onAccept }}
+      />,
+    );
+    expect(onAccept).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Hand it over' }));
+    expect(onAccept).toHaveBeenCalledOnce();
+  });
 });
