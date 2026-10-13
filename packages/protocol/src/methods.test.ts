@@ -47,6 +47,9 @@ const HOST_TO_CORE = [
   'handoffs.dismiss',
   'projects.search',
   'greeting.compose',
+  'keepAnEye.observe',
+  'keepAnEye.notNow',
+  'keepAnEye.accept',
 ] as const;
 
 const CORE_TO_HOST = ['perception.capture'] as const;
@@ -67,6 +70,7 @@ const CORE_TO_HOST_NOTIFICATIONS = [
   'handoff.proposed',
   'handoff.progress',
   'handoff.finished',
+  'pet.remark',
 ] as const;
 
 describe('method catalog', () => {
@@ -89,6 +93,41 @@ describe('method catalog', () => {
     expect(Object.keys(coreToHostNotifications).sort()).toEqual(
       [...CORE_TO_HOST_NOTIFICATIONS].sort(),
     );
+  });
+});
+
+describe('keep an eye', () => {
+  const remarkId = '11111111-2222-4333-8444-555555555555';
+  const window = {
+    id: 'w-1',
+    processName: 'Code.exe',
+    title: 'build failed',
+    state: 'foreground',
+    browser: false,
+    fullScreen: true,
+  };
+
+  it('takes a window list from the host, full-screen flag included', () => {
+    expect(paramsSchemaFor('keepAnEye.observe').parse({ windows: [window] })).toEqual({
+      windows: [window],
+    });
+  });
+
+  it('carries one line to say, and an offer only when there is one', () => {
+    const line = { remarkId, petId: 'scout', text: 'That test failed on a typo.' };
+    expect(notificationParamsSchemaFor('pet.remark').parse(line)).toEqual(line);
+    const offered = { ...line, offer: 'Fix the typo in parser.ts' };
+    expect(notificationParamsSchemaFor('pet.remark').parse(offered)).toEqual(offered);
+    const empty = { ...line, text: '' };
+    expect(notificationParamsSchemaFor('pet.remark').safeParse(empty).success).toBe(false);
+  });
+
+  it('quiets for a while on Not now, and accepts an offer by its remark', () => {
+    expect(paramsSchemaFor('keepAnEye.notNow').parse({})).toEqual({});
+    expect(paramsSchemaFor('keepAnEye.accept').parse({ remarkId })).toEqual({ remarkId });
+    expect(resultSchemaFor('keepAnEye.accept').parse({ proposed: true })).toEqual({
+      proposed: true,
+    });
   });
 });
 

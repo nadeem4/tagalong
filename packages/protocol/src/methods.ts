@@ -367,6 +367,32 @@ export const GreetingComposeResult = z.object({
 });
 export type GreetingComposeResult = z.infer<typeof GreetingComposeResult>;
 
+/**
+ * Keep an eye on things. The host sends what is open, titles only, every few seconds; the
+ * engine decides whether one window is worth a look. Most snapshots end there.
+ */
+export const KeepAnEyeObserveParams = z.object({ windows: z.array(WindowEntry) });
+export const KeepAnEyeObserveResult = Empty;
+/** "Not now" on a remark: quiet for an hour. */
+export const KeepAnEyeNotNowParams = Empty;
+export const KeepAnEyeNotNowResult = z.object({ quietUntil: z.iso.datetime() });
+/** The person took a remark's offer: its brief goes to the hand-off card, unsent. */
+export const KeepAnEyeAcceptParams = z.object({ remarkId: z.uuid() });
+export const KeepAnEyeAcceptResult = z.object({ proposed: z.boolean() });
+
+/**
+ * One short line a pet says on its own, from a window it kept an eye on. `offer` is a task
+ * an expert could take, shown as a button that opens the hand-off card; nothing is sent
+ * until the person presses Send there.
+ */
+export const PetRemarkParams = z.object({
+  remarkId: z.uuid(),
+  petId: z.string().min(1),
+  text: z.string().min(1),
+  offer: z.string().min(1).optional(),
+});
+export type PetRemarkParams = z.infer<typeof PetRemarkParams>;
+
 // ---------------------------------------------------------------------------
 // The catalog
 // ---------------------------------------------------------------------------
@@ -406,6 +432,9 @@ export const hostToCoreMethods = {
   'handoffs.dismiss': { params: HandoffsDismissParams, result: HandoffsDismissResult },
   'projects.search': { params: ProjectsSearchParams, result: ProjectsSearchResult },
   'greeting.compose': { params: GreetingComposeParams, result: GreetingComposeResult },
+  'keepAnEye.observe': { params: KeepAnEyeObserveParams, result: KeepAnEyeObserveResult },
+  'keepAnEye.notNow': { params: KeepAnEyeNotNowParams, result: KeepAnEyeNotNowResult },
+  'keepAnEye.accept': { params: KeepAnEyeAcceptParams, result: KeepAnEyeAcceptResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostMethods = {
@@ -443,6 +472,7 @@ export const coreToHostNotifications = {
   'handoff.proposed': { params: HandoffProposedParams },
   'handoff.progress': { params: HandoffProgressParams },
   'handoff.finished': { params: HandoffFinishedParams },
+  'pet.remark': { params: PetRemarkParams },
 } as const satisfies Record<string, NotificationSpec>;
 
 export type HostToCoreMethod = keyof typeof hostToCoreMethods;

@@ -402,6 +402,42 @@ describe('built-in perception tools', () => {
   });
 });
 
+describe('keep an eye over rpc', () => {
+  it('reads a window whose title reads like trouble, and says one line as pet.remark', async () => {
+    const e = await boot(new FakeBrainProvider({ text: 'The build broke on a missing import.' }));
+    const host = await TestHost.connect(e.port);
+    const reads: unknown[] = [];
+    host.onRequest = (method, params) => {
+      expect(method).toBe('perception.readText');
+      reads.push((params as Record<string, unknown>)['windowId']);
+      return { windowId: 'w-7', text: 'error TS2307', truncated: false, source: 'uia' };
+    };
+    await host.call('hello', {
+      ...helloParams(e.pairingToken),
+      capabilities: ['textLayer'] as const,
+    });
+
+    const window = {
+      id: 'w-7',
+      processName: 'Code.exe',
+      title: 'Build failed',
+      state: 'foreground',
+      browser: false,
+    };
+    await host.call('keepAnEye.observe', { windows: [window] });
+    await vi.waitFor(() => expect(host.methods()).toContain('pet.remark'), { timeout: 5000 });
+    expect(reads).toEqual(['w-7']);
+    expect(host.notifications.find((n) => n.method === 'pet.remark')?.params).toMatchObject({
+      petId: 'scout',
+      text: 'The build broke on a missing import.',
+    });
+
+    const quiet = await host.call('keepAnEye.notNow', {});
+    const until = Date.parse((quiet['result'] as { quietUntil: string }).quietUntil);
+    expect(until - Date.now()).toBeGreaterThan(59 * 60_000);
+  });
+});
+
 describe('handoff over rpc', () => {
   it('hands Scout’s thread to Ink when the user types @Ink, with the context intact', async () => {
     const seen: { model: string; text: string }[] = [];
