@@ -22,4 +22,14 @@ describe('renderBrief', () => {
     const text = renderBrief({ ask: 'Tidy this paragraph.' });
     expect(text).toBe('Tidy this paragraph.');
   });
+
+  it('hides secrets in the brief before an expert sees it', () => {
+    const key = 'ghp' + '_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789';
+    const text = renderBrief({
+      ask: 'Why is this refused?',
+      context: { selection: `TOKEN=${key}` },
+    });
+    expect(text).not.toContain(key);
+    expect(text).toContain('[hidden:');
+  });
 });

@@ -155,11 +155,33 @@ describe('captureAskSnapshot', () => {
     expect(blocked).toEqual({ rule: 'processName', entry: '1Password.exe' });
   });
 
+  it('never copies the selection out of a window it must not look at, such as a .env file', async () => {
+    const captureSelection = vi.fn(async () => 'API_KEY=abc123');
+    const platform = fakePlatform({
+      captureSelection,
+      getActiveWindow: async () => ({
+        appName: 'Code.exe',
+        title: '.env - ai_pet - Visual Studio Code',
+        bounds: { x: 0, y: 0, width: 800, height: 600 },
+      }),
+    });
+
+    const { snapshot, blocked } = await captureAskSnapshot(platform, {
+      screenshot: false,
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    // Not even Ctrl+C: the text never reaches the clipboard, let alone a model.
+    expect(captureSelection).not.toHaveBeenCalled();
+    expect(snapshot.selection).toBeUndefined();
+    expect(blocked).toEqual({ rule: 'titlePattern', entry: '.env' });
+  });
+
   it('blocks a web vault by its window title, not by the browser it runs in', async () => {
     const platform = fakePlatform({
       getActiveWindow: async () => ({
         appName: 'chrome.exe',
-        title: 'My Vault — Bitwarden',
+        title: 'My Vault — Acme',
         bounds: { x: 0, y: 0, width: 800, height: 600 },
       }),
     });

@@ -3,7 +3,7 @@ import {
   MAX_WINDOW_TEXT_CHARS,
   SettingsPatch,
 } from '@tagalong/protocol';
-import type { SettingsPatch as SettingsPatchType } from '@tagalong/protocol';
+import type { BlindSpot, SettingsPatch as SettingsPatchType } from '@tagalong/protocol';
 
 /**
  * The settings form's raw values, as `FormData` hands them over: every field a string.
@@ -166,4 +166,16 @@ function parseBaseUrls(boxes: SettingsFormValues['baseUrls']): Record<string, st
     overrides[box.providerId] = value;
   }
   return overrides;
+}
+
+/**
+ * What one built-in blind spot covers, as Settings lists it: the apps by name, or the
+ * files, or failing both the window titles it matches.
+ */
+export function blindSpotExamples(spot: BlindSpot): string {
+  if (spot.processNames.length > 0) {
+    return spot.processNames.map((name) => name.replace(/\.exe$/i, '')).join(', ');
+  }
+  if (spot.files.length > 0) return spot.files.join(', ');
+  return spot.titlePatterns.map((pattern) => pattern.replace(/\*/g, '')).join(', ');
 }

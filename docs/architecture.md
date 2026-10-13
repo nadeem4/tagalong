@@ -239,7 +239,20 @@ Both tools call the connected host's `perception.capture` through the injected `
 is read per call because hosts connect and drop mid-conversation. Each one asks for `activeWindow`
 **first** and runs `findCaptureBlock` against the live exclusion list before asking for pixels or
 selected text: an exclusion that only filters the answer has already taken the screenshot it promised
-not to take. A blocked window, a host with no `screenshot` capability, and a host that fails to answer
+not to take. `findCaptureBlock` checks the built-in blind spots (`BLIND_SPOTS` in the protocol package:
+process names, title patterns, and secret file names matched against each word of the title) before
+the person's own list, so clearing that list never removes them.
+
+### Secrets on the way out
+
+`guardBrain` (`packages/core/src/providers/guard.ts`) wraps every provider the engine resolves, for
+turns, summaries, `/crew` and watches alike. It passes the system prompt, every text block and every
+tool result, including those handed back mid-turn through `onToolUse`, through `hideSecrets`
+(`packages/core/src/privacy/secrets.ts`), which replaces keys, tokens, private keys, connection-string
+passwords, secret settings and card numbers with markers like `[hidden: API key]`. One wrapper at the
+provider rather than a call at each source, so a new source cannot forget. `renderBrief` does the same
+for briefs to experts, and the Claude Code connector adds `--disallowedTools` deny rules
+(`Read(**/<file>)`, `Edit(**/<file>)`) for every name in `SECRET_FILES`. A blocked window, a host with no `screenshot` capability, and a host that fails to answer
 all come back as error tool results naming the reason, never as silence.
 
 Results are **text**, never a snapshot object: `BrainTool` results are strings by contract, and a model
@@ -836,15 +849,16 @@ built from `officeTokens`, so Settings has no palette of its own.
 `SettingsPage` holds the form state and the save, and ends with **Open Welcome again**; each section
 is one file under `apps/desktop/src/renderer/src/settings/`:
 
-| File                    | Section                                                       |
-| ----------------------- | ------------------------------------------------------------- |
-| `keys-section.tsx`      | Provider API keys and OpenAI-compatible base URLs             |
-| `summaries-section.tsx` | The summarizer provider and model                             |
-| `hotkeys-section.tsx`   | The two global hotkeys and the hotkey problem, if any         |
-| `sight-section.tsx`     | What a look at every screen sends, and the window text budget |
-| `awareness-section.tsx` | Rolling memory and the watch limits                           |
-| `browser-section.tsx`   | The Chrome extension's pairing token                          |
-| `section.tsx`           | The section list the nav links to, and the panel each sits in |
+| File                      | Section                                                       |
+| ------------------------- | ------------------------------------------------------------- |
+| `keys-section.tsx`        | Provider API keys and OpenAI-compatible base URLs             |
+| `summaries-section.tsx`   | The summarizer provider and model                             |
+| `hotkeys-section.tsx`     | The two global hotkeys and the hotkey problem, if any         |
+| `sight-section.tsx`       | What a look at every screen sends, and the window text budget |
+| `blind-spots-section.tsx` | The built-in blind spots, read-only                           |
+| `awareness-section.tsx`   | Rolling memory and the watch limits                           |
+| `browser-section.tsx`     | The Chrome extension's pairing token                          |
+| `section.tsx`             | The section list the nav links to, and the panel each sits in |
 
 The role-shaped part of a pet is pure components in `packages/ui/src/settings/`, which take the role
 library and the recommended model as props and are now composed in Home: `RolePicker` (one role, its

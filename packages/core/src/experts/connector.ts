@@ -5,6 +5,7 @@
  * which carries it to whatever the expert really is (a command-line agent, a model API,
  * a tool server) and brings back a `ConnectorResult`. Each kind of expert is one adapter.
  */
+import { hideSecrets } from '../privacy/secrets';
 import type { Brief } from '@tagalong/protocol';
 
 export type { Brief };
@@ -32,7 +33,7 @@ export interface Connector {
 
 export const CANCELLED: ConnectorResult = { ok: false, error: 'Cancelled.' };
 
-/** The brief as plain text, the form every connector can pass on. */
+/** The brief as plain text, the form every connector can pass on, with any secret hidden. */
 export function renderBrief(brief: Brief): string {
   const sections = [brief.ask];
   const { app, windowTitle, selection } = brief.context ?? {};
@@ -43,5 +44,5 @@ export function renderBrief(brief: Brief): string {
     sections.push(`Files that matter:\n${brief.files.map((f) => `- ${f}`).join('\n')}`);
   }
   if (brief.goodAnswer) sections.push(`A good answer: ${brief.goodAnswer}`);
-  return sections.join('\n\n');
+  return hideSecrets(sections.join('\n\n'));
 }

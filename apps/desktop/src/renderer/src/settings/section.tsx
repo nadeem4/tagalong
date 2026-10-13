@@ -6,6 +6,7 @@ export const SECTIONS = [
   { id: 'summaries', title: 'Summaries' },
   { id: 'hotkeys', title: 'Hotkeys' },
   { id: 'sight', title: 'Sight' },
+  { id: 'blindSpots', title: 'Scout never looks at' },
   { id: 'awareness', title: 'Awareness' },
   { id: 'browser', title: 'Browser extension' },
 ] as const;

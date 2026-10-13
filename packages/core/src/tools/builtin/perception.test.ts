@@ -153,7 +153,7 @@ describe('look_at_screen', () => {
 
     expect(result.isError).toBe(true);
     expect(result.content).toContain('blocked');
-    expect(result.content).toContain('1password.exe');
+    expect(result.content).toMatch(/1password.exe/i);
     expect(result.content).not.toContain(PNG);
     expect(host.asked).toEqual([['activeWindow']]);
   });

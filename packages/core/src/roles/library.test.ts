@@ -91,6 +91,12 @@ describe('the role files', () => {
     expect(instructions).toContain('minimized windows too');
   });
 
+  it('tell the companion what a hidden marker means', () => {
+    const instructions = getRole('companion')?.instructions ?? '';
+    expect(instructions).toContain('[hidden: ...]');
+    expect(instructions).toContain('never ask for it');
+  });
+
   it('use unique ids', () => {
     const ids = loadRoles().map((role) => role.id);
     expect(new Set(ids).size).toBe(ids.length);

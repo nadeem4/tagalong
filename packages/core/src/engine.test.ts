@@ -1077,3 +1077,28 @@ describe('a companion handing work to an expert', () => {
     expect(String(handed?.['text'])).toContain('Why does the build fail?');
   });
 });
+
+describe('the built-in blind spots', () => {
+  it('hide a key in a question before it reaches the model', async () => {
+    const prompts: string[] = [];
+    const inner = new FakeBrainProvider({ text: 'ok' });
+    const e = await boot({
+      id: inner.id,
+      capabilities: inner.capabilities,
+      listModels: () => inner.listModels(),
+      complete: (req, events, signal) => {
+        prompts.push(JSON.stringify(req));
+        return inner.complete(req, events, signal);
+      },
+    });
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+
+    const key = 'sk-' + 'ant-api03-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789';
+    await host.call('ask', { petId: 'scout', input: { text: `why is ${key} refused?` } });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+
+    expect(prompts.join('')).not.toContain(key);
+    expect(prompts.join('')).toContain('[hidden: API key]');
+  });
+});

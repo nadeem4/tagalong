@@ -1,3 +1,4 @@
+import { guardBrain } from './providers/guard';
 import type { Database } from 'better-sqlite3';
 import { DEFAULT_ENGINE_PORT, RPC_ERROR_CODES, Settings } from '@tagalong/protocol';
 import type { Expert, Pet, Role } from '@tagalong/protocol';
@@ -213,8 +214,9 @@ export class Engine {
 
     const store = new ConversationStore(db);
     const memory = new MemoryStore(db);
-    const resolve: ProviderResolver =
-      typeof provider === 'function' ? provider : () => provider as BrainProvider;
+    // Every brain is guarded: no key, token or password in anything sent reaches a model.
+    const resolve: ProviderResolver = (pet) =>
+      guardBrain(typeof provider === 'function' ? provider(pet) : provider);
     const summarizer = new Summarizer({
       store,
       memories: memory,
@@ -264,7 +266,7 @@ export class Engine {
     const runner = new ConversationRunner({
       store,
       settings,
-      provider,
+      provider: resolve,
       emit,
       memory,
       // Off the request path: the reply is already on screen when the summary starts.

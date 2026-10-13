@@ -4,6 +4,7 @@ import { SETTINGS_CSS } from '@tagalong/ui';
 import { buildSettingsPatch } from '../settings-form';
 import { AwarenessSection } from './awareness-section';
 import { BrowserSection } from './browser-section';
+import { BlindSpotsSection } from './blind-spots-section';
 import { HotkeysSection } from './hotkeys-section';
 import { KeysSection } from './keys-section';
 import { SECTIONS } from './section';
@@ -174,6 +175,7 @@ export function SettingsPage({ embedded = false }: { embedded?: boolean }) {
         <SummariesSection providers={view.providers} settings={settings} />
         <HotkeysSection settings={settings} hotkeyError={view.hotkeyError} />
         <SightSection settings={settings} />
+        <BlindSpotsSection />
         <AwarenessSection settings={settings} />
         <BrowserSection token={view.pairingToken} />
         <div className="tg-footer">
