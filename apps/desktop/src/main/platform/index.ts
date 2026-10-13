@@ -56,7 +56,11 @@ export interface Platform {
    * refused while the rest are returned, so the decision belongs inside the enumeration.
    * Entries come back already classified, so nothing downstream has to remember to check.
    */
-  listWindows(exclusions: CaptureExclusions): Promise<WindowInventory>;
+  listWindows(
+    exclusions: CaptureExclusions,
+    /** `countText: false` skips the text count, for keeping an eye: titles are all it needs. */
+    options?: { countText?: boolean },
+  ): Promise<WindowInventory>;
   /**
    * Phase 2B: a native-resolution crop of one display, for leaning in.
    *

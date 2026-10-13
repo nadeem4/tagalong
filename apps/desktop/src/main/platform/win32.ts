@@ -97,7 +97,10 @@ export class Win32Platform implements Platform {
     return createUiaTextLayer(runPowerShellScript);
   }
 
-  async listWindows(exclusions: CaptureExclusions): Promise<WindowInventory> {
+  async listWindows(
+    exclusions: CaptureExclusions,
+    options: { countText?: boolean } = {},
+  ): Promise<WindowInventory> {
     const stdout = await runPowerShellScript(LIST_WINDOWS_SCRIPT, WINDOW_HELPER_TIMEOUT_MS);
     const outcome = parseWindowList(stdout);
     // Nothing to count and nothing to classify: hand the failure up rather than spending
@@ -107,7 +110,11 @@ export class Win32Platform implements Platform {
     const placed = placeOnDisplays(outcome.windows, screen);
     // Counting is a second pass rather than part of enumeration, so an excluded window is
     // never walked: the exclusion list decides who is countable before anyone looks.
-    const counts = await this.#textLayer.countWindowText(countableHandles(placed, exclusions));
+    // Keeping an eye needs titles only, so it skips the walk of every window's text.
+    const counts =
+      options.countText === false
+        ? new Map<number, number>()
+        : await this.#textLayer.countWindowText(countableHandles(placed, exclusions));
     return {
       windows: buildInventory(attachTextCounts(placed, counts), exclusions),
       displays: screensOf(screen),

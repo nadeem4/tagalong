@@ -5,7 +5,8 @@ import { keyCaps } from '../settings-form';
 import { Info, Section, Tip } from './section';
 
 /**
- * The hello on launch, rolling memory's on/off, and what Scout never looks at. The blind
+ * The hello on launch, keeping an eye on things, rolling memory's on/off, and what Scout
+ * never looks at. The blind
  * spots are built in and always on, so they are listed from `BLIND_SPOTS` and nothing here
  * can switch them off.
  * The minutes rolling memory keeps are under Advanced.
@@ -13,6 +14,7 @@ import { Info, Section, Tip } from './section';
 export function PrivacySection({ settings, platform }: { settings: Settings; platform: string }) {
   const [remember, setRemember] = useState(settings.rollingMemory.enabled);
   const [greet, setGreet] = useState(settings.greeting);
+  const [watching, setWatching] = useState(settings.keepAnEye);
   const pauseKey = settings.hotkeys.pauseSight ?? SETTINGS_DEFAULTS.hotkeys.pauseSight;
   return (
     <Section id="privacy">
@@ -42,6 +44,38 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
         Scout looks at nothing on screen for this. It knows only the time of day, how long since
         Tagalong last opened, and which hand-offs finished meanwhile. The summaries model writes the
         line in one short call; if that fails, Scout says a line of its own. On by default.
+      </Tip>
+      <hr className="tg-divider" />
+      <div className="tg-setting">
+        <div className="tg-setting__text">
+          <div className="tg-titlerow">
+            <h3 className="tg-sub" id="keep-an-eye-label">
+              Keep an eye on things
+            </h3>
+            <Info tip="keepAnEye" label="About keeping an eye on things" />
+          </div>
+          <p className="tg-help">Now and then, one useful line. Most of the time, nothing.</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          className="tg-switch"
+          aria-checked={watching}
+          aria-labelledby="keep-an-eye-label"
+          onClick={() => setWatching((on) => !on)}
+        >
+          {watching ? 'On' : 'Off'}
+        </button>
+        {watching && <input type="hidden" name="keepAnEye" value="on" />}
+      </div>
+      <Tip tip="keepAnEye">
+        Scout follows which windows are open and which one is in front, from their titles only: no
+        picture, no model call. When you settle on a new window for half a minute, or a title reads
+        like an error or a failed build, Scout reads that one window&apos;s text and asks the
+        summaries model, in one short call, whether there is one useful thing to say. At most one
+        line every ten minutes, never twice about the same window, and nothing while a full-screen
+        app or a call is in front. Not now on the line quiets it for an hour. Blind spots are never
+        considered, titles included. Off means no tracking at all. On by default.
       </Tip>
       <hr className="tg-divider" />
       <div className="tg-setting">

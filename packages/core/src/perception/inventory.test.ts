@@ -107,6 +107,13 @@ describe('buildInventory', () => {
     expect(entry).not.toHaveProperty('displayId');
   });
 
+  it('carries the full-screen mark, so a pet keeping an eye stays quiet over a film', () => {
+    const [entry] = buildInventory([observed({ fullScreen: true })], NOTHING_EXCLUDED);
+    expect(entry?.fullScreen).toBe(true);
+    const [plain] = buildInventory([observed()], NOTHING_EXCLUDED);
+    expect(plain).not.toHaveProperty('fullScreen');
+  });
+
   it('returns entries in the order the host enumerated them', () => {
     const entries = buildInventory(
       [observed({ id: 'w-3' }), observed({ id: 'w-1' }), observed({ id: 'w-2' })],

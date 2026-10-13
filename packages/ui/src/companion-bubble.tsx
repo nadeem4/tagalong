@@ -512,13 +512,18 @@ export interface GreetingLineProps {
   tail?: 'left' | 'right';
   /** How long it stays when nobody touches it. */
   holdMs?: number;
+  /** A remark Scout made on its own: Not now quiets it for an hour and closes the line. */
+  onNotNow?: () => void;
+  /** A task an expert could take. Its button opens the hand-off card; nothing is sent yet. */
+  offer?: { label: string; onAccept: () => void };
 }
 
 /** How long the fade out takes before the line is gone. */
 const LEAVE_MS = 300;
 
 /**
- * The quiet hello on a later launch: one line beside the pet that fades after a few seconds.
+ * One quiet line beside the pet that fades after a few seconds: the hello on a later launch,
+ * or a remark from keeping an eye on things, which adds Not now and, sometimes, an offer.
  * Pointing at it or tabbing into it keeps it there; clicking it opens the bubble to ask.
  */
 export function GreetingLine({
@@ -528,6 +533,8 @@ export function GreetingLine({
   onOpen,
   tail,
   holdMs = 7_000,
+  onNotNow,
+  offer,
 }: GreetingLineProps) {
   const [held, setHeld] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -571,6 +578,27 @@ export function GreetingLine({
             ×
           </button>
         </div>
+        {(onNotNow !== undefined || offer !== undefined) && (
+          <div className="bubble-row">
+            {offer !== undefined && (
+              <button type="button" className="bubble-primary" onClick={offer.onAccept}>
+                {offer.label}
+              </button>
+            )}
+            {onNotNow !== undefined && (
+              <button
+                type="button"
+                className="bubble-quiet"
+                onClick={() => {
+                  onNotNow();
+                  onDone();
+                }}
+              >
+                Not now
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </Speech>
   );

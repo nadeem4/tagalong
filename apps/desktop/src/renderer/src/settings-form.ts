@@ -26,6 +26,8 @@ export interface SettingsFormValues {
   summarizer?: string;
   /** Whether Scout greets you on a later launch. Absent leaves the setting alone. */
   greeting?: boolean;
+  /** Whether Scout keeps an eye on things. Absent leaves the setting alone. */
+  keepAnEye?: boolean;
   /** Phase 3B. Present together when the form shows rolling memory and the watches. */
   rollingMemoryEnabled?: boolean;
   rollingMemoryMinutes?: string;
@@ -87,6 +89,7 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
     ...(values.hiddenPets !== undefined ? { hiddenPets: [...values.hiddenPets] } : {}),
     ...(values.summarizer !== undefined ? { summarizer: parseSummarizer(values.summarizer) } : {}),
     ...(values.greeting !== undefined ? { greeting: values.greeting } : {}),
+    ...(values.keepAnEye !== undefined ? { keepAnEye: values.keepAnEye } : {}),
     ...(values.rollingMemoryMinutes !== undefined
       ? {
           rollingMemory: {

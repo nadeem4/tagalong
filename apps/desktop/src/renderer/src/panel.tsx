@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { CompanionBubble, GreetingLine, HostBridgeProvider } from '@tagalong/ui';
-import type { ContextSnapshot } from '@tagalong/protocol';
+import type { ContextSnapshot, PetRemarkParams } from '@tagalong/protocol';
 import './app.css';
 import '../../shared/ipc';
 
@@ -28,6 +28,8 @@ function Panel() {
   const [mode, setMode] = useState<'bubble' | 'chat'>('bubble');
   const [greeting, setGreeting] = useState(false);
   const [line, setLine] = useState<string | null>(null);
+  // A line Scout says on its own, from keeping an eye on things, with Not now on it.
+  const [remark, setRemark] = useState<PetRemarkParams | null>(null);
   // Which side of the pet this window sits on; the speech tail points the other way, at it.
   const [side, setSide] = useState<'left' | 'right'>('left');
   const root = useRef<HTMLDivElement>(null);
@@ -59,6 +61,16 @@ function Panel() {
     [],
   );
 
+  useEffect(
+    () =>
+      window.tagalongHost.onRemark((next) => {
+        setMode('bubble');
+        setLine(null);
+        setRemark(next);
+      }),
+    [],
+  );
+
   // The window follows what is shown: the chat at its full height, the bubble at its own.
   useEffect(() => {
     if (mode === 'chat') {
@@ -86,6 +98,7 @@ function Panel() {
       setSnapshot(next);
       setGreeting(false);
       setLine(null);
+      setRemark(null);
     });
   }, []);
 
@@ -131,7 +144,32 @@ function Panel() {
               </button>
             </p>
           )}
-          {line !== null ? (
+          {remark !== null ? (
+            <GreetingLine
+              petName={petName}
+              text={remark.text}
+              tail={side === 'left' ? 'right' : 'left'}
+              holdMs={12_000}
+              onDone={() => {
+                setRemark(null);
+                void window.tagalongHost.hidePanel();
+              }}
+              onOpen={() => setRemark(null)}
+              onNotNow={() => void window.tagalongHost.remarkNotNow()}
+              {...(remark.offer !== undefined
+                ? {
+                    offer: {
+                      label: 'Hand it over',
+                      // The bubble comes back first, so it is there to show the card.
+                      onAccept: () => {
+                        setRemark(null);
+                        void window.tagalongHost.remarkAccept(remark.remarkId);
+                      },
+                    },
+                  }
+                : {})}
+            />
+          ) : line !== null ? (
             <GreetingLine
               petName={petName}
               text={line}

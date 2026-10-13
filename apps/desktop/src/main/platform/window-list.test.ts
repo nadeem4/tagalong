@@ -148,6 +148,23 @@ describe('placeOnDisplays', () => {
     expect(placed[0]?.displayId).toBeUndefined();
   });
 
+  it('marks a window that covers its whole screen as full screen, and a maximized one not', () => {
+    const withBounds = {
+      getDisplayMatching: () => ({ id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 } }),
+    };
+    const placed = placeOnDisplays(
+      windowsFrom(
+        JSON.stringify([
+          raw({ handle: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 } }),
+          // Maximized: past the edges by its border, but short of the taskbar.
+          raw({ handle: 2, bounds: { x: -8, y: -8, width: 1936, height: 1048 } }),
+        ]),
+      ),
+      withBounds,
+    );
+    expect(placed.map((w) => w.fullScreen)).toEqual([true, undefined]);
+  });
+
   it('leaves a window unplaced when the screen lookup throws', () => {
     const throwing = {
       getDisplayMatching: () => {

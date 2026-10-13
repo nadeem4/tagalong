@@ -291,6 +291,17 @@ describe('buildSettingsPatch greeting', () => {
   });
 });
 
+describe('buildSettingsPatch keepAnEye', () => {
+  it('carries the keep-an-eye switch when the form shows it', () => {
+    expect(buildSettingsPatch({ ...values, keepAnEye: false }).keepAnEye).toBe(false);
+    expect(buildSettingsPatch({ ...values, keepAnEye: true }).keepAnEye).toBe(true);
+  });
+
+  it('leaves it alone when the form does not show it', () => {
+    expect(buildSettingsPatch(values).keepAnEye).toBeUndefined();
+  });
+});
+
 describe('buildSettingsPatch awareness', () => {
   const awareness = {
     rollingMemoryEnabled: true,

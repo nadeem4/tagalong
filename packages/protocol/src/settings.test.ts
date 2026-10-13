@@ -388,3 +388,13 @@ describe('Settings.lastOpenedAt', () => {
     expect(Settings.safeParse({ lastOpenedAt: 'yesterday' }).success).toBe(false);
   });
 });
+
+describe('Settings.keepAnEye', () => {
+  it('is on by default: Scout follows window titles and speaks up rarely', () => {
+    expect(Settings.parse({}).keepAnEye).toBe(true);
+  });
+
+  it('can be switched off in a patch alone', () => {
+    expect(SettingsPatch.parse({ keepAnEye: false })).toEqual({ keepAnEye: false });
+  });
+});

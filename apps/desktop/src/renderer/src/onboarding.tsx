@@ -157,8 +157,8 @@ function Welcome() {
           {busy ? 'Starting…' : 'Start'}
         </button>
         <p className="welcome__note">
-          I only look at your screen when you press the key. Everything here can be changed later in
-          Home.
+          I look at your screen when you press the key. Otherwise I follow window titles only and
+          speak up rarely. Everything here can be changed later in Home.
         </p>
       </footer>
     </main>

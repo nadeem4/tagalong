@@ -106,6 +106,12 @@ export const SETTINGS_DEFAULTS = {
   greeting: true,
   /** When Tagalong last opened, so the greeting can say how long you were away. */
   lastOpenedAt: null,
+  /**
+   * Whether Scout keeps an eye on things: it follows window titles (never pixels) and,
+   * rarely, reads one window and says one short line. On by default; off means no
+   * tracking at all.
+   */
+  keepAnEye: true,
 } as const;
 
 /** A non-blank, trimmed entry. A blank one would match every window and blind the pet. */
@@ -260,6 +266,8 @@ const settingsFields = {
   greeting: z.boolean(),
   /** When Tagalong last opened; null before the first launch that recorded it. */
   lastOpenedAt: z.iso.datetime().nullable(),
+  /** Whether Scout follows window titles and now and then says one useful line. */
+  keepAnEye: z.boolean(),
 };
 
 export const Settings = z.object({
@@ -291,6 +299,7 @@ export const Settings = z.object({
   welcome: settingsFields.welcome.prefault({ ...SETTINGS_DEFAULTS.welcome }),
   greeting: settingsFields.greeting.default(SETTINGS_DEFAULTS.greeting),
   lastOpenedAt: settingsFields.lastOpenedAt.default(SETTINGS_DEFAULTS.lastOpenedAt),
+  keepAnEye: settingsFields.keepAnEye.default(SETTINGS_DEFAULTS.keepAnEye),
 });
 export type Settings = z.infer<typeof Settings>;
 

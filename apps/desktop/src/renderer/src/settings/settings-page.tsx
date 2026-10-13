@@ -199,6 +199,7 @@ export function SettingsPage({
         windowTextBudget: field('windowTextBudget'),
         summarizer: field('summarizer'),
         greeting: form.get('greeting') !== null,
+        keepAnEye: form.get('keepAnEye') !== null,
         rollingMemoryEnabled: form.get('rollingMemoryEnabled') !== null,
         rollingMemoryMinutes: field('rollingMemoryMinutes'),
         watchMaxChecks: field('watchMaxChecks'),

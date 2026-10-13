@@ -25,6 +25,8 @@ export interface ObservedWindow {
    * worth telling the pet because it saves a tool call that would return nothing.
    */
   readonly textChars?: number;
+  /** True when the window covers its whole screen. Absent when it does not, or nobody knows. */
+  readonly fullScreen?: boolean;
 }
 
 /**
@@ -91,6 +93,7 @@ export function buildInventory(
       browser: isBrowserProcess(window.processName),
       ...(window.displayId === undefined ? {} : { displayId: window.displayId }),
       ...(blocked === null ? {} : { blocked }),
+      ...(window.fullScreen === true ? { fullScreen: true } : {}),
       // The count goes the way of the title for a blocked window. Knowing a vault holds
       // 4,000 readable characters says more than nothing at all, and this is a window the
       // user asked Tagalong never to read.

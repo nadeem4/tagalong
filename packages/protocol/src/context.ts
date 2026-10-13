@@ -90,6 +90,8 @@ export const WindowEntry = z.object({
   textChars: z.number().int().nonnegative().optional(),
   /** Present when an exclusion refuses this window. No text and no count are returned. */
   blocked: CaptureBlock.optional(),
+  /** True when the window covers its whole screen: a game, a video, a presentation. */
+  fullScreen: z.boolean().optional(),
 });
 export type WindowEntry = z.infer<typeof WindowEntry>;
 

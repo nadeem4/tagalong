@@ -31,6 +31,7 @@ import { startRoundtable } from './crew/roundtable';
 import { browserContextFor } from './perception';
 import type { PerceptionHost } from './perception';
 import { WatchManager, systemWatchClock } from './watch';
+import { KeepAnEye } from './keep-an-eye/keep-an-eye';
 import { dismissRolesNotice, rolesUpgradeNotice } from './pets/roles-notice';
 import { getRole, listRoles, recommendedModel } from './roles';
 import { EngineServer, RpcFailure } from './server/ws-server';
@@ -267,6 +268,19 @@ export class Engine {
       projects,
     });
     const routes = new RouteMemory(db);
+    // Keep an eye on things: the host sends window titles, and now and then one window is
+    // read and one cheap call decides whether Scout has anything worth saying.
+    const keepAnEye = new KeepAnEye({
+      clock: { now: () => Date.now() },
+      settings: () => settings.get(),
+      pet: () => pets.get(settings.get().defaultPetId),
+      hosts,
+      provider: resolve,
+      experts: () => experts.list(),
+      propose: (params) => handoffs.propose(params),
+      emit: (event) => live.server?.broadcast(event.method, event.params),
+      log: (message) => console.warn(`[engine] ${message}`),
+    });
     const runner = new ConversationRunner({
       store,
       settings,
@@ -315,6 +329,7 @@ export class Engine {
       projects,
       connectorFor,
       resolve,
+      keepAnEye,
       refreshProviders: async () => keyed?.refresh(),
       models: (providerId) =>
         listModels(providerId, options.secretStore, settings, options.env ?? process.env),
@@ -398,11 +413,13 @@ function buildHandlers(parts: {
   /** The guarded resolver turns use, for the one-off greeting call. */
   resolve: ProviderResolver;
   models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
+  keepAnEye: KeepAnEye;
   /** Re-reads provider keys, so a key saved since the last ask is used by this one. */
   refreshProviders: () => Promise<void>;
 }): MethodHandlers {
   const { db, activity, runner, store, emit, pets, settings, models, hosts, watches } = parts;
   const { refreshProviders, experts, routes, handoffs, projects, connectorFor, resolve } = parts;
+  const { keepAnEye } = parts;
 
   return {
     ask: async (params) => {
@@ -513,5 +530,13 @@ function buildHandlers(parts: {
         },
       });
     },
+    // Answers at once: the look, when there is one, runs off the request path and ends
+    // in a pet.remark notification or, most of the time, in nothing.
+    'keepAnEye.observe': (params) => {
+      void keepAnEye.observe(params.windows);
+      return {};
+    },
+    'keepAnEye.notNow': () => ({ quietUntil: keepAnEye.notNow().toISOString() }),
+    'keepAnEye.accept': (params) => ({ proposed: keepAnEye.accept(params.remarkId) }),
   };
 }
