@@ -205,6 +205,12 @@ for a folder; **Allow edits** lets this one task change files; **Send** (or **Ca
 While the expert works the bubble lists its steps with **Stop**, and its answer comes back to the
 bubble when it is done.
 
+**Keeping an eye on things.** Now and then Scout says one short line on its own, beside itself and
+without taking the keyboard: a build that failed and why, say. It follows window titles only, reads
+one window when you settle on it or its title reads like trouble, and most of the time says
+nothing. **Not now** on the line quiets it for an hour; when it offers help, **Hand it over** opens
+the hand-off card, and nothing is sent until you press **Send**. See [Privacy](#privacy).
+
 **Memory.** Tell Scout "I prefer short answers" and it remembers across restarts.
 
 Earlier versions shipped a crew of three (Scout, Ink and Bolt). Ink and Bolt are removed on
@@ -239,7 +245,8 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   - **How Scout thinks**: Scout's real brain, and whether your Claude Code sign-in works (checked
     locally with `claude auth status`). Without Claude Code you pick a service and paste its key,
     and saving moves Scout to it.
-  - **Privacy**: the hello when Tagalong opens, screen memory, and what Scout never looks at.
+  - **Privacy**: the hello when Tagalong opens, keeping an eye on things, screen memory, and what
+    Scout never looks at.
   - **Shortcuts**: the ask and pause keys.
   - **Browser extension (optional)**: the pairing token for the Chrome extension.
   - **Advanced**, closed by default: summaries, API keys (add, replace or remove, and a base URL),
@@ -295,8 +302,15 @@ Then click the toolbar button, or select text and press `Alt+Shift+Space`. More 
 
 ## Privacy
 
-- Nothing is read until you press a hotkey or ask, except screen memory and watches, which you turn
-  on. Every look badges Scout and the tray says what was read and when.
+- Nothing on screen is read until you press a hotkey or ask, except screen memory and watches, which
+  you turn on, and keeping an eye on things (below). Every look badges Scout and the tray says what
+  was read and when.
+- **Keeping an eye on things** is on by default: Scout follows window titles only (no picture, no
+  model call). Rarely, when you settle on a new window or a title reads like an error or a failed
+  build, it reads that one window and asks the summaries model in one short call whether there is
+  one useful thing to say; most of the time there is not. At most one line every ten minutes,
+  never twice about one window, quiet over full-screen apps and calls, and **Not now** quiets it for
+  an hour. Turn it off under **Settings → Privacy → Keep an eye on things**.
 - Scout never looks at its built-in blind spots: password managers, the Windows sign-in and security
   prompts, secret files such as `.env` and SSH keys, private browsing, authenticator apps and Remote
   Desktop. They are always on and listed in Settings; you can add your own.

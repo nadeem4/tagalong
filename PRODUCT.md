@@ -40,8 +40,8 @@ trust it with their screen.
 Not a chat window you go to: a team that sits with you. Each pet is a colleague with one role, a
 desk, and its own memory, in a small simulated office. Pets meet in meeting rooms to work things
 out and go back to their desks to do the work, and you can watch it happen, join a meeting, or
-just take the final answer. It sees your screen locally, only when you ask, and never takes over
-your mouse or keyboard.
+just take the final answer. It sees your screen locally when you ask, otherwise keeps an eye on
+window titles only and speaks up rarely, and never takes over your mouse or keyboard.
 
 ## Operating Context
 

@@ -939,6 +939,50 @@ the next start is a fresh install. Rename it back at the end to keep your histor
 1. **Action:** Settings → Privacy → **Say hello when Tagalong opens** → Off, Save. Restart.
 2. **Expected:** Scout docks and says nothing. The ⓘ note says the hello reads no screen.
 
+## Keeping an eye on things
+
+On by default. Not active under `TAGALONG_FAKE_PROVIDERS=1` unless `TAGALONG_KEEP_AN_EYE=1` is set.
+
+### K.1. A failed build gets one line
+
+1. **Setup:** a real brain set up; the bubble closed; nothing said in the last ten minutes.
+2. **Action:** in a terminal, run a command that fails, and give the window a title with "failed"
+   in it (PowerShell: `$host.UI.RawUI.WindowTitle = 'npm test failed'`). Keep typing elsewhere.
+3. **Expected:** within about five seconds one short line appears beside Scout, about the failure,
+   and your typing is not interrupted. It has **Not now** and fades after about twelve seconds. No
+   screenshot is taken. If the summaries model sees nothing useful, nothing appears, which is fine.
+
+### K.2. Settling on a new window
+
+1. **Action:** open a document or page you have not opened this session and stay on it for 30 s.
+2. **Expected:** usually nothing. At most one line, and never a second one about the same window.
+
+### K.3. The limits
+
+1. **Action:** after a line, cause another failure within ten minutes.
+2. **Expected:** nothing until ten minutes have passed since the last line.
+3. **Action:** press **Not now** on a line, then cause failures.
+4. **Expected:** nothing for an hour.
+5. **Action:** put a video full screen, or join a Teams, Zoom or Google Meet call, then cause a
+   failure in a window behind it.
+6. **Expected:** nothing while the full-screen window or the call is in front.
+
+### K.4. Blind spots and the switch
+
+1. **Action:** add `*failed*` to your exclusion list, then cause a failure whose title matches it.
+2. **Expected:** nothing; that window is never read.
+3. **Action:** Settings → Privacy → **Keep an eye on things** → Off, Save.
+4. **Expected:** no further lines; the window list is no longer taken. The ⓘ note explains what is
+   followed and when a window is read.
+
+### K.5. Hand it over
+
+1. **Setup:** Claude Code switched on as an expert.
+2. **Action:** cause a failure that an expert could fix. When a line with **Hand it over** appears,
+   press it.
+3. **Expected:** the hand-off card opens with the task and the window title; nothing runs until you
+   press **Send**.
+
 ## Demo run: the hackathon story
 
 A short end-to-end run of the story the hackathon demo tells. Run it on the installed app, with an

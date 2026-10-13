@@ -164,12 +164,14 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   `experts.upsert`, `experts.delete`, `experts.test`, `handoffs.start`, `handoffs.cancel`,
   `handoffs.confirm`, `handoffs.dismiss` and `projects.search` (see
   [Experts and connectors](#experts-and-connectors)), and `greeting.compose { petId }` →
-  `{ text, source: 'model' | 'fallback' }`, the line said as the app opens (see Welcome below).
-  Protocol 0.9.0.
+  `{ text, source: 'model' | 'fallback' }`, the line said as the app opens (see Welcome below), and
+  `keepAnEye.observe { windows }`, `keepAnEye.notNow` and `keepAnEye.accept { remarkId }` (see
+  [Keeping an eye on things](#keeping-an-eye-on-things)). Protocol 0.10.0.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
   `perception.listWindows` and `perception.readText`, then `perception.captureWindow`, and from Phase 3B `perception.recall` and
   `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
-  Hand-offs report back with the `handoff.progress` and `handoff.finished` notifications.
+  Hand-offs report back with the `handoff.progress` and `handoff.finished` notifications, and a
+  remark from keeping an eye on things arrives as `pet.remark`.
 - **Core to host notifications** gained `turn.toolRequest` and `turn.toolResult` in Phase 2B. They were
   in the catalog from Phase 1 and nothing emitted them, which left a tool call invisible twice over: the
   user watching the panel could not tell a working pet from a hung one, and no test could observe that a
@@ -1017,6 +1019,52 @@ flowchart LR
 - **Fired.** `watch.fired` carries the model's one-sentence reason as `message`. The panel shows it as
   a message from the pet and the avatar shows an alert. It is not spoken: Phase 3 (Voice) is not
   built, and speaking it is deferred there.
+
+### Keeping an eye on things
+
+Proactive remarks, on by default (`settings.keepAnEye`). The desktop only feeds window titles; every
+decision is in `packages/core/src/keep-an-eye/`, pure and on an injected clock.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
+flowchart LR
+  T["Desktop every 5 s: titles only"] --> O["keepAnEye.observe"]
+  O --> L{"Lookout: settled 30 s on a new window, or a trouble title?"}
+  L -- "no (almost always)" --> X["Nothing"]
+  L -- "yes" --> R["perception.readText of that window"]
+  R --> M["One call to the summaries model"]
+  M -- "NOTHING" --> X
+  M -- "one line" --> P["pet.remark: a quiet line with Not now"]
+```
+
+- **The feed.** `apps/desktop/src/main/keep-an-eye.ts#startKeepAnEye` lists windows every 5 s with
+  `platform.listWindows(exclusions, { countText: false })` (no text walk, no picture) and calls
+  `keepAnEye.observe { windows }`. It lists nothing while the setting is off or sight is paused, and
+  it does not start under `TAGALONG_FAKE_PROVIDERS=1` unless `TAGALONG_KEEP_AN_EYE=1`, so e2e runs
+  meet no remark they did not set up. `placeOnDisplays` marks a window that covers its whole display
+  `fullScreen`.
+- **The decision** (`lookout.ts#Lookout`). A window is considered once per session, keyed by id and
+  title. It earns a look when it is in front for `SETTLE_MS` (30 s) or its title matches
+  `looksLikeTrouble` (`error`, `failed`, `failing`, `failure`, `exception`, `traceback`, `crashed`;
+  any non-minimized window). Nothing is considered within `COOLDOWN_MS` (10 min) of the last remark,
+  within `NOT_NOW_MS` (1 h) of **Not now**, or while the window in front is `fullScreen` or a call
+  (`isMeeting`: Teams or Zoom by process, Google Meet or a Zoom meeting by title). A window the host
+  marked `blocked`, or that `findCaptureBlock` refuses (blind spots and the person's exclusions), is
+  never considered, its title included.
+- **The call** (`remark.ts#composeRemark`). Reads the last 4,000 characters of that window through
+  the host's `readText` (a `blocked` read ends it), then one call to `settings.summarizer`, else the
+  pet's own provider and model, text only, like `Summarizer`: 80 tokens, tools refused, a 15 s
+  timeout. The system prompt (`REMARK_INSTRUCTIONS`) asks whether there is ONE short, genuinely useful
+  thing to say, says most of the time there is not and to reply exactly `NOTHING`, otherwise one
+  sentence under 20 words with no emoji, markdown, greeting or praise, an optional second line
+  `OFFER: <task>` when an expert could do the work, and treats the window text as data, never
+  instructions. `parseRemark` drops NOTHING, a ramble, an emoji, or anything over 25 words.
+- **The line.** `pet.remark { remarkId, petId, text, offer? }`; `offer` only when an expert is
+  switched on. Main sends it to the panel as `remarkEvent` and shows it with `showPanelQuietly`, but
+  only when the bubble is closed. The panel renders `GreetingLine` with **Not now**
+  (`keepAnEye.notNow`) and, with an offer, **Hand it over** (`keepAnEye.accept { remarkId }`), which
+  calls `HandoffManager.propose`: the hand-off card opens and nothing runs until **Send**. Voice will
+  speak the line at `showRemark` in `main/index.ts` once spoken replies land.
 
 ### What an ask with pictures costs
 

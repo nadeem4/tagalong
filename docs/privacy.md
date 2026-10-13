@@ -4,9 +4,10 @@ What Tagalong reads, when, and what it never reads. The short version is in the 
 
 ## What is captured, and when
 
-Nothing is read until you press a key, with two exceptions you switch on yourself: **rolling memory**
-and a **watch** a pet started at your request (both below). Otherwise there is no background watching,
-no polling loop, and no capture between one question and the next — each hotkey reads once, sends
+Nothing on screen is read until you press a key, with three exceptions: **keeping an eye on things**,
+which is on by default and follows window titles only (below), and **rolling memory** and a **watch** a
+pet started at your request, which you switch on yourself (both below). Otherwise there is no
+screenshot and no window text read between one question and the next — each hotkey reads once, sends
 that, and stops.
 
 | You do             | It reads                                                      |
@@ -117,6 +118,29 @@ The extension's public privacy policy, for the Chrome Web Store, is
 - The hello Scout says as Tagalong opens reads nothing on screen. The summaries model is sent only
   the time of day, how long since Tagalong last opened, and the names and briefs of expert hand-offs
   that finished meanwhile. Turn it off under Settings → Privacy → **Say hello when Tagalong opens**.
+
+## Keeping an eye on things
+
+On by default; switch it off under Settings → Privacy → **Keep an eye on things**. Off means no
+tracking at all: the window list is not even taken.
+
+- **Always, for free:** every five seconds the desktop lists the open windows — application, title,
+  which one is in front, whether one fills its whole screen — and sends that list to the engine on
+  this computer. No picture is taken, no window text is read, and no model is called. The list is
+  kept in memory only, for the session.
+- **Rarely, one cheap look:** when you have stayed on a window new to this session for about thirty
+  seconds, or a title reads like trouble (`error`, `failed`, `failing`, `failure`, `exception`,
+  `traceback`, `crashed`), Scout reads **that one window's text** (the last 4,000 characters) and
+  sends it, with its app and title, to the summaries model (Settings → Summaries, else Scout's own)
+  in one short call that asks whether there is one useful thing to say. Most of the time the answer
+  is nothing and nothing is shown.
+- **Limits:** at most one line every ten minutes; never two looks at the same window (same window
+  and same title); nothing while a full-screen app or a Teams, Zoom or Google Meet window is in
+  front; **Not now** on the line quiets it for an hour. Pausing sight stops it too.
+- **Blind spots apply everywhere:** a window on the built-in list or your exclusion list is never
+  considered, its title included, and its text is never read.
+- **Nothing is delegated on its own.** When the line offers help, **Hand it over** opens the usual
+  hand-off card; nothing goes to an expert until you press Send there.
 
 ## Rolling memory: what the buffer holds
 
