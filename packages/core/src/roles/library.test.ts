@@ -92,6 +92,20 @@ describe('the role files', () => {
     expect(instructions).toContain('minimized windows too');
   });
 
+  it('tell the companion to answer "what do you see" from the window list, per screen', () => {
+    const instructions = getRole('companion')?.instructions ?? '';
+    expect(instructions).toContain('What do you see?');
+    expect(instructions).toContain('from list_windows alone');
+    expect(instructions).toContain('no screenshot and no read_window_text');
+    expect(instructions).toContain('per screen');
+    expect(instructions).toContain('then what is minimized');
+  });
+
+  it('tell the companion to read one window in detail only when asked about it', () => {
+    const instructions = getRole('companion')?.instructions ?? '';
+    expect(instructions).toContain('read_window_text that window');
+  });
+
   it('tell the companion what a hidden marker means', () => {
     const instructions = getRole('companion')?.instructions ?? '';
     expect(instructions).toContain('[hidden: ...]');

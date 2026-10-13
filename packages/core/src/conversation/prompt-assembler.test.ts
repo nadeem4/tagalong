@@ -403,6 +403,24 @@ describe('assemblePrompt window inventory', () => {
     expect(lastText(request)).toContain('w-2');
   });
 
+  it('groups the inventory by the same screen numbers the displays block uses', () => {
+    const display = {
+      id: 1,
+      bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+      scaleFactor: 1,
+      primary: true,
+      focused: true,
+    };
+    const request = assemblePrompt({
+      pet,
+      settings,
+      history: [userMessage('what do you see')],
+      snapshot: snapshotWithEverything({ windows, displays: [display] }),
+    });
+
+    expect(lastText(request)).toMatch(/^Screen 1\b/m);
+  });
+
   it('says a window is minimized, which is the part the user cannot see', () => {
     const request = assemblePrompt({
       pet,

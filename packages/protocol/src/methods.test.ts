@@ -393,6 +393,16 @@ describe('perception.listWindows', () => {
     ).toBe(true);
   });
 
+  it('may name the screens in host order, so windows can be grouped by screen number', () => {
+    const parsed = PerceptionListWindowsResult.parse({
+      windows: [],
+      displays: [
+        { id: 2528732444, bounds: { x: 0, y: 0, width: 1920, height: 1080 }, primary: true },
+      ],
+    });
+    expect(parsed.displays?.[0]?.bounds.width).toBe(1920);
+  });
+
   it('rejects a window entry carrying text, which belongs to readText', () => {
     const parsed = PerceptionListWindowsResult.parse({
       windows: [

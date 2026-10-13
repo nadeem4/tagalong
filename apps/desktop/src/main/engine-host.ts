@@ -65,9 +65,10 @@ export async function startEngineHost(options: StartEngineHostOptions): Promise<
       }
       return reading;
     },
-    listWindows: async () => ({
-      windows: (await options.platform.listWindows(options.captureExclusions())).windows,
-    }),
+    listWindows: async () => {
+      const { windows, displays } = await options.platform.listWindows(options.captureExclusions());
+      return displays === undefined ? { windows } : { windows, displays };
+    },
     captureRegion: async (params) => {
       const image = await options.platform.captureRegion(params);
       if (image === null) {

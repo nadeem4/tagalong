@@ -30,6 +30,7 @@ import {
   DisplayBounds,
   HostKind,
   PerceptionTarget,
+  ScreenInfo,
   WindowEntry,
 } from './context';
 import {
@@ -196,7 +197,11 @@ export const PerceptionCaptureWindowResult = z.object({
 
 /** Phase 2B. Every top-level window: what and where, never what is inside. */
 export const PerceptionListWindowsParams = Empty;
-export const PerceptionListWindowsResult = z.object({ windows: z.array(WindowEntry) });
+export const PerceptionListWindowsResult = z.object({
+  windows: z.array(WindowEntry),
+  /** Every screen, in the order the composite numbers them. Absent from older hosts. */
+  displays: z.array(ScreenInfo).optional(),
+});
 
 /**
  * Phase 2B. The text of exactly one window.

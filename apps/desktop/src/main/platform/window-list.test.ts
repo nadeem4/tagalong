@@ -7,6 +7,7 @@ import {
   countableHandles,
   parseWindowList,
   placeOnDisplays,
+  screensOf,
 } from './window-list';
 
 /**
@@ -290,5 +291,24 @@ describe('telling a failed enumeration from an empty desktop', () => {
     for (const junk of ['', 'nonsense', '[]']) {
       expect(Array.isArray(parseWindowList(junk).windows)).toBe(true);
     }
+  });
+});
+
+describe('screensOf', () => {
+  it('lists every screen in the order the composite numbers them, without pictures', () => {
+    const one = { id: 2528732444, bounds: { x: 0, y: 0, width: 1920, height: 1080 } };
+    const two = { id: 77, bounds: { x: 1920, y: 0, width: 2560, height: 1440 } };
+    const screens = screensOf({
+      getAllDisplays: () => [
+        { ...one, scaleFactor: 1 },
+        { ...two, scaleFactor: 2 },
+      ],
+      getPrimaryDisplay: () => one,
+    });
+
+    expect(screens).toEqual([
+      { ...one, primary: true },
+      { ...two, primary: false },
+    ]);
   });
 });
