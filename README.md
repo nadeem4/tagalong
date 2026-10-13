@@ -1,55 +1,158 @@
 # Tagalong
 
-Tagalong is a desktop screen companion: a crew of AI pets that tag along on your screen. Press a key
-and the pet you are talking to reads what you selected, looks at your screen, or reads the page you
-are on in Chrome, then answers in a bubble beside it. Pets remember what you tell them, hand work to
-each other, and can watch the screen for you. They never take over your mouse or keyboard.
+Tagalong is a desktop screen companion for Windows. One companion, Scout, sits on your screen.
+Press a key and Scout sees what you are working on: the text you selected, the window you are in,
+or the page you are on in Chrome. It writes a brief, hands the work to an expert (Claude Code
+first), follows it and brings the answer back in a bubble beside it. Scout never moves your mouse
+or types for you.
 
-- [Using Tagalong](#using-tagalong): install it, set it up, and use it. Start here.
-- [Developer guide](docs/development.md): build, test and package it from source.
-- Canonical plan, task board and decisions: <https://app.notion.com/p/3d809730490481a4be8ac5bd000b8bfc>
-- Design: [docs/specs/2026-09-11-tagalong-design.md](docs/specs/2026-09-11-tagalong-design.md) ·
-  Architecture: [docs/architecture.md](docs/architecture.md) · Test guide:
-  [docs/testing/feature-test-guide.md](docs/testing/feature-test-guide.md)
+There are three ways in:
 
-## What is in this build
+1. [Download and run it](#download-and-run-it): install the Windows app and use it.
+2. [Run it from source](#run-it-from-source): clone the repo and start the desktop app.
+3. [Use the engine in your own app](#use-the-engine-in-your-own-app): boot the engine and talk to
+   it over its local protocol.
 
-| In this build                                                                                   | Not in this build                                                   |
-| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Windows desktop app with a Welcome window and an NSIS installer                                 | macOS and Linux (the installer configs exist but are unverified)    |
-| Three providers: OpenRouter (Claude), Nebius Token Factory (NVIDIA Nemotron), Anthropic         | Voice: push to talk and spoken answers                              |
-| Sight: selection, screenshot, every display, every open window, window text, capture exclusions | Hands: MCP tools and approval cards                                 |
-| Vision routing: a text-only Nemotron pet reads pictures with Nemotron Nano 2 VL                 | A cost dashboard                                                    |
-| One companion, Scout, that hands work to experts and brings the answer back                     | Data export and delete-all in Settings                              |
-| Memory across restarts, rolling screen memory (opt-in), watches ("tell me when this finishes")  | Code signing (the installer is unsigned) and an app icon of its own |
-| The Chrome extension: the same crew in Chrome's side panel, reading the page you are on         |                                                                     |
+The [user guide](#using-tagalong) follows. Plan, task board and decisions live in
+[Notion](https://app.notion.com/p/3d809730490481a4be8ac5bd000b8bfc).
 
-# Using Tagalong
+## Download and run it
 
-## Install
-
-**Windows installer.** Run `Tagalong-Setup-<version>-x64.exe`. It installs for your user only, so it
-needs no administrator rights, and it starts Tagalong when it finishes. The installer is not code
-signed yet, so Windows SmartScreen may say "Windows protected your PC": click **More info**, then
-**Run anyway**. Uninstalling from **Settings → Apps** keeps your settings and conversations in
-`%APPDATA%\Tagalong`; delete that folder too to remove everything.
-
-To build the installer yourself, on Windows with Node.js 22 and pnpm 10:
+There is no public download page yet. Until releases are published, build the installer yourself
+on Windows with Node.js 22 and pnpm 10:
 
 ```powershell
 pnpm install
-pnpm package:win     # writes apps\desktop\release\Tagalong-Setup-0.0.0-x64.exe
+pnpm package:win     # writes apps\desktop\release\Tagalong-Setup-<version>-x64.exe
 ```
 
-**From source.** With Node.js 22 and pnpm 10 (see [How to run](docs/development.md#how-to-run) for getting pnpm):
+Then run `Tagalong-Setup-<version>-x64.exe`.
+
+- It installs for your user only, needs no administrator rights, and starts Tagalong when it
+  finishes.
+- The installer is not code signed yet. If Windows SmartScreen says "Windows protected your PC",
+  click **More info**, then **Run anyway**.
+- Your settings, conversations and stored keys live in `%APPDATA%\Tagalong`. Uninstalling from
+  **Settings → Apps** keeps that folder; delete it too to remove everything.
+
+Tagalong lives in the system tray, and Scout sits on your desktop. [First run: Welcome](#first-run-welcome)
+walks you through the rest.
+
+## Run it from source
+
+You need Windows 11, Node.js 22 or newer and pnpm 10.
 
 ```powershell
 pnpm install
 pnpm dev:desktop
 ```
 
-Tagalong lives in the system tray. Its pets sit on the desktop as a small strip of avatars you can
-drag anywhere.
+The [developer guide](docs/development.md) covers getting pnpm, testing, packaging and the Chrome
+extension.
+
+## Use the engine in your own app
+
+`packages/core` is the engine. It is pure Node, with no Electron, React or DOM, and both the
+desktop app and the Chrome extension run on it. It holds:
+
+- the companion and its pets, and the role library they are built from;
+- the conversation runner, which assembles each prompt, calls the model and runs tools;
+- memory: conversations, long-term memories and summaries, in SQLite;
+- providers: Claude Code sign-in, Anthropic, OpenRouter, Nebius Token Factory and any
+  OpenAI-compatible service;
+- experts and hand-offs: briefs sent to Claude Code, with the project and edit permission you
+  confirm;
+- watches, and a local WebSocket server that speaks the JSON-RPC protocol defined in
+  `packages/protocol` (zod schemas).
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%
+flowchart LR
+  desktop["Desktop app (Electron)"] -->|"JSON-RPC over ws://127.0.0.1"| engine["Engine (packages/core)"]
+  extension["Chrome extension"] -->|"JSON-RPC over ws://127.0.0.1"| engine
+  yours["Your app"] -->|"JSON-RPC over ws://127.0.0.1"| engine
+  engine --> models["Model providers"]
+  engine --> experts["Experts (Claude Code)"]
+```
+
+`@tagalong/core` and `@tagalong/protocol` are **not published to npm yet**. Both are marked
+`"private": true`. Today you use them from this repo: add your app as a package in the pnpm
+workspace, depend on them with `"workspace:*"`, and run `pnpm build` so their `dist/` exists.
+
+This boots an engine, connects to it as a host, and asks Scout one question.
+`TAGALONG_FAKE_PROVIDERS=1` gives scripted answers, so it runs without a key or the network; leave
+it out to use Scout's real provider.
+
+```ts
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Engine, InMemorySecretStore, SCOUT } from '@tagalong/core';
+import { engineUrl } from '@tagalong/protocol';
+
+const engine = await Engine.boot({
+  dataDir: mkdtempSync(join(tmpdir(), 'tagalong-')), // database, settings and pairing token
+  secretStore: new InMemorySecretStore(), // the desktop app uses the OS keychain instead
+  engineVersion: '0.0.0',
+  port: 0, // let the OS pick; the default is 47321
+  env: { TAGALONG_FAKE_PROVIDERS: '1' },
+});
+
+const socket = new WebSocket(engineUrl(engine.port));
+await new Promise((resolve) => socket.addEventListener('open', resolve, { once: true }));
+
+let nextId = 1;
+const pending = new Map<string, (result: unknown) => void>();
+const call = (method: string, params: unknown) =>
+  new Promise((resolve) => {
+    const id = String(nextId++);
+    pending.set(id, resolve);
+    socket.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }));
+  });
+
+const answered = new Promise<void>((resolve) => {
+  socket.addEventListener('message', (event) => {
+    const message = JSON.parse(String(event.data));
+    if (message.id !== undefined && message.method === undefined) {
+      pending.get(message.id)?.(message.result);
+    }
+    if (message.method === 'turn.delta') process.stdout.write(message.params.text);
+    if (message.method === 'turn.completed') resolve();
+  });
+});
+
+await call('hello', {
+  host: 'desktop',
+  version: '0.0.0',
+  capabilities: [], // what your host can read for Scout, such as 'selection' or 'screenshot'
+  token: engine.pairingToken,
+});
+await call('ask', { petId: SCOUT.id, input: { text: 'Hello, Scout' } });
+await answered;
+
+socket.close();
+await engine.shutdown();
+```
+
+A real host also answers the engine's `perception.*` requests for the capabilities it advertises.
+The method catalog and every payload schema are in `packages/protocol/src/methods.ts`; the desktop
+app's own client is `apps/desktop/src/main/engine-client.ts`. Read
+[Architecture](docs/architecture.md) for how the engine and its hosts fit together, and
+[How to add a host](docs/development.md#how-to-add-a-host) for the contracts a host implements.
+
+## What is in this build
+
+| In this build                                                                                                                 | Not in this build                                                   |
+| ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Windows desktop app with a Welcome window and an NSIS installer                                                               | macOS and Linux (the installer configs exist but are unverified)    |
+| One companion, Scout, that hands work to experts (Claude Code) and brings the answer back                                     | Voice: push to talk and spoken answers                              |
+| Scout thinks through your Claude Code sign-in, or OpenRouter, Nebius Token Factory, Anthropic or an OpenAI-compatible service | Hands: MCP tools and approval cards                                 |
+| Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                             | A cost dashboard                                                    |
+| Vision routing: a text-only Nemotron model reads pictures with Nemotron Nano 2 VL                                             | Data export and delete-all in Settings                              |
+| Memory across restarts, rolling screen memory (opt-in), watches ("tell me when this finishes")                                | Code signing (the installer is unsigned) and an app icon of its own |
+| The Chrome extension: Scout in Chrome's side panel, reading the page you are on                                               |                                                                     |
+
+# Using Tagalong
 
 ## First run: Welcome
 
@@ -64,81 +167,54 @@ waits until you are done with it, then arrives on your screen.
    needs no key. Otherwise pick OpenRouter, Nebius Token Factory or Anthropic and paste a key; it goes
    straight into the operating system's keychain.
 4. **One key to remember.** Ctrl+Shift+Space asks Scout about whatever is on your screen.
-5. **Start.** Scout becomes your companion, docks on your screen and says hello in a bubble: how
-   you work together and the key to press. **Try it now** has Scout look at your screen and say
-   what it could hand to an expert; **Got it** sends it back to the dock. If Claude Code is
-   installed it becomes Scout's first expert, so hand-offs work straight away.
+5. **Start.** Scout docks on your screen and says hello in a bubble: how you work together and the
+   key to press. **Try it now** has Scout look at your screen and say what it could hand to an
+   expert; **Got it** sends it back to the dock. If Claude Code is installed it becomes Scout's
+   first expert, so hand-offs work straight away.
 
-After that, press Ctrl+Shift+Space (or click Scout) to open Scout's bubble, which speaks from
-Scout's side. A click opens it at once without looking; the key also brings what you are on.
-Drag Scout anywhere on your screen; the bubble follows. Escape or the × closes it. It shows what Scout can
-see as chips (the app and window, selected text, a screenshot); remove any chip you do not want
-sent, type the question and press Enter. The answer appears in the bubble, the next question
-continues the same conversation, and **Open full chat** shows the whole conversation in a taller
-window (**Back to bubble** returns).
+Open Welcome again from **Home → Settings → Advanced → Open Welcome again**. A key saved in Welcome
+or in Settings works on the very next question. No restart is needed.
 
-When Scout hands work to an expert, the bubble shows a card first: the agent, the project it guessed
-(from your window, or the projects you used before), whether it may change files, and the brief.
-**Change project** picks another guess, searches your code folders or browses for a folder; **Allow
-edits** lets this one task change files; **Send** (or **Cancel**) decides. While the expert works the
-bubble lists its steps with **Stop**, and its answer comes back to the bubble when it is done.
+## Asking Scout
 
-Open Welcome again from **Home → Settings → Advanced → Open Welcome again**. A key saved in
-Welcome or in Settings works on the very next question. No restart is needed.
+Press Ctrl+Shift+Space (or click Scout) to open Scout's bubble. A click opens it at once without
+looking; the key also brings what you are on. Drag Scout anywhere on your screen and the bubble
+follows. Escape or the × closes it.
 
-## Providers and keys
+The bubble shows what Scout can see as chips (the app and window, selected text, a screenshot).
+Remove any chip you do not want sent, type the question and press Enter. The answer appears in the
+bubble, the next question continues the same conversation, and **Open full chat** shows the whole
+conversation in a taller window (**Back to bubble** returns).
 
-Each pet runs on one provider and one model, and each provider needs its own API key. Keys are
-entered in Welcome or in Settings, encrypted with the OS keychain, and only ever sent to the
-provider they belong to.
+There is no key for a screenshot or for your other windows. Scout lists what is open (minimized
+windows too), reads the window that matters, or takes a screenshot itself, only when a question
+needs it. It can photograph a window sitting behind others, though not a minimized one, and it
+looks past its own bubble to the window you were using. A screenshot adds roughly 1,500 input
+tokens, which is why it is not taken on every question.
 
-| Setup                               | Where to get the key                                                                                                       | Model ids                                                                                                                                                                                                                                                                                                                     |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **OpenRouter + Claude**             | [openrouter.ai/keys](https://openrouter.ai/keys)                                                                           | OpenRouter's catalog at [openrouter.ai/models](https://openrouter.ai/models), for example `anthropic/claude-sonnet-5` or `anthropic/claude-haiku-4.5`. Settings lists them live.                                                                                                                                              |
-| **Nebius Token Factory + Nemotron** | [tokenfactory.nebius.com](https://tokenfactory.nebius.com/), under API keys                                                | Token Factory's model list (`GET https://api.tokenfactory.nebius.com/v1/models`, shown live once the key is stored): `nvidia/nemotron-3-super-120b-a12b` (Nemotron 3 Super, text), `nvidia/Nemotron-Nano-V2-12b` (Nemotron Nano 2 VL, sees pictures), `nvidia/nemotron-3-nano-30b-a3b` (Nemotron 3 Nano, cheap watch checks). |
-| **Claude Code sign-in**             | Nothing: install [Claude Code](https://claude.com/claude-code) and sign in. The pet thinks through `claude -p`.            | `haiku`, `sonnet`, `opus`.                                                                                                                                                                                                                                                                                                    |
-| **Anthropic**                       | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) (an API key, not a Claude subscription) | `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5`.                                                                                                                                                                                                                                                                       |
+**Hand-offs.** When Scout hands work to an expert, the bubble shows a card first: the agent, the
+project it guessed (from your window, or the projects you used before), whether it may change
+files, and the brief. **Change project** picks another guess, searches your code folders or browses
+for a folder; **Allow edits** lets this one task change files; **Send** (or **Cancel**) decides.
+While the expert works the bubble lists its steps with **Stop**, and its answer comes back to the
+bubble when it is done.
 
-The two Nemotron ids marked as seeing and watching above could not be checked against the live list
-when they were written. If a pet answers "model not found", open Settings and pick the id from the
-live list next to the model box: it is the authority.
+**Memory.** Tell Scout "I prefer short answers" and it remembers across restarts.
 
-**Pictures on a text-only model.** Nemotron 3 Super cannot see. A pet on it gets a **vision model**
-(Nemotron Nano 2 VL by default), and any turn that carries a screenshot goes there instead. Claude sees
-on its own and needs no vision model.
-
-Any other OpenAI-compatible service also works: in **Settings → Advanced → API keys**, put its base
-URL in one of the base URL boxes, store its key there, and pick its model on the Scout page.
+Earlier versions shipped a crew of three (Scout, Ink and Bolt). Ink and Bolt are removed on
+upgrade, and their conversations stay on disk.
 
 ## Hotkeys
 
-| Key                | What it does                                                                          |
-| ------------------ | ------------------------------------------------------------------------------------- |
-| `Ctrl+Shift+Space` | **Ask.** Opens the panel with the text you have selected and the active window's name |
-| `Ctrl+Shift+Alt+P` | **Pause sight.** Nothing is read until you press it again (also in the tray)          |
-| `Alt+Shift+Space`  | In Chrome, with the extension: opens the side panel with your selection               |
+| Key                | What it does                                                                           |
+| ------------------ | -------------------------------------------------------------------------------------- |
+| `Ctrl+Shift+Space` | **Ask.** Opens the bubble with the text you have selected and the active window's name |
+| `Ctrl+Shift+Alt+P` | **Pause sight.** Nothing is read until you press it again (also in the tray)           |
+| `Alt+Shift+Space`  | In Chrome, with the extension: opens the side panel with your selection                |
 
-Highlight something, press `Ctrl+Shift+Space`, and the bubble opens with it as a **Selected text**
-chip; type your question. There is no key for a screenshot or for your other windows: Scout lists what
-is open (minimized windows too), reads the window that matters, or takes a screenshot itself, only
-when a question needs it. It can photograph a window sitting behind others, though not a minimized
-one, and it looks past its own bubble to the window you were using. A screenshot adds roughly 1,500 input tokens, which is why it is not taken
-on every question.
+Every key can be changed in **Home → Settings → Shortcuts**, and the change works at once.
 
-Escape or clicking elsewhere hides the panel. Every key can be changed in Settings, and the change
-works at once.
-
-## Scout, your companion
-
-A fresh install has one pet: Scout, the companion. Scout does not do the work itself. It sees what
-you are doing (when you press the key), writes a brief and hands it to the right expert, follows it
-and brings the answer back. It thinks through your Claude Code sign-in, or a provider key if Claude
-Code is not installed. Earlier versions shipped a crew of three (Scout, Ink and Bolt); Ink and Bolt
-are removed on upgrade, and their conversations stay on disk.
-
-- **Memory.** Tell a pet "I prefer short answers" and it remembers across restarts.
-
-### Home: one window for everything
+## Home: one window for everything
 
 Right-click the tray icon and choose **Open Tagalong**. The tray has only four items: **Open
 Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in five pages:
@@ -146,63 +222,88 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 - **Overview**: whether Scout is ready and what it thinks with, your experts, and the latest
   activity.
 - **Scout**: how Scout thinks, a provider and a model. **Save** applies from the next question.
-- **Experts** are the tools Scout hands work to, so you stop copying, switching and pasting. Choose
-  **Add expert**: give it a name and say what it is good at. There is no default project folder: each
-  task picks its project, and when Scout can't tell, the hand-off card opens the folder picker.
-  Claude Code is the first kind; it must be installed and signed in on this computer, and Welcome adds
-  it for you when it is. It only reads and searches unless you switch on **Let it edit files by default**
-  or allow edits when you send a task. **Save and test** checks that Claude Code starts, which costs
-  nothing. Each task asks which project to work in, guessed from your window and the projects you used
-  before, and you confirm before anything is sent.
+- **Experts**: the tools Scout hands work to. Choose **Add expert**, give it a name and say what it
+  is good at. Claude Code is the first kind; it must be installed and signed in on this computer,
+  and Welcome adds it for you when it is. It only reads and searches unless you switch on **Let it
+  edit files by default** or allow edits when you send a task. **Save and test** checks that Claude
+  Code starts, which costs nothing. There is no default project folder: each task picks its
+  project, and you confirm before anything is sent.
 - **Activity**: every answer and every hand-off, newest first. Click one to read it.
-- **Settings**: **How Scout thinks** (Scout's real brain and whether your Claude Code sign-in is
-  signed in, checked locally with `claude auth status`; with no Claude Code you pick a service and
-  paste its key, and Saving moves Scout to it), **Privacy** (screen memory and what Scout never looks
-  at), **Shortcuts**, the **Browser extension**, and **Advanced**, closed by default: summaries, API
-  keys (add, replace or remove, and a base URL), sight detail, screen memory and watches, and **Open
-  Welcome again**. Press ⓘ beside a setting for the longer story.
+- **Settings**, in five sections. Press ⓘ beside a setting for the longer story.
+  - **How Scout thinks**: Scout's real brain, and whether your Claude Code sign-in works (checked
+    locally with `claude auth status`). Without Claude Code you pick a service and paste its key,
+    and saving moves Scout to it.
+  - **Privacy**: screen memory, and what Scout never looks at.
+  - **Shortcuts**: the ask and pause keys.
+  - **Browser extension (optional)**: the pairing token for the Chrome extension.
+  - **Advanced**, closed by default: summaries, API keys (add, replace or remove, and a base URL),
+    sight detail, screen memory and watches, and **Open Welcome again**.
+
+## Providers and keys
+
+Scout runs on one provider and one model. Keys are entered in Welcome or in **Settings → Advanced →
+API keys**, encrypted with the OS keychain, and only ever sent to the provider they belong to.
+
+| Setup                               | Where to get the key                                                                                                       | Model ids                                                                                                                                                                                                                                                                                                                     |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Claude Code sign-in**             | Nothing: install [Claude Code](https://claude.com/claude-code) and sign in. Scout thinks through `claude -p`.              | `haiku`, `sonnet`, `opus`.                                                                                                                                                                                                                                                                                                    |
+| **OpenRouter + Claude**             | [openrouter.ai/keys](https://openrouter.ai/keys)                                                                           | OpenRouter's catalog at [openrouter.ai/models](https://openrouter.ai/models), for example `anthropic/claude-sonnet-5` or `anthropic/claude-haiku-4.5`. Settings lists them live.                                                                                                                                              |
+| **Nebius Token Factory + Nemotron** | [tokenfactory.nebius.com](https://tokenfactory.nebius.com/), under API keys                                                | Token Factory's model list (`GET https://api.tokenfactory.nebius.com/v1/models`, shown live once the key is stored): `nvidia/nemotron-3-super-120b-a12b` (Nemotron 3 Super, text), `nvidia/Nemotron-Nano-V2-12b` (Nemotron Nano 2 VL, sees pictures), `nvidia/nemotron-3-nano-30b-a3b` (Nemotron 3 Nano, cheap watch checks). |
+| **Anthropic**                       | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) (an API key, not a Claude subscription) | `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5`.                                                                                                                                                                                                                                                                       |
+
+If Scout answers "model not found", open Settings and pick the id from the live list next to the
+model box: it is the authority.
+
+**Pictures on a text-only model.** Nemotron 3 Super cannot see. On it, Scout gets a **vision model**
+(Nemotron Nano 2 VL by default), and any turn that carries a screenshot goes there instead. Claude
+sees on its own and needs no vision model.
+
+Any other OpenAI-compatible service also works: in **Settings → Advanced → API keys**, put its base
+URL in one of the base URL boxes, store its key there, and pick its model on the Scout page.
 
 ## The Chrome extension
 
-The extension puts the same crew in Chrome's side panel and lets a pet read the exact page you are
-on. It needs the desktop app running.
+The extension puts Scout in Chrome's side panel and lets it read the exact page you are on. It
+needs the desktop app running.
 
 1. Open `chrome://extensions` and turn on **Developer mode**.
 2. Click **Load unpacked** and choose the extension folder. The installer ships it in
-   `%LOCALAPPDATA%\Programs\Tagalong\resources\extension`. From source, build it with `pnpm --filter @tagalong/extension build` and choose
-   `apps/extension/dist`.
+   `%LOCALAPPDATA%\Programs\Tagalong\resources\extension`. From source, build it with
+   `pnpm --filter @tagalong/extension build` and choose `apps/extension/dist`.
 3. Copy the pairing token from **Home → Settings → Browser extension**, paste it into the
    extension's options page, and click **Save and connect**.
 
 Then click the toolbar button, or select text and press `Alt+Shift+Space`. More in
-[The Chrome extension](docs/development.md#the-chrome-extension-in-detail).
+[The Chrome extension in detail](docs/development.md#the-chrome-extension-in-detail).
 
-## Watch mode and rolling memory
+## Watches and screen memory
 
-- **Watches.** Ask "tell me when this finishes" and the pet watches the screen for you. Tagalong
-  compares the screen on your machine every five seconds and only asks a small, cheap model (Nemotron 3
-  Nano on Token Factory, Claude Haiku elsewhere) once something changed and settled. When it happens
-  you get a notification and a card in the panel. A **Watching** chip shows the checks spent and has
-  **Stop**.
-- **Rolling memory** (off by default; turn it on in **Home → Settings → Awareness**). Tagalong
-  keeps a small picture of each screen every five seconds, in memory only, for the last ten minutes,
-  so you can ask "what was I reading five minutes ago?". A red dot on the pets shows while it
-  records.
+- **Watches.** Ask "tell me when this finishes" and Scout watches the screen for you. Tagalong
+  compares the screen on your machine every five seconds and only asks a small, cheap model
+  (Nemotron 3 Nano on Token Factory, Claude Haiku elsewhere) once something changed and settled.
+  When it happens you get a notification and a card in the bubble. A **Watching** chip shows the
+  checks spent and has **Stop**.
+- **Screen memory** (off by default; turn it on in **Home → Settings → Privacy**). Tagalong keeps a
+  small picture of each screen every five seconds, in memory only, for the last ten minutes, so you
+  can ask "what was I reading five minutes ago?". A red dot on Scout shows while it records.
 
 ## Privacy
 
-- Nothing is read until you press a hotkey or ask, except rolling memory and watches, which you turn
-  on. Every look badges the pets and the tray says what was read and when.
+- Nothing is read until you press a hotkey or ask, except screen memory and watches, which you turn
+  on. Every look badges Scout and the tray says what was read and when.
 - Scout never looks at its built-in blind spots: password managers, the Windows sign-in and security
   prompts, secret files such as `.env` and SSH keys, private browsing, authenticator apps and Remote
   Desktop. They are always on and listed in Settings; you can add your own.
 - Any key, token, password or card number in what is sent is replaced with `[hidden: ...]` before it
   leaves your computer, and Claude Code is told not to open secret files.
-- Screenshots are not written to disk. Rolling memory and watches live in memory only and are thrown
+- Screenshots are not written to disk. Screen memory and watches live in memory only and are thrown
   away when you pause sight or quit.
-- What you ask goes only to the provider your pet runs on. There is no Tagalong server.
+- What you ask goes only to the provider Scout runs on. There is no Tagalong server.
 - API keys are encrypted with the OS keychain.
 - `Ctrl+Shift+Alt+P` pauses all sight at once.
+- Tagalong never moves your mouse or types for you. Scout does not click, type or drive other
+  applications. When tools arrive (a later phase), every action will go through tools you connect
+  and approve, and every action will be logged.
 
 The full detail is in [Privacy in detail](docs/privacy.md).
 
@@ -210,10 +311,10 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 
 | Problem                                                        | What to do                                                                                                                                      |
 | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| A pet says "No … API key is stored"                            | Paste that provider's key in Welcome or Settings. It works on the next question.                                                                |
-| A pet says the model was not found, or the provider refused it | Open Settings and pick the model from the live list next to the pet's model box.                                                                |
-| The pet ignores the screenshot, or warns it cannot see         | Its model is text-only. Give it a vision model in Settings (Nemotron Nano 2 VL on Token Factory) or move it to Claude.                          |
-| A hotkey does nothing                                          | Settings and the panel name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).            |
+| Scout says "No … API key is stored"                            | Paste that provider's key in Welcome or Settings. It works on the next question.                                                                |
+| Scout says the model was not found, or the provider refused it | Open Settings and pick the model from the live list next to the model box.                                                                      |
+| Scout ignores the screenshot, or warns it cannot see           | Its model is text-only. Give it a vision model in Settings (Nemotron Nano 2 VL on Token Factory) or move it to Claude.                          |
+| A hotkey does nothing                                          | Settings and the bubble name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).           |
 | The Chrome side panel says "Disconnected"                      | The desktop app must be running. If it is, copy the pairing token again from Settings and paste it into the extension's options.                |
 | "Windows protected your PC" when installing                    | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                            |
 | You want Welcome again                                         | Home → Settings → Advanced → **Open Welcome again**.                                                                                            |
@@ -221,15 +322,11 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 | From source, a look always captures the whole screen           | The active-window helper was not downloaded: run `node apps/desktop/scripts/fetch-native.mjs`. The installer already includes it.               |
 | It does not start on macOS or Linux                            | Not in this build: only Windows has a platform adapter so far.                                                                                  |
 
-## No computer control
-
-Tagalong never moves your mouse or types for you. Pets do not click, type, or drive other
-applications. When pets gain tools (a later phase), every action will go through tools you connect
-and approve, and every action will be logged.
-
 # For developers
 
 - [Developer guide](docs/development.md): build, run, test and package from source.
 - [Architecture](docs/architecture.md): how the engine and its hosts fit together today.
+- [Design](docs/specs/2026-09-11-tagalong-design.md) and
+  [feature test guide](docs/testing/feature-test-guide.md).
 - [Concepts](docs/concepts/): how pets remember, meet and talk to each other.
 - [Privacy in detail](docs/privacy.md): exactly what is read, when, and what never is.

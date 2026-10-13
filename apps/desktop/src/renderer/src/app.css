@@ -177,14 +177,6 @@ button:disabled {
   width: auto;
 }
 
-.settings__pet {
-  margin: 0 0 16px;
-  padding: 8px 12px 0;
-  border: 1px solid var(--line);
-  /* Painted in the pet's own colour by the editor. */
-  border-left-width: 4px;
-}
-
 .settings__note {
   color: var(--muted);
   font-size: 12px;
