@@ -23,6 +23,7 @@ import { SightSection } from './sight-section';
 import { SummariesSection } from './summaries-section';
 import { VoiceSection } from './voice-section';
 import { WatchesSection } from './watches-section';
+import { YouSection } from './you-section';
 import type { ClaudeSignIn, HostView } from '../../../shared/ipc';
 
 /**
@@ -216,6 +217,7 @@ export function SettingsPage({
         summarizer: field('summarizer'),
         greeting: form.get('greeting') !== null,
         keepAnEye: form.get('keepAnEye') !== null,
+        userName: field('userName'),
         rollingMemoryEnabled: form.get('rollingMemoryEnabled') !== null,
         rollingMemoryMinutes: field('rollingMemoryMinutes'),
         watchMaxChecks: field('watchMaxChecks'),
@@ -312,6 +314,7 @@ export function SettingsPage({
             onSwitched={switched}
             onOpenScout={onOpenScout}
           />
+          <YouSection settings={settings} />
           <PrivacySection settings={settings} platform={view.platform} />
           <VoiceSection settings={settings} />
           <ShortcutsSection settings={settings} hotkeyError={view.hotkeyError} />

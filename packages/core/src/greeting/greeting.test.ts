@@ -81,6 +81,20 @@ describe('fallbackGreeting', () => {
     );
   });
 
+  it('greets you by name when you gave one', () => {
+    const named = { ...morning, userName: 'Nadeem' };
+    expect(fallbackGreeting(named)).toBe('Morning, Nadeem. I’m here when you need me.');
+    expect(fallbackGreeting({ ...named, now: at(13, 23, 30) })).toBe(
+      'Working late, Nadeem? I’m here when you need me.',
+    );
+    expect(fallbackGreeting({ ...named, lastOpenedAt: at(10, 9) })).toBe(
+      'Back after 3 days, Nadeem. Nothing waiting for you.',
+    );
+    expect(fallbackGreeting({ ...morning, userName: '' })).toBe(
+      'Morning. I’m here when you need me.',
+    );
+  });
+
   it('mentions a hand-off that finished while you were away', () => {
     const one = [{ expertName: 'Claude Code', text: 'Fix the failing test' }];
     expect(fallbackGreeting({ ...morning, handoffs: one })).toBe(
@@ -121,6 +135,39 @@ describe('composeGreeting', () => {
     expect(facts).toContain('morning');
     expect(facts).toContain('Claude Code');
     expect(facts).toContain('Fix the test');
+  });
+
+  it('gives the model the person’s name only when one is set', async () => {
+    const named = brain('Morning, Nadeem.');
+    await composeGreeting({
+      pet: scout,
+      summarizer: null,
+      provider: named.resolve,
+      context: { ...morning, userName: 'Nadeem' },
+    });
+    expect(JSON.stringify(named.requests[0]!.messages)).toContain('The person’s name: Nadeem.');
+
+    const unnamed = brain('Morning.');
+    await composeGreeting({
+      pet: scout,
+      summarizer: null,
+      provider: unnamed.resolve,
+      context: morning,
+    });
+    expect(JSON.stringify(unnamed.requests[0]!.messages)).not.toContain('name');
+  });
+
+  it('falls back to a line with the name when the brain fails', async () => {
+    const result = await composeGreeting({
+      pet: scout,
+      summarizer: null,
+      provider: brain(new BrainError('auth', 'no key')).resolve,
+      context: { ...morning, userName: 'Nadeem' },
+    });
+    expect(result).toEqual({
+      text: 'Morning, Nadeem. I’m here when you need me.',
+      source: 'fallback',
+    });
   });
 
   it('uses the pet’s own brain, text only, when no summaries model is chosen', async () => {

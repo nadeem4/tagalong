@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_WINDOW_TEXT_CHARS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
+import { MAX_USER_NAME_CHARS, MAX_WINDOW_TEXT_CHARS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
 
 import {
   SettingsFieldError,
@@ -290,6 +290,23 @@ describe('buildSettingsPatch greeting', () => {
 
   it('leaves it alone when the form does not show it', () => {
     expect(buildSettingsPatch(values).greeting).toBeUndefined();
+  });
+});
+
+describe('buildSettingsPatch userName', () => {
+  it('carries the name, trimmed, and an emptied box clears it', () => {
+    expect(buildSettingsPatch({ ...values, userName: '  Nadeem ' }).userName).toBe('Nadeem');
+    expect(buildSettingsPatch({ ...values, userName: '   ' }).userName).toBe('');
+  });
+
+  it('cuts a long name to the cap rather than refusing the save', () => {
+    expect(buildSettingsPatch({ ...values, userName: 'a'.repeat(60) }).userName).toBe(
+      'a'.repeat(MAX_USER_NAME_CHARS),
+    );
+  });
+
+  it('leaves it alone when the form does not show it', () => {
+    expect(buildSettingsPatch(values).userName).toBeUndefined();
   });
 });
 

@@ -98,7 +98,7 @@ export function assemblePrompt(input: AssembleInput): BrainRequest {
   return {
     model: pet.model,
     ...(pet.visionModel === undefined ? {} : { visionModel: pet.visionModel }),
-    system: systemPrompt(pet, input.memories ?? []),
+    system: systemPrompt(pet, input.memories ?? [], settings.userName),
     messages,
     maxTokens: MAX_OUTPUT_TOKENS,
   };
@@ -140,13 +140,18 @@ function imagesToAttach(snapshot: ContextSnapshot, settings: Settings): BrainCon
 /**
  * Base rules, then who the pet is: its role's instructions, its name, and the user's notes
  * for it when there are any. Then the reply style and the memories, as before roles.
+ * The person's name, when they gave one, follows the pet's, with a nudge to use it rarely.
  */
-function systemPrompt(pet: Pet, memories: readonly Memory[]): string {
+function systemPrompt(pet: Pet, memories: readonly Memory[], userName: string): string {
   const notes = pet.notes?.trim() ?? '';
+  const name = userName.trim();
   return [
     BASE_INSTRUCTIONS,
     roleFor(pet.roleId).instructions.trim(),
     `Your name is ${pet.name}.`,
+    name.length > 0
+      ? `The person’s name is ${name}. Use it rarely: a greeting or a moment that warrants it, never every reply.`
+      : '',
     notes.length > 0 ? `${NOTES_HEADING}\n${notes}` : '',
     REPLY_STYLE_RULES[pet.replyStyle],
     memorySection(memories),

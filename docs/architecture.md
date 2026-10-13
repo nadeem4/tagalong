@@ -874,20 +874,21 @@ built from `officeTokens`, so Settings has no palette of its own.
 `SettingsPage` holds the form state and the save. The sections come in the design's order, and each
 is one file under `apps/desktop/src/renderer/src/settings/`:
 
-| File                     | Section                                                                                                                                                  |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `brain-section.tsx`      | How Scout thinks: Scout's own provider and model (`brain.ts#scoutBrain`) with a status chip, or a service picker and key when no Claude sign-in is found |
-| `privacy-section.tsx`    | The rolling memory switch, the blind spots as chips from `BLIND_SPOTS` labels, and the pause sight key                                                   |
-| `voice-section.tsx`      | Scout talks (a switch), the voice (George or Fable) with ▶ Preview (`voice-player.ts#playLine` with the form's voice and speed), and the speed slider    |
-| `shortcuts-section.tsx`  | The three global hotkeys (ask, pause sight, stop speaking); a `hotkeyError` marks the field whose combination it names                                   |
-| `browser-section.tsx`    | The Chrome extension's pairing token                                                                                                                     |
-| `advanced-section.tsx`   | Advanced: a disclosure button (`aria-expanded`), closed by default, holding the five below and **Open Welcome again**                                    |
-| `summaries-section.tsx`  | One grouped list: Same as Scout, Haiku and Sonnet on the Claude sign-in, then each keyed service that has a key                                          |
-| `keys-section.tsx`       | One row per keyed service: Key stored or No key, add or replace, base URL, and Remove key (an empty key deletes the stored one)                          |
-| `elevenlabs-section.tsx` | The ElevenLabs key (stored as `elevenlabs.apiKey`, never read back) and the voice ID from the person's library                                           |
-| `sight-section.tsx`      | What a look at several monitors sends, and the window text budget                                                                                        |
-| `watches-section.tsx`    | Minutes of screen to remember and the watch limits                                                                                                       |
-| `section.tsx`            | The section list, the panel, the ⓘ button and its inline note (one open at a time), and `useInvalid` for a refused field                                 |
+| File                     | Section                                                                                                                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `brain-section.tsx`      | How Scout thinks: Scout's own provider and model (`brain.ts#scoutBrain`) with a status chip, or a service picker and key when no Claude sign-in is found                                               |
+| `you-section.tsx`        | You: **What should Scout call you?** (`settings.userName`, empty for no name, cut to 40 characters), with an ⓘ note. When set, `prompt-assembler.ts` adds one line after the pet's name: use it rarely |
+| `privacy-section.tsx`    | The rolling memory switch, the blind spots as chips from `BLIND_SPOTS` labels, and the pause sight key                                                                                                 |
+| `voice-section.tsx`      | Scout talks (a switch), the voice (George or Fable) with ▶ Preview (`voice-player.ts#playLine` with the form's voice and speed), and the speed slider                                                  |
+| `shortcuts-section.tsx`  | The three global hotkeys (ask, pause sight, stop speaking); a `hotkeyError` marks the field whose combination it names                                                                                 |
+| `browser-section.tsx`    | The Chrome extension's pairing token                                                                                                                                                                   |
+| `advanced-section.tsx`   | Advanced: a disclosure button (`aria-expanded`), closed by default, holding the five below and **Open Welcome again**                                                                                  |
+| `summaries-section.tsx`  | One grouped list: Same as Scout, Haiku and Sonnet on the Claude sign-in, then each keyed service that has a key                                                                                        |
+| `keys-section.tsx`       | One row per keyed service: Key stored or No key, add or replace, base URL, and Remove key (an empty key deletes the stored one)                                                                        |
+| `elevenlabs-section.tsx` | The ElevenLabs key (stored as `elevenlabs.apiKey`, never read back) and the voice ID from the person's library                                                                                         |
+| `sight-section.tsx`      | What a look at several monitors sends, and the window text budget                                                                                                                                      |
+| `watches-section.tsx`    | Minutes of screen to remember and the watch limits                                                                                                                                                     |
+| `section.tsx`            | The section list, the panel, the ⓘ button and its inline note (one open at a time), and `useInvalid` for a refused field                                                                               |
 
 **How Scout thinks** reads the companion pet (`settings.defaultPetId`), never `settings.providerId`,
 which the engine ignores. Whether the Claude sign-in works comes from `main/claude-sign-in.ts`:
@@ -1165,7 +1166,10 @@ flowchart LR
   focus (`showPanelQuietly`): Scout introduces itself in its bubble (`companion-bubble.tsx#Intro`),
   in three handwritten beats typed in with **Next** between them (where it lives and that it keeps
   an eye on your work but never on passwords or private windows; that it briefs an expert like
-  Claude Code and brings the answer back; the key to press). Under `prefers-reduced-motion` each
+  Claude Code and brings the answer back; the key to press). With a name saved, beat one opens
+  "Hi Nadeem, I'm Scout." Welcome's optional **What should I call you?** field saves
+  `settings.userName` (`welcome-flow.ts#welcomeNamePatch`, trimmed and cut to 40 characters)
+  before `finishWelcome`, and the panel reads it fresh on `greetEvent`. Under `prefers-reduced-motion` each
   beat appears whole; a visually hidden `role="status"` carries each beat whole for screen readers.
   It stays until **Got it** or a hotkey question. **Try it now** captures the active window and a screenshot
   (`capture(['activeWindow', 'screenshot'])`) and asks "What am I working on, and what could you
@@ -1178,7 +1182,8 @@ flowchart LR
   Then main stores `lastOpenedAt`, whether or not it greeted. In the engine,
   `greeting/greeting.ts#composeGreeting` reads no screen: only the local time of day, the time since
   `lastOpenedAt`, and `ActivityLog#expertsFinishedSince` (expert hand-offs that finished well since
-  then, at most five, brief only). It makes one call to the summaries model (`settings.summarizer`,
+  then, at most five, brief only), plus `settings.userName` when set (the model may greet by it,
+  and the handwritten line becomes "Morning, Nadeem."). It makes one call to the summaries model (`settings.summarizer`,
   else the pet's own provider and model, text only), like `Summarizer`: 60 tokens, tools refused,
   an eight-second `AbortSignal.timeout`. The prompt asks for one sentence under 20 words, warm, no
   emoji, naming a finished hand-off if any, and never inventing facts. A failure, a timeout, an empty

@@ -518,7 +518,7 @@ function buildHandlers(parts: {
         throw new RpcFailure(RPC_ERROR_CODES.invalidParams, `no pet with id '${params.petId}'`);
       }
       await refreshProviders();
-      const { summarizer, lastOpenedAt } = settings.get();
+      const { summarizer, lastOpenedAt, userName } = settings.get();
       return composeGreeting({
         pet,
         summarizer,
@@ -527,6 +527,7 @@ function buildHandlers(parts: {
           now: new Date(),
           lastOpenedAt: lastOpenedAt === null ? null : new Date(lastOpenedAt),
           handoffs: lastOpenedAt === null ? [] : activity.expertsFinishedSince(lastOpenedAt),
+          userName,
         },
       });
     },

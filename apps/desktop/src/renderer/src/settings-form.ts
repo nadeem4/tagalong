@@ -1,5 +1,6 @@
 import {
   MAX_ROLLING_MEMORY_MINUTES,
+  MAX_USER_NAME_CHARS,
   MAX_VOICE_SPEED,
   MAX_WINDOW_TEXT_CHARS,
   MIN_VOICE_SPEED,
@@ -31,6 +32,8 @@ export interface SettingsFormValues {
   greeting?: boolean;
   /** Whether Scout keeps an eye on things. Absent leaves the setting alone. */
   keepAnEye?: boolean;
+  /** What Scout calls you. Blank clears it; absent leaves the setting alone. */
+  userName?: string;
   /** Phase 3B. Present together when the form shows rolling memory and the watches. */
   rollingMemoryEnabled?: boolean;
   rollingMemoryMinutes?: string;
@@ -110,6 +113,7 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
     ...(values.summarizer !== undefined ? { summarizer: parseSummarizer(values.summarizer) } : {}),
     ...(values.greeting !== undefined ? { greeting: values.greeting } : {}),
     ...(values.keepAnEye !== undefined ? { keepAnEye: values.keepAnEye } : {}),
+    ...(values.userName !== undefined ? { userName: cleanUserName(values.userName) } : {}),
     ...(values.rollingMemoryMinutes !== undefined
       ? {
           rollingMemory: {
@@ -152,6 +156,11 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
         }
       : {}),
   });
+}
+
+/** A name as typed, trimmed and cut to the cap: a long name is shortened, never refused. */
+export function cleanUserName(raw: string): string {
+  return raw.trim().slice(0, MAX_USER_NAME_CHARS).trim();
 }
 
 /** The speaking speed, within what still sounds like speech. */

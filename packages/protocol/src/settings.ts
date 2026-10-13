@@ -20,6 +20,9 @@ export const MAX_SCREENSHOT_RETENTION_HOURS = 24;
  */
 export const MAX_ROLLING_MEMORY_MINUTES = 30;
 
+/** Ceiling on the name Scout calls the person: a first name, not a paragraph. */
+export const MAX_USER_NAME_CHARS = 40;
+
 /** Default value for every setting, in one place so the patch schema can stay defaults-free. */
 export const SETTINGS_DEFAULTS = {
   enginePort: 47321,
@@ -120,6 +123,11 @@ export const SETTINGS_DEFAULTS = {
    * an id, ElevenLabs speaks instead of the local voice.
    */
   voice: { enabled: true, voice: 'bm_george', speed: 0.95, elevenLabsVoiceId: '' },
+  /**
+   * What Scout calls the person. Empty until they say: Scout then uses no name. Stored
+   * here, on this computer; it reaches the AI provider only inside Scout's prompt.
+   */
+  userName: '',
 } as const;
 
 /** The local voices Scout can speak in: two British male voices of the Kokoro model. */
@@ -294,6 +302,8 @@ const settingsFields = {
     /** A voice from the person's ElevenLabs library. Empty: ElevenLabs is not used. */
     elevenLabsVoiceId: z.string().trim(),
   }),
+  /** What Scout calls the person; empty for no name. */
+  userName: z.string().trim().max(MAX_USER_NAME_CHARS),
 };
 
 export const Settings = z.object({
@@ -327,6 +337,7 @@ export const Settings = z.object({
   lastOpenedAt: settingsFields.lastOpenedAt.default(SETTINGS_DEFAULTS.lastOpenedAt),
   keepAnEye: settingsFields.keepAnEye.default(SETTINGS_DEFAULTS.keepAnEye),
   voice: settingsFields.voice.prefault({ ...SETTINGS_DEFAULTS.voice }),
+  userName: settingsFields.userName.default(SETTINGS_DEFAULTS.userName),
 });
 export type Settings = z.infer<typeof Settings>;
 

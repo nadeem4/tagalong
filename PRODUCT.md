@@ -77,6 +77,8 @@ its result.
 - Scout introduces itself once, in three handwritten beats after Welcome. Each later launch it says
   one short line (time of day, time away, a finished hand-off) and fades; it reads no screen for
   this, and Settings turns it off.
+- Scout can know your name: optional in Welcome, editable in Settings → You. It uses it rarely (a
+  hello, a moment that warrants it), and the intro and the launch line greet you by it.
 - Speech runs on the computer (Kokoro, downloaded on first use); ElevenLabs is an optional
   bring-your-own-key voice that receives only the words spoken.
 - Not built yet: voice input (push to talk), connecting apps (Notion, GitHub, calendar) over MCP,

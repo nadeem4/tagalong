@@ -1,4 +1,6 @@
+import type { SettingsPatch } from '@tagalong/protocol';
 import type { FoundAgent, ProviderChoice } from '../../shared/ipc';
+import { cleanUserName } from './settings-form';
 
 /**
  * Welcome's decisions, apart from its rendering: the ways Scout can think, which one is
@@ -38,6 +40,12 @@ export function brainOptions(
 /** A sign-in first, then a provider whose key is already stored, then the first provider. */
 export function defaultBrain(options: readonly BrainOption[]): string | undefined {
   return (options.find((option) => !option.needsKey) ?? options[0])?.id;
+}
+
+/** The name typed in Welcome as a settings patch, or null when the field was skipped. */
+export function welcomeNamePatch(typed: string): SettingsPatch | null {
+  const userName = cleanUserName(typed);
+  return userName === '' ? null : { userName };
 }
 
 export function canStart(options: readonly BrainOption[], id: string, typedKey: string): boolean {

@@ -16,6 +16,8 @@ export interface CompanionBubbleProps {
   greeting?: boolean;
   /** The ask key as a person reads it, for the hello. */
   hotkeyLabel?: string;
+  /** What the person asked to be called, for the hello. Empty: no name. */
+  userName?: string;
   onDismiss?: () => void;
   onOpenChat?: () => void;
   /** The full chat: the whole conversation, not just the latest answer. */
@@ -101,6 +103,7 @@ export function CompanionBubble({
   snapshot,
   greeting = false,
   hotkeyLabel = 'Ctrl+Shift+Space',
+  userName = '',
   onDismiss,
   onOpenChat,
   expanded = false,
@@ -259,6 +262,7 @@ export function CompanionBubble({
         <Intro
           petName={petName}
           hotkeyLabel={hotkeyLabel}
+          userName={userName}
           onTry={() => void tryIt()}
           {...(onDismiss !== undefined ? { onDismiss } : {})}
           {...(onSay !== undefined ? { onSay } : {})}
@@ -481,6 +485,7 @@ function useTyped(text: string): string {
 function Intro({
   petName,
   hotkeyLabel,
+  userName,
   onTry,
   onDismiss,
   onSay,
@@ -488,6 +493,7 @@ function Intro({
 }: {
   petName: string;
   hotkeyLabel: string;
+  userName: string;
   onTry: () => void;
   onDismiss?: () => void;
   /** Each beat is said aloud once, as it appears. */
@@ -496,7 +502,7 @@ function Intro({
   indicator?: ReactNode;
 }) {
   const beats = [
-    `Hi, I’m ${petName}. I sit in the corner of your screen and keep an eye on what you’re working on, never on passwords or private windows.`,
+    `${userName.trim() === '' ? 'Hi,' : `Hi ${userName.trim()},`} I’m ${petName}. I sit in the corner of your screen and keep an eye on what you’re working on, never on passwords or private windows.`,
     'Ask me about whatever you’re on. When it needs real work, I brief an expert, like Claude Code, and bring the answer back.',
     `Press ${hotkeyLabel} anytime.`,
   ];

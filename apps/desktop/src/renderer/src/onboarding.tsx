@@ -1,12 +1,12 @@
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
+import { MAX_USER_NAME_CHARS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import { PixelSprite, characterFor } from '@tagalong/ui';
 // Bundled, not fetched: the heading uses the office's pixel face, Latin subset only.
 import '@fontsource/pixelify-sans/latin-400.css';
 import './app.css';
 import './welcome.css';
-import { brainOptions, canStart, defaultBrain } from './welcome-flow';
+import { brainOptions, canStart, defaultBrain, welcomeNamePatch } from './welcome-flow';
 import type { BrainOption } from './welcome-flow';
 import type { FoundAgent, HostView } from '../../shared/ipc';
 
@@ -28,6 +28,7 @@ function Welcome() {
   const [agents, setAgents] = useState<FoundAgent[] | null>(null);
   const [brain, setBrain] = useState<string | undefined>(undefined);
   const [key, setKey] = useState('');
+  const [name, setName] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -60,6 +61,8 @@ function Welcome() {
     setProblem(null);
     try {
       if (chosen?.needsKey === true) await window.tagalongHost.saveApiKey(brain, key.trim());
+      const named = welcomeNamePatch(name);
+      if (named !== null) await window.tagalongHost.saveSettings(named);
       await window.tagalongHost.finishWelcome(brain);
     } catch (error) {
       setProblem(error instanceof Error ? error.message : String(error));
@@ -126,6 +129,22 @@ function Welcome() {
             />
           </label>
         )}
+      </section>
+
+      <section aria-labelledby="name">
+        <h2 id="name">What should I call you?</h2>
+        <label className="welcome__key">
+          <span>Optional. Skip it and I use no name.</span>
+          <input
+            type="text"
+            aria-label="What should Scout call you?"
+            placeholder="Your first name"
+            value={name}
+            maxLength={MAX_USER_NAME_CHARS}
+            autoComplete="given-name"
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
       </section>
 
       <section aria-labelledby="key">

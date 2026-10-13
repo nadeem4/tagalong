@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FoundAgent, ProviderChoice } from '../../shared/ipc';
-import { brainOptions, canStart, defaultBrain } from './welcome-flow';
+import { MAX_USER_NAME_CHARS } from '@tagalong/protocol';
+import { brainOptions, canStart, defaultBrain, welcomeNamePatch } from './welcome-flow';
 
 const agents = (claudeFound: boolean): FoundAgent[] => [
   { id: 'claude-code', label: 'Claude Code', found: claudeFound, canThink: true },
@@ -56,5 +57,19 @@ describe('canStart', () => {
   it('waits for a key on a provider that has none', () => {
     expect(canStart(options, 'openrouter', '  ')).toBe(false);
     expect(canStart(options, 'openrouter', 'sk-or-1')).toBe(true);
+  });
+});
+
+describe('welcomeNamePatch', () => {
+  it('saves the name typed, trimmed and cut to the cap', () => {
+    expect(welcomeNamePatch('  Nadeem ')).toEqual({ userName: 'Nadeem' });
+    expect(welcomeNamePatch('a'.repeat(60))).toEqual({
+      userName: 'a'.repeat(MAX_USER_NAME_CHARS),
+    });
+  });
+
+  it('saves nothing when the field was skipped', () => {
+    expect(welcomeNamePatch('')).toBeNull();
+    expect(welcomeNamePatch('   ')).toBeNull();
   });
 });

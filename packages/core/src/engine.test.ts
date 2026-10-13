@@ -1158,6 +1158,21 @@ describe('greeting.compose', () => {
     expect(res['result']).toEqual({ text: 'Morning. Good to see you again.', source: 'model' });
   });
 
+  it('greets by the name in settings when the brain cannot', async () => {
+    const failing: BrainProvider = {
+      id: 'fake',
+      capabilities: { vision: false, tools: false, streaming: true },
+      listModels: () => Promise.resolve([]),
+      complete: () => Promise.reject(new Error('offline')),
+    };
+    const e = await boot(failing);
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('settings.set', { patch: { userName: 'Nadeem' } });
+    const res = await host.call('greeting.compose', { petId: 'scout' });
+    expect((res['result'] as { text: string }).text).toContain(', Nadeem');
+  });
+
   it('refuses a pet that does not exist', async () => {
     const e = await boot();
     const host = await TestHost.connect(e.port);
