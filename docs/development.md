@@ -215,8 +215,11 @@ The engine itself boots without any key.
 
 ### Choosing a pet's brain
 
-Settings shows, per pet, a **provider**, a **model id** and an optional **vision model id**, plus one
-API key box per provider and a base URL box per OpenAI-compatible preset.
+Home's Scout page picks Scout's **provider** (each says whether it needs a key) and **model**.
+Keys live in **Settings → Advanced → API keys**: one row per keyed provider, with Add or Replace
+key, a base URL box for each OpenAI-compatible preset, and **Remove key**. Settings' **How Scout
+thinks** card shows the brain Scout really uses and whether the Claude Code sign-in works
+(`claude auth status --json`, run locally with no model call).
 
 | Provider     | Base URL (overridable)                    | Key                  | Models                                                  |
 | ------------ | ----------------------------------------- | -------------------- | ------------------------------------------------------- |
@@ -259,7 +262,7 @@ before the bubble takes the focus. A click on the pet captures nothing, because 
 pet's own window in front. Screenshots (about 1,500 extra input tokens), the window list (a few
 seconds to enumerate) and other monitors are the pet's own tools, taken only when a question needs
 them. The pause key takes sight away entirely — see [Pausing sight](privacy.md#pausing-sight).
-**What a look at every screen sends** in the settings window decides whether a capture of every
+**With several monitors, a look sends** (Settings → Advanced → Sight detail) decides whether a capture of every
 display attaches only the composite and the focused display, or every display.
 
 Both accelerators are editable in the settings window and rebind while the app runs — no
@@ -304,8 +307,9 @@ SQLite file as conversations (`tagalong.db` in the data dir).
 
 ### Awareness: rolling memory and watches
 
-Two Phase 3B features let a pet know about time, not only about now. Both are in Settings, under
-**Awareness**, and both take effect on save.
+Two Phase 3B features let a pet know about time, not only about now. Rolling memory's switch is in
+Settings → **Privacy**; its minutes and the watch limits are under **Advanced → Screen memory and
+watches**. Both take effect on save.
 
 - **Rolling memory** (off by default). Turn it on and the desktop keeps the last few minutes — ten by
   default, at most thirty — of every screen in memory, so you can ask "what was I reading five
@@ -341,7 +345,7 @@ the Settings picker shows the live one once a key is stored.
 
 ### The two cost controls
 
-Both live in the settings window and both take effect on save, with no restart: they are read at the
+Both live in Settings under **Advanced → Sight detail** and both take effect on save, with no restart: they are read at the
 moment of each capture rather than at boot.
 
 | Setting                               | Default                            | What raising it costs                                                                                                                                                                   |

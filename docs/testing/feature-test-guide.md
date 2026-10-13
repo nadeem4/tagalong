@@ -452,12 +452,13 @@ add next?`.
 
 ### 4.17. Choose a different summarizer
 
-1. **Setup:** Settings open.
-2. **Action:** under **Conversation summaries**, pick **OpenRouter** and type a cheaper model id from
-   the live list (for example `anthropic/claude-haiku-4.5`). Save. Then type only a model with the
-   provider set back to "Each pet's own provider", and Save.
-3. **Expected:** the first save says "Saved."; the second is refused with "The summarizer needs both a
-   provider and a model — or leave both blank…". Clearing both boxes and saving is accepted.
+1. **Setup:** Settings open, an OpenRouter key stored, Claude Code installed and signed in.
+2. **Action:** open **Advanced**, then the **Summarize with** list.
+3. **Expected:** the list starts with **Same as Scout (default)**, then a **Claude sign-in** group
+   with **Haiku** and **Sonnet** (no Opus), then an **OpenRouter** group with its live models.
+   Services with no key are not listed. Pick `anthropic/claude-haiku-4.5` and Save: "Saved. Scout uses
+   it from the next ask." Reopen Settings: the choice is still selected. Pick **Same as Scout** and
+   Save to go back.
 
 ### 4.18. Edit a pet
 
@@ -549,11 +550,12 @@ as a card, a toast and an avatar alert.
 
 ### 3B.5. Rolling memory off
 
-1. **Setup:** untick **Rolling memory**, Save.
+1. **Setup:** in Settings → Privacy switch **Remember the last few minutes of the screen** off, Save.
 2. **Action:** confirm the red dot is gone from every avatar, then ask Scout:
    `what was I doing two minutes ago?`
 3. **Expected:** the dot disappeared on save. The answer says rolling memory is off and that it can be
-   turned on in Settings under Awareness. Tick **Rolling memory** again and Save before continuing.
+   turned on in Settings under Privacy. Switch **Remember the last few minutes of the screen** on
+   again and Save before continuing.
 
 ### 3B.6. What changed on screen
 
@@ -815,7 +817,7 @@ the next start is a fresh install. Rename it back at the end to keep your histor
 1. **Setup:** a Windows machine or Windows Sandbox that has never run Tagalong, with no Node.js and no
    terminal open. Copy the installer from 7.13 onto it.
 2. **Action:** double-click the installer. If SmartScreen appears, **More info → Run anyway**. Keep the
-   default folder, finish, and complete the wizard with an OpenRouter key through 7.10.
+   default install folder, finish, and complete the wizard with an OpenRouter key through 7.10.
 3. **Expected:** no administrator prompt. Tagalong installs to
    `%LOCALAPPDATA%\Programs\Tagalong`, adds Start menu and desktop shortcuts, and starts when the
    installer finishes. The wizard opens, and a first answer arrives — all without a terminal.
@@ -838,6 +840,69 @@ the next start is a fresh install. Rename it back at the end to keep your histor
 3. **Expected:** the uninstall removes the program folder and shortcuts but leaves
    `%APPDATA%\Tagalong`. After reinstalling, the wizard does not open (it was finished), and the pets,
    keys and history are as before.
+
+## Settings
+
+### S.1. How Scout thinks shows the real brain and sign-in
+
+1. **Setup:** Claude Code installed and signed in (`claude auth status` says `"loggedIn": true`);
+   Scout on the Claude sign-in with Haiku.
+2. **Action:** open Home → Settings.
+3. **Expected:** the first card reads **Your Claude sign-in · Haiku** with a **Signed in** chip (a
+   tick and the words). **Change it on the Scout page** opens Home's Scout page. Move Scout to
+   OpenRouter there and come back: the card reads **OpenRouter · <model>** with **Key stored**.
+
+### S.2. Signed out, and Check again
+
+1. **Setup:** run `claude auth logout` in a terminal. Scout on the Claude sign-in.
+2. **Action:** open Settings. Then run `claude auth login`, and click **Check again**.
+3. **Expected:** first a **Signed out** chip with "Run claude in a terminal and sign in", and the
+   buttons **Check again** and **Use an API key instead**. After signing in, **Check again** turns it
+   into **Signed in**. No model call is made (Activity stays empty).
+
+### S.3. No Claude Code: pick a service and paste a key
+
+1. **Setup:** a machine (or PATH) without `claude`. Scout on the Claude sign-in.
+2. **Action:** open Settings, pick **OpenRouter**, paste a key, click **Save**.
+3. **Expected:** before saving, "Scout needs a brain to think with" and three services. After Save
+   the card reads **OpenRouter · anthropic/claude-haiku-4.5** (the recommended model) with **Key
+   stored**, and Scout answers the next question on OpenRouter.
+
+### S.4. API keys: add, replace, remove
+
+1. **Setup:** Settings → **Advanced** (closed until you open it).
+2. **Action:** **Add key** on Token Factory, paste a key, Save. Then **Remove key** on it.
+3. **Expected:** after Save the row says **Key stored** and offers **Replace key**. **Remove key**
+   says "Token Factory key removed." and the row goes back to **No key**. There is no row for the
+   Claude sign-in.
+
+### S.5. A refused value inside Advanced opens Advanced
+
+1. **Setup:** Settings, Advanced closed.
+2. **Action:** open Advanced, type `40` in **Watches at once**, close Advanced, Save.
+3. **Expected:** "Not saved. Watches at once must be a whole number between 1 and 10." Advanced opens
+   by itself, the field is outlined, focused and has the same sentence under it.
+
+### S.6. A shortcut another app uses
+
+1. **Setup:** another app holding Ctrl+Shift+Space (or type an accelerator Windows refuses).
+2. **Action:** Save that combination as the ask key.
+3. **Expected:** the message names the combination under the shortcut fields and the ask field is
+   outlined. Fixing it and saving clears both.
+
+### S.7. The ⓘ notes
+
+1. **Action:** press each ⓘ in turn.
+2. **Expected:** each opens its note inline below, the button shows pressed (`aria-expanded`), and
+   opening another closes the first. The blind spot chips match the list in [privacy](../privacy.md).
+
+### S.8. Experts have no default folder
+
+1. **Setup:** an expert saved by an older build with a default folder.
+2. **Action:** open it in Home → Experts and Save; then ask Scout for a coding task from a window
+   with no project in its title.
+3. **Expected:** the form has no folder box, and **Let it edit files by default** and **On** are
+   switches. The hand-off card offers no remembered default and opens the folder picker.
 
 ## Demo run: the hackathon story
 

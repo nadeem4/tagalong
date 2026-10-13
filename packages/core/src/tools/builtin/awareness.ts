@@ -198,7 +198,7 @@ async function runRecallScreen(context: RecallContext, input: unknown): Promise<
       return {
         content:
           'Rolling memory is off, so Tagalong remembers nothing of the screen. Tell the user ' +
-          'they can turn it on in Settings, under Awareness, and that it starts from then.',
+          'they can turn it on in Settings, under Privacy, and that it starts from then.',
       };
     }
     return {
@@ -278,7 +278,7 @@ async function runWhatChanged(context: RecallContext, input: unknown): Promise<T
     return {
       content:
         `There is nothing to compare with: Tagalong holds no earlier frame of display ` +
-        `${displayId}. With rolling memory on (Settings, Awareness) it keeps the last few ` +
+        `${displayId}. With rolling memory on (Settings, Privacy) it keeps the last few ` +
         'minutes. Tell the user that.',
     };
   }

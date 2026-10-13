@@ -87,7 +87,7 @@ without the prompt growing.
 | Personal memory → tidy-up | Periodically, and when a pet passes its cap | Duplicates merged, unused memories faded out                           | Design |
 
 Built today in `packages/core/src/memory/summarizer.ts`: summarising runs after a turn, never
-blocks one, uses the summarizer model chosen in Settings, and gives up after a minute to try again
+blocks one, uses the summarizer model chosen in Settings → Advanced → Summaries (Same as Scout by default), and gives up after a minute to try again
 next turn.
 
 ### Minutes (design)
