@@ -186,6 +186,21 @@ export class ActivityLog {
       );
   }
 
+  /**
+   * The hand-offs that finished well after `since`, oldest first, at most five: what the
+   * greeting may mention. The brief is the only text kept; the answer stays in Home.
+   */
+  expertsFinishedSince(since: string): { expertName: string; text: string }[] {
+    return this.db
+      .prepare<[string], { expert_name: string | null; text: string | null }>(
+        `SELECT expert_name, text FROM activity
+         WHERE kind = 'expert' AND state = 'done' AND finished_at > ?
+         ORDER BY finished_at ASC LIMIT 5`,
+      )
+      .all(since)
+      .map((row) => ({ expertName: row.expert_name ?? 'An expert', text: row.text ?? '' }));
+  }
+
   /** Newest first; `before` is the `next` of the page before. */
   list(params: { before?: string | undefined; limit?: number | undefined }): ActivityListResult {
     const limit = params.limit ?? 30;

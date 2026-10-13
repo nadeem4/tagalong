@@ -28,6 +28,12 @@ import type {
  * Nothing from node or electron crosses this boundary — only plain data over IPC — so a
  * compromised page can reach exactly the calls listed here and nothing else.
  */
+/** A launch greeting that arrived before the panel subscribed, kept until it does. */
+let earlyLine: string | null = null;
+ipcRenderer.on(IPC.greetLineEvent, (_event: IpcRendererEvent, text: string) => {
+  earlyLine = text;
+});
+
 const bridge: HostBridge = {
   ask: (input: AskInput) => ipcRenderer.invoke(IPC.ask, input) as Promise<{ turnId: string }>,
   capture: (targets: readonly PerceptionTarget[]) =>
@@ -124,6 +130,17 @@ const host: TagalongHostApi = {
     const listener = (): void => handler();
     ipcRenderer.on(IPC.greetEvent, listener);
     return () => void ipcRenderer.off(IPC.greetEvent, listener);
+  },
+  onGreetLine: (handler) => {
+    // The line can arrive before React has subscribed; one that did is handed over now.
+    if (earlyLine !== null) handler(earlyLine);
+    earlyLine = null;
+    const listener = (_event: IpcRendererEvent, text: string): void => {
+      earlyLine = null;
+      handler(text);
+    };
+    ipcRenderer.on(IPC.greetLineEvent, listener);
+    return () => void ipcRenderer.off(IPC.greetLineEvent, listener);
   },
   resizeStrip: (visiblePets: number) =>
     ipcRenderer.invoke(IPC.resizeStrip, visiblePets) as Promise<void>,

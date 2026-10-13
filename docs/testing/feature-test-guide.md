@@ -908,6 +908,37 @@ the next start is a fresh install. Rename it back at the end to keep your histor
 3. **Expected:** the form has no folder box, and **Let it edit files by default** and **On** are
    switches. The hand-off card offers no remembered default and opens the folder picker.
 
+## Greeting
+
+### G.1. The intro after Welcome, in three beats
+
+1. **Setup:** a fresh install (empty `%APPDATA%\Tagalong`).
+2. **Action:** finish Welcome with **Start**.
+3. **Expected:** Scout's bubble opens beside it without taking the keyboard and types in "Hi, I'm
+   Scout. I sit in the corner of your screen and keep an eye on what you're working on, never on
+   passwords or private windows." **Next** shows "Ask me about whatever you're on. When it needs
+   real work, I brief an expert, like Claude Code, and bring the answer back." **Next** again shows
+   "Press Ctrl+Shift+Space anytime." with **Try it now** (focused) and **Got it**. Three dots show
+   which beat you are on. Tab reaches every button.
+4. **Reduced motion:** with Windows Settings → Accessibility → Visual effects → **Animation effects**
+   off, each beat appears whole, with no typing.
+
+### G.2. A later launch says one quiet line
+
+1. **Setup:** an install that finished Welcome. Quit Tagalong.
+2. **Action:** start Tagalong again, and keep typing in another window.
+3. **Expected:** one short line appears beside Scout (for example "Morning. I'm here when you need
+   me."); your typing is not interrupted. It fades after about seven seconds. Pointing at it keeps it;
+   clicking it opens the bubble to ask; × closes it. With no brain set up, or one that fails, a
+   handwritten line appears instead. Nothing is captured (no capture dot, nothing in Activity).
+4. **After a hand-off:** finish a hand-off to Claude Code, quit, start again. The line mentions
+   Claude Code.
+
+### G.3. The greeting can be switched off
+
+1. **Action:** Settings → Privacy → **Say hello when Tagalong opens** → Off, Save. Restart.
+2. **Expected:** Scout docks and says nothing. The ⓘ note says the hello reads no screen.
+
 ## Demo run: the hackathon story
 
 A short end-to-end run of the story the hackathon demo tells. Run it on the installed app, with an

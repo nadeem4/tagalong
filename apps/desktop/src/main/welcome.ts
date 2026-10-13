@@ -56,6 +56,14 @@ export function shouldOpenWelcome(
 }
 
 /**
+ * Whether Scout says its one line as the app opens. Not before Welcome is done: the intro
+ * after Welcome is the first hello. Not when the greeting is switched off in Settings.
+ */
+export function shouldGreetOnLaunch(settings: Settings): boolean {
+  return settings.welcome.done && settings.greeting;
+}
+
+/**
  * What finishing Welcome does to the crew: the default pet becomes the Companion on the
  * chosen brain, on the model its role's tier recommends there, and docks alone. The other
  * pets are hidden, not deleted, so Home can bring them back. Vision and watch models are

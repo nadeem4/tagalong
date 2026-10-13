@@ -35,6 +35,7 @@ export const IPC = {
   hidePanel: 'tagalong:panel:hide',
   fitPanel: 'tagalong:panel:fit',
   greetEvent: 'tagalong:panel:greet',
+  greetLineEvent: 'tagalong:panel:greet-line',
   panelSideEvent: 'tagalong:panel:side',
   dragAvatar: 'tagalong:avatar:drag',
   dropAvatar: 'tagalong:avatar:drop',
@@ -224,6 +225,8 @@ export interface TagalongHostApi {
   fitPanel(height: number): Promise<void>;
   /** Main asks the bubble for its one-time hello, right after Welcome. */
   onGreet(handler: () => void): () => void;
+  /** Main hands the bubble one line to say quietly as the app opens, on a later launch. */
+  onGreetLine(handler: (text: string) => void): () => void;
   /** Which side of the pet the bubble sits on, so its tail points at the pet. */
   onPanelSide(handler: (side: 'left' | 'right') => void): () => void;
   /** Moves the pet by a drag's step; the bubble follows. */

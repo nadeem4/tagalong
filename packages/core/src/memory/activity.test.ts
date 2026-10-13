@@ -279,4 +279,23 @@ describe('expert hand-offs', () => {
     expect(second?.state).toBe('stopped');
     expect(second?.error).toBeUndefined();
   });
+
+  it('lists the hand-offs that finished well since a time, for the greeting', () => {
+    const before = new Date(Date.now() - 60_000).toISOString();
+    const done = log.expertStarted({
+      petId: 'scout',
+      expertId: 'claude-code',
+      expertName: 'Claude Code',
+      text: 'Fix the failing test',
+    });
+    log.expertFinished(done, { ok: true, text: 'Fixed.', changedFiles: [] });
+    const failed = log.expertStarted({ petId: 'scout', expertId: 'x', expertName: 'X', text: 'a' });
+    log.expertFinished(failed, { ok: false, error: 'not signed in' });
+    log.expertStarted({ petId: 'scout', expertId: 'x', expertName: 'X', text: 'still going' });
+
+    expect(log.expertsFinishedSince(before)).toEqual([
+      { expertName: 'Claude Code', text: 'Fix the failing test' },
+    ]);
+    expect(log.expertsFinishedSince(new Date(Date.now() + 60_000).toISOString())).toEqual([]);
+  });
 });

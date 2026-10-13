@@ -163,7 +163,9 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   for Home `activity.list` (see [Activity](#activity)), and for experts `experts.list`,
   `experts.upsert`, `experts.delete`, `experts.test`, `handoffs.start`, `handoffs.cancel`,
   `handoffs.confirm`, `handoffs.dismiss` and `projects.search` (see
-  [Experts and connectors](#experts-and-connectors)). Protocol 0.9.0.
+  [Experts and connectors](#experts-and-connectors)), and `greeting.compose { petId }` →
+  `{ text, source: 'model' | 'fallback' }`, the line said as the app opens (see Welcome below).
+  Protocol 0.9.0.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
   `perception.listWindows` and `perception.readText`, then `perception.captureWindow`, and from Phase 3B `perception.recall` and
   `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
@@ -1109,11 +1111,29 @@ flowchart LR
   the model its role's tier recommends there (`welcomeCrew`, using `recommendedModel`), hides every
   other pet (they stay in Home), adds Claude Code as an expert when it is installed and none exists
   (`welcomeExperts`: no folder, read-only), sets `welcome.done`, closes Welcome, and sends the panel `greetEvent` and shows it without
-  focus (`showPanelQuietly`): Scout says hello in its bubble. The hello says how it works (you
-  show it, it briefs an expert, it brings the answer back) and the key to press, and stays until
-  **Got it** or a hotkey question. **Try it now** captures the active window and a screenshot
+  focus (`showPanelQuietly`): Scout introduces itself in its bubble (`companion-bubble.tsx#Intro`),
+  in three handwritten beats typed in with **Next** between them (where it lives and that it keeps
+  an eye on your work but never on passwords or private windows; that it briefs an expert like
+  Claude Code and brings the answer back; the key to press). Under `prefers-reduced-motion` each
+  beat appears whole; a visually hidden `role="status"` carries each beat whole for screen readers.
+  It stays until **Got it** or a hotkey question. **Try it now** captures the active window and a screenshot
   (`capture(['activeWindow', 'screenshot'])`) and asks "What am I working on, and what could you
   hand to an expert?" in the same bubble; when the screen cannot be seen it asks without it.
+- **Every later launch says one quiet line.** When Welcome is done and `settings.greeting` is on
+  (`welcome.ts#shouldGreetOnLaunch`, default on), main calls `greeting.compose` for the default pet,
+  sends the text as `greetLineEvent` (the preload keeps one that arrives before the panel subscribes)
+  and shows the panel with `showPanelQuietly`. The panel renders `GreetingLine`: `role="status"`,
+  fades after about seven seconds unless pointed at or focused, opens the ask bubble on a click.
+  Then main stores `lastOpenedAt`, whether or not it greeted. In the engine,
+  `greeting/greeting.ts#composeGreeting` reads no screen: only the local time of day, the time since
+  `lastOpenedAt`, and `ActivityLog#expertsFinishedSince` (expert hand-offs that finished well since
+  then, at most five, brief only). It makes one call to the summaries model (`settings.summarizer`,
+  else the pet's own provider and model, text only), like `Summarizer`: 60 tokens, tools refused,
+  an eight-second `AbortSignal.timeout`. The prompt asks for one sentence under 20 words, warm, no
+  emoji, naming a finished hand-off if any, and never inventing facts. A failure, a timeout, an empty
+  reply or one that is too long or has an emoji falls back to `fallbackGreeting`: "Morning." /
+  "Afternoon." / "Evening." / "Working late?" or "Back after N days.", then "I'm here when you need
+  me.", "Nothing waiting for you." or the hand-off that finished.
 - **A new key answers the next question.** `KeyedProviderResolver` re-reads the keychain before every
   `ask` and rebuilds a provider only when its key or base URL changed, so a key pasted in Welcome is
   used without a restart.

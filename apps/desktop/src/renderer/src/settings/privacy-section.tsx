@@ -5,15 +5,45 @@ import { keyCaps } from '../settings-form';
 import { Info, Section, Tip } from './section';
 
 /**
- * Rolling memory's on/off, and what Scout never looks at. The blind spots are built in and
- * always on, so they are listed from `BLIND_SPOTS` and nothing here can switch them off.
+ * The hello on launch, rolling memory's on/off, and what Scout never looks at. The blind
+ * spots are built in and always on, so they are listed from `BLIND_SPOTS` and nothing here
+ * can switch them off.
  * The minutes rolling memory keeps are under Advanced.
  */
 export function PrivacySection({ settings, platform }: { settings: Settings; platform: string }) {
   const [remember, setRemember] = useState(settings.rollingMemory.enabled);
+  const [greet, setGreet] = useState(settings.greeting);
   const pauseKey = settings.hotkeys.pauseSight ?? SETTINGS_DEFAULTS.hotkeys.pauseSight;
   return (
     <Section id="privacy">
+      <div className="tg-setting">
+        <div className="tg-setting__text">
+          <div className="tg-titlerow">
+            <h3 className="tg-sub" id="greeting-label">
+              Say hello when Tagalong opens
+            </h3>
+            <Info tip="greeting" label="About the hello" />
+          </div>
+          <p className="tg-help">One short line beside Scout, then it fades.</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          className="tg-switch"
+          aria-checked={greet}
+          aria-labelledby="greeting-label"
+          onClick={() => setGreet((on) => !on)}
+        >
+          {greet ? 'On' : 'Off'}
+        </button>
+        {greet && <input type="hidden" name="greeting" value="on" />}
+      </div>
+      <Tip tip="greeting">
+        Scout looks at nothing on screen for this. It knows only the time of day, how long since
+        Tagalong last opened, and which hand-offs finished meanwhile. The summaries model writes the
+        line in one short call; if that fails, Scout says a line of its own. On by default.
+      </Tip>
+      <hr className="tg-divider" />
       <div className="tg-setting">
         <div className="tg-setting__text">
           <div className="tg-titlerow">

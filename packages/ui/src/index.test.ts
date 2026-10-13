@@ -7,6 +7,7 @@ describe('ui package surface', () => {
       [
         'ChatPanel',
         'CompanionBubble',
+        'GreetingLine',
         'DockPet',
         'CrewStrip',
         'DEFAULT_PET_COLOR',

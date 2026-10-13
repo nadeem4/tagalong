@@ -7,6 +7,7 @@ import { ActivityLog } from './memory/activity';
 import { ConversationStore } from './memory/store';
 import { MemoryStore } from './memory/memories';
 import { Summarizer } from './memory/summarizer';
+import { composeGreeting } from './greeting/greeting';
 import { PetRegistry } from './pets/registry';
 import { SettingsStore } from './settings/settings';
 import type { SecretStore } from './settings/settings';
@@ -313,6 +314,7 @@ export class Engine {
       handoffs,
       projects,
       connectorFor,
+      resolve,
       refreshProviders: async () => keyed?.refresh(),
       models: (providerId) =>
         listModels(providerId, options.secretStore, settings, options.env ?? process.env),
@@ -393,12 +395,14 @@ function buildHandlers(parts: {
   handoffs: HandoffManager;
   projects: ProjectFinder;
   connectorFor: (expert: Expert) => Connector;
+  /** The guarded resolver turns use, for the one-off greeting call. */
+  resolve: ProviderResolver;
   models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
   /** Re-reads provider keys, so a key saved since the last ask is used by this one. */
   refreshProviders: () => Promise<void>;
 }): MethodHandlers {
   const { db, activity, runner, store, emit, pets, settings, models, hosts, watches } = parts;
-  const { refreshProviders, experts, routes, handoffs, projects, connectorFor } = parts;
+  const { refreshProviders, experts, routes, handoffs, projects, connectorFor, resolve } = parts;
 
   return {
     ask: async (params) => {
@@ -488,5 +492,26 @@ function buildHandlers(parts: {
     'handoffs.confirm': (params) => handoffs.confirm(params),
     'handoffs.dismiss': (params) => ({ dismissed: handoffs.dismiss(params.proposalId) }),
     'projects.search': (params) => ({ projects: projects.search(params.query) }),
+
+    // The line said as the app opens. Reads no screen: the time, the time away, and the
+    // hand-offs that finished since the last launch. Never fails: a fallback line stands in.
+    'greeting.compose': async (params) => {
+      const pet = pets.get(params.petId);
+      if (pet === null) {
+        throw new RpcFailure(RPC_ERROR_CODES.invalidParams, `no pet with id '${params.petId}'`);
+      }
+      await refreshProviders();
+      const { summarizer, lastOpenedAt } = settings.get();
+      return composeGreeting({
+        pet,
+        summarizer,
+        provider: resolve,
+        context: {
+          now: new Date(),
+          lastOpenedAt: lastOpenedAt === null ? null : new Date(lastOpenedAt),
+          handoffs: lastOpenedAt === null ? [] : activity.expertsFinishedSince(lastOpenedAt),
+        },
+      });
+    },
   };
 }

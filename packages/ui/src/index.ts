@@ -29,11 +29,11 @@ export { CrewStrip, DEFAULT_PET_COLOR } from './crew-strip';
 export type { CrewStripProps } from './crew-strip';
 
 export { ChatPanel } from './chat-panel';
-export { CompanionBubble } from './companion-bubble';
+export { CompanionBubble, GreetingLine } from './companion-bubble';
 export { DockPet } from './dock-pet';
 export type { DockPetProps } from './dock-pet';
 export type { DockMood } from './office/sprites/expressions';
-export type { CompanionBubbleProps } from './companion-bubble';
+export type { CompanionBubbleProps, GreetingLineProps } from './companion-bubble';
 export type { ChatPanelProps } from './chat-panel';
 
 /** Exported so hosts can test their renderer wiring without booting an engine. */

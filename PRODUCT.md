@@ -65,6 +65,9 @@ your mouse or keyboard.
 - Each pet picks its own provider and model (OpenRouter, Nebius Token Factory, Anthropic); the user
   brings their own API keys.
 - Everything is stored locally. Screenshots are not kept by default.
+- Scout introduces itself once, in three handwritten beats after Welcome. Each later launch it says
+  one short line (time of day, time away, a finished hand-off) and fades; it reads no screen for
+  this, and Settings turns it off.
 - Not built yet: voice, MCP tools (Hands), meetings and the office window, cost dashboard, macOS and
   Linux. Designs for those are agreed but unbuilt.
 - Undecided: whether users can configure the pets' personality and tone beyond the default voice.

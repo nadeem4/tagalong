@@ -358,3 +358,33 @@ describe('Settings.welcome', () => {
     expect(SettingsPatch.parse({ welcome: { done: true } })).toEqual({ welcome: { done: true } });
   });
 });
+
+describe('Settings.greeting', () => {
+  it('is on by default, so Scout says hello on a later launch', () => {
+    expect(Settings.parse({}).greeting).toBe(true);
+  });
+
+  it('reads as on from a settings file written before it existed', () => {
+    expect(Settings.parse({ welcome: { done: true } }).greeting).toBe(true);
+  });
+
+  it('can be switched off in a patch alone', () => {
+    expect(SettingsPatch.parse({ greeting: false })).toEqual({ greeting: false });
+  });
+});
+
+describe('Settings.lastOpenedAt', () => {
+  it('starts unknown', () => {
+    expect(Settings.parse({}).lastOpenedAt).toBeNull();
+  });
+
+  it('keeps an ISO time and rides in a patch alone', () => {
+    const at = '2026-10-12T08:00:00.000Z';
+    expect(Settings.parse({ lastOpenedAt: at }).lastOpenedAt).toBe(at);
+    expect(SettingsPatch.parse({ lastOpenedAt: at })).toEqual({ lastOpenedAt: at });
+  });
+
+  it('refuses something that is not a time', () => {
+    expect(Settings.safeParse({ lastOpenedAt: 'yesterday' }).success).toBe(false);
+  });
+});
