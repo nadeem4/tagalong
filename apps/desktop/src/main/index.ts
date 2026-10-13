@@ -33,11 +33,7 @@ import { extensionFolder, isAllowedLink } from './links';
 import { providerChoices, secretKeyFor } from './provider-choices';
 import { findAgents, shouldOpenWelcome, welcomeCrew, welcomeExperts } from './welcome';
 import type { EngineHost } from './engine-host';
-import {
-  DEFAULT_PAUSE_SIGHT_HOTKEY,
-  HotkeyManager,
-  describeHotkeyProblems,
-} from './hotkeys';
+import { DEFAULT_PAUSE_SIGHT_HOTKEY, HotkeyManager, describeHotkeyProblems } from './hotkeys';
 import { createPlatform } from './platform/index';
 import { gateSight } from './platform/sight-gate';
 import { SightPause } from './sight-pause';

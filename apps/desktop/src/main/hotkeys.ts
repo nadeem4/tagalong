@@ -154,9 +154,7 @@ export class HotkeyManager {
 
   /** Applies the bindings, one outcome per action in ask, pause order. */
   apply(bindings: HotkeyBindings): HotkeyOutcome[] {
-    return (['ask', 'pauseSight'] as const).map((action) =>
-      this.#bind(action, bindings[action]),
-    );
+    return (['ask', 'pauseSight'] as const).map((action) => this.#bind(action, bindings[action]));
   }
 
   /** Releases everything this manager holds, for quit. */
