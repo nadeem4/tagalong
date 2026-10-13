@@ -22,6 +22,7 @@ import {
   countableHandles,
   parseWindowList,
   placeOnDisplays,
+  screensOf,
 } from './window-list';
 import type { ActiveWindowInfo, CapturedImage, Platform, WindowInventory } from './index';
 
@@ -107,7 +108,10 @@ export class Win32Platform implements Platform {
     // Counting is a second pass rather than part of enumeration, so an excluded window is
     // never walked: the exclusion list decides who is countable before anyone looks.
     const counts = await this.#textLayer.countWindowText(countableHandles(placed, exclusions));
-    return { windows: buildInventory(attachTextCounts(placed, counts), exclusions) };
+    return {
+      windows: buildInventory(attachTextCounts(placed, counts), exclusions),
+      displays: screensOf(screen),
+    };
   }
 
   async lookAtWindow(

@@ -1,4 +1,4 @@
-import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
+import type { CaptureExclusions, ScreenInfo, WindowEntry } from '@tagalong/protocol';
 
 import type { DisplaysCapture } from './displays';
 import type { RegionCaptureParams } from './region';
@@ -105,6 +105,8 @@ export type { Win32Platform };
  */
 export interface WindowInventory {
   windows: WindowEntry[];
+  /** Every screen in composite order, so the list can be grouped as "Screen 1", "Screen 2". */
+  displays?: ScreenInfo[];
   failure?: WindowEnumerationFailure;
 }
 

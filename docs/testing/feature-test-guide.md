@@ -105,8 +105,12 @@ Settings from the tray.
 ### H5. OpenRouter + Claude: a tool without an image
 
 1. **Setup:** as H2.
-2. **Action:** ask "which windows do I have open?".
-3. **Expected:** Scout calls `list_windows` and answers from the result.
+2. **Action:** with windows on two screens and one minimized, ask "What do you see?".
+3. **Expected:** Scout calls `list_windows` only (no screenshot, no `read_window_text`) and answers
+   briefly per screen, numbered as the composite labels them, then what is minimized, for example
+   "Screen 1: VS Code on engine.ts, Chrome behind it. Screen 2: Slack. Minimized: Outlook."
+4. **Action:** ask "can you read the task in Chrome?".
+5. **Expected:** Scout calls `read_window_text` on that one window and answers from its text.
 
 ### H6. Token Factory + Nemotron
 

@@ -295,6 +295,36 @@ describe(LIST_WINDOWS, () => {
     const text = asText((await toolset([fullViewHost()]).run({ name: LIST_WINDOWS })).content);
     expect(text.toLowerCase()).toMatch(/approx|about|at least|roughly/);
   });
+
+  it('groups windows by screen number when the host names its screens, without a picture', async () => {
+    // "What do you see?" is answered from this list alone, so it has to say which screen
+    // each window is on in the numbers the user and the composite use, not Electron ids.
+    let captured = 0;
+    const host: PerceptionHost = {
+      ...fullViewHost(),
+      capture: () => {
+        captured += 1;
+        return Promise.resolve({});
+      },
+      listWindows: () =>
+        Promise.resolve({
+          windows: [WINDOW_EDITOR, WINDOW_BROWSER],
+          displays: [DISPLAY_ONE, DISPLAY_TWO].map(({ id, bounds, primary }) => ({
+            id,
+            bounds,
+            primary,
+          })),
+        }),
+    };
+    const text = asText((await toolset([host]).run({ name: LIST_WINDOWS })).content);
+
+    expect(text).toContain('Screen 1');
+    expect(text).toContain('Screen 2');
+    expect(text.indexOf('w-1')).toBeLessThan(text.indexOf('Screen 2'));
+    expect(text.indexOf('w-2')).toBeGreaterThan(text.indexOf('Screen 2'));
+    expect(text).not.toContain('2528732444');
+    expect(captured).toBe(0);
+  });
 });
 
 describe(READ_WINDOW_TEXT, () => {

@@ -1,4 +1,4 @@
-import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
+import type { CaptureExclusions, ScreenInfo, WindowEntry } from '@tagalong/protocol';
 
 import { findCaptureBlock, normalizeProcessName } from './exclusions';
 
@@ -127,29 +127,71 @@ function shorten(title: string): string {
  *
  * The per-window text is deliberately absent. The pet reads this, picks one window, and
  * spends a tool call on that one.
+ *
+ * Given the host's screens, windows are grouped under "Screen 1", "Screen 2" in that order,
+ * then minimized ones together. That grouping is the whole answer to "what do you see?",
+ * so the pet can give it without a screenshot.
  */
-export function renderInventory(windows: readonly WindowEntry[]): string {
+export function renderInventory(
+  windows: readonly WindowEntry[],
+  displays?: readonly ScreenInfo[],
+): string {
   if (windows.length === 0) return 'No windows are open that Tagalong can see.';
 
-  const lines = windows.map((window) => {
-    if (window.blocked !== undefined) {
-      return `${window.id} ${window.processName} blocked by ${window.blocked.entry}`;
-    }
-
-    const where = window.displayId === undefined ? '' : ` d${window.displayId}`;
-    const browser = window.browser ? ' browser' : '';
-    const name = window.processName.replace(/\.exe$/i, '');
-    // Absent stays absent rather than rendering as t0: the pet would read "nobody looked"
-    // as "there is nothing there" and skip a window worth reading.
-    const chars = window.textChars === undefined ? '' : ` ${countMark(window.textChars)}`;
-    return `${window.id} ${name}${where} ${STATE_CODE[window.state]} "${shorten(window.title)}"${chars}${browser}`;
-  });
-
-  return [
-    `Open windows (${windows.length}). fg foreground, bg background, min minimized, d1 display 1, ` +
+  const header = [
+    `Open windows (${windows.length}), top first. fg foreground, bg background, min minimized, ` +
       `t900 about 900 readable characters and t5k about 5,000.`,
     'Read one with read_window_text(id); no window text is included here.',
     'A browser window exposes only its active tab; other tabs need the browser extension.',
-    ...lines,
-  ].join('\n');
+  ];
+
+  const minimized = windows.filter((window) => window.state === 'minimized');
+  const shown = windows.filter((window) => window.state !== 'minimized');
+  const groups: string[] = [];
+
+  if (displays === undefined || displays.length === 0) {
+    // No screen list to number against. The raw display id is not printed: it is a
+    // ten-digit Electron number the pet would repeat to the user as "screen 2528732444".
+    groups.push(...shown.map(renderLine));
+  } else {
+    // Numbered by position, the way the composite labels its corners, so "screen 2" means
+    // the same screen here, in the picture and to the person reading the answer.
+    header.push(
+      `${displays.length} screen${displays.length === 1 ? '' : 's'}, numbered as on the composite: ` +
+        displays.map((display, index) => `${index + 1} ${screenSize(display)}`).join(', ') +
+        '.',
+    );
+    displays.forEach((display, index) => {
+      const on = shown.filter((window) => window.displayId === display.id);
+      groups.push(`Screen ${index + 1}:${on.length === 0 ? ' nothing open' : ''}`);
+      groups.push(...on.map(renderLine));
+    });
+    const known = new Set(displays.map((display) => display.id));
+    const elsewhere = shown.filter(
+      (window) => window.displayId === undefined || !known.has(window.displayId),
+    );
+    if (elsewhere.length > 0) groups.push('Not on a screen:', ...elsewhere.map(renderLine));
+  }
+
+  if (minimized.length > 0) groups.push('Minimized:', ...minimized.map(renderLine));
+
+  return [...header, ...groups].join('\n');
+}
+
+function screenSize(display: ScreenInfo): string {
+  const size = `${display.bounds.width}x${display.bounds.height}`;
+  return display.primary ? `primary ${size}` : size;
+}
+
+function renderLine(window: WindowEntry): string {
+  if (window.blocked !== undefined) {
+    return `${window.id} ${window.processName} blocked by ${window.blocked.entry}`;
+  }
+
+  const browser = window.browser ? ' browser' : '';
+  const name = window.processName.replace(/\.exe$/i, '');
+  // Absent stays absent rather than rendering as t0: the pet would read "nobody looked"
+  // as "there is nothing there" and skip a window worth reading.
+  const chars = window.textChars === undefined ? '' : ` ${countMark(window.textChars)}`;
+  return `${window.id} ${name} ${STATE_CODE[window.state]} "${shorten(window.title)}"${chars}${browser}`;
 }

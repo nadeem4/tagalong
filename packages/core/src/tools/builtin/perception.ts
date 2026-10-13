@@ -162,7 +162,8 @@ const LOOK_CLOSER_DEFINITION: BrainTool = {
 const LIST_WINDOWS_DEFINITION: BrainTool = {
   name: LIST_WINDOWS,
   description:
-    'List every open window — what it is, which monitor it is on, whether it is in ' +
+    'List every open window, grouped by screen (numbered 1, 2 as the user sees them), ' +
+    'then the minimized ones — what each is, whether it is in ' +
     'front, behind something else or minimized, and roughly how much readable text it ' +
     'holds. No window contents, so it is cheap. This is how you find the window you ' +
     `want before calling ${READ_WINDOW_TEXT} on it, including windows the user cannot ` +
@@ -406,7 +407,10 @@ interface CaptureRegionParams {
 
 interface FullViewMethods {
   captureRegion(params: CaptureRegionParams): Promise<{ image: CapturedImageLike }>;
-  listWindows(): Promise<{ windows: readonly WindowEntryLike[] }>;
+  listWindows(): Promise<{
+    windows: readonly WindowEntryLike[];
+    displays?: Parameters<typeof renderInventory>[1];
+  }>;
   readText(params: { windowId?: string; maxChars: number }): Promise<ReadingLike>;
   captureWindow(params: { windowId: string; maxLongSide: number }): Promise<{
     windowId: string;
@@ -661,7 +665,10 @@ async function runListWindows(context: FullViewContext): Promise<ToolOutcome> {
   try {
     // renderInventory is the same text the prompt already carries, so what the pet sees
     // through this tool and what it was handed up front cannot drift into two dialects.
-    return { content: renderInventory((await host.listWindows()).windows) };
+    // The screens come with the list rather than from a display capture, so answering
+    // "what do you see?" never takes a picture.
+    const { windows, displays } = await host.listWindows();
+    return { content: renderInventory(windows, displays) };
   } catch (error) {
     return hostFailure(error);
   }

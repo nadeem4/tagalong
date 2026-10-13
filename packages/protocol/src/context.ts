@@ -54,6 +54,15 @@ export const DisplaySnapshot = z.object({
 export type DisplaySnapshot = z.infer<typeof DisplaySnapshot>;
 
 /**
+ * A display without its picture: enough to number the screens and say how big they are.
+ *
+ * Listed in the host's own order, the order the composite labels 1, 2, 3, so a window
+ * list grouped by these reads as the same "screen 2" the user sees in the picture.
+ */
+export const ScreenInfo = DisplaySnapshot.pick({ id: true, bounds: true, primary: true });
+export type ScreenInfo = z.infer<typeof ScreenInfo>;
+
+/**
  * One top-level window in the inventory: what it is and where, never what is in it.
  *
  * The inventory is attached to every full-view capture, so it has to stay cheap. Reading a

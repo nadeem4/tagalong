@@ -22,8 +22,8 @@ they happen, and obey everything below.
 
 ## What the window list holds
 
-The pet's `list_windows` tool reads a list of every open window: its application, its title, which monitor it
-is on, whether it is in front, behind something else or minimized, and roughly how much readable
+The pet's `list_windows` tool reads a list of every open window: its application, its title, which screen it
+is on (numbered and sized, never pictured), whether it is in front, behind something else or minimized, and roughly how much readable
 text it holds. **It never contains the text inside those windows.** Reading one is a separate,
 deliberate step the pet takes for a single named window.
 

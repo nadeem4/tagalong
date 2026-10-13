@@ -1,6 +1,6 @@
 import { findCaptureBlock } from '@tagalong/core';
 import type { ObservedWindow } from '@tagalong/core';
-import type { CaptureExclusions } from '@tagalong/protocol';
+import type { CaptureExclusions, ScreenInfo } from '@tagalong/protocol';
 
 import type { WindowBounds } from './index';
 
@@ -132,6 +132,25 @@ export function placeOnDisplays(
       return window;
     }
   });
+}
+
+/**
+ * Every screen, numbered by its place in `getAllDisplays()`.
+ *
+ * That is the order the composite labels 1, 2, 3, so the window list can say "screen 2"
+ * and mean the screen the picture calls 2. Geometry only: listing windows never takes a
+ * picture.
+ */
+export function screensOf(screen: {
+  getAllDisplays(): Array<{ id: number; bounds: WindowBounds }>;
+  getPrimaryDisplay(): { id: number };
+}): ScreenInfo[] {
+  const primary = screen.getPrimaryDisplay().id;
+  return screen.getAllDisplays().map(({ id, bounds }) => ({
+    id,
+    bounds: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
+    primary: id === primary,
+  }));
 }
 
 /**

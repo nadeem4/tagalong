@@ -599,8 +599,16 @@ real desktop. Reading a window is a separate, deliberate call against one id.
 The split is the usual one. The host enumerates and maps windows to displays, because both need the
 OS. What a window _means_ — whether it may be read, whether its tabs are reachable, how it reads in a
 prompt — is decided in `packages/core/src/perception/inventory.ts`, where it is tested without a
-desktop. `renderInventory` produces the text the prompt assembler attaches, under a budget of 300
+desktop. `renderInventory` produces the text the prompt assembler attaches, under a budget of 400
 tokens for a twelve-window desktop.
+
+The inventory is grouped by screen. `perception.listWindows` returns the screens alongside the
+windows (`displays`: id, bounds and primary, in `screen.getAllDisplays()` order, with no pictures),
+and `renderInventory` lists each window under "Screen 1", "Screen 2" in that order, then the
+minimized ones together. That order is the one the composite labels in its corners, so "screen 2"
+means the same screen in the list, in the picture and in the answer, and the raw Electron display id
+never reaches the pet as a screen number. This is what lets Scout answer "What do you see?" from the
+list alone, without a screenshot. A host that sends no screens gets the same list ungrouped.
 
 Two things the inventory is careful about. A blocked window keeps its process name and **loses its
 title**: a process name says a password manager is open, which the user can see anyway, while "Chase —

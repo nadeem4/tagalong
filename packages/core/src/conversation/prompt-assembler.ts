@@ -229,7 +229,9 @@ function contextBlock(snapshot: ContextSnapshot, settings: Settings): string {
   // the enumeration failed or was never asked for, and a pet told the desktop is empty
   // will reason from that as though it were observed.
   if (snapshot.windows && snapshot.windows.length > 0) {
-    sections.push(section(CONTEXT_LABELS.windows, renderInventory(snapshot.windows)));
+    sections.push(
+      section(CONTEXT_LABELS.windows, renderInventory(snapshot.windows, snapshot.displays)),
+    );
   }
 
   return sections.length > 0 ? ['--- Screen context ---', ...sections].join('\n\n') : '';

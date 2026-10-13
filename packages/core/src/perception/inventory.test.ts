@@ -158,7 +158,14 @@ describe('renderInventory', () => {
     // Anything added to a *line* is multiplied by the window count, so new wording
     // belongs in the header instead. Moving the browser caveat out of the lines is what
     // brought the pre-count figure from 383 down to 276.
-    const text = renderInventory(buildInventory(desktopOf(12), NOTHING_EXCLUDED));
+    //
+    // Measured grouped across three screens, the longer of the two layouts.
+    const screens = [1, 2, 3].map((id) => ({
+      id,
+      bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+      primary: id === 1,
+    }));
+    const text = renderInventory(buildInventory(desktopOf(12), NOTHING_EXCLUDED), screens);
     expect(tokens(text)).toBeLessThan(400);
   });
 
@@ -208,6 +215,94 @@ describe('renderInventory', () => {
 
   it('says plainly when there are no windows', () => {
     expect(renderInventory([])).toMatch(/no .*window/i);
+  });
+});
+
+describe('renderInventory by screen', () => {
+  // Raw Electron ids, deliberately not 1 and 2: the pet must never see these as screen numbers.
+  const SCREENS = [
+    { id: 2528732444, bounds: { x: 0, y: 0, width: 1920, height: 1080 }, primary: true },
+    { id: 77, bounds: { x: 1920, y: 0, width: 2560, height: 1440 }, primary: false },
+  ];
+
+  function desktop(): ObservedWindow[] {
+    return [
+      observed({
+        id: 'w-1',
+        processName: 'Code.exe',
+        title: 'engine.ts',
+        state: 'foreground',
+        displayId: 2528732444,
+      }),
+      observed({ id: 'w-2', processName: 'chrome.exe', title: 'PR #64', displayId: 2528732444 }),
+      observed({ id: 'w-3', processName: 'slack.exe', title: '#general', displayId: 77 }),
+      // Minimized windows have no real bounds, so the host leaves them unplaced.
+      unplaced({ id: 'w-4', processName: 'OUTLOOK.EXE', title: 'Inbox', state: 'minimized' }),
+    ];
+  }
+
+  function unplaced(overrides: Partial<ObservedWindow>): ObservedWindow {
+    const { displayId: _dropped, ...rest } = observed(overrides);
+    return rest;
+  }
+
+  const render = (screens = SCREENS): string =>
+    renderInventory(buildInventory(desktop(), NOTHING_EXCLUDED), screens);
+
+  it('numbers screens in host order, as the composite labels them, never by raw id', () => {
+    const text = render();
+    expect(text).not.toContain('2528732444');
+    expect(text).not.toMatch(/\bd77\b/);
+    expect(text).toMatch(/^Screen 1\b/m);
+    expect(text).toMatch(/^Screen 2\b/m);
+  });
+
+  it('says how many screens there are and their sizes', () => {
+    const text = render();
+    expect(text).toContain('2 screens');
+    expect(text).toContain('1920x1080');
+    expect(text).toContain('2560x1440');
+    expect(text).toMatch(/primary/);
+  });
+
+  it('lists each window under its own screen, top first', () => {
+    const lines = render().split('\n');
+    const at = (prefix: string): number => lines.findIndex((line) => line.startsWith(prefix));
+    expect(at('Screen 1')).toBeLessThan(at('w-1'));
+    expect(at('w-1')).toBeLessThan(at('w-2'));
+    expect(at('w-2')).toBeLessThan(at('Screen 2'));
+    expect(at('Screen 2')).toBeLessThan(at('w-3'));
+  });
+
+  it('gathers minimized windows on their own, after the screens', () => {
+    const lines = render().split('\n');
+    const minimized = lines.findIndex((line) => line.startsWith('Minimized'));
+    expect(minimized).toBeGreaterThan(lines.findIndex((line) => line.startsWith('w-3')));
+    expect(lines.findIndex((line) => line.startsWith('w-4'))).toBeGreaterThan(minimized);
+  });
+
+  it('names a screen with nothing open on it rather than dropping it', () => {
+    const third = { id: 5, bounds: { x: 0, y: 1080, width: 1280, height: 720 }, primary: false };
+    expect(render([...SCREENS, third])).toMatch(/^Screen 3.*nothing open/m);
+  });
+
+  it('still leaks no title for a blocked window placed on a screen', () => {
+    const text = renderInventory(
+      buildInventory(
+        [observed({ processName: '1Password.exe', title: 'AWS root — production', displayId: 77 })],
+        PASSWORD_MANAGER,
+      ),
+      SCREENS,
+    );
+    expect(text).toContain('blocked');
+    expect(text).not.toContain('AWS root');
+  });
+
+  it('prints no raw display ids when the host did not name its screens', () => {
+    const text = renderInventory(buildInventory(desktop(), NOTHING_EXCLUDED));
+    expect(text).not.toContain('2528732444');
+    expect(text).not.toMatch(/\bd77\b/);
+    expect(text).toMatch(/^Minimized/m);
   });
 });
 
