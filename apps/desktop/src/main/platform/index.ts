@@ -3,6 +3,7 @@ import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
 import type { DisplaysCapture } from './displays';
 import type { RegionCaptureParams } from './region';
 import type { ReadTextAnswer, ReadWindowTextParams } from './read-text';
+import type { LookAtWindowAnswer } from './window-shot';
 import type { WindowEnumerationFailure } from './window-list';
 import { Win32Platform } from './win32';
 
@@ -75,6 +76,14 @@ export interface Platform {
     params: ReadWindowTextParams,
     exclusions: CaptureExclusions,
   ): Promise<ReadTextAnswer>;
+  /**
+   * A screenshot of one listed window, in front or behind others. Takes the exclusion list
+   * for the same reason as `readWindowText`: the refusal comes before any pixel is read.
+   */
+  lookAtWindow(
+    params: { windowId: string; maxLongSide: number },
+    exclusions: CaptureExclusions,
+  ): Promise<LookAtWindowAnswer>;
 }
 
 /**

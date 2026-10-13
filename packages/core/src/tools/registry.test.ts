@@ -46,7 +46,7 @@ function everything(overrides: Partial<ToolRegistryOptions> = {}): ToolRegistryO
   };
 }
 
-const ALL_TWELVE = [
+const ALL_THIRTEEN = [
   'look_at_screen',
   'get_selection',
   'list_displays',
@@ -54,6 +54,7 @@ const ALL_TWELVE = [
   'look_closer',
   'list_windows',
   'read_window_text',
+  'look_at_window',
   'recall_screen',
   'what_changed',
   'remember',
@@ -62,11 +63,11 @@ const ALL_TWELVE = [
 ];
 
 describe('ToolRegistry.forTurn', () => {
-  it('builds all twelve built-in tools, in the order the model has always seen them', () => {
+  it('builds all thirteen built-in tools, in the order the model has always seen them', () => {
     const turn = new ToolRegistry(everything()).forTurn(fakeTurn());
 
-    expect(turn.tools.map((tool) => tool.id)).toEqual(ALL_TWELVE);
-    expect(turn.definitions.map((definition) => definition.name)).toEqual(ALL_TWELVE);
+    expect(turn.tools.map((tool) => tool.id)).toEqual(ALL_THIRTEEN);
+    expect(turn.definitions.map((definition) => definition.name)).toEqual(ALL_THIRTEEN);
   });
 
   it('gives every tool one shape whose id is the name the model sees', () => {
@@ -81,7 +82,7 @@ describe('ToolRegistry.forTurn', () => {
     const writes = tools.filter((tool) => tool.kind === 'write').map((tool) => tool.id);
 
     expect(writes).toEqual(['remember', 'watch_for']);
-    expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(10);
+    expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(11);
   });
 
   it('gives a companion its tools, ending with hand_to_expert, which is write', () => {
@@ -106,6 +107,7 @@ describe('ToolRegistry.forTurn', () => {
       'get_selection',
       'list_windows',
       'read_window_text',
+      'look_at_window',
       'remember',
       'hand_to_expert',
     ]);
@@ -166,7 +168,7 @@ describe('toolsFor', () => {
   const ids = (pet: Pet): string[] =>
     new ToolRegistry(everything()).forTurn(fakeTurn({ pet })).tools.map((tool) => tool.id);
 
-  it('hands a generalist every tool, since its role lists all twelve', () => {
+  it('hands a generalist every tool, since its role lists all thirteen', () => {
     const tools = new ToolRegistry(everything()).forTurn(fakeTurn()).tools;
     expect(toolsFor(FAKE_TURN_PET, tools)).toEqual(tools);
   });
@@ -174,7 +176,7 @@ describe('toolsFor', () => {
   it('gives a pet exactly the tools its role lists, in the registry order', () => {
     const writer = getRole('writer')!;
     expect(ids({ ...FAKE_TURN_PET, roleId: 'writer' })).toEqual(
-      ALL_TWELVE.filter((id) => writer.tools.includes(id)),
+      ALL_THIRTEEN.filter((id) => writer.tools.includes(id)),
     );
   });
 
@@ -208,7 +210,7 @@ describe('toolsFor', () => {
   });
 
   it("gives a pet with a role the library does not have the generalist's tools", () => {
-    expect(ids({ ...FAKE_TURN_PET, roleId: 'astronaut' })).toEqual(ALL_TWELVE);
+    expect(ids({ ...FAKE_TURN_PET, roleId: 'astronaut' })).toEqual(ALL_THIRTEEN);
   });
 
   it('is the one place a turn is narrowed: what it drops is neither offered nor run', async () => {
@@ -220,7 +222,7 @@ describe('toolsFor', () => {
     const memory = fakeMemory();
     const turn = new ToolRegistry(everything({ memory, toolsFor: readOnly })).forTurn(fakeTurn());
 
-    expect(seen).toEqual([{ pet: FAKE_TURN_PET, ids: ALL_TWELVE }]);
+    expect(seen).toEqual([{ pet: FAKE_TURN_PET, ids: ALL_THIRTEEN }]);
     expect(turn.definitions.map((definition) => definition.name)).not.toContain('remember');
     expect(turn.definitions.map((definition) => definition.name)).not.toContain('watch_for');
 

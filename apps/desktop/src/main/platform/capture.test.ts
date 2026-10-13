@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { captureActiveWindowImageWith } from './capture';
+import { captureActiveWindowImageWith, captureWindowImageWith } from './capture';
 import type { CaptureImagePort, CaptureSource, WindowCaptureDeps } from './capture';
 import type { ActiveWindowInfo } from './index';
 
@@ -146,5 +146,39 @@ describe('captureActiveWindowImageWith', () => {
 
   it('returns null when neither the window nor the display could be captured', async () => {
     expect(await captureActiveWindowImageWith(deps({ window: [], screen: [] }), BOUND)).toBeNull();
+  });
+});
+
+describe('captureWindowImageWith', () => {
+  const withId = (id: string, image: CaptureImagePort): CaptureSource => ({
+    ...source('a window', image),
+    id,
+  });
+
+  it('photographs the window with that handle, even one behind others', async () => {
+    const d = deps({
+      window: [
+        withId('window:111:0', fakeImage(800, 600, 'front')),
+        withId('window:222:0', fakeImage(3840, 2160, 'behind')),
+      ],
+    });
+
+    const captured = await captureWindowImageWith(d, 222, BOUND);
+
+    expect(captured).toEqual({
+      base64: Buffer.from('behind@1568x882').toString('base64'),
+      width: 1568,
+      height: 882,
+    });
+  });
+
+  it('does not mistake a handle that merely starts the same', async () => {
+    const d = deps({ window: [withId('window:2220:0', fakeImage(800, 600))] });
+    expect(await captureWindowImageWith(d, 222, BOUND)).toBeNull();
+  });
+
+  it('returns nothing for a window Windows cannot draw, such as a minimized one', async () => {
+    const d = deps({ window: [withId('window:222:0', fakeImage(0, 0))] });
+    expect(await captureWindowImageWith(d, 222, BOUND)).toBeNull();
   });
 });

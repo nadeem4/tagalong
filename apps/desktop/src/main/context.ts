@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { findCaptureBlock } from '@tagalong/core';
+import { basename } from 'node:path';
+import { findCaptureBlock, normalizeProcessName } from '@tagalong/core';
 import type { CaptureBlock } from '@tagalong/core';
 import { ContextSnapshot } from '@tagalong/protocol';
 import type { CaptureExclusions, ContextSnapshotPatch, PerceptionTarget } from '@tagalong/protocol';
@@ -122,8 +123,40 @@ async function unlessPaused<T>(
   }
 }
 
+/** A window as far as a capture needs it: what it is, and where it is when known. */
+type SeenWindow = Pick<ActiveWindowInfo, 'appName' | 'title'> & {
+  /** Present when the window came from the list rather than the foreground. */
+  listedId?: string;
+};
+
+/** Whether a window belongs to Tagalong itself: its bubble, its pet, its settings. */
+function isOwnWindow(appName: string): boolean {
+  return normalizeProcessName(appName) === normalizeProcessName(basename(process.execPath));
+}
+
+/**
+ * The window the person means by "my screen".
+ *
+ * Usually the one in front. But while they type to Scout, Scout's own bubble is in front,
+ * and a screenshot of that tells Scout only about itself. Then it is the topmost window
+ * that is not Tagalong's and not minimized, from the list (which comes top first).
+ */
+async function windowInFocus(
+  platform: Platform,
+  exclusions: CaptureExclusions,
+): Promise<SeenWindow | null> {
+  const active = await attempt('the active window', () => platform.getActiveWindow());
+  if (active === null || !isOwnWindow(active.appName)) return active;
+  const inventory = await attempt('the open windows', () => platform.listWindows(exclusions));
+  const next = inventory?.windows.find(
+    (window) => window.state !== 'minimized' && !isOwnWindow(window.processName),
+  );
+  if (next === undefined) return null;
+  return { appName: next.processName, title: next.title, listedId: next.id };
+}
+
 /** The snapshot's `app` field, or nothing when the host could not name the window. */
-function appOf(window: ActiveWindowInfo | null): { app?: ContextSnapshot['app'] } {
+function appOf(window: SeenWindow | null): { app?: ContextSnapshot['app'] } {
   if (window === null) return {};
   return { app: { name: window.appName, ...(window.title ? { windowTitle: window.title } : {}) } };
 }
@@ -138,7 +171,7 @@ function appOf(window: ActiveWindowInfo | null): { app?: ContextSnapshot['app'] 
 async function captureScreenshot(
   platform: Platform,
   exclusions: CaptureExclusions,
-  window: ActiveWindowInfo | null,
+  window: SeenWindow | null,
 ): Promise<{ screenshot?: ContextSnapshot['screenshot']; blocked: CaptureBlock | null }> {
   const blocked = findCaptureBlock(
     window === null ? undefined : { processName: window.appName, title: window.title },
@@ -146,9 +179,20 @@ async function captureScreenshot(
   );
   if (blocked !== null) return { blocked };
 
-  const image = await attempt('the screen', () =>
-    platform.captureActiveWindowImage(MAX_SCREENSHOT_LONG_SIDE),
-  );
+  const listedId = window?.listedId;
+  const image =
+    listedId === undefined
+      ? await attempt('the screen', () =>
+          platform.captureActiveWindowImage(MAX_SCREENSHOT_LONG_SIDE),
+        )
+      : ((
+          await attempt('the window', () =>
+            platform.lookAtWindow(
+              { windowId: listedId, maxLongSide: MAX_SCREENSHOT_LONG_SIDE },
+              exclusions,
+            ),
+          )
+        )?.image ?? null);
   if (image === null) return { blocked: null };
 
   return {
@@ -315,9 +359,7 @@ export async function capturePatch(
     // Read once and share it: the exclusion check and the `app` field want the same window,
     // and asking twice could see two different foreground windows.
     const needsWindow = what.includes('activeWindow') || what.includes('screenshot');
-    const window = needsWindow
-      ? await attempt('the active window', () => platform.getActiveWindow())
-      : null;
+    const window = needsWindow ? await windowInFocus(platform, options.exclusions) : null;
 
     if (what.includes('windows')) {
       const inventory = await attempt('the open windows', () =>

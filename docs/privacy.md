@@ -15,7 +15,9 @@ that, and stops.
 | Click the pet      | Nothing. The bubble opens; the pet looks only if it needs to. |
 
 Everything else the pet reads through its own tools, mid-answer: list what is open, read one
-window's text, take a screenshot, fetch another monitor, zoom into part of one. Those run only inside a turn you started, are shown in the panel as
+window's text, take a screenshot of the window you were using or of one listed window even behind
+others (never a minimized one, which has nothing drawn), fetch another monitor, zoom into part of one.
+Each of these is announced like any capture, and blind spots refuse every one. Those run only inside a turn you started, are shown in the panel as
 they happen, and obey everything below.
 
 ## What the window list holds

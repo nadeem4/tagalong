@@ -1,6 +1,7 @@
 import {
   DEFAULT_WINDOW_TEXT_CHARS,
   PerceptionDiffParams,
+  PerceptionCaptureWindowParams,
   PerceptionRecallParams,
   coreToHostNotifications,
   engineUrl,
@@ -39,6 +40,8 @@ export interface EngineClientOptions {
     rect: { x: number; y: number; width: number; height: number };
     maxLongSide: number;
   }) => Promise<unknown>;
+  /** Answers perception.captureWindow: a screenshot of one listed window. */
+  captureWindow: (params: { windowId: string; maxLongSide: number }) => Promise<unknown>;
   /** Phase 3B. Answers perception.recall from rolling memory. */
   recall?: (params: PerceptionRecallParams) => Promise<unknown>;
   /** Phase 3B. Answers perception.diff: now against a frame from before. */
@@ -196,6 +199,11 @@ export class EngineClient {
       if (method === 'perception.captureRegion') {
         const asked = params as Parameters<EngineClientOptions['captureRegion']>[0];
         this.#send({ jsonrpc: '2.0', id, result: await this.#options.captureRegion(asked) });
+        return;
+      }
+      if (method === 'perception.captureWindow') {
+        const asked = PerceptionCaptureWindowParams.parse(params);
+        this.#send({ jsonrpc: '2.0', id, result: await this.#options.captureWindow(asked) });
         return;
       }
       if (method === 'perception.recall' && this.#options.recall !== undefined) {

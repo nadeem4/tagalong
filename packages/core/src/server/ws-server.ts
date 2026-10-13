@@ -7,6 +7,7 @@ import {
   HelloParams,
   PROTOCOL_VERSION,
   PerceptionCaptureRegionResult,
+  PerceptionCaptureWindowResult,
   PerceptionDiffParams,
   PerceptionDiffResult,
   PerceptionListWindowsResult,
@@ -27,6 +28,7 @@ import type {
   CoreToHostNotification,
   HostCapability,
   PerceptionCaptureRegionParams,
+  PerceptionCaptureWindowParams,
   PerceptionCaptureRegionResult as PerceptionCaptureRegionResultType,
   PerceptionListWindowsResult as PerceptionListWindowsResultType,
   PerceptionReadTextParams,
@@ -77,6 +79,8 @@ export interface HostSession {
   listWindows(): Promise<PerceptionListWindowsResultType>;
   /** Asks the host for a native-resolution crop of one display, for leaning in. */
   captureRegion(params: CaptureRegionParams): Promise<PerceptionCaptureRegionResultType>;
+  /** Asks the host for a screenshot of one listed window, in front or not. */
+  captureWindow(params: PerceptionCaptureWindowParams): Promise<PerceptionCaptureWindowResult>;
   /** Phase 3B. The buffered frame nearest a moment ago, from rolling memory. */
   recall(params: RecallParams): Promise<RecallResult>;
   /** Phase 3B. How a display, or a region of it, changed since a moment ago. */
@@ -151,6 +155,14 @@ class SessionImpl implements HostSession {
     // Parsed rather than trusted: this crosses a socket, and a malformed reading that
     // reached the model would look to the user like the pet inventing screen contents.
     return PerceptionReadTextResult.parse(raw);
+  }
+
+  async captureWindow(
+    params: PerceptionCaptureWindowParams,
+  ): Promise<PerceptionCaptureWindowResult> {
+    const id = `captureWindow-${this.#nextRequestId++}`;
+    const raw = await this.#request(id, 'perception.captureWindow', params);
+    return PerceptionCaptureWindowResult.parse(raw);
   }
 
   async listWindows(): Promise<PerceptionListWindowsResultType> {

@@ -10,6 +10,7 @@ tools:
   - get_selection
   - list_windows
   - read_window_text
+  - look_at_window
   - recall_screen
   - remember
   - ask_pet

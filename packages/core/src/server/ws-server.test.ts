@@ -336,6 +336,30 @@ describe('perception.readText', () => {
   });
 });
 
+describe('perception.captureWindow', () => {
+  it('asks the host for one window and validates the picture it sends back', async () => {
+    const s = await start();
+    const client = await TestClient.connect(s.port);
+    await client.call('hello', hello());
+    const asked: Array<{ method: string; params: unknown }> = [];
+    client.onRequest = (method, params) => {
+      asked.push({ method, params });
+      return {
+        windowId: 'w-1',
+        image: { mime: 'image/png', base64: 'cG5n', width: 10, height: 10 },
+      };
+    };
+
+    const session = s.sessions()[0] as HostSession;
+    const shot = await session.captureWindow({ windowId: 'w-1', maxLongSide: 1568 });
+
+    expect(asked).toEqual([
+      { method: 'perception.captureWindow', params: { windowId: 'w-1', maxLongSide: 1568 } },
+    ]);
+    expect(shot.image?.width).toBe(10);
+  });
+});
+
 describe('perception.recall and perception.diff', () => {
   it('asks the host for a remembered moment and validates the answer', async () => {
     const s = await start();

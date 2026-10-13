@@ -91,8 +91,14 @@ Hosts implement two contracts.
   returns the window inventory — what each window is and where, never what is in it. `perception.readText`
   returns the text of **exactly one** window, named by id or defaulting to the foreground one, capped and
   flagged when truncated. `perception.captureRegion` returns a native-resolution crop of one display.
-  A host that can do the first and third advertises `displays`; one that can do the second advertises
+  `perception.captureWindow` returns a screenshot of one listed window, in front or behind others; a
+  minimized window or a blind spot comes back without an image and with notes saying why. A host that
+  can do the first, third and fourth advertises `displays`; one that can do the second advertises
   `textLayer`.
+- **Scout's own windows are looked past.** While the person types to Scout, Scout's bubble is the
+  foreground window, so `capturePatch` resolves "the window in front" through `windowInFocus`: the
+  active window unless it is Tagalong's own (matched on the process name of `process.execPath`),
+  otherwise the topmost listed window that is neither Tagalong's nor minimized, captured by id.
 
   There is deliberately no scope that reads every window at once. Measured on a twelve-window Windows
   desktop, the whole text layer is 46,491 characters — roughly 11,600 tokens — in a single call, and one
@@ -153,9 +159,9 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   for Home `activity.list` (see [Activity](#activity)), and for experts `experts.list`,
   `experts.upsert`, `experts.delete`, `experts.test`, `handoffs.start`, `handoffs.cancel`,
   `handoffs.confirm`, `handoffs.dismiss` and `projects.search` (see
-  [Experts and connectors](#experts-and-connectors)). Protocol 0.8.0.
+  [Experts and connectors](#experts-and-connectors)). Protocol 0.9.0.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
-  `perception.listWindows` and `perception.readText`, and from Phase 3B `perception.recall` and
+  `perception.listWindows` and `perception.readText`, then `perception.captureWindow`, and from Phase 3B `perception.recall` and
   `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
   Hand-offs report back with the `handoff.progress` and `handoff.finished` notifications.
 - **Core to host notifications** gained `turn.toolRequest` and `turn.toolResult` in Phase 2B. They were

@@ -2,7 +2,9 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { clipboard, desktopCapturer, nativeImage, screen } from 'electron';
 import { buildInventory } from '@tagalong/core';
 import type { CaptureExclusions } from '@tagalong/protocol';
-import { captureActiveWindowImageWith } from './capture';
+import { captureActiveWindowImageWith, captureWindowImageWith } from './capture';
+import { lookAtWindowWith } from './window-shot';
+import type { LookAtWindowAnswer } from './window-shot';
 import { captureDisplaysWith } from './displays';
 import { captureRegionWith } from './region';
 import type { RegionCaptureParams } from './region';
@@ -105,6 +107,24 @@ export class Win32Platform implements Platform {
     // never walked: the exclusion list decides who is countable before anyone looks.
     const counts = await this.#textLayer.countWindowText(countableHandles(placed, exclusions));
     return { windows: buildInventory(attachTextCounts(placed, counts), exclusions) };
+  }
+
+  async lookAtWindow(
+    params: { windowId: string; maxLongSide: number },
+    exclusions: CaptureExclusions,
+  ): Promise<LookAtWindowAnswer> {
+    return lookAtWindowWith(
+      {
+        listWindows: async () => (await this.listWindows(exclusions)).windows,
+        captureWindowImage: (handle, maxLongSide) =>
+          captureWindowImageWith(
+            { desktopCapturer, log: (message) => console.log(`[platform:win32] ${message}`) },
+            handle,
+            maxLongSide,
+          ),
+      },
+      params,
+    );
   }
 
   async readWindowText(

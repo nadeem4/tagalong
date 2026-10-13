@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { basename } from 'node:path';
 import { ContextSnapshot } from '@tagalong/protocol';
 import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
 import {
@@ -39,6 +40,7 @@ function fakePlatform(overrides: Partial<Platform> = {}): Platform {
     // Phase 2B. Empty by default so a test that reaches the enumeration without meaning
     // to fails on a missing inventory rather than on invented windows.
     listWindows: async () => ({ windows: [] }),
+    lookAtWindow: async () => ({ windowId: '' }),
     ...overrides,
   };
 }
@@ -239,6 +241,53 @@ describe('capturePatch', () => {
       height: 882,
     });
     expect(blocked).toBeNull();
+  });
+
+  it('looks past its own windows to the one the person was using', async () => {
+    // Scout's bubble has the focus while the person types to it, so "the window in front"
+    // is Scout itself. The next window down is the one they mean.
+    const own = basename(process.execPath);
+    const captureActiveWindowImage = vi.fn(async () => ({
+      base64: 'c2VsZg==',
+      width: 8,
+      height: 8,
+    }));
+    const lookAtWindow = vi.fn(async () => ({
+      windowId: 'w-2',
+      image: { mime: 'image/png' as const, base64: 'ZWRpdG9y', width: 800, height: 600 },
+    }));
+    const windows: WindowEntry[] = [
+      { id: 'w-1', processName: own, title: 'Tagalong', state: 'foreground', browser: false },
+      {
+        id: 'w-2',
+        processName: 'Code.exe',
+        title: 'engine.ts - ai_pet',
+        state: 'background',
+        browser: false,
+      },
+    ];
+    const platform = fakePlatform({
+      captureActiveWindowImage,
+      lookAtWindow,
+      getActiveWindow: async () => ({
+        appName: own,
+        title: 'Tagalong',
+        bounds: { x: 0, y: 0, width: 300, height: 200 },
+      }),
+      listWindows: async () => ({ windows }),
+    });
+
+    const { patch } = await capturePatch(platform, ['activeWindow', 'screenshot'], {
+      exclusions: NOTHING_EXCLUDED,
+    });
+
+    expect(captureActiveWindowImage).not.toHaveBeenCalled();
+    expect(lookAtWindow).toHaveBeenCalledWith(
+      { windowId: 'w-2', maxLongSide: expect.any(Number) },
+      NOTHING_EXCLUDED,
+    );
+    expect(patch.app).toEqual({ name: 'Code.exe', windowTitle: 'engine.ts - ai_pet' });
+    expect(patch.screenshot?.base64).toBe('ZWRpdG9y');
   });
 
   it('enforces the exclusions on a tool-driven capture too', async () => {

@@ -34,6 +34,7 @@ export const LOOK_AT_DISPLAY = 'look_at_display';
 export const LOOK_CLOSER = 'look_closer';
 export const LIST_WINDOWS = 'list_windows';
 export const READ_WINDOW_TEXT = 'read_window_text';
+export const LOOK_AT_WINDOW = 'look_at_window';
 
 /** What the perception and recall tools need from the engine. */
 export interface PerceptionToolsOptions {
@@ -197,8 +198,25 @@ const READ_WINDOW_TEXT_DEFINITION: BrainTool = {
   },
 };
 
+const LOOK_AT_WINDOW_DEFINITION: BrainTool = {
+  name: LOOK_AT_WINDOW,
+  description:
+    'Take a screenshot of one window, named by its id from list_windows, even when it is ' +
+    `behind other windows. Use it when the picture matters; for text prefer ` +
+    `${READ_WINDOW_TEXT}, which is exact and far cheaper. A minimized window has nothing ` +
+    'to photograph, and blind spots refuse it; the result says so.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      windowId: { type: 'string', description: 'A window id from list_windows.' },
+    },
+    required: ['windowId'],
+    additionalProperties: false,
+  },
+};
+
 /**
- * The seven perception tools, bound to whatever hosts are connected.
+ * The eight perception tools, bound to whatever hosts are connected.
  *
  * `look_at_screen` hands back the captured PNG as an image block, because a model that
  * asked to look has to end up with pixels — a sentence saying "PNG, 640×480" is the one
@@ -222,6 +240,9 @@ export function perceptionTools(options: PerceptionToolsOptions): Tool[] {
     defineTool(LIST_WINDOWS_DEFINITION, 'read', (_input, ctx) => runListWindows(fullView(ctx))),
     defineTool(READ_WINDOW_TEXT_DEFINITION, 'read', (input, ctx) =>
       runReadWindowText(fullView(ctx), input),
+    ),
+    defineTool(LOOK_AT_WINDOW_DEFINITION, 'read', (input, ctx) =>
+      runLookAtWindow(fullView(ctx), input),
     ),
   ];
 }
@@ -367,7 +388,7 @@ const CROP_LONG_SIDE = 1568;
 /** What the full-view tools need from the options, bound per tool use. */
 interface FullViewContext {
   displays(): Promise<readonly DisplaySnapshot[] | undefined>;
-  host<K extends 'captureRegion' | 'listWindows' | 'readText'>(
+  host<K extends 'captureRegion' | 'listWindows' | 'readText' | 'captureWindow'>(
     capability: HostCapability,
     method: K,
   ): FullViewHost<K> | undefined;
@@ -386,6 +407,12 @@ interface FullViewMethods {
   captureRegion(params: CaptureRegionParams): Promise<{ image: CapturedImageLike }>;
   listWindows(): Promise<{ windows: readonly WindowEntryLike[] }>;
   readText(params: { windowId?: string; maxChars: number }): Promise<ReadingLike>;
+  captureWindow(params: { windowId: string; maxLongSide: number }): Promise<{
+    windowId: string;
+    image?: CapturedImageLike;
+    blocked?: CaptureBlock;
+    notes?: string[];
+  }>;
 }
 
 type FullViewHost<K extends keyof FullViewMethods> = Pick<FullViewMethods, K>;
@@ -437,7 +464,7 @@ function fullViewContext(options: PerceptionToolsOptions, vision: boolean): Full
      * as a pet that ignored them. Checking the method here turns it into a refusal the
      * pet can repeat instead of an exception that ends the turn.
      */
-    host<K extends 'captureRegion' | 'listWindows' | 'readText'>(
+    host<K extends 'captureRegion' | 'listWindows' | 'readText' | 'captureWindow'>(
       capability: HostCapability,
       method: K,
     ) {
@@ -684,6 +711,46 @@ async function runReadWindowText(context: FullViewContext, input: unknown): Prom
         ...(notes.length > 0 ? [notes.join(' ')] : []),
         ...(reading.text.length > 0 ? ['', reading.text] : []),
       ].join('\n'),
+    };
+  } catch (error) {
+    return hostFailure(error);
+  }
+}
+
+async function runLookAtWindow(context: FullViewContext, input: unknown): Promise<ToolOutcome> {
+  const asked = (input ?? {}) as { windowId?: unknown };
+  if (typeof asked.windowId !== 'string' || asked.windowId.length === 0) {
+    return { content: `Name a window id from ${LIST_WINDOWS}.`, isError: true };
+  }
+
+  const host = context.host('displays', 'captureWindow');
+  if (host === undefined) return noHost('photograph a window');
+
+  try {
+    const shot = await host.captureWindow({
+      windowId: asked.windowId,
+      maxLongSide: CROP_LONG_SIDE,
+    });
+    if (shot.image === undefined) {
+      const why = (shot.notes ?? []).join(' ') || 'Tagalong could not photograph that window.';
+      return { content: why, isError: true };
+    }
+    if (!context.vision()) {
+      return {
+        content:
+          `Window ${shot.windowId}: PNG, ${shot.image.width}x${shot.image.height}. This pet ` +
+          'cannot look at images, so you have not seen it. Tell the user that and do not ' +
+          `guess what it shows; ${READ_WINDOW_TEXT} may help.`,
+      };
+    }
+    return {
+      content: [
+        { type: 'image', mime: shot.image.mime, base64: shot.image.base64 },
+        {
+          type: 'text',
+          text: `Window ${shot.windowId}, ${shot.image.width}x${shot.image.height}.`,
+        },
+      ],
     };
   } catch (error) {
     return hostFailure(error);

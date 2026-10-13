@@ -4,6 +4,8 @@ import {
   HostCapability,
   MAX_WINDOW_TEXT_CHARS,
   PerceptionCaptureRegionParams,
+  PerceptionCaptureWindowParams,
+  PerceptionCaptureWindowResult,
   PerceptionCaptureRegionResult,
   PerceptionListWindowsParams,
   PerceptionListWindowsResult,
@@ -321,6 +323,7 @@ describe('the core-to-host catalog after 3B', () => {
     expect(Object.keys(coreToHostMethods).sort()).toEqual([
       'perception.capture',
       'perception.captureRegion',
+      'perception.captureWindow',
       'perception.diff',
       'perception.listWindows',
       'perception.readText',
@@ -524,5 +527,31 @@ describe('models.list', () => {
     expect(resultSchemaFor('models.list').safeParse({ models: [], source: 'guess' }).success).toBe(
       false,
     );
+  });
+});
+
+describe('perception.captureWindow', () => {
+  it('names one listed window and a size bound', () => {
+    expect(PerceptionCaptureWindowParams.parse({ windowId: 'w-1', maxLongSide: 1568 })).toEqual({
+      windowId: 'w-1',
+      maxLongSide: 1568,
+    });
+    expect(PerceptionCaptureWindowParams.safeParse({ maxLongSide: 1568 }).success).toBe(false);
+  });
+
+  it('answers with a picture, or with no picture and the reason', () => {
+    expect(
+      PerceptionCaptureWindowResult.parse({
+        windowId: 'w-1',
+        image: { mime: 'image/png', base64: 'cG5n', width: 10, height: 10 },
+      }).image?.width,
+    ).toBe(10);
+    expect(
+      PerceptionCaptureWindowResult.parse({
+        windowId: 'w-1',
+        blocked: { rule: 'titlePattern', entry: '.env' },
+        notes: ['a blind spot'],
+      }).image,
+    ).toBeUndefined();
   });
 });

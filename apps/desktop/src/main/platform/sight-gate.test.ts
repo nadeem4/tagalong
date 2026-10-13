@@ -28,6 +28,7 @@ function openPlatform(): Platform {
       truncated: false,
       source: 'uia' as const,
     }),
+    lookAtWindow: async () => ({ windowId: 'w-1' }),
   };
 }
 
@@ -55,6 +56,8 @@ function callOf(platform: Platform, method: keyof Platform): () => Promise<unkno
         });
     case 'readWindowText':
       return () => platform.readWindowText({ maxChars: 8000 }, NOTHING_EXCLUDED);
+    case 'lookAtWindow':
+      return () => platform.lookAtWindow({ windowId: 'w-1', maxLongSide: 1568 }, NOTHING_EXCLUDED);
   }
 }
 
@@ -75,6 +78,7 @@ describe('SIGHT_POLICY', () => {
         'captureSelection',
         'getActiveWindow',
         'listWindows',
+        'lookAtWindow',
         'readClipboard',
         'readWindowText',
       ].sort(),
@@ -90,6 +94,7 @@ describe('SIGHT_POLICY', () => {
         'listWindows',
         'captureRegion',
         'readWindowText',
+        'lookAtWindow',
       ].sort(),
     );
   });

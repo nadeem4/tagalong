@@ -3,6 +3,7 @@ import type {
   DisplayBounds,
   HostCapability,
   PerceptionCaptureRegionResult,
+  PerceptionCaptureWindowResult,
   PerceptionDiffParams,
   PerceptionDiffResult,
   PerceptionListWindowsResult,
@@ -36,6 +37,11 @@ export interface PerceptionHost {
   }): Promise<PerceptionCaptureRegionResult>;
   listWindows?(): Promise<PerceptionListWindowsResult>;
   readText?(params: { windowId?: string; maxChars: number }): Promise<PerceptionReadTextResult>;
+  /** A screenshot of one listed window, in front or not, behind the `displays` capability. */
+  captureWindow?(params: {
+    windowId: string;
+    maxLongSide: number;
+  }): Promise<PerceptionCaptureWindowResult>;
   /** Phase 3B, behind the `recall` capability: a buffered frame from a moment ago. */
   recall?(params: PerceptionRecallParams): Promise<PerceptionRecallResult>;
   /** Phase 3B, behind the `recall` capability: how a display changed since then. */

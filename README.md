@@ -121,7 +121,8 @@ boxes, store its key there, and type its model id on the pet.
 Highlight something, press `Ctrl+Shift+Space`, and the bubble opens with it as a **Selected text**
 chip; type your question. There is no key for a screenshot or for your other windows: Scout lists what
 is open (minimized windows too), reads the window that matters, or takes a screenshot itself, only
-when a question needs it. A screenshot adds roughly 1,500 input tokens, which is why it is not taken
+when a question needs it. It can photograph a window sitting behind others, though not a minimized
+one, and it looks past its own bubble to the window you were using. A screenshot adds roughly 1,500 input tokens, which is why it is not taken
 on every question.
 
 Escape or clicking elsewhere hides the panel. Every key can be changed in Settings, and the change
