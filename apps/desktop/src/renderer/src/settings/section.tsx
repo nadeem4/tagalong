@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 export const SECTIONS = [
   { id: 'brain', title: 'How Scout thinks' },
   { id: 'privacy', title: 'Privacy' },
+  { id: 'voice', title: 'Voice' },
   { id: 'shortcuts', title: 'Shortcuts' },
   { id: 'browser', title: 'Browser extension (optional)' },
   { id: 'advanced', title: 'Advanced' },

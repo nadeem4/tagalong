@@ -319,7 +319,8 @@ function showRemark(params: unknown): void {
   if (panel == null || avatar == null || !avatar.isVisible() || panel.isVisible()) return;
   panel.webContents.send(IPC.remarkEvent, params);
   showPanelQuietly(panel, avatar);
-  // Voice: when spoken replies land, the remark's text is spoken here like any bubble line.
+  // The panel says the remark aloud like any bubble line: shortened, one at a time, and
+  // silent when Scout talks is off. Speech lives in the panel, which owns the queue and stop.
 }
 
 /**
