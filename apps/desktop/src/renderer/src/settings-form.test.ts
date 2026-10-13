@@ -10,8 +10,6 @@ const values: SettingsFormValues = {
     { providerId: 'openrouter', label: 'OpenRouter', value: '' },
   ],
   askHotkey: 'CommandOrControl+Shift+Space',
-  lookHotkey: 'CommandOrControl+Shift+S',
-  seeEverythingHotkey: 'CommandOrControl+Shift+Alt+S',
   pauseSightHotkey: 'CommandOrControl+Shift+Alt+P',
   sightDetail: 'focused',
   windowTextBudget: '8000',
@@ -50,24 +48,20 @@ describe('buildSettingsPatch base URLs', () => {
 });
 
 describe('buildSettingsPatch', () => {
-  it('carries all four hotkeys, because a patch replaces the whole object', () => {
-    // The bug this exists to prevent: the form sent only ask and look, so every save
-    // silently dropped the two 2B bindings and fell back to their defaults. Nothing
-    // failed, nothing warned, and a rebound see-everything key just stopped being the
-    // one the user typed.
+  it('carries both hotkeys, because a patch replaces the whole object', () => {
+    // A form that sent only the ask would silently drop a rebound pause key back to its
+    // default: nothing failed, nothing warned.
     const patch = buildSettingsPatch(values);
 
     expect(patch.hotkeys).toEqual({
       ask: 'CommandOrControl+Shift+Space',
-      look: 'CommandOrControl+Shift+S',
-      seeEverything: 'CommandOrControl+Shift+Alt+S',
       pauseSight: 'CommandOrControl+Shift+Alt+P',
     });
   });
 
   it('keeps a rebound hotkey exactly as typed', () => {
-    const patch = buildSettingsPatch({ ...values, seeEverythingHotkey: 'CommandOrControl+Alt+V' });
-    expect(patch.hotkeys?.seeEverything).toBe('CommandOrControl+Alt+V');
+    const patch = buildSettingsPatch({ ...values, askHotkey: 'CommandOrControl+Alt+V' });
+    expect(patch.hotkeys?.ask).toBe('CommandOrControl+Alt+V');
     expect(patch.hotkeys?.pauseSight).toBe('CommandOrControl+Shift+Alt+P');
   });
 

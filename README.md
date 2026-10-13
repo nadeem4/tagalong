@@ -115,13 +115,17 @@ boxes, store its key there, and type its model id on the pet.
 | Key                | What it does                                                                          |
 | ------------------ | ------------------------------------------------------------------------------------- |
 | `Ctrl+Shift+Space` | **Ask.** Opens the panel with the text you have selected and the active window's name |
-| `Ctrl+Shift+S`     | **Look.** The same, plus a screenshot of the active window                            |
-| `Ctrl+Shift+Alt+S` | **See everything.** Every screen, plus a list of every open window                    |
 | `Ctrl+Shift+Alt+P` | **Pause sight.** Nothing is read until you press it again (also in the tray)          |
 | `Alt+Shift+Space`  | In Chrome, with the extension: opens the side panel with your selection               |
 
+Highlight something, press `Ctrl+Shift+Space`, and the bubble opens with it as a **Selected text**
+chip; type your question. There is no key for a screenshot or for your other windows: Scout lists what
+is open (minimized windows too), reads the window that matters, or takes a screenshot itself, only
+when a question needs it. A screenshot adds roughly 1,500 input tokens, which is why it is not taken
+on every question.
+
 Escape or clicking elsewhere hides the panel. Every key can be changed in Settings, and the change
-works at once. The bigger the look, the more it costs: a screenshot adds roughly 1,500 input tokens.
+works at once.
 
 ## Scout, your companion
 

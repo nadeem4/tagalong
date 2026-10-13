@@ -38,18 +38,20 @@ describe('Settings', () => {
     expect(s.pageTextBudget).toBe(40_000);
     expect(s.historyMessages).toBe(20);
     expect(s.hotkeys.ask).toBe('CommandOrControl+Shift+Space');
-    expect(s.hotkeys.look).toBe('CommandOrControl+Shift+S');
+    expect(s.hotkeys).toEqual({
+      ask: 'CommandOrControl+Shift+Space',
+      pauseSight: 'CommandOrControl+Shift+Alt+P',
+    });
     expect(s.avatar).toEqual({ x: null, y: null });
   });
 
-  it('keeps a rebound look hotkey', () => {
-    const s = Settings.parse({ hotkeys: { ask: 'Alt+Space', look: 'Alt+S' } });
-    expect(s.hotkeys.look).toBe('Alt+S');
-  });
-
-  it('accepts settings written before the look hotkey existed', () => {
-    const s = Settings.parse({ hotkeys: { ask: 'Alt+Space' } });
-    expect(s.hotkeys.look).toBeUndefined();
+  it('drops the retired look and see-everything keys from an older settings file', () => {
+    // Scout takes screenshots and reads other windows itself now, so those keys bind
+    // nothing. An older file still parses; the keys simply fall away.
+    const s = Settings.parse({
+      hotkeys: { ask: 'Alt+Space', look: 'Alt+S', seeEverything: 'Alt+Shift+S' },
+    });
+    expect(s.hotkeys).toEqual({ ask: 'Alt+Space' });
   });
 
   it('keeps explicit values', () => {
@@ -195,32 +197,6 @@ describe('Settings.sightDetail', () => {
   });
 });
 
-describe('Settings.hotkeys.seeEverything', () => {
-  it('has a default distinct from the other two', () => {
-    const { ask, look, seeEverything } = SETTINGS_DEFAULTS.hotkeys;
-    expect(seeEverything).toBe('CommandOrControl+Shift+Alt+S');
-    expect(new Set([ask, look, seeEverything]).size).toBe(3);
-  });
-
-  it('parses a settings file written before this hotkey existed', () => {
-    // Same reason `look` is optional: a patch replaces the whole hotkeys object, so a
-    // caller rebinding only `ask` must not be forced to resend a key it never touched.
-    const s = Settings.parse({ hotkeys: { ask: 'Alt+Space' } });
-    expect(s.hotkeys.seeEverything).toBeUndefined();
-  });
-
-  it('keeps a rebound see-everything key', () => {
-    const s = Settings.parse({ hotkeys: { ask: 'Alt+Space', seeEverything: 'Alt+Shift+S' } });
-    expect(s.hotkeys.seeEverything).toBe('Alt+Shift+S');
-  });
-
-  it('rejects a blank accelerator, which would bind nothing and look like a bug', () => {
-    expect(Settings.safeParse({ hotkeys: { ask: 'Alt+Space', seeEverything: '' } }).success).toBe(
-      false,
-    );
-  });
-});
-
 describe('the pause hotkey setting', () => {
   it('ships a default that matches the documented key', () => {
     expect(SETTINGS_DEFAULTS.hotkeys.pauseSight).toBe('CommandOrControl+Shift+Alt+P');
@@ -232,8 +208,8 @@ describe('the pause hotkey setting', () => {
   });
 
   it('stays optional, so a settings file written before it still parses', () => {
-    // Same reason `look` and `seeEverything` are optional: a patch replaces the whole
-    // hotkeys object, so rebinding one key must not force a caller to resend the rest.
+    // A patch replaces the whole hotkeys object, so rebinding the ask must not force a
+    // caller to resend the pause key.
     const parsed = Settings.parse({ hotkeys: { ask: 'CommandOrControl+Shift+Space' } });
     expect(parsed.hotkeys.pauseSight).toBeUndefined();
   });

@@ -9,19 +9,18 @@ and a **watch** a pet started at your request (both below). Otherwise there is n
 no polling loop, and no capture between one question and the next — each hotkey reads once, sends
 that, and stops.
 
-| You press          | It reads                                                                                                    |
-| ------------------ | ----------------------------------------------------------------------------------------------------------- |
-| `Ctrl+Shift+Space` | The selected text and the active window's title. No picture.                                                |
-| `Ctrl+Shift+S`     | The above, plus one screenshot of the active window.                                                        |
-| `Ctrl+Shift+Alt+S` | The above, plus every monitor, an overview image of how they are arranged, and a list of every open window. |
+| You do             | It reads                                                      |
+| ------------------ | ------------------------------------------------------------- |
+| `Ctrl+Shift+Space` | The selected text and the active window's title. No picture.  |
+| Click the pet      | Nothing. The bubble opens; the pet looks only if it needs to. |
 
-The pet can also look mid-answer through its own tools — read one window's text, fetch another
-monitor, zoom into part of one. Those run only inside a turn you started, are shown in the panel as
+Everything else the pet reads through its own tools, mid-answer: list what is open, read one
+window's text, take a screenshot, fetch another monitor, zoom into part of one. Those run only inside a turn you started, are shown in the panel as
 they happen, and obey everything below.
 
 ## What the window list holds
 
-`Ctrl+Shift+Alt+S` sends a list of every open window: its application, its title, which monitor it
+The pet's `list_windows` tool reads a list of every open window: its application, its title, which monitor it
 is on, whether it is in front, behind something else or minimized, and roughly how much readable
 text it holds. **It never contains the text inside those windows.** Reading one is a separate,
 deliberate step the pet takes for a single named window.

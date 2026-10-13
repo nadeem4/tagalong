@@ -16,8 +16,6 @@ export interface SettingsFormValues {
   /** One box per OpenAI-compatible preset. Blank means the preset's own URL. */
   baseUrls: readonly { providerId: string; label: string; value: string }[];
   askHotkey: string;
-  lookHotkey: string;
-  seeEverythingHotkey: string;
   pauseSightHotkey: string;
   sightDetail: string;
   windowTextBudget: string;
@@ -39,9 +37,8 @@ export interface SettingsFormValues {
  *
  * **Every hotkey goes in every time.** A patch replaces the whole `hotkeys` object, so a
  * form that sends only the keys it happens to display silently drops the rest back to
- * their defaults — which is exactly what this form did before the full-view and pause
- * keys were added to it: nothing failed, nothing warned, and a rebound key quietly
- * stopped being the one the user typed.
+ * their defaults: nothing fails, nothing warns, and a rebound key quietly stops being the
+ * one the user typed.
  *
  * Nothing the form does not show is included, so saving cannot reset the exclusion list
  * or the retention mode as a side effect of changing a base URL. Models are not here at
@@ -52,8 +49,6 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
     providerBaseUrls: parseBaseUrls(values.baseUrls),
     hotkeys: {
       ask: values.askHotkey.trim(),
-      look: values.lookHotkey.trim(),
-      seeEverything: values.seeEverythingHotkey.trim(),
       pauseSight: values.pauseSightHotkey.trim(),
     },
     sightDetail: values.sightDetail,

@@ -47,8 +47,8 @@ your mouse or keyboard.
 
 - Runs all day in the background: tray icon, pets docked on the desktop, a chat panel that opens
   beside the pet on a hotkey and hides on Escape.
-- Hotkeys: `Ctrl+Shift+Space` ask, `Ctrl+Shift+S` look, `Ctrl+Shift+Alt+S` see everything,
-  `Ctrl+Shift+Alt+P` pause sight.
+- Hotkeys: `Ctrl+Shift+Space` ask (brings the selected text and the window you are on),
+  `Ctrl+Shift+Alt+P` pause sight. Scout takes screenshots and reads other windows itself.
 - Home, the control centre: every agent, what it is doing, every handoff, consult and meeting, and
   each agent's role, model, tools and notes. Its centre scene is a theme (the Office first); the
   controls never move between themes.

@@ -1,32 +1,15 @@
 import { globalShortcut } from 'electron';
 
-/** The text-only ask. Cheap on purpose: no screenshot rides along with it. */
+/**
+ * The ask: opens the bubble with what you are on, the selected text and the window, read
+ * before the bubble takes the focus. It is the only way to hand Scout a selection, since a
+ * click on the pet puts the pet's own window in front first. Screenshots and the window
+ * list are not keys any more: Scout takes them itself, when a question needs them.
+ */
 export const DEFAULT_ASK_HOTKEY = 'CommandOrControl+Shift+Space';
 
 /**
- * The looking ask: selection, active window and a screenshot together.
- *
- * Split from the ask hotkey because a screenshot costs roughly 1,500 extra input tokens
- * per question. Charging that to every quick ask would make the cheap path expensive, so
- * the user chooses which one they are pressing.
- */
-export const DEFAULT_LOOK_HOTKEY = 'CommandOrControl+Shift+S';
-
-/**
- * The full-view ask: every display, the composite, and the window inventory.
- *
- * A third key rather than a modifier on the looking one, because the three differ in what
- * they cost and the user is choosing the bill. This one carries two images and a list of
- * everything open; the looking key carries one image; the ask key carries none.
- */
-export const DEFAULT_SEE_EVERYTHING_HOTKEY = 'CommandOrControl+Shift+Alt+S';
-
-/**
  * Turns all sight off and on again.
- *
- * Paired with the full-view key rather than given an unrelated combination: the key that
- * shows the pet everything and the key that blinds it are the two halves of one decision,
- * and a user reaching for the second is usually reacting to the first.
  *
  * This is the one hotkey whose loss matters, so the tray carries the same action. A user
  * who needs to blind the pet right now must not first have to find out that something
@@ -53,8 +36,6 @@ export interface HotkeyOutcome {
 /** What each hotkey is bound to, as the user has it in Settings. */
 export interface HotkeyBindings {
   ask: string;
-  look: string;
-  seeEverything: string;
   pauseSight: string;
 }
 
@@ -73,19 +54,16 @@ export interface RegisterHotkeyOptions {
  */
 const ACTION_LABELS: { readonly [K in keyof HotkeyBindings]: string } = {
   ask: 'Ask',
-  look: 'Look',
-  seeEverything: 'See everything',
   pauseSight: 'Pause sight',
 };
 
 /**
  * Turns registration outcomes into something worth showing a user, or null.
  *
- * Names the action rather than only the accelerator, because four hotkeys do four
- * different things and "Ctrl+Shift+Alt+S could not be registered" does not say which one
- * the user has lost. It also says the others still work: a user whose see-everything key
- * died has no way to tell whether the rest survived, and silence on that reads as "hotkeys
- * are broken" when the honest state is that exactly one is.
+ * Names the action rather than only the accelerator, because the two hotkeys do different
+ * things and "Ctrl+Shift+Alt+P could not be registered" does not say which one the user has
+ * lost. It also says the other still works: silence on that reads as "hotkeys are broken"
+ * when the honest state is that exactly one is.
  */
 export function describeHotkeyProblems(outcomes: readonly HotkeyOutcome[]): string | null {
   const refused = outcomes.filter((outcome) => !outcome.registered);
@@ -142,8 +120,6 @@ export function registerHotkey(options: RegisterHotkeyOptions): HotkeyOutcome {
 
 export interface HotkeyManagerOptions {
   onAsk: () => void;
-  onLook: () => void;
-  onSeeEverything: () => void;
   onPauseSight: () => void;
   registrar?: HotkeyRegistrar;
 }
@@ -157,14 +133,12 @@ export interface HotkeyManagerOptions {
  * user did not edit is never briefly dead.
  *
  * One refused accelerator costs only its own action. Another application owning the
- * full-view key must not take the cheap ask down with it.
+ * pause key must not take the ask down with it.
  */
 export class HotkeyManager {
   readonly #registrar: HotkeyRegistrar;
   readonly #triggers: {
     ask: () => void;
-    look: () => void;
-    seeEverything: () => void;
     pauseSight: () => void;
   };
   /** Accelerators currently held by this process, keyed by action. */
@@ -174,17 +148,13 @@ export class HotkeyManager {
     this.#registrar = options.registrar ?? globalShortcut;
     this.#triggers = {
       ask: options.onAsk,
-      look: options.onLook,
-      seeEverything: options.onSeeEverything,
       pauseSight: options.onPauseSight,
     };
   }
 
-  /** Applies the bindings, one outcome per action in ask, look, see-everything, pause order. */
+  /** Applies the bindings, one outcome per action in ask, pause order. */
   apply(bindings: HotkeyBindings): HotkeyOutcome[] {
-    return (['ask', 'look', 'seeEverything', 'pauseSight'] as const).map((action) =>
-      this.#bind(action, bindings[action]),
-    );
+    return (['ask', 'pauseSight'] as const).map((action) => this.#bind(action, bindings[action]));
   }
 
   /** Releases everything this manager holds, for quit. */

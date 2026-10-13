@@ -85,6 +85,12 @@ describe('the role files', () => {
     expect(instructions).toContain('never mention yourself or Tagalong unless the person asks');
   });
 
+  it('tell the companion to look for itself when nothing came with the question', () => {
+    const instructions = getRole('companion')?.instructions ?? '';
+    expect(instructions).toContain('nothing came with it, look before you answer');
+    expect(instructions).toContain('minimized windows too');
+  });
+
   it('use unique ids', () => {
     const ids = loadRoles().map((role) => role.id);
     expect(new Set(ids).size).toBe(ids.length);

@@ -3,7 +3,8 @@ import type { Settings } from '@tagalong/protocol';
 import { Section } from './section';
 
 /**
- * The four global hotkeys. Every one is sent on every save (see `buildSettingsPatch`), and
+ * The two global hotkeys: the ask, which brings the selected text and the window you are on,
+ * and the pause. Scout takes screenshots and reads other windows itself, so neither has a key. Every one is sent on every save (see `buildSettingsPatch`), and
  * main re-registers them, reporting a key it could not take back as `hotkeyError`.
  */
 export function HotkeysSection({
@@ -16,22 +17,8 @@ export function HotkeysSection({
   return (
     <Section id="hotkeys">
       <label>
-        <span>Ask hotkey (text only)</span>
+        <span>Ask hotkey (brings the text you selected)</span>
         <input name="askHotkey" defaultValue={settings.hotkeys.ask} />
-      </label>
-      <label>
-        <span>Look hotkey (adds a screenshot)</span>
-        <input
-          name="lookHotkey"
-          defaultValue={settings.hotkeys.look ?? SETTINGS_DEFAULTS.hotkeys.look}
-        />
-      </label>
-      <label>
-        <span>See-everything hotkey (every screen, plus what is open)</span>
-        <input
-          name="seeEverythingHotkey"
-          defaultValue={settings.hotkeys.seeEverything ?? SETTINGS_DEFAULTS.hotkeys.seeEverything}
-        />
       </label>
       <label>
         <span>Pause sight hotkey (turns all looking off and on)</span>

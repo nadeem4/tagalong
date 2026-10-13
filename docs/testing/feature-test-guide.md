@@ -91,13 +91,14 @@ Settings from the tray.
 ### H3. OpenRouter + Claude: look
 
 1. **Setup:** as H2.
-2. **Action:** press `Ctrl+Shift+S` and ask "what is on my screen?".
-3. **Expected:** the answer describes the screen, with **no** "cannot see images" warning.
+2. **Action:** click Scout and ask "what is on my screen?".
+3. **Expected:** Scout calls `look_at_screen`; the answer describes the screen, with **no** "cannot
+   see images" warning.
 
 ### H4. OpenRouter + Claude: an image inside a tool result
 
 1. **Setup:** as H2.
-2. **Action:** press `Ctrl+Shift+Alt+S` and ask Scout to zoom in on something small.
+2. **Action:** click Scout and ask it to zoom in on something small on your screen.
 3. **Expected:** Scout calls `look_closer`; the tool result shows as "1 image"; the answer describes
    the zoomed detail.
 
@@ -115,8 +116,8 @@ _Not the default configuration: this step uses Nebius Token Factory._
    says "models from Token Factory". Set Scout's **Provider** to Token Factory, **Model ID** to
    `nvidia/nemotron-3-super-120b-a12b`, **Vision model ID** to the Nemotron Nano 2 VL id from the
    live list (if it is not `nvidia/Nemotron-Nano-V2-12b`, correct `NEMOTRON_VISION_MODEL`). Save.
-2. **Action:** (a) `Ctrl+Shift+Space` with a question; (b) `Ctrl+Shift+S`, "what is on my screen?";
-   (c) `Ctrl+Shift+Alt+S`, ask to zoom in; (d) clear the vision model id, save, `Ctrl+Shift+S`.
+2. **Action:** (a) `Ctrl+Shift+Space` with a question; (b) "what is on my screen?"; (c) ask to
+   zoom in on something small; (d) clear the vision model id, save, ask (b) again.
 3. **Expected:** (a) answered by Super; (b) answered with no warning, the request goes to Nano VL
    (check the Token Factory usage page); (c) the turn starts on Super and continues on Nano VL after
    `look_closer`; (d) the "Scout cannot see images" warning and a text-only answer.
@@ -677,12 +678,11 @@ _This test changes the test configuration on purpose._
 ### 3B.17. Estimated image tokens in the sight bar
 
 1. **Setup:** any pet; the panel closed.
-2. **Action:** press `Ctrl+Shift+Space` (no picture), then `Ctrl+Shift+S`, then `Ctrl+Shift+Alt+S`,
+2. **Action:** press `Ctrl+Shift+Space` (no picture), then press **Look at screen** in the sight bar,
    reading the sight bar each time.
-3. **Expected:** no token estimate with the text-only key. With `Ctrl+Shift+S` the bar shows
+3. **Expected:** no token estimate with the key alone. After **Look at screen** the bar shows
    `~N image tokens` where N is about width × height ÷ 750 of the screenshot named beside it (a
-   1568×882 shot shows about 1,844). With `Ctrl+Shift+Alt+S` on two monitors it shows a larger N and
-   `· 3 images` (the overview plus the focused display — more with **Every screen** chosen).
+   1568×882 shot shows about 1,844).
 
 ## Phase 7: onboarding and installer
 
@@ -752,9 +752,8 @@ the next start is a fresh install. Rename it back at the end to keep your histor
 
 1. **Setup:** the wizard on "Three keys to remember".
 2. **Action:** compare it with the hotkey boxes in Settings.
-3. **Expected:** four keys — `Ctrl + Shift + Space` (Ask), `Ctrl + Shift + S` (Look),
-   `Ctrl + Shift + Alt + S` (See everything), `Ctrl + Shift + Alt + P` (Pause sight) — the same as
-   Settings, plus a line on `@Ink` handoff and `/crew`. If you rebound a key earlier, the wizard shows
+3. **Expected:** two keys — `Ctrl + Shift + Space` (Ask) and `Ctrl + Shift + Alt + P` (Pause
+   sight) — the same as Settings, plus a line on `@Ink` handoff and `/crew`. If you rebound a key earlier, the wizard shows
    your binding.
 
 ### 7.8. Rolling memory from the wizard
@@ -826,7 +825,7 @@ the next start is a fresh install. Rename it back at the end to keep your histor
 1. **Setup:** the installed app from 7.14.
 2. **Action:** (a) ask Scout "remember that my favourite colour is teal", quit from the tray, start
    Tagalong from the Start menu, ask "what is my favourite colour?". (b) Put Notepad beside a browser,
-   click into Notepad, press `Ctrl+Shift+S` and ask "which app am I in?".
+   click into Notepad, press `Ctrl+Shift+Space` and ask "which app am I in? Take a screenshot".
 3. **Expected:** (a) "teal" — conversations and memories persist, so SQLite (`better-sqlite3`) loaded
    from the packaged app. (b) The sight bar names Notepad and the screenshot is of the Notepad window,
    not the whole screen — the active-window binding (`get-windows`) loaded. Selecting text and pressing
@@ -851,7 +850,7 @@ OpenRouter key and a Token Factory key at hand. Tick each line.
       Scout something**.
 - [ ] **Nemotron on Token Factory.** Select a paragraph anywhere, press `Ctrl+Shift+Space`, ask Scout
       to explain it. The answer is labelled `Scout · nvidia/nemotron-3-super-120b-a12b`.
-- [ ] **Vision routing.** Press `Ctrl+Shift+S` and ask Scout "what is on my screen?". It describes
+- [ ] **Vision routing.** Click Scout and ask "what is on my screen?". It describes
       the screen with no "cannot see images" warning: Super handed the picture to Nemotron Nano 2 VL
       (the Token Factory usage page shows the Nano VL call).
 - [ ] **Crew roundtable on mixed models.** Type `/crew What should I build next?`. Three answers
