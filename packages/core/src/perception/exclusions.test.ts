@@ -46,23 +46,20 @@ describe('findCaptureBlock', () => {
 
   it('blocks on a title pattern with wildcards, case-insensitively', () => {
     const block = findCaptureBlock(
-      { processName: 'chrome.exe', title: 'My Bitwarden Vault - Google Chrome' },
-      { ...NONE, titlePatterns: ['*bitwarden*'] },
+      { processName: 'chrome.exe', title: 'My Acme Vault - Google Chrome' },
+      { ...NONE, titlePatterns: ['*acme*'] },
     );
-    expect(block).toEqual({ rule: 'titlePattern', entry: '*bitwarden*' });
+    expect(block).toEqual({ rule: 'titlePattern', entry: '*acme*' });
   });
 
   it('anchors title patterns, so a pattern without wildcards is an exact title', () => {
     expect(
-      findCaptureBlock(
-        { title: 'Windows Security' },
-        { ...NONE, titlePatterns: ['Windows Security'] },
-      ),
+      findCaptureBlock({ title: 'Acme Console' }, { ...NONE, titlePatterns: ['Acme Console'] }),
     ).not.toBeNull();
     expect(
       findCaptureBlock(
-        { title: 'The Windows Security thing' },
-        { ...NONE, titlePatterns: ['Windows Security'] },
+        { title: 'The Acme Console thing' },
+        { ...NONE, titlePatterns: ['Acme Console'] },
       ),
     ).toBeNull();
   });
@@ -101,5 +98,49 @@ describe('findCaptureBlock', () => {
       DEFAULTS,
     );
     expect(block?.rule).toBe('titlePattern');
+  });
+});
+
+describe('the built-in blind spots', () => {
+  it('block a password manager even with an empty exclusion list', () => {
+    expect(findCaptureBlock({ processName: 'Bitwarden.exe' }, NONE)).toEqual({
+      rule: 'processName',
+      entry: 'Bitwarden.exe',
+    });
+  });
+
+  it('block a secret file open in an editor, named in the title', () => {
+    for (const title of [
+      '.env - ai_pet - Visual Studio Code',
+      '● .env.local - ai_pet - Visual Studio Code',
+      'id_rsa - Notepad',
+      'C:\\Users\\me\\.ssh\\id_ed25519 - Notepad++',
+      'prod.tfvars - infra - Visual Studio Code',
+      'server.pem - Notepad',
+    ]) {
+      expect(findCaptureBlock({ processName: 'Code.exe', title }, NONE), title).toEqual(
+        expect.objectContaining({ rule: 'titlePattern' }),
+      );
+    }
+  });
+
+  it('leave ordinary files alone, even ones whose names look close', () => {
+    for (const title of [
+      'environment.ts - ai_pet - Visual Studio Code',
+      'README.md - ai_pet - Visual Studio Code',
+      'env.example - Notepad',
+      'id_rsa.pub - Notepad',
+    ]) {
+      expect(findCaptureBlock({ processName: 'Code.exe', title }, NONE), title).toBeNull();
+    }
+  });
+
+  it('block private browsing windows', () => {
+    expect(
+      findCaptureBlock(
+        { processName: 'msedge.exe', title: 'New tab - [InPrivate] - Microsoft Edge' },
+        NONE,
+      ),
+    ).not.toBeNull();
   });
 });

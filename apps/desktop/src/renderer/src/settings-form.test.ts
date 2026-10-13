@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_WINDOW_TEXT_CHARS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
+import { BLIND_SPOTS, MAX_WINDOW_TEXT_CHARS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
 
-import { buildSettingsPatch } from './settings-form';
+import { blindSpotExamples, buildSettingsPatch } from './settings-form';
 import type { SettingsFormValues } from './settings-form';
 
 const values: SettingsFormValues = {
@@ -225,5 +225,18 @@ describe('buildSettingsPatch awareness', () => {
     expect(() =>
       buildSettingsPatch({ ...values, ...awareness, watchMaxConcurrent: 'two' }),
     ).toThrow(/at once/i);
+  });
+});
+
+describe('blindSpotExamples', () => {
+  it('names the apps without .exe, and the files as they are', () => {
+    const [passwords, , files] = BLIND_SPOTS;
+    expect(blindSpotExamples(passwords!)).toMatch(/^1Password, Bitwarden, KeePass, /);
+    expect(blindSpotExamples(files!)).toMatch(/^\.env, \.env\.\*, \*\.pem, /);
+  });
+
+  it('falls back to the title patterns when a group has no apps or files', () => {
+    const privateBrowsing = BLIND_SPOTS.find((spot) => spot.label === 'Private browsing');
+    expect(blindSpotExamples(privateBrowsing!)).toBe('InPrivate, Incognito, Private Browsing');
   });
 });

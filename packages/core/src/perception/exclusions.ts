@@ -1,3 +1,4 @@
+import { BUILT_IN_EXCLUSIONS, SECRET_FILES } from '@tagalong/protocol';
 import type { CaptureBlock, CaptureExclusions } from '@tagalong/protocol';
 
 /**
@@ -48,6 +49,9 @@ function globToRegExp(pattern: string): RegExp {
 /**
  * The exclusion rule that forbids capturing this window, or null when capture may proceed.
  *
+ * The built-in blind spots are checked first and always, whatever the person's own list
+ * says, so clearing that list never takes them away.
+ *
  * Not named `isCaptureBlocked` because it answers with the matching rule, not a boolean:
  * the caller has to tell the user which entry blocked them, and re-deriving that would
  * mean matching twice.
@@ -61,7 +65,14 @@ export function findCaptureBlock(
   exclusions: CaptureExclusions,
 ): CaptureBlock | null {
   if (!activeWindow) return null;
+  return (
+    matchList(activeWindow, BUILT_IN_EXCLUSIONS) ??
+    matchSecretFile(activeWindow.title) ??
+    matchList(activeWindow, exclusions)
+  );
+}
 
+function matchList(activeWindow: ActiveWindow, exclusions: CaptureExclusions): CaptureBlock | null {
   const processName = activeWindow.processName?.trim();
   if (processName) {
     const actual = normalizeProcessName(processName);
@@ -75,5 +86,23 @@ export function findCaptureBlock(
     if (entry !== undefined) return { rule: 'titlePattern', entry };
   }
 
+  return null;
+}
+
+/**
+ * A secret file named in the title, the way an editor shows the open file: `.env - repo -
+ * Visual Studio Code`, or a full path ending in `id_rsa`. Each word of the title, and the
+ * last part of any path in it, is matched whole against the secret file names.
+ */
+function matchSecretFile(title: string | undefined): CaptureBlock | null {
+  if (!title) return null;
+  const words = title
+    .split(/\s+/)
+    .map((word) => word.split(/[\\/]/).pop() ?? '')
+    .filter((word) => word.length > 0);
+  for (const file of SECRET_FILES) {
+    const pattern = globToRegExp(file);
+    if (words.some((word) => pattern.test(word))) return { rule: 'titlePattern', entry: file };
+  }
   return null;
 }

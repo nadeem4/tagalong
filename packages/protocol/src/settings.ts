@@ -48,19 +48,11 @@ export const SETTINGS_DEFAULTS = {
    * They are deliberately few — a broad pattern like `*password*` would block an
    * ordinary docs page about passwords and teach the user to switch the feature off.
    */
-  captureExclusions: {
-    processNames: [
-      '1Password.exe',
-      'Bitwarden.exe',
-      'KeePass.exe',
-      'KeePassXC.exe',
-      'LastPass.exe',
-      'CredentialUIBroker.exe',
-      'LogonUI.exe',
-      'consent.exe',
-    ],
-    titlePatterns: ['*1Password*', '*Bitwarden*', '*KeePass*', '*LastPass*', '*Windows Security*'],
-  },
+  /**
+   * The person's own additions. Empty: password managers, secret files and the rest are
+   * `BLIND_SPOTS`, built in, so clearing this list never takes them away.
+   */
+  captureExclusions: { processNames: [] as string[], titlePatterns: [] as string[] },
   /**
    * Off by default. A screenshot is the most sensitive thing this app ever touches — it
    * can hold a bank balance, a private message or a token that happened to be on screen —

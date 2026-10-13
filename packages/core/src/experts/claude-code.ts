@@ -1,3 +1,4 @@
+import { SECRET_FILES } from '@tagalong/protocol';
 import { spawn as nodeSpawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -39,6 +40,12 @@ const NOT_INSTALLED = 'Claude Code is not installed, or "claude" is not on the P
 
 const READ_TOOLS = ['Read', 'Glob', 'Grep'];
 const EDIT_TOOLS = ['Edit', 'Write'];
+
+/**
+ * Claude Code reads files for itself, so the built-in blind spots go with the brief: it may
+ * not read or edit a secret file anywhere in the folder. Deny rules win over allowed tools.
+ */
+const SECRET_FILE_RULES = SECRET_FILES.flatMap((file) => [`Read(**/${file})`, `Edit(**/${file})`]);
 
 /**
  * Claude Code as an expert: runs `claude -p` headless in the expert's folder, feeds it the
@@ -97,6 +104,8 @@ export class ClaudeCodeConnector implements Connector {
       '--allowedTools',
       ...READ_TOOLS,
       ...(canEdit ? EDIT_TOOLS : []),
+      '--disallowedTools',
+      ...SECRET_FILE_RULES,
     ];
 
     let child: ChildRun;

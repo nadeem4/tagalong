@@ -237,22 +237,35 @@ export async function captureAskSnapshot(
   platform: Platform,
   options: CaptureOptions,
 ): Promise<AskCapture> {
-  const selection = await attempt('the selection', () => platform.captureSelection());
   // Every screen read sits behind one pause check, so a paused capture is one fact about
   // the attempt rather than a flag each target sets for itself.
-  const seen = await unlessPaused(async () => {
-    const window = await attempt('the active window', () => platform.getActiveWindow());
+  const focused = await unlessPaused(() =>
+    attempt('the active window', () => platform.getActiveWindow()),
+  );
+  // A window Scout must not look at (a password manager, a .env file) gives up nothing,
+  // not even a highlight: Ctrl+C is never pressed there.
+  const window = focused.value ?? null;
+  const selectionBlock = findCaptureBlock(
+    window === null ? undefined : { processName: window.appName, title: window.title },
+    options.exclusions,
+  );
+  const selection =
+    selectionBlock === null
+      ? await attempt('the selection', () => platform.captureSelection())
+      : null;
+  const seen = focused.paused
+    ? { value: null, paused: true }
+    : await unlessPaused(async () => {
+        const shot = options.screenshot
+          ? await captureScreenshot(platform, options.exclusions, window)
+          : { blocked: null };
 
-    const shot = options.screenshot
-      ? await captureScreenshot(platform, options.exclusions, window)
-      : { blocked: null };
+        const full = options.fullView
+          ? await captureFullView(platform, options.exclusions)
+          : { patch: {}, blocked: null };
 
-    const full = options.fullView
-      ? await captureFullView(platform, options.exclusions)
-      : { patch: {}, blocked: null };
-
-    return { window, shot, full };
-  });
+        return { window, shot, full };
+      });
 
   return {
     snapshot: ContextSnapshot.parse({
@@ -266,7 +279,9 @@ export async function captureAskSnapshot(
         : {}),
       ...(seen.value?.full.patch ?? {}),
     }),
-    blocked: seen.value === null ? null : (seen.value.shot.blocked ?? seen.value.full.blocked),
+    blocked:
+      selectionBlock ??
+      (seen.value === null ? null : (seen.value.shot.blocked ?? seen.value.full.blocked)),
     paused: seen.paused,
   };
 }

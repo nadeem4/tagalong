@@ -91,15 +91,10 @@ describe('Settings', () => {
 });
 
 describe('Settings.captureExclusions', () => {
-  it('ships defaults that cover password managers and the Windows credential UI', () => {
+  it('starts empty: password managers and the Windows prompts are built-in blind spots', () => {
+    // Built in rather than defaults, so clearing your own list never takes them away.
     const { captureExclusions } = Settings.parse({});
-    const processes = captureExclusions.processNames.map((p) => p.toLowerCase());
-    expect(processes).toContain('1password.exe');
-    expect(processes).toContain('bitwarden.exe');
-    expect(processes).toContain('keepass.exe');
-    expect(processes).toContain('lastpass.exe');
-    expect(processes).toContain('credentialuibroker.exe');
-    expect(captureExclusions.titlePatterns).toContain('*Windows Security*');
+    expect(captureExclusions).toEqual({ processNames: [], titlePatterns: [] });
   });
 
   it('accepts an empty list so a user can opt out of every default', () => {

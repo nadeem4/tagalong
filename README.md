@@ -187,8 +187,11 @@ Then click the toolbar button, or select text and press `Alt+Shift+Space`. More 
 
 - Nothing is read until you press a hotkey or ask, except rolling memory and watches, which you turn
   on. Every look badges the pets and the tray says what was read and when.
-- Password managers, the Windows security prompt and the lock screen are never captured. The list is
-  editable.
+- Scout never looks at its built-in blind spots: password managers, the Windows sign-in and security
+  prompts, secret files such as `.env` and SSH keys, private browsing, authenticator apps and Remote
+  Desktop. They are always on and listed in Settings; you can add your own.
+- Any key, token, password or card number in what is sent is replaced with `[hidden: ...]` before it
+  leaves your computer, and Claude Code is told not to open secret files.
 - Screenshots are not written to disk. Rolling memory and watches live in memory only and are thrown
   away when you pause sight or quit.
 - What you ask goes only to the provider your pet runs on. There is no Tagalong server.

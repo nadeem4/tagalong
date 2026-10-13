@@ -53,10 +53,32 @@ page you did not ask about, and the capture exclusion list applies to tab titles
 
 ## What is never read
 
-- **Excluded applications.** The list ships with the common password managers, the Windows security
-  prompt, the lock screen and the UAC prompt, and you can edit it. An excluded window is refused
-  before anything is read — no screenshot, no text, and no character count, because the count would
-  itself say something about a vault you asked us not to look at.
+- **The built-in blind spots.** Always on, listed read-only in Settings under **Scout never looks
+  at**, and kept apart from your own exclusion list so clearing that list never removes them
+  (`BLIND_SPOTS` in `packages/protocol/src/blind-spots.ts`):
+  - password managers: 1Password, Bitwarden, KeePass, KeePassXC, LastPass, Dashlane, Keeper, Proton
+    Pass, Enpass;
+  - the Windows sign-in screen, the UAC prompt, Windows Security and Credential Manager;
+  - secret files named in a window title, as an editor shows the open file: `.env` and `.env.*`,
+    `*.pem`, `*.key`, `*.pfx`, `*.p12`, `id_rsa`, `id_ecdsa`, `id_ed25519`, `.npmrc`, `.pypirc`,
+    `.netrc`, `.git-credentials`, `.htpasswd`, `credentials.json`, `kubeconfig`, `*.tfvars`,
+    `secrets.*`, `*.kdbx`;
+  - private browsing (InPrivate, Incognito, Private Browsing);
+  - authenticator apps (Authy, WinAuth) and Remote Desktop.
+
+  A blind spot is refused before anything is read: no screenshot, no text, no character count, and
+  no Ctrl+C for a selection — a highlight in a `.env` file never reaches the clipboard.
+
+- **Your own exclusions.** Add any app or window title in settings; they work the same way.
+- **Secrets that slip past.** A title rule only works while the title names the file (an editor
+  shows `.env` only while that tab is open). So everything sent to a model — your question,
+  selections, window text, tool results, memories — and every brief to an expert passes through
+  `hideSecrets` first. API keys and tokens (`sk-`, `ghp_`, `github_pat_`, `AKIA`, `xox`, `AIza`,
+  Stripe keys), login tokens (JWTs), private key blocks, the password in a connection string, the
+  values of `PASSWORD=`, `SECRET=`, `TOKEN=` and `API_KEY=` settings, and card numbers become a
+  marker such as `[hidden: API key]`, so the pet knows something was there without seeing it.
+- **Secret files, by your experts.** Claude Code reads files for itself, so it is started with deny
+  rules for every secret file name above (`Read(**/.env)`, `Edit(**/.env)` and so on).
 - **A monitor with an excluded window on it.** If a password manager is open and visible on your
   second screen, that whole screen is blanked in the full-view capture — not just when it is the
   window you are working in. The blanked screen is replaced with a flat panel reading BLOCKED, so
@@ -68,7 +90,8 @@ page you did not ask about, and the capture exclusion list applies to tab titles
 ## The rest
 
 - A visible indicator shows every capture.
-- An exclusion list blocks capture in password managers and other listed apps.
+- Built-in blind spots and your own exclusion list block capture in password managers, secret
+  files and other listed apps.
 - When Windows reports no foreground window at all — a locked session, a UAC prompt on the secure
   desktop — capture falls back to the screen rather than refusing, which matches the exclusion
   rules: a window that cannot be named is allowed, because a pet that never sees reads as broken.

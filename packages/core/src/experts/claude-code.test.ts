@@ -1,3 +1,4 @@
+import { SECRET_FILES } from '@tagalong/protocol';
 import { describe, expect, it } from 'vitest';
 import { ClaudeCodeConnector, type ChildRun, type SpawnFn } from './claude-code';
 
@@ -75,6 +76,8 @@ describe('ClaudeCodeConnector', () => {
       'Read',
       'Glob',
       'Grep',
+      '--disallowedTools',
+      ...SECRET_FILES.flatMap((file) => [`Read(**/${file})`, `Edit(**/${file})`]),
     ]);
     expect(call?.stdin).toBe('Explain main.ts');
   });
