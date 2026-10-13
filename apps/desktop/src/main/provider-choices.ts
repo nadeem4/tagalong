@@ -40,7 +40,14 @@ export function providerChoices(stored: ReadonlySet<string>): ProviderChoice[] {
   ];
 }
 
+/**
+ * Where the ElevenLabs key is kept. It is the voice's key, not a brain's, so it lives here
+ * rather than in core's SECRET_KEYS: the engine never reads it.
+ */
+export const ELEVENLABS_SECRET_KEY = 'elevenlabs.apiKey';
+
 /** Whether a provider id has a keychain entry at all, so a renderer cannot invent one. */
 export function secretKeyFor(providerId: string): string | undefined {
+  if (providerId === 'elevenlabs') return ELEVENLABS_SECRET_KEY;
   return Object.hasOwn(SECRET_KEYS, providerId) ? SECRET_KEYS[providerId] : undefined;
 }

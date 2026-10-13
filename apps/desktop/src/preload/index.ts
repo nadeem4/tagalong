@@ -20,6 +20,8 @@ import type {
   FoundAgent,
   HostView,
   ModelList,
+  SpeakPreview,
+  SpeakResult,
   TagalongHostApi,
 } from '../shared/ipc';
 
@@ -173,6 +175,13 @@ const host: TagalongHostApi = {
   showExtensionFolder: () => ipcRenderer.invoke(IPC.showExtensionFolder) as Promise<void>,
   hidePanel: () => ipcRenderer.invoke(IPC.hidePanel) as Promise<void>,
   togglePanel: () => ipcRenderer.invoke(IPC.togglePanel) as Promise<void>,
+  speak: (text: string, preview?: SpeakPreview) =>
+    ipcRenderer.invoke(IPC.speak, text, preview) as Promise<SpeakResult>,
+  onStopVoice: (handler) => {
+    const listener = (): void => handler();
+    ipcRenderer.on(IPC.stopVoiceEvent, listener);
+    return () => void ipcRenderer.off(IPC.stopVoiceEvent, listener);
+  },
 };
 
 contextBridge.exposeInMainWorld('tagalong', bridge);
