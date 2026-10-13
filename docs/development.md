@@ -17,6 +17,7 @@ tagalong/
   docs/
     architecture.md
     acceptance/                     # per-phase sign-off
+    chrome-web-store/               # store listing kit and the extension's privacy policy
     specs/2026-09-11-tagalong-design.md
   packages/
     protocol/src/
@@ -430,6 +431,12 @@ extension's own shortcut is `Alt+Shift+Space`. Rebind it at `chrome://extensions
 The extension reads a tab only after you use it there (Chrome's `activeTab`). To let it read
 whichever tab is in front when you ask — including from the desktop hotkey — click **Allow reading
 any tab when I ask** on its options page. It still reads nothing until you ask.
+
+### Publish it
+
+The Chrome Web Store listing text, permission justifications, data disclosures, image list and
+submission steps are in [docs/chrome-web-store/listing.md](chrome-web-store/listing.md). The
+public privacy policy is [docs/chrome-web-store/privacy-policy.md](chrome-web-store/privacy-policy.md).
 
 ## Environment variables
 

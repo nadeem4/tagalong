@@ -57,6 +57,8 @@ main text with menus and footers stripped, capped at 40,000 characters. The sigh
 attached before you send. Nothing is read from tabs you are not on, the extension never runs in a
 page you did not ask about, and the capture exclusion list applies to tab titles too. It talks only to
 `127.0.0.1`.
+The extension's public privacy policy, for the Chrome Web Store, is
+[chrome-web-store/privacy-policy.md](chrome-web-store/privacy-policy.md).
 
 ## What is never read
 
