@@ -115,6 +115,9 @@ export const SETTINGS_CSS = `
   border-radius: ${t.radius.chip}px; background: ${t.color.chipFree}; color: ${t.color.chipFreeInk};
   font-size: ${t.fontSize.min}px; font-weight: ${t.fontWeight.semibold};
 }
+.tg-chip--ok { background: ${t.color.okFill}; color: ${t.color.okInk}; }
+.tg-chip--warn { background: ${t.color.warnFill}; color: ${t.color.warnInk}; }
+.tg-chip--err { background: ${t.color.errFill}; color: ${t.color.errInk}; }
 .tg-chips { display: flex; flex-wrap: wrap; gap: ${t.space.sm}px; list-style: none; margin: ${t.space.md}px 0 0; padding: 0; }
 .tg-choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: ${t.space.sm}px; margin: 0 0 ${t.space.lg}px; padding: 0; border: 0; }
 .tg-panel label.tg-choice {

@@ -15,6 +15,8 @@ describe('ui package surface', () => {
         'HostBridgeProvider',
         'MessageList',
         'HomeView',
+        'brainLabel',
+        'modelLabel',
         'PixelSprite',
         'characterFor',
         'PetAvatar',

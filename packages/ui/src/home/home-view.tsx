@@ -6,6 +6,7 @@ import { PixelSprite } from '../office/pixel-sprite';
 import { characterFor } from '../office/sprites/characters';
 import { SETTINGS_CSS } from '../settings/settings-styles';
 import { ActivityView } from './activity-view';
+import { brainLabel, modelLabel } from './brain-label';
 import { ExpertsPanel } from './experts-panel';
 import { HOME_CSS } from './home-styles';
 
@@ -19,11 +20,18 @@ const PAGES: readonly { id: HomePage; label: (name: string) => string }[] = [
   { id: 'settings', label: () => 'Settings' },
 ];
 
+export interface HomeProvider {
+  id: string;
+  label: string;
+  needsKey?: boolean;
+}
+
 /** What Home needs from its host beyond the bridge: the companion and how it can think. */
 export interface HomeHost {
   setup(): Promise<{
     companionId: string;
-    providers: readonly { id: string; label: string }[];
+    /** `needsKey` marks a service that thinks on an API key, so the picker can say so. */
+    providers: readonly HomeProvider[];
   }>;
   listModels(providerId: string): Promise<{ models: string[]; source: 'live' | 'fallback' }>;
   savePet(pet: Pet): Promise<Pet>;
@@ -106,6 +114,7 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
             pet={companion}
             providers={setup.providers}
             host={host}
+            onOpenSettings={() => go('settings')}
             onSaved={(saved) =>
               setPets((current) => current.map((pet) => (pet.id === saved.id ? saved : pet)))
             }
@@ -124,6 +133,11 @@ function providerLabel(
   providerId: string,
 ): string {
   return setup?.providers.find((p) => p.id === providerId)?.label ?? providerId;
+}
+
+/** "Your Claude sign-in" reads "your Claude sign-in" mid-sentence. */
+function lowerYour(label: string): string {
+  return label.startsWith('Your ') ? `y${label.slice(1)}` : label;
 }
 
 function Overview({
@@ -156,10 +170,15 @@ function Overview({
           </p>
           {companion !== undefined && (
             <p>
-              Thinks with {providerLabel(setup, companion.providerId)} · {companion.model}
+              Thinks with{' '}
+              {brainLabel(
+                lowerYour(providerLabel(setup, companion.providerId)),
+                companion.providerId,
+                companion.model,
+              )}
             </p>
           )}
-          <p>Looks at your screen only when you press the key.</p>
+          <p>Looks at your screen when you ask it something. Never at its blind spots.</p>
           <button type="button" className="tg-btn-quiet" onClick={() => onGo('scout')}>
             Change how {name} thinks
           </button>
@@ -216,11 +235,13 @@ function ScoutPanel({
   providers,
   host,
   onSaved,
+  onOpenSettings,
 }: {
   pet: Pet;
-  providers: readonly { id: string; label: string }[];
+  providers: readonly HomeProvider[];
   host: HomeHost;
   onSaved: (pet: Pet) => void;
+  onOpenSettings: () => void;
 }) {
   const [providerId, setProviderId] = useState(pet.providerId);
   const [model, setModel] = useState(pet.model);
@@ -229,12 +250,23 @@ function ScoutPanel({
 
   useEffect(() => {
     let current = true;
-    void host.listModels(providerId).then((list) => {
-      if (!current) return;
-      setModels(list.models);
-      // A provider change starts on that provider's first model, unless the pet's fits.
-      setModel((chosen) => (list.models.includes(chosen) ? chosen : (list.models[0] ?? chosen)));
-    });
+    host
+      .listModels(providerId)
+      .then((list) => {
+        if (!current) return;
+        setModels(list.models);
+        // A provider change starts on that provider's first model, unless the pet's fits.
+        setModel((chosen) => (list.models.includes(chosen) ? chosen : (list.models[0] ?? chosen)));
+      })
+      .catch((error: unknown) => {
+        if (!current) return;
+        // The picker keeps the model it has rather than going blank.
+        setModels([]);
+        setStatus({
+          text: `The model list could not be read: ${error instanceof Error ? error.message : String(error)}`,
+          error: true,
+        });
+      });
     return () => {
       current = false;
     };
@@ -255,7 +287,10 @@ function ScoutPanel({
         error: false,
       });
     } catch (error) {
-      setStatus({ text: error instanceof Error ? error.message : String(error), error: true });
+      setStatus({
+        text: `Not saved. ${error instanceof Error ? error.message : String(error)}`,
+        error: true,
+      });
     }
   };
 
@@ -263,15 +298,17 @@ function ScoutPanel({
     <section className="tg-panel home-controls" aria-label={`How ${pet.name} thinks`}>
       <h1 className="home-title">{pet.name}</h1>
       <p className="tg-note">
-        {pet.name} is your companion: it sees what you are doing when you press the key, writes a
-        brief and hands it to the right expert. This is the model it does that with.
+        {pet.name} is your companion. When you ask, it looks at what you are doing, writes a brief
+        and hands it to the right expert. This is the brain it does that with.
       </p>
       <label>
         <span>Thinks with</span>
         <select value={providerId} onChange={(event) => setProviderId(event.target.value)}>
           {providers.map((provider) => (
             <option key={provider.id} value={provider.id}>
-              {provider.label}
+              {provider.needsKey === undefined
+                ? provider.label
+                : `${provider.label} (${provider.needsKey ? 'API key' : 'no key'})`}
             </option>
           ))}
         </select>
@@ -281,12 +318,20 @@ function ScoutPanel({
         <select value={model} onChange={(event) => setModel(event.target.value)}>
           {(models.includes(model) ? models : [model, ...models]).map((id) => (
             <option key={id} value={id}>
-              {id}
+              {providerId === 'claude-code' && id === 'haiku'
+                ? 'Haiku (quick, recommended)'
+                : modelLabel(providerId, id)}
             </option>
           ))}
         </select>
       </label>
-      <p className="tg-note">Keys for providers are in Settings.</p>
+      <p className="tg-note">
+        A service that needs a key uses the one stored in{' '}
+        <button type="button" className="home-link" onClick={onOpenSettings}>
+          Settings, under Advanced
+        </button>
+        .
+      </p>
       <div className="tg-footer home-controls__footer">
         <button type="button" className="tg-btn" onClick={() => void save()}>
           Save
@@ -296,7 +341,7 @@ function ScoutPanel({
             className={status.error ? 'tg-error' : undefined}
             role={status.error ? 'alert' : 'status'}
           >
-            {status.error ? `Not saved. ${status.text}` : status.text}
+            {status.text}
           </p>
         )}
       </div>

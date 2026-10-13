@@ -42,8 +42,8 @@ function host(saved: Pet[] = []): HomeHost {
       Promise.resolve({
         companionId: 'scout',
         providers: [
-          { id: 'claude-code', label: 'Claude Code (your sign-in, no key)' },
-          { id: 'anthropic', label: 'Anthropic' },
+          { id: 'claude-code', label: 'Your Claude sign-in', needsKey: false },
+          { id: 'anthropic', label: 'Anthropic', needsKey: true },
         ],
       }),
     listModels: (providerId) =>
@@ -89,8 +89,8 @@ describe('HomeView', () => {
   it('opens on an overview: how Scout thinks, the experts, and what happened lately', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT], experts: [CLAUDE], activity: [HANDED] }));
     const scout = await screen.findByRole('region', { name: 'Scout' });
-    await waitFor(() => expect(scout).toHaveTextContent('Claude Code (your sign-in, no key)'));
-    expect(scout).toHaveTextContent('haiku');
+    await waitFor(() => expect(scout).toHaveTextContent('Thinks with your Claude sign-in · Haiku'));
+    expect(scout).toHaveTextContent('Never at its blind spots.');
     const experts = screen.getByRole('region', { name: 'Experts' });
     await waitFor(() => expect(experts).toHaveTextContent('Claude Code'));
     expect(experts).toHaveTextContent('Ready');
@@ -130,5 +130,46 @@ describe('HomeView', () => {
       model: 'claude-sonnet-5',
     });
     expect(await screen.findByRole('status')).toHaveTextContent('Saved');
+  });
+
+  it('says which services need a key, and recommends Haiku on the Claude sign-in', async () => {
+    renderHome(createFakeHostBridge({ pets: [SCOUT] }), { page: 'scout' });
+    const provider = await screen.findByLabelText('Thinks with');
+    await waitFor(() => expect(provider).toHaveValue('claude-code'));
+    expect(
+      within(provider)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['Your Claude sign-in (no key)', 'Anthropic (API key)']);
+    const model = screen.getByLabelText('Model');
+    await waitFor(() =>
+      expect(
+        within(model)
+          .getAllByRole('option')
+          .map((o) => o.textContent),
+      ).toEqual(['Haiku (quick, recommended)', 'Sonnet']),
+    );
+  });
+
+  it('points to the stored keys in Settings', async () => {
+    const pages: HomePage[] = [];
+    renderHome(createFakeHostBridge({ pets: [SCOUT] }), {
+      page: 'scout',
+      onPage: (page) => pages.push(page),
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Settings, under Advanced' }));
+    expect(await screen.findByText('The settings form')).toBeVisible();
+    expect(pages).toEqual(['settings']);
+  });
+
+  it('keeps the Scout page usable when the model list cannot be read', async () => {
+    const failing: HomeHost = {
+      ...host(),
+      listModels: () => Promise.reject(new Error('no provider')),
+    };
+    renderHome(createFakeHostBridge({ pets: [SCOUT] }), { page: 'scout', homeHost: failing });
+    const model = await screen.findByLabelText('Model');
+    await waitFor(() => expect(model).toHaveValue('haiku'));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/model list/i);
   });
 });

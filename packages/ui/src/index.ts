@@ -42,7 +42,8 @@ export type { FakeHostBridge } from './test-support/fake-host-bridge';
 
 /** Home: the one window for the companion, its experts, activity and settings. */
 export { HomeView } from './home/home-view';
-export type { HomeHost, HomePage, HomeViewProps } from './home/home-view';
+export type { HomeHost, HomePage, HomeProvider, HomeViewProps } from './home/home-view';
+export { brainLabel, modelLabel } from './home/brain-label';
 export { PixelSprite } from './office/pixel-sprite';
 export { characterFor } from './office/sprites/characters';
 export type { PixelSpriteProps } from './office/pixel-sprite';

@@ -94,6 +94,16 @@ export const HOME_CSS = `
   background: transparent; color: ${t.color.panelText}; cursor: pointer;
   font-family: ${t.font.ui}; font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold};
 }
+.home-link {
+  padding: 0; border: 0; background: none; cursor: pointer; text-decoration: underline;
+  font: inherit; color: ${t.color.link};
+}
+.home-entry .tg-chip { flex: none; align-self: center; }
+.home-switch { display: flex; align-items: flex-start; gap: ${t.space.xl}px; margin: 0 0 ${t.space.lg}px; }
+.home-switch > span { flex: 1; display: flex; flex-direction: column; gap: ${t.space.xs}px; }
+.home-switch .tg-note { margin: 0; }
+.home-switch__label { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; }
+.home-danger { margin-left: auto; display: flex; gap: ${t.space.md}px; }
 .home-controls { border-radius: 0; }
 .home-controls * { box-sizing: border-box; }
 .home-controls .tg-pet { grid-template-columns: minmax(0, 1fr); }

@@ -10,7 +10,7 @@ const CLAUDE: Expert = {
   name: 'Claude Code',
   goodAt: 'Code in this repo',
   enabled: true,
-  connection: { type: 'claude-code', folder: 'C:\\projects\\ai_pet', canEdit: false },
+  connection: { type: 'claude-code', canEdit: false },
 };
 
 function renderPanel(bridge: FakeHostBridge) {
@@ -28,7 +28,7 @@ describe('ExpertsPanel', () => {
     expect(screen.getByRole('button', { name: 'Add expert' })).toBeInTheDocument();
   });
 
-  it('lists each expert with its folder, and whether it is on and may edit, in words', async () => {
+  it('lists each expert, and whether it is on and may edit, in words', async () => {
     renderPanel(
       createFakeHostBridge({
         experts: [CLAUDE, { ...CLAUDE, id: 'docs', name: 'Docs helper', enabled: false }],
@@ -37,7 +37,7 @@ describe('ExpertsPanel', () => {
     const list = await screen.findByRole('list', { name: 'Experts' });
     const rows = within(list).getAllByRole('button');
     expect(rows[0]).toHaveTextContent('Claude Code');
-    expect(rows[0]).toHaveTextContent('C:\\projects\\ai_pet');
+    expect(rows[0]).toHaveTextContent('Asks which project for each task');
     expect(rows[0]).toHaveTextContent('On');
     expect(rows[0]).toHaveTextContent('Reads only');
     expect(rows[1]).toHaveTextContent('Off');
@@ -52,9 +52,7 @@ describe('ExpertsPanel', () => {
     fireEvent.change(screen.getByLabelText('Good at'), {
       target: { value: 'Code changes and tests' },
     });
-    fireEvent.change(screen.getByLabelText(/Default project folder/), {
-      target: { value: 'C:\\work\\app' },
-    });
+    expect(screen.queryByLabelText(/project folder/i)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Save and test' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent('Saved. Claude Code is ready.');
@@ -64,7 +62,7 @@ describe('ExpertsPanel', () => {
         name: 'Claude Code',
         goodAt: 'Code changes and tests',
         enabled: true,
-        connection: { type: 'claude-code', folder: 'C:\\work\\app', canEdit: false },
+        connection: { type: 'claude-code', canEdit: false },
       },
     ]);
     expect(bridge.testedExperts).toEqual(['claude-code']);
@@ -72,17 +70,14 @@ describe('ExpertsPanel', () => {
 
   it('says plainly when the expert cannot be reached, but keeps it saved', async () => {
     const bridge = createFakeHostBridge({
-      testExpert: () => ({ ok: false, error: 'The folder C:\\nope does not exist.' }),
+      testExpert: () => ({ ok: false, error: '"claude" was not found on the PATH.' }),
     });
     renderPanel(bridge);
     fireEvent.click(await screen.findByRole('button', { name: 'Add expert' }));
-    fireEvent.change(screen.getByLabelText(/Default project folder/), {
-      target: { value: 'C:\\nope' },
-    });
     fireEvent.click(screen.getByRole('button', { name: 'Save and test' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Saved, but Claude Code cannot be reached: The folder C:\\nope does not exist.',
+      'Saved, but Claude Code cannot be reached: "claude" was not found on the PATH.',
     );
     expect(bridge.experts).toHaveLength(1);
   });
@@ -96,34 +91,28 @@ describe('ExpertsPanel', () => {
     expect(bridge.experts[0]?.connection).toEqual({ type: 'claude-code', canEdit: false });
   });
 
-  it('says in the list when an expert has no default project', async () => {
-    renderPanel(
-      createFakeHostBridge({
-        experts: [{ ...CLAUDE, connection: { type: 'claude-code', canEdit: false } }],
-      }),
-    );
-    const list = await screen.findByRole('list', { name: 'Experts' });
-    expect(within(list).getAllByRole('button')[0]).toHaveTextContent(
-      'Asks which project for each task',
-    );
-  });
-
-  it('fills the folder from the folder picker', async () => {
-    const bridge = createFakeHostBridge({ pickFolder: () => 'D:\\code\\site' });
+  it('drops a default folder an old expert still carries when it is saved again', async () => {
+    const bridge = createFakeHostBridge({
+      experts: [
+        { ...CLAUDE, connection: { type: 'claude-code', folder: 'C:\\old', canEdit: false } },
+      ],
+    });
     renderPanel(bridge);
-    fireEvent.click(await screen.findByRole('button', { name: 'Add expert' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Choose…' }));
-    await waitFor(() =>
-      expect(screen.getByLabelText(/Default project folder/)).toHaveValue('D:\\code\\site'),
-    );
+    fireEvent.click(await screen.findByRole('button', { name: /Claude Code/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save and test' }));
+    await screen.findByRole('status');
+    expect(bridge.experts[0]?.connection).toEqual({ type: 'claude-code', canEdit: false });
   });
 
   it('edits an expert: lets it edit files and switches it off', async () => {
     const bridge = createFakeHostBridge({ experts: [CLAUDE] });
     renderPanel(bridge);
     fireEvent.click(await screen.findByRole('button', { name: /Claude Code/ }));
-    fireEvent.click(screen.getByRole('checkbox', { name: /Let it edit files/ }));
-    fireEvent.click(screen.getByRole('checkbox', { name: /On:/ }));
+    const edit = screen.getByRole('switch', { name: 'Let it edit files by default' });
+    expect(edit).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(edit);
+    expect(edit).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(screen.getByRole('switch', { name: 'On' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save and test' }));
 
     await screen.findByRole('status');
