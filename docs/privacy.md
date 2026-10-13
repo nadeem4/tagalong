@@ -119,6 +119,9 @@ The extension's public privacy policy, for the Chrome Web Store, is
   the time of day, how long since Tagalong last opened, and the names and briefs of expert hand-offs
   that finished meanwhile. Turn it off under Settings → Privacy → **Say hello when Tagalong opens**.
   While Scout talks is on, the hello is also spoken (below).
+- The name you give Scout (Welcome, or Settings → **You**; optional) is stored locally in settings.
+  It is sent to the AI provider only as part of Scout's prompt: one line in its system prompt, and
+  in the hello's facts when Tagalong opens. Clear the box and it is gone from both.
 
 ## Scout's voice: what is spoken, and where it goes
 

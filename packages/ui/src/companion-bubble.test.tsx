@@ -105,6 +105,20 @@ describe('CompanionBubble intro', () => {
     expect(shown).toHaveTextContent(BEAT_ONE);
   });
 
+  it('greets by name in the first beat when the person gave one', () => {
+    prefersReducedMotion(true);
+    renderBubble(createFakeHostBridge(), { greeting: true, userName: 'Nadeem' });
+    expect(screen.getByRole('status')).toHaveTextContent(
+      BEAT_ONE.replace('Hi, I’m Scout.', 'Hi Nadeem, I’m Scout.'),
+    );
+  });
+
+  it('keeps the first beat unchanged with no name', () => {
+    prefersReducedMotion(true);
+    renderBubble(createFakeHostBridge(), { greeting: true, userName: '' });
+    expect(screen.getByRole('status')).toHaveTextContent(BEAT_ONE);
+  });
+
   it('shows each beat whole, with no typing, when motion is reduced', () => {
     prefersReducedMotion(true);
     renderBubble(createFakeHostBridge(), { greeting: true });

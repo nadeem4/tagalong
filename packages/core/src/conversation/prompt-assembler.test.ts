@@ -102,6 +102,23 @@ describe('assemblePrompt system prompt', () => {
     }
   });
 
+  it('tells the pet the person’s name, to use rarely, only when one is set', () => {
+    const named = assemblePrompt({
+      pet,
+      history: [userMessage('hi')],
+      settings: { ...settings, userName: 'Nadeem' },
+    }).system;
+    expect(named).toContain(
+      'The person’s name is Nadeem. Use it rarely: a greeting or a moment that warrants it, never every reply.',
+    );
+    expect(named.indexOf('The person’s name is')).toBeGreaterThan(
+      named.indexOf('Your name is Scout.'),
+    );
+
+    const unnamed = assemblePrompt({ pet, history: [userMessage('hi')], settings }).system;
+    expect(unnamed).not.toContain('The person’s name');
+  });
+
   it("falls back to the generalist's instructions for a role the library does not have", () => {
     const { system } = assemblePrompt({
       pet: { ...pet, roleId: 'astronaut' },

@@ -940,6 +940,17 @@ the next start is a fresh install. Rename it back at the end to keep your histor
 1. **Action:** Settings → Privacy → **Say hello when Tagalong opens** → Off, Save. Restart.
 2. **Expected:** Scout docks and says nothing. The ⓘ note says the hello reads no screen.
 
+### G.4. Scout knows your name
+
+1. **Action:** on a fresh install, type `Nadeem` in Welcome's **What should I call you?** and
+   **Start**.
+2. **Expected:** the intro's first beat reads "Hi Nadeem, I'm Scout. …". Restart with the brain
+   signed out: the handwritten line reads like "Morning, Nadeem. I'm here when you need me."
+   Answers rarely use the name.
+3. **Action:** Settings → **You** → clear the box, Save. Restart.
+4. **Expected:** the line has no name. Skipping the field in Welcome gives "Hi, I'm Scout." as
+   before.
+
 ## Keeping an eye on things
 
 On by default. Not active under `TAGALONG_FAKE_PROVIDERS=1` unless `TAGALONG_KEEP_AN_EYE=1` is set.

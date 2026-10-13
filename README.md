@@ -167,8 +167,10 @@ waits until you are done with it, then arrives on your screen.
 3. **How I think.** If Claude Code is installed, Scout thinks through your Claude Code sign-in and
    needs no key. Otherwise pick OpenRouter, Nebius Token Factory or Anthropic and paste a key; it goes
    straight into the operating system's keychain.
-4. **One key to remember.** Ctrl+Shift+Space asks Scout about whatever is on your screen.
-5. **Start.** Scout docks on your screen and introduces itself in its bubble in three short beats
+4. **What should I call you?** Optional: type your first name, or skip it. Scout uses it rarely,
+   in a hello or a moment that warrants it. Change or clear it under **Settings → You**.
+5. **One key to remember.** Ctrl+Shift+Space asks Scout about whatever is on your screen.
+6. **Start.** Scout docks on your screen and introduces itself in its bubble in three short beats
    (**Next** between them): where it lives, how it hands real work to an expert, and the key to
    press. **Try it now** has Scout look at your screen and say what it could hand to an expert;
    **Got it** sends it back to the dock. If Claude Code is installed it becomes Scout's first
@@ -250,10 +252,11 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   Code starts, which costs nothing. There is no default project folder: each task picks its
   project, and you confirm before anything is sent.
 - **Activity**: every answer and every hand-off, newest first. Click one to read it.
-- **Settings**, in six sections. Press ⓘ beside a setting for the longer story.
+- **Settings**, in seven sections. Press ⓘ beside a setting for the longer story.
   - **How Scout thinks**: Scout's real brain, and whether your Claude Code sign-in works (checked
     locally with `claude auth status`). Without Claude Code you pick a service and paste its key,
     and saving moves Scout to it.
+  - **You**: what Scout calls you. Empty means no name.
   - **Privacy**: the hello when Tagalong opens, keeping an eye on things, screen memory, and what
     Scout never looks at.
   - **Voice**: **Scout talks** (on by default), the voice (George or Fable) with **▶ Preview**, and

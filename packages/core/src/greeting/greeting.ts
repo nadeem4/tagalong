@@ -5,7 +5,7 @@ import type { BrainProvider } from '../providers';
  * The one line a pet says when the app opens, after the first time.
  *
  * It reads no screen: only the time of day, how long since the app last opened, and the
- * hand-offs that finished since then. One short call to the summaries model writes it; a
+ * hand-offs that finished since then, and the person's name when they gave one. One short call to the summaries model writes it; a
  * handwritten line stands in when that fails, is slow, or comes back unusable, so the
  * greeting never waits on a provider that is not set up yet.
  */
@@ -22,6 +22,8 @@ export interface GreetingContext {
   /** Null when no earlier launch was recorded. */
   lastOpenedAt: Date | null;
   handoffs: readonly FinishedHandoff[];
+  /** What the person asked to be called; empty or absent for no name. */
+  userName?: string;
 }
 
 /** A greeting is a nicety: if the brain has not answered in eight seconds, say the fallback. */
@@ -37,6 +39,7 @@ const GREETING_INSTRUCTIONS = [
   'You are a small desktop companion. The app has just opened; write the one line you say.',
   'One sentence, under 20 words. Warm and plain. No emoji, no markdown, no quotation marks.',
   'If a hand-off finished, mention it by the expert’s name. Otherwise greet for the time of day and how long they were away.',
+  'If the person’s name is given, you may greet them by it.',
   'Use only the facts given. Never invent facts: no tasks, files, results or plans that are not listed.',
 ].join('\n');
 
@@ -60,12 +63,14 @@ function daysAway(context: GreetingContext): number {
 export function fallbackGreeting(context: GreetingContext): string {
   const days = daysAway(context);
   const part = dayPart(context.now);
+  const name = context.userName?.trim() ?? '';
+  const named = name.length > 0 ? `, ${name}` : '';
   const opening =
     days >= 1
-      ? `Back after ${days === 1 ? 'a day' : `${days} days`}.`
+      ? `Back after ${days === 1 ? 'a day' : `${days} days`}${named}.`
       : part === 'late night'
-        ? 'Working late?'
-        : `${part[0]!.toUpperCase()}${part.slice(1)}.`;
+        ? `Working late${named}?`
+        : `${part[0]!.toUpperCase()}${part.slice(1)}${named}.`;
   const [first, ...rest] = context.handoffs;
   if (first === undefined) {
     return `${opening} ${days >= 1 ? 'Nothing waiting for you.' : 'I’m here when you need me.'}`;
@@ -90,7 +95,9 @@ function facts(context: GreetingContext): string {
       : context.handoffs.map(
           (handoff) => `${handoff.expertName} finished: "${handoff.text.slice(0, BRIEF_CHARS)}"`,
         );
+  const name = context.userName?.trim() ?? '';
   return [
+    ...(name.length > 0 ? [`The person’s name: ${name}.`] : []),
     `Time of day: ${dayPart(context.now)} (${time}).`,
     `Time since the app last opened: ${away}.`,
     'Hand-offs finished since then:',

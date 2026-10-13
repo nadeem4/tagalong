@@ -3,6 +3,7 @@ import { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './methods';
 import {
   MAX_ROLLING_MEMORY_MINUTES,
   MAX_SCREENSHOT_RETENTION_HOURS,
+  MAX_USER_NAME_CHARS,
   SETTINGS_DEFAULTS,
   Settings,
   SettingsPatch,
@@ -441,5 +442,24 @@ describe('Settings.hotkeys.stopVoice', () => {
 
   it('is optional in a patch, like the pause key', () => {
     expect(SettingsPatch.parse({ hotkeys: { ask: 'A' } })).toEqual({ hotkeys: { ask: 'A' } });
+  });
+});
+
+describe('Settings.userName', () => {
+  it('is empty by default, and a settings file from before it still parses', () => {
+    expect(Settings.parse({}).userName).toBe('');
+    expect(Settings.parse({ welcome: { done: true } }).userName).toBe('');
+  });
+
+  it('is trimmed, rides in a patch alone, and can be cleared', () => {
+    expect(SettingsPatch.parse({ userName: '  Nadeem ' })).toEqual({ userName: 'Nadeem' });
+    expect(SettingsPatch.parse({ userName: '' })).toEqual({ userName: '' });
+  });
+
+  it(`is at most ${MAX_USER_NAME_CHARS} characters`, () => {
+    expect(Settings.safeParse({ userName: 'a'.repeat(MAX_USER_NAME_CHARS) }).success).toBe(true);
+    expect(Settings.safeParse({ userName: 'a'.repeat(MAX_USER_NAME_CHARS + 1) }).success).toBe(
+      false,
+    );
   });
 });
