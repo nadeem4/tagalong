@@ -39,8 +39,13 @@ the text of a window **sitting behind another one, or minimized to the taskbar**
 being on screen.
 
 Two limits. Applications that draw their own text — code editors, terminals, design tools — publish
-very little through that layer, so a read may come back nearly empty; the pet is told the difference
-between "this window is empty" and "I could not read inside it", and says so rather than guessing.
+very little through that layer. When a read comes back that thin and the window is on screen, the text
+is read from a picture of the window instead, with the text recognition built into Windows: on this
+computer, with nothing installed and nothing sent anywhere, and the picture handed over in memory,
+never written to disk. That read is announced like a screenshot, covers only what the window shows,
+and may misread a word, and the pet is told so. A minimized window has nothing drawn, so when its
+text layer is thin the pet is told the difference between "this window is empty" and "I could not
+read inside it", and says so rather than guessing.
 And a browser publishes only the tab you are on: the other tabs are not readable this way, and the
 pet is told to say so instead of pretending.
 

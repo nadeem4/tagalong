@@ -77,6 +77,7 @@ export function encodePowerShellCommand(script: string): string {
 /** The slice of a spawned child this wrapper touches, so a test can hand over its own. */
 export interface HelperChild {
   stdout: { on(event: 'data', listener: (chunk: unknown) => void): unknown };
+  stdin?: { write(chunk: string): unknown; end(): unknown } | null;
   on(event: string, listener: (...args: unknown[]) => void): unknown;
   kill(): unknown;
 }
@@ -103,6 +104,8 @@ export function runWindowHelper(
   spawnChild: (encoded: string) => HelperChild,
   script: string,
   timeoutMs: number,
+  /** Data for the script's stdin, such as a picture to read. Too large for an argument. */
+  input?: string,
 ): Promise<string> {
   return new Promise<string>((resolve) => {
     let child: HelperChild;
@@ -132,6 +135,15 @@ export function runWindowHelper(
       }
       finish();
     }, timeoutMs);
+
+    if (input !== undefined) {
+      try {
+        child.stdin?.write(input);
+        child.stdin?.end();
+      } catch {
+        // A helper that already died answers with nothing, below.
+      }
+    }
 
     child.stdout.on('data', (chunk) => {
       if (settled || output.length >= MAX_OUTPUT_BYTES) return;

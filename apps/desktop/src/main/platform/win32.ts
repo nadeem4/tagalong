@@ -4,6 +4,7 @@ import { buildInventory } from '@tagalong/core';
 import type { CaptureExclusions } from '@tagalong/protocol';
 import { captureActiveWindowImageWith, captureWindowImageWith } from './capture';
 import { lookAtWindowWith } from './window-shot';
+import { OCR_MAX_LONG_SIDE, recognizeText } from './ocr';
 import type { LookAtWindowAnswer } from './window-shot';
 import { captureDisplaysWith } from './displays';
 import { captureRegionWith } from './region';
@@ -135,6 +136,14 @@ export class Win32Platform implements Platform {
       {
         textLayer: this.#textLayer,
         listWindows: async () => (await this.listWindows(exclusions)).windows,
+        readPicture: async (handle) => {
+          const image = await captureWindowImageWith(
+            { desktopCapturer },
+            handle,
+            OCR_MAX_LONG_SIDE,
+          );
+          return image === null ? '' : recognizeText(runPowerShellScript, image.base64);
+        },
       },
       params,
     );

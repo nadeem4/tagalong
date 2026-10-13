@@ -86,6 +86,19 @@ describe('runWindowHelper', () => {
     await run;
   });
 
+  it('hands data to the script on stdin when there is some, and closes it', async () => {
+    // A picture to read goes this way: it is too large for the command line, and it must
+    // never be written to disk.
+    const child = new FakeChild();
+    const run = runWindowHelper(() => child, 'x', 3000, 'cG5n');
+
+    expect(child.written).toEqual(['cG5n']);
+    expect(child.ended).toBe(true);
+
+    child.finish();
+    await run;
+  });
+
   it('resolves with everything the helper printed', async () => {
     const child = new FakeChild();
     const run = runWindowHelper(() => child, 'x', 3000);

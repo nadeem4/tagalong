@@ -193,3 +193,59 @@ describe('a read that never ran', () => {
     expect(result.notes?.join(' ')).toMatch(/published no text/i);
   });
 });
+
+describe('readWindowTextWith, reading the picture when the text layer is thin', () => {
+  const TERMINAL = ['PS C:> npm test', 'Error: expected 3 to be 4'].join('\n');
+
+  it('reads the text from a picture of a window that publishes little, and says so', async () => {
+    const readPicture = vi.fn().mockResolvedValue(TERMINAL);
+    const d = { ...deps({ text: 'Terminal' }), readPicture };
+
+    const result = await readWindowTextWith(d, { windowId: 'w-1', maxChars: 8_000 });
+
+    expect(readPicture).toHaveBeenCalledWith(1);
+    expect(result.text).toBe(TERMINAL);
+    expect(result.source).toBe('ocr');
+    expect(result.notes?.join(' ')).toMatch(/picture of the window/);
+  });
+
+  it('keeps the text layer when it already has plenty', async () => {
+    const readPicture = vi.fn();
+    const d = { ...deps({ text: 'x'.repeat(2_000) }), readPicture };
+
+    const result = await readWindowTextWith(d, { windowId: 'w-1', maxChars: 8_000 });
+
+    expect(readPicture).not.toHaveBeenCalled();
+    expect(result.source).toBe('uia');
+  });
+
+  it('does not try a picture of a minimized window, which has nothing drawn', async () => {
+    const readPicture = vi.fn();
+    const d = {
+      ...deps({ text: '', windows: [entry({ state: 'minimized' })] }),
+      readPicture,
+    };
+
+    await readWindowTextWith(d, { windowId: 'w-1', maxChars: 8_000 });
+
+    expect(readPicture).not.toHaveBeenCalled();
+  });
+
+  it('keeps the thin text when the picture holds no more', async () => {
+    const d = { ...deps({ text: 'Terminal' }), readPicture: vi.fn().mockResolvedValue('') };
+
+    const result = await readWindowTextWith(d, { windowId: 'w-1', maxChars: 8_000 });
+
+    expect(result.source).toBe('uia');
+    expect(result.text).toBe('Terminal');
+  });
+
+  it('caps what it read from the picture like any other read', async () => {
+    const d = { ...deps({ text: '' }), readPicture: vi.fn().mockResolvedValue('y'.repeat(100)) };
+
+    const result = await readWindowTextWith(d, { windowId: 'w-1', maxChars: 40 });
+
+    expect(result.text).toHaveLength(40);
+    expect(result.truncated).toBe(true);
+  });
+});
