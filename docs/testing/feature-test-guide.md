@@ -413,6 +413,11 @@ voice model (about 90 MB) into `%APPDATA%\Tagalong\voice`; ElevenLabs (V.6) bill
 2. **Expected:** each preview plays in the chosen voice and speed before saving; with Scout talks off
    the answer is silent, and Preview still plays.
 
+### V.5b. Who speaks: System voice
+
+1. **Action:** on a fresh profile, in Settings → Voice pick **The system voice** under **Who speaks**, Save, then press **▶ Preview**.
+2. **Expected:** the preview plays in the system voice and no Kokoro download starts (the voice folder under `%APPDATA%\Tagalong` stays empty).
+
 ### V.6. ElevenLabs (your own key)
 
 1. **Action:** in Settings → Advanced → ElevenLabs voice, paste your key and a voice ID from your

@@ -6,7 +6,7 @@ import {
   MIN_VOICE_SPEED,
   SettingsPatch,
 } from '@tagalong/protocol';
-import type { SettingsPatch as SettingsPatchType } from '@tagalong/protocol';
+import type { SettingsPatch as SettingsPatchType, VoiceAdapterFacts } from '@tagalong/protocol';
 import type { ClaudeSignIn, ProviderChoice } from '../../shared/ipc';
 
 /**
@@ -48,6 +48,8 @@ export interface SettingsFormValues {
   elevenLabsVoiceId?: string;
   /** The microphone Talk to Scout listens on. Blank: the system default. */
   microphoneId?: string;
+  mouth?: string;
+  ears?: string;
 }
 
 /**
@@ -112,6 +114,8 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
             ...(values.microphoneId !== undefined && values.microphoneId !== ''
               ? { microphoneId: values.microphoneId }
               : {}),
+            ...(values.mouth !== undefined && values.mouth !== '' ? { mouth: values.mouth } : {}),
+            ...(values.ears !== undefined && values.ears !== '' ? { ears: values.ears } : {}),
           },
         }
       : {}),
@@ -367,4 +371,16 @@ function parseBaseUrls(boxes: SettingsFormValues['baseUrls']): Record<string, st
     overrides[box.providerId] = value;
   }
   return overrides;
+}
+
+/** An adapter's facts as one plain line under the picker. */
+export function voiceFacts(facts: VoiceAdapterFacts): string {
+  return [
+    facts.offline ? 'Works offline.' : 'Needs the internet.',
+    facts.needsKey ? 'Needs your key.' : '',
+    facts.costs ? 'Costs money.' : 'Free.',
+    facts.screenshots ? 'Sends screenshots.' : '',
+  ]
+    .filter((part) => part !== '')
+    .join(' ');
 }

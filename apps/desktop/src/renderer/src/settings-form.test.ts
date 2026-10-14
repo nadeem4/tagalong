@@ -8,6 +8,7 @@ import {
   keyCaps,
   summarizerGroups,
   summarizerValue,
+  voiceFacts,
 } from './settings-form';
 import type { SettingsFormValues } from './settings-form';
 
@@ -399,6 +400,16 @@ describe('buildSettingsPatch voice', () => {
     );
   });
 
+  it('carries the picked mouth and ears', () => {
+    expect(
+      buildSettingsPatch({ ...values, ...voice, mouth: 'system', ears: 'sherpa' }).voice,
+    ).toMatchObject({
+      mouth: 'system',
+      ears: 'sherpa',
+    });
+    expect(buildSettingsPatch({ ...values, ...voice }).voice).not.toHaveProperty('mouth');
+  });
+
   it('turns Scout quiet when the switch is off', () => {
     expect(buildSettingsPatch({ ...values, ...voice, voiceEnabled: false }).voice?.enabled).toBe(
       false,
@@ -419,5 +430,17 @@ describe('buildSettingsPatch voice', () => {
     expect(isAdvancedField('elevenLabsVoiceId')).toBe(true);
     expect(isAdvancedField('key:elevenlabs')).toBe(true);
     expect(isAdvancedField('voiceSpeed')).toBe(false);
+  });
+});
+
+describe('voiceFacts', () => {
+  it('says plainly what an adapter needs and costs', () => {
+    const facts = { id: 'x', slot: 'mouth', label: 'X', screenshots: false } as const;
+    expect(voiceFacts({ ...facts, offline: true, needsKey: false, costs: false })).toBe(
+      'Works offline. Free.',
+    );
+    expect(voiceFacts({ ...facts, offline: false, needsKey: true, costs: true })).toBe(
+      'Needs the internet. Needs your key. Costs money.',
+    );
   });
 });
