@@ -277,11 +277,11 @@ components:
     rounded: '{rounded.field}'
     padding: '0 8px'
     height: '32px'
-  welcome-start:
+  setup-primary:
     backgroundColor: '{colors.gold}'
     textColor: '{colors.gold-ink}'
     rounded: '{rounded.field}'
-    padding: '0 28px'
+    padding: '0 20px'
     height: '44px'
 ---
 
@@ -303,7 +303,7 @@ Scout's state is always a face plus a word: the eyes change per mood, a small ta
 - Navy for Scout's surfaces, off-white for reading.
 - Gold for the primary action, an on state and Scout's active marks; sky blue for focus and fields inside the bubble.
 - Pixel type for names, titles and short uppercase labels; Onest for every sentence and control.
-- Sprites as data, drawn at whole-number scales only (4 on the dock and Welcome, 3 in Home's nav, 2 in Activity).
+- Sprites as data, drawn at whole-number scales only (4 on the dock, 6 in Welcome, 3 in Home's nav, 2 in Activity).
 - Flat: tone and hairlines, no drop shadows.
 
 ## Colors
@@ -312,7 +312,7 @@ A cool ink-navy family and a cool off-white family, one warm gold, and a few sig
 
 ### Primary
 
-- **Gold** (gold): the primary button fill (`tg-btn`, `bubble-primary`, Welcome's Start), a switch that is on, a pressed day toggle, the pressed mic, the Working tag, the listening dot, the speaking bars, the current intro step, the hand-off working dot, text selection and the focus ring in Settings, Home and Welcome. Ink on gold is always **Gold Ink** (gold-ink).
+- **Gold** (gold): the primary button fill (`tg-btn`, `bubble-primary`, Welcome's Check key), a switch that is on, a pressed day toggle, the pressed mic, the Working tag, the listening dot, the speaking bars, Welcome's current step chip and its 2px suggestion outline, the hand-off working dot, text selection and the focus ring in Settings, Home and Welcome. Ink on gold is always **Gold Ink** (gold-ink).
 
 ### Secondary
 
@@ -326,10 +326,10 @@ A cool ink-navy family and a cool off-white family, one warm gold, and a few sig
 - **Sidebar Navy** (sidebar-navy): Home's nav, the full chat's header.
 - **Active Row Navy** (row-active): the current page in Home's nav (hard-coded there as `#1E2442`).
 - **Avatar Tile** (avatar-tile): the tile behind Scout in Home and Welcome, bubble chips, your own messages in the chat, inline code, hover on bubble icon buttons (mostly hard-coded as `#222845`).
-- **Field Navy / Field Line** (field-navy, field-line): fields and code blocks on navy; the bubble border, the tail edge, quiet-button borders, intro step dots.
+- **Field Navy / Field Line** (field-navy, field-line): fields and code blocks on navy; the bubble border, the tail edge, quiet-button borders.
 - **Shell Line** (shell-line): hairlines in the chat and the hand-off rows (hard-coded as `#262C4A`).
 - **Frost Text / Shell Muted / Soft Text** (shell-text, shell-muted, soft-text): text on navy, strongest to softest. Soft Text (`#C9CEE0`) is hard-coded: quiet-button labels, chips, heard speech, the brief.
-- **Paused Grey** (paused-grey, hard-coded): the dock's Paused chip and Welcome's disabled label and empty dots. **Disabled Line** (disabled-line): Welcome's disabled Start fill.
+- **Paused Grey** (paused-grey, hard-coded): the dock's Paused chip and Welcome's disabled label and the step chips still ahead. **Disabled Line** (disabled-line): Welcome's disabled Check key fill.
 - **Quote Line** (quote-line, hard-coded): answer blockquote rule; Welcome key-cap border.
 - **Navy Error** (navy-error-fill, navy-error-ink, hard-coded): error messages in the bubble and Welcome.
 - **Panel White / Card White** (panel-white, card-white): Home's page ground and its cards (white is hard-coded `#fff`).
@@ -357,11 +357,11 @@ Every window bundles its faces from `@fontsource` (Latin subset), nothing fetche
 
 ### Hierarchy
 
-- **Welcome title** (Pixelify 700, 28px, 0.5px): "Hi, I'm Scout." in Welcome.
+- **Welcome title** (Pixelify 700, 28px, 0.5px): the question of the step on screen ("What should I call you?") in Welcome.
 - **Page title** (Onest 600, 20px): each Home page's heading.
 - **Companion name** (Pixelify 700, 18px, 0.5px): Scout's name in Home's nav; the chat header uses the same face at 16px.
 - **Panel heading, pixel** (Pixelify 600, 15px, 1px, uppercase): Settings section headings.
-- **Card label** (Pixelify 400, 12px, 1px, uppercase): Home card headings ("EXPERTS", "RECENT") and Welcome's section headings.
+- **Card label** (Pixelify 400, 12px, 1px, uppercase): Home card headings ("EXPERTS", "RECENT") (Welcome has none: its option cards carry their own labels).
 - **Subhead** (Onest 600, 15px): Settings sub-headings, alert titles.
 - **Title** (Onest 600, 14px): buttons, nav items, Activity headlines, template names.
 - **Body lead** (Onest 400, 14px, 1.5): bubble text, answers, Home notes.
@@ -381,12 +381,12 @@ Every window bundles its faces from `@fontsource` (Latin subset), nothing fetche
 - **Dock:** Scout at scale 4 (64px) inside a 20px top and 4px side/bottom padding that leaves room for the tag; the avatar window's button is 96px square.
 - **Bubble:** a 420px-wide window (`PANEL_WIDTH`) that sizes its own height (80 to 520px; the full chat takes 520px). It has 10px of padding on the side the tail points to.
 - **Home:** a 1440x800 window (min 880x600). A fixed 232px nav (20px by 12px padding) and a fluid main column (24px by 32px padding, 20px between blocks). Overview cards sit in an auto-fit grid (min 260px, 16px gap); routine templates in an auto-fill grid (min 220px, 8px gap). Embedded Settings sits in the main column, max 820px.
-- **Welcome:** a 640x700 window, one column, 28px by 36px padding, 20px between sections, the Start button pinned to the bottom.
+- **Welcome:** a 900x620 window in two columns. A header of step chips (18px by 32px padding, 8px apart), then a 300px left column for Scout and its words and a right column for the question, 40px apart, 40px by 48px padding. The answer pill is pinned to the bottom of the right column.
 - **Standalone Settings:** 1080x760, opened only when Tagalong starts without its engine; a 64px bar over a 280px nav (`size.headerHeight`, `size.partyWidth`).
 
-Spacing runs on the token scale (2, 3, 4, 6, 8, 12, 16, 20, 24). The bubble and cards also use 14px, 28px and 32px, hard-coded. Controls are 40px tall in Home and Settings, 36px for the bubble's primary button, 44px for the bubble field and Welcome's Start, 28px for quiet bubble controls.
+Spacing runs on the token scale (2, 3, 4, 6, 8, 12, 16, 20, 24). The bubble and cards also use 14px, 28px and 32px, hard-coded. Controls are 40px tall in Home and Settings, 36px for the bubble's primary button, 44px for the bubble field and Welcome's key field and Check key, 46px for Welcome's answer pill, 28px for quiet bubble controls.
 
-**The Integer Scale Rule.** A sprite is drawn at a whole-number scale and nothing else: 4 on the dock and in Welcome, 3 in Home's nav, 2 (`spriteScale.tile`) in Activity.
+**The Integer Scale Rule.** A sprite is drawn at a whole-number scale and nothing else: 4 on the dock, 6 in Welcome, 3 in Home's nav, 2 (`spriteScale.tile`) in Activity.
 
 ## Elevation & Depth
 
@@ -438,21 +438,21 @@ Scoped under `.tg-settings`. **Primary** (`tg-btn`): Gold, 40px, 8px, Onest 600 
 
 ### Welcome
 
-Ink Navy, one column. Scout at scale 4 on an 84px Avatar Tile tile beside the Welcome title and a Soft Text paragraph. Each section has a pixel card label over a Field Navy list (1px Field Line, 8px radius, 52px rows). Found agents show a 10px dot, filled Done Green when found. Link buttons are 32px with Sky text; key caps are Avatar Tile with a 3px bottom border. Start is Gold, 44px, 28px padding, 15px 600; disabled it turns Disabled Line with Paused Grey text.
+Setup, Scout's own voice on Ink Navy, 900x620, with no Next button: Scout asks and moves on by itself. **Header:** a row of step chips (30px pills, Onest 600 13px). A step you answered is a button in Done Green on Avatar Tile with a Field Line border and reads your answer ("You: Alex"); the step you are on has a 1px Gold outline and Gold text; steps ahead are Paused Grey with no border. **Left column:** the echo of your last answer above, a small Avatar Tile pill in Done Green (10px radius); below it Scout's speech bubble in Panel White (14px radius, with the 4px bottom-left corner as the tail), Ink Navy text, Onest 16px; then Scout at scale 6. **Right column:** the Welcome title, then option cards in a stack, 10px apart: Field Navy, 1px Field Line, 12px radius, 16px padding, label Onest 600 15px with a Soft Text note under it. The suggestion has a 2px Gold border and a Done Green note; a pressed service has a Soft Text border. The key caps for the ask key are Avatar Tile with a 3px bottom border. A pasted key has a 44px Field Navy field and a Gold Check key button (`setup-primary`). **Answer pill:** 46px, full-round, Field Navy with a 1px Field Line border, the Gold ring round the whole pill when it has focus, with a 12px Soft Text hint beneath ("Answer by typing or a tap and I move on…"). Problems with the window show in Navy Error; a key problem is said only in Scout's bubble.
 
 ## Motion
 
 - **Dock:** idle and listening breathe (2.8s ease-in-out, 1px up, endless); working bobs (0.9s, 2px); done hops three times (0.7s ease-out, 8px). Blinks last 140ms, every 3 to 6 seconds, only with open eyes (idle, listening).
-- **Bubble:** the intro and launch line enter over 220ms (fade and 4px rise, ease-out); the launch line leaves over 300ms (fade and 4px drop). Intro text types at 22ms a character. The listening dot pulses (1.2s, to 35% opacity); speaking bars follow the voice level with a 90ms linear transition.
+- **Bubble:** the invitation and launch line enter over 220ms (fade and 4px rise, ease-out); the launch line leaves over 300ms (fade and 4px drop). The invitation types at 22ms a character. The listening dot pulses (1.2s, to 35% opacity); speaking bars follow the voice level with a 90ms linear transition.
 
-Under `prefers-reduced-motion: reduce`: the dock body stops and Scout does not blink, the bubble appears and leaves without moving, the dot stops pulsing, the bars hold at 60%, and intro beats appear whole.
+Under `prefers-reduced-motion: reduce`: the dock body stops and Scout does not blink, the bubble appears and leaves without moving, the dot stops pulsing, the bars hold at 60%, and the invitation appears whole.
 
 ## Accessibility
 
 - **Reduced motion** is honoured everywhere above.
 - **Status is never colour alone:** dock tags are words, the Paused chip says Paused, the recording dot has a title and is in Scout's label, Activity states are an icon plus a word, chips carry words, the Overview dot sits beside "Ready".
 - **Focus rings:** 2px at 2px offset, Gold in Settings (`.tg-settings :focus-visible`), Home (`.home :focus-visible`) and Welcome (`.welcome :focus-visible`), and Sky in the bubble.
-- **The sprite:** `PixelSprite` is `aria-hidden`; on the dock the wrapper is `role="img"` with Scout's name and state. Intro beats are announced whole through a hidden status line while the visible text types. The chat log is `role="log"`; errors are `role="alert"`; expert steps are `aria-live="polite"`.
+- **The sprite:** `PixelSprite` is `aria-hidden`; on the dock the wrapper is `role="img"` with Scout's name and state. The invitation is announced whole through a hidden status line while the visible text types; in Welcome, Scout's bubble is the `role="status"` line. The chat log is `role="log"`; errors are `role="alert"`; expert steps are `aria-live="polite"`.
 
 ## Do's and Don'ts
 

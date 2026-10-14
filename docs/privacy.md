@@ -139,7 +139,11 @@ The extension's public privacy policy, for the Chrome Web Store, is
   app version it ran, so Scout can say it crashed or was updated. The markers themselves
   stay in that file on this computer; only the facts listed above reach the brain you chose, inside
   the prompt that writes the line.
-- The name you give Scout (Welcome, or Settings → **You**; optional) is stored locally in settings.
+- Setup stores each answer in local settings as it is given: the step reached, how you answer, your
+  name or that you declined it (`userNameDeclined`), how Scout thinks and whether it talks. A pasted
+  key goes to the OS keychain and is tested once with one tiny request to that service; it is never
+  spoken, shown or logged. Checking your Claude sign-in only reads the local sign-in and sends nothing.
+- The name you give Scout (setup, or Settings → **You**; optional) is stored locally in settings.
   It is sent to the AI provider only as part of Scout's prompt: one line in its system prompt, and
   in the hello's facts when Tagalong opens. Clear the box and it is gone from both.
 

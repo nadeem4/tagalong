@@ -163,20 +163,25 @@ app's own client is `apps/desktop/src/main/engine-client.ts`. Read
 
 ## First run: Welcome
 
-The first time Tagalong starts, one Welcome window opens on the screen you are using. Scout
-waits until you are done with it, then arrives on your screen.
+The first time Tagalong starts, one **Set up Tagalong** window opens on the screen you are using.
+Scout runs it: it asks each question in its bubble and aloud, and moves on by itself as soon as you
+answer by typing in the answer box or tapping a card. There is no Next button. The steps along the
+top show what you answered; tap one to change it. If you close the window part-way, the next launch
+picks up at the same step, and Scout arrives on your screen either way.
 
-1. **Hi, I'm Scout.** What Tagalong does: Scout sits on your screen, sees what you are working on,
-   hands the work to the right agent and tells you what came back.
-2. **Found on this computer.** The coding agents Tagalong found (Claude Code, Gemini CLI, Codex), with
-   a **How to add** link for the missing ones.
-3. **How I think.** If Claude Code is installed, Scout thinks through your Claude Code sign-in and
-   needs no key. Otherwise pick OpenRouter, Nebius Token Factory or Anthropic and paste a key; it goes
-   straight into the operating system's keychain.
-4. **What should I call you?** Optional: type your first name, or skip it. Scout uses it rarely,
-   in a hello or a moment that warrants it. Change or clear it under **Settings → You**.
-5. **One key to remember.** Ctrl+Shift+Space asks Scout about whatever is on your screen.
-6. **Start.** Scout docks on your screen and invites one real question about your
+1. **What should I call you?** Scout says why it asks. Type your first name, or tap **Rather not**
+   and it never asks again. Scout uses it rarely, in a hello or a moment that warrants it. Change or
+   clear it under **Settings → You**.
+2. **How should I think?** Scout checks your real Claude sign-in. If Claude Code is installed and
+   signed in, it suggests that and needs no key. Signed out, **Sign in to Claude** opens a terminal
+   and Scout moves on once you are in. Not installed, install Claude Code or use **An API key**:
+   pick OpenRouter, Nebius Token Factory or Anthropic and paste a key. It goes into the operating
+   system's keychain and is tested once with one tiny request; if the service turns it down, Scout
+   says so and you stay on the step.
+3. **Should I talk?** Scout speaks a sample line so you hear how it sounds; choose **Yes, talk** or
+   **Text only**.
+4. **One key to remember.** Ctrl+Shift+Space asks Scout about whatever is on your screen.
+5. **Try it.** Scout docks on your screen and invites one real question about your
    screen in a single line in its bubble, with the key to press. **Try it now** has Scout look at your screen and say what it could hand to an expert;
    **Got it** sends it back to the dock. If Claude Code is installed it becomes Scout's first
    expert, so hand-offs work straight away.

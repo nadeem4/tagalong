@@ -51,39 +51,82 @@ time), or quit Tagalong and rename `%APPDATA%\Tagalong` (rename it back afterwar
 
 ## First run: Welcome
 
-### W.1. Welcome opens on a fresh install
+Setup is typed or tapped in this build. Scout asks each question in its bubble and moves on by
+itself once it is answered; there is no Next button. Anything Scout asks can be answered by typing
+in the answer box and pressing Enter, or by tapping a card.
+
+### W.1. Setup opens alone, at the name
 
 1. **Setup:** a fresh profile.
 2. **Action:** start Tagalong.
-3. **Expected:** one window opens with Scout's pixel figure and **Hi, I'm Scout.**, then four parts:
-   **Found on this computer** (Claude Code, Gemini CLI and Codex, each Ready, "Found. Hand-offs to it
-   come soon." or Not installed with **How to add**), **How I think**, **What should I call you?**
-   (optional) and **One key to remember** (`Ctrl Shift Space`). Scout itself is not on screen yet.
+3. **Expected:** one window, **Set up Tagalong**, opens with the steps along the top (**Name**,
+   **How I think**, **Voice**, **Keys**, **Try it**), Scout at the left saying "Hi, I'm Scout. What
+   should I call you?" and the title **What should I call you?** with **Rather not** and an answer
+   box. Scout itself is not on the desktop yet.
 
-### W.2. How I think
+### W.2. The name, "Rather not" and the echo
 
-1. **Setup:** W.1, Claude Code installed and signed in.
-2. **Action:** read the choices under **How I think**.
-3. **Expected:** **Claude Code sign-in** first, picked, "No key needed"; then one row per keyed
-   service (OpenRouter, Token Factory, Anthropic), each "Paste a key below" or "Key stored".
-4. **Action:** pick OpenRouter. **Expected:** a key box appears and **Start** stays disabled until
-   something is typed in it.
-5. **Without Claude Code** (not on PATH): the sign-in row is missing and a keyed service is picked.
+1. **Action:** type `Alex` and press Enter.
+2. **Expected:** Scout echoes "Got it, I'll call you Alex.", the step becomes **How should I think?**
+   and the first chip reads **You: Alex**.
+3. **Action:** tap that chip, then **Rather not**.
+4. **Expected:** setup returns to **How should I think?** and the chip reads **No name**. Scout never
+   asks for the name again, not even after closing and relaunching. Typing `my name is 7`, or a
+   sentence, is not taken as a name: Scout asks again.
 
-### W.3. Start, the intro and the first expert
+### W.3. How Scout thinks
 
-1. **Setup:** W.1, Claude Code sign-in picked, `Nadeem` typed in **What should I call you?**.
-2. **Action:** press **Start**.
-3. **Expected:** Welcome closes, Scout docks on the desktop and its intro opens (see G.1), greeting
-   you by name. In Home → Experts, Claude Code is listed (Welcome adds it when it is installed). Home
-   → Scout shows **Claude Code** and **Haiku (quick, recommended)**.
-4. **Action:** quit and start Tagalong again. **Expected:** Welcome does not open; one launch line
+1. **Signed in:** with Claude Code installed and signed in, **Claude, with your sign-in** is
+   suggested (gold outline). Say or type `claude`, or tap it: setup moves to **Should I talk?**
+   and the chip reads **Claude**. Typing `banana` gets "I didn't catch that" and stays.
+2. **Signed out:** run `claude auth logout` first. **Sign in to Claude** is suggested; tapping it
+   opens a terminal. Run `claude auth login`: within a few seconds Scout moves on by itself to
+   suggesting Claude.
+3. **Not installed:** with `claude` off the PATH, Scout says it did not find Claude Code and
+   offers **Install Claude Code** (opens its page), **I installed it, check again** and **An API
+   key**.
+4. **An API key:** tap it, then **OpenRouter**. A box **Your OpenRouter key** appears. Paste a
+   working key and press **Check key**: the key is tested once, and setup moves to **Should I talk?**
+   with the chip **OpenRouter**. **Back** returns to the other ways to think.
+5. **A failing key:** paste a wrong key. Scout says "OpenRouter turned that key down…" in its bubble
+   and setup stays on the step. Nothing red appears for that. Pasting a key never speaks it or shows
+   it in a line.
+
+### W.4. Voice
+
+1. **Action:** reach **Should I talk?**
+2. **Expected:** Scout speaks the line, so you hear how it sounds, even before you choose.
+3. **Action:** tap **Yes, talk** or **Text only** (or type `yes`, `text only`). **Expected:** the
+   step moves to **One key to remember**; the chip reads **Talks** or **Text only**. `don't talk`
+   is not an answer: Scout asks again.
+
+### W.5. Keys and finish
+
+1. **Action:** read **One key to remember**, then say or type `got it`, or tap **Got it**.
+2. **Expected:** the setup window closes, Scout docks on the desktop, and its invitation opens (see
+   G.1). In Home → Experts, Claude Code is listed when it is installed. Home → Scout shows the
+   brain you chose.
+3. **Action:** quit and start Tagalong again. **Expected:** setup does not open; one launch line
    appears instead (G.2).
 
-### W.4. Welcome again
+### W.6. Closing mid-setup resumes
+
+1. **Action:** answer the name, then close the setup window with ×.
+2. **Expected:** Scout appears on the desktop anyway.
+3. **Action:** quit and start Tagalong. **Expected:** setup opens at **How should I think?**, with
+   **You: Alex** still on its chip.
+
+### W.7. The chips go back
+
+1. **Action:** from any later step, tap a done chip.
+2. **Expected:** setup shows that step again. Answering it returns to the step you had reached, not
+   to the one after it. A chip ahead of you does not open.
+
+### W.8. Welcome again
 
 1. **Action:** Home → Settings → Advanced → **Open Welcome again**.
-2. **Expected:** Welcome opens again; **Start** finishes it as in W.3.
+2. **Expected:** setup opens again at the top; it finishes as in W.5, and does not reopen on the
+   next launch.
 
 ## Scout's brain
 
@@ -271,7 +314,8 @@ change".
 3. **Expected:** Scout's bubble opens beside it without taking the keyboard and types in one line:
    "Here I am. Ask me one real thing about your screen. Press Ctrl+Shift+Space anytime." (with
    your name after "Here I am," when you gave one), with **Try it now** (focused) and **Got it**.
-   There is no **Next**. Tab reaches both buttons.
+   There is no **Next**. Tab reaches both buttons. This invitation is not a launch line: the next
+   launch with **Always listening** on says the listening line (G.2), not this one.
 4. **Reduced motion:** with Windows Settings → Accessibility → Visual effects → **Animation effects**
    off, the line appears whole, with no typing.
 
