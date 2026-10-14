@@ -41,7 +41,6 @@ const HOST_TO_CORE = [
   'experts.upsert',
   'experts.delete',
   'experts.test',
-  'handoffs.start',
   'handoffs.cancel',
   'handoffs.confirm',
   'handoffs.dismiss',

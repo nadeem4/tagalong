@@ -63,6 +63,9 @@ const WEB_TOOLS = ['WebSearch', 'WebFetch'];
  */
 const SECRET_FILE_RULES = SECRET_FILES.flatMap((file) => [`Read(**/${file})`, `Edit(**/${file})`]);
 
+/** `--settings` sits above user settings, so no hook from any settings file runs. */
+const SEALED_SETTINGS = JSON.stringify({ disableAllHooks: true });
+
 /**
  * Claude Code as an expert: runs `claude -p` headless in the expert's folder, feeds it the
  * brief on stdin (no command-line length limit, no quoting), and reads its stream-json.
@@ -113,6 +116,7 @@ export class ClaudeCodeConnector implements Connector {
       : this.options.folder;
     if (folder === undefined) return { ok: false, error: 'No project folder was chosen.' };
     const canEdit = !research && this.options.canEdit === true;
+    const tools = [...(research ? WEB_TOOLS : READ_TOOLS), ...(canEdit ? EDIT_TOOLS : [])];
     const args = [
       '-p',
       '--output-format',
@@ -120,10 +124,21 @@ export class ClaudeCodeConnector implements Connector {
       '--verbose',
       '--permission-mode',
       canEdit ? 'acceptEdits' : 'dontAsk',
+      // Sealed: only these built-in tools exist in the run; no MCP servers (strict, and no
+      // --mcp-config); no project or local settings, so a folder's .claude/settings.json
+      // cannot add permissions or hooks; and no hooks at all, user ones included. Reusing the
+      // person's own MCP servers is for the Expert catalog feature, not this connector.
+      '--tools',
+      tools.join(','),
+      '--strict-mcp-config',
+      '--setting-sources',
+      'user',
+      '--settings',
+      SEALED_SETTINGS,
       '--allowedTools',
-      ...(research ? WEB_TOOLS : READ_TOOLS),
-      ...(canEdit ? EDIT_TOOLS : []),
+      ...tools,
       '--disallowedTools',
+      'mcp__*',
       ...SECRET_FILE_RULES,
     ];
 

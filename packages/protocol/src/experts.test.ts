@@ -5,7 +5,6 @@ import {
   HandoffFinishedParams,
   HandoffProposedParams,
   HandoffsConfirmParams,
-  HandoffsStartParams,
   ProjectsSearchResult,
 } from './experts';
 
@@ -53,12 +52,6 @@ describe('Brief', () => {
 });
 
 describe('hand-off wire', () => {
-  it('starts with an expert, the companion, and a brief', () => {
-    expect(
-      HandoffsStartParams.parse({ expertId: 'claude-code', petId: 'scout', brief: { ask: 'x' } }),
-    ).toEqual({ expertId: 'claude-code', petId: 'scout', brief: { ask: 'x' } });
-  });
-
   it('finishes done with text and changed files, or with an error', () => {
     const id = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
     expect(
@@ -84,18 +77,6 @@ describe('hand-off wire', () => {
 describe('proposals', () => {
   const proposalId = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
   const project = { name: 'ai_pet', path: 'C:\\projects\\ai_pet', reason: 'screen' as const };
-
-  it('starts a hand-off in a chosen project, read-only or allowed to edit', () => {
-    expect(
-      HandoffsStartParams.parse({
-        expertId: 'claude-code',
-        petId: 'scout',
-        brief: { ask: 'x' },
-        folder: 'C:\\projects\\ai_pet',
-        canEdit: true,
-      }),
-    ).toMatchObject({ folder: 'C:\\projects\\ai_pet', canEdit: true });
-  });
 
   it('proposes a brief with the best project guess and the others', () => {
     const proposed = HandoffProposedParams.parse({

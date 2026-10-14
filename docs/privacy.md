@@ -89,6 +89,10 @@ The extension's public privacy policy, for the Chrome Web Store, is
   marker such as `[hidden: API key]`, so the pet knows something was there without seeing it.
 - **Secret files, by your experts.** Claude Code reads files for itself, so it is started with deny
   rules for every secret file name above (`Read(**/.env)`, `Edit(**/.env)` and so on).
+- **Experts run sealed.** An expert run of Claude Code gets only the tools its mode allows (read and
+  search; plus edit when you allowed edits; web search and fetch for a routine's research), none of
+  your MCP servers, none of the project folder's `.claude` settings (so a project cannot grant
+  itself permissions or run hooks), and no hooks from your own settings either.
 - **A monitor with an excluded window on it.** If a password manager is open and visible on your
   second screen, that whole screen is blanked in the full-view capture — not just when it is the
   window you are working in. The blanked screen is replaced with a flat panel reading BLOCKED, so
@@ -158,9 +162,12 @@ every weekday at 8. Nothing becomes a routine until you press **Save**, on Scout
   A tool that changes something still shows **Allow once** every time, and does nothing if you are
   not there to press it.
 - **Experts.** A routine hands work to an expert without asking only when its card said so ("May
-  hand to: Researcher, read-only, no project"). That expert then runs in an empty folder of its own,
-  with web search and web fetch only: it cannot read your projects or edit any file. Any other
-  hand-off shows the usual card and waits for Send.
+  hand to: Researcher, read-only, no project"). Exactly one such hand-off per run: that expert then
+  runs in an empty folder of its own, with web search and web fetch only, so it cannot read your
+  projects or edit any file, but it can search the web and open web pages. Its brief is only the
+  routine's saved instruction plus Scout's request for this run, never what is on your screen, a
+  selection or file names. A second hand-off in the same run, or to any other expert, shows the
+  usual card and waits for Send.
 - **What a run sees.** The routine's own words and topics, and, for a trigger, what triggered it: the
   first 600 characters of an expert's answer, or a watch's message. A routine that waits for an app
   or site reads window titles only, every 15 seconds, never a picture or window text, and never a

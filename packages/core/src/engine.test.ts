@@ -1123,7 +1123,7 @@ describe('experts and hand-offs', () => {
     });
   });
 
-  it('tests an expert and runs a hand-off on the fake connector, logging it', async () => {
+  it('tests an expert without spending anything', async () => {
     const e = await boot();
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
@@ -1132,39 +1132,21 @@ describe('experts and hand-offs', () => {
     expect((await host.call('experts.test', { expertId: 'claude-code' }))['result']).toEqual({
       ok: true,
     });
-
-    const started = await host.call('handoffs.start', {
-      expertId: 'claude-code',
-      petId: 'scout',
-      brief: { ask: 'Explain engine.ts' },
-      folder: process.cwd(),
-    });
-    const { handoffId } = started['result'] as { handoffId: string };
-    await vi.waitFor(() => expect(host.methods()).toContain('handoff.finished'));
-    expect(host.notifications.find((n) => n.method === 'handoff.finished')?.params).toMatchObject({
-      handoffId,
-      state: 'done',
-    });
-
-    const res = await host.call('activity.list', {});
-    expect((res['result'] as { entries: unknown[] }).entries[0]).toMatchObject({
-      id: handoffId,
-      kind: 'expert',
-      expertName: 'Claude Code',
-      state: 'done',
-    });
   });
 
-  it('refuses a hand-off to an expert that does not exist', async () => {
+  it('has no way to start a hand-off without the card: handoffs.start is gone', async () => {
     const e = await boot();
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
+    await host.call('experts.upsert', { expert });
     const res = await host.call('handoffs.start', {
-      expertId: 'nobody',
+      expertId: 'claude-code',
       petId: 'scout',
       brief: { ask: 'x' },
+      folder: process.cwd(),
     });
-    expect(res['error']).toMatchObject({ code: RPC_ERROR_CODES.invalidParams });
+    expect(res['error']).toMatchObject({ code: RPC_ERROR_CODES.methodNotFound });
+    expect(host.methods()).not.toContain('handoff.started');
   });
 });
 

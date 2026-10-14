@@ -182,20 +182,60 @@ describe(HAND_TO_EXPERT, () => {
           routine: {
             routineId: 'r1',
             expertId: 'claude-code',
+            instruction: 'Find new papers on agents each morning.',
             handedOff: (id) => handed.push(id),
           },
+          snapshot: SNAPSHOT,
         },
       ).run({
         name: HAND_TO_EXPERT,
-        input: { expert_id: 'claude-code', task_kind: 'research', ask: 'New papers on agents' },
+        input: {
+          expert_id: 'claude-code',
+          task_kind: 'research',
+          ask: 'New papers on agents',
+          files: ['notes.txt'],
+        },
       });
       expect(outcome.isError).toBeUndefined();
       expect(outcome.content).toContain('read-only');
+      // Only the saved instruction and the model's request: no screen, no files.
       expect(d.research).toEqual([
-        { expertId: 'claude-code', petId: 'scout', brief: { ask: 'New papers on agents' } },
+        {
+          expertId: 'claude-code',
+          petId: 'scout',
+          brief: {
+            ask:
+              'The saved routine asks: Find new papers on agents each morning.\n\n' +
+              'This run: New papers on agents',
+          },
+        },
       ]);
       expect(handed).toEqual(['a3bb189e-8bf9-4888-9912-ace4e6543002']);
       expect(d.started).toEqual([]);
+    });
+
+    it('pre-approves only one hand-off per run; the next one shows the normal card', async () => {
+      const d = routineDeps();
+      const tools = fakeTurnTools(
+        { experts: d.value },
+        {
+          routine: {
+            routineId: 'r1',
+            expertId: 'claude-code',
+            instruction: 'Research.',
+            handedOff: () => undefined,
+          },
+        },
+      );
+      const call = {
+        name: HAND_TO_EXPERT,
+        input: { expert_id: 'claude-code', task_kind: 'r', ask: 'a' },
+      };
+      await tools.run(call);
+      const second = await tools.run(call);
+      expect(d.research).toHaveLength(1);
+      expect(d.started.map((s) => s.expertId)).toEqual(['claude-code']);
+      expect(second.content).toContain('in front of the user');
     });
 
     it('shows the normal card for any other expert, or when the routine allowed none', async () => {

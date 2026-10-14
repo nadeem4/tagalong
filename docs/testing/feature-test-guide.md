@@ -1265,6 +1265,12 @@ and Morning papers needs Claude Code installed and signed in.
    Notion page with today's plan") shows **Allow once** every time it runs _(real brain)_.
 3. A routine that reads a connected app (for example GitHub reviews) reads it without asking
    _(real brain)_.
+4. A routine with **May hand to: Claude Code** starts Claude Code at once only for its first
+   hand-off in a run; if Scout hands off again in the same run, the second one shows the normal
+   hand-off card _(real brain)_.
+5. In a project folder whose `.claude/settings.json` has a hook (for example a `PreToolUse` hook
+   that writes a file), confirm a hand-off to Claude Code there: the hook does not run, and none
+   of your own MCP servers show up in the expert's steps.
 
 ## Not in this build
 
