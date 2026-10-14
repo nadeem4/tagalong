@@ -13,7 +13,11 @@ export interface Choice {
 
 /** Lowercase words only: apostrophes dropped ("I'll" is "ill"), everything else a space. */
 export function normalise(text: string): string {
-  return text.toLowerCase().replace(/['’]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  return text
+    .toLowerCase()
+    .replace(/['’]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
 }
 
 export function matchChoice(text: string, choices: readonly Choice[]): string | null {
@@ -64,7 +68,10 @@ export function choicesFor(
       if (picking) {
         return providers
           .filter((provider) => provider.needsKey)
-          .map((provider) => ({ id: provider.id, says: SERVICE_WORDS[provider.id] ?? [provider.label] }));
+          .map((provider) => ({
+            id: provider.id,
+            says: SERVICE_WORDS[provider.id] ?? [provider.label],
+          }));
       }
       return signIn === 'signed-in' ? [CLAUDE, KEY] : [KEY];
     default:
@@ -72,7 +79,17 @@ export function choicesFor(
   }
 }
 
-const DECLINES = ['rather not', 'id rather not', 'no', 'no thanks', 'nope', 'skip', 'pass', 'prefer not', 'id prefer not'];
+const DECLINES = [
+  'rather not',
+  'id rather not',
+  'no',
+  'no thanks',
+  'nope',
+  'skip',
+  'pass',
+  'prefer not',
+  'id prefer not',
+];
 const LEAD_IN = /^(?:my name is|my name['’]s|call me|i['’]m|i am|it['’]s|it is)\s+/i;
 
 /**
@@ -82,10 +99,20 @@ const LEAD_IN = /^(?:my name is|my name['’]s|call me|i['’]m|i am|it['’]s|i
 export function nameFrom(text: string): { name: string } | 'declined' | null {
   const heard = normalise(text);
   if (heard === '') return null;
-  if (DECLINES.some((phrase) => heard === phrase || heard.startsWith(`${phrase} `))) return 'declined';
-  const said = text.trim().replace(LEAD_IN, '').replace(/[.!?,;:]+$/u, '').trim();
+  if (DECLINES.some((phrase) => heard === phrase || heard.startsWith(`${phrase} `)))
+    return 'declined';
+  const said = text
+    .trim()
+    .replace(LEAD_IN, '')
+    .replace(/[.!?,;:]+$/u, '')
+    .trim();
   const words = said.split(/\s+/);
-  if (said === '' || /\d/.test(said) || words.length > 3 || words.some((word) => word.length > 20)) {
+  if (
+    said === '' ||
+    /\d/.test(said) ||
+    words.length > 3 ||
+    words.some((word) => word.length > 20)
+  ) {
     return null;
   }
   // Typed names keep their capitals; speech comes back lowercase, so it gets them.

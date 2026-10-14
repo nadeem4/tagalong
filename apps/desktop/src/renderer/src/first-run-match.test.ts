@@ -34,9 +34,13 @@ describe('matchChoice', () => {
 
 describe('choicesFor think', () => {
   it('offers Claude only when it is signed in', () => {
-    expect(matchChoice('Claude', choicesFor('think', 'signed-in', false, providers))).toBe('claude-code');
+    expect(matchChoice('Claude', choicesFor('think', 'signed-in', false, providers))).toBe(
+      'claude-code',
+    );
     expect(matchChoice('Claude', choicesFor('think', 'signed-out', false, providers))).toBeNull();
-    expect(matchChoice('an API key', choicesFor('think', 'signed-out', false, providers))).toBe('key');
+    expect(matchChoice('an API key', choicesFor('think', 'signed-out', false, providers))).toBe(
+      'key',
+    );
   });
 
   it('names the keyed services once a key is chosen, never the sign-in', () => {
