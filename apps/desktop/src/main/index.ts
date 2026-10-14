@@ -307,7 +307,10 @@ async function start(): Promise<void> {
     if (state.on === savedListening) return;
     savedListening = state.on;
     const current = desktop;
-    if (current?.host == null) return;
+    if (current?.host == null) {
+      console.warn('[main] could not save Always listening: the engine is not running');
+      return;
+    }
     current.host.client
       .call('settings.set', { patch: { listening: { always: state.on } } })
       .then(({ settings: saved }) => {
@@ -329,7 +332,9 @@ async function start(): Promise<void> {
 
   // What the ears hear goes to every open window: each listening window keeps only its own
   // session's words. Subscribing does not start the voice process; the first listen does.
-  // Words addressed to Scout bring the bubble up if it is hidden.
+  // Words addressed to Scout bring the bubble up if it is hidden, beside a visible pet, and
+  // without the keyboard: the person may be typing in another app when they say "Scout".
+  // Speaking a question needs no keyboard, and a click back elsewhere would hide the bubble.
   forwardEars(
     voiceWorker,
     (channel, payload) => {
@@ -340,7 +345,9 @@ async function start(): Promise<void> {
     () => {
       const panel = desktop?.panel;
       const avatar = desktop?.avatar;
-      if (panel != null && avatar != null && !panel.isVisible()) showPanelBeside(panel, avatar);
+      if (panel != null && avatar != null && avatar.isVisible() && !panel.isVisible()) {
+        showPanelQuietly(panel, avatar);
+      }
     },
   );
 

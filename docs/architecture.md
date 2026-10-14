@@ -1691,8 +1691,9 @@ flowchart LR
   the front window every 2 s while it is on and pauses listening for a call or a full-screen
   window (`listeningBlocked`), stopped on quit. `forwardEars` takes an `onSpoken` callback: a
   `partial` or `turnEnd` whose words are addressed to Scout (`addressedToScout`, from
-  `@tagalong/protocol`) brings the hidden bubble up with `showPanelBeside`; bare speech or talk
-  that does not start with the name never does.
+  `@tagalong/protocol`) brings the hidden bubble up beside a visible pet with `showPanelQuietly`,
+  without taking the keyboard, as a remark or the launch line does; bare speech or talk that
+  does not start with the name never does.
 - **The ears, in the voice process** (`main/voice/worker/ears-host.ts`, `main/voice/ears/`).
   `createEarsHost` opens an inbox for frames at each listen, so the first words are not lost while
   the models load, and runs one session at a time. Letting go of a held question only ends its
