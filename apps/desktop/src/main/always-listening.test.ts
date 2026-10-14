@@ -158,6 +158,47 @@ describe('saveListening', () => {
     expect(call).toHaveBeenCalledOnce();
   });
 
+  /** Saves that wait until the test answers them, one by one. */
+  function deferredSaves() {
+    const answers: (() => void)[] = [];
+    const call = vi.fn(
+      (_method: string, params: { patch: { listening: { always: boolean } } }) =>
+        new Promise((resolve) =>
+          answers.push(() => resolve({ settings: saved(params.patch.listening.always) })),
+        ),
+    );
+    return { call, answer: () => answers.shift()?.() };
+  }
+
+  it.each([
+    [false, [true, false]],
+    [true, [false, true]],
+  ])(
+    'switched twice before the first save is done (saved %s), the last choice is the one saved',
+    async (start, choices) => {
+      const { call, answer } = deferredSaves();
+      const onSaved = vi.fn();
+      const save = saveListening({
+        saved: start,
+        host: () => hostWith(call as unknown as ReturnType<typeof vi.fn>),
+        settingsStore: () => ({ set: vi.fn() }),
+        onSaved,
+      });
+      for (const on of choices) save({ on, paused: false });
+      // One save at a time: the second waits for the first.
+      expect(call).toHaveBeenCalledOnce();
+      answer();
+      await vi.waitFor(() => expect(call).toHaveBeenCalledTimes(2));
+      answer();
+      await vi.waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2));
+      expect(call.mock.calls.map(([, params]) => params.patch.listening.always)).toEqual(choices);
+      expect(onSaved).toHaveBeenLastCalledWith(saved(start));
+      // Saved now: a change that is no change saves nothing.
+      save({ on: start, paused: true });
+      expect(call).toHaveBeenCalledTimes(2);
+    },
+  );
+
   it('saves to the settings file when the engine is not running', () => {
     const set = vi.fn(() => saved(false));
     const onSaved = vi.fn();

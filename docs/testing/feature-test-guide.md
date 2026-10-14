@@ -572,7 +572,9 @@ Run with a real microphone and without `TAGALONG_FAKE_STT`. Switch **Always list
     Windows shows no microphone use from Tagalong. Say "Scout, what is this?": nothing happens.
     Bring another window to the front, or leave full screen: the mark turns solid again and
     listening works. A Teams window in front pauses listening even with no call.
-    Switching Always listening on while the call is already in front never opens the microphone.
+    Switching Always listening on while the call is already in front pauses it within a moment
+    (the front window is checked at once); a microphone that opened before that check closes
+    unused.
 11. **Action:** use the system voice (Settings → Voice → **Who speaks** → System voice) and ask
     for a long answer by typing.
 12. **Expected:** while the system voice speaks, Scout does not hear it and does not reply to

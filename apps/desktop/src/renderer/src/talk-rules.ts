@@ -68,7 +68,7 @@ export class EarsNotes {
     return this.#told;
   }
 
-  /** The person acted (pressed the key, switched listening): the next failure is said again. */
+  /** The talk key or the mic button started a question: the next failure is said again. */
   clear(): void {
     this.#told = null;
   }

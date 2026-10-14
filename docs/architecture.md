@@ -1832,7 +1832,9 @@ flowchart LR
   `setListening(on)` on the voice IPC, from the bubble's header switch, the Settings → Privacy
   switch or "Scout, stop". Each change reaches every window as `IPC.listeningEvent`, and main saves
   `on` with `settings.set { listening: { always } }` (`saveListening`, falling back to the settings
-  file with no engine, and trying again at the next change after a failed save). `paused` is never
+  file with no engine, and trying again at the next change after a failed save; saves run one at a
+  time and each one done saves again if the choice changed meanwhile, so the last choice is the
+  one in the file). `paused` is never
   saved: it is `listeningPaused`, true while the guard blocks or the pets are hidden.
 - **The guard.** `startListeningGuard` lists the windows every 2 s (`LISTENING_GUARD_MS`) while
   listening is on, and at once when it comes on (switched on, or on at launch), and
