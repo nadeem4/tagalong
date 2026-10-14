@@ -78,9 +78,15 @@ importers:
       '@tagalong/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@types/cross-spawn':
+        specifier: 6.0.6
+        version: 6.0.6
       '@vitejs/plugin-react':
         specifier: 6.1.1
         version: 6.1.1(vite@7.3.6(@types/node@24.13.4)(jiti@2.7.0)(lightningcss@1.33.0)(yaml@2.9.1))
+      cross-spawn:
+        specifier: 7.0.6
+        version: 7.0.6
       electron:
         specifier: 44.3.0
         version: 44.3.0
