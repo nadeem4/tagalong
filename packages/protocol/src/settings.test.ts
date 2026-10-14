@@ -390,6 +390,12 @@ describe('Settings.lastOpenedAt', () => {
   it('refuses something that is not a time', () => {
     expect(Settings.safeParse({ lastOpenedAt: 'yesterday' }).success).toBe(false);
   });
+
+  it('has a sibling, lastClosedAt, that starts unknown and rides in a patch alone', () => {
+    const at = '2026-10-12T18:00:00.000Z';
+    expect(Settings.parse({}).lastClosedAt).toBeNull();
+    expect(SettingsPatch.parse({ lastClosedAt: at })).toEqual({ lastClosedAt: at });
+  });
 });
 
 describe('Settings.keepAnEye', () => {

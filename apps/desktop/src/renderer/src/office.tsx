@@ -11,6 +11,7 @@ import '@fontsource/pixelify-sans/latin-600.css';
 import '@fontsource/pixelify-sans/latin-700.css';
 import './office.css';
 import '../../shared/ipc';
+import { overviewStatus, scoutBrain } from './settings/brain';
 import { SettingsPage } from './settings/settings-page';
 
 /** How Home reads and changes the companion on the desktop: the same host calls as before. */
@@ -27,6 +28,17 @@ const homeHost: HomeHost = {
   },
   listModels: (providerId) => window.tagalongHost.listModels(providerId),
   savePet: (pet) => window.tagalongHost.savePet(pet),
+  // The overview's line: Ready only when Scout can think (signed in, or a key) and see.
+  status: async () => {
+    const view = await window.tagalongHost.getHostView();
+    const scout = view.pets.find((pet) => pet.id === view.settings.defaultPetId) ?? view.pets[0];
+    const signIn =
+      scout?.providerId === 'claude-code'
+        ? await window.tagalongHost.checkClaudeSignIn().catch(() => 'unknown' as const)
+        : null;
+    const paused = await window.tagalongHost.getSightPaused().catch(() => false);
+    return overviewStatus(scoutBrain(scout, view.providers, signIn), paused);
+  },
 };
 
 /**

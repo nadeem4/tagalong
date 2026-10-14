@@ -109,8 +109,10 @@ export const SETTINGS_DEFAULTS = {
    * default; the line reads no screen, only the time and the hand-offs that finished.
    */
   greeting: true,
-  /** When Tagalong last opened, so the greeting can say how long you were away. */
+  /** When Tagalong last launched: the greeting names the hand-offs finished since. */
   lastOpenedAt: null,
+  /** When Tagalong was last quit, so the greeting can say how long you were away. */
+  lastClosedAt: null,
   /**
    * Whether Scout keeps an eye on things: it follows window titles (never pixels) and,
    * rarely, reads one window and says one short line. On by default; off means no
@@ -298,6 +300,8 @@ const settingsFields = {
   greeting: z.boolean(),
   /** When Tagalong last opened; null before the first launch that recorded it. */
   lastOpenedAt: z.iso.datetime().nullable(),
+  /** When Tagalong was last quit; null before the first quit that recorded it. */
+  lastClosedAt: z.iso.datetime().nullable(),
   /** Whether Scout follows window titles and now and then says one useful line. */
   keepAnEye: z.boolean(),
   /** Whether Scout speaks its bubble, in which voice and how fast. */
@@ -343,6 +347,7 @@ export const Settings = z.object({
   welcome: settingsFields.welcome.prefault({ ...SETTINGS_DEFAULTS.welcome }),
   greeting: settingsFields.greeting.default(SETTINGS_DEFAULTS.greeting),
   lastOpenedAt: settingsFields.lastOpenedAt.default(SETTINGS_DEFAULTS.lastOpenedAt),
+  lastClosedAt: settingsFields.lastClosedAt.default(SETTINGS_DEFAULTS.lastClosedAt),
   keepAnEye: settingsFields.keepAnEye.default(SETTINGS_DEFAULTS.keepAnEye),
   voice: settingsFields.voice.prefault({ ...SETTINGS_DEFAULTS.voice }),
   userName: settingsFields.userName.default(SETTINGS_DEFAULTS.userName),

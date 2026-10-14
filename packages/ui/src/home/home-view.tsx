@@ -40,6 +40,11 @@ export interface HomeHost {
   }>;
   listModels(providerId: string): Promise<{ models: string[]; source: 'live' | 'fallback' }>;
   savePet(pet: Pet): Promise<Pet>;
+  /**
+   * Whether the companion can work right now, in a few words: "Ready", or what stops it
+   * (signed out, no key, sight paused). Without it the overview says Ready.
+   */
+  status?(): Promise<{ text: string; ok: boolean }>;
 }
 
 export interface HomeViewProps {
@@ -69,6 +74,8 @@ export function HomeView({ host, settings, page: asked, onPage, routineDraft }: 
     setLastAsked(asked);
     if (asked !== undefined) setPage(asked);
   }
+  const [routinesSeen, setRoutinesSeen] = useState(page === 'routines');
+  if (page === 'routines' && !routinesSeen) setRoutinesSeen(true);
 
   useEffect(() => {
     void Promise.all([bridge.listPets(), host.setup()]).then(([listed, loaded]) => {
@@ -114,7 +121,9 @@ export function HomeView({ host, settings, page: asked, onPage, routineDraft }: 
         ))}
       </nav>
       <main className="home-main">
-        {page === 'overview' && <Overview companion={companion} setup={setup} onGo={go} />}
+        {page === 'overview' && (
+          <Overview companion={companion} setup={setup} host={host} onGo={go} />
+        )}
         {page === 'scout' && companion !== undefined && setup !== null && (
           <ScoutPanel
             key={companion.id}
@@ -128,8 +137,12 @@ export function HomeView({ host, settings, page: asked, onPage, routineDraft }: 
           />
         )}
         {page === 'experts' && <ExpertsPanel />}
-        {page === 'routines' && (
-          <RoutinesPanel draft={routineDraft} onOpenActivity={() => go('activity')} />
+        {/* Kept mounted once opened, so a routine being edited (Scout's card or your own)
+            survives a look at another page, and a card already saved is not opened again. */}
+        {(page === 'routines' || routinesSeen) && (
+          <div hidden={page !== 'routines'} className="home-page">
+            <RoutinesPanel draft={routineDraft} onOpenActivity={() => go('activity')} />
+          </div>
         )}
         {page === 'connections' && <ConnectionsPanel />}
         {page === 'activity' && <ActivityView pets={pets} />}
@@ -154,20 +167,30 @@ function lowerYour(label: string): string {
 function Overview({
   companion,
   setup,
+  host,
   onGo,
 }: {
   companion: Pet | undefined;
   setup: Awaited<ReturnType<HomeHost['setup']>> | null;
+  host: HomeHost;
   onGo: (page: HomePage) => void;
 }) {
   const bridge = useHostBridge();
   const [experts, setExperts] = useState<Expert[] | null>(null);
   const [recent, setRecent] = useState<ActivityEntry[]>([]);
+  const [status, setStatus] = useState<{ text: string; ok: boolean }>({ text: 'Ready', ok: true });
 
   useEffect(() => {
     void bridge.listExperts?.().then(setExperts);
     void bridge.listActivity?.({ limit: 3 }).then((page) => setRecent(page.entries));
   }, [bridge]);
+
+  useEffect(() => {
+    void host
+      .status?.()
+      .then(setStatus)
+      .catch(() => undefined);
+  }, [host, companion]);
 
   const name = companion?.name ?? 'Scout';
   return (
@@ -177,7 +200,11 @@ function Overview({
         <section className="home-card" aria-label={name}>
           <h2 className="home-card__label">{name.toUpperCase()}</h2>
           <p className="home-card__lead">
-            <span className="home-dot" aria-hidden="true" /> Ready
+            <span
+              className={status.ok ? 'home-dot' : 'home-dot home-dot--warn'}
+              aria-hidden="true"
+            />{' '}
+            {status.text}
           </p>
           {companion !== undefined && (
             <p>

@@ -70,3 +70,21 @@ export function scoutBrain(
   }
   return { state: 'ready', title, help: '', chip: null };
 }
+
+const NOT_READY: Partial<Record<ScoutBrain['state'], string>> = {
+  'signed-out': 'Signed out of Claude Code',
+  'no-sign-in': 'Claude Code is not installed',
+  'no-key': 'No API key',
+  unknown: 'Couldn’t check its sign-in',
+  'engine-down': 'Not running',
+};
+
+/** Home's overview line: Ready, or what stops Scout thinking, or that sight is paused. */
+export function overviewStatus(
+  brain: ScoutBrain,
+  sightPaused: boolean,
+): { text: string; ok: boolean } {
+  const problem = NOT_READY[brain.state];
+  if (problem !== undefined) return { text: problem, ok: false };
+  return sightPaused ? { text: 'Ready, sight paused', ok: false } : { text: 'Ready', ok: true };
+}

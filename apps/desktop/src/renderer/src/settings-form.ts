@@ -93,6 +93,7 @@ export function isAdvancedField(field: string): boolean {
  * all: each pet carries its own and is saved through `pets.upsert`.
  */
 export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchType {
+  refuseSharedHotkeys(values);
   return SettingsPatch.parse({
     providerBaseUrls: parseBaseUrls(values.baseUrls),
     hotkeys: {
@@ -163,6 +164,41 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
         }
       : {}),
   });
+}
+
+/** The shortcuts, in the order Settings shows them, with the names it shows. */
+const HOTKEY_FIELDS = [
+  ['askHotkey', 'Ask Scout'],
+  ['pauseSightHotkey', 'Pause sight'],
+  ['stopVoiceHotkey', 'Stop Scout speaking'],
+  ['talkHotkey', 'Talk to Scout'],
+] as const;
+
+/** An accelerator compared as keys: case, order and the spelling of Ctrl do not matter. */
+function sameKeys(accelerator: string): string {
+  return accelerator
+    .split('+')
+    .map((part) => part.trim().toLowerCase())
+    .map((part) => (['commandorcontrol', 'cmdorctrl', 'control'].includes(part) ? 'ctrl' : part))
+    .sort()
+    .join('+');
+}
+
+/** Two shortcuts on one combination would leave one of them dead: refuse the later one. */
+function refuseSharedHotkeys(values: SettingsFormValues): void {
+  const seen = new Map<string, string>();
+  for (const [field, label] of HOTKEY_FIELDS) {
+    const keys = sameKeys(values[field]);
+    if (keys === '') continue;
+    const first = seen.get(keys);
+    if (first !== undefined) {
+      throw new SettingsFieldError(
+        field,
+        `${label} uses the same keys as ${first}. Pick a different combination.`,
+      );
+    }
+    seen.set(keys, label);
+  }
 }
 
 /** A name as typed, trimmed and cut to the cap: a long name is shortened, never refused. */

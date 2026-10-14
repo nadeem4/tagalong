@@ -1280,6 +1280,32 @@ describe('greeting.compose', () => {
     expect((res['result'] as { text: string }).text).toContain(', Nadeem');
   });
 
+  it('counts the time away from when Tagalong was last closed, not last launched', async () => {
+    const failing: BrainProvider = {
+      id: 'fake',
+      capabilities: { vision: false, tools: false, streaming: true },
+      listModels: () => Promise.resolve([]),
+      complete: () => Promise.reject(new Error('offline')),
+    };
+    const e = await boot(failing);
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
+    // Opened three days ago and left running until an hour ago: away an hour, not three days.
+    await host.call('settings.set', {
+      patch: { lastOpenedAt: hoursAgo(72), lastClosedAt: hoursAgo(1) },
+    });
+    const away = await host.call('greeting.compose', { petId: 'scout' });
+    expect((away['result'] as { text: string }).text).not.toContain('Back after');
+
+    // A crash wrote no close: the last launch is the best guess.
+    await host.call('settings.set', {
+      patch: { lastOpenedAt: hoursAgo(72), lastClosedAt: hoursAgo(100) },
+    });
+    const crashed = await host.call('greeting.compose', { petId: 'scout' });
+    expect((crashed['result'] as { text: string }).text).toContain('Back after 3 days');
+  });
+
   it('refuses a pet that does not exist', async () => {
     const e = await boot();
     const host = await TestHost.connect(e.port);

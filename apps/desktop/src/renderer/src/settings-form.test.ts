@@ -76,6 +76,19 @@ describe('buildSettingsPatch', () => {
     expect(patch.hotkeys?.pauseSight).toBe('CommandOrControl+Shift+Alt+P');
   });
 
+  it('refuses one combination for two shortcuts, naming both and marking the second', () => {
+    const save = () => buildSettingsPatch({ ...values, stopVoiceHotkey: 'ctrl+shift+SPACE' });
+    expect(save).toThrow(SettingsFieldError);
+    expect(save).toThrow(
+      'Stop Scout speaking uses the same keys as Ask Scout. Pick a different combination.',
+    );
+    try {
+      save();
+    } catch (error) {
+      expect((error as SettingsFieldError).field).toBe('stopVoiceHotkey');
+    }
+  });
+
   it('trims surrounding whitespace rather than sending an unregisterable accelerator', () => {
     const patch = buildSettingsPatch({ ...values, askHotkey: '  CommandOrControl+Shift+Space  ' });
     expect(patch.hotkeys?.ask).toBe('CommandOrControl+Shift+Space');

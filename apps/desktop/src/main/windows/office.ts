@@ -2,20 +2,22 @@ import { BrowserWindow } from 'electron';
 import { PRELOAD_PATH, loadPage } from './page';
 
 /**
- * Home (the module keeps its old office name). A framed, centred window like Settings,
- * sized for its three columns: the agent list, the themed scene and the right panel
- * (activity, agent controls, meetings). The scene scrolls rather than shrinks when the
- * window is smaller than it.
+ * Home's narrowest: its nav and a page that still shows the overview two cards across.
+ * Pages are fluid below their max widths, so a small laptop screen gets the whole window.
+ */
+export const HOME_MIN_WIDTH = 880;
+
+/**
+ * Home (the module keeps its old office name). A framed, centred window like Settings:
+ * the nav on the left and one page beside it.
  */
 export function createOfficeWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1440,
     height: 800,
-    // The size of the page, not the frame: the scene is drawn for a full 800px.
+    // The size of the page, not the frame.
     useContentSize: true,
-    // Room for the agent list, the 600px scene and a readable right panel; the default
-    // leaves the agent controls 560px. A smaller screen gets a smaller window.
-    minWidth: 1200,
+    minWidth: HOME_MIN_WIDTH,
     minHeight: 600,
     show: false,
     center: true,

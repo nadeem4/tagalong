@@ -167,6 +167,12 @@ app.on('before-quit', () => {
   // Memory only, and gone on quit: nothing here was ever written anywhere to clean up.
   desktop?.rolling.dispose();
   desktop?.perceptionMemory.clear();
+  // The next launch's greeting counts the time away from now, not from when this one opened.
+  try {
+    desktop?.settingsStore.set({ lastClosedAt: new Date().toISOString() });
+  } catch (error) {
+    console.warn('[main] could not remember this quit:', error);
+  }
   void desktop?.host?.shutdown();
 });
 
@@ -353,7 +359,8 @@ function showRemark(params: unknown): void {
 
 /**
  * A later launch: Scout says one line beside itself without taking the keyboard, and the
- * launch is remembered so the next one knows how long you were away. The line reads no
+ * launch is remembered (the quit is too, in before-quit) so the next one knows how long you
+ * were away and which hand-offs finished since. The line reads no
  * screen, and the engine falls back to a handwritten one, so this never waits on a brain.
  */
 async function greetOnLaunch(host: EngineHost): Promise<void> {

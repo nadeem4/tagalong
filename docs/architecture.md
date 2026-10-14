@@ -1064,20 +1064,29 @@ anything that used to open Settings opens Home on its Settings page.
 It is a framed desktop window (`windows/office.ts`, the `office` renderer page; both keep their old
 names, the window and the page are titled **Home**) opened with `tagalongHost.openOffice()`. Main
 names a page by sending `homePageEvent` (`openOffice('settings')`), to an open window at once and to
-a new one once it has loaded. The renderer entry wraps `HomeView` (`packages/ui/src/home/home-view.tsx`)
+a new one once it has loaded; the preload keeps a page or a routine card that arrives before the
+page subscribes (`preload/held.ts`) and hands it over when it does. The window is at least
+`HOME_MIN_WIDTH` (880 px) wide: the nav and a page that still shows the overview two cards across.
+The renderer entry wraps `HomeView` (`packages/ui/src/home/home-view.tsx`)
 in the preload's `HostBridge` and hands it a `HomeHost` (the companion's id, the providers it can think
 on, the model list, `savePet`) and the settings form as a slot.
 
 `HomeView` is a navy side menu, with the companion's pixel character and name, and seven pages:
 
-- **Overview**: the companion (ready, the provider and model it thinks with), the experts (on or
+- **Overview**: the companion (its state, the provider and model it thinks with), the experts (on or
   off, read-only or allowed to edit) and the three most recent activity entries, each with a button
-  to its page.
+  to its page. The state comes from `HomeHost.status`: the desktop reads Scout's brain the way
+  Settings does (`settings/brain.ts#scoutBrain`, the Claude sign-in or a stored key) and the sight
+  pause, and `overviewStatus` says "Ready" only when Scout can think and see; otherwise "Signed out of
+  Claude Code", "No API key", "Claude Code is not installed", "Couldn’t check its sign-in", "Not
+  running" or "Ready, sight paused", with an amber dot.
 - **Scout** (the companion's name): how it thinks, a provider and a model, saved with `savePet`.
   Changing provider drops the vision and watch models, which named the old provider's models. Its
   role is always the Companion.
 - **Experts**: `ExpertsPanel`, below.
-- **Routines**: `RoutinesPanel`; see [Routines](#routines).
+- **Routines**: `RoutinesPanel`; see [Routines](#routines). Once opened it stays mounted (hidden on
+  other pages), so a routine being edited, Scout's card included, survives a look at another page,
+  and a card already saved is not opened again on the way back.
 - **Connections**: `ConnectionsPanel`; see [Connected apps](#connected-apps-mcp).
 - **Activity**: `ActivityView`; see [Activity](#activity).
 - **Settings**: the host's settings form (`SettingsPage embedded`), described under
@@ -1165,7 +1174,7 @@ is one file under `apps/desktop/src/renderer/src/settings/`:
 | `you-section.tsx`        | You: **What should Scout call you?** (`settings.userName`, empty for no name, cut to 40 characters), with an ⓘ note. When set, `prompt-assembler.ts` adds one line after the pet's name: use it rarely                                                                                      |
 | `privacy-section.tsx`    | The rolling memory switch, the blind spots as chips from `BLIND_SPOTS` labels, and the pause sight key                                                                                                                                                                                      |
 | `voice-section.tsx`      | Scout talks (a switch), the voice (George or Fable) with ▶ Preview (`voice-player.ts#playLine` with the form's voice and speed), the speed slider, the Talk to Scout key (`hotkeys.talk`) and the microphone (`voice.microphoneId`, `mic.ts#listMicrophones`, blank for the system default) |
-| `shortcuts-section.tsx`  | Three global hotkeys (ask, pause sight, stop speaking; the talk key is under Voice); a `hotkeyError` marks the field whose combination it names                                                                                                                                             |
+| `shortcuts-section.tsx`  | Three global hotkeys (ask, pause sight, stop speaking; the talk key is under Voice); a `hotkeyError` marks the field whose combination it names; one combination for two shortcuts (the talk key included) is refused before saving, naming both (`settings-form.ts#refuseSharedHotkeys`)   |
 | `browser-section.tsx`    | The Chrome extension's pairing token                                                                                                                                                                                                                                                        |
 | `advanced-section.tsx`   | Advanced: a disclosure button (`aria-expanded`), closed by default, holding the five below and **Open Welcome again**                                                                                                                                                                       |
 | `summaries-section.tsx`  | One grouped list: Same as Scout, Haiku and Sonnet on the Claude sign-in, then each keyed service that has a key                                                                                                                                                                             |
@@ -1464,10 +1473,12 @@ flowchart LR
   sends the text as `greetLineEvent` (the preload keeps one that arrives before the panel subscribes)
   and shows the panel with `showPanelQuietly`. The panel renders `GreetingLine`: `role="status"`,
   fades after about seven seconds unless pointed at or focused, opens the ask bubble on a click.
-  Then main stores `lastOpenedAt`, whether or not it greeted. In the engine,
-  `greeting/greeting.ts#composeGreeting` reads no screen: only the local time of day, the time since
-  `lastOpenedAt`, and `ActivityLog#expertsFinishedSince` (expert hand-offs that finished well since
-  then, at most five, brief only), plus `settings.userName` when set (the model may greet by it,
+  Then main stores `lastOpenedAt`, whether or not it greeted, and on `before-quit` it stores
+  `lastClosedAt`. In the engine, `greeting/greeting.ts#composeGreeting` reads no screen: only the
+  local time of day, the time away (`awaySince`: the later of `lastClosedAt` and `lastOpenedAt`, so
+  a crash that recorded no quit falls back to the last launch), and
+  `ActivityLog#expertsFinishedSince(lastOpenedAt)` (expert hand-offs that finished well since the
+  last launch, at most five, brief only), plus `settings.userName` when set (the model may greet by it,
   and the handwritten line becomes "Morning, Nadeem."). It makes one call to the summaries model (`settings.summarizer`,
   else the pet's own provider and model, text only), like `Summarizer`: 60 tokens, tools refused,
   an eight-second `AbortSignal.timeout`. The prompt asks for one sentence under 20 words, warm, no

@@ -19,8 +19,8 @@ export interface FinishedHandoff {
 export interface GreetingContext {
   /** Read in local time: "morning" means the person's morning. */
   now: Date;
-  /** Null when no earlier launch was recorded. */
-  lastOpenedAt: Date | null;
+  /** When the person was last with Tagalong (its last quit); null when nothing was recorded. */
+  awaySince: Date | null;
   handoffs: readonly FinishedHandoff[];
   /** What the person asked to be called; empty or absent for no name. */
   userName?: string;
@@ -53,10 +53,10 @@ function dayPart(now: Date): DayPart {
   return 'late night';
 }
 
-/** Whole days since the last launch; 0 when under a day or unknown. */
+/** Whole days away; 0 when under a day or unknown. */
 function daysAway(context: GreetingContext): number {
-  if (context.lastOpenedAt === null) return 0;
-  return Math.floor((context.now.getTime() - context.lastOpenedAt.getTime()) / DAY_MS);
+  if (context.awaySince === null) return 0;
+  return Math.floor((context.now.getTime() - context.awaySince.getTime()) / DAY_MS);
 }
 
 /** The handwritten line: the time of day or the days away, then what is waiting. */
@@ -84,11 +84,11 @@ function facts(context: GreetingContext): string {
   const time = context.now.toTimeString().slice(0, 5);
   const days = daysAway(context);
   const away =
-    context.lastOpenedAt === null
+    context.awaySince === null
       ? 'unknown'
       : days >= 1
         ? `${days} day${days === 1 ? '' : 's'}`
-        : `${Math.max(0, Math.round((context.now.getTime() - context.lastOpenedAt.getTime()) / 3_600_000))} hours`;
+        : `${Math.max(0, Math.round((context.now.getTime() - context.awaySince.getTime()) / 3_600_000))} hours`;
   const handoffs =
     context.handoffs.length === 0
       ? ['none']

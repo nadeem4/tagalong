@@ -22,7 +22,7 @@ const scout: Pet = {
 /** Local times, so the time of day reads the same wherever the test runs. */
 const at = (day: number, hour: number, minute = 0) => new Date(2026, 9, day, hour, minute);
 
-const morning: GreetingContext = { now: at(13, 9, 14), lastOpenedAt: at(13, 8), handoffs: [] };
+const morning: GreetingContext = { now: at(13, 9, 14), awaySince: at(13, 8), handoffs: [] };
 
 function brain(reply: string | Error) {
   const asked: { providerId: string; model: string; visionModel?: string }[] = [];
@@ -67,16 +67,16 @@ describe('fallbackGreeting', () => {
   });
 
   it('greets for the time of day when it never saw you open it before', () => {
-    expect(fallbackGreeting({ ...morning, lastOpenedAt: null })).toBe(
+    expect(fallbackGreeting({ ...morning, awaySince: null })).toBe(
       'Morning. I’m here when you need me.',
     );
   });
 
   it('says how long you were away, in days', () => {
-    expect(fallbackGreeting({ ...morning, lastOpenedAt: at(10, 9) })).toBe(
+    expect(fallbackGreeting({ ...morning, awaySince: at(10, 9) })).toBe(
       'Back after 3 days. Nothing waiting for you.',
     );
-    expect(fallbackGreeting({ ...morning, lastOpenedAt: at(12, 8) })).toBe(
+    expect(fallbackGreeting({ ...morning, awaySince: at(12, 8) })).toBe(
       'Back after a day. Nothing waiting for you.',
     );
   });
@@ -87,7 +87,7 @@ describe('fallbackGreeting', () => {
     expect(fallbackGreeting({ ...named, now: at(13, 23, 30) })).toBe(
       'Working late, Nadeem? I’m here when you need me.',
     );
-    expect(fallbackGreeting({ ...named, lastOpenedAt: at(10, 9) })).toBe(
+    expect(fallbackGreeting({ ...named, awaySince: at(10, 9) })).toBe(
       'Back after 3 days, Nadeem. Nothing waiting for you.',
     );
     expect(fallbackGreeting({ ...morning, userName: '' })).toBe(
@@ -100,7 +100,7 @@ describe('fallbackGreeting', () => {
     expect(fallbackGreeting({ ...morning, handoffs: one })).toBe(
       'Morning. Claude Code finished what you handed over.',
     );
-    expect(fallbackGreeting({ ...morning, lastOpenedAt: at(10, 9), handoffs: one })).toBe(
+    expect(fallbackGreeting({ ...morning, awaySince: at(10, 9), handoffs: one })).toBe(
       'Back after 3 days. Claude Code finished what you handed over.',
     );
     expect(fallbackGreeting({ ...morning, handoffs: [...one, ...one] })).toBe(

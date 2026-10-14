@@ -653,14 +653,19 @@ function buildHandlers(parts: {
         throw new RpcFailure(RPC_ERROR_CODES.invalidParams, `no pet with id '${params.petId}'`);
       }
       await refreshProviders();
-      const { summarizer, lastOpenedAt, userName } = settings.get();
+      const { summarizer, lastOpenedAt, lastClosedAt, userName } = settings.get();
+      // Away since the last quit; a crash records no quit, so then since the last launch.
+      const awaySince = [lastOpenedAt, lastClosedAt]
+        .filter((at): at is string => at !== null)
+        .map((at) => new Date(at))
+        .reduce<Date | null>((latest, at) => (latest === null || at > latest ? at : latest), null);
       return composeGreeting({
         pet,
         summarizer,
         provider: resolve,
         context: {
           now: new Date(),
-          lastOpenedAt: lastOpenedAt === null ? null : new Date(lastOpenedAt),
+          awaySince,
           handoffs: lastOpenedAt === null ? [] : activity.expertsFinishedSince(lastOpenedAt),
           userName,
         },
