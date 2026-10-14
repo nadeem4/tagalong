@@ -156,7 +156,7 @@ app's own client is `apps/desktop/src/main/engine-client.ts`. Read
 | Routines: Scout does things on its own, on a schedule or when something happens, and tells you in the bubble, aloud or by notification |                                                                     |
 | Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                                      | A cost dashboard                                                    |
 | Vision routing in the engine: a text-only model hands pictures to a vision model it names (Home sets none yet)                         | Data export and delete-all in Settings                              |
-| Memory across restarts, rolling screen memory (opt-in; Scout cannot recall from it or start watches yet)                               | Code signing (the installer is unsigned) and an app icon of its own |
+| Memory across restarts, rolling screen memory Scout recalls from (opt-in), and watches Scout starts                                    | Code signing (the installer is unsigned) and an app icon of its own |
 | The Chrome extension: Scout in Chrome's side panel, reading the page you are on                                                        |                                                                     |
 
 # Using Tagalong
@@ -365,9 +365,13 @@ Then click the toolbar button, or select text and press `Alt+Shift+Space`. More 
 
 **Screen memory** (off by default; turn it on in **Home → Settings → Privacy**). Tagalong keeps a
 small picture of each screen every five seconds, in memory only, for the last ten minutes. A red dot
-on Scout shows while it records. The engine's tools that read it back (and its watches) are built
-but not offered to Scout yet, so asking "what was I reading five minutes ago?" does not work in this
-build.
+on Scout shows while it records. Ask "what was on screen a few minutes ago?" or "what changed?" and
+Scout looks back through it.
+
+**Watches.** Ask "tell me when the build finishes" and Scout watches for it, says in one line what it
+is watching, and tells you when it happens. A watch stops on its own when it fires or gives up (30
+minutes by default). A routine **When a watch fires** runs then too. Scout can also zoom in on small
+text and look at your other monitor ("what's on my other screen?"). Blind spots still apply.
 
 ## Privacy
 

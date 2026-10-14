@@ -63,7 +63,32 @@ describe('the role files', () => {
   it('give the companion hand_to_expert and nothing that writes files or runs code', () => {
     const tools = getRole('companion')?.tools ?? [];
     expect(tools).toContain('hand_to_expert');
-    expect(tools).not.toContain('watch_for');
+    expect(tools.filter((tool) => /write|edit|file|run|exec|shell|command/.test(tool))).toEqual([]);
+  });
+
+  it('give the companion the watch and screen-memory tools', () => {
+    const tools = getRole('companion')?.tools ?? [];
+    for (const tool of [
+      'watch_for',
+      'recall_screen',
+      'what_changed',
+      'look_closer',
+      'list_displays',
+      'look_at_display',
+    ]) {
+      expect(tools).toContain(tool);
+    }
+  });
+
+  it('tell the companion when to watch, recall, zoom and look at another screen', () => {
+    const instructions = getRole('companion')?.instructions ?? '';
+    expect(instructions).toContain('watch_for');
+    expect(instructions).toContain('stops on its own');
+    expect(instructions).toContain('recall_screen');
+    expect(instructions).toContain('what_changed');
+    expect(instructions).toContain('look_closer');
+    expect(instructions).toContain('list_displays');
+    expect(instructions).toContain('look_at_display');
   });
 
   it('tell the companion to leave itself out of what it sees, unless asked', () => {

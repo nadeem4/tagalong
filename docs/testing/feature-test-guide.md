@@ -820,8 +820,8 @@ and Morning papers needs Claude Code installed and signed in.
 3. A routine **When Tagalong opens** runs once at each launch.
 4. **When an expert finishes**: hand Claude Code a task; when it finishes, the routine runs with its
    answer.
-5. **When a watch fires** can be saved, but Scout cannot start a watch in this build, so it is not
-   testable here.
+5. **When a watch fires**: save one, then ask Scout to watch for something (SM.4). When the watch
+   fires, the routine runs. It cannot start another watch of its own.
 
 ### R5. Missed runs and quiet times
 
@@ -889,8 +889,8 @@ A run counts as late only when it starts **more than five minutes** after its ti
 
 ## Screen memory
 
-Scout cannot recall from screen memory or start watches in this build (see
-[Not in this build](#not-in-this-build)); these steps check only the recording itself.
+SM.1 to SM.3 check the recording itself; SM.4 checks that Scout uses it, watches, and sees your other
+monitor.
 
 ### SM.1. The settings and their defaults
 
@@ -911,6 +911,19 @@ Scout cannot recall from screen memory or start watches in this build (see
    Press it again: the dot comes back.
 2. **Action:** quit Tagalong and look in `%APPDATA%\Tagalong`. **Expected:** no frame or image file.
 3. **Action:** switch it off and Save. **Expected:** the dot goes on save.
+
+### SM.4. Scout recalls, watches and looks at another monitor
+
+1. **Setup:** screen memory on (SM.2) for a few minutes; a second monitor if you have one.
+2. **Action:** ask Scout "tell me when this window's title changes", then change it (for example
+   save a Notepad file under a new name). **Expected:** Scout says in one line what it is watching
+   and that it stops on its own; when the title changes it tells you, and the watch ends.
+3. **Action:** ask "what was on screen a few minutes ago?". **Expected:** Scout describes that moment
+   and names its time, not the screen now.
+4. **Action:** ask "what's on my other monitor?". **Expected:** Scout describes the other display.
+   With one monitor it says there is only one.
+5. **Action:** put a blind-spot window (for example a password manager) in front and ask about it.
+   **Expected:** Scout says it cannot see it.
 
 ## The Chrome extension
 
@@ -1059,10 +1072,6 @@ Privacy, add the title pattern `*Bank*` to your exclusions (used in X.12; remove
 
 Do not test these here.
 
-- **Screen recall and watches for Scout.** `recall_screen`, `what_changed`, `watch_for` and
-  `look_closer` are built in the engine, but the Companion role does not list them, so "what was I
-  reading five minutes ago?" or "tell me when this finishes" does not work. A routine **When a watch
-  fires** can be saved but has nothing to fire it.
 - **A vision model for a text-only brain.** Home has no vision model field; Nemotron text models
   drop pictures with a warning.
 - **Cloud speech to text and a microphone step in Welcome.** Speech is turned into text on this

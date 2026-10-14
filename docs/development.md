@@ -352,8 +352,9 @@ take effect on save.
   while it records.
 - **The engine's time tools.** `recall_screen`, `what_changed` and `watch_for` (a watch compares the
   screen every five seconds and asks one small model yes or no only once the region has changed and
-  held still) are built and tested, but the Companion role does not list them, so Scout is not
-  offered them today. The watch limits below still save.
+  held still) are on the Companion role, with `look_closer`, `list_displays` and
+  `look_at_display`. A routine's own turn never gets `watch_for`, so a watch routine cannot set off
+  itself. The watch limits below bound every watch.
 
 | Watch limit (Settings)         | Default | What it bounds                                    |
 | ------------------------------ | ------- | ------------------------------------------------- |
