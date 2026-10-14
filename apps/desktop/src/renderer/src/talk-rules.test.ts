@@ -1,15 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FailureStreak, keyStarts, settles, shownPartial } from './talk-rules';
-
-describe('keyStarts', () => {
-  it('starts a held question when nothing listens, or a held one already ended', () => {
-    expect(keyStarts(null)).toBe(true);
-  });
-
-  it('does nothing while listening all the time: Scout already hears, "Scout" asks', () => {
-    expect(keyStarts('always')).toBe(false);
-  });
-});
+import { EarsNotes, FIRST_TIME, FailureStreak, settles, shownPartial } from './talk-rules';
 
 describe('settles', () => {
   it('lets the bubble go quiet when no held question is being asked', () => {
@@ -24,19 +14,23 @@ describe('settles', () => {
 });
 
 describe('shownPartial', () => {
-  it('shows the question without the name it starts with', () => {
-    expect(shownPartial('Scout, what am I looking at')).toBe('what am I looking at');
-    expect(shownPartial('hey Scout what time is it')).toBe('what time is it');
+  it('shows an always question without the name it starts with', () => {
+    expect(shownPartial('Scout, what am I looking at', 'always')).toBe('what am I looking at');
+    expect(shownPartial('hey Scout what time is it', 'always')).toBe('what time is it');
   });
 
   it('shows the words as heard when they do not start with the name', () => {
-    expect(shownPartial('what am I looking at')).toBe('what am I looking at');
-    expect(shownPartial('Scout')).toBe('Scout');
+    expect(shownPartial('what am I looking at', 'always')).toBe('what am I looking at');
+    expect(shownPartial('Scout', 'always')).toBe('Scout');
+  });
+
+  it('shows a held question as said: it needs no name, so "Scout" is part of it', () => {
+    expect(shownPartial('Scout, what is this', 'held')).toBe('Scout, what is this');
   });
 
   it('shows nothing when nothing was heard', () => {
-    expect(shownPartial(null)).toBeNull();
-    expect(shownPartial('')).toBeNull();
+    expect(shownPartial(null, 'always')).toBeNull();
+    expect(shownPartial('', 'held')).toBeNull();
   });
 });
 
@@ -53,5 +47,55 @@ describe('FailureStreak', () => {
     streak.fail();
     streak.clear();
     expect(streak.fail()).toBe(true);
+  });
+});
+
+describe('EarsNotes', () => {
+  const OFFLINE = 'I couldn’t download my listening models.';
+
+  it('says the first-time download, and clears it once the ears are ready', () => {
+    const notes = new EarsNotes();
+    expect(notes.status(null, 'loading')).toBe(FIRST_TIME);
+    expect(notes.status(FIRST_TIME, 'ready')).toBeNull();
+    expect(notes.status('Something else', 'ready')).toBe('Something else');
+  });
+
+  it('says a failure once, not again at each always-listening retry', () => {
+    const notes = new EarsNotes();
+    let note = notes.status(null, 'loading');
+    note = notes.failed(note, OFFLINE);
+    expect(note).toBe(OFFLINE);
+    // The next retry downloads again and fails again: the failure stays, said once.
+    note = notes.status(note, 'loading');
+    expect(note).toBe(OFFLINE);
+    note = notes.failed(note, OFFLINE);
+    expect(note).toBe(OFFLINE);
+  });
+
+  it('never leaves the first-time note behind after a failure', () => {
+    const notes = new EarsNotes();
+    notes.failed(null, OFFLINE);
+    // The failure was cleared from the bubble, then a retry fails while the first-time note shows.
+    expect(notes.failed(FIRST_TIME, OFFLINE)).toBeNull();
+  });
+
+  it('says a plain line when the failure has none', () => {
+    expect(new EarsNotes().failed(null, undefined)).toBe('Listening stopped. Try again.');
+  });
+
+  it('clears the failure once the ears work, and tells the next one again', () => {
+    const notes = new EarsNotes();
+    let note = notes.failed(null, OFFLINE);
+    note = notes.status(note, 'ready');
+    expect(note).toBeNull();
+    expect(notes.failed(note, OFFLINE)).toBe(OFFLINE);
+  });
+
+  it('tells the failure again when the person acts', () => {
+    const notes = new EarsNotes();
+    notes.failed(null, OFFLINE);
+    notes.clear();
+    expect(notes.status(null, 'loading')).toBe(FIRST_TIME);
+    expect(notes.failed(FIRST_TIME, OFFLINE)).toBe(OFFLINE);
   });
 });

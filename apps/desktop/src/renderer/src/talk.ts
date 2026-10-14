@@ -3,14 +3,12 @@ import { ListenController, PushToTalk } from '@tagalong/ui';
 import type { BubbleTalk, TalkAction } from '@tagalong/ui';
 import { openMic } from './mic';
 import { RemoteEars } from './remote-ears';
-import { FailureStreak, keyStarts, settles, shownPartial } from './talk-rules';
+import { EarsNotes, FailureStreak, settles, shownPartial } from './talk-rules';
 import { onSystemVoice } from './voice-player';
 
 /** A question is never longer than this: the microphone closes on its own after it. */
 const MAX_LISTEN_MS = 30_000;
 
-const FIRST_TIME =
-  'The first time, Tagalong downloads its speech models (about 43 MB). Speech is turned into text on this PC.';
 const NOTHING_HEARD = 'I didn’t catch that. Hold the key and try again.';
 const NO_MICROPHONE =
   'The microphone could not be opened. Check that Windows lets apps use it, or pick another in Settings.';
@@ -29,8 +27,9 @@ export interface TalkOptions {
  * its frames stream to the ears in the voice process, the words heard so far show as they
  * come, and letting go hands the question to the bubble. With Always listening switched on
  * (read at mount, so a launch with it on listens from the start) the microphone stays open
- * instead, closed during a call or full screen and while the system voice speaks, and only
- * talk that starts with "Scout" is asked. The microphone never opens otherwise.
+ * as well, closed during a call or full screen, with the pets hidden and while the system
+ * voice speaks, and only talk that starts with "Scout" is asked; the key and the mic button
+ * still ask without the name. The microphone never opens otherwise.
  */
 export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () => void } {
   const latest = useRef(options);
@@ -41,11 +40,19 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [state, setState] = useState<BubbleTalk['state']>('idle');
   const listening = useRef(false);
-  const [note, setNote] = useState<string | null>(null);
+  const [note, setNoteState] = useState<string | null>(null);
+  // The note shown now, for the ears' status to build on outside a state update.
+  const noteNow = useRef<string | null>(null);
+  const [setNote] = useState(() => (next: string | null) => {
+    noteNow.current = next;
+    setNoteState(next);
+  });
   const [partial, setPartial] = useState<string | null>(null);
   const [always, setAlwaysState] = useState({ on: false, paused: false });
   // A microphone that cannot open fails again on every always-listening retry: told once.
   const [micFailures] = useState(() => new FailureStreak());
+  // The ears failing (offline the first time) fails again at every retry too: said once.
+  const [earsNotes] = useState(() => new EarsNotes());
   // The bubble listens for each question heard, and asks it.
   const [hearers] = useState(() => new Set<(text: string) => void>());
   const [onHeard] = useState(() => (handler: (text: string) => void) => {
@@ -76,9 +83,9 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
       ears: (mode) => new RemoteEars(window.tagalongHost, mode),
       openMic: () => openMic(latest.current.microphoneId),
       onSpeechStart: bargeIn,
-      onPartial: (text) => {
+      onPartial: (text, mode) => {
         micFailures.clear();
-        setPartial(shownPartial(text));
+        setPartial(shownPartial(text, mode));
       },
       onHeard: (text) => {
         micFailures.clear();
@@ -118,12 +125,9 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
     };
     const act = (action: TalkAction): void => {
       if (action === 'start') {
-        // Listening all the time already: the key and the mic button do nothing visible.
-        if (!keyStarts(controller.made.mode)) {
-          ptt.end();
-          return;
-        }
+        // Listening all the time too: the key still asks, without the name, then it resumes.
         micFailures.clear();
+        earsNotes.clear();
         controller.bargeIn();
         listening.current = true;
         setState('listening');
@@ -137,30 +141,37 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
         }, MAX_LISTEN_MS);
       } else if (action === 'stop') stop();
     };
-    const cancel = (): void => {
+    /** No question is pending any more: the bubble goes quiet. */
+    const quiet = (): void => {
       ptt.end();
       clearTimeout(timer.current);
-      controller.made.cancel();
       listening.current = false;
       setPartial(null);
       setState('idle');
     };
-    return { act, cancel };
+    // The bubble closed: the question goes, always listening goes on.
+    const cancel = (): void => {
+      controller.made.cancel();
+      quiet();
+    };
+    return { act, cancel, quiet };
   });
 
-  // The ears' models: the first time they download. A failure ends the question being asked.
+  // The ears' models: the first time they download. A failure ends the question being asked,
+  // and the always session until the next switch, call or system voice tries again.
   useEffect(
     () =>
       window.tagalongHost.onEarsStatus(({ status, message }) => {
-        if (status === 'loading') setNote(FIRST_TIME);
-        else if (status === 'ready')
-          setNote((current) => (current === FIRST_TIME ? null : current));
-        else if (listening.current) {
-          control.cancel();
-          setNote(message ?? 'Listening stopped. Try again.');
+        if (status !== 'failed') {
+          setNote(earsNotes.status(noteNow.current, status));
+          return;
         }
+        const asking = listening.current;
+        if (controller.made.earsFailed() !== 'always' && !asking) return;
+        control.quiet();
+        setNote(earsNotes.failed(noteNow.current, message));
       }),
-    [control],
+    [control, controller, earsNotes, setNote],
   );
 
   // Always listening, as switched in the bubble or Settings, and paused for a call.

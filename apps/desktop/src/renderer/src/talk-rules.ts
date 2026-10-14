@@ -1,13 +1,9 @@
 import { addressedToScout } from '@tagalong/protocol';
 import type { ListenMode } from '@tagalong/protocol';
 
-/**
- * The talk key or the mic button starts a held question, except while Scout listens all the
- * time: it already hears, and "Scout" asks. The key then does nothing visible.
- */
-export function keyStarts(mode: ListenMode | null): boolean {
-  return mode !== 'always';
-}
+export const FIRST_TIME =
+  'The first time, Tagalong downloads its speech models (about 43 MB). Speech is turned into text on this PC.';
+const EARS_FAILED = 'Listening stopped. Try again.';
 
 /**
  * A question is over: the bubble goes quiet unless a held question has already started. An
@@ -17,9 +13,13 @@ export function settles(mode: ListenMode | null): boolean {
   return mode !== 'held';
 }
 
-/** The words heard so far, without the "Scout" they start with. */
-export function shownPartial(text: string | null): string | null {
+/**
+ * The words heard so far. Listening all the time, without the "Scout" they start with; a held
+ * question needs no name, so it shows as said.
+ */
+export function shownPartial(text: string | null, mode: ListenMode): string | null {
   if (text === null || text === '') return null;
+  if (mode === 'held') return text;
   return addressedToScout(text) ?? text;
 }
 
@@ -40,5 +40,36 @@ export class FailureStreak {
   /** Something worked, or the person acted: the next failure is told again. */
   clear(): void {
     this.#failing = false;
+  }
+}
+
+/**
+ * The note the ears' status leaves in the bubble. The first time, the models download; a
+ * failure (offline, models that will not start) is said once, and the retries that always
+ * listening makes later (each a new download, each failing again) neither repeat it nor
+ * leave the first-time note behind.
+ */
+export class EarsNotes {
+  /** The failure said and not yet cleared. */
+  #told: string | null = null;
+
+  /** `loading` or `ready`, given the note shown now. */
+  status(note: string | null, status: 'loading' | 'ready'): string | null {
+    if (status === 'loading') return this.#told === null ? FIRST_TIME : note;
+    const told = this.#told;
+    this.#told = null;
+    return note === FIRST_TIME || (told !== null && note === told) ? null : note;
+  }
+
+  /** The ears failed while something listened, given the note shown now. */
+  failed(note: string | null, message: string | undefined): string | null {
+    if (this.#told !== null) return note === FIRST_TIME ? null : note;
+    this.#told = message ?? EARS_FAILED;
+    return this.#told;
+  }
+
+  /** The person acted (pressed the key, switched listening): the next failure is said again. */
+  clear(): void {
+    this.#told = null;
   }
 }

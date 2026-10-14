@@ -38,7 +38,12 @@ function LiveSwitches() {
           className="tg-switch"
           aria-checked={seeing}
           aria-labelledby="seeing-label"
-          onClick={() => void window.tagalongHost.toggleSightPause().then((p) => setSeeing(!p))}
+          onClick={() =>
+            void window.tagalongHost
+              .toggleSightPause()
+              .then((p) => setSeeing(!p))
+              .catch((error: unknown) => console.warn('[settings] could not switch Seeing', error))
+          }
         >
           {seeing ? 'On' : 'Off'}
         </button>
@@ -66,6 +71,9 @@ function LiveSwitches() {
             void window.tagalongHost
               .setListening(!listening)
               .then((state) => setListening(state.on))
+              .catch((error: unknown) =>
+                console.warn('[settings] could not switch Always listening', error),
+              )
           }
         >
           {listening ? 'On' : 'Off'}
