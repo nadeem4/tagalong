@@ -40,6 +40,11 @@ export class ListenController {
   #session: Session | null = null;
   /** Released held questions still waiting for their words; cancel drops them too. */
   readonly #released = new Set<Session>();
+  /**
+   * Every released session hears each turnEnd (one IPC event reaches all their handlers in
+   * one go): set once one has taken it, until that event is done, so it is taken once.
+   */
+  #taken = false;
 
   constructor(options: ListenControllerOptions) {
     this.#options = options;
@@ -81,7 +86,8 @@ export class ListenController {
     this.#session = null;
     session.live = false;
     void session.mic.then((mic) => mic?.close());
-    session.ears.stop();
+    // A mic that never opened never listened: a stop now could end another session.
+    if (session.opened) session.ears.stop();
   }
 
   #start(mode: ListenMode): void {
@@ -103,6 +109,10 @@ export class ListenController {
     ears.on('turnEnd', (text = '') => {
       if (!session.live || (session.mode === 'held' && !session.released)) return;
       if (session.mode === 'held') {
+        // The voice process ends sessions in order: a turnEnd is the oldest released question's.
+        if (this.#taken || this.#released.values().next().value !== session) return;
+        this.#taken = true;
+        queueMicrotask(() => (this.#taken = false));
         session.live = false;
         this.#released.delete(session);
       }

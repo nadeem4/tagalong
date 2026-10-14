@@ -168,6 +168,7 @@ describe('ListenController, held', () => {
     expect(calls.heard).toHaveBeenCalledOnce();
     expect(calls.heard).toHaveBeenLastCalledWith('first');
     expect(controller.mode).toBe('held');
+    await tick();
     controller.release();
     ears.say('turnEnd', 'second');
     expect(calls.heard).toHaveBeenCalledTimes(2);
@@ -217,5 +218,23 @@ describe('ListenController, held', () => {
     expect(ears.made[0]?.ears.listening).toBeNull();
     expect(calls.nothing).not.toHaveBeenCalled();
     expect(controller.mode).toBeNull();
+    // It never listened, so there is nothing to stop: a stop now could end another session.
+    expect(ears.made[0]?.ears.stopped).toBe(false);
+  });
+
+  it('released questions take their words in the order they were released', async () => {
+    const { controller, ears, calls } = setup();
+    controller.hold();
+    await tick();
+    controller.release();
+    controller.hold();
+    await tick();
+    controller.release();
+    ears.say('turnEnd', 'first');
+    expect(calls.heard.mock.calls).toEqual([['first']]);
+    // Each ears event crosses IPC as its own message, so the next one comes in a later task.
+    await tick();
+    ears.say('turnEnd', 'second');
+    expect(calls.heard.mock.calls).toEqual([['first'], ['second']]);
   });
 });

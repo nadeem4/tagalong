@@ -1642,7 +1642,8 @@ flowchart LR
   heard as nothing said; one that opens after a cancel is closed unused too. Every window hears the one stream of ears
   events and the voice process runs sessions one after another, so a held session takes a turnEnd only
   once it has been released: a released question's words that arrive after the next press began go to
-  the released question. `speechStart` stops Scout talking, each `partial` shows in the bubble as the
+  the released question, and released questions take turnEnds in the order they were released, each
+  one once. A cancel never sends a stop for a mic that never opened. `speechStart` stops Scout talking, each `partial` shows in the bubble as the
   words heard so far (`BubbleTalk.partial`), and the trimmed turnEnd text is asked (empty: "I didn't
   catch that"). `openMic` (`getUserMedia` with the microphone from `voice.microphoneId` or the
   system default, echo cancellation, noise suppression and auto gain on) runs an `AudioContext` at
