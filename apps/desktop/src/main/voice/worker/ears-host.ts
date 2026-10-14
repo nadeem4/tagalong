@@ -34,11 +34,15 @@ export function createEarsHost(options: {
   // Sessions run one after another: the models hold state, so two must never share them.
   let previous: Promise<void> = Promise.resolve();
 
-  /** Stop or replace a session; a session that never made it to the ears is finished now. */
+  /**
+   * Stop or replace a session; a session that never made it to the ears is finished now. A
+   * held question let go only ends its inbox: the ears hear the frames still queued (behind
+   * a slow decode) and end the turn when the inbox runs dry, so the last words are kept.
+   */
   const end = (current: Session, superseded: boolean): void => {
     current.superseded = superseded;
     current.stopped = true;
-    current.ears?.stop();
+    if (superseded || current.mode === 'always') current.ears?.stop();
     current.inbox.end();
     if (current.ears === null ? superseded || current.mode === 'always' : current.mode === 'always')
       current.finish();

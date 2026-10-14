@@ -25,6 +25,16 @@ describe('FakeEars', () => {
     expect(events.slice(-2)).toEqual([`final:${FAKE_TRANSCRIPT}`, `turnEnd:${FAKE_TRANSCRIPT}`]);
   });
 
+  it('held: hears the fixed question once when the mic ends, as listening stopping does', async () => {
+    const { ears, events, mic } = run('held');
+    mic.push(FRAME);
+    mic.end();
+    await tick();
+    expect(events.at(-1)).toBe(`turnEnd:${FAKE_TRANSCRIPT}`);
+    ears.stop();
+    expect(events.filter((e) => e.startsWith('turnEnd'))).toEqual([`turnEnd:${FAKE_TRANSCRIPT}`]);
+  });
+
   it('always: ends one turn by itself after a few frames, addressing Scout, needing no model', async () => {
     const { events, mic } = run('always');
     for (let i = 0; i < FAKE_TURN_FRAMES; i += 1) mic.push(FRAME);

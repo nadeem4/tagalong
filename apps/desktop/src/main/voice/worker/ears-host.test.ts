@@ -118,6 +118,42 @@ describe('createEarsHost', () => {
     ]);
   });
 
+  it('hears the frames still queued behind a slow decode when the key is released', async () => {
+    const posted: FromWorker[] = [];
+    let words = 0;
+    const decodes: (() => void)[] = [];
+    const parts: EarsParts = {
+      vad: { accept: async (f) => f[0] !== 0 },
+      stt: {
+        accept: (f) => void (f[0] !== 0 && (words += 1)),
+        // A slow decode, as Moonshine's live words take a few hundred ms: done when the test says.
+        text: () =>
+          new Promise<string>((resolve) =>
+            decodes.push(() => resolve(Array(words).fill('w').join(' '))),
+          ),
+        reset: () => void (words = 0),
+      },
+      turn: { complete: async () => 1 },
+    };
+    const host = createEarsHost({
+      fake: false,
+      load: async () => parts,
+      post: (m) => posted.push(m),
+    });
+    host({ kind: 'ears.listen', mode: 'held' });
+    for (let i = 0; i < 10; i += 1) host({ kind: 'ears.frame', samples: LOUD });
+    await settle();
+    // The tenth frame is waiting on live words; six more arrive, then the key comes up.
+    for (let i = 0; i < 6; i += 1) host({ kind: 'ears.frame', samples: LOUD });
+    host({ kind: 'ears.stop' });
+    for (let i = 0; i < 20; i += 1) {
+      await tick();
+      decodes.splice(0).forEach((decode) => decode());
+    }
+    const ends = earsEvents(posted).filter((e) => e.startsWith('turnEnd'));
+    expect(ends).toEqual([`turnEnd:${Array(16).fill('w').join(' ')}`]);
+  });
+
   it('keeps the order when a session is skipped between two others', async () => {
     const posted: FromWorker[] = [];
     const seen: string[] = [];
@@ -251,7 +287,9 @@ describe('createEarsHost', () => {
     host({ kind: 'ears.frame', samples: LOUD });
     await tick();
     host({ kind: 'ears.stop' });
+    await tick();
     expect(load).not.toHaveBeenCalled();
+    expect(posted.filter((m) => m.kind === 'ears' && m.event === 'turnEnd')).toHaveLength(1);
     expect(posted.at(-1)).toEqual({
       kind: 'ears',
       event: 'turnEnd',

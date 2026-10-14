@@ -35,6 +35,8 @@ export class FakeEars implements Ears {
         }
         if (this.#mode === 'always' && this.#frames === FAKE_TURN_FRAMES) this.#finish();
       }
+      // A held mic that ends means listening stopped, as with the local ears.
+      if (this.#mode === 'held' && !this.#done) this.#finish();
     })();
   }
 
