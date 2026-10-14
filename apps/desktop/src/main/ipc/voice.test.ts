@@ -142,4 +142,20 @@ describe('forwardEars', () => {
     listeners.forEach((l) => l({ kind: 'ears', event: 'partial', text: 'Scout, what' }));
     expect(onSpoken).toHaveBeenCalledOnce();
   });
+
+  it('"Scout, stop" switches listening off without bringing the bubble up', () => {
+    const listeners: ((m: FromWorker) => void)[] = [];
+    const onSpoken = vi.fn();
+    const sent: [string, unknown][] = [];
+    forwardEars(
+      { onMessage: (l) => (listeners.push(l), () => undefined), onExit: () => () => undefined },
+      (channel, payload) => void sent.push([channel, payload]),
+      onSpoken,
+    );
+    listeners.forEach((l) => l({ kind: 'ears', event: 'partial', text: 'Scout, stop' }));
+    listeners.forEach((l) => l({ kind: 'ears', event: 'turnEnd', text: 'Scout, stop listening.' }));
+    expect(onSpoken).not.toHaveBeenCalled();
+    // The panel still hears it, and switches listening off.
+    expect(sent).toHaveLength(2);
+  });
 });

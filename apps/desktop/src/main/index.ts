@@ -17,7 +17,12 @@ import {
 import { ContextSnapshot, HandoffFinishedParams, RoutineResultParams } from '@tagalong/protocol';
 import type { PerceptionTarget, Settings, SettingsPatch } from '@tagalong/protocol';
 import { SettingsStore } from '@tagalong/core';
-import { AlwaysListening, startListeningGuard } from './always-listening';
+import {
+  AlwaysListening,
+  listeningPaused,
+  saveListening,
+  startListeningGuard,
+} from './always-listening';
 import { systemClock } from './awareness/clock';
 import { handoffNotice } from './handoff-notice';
 import { routineDelivery } from './routine-delivery';
@@ -297,35 +302,36 @@ async function start(): Promise<void> {
     desktop?.tray.setToolTip(paused ? 'Tagalong — sight is paused' : 'Tagalong');
   });
 
-  // Every window that shows Always listening follows this one state. Only `on` is saved,
-  // never `paused`: a call or full screen is not a choice the person made.
-  let savedListening = settings.listening.always;
+  // Every window that shows Always listening follows this one state. Only `on` is saved.
   listening.onChange((state) => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send(IPC.listeningEvent, state);
     }
-    if (state.on === savedListening) return;
-    savedListening = state.on;
-    const current = desktop;
-    if (current?.host == null) {
-      console.warn('[main] could not save Always listening: the engine is not running');
-      return;
-    }
-    current.host.client
-      .call('settings.set', { patch: { listening: { always: state.on } } })
-      .then(({ settings: saved }) => {
-        current.settings = saved;
-      })
-      .catch((error: unknown) => console.warn('[main] could not save Always listening', error));
   });
-  // A call or a full-screen window in front pauses listening, as it does keeping an eye.
+  listening.onChange(
+    saveListening({
+      saved: settings.listening.always,
+      host: () => desktop?.host ?? null,
+      settingsStore: () => settingsStore,
+      onSaved: (saved) => {
+        if (desktop !== null) desktop.settings = saved;
+      },
+    }),
+  );
+  // A call or a full-screen window in front pauses listening, as it does keeping an eye, and
+  // so do the pets being hidden (none shown yet: the avatar is made below).
+  pauseListening = (change) => {
+    listeningWhy = { ...listeningWhy, ...change };
+    listening.setPaused(listeningPaused(listeningWhy));
+  };
+  pauseListening({});
   stopListeningGuard = startListeningGuard({
-    active: () => listening.state.on,
+    listening,
     list: async () => {
       const exclusions = desktop?.settings.captureExclusions ?? settings.captureExclusions;
       return (await platform.listWindows(exclusions, { countText: false })).windows;
     },
-    onBlocked: (blocked) => listening.setPaused(blocked),
+    onBlocked: (blocked) => pauseListening({ blocked }),
   });
 
   registerIpc();
@@ -376,6 +382,11 @@ async function start(): Promise<void> {
         .catch((error: unknown) => console.warn('[main] could not persist avatar position', error));
     },
   });
+  // The pets hidden (the tray's Hide pets, or Welcome first): listening waits for them.
+  const avatar = desktop.avatar;
+  avatar.on('show', () => pauseListening({ petsShown: true }));
+  avatar.on('hide', () => pauseListening({ petsShown: false }));
+  pauseListening({ petsShown: avatar.isVisible() });
 
   // Deliberately not a modal, and deliberately not fatal. The only way to store an
   // accelerator that cannot be registered is to type it into Settings, so refusing to
@@ -408,6 +419,9 @@ async function start(): Promise<void> {
 let stopKeepAnEye = (): void => undefined;
 /** Stops the Always-listening guard on quit. */
 let stopListeningGuard = (): void => undefined;
+/** Why Always listening waits: a call or full screen in front, or the pets hidden. */
+let listeningWhy = { blocked: false, petsShown: false };
+let pauseListening: (change: Partial<typeof listeningWhy>) => void = () => undefined;
 
 /**
  * Scout has one thing to say from keeping an eye on things: one quiet line beside the pet,

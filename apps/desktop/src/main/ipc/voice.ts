@@ -1,4 +1,4 @@
-import { addressedToScout } from '@tagalong/protocol';
+import { addressedToScout, isStopListening } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
 import type { SpeakPreview } from '../../shared/ipc';
 import type { AlwaysListening } from '../always-listening';
@@ -80,7 +80,7 @@ export function registerVoiceIpc(handle: IpcHandle, deps: VoiceIpcDeps): void {
 /**
  * What the ears say goes to the windows; a dead voice process is said plainly. `onSpoken`
  * hears words addressed to Scout, so the bubble can come up: never bare speech, never talk
- * that does not start with the name.
+ * that does not start with the name, and never "Scout, stop", which only switches listening off.
  */
 export function forwardEars(
   worker: Pick<VoiceWorker, 'onMessage' | 'onExit'>,
@@ -89,14 +89,11 @@ export function forwardEars(
 ): void {
   worker.onMessage((message) => {
     if (message.kind === 'ears') {
-      if (
-        onSpoken !== undefined &&
-        (message.event === 'partial' || message.event === 'turnEnd') &&
-        message.text !== undefined &&
-        addressedToScout(message.text) !== null
-      ) {
-        onSpoken();
-      }
+      const question =
+        (message.event === 'partial' || message.event === 'turnEnd') && message.text !== undefined
+          ? addressedToScout(message.text)
+          : null;
+      if (onSpoken !== undefined && question !== null && !isStopListening(question)) onSpoken();
       send(
         IPC.earsEvent,
         message.text === undefined

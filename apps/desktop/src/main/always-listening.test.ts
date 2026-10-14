@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { WindowEntry } from '@tagalong/protocol';
+import type { Settings, WindowEntry } from '@tagalong/protocol';
 import {
   AlwaysListening,
   LISTENING_GUARD_MS,
   listeningBlocked,
+  listeningPaused,
+  saveListening,
   startListeningGuard,
 } from './always-listening';
+import type { EngineCall } from './ipc/handle';
 
 const win = (change: Partial<WindowEntry>): WindowEntry => ({
   id: '1',
@@ -52,26 +55,150 @@ describe('listeningBlocked', () => {
   });
 });
 
+describe('listeningPaused', () => {
+  it('pauses for a call or full screen, and while the pets are hidden: the mark is then never out of sight', () => {
+    expect(listeningPaused({ blocked: false, petsShown: true })).toBe(false);
+    expect(listeningPaused({ blocked: true, petsShown: true })).toBe(true);
+    expect(listeningPaused({ blocked: false, petsShown: false })).toBe(true);
+    expect(listeningPaused({ blocked: true, petsShown: false })).toBe(true);
+  });
+});
+
 describe('startListeningGuard', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
   it('checks only while listening is on, and keeps the last answer when a listing fails', async () => {
-    let active = false;
+    const listening = new AlwaysListening();
     const list = vi
       .fn()
       .mockResolvedValueOnce([win({ fullScreen: true })])
       .mockRejectedValueOnce(new Error('sight paused'))
       .mockResolvedValue([win({})]);
     const onBlocked = vi.fn();
-    const stop = startListeningGuard({ active: () => active, list, onBlocked });
+    const stop = startListeningGuard({ listening, list, onBlocked });
     await vi.advanceTimersByTimeAsync(LISTENING_GUARD_MS);
     expect(list).not.toHaveBeenCalled();
-    active = true;
-    await vi.advanceTimersByTimeAsync(LISTENING_GUARD_MS);
+    listening.set(true);
+    await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(LISTENING_GUARD_MS);
     await vi.advanceTimersByTimeAsync(LISTENING_GUARD_MS);
     expect(onBlocked.mock.calls).toEqual([[true], [false]]);
     stop();
+  });
+
+  it('checks the front window at once when switched on, so the mic never opens during a call', async () => {
+    const listening = new AlwaysListening();
+    const list = vi.fn().mockResolvedValue([win({ processName: 'ms-teams.exe' })]);
+    const onBlocked = vi.fn();
+    const stop = startListeningGuard({ listening, list, onBlocked });
+    listening.set(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onBlocked.mock.calls).toEqual([[true]]);
+    stop();
+  });
+
+  it('checks at once at launch when listening was left on', async () => {
+    const list = vi.fn().mockResolvedValue([win({ fullScreen: true })]);
+    const onBlocked = vi.fn();
+    const stop = startListeningGuard({ listening: new AlwaysListening(true), list, onBlocked });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onBlocked.mock.calls).toEqual([[true]]);
+    stop();
+  });
+
+  it('forgets its answer when switched off, so switching on during the same call pauses again', async () => {
+    const listening = new AlwaysListening(true);
+    const list = vi.fn().mockResolvedValue([win({ fullScreen: true })]);
+    const onBlocked = vi.fn();
+    const stop = startListeningGuard({ listening, list, onBlocked });
+    await vi.advanceTimersByTimeAsync(0);
+    listening.set(false);
+    expect(onBlocked.mock.calls).toEqual([[true], [false]]);
+    listening.set(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onBlocked.mock.calls).toEqual([[true], [false], [true]]);
+    stop();
+  });
+
+  it('ignores a listing that comes back after listening was switched off', async () => {
+    let answer!: (windows: WindowEntry[]) => void;
+    const listening = new AlwaysListening(true);
+    const list = vi.fn(() => new Promise<WindowEntry[]>((resolve) => (answer = resolve)));
+    const onBlocked = vi.fn();
+    const stop = startListeningGuard({ listening, list, onBlocked });
+    listening.set(false);
+    answer([win({ fullScreen: true })]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onBlocked).not.toHaveBeenCalled();
+    stop();
+  });
+});
+
+describe('saveListening', () => {
+  const saved = (always: boolean) => ({ listening: { always } }) as unknown as Settings;
+  const hostWith = (call: ReturnType<typeof vi.fn>) => ({
+    client: { call } as unknown as EngineCall,
+  });
+
+  it('saves only a change of on, through the engine', async () => {
+    const call = vi.fn(async () => ({ settings: saved(true) }));
+    const onSaved = vi.fn();
+    const save = saveListening({
+      saved: false,
+      host: () => hostWith(call),
+      settingsStore: () => ({ set: vi.fn() }),
+      onSaved,
+    });
+    save({ on: false, paused: true });
+    save({ on: true, paused: false });
+    await vi.waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved(true)));
+    expect(call.mock.calls).toEqual([['settings.set', { patch: { listening: { always: true } } }]]);
+    save({ on: true, paused: true });
+    expect(call).toHaveBeenCalledOnce();
+  });
+
+  it('saves to the settings file when the engine is not running', () => {
+    const set = vi.fn(() => saved(false));
+    const onSaved = vi.fn();
+    const save = saveListening({
+      saved: true,
+      host: () => null,
+      settingsStore: () => ({ set }),
+      onSaved,
+    });
+    save({ on: false, paused: false });
+    expect(set).toHaveBeenCalledWith({ listening: { always: false } });
+    expect(onSaved).toHaveBeenCalledWith(saved(false));
+  });
+
+  it('tries again at the next change after a save failed, so switching off is never lost', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const call = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('engine busy'))
+      .mockResolvedValue({ settings: saved(false) });
+    const set = vi.fn(() => {
+      throw new Error('disk full');
+    });
+    const onSaved = vi.fn();
+    let host: ReturnType<typeof hostWith> | null = null;
+    const save = saveListening({
+      saved: true,
+      host: () => host,
+      settingsStore: () => ({ set }),
+      onSaved,
+    });
+    save({ on: false, paused: false });
+    expect(warn).toHaveBeenCalledOnce();
+    host = hostWith(call);
+    save({ on: false, paused: true });
+    await vi.waitFor(() => expect(warn).toHaveBeenCalledTimes(2));
+    save({ on: false, paused: false });
+    await vi.waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved(false)));
+    expect(call).toHaveBeenCalledTimes(2);
+    save({ on: false, paused: true });
+    expect(call).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
   });
 });
