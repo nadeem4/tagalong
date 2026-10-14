@@ -35,6 +35,8 @@ export interface BubbleTalk {
   keyLabel: string;
   /** The mic button: click to talk, click again to send. */
   onMic: () => void;
+  /** Always listening: a saved setting, off by default. Paused during a call or full screen. */
+  always?: { on: boolean; paused: boolean; onToggle: () => void };
 }
 
 export interface CompanionBubbleProps {
@@ -75,6 +77,8 @@ export interface CompanionBubbleProps {
   resume?: { conversationId: string; question: string; answer: string };
   /** Talk to Scout: the mic button, the listening state and what was heard. */
   talk?: BubbleTalk;
+  /** Whether Scout may look at the screen: the Seeing switch in the header. */
+  seeing?: { on: boolean; onToggle: () => void };
 }
 
 /** A question and how it was answered, once it is over. */
@@ -155,6 +159,7 @@ export function CompanionBubble({
   onStopSpeaking,
   resume,
   talk,
+  seeing,
 }: CompanionBubbleProps) {
   const bridge = useHostBridge();
   const [draft, setDraft] = useState('');
@@ -318,14 +323,50 @@ export function CompanionBubble({
       </svg>
     </button>
   );
+  const alwaysToggle = talk?.always !== undefined && (
+    <button
+      type="button"
+      role="switch"
+      className="bubble-toggle"
+      aria-checked={talk.always.on}
+      onClick={talk.always.onToggle}
+      title={
+        talk.always.on
+          ? 'Scout is listening all the time. Click to stop.'
+          : 'Let Scout listen all the time'
+      }
+    >
+      Always listening
+    </button>
+  );
+  const seeingToggle = seeing !== undefined && (
+    <button
+      type="button"
+      role="switch"
+      className="bubble-toggle"
+      aria-checked={seeing.on}
+      onClick={seeing.onToggle}
+      title={
+        seeing.on
+          ? 'Scout can see your screen. Click to pause.'
+          : 'Sight is paused. Click to let Scout see.'
+      }
+    >
+      Seeing
+    </button>
+  );
   const talkLine =
     talk === undefined
       ? null
-      : talk.state === 'listening'
-        ? 'Listening… let go of the key, or click the mic, to send.'
-        : talk.state === 'hearing'
-          ? 'Turning that into text…'
-          : null;
+      : talk.always?.on === true && talk.state === 'idle'
+        ? talk.always.paused
+          ? 'Listening paused during a call or full screen.'
+          : 'Listening. Start with “Scout” to ask.'
+        : talk.state === 'listening'
+          ? 'Listening… let go of the key, or click the mic, to send.'
+          : talk.state === 'hearing'
+            ? 'Turning that into text…'
+            : null;
   const talkStatus = talk !== undefined && (talkLine !== null || talk.note !== null) && (
     <p role="status" className="bubble-listening" data-state={talk.state}>
       {talk.state !== 'idle' && <span className="bubble-listening-dot" aria-hidden="true" />}
@@ -527,6 +568,7 @@ export function CompanionBubble({
           if (event.key === 'Enter') send();
         }}
       />
+      {micButton}
     </label>
   );
 
@@ -546,7 +588,8 @@ export function CompanionBubble({
           <header className="bubble-head">
             <strong>{petName}</strong>
             <span className="bubble-row">
-              {micButton}
+              {alwaysToggle}
+              {seeingToggle}
               {speakingIndicator}
               {onCollapse !== undefined && (
                 <button type="button" className="bubble-quiet" onClick={onCollapse}>
@@ -598,7 +641,8 @@ export function CompanionBubble({
         <div className="bubble-top">
           {chipList || <span />}
           <span className="bubble-row">
-            {micButton}
+            {alwaysToggle}
+            {seeingToggle}
             {speakingIndicator}
             {closeButton}
           </span>
@@ -915,6 +959,18 @@ const BUBBLE_CSS = `
 .bubble-mic:hover { background: #222845; color: ${t.color.text}; }
 .bubble-mic[aria-pressed='true'] { background: ${t.color.gold}; color: ${t.color.goldInk}; }
 .bubble-mic:focus-visible { outline: 2px solid #7CB8F2; outline-offset: 2px; }
+.bubble-toggle {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px;
+  border: 1px solid ${t.color.fieldLine}; border-radius: 999px; background: transparent;
+  color: ${t.color.textMuted}; font: inherit; font-size: 12px; cursor: pointer;
+}
+.bubble-toggle::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%; background: ${t.color.fieldLine};
+}
+.bubble-toggle:hover { background: #222845; color: ${t.color.text}; }
+.bubble-toggle[aria-checked='true'] { color: ${t.color.text}; border-color: ${t.color.gold}; }
+.bubble-toggle[aria-checked='true']::before { background: ${t.color.gold}; }
+.bubble-toggle:focus-visible { outline: 2px solid #7CB8F2; outline-offset: 2px; }
 .bubble-heard {
   align-self: flex-end; max-width: 85%; margin: 0; padding: 6px 10px; border-radius: 10px 10px 4px 10px;
   background: #222845; color: #C9CEE0; font-size: 13px; line-height: 1.45;
@@ -952,11 +1008,12 @@ const BUBBLE_CSS = `
   width: 24px; height: 24px; border: 0; border-radius: 50%; background: transparent;
   color: ${t.color.textMuted}; cursor: pointer;
 }
-.bubble-field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: ${t.color.textMuted}; }
+.bubble-field { position: relative; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: ${t.color.textMuted}; }
 .bubble-field input {
-  height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid #7CB8F2;
+  height: 44px; box-sizing: border-box; padding: 0 44px 0 12px; border: 1px solid #7CB8F2;
   border-radius: 8px; background: ${t.color.field}; color: ${t.color.text}; font: inherit; font-size: 14px;
 }
+.bubble-field .bubble-mic { position: absolute; right: 6px; bottom: 8px; }
 .bubble-row { display: flex; align-items: center; gap: 12px; }
 .bubble-hello { display: grid; gap: 6px; }
 .bubble-hints { font-size: 11px; color: ${t.color.textMuted}; }

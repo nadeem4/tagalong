@@ -1474,6 +1474,10 @@ above a **Message** box. It is the same component, so it is the same conversatio
 - **One question, one answer, in place.** Enter asks; the answer streams into the bubble with
   **Stop**; the next question continues the conversation `turn.started` reported. Turns of other
   pets are ignored. Errors say what went wrong in a `role="alert"` line.
+- **The mic is in the text box; the header has two switches.** The mic button sits inside the
+  question box. The header carries **Always listening** (off by default; when on, the bubble says
+  to start with "Scout", or that listening is paused during a call or full screen) and **Seeing**,
+  both `role="switch"` buttons with `aria-checked`.
 - **Answers are formatted, not raw Markdown.** `Answer` (`@tagalong/ui`) renders every answer, in
   the bubble, the full chat and an expert's result, with `react-markdown` and `remark-gfm`: bold,
   lists, headings, code, tables. HTML in an answer is skipped, and a link shows as text with its
