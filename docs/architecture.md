@@ -1237,8 +1237,9 @@ A blind pet gets the same facts as text and is told it has not seen the pictures
 ### Watch mode
 
 `packages/core/src/watch/` holds it. `watch_for(condition, displayId?, rect?, timeoutMinutes?)` is a
-tool that knows its caller, because the watch belongs to the pet that called it. No shipped role lists
-it since the crew's roles went, so the companion is not offered it today. Without a `displayId` it
+tool that knows its caller, because the watch belongs to the pet that called it. The companion role
+lists it, with `recall_screen`, `what_changed`, `look_closer`, `list_displays` and `look_at_display`;
+a routine's own turn never gets it (see Routines). Without a `displayId` it
 watches the display of the window in front and remembers that window for a text-only check. The
 `WatchManager` belongs to the engine, not the turn — a watch outlives the reply that started it — and
 runs on an injected clock, so every timing rule below is unit tested with a fake one.

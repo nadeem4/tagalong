@@ -116,10 +116,16 @@ describe('ToolRegistry.forTurn', () => {
     expect(tools.map((tool) => tool.id)).toEqual([
       'look_at_screen',
       'get_selection',
+      'list_displays',
+      'look_at_display',
+      'look_closer',
       'list_windows',
       'read_window_text',
       'look_at_window',
+      'recall_screen',
+      'what_changed',
       'remember',
+      'watch_for',
       'hand_to_expert',
       'create_routine',
       'change_routine',
@@ -176,17 +182,16 @@ describe('toolsFor', () => {
     );
   });
 
-  it('never offers or runs a tool outside the role', async () => {
-    const memory = fakeMemory();
-    const turn = new ToolRegistry(everything({ memory, toolsFor })).forTurn(
-      fakeTurn({ pet: { ...FAKE_TURN_PET, roleId: 'companion' } }),
-    );
+  it('never offers a tool outside the role', () => {
+    const pet = { ...FAKE_TURN_PET, roleId: 'companion' };
+    const turn = new ToolRegistry(everything({ toolsFor })).forTurn(fakeTurn({ pet }));
     const offered = turn.definitions.map((definition) => definition.name);
     for (const name of offered) expect(companion.tools).toContain(name);
-    expect(offered).not.toContain('watch_for');
 
-    const outcome = await turn.run({ name: 'watch_for', input: { condition: 'a build ends' } });
-    expect(outcome.isError).toBe(true);
+    const outside = { ...turn.tools[0]!, id: 'write_file' };
+    expect(toolsFor(pet, [...turn.tools, outside]).map((tool) => tool.id)).not.toContain(
+      'write_file',
+    );
   });
 
   it('never offers or runs watch_for on a routine’s turn, so a watch routine cannot loop', async () => {
@@ -196,6 +201,17 @@ describe('toolsFor', () => {
     expect(turn.definitions.map((definition) => definition.name)).not.toContain('watch_for');
     const outcome = await turn.run({ name: 'watch_for', input: { condition: 'a build ends' } });
     expect(outcome.isError).toBe(true);
+  });
+
+  it('never offers watch_for to the companion on a routine’s turn, though its role lists it', () => {
+    const turn = new ToolRegistry(everything({ toolsFor })).forTurn(
+      fakeTurn({
+        pet: { ...FAKE_TURN_PET, roleId: 'companion' },
+        routine: { routineId: 'r', handedOff: () => undefined },
+      }),
+    );
+    expect(companion.tools).toContain('watch_for');
+    expect(turn.definitions.map((definition) => definition.name)).not.toContain('watch_for');
   });
 
   it("takes away a role's tool the pet's grants turn off", () => {
@@ -209,9 +225,14 @@ describe('toolsFor', () => {
   });
 
   it('cannot grant a tool the role does not list', () => {
-    expect(
-      ids({ ...FAKE_TURN_PET, roleId: 'companion', toolGrants: { watch_for: 'allowed' } }),
-    ).not.toContain('watch_for');
+    const pet: Pet = {
+      ...FAKE_TURN_PET,
+      roleId: 'companion',
+      toolGrants: { write_file: 'allowed' },
+    };
+    const tools = new ToolRegistry(everything()).forTurn(fakeTurn({ pet })).tools;
+    const outside = { ...tools[0]!, id: 'write_file' };
+    expect(toolsFor(pet, [...tools, outside]).map((tool) => tool.id)).not.toContain('write_file');
   });
 
   it("gives a pet with a role the library does not have the companion's tools", () => {

@@ -32,7 +32,7 @@ flowchart LR
   T -- "last N messages" --> W
   S -- "recall" --> W
   P -- "recall" --> W
-  R -. "recall tools, not offered to Scout yet" .-> W
+  R -. "recall_screen, what_changed, when asked" .-> W
 ```
 
 ## Working memory: building one turn
@@ -84,5 +84,5 @@ Built in the desktop host (`apps/desktop/src/main/awareness/`), off by default (
 - One small frame per display every five seconds, kept in RAM for the last ten minutes (1 to 30).
 - Never written to disk. Pausing sight or quitting throws it away; blind spots are never recorded.
 - A red dot shows on Scout while it records.
-- The engine's `recall_screen` and `what_changed` tools read it, but the Companion role does not
-  list them, so Scout cannot use it yet.
+- Scout reads it back with `recall_screen` and `what_changed` when you ask about something seen
+  earlier or what changed.
