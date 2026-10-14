@@ -39,6 +39,7 @@ tagalong/
       perception/                   # exclusions, retention, inventory, text layer, browser routing
       tools/                        # tool.ts (the Tool shape), registry.ts, builtin/ (the built-ins and connected-app tools)
       connections/                  # MCP client: manager, OAuth + loopback, approvals, catalog, Claude Code reader, fake server
+                                    # (Home's page: ui/src/home/connections-panel.tsx; the bubble's card: ui/src/connector-confirm.tsx)
       memory/                       # db.ts (numbered migrations), store.ts (ConversationStore)
       pets/registry.ts              # PetRegistry, the default pet Scout
       roles/                        # library.generated.ts, listRoles, getRole, recommendedModel, tiers.ts

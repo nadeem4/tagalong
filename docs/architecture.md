@@ -525,6 +525,18 @@ WebSocket and SDK servers are skipped. `connections.add { name, transport, auth,
 `connections.setEnabled`, `connections.signIn` and `connections.remove` (Disconnect: closes it,
 deletes every key and token, and forgets it) complete the set.
 
+**In the desktop host.** `EngineOptions.openBrowser` is `shell.openExternal`, for https sign-in
+pages only (`isSignInPage` in `links.ts`). Home's **Connections** page (`ConnectionsPanel`,
+`packages/ui/src/home/connections-panel.tsx`) reads `connections.list` and follows
+`connections.changed`: Connected (status chip, a plain line, the tools as Reads or Asks first, the
+switch, Sign in again, Disconnect with a second press), Popular (Connect; GitHub asks for its token
+in a password field), Found on this PC (Use; any value Claude Code kept is asked for), and Add a
+connector (an https address with its sign-in kind, or a command with `NAME=value` lines that go to
+the keychain). `connector.confirm` brings up Scout's bubble, which shows `ConnectorConfirmCard`
+(`packages/ui/src/connector-confirm.tsx`, built from the hand-off card's styles): the app, what will
+change, the details Scout filled in, **Allow once** and **Cancel**, answered with `tool.approve`.
+The card goes away when it is answered or when its turn ends.
+
 Tests never reach a real app: `fakeMcpServer` (`connections/fake-server.ts`) is an SDK server in the
 same process over the SDK's in-memory transport, `FakeOAuthTransport` plays an app behind OAuth, and
 `EngineOptions.connectorTransport` and `claudeCodeConfigPath` point the engine at them.

@@ -479,10 +479,10 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
   const home = await windowFor('office');
   await expect(home).toHaveTitle('Home');
 
-  // One companion and five pages; no crew and no office scene.
+  // One companion and six pages; no crew and no office scene.
   const nav = home.getByRole('navigation', { name: 'Tagalong' });
   await expect(nav.getByRole('button')).toHaveText(
-    ['Overview', 'Scout', 'Experts', 'Activity', 'Settings'],
+    ['Overview', 'Scout', 'Experts', 'Connections', 'Activity', 'Settings'],
     { timeout: 15_000 },
   );
   const pets = await panel.evaluate(() => window.tagalong.listPets());
@@ -504,6 +504,13 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
   // The Experts page lists the tools the companion hands work to.
   await nav.getByRole('button', { name: 'Experts' }).click();
   await expect(home.getByRole('button', { name: 'Add expert' })).toBeVisible();
+
+  // The Connections page offers the popular apps; nothing connects until Connect is pressed.
+  await nav.getByRole('button', { name: 'Connections' }).click();
+  await expect(home.getByRole('button', { name: 'Connect Notion' })).toBeVisible({
+    timeout: 15_000,
+  });
+  await home.screenshot({ path: join(appDir, 'test-results', 'connections.png') });
 
   // The bundled typefaces must load under the page's CSP, or Home falls back to system
   // fonts without saying so.

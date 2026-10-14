@@ -75,7 +75,7 @@ function renderHome(
 }
 
 describe('HomeView', () => {
-  it('is one window: Scout and five pages, with no crew and no office', async () => {
+  it('is one window: Scout and six pages, with no crew and no office', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     const nav = await screen.findByRole('navigation', { name: 'Tagalong' });
     expect(within(nav).getByText('Your companion')).toBeVisible();
@@ -83,7 +83,7 @@ describe('HomeView', () => {
       within(nav)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['Overview', 'Scout', 'Experts', 'Activity', 'Settings']);
+    ).toEqual(['Overview', 'Scout', 'Experts', 'Connections', 'Activity', 'Settings']);
   });
 
   it('opens on an overview: how Scout thinks, the experts, and what happened lately', async () => {

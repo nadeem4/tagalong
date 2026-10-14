@@ -81,8 +81,12 @@ its result.
   hello, a moment that warrants it), and the intro and the launch line greet you by it.
 - Speech runs on the computer (Kokoro, downloaded on first use); ElevenLabs is an optional
   bring-your-own-key voice that receives only the words spoken.
-- Not built yet: voice input (push to talk), connecting apps (Notion, GitHub, calendar) over MCP,
-  routines, expert templates, cost dashboard, macOS and Linux. The roadmap lives in Notion.
+- Connections: Scout uses the person's apps over MCP (Notion, GitHub, Linear, the servers already
+  in Claude Code, or any MCP server). It reads on its own; every change shows a confirm card and
+  runs only on Allow once. Tokens live in the OS keychain.
+- Not built yet: voice input (push to talk), routines, expert templates, cost dashboard, macOS and
+  Linux. Google Calendar and Gmail are not in Popular: their official MCP servers are a developer
+  preview that needs your own Google Cloud project. The roadmap lives in Notion.
 
 ## Brand Commitments
 
@@ -93,8 +97,8 @@ its result.
 
 ## Evidence on Hand
 
-- Working Windows build with Scout, sight, keep an eye, voice, experts (Claude Code), Home and the
-  Chrome extension.
+- Working Windows build with Scout, sight, keep an eye, voice, experts (Claude Code), connected
+  apps (MCP), Home and the Chrome extension.
 - No users, testimonials, metrics or press yet. Do not invent any.
 
 ## Product Principles

@@ -1,4 +1,5 @@
-import { app } from 'electron';
+import { app, shell } from 'electron';
+import { isSignInPage } from './links';
 import { Engine } from '@tagalong/core';
 import type { SecretStore } from '@tagalong/core';
 import type {
@@ -48,6 +49,11 @@ export async function startEngineHost(options: StartEngineHostOptions): Promise<
     secretStore: options.secrets,
     engineVersion: app.getVersion(),
     env: process.env,
+    // A connected app's sign-in, in the system browser; it comes back to a loopback.
+    openBrowser: async (url) => {
+      if (!isSignInPage(url)) throw new Error('That sign-in page is not https.');
+      await shell.openExternal(url);
+    },
   });
 
   const client = await EngineClient.connect({

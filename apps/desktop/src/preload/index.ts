@@ -2,6 +2,9 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron';
 import type {
   ActivityListResult,
+  ConnectionState,
+  ConnectionsAddParams,
+  ConnectionsListResult,
   ContextSnapshot,
   Expert,
   PerceptionTarget,
@@ -70,6 +73,17 @@ const bridge: HostBridge = {
     ipcRenderer.invoke(IPC.cancelHandoff, handoffId) as Promise<void>,
   searchProjects: (query: string) =>
     ipcRenderer.invoke(IPC.searchProjects, query) as Promise<ProjectCandidate[]>,
+  approveTool: (approvalId: string, decision: 'once' | 'deny') =>
+    ipcRenderer.invoke(IPC.approveTool, approvalId, decision) as Promise<void>,
+  listConnections: () => ipcRenderer.invoke(IPC.listConnections) as Promise<ConnectionsListResult>,
+  addConnection: (params: ConnectionsAddParams) =>
+    ipcRenderer.invoke(IPC.addConnection, params) as Promise<ConnectionState>,
+  setConnectionEnabled: (id: string, enabled: boolean) =>
+    ipcRenderer.invoke(IPC.setConnectionEnabled, id, enabled) as Promise<ConnectionState>,
+  signInConnection: (id: string) =>
+    ipcRenderer.invoke(IPC.signInConnection, id) as Promise<ConnectionState>,
+  removeConnection: (id: string) =>
+    ipcRenderer.invoke(IPC.removeConnection, id) as Promise<boolean>,
   onTurnEvent: (handler: (event: TurnEvent) => void) => {
     const listener = (_event: IpcRendererEvent, turnEvent: TurnEvent): void => handler(turnEvent);
     ipcRenderer.on(IPC.turnEvent, listener);
