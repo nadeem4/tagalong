@@ -98,6 +98,15 @@ Hosts implement two contracts.
   `readPicture` port, which captures the window by handle and passes the PNG on stdin to Windows' own
   recogniser (`OCR_SCRIPT` in `platform/ocr.ts`, through `runPowerShellScript`), so nothing is written to
   disk. The host announces that read as a screenshot. `perception.captureRegion` returns a native-resolution crop of one display.
+  It runs the same per-display refusal as `captureDisplays` first (`displayRefusals` in
+  `platform/displays.ts`: a visible blocked window on that display, or the focused window blocked)
+  and answers "no crop" for a blocked display, so a model naming a blocked display's id from the
+  listing gets nothing. `captureActiveWindowImage` uses the same refusal for its whole-screen
+  fallback, and refuses a screen with no display id while anything is blocked. A blocked focused
+  window reaches the snapshot as `app: { name, blocked }` with no `windowTitle`
+  (`appCaptureBlock` in core reads `blocked` where the title rules can no longer match), and a
+  paused `screenshot` or `displays` request answers with the pause error like every other gated
+  read (`answerCapture` in `context.ts`).
   `perception.captureWindow` returns a screenshot of one listed window, in front or behind others; a
   minimized window or a blind spot comes back without an image and with notes saying why. A host that
   can do the first, third and fourth advertises `displays`; one that can do the second advertises

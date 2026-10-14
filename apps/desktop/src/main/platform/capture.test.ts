@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { captureActiveWindowImageWith, captureWindowImageWith } from './capture';
 import type { CaptureImagePort, CaptureSource, WindowCaptureDeps } from './capture';
 import type { ActiveWindowInfo } from './index';
+import type { WindowEntry } from '@tagalong/protocol';
 
 const BOUND = 1568;
 
@@ -35,11 +36,13 @@ interface Recorded {
 
 function deps(
   sources: { window?: CaptureSource[]; screen?: CaptureSource[] },
-  overrides: { active?: ActiveWindowInfo | null; displayId?: number } = {},
+  overrides: { active?: ActiveWindowInfo | null; displayId?: number; windows?: WindowEntry[] } = {},
 ): WindowCaptureDeps & { calls: Recorded[] } {
   const calls: Recorded[] = [];
   return {
     calls,
+    listWindows: async () => overrides.windows ?? [],
+    exclusions: { processNames: [], titlePatterns: [] },
     getActiveWindow: async () => (overrides.active === undefined ? ACTIVE : overrides.active),
     screen: { getDisplayMatching: () => ({ id: overrides.displayId ?? 1 }) },
     desktopCapturer: {
@@ -146,6 +149,52 @@ describe('captureActiveWindowImageWith', () => {
 
   it('returns null when neither the window nor the display could be captured', async () => {
     expect(await captureActiveWindowImageWith(deps({ window: [], screen: [] }), BOUND)).toBeNull();
+  });
+});
+
+describe('captureActiveWindowImageWith, a screen instead of the window', () => {
+  const vault = (displayId: number): WindowEntry => ({
+    id: 'w-9',
+    processName: '1Password.exe',
+    title: 'All Items',
+    state: 'background',
+    browser: false,
+    displayId,
+    blocked: { rule: 'processName', entry: '1Password.exe' },
+  });
+
+  it('takes no screenshot of a display that holds a blocked window', async () => {
+    const d = deps(
+      { window: [], screen: [source('Screen 2', fakeImage(1920, 1080), '7')] },
+      { displayId: 7, windows: [vault(7)] },
+    );
+    expect(await captureActiveWindowImageWith(d, BOUND)).toBeNull();
+  });
+
+  it('takes no screenshot of any screen when there is no active window and it is blocked', async () => {
+    const d = deps(
+      { screen: [source('Screen 1', fakeImage(1920, 1080), '1')] },
+      { active: null, windows: [vault(1)] },
+    );
+    expect(await captureActiveWindowImageWith(d, BOUND)).toBeNull();
+  });
+
+  it('takes no screenshot of a screen it cannot place while anything is blocked', async () => {
+    const d = deps(
+      { window: [], screen: [source('Screen', fakeImage(1920, 1080))] },
+      {
+        windows: [vault(3)],
+      },
+    );
+    expect(await captureActiveWindowImageWith(d, BOUND)).toBeNull();
+  });
+
+  it('still uses a screen with nothing blocked on it', async () => {
+    const d = deps(
+      { window: [], screen: [source('Screen 2', fakeImage(1920, 1080), '7')] },
+      { displayId: 7, windows: [vault(3)] },
+    );
+    expect((await captureActiveWindowImageWith(d, BOUND))?.width).toBe(1568);
   });
 });
 

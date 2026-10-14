@@ -8,11 +8,7 @@ import type {
 } from '@tagalong/protocol';
 import type { BrainContentBlock, BrainTool } from '../../providers';
 import { captureSelection } from '../../perception/browser-route';
-import {
-  findCaptureBlock,
-  type ActiveWindow,
-  type CaptureBlock,
-} from '../../perception/exclusions';
+import { appCaptureBlock, type CaptureBlock } from '../../perception/exclusions';
 import type { PerceptionHost } from '../../perception/host';
 import { renderInventory } from '../../perception/inventory';
 import { defineTool, type Tool, type ToolContext, type ToolOutcome } from '../tool';
@@ -269,7 +265,7 @@ async function capture(options: PerceptionToolsOptions, vision: boolean): Promis
     const identity = host.capabilities.includes('activeWindow')
       ? await host.capture(['activeWindow'])
       : {};
-    const block = findCaptureBlock(toActiveWindow(identity), options.exclusions());
+    const block = appCaptureBlock(identity.app, options.exclusions());
     if (block !== null) return { content: refusal(block), isError: true };
 
     const patch = await host.capture([target]);
@@ -315,15 +311,6 @@ async function selection(options: PerceptionToolsOptions): Promise<ToolOutcome> 
 }
 
 type SnapshotApp = NonNullable<ContextSnapshotPatch['app']>;
-
-function toActiveWindow(patch: ContextSnapshotPatch): ActiveWindow | undefined {
-  const app = patch.app;
-  if (app === undefined) return undefined;
-  return {
-    processName: app.name,
-    ...(app.windowTitle === undefined ? {} : { title: app.windowTitle }),
-  };
-}
 
 /**
  * Says which entry blocked the capture, not just that something did. The pet has to be

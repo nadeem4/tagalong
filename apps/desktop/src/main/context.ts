@@ -5,7 +5,7 @@ import type { CaptureBlock } from '@tagalong/core';
 import { ContextSnapshot } from '@tagalong/protocol';
 import type { CaptureExclusions, ContextSnapshotPatch, PerceptionTarget } from '@tagalong/protocol';
 import type { ActiveWindowInfo, DisplaysCapture, Platform } from './platform/index';
-import { isSightPaused } from './platform/sight-gate';
+import { SightPausedError, isSightPaused } from './platform/sight-gate';
 
 /** What the desktop host tells the engine it can perceive. */
 export const DESKTOP_CAPABILITIES = [
@@ -155,9 +155,22 @@ async function windowInFocus(
   return { appName: next.processName, title: next.title, listedId: next.id };
 }
 
-/** The snapshot's `app` field, or nothing when the host could not name the window. */
-function appOf(window: SeenWindow | null): { app?: ContextSnapshot['app'] } {
+/**
+ * The snapshot's `app` field, or nothing when the host could not name the window. A blocked
+ * window (a blind spot or an exclusion) keeps only its app name: its title never reaches the
+ * prompt, the conversation or a brief. It carries `blocked` instead, so the engine still refuses
+ * on a title rule it can no longer match.
+ */
+function appOf(
+  window: SeenWindow | null,
+  exclusions: CaptureExclusions,
+): { app?: ContextSnapshot['app'] } {
   if (window === null) return {};
+  const blocked = findCaptureBlock(
+    { processName: window.appName, title: window.title },
+    exclusions,
+  );
+  if (blocked !== null) return { app: { name: window.appName, blocked } };
   return { app: { name: window.appName, ...(window.title ? { windowTitle: window.title } : {}) } };
 }
 
@@ -183,7 +196,7 @@ async function captureScreenshot(
   const image =
     listedId === undefined
       ? await attempt('the screen', () =>
-          platform.captureActiveWindowImage(MAX_SCREENSHOT_LONG_SIDE),
+          platform.captureActiveWindowImage(MAX_SCREENSHOT_LONG_SIDE, exclusions),
         )
       : ((
           await attempt('the window', () =>
@@ -317,7 +330,7 @@ export async function captureAskSnapshot(
       capturedAt: new Date().toISOString(),
       host: 'desktop',
       ...(selection !== null && selection.length > 0 ? { selection } : {}),
-      ...appOf(seen.value?.window ?? null),
+      ...appOf(seen.value?.window ?? null, options.exclusions),
       ...(seen.value?.shot && 'screenshot' in seen.value.shot && seen.value.shot.screenshot
         ? { screenshot: seen.value.shot.screenshot }
         : {}),
@@ -391,7 +404,7 @@ export async function capturePatch(
       blocked = full.blocked;
     }
 
-    if (what.includes('activeWindow')) Object.assign(patch, appOf(window));
+    if (what.includes('activeWindow')) Object.assign(patch, appOf(window, options.exclusions));
     if (what.includes('screenshot')) {
       const shot = await captureScreenshot(platform, options.exclusions, window);
       if (shot.screenshot) patch.screenshot = shot.screenshot;
@@ -401,4 +414,18 @@ export async function capturePatch(
   });
 
   return { patch, blocked, warnings, paused: gated.paused };
+}
+
+/**
+ * What perception.capture answers. A paused look at the screen or the displays surfaces the
+ * pause, as every other screen tool does, instead of an empty answer the pet would read as
+ * a capture that found nothing. Ungated reads (the selection, the clipboard) still answer.
+ */
+export function answerCapture(
+  what: readonly PerceptionTarget[],
+  capture: PatchCapture,
+): ContextSnapshotPatch {
+  const looked = what.find((target) => target === 'screenshot' || target === 'displays');
+  if (capture.paused && looked !== undefined) throw new SightPausedError(looked);
+  return capture.patch;
 }

@@ -256,7 +256,10 @@ any tab.
    the selected sentence or the page's text.
 4. **Action:** on the same tab open the side panel and ask "What does this page say?".
 5. **Expected:** the answer does not contain the page's text: the engine strips a side-panel ask made
-   on an excluded tab down to the tab's identity before the pet sees it.
+   on an excluded tab down to the browser's name before the pet sees it.
+6. **Action:** ask "What is the title of this tab?".
+7. **Expected:** Scout cannot say: neither the desktop nor the side panel sends a blocked window's
+   title, only the app's name.
 
 ### 6.13. Pages Chrome does not let extensions read
 
@@ -989,6 +992,15 @@ On by default. Not active under `TAGALONG_FAKE_PROVIDERS=1` unless `TAGALONG_KEE
 3. **Action:** Settings → Privacy → **Keep an eye on things** → Off, Save.
 4. **Expected:** no further lines; the window list is no longer taken. The ⓘ note explains what is
    followed and when a window is read.
+
+### K.4b. Blind screens stay blind up close
+
+1. **Setup:** two monitors; 1Password (or any excluded app) open and visible on the second.
+2. **Action:** ask Scout to look closer at the second display (for example "zoom into the top left
+   of display 2").
+3. **Expected:** Scout says it could not crop that display; nothing from it is shown.
+4. **Action:** pause sight (`Ctrl+Shift+Alt+P`) and ask "look at my screen".
+5. **Expected:** Scout says sight is paused, not that the screen was empty.
 
 ### K.5. Hand it over
 

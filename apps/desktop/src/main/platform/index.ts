@@ -38,13 +38,19 @@ export interface Platform {
   captureSelection(): Promise<string | null>;
   readClipboard(): Promise<string>;
   /** Phase 2. */
-  captureActiveWindowImage(maxLongSide: number): Promise<CapturedImage | null>;
+  /**
+   * Takes the exclusion list for its screen fallback: when no window matches, a whole screen
+   * is used only if the per-display refusal allows it.
+   */
+  captureActiveWindowImage(
+    maxLongSide: number,
+    exclusions: CaptureExclusions,
+  ): Promise<CapturedImage | null>;
   /**
    * Phase 2B: every display at once, plus a composite showing how they are arranged.
    *
-   * Takes the exclusion list, unlike `captureActiveWindowImage`, where the caller checks
-   * it and then either asks for a picture or does not. That works when a capture is one
-   * image and the answer is yes or no. Here one display can be refused while the others
+   * Takes the exclusion list. `captureActiveWindowImage` uses it only for its screen
+   * fallback; its caller checks the focused window first. Here one display can be refused while the others
    * are returned, and the composite has to show the refusal in that display's slot, so
    * the decision has to be made inside the capture rather than above it.
    */
@@ -64,11 +70,14 @@ export interface Platform {
   /**
    * Phase 2B: a native-resolution crop of one display, for leaning in.
    *
-   * Takes no exclusion list, unlike its neighbours. A crop is only ever reached through a
-   * display the pet listed first, and that listing is where a blocked display is refused;
-   * checking twice would let the two checks disagree.
+   * Takes the exclusion list like its neighbours: the model can name any display id, so a
+   * crop runs the same per-display refusal as `captureDisplays` and returns null for a
+   * blocked display.
    */
-  captureRegion(params: RegionCaptureParams): Promise<CapturedImage | null>;
+  captureRegion(
+    params: RegionCaptureParams,
+    exclusions: CaptureExclusions,
+  ): Promise<CapturedImage | null>;
   /**
    * Phase 2B: the text of one window, named by id or defaulting to the foreground one.
    *

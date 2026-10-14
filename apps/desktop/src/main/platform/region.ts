@@ -1,17 +1,17 @@
 import type { DisplayBounds } from '@tagalong/protocol';
 
-import type { DisplayImagePort, DisplayInfo, DisplaySource } from './displays';
+import { displayRefusals } from './displays';
+import type { DisplayImagePort, DisplayInfo, DisplayRefusalDeps, DisplaySource } from './displays';
 import { fitWithin } from './downscale';
 import type { PixelSize } from './downscale';
 import type { CapturedImage } from './index';
 
 /**
- * The ports a crop needs. Narrower than a full display capture: no exclusions, because
- * `look_closer` is only ever reached through a display the pet already listed, and that
- * listing is where a blocked display is refused.
+ * The ports a crop needs. The same refusal as a full display capture runs first: the model
+ * can name any display id, so a crop must not trust that it came from a listing.
  */
-export interface RegionCaptureDeps {
-  screen: {
+export interface RegionCaptureDeps extends Omit<DisplayRefusalDeps, 'screen'> {
+  screen: DisplayRefusalDeps['screen'] & {
     getAllDisplays(): DisplayInfo[];
   };
   desktopCapturer: {
@@ -40,7 +40,7 @@ export interface RegionCaptureParams {
  * a large one is still capped at the same ceiling as every other image.
  *
  * Returns null rather than throwing on every miss — an unknown display, a capturer with
- * no source for it, a rectangle entirely off the screen. A model can name a display that
+ * no source for it, a rectangle entirely off the screen, a blocked display. A model can name a display that
  * closed between one tool call and the next, and the honest answer is a refusal the pet
  * can repeat, not a turn that dies.
  */
@@ -54,6 +54,12 @@ export async function captureRegionWith(
     .find((candidate) => candidate.id === params.displayId);
   if (display === undefined) {
     log(`captureRegion: no display ${params.displayId}`);
+    return null;
+  }
+
+  const { refusal } = (await displayRefusals(deps))(display.id);
+  if (refusal !== null) {
+    log(`captureRegion: display ${params.displayId} blocked by ${refusal.entry}`);
     return null;
   }
 

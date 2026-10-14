@@ -166,6 +166,8 @@ describe('perception.diff', () => {
     expect(result.after?.base64).toBe('bmF0aXZl');
     expect(platform.captureRegion).toHaveBeenCalledWith(
       expect.objectContaining({ displayId: 1, rect: { x: 200, y: 200, width: 80, height: 40 } }),
+      // The crop gets the exclusions, so it refuses a blocked display like any capture.
+      { processNames: ['KeePass.exe'], titlePatterns: [] },
     );
   });
 

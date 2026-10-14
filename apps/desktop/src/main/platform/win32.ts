@@ -72,12 +72,17 @@ export class Win32Platform implements Platform {
     return clipboard.readText();
   }
 
-  async captureActiveWindowImage(maxLongSide: number): Promise<CapturedImage | null> {
+  async captureActiveWindowImage(
+    maxLongSide: number,
+    exclusions: CaptureExclusions,
+  ): Promise<CapturedImage | null> {
     return captureActiveWindowImageWith(
       {
         desktopCapturer,
         screen,
         getActiveWindow: () => this.getActiveWindow(),
+        listWindows: async () => (await this.listWindows(exclusions)).windows,
+        exclusions,
         log: (message) => console.log(`[platform:win32] ${message}`),
       },
       maxLongSide,
@@ -160,7 +165,10 @@ export class Win32Platform implements Platform {
     );
   }
 
-  async captureRegion(params: RegionCaptureParams): Promise<CapturedImage | null> {
+  async captureRegion(
+    params: RegionCaptureParams,
+    exclusions: CaptureExclusions,
+  ): Promise<CapturedImage | null> {
     return captureRegionWith(
       {
         screen: {
@@ -171,8 +179,12 @@ export class Win32Platform implements Platform {
               scaleFactor: display.scaleFactor,
               primary: display.id === screen.getPrimaryDisplay().id,
             })),
+          getDisplayMatching: (bounds) => screen.getDisplayMatching(bounds),
         },
         desktopCapturer,
+        getActiveWindow: () => this.getActiveWindow(),
+        listWindows: async () => (await this.listWindows(exclusions)).windows,
+        exclusions,
         log: (message) => console.log(`[platform:win32] ${message}`),
       },
       params,

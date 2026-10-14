@@ -77,7 +77,10 @@ The extension's public privacy policy, for the Chrome Web Store, is
   - authenticator apps (Authy, WinAuth) and Remote Desktop.
 
   A blind spot is refused before anything is read: no screenshot, no text, no character count, and
-  no Ctrl+C for a selection — a highlight in a `.env` file never reaches the clipboard.
+  no Ctrl+C for a selection — a highlight in a `.env` file never reaches the clipboard. Its title
+  is not sent either: when the window in front is a blind spot or on your exclusion list, Scout
+  is told only the app's name (for example `chrome.exe`) and which rule blocked it, never the
+  window or tab title, so the title stays out of the conversation and out of any expert's brief.
 
 - **Your own exclusions.** Add any app or window title in settings; they work the same way.
 - **Secrets that slip past.** A title rule only works while the title names the file (an editor
@@ -99,6 +102,10 @@ The extension's public privacy policy, for the Chrome Web Store, is
   the pet can see that something was withheld rather than being handed a gap it might guess at.
   Minimized windows do not blank their monitor: a vault in the taskbar is not on screen, and
   blanking a screen you are working on because something is hidden would be a bug, not caution.
+  The same check runs before a close-up crop (`look_closer`, and the sharp crop a "what changed"
+  check takes) and before a plain screenshot falls back to a whole screen: a screen with an
+  excluded window on it is never cropped or photographed. When Tagalong cannot tell which screen
+  a picture is of, it takes none while anything at all is blocked.
 - **Anything at all, while sight is paused** — see [Pausing sight](#pausing-sight).
 
 ## The rest

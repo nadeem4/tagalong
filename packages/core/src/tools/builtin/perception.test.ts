@@ -159,6 +159,21 @@ describe('look_at_screen', () => {
     expect(host.asked).toEqual([['activeWindow']]);
   });
 
+  it('refuses when the host marks the window blocked and kept its title back', async () => {
+    // The desktop never sends a blocked window's title, only its app and which rule blocked
+    // it, so a title rule such as a vault in a browser still refuses here.
+    const host = fakeHost(['screenshot', 'activeWindow'], {
+      app: { name: 'chrome.exe', blocked: { rule: 'titlePattern', entry: '*Vault*' } },
+      screenshot: { mime: 'image/png', base64: PNG, width: 10, height: 10 },
+    });
+
+    const result = await toolset([host]).run({ name: LOOK_AT_SCREEN });
+
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain('*Vault*');
+    expect(host.asked).toEqual([['activeWindow']]);
+  });
+
   it('says so plainly when no connected host can take a screenshot', async () => {
     const host = fakeHost(['selection'], { selection: 'anything' });
 

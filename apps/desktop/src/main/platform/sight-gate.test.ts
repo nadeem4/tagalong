@@ -42,18 +42,17 @@ function callOf(platform: Platform, method: keyof Platform): () => Promise<unkno
     case 'readClipboard':
       return () => platform.readClipboard();
     case 'captureActiveWindowImage':
-      return () => platform.captureActiveWindowImage(1568);
+      return () => platform.captureActiveWindowImage(1568, NOTHING_EXCLUDED);
     case 'captureDisplays':
       return () => platform.captureDisplays(1568, NOTHING_EXCLUDED);
     case 'listWindows':
       return () => platform.listWindows(NOTHING_EXCLUDED);
     case 'captureRegion':
       return () =>
-        platform.captureRegion({
-          displayId: 1,
-          rect: { x: 0, y: 0, width: 10, height: 10 },
-          maxLongSide: 1568,
-        });
+        platform.captureRegion(
+          { displayId: 1, rect: { x: 0, y: 0, width: 10, height: 10 }, maxLongSide: 1568 },
+          NOTHING_EXCLUDED,
+        );
     case 'readWindowText':
       return () => platform.readWindowText({ maxChars: 8000 }, NOTHING_EXCLUDED);
     case 'lookAtWindow':

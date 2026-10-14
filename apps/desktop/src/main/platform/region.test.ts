@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { captureRegionWith } from './region';
 import type { RegionCaptureDeps } from './region';
 import type { DisplayImagePort } from './displays';
+import type { ActiveWindowInfo } from './index';
+import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
 
 /** A capturer thumbnail that records how it was cropped and resized. */
 function fakeImage(
@@ -31,6 +33,9 @@ function harness(options: {
   displayHeight?: number;
   scaleFactor?: number;
   sourceId?: string;
+  windows?: WindowEntry[];
+  active?: ActiveWindowInfo | null;
+  exclusions?: CaptureExclusions;
 }): { deps: RegionCaptureDeps; log: { crops: unknown[]; resizes: unknown[] } } {
   const log = { crops: [] as unknown[], resizes: [] as unknown[] };
   const width = options.displayWidth ?? 3840;
@@ -52,7 +57,11 @@ function harness(options: {
             primary: true,
           },
         ],
+        getDisplayMatching: () => ({ id: 1 }),
       },
+      getActiveWindow: () => Promise.resolve(options.active ?? null),
+      listWindows: () => Promise.resolve(options.windows ?? []),
+      exclusions: options.exclusions ?? { processNames: [], titlePatterns: [] },
       desktopCapturer: {
         getSources: () =>
           Promise.resolve([
@@ -177,5 +186,46 @@ describe('captureRegionWith', () => {
     });
 
     expect(image).toBeNull();
+  });
+
+  it('refuses a display that holds a blocked window, focused or not', async () => {
+    const { deps, log } = harness({
+      windows: [
+        {
+          id: 'w-9',
+          processName: '1Password.exe',
+          title: 'Vault',
+          state: 'background',
+          browser: false,
+          displayId: 1,
+          blocked: { rule: 'processName', entry: '1Password.exe' },
+        },
+      ],
+    });
+    const image = await captureRegionWith(deps, {
+      displayId: 1,
+      rect: { x: 0, y: 0, width: 100, height: 100 },
+      maxLongSide: 1568,
+    });
+    expect(image).toBeNull();
+    expect(log.crops).toEqual([]);
+  });
+
+  it('refuses the display whose focused window the person excluded', async () => {
+    const { deps, log } = harness({
+      active: {
+        appName: 'Bank.exe',
+        title: 'Statement',
+        bounds: { x: 0, y: 0, width: 9, height: 9 },
+      },
+      exclusions: { processNames: ['Bank.exe'], titlePatterns: [] },
+    });
+    const image = await captureRegionWith(deps, {
+      displayId: 1,
+      rect: { x: 0, y: 0, width: 100, height: 100 },
+      maxLongSide: 1568,
+    });
+    expect(image).toBeNull();
+    expect(log.crops).toEqual([]);
   });
 });
