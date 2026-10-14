@@ -1,7 +1,8 @@
 import { SECRET_FILES } from '@tagalong/protocol';
 import { spawn as nodeSpawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import {
   CANCELLED,
@@ -34,12 +35,27 @@ export interface ClaudeCodeOptions {
   command?: string;
   spawn?: SpawnFn;
   folderExists?: (folder: string) => boolean;
+  /**
+   * Research with no project: a routine's pre-approved hand-off. It may only search and
+   * fetch the web, from an empty folder, and never edits, whatever `canEdit` says.
+   */
+  research?: boolean;
+  /** The empty folder research runs in. Defaults to one in the temp folder. */
+  researchFolder?: () => string;
+}
+
+/** An empty folder of Tagalong's own, so research has no project files to read. */
+function defaultResearchFolder(): string {
+  const folder = join(tmpdir(), 'tagalong-research');
+  mkdirSync(folder, { recursive: true });
+  return folder;
 }
 
 const NOT_INSTALLED = 'Claude Code is not installed, or "claude" is not on the PATH.';
 
 const READ_TOOLS = ['Read', 'Glob', 'Grep'];
 const EDIT_TOOLS = ['Edit', 'Write'];
+const WEB_TOOLS = ['WebSearch', 'WebFetch'];
 
 /**
  * Claude Code reads files for itself, so the built-in blind spots go with the brief: it may
@@ -91,9 +107,12 @@ export class ClaudeCodeConnector implements Connector {
     signal?: AbortSignal,
   ): Promise<ConnectorResult> {
     if (signal?.aborted) return CANCELLED;
-    const { folder } = this.options;
+    const research = this.options.research === true;
+    const folder = research
+      ? (this.options.researchFolder ?? defaultResearchFolder)()
+      : this.options.folder;
     if (folder === undefined) return { ok: false, error: 'No project folder was chosen.' };
-    const canEdit = this.options.canEdit === true;
+    const canEdit = !research && this.options.canEdit === true;
     const args = [
       '-p',
       '--output-format',
@@ -102,7 +121,7 @@ export class ClaudeCodeConnector implements Connector {
       '--permission-mode',
       canEdit ? 'acceptEdits' : 'dontAsk',
       '--allowedTools',
-      ...READ_TOOLS,
+      ...(research ? WEB_TOOLS : READ_TOOLS),
       ...(canEdit ? EDIT_TOOLS : []),
       '--disallowedTools',
       ...SECRET_FILE_RULES,

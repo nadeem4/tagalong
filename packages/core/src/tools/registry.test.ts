@@ -85,7 +85,7 @@ describe('ToolRegistry.forTurn', () => {
     expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(11);
   });
 
-  it('gives a companion its tools, ending with hand_to_expert, which is write', () => {
+  it('gives a companion its tools, ending with the routine tools; all three are write', () => {
     const experts = {
       experts: () => [
         {
@@ -99,7 +99,24 @@ describe('ToolRegistry.forTurn', () => {
       routes: { get: () => null, remember: () => undefined },
       propose: () => ({ proposalId: '7c9e6679-7425-40de-944b-e07fc1f90ae7' }),
     };
-    const tools = new ToolRegistry(everything({ experts })).forTurn(
+    const routines = {
+      list: () => [
+        {
+          id: '6f1c2f4e-8a7b-4c1d-9e2f-3a4b5c6d7e8f',
+          name: 'Morning papers',
+          enabled: true,
+          when: { type: 'launch' as const },
+          what: 'x',
+          topics: '',
+          deliver: { bubble: true, voice: false, notification: false },
+          uses: [],
+          createdAt: '2026-10-13T07:00:00.000Z',
+        },
+      ],
+      experts: experts.experts,
+      propose: () => ({ proposalId: '7c9e6679-7425-40de-944b-e07fc1f90ae7' }),
+    };
+    const tools = new ToolRegistry(everything({ experts, routines })).forTurn(
       fakeTurn({ pet: { ...FAKE_TURN_PET, roleId: 'companion' } }),
     ).tools;
     expect(tools.map((tool) => tool.id)).toEqual([
@@ -110,8 +127,12 @@ describe('ToolRegistry.forTurn', () => {
       'look_at_window',
       'remember',
       'hand_to_expert',
+      'create_routine',
+      'change_routine',
     ]);
-    expect(tools.find((tool) => tool.id === 'hand_to_expert')?.kind).toBe('write');
+    for (const id of ['hand_to_expert', 'create_routine', 'change_routine']) {
+      expect(tools.find((tool) => tool.id === id)?.kind).toBe('write');
+    }
   });
 
   it('builds only what is wired: no perception options, no perception tools', () => {

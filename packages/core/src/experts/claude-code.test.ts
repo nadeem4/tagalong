@@ -82,6 +82,33 @@ describe('ClaudeCodeConnector', () => {
     expect(call?.stdin).toBe('Explain main.ts');
   });
 
+  it('researches with no project: web search and fetch only, in an empty folder, never edits', async () => {
+    const { spawn, calls } = fakeSpawn([result('Three papers.')]);
+    const connector = new ClaudeCodeConnector({
+      research: true,
+      canEdit: true,
+      spawn,
+      researchFolder: () => 'C:\\tmp\\tagalong-research',
+    });
+    const outcome = await connector.send({ ask: 'New papers on agents' }, () => {});
+    expect(outcome).toMatchObject({ ok: true, text: 'Three papers.' });
+    const [call] = calls;
+    expect(call?.cwd).toBe('C:\\tmp\\tagalong-research');
+    expect(call?.args).toEqual([
+      '-p',
+      '--output-format',
+      'stream-json',
+      '--verbose',
+      '--permission-mode',
+      'dontAsk',
+      '--allowedTools',
+      'WebSearch',
+      'WebFetch',
+      '--disallowedTools',
+      ...SECRET_FILES.flatMap((file) => [`Read(**/${file})`, `Edit(**/${file})`]),
+    ]);
+  });
+
   it('lets edits through only when the expert may edit', async () => {
     const { spawn, calls } = fakeSpawn([result('ok')]);
     const connector = new ClaudeCodeConnector({ folder: 'C:\\r', canEdit: true, spawn });

@@ -12,7 +12,14 @@ export {
   type TurnRequest,
   type TurnTools,
 } from './registry';
-export { defineTool, type Tool, type ToolContext, type ToolKind, type ToolOutcome } from './tool';
+export {
+  defineTool,
+  type RoutineTurnContext,
+  type Tool,
+  type ToolContext,
+  type ToolKind,
+  type ToolOutcome,
+} from './tool';
 export {
   GET_SELECTION,
   LIST_DISPLAYS,
@@ -32,6 +39,7 @@ export {
   type AskPetDeps,
 } from './builtin/crew';
 export { HAND_TO_EXPERT, type ExpertToolDeps } from './builtin/experts';
+export { CHANGE_ROUTINE, CREATE_ROUTINE, type RoutineToolDeps } from './builtin/routines';
 export {
   CONNECTIONS_GROUP,
   CONNECTOR_SEPARATOR,

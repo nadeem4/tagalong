@@ -161,4 +161,56 @@ describe(HAND_TO_EXPERT, () => {
       isError: true,
     });
   });
+
+  describe('in a routine', () => {
+    const routineDeps = () => {
+      const d = deps([CLAUDE, GEMINI]);
+      const research: { expertId: string; petId: string; brief: Brief }[] = [];
+      d.value.startReadOnly = (params) => {
+        research.push(params);
+        return { handoffId: 'a3bb189e-8bf9-4888-9912-ace4e6543002' };
+      };
+      return { ...d, research };
+    };
+
+    it('starts the expert the routine allowed at once, read-only, with no card', async () => {
+      const d = routineDeps();
+      const handed: string[] = [];
+      const outcome = await fakeTurnTools(
+        { experts: d.value },
+        {
+          routine: {
+            routineId: 'r1',
+            expertId: 'claude-code',
+            handedOff: (id) => handed.push(id),
+          },
+        },
+      ).run({
+        name: HAND_TO_EXPERT,
+        input: { expert_id: 'claude-code', task_kind: 'research', ask: 'New papers on agents' },
+      });
+      expect(outcome.isError).toBeUndefined();
+      expect(outcome.content).toContain('read-only');
+      expect(d.research).toEqual([
+        { expertId: 'claude-code', petId: 'scout', brief: { ask: 'New papers on agents' } },
+      ]);
+      expect(handed).toEqual(['a3bb189e-8bf9-4888-9912-ace4e6543002']);
+      expect(d.started).toEqual([]);
+    });
+
+    it('shows the normal card for any other expert, or when the routine allowed none', async () => {
+      const d = routineDeps();
+      const handedOff = () => undefined;
+      await fakeTurnTools(
+        { experts: d.value },
+        { routine: { routineId: 'r1', expertId: 'claude-code', handedOff } },
+      ).run({ name: HAND_TO_EXPERT, input: { expert_id: 'gemini', task_kind: 'x', ask: 'x' } });
+      await fakeTurnTools({ experts: d.value }, { routine: { routineId: 'r1', handedOff } }).run({
+        name: HAND_TO_EXPERT,
+        input: { expert_id: 'claude-code', task_kind: 'y', ask: 'y' },
+      });
+      expect(d.research).toEqual([]);
+      expect(d.started.map((s) => s.expertId)).toEqual(['gemini', 'claude-code']);
+    });
+  });
 });

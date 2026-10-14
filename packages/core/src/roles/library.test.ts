@@ -28,6 +28,8 @@ const BUILT_IN_TOOLS = [
   'watch_for',
   'remember',
   'ask_pet',
+  'create_routine',
+  'change_routine',
   'hand_to_expert',
   // A group: every tool of the person's connected apps.
   'connections',
