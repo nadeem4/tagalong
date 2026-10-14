@@ -299,3 +299,47 @@ describe('expert hand-offs', () => {
     expect(log.expertsFinishedSince(new Date(Date.now() + 60_000).toISOString())).toEqual([]);
   });
 });
+
+describe('connector calls', () => {
+  it('records the app, the tool, read or write, and how it ended, never the content', () => {
+    log.connectorCalled({
+      petId: 'scout',
+      turnId: randomUUID(),
+      app: 'Notion',
+      tool: 'search',
+      access: 'read',
+      state: 'done',
+    });
+    log.connectorCalled({
+      petId: 'scout',
+      app: 'Notion',
+      tool: 'create-pages',
+      access: 'write',
+      state: 'error',
+      error: 'Notion did not answer within 30 seconds.',
+    });
+    log.connectorCalled({
+      petId: 'scout',
+      app: 'Notion',
+      tool: 'create-pages',
+      access: 'write',
+      state: 'stopped',
+    });
+    const [stopped, failed, done] = log.list({}).entries;
+    expect(done).toMatchObject({
+      kind: 'connector',
+      app: 'Notion',
+      tool: 'search',
+      access: 'read',
+    });
+    expect(done?.state).toBe('done');
+    expect(done?.finishedAt).toBeDefined();
+    expect(failed).toMatchObject({
+      state: 'error',
+      error: 'Notion did not answer within 30 seconds.',
+    });
+    expect(stopped?.state).toBe('stopped');
+    expect(done?.text).toBeUndefined();
+    expect(done?.answer).toBeUndefined();
+  });
+});
