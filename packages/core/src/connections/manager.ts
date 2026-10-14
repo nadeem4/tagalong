@@ -205,10 +205,17 @@ export class ConnectionManager {
       enabled: true,
     });
     await this.#connect(connection);
-    // A new OAuth app signs in straight away: that is what Connect means.
-    if (connection.auth === 'oauth' && this.#status.get(id)?.status === 'needs-sign-in') {
-      return this.signIn(id);
-    }
+    return this.#state(connection);
+  }
+
+  /**
+   * Starts the sign-in and answers at once with `connecting`: the person may take minutes
+   * in the browser, longer than a host waits for a reply. The end arrives as a change.
+   */
+  beginSignIn(id: string): ConnectionState {
+    const connection = this.#must(id);
+    this.#set(id, { status: 'connecting' });
+    void this.signIn(id);
     return this.#state(connection);
   }
 

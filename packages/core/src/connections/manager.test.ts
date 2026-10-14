@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ConnectionState } from '@tagalong/protocol';
 import { migrate } from '../memory/db';
 import { InMemorySecretStore } from '../settings/settings';
@@ -190,6 +190,14 @@ describe('ConnectionManager', () => {
 });
 
 describe('ConnectionManager sign-in', () => {
+  it('beginSignIn answers at once with connecting, and the result arrives as a change', async () => {
+    const opened: string[] = [];
+    const { manager, changes } = oauthSetup(browserThatSignsIn(opened));
+    await manager.add({ ...notion, auth: 'oauth' });
+    expect(manager.beginSignIn('notion').status).toBe('connecting');
+    await vi.waitFor(() => expect(changes.at(-1)?.[0]?.status).toBe('connected'));
+  });
+
   function oauthSetup(openBrowser?: (url: string) => void) {
     const server = fakeMcpServer(TOOLS);
     return setup({
@@ -214,7 +222,10 @@ describe('ConnectionManager sign-in', () => {
   it('opens the browser, takes the code on the loopback, and keeps the token in the secret store', async () => {
     const opened: string[] = [];
     const { manager, secrets } = oauthSetup(browserThatSignsIn(opened));
-    const state = await manager.add({ ...notion, auth: 'oauth' });
+    const added = await manager.add({ ...notion, auth: 'oauth' });
+    expect(added.status).toBe('needs-sign-in');
+    expect(opened).toEqual([]);
+    const state = await manager.signIn('notion');
     expect(opened).toHaveLength(1);
     expect(new URL(opened[0]!).searchParams.get('redirect_uri')).toMatch(
       /^http:\/\/127\.0\.0\.1:\d+\/callback$/,
@@ -229,6 +240,7 @@ describe('ConnectionManager sign-in', () => {
     const opened: string[] = [];
     const first = oauthSetup(browserThatSignsIn(opened));
     await first.manager.add({ ...notion, auth: 'oauth' });
+    await first.manager.signIn('notion');
     const again = new ConnectionManager({
       store: first.store,
       secrets: first.secrets,
@@ -244,7 +256,8 @@ describe('ConnectionManager sign-in', () => {
 
   it('needs sign-in, without a browser, when nothing was ever signed in', async () => {
     const first = oauthSetup();
-    const state = await first.manager.add({ ...notion, auth: 'oauth' });
+    await first.manager.add({ ...notion, auth: 'oauth' });
+    const state = await first.manager.signIn('notion');
     expect(state.status).toBe('needs-sign-in');
     expect(state.error).toBe('Tagalong could not open a browser to sign in to Notion.');
   });
@@ -261,7 +274,8 @@ describe('ConnectionManager sign-in', () => {
       transportFor: async (_c, ctx) =>
         new FakeOAuthTransport(await fakeMcpServer(TOOLS).transport(), ctx.authProvider!),
     });
-    const state = await manager.add({ ...notion, auth: 'oauth' });
+    await manager.add({ ...notion, auth: 'oauth' });
+    const state = await manager.signIn('notion');
     expect(state.status).toBe('needs-sign-in');
     expect(state.error).toBe('Signing in to Notion did not finish. Try Sign in again.');
   });

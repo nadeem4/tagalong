@@ -608,14 +608,19 @@ function buildHandlers(parts: {
       );
       return { connections: list, popular: [...POPULAR_CONNECTORS], found };
     },
+    // Connect means sign in: a new OAuth app opens its sign-in straight away.
     'connections.add': (params) =>
-      plainly(async () => ({ connection: await connections.add(params) })),
+      plainly(async () => {
+        const added = await connections.add(params);
+        const signIn = added.auth === 'oauth' && added.status === 'needs-sign-in';
+        return { connection: signIn ? connections.beginSignIn(added.id) : added };
+      }),
     'connections.setEnabled': (params) =>
       plainly(async () => ({
         connection: await connections.setEnabled(params.id, params.enabled),
       })),
     'connections.signIn': (params) =>
-      plainly(async () => ({ connection: await connections.signIn(params.id) })),
+      plainly(async () => ({ connection: connections.beginSignIn(params.id) })),
     'connections.remove': async (params) => ({ removed: await connections.remove(params.id) }),
     'tool.approve': (params) => ({
       accepted: approvals.answer(params.approvalId, params.decision),
