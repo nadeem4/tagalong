@@ -191,4 +191,4 @@ export const RoutineResultParams = z.object({
 export type RoutineResultParams = z.infer<typeof RoutineResultParams>;
 
 /** Something about the routines changed: Home lists them again. */
-export const RoutinesChangedParams = z.object({});
+export const RoutinesChangedParams = z.looseObject({});

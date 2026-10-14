@@ -1,9 +1,14 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { ConnectorConfirmParams, ContextSnapshot } from '@tagalong/protocol';
+import type {
+  ConnectorConfirmParams,
+  ContextSnapshot,
+  RoutineProposedParams,
+} from '@tagalong/protocol';
 import { ANSWER_CSS, Answer } from './answer';
 import { HANDOFF_CSS, HandoffStatus, ProposalCard, type Handoff } from './handoff-card';
 import { ConnectorConfirmCard } from './connector-confirm';
+import { RoutineCard } from './routine-card';
 import { useHostBridge } from './host-bridge';
 import type { TurnEvent } from './host-bridge';
 import { officeTokens as t } from './office/tokens';
@@ -37,6 +42,11 @@ export interface CompanionBubbleProps {
   /** Whether the host is speaking now: the bubble shows it, with a way to stop. */
   speaking?: boolean;
   onStopSpeaking?: () => void;
+  /**
+   * Opens on a routine's result: its name stands for the question, its answer is shown, and
+   * the next question continues its conversation.
+   */
+  resume?: { conversationId: string; question: string; answer: string };
 }
 
 /** A question and how it was answered, once it is over. */
@@ -114,19 +124,24 @@ export function CompanionBubble({
   onSay,
   speaking = false,
   onStopSpeaking,
+  resume,
 }: CompanionBubbleProps) {
   const bridge = useHostBridge();
   const [draft, setDraft] = useState('');
   const [removed, setRemoved] = useState<ReadonlySet<Chip['id']>>(new Set());
-  const [reply, setReply] = useState<Reply>({ state: 'idle' });
+  const [reply, setReply] = useState<Reply>(
+    resume === undefined ? { state: 'idle' } : { state: 'done', text: resume.answer },
+  );
   const [handoff, setHandoff] = useState<Handoff | null>(null);
   // A change Scout wants to make in a connected app, waiting for Allow once or Cancel.
   const [confirm, setConfirm] = useState<ConnectorConfirmParams | null>(null);
+  // A routine Scout wrote or changed, waiting for Save.
+  const [routine, setRoutine] = useState<RoutineProposedParams | null>(null);
   const [past, setPast] = useState<Exchange[]>([]);
-  const [question, setQuestion] = useState<string | null>(null);
+  const [question, setQuestion] = useState<string | null>(resume?.question ?? null);
   // Try it now ends the hello here, even when the screen could not be seen.
   const [tried, setTried] = useState(false);
-  const conversation = useRef<string | undefined>(undefined);
+  const conversation = useRef<string | undefined>(resume?.conversationId);
   const mine = useRef<string | null>(null);
 
   // A new capture brings every chip back: removing is per question, not forever.
@@ -150,8 +165,17 @@ export function CompanionBubble({
         setConfirm(params);
         return;
       }
+      case 'routine.proposed': {
+        if (event.petId !== petId) return;
+        const { type: _type, ...params } = event;
+        setRoutine(params);
+        return;
+      }
       case 'turn.started':
-        if (event.petId !== petId || reply.state !== 'running') return;
+        // A routine's turn runs on its own; its result arrives as routine.result.
+        if (event.petId !== petId || reply.state !== 'running' || event.routineId !== undefined) {
+          return;
+        }
         mine.current = event.turnId;
         conversation.current = event.conversationId;
         setReply({ state: 'running', turnId: event.turnId, text: '' });
@@ -343,6 +367,9 @@ export function CompanionBubble({
     <>
       {confirm !== null && (
         <ConnectorConfirmCard key={confirm.approvalId} confirm={confirm} onAnswer={answerConfirm} />
+      )}
+      {routine !== null && (
+        <RoutineCard key={routine.proposalId} proposal={routine} onDone={() => setRoutine(null)} />
       )}
       {handoff?.phase === 'proposed' && (
         <ProposalCard
