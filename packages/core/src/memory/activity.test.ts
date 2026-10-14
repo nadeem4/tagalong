@@ -342,4 +342,26 @@ describe('connector calls', () => {
     expect(done?.text).toBeUndefined();
     expect(done?.answer).toBeUndefined();
   });
+
+  it('records a routine run: its name, how it ended, and the answer in Scout’s conversation', () => {
+    const routineId = randomUUID();
+    const conversationId = randomUUID();
+    const done = log.routineStarted({ routineId, petId: 'scout', name: 'Morning papers' });
+    log.routineFinished(done, { state: 'done', answer: 'Three new papers.', conversationId });
+    const failed = log.routineStarted({ routineId, petId: 'scout', name: 'Morning papers' });
+    log.routineFinished(failed, { state: 'error', error: 'No key for Scout.' });
+
+    const [second, first] = log.list({}).entries;
+    expect(first).toMatchObject({
+      id: done,
+      kind: 'routine',
+      state: 'done',
+      routineId,
+      text: 'Morning papers',
+      answer: 'Three new papers.',
+      conversationId,
+    });
+    expect(first?.finishedAt).toBeDefined();
+    expect(second).toMatchObject({ kind: 'routine', state: 'error', error: 'No key for Scout.' });
+  });
 });

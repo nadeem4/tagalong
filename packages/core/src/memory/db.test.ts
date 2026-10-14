@@ -54,6 +54,7 @@ describe('openDatabase', () => {
         'pet_seeds',
         'pets',
         'projects',
+        'routines',
         'schema_version',
       ]);
       const row = db
@@ -151,6 +152,34 @@ describe('migrate', () => {
         .map((row) => row.id);
       expect(ids).toEqual(['pip', 'scout']);
       expect(db.prepare("SELECT id FROM conversations WHERE id = 'c1'").get()).toBeDefined();
+    } finally {
+      db.close();
+    }
+  });
+
+  it('adds routines in migration 13, keeping every activity row and taking routine runs', () => {
+    const db = new Database(':memory:');
+    try {
+      migrate(db);
+      db.prepare('DELETE FROM schema_version WHERE version >= 13').run();
+      db.exec('DROP TABLE routines');
+      db.prepare(
+        `INSERT INTO activity (id, kind, state, pet_id, app, tool, access, started_at)
+         VALUES ('a1', 'connector', 'done', 'scout', 'Notion', 'search', 'read', 'x')`,
+      ).run();
+
+      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+
+      expect(db.prepare("SELECT app FROM activity WHERE id = 'a1'").get()).toEqual({
+        app: 'Notion',
+      });
+      db.prepare(
+        `INSERT INTO activity (id, kind, state, pet_id, routine_id, text, started_at)
+         VALUES ('a2', 'routine', 'running', 'scout', 'r1', 'Morning papers', 'y')`,
+      ).run();
+      expect(db.prepare("SELECT routine_id FROM activity WHERE id = 'a2'").get()).toEqual({
+        routine_id: 'r1',
+      });
     } finally {
       db.close();
     }

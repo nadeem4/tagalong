@@ -38,6 +38,15 @@ export class FakeClock implements WatchClock {
     this.#timers = this.#timers.filter((timer) => timer.id !== handle);
   }
 
+  /**
+   * The PC sleeps for `ms`: time moves on and no timer fires meanwhile; on waking, each
+   * overdue timer fires once, late, as Node's do.
+   */
+  async sleep(ms: number): Promise<void> {
+    this.#now += ms;
+    await this.advance(0);
+  }
+
   async advance(ms: number): Promise<void> {
     const until = this.#now + ms;
     await settle();
@@ -46,7 +55,8 @@ export class FakeClock implements WatchClock {
         .filter((timer) => timer.due <= until)
         .sort((a, b) => a.due - b.due || a.id - b.id)[0];
       if (next === undefined) break;
-      this.#now = next.due;
+      // A timer overdue after a sleep fires late, at the time it is now.
+      this.#now = Math.max(this.#now, next.due);
       this.clearTimeout(next.id);
       next.run();
       await settle();
