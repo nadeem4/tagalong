@@ -114,3 +114,28 @@ export async function ensureFiles(
     onProgress?.(Math.min(done / total, 1));
   }
 }
+
+/**
+ * `ensureFiles` shared by everything in the voice process that needs the files (the Settings
+ * prefetch, the first listen): a caller while a download is under way joins it, hearing its
+ * progress from then on, so two never write the same `.part`. A failure lets the next try afresh.
+ */
+export function sharedEnsureFiles(
+  dir: string,
+  files: readonly ModelFile[],
+  fetchFn: typeof fetch = fetch,
+): (onProgress?: (fraction: number) => void) => Promise<void> {
+  let running: Promise<void> | null = null;
+  const listeners = new Set<(fraction: number) => void>();
+  return async (onProgress) => {
+    if (onProgress !== undefined) listeners.add(onProgress);
+    try {
+      running ??= ensureFiles(dir, files, fetchFn, (fraction) => {
+        for (const listener of listeners) listener(fraction);
+      }).finally(() => (running = null));
+      await running;
+    } finally {
+      if (onProgress !== undefined) listeners.delete(onProgress);
+    }
+  };
+}
