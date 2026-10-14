@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './limits';
+import { EARS_IDS, MOUTH_IDS } from './voice';
 
 /**
  * Engine settings that cross the wire. Secrets are deliberately absent: they live in
@@ -304,6 +305,13 @@ const settingsFields = {
     elevenLabsVoiceId: z.string().trim(),
     /** The microphone Talk to Scout listens on. Absent: the system default microphone. */
     microphoneId: z.string().optional(),
+    /**
+     * Who says Scout's lines. Absent in a file from before the picker: `chosenMouth`
+     * decides (ElevenLabs when a voice ID is set, otherwise Kokoro).
+     */
+    mouth: z.enum(MOUTH_IDS).optional(),
+    /** Who listens. Absent: the local ears, the only ones today. */
+    ears: z.enum(EARS_IDS).optional(),
   }),
   /** What Scout calls the person; empty for no name. */
   userName: z.string().trim().max(MAX_USER_NAME_CHARS),
