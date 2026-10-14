@@ -62,6 +62,8 @@ desktop app and the Chrome extension run on it. It holds:
   OpenAI-compatible service;
 - experts and hand-offs: briefs sent to Claude Code, with the project and edit permission you
   confirm;
+- connected apps over MCP (Notion, GitHub, Linear, or any MCP server): reads run at once, every
+  change waits for Allow once;
 - watches, and a local WebSocket server that speaks the JSON-RPC protocol defined in
   `packages/protocol` (zod schemas).
 
@@ -73,6 +75,7 @@ flowchart LR
   yours["Your app"] -->|"JSON-RPC over ws://127.0.0.1"| engine
   engine --> models["Model providers"]
   engine --> experts["Experts (Claude Code)"]
+  engine --> apps["Your apps (MCP)"]
 ```
 
 `@tagalong/core` and `@tagalong/protocol` are **not published to npm yet**. Both are marked
@@ -147,7 +150,8 @@ app's own client is `apps/desktop/src/main/engine-client.ts`. Read
 | Windows desktop app with a Welcome window and an NSIS installer                                                               | macOS and Linux (the installer configs exist but are unverified)    |
 | One companion, Scout, that hands work to experts (Claude Code) and brings the answer back                                     | Voice input: push to talk                                           |
 | Scout talks: answers read aloud in a calm British voice, made on this computer, or through ElevenLabs with your own key       |                                                                     |
-| Scout thinks through your Claude Code sign-in, or OpenRouter, Nebius Token Factory, Anthropic or an OpenAI-compatible service | Hands: MCP tools and approval cards                                 |
+| Scout thinks through your Claude Code sign-in, or OpenRouter, Nebius Token Factory, Anthropic or an OpenAI-compatible service | Per-pet tool grants (ask me, always allow)                          |
+| Connections: Scout uses your apps over MCP (Notion, GitHub, Linear, Claude Code's servers); every change asks first           |                                                                     |
 | Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                             | A cost dashboard                                                    |
 | Vision routing: a text-only Nemotron model reads pictures with Nemotron Nano 2 VL                                             | Data export and delete-all in Settings                              |
 | Memory across restarts, rolling screen memory (opt-in), watches ("tell me when this finishes")                                | Code signing (the installer is unsigned) and an app icon of its own |
@@ -240,7 +244,7 @@ Every key can be changed in **Home → Settings → Shortcuts**, and the change 
 ## Home: one window for everything
 
 Right-click the tray icon and choose **Open Tagalong**. The tray has only four items: **Open
-Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in five pages:
+Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in six pages:
 
 - **Overview**: whether Scout is ready and what it thinks with, your experts, and the latest
   activity.
@@ -251,7 +255,21 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   edit files by default** or allow edits when you send a task. **Save and test** checks that Claude
   Code starts, which costs nothing. There is no default project folder: each task picks its
   project, and you confirm before anything is sent.
-- **Activity**: every answer and every hand-off, newest first. Click one to read it.
+- **Connections**: the apps Scout can use, so "what is on my calendar" or "any reviews waiting on
+  GitHub" just work.
+  - **Popular**: Notion and Linear connect with **Connect**, which opens their sign-in in your
+    browser. GitHub asks for a personal access token instead.
+  - **Found on this PC**: the MCP servers already set up in Claude Code. **Use** adds one; a key
+    Claude Code keeps is not copied, so you paste it once.
+  - **Add a connector**: any other MCP server, by its https address or by the command that starts it
+    on this PC.
+  - Each connection shows whether it works, its tools (**Reads** or **Asks first**), an on/off
+    switch, **Sign in again** when needed, and **Disconnect**, which deletes its sign-in.
+  - Scout reads with an app on its own. Anything that changes something (a tool the app does not
+    mark read-only) shows a card in Scout's bubble: which app, what will change, **Allow once** or
+    **Cancel**.
+- **Activity**: every answer, every hand-off and every call to an app, newest first. Click one to
+  read it.
 - **Settings**, in seven sections. Press ⓘ beside a setting for the longer story.
   - **How Scout thinks**: Scout's real brain, and whether your Claude Code sign-in works (checked
     locally with `claude auth status`). Without Claude Code you pick a service and paste its key,
@@ -339,8 +357,10 @@ Then click the toolbar button, or select text and press `Alt+Shift+Space`. More 
 - API keys are encrypted with the OS keychain.
 - `Ctrl+Shift+Alt+P` pauses all sight at once.
 - Tagalong never moves your mouse or types for you. Scout does not click, type or drive other
-  applications. When tools arrive (a later phase), every action will go through tools you connect
-  and approve, and every action will be logged.
+  applications. It changes things only through apps you connect, and only after you press
+  **Allow once**; every call is logged in Activity (which app and tool, never the content).
+- Connected apps get only what Scout fills in for one tool, with keys and passwords hidden. Their
+  sign-in tokens are kept in the OS keychain and deleted on **Disconnect**.
 
 The full detail is in [Privacy in detail](docs/privacy.md).
 

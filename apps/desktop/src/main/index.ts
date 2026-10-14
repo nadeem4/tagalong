@@ -12,7 +12,7 @@ import {
   screen,
   shell,
 } from 'electron';
-import { ContextSnapshot, HandoffFinishedParams } from '@tagalong/protocol';
+import { ConnectionsAddParams, ContextSnapshot, HandoffFinishedParams } from '@tagalong/protocol';
 import type {
   Expert,
   PerceptionTarget,
@@ -413,6 +413,8 @@ function forwardToRenderers(notification: { method: string; params: unknown }): 
   if (notification.method === 'pet.remark') showRemark(notification.params);
   // A brief to check: the bubble comes up beside the pet with the card in it.
   if (notification.method === 'handoff.proposed') bringUpBubble(true);
+  // A change Scout wants to make in a connected app: the confirm card must be seen.
+  if (notification.method === 'connector.confirm') bringUpBubble(true);
 
   // The renderer speaks the UI package's TurnEvent shape: the wire params plus the
   // method as a discriminant.
@@ -777,6 +779,32 @@ function registerIpc(): void {
   ipcMain.handle(IPC.searchProjects, async (_event, query: string) => {
     const { projects } = await engine().client.call('projects.search', { query });
     return projects;
+  });
+
+  // Connected apps, and the answer to a change Scout asked to make in one.
+  ipcMain.handle(IPC.approveTool, async (_event, approvalId: string, decision: 'once' | 'deny') => {
+    await engine().client.call('tool.approve', { approvalId, decision });
+  });
+  ipcMain.handle(IPC.listConnections, async () => engine().client.call('connections.list', {}));
+  ipcMain.handle(IPC.addConnection, async (_event, params: ConnectionsAddParams) => {
+    // Parsed here so the defaults (no args, no env) are filled before the call goes out.
+    const { connection } = await engine().client.call(
+      'connections.add',
+      ConnectionsAddParams.parse(params),
+    );
+    return connection;
+  });
+  ipcMain.handle(IPC.setConnectionEnabled, async (_event, id: string, enabled: boolean) => {
+    const { connection } = await engine().client.call('connections.setEnabled', { id, enabled });
+    return connection;
+  });
+  ipcMain.handle(IPC.signInConnection, async (_event, id: string) => {
+    const { connection } = await engine().client.call('connections.signIn', { id });
+    return connection;
+  });
+  ipcMain.handle(IPC.removeConnection, async (_event, id: string) => {
+    const { removed } = await engine().client.call('connections.remove', { id });
+    return removed;
   });
 
   ipcMain.handle(IPC.getContext, () => required().pendingSnapshot);

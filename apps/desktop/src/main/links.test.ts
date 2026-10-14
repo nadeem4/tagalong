@@ -1,6 +1,6 @@
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { extensionFolder, isAllowedLink } from './links';
+import { extensionFolder, isAllowedLink, isSignInPage } from './links';
 
 describe('isAllowedLink', () => {
   it('opens the pages where provider keys are made', () => {
@@ -60,5 +60,14 @@ describe('extensionFolder', () => {
         exists: exists([]),
       }),
     ).toBeUndefined();
+  });
+});
+
+describe('isSignInPage', () => {
+  it('opens a connected app’s sign-in page only over https', () => {
+    expect(isSignInPage('https://mcp.notion.com/authorize?client_id=x')).toBe(true);
+    expect(isSignInPage('http://evil.example/authorize')).toBe(false);
+    expect(isSignInPage('file:///C:/Windows/system32/cmd.exe')).toBe(false);
+    expect(isSignInPage('not a url')).toBe(false);
   });
 });

@@ -24,6 +24,15 @@ export function isAllowedLink(url: string): boolean {
   return ALLOWED_LINK_ORIGINS.has(new URL(url).origin) || ALLOWED_LINKS.has(url);
 }
 
+/**
+ * A connected app's sign-in page, which the engine asks main to open. It comes from the
+ * app's own sign-in metadata rather than from a renderer, and only https is opened: a
+ * `file:` or plain-http address is never handed to the system browser.
+ */
+export function isSignInPage(url: string): boolean {
+  return URL.canParse(url) && new URL(url).protocol === 'https:';
+}
+
 export interface ExtensionFolderOptions {
   packaged: boolean;
   /** `process.resourcesPath`: the installer copies the extension next to app.asar. */

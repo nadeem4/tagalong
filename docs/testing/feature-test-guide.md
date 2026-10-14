@@ -16,6 +16,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Phase 3B: Awareness](#phase-3b-awareness)
 - [Phase 7: onboarding and installer](#phase-7-onboarding-and-installer)
 - [Voice: Scout talks](#voice-scout-talks)
+- [Connections: your apps over MCP](#connections-your-apps-over-mcp)
 - [Demo run: the hackathon story](#demo-run-the-hackathon-story)
 - [Not in this build](#not-in-this-build)
 
@@ -1072,14 +1073,70 @@ OpenRouter key and a Token Factory key at hand. Tick each line.
 - [ ] **Privacy.** Press `Ctrl+Shift+Alt+P`: the pets' eye turns grey and a look is refused. Press it
       again to resume.
 
+## Connections: your apps over MCP
+
+These use real apps and a real provider, so they are yours to run. Scout must think with a provider
+that calls tools (your Claude sign-in or OpenRouter + Claude).
+
+### C1. Connect Notion
+
+- [ ] Home → **Connections** → Popular → **Connect Notion**. Your browser opens Notion's sign-in;
+      the page says **Finish signing in to Notion in your browser.**
+- [ ] Approve in Notion. The browser shows "You are signed in"; Home lists Notion as **Connected**
+      with its tools, each **Reads** or **Asks first**.
+- [ ] Restart Tagalong. Notion connects again with no browser.
+
+### C2. Read with Notion
+
+- [ ] Ask Scout "look at my launch plan in Notion" (a page you have). Scout answers from the page with
+      no card. Activity shows "Scout read Notion" with the tool name.
+
+### C3. A change asks first
+
+- [ ] Ask Scout "add a page in Notion called Tagalong test". The bubble comes up with a card: Notion,
+      what will change, the title. Nothing has changed in Notion yet.
+- [ ] Press **Cancel**. Scout says nothing was changed; Activity shows "Scout did not change Notion".
+- [ ] Ask again and press **Allow once**. The page appears in Notion; Activity shows "Scout changed
+      Notion".
+- [ ] Ask again and leave the card for two minutes. Scout says you did not answer and nothing changed.
+
+### C4. GitHub with a token
+
+- [ ] **Connect GitHub**, paste a personal access token (read-only is enough), **Connect**. GitHub
+      shows **Connected**.
+- [ ] Ask "any reviews waiting for me on GitHub?". Scout lists them.
+- [ ] Settings files and `tagalong.db` do not contain the token (search the data folder for it).
+
+### C5. Found on this PC
+
+- [ ] With a server set up in Claude Code (`claude mcp add ...`), it is listed under **Found on this
+      PC** with "From Claude Code". **Use** adds it; one with a key in its env asks for the key first.
+- [ ] A server already connected is not listed again.
+
+### C6. Add a connector
+
+- [ ] **Add a connector** → **A command on this PC**, name `Files`, command
+      `npx -y @modelcontextprotocol/server-filesystem C:/Users/<you>/Documents` → **Add**. It connects
+      and lists its tools.
+- [ ] An address that is not https is refused with a plain message.
+
+### C7. Failures stay plain
+
+- [ ] Add a command that does not exist. Its row says **Not working** and why; Scout still answers
+      other questions.
+- [ ] Switch a connection **Off**. Scout no longer uses it, and says so if you ask for it.
+- [ ] **Disconnect** → **Disconnect ... and delete its sign-in**. It is gone; connecting again asks
+      you to sign in again.
+
 ## Not in this build
 
 These appear in the plan but are not built; do not test them here.
 
 - **Voice input (Phase 3).** No push to talk and no microphone or speaker step in the wizard. A
   pet's reply style and voice id save but change nothing; Scout's voice is set in Settings → Voice.
-- **Hands (Phase 5).** No MCP tools, no tool allowlists beyond the built-in perception and crew tools,
-  no approval cards, no action log.
+- **Per-pet tool grants (Phase 5).** Connected apps work (see
+  [Connections](#connections-your-apps-over-mcp)), but there is no per-pet allow list and no
+  "always allow": every change asks.
 - **macOS and Linux platform code (tasks 67, 68).** The app stops at launch on both; the dmg, AppImage
   and deb configs exist but are unverified.
 - **Cost dashboard (task 72).** The panel counts model calls per run and the sight bar estimates image
