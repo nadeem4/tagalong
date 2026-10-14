@@ -141,7 +141,7 @@ the root `vitest.config.ts`.
 | `packages/core/src`                                    | 70 / 70 / 70 / 70                                 |
 | `packages/protocol/src`                                | 70 / 70 / 70 / 70                                 |
 | `packages/ui/src`                                      | 92 / 85 / 91 / 94                                 |
-| `apps/desktop/src/main` and `apps/desktop/src/preload` | 52 / 57 / 43 / 52                                 |
+| `apps/desktop/src/main` and `apps/desktop/src/preload` | 59 / 62 / 49 / 60                                 |
 
 The `packages/ui` and desktop host floors sit just below what they measured when they were added.
 Raise them when coverage grows; never lower them to make a change pass. The desktop renderer and

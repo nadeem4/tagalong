@@ -1,0 +1,136 @@
+import { describe, expect, it, vi } from 'vitest';
+import { InMemorySecretStore, WATCH_MODEL_DEFAULTS } from '@tagalong/core';
+import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
+import type { Settings, SettingsPatch } from '@tagalong/protocol';
+import { IPC } from '../../shared/ipc';
+import type { HostView } from '../../shared/ipc';
+import { ELEVENLABS_SECRET_KEY, providerChoices, secretKeyFor } from '../provider-choices';
+import { fakeEngine, fakeIpc } from './fake-ipc';
+import { registerSettingsIpc } from './settings';
+
+const ENGINE_SETTINGS: Settings = { ...SETTINGS_DEFAULTS, userName: 'Ada' } as Settings;
+const STORED_SETTINGS: Settings = { ...SETTINGS_DEFAULTS };
+const PET = { id: 'scout' };
+
+function setup({ engineUp = true, problem = null as string | null, folder = 'C:\\ext' } = {}) {
+  const ipc = fakeIpc();
+  const engine = fakeEngine({
+    'settings.get': { settings: ENGINE_SETTINGS },
+    'settings.set': { settings: ENGINE_SETTINGS },
+    'pets.list': { pets: [PET] },
+    'models.list': { models: ['m1'], source: 'live' },
+  });
+  const secrets = new InMemorySecretStore();
+  const settingsStore = {
+    get: vi.fn(() => STORED_SETTINGS),
+    set: vi.fn((patch: SettingsPatch) => ({ ...STORED_SETTINGS, ...patch }) as Settings),
+  };
+  const deps = {
+    host: () => (engineUp ? { client: engine.client, engine: { pairingToken: 'tok' } } : null),
+    settingsStore: () => settingsStore,
+    secrets: () => secrets,
+    problem: () => problem,
+    extensionFolder: () => (folder.length > 0 ? folder : undefined),
+    version: () => '1.2.3',
+    setSettings: vi.fn(),
+    applyHotkeys: vi.fn(),
+    refreshStrip: vi.fn(),
+    configureRolling: vi.fn(),
+    broadcast: vi.fn(),
+  };
+  registerSettingsIpc(ipc.handle, deps);
+  return { ...ipc, calls: engine.calls, secrets, settingsStore, deps };
+}
+
+describe('registerSettingsIpc: hostView', () => {
+  it("shows the engine's settings, the pets, which keys are stored and the pairing token", async () => {
+    const { invoke, secrets } = setup();
+    await secrets.set(secretKeyFor('openrouter')!, 'sk');
+    await secrets.set(ELEVENLABS_SECRET_KEY, 'el');
+    const view = (await invoke(IPC.hostView)) as HostView;
+    expect(view).toEqual({
+      elevenLabsKeyStored: true,
+      settings: ENGINE_SETTINGS,
+      pets: [PET],
+      providers: providerChoices(new Set(['openrouter'])),
+      engineVersion: '1.2.3',
+      watchModelDefaults: { ...WATCH_MODEL_DEFAULTS },
+      platform: process.platform,
+      extensionFolder: 'C:\\ext',
+      pairingToken: 'tok',
+    });
+  });
+
+  it('still opens with no engine: stored settings, no pets, no token, and the problem', async () => {
+    const { invoke } = setup({ engineUp: false, problem: 'the engine is down', folder: '' });
+    const view = (await invoke(IPC.hostView)) as HostView;
+    expect(view.settings).toBe(STORED_SETTINGS);
+    expect(view.pets).toEqual([]);
+    expect(view.elevenLabsKeyStored).toBe(false);
+    expect(view.hotkeyError).toBe('the engine is down');
+    expect(view).not.toHaveProperty('pairingToken');
+    expect(view).not.toHaveProperty('extensionFolder');
+  });
+});
+
+describe('registerSettingsIpc: saveSettings', () => {
+  it('saves through the engine and tells every window', async () => {
+    const { invoke, calls, deps } = setup();
+    const patch: SettingsPatch = { userName: 'Ada' };
+    expect(await invoke(IPC.saveSettings, patch)).toBe(ENGINE_SETTINGS);
+    expect(calls).toEqual([['settings.set', { patch }]]);
+    expect(deps.setSettings).toHaveBeenCalledWith(ENGINE_SETTINGS);
+    expect(deps.broadcast).toHaveBeenCalledWith(ENGINE_SETTINGS);
+    expect(deps.applyHotkeys).not.toHaveBeenCalled();
+    expect(deps.refreshStrip).not.toHaveBeenCalled();
+    expect(deps.configureRolling).not.toHaveBeenCalled();
+  });
+
+  it('saves to the file with no engine, and applies hotkeys, the strip and rolling memory now', async () => {
+    const { invoke, calls, deps, settingsStore } = setup({ engineUp: false });
+    const patch = {
+      hotkeys: SETTINGS_DEFAULTS.hotkeys,
+      hiddenPets: [],
+      defaultPetId: 'scout',
+      rollingMemory: SETTINGS_DEFAULTS.rollingMemory,
+    } as SettingsPatch;
+    const saved = (await invoke(IPC.saveSettings, patch)) as Settings;
+    expect(settingsStore.set).toHaveBeenCalledWith(patch);
+    expect(calls).toEqual([]);
+    expect(deps.applyHotkeys).toHaveBeenCalledWith(saved);
+    expect(deps.refreshStrip).toHaveBeenCalledTimes(2);
+    expect(deps.configureRolling).toHaveBeenCalledWith(saved.rollingMemory);
+  });
+});
+
+describe('registerSettingsIpc: keys and models', () => {
+  it('stores a key, and deletes it when the key is empty', async () => {
+    const { invoke, secrets } = setup();
+    const key = secretKeyFor('openrouter')!;
+    await invoke(IPC.saveApiKey, 'openrouter', 'sk-1');
+    expect(await secrets.get(key)).toBe('sk-1');
+    await invoke(IPC.saveApiKey, 'openrouter', '');
+    expect(await secrets.get(key)).toBeNull();
+  });
+
+  it('refuses a provider that takes no key', async () => {
+    const { invoke } = setup();
+    await expect(invoke(IPC.saveApiKey, 'nonsense', 'x')).rejects.toThrow(
+      "'nonsense' does not take an API key",
+    );
+  });
+
+  it("lists a provider's models, or none with no engine", async () => {
+    const up = setup();
+    expect(await up.invoke(IPC.listModels, 'openrouter')).toEqual({
+      models: ['m1'],
+      source: 'live',
+    });
+    expect(up.calls).toEqual([['models.list', { providerId: 'openrouter' }]]);
+    const down = setup({ engineUp: false });
+    expect(await down.invoke(IPC.listModels, 'openrouter')).toEqual({
+      models: [],
+      source: 'fallback',
+    });
+  });
+});
