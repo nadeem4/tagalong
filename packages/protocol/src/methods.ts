@@ -1,6 +1,20 @@
 import { z } from 'zod';
 import { ActivityListParams, ActivityListResult } from './activity';
 import {
+  ConnectionsAddParams,
+  ConnectionsAddResult,
+  ConnectionsChangedParams,
+  ConnectionsListParams,
+  ConnectionsListResult,
+  ConnectionsRemoveParams,
+  ConnectionsRemoveResult,
+  ConnectionsSetEnabledParams,
+  ConnectionsSetEnabledResult,
+  ConnectionsSignInParams,
+  ConnectionsSignInResult,
+  ConnectorConfirmParams,
+} from './connections';
+import {
   ExpertsDeleteParams,
   ExpertsDeleteResult,
   ExpertsListParams,
@@ -149,7 +163,10 @@ export const ModelsListResult = z.object({
   source: z.enum(['live', 'fallback']),
 });
 
-/** Phase 5. Present from Phase 1 so the catalog matches the documented table. */
+/**
+ * The person's answer to `connector.confirm`. `once` runs that one change; `deny` cancels
+ * it. `always` is not offered yet and counts as `once`: nothing is remembered.
+ */
 export const ToolApproveParams = z.object({
   approvalId: z.uuid(),
   decision: z.enum(['once', 'always', 'deny']),
@@ -435,6 +452,14 @@ export const hostToCoreMethods = {
   'keepAnEye.observe': { params: KeepAnEyeObserveParams, result: KeepAnEyeObserveResult },
   'keepAnEye.notNow': { params: KeepAnEyeNotNowParams, result: KeepAnEyeNotNowResult },
   'keepAnEye.accept': { params: KeepAnEyeAcceptParams, result: KeepAnEyeAcceptResult },
+  'connections.list': { params: ConnectionsListParams, result: ConnectionsListResult },
+  'connections.add': { params: ConnectionsAddParams, result: ConnectionsAddResult },
+  'connections.setEnabled': {
+    params: ConnectionsSetEnabledParams,
+    result: ConnectionsSetEnabledResult,
+  },
+  'connections.signIn': { params: ConnectionsSignInParams, result: ConnectionsSignInResult },
+  'connections.remove': { params: ConnectionsRemoveParams, result: ConnectionsRemoveResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostMethods = {
@@ -473,6 +498,8 @@ export const coreToHostNotifications = {
   'handoff.progress': { params: HandoffProgressParams },
   'handoff.finished': { params: HandoffFinishedParams },
   'pet.remark': { params: PetRemarkParams },
+  'connections.changed': { params: ConnectionsChangedParams },
+  'connector.confirm': { params: ConnectorConfirmParams },
 } as const satisfies Record<string, NotificationSpec>;
 
 export type HostToCoreMethod = keyof typeof hostToCoreMethods;

@@ -50,6 +50,11 @@ const HOST_TO_CORE = [
   'keepAnEye.observe',
   'keepAnEye.notNow',
   'keepAnEye.accept',
+  'connections.list',
+  'connections.add',
+  'connections.setEnabled',
+  'connections.signIn',
+  'connections.remove',
 ] as const;
 
 const CORE_TO_HOST = ['perception.capture'] as const;
@@ -71,6 +76,8 @@ const CORE_TO_HOST_NOTIFICATIONS = [
   'handoff.progress',
   'handoff.finished',
   'pet.remark',
+  'connections.changed',
+  'connector.confirm',
 ] as const;
 
 describe('method catalog', () => {
