@@ -130,6 +130,11 @@ export const SETTINGS_DEFAULTS = {
    * here, on this computer; it reaches the AI provider only inside Scout's prompt.
    */
   userName: '',
+  /**
+   * Whether Scout listens all the time. Off by default: only the person switches it on,
+   * and it stays on across restarts until they switch it off. Scout never switches it on.
+   */
+  listening: { always: false },
 } as const;
 
 /** The local voices Scout can speak in: two British male voices of the Kokoro model. */
@@ -315,6 +320,8 @@ const settingsFields = {
   }),
   /** What Scout calls the person; empty for no name. */
   userName: z.string().trim().max(MAX_USER_NAME_CHARS),
+  /** Whether Scout listens all the time, hearing only turns that start with its name. */
+  listening: z.object({ always: z.boolean() }),
 };
 
 export const Settings = z.object({
@@ -348,6 +355,7 @@ export const Settings = z.object({
   keepAnEye: settingsFields.keepAnEye.default(SETTINGS_DEFAULTS.keepAnEye),
   voice: settingsFields.voice.prefault({ ...SETTINGS_DEFAULTS.voice }),
   userName: settingsFields.userName.default(SETTINGS_DEFAULTS.userName),
+  listening: settingsFields.listening.prefault({ ...SETTINGS_DEFAULTS.listening }),
 });
 export type Settings = z.infer<typeof Settings>;
 

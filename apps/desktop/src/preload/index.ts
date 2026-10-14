@@ -28,6 +28,7 @@ import type {
   EarsStatus,
   FoundAgent,
   HostView,
+  ListeningState,
   ModelList,
   SpeakPreview,
   SpeakResult,
@@ -252,6 +253,13 @@ const host: TagalongHostApi = {
     } finally {
       ipcRenderer.off(IPC.earsProgressEvent, listener);
     }
+  },
+  getListening: () => ipcRenderer.invoke(IPC.getListening) as Promise<ListeningState>,
+  setListening: (on) => ipcRenderer.invoke(IPC.setListening, on) as Promise<ListeningState>,
+  onListening: (handler) => {
+    const listener = (_event: IpcRendererEvent, state: ListeningState): void => handler(state);
+    ipcRenderer.on(IPC.listeningEvent, listener);
+    return () => void ipcRenderer.off(IPC.listeningEvent, listener);
   },
 };
 

@@ -999,7 +999,11 @@ character (`characterFor`) at 4x, with a face and a tag per mood (`withMood`,
 while the companion answers or an expert has a task, eyes down; **Done** when a hand-off finishes, a
 happy squint, until the pet is clicked. The mood comes from `dockMood(nextDock(...))`
 (`renderer/src/dock.ts`), a pure reducer over turn and hand-off notifications and capture notices.
-The sight-paused mark and the recording dot stay. The pet is alive: it blinks every three to six
+The sight-paused mark and the recording dot stay, and so does the listening mark: while Always
+listening is on, `DockPet`'s `listening` prop draws a small green dot (`dock-pet__listening`), solid
+while on and an outline while paused, and the pet's name reads "…, listening" or "…, listening
+paused". The avatar reads `getListening` on mount and follows `onListening`, so the mark shows
+from the first second. The pet is alive: it blinks every three to six
 seconds (`withBlink`) in moods with open eyes, breathes with a 1 px rise when idle or seeing, bobs
 faster while working and hops three times when done; `prefers-reduced-motion` stops all of it.
 
@@ -1125,7 +1129,7 @@ is one file under `apps/desktop/src/renderer/src/settings/`:
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `brain-section.tsx`      | How Scout thinks: Scout's own provider and model (`brain.ts#scoutBrain`) with a status chip, or a service picker and key when no Claude sign-in is found                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `you-section.tsx`        | You: **What should Scout call you?** (`settings.userName`, empty for no name, cut to 40 characters), with an ⓘ note. When set, `prompt-assembler.ts` adds one line after the pet's name: use it rarely                                                                                                                                                                                                                                                                                                                                                                                  |
-| `privacy-section.tsx`    | The rolling memory switch, the blind spots as chips from `BLIND_SPOTS` labels, and the pause sight key                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `privacy-section.tsx`    | **Seeing** and **Always listening** at the top, live switches that act at once and are no form fields (Seeing: `getSightPaused`, `onSightPause`, `toggleSightPause`; Always listening: `getListening`, `onListening`, `setListening(!on)`), then the rolling memory switch, the blind spots as chips from `BLIND_SPOTS` labels, and the pause sight key                                                                                                                                                                                                                                 |
 | `voice-section.tsx`      | Scout talks (a switch), **Who speaks** (`voice.mouth`, from `adaptersFor('mouth')`) and **Who listens** (`voice.ears`, from `adaptersFor('ears')`; the one choice so far is `local`, on this computer), each with its facts line (`settings-form.ts#voiceFacts`: offline or online, key, cost, screenshots), the voice (George or Fable) with ▶ Preview (`voice-player.ts#playLine` with the form's mouth, voice and speed), the speed slider, the Talk to Scout key (`hotkeys.talk`) and the microphone (`voice.microphoneId`, `mic.ts#listMicrophones`, blank for the system default) |
 | `shortcuts-section.tsx`  | Three global hotkeys (ask, pause sight, stop speaking; the talk key is under Voice); a `hotkeyError` marks the field whose combination it names; one combination for two shortcuts (the talk key included) is refused before saving, naming both (`settings-form.ts#refuseSharedHotkeys`)                                                                                                                                                                                                                                                                                               |
 | `browser-section.tsx`    | The Chrome extension's pairing token                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -1423,9 +1427,13 @@ flowchart LR
   It stays until **Got it** or a hotkey question. **Try it now** captures the active window and a screenshot
   (`capture(['activeWindow', 'screenshot'])`) and asks "What am I working on, and what could you
   hand to an expert?" in the same bubble; when the screen cannot be seen it asks without it.
-- **Every later launch says one quiet line.** When Welcome is done and `settings.greeting` is on
-  (`welcome.ts#shouldGreetOnLaunch`, default on), main calls `greeting.compose` for the default pet,
-  sends the text as `greetLineEvent` (the preload keeps one that arrives before the panel subscribes)
+- **Every later launch says one quiet line.** `welcome.ts#launchLine` picks it. With Always
+  listening on at launch (`settings.listening.always`) it is the listening line,
+  `LISTENING_LINE` ("I’m listening. Say “Scout, stop”, or switch off Always listening in my
+  bubble."), even when the greeting is switched off, and nothing is composed. Otherwise, when
+  Welcome is done and `settings.greeting` is on (`welcome.ts#shouldGreetOnLaunch`, default on),
+  main calls `greeting.compose` for the default pet. Either way main sends the text as
+  `greetLineEvent` (the preload keeps one that arrives before the panel subscribes)
   and shows the panel with `showPanelQuietly`. The panel renders `GreetingLine`: `role="status"`,
   fades after about seven seconds unless pointed at or focused, opens the ask bubble on a click.
   Then main stores `lastOpenedAt`, whether or not it greeted, and on `before-quit` it stores
@@ -1466,6 +1474,13 @@ above a **Message** box. It is the same component, so it is the same conversatio
 - **One question, one answer, in place.** Enter asks; the answer streams into the bubble with
   **Stop**; the next question continues the conversation `turn.started` reported. Turns of other
   pets are ignored. Errors say what went wrong in a `role="alert"` line.
+- **The mic is in the text box; the header has two switches.** The mic button sits inside the
+  question box. The header carries **Always listening** (off by default; when on, the bubble says
+  to start with "Scout", or that listening is paused during a call or full screen) and **Seeing**,
+  both `role="switch"` buttons with `aria-checked`. The question box carries its own
+  `aria-label` (Ask Scout, Message Scout), so the mic button inside its label never joins its name.
+  The panel (`renderer/src/panel.tsx`) passes `seeing` from `getSightPaused` and `onSightPause`
+  (on is not paused) and `toggleSightPause` on click: the same pause as the pause key and the tray.
 - **Answers are formatted, not raw Markdown.** `Answer` (`@tagalong/ui`) renders every answer, in
   the bubble, the full chat and an expert's result, with `react-markdown` and `remark-gfm`: bold,
   lists, headings, code, tables. HTML in an answer is skipped, and a link shows as text with its
@@ -1584,7 +1599,8 @@ flowchart LR
 
 A spoken conversation on our own pipeline, with the configured provider still the brain: speech to
 text on this computer, a Scout turn in spoken mode, and the answer said sentence by sentence as it
-streams. The microphone opens only on the talk key (held) or the bubble's mic button.
+streams. The microphone opens only on the talk key (held), the bubble's mic button, or, while the
+person has switched Always listening on, all the time.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
@@ -1592,14 +1608,14 @@ flowchart LR
   subgraph Main["Main process"]
     HK["hotkeys.talk: every press"] --> TE["IPC talkEvent(at)"]
     IPCV["ipc/voice.ts: earsListen notes the active window; micFrame, earsStop"]
-    FE["forwardEars: to every window"]
+    FE["forwardEars: to every window; words addressed to Scout bring the bubble up"]
   end
   subgraph Worker["Voice process"]
     EH["createEarsHost: one session at a time"] --> LE["LocalEars (FakeEars under TAGALONG_FAKE_STT)"]
   end
   subgraph Panel["Panel renderer"]
     TE --> PTT["PushToTalk: held, repeat, fresh press, click"]
-    PTT --> LC["ListenController: hold, release, cancel"]
+    PTT --> LC["ListenController: hold, release, cancel; setAlways, setPaused, setDeaf"]
     LC --> MIC["mic.ts openMic: getUserMedia, mic-worklet.js, 512-sample 16 kHz frames"]
     MIC --> RE["RemoteEars"]
     RE -- "IPC earsListen, micFrame, earsStop" --> IPCV
@@ -1641,14 +1657,17 @@ flowchart LR
 - **The ears, in the panel** (`renderer/src/mic.ts`, `mic-worklet.js`, `remote-ears.ts`,
   `ui/voice/listen-controller.ts`). `ListenController` decides when the microphone is open: `hold`
   (the talk key, the mic button) opens it and makes the ears for that session, `release` closes it and
-  stops the ears, whose turnEnd then carries the question; `cancel` drops the question being held and
-  every released one whose words have not come yet (models that failed to load, a voice process that
-  died), so none of them is asked later. A mic that opens after the release is closed unused and is
+  stops the ears, whose turnEnd then carries the question; `cancel` (the bubble closing) drops the
+  question being held and every released one whose words have not come yet, so none of them is asked
+  later, and leaves an always session running (or brings it back after the held one). `earsFailed`
+  (models that failed to load, a voice process that died) drops every question too and ends the
+  always session without switching it off and without retrying at once; the next `setAlways`,
+  `setPaused` or `setDeaf` starts it again, and the voice process tries its download again. A mic that opens after the release is closed unused and is
   heard as nothing said; one that opens after a cancel is closed unused too. Every window hears the one stream of ears
   events and the voice process runs sessions one after another, so a held session takes a turnEnd only
   once it has been released: a released question's words that arrive after the next press began go to
   the released question, and released questions take turnEnds in the order they were released, each
-  one once. A cancel never sends a stop for a mic that never opened. `speechStart` stops Scout talking, each `partial` shows in the bubble as the
+  one once. A cancel never sends a stop for a mic that never opened. `speechStart` stops Scout talking, each `partial` (with its session's mode) shows in the bubble as the
   words heard so far (`BubbleTalk.partial`), and the trimmed turnEnd text is asked (empty: "I didn't
   catch that"). `openMic` (`getUserMedia` with the microphone from `voice.microphoneId` or the
   system default, echo cancellation, noise suppression and auto gain on) runs an `AudioContext` at
@@ -1660,6 +1679,40 @@ flowchart LR
   30 s of frames waiting) and has `close()`; ending the reading early closes it too. `RemoteEars` is
   the `Ears` the panel sees: `listen` calls `earsListen(mode)` and sends each frame with `micFrame`,
   `stop` calls `earsStop`; held, it keeps its handlers until the turnEnd that follows the stop.
+- **Always listening, in the panel** (`ui/voice/listen-controller.ts`, `renderer/src/voice-player.ts`).
+  `setAlways(on)`, `setPaused(paused)` (a call or full screen, or the pets hidden) and `setDeaf(deaf)`
+  keep one `always` session open exactly while it is on, not paused and not deaf; otherwise its mic
+  closes and its ears stop at once. The talk key and the mic button still ask without the name while
+  an always session runs: `hold` ends the always session (its ears stop first, and the voice process
+  runs sessions in order) and starts a held one, and `release`, or a `cancel` of the held question,
+  brings the always session back. During a pause the key works as usual, and the always session
+  comes back only when the pause ends. Ending an always session keeps released held questions
+  waiting for their words, and while one waits the always session counts nothing (the voice process
+  runs sessions in order, so those words are the held question's). An always session that ends
+  mid-turn (a pause, the switch, the system voice, the talk key) after an addressed `partial` cut
+  Scout off calls `onDropped`, so its words leave the bubble. Only talk addressed to Scout counts
+  (`addressedToScout` from `@tagalong/protocol`): bare `speechStart` does nothing, the first addressed
+  `partial` of a turn cuts Scout off and each one shows, an unaddressed turn goes nowhere, and an
+  addressed turnEnd asks what follows the name, or, for "Scout, stop" (`isStopListening`), calls
+  `onStopListening`, which switches Always listening off through `setListening(false)`. A turn that
+  cut Scout off but ends unaddressed or empty calls `onDropped`, and the bubble clears its words. The system
+  voice is not echo-cancelled, so `voice-player.ts` reports it speaking (`onSystemVoice`,
+  `systemVoiceSpeaking`) for `setDeaf`: Scout never answers or cuts off its own words.
+- **Always listening, wired** (`renderer/src/talk.ts`, `renderer/src/talk-rules.ts`). `useTalk`
+  reads `getListening` at mount and follows `onListening`, passing `on` to `setAlways` and `paused`
+  to `setPaused`; the panel window is created hidden at launch (`createPanelWindow` in
+  `main/index.ts`), so with Always listening saved on, the microphone opens from the start. It
+  passes `onSystemVoice` to `setDeaf`, and returns `talk.always` (`{ on, paused, onToggle }`,
+  `onToggle` calling `setListening(!on)`) for the bubble's switch. Closing the bubble cancels the
+  question being asked, never always listening. The decisions sit in `talk-rules.ts`, unit tested:
+  `settles` (a heard question clears the words and the state unless a held question has started, so
+  an always question and a held question heard after the always session resumed both settle),
+  `shownPartial` (always words without the leading "Scout", as heard when they do not start with
+  it; held words as said, since they need no name), `FailureStreak` (a microphone that cannot open
+  fails again at every always retry, each time the system voice stops: the note shows once per run
+  of failures, until words are heard or the person presses the key) and `EarsNotes` (the first-time
+  download note, and an ears failure said once: always listening's later retries each download
+  again and fail again, and neither repeat the failure nor leave the download note behind).
 - **The ears, through main** (`main/ipc/voice.ts`). `earsListen` notes the active window for a held
   question (never the selection: copying it would press keys while the talk key is held), then sends
   `ears.listen` to the voice process, which `VoiceWorker` forks then if Scout has not spoken yet.
@@ -1670,10 +1723,27 @@ flowchart LR
   dies, or the models fail to load, the windows hear a `failed` status with a plain line ("Listening
   stopped unexpectedly. Try again." for a dead process; `ears-host.ts#EARS_DOWNLOAD_FAILED` when the
   first-time download fails, `EARS_START_FAILED` when models already on disk cannot start; the raw
-  error goes to the voice process's log only); the panel then cancels, which drops the question
-  being held and any released question still waiting for its words, and shows the message. The
+  error goes to the voice process's log only); the panel then calls `earsFailed`, which drops the
+  question being held and any released question still waiting for its words and ends an always
+  session, and shows the message once. The
   voice process posts `loading` only when the model files are not on disk yet, and the panel then
   says the first-time download (about 43 MB).
+- **Always listening, in main** (`main/always-listening.ts`, `main/ipc/voice.ts`). One
+  `AlwaysListening` state (`{ on, paused }`) is built from the saved `settings.listening.always`
+  before any window opens. Only the person switches it: `getListening` and `setListening(on)` (a
+  boolean, anything else refused with "Always listening is on or off.") on the voice IPC. Each
+  change goes to every window as `IPC.listeningEvent`, and when `on` changes main saves it with
+  `settings.set { listening: { always } }` (`saveListening`: the settings file when the engine is
+  not running, and a save that fails is tried again at the next change); `paused` is never saved.
+  `startListeningGuard` checks the front window every 2 s while it is on, and at once when it comes
+  on, and blocks listening for a call or a full-screen window (`listeningBlocked`); switched off,
+  it forgets its answer. `paused` is `listeningPaused`: blocked, or the pets hidden (the avatar's
+  `show` and `hide` events), so the mark is never out of sight while the mic is open. The guard is
+  stopped on quit. `forwardEars` takes an `onSpoken` callback: a
+  `partial` or `turnEnd` whose words are addressed to Scout (`addressedToScout`, from
+  `@tagalong/protocol`) brings the hidden bubble up beside a visible pet with `showPanelQuietly`,
+  without taking the keyboard, as a remark or the launch line does; bare speech, talk that does
+  not start with the name, and "Scout, stop" never do.
 - **The ears, in the voice process** (`main/voice/worker/ears-host.ts`, `main/voice/ears/`).
   `createEarsHost` opens an inbox for frames at each listen, so the first words are not lost while
   the models load, and runs one session at a time. Letting go of a held question only ends its
@@ -1727,7 +1797,78 @@ flowchart LR
   "The answer is in the bubble." when nothing was speakable. Each piece goes through
   a `Pushable` to `mouth.speak` (the panel's `QueueMouth`), which calls `SpeechQueue.say(text, { whole: true })`: shaped by `toSpeakable` but never cut to two sentences. Stopping the mouth drops whatever is still streaming.
   The finished answer is not said again; the bubble shows what it heard and, after the answer,
-  "Hold <key> to reply". The microphone never reopens on its own.
+  "Hold <key> to reply". The microphone does not reopen on its own: only the talk key, the mic button
+  or Always listening opens it.
+
+## Always listening
+
+Scout listens all the time only while the person has switched this on, and the choice is kept
+(`settings.listening.always`, default `false`, in `@tagalong/protocol`'s settings). The bullets under
+"Talk to Scout" give the details of each part; this is how they fit together.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
+flowchart LR
+  subgraph Main["Main process"]
+    AL["AlwaysListening: { on, paused }, from the saved setting"]
+    G["startListeningGuard: every 2 s, window titles only"]
+    G -->|"listeningBlocked: call or full screen"| AL
+    PH["Avatar show and hide: the pets hidden"] -->|"listeningPaused"| AL
+    AL -->|"IPC listeningEvent, to every window"| W["Bubble, avatar, Settings"]
+    FE["forwardEars onSpoken: addressed words show the bubble quietly"]
+  end
+  subgraph Panel["Panel renderer"]
+    TK["useTalk: setAlways, setPaused, setDeaf"] --> LC["ListenController: addressedToScout, isStopListening"]
+    LC -->|"Scout, what is this?"| ASK["Ask without the name"]
+    LC -->|"Scout, stop"| OFF["setListening(false)"]
+    LC -->|"not addressed"| DROP["Dropped"]
+  end
+  W --> TK
+  OFF --> AL
+```
+
+- **The state** (`main/always-listening.ts`). `AlwaysListening` holds `{ on, paused }` and starts
+  from the saved setting before any window opens. Only the person changes `on`: `getListening` and
+  `setListening(on)` on the voice IPC, from the bubble's header switch, the Settings → Privacy
+  switch or "Scout, stop". Each change reaches every window as `IPC.listeningEvent`, and main saves
+  `on` with `settings.set { listening: { always } }` (`saveListening`, falling back to the settings
+  file with no engine, and trying again at the next change after a failed save; saves run one at a
+  time and each one done saves again if the choice changed meanwhile, so the last choice is the
+  one in the file). `paused` is never
+  saved: it is `listeningPaused`, true while the guard blocks or the pets are hidden.
+- **The guard.** `startListeningGuard` lists the windows every 2 s (`LISTENING_GUARD_MS`) while
+  listening is on, and at once when it comes on (switched on, or on at launch), and
+  `listeningBlocked` is true when the front window is a call app (`isMeeting`, from
+  `@tagalong/core`; a Teams window in front counts even with no call) or fills the screen. Only
+  titles and positions are read, never window text. A failed listing keeps the last answer;
+  switched off, the guard forgets it.
+- **The pets hidden.** The tray's Hide pets (or Welcome, before Scout arrives) hides the avatar,
+  and listening is paused until it shows again, so the mark is in sight whenever the mic is open.
+- **The controller** (`ui/voice/listen-controller.ts`). `setAlways`, `setPaused` and `setDeaf` keep
+  one `always` session open exactly while it is on, not paused and not deaf (the system voice is
+  not echo-cancelled). `addressedToScout` (`@tagalong/protocol`) accepts a turn that starts with
+  "Scout", after an optional "hey", "ok" or "okay", and returns the rest as the question; "Scout's"
+  and "Scout-like" are not addressed. `isStopListening` matches "stop" or "stop listening" after
+  the name. An unaddressed turn goes nowhere.
+- **Hold-to-talk and the mic button need no name**, in every case. They are the `held` mode, not
+  the `always` mode, and `addressedToScout` is never applied to them: pressed while an always
+  session runs, it ends for the held question and comes back after it.
+- **The bubble from main.** `forwardEars` takes `onSpoken`. A `partial` or `turnEnd` addressed to
+  Scout brings the hidden bubble up beside a visible pet (`showPanelQuietly`), without taking the
+  keyboard.
+- **The launch line.** `welcome.ts#launchLine` returns `LISTENING_LINE` when
+  `settings.listening.always` is on, even with the greeting off, so Scout's first line says it is
+  listening and how to stop. The panel is created hidden at launch, so the microphone and the mark
+  are there from the first second.
+- **The mark.** `DockPet`'s `listening` prop (`'on'` or `'paused'`) draws `dock-pet__listening`,
+  solid while on and outlined while paused, and adds "listening" or "listening paused" to the pet's
+  accessible name. The avatar follows `getListening` and `onListening`.
+- **The switches.** The bubble's header carries **Always listening** and **Seeing**
+  (`role="switch"`); Settings → Privacy (`privacy-section.tsx`) has the same two as live switches
+  that act at once and are not form fields.
+- **Tests.** `listening.spec.ts` (end to end, on fakes) switches it on, hears a turn that starts
+  with "Scout", answers it, and switches it off. Under `TAGALONG_FAKE_STT=1` the fake ears hear
+  "Scout, what am I looking at?" after `FAKE_TURN_FRAMES` frames in always mode.
 
 ## Packaging (Phase 7)
 

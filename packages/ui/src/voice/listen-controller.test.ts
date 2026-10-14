@@ -46,6 +46,8 @@ function setup(openMic: () => Promise<ListenMic> = vi.fn(async () => fakeMic()))
     heard: vi.fn(),
     nothing: vi.fn(),
     failed: vi.fn(),
+    stop: vi.fn(),
+    dropped: vi.fn(),
   };
   const controller = new ListenController({
     ears: ears.make,
@@ -55,6 +57,8 @@ function setup(openMic: () => Promise<ListenMic> = vi.fn(async () => fakeMic()))
     onHeard: calls.heard,
     onNothingHeard: calls.nothing,
     onMicFailed: calls.failed,
+    onStopListening: calls.stop,
+    onDropped: calls.dropped,
   });
   return { controller, ears, calls, openMic: openMic as ReturnType<typeof vi.fn> };
 }
@@ -77,8 +81,7 @@ describe('ListenController, held', () => {
     expect(ears.made[0]?.ears.stopped).toBe(true);
     ears.say('turnEnd', ' what is this ');
     expect(calls.speechStart).toHaveBeenCalledOnce();
-    expect(calls.partial).toHaveBeenCalledOnce();
-    expect(calls.partial).toHaveBeenCalledWith('what is');
+    expect(calls.partial.mock.calls).toEqual([['what is', 'held']]);
     expect(calls.heard).toHaveBeenCalledWith('what is this');
     expect(controller.mode).toBeNull();
   });
@@ -236,5 +239,343 @@ describe('ListenController, held', () => {
     await tick();
     ears.say('turnEnd', 'second');
     expect(calls.heard.mock.calls).toEqual([['first'], ['second']]);
+  });
+});
+
+describe('ListenController, always', () => {
+  it('listens while on, keeps listening after each turn, and closes the mic when switched off', async () => {
+    const { controller, ears, calls, openMic } = setup();
+    controller.setAlways(true);
+    await tick();
+    expect(controller.mode).toBe('always');
+    expect(ears.made[0]?.mode).toBe('always');
+    ears.say('turnEnd', 'Scout, first question');
+    ears.say('turnEnd', 'Scout, second question');
+    expect(calls.heard.mock.calls).toEqual([['first question'], ['second question']]);
+    expect(controller.mode).toBe('always');
+    controller.setAlways(false);
+    await tick();
+    expect((await openMic.mock.results[0]!.value).close).toHaveBeenCalledOnce();
+    expect(ears.made[0]?.ears.stopped).toBe(true);
+    expect(controller.mode).toBeNull();
+  });
+
+  it('closes the mic during a call or full screen and opens it again after', async () => {
+    const { controller, openMic } = setup();
+    controller.setAlways(true);
+    await tick();
+    controller.setPaused(true);
+    await tick();
+    expect(controller.mode).toBeNull();
+    expect((await openMic.mock.results[0]!.value).close).toHaveBeenCalledOnce();
+    controller.setPaused(false);
+    await tick();
+    expect(openMic).toHaveBeenCalledTimes(2);
+    expect(controller.mode).toBe('always');
+  });
+
+  it('is deaf while the system voice speaks, so Scout never answers or stops itself', async () => {
+    const { controller, ears, calls, openMic } = setup();
+    controller.setAlways(true);
+    await tick();
+    controller.setDeaf(true);
+    await tick();
+    expect((await openMic.mock.results[0]!.value).close).toHaveBeenCalledOnce();
+    ears.say('speechStart');
+    ears.say('partial', 'Scout, what');
+    ears.say('turnEnd', 'Scout, what is that');
+    ears.say('turnEnd', 'Scout, stop');
+    expect(calls.speechStart).not.toHaveBeenCalled();
+    expect(calls.partial).not.toHaveBeenCalled();
+    expect(calls.heard).not.toHaveBeenCalled();
+    expect(calls.stop).not.toHaveBeenCalled();
+    controller.setDeaf(false);
+    await tick();
+    expect(controller.mode).toBe('always');
+  });
+
+  it('the talk key asks without the name while listening all the time, then listening resumes', async () => {
+    const order: string[] = [];
+    const { controller, ears, calls } = setup(
+      vi.fn(async () => {
+        order.push(`open, always stopped: ${String(ears.made[0]?.ears.stopped)}`);
+        return fakeMic();
+      }),
+    );
+    controller.setAlways(true);
+    await tick();
+    controller.hold();
+    await tick();
+    expect(controller.mode).toBe('held');
+    expect(ears.made.map((made) => made.mode)).toEqual(['always', 'held']);
+    // The always session ends before the held one opens its mic: the voice process runs them in order.
+    expect(order).toEqual(['open, always stopped: false', 'open, always stopped: true']);
+    ears.say('partial', 'what is');
+    controller.release();
+    await tick();
+    expect(controller.mode).toBe('always');
+    expect(ears.made.map((made) => made.mode)).toEqual(['always', 'held', 'always']);
+    ears.say('turnEnd', 'what is this');
+    expect(calls.partial.mock.calls).toEqual([['what is', 'held']]);
+    expect(calls.heard.mock.calls).toEqual([['what is this']]);
+    // Always listening goes on as before: only "Scout" asks.
+    await tick();
+    ears.say('turnEnd', 'what is that');
+    ears.say('turnEnd', 'Scout, and that?');
+    expect(calls.heard.mock.calls).toEqual([['what is this'], ['and that?']]);
+  });
+
+  it('cancel while listening all the time keeps listening', async () => {
+    const { controller, ears, openMic } = setup();
+    controller.setAlways(true);
+    await tick();
+    controller.cancel();
+    await tick();
+    expect(controller.mode).toBe('always');
+    expect(openMic).toHaveBeenCalledOnce();
+    expect(ears.made[0]?.ears.stopped).toBe(false);
+  });
+
+  it('cancel drops a question held while listening all the time, and listening resumes', async () => {
+    const { controller, ears, calls } = setup();
+    controller.setAlways(true);
+    await tick();
+    controller.hold();
+    await tick();
+    controller.cancel();
+    await tick();
+    expect(controller.mode).toBe('always');
+    expect(ears.made[1]?.ears.stopped).toBe(true);
+    ears.say('turnEnd', 'what is this');
+    expect(calls.heard).not.toHaveBeenCalled();
+  });
+
+  it('ending the session mid-turn after "Scout" cut Scout off lets the bubble go', async () => {
+    const { controller, ears, calls } = setup();
+    controller.setAlways(true);
+    await tick();
+    ears.say('partial', 'Scout, wh');
+    controller.setPaused(true);
+    expect(calls.dropped).toHaveBeenCalledOnce();
+    controller.setPaused(false);
+    await tick();
+    // A session ended with nothing addressed drops nothing.
+    controller.setDeaf(true);
+    expect(calls.dropped).toHaveBeenCalledOnce();
+  });
+
+  it('the ears failing ends the always session but leaves it switched on: the next change retries', async () => {
+    const { controller, ears, openMic } = setup();
+    controller.setAlways(true);
+    await tick();
+    expect(controller.earsFailed()).toBe('always');
+    await tick();
+    expect(controller.mode).toBeNull();
+    expect(ears.made[0]?.ears.stopped).toBe(true);
+    expect(openMic).toHaveBeenCalledOnce();
+    // The system voice speaking and stopping, a call, or the switch: listening tries again.
+    controller.setDeaf(true);
+    controller.setDeaf(false);
+    await tick();
+    expect(controller.mode).toBe('always');
+    expect(openMic).toHaveBeenCalledTimes(2);
+  });
+
+  it('the ears failing drops a held question and every released one, without resuming', async () => {
+    const { controller, ears, calls } = setup();
+    controller.setAlways(true);
+    await tick();
+    controller.hold();
+    await tick();
+    controller.release();
+    controller.hold();
+    await tick();
+    expect(controller.earsFailed()).toBe('held');
+    await tick();
+    expect(controller.mode).toBeNull();
+    ears.say('turnEnd', 'late');
+    expect(calls.heard).not.toHaveBeenCalled();
+    expect(controller.earsFailed()).toBeNull();
+  });
+
+  it('still lets the talk key work during a call, and does not reopen afterwards on its own', async () => {
+    const { controller, openMic } = setup();
+    controller.setAlways(true);
+    controller.setPaused(true);
+    await tick();
+    controller.hold();
+    await tick();
+    expect(controller.mode).toBe('held');
+    controller.release();
+    await tick();
+    expect(controller.mode).toBeNull();
+    expect(openMic).toHaveBeenCalledTimes(2);
+  });
+
+  it('lets talk that is not addressed to Scout go nowhere, not even the bubble', async () => {
+    const { controller, ears, calls } = setup();
+    controller.setAlways(true);
+    await tick();
+    ears.say('speechStart');
+    ears.say('partial', 'what is');
+    ears.say('turnEnd', 'what is this');
+    ears.say('turnEnd', '');
+    ears.say('turnEnd', 'Scout');
+    expect(calls.speechStart).not.toHaveBeenCalled();
+    expect(calls.partial).not.toHaveBeenCalled();
+    expect(calls.heard).not.toHaveBeenCalled();
+    expect(calls.nothing).not.toHaveBeenCalled();
+    expect(calls.stop).not.toHaveBeenCalled();
+  });
+
+  it('cuts Scout off once a turn is addressed to it, and asks what follows the name', async () => {
+    const { controller, ears, calls } = setup();
+    controller.setAlways(true);
+    await tick();
+    ears.say('partial', 'hey');
+    ears.say('partial', 'Hey Scout, what');
+    ears.say('partial', 'hey scout, what is');
+    ears.say('turnEnd', 'Hey Scout, what is this?');
+    expect(calls.speechStart).toHaveBeenCalledOnce();
+    expect(calls.partial.mock.calls).toEqual([
+      ['Hey Scout, what', 'always'],
+      ['hey scout, what is', 'always'],
+    ]);
+    expect(calls.heard.mock.calls).toEqual([['what is this?']]);
+    // The next turn barges in again.
+    ears.say('turnEnd', 'scout, and that?');
+    expect(calls.speechStart).toHaveBeenCalledTimes(2);
+    expect(calls.heard).toHaveBeenLastCalledWith('and that?');
+  });
+
+  it('"Scout, stop" switches listening off and is never asked', async () => {
+    const { controller, ears, calls } = setup();
+    controller.setAlways(true);
+    await tick();
+    ears.say('turnEnd', 'Scout, stop.');
+    expect(calls.stop).toHaveBeenCalledOnce();
+    expect(calls.speechStart).toHaveBeenCalledOnce();
+    expect(calls.heard).not.toHaveBeenCalled();
+  });
+
+  it('a held question needs no name', async () => {
+    const { controller, ears, calls } = setup();
+    controller.hold();
+    await tick();
+    controller.release();
+    ears.say('turnEnd', 'what is this');
+    expect(calls.heard).toHaveBeenCalledWith('what is this');
+  });
+
+  it('switched on while the key is held, it starts listening once the key is let go', async () => {
+    const { controller, openMic } = setup();
+    controller.hold();
+    await tick();
+    controller.setAlways(true);
+    await tick();
+    expect(controller.mode).toBe('held');
+    expect(openMic).toHaveBeenCalledOnce();
+    controller.release();
+    await tick();
+    expect(controller.mode).toBe('always');
+    expect(openMic).toHaveBeenCalledTimes(2);
+  });
+
+  it('a held question released just before listening starts keeps its own words', async () => {
+    const { controller, ears, calls } = setup();
+    controller.hold();
+    await tick();
+    controller.release();
+    controller.setAlways(true);
+    await tick();
+    expect(controller.mode).toBe('always');
+    // The voice process runs sessions in order: the held question's words come first.
+    ears.say('partial', 'Scout, the held');
+    ears.say('turnEnd', 'Scout, the held one');
+    expect(calls.heard.mock.calls).toEqual([['Scout, the held one']]);
+    expect(calls.partial.mock.calls).toEqual([['Scout, the held', 'held']]);
+    expect(calls.speechStart).not.toHaveBeenCalled();
+    await tick();
+    ears.say('turnEnd', 'Scout, the always one');
+    expect(calls.heard.mock.calls).toEqual([['Scout, the held one'], ['the always one']]);
+  });
+
+  it('a question asked during a call keeps its words when listening comes back', async () => {
+    const { controller, ears, calls } = setup();
+    controller.setAlways(true);
+    await tick();
+    controller.setPaused(true);
+    controller.hold();
+    await tick();
+    controller.release();
+    controller.setPaused(false);
+    await tick();
+    expect(controller.mode).toBe('always');
+    ears.say('turnEnd', 'what is this');
+    expect(calls.heard.mock.calls).toEqual([['what is this']]);
+    await tick();
+    ears.say('turnEnd', 'Scout, and now?');
+    expect(calls.heard.mock.calls).toEqual([['what is this'], ['and now?']]);
+  });
+
+  it('going deaf keeps a released question waiting for its words', async () => {
+    const { controller, ears, calls } = setup();
+    controller.hold();
+    await tick();
+    controller.release();
+    controller.setAlways(true);
+    await tick();
+    controller.setDeaf(true);
+    ears.say('turnEnd', 'what is this');
+    expect(calls.heard).toHaveBeenCalledWith('what is this');
+  });
+
+  it('switched off before the mic opens, it closes the mic unused and stops nothing', async () => {
+    let open!: (mic: ListenMic) => void;
+    const close = vi.fn();
+    const { controller, ears } = setup(
+      vi.fn(() => new Promise<ListenMic>((resolve) => (open = resolve))),
+    );
+    controller.setAlways(true);
+    controller.setAlways(false);
+    open(fakeMic(close));
+    await tick();
+    expect(close).toHaveBeenCalledOnce();
+    expect(ears.made[0]?.ears.listening).toBeNull();
+    expect(ears.made[0]?.ears.stopped).toBe(false);
+    expect(controller.mode).toBeNull();
+  });
+
+  it('a turn that stopped Scout but ends with nothing for it lets the bubble go', async () => {
+    const { controller, ears, calls } = setup();
+    controller.setAlways(true);
+    await tick();
+    ears.say('partial', 'Scout, wh');
+    ears.say('turnEnd', 'what');
+    expect(calls.dropped).toHaveBeenCalledOnce();
+    expect(calls.heard).not.toHaveBeenCalled();
+    expect(calls.nothing).not.toHaveBeenCalled();
+    // The next turn starts fresh: unaddressed again, nothing to let go.
+    ears.say('turnEnd', 'what');
+    expect(calls.dropped).toHaveBeenCalledOnce();
+  });
+
+  it('an unaddressed turn that never stopped Scout drops nothing', async () => {
+    const { controller, ears, calls } = setup();
+    controller.setAlways(true);
+    await tick();
+    ears.say('partial', 'what is');
+    ears.say('turnEnd', 'what is this');
+    ears.say('turnEnd', 'Scout, what is this');
+    expect(calls.dropped).not.toHaveBeenCalled();
+  });
+
+  it('switching on twice opens one mic', async () => {
+    const { controller, openMic } = setup();
+    controller.setAlways(true);
+    controller.setAlways(true);
+    controller.setPaused(false);
+    await tick();
+    expect(openMic).toHaveBeenCalledOnce();
   });
 });

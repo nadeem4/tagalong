@@ -98,7 +98,16 @@ export const IPC = {
   earsStatusEvent: 'tagalong:voice:ears-status',
   ensureEars: 'tagalong:voice:ensure-ears',
   earsProgressEvent: 'tagalong:voice:ears-progress',
+  getListening: 'tagalong:voice:get-listening',
+  setListening: 'tagalong:voice:set-listening',
+  listeningEvent: 'tagalong:voice:listening',
 } as const;
+
+/** Always listening: switched on by the person, and paused while a call or full screen is in front. */
+export interface ListeningState {
+  on: boolean;
+  paused: boolean;
+}
 
 /** The ears' models: loading (the first time, a download), ready, or failed and why. */
 export interface EarsStatus {
@@ -328,6 +337,12 @@ export interface TagalongHostApi {
   onEarsStatus(handler: (status: EarsStatus) => void): () => void;
   /** Downloads the ears' model files if missing; `onProgress` hears 0..1, ending at 1. */
   ensureEars(onProgress: (fraction: number) => void): Promise<void>;
+  /** Always listening now, for a window that just opened: the mark on Scout. */
+  getListening(): Promise<ListeningState>;
+  /** Switches Always listening on or off, returning the state it moved to. */
+  setListening(on: boolean): Promise<ListeningState>;
+  /** Fires whenever Always listening is switched, paused or resumed. */
+  onListening(handler: (state: ListeningState) => void): () => void;
 }
 
 declare global {

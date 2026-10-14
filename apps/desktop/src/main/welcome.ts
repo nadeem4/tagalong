@@ -63,6 +63,23 @@ export function shouldGreetOnLaunch(settings: Settings): boolean {
   return settings.welcome.done && settings.greeting;
 }
 
+/** Scout's first line when Always listening is on at launch: that it listens, and how to stop. */
+export const LISTENING_LINE =
+  'I’m listening. Say “Scout, stop”, or switch off Always listening in my bubble.';
+
+/**
+ * Scout's one line as the app opens. With Always listening on it is always the listening
+ * line, even with the greeting switched off, and nothing is composed; otherwise the composed
+ * greeting when one is allowed, or nothing.
+ */
+export async function launchLine(
+  settings: Settings,
+  compose: () => Promise<string>,
+): Promise<string | null> {
+  if (settings.listening.always) return LISTENING_LINE;
+  return shouldGreetOnLaunch(settings) ? compose() : null;
+}
+
 /**
  * What finishing Welcome does to the crew: the default pet becomes the Companion on the
  * chosen brain, on the model its role's tier recommends there, and docks alone. The other

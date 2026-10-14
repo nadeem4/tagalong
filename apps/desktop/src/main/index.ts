@@ -17,6 +17,12 @@ import {
 import { ContextSnapshot, HandoffFinishedParams, RoutineResultParams } from '@tagalong/protocol';
 import type { PerceptionTarget, Settings, SettingsPatch } from '@tagalong/protocol';
 import { SettingsStore } from '@tagalong/core';
+import {
+  AlwaysListening,
+  listeningPaused,
+  saveListening,
+  startListeningGuard,
+} from './always-listening';
 import { systemClock } from './awareness/clock';
 import { handoffNotice } from './handoff-notice';
 import { routineDelivery } from './routine-delivery';
@@ -37,7 +43,7 @@ import type { WorkerProcess } from './voice/worker/messages';
 import { WorkerLocalVoice } from './voice/worker/worker-local-voice';
 import type { VoiceService } from './voice/voice';
 import { checkClaudeSignIn } from './claude-sign-in';
-import { findAgents, shouldGreetOnLaunch, shouldOpenWelcome } from './welcome';
+import { findAgents, launchLine, shouldOpenWelcome } from './welcome';
 import type { EngineHost } from './engine-host';
 import {
   DEFAULT_PAUSE_SIGHT_HOTKEY,
@@ -113,6 +119,8 @@ interface Desktop {
   voice: VoiceService;
   /** The process the voice models run in, Scout's voice and its ears; stopped on quit. */
   voiceWorker: VoiceWorker;
+  /** Always listening: from the saved setting at launch, saved again on each switch. */
+  listening: AlwaysListening;
 }
 
 let desktop: Desktop | null = null;
@@ -152,6 +160,7 @@ app.on('before-quit', () => {
   desktop?.hotkeys.dispose();
   desktop?.voiceWorker.stop();
   stopKeepAnEye();
+  stopListeningGuard();
   // Memory only, and gone on quit: nothing here was ever written anywhere to clean up.
   desktop?.rolling.dispose();
   desktop?.perceptionMemory.clear();
@@ -175,6 +184,9 @@ async function start(): Promise<void> {
   const settingsStore = new SettingsStore(dataDir);
 
   const settings = settingsStore.get();
+  // From the saved setting, before any window opens, so the mark on Scout shows from the
+  // first second listening is on.
+  const listening = new AlwaysListening(settings.listening.always);
 
   const rolling = new RollingMemory({
     platform,
@@ -252,6 +264,7 @@ async function start(): Promise<void> {
     rolling,
     perceptionMemory,
     voiceWorker,
+    listening,
     voice: (() => {
       // The model downloads into the data dir on first use, never at start.
       const local = new WorkerLocalVoice(voiceWorker);
@@ -289,15 +302,60 @@ async function start(): Promise<void> {
     desktop?.tray.setToolTip(paused ? 'Tagalong — sight is paused' : 'Tagalong');
   });
 
+  // Every window that shows Always listening follows this one state. Only `on` is saved.
+  listening.onChange((state) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(IPC.listeningEvent, state);
+    }
+  });
+  listening.onChange(
+    saveListening({
+      saved: settings.listening.always,
+      host: () => desktop?.host ?? null,
+      settingsStore: () => settingsStore,
+      onSaved: (saved) => {
+        if (desktop !== null) desktop.settings = saved;
+      },
+    }),
+  );
+  // A call or a full-screen window in front pauses listening, as it does keeping an eye, and
+  // so do the pets being hidden (none shown yet: the avatar is made below).
+  pauseListening = (change) => {
+    listeningWhy = { ...listeningWhy, ...change };
+    listening.setPaused(listeningPaused(listeningWhy));
+  };
+  pauseListening({});
+  stopListeningGuard = startListeningGuard({
+    listening,
+    list: async () => {
+      const exclusions = desktop?.settings.captureExclusions ?? settings.captureExclusions;
+      return (await platform.listWindows(exclusions, { countText: false })).windows;
+    },
+    onBlocked: (blocked) => pauseListening({ blocked }),
+  });
+
   registerIpc();
 
   // What the ears hear goes to every open window: each listening window keeps only its own
   // session's words. Subscribing does not start the voice process; the first listen does.
-  forwardEars(voiceWorker, (channel, payload) => {
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) window.webContents.send(channel, payload);
-    }
-  });
+  // Words addressed to Scout bring the bubble up if it is hidden, beside a visible pet, and
+  // without the keyboard: the person may be typing in another app when they say "Scout".
+  // Speaking a question needs no keyboard, and a click back elsewhere would hide the bubble.
+  forwardEars(
+    voiceWorker,
+    (channel, payload) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) window.webContents.send(channel, payload);
+      }
+    },
+    () => {
+      const panel = desktop?.panel;
+      const avatar = desktop?.avatar;
+      if (panel != null && avatar != null && avatar.isVisible() && !panel.isVisible()) {
+        showPanelQuietly(panel, avatar);
+      }
+    },
+  );
 
   if (host === null) {
     openSettings();
@@ -324,6 +382,11 @@ async function start(): Promise<void> {
         .catch((error: unknown) => console.warn('[main] could not persist avatar position', error));
     },
   });
+  // The pets hidden (the tray's Hide pets, or Welcome first): listening waits for them.
+  const avatar = desktop.avatar;
+  avatar.on('show', () => pauseListening({ petsShown: true }));
+  avatar.on('hide', () => pauseListening({ petsShown: false }));
+  pauseListening({ petsShown: avatar.isVisible() });
 
   // Deliberately not a modal, and deliberately not fatal. The only way to store an
   // accelerator that cannot be registered is to type it into Settings, so refusing to
@@ -354,6 +417,11 @@ async function start(): Promise<void> {
 
 /** Stops the keep-an-eye timer on quit. */
 let stopKeepAnEye = (): void => undefined;
+/** Stops the Always-listening guard on quit. */
+let stopListeningGuard = (): void => undefined;
+/** Why Always listening waits: a call or full screen in front, or the pets hidden. */
+let listeningWhy = { blocked: false, petsShown: false };
+let pauseListening: (change: Partial<typeof listeningWhy>) => void = () => undefined;
 
 /**
  * Scout has one thing to say from keeping an eye on things: one quiet line beside the pet,
@@ -380,10 +448,13 @@ async function greetOnLaunch(host: EngineHost): Promise<void> {
   const current = desktop;
   if (current === null) return;
   try {
-    if (shouldGreetOnLaunch(current.settings)) {
-      const { text } = await host.client.call('greeting.compose', {
-        petId: current.settings.defaultPetId,
-      });
+    // With Always listening on, the first line says so and how to stop, greeting or not.
+    const text = await launchLine(
+      current.settings,
+      async () =>
+        (await host.client.call('greeting.compose', { petId: current.settings.defaultPetId })).text,
+    );
+    if (text !== null) {
       const { panel, avatar } = current;
       if (panel !== null && avatar !== null && avatar.isVisible() && !panel.isVisible()) {
         if (panel.webContents.isLoading()) {
@@ -847,6 +918,7 @@ function registerIpc(): void {
     // The voice process starts on the first listen, if Scout has not spoken yet.
     worker: () => required().voiceWorker,
     noteActiveWindow: () => captureForPanel(required(), ['activeWindow']),
+    listening: () => required().listening,
     on: (channel, listener) => ipcMain.on(channel, listener as never),
   });
 

@@ -515,3 +515,20 @@ describe('Settings.userName', () => {
     );
   });
 });
+
+describe('Settings.listening', () => {
+  it('reads an old file without it as off', () => {
+    expect(Settings.parse({ welcome: { done: true } }).listening).toEqual({ always: false });
+  });
+
+  it('keeps Always listening on across a round trip', () => {
+    const parsed = Settings.parse({ listening: { always: true } });
+    expect(Settings.parse(JSON.parse(JSON.stringify(parsed))).listening).toEqual({ always: true });
+  });
+
+  it('rides in a patch', () => {
+    expect(SettingsPatch.parse({ listening: { always: true } })).toEqual({
+      listening: { always: true },
+    });
+  });
+});

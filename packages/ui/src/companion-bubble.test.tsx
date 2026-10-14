@@ -529,6 +529,87 @@ describe('CompanionBubble, talking to Scout', () => {
     ...change,
   });
 
+  it('has the mic inside the text box, not in the header', () => {
+    render(
+      <HostBridgeProvider bridge={createFakeHostBridge()}>
+        <CompanionBubble petId="scout" petName="Scout" talk={talk()} />
+      </HostBridgeProvider>,
+    );
+    const mic = screen.getByRole('button', { name: 'Talk to Scout' });
+    expect(mic.closest('.bubble-field')).not.toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Talk to Scout' })).toHaveLength(1);
+  });
+
+  it('keeps the text box named for what it asks, the mic inside it notwithstanding', () => {
+    render(
+      <HostBridgeProvider bridge={createFakeHostBridge()}>
+        <CompanionBubble petId="scout" petName="Scout" talk={talk()} />
+      </HostBridgeProvider>,
+    );
+    expect(screen.getByRole('textbox', { name: 'Ask Scout' })).toBeVisible();
+  });
+
+  it('switches Always listening from the header, off by default, and says when it is paused', () => {
+    const onToggle = vi.fn();
+    const { rerender } = render(
+      <HostBridgeProvider bridge={createFakeHostBridge()}>
+        <CompanionBubble
+          petId="scout"
+          petName="Scout"
+          talk={talk({ always: { on: false, paused: false, onToggle } })}
+        />
+      </HostBridgeProvider>,
+    );
+    const toggle = screen.getByRole('switch', { name: 'Always listening' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(toggle);
+    expect(onToggle).toHaveBeenCalledOnce();
+    rerender(
+      <HostBridgeProvider bridge={createFakeHostBridge()}>
+        <CompanionBubble
+          petId="scout"
+          petName="Scout"
+          talk={talk({ always: { on: true, paused: true, onToggle } })}
+        />
+      </HostBridgeProvider>,
+    );
+    expect(screen.getByRole('switch', { name: 'Always listening' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Listening paused during a call or full screen.',
+    );
+    rerender(
+      <HostBridgeProvider bridge={createFakeHostBridge()}>
+        <CompanionBubble
+          petId="scout"
+          petName="Scout"
+          talk={talk({ always: { on: true, paused: false, onToggle } })}
+        />
+      </HostBridgeProvider>,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Listening. Start with “Scout” to ask.');
+  });
+
+  it('has a Seeing switch beside it', () => {
+    const onToggle = vi.fn();
+    render(
+      <HostBridgeProvider bridge={createFakeHostBridge()}>
+        <CompanionBubble
+          petId="scout"
+          petName="Scout"
+          talk={talk()}
+          seeing={{ on: true, onToggle }}
+        />
+      </HostBridgeProvider>,
+    );
+    const seeing = screen.getByRole('switch', { name: 'Seeing' });
+    expect(seeing).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(seeing);
+    expect(onToggle).toHaveBeenCalledOnce();
+  });
+
   it('has a mic button, which says when it is listening', () => {
     const onMic = vi.fn();
     const { rerender } = render(
