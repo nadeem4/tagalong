@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * What the crew did, as Home's activity view lists it: each turn, each consult (`ask_pet`),
  * each handoff (`@Name`), each roundtable (`/crew`), each brief a companion handed
- * to an expert, and each call to a connected app (`connector`). Meetings are not here: they do not
+ * to an expert, each call to a connected app (`connector`), and each routine run (`routine`). Meetings are not here: they do not
  * exist in the engine yet, and the view keeps their empty state instead.
  */
 export const ActivityKind = z.enum([
@@ -13,6 +13,7 @@ export const ActivityKind = z.enum([
   'roundtable',
   'expert',
   'connector',
+  'routine',
 ]);
 export type ActivityKind = z.infer<typeof ActivityKind>;
 
@@ -50,6 +51,8 @@ export const ActivityEntry = z.object({
   app: z.string().min(1).optional(),
   tool: z.string().min(1).optional(),
   access: z.enum(['read', 'write']).optional(),
+  /** A `routine` entry: the routine that ran. Its name, as it was then, is `text`. */
+  routineId: z.string().min(1).optional(),
   /** Why it failed, when `state` is `error`. */
   error: z.string().optional(),
   modelCalls: z.number().int().nonnegative().optional(),

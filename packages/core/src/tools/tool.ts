@@ -17,6 +17,15 @@ export interface ToolOutcome {
   isError?: boolean;
 }
 
+/** A turn a routine started: what the saved routine allows, and where a hand-off reports. */
+export interface RoutineTurnContext {
+  routineId: string;
+  /** The expert the routine's card allowed: read-only, no project, no card. */
+  expertId?: string | undefined;
+  /** The hand-off the turn started with that expert, so the routine waits for its answer. */
+  handedOff: (handoffId: string) => void;
+}
+
 /** What one turn hands every tool it runs. */
 export interface ToolContext {
   /** The pet whose turn it is: memories are filed under it, a consult names it as caller. */
@@ -33,6 +42,8 @@ export interface ToolContext {
   vision?: boolean | undefined;
   /** Counts a nested model call a tool makes toward the turn. */
   countCall: () => void;
+  /** Set on a turn a routine started. */
+  routine?: RoutineTurnContext | undefined;
 }
 
 /** One built-in tool, in the one shape every tool has. */

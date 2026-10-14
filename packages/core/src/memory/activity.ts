@@ -32,6 +32,7 @@ interface ActivityRow {
   app: string | null;
   tool: string | null;
   access: string | null;
+  routine_id: string | null;
 }
 
 interface NewEntry {
@@ -223,6 +224,43 @@ export class ActivityLog {
       );
   }
 
+  /** A routine started a run. Returns the entry's id, for `routineFinished`. */
+  routineStarted(entry: { routineId: string; petId: string; name: string }): string {
+    const id = randomUUID();
+    this.db
+      .prepare(
+        `INSERT INTO activity (id, kind, state, pet_id, routine_id, text, started_at)
+         VALUES (?, 'routine', 'running', ?, ?, ?, ?)`,
+      )
+      .run(id, entry.petId, entry.routineId, clip(entry.name), now());
+    return id;
+  }
+
+  /** How a routine run ended, with its answer and the conversation it is in. */
+  routineFinished(
+    id: string,
+    outcome: {
+      state: 'done' | 'error';
+      answer?: string | undefined;
+      error?: string | undefined;
+      conversationId?: string | undefined;
+    },
+  ): void {
+    this.db
+      .prepare(
+        `UPDATE activity SET state = ?, answer = ?, error = ?, conversation_id = ?, finished_at = ?
+         WHERE id = ? AND kind = 'routine'`,
+      )
+      .run(
+        outcome.state,
+        clip(outcome.answer),
+        clip(outcome.error),
+        outcome.conversationId ?? null,
+        now(),
+        id,
+      );
+  }
+
   /**
    * The hand-offs that finished well after `since`, oldest first, at most five: what the
    * greeting may mention. The brief is the only text kept; the answer stays in Home.
@@ -327,6 +365,7 @@ function toEntry(row: ActivityRow): ActivityEntry {
     ...optional('app', row.app),
     ...optional('tool', row.tool),
     ...optional('access', row.access),
+    ...optional('routineId', row.routine_id),
     ...(row.changed_files === null
       ? {}
       : { changedFiles: JSON.parse(row.changed_files) as unknown }),

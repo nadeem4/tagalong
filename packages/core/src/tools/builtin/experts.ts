@@ -21,6 +21,11 @@ export interface ExpertToolDeps {
    * comes back on its own, outside this turn.
    */
   propose(params: { expertId: string; petId: string; brief: Brief }): { proposalId: string };
+  /**
+   * Starts the expert at once, read-only, with web search and no project: only for the expert
+   * a saved routine's card allowed, on that routine's own turn.
+   */
+  startReadOnly?(params: { expertId: string; petId: string; brief: Brief }): { handoffId: string };
 }
 
 /** The experts a turn can hand to: only those switched on. */
@@ -123,8 +128,27 @@ export function handToExpertTool(deps: ExpertToolDeps, experts: readonly Expert[
       });
     }
 
+    const brief = briefFrom(parsed, ctx);
+    const routine = ctx.routine;
+    if (routine?.expertId === expert.id && deps.startReadOnly !== undefined) {
+      try {
+        const { handoffId } = deps.startReadOnly({ expertId: expert.id, petId: ctx.pet.id, brief });
+        routine.handedOff(handoffId);
+      } catch (error) {
+        return Promise.resolve({
+          content: `${expert.name} could not start: ${(error as Error).message}`,
+          isError: true,
+        });
+      }
+      return Promise.resolve({
+        content:
+          `${expert.name} has it, read-only with no project, as the saved routine allows. ` +
+          'Say so in one line; its answer reaches the person on its own.',
+      });
+    }
+
     try {
-      deps.propose({ expertId: expert.id, petId: ctx.pet.id, brief: briefFrom(parsed, ctx) });
+      deps.propose({ expertId: expert.id, petId: ctx.pet.id, brief });
     } catch (error) {
       return Promise.resolve({
         content: `The brief for ${expert.name} could not be shown: ${(error as Error).message}`,

@@ -15,6 +15,8 @@ import {
   type WatchToolDeps,
   type ExpertToolDeps,
   type ConnectorToolDeps,
+  type RoutineTurnContext,
+  type RoutineToolDeps,
 } from '../tools';
 import { assemblePrompt } from './prompt-assembler';
 
@@ -84,6 +86,8 @@ export interface ConversationRunnerOptions {
   experts?: ExpertToolDeps | undefined;
   /** The tools of the person's connected apps, for a role that lists `connections`. */
   connections?: ConnectorToolDeps | undefined;
+  /** Gives a companion `create_routine` and `change_routine`, which show the routine card. */
+  routines?: RoutineToolDeps | undefined;
   /** Narrows a pet's tools for a turn. Absent: every pet gets every tool. Phase 8 roles. */
   toolsFor?: ToolFilter | undefined;
 }
@@ -103,6 +107,13 @@ export interface RunAsk {
   beforeStart?: ((ids: { turnId: string; conversationId: string }) => void) | undefined;
   /** False keeps `ask_pet` off this turn. Roundtable turns already hear from every pet. */
   allowConsult?: boolean | undefined;
+  /**
+   * A turn nobody is watching, such as a routine's: it does not stop the pet's turn in
+   * progress, and a question the person asks does not stop it.
+   */
+  background?: boolean | undefined;
+  /** Set when a routine started the turn; rides on `turn.started` and reaches the tools. */
+  routine?: RoutineTurnContext | undefined;
 }
 
 export interface TurnOutcome {
@@ -127,6 +138,7 @@ export interface TurnHandle {
 interface ActiveTurn {
   petId: string;
   controller: AbortController;
+  background: boolean;
 }
 
 /**
@@ -174,6 +186,7 @@ export class ConversationRunner {
       watch: options.watch,
       experts: options.experts,
       connections: options.connections,
+      routines: options.routines,
       toolsFor: options.toolsFor,
       consult: consult && {
         pets: consult.pets,
@@ -198,7 +211,7 @@ export class ConversationRunner {
   run(ask: RunAsk): TurnHandle {
     // One turn per pet: a pet that is still answering the last question has been
     // overtaken by this one, and two streams into one panel read as nonsense.
-    this.#interruptPet(ask.pet.id);
+    if (ask.background !== true) this.#interruptPet(ask.pet.id);
 
     const settings = this.#options.settings.get();
     const conversationId =
@@ -237,7 +250,11 @@ export class ConversationRunner {
 
     const turnId = randomUUID();
     const controller = new AbortController();
-    this.#active.set(turnId, { petId: ask.pet.id, controller });
+    this.#active.set(turnId, {
+      petId: ask.pet.id,
+      controller,
+      background: ask.background === true,
+    });
     ask.beforeStart?.({ turnId, conversationId });
     this.#options.emit({
       method: 'turn.started',
@@ -248,6 +265,7 @@ export class ConversationRunner {
         providerId: ask.pet.providerId,
         model: ask.pet.model,
         ...(ask.runId === undefined ? {} : { runId: ask.runId }),
+        ...(ask.routine === undefined ? {} : { routineId: ask.routine.routineId }),
       },
     });
 
@@ -282,7 +300,7 @@ export class ConversationRunner {
 
   #interruptPet(petId: string): void {
     for (const [turnId, active] of this.#active) {
-      if (active.petId === petId) this.interrupt(turnId);
+      if (active.petId === petId && !active.background) this.interrupt(turnId);
     }
   }
 
@@ -354,6 +372,7 @@ export class ConversationRunner {
       // outright, and the rest would only be told about an ability they cannot use.
       toolSupport: provider.capabilities.tools,
       allowConsult: ask.allowConsult,
+      ...(ask.routine !== undefined ? { routine: ask.routine } : {}),
     });
     const request =
       tools.definitions.length > 0 ? { ...base, tools: [...tools.definitions] } : base;

@@ -7,6 +7,7 @@ import { connectorTools, type ConnectorToolDeps } from './builtin/connections';
 import { askPetTool, rememberTool, type AskPetDeps } from './builtin/crew';
 import { enabledExperts, handToExpertTool, type ExpertToolDeps } from './builtin/experts';
 import { perceptionTools, type PerceptionToolsOptions } from './builtin/perception';
+import { changeRoutineTool, createRoutineTool, type RoutineToolDeps } from './builtin/routines';
 import type { Tool, ToolContext, ToolOutcome } from './tool';
 
 /**
@@ -44,6 +45,8 @@ export interface ToolRegistryOptions {
   experts?: ExpertToolDeps | undefined;
   /** The tools of the person's connected apps, for a role that lists `connections`. */
   connections?: ConnectorToolDeps | undefined;
+  /** Gives a pet whose role lists them `create_routine` and `change_routine`. */
+  routines?: RoutineToolDeps | undefined;
   /** Defaults to `toolsFor`: the tools its role lists, minus any its grants switch off. */
   toolsFor?: ToolFilter | undefined;
 }
@@ -107,7 +110,7 @@ export class ToolRegistry {
 
   /** Every built-in this engine is wired for, in the order the model has always seen. */
   #all(turn: TurnRequest): Tool[] {
-    const { perception, memory, watch, consult, experts, connections } = this.#options;
+    const { perception, memory, watch, consult, experts, connections, routines } = this.#options;
     const tools: Tool[] = [];
     if (perception) tools.push(...perceptionTools(perception), ...recallTools(perception));
     if (memory) tools.push(rememberTool(memory));
@@ -119,6 +122,12 @@ export class ToolRegistry {
     const switchedOn = experts ? enabledExperts(experts) : [];
     if (experts && switchedOn.length > 0) tools.push(handToExpertTool(experts, switchedOn));
     if (connections) tools.push(...connectorTools(connections));
+    // A routine's own turn never sets up or changes routines.
+    if (routines && turn.routine === undefined) {
+      tools.push(createRoutineTool(routines));
+      const saved = routines.list();
+      if (saved.length > 0) tools.push(changeRoutineTool(routines, saved));
+    }
     return tools;
   }
 }

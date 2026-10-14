@@ -162,6 +162,19 @@ describe('ActivityView', () => {
     expect(row(/Scout could not reach Notion/)).toHaveTextContent('Failed');
   });
 
+  it('names each routine run, and one that failed', async () => {
+    await renderActivity(
+      createFakeHostBridge({
+        activity: [
+          entry({ id: 'p', kind: 'routine', text: 'Morning papers', answer: 'Two new papers.' }),
+          entry({ id: 'q', kind: 'routine', text: 'Calendar', state: 'error', error: 'No key.' }),
+        ],
+      }),
+    );
+    expect(row(/Scout ran Morning papers/)).toHaveTextContent('Done');
+    expect(row(/Calendar did not run/)).toHaveTextContent('Failed');
+  });
+
   it('pairs every state with a word: working, done, failed', async () => {
     await renderActivity(
       createFakeHostBridge({

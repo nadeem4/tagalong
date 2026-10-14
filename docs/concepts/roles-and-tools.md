@@ -27,8 +27,8 @@ The first six:
 
 The Companion never does the work itself. Its tools are only the ones that look (screen, selection,
 windows), `remember`, `hand_to_expert`, which writes a brief and hands it to an expert such as
-Claude Code, and the tools of the person's connected apps (`connections`), whose changes always ask
-first; it has no `ask_pet` and nothing that writes files or runs code. Its own figure and
+Claude Code, the tools of the person's connected apps (`connections`), whose changes always ask
+first, and `create_routine` and `change_routine`, which show a routine card the person saves; it has no `ask_pet` and nothing that writes files or runs code. Its own figure and
 bubble show up in its screenshots, so its instructions tell it to look past them and never mention
 itself or Tagalong unless asked.
 
@@ -251,18 +251,22 @@ packages/core/src/tools/
     crew.ts        remember, ask_pet
     experts.ts     hand_to_expert
     connections.ts <connection>__<tool>: every tool of the person's connected apps
+    routines.ts    create_routine, change_routine
 ```
 
 - **Kind.** A tool is `write` when it leaves stored state behind after the turn: `remember` files a
   memory, `watch_for` starts a watch, `hand_to_expert` starts a hand-off and remembers which expert
-  took that kind of task. The other eleven are `read`; `ask_pet` costs a model call but stores nothing.
+  took that kind of task, and `create_routine` and `change_routine` lead to a saved routine once the
+  person presses Save. The other eleven are `read`; `ask_pet` costs a model call but stores nothing.
 - **Context.** Every tool runs with the turn's pet, turn id, abort signal, snapshot, whether the
-  pet's brain can see, and a counter for nested model calls.
+  pet's brain can see, a counter for nested model calls, and, on a routine's turn, the routine
+  (`ToolContext.routine`): the expert its card allowed and where a hand-off reports.
 - **Which tools a turn gets.** The registry builds what the engine is wired for, in a fixed order,
   and returns none when the pet's provider cannot call tools. `ask_pet` is left off roundtable
   turns and off a crew of one. `hand_to_expert` is built only when an expert is switched on, and
-  lists every such expert and what it is good at in its description. An unknown name is refused by
-  name.
+  lists every such expert and what it is good at in its description. The routine tools are left off
+  a routine's own turn, and `change_routine` is built only when a routine is saved. An unknown name
+  is refused by name.
 - **`toolsFor(pet, tools)`** is the single place a turn's tools are narrowed: the tools the pet's
   role lists, minus any its grants turn off (see [What the role decides](#what-the-role-decides)).
   A role can list a group instead of single tools: `connections` gives it every tool of the

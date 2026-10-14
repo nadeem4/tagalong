@@ -373,6 +373,47 @@ describe('ConversationRunner.interrupt', () => {
     expect(firstOutcome.stopReason).toBe('end');
     expect(secondOutcome.stopReason).toBe('end');
   });
+
+  it('runs a routine turn beside the person’s own: neither stops the other', async () => {
+    const runner = makeRunner(new FakeBrainProvider({ text: 'one two three four', delayMs: 5 }));
+    const handedOff = (): void => undefined;
+    const routineId = randomUUID();
+    const routine = runner.run({
+      pet,
+      text: 'the routine',
+      background: true,
+      routine: { routineId, handedOff },
+    });
+    await firstDelta();
+    const asked = runner.run({ pet, text: 'my own question' });
+    const later = runner.run({ pet, text: 'another routine', background: true });
+    const outcomes = await Promise.all([routine.done, asked.done, later.done]);
+    expect(outcomes.map((outcome) => outcome.stopReason)).toEqual(['end', 'end', 'end']);
+    const started = events.find(
+      (event) => event.method === 'turn.started' && event.params.turnId === routine.turnId,
+    );
+    expect(started?.params).toMatchObject({ routineId });
+  });
+
+  it('hands a routine turn’s tools the routine', async () => {
+    let seen: unknown;
+    const spy = defineTool(
+      { name: 'spy', description: 'Spy.', inputSchema: { type: 'object', properties: {} } },
+      'read',
+      (_input, ctx) => {
+        seen = ctx.routine;
+        return Promise.resolve({ content: 'ok' });
+      },
+    );
+    const runner = makeRunner(
+      new FakeBrainProvider({ text: 'done', toolCall: { id: 't1', name: 'spy', input: {} } }),
+      undefined,
+      only(spy),
+    );
+    const routine = { routineId: randomUUID(), expertId: 'researcher', handedOff: () => undefined };
+    await runner.run({ pet, text: 'go', background: true, routine }).done;
+    expect(seen).toBe(routine);
+  });
 });
 
 describe('ConversationRunner failures', () => {

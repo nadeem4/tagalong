@@ -32,6 +32,9 @@ type TurnNotification =
   | 'handoff.progress'
   | 'handoff.finished'
   | 'connector.confirm'
+  | 'routine.proposed'
+  | 'routine.result'
+  | 'routines.changed'
   | 'connections.changed';
 
 /**

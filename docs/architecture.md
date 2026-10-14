@@ -541,6 +541,109 @@ Tests never reach a real app: `fakeMcpServer` (`connections/fake-server.ts`) is 
 same process over the SDK's in-memory transport, `FakeOAuthTransport` plays an app behind OAuth, and
 `EngineOptions.connectorTransport` and `claudeCodeConfigPath` point the engine at them.
 
+## Routines
+
+A routine is **when** + **what** + **where the result goes**: "every weekday at 8, give me new papers
+on AI agents and explain the best one simply". Each run is one Scout turn with Scout's normal tools.
+Everything lives in `packages/core/src/routines/`, pure and on an injected clock; the schemas are in
+`packages/protocol/src/routines.ts`. There is no cron and no workflow engine: a schedule is days of
+the week and a time, and the triggers are a fixed set of four.
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000'}}}%%
+flowchart LR
+  C["create_routine / change_routine"] -- "routine.proposed" --> K["Routine card"]
+  K -- "routines.confirm (Save)" --> S[(routines table)]
+  H["Home: routines.save"] --> S
+  S --> R["Routines: tick every 15 s"]
+  R -- "schedule slot, launch, app appears, expert finishes, watch fires" --> T["Background Scout turn"]
+  T -- "pre-approved hand-off" --> E["Expert, read-only, web, no project"]
+  T --> Q["Result waits while a call or full screen is in front"]
+  E --> Q
+  Q -- "routine.result" --> B["Bubble line, voice, notification"]
+  T --> A["Activity: routine row"]
+```
+
+**The data.** `Routine` is `{ id, name, enabled, when, what, topics, deliver, handTo?, uses,
+createdAt }`. `when` is `{ type: 'schedule', days, time }` (days are `Date#getDay` numbers, `time` is
+`HH:MM`, 24-hour; daily, weekdays and weekly are all this one shape), `{ type: 'launch' }`,
+`{ type: 'app', match }`, `{ type: 'expert' }` or `{ type: 'watch' }`. `deliver` is `{ bubble, voice,
+notification }`; Activity always gets the run. `handTo` is the one expert the routine may hand to
+without a card, and `uses` is display only, for the card. `RoutineStore` keeps one row each in the
+`routines` table (migration 13): the definition as JSON, and beside it `last_due_at` (the latest
+schedule slot handled), `last_run_at`, `last_state` and `last_activity_id`, so a run never rewrites
+what the person saved. Migration 13 also rebuilds `activity` with `routine` among its kinds and a
+`routine_id` column. `describeWhen` and `describeDeliver` say a routine in words ("Weekdays at 08:00",
+"Bubble, voice, Activity") for the card and Home.
+
+**Schedule math** (`schedule.ts`). Wall-clock times in the person's IANA zone, through
+`Intl.DateTimeFormat`, so tests pin the zone and the engine passes the system's. `zonedToEpoch` takes
+the first of a time the clocks repeat in autumn and moves a time they skip in spring forward by the
+gap (01:30 on the night London skips 01:00 to 02:00 runs at 02:30). `dueSlot(when, lastHandled, now)`
+is the latest slot at or before now that is newer than the last one handled, or null: a PC that slept
+through three mornings runs the routine once, for the latest morning.
+
+**The scheduler** (`Routines`). `start()` at boot runs the `launch` routines and ticks at once, then
+every `ROUTINE_TICK_MS` (15 s). A tick runs each enabled schedule routine with a due slot, writing
+`last_due_at` before the run so a crash or a second tick can never run it twice; a run more than
+`LATE_AFTER_MS` (5 min) after its slot is **late** (the PC was asleep or Tagalong was closed) and
+says so. Saving a routine starts its schedule from now, and so does switching it on again, so nothing
+missed while it was new or off runs. App routines read the window list from the host
+(`perception.listWindows`, titles only) and run when a window whose title or app name contains
+`match` appears: already open at the first look is not appearing, a minimized window does not count,
+and a window the host marked `blocked` or that `findCaptureBlock` refuses never triggers anything.
+`handoffFinished` runs the `expert` routines with the expert's name and the first 600 characters of
+its answer, except for a hand-off a routine itself started; `watchFired` runs the `watch` routines
+with the watch's message. One run per routine at a time.
+
+**A run.** The instruction becomes the text of a Scout turn, headed `[Routine "<name>", <when>]`,
+with the topics, what triggered it, whether it ran late, and the line that the person is not
+watching. It goes to `ConversationRunner.run` with `background: true` (it neither stops the
+person's own turn nor is stopped by it) and `routine: { routineId, expertId, handedOff }`, which
+rides on `turn.started` as `routineId` and reaches the tools as `ToolContext.routine`. It runs in a
+new conversation of Scout's, whose id comes back with the result, so a follow-up ("explain the second
+paper") continues it. `create_routine` and `change_routine` are not offered on a routine's own turn.
+
+**Consent, as built.**
+
+- Saving a routine (Save on the card, or Save in Home) is the person's consent for its read-only
+  work, so the read tools of connected apps run as they do in any turn.
+- A write tool of a connected app still shows the **Allow once** card, every time.
+- `hand_to_expert` on a routine's turn starts the expert at once only when it is the routine's
+  `handTo` and the tool deps have `startReadOnly`: `HandoffManager.startReadOnly` drops the folder,
+  forces `canEdit: false`, and asks `connectorFor(expert, { research: true })`, which is
+  `ClaudeCodeConnector` with `research: true`: it runs in an empty folder of its own
+  (`%TEMP%\tagalong-research`), allowed only `WebSearch` and `WebFetch`, with `--permission-mode
+dontAsk`, so it cannot read a project or edit a file. The run then waits for that hand-off's
+  `handoff.finished`, adds the expert's answer to the conversation, and delivers it. Any other
+  expert, or a routine without `handTo`, gets the normal hand-off card.
+- `handTo` is set only from the card or the form that saved it, never by a run.
+
+**Delivery.** A finished run becomes `routine.result { routineId, name, petId, conversationId,
+state, line, text, late, deliver, activityId }`. `line` is the routine's name and the answer's first
+sentence (`Morning papers (ran late): ...`, or `Morning papers did not run: ...`). Results wait in
+memory while no host is connected, or while the window in front is full screen or a call (`isMeeting`,
+the same check keeping an eye on things uses), and go out on the first tick that is clear. Activity
+has one `routine` row per run: the name, the state, the answer or the error, and the conversation.
+
+**Scout's card.** `create_routine` (`tools/builtin/routines.ts`) takes `{ name, when, what, topics?,
+result?, hand_to?, uses? }`, where `when.type` is `daily`, `weekdays`, `weekly` (with `days` such as
+`["mon", "thu"]`), `launch`, `app` (with `match`), `expert` or `watch`. It validates the draft against
+`RoutineDraft`, refuses an expert that is not switched on by naming the ones that are, and calls
+`Routines.propose`, which emits `routine.proposed { proposalId, petId, action, routine, routineId?,
+handToName? }` and saves nothing. `change_routine { name, action, ...fields }` finds a saved routine
+by name (its description lists them) and proposes `update` (the change laid over the saved one),
+`pause`, `resume` or `delete`. `routines.confirm { proposalId, routine? }` does what the card said,
+with the person's edit when there is one; `routines.dismiss` drops it. Home's methods are
+`routines.list` (with `lastRunAt`, `lastState`, `lastActivityId` and, for schedules, `nextRunAt`),
+`routines.save`, `routines.delete`, `routines.setEnabled` and `routines.runNow` (answers at once; the
+result arrives as `routine.result`). Every change is broadcast as `routines.changed`.
+
+**Morning papers gets its papers** the simplest way that works with what exists: through a Claude
+Code expert as the routine's `handTo`, read-only with web search and no project.
+When the person has connected an arXiv or paper app, the companion's guidance and the tool's
+description tell Scout to use that app's read tools instead, which need no hand-off.
+
 ## The desktop host's shape
 
 `apps/desktop` runs the engine **in the Electron main process and still speaks to it over the socket**.

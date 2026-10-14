@@ -43,6 +43,32 @@ function manager(connector: Connector): HandoffManager {
 const finished = () => events.find((e) => e.method === 'handoff.finished');
 
 describe('HandoffManager', () => {
+  it('starts a routine’s research at once: no folder, no edits, the research connector', async () => {
+    const connector = new FakeConnector({ steps: [], text: 'Three papers.' });
+    const asked: { expert: Expert; research: boolean }[] = [];
+    const handoffs = new HandoffManager({
+      experts,
+      activity,
+      connectorFor: (expert, mode) => {
+        asked.push({ expert, research: mode?.research === true });
+        return connector;
+      },
+      emit: (event) => events.push(event),
+    });
+    experts.upsert({ ...claudeCode, connection: { ...claudeCode.connection, canEdit: true } });
+    const { handoffId } = handoffs.startReadOnly({
+      expertId: 'claude-code',
+      petId: 'scout',
+      brief: { ask: 'New papers on agents' },
+    });
+    await vi.waitFor(() => expect(finished()).toBeDefined());
+    expect(asked).toHaveLength(1);
+    expect(asked[0]?.research).toBe(true);
+    expect(asked[0]?.expert.connection).toMatchObject({ canEdit: false });
+    expect(asked[0]?.expert.connection.folder).toBeUndefined();
+    expect(finished()?.params).toMatchObject({ handoffId, state: 'done', text: 'Three papers.' });
+  });
+
   it('sends the brief, reports progress, then the result, and logs it', async () => {
     const connector = new FakeConnector({
       steps: ['Reading a.ts'],

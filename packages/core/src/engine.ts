@@ -60,6 +60,7 @@ import {
   type TransportFor,
 } from './connections';
 import { readOrCreatePairingToken } from './server/pairing';
+import { RoutineStore, Routines } from './routines';
 
 /** Key the Anthropic API key is filed under in the host's SecretStore. */
 export const ANTHROPIC_KEY = SECRET_KEYS.anthropic!;
@@ -110,6 +111,12 @@ async function listModels(
   throw new Error(`no provider with id '${providerId}'`);
 }
 
+/** The routines, which exist by the time any turn can call a routine tool. */
+function routinesOf(live: { routines?: Routines }): Routines {
+  if (live.routines === undefined) throw new Error('routines are not running yet');
+  return live.routines;
+}
+
 /** The library role with this id, or an invalidParams refusal naming the id. */
 function knownRole(roleId: string): Role {
   const role = getRole(roleId);
@@ -141,7 +148,7 @@ export interface EngineOptions {
   /** Skips the registry entirely. Only tests that script a provider need this. */
   provider?: BrainProvider | undefined;
   /** How an expert is reached. Defaults to its real connector, or a fake one in fake mode. */
-  connectorFor?: ((expert: Expert) => Connector) | undefined;
+  connectorFor?: ((expert: Expert, mode?: { research: boolean }) => Connector) | undefined;
   /** Where the project finder looks for code. Tests point it at a temporary folder. */
   projectRoots?: (() => string[]) | undefined;
   /** Opens the system browser for an app's sign-in. The host owns it. */
@@ -157,7 +164,7 @@ export interface EngineOptions {
  * brain providers follow, so a test or a demo cannot spend the user's Claude Code usage.
  */
 function defaultConnectorFor(env: Record<string, string | undefined>) {
-  return (expert: Expert): Connector => {
+  return (expert: Expert, mode?: { research: boolean }): Connector => {
     if (env.TAGALONG_FAKE_PROVIDERS === '1') {
       return new FakeConnector({
         steps: ['Reading the brief'],
@@ -169,6 +176,7 @@ function defaultConnectorFor(env: Record<string, string | undefined>) {
       canEdit,
       ...(folder !== undefined ? { folder } : {}),
       ...(command ? { command } : {}),
+      ...(mode?.research === true ? { research: true } : {}),
     });
   };
 }
@@ -190,6 +198,7 @@ export class Engine {
   readonly #watches: WatchManager;
   readonly #handoffs: HandoffManager;
   readonly #connections: ConnectionManager;
+  readonly #routines: Routines;
 
   private constructor(parts: {
     db: Database;
@@ -201,7 +210,9 @@ export class Engine {
     watches: WatchManager;
     handoffs: HandoffManager;
     connections: ConnectionManager;
+    routines: Routines;
   }) {
+    this.#routines = parts.routines;
     this.#connections = parts.connections;
     this.#watches = parts.watches;
     this.#handoffs = parts.handoffs;
@@ -250,7 +261,7 @@ export class Engine {
     // The runner needs an event sink before the server exists, and the server needs the
     // runner's handlers before it starts. The holder ties that knot without a mutable
     // binding: no turn can run before boot returns, so the sink is never called empty.
-    const live: { server?: EngineServer } = {};
+    const live: { server?: EngineServer; routines?: Routines } = {};
     // Home's activity record is written before the broadcast, so a host that re-reads
     // activity.list on a notification already finds the row.
     const activity = new ActivityLog(db, store);
@@ -266,7 +277,10 @@ export class Engine {
       provider: resolve,
       // Read when a watch starts, so limits saved in Settings apply to the next one.
       limits: () => settings.get().watch,
-      emit: (event) => live.server?.broadcast(event.method, event.params),
+      emit: (event) => {
+        live.server?.broadcast(event.method, event.params);
+        if (event.method === 'watch.fired') live.routines?.watchFired(event.params.message);
+      },
       log: (message) => console.warn(`[engine] ${message}`),
     });
     const experts = new ExpertStore(db);
@@ -281,7 +295,10 @@ export class Engine {
       experts,
       activity,
       connectorFor,
-      emit: (event) => live.server?.broadcast(event.method, event.params),
+      emit: (event) => {
+        live.server?.broadcast(event.method, event.params);
+        if (event.method === 'handoff.finished') live.routines?.handoffFinished(event.params);
+      },
       projects,
     });
     const routes = new RouteMemory(db);
@@ -329,6 +346,13 @@ export class Engine {
         experts: () => experts.list(),
         routes,
         propose: (params) => handoffs.propose(params),
+        // Only reached on a routine's turn, for the expert its saved card allowed.
+        startReadOnly: (params) => handoffs.startReadOnly(params),
+      },
+      routines: {
+        list: () => live.routines?.list() ?? [],
+        experts: () => experts.list(),
+        propose: (params) => routinesOf(live).propose(params),
       },
       connections: {
         tools: () => connections.tools(),
@@ -349,6 +373,55 @@ export class Engine {
       },
     });
 
+    // Routines run as Scout turns in the background, on the system clock and time zone.
+    const routines = new Routines({
+      store: new RoutineStore(db),
+      clock: systemWatchClock,
+      timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+      pet: () => pets.get(settings.get().defaultPetId),
+      experts: () => experts.list(),
+      exclusions: () => settings.get().captureExclusions,
+      run: (ask) => {
+        const handle = runner.run({
+          pet: ask.pet,
+          text: ask.text,
+          background: true,
+          routine: {
+            routineId: ask.routineId,
+            expertId: ask.preApprovedExpertId,
+            handedOff: ask.handedOff,
+          },
+        });
+        return {
+          conversationId: handle.conversationId,
+          done: handle.done.then((outcome) => ({ text: outcome.text, error: outcome.error })),
+        };
+      },
+      answer: (conversationId, text) =>
+        store.appendMessage({
+          conversationId,
+          role: 'assistant',
+          content: [{ type: 'text', text }],
+        }),
+      activity,
+      windows: async () => {
+        const connected = hosts();
+        if (connected.length === 0) return null;
+        const lister = connected.find(
+          (host) => host.capabilities.includes('displays') && host.listWindows !== undefined,
+        );
+        if (lister?.listWindows === undefined) return [];
+        try {
+          return (await lister.listWindows()).windows;
+        } catch {
+          return [];
+        }
+      },
+      emit: (event) => live.server?.broadcast(event.method, event.params),
+      log: (message) => console.warn(`[engine] ${message}`),
+    });
+    live.routines = routines;
+
     const handlers = buildHandlers({
       db,
       activity,
@@ -368,6 +441,7 @@ export class Engine {
       keepAnEye,
       connections,
       approvals,
+      routines,
       claudeCodeConfigPath: options.claudeCodeConfigPath,
       refreshProviders: async () => keyed?.refresh(),
       models: (providerId) =>
@@ -383,6 +457,7 @@ export class Engine {
     });
 
     live.server = server;
+    routines.start();
 
     return new Engine({
       db,
@@ -394,6 +469,7 @@ export class Engine {
       watches,
       handoffs,
       connections,
+      routines,
     });
   }
 
@@ -416,6 +492,7 @@ export class Engine {
   }
 
   async shutdown(): Promise<void> {
+    this.#routines.stop();
     this.#watches.stopAll();
     await this.#handoffs.stopAll();
     await this.#connections.closeAll();
@@ -451,6 +528,7 @@ function buildHandlers(parts: {
   handoffs: HandoffManager;
   projects: ProjectFinder;
   connectorFor: (expert: Expert) => Connector;
+  routines: Routines;
   /** The guarded resolver turns use, for the one-off greeting call. */
   resolve: ProviderResolver;
   models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
@@ -463,7 +541,7 @@ function buildHandlers(parts: {
 }): MethodHandlers {
   const { db, activity, runner, store, emit, pets, settings, models, hosts, watches } = parts;
   const { refreshProviders, experts, routes, handoffs, projects, connectorFor, resolve } = parts;
-  const { keepAnEye, connections, approvals } = parts;
+  const { keepAnEye, connections, approvals, routines } = parts;
   /** A manager refusal (an id taken, none such) as an invalidParams error the host shows. */
   const plainly = async <T>(work: () => Promise<T>): Promise<T> => {
     try {
@@ -625,5 +703,26 @@ function buildHandlers(parts: {
     'tool.approve': (params) => ({
       accepted: approvals.answer(params.approvalId, params.decision),
     }),
+
+    // Routines. Saving one in Home, or pressing Save on Scout's card, is the person's consent.
+    'routines.list': () => ({ routines: routines.list() }),
+    'routines.save': (params) =>
+      plainly(() => Promise.resolve({ routine: routines.save(params.routine) })),
+    'routines.delete': (params) => ({ deleted: routines.delete(params.id) }),
+    'routines.setEnabled': (params) => {
+      const routine = routines.setEnabled(params.id, params.enabled);
+      if (routine === null) {
+        throw new RpcFailure(RPC_ERROR_CODES.invalidParams, `no routine '${params.id}'`);
+      }
+      return { routine };
+    },
+    // Answers at once; the result arrives as routine.result.
+    'routines.runNow': (params) => {
+      if (routines.get(params.id) === null) return { started: false };
+      void routines.runNow(params.id);
+      return { started: true };
+    },
+    'routines.confirm': (params) => routines.confirm(params),
+    'routines.dismiss': (params) => ({ dismissed: routines.dismiss(params.proposalId) }),
   };
 }

@@ -406,6 +406,85 @@ describe('built-in perception tools', () => {
   });
 });
 
+describe('routines over rpc', () => {
+  const PAPERS = {
+    name: 'Morning papers',
+    when: { type: 'schedule', days: [1, 2, 3, 4, 5], time: '08:00' },
+    what: 'Find new papers on my topics.',
+    topics: 'AI agents',
+  };
+
+  it('saves one from Home, lists it with its next run, and runs it now into Scout’s conversation', async () => {
+    const e = await boot(
+      new FakeBrainProvider({ text: 'Two new papers. The first matters most.' }),
+    );
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+
+    const saved = (await host.call('routines.save', { routine: PAPERS }))['result'] as {
+      routine: { id: string };
+    };
+    const listed = (await host.call('routines.list', {}))['result'] as {
+      routines: { name: string; nextRunAt?: string }[];
+    };
+    expect(listed.routines[0]?.name).toBe('Morning papers');
+    expect(listed.routines[0]?.nextRunAt).toBeDefined();
+
+    const run = await host.call('routines.runNow', { id: saved.routine.id });
+    expect(run['result']).toEqual({ started: true });
+    await vi.waitFor(() => expect(host.methods()).toContain('routine.result'), { timeout: 5000 });
+    const result = host.notifications.find((n) => n.method === 'routine.result')?.params;
+    expect(result).toMatchObject({
+      name: 'Morning papers',
+      state: 'done',
+      line: 'Morning papers: Two new papers.',
+      text: 'Two new papers. The first matters most.',
+    });
+    // The turn said which routine started it, so no bubble takes it for a question.
+    expect(host.notifications.find((n) => n.method === 'turn.started')?.params).toMatchObject({
+      routineId: saved.routine.id,
+    });
+    const activity = (await host.call('activity.list', {}))['result'] as {
+      entries: { kind: string; state: string; conversationId?: string }[];
+    };
+    const row = activity.entries.find((entry) => entry.kind === 'routine');
+    expect(row).toMatchObject({ state: 'done', conversationId: result?.['conversationId'] });
+  });
+
+  it('shows Scout’s routine card and saves it only on Save', async () => {
+    const e = await boot(
+      new FakeBrainProvider({
+        text: 'Check the card and press Save.',
+        toolCall: {
+          id: 'call-1',
+          name: 'create_routine',
+          input: { ...PAPERS, when: { type: 'weekdays', time: '08:00' } },
+        },
+      }),
+    );
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('ask', { petId: 'scout', input: { text: 'every weekday at 8, new papers' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('routine.proposed'), { timeout: 5000 });
+    const listedBefore = (await host.call('routines.list', {}))['result'] as { routines: [] };
+    expect(listedBefore.routines).toEqual([]);
+
+    const proposal = host.notifications.find((n) => n.method === 'routine.proposed')?.params as {
+      proposalId: string;
+    };
+    const confirmed = (await host.call('routines.confirm', { proposalId: proposal.proposalId }))[
+      'result'
+    ] as { routine: { name: string; when: unknown } };
+    expect(confirmed.routine).toMatchObject({
+      name: 'Morning papers',
+      when: { type: 'schedule', days: [1, 2, 3, 4, 5], time: '08:00' },
+    });
+    const listed = (await host.call('routines.list', {}))['result'] as { routines: unknown[] };
+    expect(listed.routines).toHaveLength(1);
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+  });
+});
+
 describe('keep an eye over rpc', () => {
   it('reads a window whose title reads like trouble, and says one line as pet.remark', async () => {
     const e = await boot(new FakeBrainProvider({ text: 'The build broke on a missing import.' }));

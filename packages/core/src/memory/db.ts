@@ -101,6 +101,7 @@ const MIGRATIONS: readonly Migration[] = [
   // stay on disk. pet_seeds still lists them, so they are never seeded again.
   `DELETE FROM pets WHERE id IN ('ink', 'bolt')`,
   addConnections,
+  addRoutines,
 ];
 
 /** The columns migration 7 gave `activity`, in order. */
@@ -194,6 +195,60 @@ function addConnections(db: Database.Database): void {
      SELECT rowid, ${ACTIVITY_V8_COLUMNS} FROM activity ORDER BY rowid;
    DROP TABLE activity;
    ALTER TABLE activity_v12 RENAME TO activity;
+   CREATE INDEX activity_turn ON activity(turn_id);
+   CREATE INDEX activity_run ON activity(run_id);`);
+}
+
+/** The columns migration 12 gave `activity`, in order. */
+const ACTIVITY_V12_COLUMNS = `${ACTIVITY_V8_COLUMNS}, app, tool, access`;
+
+/**
+ * Migration 13. Routines: the definition as JSON, and how its schedule and its last run
+ * stand in columns, so a run never rewrites what the person saved. `last_due_at` is the
+ * latest schedule slot handled, which is what keeps a missed routine to one run. `activity`
+ * is rebuilt, as in migration 8, with `routine` among its kinds and a `routine_id` column.
+ */
+function addRoutines(db: Database.Database): void {
+  db.exec(`CREATE TABLE IF NOT EXISTS routines (
+     id TEXT PRIMARY KEY,
+     json TEXT NOT NULL,
+     last_due_at TEXT,
+     last_run_at TEXT,
+     last_state TEXT,
+     last_activity_id TEXT,
+     updated_at TEXT NOT NULL
+   )`);
+  const columns = db.prepare<[], { name: string }>('PRAGMA table_info(activity)').all();
+  if (columns.some((column) => column.name === 'routine_id')) return;
+  db.exec(`CREATE TABLE activity_v13 (
+     id TEXT PRIMARY KEY,
+     kind TEXT NOT NULL CHECK (kind IN ('turn', 'consult', 'handoff', 'roundtable', 'expert', 'connector', 'routine')),
+     state TEXT NOT NULL CHECK (state IN ('running', 'done', 'error', 'stopped')),
+     pet_id TEXT NOT NULL,
+     to_pet_id TEXT,
+     turn_id TEXT,
+     conversation_id TEXT,
+     run_id TEXT,
+     provider_id TEXT,
+     model TEXT,
+     text TEXT,
+     answer TEXT,
+     error TEXT,
+     model_calls INTEGER,
+     started_at TEXT NOT NULL,
+     finished_at TEXT,
+     expert_id TEXT,
+     expert_name TEXT,
+     changed_files TEXT,
+     app TEXT,
+     tool TEXT,
+     access TEXT,
+     routine_id TEXT
+   );
+   INSERT INTO activity_v13 (rowid, ${ACTIVITY_V12_COLUMNS})
+     SELECT rowid, ${ACTIVITY_V12_COLUMNS} FROM activity ORDER BY rowid;
+   DROP TABLE activity;
+   ALTER TABLE activity_v13 RENAME TO activity;
    CREATE INDEX activity_turn ON activity(turn_id);
    CREATE INDEX activity_run ON activity(run_id);`);
 }

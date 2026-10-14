@@ -19,7 +19,8 @@ export type HandoffEvent =
 export interface HandoffManagerOptions {
   experts: ExpertStore;
   activity: ActivityLog;
-  connectorFor: (expert: Expert) => Connector;
+  /** `research`: a routine's pre-approved hand-off, web only, with no project. */
+  connectorFor: (expert: Expert, mode?: { research: boolean }) => Connector;
   emit: (event: HandoffEvent) => void;
   /** Guesses the project a brief is about, and remembers the one the person confirmed. */
   projects?: {
@@ -126,15 +127,30 @@ export class HandoffManager {
         canEdit: params.canEdit ?? stored.connection.canEdit,
       },
     };
+    return this.#begin(expert, params.petId, params.brief, false);
+  }
+
+  /**
+   * A saved routine's hand-off, which its card already approved: starts at once with no
+   * project, read-only, able to search the web. Nothing else may start a hand-off this way.
+   */
+  startReadOnly(params: { expertId: string; petId: string; brief: Brief }): { handoffId: string } {
+    const stored = this.#expert(params.expertId);
+    const { folder: _folder, ...connection } = stored.connection;
+    const expert: Expert = { ...stored, connection: { ...connection, canEdit: false } };
+    return this.#begin(expert, params.petId, params.brief, true);
+  }
+
+  #begin(expert: Expert, petId: string, brief: Brief, research: boolean): { handoffId: string } {
     const handoffId = this.options.activity.expertStarted({
-      petId: params.petId,
+      petId,
       expertId: expert.id,
       expertName: expert.name,
-      text: renderBrief(params.brief),
+      text: renderBrief(brief),
     });
     const controller = new AbortController();
     this.#running.set(handoffId, controller);
-    const run = this.#run(handoffId, expert, params.brief, controller.signal).finally(() =>
+    const run = this.#run(handoffId, expert, brief, research, controller.signal).finally(() =>
       this.#runs.delete(run),
     );
     this.#runs.add(run);
@@ -167,11 +183,17 @@ export class HandoffManager {
     return expert;
   }
 
-  async #run(handoffId: string, expert: Expert, brief: Brief, signal: AbortSignal): Promise<void> {
+  async #run(
+    handoffId: string,
+    expert: Expert,
+    brief: Brief,
+    research: boolean,
+    signal: AbortSignal,
+  ): Promise<void> {
     const { activity, emit } = this.options;
     const expertId = expert.id;
     const result = await this.options
-      .connectorFor(expert)
+      .connectorFor(expert, research ? { research: true } : undefined)
       .send(
         brief,
         (step) => emit({ method: 'handoff.progress', params: { handoffId, expertId, step } }),
