@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { pickSystemVoice, prepareLine } from './voice-player';
+import { onSystemVoice, pickSystemVoice, prepareLine, systemVoiceSpeaking } from './voice-player';
 
 const voice = (name: string, lang: string) => ({ name, lang });
 
@@ -62,5 +62,46 @@ describe('prepareLine', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     process.off('unhandledRejection', unhandled);
     expect(unhandled).not.toHaveBeenCalled();
+  });
+});
+
+describe('onSystemVoice', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('starts quiet and lets a listener go', () => {
+    expect(systemVoiceSpeaking()).toBe(false);
+    const off = onSystemVoice(() => undefined);
+    expect(typeof off).toBe('function');
+    off();
+  });
+
+  it('says when the system voice starts and stops speaking', async () => {
+    vi.stubGlobal('window', {
+      tagalongHost: { speak: () => Promise.resolve({ kind: 'fallback' }) },
+    });
+    vi.stubGlobal('document', { documentElement: { style: { setProperty: vi.fn() } } });
+    vi.stubGlobal(
+      'SpeechSynthesisUtterance',
+      class {
+        onend: (() => void) | null = null;
+        constructor(readonly text: string) {}
+      },
+    );
+    let spoken!: { onend: () => void };
+    vi.stubGlobal('speechSynthesis', {
+      speak: (utterance: { onend: () => void }) => (spoken = utterance),
+      getVoices: () => [],
+    });
+    const heard: boolean[] = [];
+    const off = onSystemVoice((speaking) => heard.push(speaking));
+    const playing = prepareLine('Hello there.')(new AbortController().signal);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(systemVoiceSpeaking()).toBe(true);
+    expect(heard).toEqual([true]);
+    spoken.onend();
+    await playing;
+    expect(systemVoiceSpeaking()).toBe(false);
+    expect(heard).toEqual([true, false]);
+    off();
   });
 });

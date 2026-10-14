@@ -65,6 +65,26 @@ async function playAudio(bytes: Uint8Array, signal: AbortSignal): Promise<void> 
   });
 }
 
+let systemSpeaking = false;
+const systemListeners = new Set<(speaking: boolean) => void>();
+
+/** Whether the system voice is speaking: the one voice echo cancellation cannot remove. */
+export function systemVoiceSpeaking(): boolean {
+  return systemSpeaking;
+}
+
+/** Hears each start and end of the system voice; the function returned stops listening. */
+export function onSystemVoice(listener: (speaking: boolean) => void): () => void {
+  systemListeners.add(listener);
+  return () => void systemListeners.delete(listener);
+}
+
+function setSystemSpeaking(speaking: boolean): void {
+  if (systemSpeaking === speaking) return;
+  systemSpeaking = speaking;
+  for (const listener of [...systemListeners]) listener(speaking);
+}
+
 /** The system voice, while the local model downloads or if every engine failed. */
 function speakWithSystem(text: string, signal: AbortSignal, rate: number): Promise<void> {
   return new Promise<void>((resolve) => {
@@ -83,8 +103,12 @@ function speakWithSystem(text: string, signal: AbortSignal, rate: number): Promi
       { once: true },
     );
     setLevel(0.5);
+    setSystemSpeaking(true);
     speechSynthesis.speak(utterance);
-  }).finally(() => setLevel(0));
+  }).finally(() => {
+    setLevel(0);
+    setSystemSpeaking(false);
+  });
 }
 
 // The system's voice list fills in asynchronously; asking once early has it ready.

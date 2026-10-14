@@ -1607,7 +1607,7 @@ flowchart LR
   end
   subgraph Panel["Panel renderer"]
     TE --> PTT["PushToTalk: held, repeat, fresh press, click"]
-    PTT --> LC["ListenController: hold, release, cancel"]
+    PTT --> LC["ListenController: hold, release, cancel; setAlways, setPaused, setDeaf"]
     LC --> MIC["mic.ts openMic: getUserMedia, mic-worklet.js, 512-sample 16 kHz frames"]
     MIC --> RE["RemoteEars"]
     RE -- "IPC earsListen, micFrame, earsStop" --> IPCV
@@ -1668,6 +1668,20 @@ flowchart LR
   30 s of frames waiting) and has `close()`; ending the reading early closes it too. `RemoteEars` is
   the `Ears` the panel sees: `listen` calls `earsListen(mode)` and sends each frame with `micFrame`,
   `stop` calls `earsStop`; held, it keeps its handlers until the turnEnd that follows the stop.
+- **Always listening, in the panel** (`ui/voice/listen-controller.ts`, `renderer/src/voice-player.ts`).
+  `setAlways(on)`, `setPaused(paused)` (a call or full screen) and `setDeaf(deaf)` keep one `always`
+  session open exactly while it is on, not paused and not deaf; otherwise its mic closes and its ears
+  stop at once. The talk key is ignored while an always session runs; during a pause it works as
+  usual, and the always session comes back only when the pause ends, or when a key held as it was
+  switched on is let go. Ending an always session keeps released held questions waiting for their
+  words, and while one waits the always session counts nothing (the voice process runs sessions in
+  order, so those words are the held question's). Only talk addressed to Scout counts
+  (`addressedToScout` from `@tagalong/protocol`): bare `speechStart` does nothing, the first addressed
+  `partial` of a turn cuts Scout off and each one shows, an unaddressed turn goes nowhere, and an
+  addressed turnEnd asks what follows the name, or, for "Scout, stop" (`isStopListening`), calls
+  `onStopListening`, which switches Always listening off through `setListening(false)`. The system
+  voice is not echo-cancelled, so `voice-player.ts` reports it speaking (`onSystemVoice`,
+  `systemVoiceSpeaking`) for `setDeaf`: Scout never answers or cuts off its own words.
 - **The ears, through main** (`main/ipc/voice.ts`). `earsListen` notes the active window for a held
   question (never the selection: copying it would press keys while the talk key is held), then sends
   `ears.listen` to the voice process, which `VoiceWorker` forks then if Scout has not spoken yet.

@@ -81,6 +81,11 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
         clearTimeout(timer.current);
         done(NO_MICROPHONE);
       },
+      // "Scout, stop": switched off as the person would, so main saves it and tells every window.
+      onStopListening: () =>
+        void window.tagalongHost
+          .setListening(false)
+          .catch((error: unknown) => console.warn('[talk] listening could not stop', error)),
     });
     return { made, bargeIn };
   });
