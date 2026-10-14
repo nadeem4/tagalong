@@ -77,6 +77,16 @@ describe('negation', () => {
       matchChoice('not Claude', choicesFor('think', 'signed-in', false, providers)),
     ).toBeNull();
   });
+
+  it('counts haven’t, hasn’t, didn’t and cannot as negations too', () => {
+    const missing = choicesFor('think', 'not-installed', false, providers);
+    expect(matchChoice('I haven’t installed it', missing)).toBeNull();
+    expect(matchChoice('it hasn’t installed', missing)).toBeNull();
+    expect(
+      matchChoice('I didn’t sign in', choicesFor('think', 'signed-out', false, providers)),
+    ).toBeNull();
+    expect(matchChoice('I cannot talk', step('answer'))).toBeNull();
+  });
 });
 
 describe('nameFrom refusals', () => {

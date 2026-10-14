@@ -10,21 +10,27 @@ import '@fontsource/pixelify-sans/latin-400.css';
 import '@fontsource/pixelify-sans/latin-700.css';
 import './app.css';
 import './welcome.css';
-import { answerPatch, answered, chipState, goTo, startFirstRun } from './first-run';
+import { answerPatch, answered, chipState, goTo, listensNow, startFirstRun } from './first-run';
 import type { FirstRun, FirstRunAnswer } from './first-run';
 import { choicesFor, matchChoice, nameFrom } from './first-run-match';
 import {
   KEY_LINES,
+  LISTENING_HINT,
   STEP_NAMES,
   chipLabel,
   echoFor,
+  listenFailed,
+  listeningHint,
   notCaught,
   optionsFor,
   readableKey,
   scoutSays,
 } from './first-run-lines';
 import type { LineContext } from './first-run-lines';
-import { prepareLine } from './voice-player';
+import { RemoteEars } from './remote-ears';
+import { setupEars } from './setup-ears';
+import type { SetupEars, SetupListening } from './setup-ears';
+import { onSystemVoice, prepareLine } from './voice-player';
 import { installVoiceSeam } from './voice-seam';
 import type { ClaudeSignIn, HostView } from '../../shared/ipc';
 
@@ -37,9 +43,9 @@ const messageOf = (error: unknown): string =>
 
 /**
  * Setup, driven by Scout: it asks each question aloud and in its bubble, suggests an answer
- * when it can, and moves on by itself once you answer by typing or a tap. No Next button;
- * the step chips are the way back. Every answer is saved as it is given, so closing the
- * window resumes at the same step next launch.
+ * when it can, and moves on by itself once you answer by voice, typing or a tap. No Next
+ * button; the step chips are the way back. Every answer is saved as it is given, so closing
+ * the window resumes at the same step next launch. It listens only after "Talk to me".
  */
 function FirstRunWindow() {
   const [view, setView] = useState<HostView | null>(null);
@@ -54,6 +60,10 @@ function FirstRunWindow() {
   const [aside, setAside] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // 'off'; a fraction while the speech model downloads; null while the mic is open.
+  const [listening, setListening] = useState<SetupListening>('off');
+  // Always listening, as main holds it: switched here, saved by main.
+  const [always, setAlways] = useState(false);
   // Keys saved in this window: a key that failed its test is still stored, so Check key retests it.
   const [savedKeys, setSavedKeys] = useState<readonly string[]>([]);
   const answerInput = useRef<HTMLInputElement>(null);
@@ -77,8 +87,7 @@ function FirstRunWindow() {
         setView(loaded);
         setSettings(loaded.settings);
         setSignIn(state);
-        // Milestone 2 answers by typing or a tap; listening joins in Milestone 3.
-        setRun(startFirstRun(loaded.settings, false));
+        setRun(startFirstRun(loaded.settings, 'tagalongVoice' in window));
       })
       .catch((error: unknown) => setProblem(`Tagalong could not start setup: ${String(error)}`));
   }, []);
@@ -120,6 +129,65 @@ function FirstRunWindow() {
     (keyFor !== null ? keyInput : answerInput).current?.focus();
   }, [current, picking, keyFor, busy]);
 
+  useEffect(() => {
+    void window.tagalongHost
+      .getListening()
+      .then((state) => setAlways(state.on))
+      .catch(() => undefined);
+    return window.tagalongHost.onListening((state) => setAlways(state.on));
+  }, []);
+
+  // What the ears' callbacks reach: always the latest, as the ears are made once.
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  const heardRef = useRef<(text: string) => void>(() => undefined);
+
+  // Setup's ears, made once. Closing the window disposes them, and that closes the mic.
+  const ears = useRef<SetupEars | null>(null);
+  useEffect(() => {
+    const made = setupEars({
+      ears: (mode) => new RemoteEars(window.tagalongHost, mode),
+      openMic: () => window.tagalongVoice.openMic(settingsRef.current?.voice.microphoneId),
+      ensureEars: (onProgress) => window.tagalongVoice.ensureEars(onProgress),
+      onEarsStatus: (handler) => window.tagalongHost.onEarsStatus(handler),
+      onSystemVoice,
+      onHeard: (text) => {
+        if (!busyRef.current) heardRef.current(text);
+      },
+      onSpeechStart: () => voice.stop(),
+      onState: setListening,
+      onFailure: (why) => {
+        setAside(listenFailed(why));
+        void typeInstead();
+      },
+    });
+    ears.current = made;
+    return () => made.dispose();
+  }, []);
+
+  // Listening follows what was saved, and this is the only place it starts or stops: "Talk
+  // to me", "I'll type", a resume, the chips and Try it all come through here.
+  const wants = run !== null && settings !== null && listensNow(run, settings);
+  useEffect(() => {
+    if (wants) ears.current?.start();
+    else ears.current?.stop();
+  }, [wants]);
+
+  /** Listening failed: answers are typed from here, and the Answer chip says so. */
+  async function typeInstead(): Promise<void> {
+    const now = settingsRef.current;
+    if (now === null) return;
+    try {
+      setSettings(
+        await window.tagalongHost.saveSettings({ welcome: { ...now.welcome, answerBy: 'type' } }),
+      );
+    } catch (error) {
+      setProblem(messageOf(error));
+    }
+  }
+
   const providers = view?.providers ?? [];
   const scout = view?.pets.find((pet) => pet.id === view.settings.defaultPetId);
   const context: LineContext | null =
@@ -151,6 +219,8 @@ function FirstRunWindow() {
     finishing.current = true;
     setProblem(null);
     voice.stop();
+    // The mic closes before the window does.
+    ears.current?.stop();
     try {
       await window.tagalongHost.finishWelcome(saved.welcome.brain ?? 'claude-code');
     } catch (error) {
@@ -226,7 +296,7 @@ function FirstRunWindow() {
     }
   }
 
-  /** The one way an answer comes in: typed text now, heard speech too in Milestone 3. */
+  /** The one way an answer comes in: typed, or heard once "Talk to me" was chosen. */
   function heard(text: string): void {
     if (run === null || context === null) return;
     if (run.current === 'name') {
@@ -238,6 +308,7 @@ function FirstRunWindow() {
     if (id === null) return setAside(notCaught(run.current, context));
     pick(id);
   }
+  heardRef.current = heard;
 
   /** Saves the pasted key, if any, and tests it once. Only a passing test moves setup on. */
   async function testKey(): Promise<void> {
@@ -326,6 +397,12 @@ function FirstRunWindow() {
         <nav className="first-run__steps" aria-label="Setup steps">
           {run.steps.map(chip)}
         </nav>
+        {listening !== 'off' && (
+          <p className="first-run__listening" role="status">
+            {listening === null && <span className="first-run__dot" aria-hidden="true" />}
+            {listeningHint(listening)}
+          </p>
+        )}
       </header>
       <div className="first-run__body">
         <aside className="first-run__scout" aria-label={context.petName}>
@@ -368,6 +445,31 @@ function FirstRunWindow() {
                 <kbd key={part}>{part}</kbd>
               ))}
             </p>
+          )}
+          {run.current === 'keys' && (
+            <div className="first-run__setting">
+              <div>
+                <p id="always-listening" className="first-run__label">
+                  Always listening
+                </p>
+                <p className="first-run__note">Off by default. I never switch it on myself.</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                className="first-run__switch"
+                aria-checked={always}
+                aria-labelledby="always-listening"
+                onClick={() =>
+                  void window.tagalongHost
+                    .setListening(!always)
+                    .then((state) => setAlways(state.on))
+                    .catch((error: unknown) => setProblem(messageOf(error)))
+                }
+              >
+                {always ? 'On' : 'Off'}
+              </button>
+            </div>
           )}
           {run.current === 'think' && keyFor !== null && (
             <form
@@ -436,7 +538,9 @@ function FirstRunWindow() {
             </form>
           )}
           <p className="first-run__hint">
-            Answer by typing or a tap and I move on. Tap a step above to change it.
+            {wants
+              ? LISTENING_HINT
+              : 'Answer by typing or a tap and I move on. Tap a step above to change it.'}
           </p>
         </section>
       </div>
@@ -446,7 +550,7 @@ function FirstRunWindow() {
 
 const container = document.getElementById('root');
 if (container !== null) {
-  // Voice reaches this window the way it reaches the bubble; Milestone 3 switches listening on.
+  // Voice reaches this window the way it reaches the bubble.
   installVoiceSeam();
   createRoot(container).render(
     <StrictMode>

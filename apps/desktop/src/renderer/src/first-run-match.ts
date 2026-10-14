@@ -38,7 +38,18 @@ export function matchChoice(text: string, choices: readonly Choice[]): string | 
 }
 
 /** "no" is left out: it is also an answer ("No. Text only."). */
-const NEGATORS = ['dont', 'do not', 'not', 'never', 'wont', 'cant'];
+const NEGATORS = [
+  'dont',
+  'do not',
+  'not',
+  'never',
+  'wont',
+  'cant',
+  'cannot',
+  'havent',
+  'hasnt',
+  'didnt',
+];
 
 const ANSWER: Choice[] = [
   { id: 'talk', says: ['talk', 'talk to me', 'speak', 'voice', 'out loud'] },

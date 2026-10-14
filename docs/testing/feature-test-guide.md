@@ -51,18 +51,21 @@ time), or quit Tagalong and rename `%APPDATA%\Tagalong` (rename it back afterwar
 
 ## First run: Welcome
 
-Setup is typed or tapped in this build. Scout asks each question in its bubble and moves on by
-itself once it is answered; there is no Next button. Anything Scout asks can be answered by typing
-in the answer box and pressing Enter, or by tapping a card.
+Scout asks each question in its bubble and moves on by itself once it is answered; there is no
+Next button. Anything Scout asks can be answered by typing in the answer box and pressing Enter,
+by tapping a card, or, after **Talk to me**, by saying it (W.9). W.1 to W.8 type; W.9 to W.14 talk.
 
-### W.1. Setup opens alone, at the name
+### W.1. Setup opens alone, at Talk or type
 
 1. **Setup:** a fresh profile.
 2. **Action:** start Tagalong.
-3. **Expected:** one window, **Set up Tagalong**, opens with the steps along the top (**Name**,
-   **How I think**, **Voice**, **Keys**, **Try it**), Scout at the left saying "Hi, I'm Scout. What
-   should I call you?" and the title **What should I call you?** with **Rather not** and an answer
-   box. Scout itself is not on the desktop yet.
+3. **Expected:** one window, **Set up Tagalong**, opens with the steps along the top (**Answer**,
+   **Name**, **How I think**, **Voice**, **Keys**, **Try it**), Scout at the left saying "Hi, I'm
+   Scout. A few quick questions and we're set. Will you talk to me, or type?" and the title **Talk
+   or type?** with **Talk to me**, **I'll type** and an answer box. Scout itself is not on the
+   desktop yet. The Windows microphone indicator is off.
+4. **Action:** tap **I'll type**. **Expected:** the first chip reads **Typing**, the title is **What
+   should I call you?** with **Rather not**, and the microphone indicator stays off.
 
 ### W.2. The name, "Rather not" and the echo
 
@@ -102,11 +105,15 @@ in the answer box and pressing Enter, or by tapping a card.
 
 ### W.5. Keys and finish
 
-1. **Action:** read **One key to remember**, then say or type `got it`, or tap **Got it**.
-2. **Expected:** the setup window closes, Scout docks on the desktop, and its invitation opens (see
+1. **Action:** read **One key to remember**. Below the key caps, **Always listening** reads
+   **Off**, with "Off by default. I never switch it on myself." Tap it: it turns gold and reads
+   **On**; tap again for **Off**. It is the same switch as the bubble's and Settings → Privacy's
+   (open Home → Settings → Privacy to check), and Scout does not listen while setup is open.
+2. **Action:** say or type `got it`, or tap **Got it**.
+3. **Expected:** the setup window closes, Scout docks on the desktop, and its invitation opens (see
    G.1). In Home → Experts, Claude Code is listed when it is installed. Home → Scout shows the
    brain you chose.
-3. **Action:** quit and start Tagalong again. **Expected:** setup does not open; one launch line
+4. **Action:** quit and start Tagalong again. **Expected:** setup does not open; one launch line
    appears instead (G.2).
 
 ### W.6. Closing mid-setup resumes
@@ -114,7 +121,7 @@ in the answer box and pressing Enter, or by tapping a card.
 1. **Action:** answer the name, then close the setup window with ×.
 2. **Expected:** Scout appears on the desktop anyway.
 3. **Action:** quit and start Tagalong. **Expected:** setup opens at **How should I think?**, with
-   **You: Alex** still on its chip.
+   **Typing** and **You: Alex** still on their chips.
 
 ### W.7. The chips go back
 
@@ -126,7 +133,68 @@ in the answer box and pressing Enter, or by tapping a card.
 
 1. **Action:** Home → Settings → Advanced → **Open Welcome again**.
 2. **Expected:** setup opens again at the top; it finishes as in W.5, and does not reopen on the
-   next launch.
+   next launch. Even if you chose **Talk to me** last time, the microphone stays off until you
+   choose it again.
+
+### W.9. Answering by voice
+
+1. **Setup:** a fresh profile and a working microphone.
+2. **Action:** at **Talk or type?**, tap **Talk to me** (or type `talk`).
+3. **Expected:** the first chip reads **Talking**. The first time, the header right of the chips
+   says "Getting my ears ready… N%. Type or tap meanwhile." while the speech model downloads
+   (about 43 MB), and the Windows microphone indicator stays off. Once it is ready, a red dot and
+   "Listening for your answer" show, and the microphone indicator comes on. The hint under the
+   answer box reads "Answer by voice, typing or a tap…".
+4. **Action:** say `Alex`. **Expected:** "Got it, I'll call you Alex." and the next step, as if
+   typed. Say `claude`, then `yes, talk`, then `got it`: each moves setup on. Talking over Scout
+   stops its line. "Stop" is just a word here ("I didn't catch that"). Typing and tapping still
+   work the whole time.
+5. **Expected:** nothing you say leaves the computer; the words are matched on the computer.
+6. **Note:** on **Open Welcome again** with Scout on the desktop, an answer that starts with
+   "Scout, …" can also bring the bubble up quietly. That is expected and harmless.
+
+### W.10. No microphone
+
+1. **Setup:** a fresh profile, every microphone unplugged or disabled in Windows Sound settings.
+2. **Action:** tap **Talk to me**.
+3. **Expected:** after the model is ready, Scout says plainly "I can't find a microphone, so let's
+   type. Tap or type your answers." The listening line goes, the Answer chip reads **Typing**, and
+   setup carries on by typing at the same step. Closing and relaunching does not try again.
+
+### W.11. Permission denied
+
+1. **Setup:** a fresh profile; Windows Settings → Privacy & security → Microphone → let desktop
+   apps access your microphone: Off.
+2. **Action:** tap **Talk to me**.
+3. **Expected:** Scout says plainly "I wasn't allowed to use the microphone, so let's type. You can
+   allow it later in Windows settings." The chip reads **Typing** and typing carries on. Switch the
+   permission back on, tap the **Typing** chip, then **Talk to me**: it listens.
+
+### W.12. The model download fails
+
+1. **Setup:** a fresh profile (no speech model in `%APPDATA%\Tagalong\voice`), and the network
+   off.
+2. **Action:** tap **Talk to me**.
+3. **Expected:** the microphone never opens (the Windows indicator stays off). Scout says plainly
+   "My listening model didn't download, so let's type for now." The chip reads **Typing** and
+   typing carries on. With the network back, the **Typing** chip then **Talk to me** retries.
+
+### W.13. The microphone turns off
+
+1. **Action:** in W.9, once listening, tap the **Talking** chip and then **I'll type**.
+   **Expected:** the red dot and the listening line go, and the Windows microphone indicator (in
+   the taskbar) turns off within a second or two.
+2. **Action:** choose **Talk to me** again and answer to the end. **Expected:** when **Try it** is
+   reached the setup window closes and the microphone indicator turns off. Closing the setup
+   window with × while listening turns it off too.
+
+### W.14. The talk key during setup
+
+1. **Action:** with the setup window open (behind another window), press the talk key
+   (`Ctrl+Shift+Alt+Space`).
+2. **Expected:** setup comes to the front. The bubble does not open and no second microphone
+   opens. With Always listening on (re-run via **Open Welcome again**), Scout's mark shows
+   listening paused until the setup window closes.
 
 ## Scout's brain
 

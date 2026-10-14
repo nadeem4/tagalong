@@ -1395,12 +1395,13 @@ closing one opened again from Home leaves the pet as it was.
 
 Setup is guided by Scout itself, in one window, with no Next button. Scout asks each question
 aloud and in its bubble, suggests an answer when it can, and moves on by itself once the question
-is answered by typing or a tap. The step chips along the top are the way back.
+is answered by voice, typing or a tap. The step chips along the top are the way back.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000'}}}%%
 stateDiagram-v2
-  [*] --> name
+  [*] --> answer
+  answer --> name: Talk to me or I'll type
   name --> think: answered, or Rather not
   think --> voice: Claude, or a key that passed
   voice --> keys: Yes, talk or Text only
@@ -1410,11 +1411,12 @@ stateDiagram-v2
   voice --> think: chip
   voice --> name: chip
   keys --> voice: chip
+  name --> answer: chip
 ```
 
 A chip goes back to any step already reached; answering there returns setup to the step it had
-reached. Milestone 2 is typing only, so the "Talk or type?" step (`answer`) is left out of the
-list until voice answers join in.
+reached. The "Talk or type?" step (`answer`) is offered when the window has the voice seam
+(`startFirstRun(settings, 'tagalongVoice' in window)`), which setup always installs.
 
 - **The step machine** (`renderer/src/first-run.ts`) is pure: which steps this computer offers
   (`stepsFor`), the step on screen and the furthest one reached. `startFirstRun` opens at the step
@@ -1436,10 +1438,46 @@ list until voice answers join in.
   step (`scoutSays`), the option cards (`optionsFor`), the echo of the last answer, the chip
   labels. A line never carries a key. Each line is also spoken while Scout talks; the voice
   step's line is the sample of how Scout sounds, so it is spoken either way.
-- **`heard(text)`** in `onboarding.tsx` is the one way an answer comes in. Typing and a tap call
-  it today; Milestone 3 feeds it the words the voice engine's ears hear, with no other change to
-  the window. `installVoiceSeam()` runs in the setup window so voice reaches it the way it
-  reaches the bubble.
+- **`heard(text)`** in `onboarding.tsx` is the one way an answer comes in: typed text, and the
+  words setup's ears hear. A heard turn is dropped while the window is busy saving. Matching
+  (above) also reads `cannot`, `haven't`, `hasn't` and `didn't` as negations, so "I haven't
+  installed it" is asked about again. `installVoiceSeam()` runs in the setup window so voice
+  reaches it the way it reaches the bubble.
+- **Setup's ears** (`renderer/src/setup-ears.ts`). `setupEars(deps)` is a thin wrapper over the
+  shared `ListenController` (`ui/voice/listen-controller.ts`) in `always` mode with
+  `needsName: false`: every turn is handed over whole, no "Scout" needed, and "stop" is just
+  words. It reuses the controller's mic open and close, its stale-session guards, `setDeaf` for
+  the system voice and barge-in on the first partial (which stops Scout's spoken line). The ears
+  are `new RemoteEars(window.tagalongHost, 'always')` (the seam's `ears` is held-only); the mic
+  is the seam's `openMic`, typed `Promise<OpenMic>` (a stream with `close()`), with the mic
+  picked in Settings → Voice. `start()` reports `0`, then each `ensureEars` download fraction
+  (capped at 0.99), then `null` once the model is ready, and only then opens the mic
+  (`setAlways(true)`). `stop()` is `setAlways(false)`, which closes the mic; a download that ends
+  after a stop is ignored. Every failure (`onMicFailed`, `ensureEars` rejecting, or an
+  `IPC.earsStatusEvent` of `failed` while on) is `stop()` then `onFailure` with `no-mic`, `denied`
+  (`NotAllowedError` or `SecurityError`, `micFailure`) or `model-failed`. The Ears events used are
+  `partial` (barge-in only) and `turnEnd` (the answer), from `IPC.earsEvent`, which reaches every
+  window; the controller ignores events outside its own session.
+- **When setup listens** is derived, never started on a tap: `listensNow(run, settings)`
+  (`first-run.ts`) is true once "Talk to me" was saved as `welcome.answerBy` in this run (the step
+  reached is past `answer`, so a re-run of a finished setup starts with the mic closed) and the
+  step is not Try it. One effect on that value is the only place `onboarding.tsx` starts or stops
+  the ears, so "Talk to me", "I'll type", a resume, the chips and Try it all go through it;
+  `finish` also stops them before `finishWelcome`, and unmounting disposes them. The header then
+  shows `listeningHint`: the download percentage, then a red dot and "Listening for your answer"
+  while the mic is open. A failure has Scout say `listenFailed(why)` in its bubble and saves
+  `welcome.answerBy: 'type'` (the step does not move), so the Answer chip says "Typing", a resume
+  does not retry, and the chip then "Talk to me" is the retry.
+- **The keys step's Always listening switch** goes through `getListening`, `setListening` and
+  `onListening` on the voice IPC, as the bubble's switch does; main saves it. It never calls
+  `saveSettings`.
+- **Main's two setup guards** (`main/index.ts`). While the setup window is open, the talk key
+  (`talkPressed`) focuses setup and returns, so the bubble never opens a second mic over setup's.
+  And `openOnboarding` calls `pauseListening({ setupOpen: true })`, and `{ setupOpen: false }`
+  when the window closes: `listeningPaused` is `blocked || !petsShown || setupOpen`, so Always
+  listening (on a re-run of setup) never shares the voice process, which hears one session at a
+  time, with setup. On a re-run with Scout shown, an answer that starts with "Scout, …" can still
+  bring the bubble up quietly (`forwardEars` `onSpoken`); it is harmless.
 - **How Scout thinks** reads the real Claude sign-in. `checkClaudeSignIn` (IPC; main
   `claude-sign-in.ts`) runs `claude auth status --json`, which makes no model call, and reports
   `signed-in`, `signed-out`, `not-installed` or `unknown`. Signed in, Scout suggests Claude. Signed
@@ -1832,8 +1870,9 @@ flowchart LR
   not running, and a save that fails is tried again at the next change); `paused` is never saved.
   `startListeningGuard` checks the front window every 2 s while it is on, and at once when it comes
   on, and blocks listening for a call or a full-screen window (`listeningBlocked`); switched off,
-  it forgets its answer. `paused` is `listeningPaused`: blocked, or the pets hidden (the avatar's
-  `show` and `hide` events), so the mark is never out of sight while the mic is open. The guard is
+  it forgets its answer. `paused` is `listeningPaused`: blocked, the pets hidden (the avatar's
+  `show` and `hide` events), so the mark is never out of sight while the mic is open, or setup
+  open (above). The guard is
   stopped on quit. `forwardEars` takes an `onSpoken` callback: a
   `partial` or `turnEnd` whose words are addressed to Scout (`addressedToScout`, from
   `@tagalong/protocol`) brings the hidden bubble up beside a visible pet with `showPanelQuietly`,
@@ -1866,10 +1905,10 @@ flowchart LR
   `use-fake-ui-for-media-stream` switches, so the e2e suite needs no model and no microphone while
   the frames still flow through the real voice process. ElevenLabs Scribe is not wired in.
 - **Voice seam for other windows** (`renderer/src/voice-seam.ts`). `installVoiceSeam()` puts
-  `window.tagalongVoice` on a window (the panel calls it at start; the first-run window will call it
-  in its own): `ears` (`listen` and `stop` go to one `RemoteEars` in `held` mode; `on` subscribes to the ears
+  `window.tagalongVoice` on a window (the panel calls it at start, and the setup window in its
+  own): `ears` (`listen` and `stop` go to one `RemoteEars` in `held` mode; `on` subscribes to the ears
   events for good, so handlers set once keep hearing every question), `openMic(deviceId?)` (the `openMic` above,
-  resolving to a `MicStream` with `close()`) and `ensureEars(onProgress)`, which downloads the ears'
+  resolving to an `OpenMic`, a stream with `close()`) and `ensureEars(onProgress)`, which downloads the ears'
   model files if missing. `ensureEars` goes `TagalongHostApi.ensureEars` → `IPC.ensureEars` → the
   `ears.ensure` worker call, outside the listening order queue; the voice process runs the shared
   `ensureFiles` (above) with `onProgress` and posts each `ears.progress` fraction, which
@@ -1930,7 +1969,8 @@ flowchart LR
   file with no engine, and trying again at the next change after a failed save; saves run one at a
   time and each one done saves again if the choice changed meanwhile, so the last choice is the
   one in the file). `paused` is never
-  saved: it is `listeningPaused`, true while the guard blocks or the pets are hidden.
+  saved: it is `listeningPaused`, true while the guard blocks, the pets are hidden or setup is
+  open.
 - **The guard.** `startListeningGuard` lists the windows every 2 s (`LISTENING_GUARD_MS`) while
   listening is on, and at once when it comes on (switched on, or on at launch), and
   `listeningBlocked` is true when the front window is a call app (`isMeeting`, from

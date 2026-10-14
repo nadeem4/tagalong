@@ -249,7 +249,8 @@ computer and is never sent or stored.
 Otherwise the microphone is used only while you hold the talk key (`Ctrl+Shift+Alt+Space` by
 default, Settings → Voice) or after you click the mic in the text box, until you let go or click
 again (at most 30 seconds). Hold-to-talk and the mic button need no name, whether or not Always
-listening is on. After an answer the bubble only offers the key to reply.
+listening is on. After an answer the bubble only offers the key to reply. Setup listens for its
+answers only after you choose **Talk to me** (below).
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%
@@ -310,6 +311,34 @@ is listening and how to stop, and the mark shows from the first second.
 - **Closing the bubble does not stop listening.** It drops a question being asked; switch Always
   listening off to stop.
 - **Models and size.** The same three models as above, about 43 MB in all, run on the CPU.
+- **Paused while setup is open.** Setup may be listening for its answers, so Always listening
+  waits until the setup window closes, and the talk key brings setup forward instead of opening
+  the bubble's mic. One window listens at a time.
+
+### Setup by voice
+
+Setup's first question is "Talk or type?". **Talk to me** is setup's permission to use the
+microphone; **I'll type** (or a fresh setup that has not been answered yet) leaves it closed.
+
+- **Only after "Talk to me".** Setup listens only once you chose it in this setup. Opening setup
+  again later starts with the microphone closed, even if you chose to talk last time, until you
+  choose again.
+- **The model first, then the mic.** The first time, the same three speech models as above
+  (about 43 MB) download before the microphone opens; the header shows the download, and you can
+  type or tap meanwhile. Only then does the mic open.
+- **The indicator shows the whole time.** While the mic is open, a red dot and "Listening for
+  your answer" show in setup's header. Windows' own microphone indicator shows too.
+- **On this computer.** Audio is understood on the computer, as above, and is never sent or
+  stored. What you say is matched to setup's fixed answers on the computer, with no AI; nothing
+  goes to a provider.
+- **No name needed, and "stop" is just a word.** Every turn is an answer. Say or tap "I'll type"
+  to stop listening.
+- **The mic closes** when setup ends (Try it, or the window closing), when you choose **I'll
+  type**, and while the system voice speaks. A missing microphone, a refused permission or a
+  model that will not download is said plainly, the mic stays closed, and setup carries on by
+  typing; it saves that you type, so it does not try again until you choose **Talk to me** again.
+- **Always listening is separate.** Its switch on the keys step is off by default and only you
+  switch it on; it starts once setup is closed.
 
 ## Keeping an eye on things
 
