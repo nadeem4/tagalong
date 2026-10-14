@@ -47,6 +47,7 @@ function setup(openMic: () => Promise<ListenMic> = vi.fn(async () => fakeMic()))
     nothing: vi.fn(),
     failed: vi.fn(),
     stop: vi.fn(),
+    dropped: vi.fn(),
   };
   const controller = new ListenController({
     ears: ears.make,
@@ -57,6 +58,7 @@ function setup(openMic: () => Promise<ListenMic> = vi.fn(async () => fakeMic()))
     onNothingHeard: calls.nothing,
     onMicFailed: calls.failed,
     onStopListening: calls.stop,
+    onDropped: calls.dropped,
   });
   return { controller, ears, calls, openMic: openMic as ReturnType<typeof vi.fn> };
 }
@@ -448,6 +450,30 @@ describe('ListenController, always', () => {
     expect(ears.made[0]?.ears.listening).toBeNull();
     expect(ears.made[0]?.ears.stopped).toBe(false);
     expect(controller.mode).toBeNull();
+  });
+
+  it('a turn that stopped Scout but ends with nothing for it lets the bubble go', async () => {
+    const { controller, ears, calls } = setup();
+    controller.setAlways(true);
+    await tick();
+    ears.say('partial', 'Scout, wh');
+    ears.say('turnEnd', 'what');
+    expect(calls.dropped).toHaveBeenCalledOnce();
+    expect(calls.heard).not.toHaveBeenCalled();
+    expect(calls.nothing).not.toHaveBeenCalled();
+    // The next turn starts fresh: unaddressed again, nothing to let go.
+    ears.say('turnEnd', 'what');
+    expect(calls.dropped).toHaveBeenCalledOnce();
+  });
+
+  it('an unaddressed turn that never stopped Scout drops nothing', async () => {
+    const { controller, ears, calls } = setup();
+    controller.setAlways(true);
+    await tick();
+    ears.say('partial', 'what is');
+    ears.say('turnEnd', 'what is this');
+    ears.say('turnEnd', 'Scout, what is this');
+    expect(calls.dropped).not.toHaveBeenCalled();
   });
 
   it('switching on twice opens one mic', async () => {

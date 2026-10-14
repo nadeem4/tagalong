@@ -1679,7 +1679,8 @@ flowchart LR
   (`addressedToScout` from `@tagalong/protocol`): bare `speechStart` does nothing, the first addressed
   `partial` of a turn cuts Scout off and each one shows, an unaddressed turn goes nowhere, and an
   addressed turnEnd asks what follows the name, or, for "Scout, stop" (`isStopListening`), calls
-  `onStopListening`, which switches Always listening off through `setListening(false)`. The system
+  `onStopListening`, which switches Always listening off through `setListening(false)`. A turn that
+  cut Scout off but ends unaddressed or empty calls `onDropped`, and the bubble clears its words. The system
   voice is not echo-cancelled, so `voice-player.ts` reports it speaking (`onSystemVoice`,
   `systemVoiceSpeaking`) for `setDeaf`: Scout never answers or cuts off its own words.
 - **The ears, through main** (`main/ipc/voice.ts`). `earsListen` notes the active window for a held

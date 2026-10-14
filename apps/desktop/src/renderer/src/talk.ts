@@ -86,6 +86,7 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
         void window.tagalongHost
           .setListening(false)
           .catch((error: unknown) => console.warn('[talk] listening could not stop', error)),
+      onDropped: () => setPartial(null),
     });
     return { made, bargeIn };
   });

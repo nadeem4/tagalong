@@ -16,6 +16,8 @@ export interface ListenControllerOptions {
   onMicFailed(error: unknown): void;
   /** "Scout, stop" was heard while listening all the time. */
   onStopListening(): void;
+  /** A turn that had stopped Scout ended with nothing to send. */
+  onDropped(): void;
 }
 
 interface Session {
@@ -172,9 +174,14 @@ export class ListenController {
     ears.on('turnEnd', (text = '') => {
       if (!session.live) return;
       if (mode === 'always') {
+        const barged = session.barged;
         const question = this.#addressed(session, text);
         session.barged = false;
-        if (question === null) return;
+        if (question === null) {
+          // The final words dropped the name (or came back empty): the bubble lets go.
+          if (barged) this.#options.onDropped();
+          return;
+        }
         if (isStopListening(question)) this.#options.onStopListening();
         else this.#options.onHeard(question);
         return;
