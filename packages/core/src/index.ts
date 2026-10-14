@@ -143,6 +143,8 @@ export {
   type TurnOutcome,
 } from './conversation';
 
+export { isMeeting } from './keep-an-eye/lookout';
+
 export {
   WATCH_CHANGE_THRESHOLD,
   WATCH_POLL_MS,
