@@ -13,6 +13,10 @@ import type {
   ProjectCandidate,
   Role,
   RolesUpgradeNotice,
+  RoutineDraftInput,
+  RoutineProposedParams,
+  RoutineResultParams,
+  RoutineView,
   SettingsPatch,
 } from '@tagalong/protocol';
 import type { AskInput, HostBridge, TurnEvent } from '@tagalong/ui';
@@ -84,6 +88,22 @@ const bridge: HostBridge = {
     ipcRenderer.invoke(IPC.signInConnection, id) as Promise<ConnectionState>,
   removeConnection: (id: string) =>
     ipcRenderer.invoke(IPC.removeConnection, id) as Promise<boolean>,
+  listRoutines: () => ipcRenderer.invoke(IPC.listRoutines) as Promise<RoutineView[]>,
+  saveRoutine: (routine: RoutineDraftInput & { id?: string }) =>
+    ipcRenderer.invoke(IPC.saveRoutine, routine) as Promise<RoutineView>,
+  deleteRoutine: (id: string) => ipcRenderer.invoke(IPC.deleteRoutine, id) as Promise<boolean>,
+  setRoutineEnabled: (id: string, enabled: boolean) =>
+    ipcRenderer.invoke(IPC.setRoutineEnabled, id, enabled) as Promise<RoutineView>,
+  runRoutine: (id: string) => ipcRenderer.invoke(IPC.runRoutine, id) as Promise<boolean>,
+  confirmRoutine: (proposalId: string, routine?: RoutineDraftInput) =>
+    ipcRenderer.invoke(IPC.confirmRoutine, proposalId, routine) as Promise<{
+      routine?: RoutineView;
+      deleted?: boolean;
+    }>,
+  dismissRoutine: (proposalId: string) =>
+    ipcRenderer.invoke(IPC.dismissRoutine, proposalId) as Promise<void>,
+  editRoutine: (proposal: RoutineProposedParams) =>
+    ipcRenderer.invoke(IPC.editRoutine, proposal) as Promise<void>,
   onTurnEvent: (handler: (event: TurnEvent) => void) => {
     const listener = (_event: IpcRendererEvent, turnEvent: TurnEvent): void => handler(turnEvent);
     ipcRenderer.on(IPC.turnEvent, listener);
@@ -163,6 +183,21 @@ const host: TagalongHostApi = {
     const listener = (_event: IpcRendererEvent, remark: PetRemarkParams): void => handler(remark);
     ipcRenderer.on(IPC.remarkEvent, listener);
     return () => void ipcRenderer.off(IPC.remarkEvent, listener);
+  },
+  onRoutine: (handler) => {
+    const listener = (
+      _event: IpcRendererEvent,
+      result: RoutineResultParams,
+      how: { line: boolean; speak: boolean },
+    ): void => handler(result, how);
+    ipcRenderer.on(IPC.routineEvent, listener);
+    return () => void ipcRenderer.off(IPC.routineEvent, listener);
+  },
+  onRoutineDraft: (handler) => {
+    const listener = (_event: IpcRendererEvent, proposal: RoutineProposedParams): void =>
+      handler(proposal);
+    ipcRenderer.on(IPC.routineDraftEvent, listener);
+    return () => void ipcRenderer.off(IPC.routineDraftEvent, listener);
   },
   remarkNotNow: () => ipcRenderer.invoke(IPC.remarkNotNow) as Promise<void>,
   remarkAccept: (remarkId: string) =>

@@ -2,6 +2,7 @@ import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HomeView, HostBridgeProvider } from '@tagalong/ui';
 import type { HomeHost, HomePage } from '@tagalong/ui';
+import type { RoutineProposedParams } from '@tagalong/protocol';
 // Bundled, not fetched: Home's two typefaces ship inside the app, Latin subset only.
 import '@fontsource/onest/latin-400.css';
 import '@fontsource/onest/latin-600.css';
@@ -35,13 +36,24 @@ const homeHost: HomeHost = {
  */
 function Home() {
   const [page, setPage] = useState<HomePage | undefined>(undefined);
+  // Scout's routine card, opened here by its Edit button.
+  const [routineDraft, setRoutineDraft] = useState<RoutineProposedParams | undefined>(undefined);
   useEffect(() => window.tagalongHost.onHomePage((next) => setPage(next as HomePage)), []);
+  useEffect(
+    () =>
+      window.tagalongHost.onRoutineDraft((proposal) => {
+        setRoutineDraft(proposal);
+        setPage('routines');
+      }),
+    [],
+  );
   return (
     <HostBridgeProvider bridge={window.tagalong}>
       <HomeView
         host={homeHost}
         settings={<SettingsPage embedded onOpenScout={() => setPage('scout')} />}
         {...(page === undefined ? {} : { page })}
+        {...(routineDraft === undefined ? {} : { routineDraft })}
         onPage={setPage}
       />
     </HostBridgeProvider>

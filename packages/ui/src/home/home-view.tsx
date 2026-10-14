@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { ActivityEntry, Expert, Pet } from '@tagalong/protocol';
+import type { ActivityEntry, Expert, Pet, RoutineProposedParams } from '@tagalong/protocol';
 import { useHostBridge } from '../host-bridge';
 import { PixelSprite } from '../office/pixel-sprite';
 import { characterFor } from '../office/sprites/characters';
@@ -10,13 +10,16 @@ import { brainLabel, modelLabel } from './brain-label';
 import { ConnectionsPanel } from './connections-panel';
 import { ExpertsPanel } from './experts-panel';
 import { HOME_CSS } from './home-styles';
+import { RoutinesPanel } from './routines-panel';
 
-export type HomePage = 'overview' | 'scout' | 'experts' | 'connections' | 'activity' | 'settings';
+export type HomePage =
+  'overview' | 'scout' | 'experts' | 'routines' | 'connections' | 'activity' | 'settings';
 
 const PAGES: readonly { id: HomePage; label: (name: string) => string }[] = [
   { id: 'overview', label: () => 'Overview' },
   { id: 'scout', label: (name) => name },
   { id: 'experts', label: () => 'Experts' },
+  { id: 'routines', label: () => 'Routines' },
   { id: 'connections', label: () => 'Connections' },
   { id: 'activity', label: () => 'Activity' },
   { id: 'settings', label: () => 'Settings' },
@@ -46,14 +49,16 @@ export interface HomeViewProps {
   /** The page to show; the host sets it when the tray or the bubble opens a page. */
   page?: HomePage;
   onPage?: (page: HomePage) => void;
+  /** Scout's routine card, opened by its Edit button: Routines shows it in the form. */
+  routineDraft?: RoutineProposedParams;
 }
 
 /**
- * Home: the one window for everything. The companion in the corner, and six pages: an
- * overview, how the companion thinks, the experts it hands work to, the apps it can use,
- * what happened, and the app's settings.
+ * Home: the one window for everything. The companion in the corner, and seven pages: an
+ * overview, how the companion thinks, the experts it hands work to, what it does on its own,
+ * the apps it can use, what happened, and the app's settings.
  */
-export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps) {
+export function HomeView({ host, settings, page: asked, onPage, routineDraft }: HomeViewProps) {
   const bridge = useHostBridge();
   const [page, setPage] = useState<HomePage>(asked ?? 'overview');
   const [pets, setPets] = useState<Pet[]>([]);
@@ -123,6 +128,9 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
           />
         )}
         {page === 'experts' && <ExpertsPanel />}
+        {page === 'routines' && (
+          <RoutinesPanel draft={routineDraft} onOpenActivity={() => go('activity')} />
+        )}
         {page === 'connections' && <ConnectionsPanel />}
         {page === 'activity' && <ActivityView pets={pets} />}
         {page === 'settings' && settings}

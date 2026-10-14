@@ -479,10 +479,10 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
   const home = await windowFor('office');
   await expect(home).toHaveTitle('Home');
 
-  // One companion and six pages; no crew and no office scene.
+  // One companion and seven pages; no crew and no office scene.
   const nav = home.getByRole('navigation', { name: 'Tagalong' });
   await expect(nav.getByRole('button')).toHaveText(
-    ['Overview', 'Scout', 'Experts', 'Connections', 'Activity', 'Settings'],
+    ['Overview', 'Scout', 'Experts', 'Routines', 'Connections', 'Activity', 'Settings'],
     { timeout: 15_000 },
   );
   const pets = await panel.evaluate(() => window.tagalong.listPets());
@@ -511,6 +511,24 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
     timeout: 15_000,
   });
   await home.screenshot({ path: join(appDir, 'test-results', 'connections.png') });
+
+  // A routine made in Home runs now on the fake brain and lands in Activity.
+  await nav.getByRole('button', { name: 'Routines' }).click();
+  await home.getByRole('button', { name: 'New routine' }).click();
+  await home.getByRole('button', { name: /Blank/ }).click();
+  await home.getByLabel('Name').fill('Smoke check');
+  await home.getByLabel('What').fill('Say hello in one line.');
+  await home.getByRole('button', { name: 'Save' }).click();
+  const routines = home.getByRole('list', { name: 'Routines' });
+  await expect(routines).toContainText('Smoke check', { timeout: 15_000 });
+  await routines.getByRole('button', { name: 'Run now' }).click();
+  await home.screenshot({ path: join(appDir, 'test-results', 'routines.png') });
+  await nav.getByRole('button', { name: 'Activity' }).click();
+  await expect(
+    home
+      .getByRole('list', { name: 'Activity' })
+      .getByRole('button', { name: /Scout ran Smoke check/ }),
+  ).toBeVisible({ timeout: 30_000 });
 
   // The bundled typefaces must load under the page's CSP, or Home falls back to system
   // fonts without saying so.

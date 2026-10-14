@@ -17,6 +17,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Phase 7: onboarding and installer](#phase-7-onboarding-and-installer)
 - [Voice: Scout talks](#voice-scout-talks)
 - [Connections: your apps over MCP](#connections-your-apps-over-mcp)
+- [Routines](#routines)
 - [Demo run: the hackathon story](#demo-run-the-hackathon-story)
 - [Not in this build](#not-in-this-build)
 
@@ -1127,6 +1128,79 @@ that calls tools (your Claude sign-in or OpenRouter + Claude).
 - [ ] Switch a connection **Off**. Scout no longer uses it, and says so if you ask for it.
 - [ ] **Disconnect** → **Disconnect ... and delete its sign-in**. It is gone; connecting again asks
       you to sign in again.
+
+## Routines
+
+Scout does things on its own, at a time or when something happens. Most of this runs on the fake
+provider (`TAGALONG_FAKE_PROVIDERS=1`); the steps marked _(real brain)_ need Scout on a real provider,
+and Morning papers needs Claude Code installed and signed in.
+
+### R1. Home → Routines, from a template
+
+1. Open Home and choose **Routines**. It says there are none yet.
+2. **New routine** → **Morning papers**. Name, **Weekdays** at **08:00**, the instruction and
+   **May hand to: Claude Code** are filled in. Type a topic, such as `AI agents`.
+3. **Save**. The list shows Morning papers, **On**, "Not run yet" and **Next:** tomorrow's (or
+   today's) 08:00.
+
+### R2. Run now, and the result
+
+1. **Run now** on Morning papers. Within a minute a quiet line appears beside Scout,
+   "Morning papers: ...".
+2. Click the line: the bubble opens on the full answer. Ask "explain the second one simply"
+   _(real brain)_: Scout answers from the same conversation.
+3. **Activity** shows "Scout ran Morning papers", and a Claude Code hand-off with no project.
+   Routines shows "Last run: done" with **See in Activity**.
+
+### R3. Ask Scout for one _(real brain)_
+
+1. Ask: "every weekday at 8, give me new papers on AI agents and explain the best one simply".
+2. A routine card appears: Name, When "Weekdays at 08:00", What, Uses (with "May hand to: Claude
+   Code, read-only, no project" when Scout chose to hand off), Result goes to.
+3. Before you press anything, Home → Routines shows nothing new. **Cancel**: still nothing.
+4. Ask again and press **Save**. The card says "Saved. Run it now to test?". **Run it now** runs it.
+5. Ask "pause morning papers". A card says **Pause**; only after you press it does the switch in
+   Home read **Off**. Then "delete morning papers", and **Delete**.
+6. Ask again and press **Edit** on the card: Home opens on Routines with it in the form. Change the
+   name and **Save**.
+
+### R4. Triggers
+
+1. Make a **Blank** routine, **When an app or site appears**, app `Notepad`, What "Say hi in one
+   line". Save. Open Notepad: within 15 seconds the line appears. It does not repeat while Notepad
+   stays open; close and reopen it, and it runs again.
+2. Add `notepad.exe` to your exclusions (Settings → Privacy). Reopen Notepad: nothing runs.
+3. A routine **When Tagalong opens** runs once at each launch.
+4. **When an expert finishes**: hand Claude Code a task; when it finishes, the routine runs with its
+   answer.
+5. **When a watch fires**: start a watch ("tell me when this finishes"); when it fires, the routine
+   runs.
+
+### R5. Missed runs and quiet times
+
+1. Make a routine **Every day** at a time two minutes ahead, then put the PC to sleep for five
+   minutes. On waking, it runs once and its line says "(ran late)".
+2. Quit Tagalong before a routine's time and start it after: it runs once, late. Quit and start
+   again: it does not run again.
+3. Start a Teams or Zoom call, or a full-screen video, and **Run now**: nothing shows until the call
+   or the full screen ends, then the line appears.
+
+### R6. Where the result goes
+
+1. Edit a routine: untick **In Scout's bubble**, tick **Windows notification**. **Run now**: a
+   notification arrives and no line shows. Click it: the bubble opens on the result.
+2. Tick **Read aloud**: the result is spoken (with Scout talks on in Settings → Voice).
+3. Leave the bubble open and **Run now** on a bubble-only routine: the line does not cover the open
+   bubble; a notification carries it instead.
+
+### R7. Consent
+
+1. A routine with **May hand to: No one without asking** that needs an expert shows the normal
+   hand-off card and waits for **Send**.
+2. A routine whose instruction would change something in a connected app (for example "create a
+   Notion page with today's plan") shows **Allow once** every time it runs _(real brain)_.
+3. A routine that reads a connected app (for example GitHub reviews) reads it without asking
+   _(real brain)_.
 
 ## Not in this build
 

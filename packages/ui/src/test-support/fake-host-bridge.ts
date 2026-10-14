@@ -10,6 +10,9 @@ import type {
   ProjectCandidate,
   Role,
   RolesUpgradeNotice,
+  RoutineDraftInput,
+  RoutineProposedParams,
+  RoutineView,
 } from '@tagalong/protocol';
 import type { AskInput, ConfirmHandoff, HostBridge, TurnEvent } from '../host-bridge';
 
@@ -45,6 +48,12 @@ export interface FakeHostBridge extends HostBridge {
   readonly addedConnections: readonly ConnectionsAddParams[];
   readonly signIns: readonly string[];
   readonly removedConnections: readonly string[];
+  /** Home's routines, as saved; a test reads them back after a save. */
+  routines: RoutineView[];
+  readonly ranRoutines: readonly string[];
+  readonly confirmedRoutines: readonly { proposalId: string; routine?: RoutineDraftInput }[];
+  readonly dismissedRoutines: readonly string[];
+  readonly editedRoutines: readonly RoutineProposedParams[];
 }
 
 /**
@@ -72,6 +81,7 @@ export function createFakeHostBridge(
     connections?: Partial<ConnectionsListResult>;
     /** What adding answers; absent answers a connected connection with no tools. */
     addConnection?: (params: ConnectionsAddParams) => ConnectionState;
+    routines?: RoutineView[];
   } = {},
 ): FakeHostBridge {
   const handlers = new Set<(event: TurnEvent) => void>();
@@ -89,6 +99,25 @@ export function createFakeHostBridge(
   const addedConnections: ConnectionsAddParams[] = [];
   const signIns: string[] = [];
   const removedConnections: string[] = [];
+  const ranRoutines: string[] = [];
+  const confirmedRoutines: { proposalId: string; routine?: RoutineDraftInput }[] = [];
+  const dismissedRoutines: string[] = [];
+  const editedRoutines: RoutineProposedParams[] = [];
+  let routineCount = 0;
+  const toView = (draft: RoutineDraftInput & { id?: string }): RoutineView => {
+    routineCount += 1;
+    const existing = fake.routines.find((r) => r.id === draft.id);
+    return {
+      enabled: true,
+      topics: '',
+      deliver: { bubble: true, voice: false, notification: false },
+      uses: [],
+      ...existing,
+      ...draft,
+      id: draft.id ?? `30000000-0000-4000-8000-${String(routineCount).padStart(12, '0')}`,
+      createdAt: existing?.createdAt ?? '2026-10-13T07:00:00.000Z',
+    } as RoutineView;
+  };
   const update = (id: string, patch: Partial<ConnectionState>): ConnectionState => {
     const list = fake.connections.connections;
     const index = list.findIndex((c) => c.id === id);
@@ -242,6 +271,49 @@ export function createFakeHostBridge(
       removedConnections.push(id);
       fake.connections.connections = fake.connections.connections.filter((c) => c.id !== id);
       return Promise.resolve(true);
+    },
+    routines: [...(options.routines ?? [])],
+    ranRoutines,
+    confirmedRoutines,
+    dismissedRoutines,
+    editedRoutines,
+    listRoutines() {
+      return Promise.resolve(structuredClone(fake.routines));
+    },
+    saveRoutine(routine) {
+      const saved = toView(routine);
+      const index = fake.routines.findIndex((r) => r.id === saved.id);
+      if (index === -1) fake.routines.push(saved);
+      else fake.routines[index] = saved;
+      return Promise.resolve(saved);
+    },
+    deleteRoutine(id) {
+      const before = fake.routines.length;
+      fake.routines = fake.routines.filter((r) => r.id !== id);
+      return Promise.resolve(fake.routines.length < before);
+    },
+    setRoutineEnabled(id, enabled) {
+      const index = fake.routines.findIndex((r) => r.id === id);
+      fake.routines[index] = { ...fake.routines[index]!, enabled };
+      return Promise.resolve(fake.routines[index]!);
+    },
+    runRoutine(id) {
+      ranRoutines.push(id);
+      return Promise.resolve(true);
+    },
+    confirmRoutine(proposalId, routine) {
+      confirmedRoutines.push({ proposalId, ...(routine !== undefined ? { routine } : {}) });
+      return Promise.resolve({
+        routine: toView(routine ?? { name: 'Saved', when: { type: 'launch' }, what: 'x' }),
+      });
+    },
+    dismissRoutine(proposalId) {
+      dismissedRoutines.push(proposalId);
+      return Promise.resolve();
+    },
+    editRoutine(proposal) {
+      editedRoutines.push(proposal);
+      return Promise.resolve();
     },
     rolesNotice() {
       return Promise.resolve(notice);

@@ -15,6 +15,9 @@ import type {
   ProjectCandidate,
   Role,
   RolesUpgradeNotice,
+  RoutineDraftInput,
+  RoutineProposedParams,
+  RoutineView,
 } from '@tagalong/protocol';
 
 /**
@@ -127,6 +130,24 @@ export interface HostBridge {
   signInConnection?(id: string): Promise<ConnectionState>;
   /** Disconnect: tokens and keys deleted, the connection forgotten. */
   removeConnection?(id: string): Promise<boolean>;
+  /**
+   * Home's Routines page and the routine card. All optional: a host without Home never shows
+   * either. Saving, in Home or on the card, is the person's consent.
+   */
+  listRoutines?(): Promise<RoutineView[]>;
+  saveRoutine?(routine: RoutineDraftInput & { id?: string }): Promise<RoutineView>;
+  deleteRoutine?(id: string): Promise<boolean>;
+  setRoutineEnabled?(id: string, enabled: boolean): Promise<RoutineView>;
+  /** Runs it once now; the result arrives as `routine.result`. */
+  runRoutine?(id: string): Promise<boolean>;
+  /** Save on Scout's card, with the person's edit when there is one. */
+  confirmRoutine?(
+    proposalId: string,
+    routine?: RoutineDraftInput,
+  ): Promise<{ routine?: RoutineView; deleted?: boolean }>;
+  dismissRoutine?(proposalId: string): Promise<void>;
+  /** Edit on Scout's card: Home opens on Routines with the card's routine in the form. */
+  editRoutine?(proposal: RoutineProposedParams): Promise<void>;
 }
 
 export interface ConfirmHandoff {

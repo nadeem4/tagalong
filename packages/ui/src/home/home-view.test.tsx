@@ -75,7 +75,7 @@ function renderHome(
 }
 
 describe('HomeView', () => {
-  it('is one window: Scout and six pages, with no crew and no office', async () => {
+  it('is one window: Scout and seven pages, with no crew and no office', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     const nav = await screen.findByRole('navigation', { name: 'Tagalong' });
     expect(within(nav).getByText('Your companion')).toBeVisible();
@@ -83,7 +83,35 @@ describe('HomeView', () => {
       within(nav)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['Overview', 'Scout', 'Experts', 'Connections', 'Activity', 'Settings']);
+    ).toEqual(['Overview', 'Scout', 'Experts', 'Routines', 'Connections', 'Activity', 'Settings']);
+  });
+
+  it('opens Routines with Scout’s card in the form when the host hands one over', async () => {
+    const routineDraft = {
+      proposalId: '60000000-0000-4000-8000-000000000001',
+      petId: 'scout',
+      action: 'create' as const,
+      routine: {
+        name: 'Morning papers',
+        when: { type: 'launch' as const },
+        what: 'Papers.',
+        enabled: true,
+        topics: '',
+        deliver: { bubble: true, voice: false, notification: false },
+        uses: [],
+      },
+    };
+    render(
+      <HostBridgeProvider bridge={createFakeHostBridge({ pets: [SCOUT] })}>
+        <HomeView
+          host={host()}
+          settings={<p>The settings form</p>}
+          page="routines"
+          routineDraft={routineDraft}
+        />
+      </HostBridgeProvider>,
+    );
+    expect(await screen.findByLabelText('Name')).toHaveValue('Morning papers');
   });
 
   it('opens on an overview: how Scout thinks, the experts, and what happened lately', async () => {

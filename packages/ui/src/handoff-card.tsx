@@ -286,5 +286,6 @@ export const HANDOFF_CSS = `
 }
 .handoff-steps li:last-child { color: #E9ECF5; }
 .connector-details { white-space: pre-wrap; overflow-wrap: anywhere; }
+.routine-card .handoff-rows dt { width: 72px; }
 .handoff-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #F2C14E; }
 `;
