@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EARS_FRAME } from '@tagalong/protocol';
-import { createEarsHost } from './ears-host';
+import { createEarsHost, EARS_DOWNLOAD_FAILED, EARS_START_FAILED } from './ears-host';
 import type { EarsParts } from '../ears/local-ears';
 import type { FromWorker } from './messages';
 
@@ -264,19 +264,52 @@ describe('createEarsHost', () => {
     ]);
   });
 
-  it('says plainly when the models cannot load, and tries again next time', async () => {
+  it('says plainly when the models cannot download, and tries again next time', async () => {
     const posted: FromWorker[] = [];
     const load = vi
       .fn()
-      .mockRejectedValueOnce(new Error('offline'))
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
       .mockImplementation(partsOnce());
     const host = createEarsHost({ fake: false, load, post: (m) => posted.push(m) });
     host({ kind: 'ears.listen', mode: 'always' });
     await tick();
-    expect(posted).toContainEqual({ kind: 'ears.status', status: 'failed', message: 'offline' });
+    expect(posted).toContainEqual({
+      kind: 'ears.status',
+      status: 'failed',
+      message: EARS_DOWNLOAD_FAILED,
+    });
+    expect(JSON.stringify(posted)).not.toContain('fetch failed');
     host({ kind: 'ears.listen', mode: 'always' });
     await tick();
     expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  it('says plainly when models already on disk cannot start', async () => {
+    const posted: FromWorker[] = [];
+    const load = vi.fn().mockRejectedValueOnce(new Error('onnx: bad model'));
+    const host = createEarsHost({
+      fake: false,
+      load,
+      post: (m) => posted.push(m),
+      filesPresent: () => true,
+    });
+    host({ kind: 'ears.listen', mode: 'held' });
+    await tick();
+    expect(posted).toEqual([{ kind: 'ears.status', status: 'failed', message: EARS_START_FAILED }]);
+  });
+
+  it('says the first-time download only when the models are not on disk yet', async () => {
+    const posted: FromWorker[] = [];
+    const host = createEarsHost({
+      fake: false,
+      load: partsOnce(),
+      post: (m) => posted.push(m),
+      filesPresent: () => true,
+    });
+    host({ kind: 'ears.listen', mode: 'held' });
+    await tick();
+    expect(posted).not.toContainEqual({ kind: 'ears.status', status: 'loading' });
+    expect(posted).toContainEqual({ kind: 'ears.status', status: 'ready' });
   });
 
   it('uses the fake ears under TAGALONG_FAKE_STT, and loads nothing', async () => {

@@ -8,6 +8,12 @@ import type { FromWorker, ToWorker } from './messages';
 /** Frames kept while the models load: about 30 s, then the oldest go. */
 export const MAX_BUFFERED_FRAMES = 940;
 
+/** What the panel says when the models cannot be fetched (offline, the first time). */
+export const EARS_DOWNLOAD_FAILED =
+  'I couldn’t download my listening models. Check the internet connection and try again.';
+/** What it says when models already on disk cannot start. */
+export const EARS_START_FAILED = 'I couldn’t start listening. Try again.';
+
 export type EarsMessage = Extract<ToWorker, { kind: 'ears.listen' | 'ears.frame' | 'ears.stop' }>;
 
 /**
@@ -19,8 +25,12 @@ export function createEarsHost(options: {
   fake: boolean;
   load: () => Promise<EarsParts>;
   post: (message: FromWorker) => void;
+  /** The models are on disk already: no first-time download to tell about. */
+  filesPresent?: () => boolean;
 }): (message: EarsMessage) => void {
   let parts: Promise<EarsParts> | null = null;
+  /** The load under way includes the first-time download. */
+  let downloading = false;
   interface Session {
     mode: ListenMode;
     ears: Ears | null;
@@ -88,8 +98,12 @@ export function createEarsHost(options: {
     const after = previous;
     // Even a session skipped at once finishes only after the one before it.
     previous = after.then(() => done);
-    if (parts === null) options.post({ kind: 'ears.status', status: 'loading' });
-    const loading = (parts ??= options.load());
+    if (parts === null) {
+      downloading = !(options.filesPresent?.() ?? false);
+      if (downloading) options.post({ kind: 'ears.status', status: 'loading' });
+      parts = options.load();
+    }
+    const loading = parts;
     loading.then(
       (loaded) => {
         if (!current.superseded) options.post({ kind: 'ears.status', status: 'ready' });
@@ -113,10 +127,11 @@ export function createEarsHost(options: {
       (error: unknown) => {
         if (parts === loading) parts = null;
         current.finish();
+        console.warn('[ears] the models could not load', error);
         options.post({
           kind: 'ears.status',
           status: 'failed',
-          message: error instanceof Error ? error.message : String(error),
+          message: downloading ? EARS_DOWNLOAD_FAILED : EARS_START_FAILED,
         });
       },
     );

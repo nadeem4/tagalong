@@ -14,16 +14,21 @@ export const FRESH_PRESS_MS = 1100;
  * missed, a fresh press stops instead. The mic button toggles: click to talk, click to stop.
  */
 export class PushToTalk {
-  #mode: 'idle' | 'held' | 'clicked' = 'idle';
+  /** `spent`: listening was ended while the key is still held; its repeats start nothing. */
+  #mode: 'idle' | 'held' | 'clicked' | 'spent' = 'idle';
   #lastPress = 0;
 
   get listening(): boolean {
-    return this.#mode !== 'idle';
+    return this.#mode === 'held' || this.#mode === 'clicked';
   }
 
   /** The hotkey fired, at `now` milliseconds. */
   press(now: number): TalkAction {
-    if (this.#mode === 'idle') {
+    if (this.#mode === 'spent' && now - this.#lastPress <= FRESH_PRESS_MS) {
+      this.#lastPress = now;
+      return 'none';
+    }
+    if (this.#mode === 'idle' || this.#mode === 'spent') {
       this.#mode = 'held';
       this.#lastPress = now;
       return 'start';
@@ -38,6 +43,7 @@ export class PushToTalk {
 
   /** A key came up in the bubble. */
   release(): TalkAction {
+    if (this.#mode === 'spent') this.#mode = 'idle';
     if (this.#mode !== 'held') return 'none';
     this.#mode = 'idle';
     return 'stop';
@@ -53,8 +59,11 @@ export class PushToTalk {
     return 'stop';
   }
 
-  /** Listening ended some other way: the time limit, or the microphone failed. */
+  /**
+   * Listening ended some other way: the time limit, the microphone or the ears failed. A key
+   * still held keeps repeating: those repeats start nothing until it comes up or a fresh press.
+   */
   end(): void {
-    this.#mode = 'idle';
+    this.#mode = this.#mode === 'held' ? 'spent' : 'idle';
   }
 }
