@@ -7,6 +7,14 @@ import type { FromWorker } from './messages';
 const LOUD = new Float32Array(EARS_FRAME).fill(0.3);
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+const settle = async () => {
+  for (let i = 0; i < 10; i += 1) await tick();
+};
+const earsEvents = (posted: FromWorker[]) =>
+  posted.flatMap((m) =>
+    m.kind === 'ears' ? [m.text === undefined ? m.event : `${m.event}:${m.text}`] : [],
+  );
+
 function partsOnce() {
   return vi.fn(async () => ({
     vad: { accept: async (f: Float32Array) => f[0] !== 0 },
@@ -61,6 +69,53 @@ describe('createEarsHost', () => {
     await tick();
     expect(posted.filter((m) => m.kind === 'ears')).toEqual([]);
     expect(posted.filter((m) => m.kind === 'ears.status' && m.status === 'ready')).toHaveLength(1);
+  });
+
+  it('hears one session at a time when a listen follows a stop during the load', async () => {
+    const posted: FromWorker[] = [];
+    let release: (parts: EarsParts) => void = () => undefined;
+    const load = vi.fn(() => new Promise<EarsParts>((resolve) => (release = resolve)));
+    const host = createEarsHost({ fake: false, load, post: (m) => posted.push(m) });
+    host({ kind: 'ears.listen', mode: 'held' });
+    host({ kind: 'ears.frame', samples: LOUD });
+    host({ kind: 'ears.stop' });
+    host({ kind: 'ears.listen', mode: 'held' });
+    host({ kind: 'ears.frame', samples: LOUD });
+    release(await partsOnce()());
+    await settle();
+    host({ kind: 'ears.stop' });
+    await settle();
+    expect(earsEvents(posted)).toEqual([
+      'speechStart',
+      'final:hello there',
+      'turnEnd:hello there',
+      'speechStart',
+      'final:hello there',
+      'turnEnd:hello there',
+    ]);
+  });
+
+  it('hears one session at a time when a listen follows a held stop at once', async () => {
+    const posted: FromWorker[] = [];
+    const host = createEarsHost({ fake: false, load: partsOnce(), post: (m) => posted.push(m) });
+    host({ kind: 'ears.listen', mode: 'held' });
+    await tick();
+    host({ kind: 'ears.frame', samples: LOUD });
+    await tick();
+    host({ kind: 'ears.stop' });
+    host({ kind: 'ears.listen', mode: 'held' });
+    host({ kind: 'ears.frame', samples: LOUD });
+    await settle();
+    host({ kind: 'ears.stop' });
+    await settle();
+    expect(earsEvents(posted)).toEqual([
+      'speechStart',
+      'final:hello there',
+      'turnEnd:hello there',
+      'speechStart',
+      'final:hello there',
+      'turnEnd:hello there',
+    ]);
   });
 
   it('says plainly when the models cannot load, and tries again next time', async () => {

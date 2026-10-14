@@ -1,5 +1,5 @@
 import { Pushable } from '@tagalong/protocol';
-import type { Ears, EarsEvent } from '@tagalong/protocol';
+import type { Ears, EarsEvent, ListenMode } from '@tagalong/protocol';
 import { FakeEars } from '../ears/fake-ears';
 import { LocalEars } from '../ears/local-ears';
 import type { EarsParts } from '../ears/local-ears';
@@ -21,8 +21,28 @@ export function createEarsHost(options: {
   post: (message: FromWorker) => void;
 }): (message: EarsMessage) => void {
   let parts: Promise<EarsParts> | null = null;
-  let session: { ears: Ears | null; inbox: Pushable<Float32Array>; superseded: boolean } | null =
-    null;
+  interface Session {
+    mode: ListenMode;
+    ears: Ears | null;
+    inbox: Pushable<Float32Array>;
+    superseded: boolean;
+    stopped: boolean;
+    /** Resolves when the session has finished with the models. */
+    finish: () => void;
+  }
+  let session: Session | null = null;
+  // Sessions run one after another: the models hold state, so two must never share them.
+  let previous: Promise<void> = Promise.resolve();
+
+  /** Stop or replace a session; a session that never made it to the ears is finished now. */
+  const end = (current: Session, superseded: boolean): void => {
+    current.superseded = superseded;
+    current.stopped = true;
+    current.ears?.stop();
+    current.inbox.end();
+    if (current.ears === null ? superseded || current.mode === 'always' : current.mode === 'always')
+      current.finish();
+  };
 
   const wire = (ears: Ears): Ears => {
     for (const event of ['speechStart', 'partial', 'final', 'turnEnd'] as EarsEvent[])
@@ -41,19 +61,19 @@ export function createEarsHost(options: {
       const current = session;
       session = null;
       if (current === null) return;
-      current.ears?.stop();
-      current.inbox.end();
+      end(current, false);
       return;
     }
-    if (session !== null) {
-      session.superseded = true;
-      session.ears?.stop();
-      session.inbox.end();
-    }
-    const current = {
-      ears: null as Ears | null,
+    if (session !== null) end(session, true);
+    let finish: () => void = () => undefined;
+    const done = new Promise<void>((resolve) => (finish = resolve));
+    const current: Session = {
+      mode: message.mode,
+      ears: null,
       inbox: new Pushable<Float32Array>(MAX_BUFFERED_FRAMES),
       superseded: false,
+      stopped: false,
+      finish,
     };
     session = current;
     if (options.fake) {
@@ -61,19 +81,28 @@ export function createEarsHost(options: {
       current.ears.listen(current.inbox);
       return;
     }
+    const after = previous;
+    previous = done;
     if (parts === null) options.post({ kind: 'ears.status', status: 'loading' });
-    parts ??= options.load();
-    parts.then(
+    const loading = (parts ??= options.load());
+    loading.then(
       (loaded) => {
-        if (current.superseded) return;
-        options.post({ kind: 'ears.status', status: 'ready' });
-        // A session stopped before the load has an ended inbox: its buffered words still
-        // play through, and the mic ending ends the turn.
-        current.ears = wire(new LocalEars(loaded, message.mode));
-        current.ears.listen(current.inbox);
+        if (!current.superseded) options.post({ kind: 'ears.status', status: 'ready' });
+        void after.then(() => {
+          if (current.superseded || (current.stopped && current.mode === 'always')) {
+            current.finish();
+            return;
+          }
+          // A session stopped before this point has an ended inbox: its buffered words still
+          // play through, and the mic ending ends the turn.
+          current.ears = wire(new LocalEars(loaded, current.mode));
+          if (current.mode === 'held') current.ears.on('turnEnd', current.finish);
+          current.ears.listen(current.inbox);
+        });
       },
       (error: unknown) => {
-        parts = null;
+        if (parts === loading) parts = null;
+        current.finish();
         options.post({
           kind: 'ears.status',
           status: 'failed',
