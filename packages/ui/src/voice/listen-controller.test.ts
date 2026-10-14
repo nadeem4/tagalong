@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Ears, EarsEvent, ListenMode, MicStream } from '@tagalong/protocol';
 import { ListenController } from './listen-controller';
-import type { ListenMic } from './listen-controller';
+import type { ListenControllerOptions, ListenMic } from './listen-controller';
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -38,7 +38,10 @@ function fakeEars() {
   };
 }
 
-function setup(openMic: () => Promise<ListenMic> = vi.fn(async () => fakeMic())) {
+function setup(
+  openMic: () => Promise<ListenMic> = vi.fn(async () => fakeMic()),
+  more: Partial<ListenControllerOptions> = {},
+) {
   const ears = fakeEars();
   const calls = {
     speechStart: vi.fn(),
@@ -59,6 +62,7 @@ function setup(openMic: () => Promise<ListenMic> = vi.fn(async () => fakeMic()))
     onMicFailed: calls.failed,
     onStopListening: calls.stop,
     onDropped: calls.dropped,
+    ...more,
   });
   return { controller, ears, calls, openMic: openMic as ReturnType<typeof vi.fn> };
 }
@@ -577,5 +581,28 @@ describe('ListenController, always', () => {
     controller.setPaused(false);
     await tick();
     expect(openMic).toHaveBeenCalledOnce();
+  });
+});
+
+describe('ListenController, always without the name', () => {
+  it('hands over every turn whole: no "Scout" needed, and "stop" is just words', async () => {
+    const { controller, ears, calls } = setup(undefined, { needsName: false });
+    controller.setAlways(true);
+    await tick();
+    ears.say('turnEnd', 'Claude');
+    ears.say('turnEnd', 'stop');
+    ears.say('turnEnd', '  ');
+    expect(calls.heard.mock.calls).toEqual([['Claude'], ['stop']]);
+    expect(calls.stop).not.toHaveBeenCalled();
+  });
+
+  it('cuts Scout off once, on the first words of a turn', async () => {
+    const { controller, ears, calls } = setup(undefined, { needsName: false });
+    controller.setAlways(true);
+    await tick();
+    ears.say('partial', '');
+    ears.say('partial', 'Cla');
+    ears.say('partial', 'Claude');
+    expect(calls.speechStart).toHaveBeenCalledOnce();
   });
 });

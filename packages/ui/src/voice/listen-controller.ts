@@ -21,6 +21,8 @@ export interface ListenControllerOptions {
    * (a call, the switch, the system voice, the talk key).
    */
   onDropped(): void;
+  /** Always listening: false hands over every turn whole, no "Scout" needed and "stop" is just words. Default true. */
+  needsName?: boolean;
 }
 
 interface Session {
@@ -46,7 +48,8 @@ interface Session {
  * on (`setAlways`) it stays open, except during a call or full screen, or with the pets hidden
  * (`setPaused`), and while the system voice speaks (`setDeaf`). The talk key still asks
  * without the name then: the always session ends for the held question and comes back after
- * it. Nothing heard after a session ends reaches the bubble.
+ * it. Nothing heard after a session ends reaches the bubble. Setup listens all the time
+ * without the name (`needsName: false`): every turn is an answer.
  */
 export class ListenController {
   readonly #options: ListenControllerOptions;
@@ -177,7 +180,8 @@ export class ListenController {
    */
   #addressed(session: Session, text: string): string | null {
     if (this.#taken || this.#released.size > 0) return null;
-    const question = addressedToScout(text);
+    const question =
+      this.#options.needsName === false ? text.trim() || null : addressedToScout(text);
     if (question !== null && !session.barged) {
       session.barged = true;
       this.#options.onSpeechStart();
@@ -216,7 +220,8 @@ export class ListenController {
           if (barged) this.#options.onDropped();
           return;
         }
-        if (isStopListening(question)) this.#options.onStopListening();
+        if (this.#options.needsName !== false && isStopListening(question))
+          this.#options.onStopListening();
         else this.#options.onHeard(question);
         return;
       }

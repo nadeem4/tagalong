@@ -1,12 +1,13 @@
-import type { Ears, MicStream } from '@tagalong/protocol';
+import type { Ears } from '@tagalong/protocol';
 import '../../shared/ipc';
 import { openMic } from './mic';
+import type { OpenMic } from './mic';
 import { RemoteEars } from './remote-ears';
 
 /** What any window can reach for voice: the ears, the microphone and the ears' models. */
 export type TagalongVoice = {
   ears: Ears;
-  openMic(deviceId?: string): Promise<MicStream>;
+  openMic(deviceId?: string): Promise<OpenMic>;
   ensureEars(onProgress: (fraction: number) => void): Promise<void>;
 };
 

@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { SETTINGS_DEFAULTS, Settings } from '@tagalong/protocol';
-import { answerPatch, answered, chipState, goTo, startFirstRun, stepsFor } from './first-run';
+import {
+  answerPatch,
+  answered,
+  chipState,
+  goTo,
+  listensNow,
+  startFirstRun,
+  stepsFor,
+} from './first-run';
 
 const fresh = Settings.parse({});
 
@@ -130,5 +138,48 @@ describe('answerPatch', () => {
       ...SETTINGS_DEFAULTS.voice,
       enabled: false,
     });
+  });
+});
+
+describe('listensNow', () => {
+  const talk = Settings.parse({ welcome: { done: false, step: 'name', answerBy: 'talk' } });
+  const type = Settings.parse({ welcome: { done: false, step: 'name', answerBy: 'type' } });
+  const atAnswer = startFirstRun(fresh, true);
+  const afterTalk = answered(atAnswer, false);
+
+  it('stays off at the first question, before you choose', () => {
+    expect(atAnswer.current).toBe('answer');
+    expect(listensNow(atAnswer, fresh)).toBe(false);
+  });
+
+  it('stays off when a finished setup that was answered by talking is opened again', () => {
+    const done = Settings.parse({ welcome: { done: true, step: 'try', answerBy: 'talk' } });
+    const rerun = startFirstRun(done, true);
+    expect(rerun).toMatchObject({ current: 'answer', reached: 'answer' });
+    expect(listensNow(rerun, done)).toBe(false);
+  });
+
+  it('listens after "Talk to me", also back on the Answer chip', () => {
+    expect(listensNow(afterTalk, talk)).toBe(true);
+    expect(listensNow(goTo(afterTalk, 'answer'), talk)).toBe(true);
+  });
+
+  it('stops after "I\'ll type"', () => {
+    expect(listensNow(afterTalk, type)).toBe(false);
+  });
+
+  it('stops when setup finishes at Try it', () => {
+    let at = afterTalk;
+    while (at.current !== 'try') at = answered(at, false);
+    expect(listensNow(at, talk)).toBe(false);
+  });
+
+  it('listens again on a resumed setup that was answered by talking', () => {
+    const saved = Settings.parse({ welcome: { done: false, step: 'think', answerBy: 'talk' } });
+    expect(listensNow(startFirstRun(saved, true), saved)).toBe(true);
+  });
+
+  it('never listens without the Answer step', () => {
+    expect(listensNow(answered(startFirstRun(talk, false), false), talk)).toBe(false);
   });
 });
