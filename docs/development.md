@@ -191,7 +191,9 @@ The suites run offline on fakes: `TAGALONG_FAKE_PROVIDERS=1` (a scripted pet and
 which make the fake pet call one tool before it answers. `cards.spec.ts` uses the last pair to bring
 up each card: `hand_to_expert`, a connected app's `notes__add_note`, and `create_routine`. Each card
 gets its own launch, since the tool is read once at start. The native folder picker is stubbed
-through `app.evaluate`, so the hand-off card's Browse picks a temporary folder.
+through `app.evaluate`, so the hand-off card's Browse picks a temporary folder. When an e2e suite
+fails in CI, its `test-results` folder (page snapshots and screenshots) is uploaded as the
+`e2e-test-results` artifact.
 
 Quit any running Tagalong before `pnpm test:e2e`. The main process takes a single-instance lock, so a
 second copy quits immediately and Playwright reports the confusing
