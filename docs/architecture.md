@@ -720,6 +720,22 @@ The main process is the **single websocket client** for this host. Renderers nev
 go through IPC to main, which holds the one connection. That is what keeps the pairing token out of
 every window, and what makes the two hosts interchangeable.
 
+`main/index.ts` assembles the app and wires the IPC channels. The handlers that only need the engine,
+the settings or the voice live in `main/ipc/`, one module per area, each a `register…Ipc(handle, deps)`
+that takes `ipcMain.handle` and what it reads as arguments, so it is unit tested without Electron:
+
+| Module           | Channels                                                                           |
+| ---------------- | ---------------------------------------------------------------------------------- |
+| `turns.ts`       | ask, stop a watch, interrupt, a remark's Not now and accept                        |
+| `crew.ts`        | pets, roles, the roles notice, save and delete a pet, switch Scout, finish Welcome |
+| `experts.ts`     | Activity, the Experts tab, the hand-off card, project search                       |
+| `connections.ts` | connected apps and the answer to a change Scout asked to make                      |
+| `routines.ts`    | Home's Routines page and the routine card, including its Edit                      |
+| `settings.ts`    | the settings view, saving settings and keys, model lists                           |
+| `voice.ts`       | speak, prepare to listen, transcribe                                               |
+
+The handlers that move windows, open dialogs or read the screen stay in `index.ts`.
+
 The preload exposes exactly two globals, and the split between them is deliberate:
 
 - `window.tagalong` is precisely the `HostBridge` interface that `@tagalong/ui` consumes — `ask`,
@@ -1187,7 +1203,8 @@ is one file under `apps/desktop/src/renderer/src/settings/`:
 **How Scout thinks** reads the companion pet (`settings.defaultPetId`), never `settings.providerId`,
 which the engine ignores. Whether the Claude sign-in works comes from `main/claude-sign-in.ts`:
 `checkClaudeSignIn` runs `claude auth status --json` (local, no model call, five-second timeout)
-and reads `loggedIn`, giving `signed-in`, `signed-out`, `not-installed` (claude cannot be
+through cross-spawn with no shell, as the experts start claude, so an npm install's `claude.cmd`
+shim is found on Windows, and reads `loggedIn`, giving `signed-in`, `signed-out`, `not-installed` (claude cannot be
 started) or `unknown` (anything else). The renderer asks through `checkClaudeSignIn` on the host
 API, and **Check again** asks again. With no Claude Code, a service is picked and its key pasted;
 Save stores it with `saveApiKey` and calls `switchScout`, which makes Scout the Companion on that

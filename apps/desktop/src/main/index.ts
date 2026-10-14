@@ -12,24 +12,9 @@ import {
   screen,
   shell,
 } from 'electron';
-import {
-  ConnectionsAddParams,
-  ContextSnapshot,
-  HandoffFinishedParams,
-  RoutineDraft,
-  RoutineResultParams,
-} from '@tagalong/protocol';
-import type {
-  Expert,
-  PerceptionTarget,
-  Pet,
-  Role,
-  RoutineDraftInput,
-  RoutineProposedParams,
-  Settings,
-  SettingsPatch,
-} from '@tagalong/protocol';
-import { SettingsStore, WATCH_MODEL_DEFAULTS, getRole } from '@tagalong/core';
+import { ContextSnapshot, HandoffFinishedParams, RoutineResultParams } from '@tagalong/protocol';
+import type { PerceptionTarget, Settings, SettingsPatch } from '@tagalong/protocol';
+import { SettingsStore } from '@tagalong/core';
 import { systemClock } from './awareness/clock';
 import { handoffNotice } from './handoff-notice';
 import { routineDelivery } from './routine-delivery';
@@ -41,7 +26,7 @@ import { captureAskSnapshot, capturePatch } from './context';
 import { startEngineHost } from './engine-host';
 import { keepAnEyeAllowed, startKeepAnEye } from './keep-an-eye';
 import { extensionFolder, isAllowedLink } from './links';
-import { ELEVENLABS_SECRET_KEY, providerChoices, secretKeyFor } from './provider-choices';
+import { ELEVENLABS_SECRET_KEY } from './provider-choices';
 import { elevenLabsTts } from './voice/elevenlabs';
 import { loadKokoro } from './voice/kokoro';
 import { LazyLocalVoice, createVoiceService } from './voice/voice';
@@ -50,14 +35,7 @@ import { LazyLocalStt, createListenService } from './voice/listen';
 import type { ListenService } from './voice/listen';
 import { loadWhisper } from './voice/whisper';
 import { checkClaudeSignIn } from './claude-sign-in';
-import {
-  companionOn,
-  findAgents,
-  shouldGreetOnLaunch,
-  shouldOpenWelcome,
-  welcomeCrew,
-  welcomeExperts,
-} from './welcome';
+import { findAgents, shouldGreetOnLaunch, shouldOpenWelcome } from './welcome';
 import type { EngineHost } from './engine-host';
 import {
   DEFAULT_PAUSE_SIGHT_HOTKEY,
@@ -86,9 +64,16 @@ import { moveWindow } from './windows/move';
 import { createOfficeWindow } from './windows/office';
 import { createOnboardingWindow } from './windows/onboarding';
 import { createSettingsWindow } from './windows/settings';
+import { registerConnectionIpc } from './ipc/connections';
+import { registerCrewIpc } from './ipc/crew';
+import { registerExpertIpc } from './ipc/experts';
+import type { EngineCall, IpcHandle } from './ipc/handle';
+import { registerRoutineIpc } from './ipc/routines';
+import { registerSettingsIpc } from './ipc/settings';
+import { registerTurnIpc } from './ipc/turns';
+import { registerVoiceIpc } from './ipc/voice';
 import { IPC } from '../shared/ipc';
-import type { CaptureNotice, HostView, ModelList, SpeakPreview } from '../shared/ipc';
-import type { ConfirmHandoff } from '@tagalong/ui';
+import type { CaptureNotice } from '../shared/ipc';
 
 /** Everything the app owns once it is up. Assembled in `start`, torn down on quit. */
 interface Desktop {
@@ -752,6 +737,11 @@ async function captureForPanel(
   return snapshot;
 }
 
+/**
+ * Wires every IPC channel. The handlers that only need the engine, the settings or the
+ * voice live in `ipc/`, which takes what it needs as arguments so it is tested without
+ * Electron; the ones left here move windows or read the screen.
+ */
 function registerIpc(): void {
   const required = (): Desktop => {
     if (desktop === null) throw new Error('the desktop host is not ready yet');
@@ -759,93 +749,77 @@ function registerIpc(): void {
   };
 
   /** Anything that needs a turn to run needs the engine that runs it. */
-  const engine = (): EngineHost => {
+  const engine = (): EngineCall => {
     const current = required();
     if (current.host === null) {
       throw new Error(current.bootError ?? 'the engine is not running');
     }
-    return current.host;
+    return current.host.client;
   };
 
-  /** Settings still work with no engine, which is the whole point of the degraded mode. */
-  const readSettings = async (): Promise<Settings> => {
-    const current = required();
-    if (current.host === null) return current.settingsStore.get();
-    return (await current.host.client.call('settings.get', {})).settings;
-  };
+  const handle: IpcHandle = (channel, listener) =>
+    ipcMain.handle(channel, listener as (event: unknown, ...args: unknown[]) => unknown);
 
-  ipcMain.handle(
-    IPC.ask,
-    async (
-      _event,
-      input: { petId: string; conversationId?: string; text?: string; spoken?: boolean },
-    ) => {
-      const snapshot = required().pendingSnapshot;
-      return engine().client.call('ask', {
-        petId: input.petId,
-        ...(input.conversationId !== undefined ? { conversationId: input.conversationId } : {}),
-        input: { text: input.text ?? '' },
-        ...(snapshot !== null ? { snapshot } : {}),
-        ...(input.spoken === true ? { spoken: true } : {}),
-      });
+  registerTurnIpc(handle, {
+    engine,
+    maybeEngine: () => required().host?.client ?? null,
+    pendingSnapshot: () => required().pendingSnapshot,
+  });
+  registerCrewIpc(handle, {
+    engine,
+    settings: () => required().settings,
+    setSettings: (settings) => {
+      required().settings = settings;
     },
-  );
-
-  ipcMain.handle(IPC.stopWatch, async (_event, watchId: string) => {
-    await engine().client.call('watch.stop', { watchId });
+    refreshStrip,
+    findAgents: () => findAgents(),
+    welcomed: () => {
+      const current = required();
+      current.onboardingWindow?.close();
+      if (current.panel !== null && current.avatar !== null) {
+        current.avatar.show();
+        current.panel.webContents.send(IPC.greetEvent);
+        showPanelQuietly(current.panel, current.avatar);
+      }
+    },
+  });
+  registerExpertIpc(handle, { engine });
+  registerConnectionIpc(handle, { engine });
+  registerRoutineIpc(handle, {
+    engine,
+    openOffice: (page) => openOffice(page),
+    officeWindow: () => required().officeWindow,
+  });
+  registerSettingsIpc(handle, {
+    host: () => required().host,
+    settingsStore: () => required().settingsStore,
+    secrets: () => required().secrets,
+    problem: () => {
+      const current = required();
+      return current.hotkeyError ?? current.bootError;
+    },
+    extensionFolder: localExtensionFolder,
+    version: () => app.getVersion(),
+    setSettings: (settings) => {
+      required().settings = settings;
+    },
+    applyHotkeys: (settings) => {
+      applyHotkeys(settings);
+    },
+    refreshStrip,
+    configureRolling: (rollingMemory) => required().rolling.configure(rollingMemory),
+    broadcast: (settings) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) window.webContents.send(IPC.settingsChangedEvent, settings);
+      }
+    },
+  });
+  registerVoiceIpc(handle, {
+    voice: () => required().voice,
+    listen: () => required().listen,
+    noteActiveWindow: () => captureForPanel(required(), ['activeWindow']),
   });
 
-  ipcMain.handle(IPC.interrupt, async (_event, turnId: string) => {
-    await engine().client.call('interrupt', { turnId });
-  });
-
-  ipcMain.handle(IPC.listPets, async (): Promise<Pet[]> => {
-    const result = await engine().client.call('pets.list', {});
-    return result.pets;
-  });
-
-  ipcMain.handle(IPC.listRoles, async (): Promise<Role[]> => {
-    const result = await engine().client.call('roles.list', {});
-    return result.roles;
-  });
-
-  ipcMain.handle(IPC.recommendModel, async (_event, roleId: string, providerId: string) =>
-    engine().client.call('roles.recommendModel', { roleId, providerId }),
-  );
-
-  ipcMain.handle(IPC.rolesNotice, async () => {
-    const result = await engine().client.call('notices.rolesUpgrade', {});
-    return result.notice;
-  });
-
-  ipcMain.handle(IPC.dismissRolesNotice, async (): Promise<void> => {
-    await engine().client.call('notices.dismiss', { notice: 'rolesUpgrade' });
-  });
-
-  // Home's activity view.
-  ipcMain.handle(IPC.listActivity, async (_event, params: { before?: string; limit?: number }) =>
-    engine().client.call('activity.list', {
-      limit: params.limit ?? 30,
-      ...(params.before === undefined ? {} : { before: params.before }),
-    }),
-  );
-
-  // Home's Experts tab.
-  ipcMain.handle(IPC.listExperts, async (): Promise<Expert[]> => {
-    const result = await engine().client.call('experts.list', {});
-    return result.experts;
-  });
-  ipcMain.handle(IPC.saveExpert, async (_event, expert: Expert): Promise<Expert> => {
-    const result = await engine().client.call('experts.upsert', { expert });
-    return result.expert;
-  });
-  ipcMain.handle(IPC.deleteExpert, async (_event, expertId: string): Promise<boolean> => {
-    const result = await engine().client.call('experts.delete', { expertId });
-    return result.deleted;
-  });
-  ipcMain.handle(IPC.testExpert, async (_event, expertId: string) =>
-    engine().client.call('experts.test', { expertId }),
-  );
   ipcMain.handle(IPC.pickFolder, async (event): Promise<string | null> => {
     const owner = BrowserWindow.fromWebContents(event.sender);
     const options = { title: 'Choose a project folder', properties: ['openDirectory' as const] };
@@ -856,91 +830,6 @@ function registerIpc(): void {
     const { panel, avatar } = required();
     if (owner !== null && owner === panel && avatar !== null) showPanelBeside(panel, avatar);
     return picked.canceled ? null : (picked.filePaths[0] ?? null);
-  });
-  ipcMain.handle(IPC.confirmHandoff, async (_event, params: ConfirmHandoff) =>
-    engine().client.call('handoffs.confirm', params),
-  );
-  ipcMain.handle(IPC.dismissHandoff, async (_event, proposalId: string) => {
-    await engine().client.call('handoffs.dismiss', { proposalId });
-  });
-  ipcMain.handle(IPC.cancelHandoff, async (_event, handoffId: string) => {
-    await engine().client.call('handoffs.cancel', { handoffId });
-  });
-  ipcMain.handle(IPC.searchProjects, async (_event, query: string) => {
-    const { projects } = await engine().client.call('projects.search', { query });
-    return projects;
-  });
-
-  // Connected apps, and the answer to a change Scout asked to make in one.
-  ipcMain.handle(IPC.approveTool, async (_event, approvalId: string, decision: 'once' | 'deny') => {
-    await engine().client.call('tool.approve', { approvalId, decision });
-  });
-  ipcMain.handle(IPC.listConnections, async () => engine().client.call('connections.list', {}));
-  ipcMain.handle(IPC.addConnection, async (_event, params: ConnectionsAddParams) => {
-    // Parsed here so the defaults (no args, no env) are filled before the call goes out.
-    const { connection } = await engine().client.call(
-      'connections.add',
-      ConnectionsAddParams.parse(params),
-    );
-    return connection;
-  });
-  ipcMain.handle(IPC.setConnectionEnabled, async (_event, id: string, enabled: boolean) => {
-    const { connection } = await engine().client.call('connections.setEnabled', { id, enabled });
-    return connection;
-  });
-  ipcMain.handle(IPC.signInConnection, async (_event, id: string) => {
-    const { connection } = await engine().client.call('connections.signIn', { id });
-    return connection;
-  });
-  ipcMain.handle(IPC.removeConnection, async (_event, id: string) => {
-    const { removed } = await engine().client.call('connections.remove', { id });
-    return removed;
-  });
-
-  // Home's Routines page and the routine card. Saving, here or on the card, is consent.
-  ipcMain.handle(IPC.listRoutines, async () => {
-    const { routines } = await engine().client.call('routines.list', {});
-    return routines;
-  });
-  ipcMain.handle(IPC.saveRoutine, async (_event, routine: RoutineDraftInput & { id?: string }) => {
-    const { routine: saved } = await engine().client.call('routines.save', {
-      routine: { ...RoutineDraft.parse(routine), ...(routine.id ? { id: routine.id } : {}) },
-    });
-    return saved;
-  });
-  ipcMain.handle(IPC.deleteRoutine, async (_event, id: string) => {
-    const { deleted } = await engine().client.call('routines.delete', { id });
-    return deleted;
-  });
-  ipcMain.handle(IPC.setRoutineEnabled, async (_event, id: string, enabled: boolean) => {
-    const { routine } = await engine().client.call('routines.setEnabled', { id, enabled });
-    return routine;
-  });
-  ipcMain.handle(IPC.runRoutine, async (_event, id: string) => {
-    const { started } = await engine().client.call('routines.runNow', { id });
-    return started;
-  });
-  ipcMain.handle(
-    IPC.confirmRoutine,
-    async (_event, proposalId: string, routine?: RoutineDraftInput) =>
-      engine().client.call('routines.confirm', {
-        proposalId,
-        ...(routine !== undefined ? { routine: RoutineDraft.parse(routine) } : {}),
-      }),
-  );
-  ipcMain.handle(IPC.dismissRoutine, async (_event, proposalId: string) => {
-    await engine().client.call('routines.dismiss', { proposalId });
-  });
-  // The card's Edit: Home opens on Routines with the card's routine in the form.
-  ipcMain.handle(IPC.editRoutine, (_event, proposal: RoutineProposedParams) => {
-    openOffice('routines');
-    const window = required().officeWindow;
-    if (window === null) return;
-    if (window.webContents.isLoading()) {
-      window.webContents.once('did-finish-load', () =>
-        window.webContents.send(IPC.routineDraftEvent, proposal),
-      );
-    } else window.webContents.send(IPC.routineDraftEvent, proposal);
   });
 
   ipcMain.handle(IPC.getContext, () => required().pendingSnapshot);
@@ -956,103 +845,6 @@ function registerIpc(): void {
   ipcMain.handle(IPC.capture, async (_event, targets: PerceptionTarget[]) =>
     captureForPanel(required(), targets),
   );
-
-  ipcMain.handle(IPC.hostView, async (): Promise<HostView> => {
-    const current = required();
-    const settings = await readSettings();
-    const stored = new Set<string>();
-    for (const choice of providerChoices(new Set())) {
-      const secretKey = secretKeyFor(choice.id);
-      if (secretKey === undefined) continue;
-      const value = await current.secrets.get(secretKey);
-      if (value !== null && value.length > 0) stored.add(choice.id);
-    }
-    // Pets live in the engine's database; with no engine the form shows keys and URLs
-    // only, which is exactly what someone fixing a failed boot needs.
-    const pets =
-      current.host === null ? [] : (await current.host.client.call('pets.list', {})).pets;
-    const problem = current.hotkeyError ?? current.bootError;
-    const folder = localExtensionFolder();
-    const elevenLabsKey = await current.secrets.get(ELEVENLABS_SECRET_KEY).catch(() => null);
-    return {
-      elevenLabsKeyStored: elevenLabsKey !== null && elevenLabsKey.length > 0,
-      settings,
-      pets,
-      providers: providerChoices(stored),
-      engineVersion: app.getVersion(),
-      watchModelDefaults: { ...WATCH_MODEL_DEFAULTS },
-      platform: process.platform,
-      ...(folder !== undefined ? { extensionFolder: folder } : {}),
-      ...(current.host !== null ? { pairingToken: current.host.engine.pairingToken } : {}),
-      ...(problem !== null ? { hotkeyError: problem } : {}),
-    };
-  });
-
-  ipcMain.handle(IPC.saveSettings, async (_event, patch: SettingsPatch): Promise<Settings> => {
-    const current = required();
-    const saved =
-      current.host === null
-        ? current.settingsStore.set(patch)
-        : (await current.host.client.call('settings.set', { patch })).settings;
-
-    // Rebinding here is the whole point: a hotkey the user just typed has to work now,
-    // not after a restart.
-    current.settings = saved;
-    if (patch.hotkeys !== undefined) applyHotkeys(saved);
-    if (patch.hiddenPets !== undefined) refreshStrip();
-    // Home's Desktop pet control: the desktop redraws on the pet it now shows.
-    if (patch.defaultPetId !== undefined) refreshStrip();
-    // Rolling memory starts, stops or trims the moment the user saves, not after a restart.
-    if (patch.rollingMemory !== undefined) current.rolling.configure(saved.rollingMemory);
-    // An open panel reads its keys, microphone and the user's name from here, not a restart.
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) window.webContents.send(IPC.settingsChangedEvent, saved);
-    }
-    return saved;
-  });
-
-  ipcMain.handle(IPC.saveApiKey, async (_event, providerId: string, apiKey: string) => {
-    const { secrets } = required();
-    const secretKey = secretKeyFor(providerId);
-    if (secretKey === undefined) throw new Error(`'${providerId}' does not take an API key`);
-    if (apiKey.length === 0) await secrets.delete(secretKey);
-    else await secrets.set(secretKey, apiKey);
-  });
-
-  // Only the line itself reaches a speech engine: never the screen or the conversation.
-  ipcMain.handle(IPC.speak, (_event, text: string, preview?: SpeakPreview) =>
-    required().voice.speak(String(text), preview),
-  );
-
-  // Talk to Scout started: note the window you are on, as the ask key does (never the
-  // selection: copying it would press keys while the talk key is held), and start loading
-  // the speech model while the person talks.
-  ipcMain.handle(IPC.prepareListening, async () => {
-    const current = required();
-    await captureForPanel(current, ['activeWindow']).catch((error: unknown) =>
-      console.warn('[main] could not note the window for a spoken question', error),
-    );
-    return current.listen.prepare();
-  });
-
-  // The recording, as 16 kHz samples. Turned into text here and dropped: never sent, never kept.
-  ipcMain.handle(IPC.transcribe, (_event, samples: Float32Array) =>
-    required().listen.transcribe(
-      samples instanceof Float32Array ? samples : new Float32Array(samples),
-    ),
-  );
-
-  ipcMain.handle(IPC.savePet, async (_event, pet: Pet): Promise<Pet> => {
-    const saved = (await engine().client.call('pets.upsert', { pet })).pet;
-    refreshStrip();
-    return saved;
-  });
-
-  ipcMain.handle(IPC.deletePet, async (_event, petId: string): Promise<boolean> => {
-    const { deleted } = await engine().client.call('pets.delete', { petId });
-    refreshStrip();
-    return deleted;
-  });
 
   // A click on the crew strip opens the panel on that pet, the way the chat button does.
   ipcMain.handle(IPC.selectPet, (_event, petId: string) => {
@@ -1074,62 +866,12 @@ function registerIpc(): void {
     avatar.setBounds({ x: at.x, y: at.y, width, height: AVATAR_SIZE });
   });
 
-  ipcMain.handle(IPC.listModels, async (_event, providerId: string): Promise<ModelList> => {
-    const current = required();
-    // No engine, no list: the form still takes a typed model id.
-    if (current.host === null) return { models: [], source: 'fallback' };
-    return current.host.client.call('models.list', { providerId });
-  });
-
   ipcMain.handle(IPC.openSettings, () => openSettingsPage());
   ipcMain.handle(IPC.openOnboarding, () => openOnboarding());
   ipcMain.handle(IPC.openOffice, () => openOffice());
 
   ipcMain.handle(IPC.findAgents, () => findAgents());
   ipcMain.handle(IPC.checkClaudeSignIn, () => checkClaudeSignIn());
-
-  // Settings' "no sign-in found": the key is stored first, then Scout moves to that service.
-  ipcMain.handle(IPC.switchScout, async (_event, providerId: string): Promise<Pet> => {
-    const client = engine().client;
-    const companion = getRole('companion');
-    if (companion === undefined) throw new Error('The role library has no Companion.');
-    const { pets } = await client.call('pets.list', {});
-    const { defaultPetId } = required().settings;
-    const current = pets.find((pet) => pet.id === defaultPetId);
-    if (current === undefined) throw new Error(`There is no ${defaultPetId} to switch.`);
-    const saved = (
-      await client.call('pets.upsert', { pet: companionOn(current, providerId, companion) })
-    ).pet;
-    refreshStrip();
-    return saved;
-  });
-
-  // Scout becomes the Companion on the chosen brain and docks alone; the others are hidden,
-  // not deleted. Then Welcome closes and Scout says hello in its bubble, without taking focus.
-  ipcMain.handle(IPC.finishWelcome, async (_event, providerId: string) => {
-    const current = required();
-    const client = engine().client;
-    const companion = getRole('companion');
-    if (companion === undefined) throw new Error('The role library has no Companion.');
-    const { pets } = await client.call('pets.list', {});
-    const { defaultPetId } = current.settings;
-    const { scout, hiddenPets } = welcomeCrew(pets, defaultPetId, providerId, companion);
-    await client.call('pets.upsert', { pet: scout });
-    // Claude Code, when it is here, becomes the first expert, so a hand-off works at once.
-    const { experts } = await client.call('experts.list', {});
-    for (const expert of welcomeExperts(await findAgents(), experts)) {
-      await client.call('experts.upsert', { expert });
-    }
-    const patch: SettingsPatch = { hiddenPets, welcome: { done: true } };
-    current.settings = (await client.call('settings.set', { patch })).settings;
-    refreshStrip();
-    current.onboardingWindow?.close();
-    if (current.panel !== null && current.avatar !== null) {
-      current.avatar.show();
-      current.panel.webContents.send(IPC.greetEvent);
-      showPanelQuietly(current.panel, current.avatar);
-    }
-  });
 
   // The pet is dragged by hand (a drag region would swallow its clicks), and its bubble
   // moves with it, so it keeps speaking from the pet.
@@ -1167,14 +909,6 @@ function registerIpc(): void {
     if (problem.length > 0) throw new Error(problem);
   });
   ipcMain.handle(IPC.hidePanel, () => required().panel?.hide());
-  // A remark's two buttons. Not now quiets Scout for an hour; taking the offer sends its
-  // brief to the hand-off card, where nothing runs until the person presses Send.
-  ipcMain.handle(IPC.remarkNotNow, async () => {
-    await required().host?.client.call('keepAnEye.notNow', {});
-  });
-  ipcMain.handle(IPC.remarkAccept, async (_event, remarkId: string) => {
-    await required().host?.client.call('keepAnEye.accept', { remarkId });
-  });
   ipcMain.handle(IPC.togglePanel, () => {
     const current = required();
     if (current.panel?.isVisible() === true) {
