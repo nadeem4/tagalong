@@ -11,6 +11,7 @@ import { ActivityLog } from './memory/activity';
 import { openDatabase } from './memory/db';
 import { ConversationStore } from './memory/store';
 import {
+  BrainError,
   CLAUDE_CODE_MODELS,
   FakeBrainProvider,
   NEBIUS_FALLBACK_MODELS,
@@ -1175,6 +1176,25 @@ describe('connections over rpc', () => {
       tool: 'create_page',
       access: 'write',
       state: 'done',
+    });
+  });
+});
+
+describe('providers.check', () => {
+  it('tests the key once and says plainly when it fails', async () => {
+    const refusing: BrainProvider = {
+      id: 'fake',
+      capabilities: { vision: false, tools: false, streaming: true },
+      listModels: () => Promise.resolve([]),
+      complete: () => Promise.reject(new BrainError('auth', 'rejected')),
+    };
+    const e = await boot(refusing);
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const res = await host.call('providers.check', { providerId: 'openrouter' });
+    expect(res['result']).toEqual({
+      ok: false,
+      message: expect.stringContaining('turned that key down'),
     });
   });
 });

@@ -176,7 +176,7 @@ handler.
 The catalog in `packages/protocol/src/methods.ts` is the whole surface:
 
 - **Host to core:** `hello`, `ask`, `interrupt`, `pets.list`, `pets.upsert`,
-  `settings.get`, `settings.set`, `models.list`, `tool.approve` (`once` or `deny`), `watch.stop`
+  `settings.get`, `settings.set`, `models.list`, `providers.check` (setup's one tiny test of a pasted key: `{ ok: true }` or `{ ok: false, message }` in plain words), `tool.approve` (`once` or `deny`), `watch.stop`
   (Phase 3B), and for Home `activity.list` (see [Activity](#activity)), and for experts `experts.list`,
   `experts.upsert`, `experts.delete`, `experts.test`, `handoffs.cancel`,
   `handoffs.confirm`, `handoffs.dismiss` and `projects.search` (see

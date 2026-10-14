@@ -1,4 +1,5 @@
 import { guardBrain } from './providers/guard';
+import { checkKey } from './providers/check-key';
 import type { Database } from 'better-sqlite3';
 import { DEFAULT_ENGINE_PORT, RPC_ERROR_CODES, Settings } from '@tagalong/protocol';
 import type { Expert, Pet } from '@tagalong/protocol';
@@ -569,6 +570,18 @@ function buildHandlers(parts: {
     'settings.get': () => ({ settings: settings.get() }),
     'settings.set': (params) => ({ settings: settings.set(params.patch) }),
     'models.list': (params) => models(params.providerId),
+    // Setup's one test of a pasted key, on Scout as it would think with that provider.
+    'providers.check': async (params) => {
+      await refreshProviders();
+      const base = pets.get(settings.get().defaultPetId);
+      if (base === null) {
+        throw new RpcFailure(RPC_ERROR_CODES.invalidParams, 'there is no Scout to test a key with');
+      }
+      const label =
+        openAiPreset(params.providerId)?.label ??
+        (params.providerId === 'anthropic' ? 'Anthropic' : params.providerId);
+      return checkKey({ resolve, base, providerId: params.providerId, label });
+    },
     'watch.stop': (params) => ({ stopped: watches.stop(params.watchId) }),
 
     'activity.list': (params) => activity.list(params),
