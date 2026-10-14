@@ -25,6 +25,8 @@ import {
 } from './always-listening';
 import { systemClock } from './awareness/clock';
 import { handoffNotice } from './handoff-notice';
+import { recordCleanClose, recordLaunch } from './launch';
+import type { PreviousLaunch } from './launch';
 import { routineDelivery } from './routine-delivery';
 import { nativeCodec } from './awareness/native-codec';
 import { PerceptionMemory } from './awareness/perception-memory';
@@ -90,6 +92,8 @@ interface Desktop {
   bootError: string | null;
   platform: Platform;
   settingsStore: SettingsStore;
+  /** What the last launch left behind: whether it crashed, and which version it ran. */
+  previousLaunch: PreviousLaunch;
   /** The settings the running app is using; refreshed whenever they are saved. */
   settings: Settings;
   secrets: SafeStorageSecretStore;
@@ -165,11 +169,7 @@ app.on('before-quit', () => {
   desktop?.rolling.dispose();
   desktop?.perceptionMemory.clear();
   // The next launch's greeting counts the time away from now, not from when this one opened.
-  try {
-    desktop?.settingsStore.set({ lastClosedAt: new Date().toISOString() });
-  } catch (error) {
-    console.warn('[main] could not remember this quit:', error);
-  }
+  recordCleanClose(desktop?.settingsStore, new Date());
   void desktop?.host?.shutdown();
 });
 
@@ -183,6 +183,8 @@ async function start(): Promise<void> {
   const secrets = new SafeStorageSecretStore(dataDir);
   const settingsStore = new SettingsStore(dataDir);
 
+  // Before anything else reads or writes settings: what the last launch left, then this one.
+  const previousLaunch = recordLaunch(settingsStore, app.getVersion());
   const settings = settingsStore.get();
   // From the saved setting, before any window opens, so the mark on Scout shows from the
   // first second listening is on.
@@ -242,6 +244,7 @@ async function start(): Promise<void> {
     bootError,
     platform,
     settingsStore,
+    previousLaunch,
     settings,
     secrets,
     avatar: null,
@@ -382,6 +385,9 @@ async function start(): Promise<void> {
         .catch((error: unknown) => console.warn('[main] could not persist avatar position', error));
     },
   });
+  // Windows ends a session (shutdown, restart, sign-out) without before-quit; that is a
+  // clean close too, not a crash.
+  desktop.avatar.on('session-end', () => recordCleanClose(desktop?.settingsStore, new Date()));
   // The pets hidden (the tray's Hide pets, or Welcome first): listening waits for them.
   const avatar = desktop.avatar;
   avatar.on('show', () => pauseListening({ petsShown: true }));
