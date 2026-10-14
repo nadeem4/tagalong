@@ -312,7 +312,7 @@ A cool ink-navy family and a cool off-white family, one warm gold, and a few sig
 
 ### Primary
 
-- **Gold** (gold): the primary button fill (`tg-btn`, `bubble-primary`, Welcome's Start), a switch that is on, a pressed day toggle, the pressed mic, the Working tag, the listening dot, the speaking bars, the current intro step, the hand-off working dot, text selection and the focus ring in Settings. Ink on gold is always **Gold Ink** (gold-ink).
+- **Gold** (gold): the primary button fill (`tg-btn`, `bubble-primary`, Welcome's Start), a switch that is on, a pressed day toggle, the pressed mic, the Working tag, the listening dot, the speaking bars, the current intro step, the hand-off working dot, text selection and the focus ring in Settings, Home and Welcome. Ink on gold is always **Gold Ink** (gold-ink).
 
 ### Secondary
 
@@ -351,7 +351,7 @@ A cool ink-navy family and a cool off-white family, one warm gold, and a few sig
 **Body Font:** Onest (with system-ui, sans-serif)
 **Mono:** ui-monospace, Cascadia Mono, Consolas
 
-Home and the standalone Settings window bundle Onest 400/600 and Pixelify Sans 400/600/700 from `@fontsource` (Latin subset). Welcome bundles only Pixelify Sans 400; the bubble and dock windows bundle neither, so they fall back to the system stack.
+Every window bundles its faces from `@fontsource` (Latin subset), nothing fetched: Home and the standalone Settings window Onest 400/600 and Pixelify Sans 400/600/700; Welcome Onest 400/600 and Pixelify Sans 400/700; the bubble Onest 400/600 and Pixelify Sans 700; the dock Onest 600 for its tags.
 
 **Character:** A chunky pixel face gives Scout a name and a voice; a clean geometric sans keeps every sentence and control modern.
 
@@ -445,13 +445,13 @@ Ink Navy, one column. Scout at scale 4 on an 84px Avatar Tile tile beside the We
 - **Dock:** idle and listening breathe (2.8s ease-in-out, 1px up, endless); working bobs (0.9s, 2px); done hops three times (0.7s ease-out, 8px). Blinks last 140ms, every 3 to 6 seconds, only with open eyes (idle, listening).
 - **Bubble:** the intro and launch line enter over 220ms (fade and 4px rise, ease-out); the launch line leaves over 300ms (fade and 4px drop). Intro text types at 22ms a character. The listening dot pulses (1.2s, to 35% opacity); speaking bars follow the voice level with a 90ms linear transition.
 
-Under `prefers-reduced-motion: reduce`: the dock body stops, the bubble appears and leaves without moving, the dot stops pulsing, the bars hold at 60%, and intro beats appear whole. The blink still runs.
+Under `prefers-reduced-motion: reduce`: the dock body stops and Scout does not blink, the bubble appears and leaves without moving, the dot stops pulsing, the bars hold at 60%, and intro beats appear whole.
 
 ## Accessibility
 
 - **Reduced motion** is honoured everywhere above.
 - **Status is never colour alone:** dock tags are words, the Paused chip says Paused, the recording dot has a title and is in Scout's label, Activity states are an icon plus a word, chips carry words, the Overview dot sits beside "Ready".
-- **Focus rings:** 2px at 2px offset, Gold in Settings (`.tg-settings :focus-visible`) and Sky in the bubble. Home's own nav and cards, and Welcome, set no focus style and fall back to the browser outline.
+- **Focus rings:** 2px at 2px offset, Gold in Settings (`.tg-settings :focus-visible`), Home (`.home :focus-visible`) and Welcome (`.welcome :focus-visible`), and Sky in the bubble.
 - **The sprite:** `PixelSprite` is `aria-hidden`; on the dock the wrapper is `role="img"` with Scout's name and state. Intro beats are announced whole through a hidden status line while the visible text types. The chat log is `role="log"`; errors are `role="alert"`; expert steps are `aria-live="polite"`.
 
 ## Do's and Don'ts

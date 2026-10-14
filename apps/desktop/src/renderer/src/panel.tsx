@@ -2,6 +2,10 @@ import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { CompanionBubble, GreetingLine, HostBridgeProvider, SpeechQueue } from '@tagalong/ui';
 import type { ContextSnapshot, PetRemarkParams, RoutineResultParams } from '@tagalong/protocol';
+// Bundled, not fetched: the bubble's two typefaces ship inside the app, Latin subset only.
+import '@fontsource/onest/latin-400.css';
+import '@fontsource/onest/latin-600.css';
+import '@fontsource/pixelify-sans/latin-700.css';
 import './app.css';
 import '../../shared/ipc';
 import { playLine } from './voice-player';

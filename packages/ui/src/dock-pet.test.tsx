@@ -90,6 +90,22 @@ describe('a living pet', () => {
     expect(pet).toHaveAttribute('data-blink', 'false');
   });
 
+  it('does not blink when the system asks for reduced motion', () => {
+    vi.useFakeTimers();
+    // jsdom has no matchMedia of its own.
+    vi.stubGlobal(
+      'matchMedia',
+      (query: string) => ({ matches: query.includes('reduce'), media: query }) as never,
+    );
+    try {
+      render(<DockPet pet={SCOUT} mood="idle" blinkEveryMs={3000} />);
+      act(() => vi.advanceTimersByTime(3000));
+      expect(screen.getByRole('img')).toHaveAttribute('data-blink', 'false');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('breathes when idle, bobs faster when working, and hops when done', () => {
     const { rerender } = render(<DockPet pet={SCOUT} mood="idle" />);
     expect(screen.getByTestId('dock-body')).toHaveAttribute('data-motion', 'breathe');

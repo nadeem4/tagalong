@@ -2,8 +2,11 @@ import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MAX_USER_NAME_CHARS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import { PixelSprite, characterFor } from '@tagalong/ui';
-// Bundled, not fetched: the heading uses the office's pixel face, Latin subset only.
+// Bundled, not fetched: Welcome's two typefaces ship inside the app, Latin subset only.
+import '@fontsource/onest/latin-400.css';
+import '@fontsource/onest/latin-600.css';
 import '@fontsource/pixelify-sans/latin-400.css';
+import '@fontsource/pixelify-sans/latin-700.css';
 import './app.css';
 import './welcome.css';
 import { brainOptions, canStart, defaultBrain, welcomeNamePatch } from './welcome-flow';

@@ -16,6 +16,11 @@ body:has(.welcome) {
   font-family: 'Onest', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
 }
 
+.welcome :focus-visible {
+  outline: 2px solid #f2c14e;
+  outline-offset: 2px;
+}
+
 .welcome__hello {
   display: flex;
   gap: 20px;

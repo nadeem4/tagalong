@@ -10,6 +10,9 @@ export const HOME_CSS = `
   height: 100%; display: flex; overflow: hidden;
   background: ${t.color.panel}; color: ${t.color.panelText}; font-family: ${t.font.ui};
 }
+.home :focus-visible {
+  outline: ${t.size.focusRing}px solid ${t.color.gold}; outline-offset: ${t.size.focusOffset}px;
+}
 .home-nav {
   width: 232px; flex: none; display: flex; flex-direction: column; gap: ${t.space.xs}px;
   padding: ${t.space.xxl}px ${t.space.lg}px; background: ${t.color.sidebar}; color: ${t.color.text};
@@ -156,8 +159,6 @@ export const HOME_CSS = `
 .home-routine__runs { flex-wrap: wrap; margin: 0; }
 .home-controls { border-radius: 0; }
 .home-controls * { box-sizing: border-box; }
-.home-controls .tg-pet { grid-template-columns: minmax(0, 1fr); }
-.home-controls .tg-card { position: static; }
 .home-controls .tg-footer { margin-top: ${t.space.xxl}px; }
 .home-controls .tg-footer p { color: ${t.color.panelMuted}; }
 `;
