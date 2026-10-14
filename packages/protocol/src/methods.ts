@@ -334,7 +334,22 @@ export const TurnWarningParams = z.object({
  * The line a pet says when the app opens, after the first time. `model` when the summaries
  * model wrote it, `fallback` when a handwritten line stood in. It reads no screen.
  */
-export const GreetingComposeParams = z.object({ petId: z.string().min(1) });
+/** What the host recorded about the last launch, for the line said as this one opens. */
+export const GreetingLaunch = z.object({
+  /** The last launch never recorded a clean close. */
+  crashed: z.boolean(),
+  /** The version the last launch ran; null when none was recorded. */
+  lastVersion: z.string().min(1).nullable(),
+  /** The version running now. */
+  version: z.string().min(1),
+  /** One line on what is new in this version; empty when there is nothing to say. */
+  whatsNew: z.string(),
+});
+export type GreetingLaunch = z.infer<typeof GreetingLaunch>;
+export const GreetingComposeParams = z.object({
+  petId: z.string().min(1),
+  launch: GreetingLaunch.optional(),
+});
 export const GreetingComposeResult = z.object({
   text: z.string().min(1),
   source: z.enum(['model', 'fallback']),
