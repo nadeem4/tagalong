@@ -47,7 +47,8 @@ its result.
 - Runs all day in the background: tray icon, Scout docked on the desktop, a bubble that opens
   beside it on a hotkey and hides on Escape.
 - Hotkeys: `Ctrl+Shift+Space` ask (brings the selected text and the window you are on),
-  `Ctrl+Shift+Alt+P` pause sight, `Ctrl+Shift+Alt+M` stop speaking.
+  `Ctrl+Shift+Alt+P` pause sight, `Ctrl+Shift+Alt+M` stop speaking, `Ctrl+Shift+Alt+Space` held
+  to talk to Scout.
 - "What do you see?" is answered per screen from the window list, without a screenshot. Scout
   reads one window, or photographs it, only when you ask about it.
 - Keep an eye on things: every few seconds Scout looks at window titles only. After you settle on
@@ -56,6 +57,10 @@ its result.
 - Scout talks: you may not be looking at the screen, so Scout says its bubble lines aloud
   (answers, the hello, a remark, an expert that finished), in a calm, refined, dry British voice.
   Only the first sentence or two; code, lists and long text stay in the bubble.
+- Talk to Scout: hold a key (or click the mic) and ask out loud. It should feel like talking to a
+  person, not an agent: Scout answers in short spoken sentences, starts speaking on the first one,
+  asks one question back at most and leaves detail in the bubble. Talking cuts Scout off. The
+  microphone never opens without a key press or a click; the bubble offers the key to reply.
 - Home, the control centre: Overview, Scout (how it thinks), Experts, Routines, Connections,
   Activity (every hand-off and its thread), Settings.
 - Routines: when + what + where the result goes. A schedule (daily, weekdays, chosen days at a
@@ -87,11 +92,12 @@ its result.
 - Scout can know your name: optional in Welcome, editable in Settings → You. It uses it rarely (a
   hello, a moment that warrants it), and the intro and the launch line greet you by it.
 - Speech runs on the computer (Kokoro, downloaded on first use); ElevenLabs is an optional
-  bring-your-own-key voice that receives only the words spoken.
+  bring-your-own-key voice that receives only the words spoken. Speech to text runs on the
+  computer too (Whisper base.en, downloaded on first use); the audio is never sent or stored.
 - Connections: Scout uses the person's apps over MCP (Notion, GitHub, Linear, the servers already
   in Claude Code, or any MCP server). It reads on its own; every change shows a confirm card and
   runs only on Allow once. Tokens live in the OS keychain.
-- Not built yet: voice input (push to talk), expert templates, cost dashboard, macOS and
+- Not built yet: speech to text through ElevenLabs, expert templates, cost dashboard, macOS and
   Linux. Google Calendar and Gmail are not in Popular: their official MCP servers are a developer
   preview that needs your own Google Cloud project. The roadmap lives in Notion.
 

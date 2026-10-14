@@ -22,6 +22,7 @@ export interface SettingsFormValues {
   askHotkey: string;
   pauseSightHotkey: string;
   stopVoiceHotkey: string;
+  talkHotkey: string;
   sightDetail: string;
   windowTextBudget: string;
   /** Phase 4. The pets unticked under "Show on desktop". Absent leaves the setting alone. */
@@ -45,6 +46,8 @@ export interface SettingsFormValues {
   voice?: string;
   voiceSpeed?: string;
   elevenLabsVoiceId?: string;
+  /** The microphone Talk to Scout listens on. Blank: the system default. */
+  microphoneId?: string;
 }
 
 /**
@@ -96,6 +99,7 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
       ask: values.askHotkey.trim(),
       pauseSight: values.pauseSightHotkey.trim(),
       stopVoice: values.stopVoiceHotkey.trim(),
+      talk: values.talkHotkey.trim(),
     },
     ...(values.voice !== undefined
       ? {
@@ -104,6 +108,9 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
             voice: values.voice,
             speed: parseSpeed(values.voiceSpeed ?? ''),
             elevenLabsVoiceId: (values.elevenLabsVoiceId ?? '').trim(),
+            ...(values.microphoneId !== undefined && values.microphoneId !== ''
+              ? { microphoneId: values.microphoneId }
+              : {}),
           },
         }
       : {}),

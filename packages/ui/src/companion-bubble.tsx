@@ -12,6 +12,24 @@ import { RoutineCard } from './routine-card';
 import { useHostBridge } from './host-bridge';
 import type { TurnEvent } from './host-bridge';
 import { officeTokens as t } from './office/tokens';
+import { SpokenStream } from './voice/spoken-stream';
+
+/**
+ * Talk to Scout, as the bubble sees it: the host holds the microphone and turns speech into
+ * text; the bubble shows that it is listening and asks what was heard, as a spoken question.
+ */
+export interface BubbleTalk {
+  /** Listening to the microphone, or turning what it heard into text. */
+  state: 'idle' | 'listening' | 'hearing';
+  /** Subscribes to each spoken question as it is heard; returns an unsubscribe function. */
+  onHeard: (handler: (text: string) => void) => () => void;
+  /** A line about the microphone: nothing heard, the model downloading, a failure. */
+  note: string | null;
+  /** The talk key as a person reads it, for "Hold … to reply". */
+  keyLabel: string;
+  /** The mic button: click to talk, click again to send. */
+  onMic: () => void;
+}
 
 export interface CompanionBubbleProps {
   petId: string;
@@ -36,9 +54,10 @@ export interface CompanionBubbleProps {
   tail?: 'left' | 'right';
   /**
    * A line the bubble says, for the host to speak aloud: each finished answer, the hello,
-   * and an expert's finish. Called once per line, with the text as shown.
+   * and an expert's finish. Called once per line, with the text as shown. A spoken answer
+   * is said as it streams, a sentence at a time, each with `whole`: say all of it.
    */
-  onSay?: (text: string) => void;
+  onSay?: (text: string, options?: { whole: boolean }) => void;
   /** Whether the host is speaking now: the bubble shows it, with a way to stop. */
   speaking?: boolean;
   onStopSpeaking?: () => void;
@@ -47,6 +66,8 @@ export interface CompanionBubbleProps {
    * the next question continues its conversation.
    */
   resume?: { conversationId: string; question: string; answer: string };
+  /** Talk to Scout: the mic button, the listening state and what was heard. */
+  talk?: BubbleTalk;
 }
 
 /** A question and how it was answered, once it is over. */
@@ -125,6 +146,7 @@ export function CompanionBubble({
   speaking = false,
   onStopSpeaking,
   resume,
+  talk,
 }: CompanionBubbleProps) {
   const bridge = useHostBridge();
   const [draft, setDraft] = useState('');
@@ -143,6 +165,12 @@ export function CompanionBubble({
   const [tried, setTried] = useState(false);
   const conversation = useRef<string | undefined>(resume?.conversationId);
   const mine = useRef<string | null>(null);
+  // A spoken question's answer, said sentence by sentence as it streams.
+  const spoken = useRef<SpokenStream | null>(null);
+  // The last answer was to a spoken question: the bubble offers the key to reply.
+  const [spokenReply, setSpokenReply] = useState(false);
+  // The question was spoken: the bubble shows what it heard, so a mishearing is visible.
+  const [askedAloud, setAskedAloud] = useState(false);
 
   // A new capture brings every chip back: removing is per question, not forever.
   const [lastSnapshot, setLastSnapshot] = useState(snapshot);
@@ -182,6 +210,7 @@ export function CompanionBubble({
         return;
       case 'turn.delta':
         if (event.turnId !== mine.current) return;
+        spoken.current?.push(event.text);
         setReply((current) =>
           current.state === 'running' ? { ...current, text: current.text + event.text } : current,
         );
@@ -190,11 +219,18 @@ export function CompanionBubble({
         if (event.turnId !== mine.current) return;
         mine.current = null;
         setReply({ state: 'done', text: event.text });
-        onSay?.(event.text);
+        if (spoken.current === null) {
+          onSay?.(event.text);
+        } else {
+          spoken.current.end();
+          spoken.current = null;
+          setSpokenReply(true);
+        }
         return;
       case 'turn.error':
         if (event.turnId !== mine.current) return;
         mine.current = null;
+        spoken.current = null;
         setReply({ state: 'failed', text: event.message });
         return;
       case 'handoff.proposed':
@@ -256,20 +292,62 @@ export function CompanionBubble({
     </button>
   );
 
-  /** Asks one question, with what the companion can see, and keeps the last answer above. */
-  const submit = (text: string, context: ContextSnapshot | undefined): void => {
+  const listening = talk !== undefined && talk.state === 'listening';
+  const micButton = talk !== undefined && (
+    <button
+      type="button"
+      className="bubble-mic"
+      aria-label={listening ? 'Stop listening' : `Talk to ${petName}`}
+      aria-pressed={listening}
+      title={listening ? 'Stop listening' : `Talk to ${petName} (or hold ${talk.keyLabel})`}
+      onClick={talk.onMic}
+    >
+      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+        <rect x="5.5" y="1.5" width="5" height="8.5" rx="2.5" fill="currentColor" />
+        <path d="M3 8a5 5 0 0 0 10 0M8 13v2" stroke="currentColor" fill="none" strokeWidth="1.5" />
+      </svg>
+    </button>
+  );
+  const talkLine =
+    talk === undefined
+      ? null
+      : talk.state === 'listening'
+        ? 'Listening… let go of the key, or click the mic, to send.'
+        : talk.state === 'hearing'
+          ? 'Turning that into text…'
+          : null;
+  const talkStatus = talk !== undefined && (talkLine !== null || talk.note !== null) && (
+    <p role="status" className="bubble-listening" data-state={talk.state}>
+      {talk.state !== 'idle' && <span className="bubble-listening-dot" aria-hidden="true" />}
+      {[talkLine, talk.note].filter((part) => part !== null).join(' ')}
+    </p>
+  );
+  const replyHint = talk !== undefined && spokenReply && reply.state === 'done' && (
+    <span>Hold {talk.keyLabel} to reply</span>
+  );
+
+  /**
+   * Asks one question, with what the companion can see, and keeps the last answer above.
+   * A spoken question may cut in on an answer still running: the engine stops that turn.
+   */
+  const submit = (text: string, context: ContextSnapshot | undefined, asSpoken = false): void => {
     if (question !== null && (reply.state === 'done' || reply.state === 'failed')) {
       const answered = { question, answer: reply.text, failed: reply.state === 'failed' };
       setPast((current) => [...current, answered]);
     }
     setQuestion(text);
     setReply({ state: 'running', turnId: null, text: '' });
+    setSpokenReply(false);
+    setAskedAloud(asSpoken);
+    mine.current = null;
+    spoken.current = asSpoken ? new SpokenStream((line) => onSay?.(line, { whole: true })) : null;
     bridge
       .ask({
         petId,
         ...(conversation.current !== undefined ? { conversationId: conversation.current } : {}),
         text,
         ...(context !== undefined ? { snapshot: context } : {}),
+        ...(asSpoken ? { spoken: true } : {}),
       })
       .then(({ turnId }) => {
         mine.current ??= turnId;
@@ -288,6 +366,14 @@ export function CompanionBubble({
     setDraft('');
     submit(text, snapshot === undefined ? undefined : without(snapshot, removed));
   };
+
+  // A spoken question arrives from the host: ask it, once per new `seq`.
+  const askHeard = useEffectEvent((text: string) => {
+    if (text.trim() === '') return;
+    submit(text, snapshot === undefined ? undefined : without(snapshot, removed), true);
+  });
+  const onHeard = talk?.onHeard;
+  useEffect(() => onHeard?.((text) => askHeard(text)), [onHeard]);
 
   const tryIt = async (): Promise<void> => {
     setTried(true);
@@ -423,6 +509,7 @@ export function CompanionBubble({
           <header className="bubble-head">
             <strong>{petName}</strong>
             <span className="bubble-row">
+              {micButton}
               {speakingIndicator}
               {onCollapse !== undefined && (
                 <button type="button" className="bubble-quiet" onClick={onCollapse}>
@@ -456,6 +543,8 @@ export function CompanionBubble({
           </div>
           <footer className="bubble-foot">
             {chipList}
+            {talkStatus}
+            {replyHint !== false && <p className="bubble-hints">{replyHint}</p>}
             {field(`Message ${petName}`)}
           </footer>
         </div>
@@ -472,14 +561,23 @@ export function CompanionBubble({
         <div className="bubble-top">
           {chipList || <span />}
           <span className="bubble-row">
+            {micButton}
             {speakingIndicator}
             {closeButton}
           </span>
         </div>
+        {askedAloud && question !== null && (
+          <p className="bubble-heard">
+            <span className="bubble-sr">You said: </span>
+            {question}
+          </p>
+        )}
         {answer}
         {handoffCard}
+        {talkStatus}
         {field(`Ask ${petName}`)}
         <div className="bubble-row bubble-hints">
+          {replyHint}
           <span>Enter to ask</span>
           <span>Esc to close</span>
           {onOpenChat !== undefined && (
@@ -772,6 +870,28 @@ const BUBBLE_CSS = `
   cursor: pointer;
 }
 .bubble-speaking:hover { background: #222845; }
+.bubble-mic {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0; border: 0; border-radius: 6px; background: transparent;
+  color: ${t.color.textMuted}; cursor: pointer;
+}
+.bubble-mic:hover { background: #222845; color: ${t.color.text}; }
+.bubble-mic[aria-pressed='true'] { background: ${t.color.gold}; color: ${t.color.goldInk}; }
+.bubble-mic:focus-visible { outline: 2px solid #7CB8F2; outline-offset: 2px; }
+.bubble-heard {
+  align-self: flex-end; max-width: 85%; margin: 0; padding: 6px 10px; border-radius: 10px 10px 4px 10px;
+  background: #222845; color: #C9CEE0; font-size: 13px; line-height: 1.45;
+}
+.bubble-listening {
+  display: flex; align-items: center; gap: 8px; margin: 0; font-size: 12px; color: #C9CEE0;
+}
+.bubble-listening-dot {
+  flex: none; width: 8px; height: 8px; border-radius: 50%; background: ${t.color.gold};
+  animation: bubble-pulse 1.2s ease-in-out infinite;
+}
+.bubble-listening[data-state='hearing'] .bubble-listening-dot { background: #7CB8F2; }
+@keyframes bubble-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .bubble-listening-dot { animation: none; } }
 /* The host sets --tg-voice-level (0 to 1) from the audio as it plays. */
 .bubble-speaking span {
   width: 3px; height: 14px; border-radius: 2px; background: ${t.color.gold};

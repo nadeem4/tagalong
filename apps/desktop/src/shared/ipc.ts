@@ -91,7 +91,13 @@ export const IPC = {
   switchScout: 'tagalong:pets:switch-scout',
   speak: 'tagalong:voice:speak',
   stopVoiceEvent: 'tagalong:voice:stop',
+  talkEvent: 'tagalong:voice:talk',
+  prepareListening: 'tagalong:voice:prepare-listening',
+  transcribe: 'tagalong:voice:transcribe',
 } as const;
+
+/** What main heard in one spoken question: the words (empty when nothing was said), or why not. */
+export type TranscribeResult = { kind: 'text'; text: string } | { kind: 'failed'; message: string };
 
 /** Settings' ▶ Preview: the voice and speed the form shows, not yet saved. */
 export interface SpeakPreview {
@@ -299,6 +305,12 @@ export interface TagalongHostApi {
   speak(text: string, preview?: SpeakPreview): Promise<SpeakResult>;
   /** Fires when the stop key is pressed: Scout stops speaking at once. */
   onStopVoice(handler: () => void): () => void;
+  /** Fires on every press of the talk key, repeats included, with when it fired. */
+  onTalk(handler: (at: number) => void): () => void;
+  /** Listening started: main notes the window you are on and warms the speech model. */
+  prepareListening(): Promise<{ ready: boolean }>;
+  /** 16 kHz mono samples of one spoken question, turned into text in main and dropped. */
+  transcribe(samples: Float32Array): Promise<TranscribeResult>;
 }
 
 declare global {

@@ -33,7 +33,7 @@ export { CompanionBubble, GreetingLine } from './companion-bubble';
 export { DockPet } from './dock-pet';
 export type { DockPetProps } from './dock-pet';
 export type { DockMood } from './office/sprites/expressions';
-export type { CompanionBubbleProps, GreetingLineProps } from './companion-bubble';
+export type { BubbleTalk, CompanionBubbleProps, GreetingLineProps } from './companion-bubble';
 export type { ChatPanelProps } from './chat-panel';
 
 /** Exported so hosts can test their renderer wiring without booting an engine. */
@@ -54,4 +54,7 @@ export { SETTINGS_CSS } from './settings/settings-styles';
 export { SpeechQueue } from './voice/speech-queue';
 export type { SpeechQueueOptions } from './voice/speech-queue';
 export { toSpeakable } from './voice/speakable';
+/** Talk to Scout: telling a held key from a fresh press, and the bubble's side of it. */
+export { PushToTalk } from './voice/push-to-talk';
+export type { TalkAction } from './voice/push-to-talk';
 export { officeTokens } from './office/tokens';

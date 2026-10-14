@@ -54,6 +54,8 @@ export interface AskInput {
   conversationId?: string;
   text?: string;
   snapshot?: ContextSnapshot;
+  /** The question was spoken (Talk to Scout): Scout answers the way a person talks. */
+  spoken?: boolean;
 }
 
 /**

@@ -51,6 +51,19 @@ describe('toSpeakable', () => {
   });
 });
 
+describe('toSpeakable, whole', () => {
+  it('says every sentence of a spoken answer, with no cut and no pointer to the bubble', () => {
+    const answer = 'It’s a test runner. It’s already set up. You just run it. Want me to?';
+    expect(toSpeakable(answer, { whole: true })).toBe(answer);
+  });
+
+  it('still strips markdown, and says nothing for a piece that is all code or list', () => {
+    expect(toSpeakable('**Sure.** Run `pnpm test`.', { whole: true })).toBe('Sure. Run pnpm test.');
+    expect(toSpeakable('- first item', { whole: true })).toBe('');
+    expect(toSpeakable('```\nconst a = 1;\n```', { whole: true })).toBe('');
+  });
+});
+
 describe('mergeShortLines', () => {
   it('joins consecutive short lines, which the local voice says badly on their own', () => {
     expect(mergeShortLines(['Done.', 'All green.', 'Shall I push?'])).toEqual([

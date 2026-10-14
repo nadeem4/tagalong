@@ -58,6 +58,23 @@ const REPLY_STYLE_RULES: Record<ReplyStyle, string> = {
     'Your reply is spoken aloud in full. Write plain sentences: no markdown, no lists, no code fences.',
 };
 
+/** Heads the spoken-mode block, which only a question asked out loud gets. */
+export const SPOKEN_HEADING = '## This turn is spoken';
+
+/**
+ * Talk to Scout: the question was said out loud and the answer is read aloud as it streams.
+ * Lists and code blocks are left out of the speech, so details go there, in the bubble.
+ */
+export const SPOKEN_MODE = [
+  SPOKEN_HEADING,
+  'The person asked this out loud, and your answer is read aloud as you write it. Answer like a person talking, not a document:',
+  '- Short sentences and contractions. Two or three sentences is usually plenty.',
+  '- No markdown, headings, links or lists in what you say. When exact detail helps (code, steps, a list), say so in a sentence and put the detail after it as a list or code block: that shows in the bubble and is not read aloud.',
+  '- Ask at most one question back, and only when you need the answer.',
+  '- Your tools work as usual. When a change waits for the person to confirm it on a card, say "check the card" rather than reading it out.',
+  '- The words came from speech recognition, so a word may be misheard: go with the likely meaning.',
+].join('\n');
+
 /** Heads the user's own notes for the pet in the system prompt. */
 export const NOTES_HEADING = "## The user's notes for you";
 
@@ -79,6 +96,8 @@ export interface AssembleInput {
   history: Message[];
   snapshot?: ContextSnapshot | undefined;
   settings: Settings;
+  /** The question was spoken (Talk to Scout): the spoken-mode block goes last. */
+  spoken?: boolean | undefined;
 }
 
 /** Builds the provider-neutral request for one turn. Pure: no clock, no store, no IO. */
@@ -98,7 +117,12 @@ export function assemblePrompt(input: AssembleInput): BrainRequest {
   return {
     model: pet.model,
     ...(pet.visionModel === undefined ? {} : { visionModel: pet.visionModel }),
-    system: systemPrompt(pet, input.memories ?? [], settings.userName),
+    system: [
+      systemPrompt(pet, input.memories ?? [], settings.userName),
+      input.spoken === true ? SPOKEN_MODE : '',
+    ]
+      .filter((part) => part.length > 0)
+      .join('\n\n'),
     messages,
     maxTokens: MAX_OUTPUT_TOKENS,
   };

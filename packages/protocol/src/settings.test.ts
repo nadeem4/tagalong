@@ -43,6 +43,7 @@ describe('Settings', () => {
       ask: 'CommandOrControl+Shift+Space',
       pauseSight: 'CommandOrControl+Shift+Alt+P',
       stopVoice: 'CommandOrControl+Shift+Alt+M',
+      talk: 'CommandOrControl+Shift+Alt+Space',
     });
     expect(s.avatar).toEqual({ x: null, y: null });
   });
@@ -437,11 +438,37 @@ describe('Settings.hotkeys.stopVoice', () => {
   it('defaults to a key of its own, distinct from the others', () => {
     const { hotkeys } = Settings.parse({});
     expect(hotkeys.stopVoice).toBe('CommandOrControl+Shift+Alt+M');
-    expect(new Set(Object.values(hotkeys)).size).toBe(3);
+    expect(new Set(Object.values(hotkeys)).size).toBe(4);
   });
 
   it('is optional in a patch, like the pause key', () => {
     expect(SettingsPatch.parse({ hotkeys: { ask: 'A' } })).toEqual({ hotkeys: { ask: 'A' } });
+  });
+});
+
+describe('Settings.hotkeys.talk', () => {
+  it('defaults to a key of its own, apart from the ask key', () => {
+    const { hotkeys } = Settings.parse({});
+    expect(hotkeys.talk).toBe('CommandOrControl+Shift+Alt+Space');
+    expect(hotkeys.talk).not.toBe(hotkeys.ask);
+  });
+
+  it('is optional, so a settings file from before it still parses', () => {
+    expect(Settings.parse({ hotkeys: { ask: 'A' } }).hotkeys.talk).toBeUndefined();
+  });
+});
+
+describe('Settings.voice.microphoneId', () => {
+  it('is absent by default, which means the system default microphone', () => {
+    expect(Settings.parse({}).voice.microphoneId).toBeUndefined();
+  });
+
+  it('keeps a picked microphone, and a voice from before it still parses', () => {
+    const voice = { ...SETTINGS_DEFAULTS.voice, microphoneId: 'usb-mic' };
+    expect(Settings.parse({ voice }).voice.microphoneId).toBe('usb-mic');
+    expect(SettingsPatch.parse({ voice: { ...SETTINGS_DEFAULTS.voice } }).voice).toEqual(
+      SETTINGS_DEFAULTS.voice,
+    );
   });
 });
 

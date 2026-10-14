@@ -19,6 +19,7 @@ const values: SettingsFormValues = {
   askHotkey: 'CommandOrControl+Shift+Space',
   pauseSightHotkey: 'CommandOrControl+Shift+Alt+P',
   stopVoiceHotkey: 'CommandOrControl+Shift+Alt+M',
+  talkHotkey: 'CommandOrControl+Shift+Alt+Space',
   sightDetail: 'focused',
   windowTextBudget: '8000',
 };
@@ -65,6 +66,7 @@ describe('buildSettingsPatch', () => {
       ask: 'CommandOrControl+Shift+Space',
       pauseSight: 'CommandOrControl+Shift+Alt+P',
       stopVoice: 'CommandOrControl+Shift+Alt+M',
+      talk: 'CommandOrControl+Shift+Alt+Space',
     });
   });
 
@@ -373,6 +375,15 @@ describe('buildSettingsPatch voice', () => {
       speed: 1.05,
       elevenLabsVoiceId: 'abc123',
     });
+  });
+
+  it('keeps a picked microphone, and leaves it out for the system default', () => {
+    expect(
+      buildSettingsPatch({ ...values, ...voice, microphoneId: 'usb-mic' }).voice?.microphoneId,
+    ).toBe('usb-mic');
+    expect(buildSettingsPatch({ ...values, ...voice, microphoneId: '' }).voice).not.toHaveProperty(
+      'microphoneId',
+    );
   });
 
   it('turns Scout quiet when the switch is off', () => {

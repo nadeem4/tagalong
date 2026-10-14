@@ -590,6 +590,7 @@ function buildHandlers(parts: {
         text: command.text,
         conversationId: params.conversationId,
         snapshot,
+        spoken: params.spoken,
       });
       // The turn keeps running after this resolves; progress arrives as notifications.
       return { turnId: handle.turnId };

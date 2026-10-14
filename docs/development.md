@@ -254,10 +254,11 @@ selection and the active window and opens the chat panel beside it, Escape or fo
 panel (unless a turn is still streaming), and the tray menu shows or hides the pets, opens settings,
 and quits.
 
-| Hotkey             | What rides along                            | Roughly what it costs |
-| ------------------ | ------------------------------------------- | --------------------- |
-| `Ctrl+Shift+Space` | Selection and the active window             | text only             |
-| `Ctrl+Shift+Alt+P` | Nothing — turns all sight off, and on again | nothing               |
+| Hotkey                        | What rides along                                   | Roughly what it costs |
+| ----------------------------- | -------------------------------------------------- | --------------------- |
+| `Ctrl+Shift+Space`            | Selection and the active window                    | text only             |
+| `Ctrl+Shift+Alt+P`            | Nothing — turns all sight off, and on again        | nothing               |
+| `Ctrl+Shift+Alt+Space` (hold) | The active window, and the spoken question as text | text only             |
 
 The ask key exists for the one thing only a key can do: read the selection and the window you are on
 before the bubble takes the focus. A click on the pet captures nothing, because it has just put the
@@ -450,21 +451,22 @@ public privacy policy is [docs/chrome-web-store/privacy-policy.md](chrome-web-st
 Nothing reads `.env.local` today: there is no dotenv dependency, and no code in `packages/` or `apps/`
 opens a `.env` file. Copying it therefore changes nothing at runtime.
 
-Three environment variables are read today, all straight from `process.env`:
+Four environment variables are read today, all straight from `process.env`:
 `TAGALONG_FAKE_PROVIDERS` in `packages/core/src/providers/registry.ts`, `TAGALONG_SKIP_ONBOARDING`
-in `apps/desktop/src/main/welcome.ts`, and `TAGALONG_FAKE_TTS` in
-`apps/desktop/src/main/voice/voice.ts`. **Set them in the shell you launch from**, as shown above.
+in `apps/desktop/src/main/welcome.ts`, `TAGALONG_FAKE_TTS` in
+`apps/desktop/src/main/voice/voice.ts`, and `TAGALONG_FAKE_STT` in
+`apps/desktop/src/main/voice/listen.ts` (and `main/index.ts`, for the fake microphone). **Set them in the shell you launch from**, as shown above.
 
-| Variable                     | Status today                                                                                                                                            |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TAGALONG_FAKE_PROVIDERS=1`  | **Read.** Forces the fake brain provider, for tests and demos. No keys or network needed. Must be set in the shell environment.                         |
-| `TAGALONG_SKIP_ONBOARDING=1` | **Read.** Keeps Welcome shut. The Electron smoke tests set it.                                                                                          |
-| `TAGALONG_FAKE_TTS=1`        | **Read.** Scout's voice becomes a short silent clip: no model download, no ElevenLabs call, no sound. Every Electron suite sets it.                     |
-| `ANTHROPIC_API_KEY`          | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment. |
-| `OPENROUTER_API_KEY`         | **Not read.** The key for the `openrouter` provider, entered in Settings and stored like the Anthropic key.                                             |
-| `NEBIUS_API_KEY`             | **Not read.** The key for the `nebius` provider (Token Factory), entered in Settings and stored like the Anthropic key.                                 |
-| `ELEVENLABS_API_KEY`         | **Not read.** The optional ElevenLabs voice's key is entered in Settings → Advanced and stored like the others (`elevenlabs.apiKey`).                   |
-| `OPENAI_API_KEY`             | **Not used yet.** Whisper speech to text only, from Phase 3.                                                                                            |
+| Variable                     | Status today                                                                                                                                                                  |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TAGALONG_FAKE_PROVIDERS=1`  | **Read.** Forces the fake brain provider, for tests and demos. No keys or network needed. Must be set in the shell environment.                                               |
+| `TAGALONG_SKIP_ONBOARDING=1` | **Read.** Keeps Welcome shut. The Electron smoke tests set it.                                                                                                                |
+| `TAGALONG_FAKE_TTS=1`        | **Read.** Scout's voice becomes a short silent clip: no model download, no ElevenLabs call, no sound. Every Electron suite sets it.                                           |
+| `TAGALONG_FAKE_STT=1`        | **Read.** Talk to Scout hears "What am I looking at?" every time: no speech model download, and Chromium's fake microphone stands in for a real one. The smoke suite sets it. |
+| `ANTHROPIC_API_KEY`          | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment.                       |
+| `OPENROUTER_API_KEY`         | **Not read.** The key for the `openrouter` provider, entered in Settings and stored like the Anthropic key.                                                                   |
+| `NEBIUS_API_KEY`             | **Not read.** The key for the `nebius` provider (Token Factory), entered in Settings and stored like the Anthropic key.                                                       |
+| `ELEVENLABS_API_KEY`         | **Not read.** The optional ElevenLabs voice's key is entered in Settings → Advanced and stored like the others (`elevenlabs.apiKey`).                                         |
 
 Secrets never enter git. In the app they live in the OS keychain through Electron `safeStorage`, written
 as ciphertext to `secrets.json`; if the OS has no encryption backend the store refuses to write at all
@@ -554,10 +556,11 @@ What is still standing, recorded here so nobody rediscovers it.
 - **The installer is unsigned and uses Electron's default icon.** SmartScreen warns on first run.
 - **Windows only.** The macOS and Linux installers are configured, but there is no platform adapter for
   either, so the app stops at launch there.
-- **No voice input.** Scout talks, but push to talk (speech to text) is not built, and Welcome has
-  no microphone or speaker step.
-- **The local voice is not checked end to end in CI.** Tests and the Electron suites run on
-  `TAGALONG_FAKE_TTS=1`, so the Kokoro download and synthesis are only exercised on a real run.
+- **Talk to Scout has no cloud speech to text.** Speech is turned into text on this computer only
+  (Whisper base.en); ElevenLabs Scribe is not wired in. Welcome has no microphone or speaker step.
+- **The local voice and ears are not checked end to end in CI.** Tests and the Electron suites run
+  on `TAGALONG_FAKE_TTS=1` and `TAGALONG_FAKE_STT=1`, so the Kokoro and Whisper downloads, synthesis
+  and transcription are only exercised on a real run.
 
 ## Delivery phases
 

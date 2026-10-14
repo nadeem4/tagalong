@@ -495,3 +495,108 @@ describe('CompanionBubble voice', () => {
     expect(screen.queryByRole('button', { name: 'Stop speaking' })).toBeNull();
   });
 });
+
+describe('CompanionBubble, talking to Scout', () => {
+  /** The host's side: a test says what was heard through `hear`. */
+  const heard = () => {
+    const handlers = new Set<(text: string) => void>();
+    return {
+      onHeard: (handler: (text: string) => void) => {
+        handlers.add(handler);
+        return () => void handlers.delete(handler);
+      },
+      hear: (text: string) => handlers.forEach((handler) => handler(text)),
+    };
+  };
+  const talk = (change: object = {}) => ({
+    state: 'idle' as const,
+    onHeard: () => () => undefined,
+    note: null,
+    keyLabel: 'Ctrl+Shift+Alt+Space',
+    onMic: vi.fn(),
+    ...change,
+  });
+
+  it('has a mic button, which says when it is listening', () => {
+    const onMic = vi.fn();
+    const { rerender } = render(
+      <HostBridgeProvider bridge={createFakeHostBridge()}>
+        <CompanionBubble petId="scout" petName="Scout" talk={talk({ onMic })} />
+      </HostBridgeProvider>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Talk to Scout' }));
+    expect(onMic).toHaveBeenCalledOnce();
+    expect(screen.queryByText(/Listening/)).toBeNull();
+
+    rerender(
+      <HostBridgeProvider bridge={createFakeHostBridge()}>
+        <CompanionBubble petId="scout" petName="Scout" talk={talk({ state: 'listening' })} />
+      </HostBridgeProvider>,
+    );
+    expect(screen.getByRole('button', { name: 'Stop listening' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Listening');
+
+    rerender(
+      <HostBridgeProvider bridge={createFakeHostBridge()}>
+        <CompanionBubble
+          petId="scout"
+          petName="Scout"
+          talk={talk({ state: 'idle', note: 'I didn’t catch that.' })}
+        />
+      </HostBridgeProvider>,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('I didn’t catch that.');
+  });
+
+  it('asks what it heard as a spoken question, and says the answer sentence by sentence', async () => {
+    const bridge = createFakeHostBridge();
+    const onSay = vi.fn();
+    const host = heard();
+    renderBubble(bridge, { onSay, snapshot: SNAPSHOT, talk: talk({ onHeard: host.onHeard }) });
+    await act(async () => host.hear('what is this test?'));
+    expect(bridge.asks).toEqual([
+      { petId: 'scout', text: 'what is this test?', snapshot: SNAPSHOT, spoken: true },
+    ]);
+    expect(screen.getByText('what is this test?')).toBeInTheDocument();
+
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'turn-1',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      });
+      bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: 'It checks shutdown. It' });
+    });
+    // The first sentence is on its way to the voice before the answer is done.
+    expect(onSay).toHaveBeenCalledExactlyOnceWith('It checks shutdown.', { whole: true });
+
+    act(() => {
+      bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: '’s green.' });
+      bridge.emit(done('turn-1', 'It checks shutdown. It’s green.'));
+    });
+    expect(onSay).toHaveBeenCalledTimes(2);
+    expect(onSay).toHaveBeenLastCalledWith('It’s green.', { whole: true });
+    expect(screen.getByText('Hold Ctrl+Shift+Alt+Space to reply')).toBeInTheDocument();
+  });
+
+  it('leaves a typed question unspoken, with no reply hint', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge, { talk: talk() });
+    await act(async () => ask('why?'));
+    expect(bridge.asks[0]).not.toHaveProperty('spoken');
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'turn-1',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      });
+      bridge.emit(done('turn-1', 'Because.'));
+    });
+    expect(screen.queryByText(/to reply/)).toBeNull();
+  });
+});

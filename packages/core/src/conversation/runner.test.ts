@@ -22,6 +22,7 @@ import {
   type ToolOutcome,
 } from '../tools';
 import { ConversationRunner, type TurnEvent } from './runner';
+import { SPOKEN_HEADING } from './prompt-assembler';
 
 const pet: Pet = {
   id: 'scout',
@@ -187,6 +188,17 @@ describe('ConversationRunner.run', () => {
     await second.done;
 
     expect(seen[1]?.messages).toHaveLength(2);
+  });
+
+  it('answers a spoken question in spoken mode, and only that one', async () => {
+    const seen: BrainRequest[] = [];
+    const runner = makeRunner(recording(seen, 'ok'));
+
+    await runner.run({ pet, text: 'what is this', spoken: true }).done;
+    await runner.run({ pet, text: 'typed this time' }).done;
+
+    expect(seen[0]?.system).toContain(SPOKEN_HEADING);
+    expect(seen[1]?.system).not.toContain(SPOKEN_HEADING);
   });
 });
 

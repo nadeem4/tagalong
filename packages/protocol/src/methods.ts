@@ -147,6 +147,8 @@ export const AskParams = z.object({
   conversationId: z.uuid().optional(),
   input: AskInput,
   snapshot: ContextSnapshot.optional(),
+  /** The question was spoken (Talk to Scout): Scout answers the way a person talks. */
+  spoken: z.boolean().optional(),
 });
 /** Progress arrives as turn.* notifications, not in this result. */
 export const AskResult = z.object({ turnId: z.uuid() });
