@@ -639,6 +639,29 @@ with the person's edit when there is one; `routines.dismiss` drops it. Home's me
 `routines.save`, `routines.delete`, `routines.setEnabled` and `routines.runNow` (answers at once; the
 result arrives as `routine.result`). Every change is broadcast as `routines.changed`.
 
+**In the hosts.** `routine.proposed` brings up Scout's bubble, where `CompanionBubble` shows
+`RoutineCard` (`packages/ui/src/routine-card.tsx`, built from the hand-off card's styles): Name,
+When, What (with Topics), Uses (with "May hand to: <expert>, read-only, no project" when the routine
+has `handTo`), and Result goes to, then **Save** (or **Pause**, **Turn on**, **Delete** for those
+changes), **Edit** and **Cancel**. Save calls `routines.confirm`; after a new or changed routine it
+offers **Run it now** (`routines.runNow`). **Edit** opens Home on Routines with the card's routine in
+the form (`routineDraftEvent`), whose Save confirms the card with the edit. The bubble ignores a
+`turn.started` that carries a `routineId`, so a routine never takes over the person's own question.
+Main decides delivery with `routineDelivery` (`apps/desktop/src/main/routine-delivery.ts`): the
+quiet line beside Scout (`routineEvent`, shown with `showPanelQuietly`) only when the bubble is
+chosen, Scout is visible and the bubble is closed; voice through the panel's `SpeechQueue` (silent
+when Scout talks is off); a Windows notification when chosen, or when a chosen bubble could not show,
+so a result is never lost. Clicking the notification opens the bubble on the result. The panel
+renders the line with `GreetingLine`; clicking it opens `CompanionBubble` with `resume { conversationId,
+question, answer }`, so a follow-up continues the routine's conversation. Home's **Routines** page
+(`RoutinesPanel`, `packages/ui/src/home/routines-panel.tsx`) lists each routine with its switch
+(`routines.setEnabled`), last run (with **See in Activity**), next run, **Run now** and **Edit**, and
+follows `routines.changed`. **New routine** offers the templates, which live in the UI only: Morning
+papers (weekdays 08:00, with Topics and `handTo` set to the first Claude Code expert switched on),
+Today's calendar, Reviews waiting on GitHub, End-of-day summary, and Blank. The form has Name, When
+(every day, weekdays, chosen days with a time; or one of the four triggers, with the app or site to
+match), What, Topics, Result goes to, and May hand to.
+
 **Morning papers gets its papers** the simplest way that works with what exists: through a Claude
 Code expert as the routine's `handTo`, read-only with web search and no project.
 When the person has connected an arXiv or paper app, the companion's guidance and the tool's
@@ -997,7 +1020,7 @@ a new one once it has loaded. The renderer entry wraps `HomeView` (`packages/ui/
 in the preload's `HostBridge` and hands it a `HomeHost` (the companion's id, the providers it can think
 on, the model list, `savePet`) and the settings form as a slot.
 
-`HomeView` is a navy side menu, with the companion's pixel character and name, and five pages:
+`HomeView` is a navy side menu, with the companion's pixel character and name, and seven pages:
 
 - **Overview**: the companion (ready, the provider and model it thinks with), the experts (on or
   off, read-only or allowed to edit) and the three most recent activity entries, each with a button
@@ -1006,6 +1029,8 @@ on, the model list, `savePet`) and the settings form as a slot.
   Changing provider drops the vision and watch models, which named the old provider's models. Its
   role is always the Companion.
 - **Experts**: `ExpertsPanel`, below.
+- **Routines**: `RoutinesPanel`; see [Routines](#routines).
+- **Connections**: `ConnectionsPanel`; see [Connected apps](#connected-apps-mcp).
 - **Activity**: `ActivityView`; see [Activity](#activity).
 - **Settings**: the host's settings form (`SettingsPage embedded`), described under
   [The Settings window](#the-settings-window).
@@ -1031,12 +1056,15 @@ flowchart LR
     Overview
     Scout["Scout: how it thinks"]
     Experts
+    Routines
+    Connections
     Activity
     Settings
   end
   Engine[(Engine)] -- "pets.list, experts.list, activity.list" --> Home
   Scout -- "pets.upsert" --> Engine
   Experts -- "experts.upsert, experts.delete, experts.test" --> Engine
+  Routines -- "routines.save, routines.setEnabled, routines.runNow" --> Engine
   Settings -- "settings.set, keys to the keychain" --> Engine
 ```
 
@@ -1044,9 +1072,10 @@ flowchart LR
 
 `memory/activity.ts` is the durable record behind the activity view: `activity(id, kind, state,
 pet_id, to_pet_id, turn_id, conversation_id, run_id, provider_id, model, text, answer, error,
-model_calls, started_at, finished_at, expert_id, expert_name, changed_files)` (migration 7, rebuilt by
-migration 8 to add the expert columns), ordered by rowid. `kind` is `turn`, `consult`, `handoff`,
-`roundtable` or `expert`; `state` is `running`, `done`, `error` or `stopped`. `ActivityLog.observe`
+model_calls, started_at, finished_at, expert_id, expert_name, changed_files, app, tool, access,
+routine_id)` (migration 7, rebuilt by migrations 8, 12 and 13 to add the expert, app and routine
+columns), ordered by rowid. `kind` is `turn`, `consult`, `handoff`, `roundtable`, `expert`,
+`connector` or `routine`; `state` is `running`, `done`, `error` or `stopped`. `ActivityLog.observe`
 sits in the engine's event sink in front of the broadcast, so a host that re-reads on a notification
 already finds the row, and writes everything from the notifications the engine already sends:
 

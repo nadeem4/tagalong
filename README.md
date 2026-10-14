@@ -145,17 +145,18 @@ app's own client is `apps/desktop/src/main/engine-client.ts`. Read
 
 ## What is in this build
 
-| In this build                                                                                                                 | Not in this build                                                   |
-| ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Windows desktop app with a Welcome window and an NSIS installer                                                               | macOS and Linux (the installer configs exist but are unverified)    |
-| One companion, Scout, that hands work to experts (Claude Code) and brings the answer back                                     | Voice input: push to talk                                           |
-| Scout talks: answers read aloud in a calm British voice, made on this computer, or through ElevenLabs with your own key       |                                                                     |
-| Scout thinks through your Claude Code sign-in, or OpenRouter, Nebius Token Factory, Anthropic or an OpenAI-compatible service | Per-pet tool grants (ask me, always allow)                          |
-| Connections: Scout uses your apps over MCP (Notion, GitHub, Linear, Claude Code's servers); every change asks first           |                                                                     |
-| Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                             | A cost dashboard                                                    |
-| Vision routing: a text-only Nemotron model reads pictures with Nemotron Nano 2 VL                                             | Data export and delete-all in Settings                              |
-| Memory across restarts, rolling screen memory (opt-in), watches ("tell me when this finishes")                                | Code signing (the installer is unsigned) and an app icon of its own |
-| The Chrome extension: Scout in Chrome's side panel, reading the page you are on                                               |                                                                     |
+| In this build                                                                                                                          | Not in this build                                                   |
+| -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Windows desktop app with a Welcome window and an NSIS installer                                                                        | macOS and Linux (the installer configs exist but are unverified)    |
+| One companion, Scout, that hands work to experts (Claude Code) and brings the answer back                                              | Voice input: push to talk                                           |
+| Scout talks: answers read aloud in a calm British voice, made on this computer, or through ElevenLabs with your own key                |                                                                     |
+| Scout thinks through your Claude Code sign-in, or OpenRouter, Nebius Token Factory, Anthropic or an OpenAI-compatible service          | Per-pet tool grants (ask me, always allow)                          |
+| Connections: Scout uses your apps over MCP (Notion, GitHub, Linear, Claude Code's servers); every change asks first                    |                                                                     |
+| Routines: Scout does things on its own, on a schedule or when something happens, and tells you in the bubble, aloud or by notification |                                                                     |
+| Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                                      | A cost dashboard                                                    |
+| Vision routing: a text-only Nemotron model reads pictures with Nemotron Nano 2 VL                                                      | Data export and delete-all in Settings                              |
+| Memory across restarts, rolling screen memory (opt-in), watches ("tell me when this finishes")                                         | Code signing (the installer is unsigned) and an app icon of its own |
+| The Chrome extension: Scout in Chrome's side panel, reading the page you are on                                                        |                                                                     |
 
 # Using Tagalong
 
@@ -244,7 +245,7 @@ Every key can be changed in **Home → Settings → Shortcuts**, and the change 
 ## Home: one window for everything
 
 Right-click the tray icon and choose **Open Tagalong**. The tray has only four items: **Open
-Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in six pages:
+Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in seven pages:
 
 - **Overview**: whether Scout is ready and what it thinks with, your experts, and the latest
   activity.
@@ -255,6 +256,25 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   edit files by default** or allow edits when you send a task. **Save and test** checks that Claude
   Code starts, which costs nothing. There is no default project folder: each task picks its
   project, and you confirm before anything is sent.
+- **Routines**: things Scout does for you on its own, such as new papers every weekday at 8.
+  - **New routine** starts from a template (**Morning papers**, **Today's calendar**, **Reviews
+    waiting on GitHub**, **End-of-day summary**) or **Blank**. Pick **When** (every day, weekdays,
+    chosen days at a time, or when Tagalong opens, an app or site appears, an expert finishes, a
+    watch fires), say **What** in your own words, and where the **Result goes**: Scout's bubble,
+    read aloud, a Windows notification. Activity always keeps each run.
+  - **May hand to** lets each run hand work to one expert without asking, read-only, with web search
+    and no project, so it never touches your files. Morning papers uses this to search the web with
+    Claude Code, or a paper app such as arXiv when you have connected one.
+  - Each routine shows its switch, its last run (with **See in Activity**) and its next run, with
+    **Run now** and **Edit**.
+  - You can also ask Scout: "every weekday at 8, give me new papers on AI agents and explain the best
+    one simply". Scout shows a routine card (name, when, what, what it uses, where the result goes)
+    with **Save**, **Edit** and **Cancel**; nothing is saved until you press **Save**, and then it
+    offers **Run it now** to test. Ask Scout to pause, change or delete a routine by name the same
+    way.
+  - A routine that was due while the PC was asleep or Tagalong was closed runs once when it is back,
+    and says it ran late. Results wait while a full-screen app or a call is in front. Click the
+    result's line to read it all and ask a follow-up.
 - **Connections**: the apps Scout can use, so "what is on my calendar" or "any reviews waiting on
   GitHub" just work.
   - **Popular**: Notion and Linear connect with **Connect**, which opens their sign-in in your
@@ -268,8 +288,8 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   - Scout reads with an app on its own. Anything that changes something (a tool the app does not
     mark read-only) shows a card in Scout's bubble: which app, what will change, **Allow once** or
     **Cancel**.
-- **Activity**: every answer, every hand-off and every call to an app, newest first. Click one to
-  read it.
+- **Activity**: every answer, every hand-off, every call to an app and every routine run, newest
+  first. Click one to read it.
 - **Settings**, in seven sections. Press ⓘ beside a setting for the longer story.
   - **How Scout thinks**: Scout's real brain, and whether your Claude Code sign-in works (checked
     locally with `claude auth status`). Without Claude Code you pick a service and paste its key,

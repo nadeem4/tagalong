@@ -56,8 +56,15 @@ its result.
 - Scout talks: you may not be looking at the screen, so Scout says its bubble lines aloud
   (answers, the hello, a remark, an expert that finished), in a calm, refined, dry British voice.
   Only the first sentence or two; code, lists and long text stay in the bubble.
-- Home, the control centre: Overview, Scout (how it thinks), Experts, Activity (every hand-off and
-  its thread), Settings.
+- Home, the control centre: Overview, Scout (how it thinks), Experts, Routines, Connections,
+  Activity (every hand-off and its thread), Settings.
+- Routines: when + what + where the result goes. A schedule (daily, weekdays, chosen days at a
+  time) or a trigger (Tagalong opens, an app or site appears, an expert finishes, a watch fires);
+  the instruction runs as a Scout turn; the result goes to the bubble, voice or a Windows
+  notification, and always to Activity. Set one up in Home → Routines from a template, or ask Scout,
+  which shows a routine card that saves nothing until Save. Saving is consent for the routine's
+  read-only work; changes still ask every time, and a hand-off runs without a card only for the
+  expert the card named, read-only with no project.
 - Settings leads with how Scout thinks (its real brain and whether the Claude sign-in works), then
   privacy, voice, shortcuts and the browser extension; the tuning knobs (summaries, API keys, the
   ElevenLabs voice, sight detail, watches) sit under Advanced, closed by default, with a short line
@@ -84,7 +91,7 @@ its result.
 - Connections: Scout uses the person's apps over MCP (Notion, GitHub, Linear, the servers already
   in Claude Code, or any MCP server). It reads on its own; every change shows a confirm card and
   runs only on Allow once. Tokens live in the OS keychain.
-- Not built yet: voice input (push to talk), routines, expert templates, cost dashboard, macOS and
+- Not built yet: voice input (push to talk), expert templates, cost dashboard, macOS and
   Linux. Google Calendar and Gmail are not in Popular: their official MCP servers are a developer
   preview that needs your own Google Cloud project. The roadmap lives in Notion.
 
