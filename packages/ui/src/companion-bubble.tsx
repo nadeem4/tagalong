@@ -559,7 +559,9 @@ export function CompanionBubble({
   const field = (label: string) => (
     <label className="bubble-field">
       <span>{label}</span>
+      {/* Named outright: the mic button inside the label would join its name in Chromium. */}
       <input
+        aria-label={label}
         value={draft}
         autoFocus
         disabled={reply.state === 'running'}

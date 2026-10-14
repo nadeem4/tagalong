@@ -518,6 +518,27 @@ looking at?" and Chromium's fake microphone stands in for a real one.
    Save, then talk to Scout without restarting.
 4. **Expected:** the new microphone is used and Scout uses the new name.
 
+### T.9. Always listening and Seeing switches
+
+1. **Setup:** a fresh install. Open the bubble.
+2. **Expected:** the header's **Always listening** is off and no listening mark shows on Scout.
+   Settings → Privacy shows **Seeing** (on) and **Always listening** (off) at the top.
+3. **Action:** switch **Always listening** on in the bubble, then say "Scout, what am I looking at?".
+4. **Expected:** the mark shows on Scout at once and Settings → Privacy shows it on too. The bubble
+   says "Listening. Start with “Scout” to ask.", shows the words without "Scout", and Scout
+   answers. Talk that does not start with "Scout" is ignored. Pressing the talk key or the mic
+   button does nothing visible; it never says "Turning that into text…".
+5. **Action:** quit and restart Tagalong.
+6. **Expected:** listening is on from the start: Scout's first line says so and how to stop.
+7. **Action:** say "Scout, stop".
+8. **Expected:** the mark goes, and both switches show off.
+9. **Action:** switch **Seeing** off in Settings → Privacy.
+10. **Expected:** the bubble's **Seeing** switch goes off at once and Scout shows sight paused;
+    switching it on in the bubble turns the Settings switch back on.
+11. **Edge:** block the microphone in Windows privacy settings with Always listening on. The note
+    "The microphone could not be opened…" shows once and stays; it does not flicker each time
+    Scout finishes a line in the system voice.
+
 ## Connections: your apps over MCP
 
 These use real apps and a real provider, so they are yours to run. Scout must think with a provider

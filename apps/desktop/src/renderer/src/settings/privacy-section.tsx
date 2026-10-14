@@ -1,11 +1,83 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BLIND_SPOTS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import type { Settings } from '@tagalong/protocol';
 import { keyCaps } from '../settings-form';
 import { Info, Section, Tip } from './section';
 
 /**
- * The hello on launch, keeping an eye on things, rolling memory's on/off, and what Scout
+ * Seeing and Always listening act at once, through main, so they are no form fields: each
+ * reads its state on mount and follows it when it changes elsewhere (the bubble, the pause
+ * key, "Scout, stop").
+ */
+function LiveSwitches() {
+  const [seeing, setSeeing] = useState(true);
+  const [listening, setListening] = useState(false);
+  useEffect(() => {
+    void window.tagalongHost.getSightPaused().then((paused) => setSeeing(!paused));
+    return window.tagalongHost.onSightPause((paused) => setSeeing(!paused));
+  }, []);
+  useEffect(() => {
+    void window.tagalongHost.getListening().then((state) => setListening(state.on));
+    return window.tagalongHost.onListening((state) => setListening(state.on));
+  }, []);
+  return (
+    <>
+      <div className="tg-setting">
+        <div className="tg-setting__text">
+          <h3 className="tg-sub" id="seeing-label">
+            Seeing
+          </h3>
+          <p className="tg-help">
+            Scout can look at your screen when you ask. Off pauses all sight until you turn it back
+            on, or until Tagalong restarts.
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          className="tg-switch"
+          aria-checked={seeing}
+          aria-labelledby="seeing-label"
+          onClick={() => void window.tagalongHost.toggleSightPause().then((p) => setSeeing(!p))}
+        >
+          {seeing ? 'On' : 'Off'}
+        </button>
+      </div>
+      <hr className="tg-divider" />
+      <div className="tg-setting">
+        <div className="tg-setting__text">
+          <h3 className="tg-sub" id="always-listening-label">
+            Always listening
+          </h3>
+          <p className="tg-help">
+            Off by default. When on, Scout hears everything said near the computer but only answers
+            when you start with &ldquo;Scout&rdquo;. It stays on after a restart until you switch it
+            off; a mark on Scout shows the whole time. Audio is understood on this computer and
+            never sent or stored.
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          className="tg-switch"
+          aria-checked={listening}
+          aria-labelledby="always-listening-label"
+          onClick={() =>
+            void window.tagalongHost
+              .setListening(!listening)
+              .then((state) => setListening(state.on))
+          }
+        >
+          {listening ? 'On' : 'Off'}
+        </button>
+      </div>
+      <hr className="tg-divider" />
+    </>
+  );
+}
+
+/**
+ * Seeing and Always listening (live), the hello on launch, keeping an eye on things, rolling memory's on/off, and what Scout
  * never looks at. The blind
  * spots are built in and always on, so they are listed from `BLIND_SPOTS` and nothing here
  * can switch them off.
@@ -18,6 +90,7 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
   const pauseKey = settings.hotkeys.pauseSight ?? SETTINGS_DEFAULTS.hotkeys.pauseSight;
   return (
     <Section id="privacy">
+      <LiveSwitches />
       <div className="tg-setting">
         <div className="tg-setting__text">
           <div className="tg-titlerow">

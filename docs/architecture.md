@@ -1129,7 +1129,7 @@ is one file under `apps/desktop/src/renderer/src/settings/`:
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `brain-section.tsx`      | How Scout thinks: Scout's own provider and model (`brain.ts#scoutBrain`) with a status chip, or a service picker and key when no Claude sign-in is found                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `you-section.tsx`        | You: **What should Scout call you?** (`settings.userName`, empty for no name, cut to 40 characters), with an ⓘ note. When set, `prompt-assembler.ts` adds one line after the pet's name: use it rarely                                                                                                                                                                                                                                                                                                                                                                                  |
-| `privacy-section.tsx`    | The rolling memory switch, the blind spots as chips from `BLIND_SPOTS` labels, and the pause sight key                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `privacy-section.tsx`    | **Seeing** and **Always listening** at the top, live switches that act at once and are no form fields (Seeing: `getSightPaused`, `onSightPause`, `toggleSightPause`; Always listening: `getListening`, `onListening`, `setListening(!on)`), then the rolling memory switch, the blind spots as chips from `BLIND_SPOTS` labels, and the pause sight key                                                                                                                                                                                                                                 |
 | `voice-section.tsx`      | Scout talks (a switch), **Who speaks** (`voice.mouth`, from `adaptersFor('mouth')`) and **Who listens** (`voice.ears`, from `adaptersFor('ears')`; the one choice so far is `local`, on this computer), each with its facts line (`settings-form.ts#voiceFacts`: offline or online, key, cost, screenshots), the voice (George or Fable) with ▶ Preview (`voice-player.ts#playLine` with the form's mouth, voice and speed), the speed slider, the Talk to Scout key (`hotkeys.talk`) and the microphone (`voice.microphoneId`, `mic.ts#listMicrophones`, blank for the system default) |
 | `shortcuts-section.tsx`  | Three global hotkeys (ask, pause sight, stop speaking; the talk key is under Voice); a `hotkeyError` marks the field whose combination it names; one combination for two shortcuts (the talk key included) is refused before saving, naming both (`settings-form.ts#refuseSharedHotkeys`)                                                                                                                                                                                                                                                                                               |
 | `browser-section.tsx`    | The Chrome extension's pairing token                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -1477,7 +1477,10 @@ above a **Message** box. It is the same component, so it is the same conversatio
 - **The mic is in the text box; the header has two switches.** The mic button sits inside the
   question box. The header carries **Always listening** (off by default; when on, the bubble says
   to start with "Scout", or that listening is paused during a call or full screen) and **Seeing**,
-  both `role="switch"` buttons with `aria-checked`.
+  both `role="switch"` buttons with `aria-checked`. The question box carries its own
+  `aria-label` (Ask Scout, Message Scout), so the mic button inside its label never joins its name.
+  The panel (`renderer/src/panel.tsx`) passes `seeing` from `getSightPaused` and `onSightPause`
+  (on is not paused) and `toggleSightPause` on click: the same pause as the pause key and the tray.
 - **Answers are formatted, not raw Markdown.** `Answer` (`@tagalong/ui`) renders every answer, in
   the bubble, the full chat and an expert's result, with `react-markdown` and `remark-gfm`: bold,
   lists, headings, code, tables. HTML in an answer is skipped, and a link shows as text with its
@@ -1596,7 +1599,8 @@ flowchart LR
 
 A spoken conversation on our own pipeline, with the configured provider still the brain: speech to
 text on this computer, a Scout turn in spoken mode, and the answer said sentence by sentence as it
-streams. The microphone opens only on the talk key (held) or the bubble's mic button.
+streams. The microphone opens only on the talk key (held), the bubble's mic button, or, while the
+person has switched Always listening on, all the time.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
@@ -1687,6 +1691,20 @@ flowchart LR
   cut Scout off but ends unaddressed or empty calls `onDropped`, and the bubble clears its words. The system
   voice is not echo-cancelled, so `voice-player.ts` reports it speaking (`onSystemVoice`,
   `systemVoiceSpeaking`) for `setDeaf`: Scout never answers or cuts off its own words.
+- **Always listening, wired** (`renderer/src/talk.ts`, `renderer/src/talk-rules.ts`). `useTalk`
+  reads `getListening` at mount and follows `onListening`, passing `on` to `setAlways` and `paused`
+  to `setPaused`; the panel window is created hidden at launch (`createPanelWindow` in
+  `main/index.ts`), so with Always listening saved on, the microphone opens from the start. It
+  passes `onSystemVoice` to `setDeaf`, and returns `talk.always` (`{ on, paused, onToggle }`,
+  `onToggle` calling `setListening(!on)`) for the bubble's switch. The decisions sit in
+  `talk-rules.ts`, unit tested: `keyStarts` (the talk key and the mic button do nothing while an
+  always session runs, so the bubble keeps the always line and never shows "hearing" with nothing
+  pending; `PushToTalk.end()` leaves a held key spent), `settles` (a heard question clears the words
+  and the state unless a held question has started, so an always question and a held question heard
+  after the always session resumed both settle), `shownPartial` (the words so far without the
+  leading "Scout", as heard when they do not start with it) and `FailureStreak` (a microphone that
+  cannot open fails again at every always retry, each time the system voice stops: the note shows
+  once per run of failures, until words are heard or the person presses the key).
 - **The ears, through main** (`main/ipc/voice.ts`). `earsListen` notes the active window for a held
   question (never the selection: copying it would press keys while the talk key is held), then sends
   `ears.listen` to the voice process, which `VoiceWorker` forks then if Scout has not spoken yet.

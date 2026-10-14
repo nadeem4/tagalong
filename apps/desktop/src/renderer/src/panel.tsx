@@ -63,6 +63,8 @@ function Panel() {
   const [talkKey, setTalkKey] = useState(readable(DEFAULT_TALK_KEY, 'win32'));
   const [microphoneId, setMicrophoneId] = useState<string | undefined>(undefined);
   const platform = useRef('win32');
+  // Seeing: off is sight paused, the same switch as the pause key and the tray.
+  const [seeing, setSeeing] = useState(true);
   function apply(next: PanelSettings): void {
     setHotkeyLabel(next.hotkeyLabel);
     setTalkKey(next.talkKey);
@@ -80,6 +82,11 @@ function Panel() {
       setRoutine(null);
     },
   });
+
+  useEffect(() => {
+    void window.tagalongHost.getSightPaused().then((paused) => setSeeing(!paused));
+    return window.tagalongHost.onSightPause((paused) => setSeeing(!paused));
+  }, []);
 
   // The stop key cuts Scout off mid-sentence, and a watch that fires is said aloud.
   useEffect(() => window.tagalongHost.onStopVoice(() => mouth.stop()), [mouth]);
@@ -317,6 +324,7 @@ function Panel() {
               onSay={(said) => mouth.say(said)}
               mouth={mouth}
               talk={talk}
+              seeing={{ on: seeing, onToggle: () => void window.tagalongHost.toggleSightPause() }}
               speaking={speaking}
               onStopSpeaking={() => mouth.stop()}
               {...(snapshot !== null ? { snapshot } : {})}

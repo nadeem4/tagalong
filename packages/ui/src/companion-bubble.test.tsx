@@ -540,6 +540,15 @@ describe('CompanionBubble, talking to Scout', () => {
     expect(screen.getAllByRole('button', { name: 'Talk to Scout' })).toHaveLength(1);
   });
 
+  it('keeps the text box named for what it asks, the mic inside it notwithstanding', () => {
+    render(
+      <HostBridgeProvider bridge={createFakeHostBridge()}>
+        <CompanionBubble petId="scout" petName="Scout" talk={talk()} />
+      </HostBridgeProvider>,
+    );
+    expect(screen.getByRole('textbox', { name: 'Ask Scout' })).toBeVisible();
+  });
+
   it('switches Always listening from the header, off by default, and says when it is paused', () => {
     const onToggle = vi.fn();
     const { rerender } = render(
