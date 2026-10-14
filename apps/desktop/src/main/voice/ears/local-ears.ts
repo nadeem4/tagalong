@@ -57,6 +57,8 @@ export class LocalEars implements Ears {
   #audio: Float32Array[] = [];
   #stretch = 0;
   #closing: Promise<void> | undefined;
+  /** A listen stops once: a second stop (the host after a failed loop) is a no-op. */
+  #stopped = false;
 
   constructor(parts: EarsParts, mode: ListenMode) {
     this.#parts = parts;
@@ -71,6 +73,7 @@ export class LocalEars implements Ears {
 
   listen(mic: MicStream): void {
     const run = ++this.#run;
+    this.#stopped = false;
     this.#reset();
     void (async () => {
       for await (const frame of mic) {
@@ -87,6 +90,8 @@ export class LocalEars implements Ears {
   }
 
   stop(): void {
+    if (this.#stopped) return;
+    this.#stopped = true;
     const run = ++this.#run;
     if (this.#mode === 'always') {
       this.#reset();

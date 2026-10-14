@@ -196,6 +196,38 @@ describe('createEarsHost', () => {
     expect(earsEvents(posted)).toEqual(['turnEnd:', 'speechStart', 'final:again', 'turnEnd:again']);
   });
 
+  it('posts one turn end when the models fail mid-hold and the key is released after', async () => {
+    const posted: FromWorker[] = [];
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    let calls = 0;
+    const parts: EarsParts = {
+      vad: {
+        accept: async (f) => {
+          calls += 1;
+          if (calls === 2) throw new Error('vad broke');
+          return f[0] !== 0;
+        },
+      },
+      stt: { accept: () => undefined, text: async () => 'hello there', reset: () => undefined },
+      turn: { complete: async () => 1 },
+    };
+    const host = createEarsHost({
+      fake: false,
+      load: async () => parts,
+      post: (m) => posted.push(m),
+    });
+    host({ kind: 'ears.listen', mode: 'held' });
+    await settle();
+    host({ kind: 'ears.frame', samples: LOUD });
+    host({ kind: 'ears.frame', samples: LOUD });
+    await settle();
+    host({ kind: 'ears.stop' });
+    await settle();
+    expect(earsEvents(posted).filter((e) => e.startsWith('turnEnd'))).toEqual([
+      'turnEnd:hello there',
+    ]);
+  });
+
   it('says plainly when the models cannot load, and tries again next time', async () => {
     const posted: FromWorker[] = [];
     const load = vi

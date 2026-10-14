@@ -210,6 +210,32 @@ describe('LocalEars, held', () => {
     expect(events.filter((e) => e.startsWith('turnEnd'))).toEqual(['turnEnd:word word']);
   });
 
+  it('ends the turn once when the listening loop fails and the key is released after', async () => {
+    const p = parts();
+    let calls = 0;
+    p.vad.accept = async (frame) => {
+      calls += 1;
+      if (calls === 3) throw new Error('vad broke');
+      return frame[0] !== 0;
+    };
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { ears, events, feed } = hear('held', p);
+    await feed(LOUD, 3);
+    await feed(QUIET, 0);
+    ears.stop();
+    await feed(QUIET, 0);
+    expect(events.filter((e) => e.startsWith('turnEnd'))).toEqual(['turnEnd:word word']);
+  });
+
+  it('ends the turn once when stop is called twice', async () => {
+    const { ears, events, feed } = hear('held', parts());
+    await feed(LOUD, 2);
+    ears.stop();
+    ears.stop();
+    await feed(QUIET, 0);
+    expect(events.filter((e) => e.startsWith('turnEnd'))).toEqual(['turnEnd:word word']);
+  });
+
   it('ends with an empty turn when nothing was said, so the bubble can say so', async () => {
     const { ears, events, feed } = hear('held', parts());
     await feed(QUIET, 5);
