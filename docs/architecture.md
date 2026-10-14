@@ -3,20 +3,21 @@
 Adapted from the project home in Notion:
 <https://app.notion.com/p/3d809730490481a4be8ac5bd000b8bfc>
 
-This page describes how the engine and its hosts are built today. How pets remember, meet and talk
-to each other, including designs not built yet, is in [concepts/](concepts/README.md). Building and
+This page describes how the engine and its hosts are built today. How Scout remembers and what
+tools it may use, including designs not built yet, is in [concepts/](concepts/README.md). Building and
 running from source is in [development.md](development.md).
 
 ## Core engine, thin hosts
 
 One core engine, many thin hosts. The core never knows which OS or which host it is talking to.
 
-`packages/core` is the whole engine: pets, the conversation loop, prompt assembly, memory, and the
-provider adapters today; the voice pipeline, the inter-pet bus, and the MCP client in later phases. It
+`packages/core` is the whole engine: Scout, the conversation loop, prompt assembly, memory, experts,
+the MCP client for connected apps, routines and the provider adapters. Voice lives in the desktop
+host. It
 runs as pure Node TypeScript and exposes itself to hosts through a WebSocket JSON-RPC server.
 
-A host is a thin shell around that engine. It captures what the user is looking at and renders what the
-pets say. `apps/desktop` runs the engine in the Electron main process; `apps/extension` connects to an
+A host is a thin shell around that engine. It captures what the user is looking at and renders what
+Scout says. `apps/desktop` runs the engine in the Electron main process; `apps/extension` connects to an
 already-running engine over the socket. Adding a host, or adding an operating system, never touches the
 core.
 
@@ -77,7 +78,7 @@ landed in Phase 6, which ran fifth; see "The browser host" below.
 | packages/core     | Engine facade, conversation runner, prompt assembler, SQLite memory, pet registry, settings and SecretStore, pairing, websocket server, brain providers                                                                                                                                  | electron, react, DOM globals                     |
 | packages/ui       | React components — `DockPet`, `CompanionBubble`, `HomeView`, `MessageList`, `Composer`, `SightBar`, `ChatPanel` — plus the `HostBridge` contract and its context, and a fake bridge for host tests                                                                                       | electron, sockets, node APIs                     |
 | apps/desktop      | Electron host. Runs the engine in the main process, dials it over the loopback socket, owns avatar, panel and settings windows, the tray, the two global hotkeys (ask and pause sight), perception with exclusions and capture announcements, and safeStorage secrets, one folder per OS | nothing from core internals, only its public API |
-| apps/extension    | Chrome MV3 host. Connects to the running engine from its service worker, supplies the exact selection and page text on demand, renders pets in the side panel, pairs from its options page                                                                                               | core at all; it speaks the protocol only         |
+| apps/extension    | Chrome MV3 host. Connects to the running engine from its service worker, supplies the exact selection and page text on demand, renders Scout in the side panel, pairs from its options page                                                                                              | core at all; it speaks the protocol only         |
 
 ## Host contracts
 
@@ -121,7 +122,7 @@ Hosts implement two contracts.
   background browser window supplied 34,588 of them. The inventory costs about 200 tokens, so the pet
   reads that, picks a window, and pays for one. The absence is asserted by a test, not left to habit.
 
-- **Presentation** renders pets, streams replies, plays audio, and shows approval cards.
+- **Presentation** renders Scout, streams replies, plays audio, and shows the cards.
 
 ### Routing between the desktop and the browser host
 
