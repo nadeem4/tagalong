@@ -59,7 +59,9 @@ tagalong/
       electron-builder.json         # installer config: NSIS (Windows), dmg, AppImage, deb
       scripts/ensure-electron.mjs   # fetches the Electron binary
       scripts/fetch-native.mjs      # fetches get-windows' prebuilt binding before packaging
-      e2e/smoke.spec.ts
+      e2e/                          # smoke, first-run, hotkey-recovery, and cards.spec.ts (the
+                                    # hand-off, connector confirm and routine cards)
+      e2e/fixtures/notes-mcp.mjs    # a tiny stdio MCP server with one write tool, for cards.spec.ts
       src/main/                     # index.ts, engine-host.ts, engine-client.ts, context.ts,
                                     # hotkeys.ts, secret-store.ts, tray-icon.ts, tray-menu.ts,
                                     # onboarding.ts,
@@ -183,6 +185,13 @@ against the protocol's `Role` schema. A test fails while the generated file is s
   `windows-latest`, upload it as the `tagalong-windows-installer` artifact) are in
   [docs/acceptance/phase-7.md](acceptance/phase-7.md#ci-steps-for-the-installer), to be added to
   `.github/workflows/ci.yml` by hand.
+
+The suites run offline on fakes: `TAGALONG_FAKE_PROVIDERS=1` (a scripted pet and a scripted expert),
+`TAGALONG_FAKE_TTS=1`, `TAGALONG_FAKE_STT=1`, and `TAGALONG_FAKE_TOOL` with `TAGALONG_FAKE_TOOL_INPUT`,
+which make the fake pet call one tool before it answers. `cards.spec.ts` uses the last pair to bring
+up each card: `hand_to_expert`, a connected app's `notes__add_note`, and `create_routine`. Each card
+gets its own launch, since the tool is read once at start. The native folder picker is stubbed
+through `app.evaluate`, so the hand-off card's Browse picks a temporary folder.
 
 Quit any running Tagalong before `pnpm test:e2e`. The main process takes a single-instance lock, so a
 second copy quits immediately and Playwright reports the confusing
