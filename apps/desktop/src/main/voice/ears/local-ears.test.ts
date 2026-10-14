@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EARS_FRAME, Pushable } from '@tagalong/protocol';
-import { GIVE_UP_FRAMES, LocalEars, PAUSE_FRAMES } from './local-ears';
+import { GIVE_UP_FRAMES, LocalEars, MAX_STRETCH_FRAMES, PAUSE_FRAMES } from './local-ears';
 import type { EarsParts } from './local-ears';
 
 const LOUD = new Float32Array(EARS_FRAME).fill(0.3);
@@ -96,6 +96,49 @@ describe('LocalEars, always listening', () => {
     ears.stop();
     await feed(QUIET, PAUSE_FRAMES);
     expect(events.filter((e) => e.startsWith('final') || e.startsWith('turnEnd'))).toEqual([]);
+  });
+});
+
+describe('LocalEars, noise and failing models', () => {
+  it('closes a stretch that never goes quiet, so a turn cannot grow forever', async () => {
+    const { events, feed } = hear('always', parts());
+    await feed(LOUD, MAX_STRETCH_FRAMES);
+    expect(events.some((e) => e.startsWith('final:'))).toBe(true);
+    expect(events.some((e) => e.startsWith('turnEnd:'))).toBe(true);
+  });
+
+  it('keeps the words of a pause still being transcribed when the key is released', async () => {
+    const p = parts();
+    const real = p.stt.text;
+    let release: () => void = () => undefined;
+    let first = true;
+    p.stt.text = async () => {
+      if (!first) return real();
+      first = false;
+      await new Promise<void>((resolve) => (release = resolve));
+      return real();
+    };
+    const { ears, events, feed } = hear('held', p);
+    await feed(LOUD, 2);
+    await feed(QUIET, PAUSE_FRAMES);
+    ears.stop();
+    release();
+    await feed(QUIET, 0);
+    expect(events.at(-1)).toBe('turnEnd:word word');
+  });
+
+  it('still ends a held turn when the speech model fails on stop', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const p = parts();
+    const { ears, events, feed } = hear('held', p);
+    await feed(LOUD, 2);
+    p.stt.text = async () => {
+      throw new Error('onnx');
+    };
+    ears.stop();
+    await feed(QUIET, 0);
+    expect(events.at(-1)).toMatch(/^turnEnd:/);
+    warn.mockRestore();
   });
 });
 

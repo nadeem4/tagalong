@@ -31,6 +31,8 @@ export const GIVE_UP_FRAMES = 63;
 /** Live words about three times a second. */
 export const PARTIAL_EVERY_FRAMES = 10;
 export const TURN_THRESHOLD = 0.5;
+/** Speech that never goes quiet (noise) is closed as a stretch after about 30 s. */
+export const MAX_STRETCH_FRAMES = 938;
 /** Smart Turn reads the last 8 s. */
 const TURN_SAMPLES = 8 * EARS_SAMPLE_RATE;
 
@@ -53,6 +55,8 @@ export class LocalEars implements Ears {
   #lastPartial = '';
   #heard: string[] = [];
   #audio: Float32Array[] = [];
+  #stretch = 0;
+  #closing: Promise<void> | undefined;
 
   constructor(parts: EarsParts, mode: ListenMode) {
     this.#parts = parts;
@@ -67,6 +71,7 @@ export class LocalEars implements Ears {
 
   listen(mic: MicStream): void {
     const run = ++this.#run;
+    this.#reset();
     void (async () => {
       for await (const frame of mic) {
         if (run !== this.#run) return;
@@ -82,8 +87,14 @@ export class LocalEars implements Ears {
       return;
     }
     void (async () => {
-      if (this.#inSpeech) await this.#closeStretch(run, true);
-      this.#endTurn(true);
+      try {
+        await this.#closing;
+        if (this.#inSpeech) await this.#closeStretch(run, true);
+      } catch (error) {
+        console.warn('[ears] the speech model failed; ending the turn with what was heard', error);
+      } finally {
+        this.#endTurn(true);
+      }
     })();
   }
 
@@ -100,6 +111,12 @@ export class LocalEars implements Ears {
       this.#quiet = 0;
       this.#keep(frame);
       this.#parts.stt.accept(frame);
+      this.#stretch += 1;
+      if (this.#stretch >= MAX_STRETCH_FRAMES) {
+        this.#closing = this.#closeStretch(run, false);
+        await this.#closing;
+        return;
+      }
       this.#sincePartial += 1;
       if (this.#sincePartial >= PARTIAL_EVERY_FRAMES) {
         this.#sincePartial = 0;
@@ -117,7 +134,10 @@ export class LocalEars implements Ears {
     if (this.#inSpeech) {
       this.#keep(frame);
       this.#parts.stt.accept(frame);
-      if (this.#quiet === PAUSE_FRAMES) await this.#closeStretch(run, false);
+      if (this.#quiet === PAUSE_FRAMES) {
+        this.#closing = this.#closeStretch(run, false);
+        await this.#closing;
+      }
       return;
     }
     if (this.#mode === 'always' && this.#quiet >= PAUSE_FRAMES + GIVE_UP_FRAMES)
@@ -126,9 +146,11 @@ export class LocalEars implements Ears {
 
   async #closeStretch(run: number, stopping: boolean): Promise<void> {
     this.#inSpeech = false;
+    this.#stretch = 0;
     const words = (await this.#parts.stt.text()).trim();
+    // After a stop, always mode drops the turn; held mode still hands over the last words.
+    if (run !== this.#run && this.#mode === 'always') return;
     this.#parts.stt.reset();
-    if (run !== this.#run && !stopping) return;
     if (words !== '') {
       this.#heard.push(words);
       this.#emit('final', words);
@@ -155,6 +177,7 @@ export class LocalEars implements Ears {
     this.#inSpeech = false;
     this.#quiet = 0;
     this.#sincePartial = 0;
+    this.#stretch = 0;
     this.#lastPartial = '';
     this.#heard = [];
     this.#audio = [];
