@@ -1506,7 +1506,8 @@ is a native ONNX runtime, and core stays pure.
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
 flowchart LR
   subgraph Panel["Panel renderer"]
-    CB["CompanionBubble onSay"] --> Q["SpeechQueue: toSpeakable, merge short lines, one at a time, next one got ready"]
+    CB["CompanionBubble onSay"] --> QM["QueueMouth (Mouth)"]
+    QM --> Q["SpeechQueue: toSpeakable, merge short lines, one at a time, next one got ready"]
     Q --> PL["voice-player prepareLine"]
     PL --> WA["WebAudio + AnalyserNode"]
     PL --> SS["speechSynthesis fallback"]
@@ -1600,7 +1601,9 @@ flowchart LR
     MIC -- "IPC transcribe(samples)" --> LS
     LS -- "text" --> CB["CompanionBubble: ask with spoken: true"]
     CB --> SS["SpokenStream: sentence by sentence"]
-    SS --> Q["SpeechQueue (whole)"]
+    SS --> PU["Pushable"]
+    PU --> QM["QueueMouth.speak"]
+    QM --> Q["SpeechQueue (whole)"]
   end
   CB -- "ask spoken" --> E["Engine: SPOKEN_MODE in the system prompt"]
   E -- "turn.delta" --> CB
@@ -1648,7 +1651,7 @@ flowchart LR
   list item or table row whole (judged by how its line starts, `-`, `*`, `+`, `•`, `1.`, `1)` or
   `|`, waiting for more when a line start could still be a marker), and says
   "The answer is in the bubble." when nothing was speakable. Each piece goes through
-  `SpeechQueue.say(text, { whole: true })`: shaped by `toSpeakable` but never cut to two sentences.
+  a `Pushable` to `mouth.speak` (the panel's `QueueMouth`), which calls `SpeechQueue.say(text, { whole: true })`: shaped by `toSpeakable` but never cut to two sentences. Stopping the mouth drops whatever is still streaming.
   The finished answer is not said again; the bubble shows what it heard and, after the answer,
   "Hold <key> to reply". The microphone never reopens on its own.
 

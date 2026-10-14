@@ -24,6 +24,7 @@ describe('ui package surface', () => {
         'useHostBridge',
         'officeTokens',
         'SpeechQueue',
+        'QueueMouth',
         'toSpeakable',
         'PushToTalk',
       ].sort(),

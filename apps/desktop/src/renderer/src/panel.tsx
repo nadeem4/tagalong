@@ -1,6 +1,12 @@
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { CompanionBubble, GreetingLine, HostBridgeProvider, SpeechQueue } from '@tagalong/ui';
+import {
+  CompanionBubble,
+  GreetingLine,
+  HostBridgeProvider,
+  QueueMouth,
+  SpeechQueue,
+} from '@tagalong/ui';
 import type { ContextSnapshot, PetRemarkParams, RoutineResultParams } from '@tagalong/protocol';
 // Bundled, not fetched: the bubble's two typefaces ship inside the app, Latin subset only.
 import '@fontsource/onest/latin-400.css';
@@ -46,8 +52,11 @@ function Panel() {
   const root = useRef<HTMLDivElement>(null);
   // Scout talks: one line at a time; main decides who says it, or that it stays quiet.
   const [speaking, setSpeaking] = useState(false);
-  const [voice] = useState(
-    () => new SpeechQueue({ prepare: (text) => prepareLine(text), onSpeaking: setSpeaking }),
+  const [mouth] = useState(
+    () =>
+      new QueueMouth(
+        new SpeechQueue({ prepare: (text) => prepareLine(text), onSpeaking: setSpeaking }),
+      ),
   );
   // Talk to Scout: the talk key held, or the mic button. Talking cuts Scout off at once.
   const [talkKey, setTalkKey] = useState(readable(DEFAULT_TALK_KEY, 'win32'));
@@ -63,7 +72,7 @@ function Panel() {
     keyLabel: talkKey,
     microphoneId,
     onBegin: () => {
-      voice.stop();
+      mouth.stop();
       setGreeting(false);
       setLine(null);
       setRemark(null);
@@ -72,13 +81,13 @@ function Panel() {
   });
 
   // The stop key cuts Scout off mid-sentence, and a watch that fires is said aloud.
-  useEffect(() => window.tagalongHost.onStopVoice(() => voice.stop()), [voice]);
+  useEffect(() => window.tagalongHost.onStopVoice(() => mouth.stop()), [mouth]);
   useEffect(
     () =>
       window.tagalong.onTurnEvent((event) => {
-        if (event.type === 'watch.fired') voice.say(event.message);
+        if (event.type === 'watch.fired') mouth.say(event.message);
       }),
-    [voice],
+    [mouth],
   );
 
   // Transparent around the bubble's rounded corners; the window itself is transparent.
@@ -109,9 +118,9 @@ function Panel() {
       window.tagalongHost.onGreetLine((text) => {
         setMode('bubble');
         setLine(text);
-        voice.say(text);
+        mouth.say(text);
       }),
-    [voice],
+    [mouth],
   );
 
   useEffect(
@@ -120,22 +129,22 @@ function Panel() {
         setMode('bubble');
         setLine(null);
         setRemark(next);
-        voice.say(next.text);
+        mouth.say(next.text);
       }),
-    [voice],
+    [mouth],
   );
 
   useEffect(
     () =>
       window.tagalongHost.onRoutine((result, how) => {
-        if (how.speak) voice.say(result.text || result.line);
+        if (how.speak) mouth.say(result.text || result.line);
         if (!how.line) return;
         setMode('bubble');
         setLine(null);
         setRemark(null);
         setRoutine(result);
       }),
-    [voice],
+    [mouth],
   );
 
   // The window follows what is shown: the chat at its full height, the bubble at its own.
@@ -155,7 +164,7 @@ function Panel() {
 
   function dismissGreeting(): void {
     setGreeting(false);
-    voice.stop();
+    mouth.stop();
     void window.tagalongHost.hidePanel();
   }
 
@@ -232,7 +241,7 @@ function Panel() {
               holdMs={12_000}
               onDone={() => {
                 setRoutine(null);
-                voice.stop();
+                mouth.stop();
                 void window.tagalongHost.hidePanel();
               }}
               onOpen={() => {
@@ -256,7 +265,7 @@ function Panel() {
               holdMs={12_000}
               onDone={() => {
                 setRemark(null);
-                voice.stop();
+                mouth.stop();
                 void window.tagalongHost.hidePanel();
               }}
               onOpen={() => setRemark(null)}
@@ -281,7 +290,7 @@ function Panel() {
               tail={side === 'left' ? 'right' : 'left'}
               onDone={() => {
                 setLine(null);
-                voice.stop();
+                mouth.stop();
                 void window.tagalongHost.hidePanel();
               }}
               onOpen={() => setLine(null)}
@@ -299,15 +308,16 @@ function Panel() {
               onOpenChat={() => setMode('chat')}
               onCollapse={() => setMode('bubble')}
               onClose={() => {
-                voice.stop();
+                mouth.stop();
                 cancelTalk();
                 void window.tagalongHost.hidePanel();
               }}
               tail={side === 'left' ? 'right' : 'left'}
-              onSay={(said, how) => voice.say(said, how)}
+              onSay={(said) => mouth.say(said)}
+              mouth={mouth}
               talk={talk}
               speaking={speaking}
-              onStopSpeaking={() => voice.stop()}
+              onStopSpeaking={() => mouth.stop()}
               {...(snapshot !== null ? { snapshot } : {})}
               {...(resume !== null ? { resume } : {})}
             />
