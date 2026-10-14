@@ -576,6 +576,32 @@ What is still standing, recorded here so nobody rediscovers it.
   on `TAGALONG_FAKE_TTS=1` and `TAGALONG_FAKE_STT=1`, so the Kokoro and Whisper downloads, synthesis
   and transcription are only exercised on a real run.
 
+### Voice models
+
+The ears use three models, about 43 MB in all (43,001,836 bytes). They are not shipped in the
+installer. The first time listening is used, `apps/desktop/src/main/voice/ears/model-files.ts`
+downloads the missing files into the voice folder, each as a `.part` file renamed only when the
+download is complete, so an interrupted download is retried cleanly. Nothing is fetched at launch or
+in tests. Audio is never sent anywhere; only these model files are downloaded.
+
+| File                                                                          | Source                               | Bytes          | Licence      |
+| ----------------------------------------------------------------------------- | ------------------------------------ | -------------- | ------------ |
+| `ears/silero-vad/model.onnx`                                                  | `onnx-community/silero-vad`          | 2,243,022      | MIT          |
+| `onnx-community/moonshine-tiny-ONNX/config.json`                              | `onnx-community/moonshine-tiny-ONNX` | 921            | MIT          |
+| `onnx-community/moonshine-tiny-ONNX/generation_config.json`                   | `onnx-community/moonshine-tiny-ONNX` | 147            | MIT          |
+| `onnx-community/moonshine-tiny-ONNX/preprocessor_config.json`                 | `onnx-community/moonshine-tiny-ONNX` | 128            | MIT          |
+| `onnx-community/moonshine-tiny-ONNX/tokenizer.json`                           | `onnx-community/moonshine-tiny-ONNX` | 3,761,754      | MIT          |
+| `onnx-community/moonshine-tiny-ONNX/tokenizer_config.json`                    | `onnx-community/moonshine-tiny-ONNX` | 135,735        | MIT          |
+| `onnx-community/moonshine-tiny-ONNX/onnx/encoder_model_quantized.onnx`        | `onnx-community/moonshine-tiny-ONNX` | 7,937,661      | MIT          |
+| `onnx-community/moonshine-tiny-ONNX/onnx/decoder_model_merged_quantized.onnx` | `onnx-community/moonshine-tiny-ONNX` | 20,243,286     | MIT          |
+| `ears/smart-turn-v3/smart-turn-v3.2-cpu.onnx`                                 | `pipecat-ai/smart-turn-v3`           | 8,679,182      | BSD-2-Clause |
+| **Total**                                                                     |                                      | **43,001,836** |              |
+
+Silero VAD (MIT) spots speech, Moonshine tiny (MIT) turns it into text through transformers.js, and
+Smart Turn (BSD-2-Clause) decides when a turn has ended. The Moonshine files sit in the
+transformers.js cache layout under the voice folder, the same cache Kokoro uses. The byte counts are
+minimums: a file a few bytes larger is accepted, a shorter one is rejected as incomplete.
+
 ## Roadmap
 
 The plan and its phases live in Notion. What this build does and does not do is in the
