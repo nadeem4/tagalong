@@ -32,3 +32,8 @@ export {
   type AskPetDeps,
 } from './builtin/crew';
 export { HAND_TO_EXPERT, type ExpertToolDeps } from './builtin/experts';
+export {
+  CONNECTIONS_GROUP,
+  CONNECTOR_SEPARATOR,
+  type ConnectorToolDeps,
+} from './builtin/connections';

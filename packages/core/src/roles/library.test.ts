@@ -29,6 +29,8 @@ const BUILT_IN_TOOLS = [
   'remember',
   'ask_pet',
   'hand_to_expert',
+  // A group: every tool of the person's connected apps.
+  'connections',
 ];
 
 const roleFiles = readdirSync(ROLES_DIR)

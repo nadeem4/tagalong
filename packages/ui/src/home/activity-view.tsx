@@ -46,6 +46,12 @@ function headline(entry: ActivityEntry, name: (petId: string) => string): string
       return `${who} started a roundtable`;
     case 'expert':
       return `${who} handed off to ${entry.expertName ?? 'an expert'}`;
+    case 'connector': {
+      const app = entry.app ?? 'an app';
+      if (entry.state === 'error') return `${who} could not reach ${app}`;
+      if (entry.state === 'stopped') return `${who} did not change ${app}`;
+      return entry.access === 'read' ? `${who} read ${app}` : `${who} changed ${app}`;
+    }
     case 'turn':
       return {
         running: `${who} is answering`,
@@ -226,6 +232,7 @@ function Entry({
   const title = headline(entry, name);
   const pet = pets.find((candidate) => candidate.id === entry.petId);
   const meta = [
+    entry.tool,
     entry.model,
     entry.modelCalls === undefined
       ? undefined
@@ -344,5 +351,19 @@ function Thread({
         </>
       );
     }
+    case 'connector':
+      // What went in and what came back are never kept: only which tool, and how it ended.
+      return (
+        <>
+          <Said
+            who={entry.access === 'read' ? 'Tool (reads only)' : 'Tool (changes things)'}
+            text={entry.tool ?? 'unknown'}
+          />
+          {entry.state === 'stopped' && (
+            <Said who="Nothing changed" text="You said no, or did not answer in time." />
+          )}
+          {failure}
+        </>
+      );
   }
 }

@@ -37,7 +37,8 @@ tagalong/
       engine.ts                     # Engine.boot: wires the parts together and listens
       conversation/                 # ConversationRunner, prompt-assembler
       perception/                   # exclusions, retention, inventory, text layer, browser routing
-      tools/                        # tool.ts (the Tool shape), registry.ts, builtin/ (the 12 built-ins)
+      tools/                        # tool.ts (the Tool shape), registry.ts, builtin/ (the built-ins and connected-app tools)
+      connections/                  # MCP client: manager, OAuth + loopback, approvals, catalog, Claude Code reader, fake server
       memory/                       # db.ts (numbered migrations), store.ts (ConversationStore)
       pets/registry.ts              # PetRegistry, the default pet Scout
       roles/                        # library.generated.ts, listRoles, getRole, recommendedModel, tiers.ts

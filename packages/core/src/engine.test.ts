@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 import { PROTOCOL_VERSION, RPC_ERROR_CODES } from '@tagalong/protocol';
 import { listRoles, recommendedModel, roleFor } from './roles';
-import { Engine } from './engine';
+import { Engine, type EngineOptions } from './engine';
+import { fakeMcpServer } from './connections/fake-server';
 import { openDatabase } from './memory/db';
 import {
   CLAUDE_CODE_MODELS,
@@ -31,7 +32,7 @@ afterEach(async () => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-async function boot(provider?: BrainProvider): Promise<Engine> {
+async function boot(provider?: BrainProvider, extra: Partial<EngineOptions> = {}): Promise<Engine> {
   engine = await Engine.boot({
     dataDir: dir,
     secretStore: new InMemorySecretStore(),
@@ -42,6 +43,9 @@ async function boot(provider?: BrainProvider): Promise<Engine> {
     // The project finder never scans this machine's real code folders in a test.
     projectRoots: () => [],
     ...(provider ? { provider } : {}),
+    // Never this machine's own Claude Code servers.
+    claudeCodeConfigPath: join(dir, 'no-claude.json'),
+    ...extra,
   });
   return engine;
 }
@@ -1179,5 +1183,119 @@ describe('greeting.compose', () => {
     await host.call('hello', helloParams(e.pairingToken));
     const res = await host.call('greeting.compose', { petId: 'nobody' });
     expect(res['error']).toBeDefined();
+  });
+});
+
+describe('connections over rpc', () => {
+  const server = () =>
+    fakeMcpServer([
+      {
+        name: 'search',
+        description: 'Search pages.',
+        annotations: { readOnlyHint: true },
+        run: () => ({ content: [{ type: 'text', text: 'Plan: ship Friday.' }] }),
+      },
+      {
+        name: 'create_page',
+        description: 'Create a page.',
+        run: () => ({ content: [{ type: 'text', text: 'Created.' }] }),
+      },
+    ]);
+
+  it('lists Popular and Found on this PC, adds a connection, and disconnects it', async () => {
+    const { writeFileSync } = await import('node:fs');
+    const claudeJson = join(dir, 'claude.json');
+    writeFileSync(
+      claudeJson,
+      JSON.stringify({
+        mcpServers: {
+          wiki: { type: 'http', url: 'https://wiki.example/mcp' },
+          tracker: { type: 'http', url: 'https://tracker.example/mcp' },
+        },
+      }),
+    );
+    const fake = server();
+    const e = await boot(undefined, {
+      claudeCodeConfigPath: claudeJson,
+      connectorTransport: () => fake.transport(),
+    });
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+
+    const before = (await host.call('connections.list', {}))['result'] as Record<string, unknown[]>;
+    expect((before['popular'] as { id: string }[]).map((p) => p.id)).toEqual([
+      'notion',
+      'github',
+      'linear',
+    ]);
+    expect((before['found'] as { name: string }[]).map((f) => f.name)).toEqual(['wiki', 'tracker']);
+
+    const added = await host.call('connections.add', {
+      name: 'wiki',
+      transport: { type: 'http', url: 'https://wiki.example/mcp' },
+      auth: 'none',
+    });
+    const connection = (added['result'] as { connection: Record<string, unknown> }).connection;
+    expect(connection['status']).toBe('connected');
+    expect(host.methods()).toContain('connections.changed');
+
+    const after = (await host.call('connections.list', {}))['result'] as Record<string, unknown[]>;
+    expect((after['found'] as { name: string }[]).map((f) => f.name)).toEqual(['tracker']);
+
+    const again = await host.call('connections.add', {
+      id: 'wiki',
+      name: 'wiki',
+      transport: { type: 'http', url: 'https://wiki.example/mcp' },
+      auth: 'none',
+    });
+    expect((again['error'] as { message: string }).message).toBe('wiki is already connected.');
+
+    await host.call('connections.remove', { id: 'wiki' });
+    const gone = (await host.call('connections.list', {}))['result'] as Record<string, unknown[]>;
+    expect(gone['connections']).toEqual([]);
+  });
+
+  it('Scout reads at once, asks before a change, and logs both to Activity', async () => {
+    const fake = server();
+    const e = await boot(
+      new FakeBrainProvider({
+        text: 'Done.',
+        toolCall: { id: 'call-1', name: 'wiki__create_page', input: { title: 'Plan' } },
+      }),
+      { connectorTransport: () => fake.transport() },
+    );
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('connections.add', {
+      name: 'Wiki',
+      transport: { type: 'http', url: 'https://wiki.example/mcp' },
+      auth: 'none',
+    });
+
+    await host.call('ask', { petId: 'scout', input: { text: 'make a plan page' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('connector.confirm'), {
+      timeout: 5000,
+    });
+    const confirm = host.notifications.find((n) => n.method === 'connector.confirm')!.params;
+    expect(confirm).toMatchObject({ app: 'Wiki', tool: 'create_page', petId: 'scout' });
+    expect(fake.calls).toEqual([]);
+
+    const answered = await host.call('tool.approve', {
+      approvalId: confirm['approvalId'],
+      decision: 'once',
+    });
+    expect(answered['result']).toEqual({ accepted: true });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+    expect(fake.calls).toEqual([{ name: 'create_page', args: { title: 'Plan' } }]);
+
+    const activity = (await host.call('activity.list', {}))['result'] as {
+      entries: { kind: string; app?: string; tool?: string; access?: string; state: string }[];
+    };
+    expect(activity.entries.find((entry) => entry.kind === 'connector')).toMatchObject({
+      app: 'Wiki',
+      tool: 'create_page',
+      access: 'write',
+      state: 'done',
+    });
   });
 });

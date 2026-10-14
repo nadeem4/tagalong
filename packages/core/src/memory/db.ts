@@ -100,6 +100,7 @@ const MIGRATIONS: readonly Migration[] = [
   // One companion. Ink and Bolt came from the crew design and are gone; their conversations
   // stay on disk. pet_seeds still lists them, so they are never seeded again.
   `DELETE FROM pets WHERE id IN ('ink', 'bolt')`,
+  addConnections,
 ];
 
 /** The columns migration 7 gave `activity`, in order. */
@@ -145,6 +146,54 @@ function addExperts(db: Database.Database): void {
      SELECT rowid, ${ACTIVITY_V7_COLUMNS} FROM activity ORDER BY rowid;
    DROP TABLE activity;
    ALTER TABLE activity_v8 RENAME TO activity;
+   CREATE INDEX activity_turn ON activity(turn_id);
+   CREATE INDEX activity_run ON activity(run_id);`);
+}
+
+/** The columns migration 8 gave `activity`, in order. */
+const ACTIVITY_V8_COLUMNS = `${ACTIVITY_V7_COLUMNS}, expert_id, expert_name, changed_files`;
+
+/**
+ * Connections to the person's apps, and calls to them in the activity log. Definitions only
+ * in `connections`: tokens stay in the host's secret store. `activity` is rebuilt, as in
+ * migration 8, with `connector` among its kinds and the app, tool and access columns.
+ */
+function addConnections(db: Database.Database): void {
+  db.exec(`CREATE TABLE IF NOT EXISTS connections (
+     id TEXT PRIMARY KEY,
+     json TEXT NOT NULL,
+     updated_at TEXT NOT NULL
+   )`);
+  const columns = db.prepare<[], { name: string }>('PRAGMA table_info(activity)').all();
+  if (columns.some((column) => column.name === 'app')) return;
+  db.exec(`CREATE TABLE activity_v12 (
+     id TEXT PRIMARY KEY,
+     kind TEXT NOT NULL CHECK (kind IN ('turn', 'consult', 'handoff', 'roundtable', 'expert', 'connector')),
+     state TEXT NOT NULL CHECK (state IN ('running', 'done', 'error', 'stopped')),
+     pet_id TEXT NOT NULL,
+     to_pet_id TEXT,
+     turn_id TEXT,
+     conversation_id TEXT,
+     run_id TEXT,
+     provider_id TEXT,
+     model TEXT,
+     text TEXT,
+     answer TEXT,
+     error TEXT,
+     model_calls INTEGER,
+     started_at TEXT NOT NULL,
+     finished_at TEXT,
+     expert_id TEXT,
+     expert_name TEXT,
+     changed_files TEXT,
+     app TEXT,
+     tool TEXT,
+     access TEXT
+   );
+   INSERT INTO activity_v12 (rowid, ${ACTIVITY_V8_COLUMNS})
+     SELECT rowid, ${ACTIVITY_V8_COLUMNS} FROM activity ORDER BY rowid;
+   DROP TABLE activity;
+   ALTER TABLE activity_v12 RENAME TO activity;
    CREATE INDEX activity_turn ON activity(turn_id);
    CREATE INDEX activity_run ON activity(run_id);`);
 }

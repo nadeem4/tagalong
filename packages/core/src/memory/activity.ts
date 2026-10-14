@@ -29,6 +29,9 @@ interface ActivityRow {
   expert_id: string | null;
   expert_name: string | null;
   changed_files: string | null;
+  app: string | null;
+  tool: string | null;
+  access: string | null;
 }
 
 interface NewEntry {
@@ -187,6 +190,40 @@ export class ActivityLog {
   }
 
   /**
+   * One call to a connected app, written once it is over. Only which app, which tool, read
+   * or write, and how it ended: what went in and what came back are never kept.
+   */
+  connectorCalled(entry: {
+    petId: string;
+    turnId?: string | undefined;
+    app: string;
+    tool: string;
+    access: 'read' | 'write';
+    state: 'done' | 'error' | 'stopped';
+    error?: string | undefined;
+  }): void {
+    const at = now();
+    this.db
+      .prepare(
+        `INSERT INTO activity (id, kind, state, pet_id, turn_id, app, tool, access, error,
+           started_at, finished_at)
+         VALUES (?, 'connector', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        randomUUID(),
+        entry.state,
+        entry.petId,
+        entry.turnId ?? null,
+        entry.app,
+        entry.tool,
+        entry.access,
+        entry.state === 'error' ? clip(entry.error) : null,
+        at,
+        at,
+      );
+  }
+
+  /**
    * The hand-offs that finished well after `since`, oldest first, at most five: what the
    * greeting may mention. The brief is the only text kept; the answer stays in Home.
    */
@@ -287,6 +324,9 @@ function toEntry(row: ActivityRow): ActivityEntry {
     ...optional('modelCalls', row.model_calls),
     ...optional('expertId', row.expert_id),
     ...optional('expertName', row.expert_name),
+    ...optional('app', row.app),
+    ...optional('tool', row.tool),
+    ...optional('access', row.access),
     ...(row.changed_files === null
       ? {}
       : { changedFiles: JSON.parse(row.changed_files) as unknown }),

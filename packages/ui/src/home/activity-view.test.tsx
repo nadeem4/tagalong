@@ -143,6 +143,25 @@ describe('ActivityView', () => {
     expect(thread).toHaveTextContent('src/a.ts');
   });
 
+  it('names each call to a connected app: which app, which tool, read or change', async () => {
+    const call = (fields: Partial<ActivityEntry>) =>
+      entry({ id: String(fields.tool), kind: 'connector', app: 'Notion', ...fields });
+    await renderActivity(
+      createFakeHostBridge({
+        activity: [
+          call({ tool: 'search', access: 'read' }),
+          call({ tool: 'create_page', access: 'write' }),
+          call({ tool: 'update_page', access: 'write', state: 'stopped' }),
+          call({ tool: 'fetch', access: 'read', state: 'error', error: 'Notion did not answer.' }),
+        ],
+      }),
+    );
+    expect(row(/Scout read Notion/)).toHaveTextContent('search');
+    expect(row(/Scout changed Notion/)).toHaveTextContent('create_page');
+    expect(row(/Scout did not change Notion/)).toHaveTextContent('Stopped');
+    expect(row(/Scout could not reach Notion/)).toHaveTextContent('Failed');
+  });
+
   it('pairs every state with a word: working, done, failed', async () => {
     await renderActivity(
       createFakeHostBridge({

@@ -26,8 +26,9 @@ The first six:
 | Companion         | Working out what you need, briefing experts | Fast                    |
 
 The Companion never does the work itself. Its tools are only the ones that look (screen, selection,
-windows), `remember`, and `hand_to_expert`, which writes a brief and hands it to an expert such as
-Claude Code; it has no `ask_pet` and nothing that writes files or runs code. Its own figure and
+windows), `remember`, `hand_to_expert`, which writes a brief and hands it to an expert such as
+Claude Code, and the tools of the person's connected apps (`connections`), whose changes always ask
+first; it has no `ask_pet` and nothing that writes files or runs code. Its own figure and
 bubble show up in its screenshots, so its instructions tell it to look past them and never mention
 itself or Tagalong unless asked.
 
@@ -249,6 +250,7 @@ packages/core/src/tools/
     awareness.ts   recall_screen, what_changed, watch_for
     crew.ts        remember, ask_pet
     experts.ts     hand_to_expert
+    connections.ts <connection>__<tool>: every tool of the person's connected apps
 ```
 
 - **Kind.** A tool is `write` when it leaves stored state behind after the turn: `remember` files a
@@ -263,11 +265,16 @@ packages/core/src/tools/
   name.
 - **`toolsFor(pet, tools)`** is the single place a turn's tools are narrowed: the tools the pet's
   role lists, minus any its grants turn off (see [What the role decides](#what-the-role-decides)).
+  A role can list a group instead of single tools: `connections` gives it every tool of the
+  person's connected apps, whose names are only known once they connect.
+- **Connected apps.** An app tool is `read` when its server marks it read-only and `write`
+  otherwise, unknown included. A write asks the person first with a confirm card and runs only on
+  Allow once; see [Connected apps](../architecture.md#connected-apps-mcp).
 
 The runner asks the registry for a turn's tools and dispatches through it. An ESLint rule keeps
 `conversation/` and `engine.ts` importing tools only from `tools/registry` or the `tools` index,
 never from `tools/builtin/*`. To add a built-in, follow the repo skill
 `.claude/skills/tagalong-add-tool/SKILL.md`.
 
-Tools that need a login (GitHub, Notion and others) arrive with Hands: the user connects a service
-once in Settings, then grants it per pet as off, ask me, or allowed.
+Tools that need a login (GitHub, Notion and others) come from Home, Connections: the person
+connects an app once, and the Companion gets its tools. Reads run at once; every change asks first.
