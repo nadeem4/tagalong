@@ -3,8 +3,11 @@ import { Settings } from '@tagalong/protocol';
 import type { ProviderChoice } from '../../shared/ipc';
 import {
   KEY_LINES,
+  LISTENING_HINT,
   chipLabel,
   echoFor,
+  listenFailed,
+  listeningHint,
   notCaught,
   optionsFor,
   readableKey,
@@ -135,5 +138,27 @@ describe('echoes, misses and chips', () => {
 
   it('writes a key the way a person reads it', () => {
     expect(readableKey('CommandOrControl+Shift+Space')).toBe('Ctrl+Shift+Space');
+  });
+});
+
+describe('listening lines', () => {
+  it('says plainly why it cannot listen, and that typing carries on', () => {
+    expect(listenFailed('no-mic')).toBe(
+      'I can’t find a microphone, so let’s type. Tap or type your answers.',
+    );
+    expect(listenFailed('denied')).toBe(
+      'I wasn’t allowed to use the microphone, so let’s type. You can allow it later in Windows settings.',
+    );
+    expect(listenFailed('model-failed')).toBe(
+      'My listening model didn’t download, so let’s type for now.',
+    );
+  });
+
+  it('shows the speech model’s download, then that it is listening', () => {
+    expect(listeningHint(0.4)).toBe('Getting my ears ready… 40%. Type or tap meanwhile.');
+    expect(listeningHint(null)).toBe('Listening for your answer');
+    expect(LISTENING_HINT).toBe(
+      'Answer by voice, typing or a tap and I move on. Tap a step above to change it.',
+    );
   });
 });

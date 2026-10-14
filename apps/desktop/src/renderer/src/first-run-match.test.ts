@@ -121,3 +121,25 @@ describe('nameFrom', () => {
     expect(nameFrom('')).toBeNull();
   });
 });
+
+describe('choicesFor think sign-in answers', () => {
+  const ask = (said: string, signIn: Parameters<typeof choicesFor>[1]) =>
+    matchChoice(said, choicesFor('think', signIn, false, providers));
+
+  it('hears sign in when signed out, and refuses a mix with the key', () => {
+    expect(ask('sign in', 'signed-out')).toBe('sign-in');
+    expect(ask('use a key', 'signed-out')).toBe('key');
+    expect(ask('sign in with a key', 'signed-out')).toBeNull();
+  });
+
+  it('hears install and check when not installed', () => {
+    expect(ask('install it', 'not-installed')).toBe('install');
+    expect(ask('I installed it, check again', 'not-installed')).toBe('check');
+    expect(ask('check', 'not-installed')).toBe('check');
+  });
+
+  it('hears check again when unknown, and keeps sign in meaning Claude when signed in', () => {
+    expect(ask('check again', null)).toBe('check');
+    expect(ask('sign in', 'signed-in')).toBe('claude-code');
+  });
+});

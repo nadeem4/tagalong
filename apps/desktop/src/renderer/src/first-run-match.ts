@@ -55,6 +55,9 @@ const CLAUDE: Choice = {
   id: 'claude-code',
   says: ['claude', 'claude code', 'sign in', 'my sign in', 'yes', 'sure', 'ok', 'okay'],
 };
+const SIGN_IN: Choice = { id: 'sign-in', says: ['sign in', 'log in', 'login'] };
+const INSTALL: Choice = { id: 'install', says: ['install', 'install it'] };
+const CHECK: Choice = { id: 'check', says: ['check', 'check again', 'installed', 'try again'] };
 const BACK: Choice = { id: 'back', says: ['back', 'go back'] };
 const KEY: Choice = { id: 'key', says: ['key', 'api', 'api key', 'a key'] };
 const SERVICE_WORDS: Readonly<Record<string, readonly string[]>> = {
@@ -88,7 +91,17 @@ export function choicesFor(
           BACK,
         ];
       }
-      return signIn === 'signed-in' ? [CLAUDE, KEY] : [KEY];
+      // These mirror the buttons optionsFor shows for each sign-in state.
+      switch (signIn) {
+        case 'signed-in':
+          return [CLAUDE, KEY];
+        case 'signed-out':
+          return [SIGN_IN, KEY];
+        case 'not-installed':
+          return [INSTALL, CHECK, KEY];
+        default:
+          return [CHECK, KEY];
+      }
     default:
       return [];
   }
