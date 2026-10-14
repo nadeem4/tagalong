@@ -13,22 +13,17 @@ import type {
   PerceptionTarget,
   Pet,
   ProjectCandidate,
-  Role,
-  RolesUpgradeNotice,
   RoutineDraftInput,
   RoutineProposedParams,
   RoutineView,
 } from '@tagalong/protocol';
 
 /**
- * The core-to-host notifications a panel renders: everything about a turn in flight, plus
- * the crew's own — one pet addressing another, and a crew run's progress — and a hand-off
- * to an expert as it goes.
+ * The core-to-host notifications a panel renders: everything about a turn in flight, a
+ * watch, a hand-off to an expert as it goes, connector confirms and routines.
  */
 type TurnNotification =
   | Extract<CoreToHostNotification, `turn.${string}`>
-  | 'pet.message'
-  | 'crew.status'
   | 'watch.fired'
   | 'watch.status'
   | 'handoff.proposed'
@@ -75,30 +70,13 @@ export interface HostBridge {
   /** Returns an unsubscribe function. */
   onTurnEvent(handler: (event: TurnEvent) => void): () => void;
   listPets(): Promise<Pet[]>;
-  /** Phase 8. Every role in the engine's library: the office labels and the role picker. */
-  listRoles(): Promise<Role[]>;
-  /**
-   * Phase 8. The model a pet with this role would start on, on this provider, for a form to
-   * prefill. Both fields are absent when the provider has no tier table, such as `fake`.
-   */
-  recommendModel(
-    roleId: string,
-    providerId: string,
-  ): Promise<{ model?: string; visionModel?: string }>;
-  /**
-   * Phase 8. What the upgrade to roles did to this install, while the one-time notice is
-   * unseen; null once dismissed, and always null on a fresh install.
-   */
-  rolesNotice(): Promise<RolesUpgradeNotice | null>;
-  /** Phase 8. Marks the roles notice seen, so no window shows it again. */
-  dismissRolesNotice(): Promise<void>;
   /**
    * Phase 3B. Ends a watch from its Watching chip. Optional: a host that cannot start
    * watches never shows a chip to stop.
    */
   stopWatch?(watchId: string): Promise<void>;
   /**
-   * Home. What the crew did — turns, consults, handoffs, roundtables — newest first, a page
+   * Home. What Scout did — turns, hand-offs to experts, app calls, routines — newest first, a page
    * at a time (`before` is the previous page's `next`). Optional: a host without Home never
    * shows the activity view.
    */

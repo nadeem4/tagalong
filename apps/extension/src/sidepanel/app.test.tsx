@@ -69,15 +69,12 @@ function send(text: string): void {
 }
 
 describe('SidePanelApp', () => {
-  it('shows the crew once connected', () => {
+  it('shows the chat once connected, with no pet picker', () => {
     const f = fakeBridge();
     render(<SidePanelApp bridge={f.bridge} openOptions={vi.fn()} />);
     f.setStatus(CONNECTED);
-    const strip = screen.getByRole('group', { name: 'Crew' });
-    expect([...strip.querySelectorAll('button')].map((b) => b.getAttribute('aria-label'))).toEqual([
-      'Ask Scout',
-      'Ask Fern',
-    ]);
+    expect(screen.getByRole('textbox')).toBeTruthy();
+    expect(screen.queryByRole('group', { name: 'Crew' })).toBeNull();
   });
 
   it('shows disconnected, with the reason, while the app is down', () => {
@@ -91,7 +88,7 @@ describe('SidePanelApp', () => {
     const banner = screen.getByTestId('connection');
     expect(banner.getAttribute('data-state')).toBe('disconnected');
     expect(banner.textContent).toContain('Is the Tagalong app running?');
-    // Never connected, so there is no crew to show yet.
+    // Never connected, so there is no one to ask yet.
     expect(screen.queryByRole('textbox')).toBeNull();
   });
 
@@ -174,13 +171,12 @@ describe('SidePanelApp', () => {
     );
   });
 
-  it('asks the pet picked in the crew strip', () => {
+  it('asks the first pet the engine lists: Scout', () => {
     const f = fakeBridge();
     render(<SidePanelApp bridge={f.bridge} openOptions={vi.fn()} />);
     f.setStatus(CONNECTED);
-    fireEvent.click(screen.getByRole('button', { name: 'Ask Fern' }));
     send('hello');
-    expect(f.bridge.asks.at(-1)?.petId).toBe('fern');
+    expect(f.bridge.asks.at(-1)?.petId).toBe('scout');
   });
 
   it('streams the answer into the panel', async () => {

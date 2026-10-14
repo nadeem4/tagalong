@@ -11,34 +11,16 @@ colors:
   avatar-tile: '#222845'
   field-navy: '#1A1F3A'
   field-line: '#2E3558'
-  disabled-ink: '#6B7290'
-  disabled-line: '#2A3050'
   gold: '#F2C14E'
   gold-ink: '#12162B'
-  concrete-floor: '#DCDBD7'
-  floor-grid: '#D0CFCA'
-  wall: '#2B3150'
-  room-glass: '#9FCBE0'
-  room-fill: 'rgba(176, 214, 232, 0.22)'
-  room-shine: 'rgba(255, 255, 255, 0.55)'
-  room-label: '#2B3150'
   chip-free: '#E6E9F2'
   chip-free-ink: '#4A5168'
-  name-plate: '#3F465C'
   panel-white: '#F6F7FB'
   panel-text: '#12162B'
   panel-muted: '#5A6178'
   panel-line: '#E0E3EC'
   panel-tile: '#E6E9F2'
-  meter-off: '#E0E3EC'
   scrollbar-thumb: '#CDD2DE'
-  scrim: 'rgba(18, 22, 43, 0.72)'
-  job-generalist: '#4FD1C1'
-  job-writer: '#A996F5'
-  job-backend: '#F6B85A'
-  job-frontend: '#F28DB8'
-  job-researcher: '#7DD87F'
-  job-companion: '#7CB8F2'
 typography:
   office-title:
     fontFamily: "'Pixelify Sans', 'Onest', sans-serif"
@@ -196,6 +178,8 @@ components:
 
 # Design System: Tagalong
 
+> The crew-era Office (the floor, rooms, furniture, desk plates, job-class inks, the cursor and the roles notice) was removed with the crew. Tagalong is one companion, Scout. Where this document still describes the office, it is history; `packages/ui/src/office/tokens.ts` is the source of truth for what remains.
+
 ## Overview
 
 **Creative North Star: "The Party in the Glass Office"**
@@ -225,8 +209,6 @@ A cool ink-navy shell and cool off-white panels frame a warm-grey concrete floor
 
 ### Secondary
 
-- **Job-class inks** (job-generalist teal, job-writer violet, job-backend amber, job-frontend pink, job-researcher green, job-companion sky): each job class's small-caps label in the agent list. Chosen to read on the sidebar navy. The class is the pet's role: the label is the role's name and the ink is keyed by role id in `officeTokens.roleInk`. A pet whose role is unknown reads "GENERALIST" in the generalist ink; a role without an ink of its own uses the shell muted text.
-
 ### Neutral
 
 - **Ink Navy** (shell-navy): the page and top bar; the darkest ground.
@@ -237,20 +219,13 @@ A cool ink-navy shell and cool off-white panels frame a warm-grey concrete floor
 - **Shell Line** (shell-line): the hairline under the top bar.
 - **Frost Text** (shell-text) and **Shell Muted** (shell-muted): primary and secondary text on navy; muted also carries status lines, placeholders and the party heading.
 - **Disabled Ink / Disabled Line** (disabled-ink, disabled-line): a disabled control's label and border; dimmer than muted, still 3:1 on the page.
-- **Pale Concrete** (concrete-floor) with **Floor Grid** (floor-grid): the office floor and its 2px tile grid.
-- **Wall Navy** (wall): the window wall along the top of the floor. **Room Label** (room-label) is the same navy for room names.
-- **Room Glass** (room-glass), **Room Fill** (room-fill), **Room Shine** (room-shine): a meeting room's 4px glass wall, its translucent tint and the inner highlight.
 - **Free Chip** (chip-free / chip-free-ink): the "Free" status chip beside a room name.
-- **Name Plate** (name-plate): a pet's name under its desk.
 - **Panel White** (panel-white), **Panel Text** (panel-text), **Panel Muted** (panel-muted), **Panel Line** (panel-line), **Panel Tile** (panel-tile): the light meetings panel and its dividers.
-- **Meter Off** (meter-off): an unlit call-meter segment. **Scrollbar Thumb** (scrollbar-thumb): the 8px scrollbar.
-- **Scrim** (scrim): the page navy at 72% behind a modal dialog, such as the roles notice.
+- **Scrollbar Thumb** (scrollbar-thumb): the 8px scrollbar.
 
 ### Named Rules
 
 **The Gold Means You Rule.** Gold marks what is selected, focused or needs the user: the selected row, the cursor, the focus ring, the primary action, a pressed toggle. It never decorates, never fills a panel, and never names a job class.
-
-**The One Colour Per Class Rule.** Each job class owns exactly one label ink, keyed by role id in the office tokens (`roleInk`), used only on that class's job label. The ink belongs to the role, never to a pet, so two pets with the same role share it. Adding a class means adding one ink that reads on the sidebar navy and stays clearly distinct from gold.
 
 **The Three Grounds Rule.** Navy is chrome (bar, agent list), off-white is reading (panels, threads, the activity view, agent controls), pale concrete is the world (the floor). A new surface picks the ground for its job; it does not invent a fourth.
 
@@ -290,7 +265,7 @@ Home is a fixed three-column desktop window (1440x800 by default) under a 64px t
 
 Spacing runs on a small 2-to-24px scale (xxs 2, hair 3, xs 4, sm 6, md 8, lg 12, xl 16, xxl 20, xxxl 24). Controls are 40px tall. Party rows gap 6px; inside a row the sprite and text gap 12px.
 
-The floor is a positioned world, not a flow layout: desks, rooms, furniture and plants sit at coordinates from `layout.ts`, all drawn at sprite scale 3. Sprite scales are whole numbers by job: logo 2, party 3, floor 3, furniture 3, plant 3, cursor 2.
+Sprites are drawn at whole-number scales (`spriteScale`).
 
 **The Integer Scale Rule.** A sprite is drawn at a whole-number scale (`spriteScale`) and nothing else. Pixel art scaled by a fraction smears.
 
@@ -300,7 +275,7 @@ Flat. The chrome uses tonal layering, not shadows: the page navy, a lighter side
 
 ### Shadow Vocabulary
 
-- **Sprite pixel** (`box-shadow: <x>px <y>px 0 0 <colour>`, one per painted pixel): how every character and piece of furniture is drawn.
+- **Sprite pixel** (`box-shadow: <x>px <y>px 0 0 <colour>`, one per painted pixel): how every character is drawn.
 - **Glass shine** (`box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.55)`): inside a meeting room's glass wall.
 
 **The No Lift Rule.** Chrome never floats: no drop shadows on panels, rows, buttons or cards. Hierarchy is tone and hairlines.
@@ -357,32 +332,18 @@ The picked agent's tab is the Settings pet editor in one column on Panel White: 
 
 Off-white reading surface: a heading block (Onest 600 14px plus a 12px muted subline) over a Panel Line divider, the thread area, and a call meter of 12 square 10px-tall segments (Meter Off when unlit) between "Calls" and a count. Empty state: two crew sprites at 3x, a pixel "No meetings yet" line and a 300px Onest paragraph.
 
-### Roles Notice
-
-The one-time "Your crew has roles now" dialog over the office, shown after an install from before roles is upgraded. A modal `<dialog>` on Sidebar Navy (it is chrome, and the job-class inks are tuned for that navy), 660px wide, 10px radius, a 1px Field Line border and no shadow, over a Scrim (`scrim`, the page navy at 72%) that keeps the office visible but receded. The title is the office-title style; one Body lead sentence in Shell Muted; then a table, one row per upgraded pet: avatar tile with the sprite at 2x and the pet name (pixel 17px), a muted arrow, the new role as a job-class label in its class ink, and what happened in Onest 13px. A "What changed?" text button (Onest 600 13px, underlined, `aria-expanded`) opens a Field Navy box of three short lines. The footer ends on "Review my crew" (toggle style, opens the first agent's controls in Home's right panel) and "Got it" (primary gold, focused on open); both, and Escape, mark the notice seen.
-
 ### Pixel Sprite (signature)
 
-Any sprite is data: `rows` (one character per pixel, `.` transparent), a `palette` mapping characters to colours, and optional `overlay` pixels (`[x, y, key]`) painted on top so characters share one 16x16 body and differ by palette and a few pixels. `PixelSprite` draws it as a box-shadow on one 1px element scaled by `transform: scale(n)` with n a whole number; it is `aria-hidden`, and the name beside it is what assistive tech reads. Characters live in `sprites/characters.ts` keyed by pet id (adding a character is adding an entry); furniture (desks, monitors lit and dark, chairs, meeting tables, sofa, rug, bookshelf, water cooler, plants) lives in `sprites/furniture.ts`.
-
-### Cursor
-
-A 7x4 gold down-pointing sprite at 2x that hops above the selected pet on the floor.
-
-### Motion
-
-- **Idle bob:** each seated pet steps up 3px and back, `1.1s steps(1) infinite`: two frames, never eased. Neighbouring pets are offset by 0.23s so the crew does not move in lockstep.
-- **Cursor hop:** the cursor steps down 3px and back, `0.7s steps(1) infinite`.
-- **Stillness:** both stop under `prefers-reduced-motion: reduce` and when the Still office toggle is on (remembered locally). The office must read completely when still.
+Any sprite is data: `rows` (one character per pixel, `.` transparent), a `palette` mapping characters to colours, and optional `overlay` pixels (`[x, y, key]`) painted on top so characters share one 16x16 body and differ by palette and a few pixels. `PixelSprite` draws it as a box-shadow on one 1px element scaled by `transform: scale(n)` with n a whole number; it is `aria-hidden`, and the name beside it is what assistive tech reads. Characters live in `sprites/characters.ts` keyed by pet id (adding a character is adding an entry).
 
 ## Do's and Don'ts
 
 ### Do:
 
 - **Do** take every colour, size, space, radius and timing from `officeTokens`; add a token before adding a value.
-- **Do** draw characters and furniture as sprite data (rows, palette, overlay) through `PixelSprite`, at a whole-number `spriteScale`.
+- **Do** draw characters as sprite data (rows, palette, overlay) through `PixelSprite`, at a whole-number `spriteScale`.
 - **Do** reserve gold for selection, focus, the cursor and the one primary action on a surface.
-- **Do** give each job class one label ink, and pair every status with an icon and a word.
+- **Do** pair every status with an icon and a word.
 - **Do** keep pixel type to names and short labels; set sentences, controls and numbers in Onest.
 - **Do** make every idle animation stepped and stop it for `prefers-reduced-motion` and the Still office setting.
 - **Do** build Hire a pet, Pet settings and the chat panel from these tokens: navy chrome, off-white reading panels, 40px gold primary button, 8px fields, the gold focus ring, party-row selection for choosing a pet or class, sprites at scale 3 for previews and 2 for small marks, and character ink for job labels.

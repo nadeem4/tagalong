@@ -3,9 +3,9 @@ import { dirname } from 'node:path';
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
 
 /**
- * React belongs to @tagalong/ui, not to this app, and the desktop package may not add
- * dependencies. Resolving from the ui package keeps a single React instance in the
- * renderer, which is what matters for hooks and context.
+ * The renderer imports React itself, so this app declares it, at the same version as
+ * @tagalong/ui. Resolving from the ui package still guarantees a single React instance in
+ * the renderer, which is what matters for hooks and context.
  */
 const fromUi = createRequire(new URL('../../packages/ui/package.json', import.meta.url));
 const reactDir = dirname(fromUi.resolve('react/package.json'));

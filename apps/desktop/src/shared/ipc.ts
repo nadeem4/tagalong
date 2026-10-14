@@ -16,10 +16,6 @@ export const IPC = {
   ask: 'tagalong:ask',
   interrupt: 'tagalong:interrupt',
   listPets: 'tagalong:pets:list',
-  listRoles: 'tagalong:roles:list',
-  recommendModel: 'tagalong:roles:recommend-model',
-  rolesNotice: 'tagalong:notices:roles-upgrade',
-  dismissRolesNotice: 'tagalong:notices:dismiss-roles-upgrade',
   // Home.
   listActivity: 'tagalong:activity:list',
   listExperts: 'tagalong:experts:list',
@@ -74,7 +70,6 @@ export const IPC = {
   toggleSightPause: 'tagalong:toggle-sight-pause',
   hotkeyProblemEvent: 'tagalong:hotkey-problem-event',
   settingsChangedEvent: 'tagalong:settings-changed-event',
-  deletePet: 'tagalong:pets:delete',
   selectPet: 'tagalong:pets:select',
   activePetEvent: 'tagalong:active-pet-event',
   resizeStrip: 'tagalong:avatar:resize-strip',
@@ -241,8 +236,6 @@ export interface TagalongHostApi {
   /** An empty key deletes the stored one. */
   saveApiKey(providerId: string, apiKey: string): Promise<void>;
   savePet(pet: Pet): Promise<Pet>;
-  /** Phase 4. Removes a pet for good; a deleted default pet is not re-seeded. */
-  deletePet(petId: string): Promise<boolean>;
   /** Phase 4. A click on the crew strip: makes that pet the panel's and opens the panel. */
   selectPet(petId: string): Promise<void>;
   /** Phase 4. Fires in the panel when the strip picked a pet. */

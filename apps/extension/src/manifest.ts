@@ -11,7 +11,8 @@ export const COMMAND_OPEN_PANEL = 'open-tagalong';
 export const manifest = {
   manifest_version: 3,
   name: 'Tagalong',
-  description: 'Your Tagalong crew in the browser: exact selections, page text, and a side panel.',
+  description:
+    'Hands Scout, your Tagalong companion, your selection and the page you are on. Needs the Tagalong desktop app running on Windows.',
   version: '0.0.0',
   minimum_chrome_version: '116',
   background: { service_worker: 'service-worker.js', type: 'module' },

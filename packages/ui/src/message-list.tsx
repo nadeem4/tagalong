@@ -1,26 +1,21 @@
 import type { MessageRole, Pet } from '@tagalong/protocol';
-import { DEFAULT_PET_COLOR } from './crew-strip';
+import { DEFAULT_PET_COLOR } from './office/sprites/characters';
 
 /**
- * A message as the panel shows it: the stored content blocks flattened to text.
- *
- * Crew messages carry more: which pet said it and on which model (`speaker`), or what kind
- * of crew event it records — a handoff bubble, a consult card, a roundtable round marker.
+ * A message as the panel shows it: the stored content blocks flattened to text, with who
+ * said it and on which model (`speaker`), or what it records — a fired watch, or a note.
  */
 export interface ChatMessage {
   id: string;
   role: MessageRole;
   text: string;
-  /** The pet that answered, for an assistant message in a crew. */
+  /** The pet that answered, for an assistant message. */
   petId?: string;
-  /** "Ink · anthropic/claude-sonnet-5": who said it, on what. */
+  /** "Scout · haiku": who said it, on what. */
   speaker?: string;
-  kind?: 'handoff' | 'consult' | 'round' | 'watch';
+  kind?: 'note' | 'watch';
   /** For a fired watch: what the pet was watching for. */
   condition?: string;
-  /** For a handoff or consult: who addressed whom. */
-  fromPetId?: string;
-  toPetId?: string;
 }
 
 export interface MessageListProps {
@@ -29,10 +24,8 @@ export interface MessageListProps {
   streamingText: string;
   /** Labels the streaming bubble with the pet and model answering. */
   streamingSpeaker?: string;
-  /** The crew, for names, avatars and colours. Empty for a single-pet host. */
+  /** The pets, for names and colours. */
   pets?: readonly Pet[];
-  /** Offered on each answer when set: hands the thread to another pet. */
-  onHandoff?: (fromPetId: string, toPetId: string) => void;
 }
 
 const BUBBLE_BY_ROLE: Record<MessageRole, string> = {
@@ -66,7 +59,6 @@ export function MessageList({
   streamingText,
   streamingSpeaker,
   pets = [],
-  onHandoff,
 }: MessageListProps) {
   return (
     <div
@@ -75,35 +67,6 @@ export function MessageList({
       className="flex flex-1 flex-col gap-2 overflow-y-auto p-3 text-sm"
     >
       {messages.map((message) => {
-        if (message.kind === 'handoff') {
-          return (
-            <div
-              key={message.id}
-              data-testid="handoff"
-              role="note"
-              className="self-center w-[90%] rounded-lg border border-dashed px-3 py-2 text-xs text-slate-600"
-              style={{ borderColor: colorOf(pets, message.toPetId) }}
-            >
-              <p className="font-medium">
-                {nameOf(pets, message.fromPetId)} handed this to {nameOf(pets, message.toPetId)}
-              </p>
-              <p className="mt-1 whitespace-pre-wrap">{message.text}</p>
-            </div>
-          );
-        }
-        if (message.kind === 'consult') {
-          return (
-            <div
-              key={message.id}
-              data-testid="consult"
-              role="note"
-              className="self-start rounded-md bg-amber-50 px-2 py-1 text-[11px] text-amber-900"
-            >
-              {nameOf(pets, message.fromPetId)} consulted {nameOf(pets, message.toPetId)}:{' '}
-              {message.text}
-            </div>
-          );
-        }
         if (message.kind === 'watch') {
           return (
             <div
@@ -124,11 +87,11 @@ export function MessageList({
             </div>
           );
         }
-        if (message.kind === 'round') {
+        if (message.kind === 'note') {
           return (
             <div
               key={message.id}
-              data-testid="round"
+              data-testid="note"
               role="separator"
               className="self-center text-[11px] uppercase tracking-wide text-slate-400"
             >
@@ -137,10 +100,6 @@ export function MessageList({
           );
         }
 
-        const others =
-          onHandoff !== undefined && message.role === 'assistant' && message.petId !== undefined
-            ? pets.filter((pet) => pet.id !== message.petId)
-            : [];
         return (
           <div
             key={message.id}
@@ -155,25 +114,6 @@ export function MessageList({
             >
               {message.text}
             </div>
-            {others.length > 0 && (
-              <select
-                aria-label="Hand off"
-                value=""
-                onChange={(event) => {
-                  if (event.target.value !== '' && message.petId !== undefined) {
-                    onHandoff?.(message.petId, event.target.value);
-                  }
-                }}
-                className="rounded border-none bg-transparent text-[11px] text-slate-500"
-              >
-                <option value="">Hand off…</option>
-                {others.map((pet) => (
-                  <option key={pet.id} value={pet.id}>
-                    {`${pet.avatar} ${pet.name}`}
-                  </option>
-                ))}
-              </select>
-            )}
           </div>
         );
       })}

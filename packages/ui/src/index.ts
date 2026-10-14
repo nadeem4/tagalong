@@ -13,9 +13,6 @@ export type {
   TurnEvent,
 } from './host-bridge';
 
-export { PetAvatar } from './pet-avatar';
-export type { PetAvatarProps, PetState } from './pet-avatar';
-
 export { MessageList } from './message-list';
 export type { ChatMessage, MessageListProps } from './message-list';
 
@@ -24,9 +21,6 @@ export type { ComposerProps } from './composer';
 
 export { SightBar, estimateImageTokens } from './sight-bar';
 export type { SightBarProps, SightProblem } from './sight-bar';
-
-export { CrewStrip, DEFAULT_PET_COLOR } from './crew-strip';
-export type { CrewStripProps } from './crew-strip';
 
 export { ChatPanel } from './chat-panel';
 export { CompanionBubble, GreetingLine } from './companion-bubble';

@@ -28,10 +28,6 @@ function setup(answers: Partial<Record<HostToCoreMethod, unknown>> = {}) {
   const engine = fakeEngine({
     'pets.list': { pets: [SCOUT, pet('sage')] },
     'pets.upsert': { pet: SCOUT },
-    'pets.delete': { deleted: true },
-    'roles.list': { roles: [] },
-    'roles.recommendModel': { model: 'm' },
-    'notices.rolesUpgrade': { notice: null },
     'experts.list': { experts: [] },
     'settings.set': { settings: { ...SETTINGS, welcome: { done: true } } },
     ...answers,
@@ -50,31 +46,17 @@ function setup(answers: Partial<Record<HostToCoreMethod, unknown>> = {}) {
 }
 
 describe('registerCrewIpc', () => {
-  it('lists pets and roles, recommends a model and reads the roles notice', async () => {
+  it('lists pets', async () => {
     const { invoke, calls } = setup();
     expect(await invoke(IPC.listPets)).toEqual([SCOUT, pet('sage')]);
-    expect(await invoke(IPC.listRoles)).toEqual([]);
-    expect(await invoke(IPC.recommendModel, 'coder', 'openrouter')).toEqual({ model: 'm' });
-    expect(await invoke(IPC.rolesNotice)).toBeNull();
-    expect(await invoke(IPC.dismissRolesNotice)).toBeUndefined();
-    expect(calls).toEqual([
-      ['pets.list', {}],
-      ['roles.list', {}],
-      ['roles.recommendModel', { roleId: 'coder', providerId: 'openrouter' }],
-      ['notices.rolesUpgrade', {}],
-      ['notices.dismiss', { notice: 'rolesUpgrade' }],
-    ]);
+    expect(calls).toEqual([['pets.list', {}]]);
   });
 
-  it('saves and deletes a pet, redrawing the strip after each', async () => {
+  it('saves a pet, redrawing the strip after', async () => {
     const { invoke, calls, deps } = setup();
     expect(await invoke(IPC.savePet, SCOUT)).toEqual(SCOUT);
-    expect(await invoke(IPC.deletePet, 'sage')).toBe(true);
-    expect(calls).toEqual([
-      ['pets.upsert', { pet: SCOUT }],
-      ['pets.delete', { petId: 'sage' }],
-    ]);
-    expect(deps.refreshStrip).toHaveBeenCalledTimes(2);
+    expect(calls).toEqual([['pets.upsert', { pet: SCOUT }]]);
+    expect(deps.refreshStrip).toHaveBeenCalledOnce();
   });
 
   it('moves Scout, as the Companion, to the chosen service', async () => {
