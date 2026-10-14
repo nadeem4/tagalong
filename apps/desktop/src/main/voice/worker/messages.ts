@@ -11,6 +11,7 @@ export type ToWorker =
       voice: VoiceId;
       speed: number;
     }
+  | { kind: 'call'; id: number; method: 'ears.ensure' }
   | { kind: 'ears.listen'; mode: ListenMode }
   | { kind: 'ears.frame'; samples: Float32Array }
   | { kind: 'ears.stop' };
@@ -21,7 +22,8 @@ export type FromWorker =
   | { kind: 'error'; id: number; message: string }
   | { kind: 'kokoro.ready' }
   | { kind: 'ears'; event: EarsEvent; text?: string }
-  | { kind: 'ears.status'; status: 'loading' | 'ready' | 'failed'; message?: string };
+  | { kind: 'ears.status'; status: 'loading' | 'ready' | 'failed'; message?: string }
+  | { kind: 'ears.progress'; fraction: number };
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 

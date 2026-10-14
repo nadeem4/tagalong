@@ -7,7 +7,7 @@ import { forwardEars, registerVoiceIpc } from './voice';
 function setup(noteActiveWindow: () => Promise<unknown> = () => Promise.resolve()) {
   const ipc = fakeIpc();
   const voice = { speak: vi.fn(() => Promise.resolve({ kind: 'off' as const })) };
-  const worker = { send: vi.fn() };
+  const worker = { send: vi.fn(), call: vi.fn(async () => true as unknown) };
   registerVoiceIpc(ipc.handle, {
     voice: () => voice,
     worker: () => worker,
@@ -40,6 +40,12 @@ describe('registerVoiceIpc', () => {
     expect(worker.send).toHaveBeenCalledWith({ kind: 'ears.listen', mode: 'held' });
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
+  });
+
+  it('ensures the ears’ models through the voice process and resolves with nothing', async () => {
+    const { invoke, worker } = setup();
+    expect(await invoke(IPC.ensureEars)).toBeUndefined();
+    expect(worker.call).toHaveBeenCalledWith({ kind: 'call', method: 'ears.ensure' });
   });
 
   it('refuses a mode it does not know, rather than guessing', async () => {
@@ -94,6 +100,7 @@ describe('forwardEars', () => {
     listeners.forEach((l) => l({ kind: 'ears', event: 'speechStart' }));
     listeners.forEach((l) => l({ kind: 'ears.status', status: 'loading' }));
     listeners.forEach((l) => l({ kind: 'ears.status', status: 'failed', message: 'offline' }));
+    listeners.forEach((l) => l({ kind: 'ears.progress', fraction: 0.25 }));
     listeners.forEach((l) => l({ kind: 'kokoro.ready' }));
     exits.forEach((l) => l());
     expect(sent).toEqual([
@@ -101,6 +108,7 @@ describe('forwardEars', () => {
       [IPC.earsEvent, { event: 'speechStart' }],
       [IPC.earsStatusEvent, { status: 'loading' }],
       [IPC.earsStatusEvent, { status: 'failed', message: 'offline' }],
+      [IPC.earsProgressEvent, { fraction: 0.25 }],
       [
         IPC.earsStatusEvent,
         { status: 'failed', message: 'Listening stopped unexpectedly. Try again.' },

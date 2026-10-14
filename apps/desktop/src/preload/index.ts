@@ -243,6 +243,16 @@ const host: TagalongHostApi = {
     ipcRenderer.on(IPC.earsStatusEvent, listener);
     return () => void ipcRenderer.off(IPC.earsStatusEvent, listener);
   },
+  ensureEars: async (onProgress) => {
+    const listener = (_event: IpcRendererEvent, payload: { fraction: number }): void =>
+      onProgress(payload.fraction);
+    ipcRenderer.on(IPC.earsProgressEvent, listener);
+    try {
+      await ipcRenderer.invoke(IPC.ensureEars);
+    } finally {
+      ipcRenderer.off(IPC.earsProgressEvent, listener);
+    }
+  },
 };
 
 contextBridge.exposeInMainWorld('tagalong', bridge);

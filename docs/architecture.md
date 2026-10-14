@@ -1686,6 +1686,18 @@ flowchart LR
   looking at?", when stopped) and main adds Chromium's `use-fake-device-for-media-stream` and
   `use-fake-ui-for-media-stream` switches, so the e2e suite needs no model and no microphone while
   the frames still flow through the real voice process. ElevenLabs Scribe is not wired in.
+- **Voice seam for other windows** (`renderer/src/voice-seam.ts`). `installVoiceSeam()` puts
+  `window.tagalongVoice` on a window (the panel calls it at start; the first-run window will call it
+  in its own): `ears` (a `RemoteEars` in `held` mode), `openMic(deviceId?)` (the `openMic` above,
+  resolving to a `MicStream` with `close()`) and `ensureEars(onProgress)`, which downloads the ears'
+  model files if missing. `ensureEars` goes `TagalongHostApi.ensureEars` → `IPC.ensureEars` → the
+  `ears.ensure` worker call, outside the listening order queue; the voice process runs
+  `ensureFiles(dir, EARS_FILES, fetch, onProgress)` and posts each `ears.progress` fraction, which
+  `forwardEars` sends as `IPC.earsProgressEvent` (`{ fraction }`) and the preload hands to
+  `onProgress` until the call settles. Progress is file by file (bytes of the files done over all
+  bytes, never above 1) and ends at exactly 1, also when every file was already there. Under
+  `TAGALONG_FAKE_STT=1` it reports 1 and downloads nothing. It only fetches; the ears still load
+  their models when listening starts.
 - **Spoken mode** (`core/conversation/prompt-assembler.ts`). `ask` takes `spoken: true`; the runner
   passes it to `assemblePrompt`, which appends `SPOKEN_MODE` (headed `SPOKEN_HEADING`) last in the
   system prompt for that turn only: short sentences and contractions, no markdown or lists in what

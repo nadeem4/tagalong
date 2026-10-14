@@ -12,9 +12,13 @@ function setup(loaded = true) {
     speak: vi.fn(async () => AUDIO),
   };
   const ears = vi.fn();
-  const handle = createWorkerHandler({ kokoro, ears }, (m) => posted.push(m));
+  const ensureEars = vi.fn(async (onProgress: (fraction: number) => void) => {
+    onProgress(0.5);
+    onProgress(1);
+  });
+  const handle = createWorkerHandler({ kokoro, ears, ensureEars }, (m) => posted.push(m));
   const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
-  return { posted, kokoro, ears, handle, settle };
+  return { posted, kokoro, ears, ensureEars, handle, settle };
 }
 
 describe('createWorkerHandler', () => {
@@ -59,6 +63,25 @@ describe('createWorkerHandler', () => {
     });
     await settle();
     expect(posted).toEqual([{ kind: 'error', id: 3, message: 'not loaded' }]);
+  });
+
+  it('downloads the ears’ models on ears.ensure, posting each fraction, then answers true', async () => {
+    const { posted, handle, settle } = setup();
+    handle({ kind: 'call', id: 9, method: 'ears.ensure' });
+    await settle();
+    expect(posted).toEqual([
+      { kind: 'ears.progress', fraction: 0.5 },
+      { kind: 'ears.progress', fraction: 1 },
+      { kind: 'result', id: 9, value: true },
+    ]);
+  });
+
+  it('answers a failed ears.ensure as an error', async () => {
+    const { posted, ensureEars, handle, settle } = setup();
+    ensureEars.mockRejectedValueOnce(new Error('offline'));
+    handle({ kind: 'call', id: 10, method: 'ears.ensure' });
+    await settle();
+    expect(posted).toEqual([{ kind: 'error', id: 10, message: 'offline' }]);
   });
 
   it('passes ears messages to the ears', () => {

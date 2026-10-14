@@ -96,6 +96,8 @@ export const IPC = {
   earsStop: 'tagalong:voice:ears-stop',
   earsEvent: 'tagalong:voice:ears-event',
   earsStatusEvent: 'tagalong:voice:ears-status',
+  ensureEars: 'tagalong:voice:ensure-ears',
+  earsProgressEvent: 'tagalong:voice:ears-progress',
 } as const;
 
 /** The ears' models: loading (the first time, a download), ready, or failed and why. */
@@ -324,6 +326,8 @@ export interface TagalongHostApi {
   onEarsEvent(handler: (event: EarsEvent, text?: string) => void): () => void;
   /** The ears' models loading, ready, or failed. */
   onEarsStatus(handler: (status: EarsStatus) => void): () => void;
+  /** Downloads the ears' model files if missing; `onProgress` hears 0..1, ending at 1. */
+  ensureEars(onProgress: (fraction: number) => void): Promise<void>;
 }
 
 declare global {

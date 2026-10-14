@@ -75,15 +75,28 @@ export function filesPresent(dir: string, files: readonly ModelFile[]): boolean 
  * Downloads every file not yet on disk. Each is written beside itself as `.part` and
  * renamed when complete, so a failed or interrupted download leaves nothing that looks done.
  * `bytes` is a minimum, not an exact match: a re-upload a few bytes larger must not break listening.
+ * `onProgress` hears the share of all bytes done (present or just fetched) after each file,
+ * and ends with exactly 1; with everything already there it hears just that 1.
  */
 export async function ensureFiles(
   dir: string,
   files: readonly ModelFile[],
   fetchFn: typeof fetch = fetch,
+  onProgress?: (fraction: number) => void,
 ): Promise<void> {
+  if (filesPresent(dir, files)) {
+    onProgress?.(1);
+    return;
+  }
+  const total = files.reduce((sum, file) => sum + file.bytes, 0);
+  let done = 0;
   for (const file of files) {
     const target = join(dir, file.path);
-    if (existsSync(target)) continue;
+    if (existsSync(target)) {
+      done += file.bytes;
+      onProgress?.(Math.min(done / total, 1));
+      continue;
+    }
     const part = `${target}.part`;
     try {
       const response = await fetchFn(file.url);
@@ -97,5 +110,7 @@ export async function ensureFiles(
       await rm(part, { force: true });
       throw error;
     }
+    done += file.bytes;
+    onProgress?.(Math.min(done / total, 1));
   }
 }

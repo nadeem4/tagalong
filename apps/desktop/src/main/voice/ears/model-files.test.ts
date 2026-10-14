@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -27,6 +27,25 @@ describe('ensureFiles', () => {
     expect(filesPresent(dir, FILES)).toBe(true);
     await ensureFiles(dir, FILES, fetchFn);
     expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports progress after each file by bytes, ending at exactly 1', async () => {
+    mkdirSync(join(dir, 'ears'), { recursive: true });
+    writeFileSync(join(dir, 'ears/vad.onnx'), 'abc');
+    const fetchFn = vi.fn(async () => new Response('de')) as unknown as typeof fetch;
+    const fractions: number[] = [];
+    await ensureFiles(dir, FILES, fetchFn, (f) => fractions.push(f));
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(fractions).toEqual([3 / 5, 1]);
+  });
+
+  it('reports a single 1 when every file is already there', async () => {
+    mkdirSync(join(dir, 'ears'), { recursive: true });
+    writeFileSync(join(dir, 'ears/vad.onnx'), 'abc');
+    writeFileSync(join(dir, 'ears/stt.onnx'), 'de');
+    const fractions: number[] = [];
+    await ensureFiles(dir, FILES, vi.fn() as unknown as typeof fetch, (f) => fractions.push(f));
+    expect(fractions).toEqual([1]);
   });
 
   it('keeps nothing of a failed or short download, so the next try starts clean', async () => {

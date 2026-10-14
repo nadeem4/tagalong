@@ -6,7 +6,7 @@ import type { IpcHandle, IpcOn } from './handle';
 
 export interface VoiceIpcDeps {
   voice: () => Pick<VoiceService, 'speak'>;
-  worker: () => Pick<VoiceWorker, 'send'>;
+  worker: () => Pick<VoiceWorker, 'send' | 'call'>;
   /** Notes the window you are on, as the ask key does. */
   noteActiveWindow: () => Promise<unknown>;
   on: IpcOn;
@@ -59,6 +59,12 @@ export function registerVoiceIpc(handle: IpcHandle, deps: VoiceIpcDeps): void {
   });
 
   handle(IPC.earsStop, () => inOrder(() => deps.worker().send({ kind: 'ears.stop' })));
+
+  // A download, not a listening step: it stays out of the ordering queue. Progress comes back
+  // through forwardEars as IPC.earsProgressEvent.
+  handle(IPC.ensureEars, async () => {
+    await deps.worker().call({ kind: 'call', method: 'ears.ensure' });
+  });
 }
 
 /** What the ears say goes to the windows; a dead voice process is said plainly. */
@@ -74,6 +80,8 @@ export function forwardEars(
           ? { event: message.event }
           : { event: message.event, text: message.text },
       );
+    } else if (message.kind === 'ears.progress') {
+      send(IPC.earsProgressEvent, { fraction: message.fraction });
     } else if (message.kind === 'ears.status') {
       send(
         IPC.earsStatusEvent,
