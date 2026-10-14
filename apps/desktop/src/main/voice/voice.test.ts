@@ -213,6 +213,13 @@ describe('createVoiceService', () => {
     expect(local.warm).not.toHaveBeenCalled();
   });
 
+  it('a preview with the system voice picked uses it, and never loads Kokoro, even when Kokoro is saved', async () => {
+    const { voice, local, spoken } = service({ mouth: 'kokoro' });
+    expect(await voice.speak('Hello.', { mouth: 'system' })).toEqual({ kind: 'fallback' });
+    expect(spoken).toEqual([]);
+    expect(local.warm).not.toHaveBeenCalled();
+  });
+
   it('falls from a chosen ElevenLabs with no key to Kokoro', async () => {
     const { voice, spoken } = service({ mouth: 'elevenlabs', voiceId: 'voice-1' });
     await voice.speak('Hi.');
@@ -244,7 +251,9 @@ describe('LazyLocalVoice', () => {
   };
 
   it('says when a warm-up has finished, and whether it loaded', async () => {
-    const ok = new LazyLocalVoice(async () => ({ generate: async () => ({ toWav: () => new ArrayBuffer(0) }) }));
+    const ok = new LazyLocalVoice(async () => ({
+      generate: async () => ({ toWav: () => new ArrayBuffer(0) }),
+    }));
     expect(await ok.loaded()).toBe(false);
     ok.warm();
     expect(await ok.loaded()).toBe(true);

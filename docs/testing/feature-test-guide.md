@@ -415,8 +415,8 @@ voice model (about 90 MB) into `%APPDATA%\Tagalong\voice`; ElevenLabs (V.6) bill
 
 ### V.5b. Who speaks: System voice
 
-1. **Action:** on a fresh profile, in Settings → Voice pick **The system voice** under **Who speaks**, Save, then press **▶ Preview**.
-2. **Expected:** the preview plays in the system voice and no Kokoro download starts (the voice folder under `%APPDATA%\Tagalong` stays empty).
+1. **Action:** on a fresh profile, in Settings → Voice pick **The system voice** under **Who speaks**, then press **▶ Preview**.
+2. **Expected:** the preview plays in the system voice and no Kokoro download starts, with no Save needed (the voice folder under `%APPDATA%\Tagalong` stays empty).
 
 ### V.6. ElevenLabs (your own key)
 

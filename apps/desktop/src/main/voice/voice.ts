@@ -176,7 +176,10 @@ export function createVoiceService(options: VoiceServiceOptions) {
      * Says one line. `preview` is Settings' Preview, which plays even while Scout talks
      * is off, in the voice and speed the form shows rather than the saved ones.
      */
-    async speak(text: string, preview?: Partial<SpeakOptions>): Promise<SpeakResult> {
+    async speak(
+      text: string,
+      preview?: Partial<SpeakOptions> & { mouth?: MouthId },
+    ): Promise<SpeakResult> {
       const chosen = settings();
       if (preview === undefined && !chosen.enabled) return { kind: 'off' };
       const how: SpeakOptions = {
@@ -185,7 +188,7 @@ export function createVoiceService(options: VoiceServiceOptions) {
       };
       if (env.TAGALONG_FAKE_TTS === '1')
         return { kind: 'audio', ...(await fakeTts.speak(text, how)) };
-      for (const id of mouthOrder(chosenMouth(chosen))) {
+      for (const id of mouthOrder(preview?.mouth ?? chosenMouth(chosen))) {
         if (id === 'system') return { kind: 'fallback' };
         try {
           const mouth = mouths[id];

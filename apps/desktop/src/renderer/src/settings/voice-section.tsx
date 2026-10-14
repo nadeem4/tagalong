@@ -6,7 +6,7 @@ import {
   adaptersFor,
   chosenMouth,
 } from '@tagalong/protocol';
-import type { Settings, VoiceId } from '@tagalong/protocol';
+import type { MouthId, Settings, VoiceId } from '@tagalong/protocol';
 import { listMicrophones } from '../mic';
 import { voiceFacts } from '../settings-form';
 import { playLine } from '../voice-player';
@@ -54,7 +54,7 @@ export function VoiceSection({
 
   const preview = (): void => {
     setPreviewing(true);
-    playLine(PREVIEW_LINE, new AbortController().signal, { voice, speed })
+    playLine(PREVIEW_LINE, new AbortController().signal, { voice, speed, mouth: mouth as MouthId })
       .catch((error: unknown) => console.warn('[voice] preview failed', error))
       .finally(() => setPreviewing(false));
   };

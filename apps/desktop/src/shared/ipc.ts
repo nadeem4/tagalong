@@ -7,6 +7,7 @@ import type {
   RoutineResultParams,
   Settings,
   SettingsPatch,
+  MouthId,
   VoiceId,
 } from '@tagalong/protocol';
 import type { HostBridge } from '@tagalong/ui';
@@ -99,6 +100,8 @@ export type TranscribeResult = { kind: 'text'; text: string } | { kind: 'failed'
 export interface SpeakPreview {
   voice?: VoiceId;
   speed?: number;
+  /** Who speaks, as the picker shows it. */
+  mouth?: MouthId;
 }
 
 /**
