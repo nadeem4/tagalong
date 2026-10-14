@@ -7,8 +7,9 @@ import {
   type ProjectCandidate,
 } from '@tagalong/protocol';
 import type { ActivityLog } from '../memory/activity';
+import { hideSecrets } from '../privacy/secrets';
 import { RpcFailure } from '../server/ws-server';
-import { renderBrief, type Brief, type Connector } from './connector';
+import { renderBrief, type Brief, type Connector, type ConnectorResult } from './connector';
 import type { ExpertStore } from './store';
 
 export type HandoffEvent =
@@ -192,13 +193,22 @@ export class HandoffManager {
   ): Promise<void> {
     const { activity, emit } = this.options;
     const expertId = expert.id;
-    const result = await this.options
+    const sent = await this.options
       .connectorFor(expert, research ? { research: true } : undefined)
       .send(
         brief,
-        (step) => emit({ method: 'handoff.progress', params: { handoffId, expertId, step } }),
+        (step) =>
+          emit({
+            method: 'handoff.progress',
+            params: { handoffId, expertId, step: hideSecrets(step) },
+          }),
         signal,
       );
+    // An expert reads files for itself, so its answer can carry a key it read: hidden
+    // before it is stored, shown or handed back to the companion.
+    const result: ConnectorResult = sent.ok
+      ? { ...sent, text: hideSecrets(sent.text) }
+      : { ...sent, error: hideSecrets(sent.error) };
     this.#running.delete(handoffId);
 
     if (signal.aborted) {

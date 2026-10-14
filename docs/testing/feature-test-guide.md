@@ -1162,6 +1162,8 @@ that calls tools (your Claude sign-in or OpenRouter + Claude).
 - [ ] Approve in Notion. The browser shows "You are signed in"; Home lists Notion as **Connected**
       with its tools, each **Reads** or **Asks first**.
 - [ ] Restart Tagalong. Notion connects again with no browser.
+- [ ] Remove Notion, connect it again and press **Cancel** (or Deny) on Notion's page. Home says the
+      sign-in did not work straight away, not after five minutes.
 
 ### C2. Read with Notion
 
@@ -1176,6 +1178,8 @@ that calls tools (your Claude sign-in or OpenRouter + Claude).
 - [ ] Ask again and press **Allow once**. The page appears in Notion; Activity shows "Scout changed
       Notion".
 - [ ] Ask again and leave the card for two minutes. Scout says you did not answer and nothing changed.
+- [ ] Ask for a page with a long body (a few paragraphs). The card shows the whole body, scrolling
+      inside the card, never cut off with "...".
 
 ### C4. GitHub with a token
 
