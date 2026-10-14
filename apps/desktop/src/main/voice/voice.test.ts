@@ -136,6 +136,34 @@ describe('createVoiceService', () => {
       { voice: 'bm_george', speed: 0.95 },
     ]);
   });
+
+  it('loads an already downloaded local voice at start, so the first lines are not the system voice', () => {
+    const { voice, local } = service({ ready: false });
+    voice.warmAtStart(true);
+    expect(local.warm).toHaveBeenCalledOnce();
+  });
+
+  it('never starts a download at start', () => {
+    const { voice, local } = service({ ready: false });
+    voice.warmAtStart(false);
+    expect(local.warm).not.toHaveBeenCalled();
+  });
+
+  it('loads nothing at start when Scout talks is off or under TAGALONG_FAKE_TTS', () => {
+    const fake = service({ ready: false, env: { TAGALONG_FAKE_TTS: '1' } });
+    fake.voice.warmAtStart(true);
+    expect(fake.local.warm).not.toHaveBeenCalled();
+
+    const local = localVoice(false, []);
+    createVoiceService({
+      env: {},
+      settings: () => ({ ...SETTINGS_DEFAULTS.voice, enabled: false }),
+      elevenLabsKey: async () => null,
+      local,
+      elevenLabs: () => local,
+    }).warmAtStart(true);
+    expect(local.warm).not.toHaveBeenCalled();
+  });
 });
 
 describe('LazyLocalVoice', () => {

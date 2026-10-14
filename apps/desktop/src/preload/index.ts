@@ -40,10 +40,10 @@ import type {
  * compromised page can reach exactly the calls listed here and nothing else.
  */
 /** A launch greeting that arrived before the panel subscribed, kept until it does. */
-let earlyLine: string | null = null;
-ipcRenderer.on(IPC.greetLineEvent, (_event: IpcRendererEvent, text: string) => {
-  earlyLine = text;
-});
+const greetLine = heldUntilHeard<string>();
+ipcRenderer.on(IPC.greetLineEvent, (_event: IpcRendererEvent, text: string) =>
+  greetLine.arrived(text),
+);
 
 /** Home's page and Scout's card, which a fresh Home window can be sent before React listens. */
 const homePage = heldUntilHeard<string>();
@@ -175,17 +175,8 @@ const host: TagalongHostApi = {
     ipcRenderer.on(IPC.greetEvent, listener);
     return () => void ipcRenderer.off(IPC.greetEvent, listener);
   },
-  onGreetLine: (handler) => {
-    // The line can arrive before React has subscribed; one that did is handed over now.
-    if (earlyLine !== null) handler(earlyLine);
-    earlyLine = null;
-    const listener = (_event: IpcRendererEvent, text: string): void => {
-      earlyLine = null;
-      handler(text);
-    };
-    ipcRenderer.on(IPC.greetLineEvent, listener);
-    return () => void ipcRenderer.off(IPC.greetLineEvent, listener);
-  },
+  // The line can arrive before React has subscribed; one that did is handed over then.
+  onGreetLine: (handler) => greetLine.listen(handler),
   onRemark: (handler) => {
     const listener = (_event: IpcRendererEvent, remark: PetRemarkParams): void => handler(remark);
     ipcRenderer.on(IPC.remarkEvent, listener);

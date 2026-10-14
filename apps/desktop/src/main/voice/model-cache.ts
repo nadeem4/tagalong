@@ -1,5 +1,11 @@
+import { existsSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
+
+/** Whether a model's file is already in the cache: a look on disk, never a fetch. */
+export function isDownloaded(cacheDir: string, model: string, file: string): boolean {
+  return existsSync(join(cacheDir, model, file));
+}
 
 /**
  * Runs a model loader, and if it fails deletes that model's folder in the cache.

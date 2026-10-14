@@ -91,16 +91,27 @@ function speakWithSystem(text: string, signal: AbortSignal, rate: number): Promi
 if (typeof speechSynthesis !== 'undefined') speechSynthesis.getVoices();
 
 /**
- * Says one line in this window: main synthesises it (Kokoro or ElevenLabs) and the audio
- * is played here, or main says to use the system voice. `preview` is Settings' ▶ Preview.
+ * Gets one line ready in this window: main starts synthesising it (Kokoro or ElevenLabs)
+ * now, and the function returned plays the audio here once it is in, or uses the system
+ * voice when main says to. A line that is dropped unplayed is simply never played.
+ * `preview` is Settings' ▶ Preview.
  */
-export async function playLine(
+export function prepareLine(
   text: string,
-  signal: AbortSignal,
   preview?: SpeakPreview,
-): Promise<void> {
-  const result = await window.tagalongHost.speak(text, preview);
-  if (signal.aborted || result.kind === 'off') return;
-  if (result.kind === 'fallback') return speakWithSystem(text, signal, preview?.speed ?? 1);
-  return playAudio(result.audio, signal);
+): (signal: AbortSignal) => Promise<void> {
+  const result = window.tagalongHost.speak(text, preview);
+  // Nobody may ever play a line got ready ahead; its failure must not go unhandled.
+  result.catch(() => undefined);
+  return async (signal) => {
+    const spoken = await result;
+    if (signal.aborted || spoken.kind === 'off') return;
+    if (spoken.kind === 'fallback') return speakWithSystem(text, signal, preview?.speed ?? 1);
+    return playAudio(spoken.audio, signal);
+  };
+}
+
+/** Says one line in this window, start to finish. */
+export function playLine(text: string, signal: AbortSignal, preview?: SpeakPreview): Promise<void> {
+  return prepareLine(text, preview)(signal);
 }

@@ -46,7 +46,7 @@ export { SETTINGS_CSS } from './settings/settings-styles';
 
 /** Scout talks: what a bubble line sounds like, and the queue that says one at a time. */
 export { SpeechQueue } from './voice/speech-queue';
-export type { SpeechQueueOptions } from './voice/speech-queue';
+export type { PreparedLine, SpeechQueueOptions } from './voice/speech-queue';
 export { toSpeakable } from './voice/speakable';
 /** Talk to Scout: telling a held key from a fresh press, and the bubble's side of it. */
 export { PushToTalk } from './voice/push-to-talk';

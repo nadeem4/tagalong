@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { pickSystemVoice } from './voice-player';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { pickSystemVoice, prepareLine } from './voice-player';
 
 const voice = (name: string, lang: string) => ({ name, lang });
 
@@ -26,5 +26,41 @@ describe('pickSystemVoice', () => {
       undefined,
     );
     expect(pickSystemVoice([])).toBe(undefined);
+  });
+});
+
+describe('prepareLine', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('asks main for the audio at once, before the line is played', () => {
+    const speak = vi.fn(() => new Promise<never>(() => undefined));
+    vi.stubGlobal('window', { tagalongHost: { speak } });
+    prepareLine('Hello there.');
+    expect(speak).toHaveBeenCalledWith('Hello there.', undefined);
+  });
+
+  it('plays nothing when stopped before it was played', async () => {
+    vi.stubGlobal('window', {
+      tagalongHost: { speak: () => Promise.resolve({ kind: 'fallback' }) },
+    });
+    const speakSystem = vi.fn();
+    vi.stubGlobal('speechSynthesis', { speak: speakSystem, getVoices: () => [] });
+    const play = prepareLine('Hello there.');
+    const controller = new AbortController();
+    controller.abort();
+    await play(controller.signal);
+    expect(speakSystem).not.toHaveBeenCalled();
+  });
+
+  it('leaves no failed synthesis unhandled when the line is dropped', async () => {
+    const unhandled = vi.fn();
+    process.on('unhandledRejection', unhandled);
+    vi.stubGlobal('window', {
+      tagalongHost: { speak: () => Promise.reject(new Error('no voice')) },
+    });
+    prepareLine('Hello there.');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    process.off('unhandledRejection', unhandled);
+    expect(unhandled).not.toHaveBeenCalled();
   });
 });

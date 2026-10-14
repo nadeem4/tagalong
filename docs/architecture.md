@@ -1436,7 +1436,9 @@ flowchart LR
   last launch, at most five, brief only), plus `settings.userName` when set (the model may greet by it,
   and the handwritten line becomes "Morning, Nadeem."). It makes one call to the summaries model (`settings.summarizer`,
   else the pet's own provider and model, text only), like `Summarizer`: 60 tokens, tools refused,
-  an eight-second `AbortSignal.timeout`. The prompt asks for one sentence under 20 words, warm, no
+  a 1.2-second budget (`GREETING_TIMEOUT_MS`): an `AbortSignal.timeout` raced against the call, so a
+  brain slow to notice the abort is not waited for either. A cold `claude -p` takes longer than
+  that, so with the Claude Code sign-in the handwritten line is what is usually said, at once. The prompt asks for one sentence under 20 words, warm, no
   emoji, naming a finished hand-off if any, and never inventing facts. A failure, a timeout, an empty
   reply or one that is too long or has an emoji falls back to `fallbackGreeting`: "Morning." /
   "Afternoon." / "Evening." / "Working late?" or "Back after N days.", then "I'm here when you need
@@ -1504,8 +1506,8 @@ is a native ONNX runtime, and core stays pure.
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
 flowchart LR
   subgraph Panel["Panel renderer"]
-    CB["CompanionBubble onSay"] --> Q["SpeechQueue: toSpeakable, merge short lines, one at a time"]
-    Q --> PL["voice-player playLine"]
+    CB["CompanionBubble onSay"] --> Q["SpeechQueue: toSpeakable, merge short lines, one at a time, next one got ready"]
+    Q --> PL["voice-player prepareLine"]
     PL --> WA["WebAudio + AnalyserNode"]
     PL --> SS["speechSynthesis fallback"]
   end
@@ -1525,7 +1527,11 @@ flowchart LR
   `SpeechQueue` shapes each line with `toSpeakable` (markdown stripped; code blocks, lists, tables
   and URLs left out; at most two sentences or 200 characters, then "The rest is in the bubble."),
   merges short lines waiting together (`mergeShortLines`, because Kokoro says a lone "Done." badly),
-  and plays one line at a time. `stop()` aborts the line playing and drops the rest: the bubble's ×,
+  and plays one line at a time. While a line plays, the next one is already being synthesised
+  (`prepare` starts `speak` at once and returns how to play the result; one line ahead, and not a
+  line under 40 characters, which a later line may still join), so there is no pause for synthesis
+  between lines. `stop()` aborts the line playing and drops the rest, the line got ready included,
+  which is never played: the bubble's ×,
   Got it, the speaking indicator and the stop key (`hotkeys.stopVoice`, default
   `Ctrl+Shift+Alt+M`, broadcast as `IPC.stopVoiceEvent`) all call it.
 - **Who says it** (`main/voice/voice.ts`, `createVoiceService`). `TAGALONG_FAKE_TTS=1` means
@@ -1535,7 +1541,9 @@ flowchart LR
   `ELEVENLABS_TIMEOUT_MS`, 15 s); on failure or timeout, Kokoro.
   Kokoro (`kokoro.ts`, `kokoro-js` with `@huggingface/transformers`, `onnx-community/Kokoro-82M-v1.0-ONNX`,
   q8, CPU) is `LazyLocalVoice`: the first line starts the download into `<userData>/voice` and
-  answers `fallback`; once loaded every line is a WAV. A failed load is tried again on the next
+  answers `fallback`; once loaded every line is a WAV. At start, `warmAtStart` loads it when an
+  earlier run downloaded it (`kokoroDownloaded`: its q8 weights are on disk) and Scout talks is on,
+  so the first lines are Kokoro rather than the system voice; it never starts a download. A failed load is tried again on the next
   line, and a failed load first deletes that model's folder under `<userData>/voice`
   (`voice/model-cache.ts`), so an interrupted download is fetched again. With **Scout talks** off, `speak` answers `off`, except for a Settings preview.
 - **How it plays** (`renderer/src/voice-player.ts`). Audio is decoded with `AudioContext` and played
