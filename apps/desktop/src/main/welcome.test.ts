@@ -87,25 +87,25 @@ describe('launchLine', () => {
       'I’m listening. Say “Scout, stop”, or switch off Always listening in my bubble.',
     );
     for (const greeting of [true, false]) {
-      const compose = vi.fn(async () => 'Morning.');
+      const compose = vi.fn(async () => ({ text: 'Morning.' }));
       const settings = Settings.parse({
         welcome: { done: true },
         greeting,
         listening: { always: true },
       });
-      expect(await launchLine(settings, compose)).toBe(LISTENING_LINE);
+      expect(await launchLine(settings, compose)).toEqual({ text: LISTENING_LINE });
       expect(compose).not.toHaveBeenCalled();
     }
   });
 
   it('says the composed greeting when listening is off and the greeting is allowed', async () => {
-    const compose = vi.fn(async () => 'Morning.');
-    expect(await launchLine(Settings.parse({ welcome: { done: true } }), compose)).toBe('Morning.');
+    const compose = vi.fn(async () => ({ text: 'Morning.' }));
+    expect(await launchLine(Settings.parse({ welcome: { done: true } }), compose)).toEqual({ text: 'Morning.' });
     expect(compose).toHaveBeenCalledOnce();
   });
 
   it('says nothing when listening is off and the greeting is switched off', async () => {
-    const compose = vi.fn(async () => 'Morning.');
+    const compose = vi.fn(async () => ({ text: 'Morning.' }));
     const settings = Settings.parse({ welcome: { done: true }, greeting: false });
     expect(await launchLine(settings, compose)).toBeNull();
     expect(compose).not.toHaveBeenCalled();

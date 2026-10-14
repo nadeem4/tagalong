@@ -25,7 +25,13 @@ import {
 } from './always-listening';
 import { systemClock } from './awareness/clock';
 import { handoffNotice } from './handoff-notice';
-import { recordCleanClose, recordLaunch } from './launch';
+import {
+  brainLine,
+  brainReadiness,
+  recordCleanClose,
+  recordLaunch,
+  SIGN_IN_BUDGET_MS,
+} from './launch';
 import type { PreviousLaunch } from './launch';
 import { routineDelivery } from './routine-delivery';
 import { nativeCodec } from './awareness/native-codec';
@@ -36,7 +42,8 @@ import { captureAskSnapshot, capturePatch } from './context';
 import { startEngineHost } from './engine-host';
 import { keepAnEyeAllowed, startKeepAnEye } from './keep-an-eye';
 import { extensionFolder, isAllowedLink } from './links';
-import { ELEVENLABS_SECRET_KEY } from './provider-choices';
+import { ELEVENLABS_SECRET_KEY, providerChoices, storedKeys } from './provider-choices';
+import { WHATS_NEW } from './whats-new';
 import { elevenLabsTts } from './voice/elevenlabs';
 import { kokoroDownloaded } from './voice/kokoro';
 import { createVoiceService, elevenLabsMouth, localMouth } from './voice/voice';
@@ -455,18 +462,32 @@ async function greetOnLaunch(host: EngineHost): Promise<void> {
   if (current === null) return;
   try {
     // With Always listening on, the first line says so and how to stop, greeting or not.
-    const text = await launchLine(
-      current.settings,
-      async () =>
-        (await host.client.call('greeting.compose', { petId: current.settings.defaultPetId })).text,
-    );
-    if (text !== null) {
+    const line = await launchLine(current.settings, async () => {
+      const { settings, previousLaunch } = current;
+      // Compose first, then check the brain beside it, so a slow check never delays the line.
+      const composing = host.client.call('greeting.compose', {
+        petId: settings.defaultPetId,
+        launch: { ...previousLaunch, version: app.getVersion(), whatsNew: WHATS_NEW },
+      });
+      const readiness = (async () => {
+        const { pets } = await host.client.call('pets.list', {});
+        return brainReadiness({
+          pet: pets.find((pet) => pet.id === settings.defaultPetId),
+          providers: providerChoices(await storedKeys(current.secrets)),
+          signIn: () => signInFor(process.env),
+          budgetMs: SIGN_IN_BUDGET_MS,
+        });
+      })().catch(() => 'unknown' as const);
+      const [brain, composed] = await Promise.all([readiness, composing]);
+      return brainLine(brain, composed.text, settings.userName);
+    });
+    if (line !== null) {
       const { panel, avatar } = current;
       if (panel !== null && avatar !== null && avatar.isVisible() && !panel.isVisible()) {
         if (panel.webContents.isLoading()) {
           await new Promise<void>((resolve) => panel.webContents.once('did-finish-load', resolve));
         }
-        panel.webContents.send(IPC.greetLineEvent, text);
+        panel.webContents.send(IPC.greetLineEvent, line);
         showPanelQuietly(panel, avatar);
       }
     }
