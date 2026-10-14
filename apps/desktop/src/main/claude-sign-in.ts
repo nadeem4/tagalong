@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import crossSpawn from 'cross-spawn';
 import type { ClaudeSignIn } from '../shared/ipc';
 
 /** What running claude returned: its stdout, and the error code when it failed. */
@@ -44,17 +44,33 @@ export function parseAuthStatus(stdout: string): ClaudeSignIn {
   }
 }
 
-/** Runs claude the way the brain does (no shell), giving up after five seconds. */
+/**
+ * Runs claude the way the experts do: no shell, through cross-spawn, which finds npm's
+ * `claude.cmd` shim on Windows that a plain execFile misses. Gives up after five seconds.
+ */
 function runClaude(args: string[]): Promise<ClaudeRun> {
   return new Promise((resolve) => {
-    execFile('claude', args, { windowsHide: true, timeout: 5000 }, (error, stdout) => {
-      const code = (error as (NodeJS.ErrnoException & { killed?: boolean }) | null)?.code;
-      const killed = (error as { killed?: boolean } | null)?.killed === true;
-      resolve(
-        error === null
-          ? { stdout }
-          : { stdout, errorCode: killed ? 'ETIMEDOUT' : (code ?? 'failed') },
-      );
-    });
+    const child = crossSpawn('claude', args, { windowsHide: true });
+    let stdout = '';
+    let settled = false;
+    const finish = (run: ClaudeRun) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(run);
+    };
+    const timer = setTimeout(() => {
+      child.kill();
+      finish({ stdout, errorCode: 'ETIMEDOUT' });
+    }, 5000);
+    child.stdout?.setEncoding('utf8');
+    child.stdout?.on('data', (chunk: string) => (stdout += chunk));
+    // A missing claude arrives as an 'error' event with ENOENT, which reads as not installed.
+    child.on('error', (error: NodeJS.ErrnoException) =>
+      finish({ stdout, errorCode: error.code ?? 'failed' }),
+    );
+    child.on('close', (code) =>
+      finish(code === 0 ? { stdout } : { stdout, errorCode: code ?? 'failed' }),
+    );
   });
 }

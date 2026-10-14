@@ -1203,7 +1203,8 @@ is one file under `apps/desktop/src/renderer/src/settings/`:
 **How Scout thinks** reads the companion pet (`settings.defaultPetId`), never `settings.providerId`,
 which the engine ignores. Whether the Claude sign-in works comes from `main/claude-sign-in.ts`:
 `checkClaudeSignIn` runs `claude auth status --json` (local, no model call, five-second timeout)
-and reads `loggedIn`, giving `signed-in`, `signed-out`, `not-installed` (claude cannot be
+through cross-spawn with no shell, as the experts start claude, so an npm install's `claude.cmd`
+shim is found on Windows, and reads `loggedIn`, giving `signed-in`, `signed-out`, `not-installed` (claude cannot be
 started) or `unknown` (anything else). The renderer asks through `checkClaudeSignIn` on the host
 API, and **Check again** asks again. With no Claude Code, a service is picked and its key pasted;
 Save stores it with `saveApiKey` and calls `switchScout`, which makes Scout the Companion on that
