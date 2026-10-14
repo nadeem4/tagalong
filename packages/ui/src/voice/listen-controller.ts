@@ -38,6 +38,8 @@ interface Session {
 export class ListenController {
   readonly #options: ListenControllerOptions;
   #session: Session | null = null;
+  /** Released held questions still waiting for their words; cancel drops them too. */
+  readonly #released = new Set<Session>();
 
   constructor(options: ListenControllerOptions) {
     this.#options = options;
@@ -63,10 +65,17 @@ export class ListenController {
       return;
     }
     session.released = true;
+    this.#released.add(session);
     session.ears.stop();
   }
 
+  /**
+   * Drops the question being asked, and any released question whose words have not come
+   * (models that failed to load, a voice process that died): none of them is heard later.
+   */
   cancel(): void {
+    for (const waiting of this.#released) waiting.live = false;
+    this.#released.clear();
     const session = this.#session;
     if (session === null) return;
     this.#session = null;
@@ -93,7 +102,10 @@ export class ListenController {
     });
     ears.on('turnEnd', (text = '') => {
       if (!session.live || (session.mode === 'held' && !session.released)) return;
-      if (session.mode === 'held') session.live = false;
+      if (session.mode === 'held') {
+        session.live = false;
+        this.#released.delete(session);
+      }
       if (text.trim() !== '') this.#options.onHeard(text.trim());
       else if (session.mode === 'held') this.#options.onNothingHeard();
     });

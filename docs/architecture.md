@@ -1636,15 +1636,19 @@ flowchart LR
 - **The ears, in the panel** (`renderer/src/mic.ts`, `mic-worklet.js`, `remote-ears.ts`,
   `ui/voice/listen-controller.ts`). `ListenController` decides when the microphone is open: `hold`
   (the talk key, the mic button) opens it and makes the ears for that session, `release` closes it and
-  stops the ears, whose turnEnd then carries the question; `cancel` drops it. A mic that opens after the
-  release is closed unused and is heard as nothing said. Every window hears the one stream of ears
+  stops the ears, whose turnEnd then carries the question; `cancel` drops the question being held and
+  every released one whose words have not come yet (models that failed to load, a voice process that
+  died), so none of them is asked later. A mic that opens after the release is closed unused and is
+  heard as nothing said; one that opens after a cancel is closed unused too. Every window hears the one stream of ears
   events and the voice process runs sessions one after another, so a held session takes a turnEnd only
   once it has been released: a released question's words that arrive after the next press began go to
   the released question. `speechStart` stops Scout talking, each `partial` shows in the bubble as the
   words heard so far (`BubbleTalk.partial`), and the trimmed turnEnd text is asked (empty: "I didn't
   catch that"). `openMic` (`getUserMedia` with the microphone from `voice.microphoneId` or the
   system default, echo cancellation, noise suppression and auto gain on) runs an `AudioContext` at
-  16 kHz with the `tagalong-mic` `AudioWorklet` (`mic-worklet.js`), which posts 512-sample frames;
+  16 kHz with the `tagalong-mic` `AudioWorklet` (`mic-worklet.js`), which posts 512-sample frames
+  (`EARS_FRAME`; the worklet cannot import it); any failure after `getUserMedia` stops the microphone
+  and closes the audio;
   the worklet is imported as `?url&no-inline` because the panel's CSP (`default-src 'self'`) blocks
   the `data:` URL Vite would otherwise inline. The open mic is itself the `MicStream` (at most about
   30 s of frames waiting) and has `close()`; ending the reading early closes it too. `RemoteEars` is
@@ -1657,8 +1661,9 @@ flowchart LR
   still noting the window. `forwardEars` sends the voice process's `ears` messages as
   `IPC.earsEvent` and its `ears.status` (loading, ready, failed) as `IPC.earsStatusEvent` to every
   open window; each `ListenController` ignores events outside its own session. If the voice process
-  dies, the windows hear "Listening stopped unexpectedly. Try again.", and a question being asked
-  ends. The panel says the first-time download (about 45 MB) while the status is loading.
+  dies, or the models fail to load, the windows hear a `failed` status ("Listening stopped
+  unexpectedly. Try again." for a dead process); the panel then cancels, which drops the question
+  being held and any released question still waiting for its words, and shows the message. The panel says the first-time download (about 45 MB) while the status is loading.
 - **The ears, in the voice process** (`main/voice/worker/ears-host.ts`, `main/voice/ears/`).
   `createEarsHost` opens an inbox for frames at each listen, so the first words are not lost while
   the models load, and runs one session at a time. `LocalEars` (`local-ears.ts`) is the `Ears`

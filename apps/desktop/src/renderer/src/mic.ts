@@ -27,22 +27,26 @@ export async function openMic(deviceId?: string): Promise<OpenMic> {
       autoGainControl: true,
     },
   });
-  const context = new AudioContext({ sampleRate: EARS_SAMPLE_RATE });
+  const frames = new Pushable<Float32Array>(MAX_WAITING);
+  let context: AudioContext | null = null;
+  let node: AudioWorkletNode;
+  // Any failure past this point stops the microphone and closes the audio: never left open.
   try {
+    context = new AudioContext({ sampleRate: EARS_SAMPLE_RATE });
     await context.audioWorklet.addModule(workletUrl);
+    const source = context.createMediaStreamSource(stream);
+    node = new AudioWorkletNode(context, 'tagalong-mic');
+    node.port.onmessage = (event: MessageEvent<Float32Array>) => frames.push(event.data);
+    // A worklet is only run while connected towards the speakers; silent, so nothing plays.
+    const mute = context.createGain();
+    mute.gain.value = 0;
+    source.connect(node).connect(mute).connect(context.destination);
   } catch (error) {
     stream.getTracks().forEach((track) => track.stop());
-    void context.close();
+    void context?.close();
     throw error;
   }
-  const frames = new Pushable<Float32Array>(MAX_WAITING);
-  const source = context.createMediaStreamSource(stream);
-  const node = new AudioWorkletNode(context, 'tagalong-mic');
-  node.port.onmessage = (event: MessageEvent<Float32Array>) => frames.push(event.data);
-  // A worklet is only run while connected towards the speakers; silent, so nothing plays.
-  const mute = context.createGain();
-  mute.gain.value = 0;
-  source.connect(node).connect(mute).connect(context.destination);
+  const audio = context;
 
   let open = true;
   const close = (): void => {
@@ -51,7 +55,7 @@ export async function openMic(deviceId?: string): Promise<OpenMic> {
     frames.end();
     node.port.onmessage = null;
     stream.getTracks().forEach((track) => track.stop());
-    void context.close();
+    void audio.close();
   };
   return {
     close,

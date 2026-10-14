@@ -145,7 +145,9 @@ test('talking to Scout: the mic listens, Scout hears the question and answers', 
   await mic.click();
   await expect(panel.getByRole('button', { name: 'Stop listening' })).toBeVisible();
   await expect(panel.getByText(/Listening/)).toBeVisible();
-  await panel.waitForTimeout(800);
+  // The fake ears' live words: the mic opened, its frames reached the voice process and the
+  // ears' events came back. Only then is it let go, so the release never beats the mic.
+  await expect(panel.getByText('What am I', { exact: true })).toBeVisible({ timeout: 30_000 });
   await panel.getByRole('button', { name: 'Stop listening' }).click();
 
   // The fake ears, in the real voice process, hear the same question every time; the bubble shows it.

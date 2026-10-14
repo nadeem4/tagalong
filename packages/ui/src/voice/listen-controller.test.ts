@@ -173,4 +173,49 @@ describe('ListenController, held', () => {
     expect(calls.heard).toHaveBeenCalledTimes(2);
     expect(calls.heard).toHaveBeenLastCalledWith('second');
   });
+
+  it('cancel drops a released question whose words never came, so the next is heard once', async () => {
+    const { controller, ears, calls } = setup();
+    controller.hold();
+    await tick();
+    controller.release();
+    controller.cancel();
+    controller.hold();
+    await tick();
+    controller.release();
+    ears.say('turnEnd', 'x');
+    expect(calls.heard).toHaveBeenCalledOnce();
+    expect(calls.heard).toHaveBeenCalledWith('x');
+  });
+
+  it('cancel drops every released question still waiting for its words', async () => {
+    const { controller, ears, calls } = setup();
+    controller.hold();
+    await tick();
+    controller.release();
+    controller.hold();
+    await tick();
+    controller.release();
+    controller.cancel();
+    ears.say('turnEnd', 'late');
+    ears.say('turnEnd', 'later');
+    expect(calls.heard).not.toHaveBeenCalled();
+    expect(calls.nothing).not.toHaveBeenCalled();
+  });
+
+  it('cancel before the mic opens closes it, and never listens with it', async () => {
+    let open!: (mic: ListenMic) => void;
+    const close = vi.fn();
+    const { controller, ears, calls } = setup(
+      vi.fn(() => new Promise<ListenMic>((resolve) => (open = resolve))),
+    );
+    controller.hold();
+    controller.cancel();
+    open(fakeMic(close));
+    await tick();
+    expect(close).toHaveBeenCalledOnce();
+    expect(ears.made[0]?.ears.listening).toBeNull();
+    expect(calls.nothing).not.toHaveBeenCalled();
+    expect(controller.mode).toBeNull();
+  });
 });
