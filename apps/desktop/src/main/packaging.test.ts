@@ -95,7 +95,10 @@ describe('desktop runtime dependencies', () => {
       'better-sqlite3',
       'get-windows',
       'kokoro-js',
+      'onnxruntime-node',
     ]);
+    // The version @huggingface/transformers pins, so one onnxruntime runs in the voice process.
+    expect(manifest.dependencies['onnxruntime-node']).toBe('1.21.0');
     expect(manifest.devDependencies['@tagalong/core']).toBe('workspace:*');
   });
 

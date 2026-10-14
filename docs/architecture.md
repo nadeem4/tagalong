@@ -1639,6 +1639,21 @@ flowchart LR
   `FAKE_TRANSCRIPT` and adds Chromium's `use-fake-device-for-media-stream` and
   `use-fake-ui-for-media-stream` switches, so the e2e suite needs no model and no microphone.
   ElevenLabs Scribe is not wired in.
+- **The local ears** (`main/voice/ears/`). `LocalEars` (`local-ears.ts`) is the `Ears` implementation
+  behind three seams that fakes test: `Vad` (speech or not, per 512-sample frame), `StreamingStt`
+  (words so far for the current stretch) and `EndOfTurn` (how sure the person is done, from the last
+  8 s). The real parts are loaded in the voice process only, never in tests, and each loader is one
+  screen: `ort-ears.ts` (Silero VAD v5 on `onnxruntime-node`, input the previous frame's last 64
+  samples plus the 512-sample frame, state carried between frames; Moonshine tiny through
+  `@huggingface/transformers`, q8, CPU, its decodes chained so a second `text()` waits for the first),
+  `smart-turn.ts` (Smart Turn v3.2: the last 8 s normalised to zero mean and unit variance, left-padded
+  to 8 s, Whisper features, output already a probability) and `load-ears.ts` (`loadEars(dir)`: fetch
+  what is missing with `ensureFiles`, then load the three parts). **Variant C** was chosen over
+  sherpa-onnx, whose bundled onnxruntime 1.28 clashes with the 1.21 that Transformers.js pins when both
+  load in one process. The model files (about 43 MB, `model-files.ts#EARS_FILES`) are downloaded once on
+  first use into `<userData>/voice`, the Transformers.js cache Kokoro also uses: `ears/silero-vad/`,
+  `ears/smart-turn-v3/` and Moonshine at `onnx-community/moonshine-tiny-ONNX/`. `loadEars` is not wired
+  to a caller yet; the Whisper path above is still what answers.
 - **Spoken mode** (`core/conversation/prompt-assembler.ts`). `ask` takes `spoken: true`; the runner
   passes it to `assemblePrompt`, which appends `SPOKEN_MODE` (headed `SPOKEN_HEADING`) last in the
   system prompt for that turn only: short sentences and contractions, no markdown or lists in what
@@ -1662,7 +1677,11 @@ matters for the hackathon, and carries best-effort, unverified dmg, AppImage and
 
 - `files` is `dist/**/*` and `package.json`: everything else the app needs is bundled.
 - `asarUnpack: ['**/*.node']`. Node cannot `dlopen` from inside an asar archive; Electron redirects
-  `require` to `app.asar.unpacked` when the file lives there.
+  `require` to `app.asar.unpacked` when the file lives there. The voice's native libraries are
+  unpacked too: `**/node_modules/onnxruntime-node/bin/**` (its DLLs) and `**/node_modules/@img/**`.
+  `onnxruntime-node` is a direct dependency pinned to `1.21.0`, the version `@huggingface/transformers`
+  3.8.1 pins, so one ONNX runtime serves Kokoro, Moonshine, Silero and Smart Turn; it is in
+  `NATIVE_DEPS`, external to the main bundle.
 - `npmRebuild: false`. `better-sqlite3` 13, `libnut` and `get-windows` all ship N-API binaries, which
   are ABI-stable across Node and Electron, so there is nothing to rebuild and no toolchain to require.
   The phase plan's "rebuild native modules in postinstall" is therefore unnecessary and not done.

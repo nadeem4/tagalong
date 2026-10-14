@@ -59,6 +59,9 @@ importers:
       kokoro-js:
         specifier: 1.2.1
         version: 1.2.1
+      onnxruntime-node:
+        specifier: 1.21.0
+        version: 1.21.0
     devDependencies:
       '@fontsource/onest':
         specifier: 5.3.1
