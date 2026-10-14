@@ -228,12 +228,14 @@ Kokoro, made on this computer: the first time Scout speaks it downloads the voic
 change the speed in **Home → Settings → Voice**.
 
 **Talk to Scout.** Hold `Ctrl+Shift+Alt+Space` (or click the mic in the bubble), say your
-question and let go (or click again). The bubble shows what it heard, and Scout answers out loud
+question and let go (or click again). The bubble shows your words as you talk, then what it
+heard, and Scout answers out loud
 the way a person talks: short sentences, one question back at most, details left in the bubble.
 It starts speaking on the first sentence rather than waiting for the whole answer. Talking while
 Scout speaks cuts it off. When it is done the bubble says "Hold Ctrl+Shift+Alt+Space to reply":
-the microphone never opens on its own. Your speech is turned into text on this computer, by a
-Whisper model downloaded the first time (about 80 MB); the recording is never sent or kept.
+the microphone never opens on its own. Your speech is turned into text on this computer, by
+small models (Silero VAD, Moonshine and Smart Turn) downloaded the first time (about 45 MB); the
+audio is never sent or kept.
 
 **Memory.** Tell Scout "I prefer short answers" and it remembers across restarts.
 
@@ -404,7 +406,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 | A hotkey does nothing                                          | Settings and the bubble name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).           |
 | Scout is silent                                                | Check **Scout talks** in Home → Settings → Voice, and your sound output. The stop key only silences the current answer.                         |
 | Talk to Scout says it could not open the microphone            | Windows Settings → Privacy → Microphone: let desktop apps use it. Pick the right microphone in Home → Settings → Voice.                         |
-| The first spoken question takes a while                        | The first time, Tagalong downloads its speech model (about 80 MB). After that it is read from disk.                                             |
+| The first spoken question takes a while                        | The first time, Tagalong downloads its speech models (about 45 MB). After that they are read from disk.                                         |
 | Scout's voice changes after the first answers                  | The first time it speaks, Scout downloads its voice (about 90 MB) and uses the Windows voice until then. Offline, it keeps the Windows voice.   |
 | The Chrome side panel says "Disconnected"                      | The desktop app must be running. If it is, copy the pairing token again from Settings and paste it into the extension's options.                |
 | "Windows protected your PC" when installing                    | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                            |

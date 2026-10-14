@@ -143,6 +143,13 @@ export default tseslint.config(
     },
   },
   {
+    // Runs on the audio thread, where the worklet's own globals are all there is.
+    files: ['apps/desktop/src/renderer/src/mic-worklet.js'],
+    languageOptions: {
+      globals: { ...globals.audioWorklet },
+    },
+  },
+  {
     files: ['**/*.{ts,tsx}'],
     rules: {
       // Underscore prefix is the documented way to say "deliberately discarded".

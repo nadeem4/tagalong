@@ -93,7 +93,8 @@ its result.
   hello, a moment that warrants it), and the intro and the launch line greet you by it.
 - Speech runs on the computer (Kokoro, downloaded on first use); ElevenLabs is an optional
   bring-your-own-key voice that receives only the words spoken. Speech to text runs on the
-  computer too (Whisper base.en, downloaded on first use); the audio is never sent or stored.
+  computer too (Moonshine, with Silero VAD and Smart Turn, downloaded on first use); the words show
+  in the bubble as you talk, and the audio is never sent or stored.
 - Connections: Scout uses the person's apps over MCP (Notion, GitHub, Linear, the servers already
   in Claude Code, or any MCP server). It reads on its own; every change shows a confirm card and
   runs only on Allow once. Tokens live in the OS keychain.

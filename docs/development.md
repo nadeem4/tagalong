@@ -469,19 +469,19 @@ opens a `.env` file. Copying it therefore changes nothing at runtime.
 Seven environment variables are read, all straight from the process environment. **Set them in the
 shell you launch from**, as shown above.
 
-| Variable                     | Status today                                                                                                                                                                                                       |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `TAGALONG_FAKE_PROVIDERS=1`  | **Read** (`packages/core/src/providers/registry.ts`, `engine.ts`). Forces the fake brain and a fake expert, for tests and demos. No keys, network or Claude Code usage.                                            |
-| `TAGALONG_FAKE_TOOL`         | **Read** (`providers/registry.ts`). Under the fake brain, the name of one tool it calls before it answers. `cards.spec.ts` and the smoke suite set it.                                                             |
-| `TAGALONG_FAKE_TOOL_INPUT`   | **Read** (`providers/registry.ts`). The JSON input for that tool call; bad JSON means no input.                                                                                                                    |
-| `TAGALONG_KEEP_AN_EYE=1`     | **Read** (`apps/desktop/src/main/keep-an-eye.ts`). Keeps an eye on things under the fake brain, where it is otherwise off.                                                                                         |
-| `TAGALONG_SKIP_ONBOARDING=1` | **Read** (`apps/desktop/src/main/welcome.ts`). Keeps Welcome shut. The Electron suites other than first-run set it.                                                                                                |
-| `TAGALONG_FAKE_TTS=1`        | **Read** (`voice/voice.ts`). Scout's voice becomes a short silent clip: no model download, no ElevenLabs call, no sound. Every Electron suite sets it.                                                             |
-| `TAGALONG_FAKE_STT=1`        | **Read** (`voice/listen.ts`, `main/index.ts`). Talk to Scout hears "What am I looking at?" every time: no speech model download, and Chromium's fake microphone stands in for a real one. The smoke suite sets it. |
-| `ANTHROPIC_API_KEY`          | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment.                                                            |
-| `OPENROUTER_API_KEY`         | **Not read.** The key for the `openrouter` provider, entered in Settings and stored like the Anthropic key.                                                                                                        |
-| `NEBIUS_API_KEY`             | **Not read.** The key for the `nebius` provider (Token Factory), entered in Settings and stored like the Anthropic key.                                                                                            |
-| `ELEVENLABS_API_KEY`         | **Not read.** The optional ElevenLabs voice's key is entered in Settings → Advanced and stored like the others (`elevenlabs.apiKey`).                                                                              |
+| Variable                     | Status today                                                                                                                                                                                                                                                               |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TAGALONG_FAKE_PROVIDERS=1`  | **Read** (`packages/core/src/providers/registry.ts`, `engine.ts`). Forces the fake brain and a fake expert, for tests and demos. No keys, network or Claude Code usage.                                                                                                    |
+| `TAGALONG_FAKE_TOOL`         | **Read** (`providers/registry.ts`). Under the fake brain, the name of one tool it calls before it answers. `cards.spec.ts` and the smoke suite set it.                                                                                                                     |
+| `TAGALONG_FAKE_TOOL_INPUT`   | **Read** (`providers/registry.ts`). The JSON input for that tool call; bad JSON means no input.                                                                                                                                                                            |
+| `TAGALONG_KEEP_AN_EYE=1`     | **Read** (`apps/desktop/src/main/keep-an-eye.ts`). Keeps an eye on things under the fake brain, where it is otherwise off.                                                                                                                                                 |
+| `TAGALONG_SKIP_ONBOARDING=1` | **Read** (`apps/desktop/src/main/welcome.ts`). Keeps Welcome shut. The Electron suites other than first-run set it.                                                                                                                                                        |
+| `TAGALONG_FAKE_TTS=1`        | **Read** (`voice/voice.ts`). Scout's voice becomes a short silent clip: no model download, no ElevenLabs call, no sound. Every Electron suite sets it.                                                                                                                     |
+| `TAGALONG_FAKE_STT=1`        | **Read** (`voice/worker/main.ts`, `main/index.ts`). The voice process uses the fake ears: a held question is heard as "What am I looking at?" every time, with no speech model download, and Chromium's fake microphone stands in for a real one. The smoke suite sets it. |
+| `ANTHROPIC_API_KEY`          | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment.                                                                                                                    |
+| `OPENROUTER_API_KEY`         | **Not read.** The key for the `openrouter` provider, entered in Settings and stored like the Anthropic key.                                                                                                                                                                |
+| `NEBIUS_API_KEY`             | **Not read.** The key for the `nebius` provider (Token Factory), entered in Settings and stored like the Anthropic key.                                                                                                                                                    |
+| `ELEVENLABS_API_KEY`         | **Not read.** The optional ElevenLabs voice's key is entered in Settings → Advanced and stored like the others (`elevenlabs.apiKey`).                                                                                                                                      |
 
 Secrets never enter git. In the app they live in the OS keychain through Electron `safeStorage`, written
 as ciphertext to `secrets.json`; if the OS has no encryption backend the store refuses to write at all
@@ -519,8 +519,9 @@ than one planned implementation.
   `apps/desktop/src/main/voice/voice.ts` (`speak(text, { voice, speed })` returns encoded audio),
   with Kokoro (`LazyLocalVoice` over `kokoro.ts`), ElevenLabs (`elevenlabs.ts`) and `fakeTts`.
   `createVoiceService` picks one; see [Scout talks](architecture.md#scout-talks).
-- **Speech to text** also lives in the desktop host: Whisper base.en on this computer
-  (`voice/whisper.ts`, `voice/listen.ts`), or the fake under `TAGALONG_FAKE_STT=1`.
+- **Speech to text** also lives in the desktop host: the `Ears` in the voice process, `LocalEars`
+  (Silero VAD, Moonshine tiny and Smart Turn, `voice/ears/`) on this computer, or `FakeEars` under
+  `TAGALONG_FAKE_STT=1`; see [Talk to Scout](architecture.md#talk-to-scout).
 
 Implement `BrainProvider`, register it in `packages/core/src/providers/registry.ts`, give it a
 `SECRET_KEYS` entry if it takes a key, and pick it for Scout in Home. Do not widen the interface for a provider that is not being built.
@@ -571,10 +572,12 @@ What is still standing, recorded here so nobody rediscovers it.
 - **Windows only.** The macOS and Linux installers are configured, but there is no platform adapter for
   either, so the app stops at launch there.
 - **Talk to Scout has no cloud speech to text.** Speech is turned into text on this computer only
-  (Whisper base.en); ElevenLabs Scribe is not wired in. Welcome has no microphone or speaker step.
+  (Silero VAD, Moonshine tiny, Smart Turn); ElevenLabs Scribe is not wired in. Welcome has no
+  microphone or speaker step.
 - **The local voice and ears are not checked end to end in CI.** Tests and the Electron suites run
-  on `TAGALONG_FAKE_TTS=1` and `TAGALONG_FAKE_STT=1`, so the Kokoro and Whisper downloads, synthesis
-  and transcription are only exercised on a real run.
+  on `TAGALONG_FAKE_TTS=1` and `TAGALONG_FAKE_STT=1`, so the Kokoro and ears model downloads,
+  synthesis and transcription are only exercised on a real run. The mic path itself (worklet, IPC,
+  the voice process) does run in the smoke suite, on the fake ears.
 
 ### Voice models
 

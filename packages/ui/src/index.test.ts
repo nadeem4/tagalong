@@ -27,6 +27,7 @@ describe('ui package surface', () => {
         'QueueMouth',
         'toSpeakable',
         'PushToTalk',
+        'ListenController',
       ].sort(),
     );
   });

@@ -432,17 +432,22 @@ voice model (about 90 MB) into `%APPDATA%\Tagalong\voice`; ElevenLabs (V.6) bill
 
 Run from source **without** `TAGALONG_FAKE_STT` and `TAGALONG_FAKE_TTS`, with a microphone and
 speakers. The fake brain is fine for T.1 to T.6; T.7 needs a real one. The first spoken question
-downloads the speech model (about 80 MB) into `%APPDATA%\Tagalong\voice`. With
-`TAGALONG_FAKE_STT=1` every question is heard as "What am I looking at?" and no microphone is used.
+downloads the speech models (Silero VAD, Moonshine tiny and Smart Turn, about 45 MB) into
+`%APPDATA%\Tagalong\voice`. With `TAGALONG_FAKE_STT=1` every held question is heard as "What am I
+looking at?" and Chromium's fake microphone stands in for a real one.
 
 ### T.1. Hold to talk
 
-1. **Setup:** a fresh profile, so the speech model is not downloaded yet.
+1. **Setup:** a fresh profile, so the speech models are not downloaded yet.
 2. **Action:** hold `Ctrl+Shift+Alt+Space`, say "what am I looking at?", let go.
 3. **Expected:** the bubble opens with a pulsing dot and "Listening…" while the key is held, and a
-   note that the first time downloads the speech model. On letting go it says "Turning that into
-   text…", then shows what it heard and answers. Windows shows the microphone in use only while
-   the key is held.
+   note that the first time downloads the speech models (about 45 MB). Once they have loaded, the
+   words you are saying appear under "Listening…" as you talk. On letting go it says "Turning that
+   into text…", then shows what it heard and answers. Windows shows the microphone in use only
+   while the key is held.
+4. **Action:** hold the key again and ask a second question, now that the models are downloaded.
+5. **Expected:** no download note; your words show live while you talk, and the answer follows the
+   release.
 
 ### T.2. Spoken answers start early and sound spoken
 

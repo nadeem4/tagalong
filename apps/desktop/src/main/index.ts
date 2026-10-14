@@ -36,9 +36,6 @@ import { VoiceWorker } from './voice/worker/client';
 import type { WorkerProcess } from './voice/worker/messages';
 import { WorkerLocalVoice } from './voice/worker/worker-local-voice';
 import type { VoiceService } from './voice/voice';
-import { LazyLocalStt, createListenService } from './voice/listen';
-import type { ListenService } from './voice/listen';
-import { loadWhisper } from './voice/whisper';
 import { checkClaudeSignIn } from './claude-sign-in';
 import { findAgents, shouldGreetOnLaunch, shouldOpenWelcome } from './welcome';
 import type { EngineHost } from './engine-host';
@@ -76,7 +73,7 @@ import type { EngineCall, IpcHandle } from './ipc/handle';
 import { registerRoutineIpc } from './ipc/routines';
 import { registerSettingsIpc } from './ipc/settings';
 import { registerTurnIpc } from './ipc/turns';
-import { registerVoiceIpc } from './ipc/voice';
+import { forwardEars, registerVoiceIpc } from './ipc/voice';
 import { IPC } from '../shared/ipc';
 import type { CaptureNotice } from '../shared/ipc';
 
@@ -114,10 +111,8 @@ interface Desktop {
   perceptionMemory: PerceptionMemory;
   /** Turns Scout's lines into audio for the panel to play. */
   voice: VoiceService;
-  /** The process the voice models run in; stopped on quit. */
+  /** The process the voice models run in, Scout's voice and its ears; stopped on quit. */
   voiceWorker: VoiceWorker;
-  /** Talk to Scout: turns what the panel recorded into text, on this computer. */
-  listen: ListenService;
 }
 
 let desktop: Desktop | null = null;
@@ -274,11 +269,6 @@ async function start(): Promise<void> {
         },
       });
     })(),
-    // The speech model downloads beside the voice, on the first Talk to Scout.
-    listen: createListenService({
-      env: process.env,
-      local: new LazyLocalStt(() => loadWhisper(join(dataDir, 'voice'))),
-    }),
   };
 
   rolling.configure(settings.rollingMemory);
@@ -300,6 +290,14 @@ async function start(): Promise<void> {
   });
 
   registerIpc();
+
+  // What the ears hear goes to every open window: each listening window keeps only its own
+  // session's words. Subscribing does not start the voice process; the first listen does.
+  forwardEars(voiceWorker, (channel, payload) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(channel, payload);
+    }
+  });
 
   if (host === null) {
     openSettings();
@@ -846,8 +844,10 @@ function registerIpc(): void {
   });
   registerVoiceIpc(handle, {
     voice: () => required().voice,
-    listen: () => required().listen,
+    // The voice process starts on the first listen, if Scout has not spoken yet.
+    worker: () => required().voiceWorker,
     noteActiveWindow: () => captureForPanel(required(), ['activeWindow']),
+    on: (channel, listener) => ipcMain.on(channel, listener as never),
   });
 
   ipcMain.handle(IPC.pickFolder, async (event): Promise<string | null> => {

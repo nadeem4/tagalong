@@ -6,6 +6,7 @@ import type {
   ConnectionsAddParams,
   ConnectionsListResult,
   ContextSnapshot,
+  EarsEvent,
   Expert,
   PerceptionTarget,
   Pet,
@@ -24,11 +25,11 @@ import { heldUntilHeard } from './held';
 import type {
   CaptureNotice,
   ClaudeSignIn,
+  EarsStatus,
   FoundAgent,
   HostView,
   ModelList,
   SpeakPreview,
-  TranscribeResult,
   SpeakResult,
   TagalongHostApi,
 } from '../shared/ipc';
@@ -225,9 +226,23 @@ const host: TagalongHostApi = {
     ipcRenderer.on(IPC.talkEvent, listener);
     return () => void ipcRenderer.off(IPC.talkEvent, listener);
   },
-  prepareListening: () => ipcRenderer.invoke(IPC.prepareListening) as Promise<{ ready: boolean }>,
-  transcribe: (samples: Float32Array) =>
-    ipcRenderer.invoke(IPC.transcribe, samples) as Promise<TranscribeResult>,
+  earsListen: (mode) => ipcRenderer.invoke(IPC.earsListen, mode) as Promise<void>,
+  // A frame at a time, without waiting for an answer: the ears are in the voice process.
+  micFrame: (samples) => ipcRenderer.send(IPC.micFrame, samples),
+  earsStop: () => ipcRenderer.invoke(IPC.earsStop) as Promise<void>,
+  onEarsEvent: (handler) => {
+    const listener = (
+      _event: IpcRendererEvent,
+      payload: { event: EarsEvent; text?: string },
+    ): void => handler(payload.event, payload.text);
+    ipcRenderer.on(IPC.earsEvent, listener);
+    return () => void ipcRenderer.off(IPC.earsEvent, listener);
+  },
+  onEarsStatus: (handler) => {
+    const listener = (_event: IpcRendererEvent, status: EarsStatus): void => handler(status);
+    ipcRenderer.on(IPC.earsStatusEvent, listener);
+    return () => void ipcRenderer.off(IPC.earsStatusEvent, listener);
+  },
 };
 
 contextBridge.exposeInMainWorld('tagalong', bridge);

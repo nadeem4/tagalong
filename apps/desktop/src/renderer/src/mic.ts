@@ -1,73 +1,71 @@
-/** Whisper listens at 16 kHz, mono. Matches main's SAMPLE_RATE. */
-const RATE = 16_000;
+import { EARS_SAMPLE_RATE, Pushable } from '@tagalong/protocol';
+import type { MicStream } from '@tagalong/protocol';
+// Its own file, not a data: URL: the panel's CSP (default-src 'self') blocks data: worklets.
+import workletUrl from './mic-worklet.js?url&no-inline';
 
-/** One spoken question being recorded. Nothing is kept once it has been handed over. */
-export interface Recording {
-  /** Stops and hands back what was said, as 16 kHz mono samples. */
-  stop(): Promise<Float32Array>;
-  /** Stops and throws the audio away. */
-  cancel(): void;
-}
+/** About 30 s of frames waiting at most; a stalled reader drops the oldest. */
+const MAX_WAITING = 940;
 
 /**
- * Opens the microphone (the one picked in Settings, or the system default) and records
- * until stopped. Only ever called on the talk key or the mic button: never on its own.
+ * The open microphone: its 16 kHz mono frames, one after another, until closed. Ending the
+ * reading early closes it too. Nothing is recorded or kept.
  */
-export async function startRecording(deviceId?: string): Promise<Recording> {
+export type OpenMic = MicStream & { close(): void };
+
+/**
+ * Opens the microphone (the one picked in Settings, or the system default) with Chromium's
+ * echo cancellation on, so Scout's own voice played in this window is not heard, and
+ * delivers 16 kHz mono frames. Only on the talk key, the mic button or Always listening.
+ */
+export async function openMic(deviceId?: string): Promise<OpenMic> {
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: {
       ...(deviceId !== undefined && deviceId !== '' ? { deviceId: { exact: deviceId } } : {}),
       channelCount: 1,
       echoCancellation: true,
       noiseSuppression: true,
+      autoGainControl: true,
     },
   });
-  const recorder = new MediaRecorder(stream);
-  const chunks: Blob[] = [];
-  recorder.ondataavailable = (event) => {
-    if (event.data.size > 0) chunks.push(event.data);
+  const context = new AudioContext({ sampleRate: EARS_SAMPLE_RATE });
+  try {
+    await context.audioWorklet.addModule(workletUrl);
+  } catch (error) {
+    stream.getTracks().forEach((track) => track.stop());
+    void context.close();
+    throw error;
+  }
+  const frames = new Pushable<Float32Array>(MAX_WAITING);
+  const source = context.createMediaStreamSource(stream);
+  const node = new AudioWorkletNode(context, 'tagalong-mic');
+  node.port.onmessage = (event: MessageEvent<Float32Array>) => frames.push(event.data);
+  // A worklet is only run while connected towards the speakers; silent, so nothing plays.
+  const mute = context.createGain();
+  mute.gain.value = 0;
+  source.connect(node).connect(mute).connect(context.destination);
+
+  let open = true;
+  const close = (): void => {
+    if (!open) return;
+    open = false;
+    frames.end();
+    node.port.onmessage = null;
+    stream.getTracks().forEach((track) => track.stop());
+    void context.close();
   };
-  recorder.start();
-  const release = (): void => stream.getTracks().forEach((track) => track.stop());
   return {
-    stop: () =>
-      new Promise<Float32Array>((resolve, reject) => {
-        recorder.onstop = () => {
-          release();
-          toSamples(new Blob(chunks, { type: recorder.mimeType })).then(resolve, reject);
-        };
-        recorder.stop();
-      }),
-    cancel: () => {
-      recorder.onstop = null;
-      if (recorder.state !== 'inactive') recorder.stop();
-      release();
+    close,
+    [Symbol.asyncIterator]: () => {
+      const reading = frames[Symbol.asyncIterator]();
+      return {
+        next: () => reading.next(),
+        return: () => {
+          close();
+          return Promise.resolve({ value: undefined, done: true as const });
+        },
+      };
     },
   };
-}
-
-/** Decodes the recording and resamples it to 16 kHz mono. */
-async function toSamples(blob: Blob): Promise<Float32Array> {
-  if (blob.size === 0) return new Float32Array(0);
-  const context = new AudioContext();
-  try {
-    // A recording that cannot be decoded is heard as nothing said.
-    const decoded = await context.decodeAudioData(await blob.arrayBuffer()).catch((error) => {
-      console.warn('[mic] the recording could not be decoded', error);
-      return null;
-    });
-    if (decoded === null) return new Float32Array(0);
-    const length = Math.ceil(decoded.duration * RATE);
-    if (length === 0) return new Float32Array(0);
-    const offline = new OfflineAudioContext(1, length, RATE);
-    const source = offline.createBufferSource();
-    source.buffer = decoded;
-    source.connect(offline.destination);
-    source.start();
-    return (await offline.startRendering()).getChannelData(0).slice();
-  } finally {
-    void context.close();
-  }
 }
 
 /** The microphones on this computer, for Settings. Names appear once one has been used. */

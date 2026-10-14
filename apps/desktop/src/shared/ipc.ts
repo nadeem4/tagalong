@@ -1,6 +1,8 @@
 import type { CaptureBlock } from '@tagalong/core';
 import type {
   ContextSnapshot,
+  EarsEvent,
+  ListenMode,
   Pet,
   PetRemarkParams,
   RoutineProposedParams,
@@ -89,12 +91,18 @@ export const IPC = {
   speak: 'tagalong:voice:speak',
   stopVoiceEvent: 'tagalong:voice:stop',
   talkEvent: 'tagalong:voice:talk',
-  prepareListening: 'tagalong:voice:prepare-listening',
-  transcribe: 'tagalong:voice:transcribe',
+  earsListen: 'tagalong:voice:ears-listen',
+  micFrame: 'tagalong:voice:mic-frame',
+  earsStop: 'tagalong:voice:ears-stop',
+  earsEvent: 'tagalong:voice:ears-event',
+  earsStatusEvent: 'tagalong:voice:ears-status',
 } as const;
 
-/** What main heard in one spoken question: the words (empty when nothing was said), or why not. */
-export type TranscribeResult = { kind: 'text'; text: string } | { kind: 'failed'; message: string };
+/** The ears' models: loading (the first time, a download), ready, or failed and why. */
+export interface EarsStatus {
+  status: 'loading' | 'ready' | 'failed';
+  message?: string;
+}
 
 /** Settings' ▶ Preview: the voice and speed the form shows, not yet saved. */
 export interface SpeakPreview {
@@ -306,10 +314,16 @@ export interface TagalongHostApi {
   onStopVoice(handler: () => void): () => void;
   /** Fires on every press of the talk key, repeats included, with when it fired. */
   onTalk(handler: (at: number) => void): () => void;
-  /** Listening started: main notes the window you are on and warms the speech model. */
-  prepareListening(): Promise<{ ready: boolean }>;
-  /** 16 kHz mono samples of one spoken question, turned into text in main and dropped. */
-  transcribe(samples: Float32Array): Promise<TranscribeResult>;
+  /** Listening starts in the voice process; a held question first notes the window you are on. */
+  earsListen(mode: ListenMode): Promise<void>;
+  /** One 16 kHz mono frame from the microphone, for the ears. Never kept. */
+  micFrame(samples: Float32Array): void;
+  /** Listening stops; a held question's words still arrive as its turnEnd. */
+  earsStop(): Promise<void>;
+  /** What the ears heard: speech started, the words so far, a finished turn. */
+  onEarsEvent(handler: (event: EarsEvent, text?: string) => void): () => void;
+  /** The ears' models loading, ready, or failed. */
+  onEarsStatus(handler: (status: EarsStatus) => void): () => void;
 }
 
 declare global {

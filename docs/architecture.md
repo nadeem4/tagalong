@@ -41,7 +41,7 @@ flowchart LR
   end
   subgraph External
     C["Claude API"]
-    V["ElevenLabs and Whisper"]
+    V["ElevenLabs"]
     X["MCP servers: Notion, Gmail, Calendar, files"]
   end
   D -- "ws://127.0.0.1" --> S
@@ -733,7 +733,7 @@ that takes `ipcMain.handle` and what it reads as arguments, so it is unit tested
 | `connections.ts` | connected apps and the answer to a change Scout asked to make |
 | `routines.ts`    | Home's Routines page and the routine card, including its Edit |
 | `settings.ts`    | the settings view, saving settings and keys, model lists      |
-| `voice.ts`       | speak, prepare to listen, transcribe                          |
+| `voice.ts`       | speak; listen, mic frames and stop, to the voice process      |
 
 The handlers that move windows, open dialogs or read the screen stay in `index.ts`.
 
@@ -1575,7 +1575,7 @@ flowchart LR
   `speechSynthesis`, choosing an en-GB male voice (`pickSystemVoice`: Microsoft George first) or
   the default.
 - **Packaging.** `kokoro-js` and `@huggingface/transformers` are runtime dependencies of the
-  desktop app, external to the bundles and imported only when Scout first speaks. The main build has
+  desktop app, external to the bundles and imported only when Scout first speaks or listens. The main build has
   two entries, `dist/main.js` and `dist/voice-worker.js`; `electron-builder.json` packages all of `dist`.
   `onnxruntime-node`'s DLLs and sharp's `@img` binaries are unpacked from `app.asar`. The model is
   not bundled.
@@ -1591,15 +1591,23 @@ streams. The microphone opens only on the talk key (held) or the bubble's mic bu
 flowchart LR
   subgraph Main["Main process"]
     HK["hotkeys.talk: every press"] --> TE["IPC talkEvent(at)"]
-    PRE["prepareListening: active window, warm model"]
-    LS["createListenService: LazyLocalStt (Whisper) or fake"]
+    IPCV["ipc/voice.ts: earsListen notes the active window; micFrame, earsStop"]
+    FE["forwardEars: to every window"]
+  end
+  subgraph Worker["Voice process"]
+    EH["createEarsHost: one session at a time"] --> LE["LocalEars (FakeEars under TAGALONG_FAKE_STT)"]
   end
   subgraph Panel["Panel renderer"]
     TE --> PTT["PushToTalk: held, repeat, fresh press, click"]
-    PTT --> MIC["mic.ts: getUserMedia, MediaRecorder, 16 kHz mono"]
-    PTT --> PRE
-    MIC -- "IPC transcribe(samples)" --> LS
-    LS -- "text" --> CB["CompanionBubble: ask with spoken: true"]
+    PTT --> LC["ListenController: hold, release, cancel"]
+    LC --> MIC["mic.ts openMic: getUserMedia, mic-worklet.js, 512-sample 16 kHz frames"]
+    MIC --> RE["RemoteEars"]
+    RE -- "IPC earsListen, micFrame, earsStop" --> IPCV
+    IPCV -- "VoiceWorker.send" --> EH
+    LE -- "speechStart, partial, turnEnd" --> FE
+    FE -- "IPC earsEvent" --> RE
+    RE --> LC
+    LC -- "speechStart: barge-in; partial: live words; turnEnd: text" --> CB["CompanionBubble: ask with spoken: true"]
     CB --> SS["SpokenStream: sentence by sentence"]
     SS --> PU["Pushable"]
     PU --> QM["QueueMouth.speak"]
@@ -1617,7 +1625,7 @@ flowchart LR
   `FRESH_PRESS_MS` (1.1 s) of the last are the key repeating; the first `keyup` in the bubble is the
   release; a later fresh press stops if the release was missed. The mic button toggles. Listening
   ends on its own after 30 s.
-- **Barge-in.** Starting to listen calls `SpeechQueue.stop()`: Scout stops mid-sentence. The
+- **Barge-in.** Starting to listen, and the ears' `speechStart`, call `SpeechQueue.stop()`: Scout stops mid-sentence. The
   bubble subscribes to `talk.onListen`; when listening starts while an answer still streams it
   also interrupts that turn (`bridge.interrupt`), drops its `SpokenStream` and keeps what was shown so far, so no later
   sentence of the old answer is said. A spoken question sent while an answer still runs is a new
@@ -1625,35 +1633,53 @@ flowchart LR
 - **Settings on the fly.** Main sends `IPC.settingsChangedEvent` with the saved settings to every
   window after each save; the panel reads the ask and talk keys, the microphone and the user's name
   from it (`renderer/src/panel-settings.ts`), as it does at open, so none needs a restart.
-- **The ears** (`renderer/src/mic.ts`, `main/voice/listen.ts`, `main/voice/whisper.ts`). The panel
-  records with `getUserMedia` (the microphone from `voice.microphoneId`, or the system default) and
-  `MediaRecorder`, decodes it and resamples to 16 kHz mono with an `OfflineAudioContext`, and sends
-  the `Float32Array` over `IPC.transcribe`. `prepareListening`, called when listening starts, notes
-  the active window (never the selection: copying it would press keys while the talk key is held)
-  and warms the model. `createListenService` skips silence and clicks shorter than 0.3 s, strips
-  Whisper's `[BLANK_AUDIO]`-style markers and reports a failure instead of throwing.
-  `LazyLocalStt` loads `onnx-community/whisper-base.en` (Apache-2.0, q8, about 77 MB) through
-  `@huggingface/transformers` on the CPU, downloading it into `<userData>/voice` on first use; a
-  failed load deletes the model's folder and is tried again (downloaded afresh) next time. Nothing
-  is stored. `TAGALONG_FAKE_STT=1` hears
-  `FAKE_TRANSCRIPT` and adds Chromium's `use-fake-device-for-media-stream` and
-  `use-fake-ui-for-media-stream` switches, so the e2e suite needs no model and no microphone.
-  ElevenLabs Scribe is not wired in.
-- **The local ears** (`main/voice/ears/`). `LocalEars` (`local-ears.ts`) is the `Ears` implementation
-  behind three seams that fakes test: `Vad` (speech or not, per 512-sample frame), `StreamingStt`
-  (words so far for the current stretch) and `EndOfTurn` (how sure the person is done, from the last
-  8 s). The real parts are loaded in the voice process only, never in tests, and each loader is one
-  screen: `ort-ears.ts` (Silero VAD v5 on `onnxruntime-node`, input the previous frame's last 64
-  samples plus the 512-sample frame, state carried between frames; Moonshine tiny through
+- **The ears, in the panel** (`renderer/src/mic.ts`, `mic-worklet.js`, `remote-ears.ts`,
+  `ui/voice/listen-controller.ts`). `ListenController` decides when the microphone is open: `hold`
+  (the talk key, the mic button) opens it and makes the ears for that session, `release` closes it and
+  stops the ears, whose turnEnd then carries the question; `cancel` drops it. A mic that opens after the
+  release is closed unused and is heard as nothing said. Every window hears the one stream of ears
+  events and the voice process runs sessions one after another, so a held session takes a turnEnd only
+  once it has been released: a released question's words that arrive after the next press began go to
+  the released question. `speechStart` stops Scout talking, each `partial` shows in the bubble as the
+  words heard so far (`BubbleTalk.partial`), and the trimmed turnEnd text is asked (empty: "I didn't
+  catch that"). `openMic` (`getUserMedia` with the microphone from `voice.microphoneId` or the
+  system default, echo cancellation, noise suppression and auto gain on) runs an `AudioContext` at
+  16 kHz with the `tagalong-mic` `AudioWorklet` (`mic-worklet.js`), which posts 512-sample frames;
+  the worklet is imported as `?url&no-inline` because the panel's CSP (`default-src 'self'`) blocks
+  the `data:` URL Vite would otherwise inline. The open mic is itself the `MicStream` (at most about
+  30 s of frames waiting) and has `close()`; ending the reading early closes it too. `RemoteEars` is
+  the `Ears` the panel sees: `listen` calls `earsListen(mode)` and sends each frame with `micFrame`,
+  `stop` calls `earsStop`; held, it keeps its handlers until the turnEnd that follows the stop.
+- **The ears, through main** (`main/ipc/voice.ts`). `earsListen` notes the active window for a held
+  question (never the selection: copying it would press keys while the talk key is held), then sends
+  `ears.listen` to the voice process, which `VoiceWorker` forks then if Scout has not spoken yet.
+  `micFrame` (an `ipcRenderer.send`, not an invoke) and `earsStop` are kept in order behind a listen
+  still noting the window. `forwardEars` sends the voice process's `ears` messages as
+  `IPC.earsEvent` and its `ears.status` (loading, ready, failed) as `IPC.earsStatusEvent` to every
+  open window; each `ListenController` ignores events outside its own session. If the voice process
+  dies, the windows hear "Listening stopped unexpectedly. Try again.", and a question being asked
+  ends. The panel says the first-time download (about 45 MB) while the status is loading.
+- **The ears, in the voice process** (`main/voice/worker/ears-host.ts`, `main/voice/ears/`).
+  `createEarsHost` opens an inbox for frames at each listen, so the first words are not lost while
+  the models load, and runs one session at a time. `LocalEars` (`local-ears.ts`) is the `Ears`
+  implementation behind three seams that fakes test: `Vad` (speech or not, per 512-sample frame),
+  `StreamingStt` (words so far for the current stretch) and `EndOfTurn` (how sure the person is done,
+  from the last 8 s). The real parts are loaded in the voice process only, never in tests, and each
+  loader is one screen: `ort-ears.ts` (Silero VAD v5 on `onnxruntime-node`, input the previous frame's
+  last 64 samples plus the 512-sample frame, state carried between frames; Moonshine tiny through
   `@huggingface/transformers`, q8, CPU, its decodes chained so a second `text()` waits for the first),
   `smart-turn.ts` (Smart Turn v3.2: the last 8 s normalised to zero mean and unit variance, left-padded
-  to 8 s, Whisper features, output already a probability) and `load-ears.ts` (`loadEars(dir)`: fetch
-  what is missing with `ensureFiles`, then load the three parts). **Variant C** was chosen over
-  sherpa-onnx, whose bundled onnxruntime 1.28 clashes with the 1.21 that Transformers.js pins when both
-  load in one process. The model files (about 43 MB, `model-files.ts#EARS_FILES`) are downloaded once on
-  first use into `<userData>/voice`, the Transformers.js cache Kokoro also uses: `ears/silero-vad/`,
-  `ears/smart-turn-v3/` and Moonshine at `onnx-community/moonshine-tiny-ONNX/`. `loadEars` is not wired
-  to a caller yet; the Whisper path above is still what answers.
+  to 8 s, log-mel features from Transformers.js's `WhisperFeatureExtractor`, output already a
+  probability) and `load-ears.ts` (`loadEars(dir)`: fetch what is missing with `ensureFiles`, then
+  load the three parts). **Variant C** was chosen over sherpa-onnx, whose bundled onnxruntime 1.28
+  clashes with the 1.21 that Transformers.js pins when both load in one process. The model files
+  (about 43 MB, `model-files.ts#EARS_FILES`) are downloaded once on first use into `<userData>/voice`,
+  the Transformers.js cache Kokoro also uses: `ears/silero-vad/`, `ears/smart-turn-v3/` and Moonshine
+  at `onnx-community/moonshine-tiny-ONNX/`. Nothing heard is stored. `TAGALONG_FAKE_STT=1` makes the
+  voice process use `FakeEars` (no model, no download; held, it hears `FAKE_TRANSCRIPT`, "What am I
+  looking at?", when stopped) and main adds Chromium's `use-fake-device-for-media-stream` and
+  `use-fake-ui-for-media-stream` switches, so the e2e suite needs no model and no microphone while
+  the frames still flow through the real voice process. ElevenLabs Scribe is not wired in.
 - **Spoken mode** (`core/conversation/prompt-assembler.ts`). `ask` takes `spoken: true`; the runner
   passes it to `assemblePrompt`, which appends `SPOKEN_MODE` (headed `SPOKEN_HEADING`) last in the
   system prompt for that turn only: short sentences and contractions, no markdown or lists in what
