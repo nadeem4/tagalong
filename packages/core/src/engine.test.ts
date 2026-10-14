@@ -7,7 +7,9 @@ import { PROTOCOL_VERSION, RPC_ERROR_CODES } from '@tagalong/protocol';
 import { Engine, type EngineOptions } from './engine';
 import { SPOKEN_HEADING } from './conversation/prompt-assembler';
 import { fakeMcpServer } from './connections/fake-server';
+import { ActivityLog } from './memory/activity';
 import { openDatabase } from './memory/db';
+import { ConversationStore } from './memory/store';
 import {
   CLAUDE_CODE_MODELS,
   FakeBrainProvider,
@@ -1011,6 +1013,55 @@ describe('greeting.compose', () => {
     await host.call('hello', helloParams(e.pairingToken));
     const res = await host.call('greeting.compose', { petId: 'nobody' });
     expect(res['error']).toBeDefined();
+  });
+
+  it('says it closed unexpectedly when main says the last launch crashed', async () => {
+    const failing: BrainProvider = {
+      id: 'fake',
+      capabilities: { vision: false, tools: false, streaming: true },
+      listModels: () => Promise.resolve([]),
+      complete: () => Promise.reject(new Error('offline')),
+    };
+    // A hand-off still running when the last launch died: boot closes it as interrupted.
+    const seeded = openDatabase(dir);
+    new ActivityLog(seeded, new ConversationStore(seeded)).expertStarted({
+      petId: 'scout',
+      expertId: 'claude-code',
+      expertName: 'Claude Code',
+      text: 'Fix the test.',
+    });
+    seeded.close();
+
+    const e = await boot(failing);
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const launch = { crashed: true, lastVersion: '0.4.0', version: '0.4.0', whatsNew: '' };
+    const res = await host.call('greeting.compose', { petId: 'scout', launch });
+    expect((res['result'] as { text: string }).text).toContain(
+      'I closed unexpectedly last time, and one task stopped.',
+    );
+  });
+
+  it('says what is new when the version changed', async () => {
+    const failing: BrainProvider = {
+      id: 'fake',
+      capabilities: { vision: false, tools: false, streaming: true },
+      listModels: () => Promise.resolve([]),
+      complete: () => Promise.reject(new Error('offline')),
+    };
+    const e = await boot(failing);
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const launch = {
+      crashed: false,
+      lastVersion: '0.4.0',
+      version: '0.5.0',
+      whatsNew: 'Setup by voice.',
+    };
+    const res = await host.call('greeting.compose', { petId: 'scout', launch });
+    expect((res['result'] as { text: string }).text).toContain(
+      'I’ve been updated to 0.5.0. Setup by voice.',
+    );
   });
 });
 

@@ -8,6 +8,7 @@ import { ConversationStore } from './memory/store';
 import { MemoryStore } from './memory/memories';
 import { Summarizer } from './memory/summarizer';
 import { composeGreeting } from './greeting/greeting';
+import { launchScenario } from './greeting/scenario';
 import { PetRegistry } from './pets/registry';
 import { SettingsStore } from './settings/settings';
 import type { SecretStore } from './settings/settings';
@@ -254,7 +255,8 @@ export class Engine {
     // activity.list on a notification already finds the row.
     const activity = new ActivityLog(db, store);
     // Nothing runs yet, so anything still marked running was cut short by a crash or quit.
-    activity.interrupted();
+    // The count is kept for the launch line, which names it only after a crash.
+    const interruptedAtBoot = activity.interrupted();
     const routineStore = new RoutineStore(db);
     routineStore.interrupted();
     const emit: TurnEventSink = (event) => {
@@ -427,6 +429,7 @@ export class Engine {
       keepAnEye,
       connections,
       approvals,
+      interruptedAtBoot,
       routines,
       claudeCodeConfigPath: options.claudeCodeConfigPath,
       refreshProviders: async () => keyed?.refresh(),
@@ -517,13 +520,15 @@ function buildHandlers(parts: {
   keepAnEye: KeepAnEye;
   connections: ConnectionManager;
   approvals: Approvals;
+  /** Runs boot found still running and closed as interrupted. */
+  interruptedAtBoot: number;
   claudeCodeConfigPath: string | undefined;
   /** Re-reads provider keys, so a key saved since the last ask is used by this one. */
   refreshProviders: () => Promise<void>;
 }): MethodHandlers {
   const { activity, runner, pets, settings, models, hosts, watches } = parts;
   const { refreshProviders, experts, routes, handoffs, projects, connectorFor, resolve } = parts;
-  const { keepAnEye, connections, approvals, routines } = parts;
+  const { keepAnEye, connections, approvals, routines, interruptedAtBoot } = parts;
   /** A manager refusal (an id taken, none such) as an invalidParams error the host shows. */
   const plainly = async <T>(work: () => Promise<T>): Promise<T> => {
     try {
@@ -603,15 +608,32 @@ function buildHandlers(parts: {
         .filter((at): at is string => at !== null)
         .map((at) => new Date(at))
         .reduce<Date | null>((latest, at) => (latest === null || at > latest ? at : latest), null);
+      const now = new Date();
+      const scenario =
+        params.launch === undefined
+          ? undefined
+          : launchScenario({
+              crashed: params.launch.crashed,
+              lastVersion: params.launch.lastVersion,
+              version: params.launch.version,
+              now,
+              awaySince,
+            });
       return composeGreeting({
         pet,
         summarizer,
         provider: resolve,
         context: {
-          now: new Date(),
+          now,
           awaySince,
           handoffs: lastOpenedAt === null ? [] : activity.expertsFinishedSince(lastOpenedAt),
+          routines: lastOpenedAt === null ? [] : activity.routinesFinishedSince(lastOpenedAt),
           userName,
+          interrupted: interruptedAtBoot,
+          ...(scenario === undefined ? {} : { scenario }),
+          ...(scenario === 'update' && params.launch !== undefined
+            ? { update: { version: params.launch.version, whatsNew: params.launch.whatsNew } }
+            : {}),
         },
       });
     },
