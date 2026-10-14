@@ -476,7 +476,10 @@ export function CompanionBubble({
         <ProposalCard
           key={handoff.proposal.proposalId}
           proposal={handoff.proposal}
-          onSent={setHandoff}
+          // A quick expert can finish before Send hears back its id: keep what it sent.
+          onSent={(next) =>
+            setHandoff((current) => (current?.phase === 'finished' ? current : next))
+          }
           onCancelled={() => setHandoff(null)}
         />
       )}
