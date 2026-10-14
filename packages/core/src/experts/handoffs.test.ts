@@ -6,7 +6,7 @@ import { migrate } from '../memory/db';
 import { ConversationStore } from '../memory/store';
 import type { Brief, Connector, ConnectorResult } from './connector';
 import { FakeConnector } from './fake';
-import { HandoffManager, type HandoffEvent } from './handoffs';
+import { HANDOFF_TIMEOUT_MS, HandoffManager, type HandoffEvent } from './handoffs';
 import { ExpertStore } from './store';
 
 let db: Database.Database;
@@ -173,6 +173,58 @@ describe('HandoffManager', () => {
     expect(activity.list({}).entries[0]?.state).toBe('stopped');
     expect(handoffs.cancel(handoffId)).toBe(false);
     release({ ok: true, text: 'late', changedFiles: [] });
+  });
+
+  it('stops a hand-off that runs past the time limit and says so plainly', async () => {
+    vi.useFakeTimers();
+    try {
+      const hanging: Connector = {
+        check: () => Promise.resolve({ ok: true }),
+        send: (_b, _p, signal) =>
+          new Promise((resolve) =>
+            signal?.addEventListener('abort', () => resolve({ ok: false, error: 'Cancelled.' })),
+          ),
+      };
+      const { handoffId } = manager(hanging).start({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief: { ask: 'x' },
+        folder: 'C:\\r',
+      });
+
+      await vi.advanceTimersByTimeAsync(HANDOFF_TIMEOUT_MS);
+
+      expect(finished()?.params).toEqual({
+        handoffId,
+        expertId: 'claude-code',
+        state: 'error',
+        error: 'Claude Code took longer than 30 minutes, so it was stopped.',
+      });
+      expect(activity.list({}).entries[0]?.state).toBe('error');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('turns a connector that throws into a failed hand-off', async () => {
+    const broken: Connector = {
+      check: () => Promise.resolve({ ok: true }),
+      send: () => Promise.reject(new Error('spawn EINVAL')),
+    };
+    const { handoffId } = manager(broken).start({
+      expertId: 'claude-code',
+      petId: 'scout',
+      brief: { ask: 'x' },
+      folder: 'C:\\r',
+    });
+    await vi.waitFor(() => expect(finished()).toBeDefined());
+    expect(finished()?.params).toEqual({
+      handoffId,
+      expertId: 'claude-code',
+      state: 'error',
+      error: 'Claude Code could not run: spawn EINVAL',
+    });
+    expect(activity.list({}).entries[0]?.state).toBe('error');
   });
 
   it('refuses an expert that does not exist or is switched off', () => {

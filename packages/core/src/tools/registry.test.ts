@@ -214,6 +214,15 @@ describe('toolsFor', () => {
     expect(outcome.isError).toBe(true);
   });
 
+  it('never offers or runs watch_for on a routine’s turn, so a watch routine cannot loop', async () => {
+    const turn = new ToolRegistry(everything()).forTurn(
+      fakeTurn({ routine: { routineId: 'r', handedOff: () => undefined } }),
+    );
+    expect(turn.definitions.map((definition) => definition.name)).not.toContain('watch_for');
+    const outcome = await turn.run({ name: 'watch_for', input: { condition: 'a build ends' } });
+    expect(outcome.isError).toBe(true);
+  });
+
   it("takes away a role's tool the pet's grants turn off", () => {
     const granted = ids({
       ...FAKE_TURN_PET,

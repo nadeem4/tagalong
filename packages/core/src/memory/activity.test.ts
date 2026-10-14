@@ -365,3 +365,29 @@ describe('connector calls', () => {
     expect(second).toMatchObject({ kind: 'routine', state: 'error', error: 'No key for Scout.' });
   });
 });
+
+describe('after a crash', () => {
+  it('marks every row still running as interrupted, and leaves finished rows alone', () => {
+    const turnId = started('scout', asked('scout', 'hi'));
+    const expert = log.expertStarted({
+      petId: 'scout',
+      expertId: 'claude-code',
+      expertName: 'Claude Code',
+      text: 'Fix the test.',
+    });
+    const routine = log.routineStarted({ routineId: randomUUID(), petId: 'scout', name: 'Papers' });
+    log.routineFinished(routine, { state: 'done', answer: 'None today.' });
+
+    expect(log.interrupted()).toBe(2);
+
+    const entries = log.list({}).entries;
+    const byId = (id: string) => entries.find((entry) => entry.id === id);
+    expect(entries.find((entry) => entry.turnId === turnId)).toMatchObject({
+      state: 'error',
+      error: 'Interrupted: Tagalong closed before this finished.',
+    });
+    expect(byId(expert)).toMatchObject({ state: 'error' });
+    expect(byId(expert)?.finishedAt).toBeDefined();
+    expect(byId(routine)).toMatchObject({ state: 'done', answer: 'None today.' });
+  });
+});

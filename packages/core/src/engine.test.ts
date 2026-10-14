@@ -178,6 +178,23 @@ describe('Engine.boot', () => {
 
     expect(engine.pairingToken).toBe(token);
   });
+
+  it('closes activity a crash left running, so it does not spin forever', async () => {
+    const db = openDatabase(dir);
+    db.prepare(
+      `INSERT INTO activity (id, kind, state, pet_id, started_at)
+       VALUES ('left-over', 'expert', 'running', 'scout', '2026-10-12T06:00:00.000Z')`,
+    ).run();
+    db.close();
+
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const res = await host.call('activity.list', {});
+    const entries = (res['result'] as { entries: { id: string; state: string }[] }).entries;
+
+    expect(entries.find((entry) => entry.id === 'left-over')?.state).toBe('error');
+  });
 });
 
 describe('per-pet providers', () => {

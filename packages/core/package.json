@@ -21,11 +21,13 @@
     "@modelcontextprotocol/sdk": "1.32.1",
     "@tagalong/protocol": "workspace:*",
     "better-sqlite3": "13.0.3",
+    "cross-spawn": "7.0.6",
     "openai": "7.27.0",
     "ws": "8.21.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "9.6.0",
+    "@types/cross-spawn": "6.0.6",
     "@types/ws": "8.18.1",
     "yaml": "2.9.1"
   }

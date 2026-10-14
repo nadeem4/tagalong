@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -31,25 +31,30 @@ describe('SettingsStore.get', () => {
     expect(store.get().defaultModel).toBe(SETTINGS_DEFAULTS.defaultModel);
   });
 
-  it('throws an error naming the file when the JSON is malformed', () => {
-    writeFileSync(file, '{ not json', 'utf8');
+  it('falls back to the last good copy when the file is malformed', () => {
     const store = new SettingsStore(dataDir);
-    expect(() => store.get()).toThrow(file);
-    expect(() => store.get()).toThrow(/not valid JSON/i);
+    store.set({ providerId: 'fake' });
+    store.set({ enginePort: 50000 });
+    writeFileSync(file, '{ not json', 'utf8');
+    expect(store.get().providerId).toBe('fake');
   });
 
-  it('throws an error naming the offending field when the file fails the schema', () => {
+  it('falls back to the defaults when the file fails the schema and no backup exists', () => {
     writeFileSync(file, JSON.stringify({ enginePort: 80 }), 'utf8');
-    const store = new SettingsStore(dataDir);
-    expect(() => store.get()).toThrow(file);
-    expect(() => store.get()).toThrow(/enginePort/);
+    expect(new SettingsStore(dataDir).get()).toEqual(SETTINGS_DEFAULTS);
   });
 
-  it('never silently resets an invalid file', () => {
+  it('never silently overwrites an invalid file on read', () => {
     writeFileSync(file, '{ not json', 'utf8');
-    const store = new SettingsStore(dataDir);
-    expect(() => store.get()).toThrow();
+    new SettingsStore(dataDir).get();
     expect(readFileSync(file, 'utf8')).toBe('{ not json');
+  });
+
+  it('keeps an invalid file aside before the next save replaces it', () => {
+    writeFileSync(file, '{ not json', 'utf8');
+    new SettingsStore(dataDir).set({ providerId: 'fake' });
+    expect(readFileSync(`${file}.corrupt`, 'utf8')).toBe('{ not json');
+    expect(new SettingsStore(dataDir).get().providerId).toBe('fake');
   });
 });
 
@@ -75,6 +80,16 @@ describe('SettingsStore.set', () => {
     const store = new SettingsStore(dataDir);
     store.set({ avatar: { x: 12, y: 34 } });
     expect(store.set({ providerId: 'fake' }).avatar).toEqual({ x: 12, y: 34 });
+  });
+
+  it('keeps the previous good file as a .bak and leaves no temp file', () => {
+    const store = new SettingsStore(dataDir);
+    store.set({ providerId: 'fake' });
+    store.set({ enginePort: 50000 });
+    expect(JSON.parse(readFileSync(`${file}.bak`, 'utf8')).enginePort).toBe(
+      SETTINGS_DEFAULTS.enginePort,
+    );
+    expect(existsSync(`${file}.tmp`)).toBe(false);
   });
 
   it('rejects an invalid patch without writing anything', () => {

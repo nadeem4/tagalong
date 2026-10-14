@@ -1,4 +1,5 @@
 import type { Recognizer } from './listen';
+import { loadOrForget } from './model-cache';
 
 /**
  * Whisper base.en (OpenAI, Apache-2.0), as ONNX for Transformers.js. English only, which
@@ -19,10 +20,10 @@ export async function loadWhisper(cacheDir: string): Promise<Recognizer> {
   const { env, pipeline } = await import('@huggingface/transformers');
   env.cacheDir = cacheDir;
   // The pipeline's overloads are too much for the checker; this is the call it makes.
-  const transcribe = (await pipeline('automatic-speech-recognition', WHISPER_MODEL, {
-    dtype: 'q8',
-    device: 'cpu',
-  })) as unknown as Transcriber;
+  // A failed load deletes the cached model, so a broken download is fetched afresh.
+  const transcribe = (await loadOrForget(cacheDir, WHISPER_MODEL, () =>
+    pipeline('automatic-speech-recognition', WHISPER_MODEL, { dtype: 'q8', device: 'cpu' }),
+  )) as unknown as Transcriber;
   return async (samples) => {
     const result = await transcribe(samples);
     return (Array.isArray(result) ? result.map((part) => part.text).join(' ') : result.text) ?? '';
