@@ -23,7 +23,7 @@ const reactDomDir = dirname(fromUi.resolve('react-dom/package.json'));
  * JavaScript deps such as ws and the Anthropic SDK are inlined with everything else.
  */
 const WORKSPACE_PACKAGES = ['@tagalong/core', '@tagalong/protocol', '@tagalong/ui'];
-const NATIVE_DEPS = ['better-sqlite3', 'get-windows'];
+const NATIVE_DEPS = ['better-sqlite3', 'get-windows', 'onnxruntime-node'];
 
 export default defineConfig({
   main: {

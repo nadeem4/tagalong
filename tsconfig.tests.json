@@ -16,6 +16,7 @@
     "packages/*/src/**/*.test.tsx",
     "packages/*/src/**/*.test-d.ts",
     "apps/*/src/**/*.test.ts",
+    "apps/desktop/src/renderer/src/env.d.ts",
     "apps/*/playwright.config.ts",
     "apps/*/e2e/**/*.ts"
   ]

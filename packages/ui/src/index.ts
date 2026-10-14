@@ -52,4 +52,6 @@ export { toSpeakable } from './voice/speakable';
 /** Talk to Scout: telling a held key from a fresh press, and the bubble's side of it. */
 export { PushToTalk } from './voice/push-to-talk';
 export type { TalkAction } from './voice/push-to-talk';
+export { ListenController } from './voice/listen-controller';
+export type { ListenControllerOptions, ListenMic } from './voice/listen-controller';
 export { officeTokens } from './office/tokens';

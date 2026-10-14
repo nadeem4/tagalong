@@ -109,7 +109,7 @@ export function VoiceSection({
         </div>
         <div>
           <label htmlFor="f-ears">Who listens</label>
-          <select id="f-ears" name="ears" defaultValue={settings.voice.ears ?? 'sherpa'}>
+          <select id="f-ears" name="ears" defaultValue={settings.voice.ears ?? 'local'}>
             {EARS.map((adapter) => (
               <option key={adapter.id} value={adapter.id}>
                 {adapter.label}
@@ -193,8 +193,8 @@ export function VoiceSection({
         Hold the key, or click the mic in the bubble, and say your question. Let go (or click again)
         and Scout answers in short spoken sentences, with any detail in the bubble. Talking while
         Scout speaks cuts it off. The microphone only listens while you hold the key or after you
-        click the mic: never on its own. The first time, Tagalong downloads a small speech model
-        (about 80 MB) that turns your voice into text on this PC.
+        click the mic: never on its own. The first time, Tagalong downloads its speech models (about
+        43 MB) that turn your voice into text on this PC.
       </Tip>
     </Section>
   );

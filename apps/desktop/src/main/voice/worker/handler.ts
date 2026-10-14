@@ -1,8 +1,12 @@
 import type { LazyLocalVoice } from '../voice';
+import type { EarsMessage } from './ears-host';
 import type { FromWorker, ToWorker } from './messages';
 
 export interface WorkerDeps {
   kokoro: Pick<LazyLocalVoice, 'warm' | 'loaded' | 'speak'>;
+  ears: (message: EarsMessage) => void;
+  /** Pre-downloads the ears' model files, reporting the share done. */
+  ensureEars(onProgress: (fraction: number) => void): Promise<void>;
 }
 
 /** The voice process's side: runs each call and posts its answer, or why it failed. */
@@ -21,10 +25,16 @@ export function createWorkerHandler(deps: WorkerDeps, post: (message: FromWorker
       }
       case 'kokoro.speak':
         return deps.kokoro.speak(message.text, { voice: message.voice, speed: message.speed });
+      case 'ears.ensure':
+        await deps.ensureEars((fraction) => post({ kind: 'ears.progress', fraction }));
+        return true;
     }
   };
   return (message: ToWorker): void => {
-    if (message.kind !== 'call') return;
+    if (message.kind !== 'call') {
+      deps.ears(message);
+      return;
+    }
     run(message).then(
       (value) => post({ kind: 'result', id: message.id, value }),
       (error: unknown) =>

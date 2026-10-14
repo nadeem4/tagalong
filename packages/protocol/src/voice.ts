@@ -49,7 +49,7 @@ export interface LiveVoice {
 
 export type VoiceSetup = { ears: Ears; mouth: Mouth } | { live: LiveVoice };
 
-export const EARS_IDS = ['sherpa'] as const;
+export const EARS_IDS = ['local'] as const;
 export type EarsId = (typeof EARS_IDS)[number];
 
 export const MOUTH_IDS = ['kokoro', 'elevenlabs', 'system'] as const;
@@ -71,7 +71,7 @@ export interface VoiceAdapterFacts {
 
 export const VOICE_ADAPTERS: readonly VoiceAdapterFacts[] = [
   {
-    id: 'sherpa',
+    id: 'local',
     slot: 'ears',
     label: 'On this computer',
     offline: true,

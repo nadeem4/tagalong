@@ -1,7 +1,10 @@
 import type { HostToCoreMethod } from '@tagalong/protocol';
-import type { EngineCall, IpcHandle, IpcListener } from './handle';
+import type { EngineCall, IpcHandle, IpcListener, IpcOn } from './handle';
 
-/** Stands in for ipcMain in tests: records each handler and invokes it as a renderer would. */
+/**
+ * Stands in for ipcMain in tests: records each handler and invokes it as a renderer would,
+ * and each `on` listener, which `send` calls as a renderer's ipcRenderer.send would.
+ */
 export function fakeIpc() {
   const handlers = new Map<string, IpcListener>();
   const handle: IpcHandle = (channel, listener) => {
@@ -13,7 +16,11 @@ export function fakeIpc() {
     if (listener === undefined) throw new Error(`nothing handles ${channel}`);
     return listener({}, ...(args as never[]));
   };
-  return { handle, invoke, channels: () => [...handlers.keys()].sort() };
+  const ons = new Map<string, (event: unknown, ...args: never[]) => void>();
+  const on: IpcOn = (channel, listener) => void ons.set(channel, listener);
+  const send = (channel: string, ...args: unknown[]): void =>
+    ons.get(channel)?.({}, ...(args as never[]));
+  return { handle, invoke, on, send, channels: () => [...handlers.keys()].sort() };
 }
 
 /** An engine connection that answers each method from `answers` and records every call. */

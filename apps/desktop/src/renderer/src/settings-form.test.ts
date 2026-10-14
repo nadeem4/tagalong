@@ -402,10 +402,10 @@ describe('buildSettingsPatch voice', () => {
 
   it('carries the picked mouth and ears', () => {
     expect(
-      buildSettingsPatch({ ...values, ...voice, mouth: 'system', ears: 'sherpa' }).voice,
+      buildSettingsPatch({ ...values, ...voice, mouth: 'system', ears: 'local' }).voice,
     ).toMatchObject({
       mouth: 'system',
-      ears: 'sherpa',
+      ears: 'local',
     });
     expect(buildSettingsPatch({ ...values, ...voice }).voice).not.toHaveProperty('mouth');
   });

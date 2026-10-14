@@ -18,6 +18,7 @@ import { prepareLine } from './voice-player';
 import { DEFAULT_TALK_KEY, panelSettings, readable } from './panel-settings';
 import type { PanelSettings } from './panel-settings';
 import { useTalk } from './talk';
+import { installVoiceSeam } from './voice-seam';
 
 /** The full chat's height; the bubble measures its own. Matches main's PANEL_HEIGHT. */
 const CHAT_HEIGHT = 520;
@@ -330,6 +331,7 @@ function Panel() {
 
 const container = document.getElementById('root');
 if (container !== null) {
+  installVoiceSeam();
   createRoot(container).render(
     <StrictMode>
       <Panel />

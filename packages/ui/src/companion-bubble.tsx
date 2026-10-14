@@ -29,6 +29,8 @@ export interface BubbleTalk {
   onListen?: (handler: () => void) => () => void;
   /** A line about the microphone: nothing heard, the model downloading, a failure. */
   note: string | null;
+  /** The words heard so far, shown while listening. */
+  partial?: string | null;
   /** The talk key as a person reads it, for "Hold … to reply". */
   keyLabel: string;
   /** The mic button: click to talk, click again to send. */
@@ -328,6 +330,11 @@ export function CompanionBubble({
     <p role="status" className="bubble-listening" data-state={talk.state}>
       {talk.state !== 'idle' && <span className="bubble-listening-dot" aria-hidden="true" />}
       {[talkLine, talk.note].filter((part) => part !== null).join(' ')}
+      {talk.partial ? (
+        <span className="bubble-partial" aria-live="off">
+          {talk.partial}
+        </span>
+      ) : null}
     </p>
   );
   const replyHint = talk !== undefined && spokenReply && reply.state === 'done' && (
@@ -913,8 +920,9 @@ const BUBBLE_CSS = `
   background: #222845; color: #C9CEE0; font-size: 13px; line-height: 1.45;
 }
 .bubble-listening {
-  display: flex; align-items: center; gap: 8px; margin: 0; font-size: 12px; color: #C9CEE0;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; font-size: 12px; color: #C9CEE0;
 }
+.bubble-partial { flex-basis: 100%; font-size: 13px; line-height: 1.45; color: ${t.color.text}; }
 .bubble-listening-dot {
   flex: none; width: 8px; height: 8px; border-radius: 50%; background: ${t.color.gold};
   animation: bubble-pulse 1.2s ease-in-out infinite;

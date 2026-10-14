@@ -563,6 +563,21 @@ describe('CompanionBubble, talking to Scout', () => {
     expect(screen.getByRole('status')).toHaveTextContent('I didn’t catch that.');
   });
 
+  it('shows the words heard so far while listening', () => {
+    render(
+      <HostBridgeProvider bridge={createFakeHostBridge()}>
+        <CompanionBubble
+          petId="scout"
+          petName="Scout"
+          talk={talk({ state: 'listening', partial: 'what is' })}
+        />
+      </HostBridgeProvider>,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('what is');
+    // Live words change about three times a second: a screen reader is not told each one.
+    expect(screen.getByText('what is')).toHaveAttribute('aria-live', 'off');
+  });
+
   it('asks what it heard as a spoken question, and says the answer sentence by sentence', async () => {
     const bridge = createFakeHostBridge();
     const onSay = vi.fn();

@@ -1,13 +1,31 @@
+import { loadEars } from '../ears/load-ears';
+import { EARS_FILES, filesPresent, sharedEnsureFiles } from '../ears/model-files';
 import { loadKokoro } from '../kokoro';
 import { LazyLocalVoice } from '../voice';
+import { createEarsHost } from './ears-host';
 import { createWorkerHandler } from './handler';
 import type { ToWorker } from './messages';
 
 // An Electron utility process: the voice models load and run here, so they never stall a window.
 const dir = process.env.TAGALONG_VOICE_DIR ?? '.';
 const port = process.parentPort;
+const fake = process.env.TAGALONG_FAKE_STT === '1';
+// One download of the ears' files at a time, whether Settings or the first listen asked.
+const ensureEarsFiles = sharedEnsureFiles(dir, EARS_FILES);
 const handle = createWorkerHandler(
-  { kokoro: new LazyLocalVoice(() => loadKokoro(dir)) },
+  {
+    kokoro: new LazyLocalVoice(() => loadKokoro(dir)),
+    ears: createEarsHost({
+      fake,
+      load: () => loadEars(dir, () => ensureEarsFiles()),
+      post: (m) => port.postMessage(m),
+      filesPresent: () => filesPresent(dir, EARS_FILES),
+    }),
+    // Never downloads under the fake: the e2e suite needs no model.
+    ensureEars: fake
+      ? async (onProgress) => onProgress(1)
+      : (onProgress) => ensureEarsFiles(onProgress),
+  },
   (message) => port.postMessage(message),
 );
 port.on('message', (event: { data: ToWorker }) => handle(event.data));

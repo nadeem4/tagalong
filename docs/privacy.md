@@ -239,17 +239,21 @@ after an answer the bubble only offers the key to reply.
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%
 flowchart LR
-  K["Talk key held, or mic clicked"] --> R["Recorded in the panel, in memory"]
-  R --> W["Whisper on this computer"]
-  W --> T["Text of the question"]
+  K["Talk key held, or mic clicked"] --> R["Microphone frames, in memory"]
+  R --> V["The voice process on this computer: Silero, Moonshine, Smart Turn"]
+  V --> T["Text of the question"]
   T --> P["Scout's provider, like a typed question"]
-  R -.->|"dropped after"| X["Nothing kept"]
+  V -.->|"dropped as heard"| X["Nothing kept"]
 ```
 
-- **On this computer.** The recording is turned into text by Whisper base.en (OpenAI's model,
-  Apache-2.0, quantised, about 77 MB), downloaded from Hugging Face the first time you talk to
-  Scout into the same `voice` folder as the voice, and run on the CPU. The download fetches the
-  model only; no audio is sent.
+- **On this computer.** While you talk, the microphone's audio streams in memory, a frame at a
+  time, from the panel through the app to its voice process, where three small models turn it into
+  text on the CPU: Silero VAD (MIT, about 2 MB) spots speech, Moonshine tiny (Useful Sensors, MIT,
+  quantised, about 32 MB) writes the words, shown in the bubble as you talk, and Smart Turn v3.2
+  (Pipecat, BSD-2-Clause, about 9 MB) judges when you have finished. They are about 43 MB in all,
+  downloaded from Hugging Face (`onnx-community/silero-vad`, `onnx-community/moonshine-tiny-ONNX`,
+  `pipecat-ai/smart-turn-v3`) the first time you talk to Scout, into the same `voice` folder as the
+  voice. The download fetches the models only; no audio is sent.
 - **The audio never leaves the computer and is never stored.** It lives in memory until it has been
   turned into text, and is then dropped. Only the text goes on, to Scout's provider, exactly as if
   you had typed it, with the name of the window you are on (never the selected text).

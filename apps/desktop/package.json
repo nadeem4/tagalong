@@ -23,7 +23,8 @@
     "@nut-tree-fork/nut-js": "4.2.6",
     "better-sqlite3": "13.0.3",
     "get-windows": "9.3.0",
-    "kokoro-js": "1.2.1"
+    "kokoro-js": "1.2.1",
+    "onnxruntime-node": "1.21.0"
   },
   "devDependencies": {
     "@fontsource/onest": "5.3.1",
