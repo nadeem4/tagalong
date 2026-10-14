@@ -538,6 +538,17 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 11. **Edge:** block the microphone in Windows privacy settings with Always listening on. The note
     "The microphone could not be opened…" shows once and stays; it does not flicker each time
     Scout finishes a line in the system voice.
+12. **Edge:** on a fresh install with no internet, switch **Always listening** on. The bubble says
+    the first-time download, then "I couldn’t download my listening models…" once; it does not
+    go back to the download note or repeat as Scout finishes lines. Connect, switch Always
+    listening off and on: the models download and listening works.
+13. **Action:** with Always listening on, close the bubble with ×.
+14. **Expected:** the mark stays solid and listening goes on: say "Scout, what is this?" and the
+    bubble comes back with the question.
+15. **Action:** with Always listening on, choose **Hide pets** in the tray, wait a few seconds,
+    then show the pets again.
+16. **Expected:** while the pets are hidden Windows shows no microphone use from Tagalong and
+    "Scout, what is this?" does nothing. Shown again, the mark is solid and listening works.
 
 ### T.10. Always listening: the name, calls, and the system voice
 
@@ -552,12 +563,16 @@ Run with a real microphone and without `TAGALONG_FAKE_STT`. Switch **Always list
 6. **Expected:** both are ignored, as they are about Scout, not to it.
 7. **Action:** with Always listening on, hold `Ctrl+Shift+Alt+Space`, or click the mic in the text
    box, and ask a question without the name.
-8. **Expected:** the question is asked and answered. Hold-to-talk and the mic button need no name.
-9. **Action:** start a Teams (or Zoom, or Google Meet) call, or put another app full screen, and
-   wait a few seconds.
+8. **Expected:** the bubble listens as usual and shows your words as said; the question is asked
+   and answered. Hold-to-talk and the mic button need no name. Afterwards always listening
+   carries on: "what time is it?" is still ignored and "Scout, what time is it?" is asked.
+9. **Action:** bring a call app to the front (for example a Teams, Zoom or Google Meet call), or
+   put another app full screen, and wait a few seconds.
 10. **Expected:** within about 2 seconds the mark on Scout turns from solid to an outline, and
     Windows shows no microphone use from Tagalong. Say "Scout, what is this?": nothing happens.
-    End the call or leave full screen: the mark turns solid again and listening works.
+    Bring another window to the front, or leave full screen: the mark turns solid again and
+    listening works. A Teams window in front pauses listening even with no call.
+    Switching Always listening on while the call is already in front never opens the microphone.
 11. **Action:** use the system voice (Settings → Voice → **Who speaks** → System voice) and ask
     for a long answer by typing.
 12. **Expected:** while the system voice speaks, Scout does not hear it and does not reply to

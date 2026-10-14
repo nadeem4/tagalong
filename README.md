@@ -234,7 +234,8 @@ the way a person talks: short sentences, one question back at most, details left
 It starts speaking on the first sentence rather than waiting for the whole answer. Talking while
 Scout speaks cuts it off. When it is done the bubble says "Hold Ctrl+Shift+Alt+Space to reply".
 The microphone opens on that key or the mic button, or all the time only if you switch Always
-listening on in the bubble (then start with "Scout"; "Scout, stop" turns it off). Your speech is turned into text on this computer, by
+listening on in the bubble (then start with "Scout"; "Scout, stop" turns it off; it pauses while a
+call or a full-screen window is in front, and while the pets are hidden). Your speech is turned into text on this computer, by
 small models (Silero VAD, Moonshine and Smart Turn) downloaded the first time (about 43 MB); the
 audio is never sent or kept.
 

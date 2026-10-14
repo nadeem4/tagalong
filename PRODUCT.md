@@ -62,9 +62,9 @@ its result.
   asks one question back at most and leaves detail in the bubble. Talking cuts Scout off. Scout
   listens continuously only after you switch Always listening on, once, in the bubble. It stays
   on until you switch it off, and Scout never switches it on itself. A clear mark on Scout shows
-  the whole time. Listening pauses during calls and full screen. Scout acts only on what starts
-  with its name ("Scout, what is this?"); everything else is dropped on the computer and goes
-  nowhere. "Scout, stop" switches it off. Audio is understood on the computer and never sent or
+  the whole time. Listening pauses while a call or a full-screen window is in front, and while
+  the pets are hidden. Scout acts only on what starts with its name ("Scout, what is this?");
+  everything else is dropped on the computer and goes nowhere. "Scout, stop" switches it off. Audio is understood on the computer and never sent or
   stored. Otherwise the microphone opens only on the talk key or the mic in the text box, and
   those need no name. The bubble offers the key to reply.
 - The bubble's header has Always listening (off by default) and Seeing (sight on or paused);

@@ -275,6 +275,9 @@ is listening and how to stop, and the mark shows from the first second.
 
 - **The mark.** A small green dot on Scout shows the whole time. It is solid while Scout listens
   and an outline while listening is paused. It is never hidden.
+- **Hiding the pets pauses listening.** While the pets are hidden (the tray's **Hide pets**), the
+  microphone is closed, so it is never open while the mark is out of sight. Showing the pets
+  again resumes listening.
 - **Only Scout's name counts.** Scout acts only on what starts with "Scout" (optionally "hey
   Scout" or "ok Scout"). Everything else is dropped on the computer and goes nowhere. "Scout's
   plan" or "Scout-like" is talk about Scout, not to it, so it is dropped too. Only the
@@ -283,13 +286,19 @@ is listening and how to stop, and the mark shows from the first second.
   anything you say that starts with "Scout" is sent.
 - **"Scout, stop".** Saying "Scout, stop" (or "Scout, stop listening") switches Always listening
   off. So does the switch in the bubble or Settings.
-- **Paused for calls and full screen.** Every 2 seconds, from window titles only, Scout checks
-  whether the front window is a call (Teams, Zoom, Google Meet) or fills the screen. If so, the
-  microphone closes and the mark turns to an outline until the call or full screen ends.
+- **Paused while a call or a full-screen window is in front.** From window titles only, Scout
+  checks the front window when listening comes on and every 2 seconds after: if it is a call app
+  (for example Teams, Zoom or Google Meet) or fills the screen, the microphone closes and the mark
+  turns to an outline until that window is no longer in front. It is the front window that
+  counts, as with keeping an eye on things: a Teams window in front pauses listening even with no
+  call, and a call behind another window does not.
 - **Deaf while the system voice speaks.** The system voice is not echo-cancelled, so Scout
   ignores what it hears while that voice is speaking. Kokoro and ElevenLabs are echo-cancelled,
   so you can interrupt them by saying "Scout".
-- **Hold-to-talk and the mic button need no name**, in every case.
+- **Hold-to-talk and the mic button need no name**, in every case, also while Always listening
+  is on: that question is asked as said, then listening carries on.
+- **Closing the bubble does not stop listening.** It drops a question being asked; switch Always
+  listening off to stop.
 - **Models and size.** The same three models as above, about 43 MB in all, run on the CPU.
 
 ## Keeping an eye on things
