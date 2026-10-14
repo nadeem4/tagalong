@@ -51,7 +51,7 @@ export class PushToTalk {
 
   /** The mic button. */
   click(): TalkAction {
-    if (this.#mode === 'idle') {
+    if (this.#mode === 'idle' || this.#mode === 'spent') {
       this.#mode = 'clicked';
       return 'start';
     }

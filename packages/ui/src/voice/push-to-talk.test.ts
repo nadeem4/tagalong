@@ -67,6 +67,30 @@ describe('PushToTalk', () => {
     expect(talk.listening).toBe(true);
   });
 
+  it('ended while held, a click on the mic button starts listening', () => {
+    const talk = new PushToTalk();
+    talk.press(0);
+    talk.end();
+    expect(talk.click()).toBe('start');
+    expect(talk.listening).toBe(true);
+  });
+
+  it('ended while held, the key coming up clears it at once, so a quick press starts', () => {
+    const talk = new PushToTalk();
+    talk.press(0);
+    talk.end();
+    // The bubble passes every key up on, listening or not.
+    expect(talk.release()).toBe('none');
+    expect(talk.press(100)).toBe('start');
+  });
+
+  it('a key coming up after the mic button is clicked changes nothing', () => {
+    const talk = new PushToTalk();
+    talk.click();
+    expect(talk.release()).toBe('none');
+    expect(talk.listening).toBe(true);
+  });
+
   it('ended after a click, the next click or press starts at once', () => {
     const talk = new PushToTalk();
     talk.click();

@@ -88,6 +88,12 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
   const [control] = useState(() => {
     const stop = (): void => {
       clearTimeout(timer.current);
+      // Nothing held (a failure already ended it): no question is coming, so never "hearing".
+      if (controller.made.mode === null) {
+        listening.current = false;
+        setState('idle');
+        return;
+      }
       setState('hearing');
       controller.made.release();
     };
@@ -135,11 +141,10 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
   // Every press of the talk key, repeats included; PushToTalk tells them apart.
   useEffect(() => window.tagalongHost.onTalk((at) => control.act(ptt.press(at))), [control, ptt]);
 
-  // The bubble has the keyboard while the key is held: the first key up means "let go".
+  // The bubble has the keyboard while the key is held: the first key up means "let go". Every
+  // key up goes to PushToTalk, listening or not: it also clears a hold that a failure ended.
   useEffect(() => {
-    const up = (): void => {
-      if (ptt.listening) control.act(ptt.release());
-    };
+    const up = (): void => control.act(ptt.release());
     window.addEventListener('keyup', up);
     return () => window.removeEventListener('keyup', up);
   }, [control, ptt]);
