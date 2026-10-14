@@ -106,6 +106,42 @@ describe('fallbackGreeting', () => {
       'Morning. 2 hand-offs finished while you were away.',
     );
   });
+
+  it('says it closed unexpectedly after a crash, and what stopped', () => {
+    expect(fallbackGreeting({ ...morning, scenario: 'crash' })).toBe(
+      'Morning. I closed unexpectedly last time.',
+    );
+    expect(fallbackGreeting({ ...morning, scenario: 'crash', interrupted: 1 })).toBe(
+      'Morning. I closed unexpectedly last time, and one task stopped. It’s in Activity.',
+    );
+    expect(fallbackGreeting({ ...morning, scenario: 'crash', interrupted: 3 })).toBe(
+      'Morning. I closed unexpectedly last time, and 3 tasks stopped. They’re in Activity.',
+    );
+  });
+
+  it('says what is new after an update', () => {
+    const update = { version: '0.5.0', whatsNew: 'I can set up by talking now.' };
+    expect(fallbackGreeting({ ...morning, scenario: 'update', update })).toBe(
+      'Morning. I’ve been updated to 0.5.0. I can set up by talking now.',
+    );
+    expect(
+      fallbackGreeting({ ...morning, scenario: 'update', update: { ...update, whatsNew: '' } }),
+    ).toBe('Morning. I’ve been updated to 0.5.0.');
+  });
+
+  it('names the routines that ran while you were away', () => {
+    const away = { ...morning, awaySince: at(10, 9), scenario: 'away' as const };
+    expect(fallbackGreeting({ ...away, routines: ['Morning papers'] })).toBe(
+      'Back after 3 days. Morning papers ran while you were away.',
+    );
+    expect(fallbackGreeting({ ...away, routines: ['Morning papers', 'Inbox sweep'] })).toBe(
+      'Back after 3 days. 2 routines ran while you were away.',
+    );
+    const one = [{ expertName: 'Claude Code', text: 'Fix the failing test' }];
+    expect(fallbackGreeting({ ...away, handoffs: one, routines: ['Morning papers'] })).toBe(
+      'Back after 3 days. Claude Code finished what you handed over. Morning papers ran while you were away.',
+    );
+  });
 });
 
 describe('composeGreeting', () => {
@@ -259,5 +295,34 @@ describe('composeGreeting', () => {
       timeoutMs: 10,
     });
     expect(result).toEqual({ text: 'Morning. I’m here when you need me.', source: 'fallback' });
+  });
+
+  it('gives the model the crash, the update and the routines as facts', async () => {
+    const b = brain('Morning. I closed unexpectedly last time.');
+    await composeGreeting({
+      pet: scout,
+      summarizer: null,
+      provider: b.resolve,
+      context: {
+        ...morning,
+        scenario: 'crash',
+        interrupted: 2,
+        routines: ['Morning papers'],
+      },
+    });
+    const facts = JSON.stringify(b.requests[0]!.messages);
+    expect(facts).toContain('Tagalong closed unexpectedly');
+    expect(facts).toContain('Tasks it cut short: 2.');
+    expect(facts).toContain('Morning papers');
+    expect(b.requests[0]!.system).toContain('closed unexpectedly');
+
+    const u = brain('Morning. I was updated.');
+    await composeGreeting({
+      pet: scout,
+      summarizer: null,
+      provider: u.resolve,
+      context: { ...morning, scenario: 'update', update: { version: '0.5.0', whatsNew: 'Voice setup.' } },
+    });
+    expect(JSON.stringify(u.requests[0]!.messages)).toContain('updated to 0.5.0. What is new: Voice setup.');
   });
 });
