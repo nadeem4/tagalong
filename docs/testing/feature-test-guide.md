@@ -900,6 +900,25 @@ the next start is a fresh install. Rename it back at the end to keep your histor
 2. **Action:** Save that combination as the ask key.
 3. **Expected:** the message names the combination under the shortcut fields and the ask field is
    outlined. Fixing it and saving clears both.
+4. **Action:** type the ask key's combination into **Stop Scout speaking** (or **Talk to Scout**)
+   and Save.
+5. **Expected:** nothing is saved; the message reads "Stop Scout speaking uses the same keys as Ask
+   Scout. Pick a different combination." and that field has the focus.
+
+### S.6b. Home's overview says what is wrong, and Home fits a small screen
+
+1. **Action:** sign out of Claude Code (`claude /logout`) with Scout on the Claude sign-in, and
+   open Home → Overview. Sign in again and reopen Home. Then pause sight from the tray.
+2. **Expected:** the Scout card reads "Signed out of Claude Code" with an amber dot, then "Ready"
+   with a green one, then "Ready, sight paused". A Scout on a service with no key reads "No API key".
+3. **Action:** make Home as narrow as it goes.
+4. **Expected:** it stops at 880 px; the nav and every page stay usable, the overview cards two
+   across, nothing cut off.
+5. **Action:** press **Edit** on Scout's routine card, change its name in Home → Routines, look at
+   Experts, then come back to Routines; Save; leave Routines and come back again.
+6. **Expected:** the changed name is still in the form after the detour; after Save the list shows
+   and the card's form does not reopen. With Home closed, **Edit** opens Home on Routines with the
+   card in the form.
 
 ### S.7. The ⓘ notes
 
@@ -965,6 +984,8 @@ the next start is a fresh install. Rename it back at the end to keep your histor
    handwritten line appears instead. Nothing is captured (no capture dot, nothing in Activity).
 4. **After a hand-off:** finish a hand-off to Claude Code, quit, start again. The line mentions
    Claude Code.
+5. **Time away:** leave Tagalong running for a day or more, quit it, and start it again a few
+   minutes later. The line greets for the time of day; it does not say "Back after a day".
 
 ### G.3. The greeting can be switched off
 

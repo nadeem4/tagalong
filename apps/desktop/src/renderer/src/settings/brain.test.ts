@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Pet } from '@tagalong/protocol';
 import type { ProviderChoice } from '../../../shared/ipc';
-import { scoutBrain } from './brain';
+import { overviewStatus, scoutBrain } from './brain';
 
 const providers: ProviderChoice[] = [
   { id: 'claude-code', label: 'Your Claude sign-in', needsKey: false, hasKey: false },
@@ -69,5 +69,34 @@ describe('scoutBrain', () => {
 
   it('reports the engine as down when there is no Scout to read', () => {
     expect(scoutBrain(undefined, providers, 'signed-in').state).toBe('engine-down');
+  });
+});
+
+describe('overviewStatus', () => {
+  const brain = (providerId: string, signIn: 'signed-in' | 'signed-out' | null = 'signed-in') =>
+    scoutBrain(scout(providerId, 'm'), providers, signIn);
+
+  it('is Ready only when Scout can think and sees', () => {
+    expect(overviewStatus(brain('claude-code'), false)).toEqual({ text: 'Ready', ok: true });
+    expect(overviewStatus(brain('openrouter'), false)).toEqual({ text: 'Ready', ok: true });
+  });
+
+  it('says what stops Scout thinking, first', () => {
+    expect(overviewStatus(brain('claude-code', 'signed-out'), true)).toEqual({
+      text: 'Signed out of Claude Code',
+      ok: false,
+    });
+    expect(overviewStatus(brain('anthropic'), false)).toEqual({ text: 'No API key', ok: false });
+    expect(overviewStatus(scoutBrain(undefined, providers, null), false)).toEqual({
+      text: 'Not running',
+      ok: false,
+    });
+  });
+
+  it('says when sight is paused', () => {
+    expect(overviewStatus(brain('claude-code'), true)).toEqual({
+      text: 'Ready, sight paused',
+      ok: false,
+    });
   });
 });

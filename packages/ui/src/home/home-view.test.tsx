@@ -126,6 +126,55 @@ describe('HomeView', () => {
     await waitFor(() => expect(recent).toHaveTextContent('Find why the shutdown test fails'));
   });
 
+  it('keeps a routine being edited when you switch pages, and never reopens a saved card', async () => {
+    const routineDraft = {
+      proposalId: '60000000-0000-4000-8000-000000000002',
+      petId: 'scout',
+      action: 'create' as const,
+      routine: {
+        name: 'Morning papers',
+        when: { type: 'launch' as const },
+        what: 'Papers.',
+        enabled: true,
+        topics: '',
+        deliver: { bubble: true, voice: false, notification: false },
+        uses: [],
+      },
+    };
+    const bridge = createFakeHostBridge({ pets: [SCOUT] });
+    render(
+      <HostBridgeProvider bridge={bridge}>
+        <HomeView
+          host={host()}
+          settings={<p>The settings form</p>}
+          page="routines"
+          routineDraft={routineDraft}
+        />
+      </HostBridgeProvider>,
+    );
+    fireEvent.change(await screen.findByLabelText('Name'), { target: { value: 'My papers' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Experts' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Routines' }));
+    expect(screen.getByLabelText('Name')).toHaveValue('My papers');
+
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Save' })));
+    expect(bridge.confirmedRoutines).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Routines' }));
+    expect(screen.queryByLabelText('Name')).toBeNull();
+  });
+
+  it('says what is really wrong with Scout instead of Ready', async () => {
+    const signedOut: HomeHost = {
+      ...host(),
+      status: () => Promise.resolve({ text: 'Signed out of Claude Code', ok: false }),
+    };
+    renderHome(createFakeHostBridge({ pets: [SCOUT] }), { homeHost: signedOut });
+    const scout = await screen.findByRole('region', { name: 'Scout' });
+    await waitFor(() => expect(scout).toHaveTextContent('Signed out of Claude Code'));
+    expect(scout).not.toHaveTextContent('Ready');
+  });
+
   it('moves between pages, and reports the page to the host', async () => {
     const pages: HomePage[] = [];
     renderHome(createFakeHostBridge({ pets: [SCOUT], experts: [CLAUDE] }), {

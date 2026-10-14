@@ -22,6 +22,7 @@ import type {
 } from '@tagalong/protocol';
 import type { AskInput, HostBridge, TurnEvent } from '@tagalong/ui';
 import { IPC } from '../shared/ipc';
+import { heldUntilHeard } from './held';
 import type {
   CaptureNotice,
   ClaudeSignIn,
@@ -45,6 +46,16 @@ let earlyLine: string | null = null;
 ipcRenderer.on(IPC.greetLineEvent, (_event: IpcRendererEvent, text: string) => {
   earlyLine = text;
 });
+
+/** Home's page and Scout's card, which a fresh Home window can be sent before React listens. */
+const homePage = heldUntilHeard<string>();
+ipcRenderer.on(IPC.homePageEvent, (_event: IpcRendererEvent, page: string) =>
+  homePage.arrived(page),
+);
+const routineDraft = heldUntilHeard<RoutineProposedParams>();
+ipcRenderer.on(IPC.routineDraftEvent, (_event: IpcRendererEvent, proposal: RoutineProposedParams) =>
+  routineDraft.arrived(proposal),
+);
 
 const bridge: HostBridge = {
   ask: (input: AskInput) => ipcRenderer.invoke(IPC.ask, input) as Promise<{ turnId: string }>,
@@ -200,12 +211,7 @@ const host: TagalongHostApi = {
     ipcRenderer.on(IPC.routineEvent, listener);
     return () => void ipcRenderer.off(IPC.routineEvent, listener);
   },
-  onRoutineDraft: (handler) => {
-    const listener = (_event: IpcRendererEvent, proposal: RoutineProposedParams): void =>
-      handler(proposal);
-    ipcRenderer.on(IPC.routineDraftEvent, listener);
-    return () => void ipcRenderer.off(IPC.routineDraftEvent, listener);
-  },
+  onRoutineDraft: (handler) => routineDraft.listen(handler),
   remarkNotNow: () => ipcRenderer.invoke(IPC.remarkNotNow) as Promise<void>,
   remarkAccept: (remarkId: string) =>
     ipcRenderer.invoke(IPC.remarkAccept, remarkId) as Promise<void>,
@@ -216,11 +222,7 @@ const host: TagalongHostApi = {
   openSettings: () => ipcRenderer.invoke(IPC.openSettings) as Promise<void>,
   openOnboarding: () => ipcRenderer.invoke(IPC.openOnboarding) as Promise<void>,
   openOffice: () => ipcRenderer.invoke(IPC.openOffice) as Promise<void>,
-  onHomePage: (handler) => {
-    const listener = (_event: IpcRendererEvent, page: string): void => handler(page);
-    ipcRenderer.on(IPC.homePageEvent, listener);
-    return () => void ipcRenderer.off(IPC.homePageEvent, listener);
-  },
+  onHomePage: (handler) => homePage.listen(handler),
   findAgents: () => ipcRenderer.invoke(IPC.findAgents) as Promise<FoundAgent[]>,
   finishWelcome: (providerId: string) =>
     ipcRenderer.invoke(IPC.finishWelcome, providerId) as Promise<void>,

@@ -33,6 +33,8 @@ export const HOME_CSS = `
   flex: 1; min-width: 0; overflow-y: auto; display: flex; flex-direction: column;
   gap: ${t.space.xxl}px; padding: ${t.space.xxxl}px 32px;
 }
+.home-page { display: contents; }
+.home-page[hidden] { display: none; }
 .home-title { margin: 0; font-size: 20px; font-weight: ${t.fontWeight.semibold}; }
 .home-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: ${t.space.xl}px; }
 .home-card {
@@ -50,6 +52,7 @@ export const HOME_CSS = `
 .home-card p.home-card__row { display: flex; justify-content: space-between; gap: ${t.space.lg}px; color: ${t.color.panelText}; }
 .home-card__row span:last-child { flex: none; color: ${t.color.panelMuted}; }
 .home-dot { width: 8px; height: 8px; border-radius: 50%; background: #2F9E44; }
+.home-dot--warn { background: ${t.color.gold}; }
 .home-note {
   margin: 0; padding: ${t.space.xxl}px; font-size: ${t.fontSize.field}px; line-height: 1.5;
   color: ${t.color.panelMuted};
