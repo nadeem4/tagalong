@@ -1422,7 +1422,11 @@ flowchart LR
   Claude Code and brings the answer back; the key to press). With a name saved, beat one opens
   "Hi Nadeem, I'm Scout." Welcome's optional **What should I call you?** field saves
   `settings.userName` (`welcome-flow.ts#welcomeNamePatch`, trimmed and cut to 40 characters)
-  before `finishWelcome`, and the panel reads it fresh on `greetEvent`. Under `prefers-reduced-motion` each
+  before `finishWelcome`, and the panel reads it fresh on `greetEvent`. The setup record is
+  `settings.welcome` (`done`, plus the `step` reached, `answerBy` and `brain` once a setup window
+  writes them; an older `{ done }` record reads as not started at step one) and
+  `settings.userNameDeclined` (set by "Rather not", so the name is never asked for again). Both are
+  schema-only today: the protocol defines them, no writer sets them yet. Under `prefers-reduced-motion` each
   beat appears whole; a visually hidden `role="status"` carries each beat whole for screen readers.
   It stays until **Got it** or a hotkey question. **Try it now** captures the active window and a screenshot
   (`capture(['activeWindow', 'screenshot'])`) and asks "What am I working on, and what could you

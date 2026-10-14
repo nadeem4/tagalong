@@ -7,6 +7,7 @@ import {
   SETTINGS_DEFAULTS,
   Settings,
   SettingsPatch,
+  WELCOME_STEPS,
 } from './settings';
 import { chosenMouth } from './voice';
 
@@ -547,5 +548,28 @@ describe('Settings.closedCleanly and lastVersion', () => {
 
   it('refuse an empty version', () => {
     expect(SettingsPatch.safeParse({ lastVersion: '' }).success).toBe(false);
+  });
+});
+
+describe('Settings.welcome steps', () => {
+  it('reads a record from before the steps as not started', () => {
+    expect(Settings.parse({ welcome: { done: false } }).welcome).toEqual({ done: false });
+    expect(Settings.parse({}).userNameDeclined).toBe(false);
+  });
+
+  it('keeps the step reached, how you answer and the brain picked', () => {
+    const welcome = { done: false, step: 'voice', answerBy: 'type', brain: 'openrouter' } as const;
+    expect(SettingsPatch.parse({ welcome })).toEqual({ welcome });
+    expect(WELCOME_STEPS).toEqual(['answer', 'name', 'think', 'voice', 'keys', 'try']);
+  });
+
+  it('refuses a step that does not exist', () => {
+    expect(SettingsPatch.safeParse({ welcome: { done: false, step: 'colour' } }).success).toBe(
+      false,
+    );
+  });
+
+  it('remembers a declined name in a patch alone', () => {
+    expect(SettingsPatch.parse({ userNameDeclined: true })).toEqual({ userNameDeclined: true });
   });
 });
