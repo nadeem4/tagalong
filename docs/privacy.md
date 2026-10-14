@@ -178,8 +178,9 @@ every weekday at 8. Nothing becomes a routine until you press **Save**, on Scout
 
 Scout says its bubble lines aloud while **Scout talks** is on (Settings → Voice, on by default).
 What reaches a speech engine is only the line being spoken, after it is shortened in the panel:
-markdown stripped, code blocks, lists, tables and URLs left out, and at most two sentences. Never
-the screen, the window list, the question or the conversation.
+markdown stripped, code blocks, lists, tables and URLs left out, and at most two sentences (an
+answer to a spoken question is said in full, sentence by sentence, still without code or lists).
+Never the screen, the window list, the question or the conversation.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%
@@ -205,6 +206,34 @@ flowchart LR
   fails, Scout uses Kokoro.
 - Nothing spoken is recorded or stored. Closing the bubble or `Ctrl+Shift+Alt+M` stops speech at
   once.
+
+## Talking to Scout: your microphone
+
+The microphone is used only while you hold the talk key (`Ctrl+Shift+Alt+Space` by default,
+Settings → Voice) or after you click the mic in the bubble, until you let go or click again (at
+most 30 seconds). It never opens on its own: there is no wake word and no always-on listening, and
+after an answer the bubble only offers the key to reply.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%
+flowchart LR
+  K["Talk key held, or mic clicked"] --> R["Recorded in the panel, in memory"]
+  R --> W["Whisper on this computer"]
+  W --> T["Text of the question"]
+  T --> P["Scout's provider, like a typed question"]
+  R -.->|"dropped after"| X["Nothing kept"]
+```
+
+- **On this computer.** The recording is turned into text by Whisper base.en (OpenAI's model,
+  Apache-2.0, quantised, about 77 MB), downloaded from Hugging Face the first time you talk to
+  Scout into the same `voice` folder as the voice, and run on the CPU. The download fetches the
+  model only; no audio is sent.
+- **The audio never leaves the computer and is never stored.** It lives in memory until it has been
+  turned into text, and is then dropped. Only the text goes on, to Scout's provider, exactly as if
+  you had typed it, with the name of the window you are on (never the selected text).
+- The microphone is the one picked in Settings → Voice, or the system default. Windows' own
+  microphone privacy setting applies.
+- There is no cloud speech to text: ElevenLabs is used for Scout's voice only, never for yours.
 
 ## Keeping an eye on things
 

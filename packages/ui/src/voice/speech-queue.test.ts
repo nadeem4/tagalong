@@ -98,4 +98,11 @@ describe('SpeechQueue', () => {
     new SpeechQueue({ play: player.play }).say('  ');
     expect(player.played).toEqual([]);
   });
+
+  it('says a whole piece of a spoken answer, without cutting it to two sentences', () => {
+    const player = controlledPlayer();
+    const piece = 'One thing first. Then another. And a third one, for good measure here.';
+    new SpeechQueue({ play: player.play }).say(piece, { whole: true });
+    expect(player.played).toEqual([piece]);
+  });
 });

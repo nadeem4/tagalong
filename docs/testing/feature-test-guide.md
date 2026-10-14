@@ -16,6 +16,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Phase 3B: Awareness](#phase-3b-awareness)
 - [Phase 7: onboarding and installer](#phase-7-onboarding-and-installer)
 - [Voice: Scout talks](#voice-scout-talks)
+- [Talk to Scout](#talk-to-scout)
 - [Connections: your apps over MCP](#connections-your-apps-over-mcp)
 - [Routines](#routines)
 - [Demo run: the hackathon story](#demo-run-the-hackathon-story)
@@ -1046,6 +1047,69 @@ voice model (about 90 MB) into `%APPDATA%\Tagalong\voice`; ElevenLabs (V.6) bill
 2. **Expected:** the answer is spoken in that voice (the ElevenLabs history shows only the spoken
    words). With the key removed, or a wrong voice ID, Scout speaks with the local voice again.
 
+## Talk to Scout
+
+Run from source **without** `TAGALONG_FAKE_STT` and `TAGALONG_FAKE_TTS`, with a microphone and
+speakers. The fake brain is fine for T.1 to T.6; T.7 needs a real one. The first spoken question
+downloads the speech model (about 80 MB) into `%APPDATA%\Tagalong\voice`. With
+`TAGALONG_FAKE_STT=1` every question is heard as "What am I looking at?" and no microphone is used.
+
+### T.1. Hold to talk
+
+1. **Setup:** a fresh profile, so the speech model is not downloaded yet.
+2. **Action:** hold `Ctrl+Shift+Alt+Space`, say "what am I looking at?", let go.
+3. **Expected:** the bubble opens with a pulsing dot and "Listening…" while the key is held, and a
+   note that the first time downloads the speech model. On letting go it says "Turning that into
+   text…", then shows what it heard and answers. Windows shows the microphone in use only while
+   the key is held.
+
+### T.2. Spoken answers start early and sound spoken
+
+1. **Setup:** a real brain (Claude or another provider).
+2. **Action:** hold the key and ask "what's a good way to name a test?".
+3. **Expected:** Scout starts speaking after the first sentence arrives, before the answer finishes
+   streaming. The answer is a few short sentences with contractions, no list read aloud, at most
+   one question back. Any code or list shows in the bubble and is not spoken.
+
+### T.3. Barge-in
+
+1. **Action:** ask a typed question that gets a long answer; while Scout speaks, hold the talk key.
+2. **Expected:** Scout stops speaking at once, the bubble listens, and the new spoken question is
+   answered.
+
+### T.4. Reply, never an open mic
+
+1. **Action:** after a spoken answer finishes, wait ten seconds without touching anything.
+2. **Expected:** the bubble shows "Hold Ctrl+Shift+Alt+Space to reply". The microphone does not open
+   (no microphone icon in the Windows tray). Holding the key again continues the same conversation.
+
+### T.5. The mic button
+
+1. **Action:** click the mic beside × in the bubble, speak, click it again.
+2. **Expected:** the mic button turns gold while listening ("Stop listening"); the second click sends
+   the question. Closing the bubble while listening stops the microphone and sends nothing.
+
+### T.6. Nothing said, and the microphone setting
+
+1. **Action:** hold the key for a second in silence and let go. Then in Settings → Voice pick another
+   microphone, Save, and talk again. Then turn off microphone access for desktop apps in Windows
+   Settings and talk again.
+2. **Expected:** silence: "I didn't catch that." and nothing is asked. The picked microphone is used.
+   With access off, the bubble says the microphone could not be opened.
+
+### T.7. Confirmations in a spoken turn
+
+1. **Setup:** a connected app (see [Connections](#connections-your-apps-over-mcp)).
+2. **Action:** hold the key and ask Scout to make a change in that app.
+3. **Expected:** the confirm card appears in the bubble and Scout says to check the card rather than
+   reading it out. Nothing changes until **Allow once**.
+
+### T.8. Settings → Voice
+
+1. **Action:** change **Talk to Scout** to another combination, Save, and hold the new key.
+2. **Expected:** the new key works at once; the bubble's reply hint names it. A key another app owns is
+   reported in Shortcuts and the field is marked.
+
 ## Demo run: the hackathon story
 
 A short end-to-end run of the story the hackathon demo tells. Run it on the installed app, with an
@@ -1206,8 +1270,9 @@ and Morning papers needs Claude Code installed and signed in.
 
 These appear in the plan but are not built; do not test them here.
 
-- **Voice input (Phase 3).** No push to talk and no microphone or speaker step in the wizard. A
-  pet's reply style and voice id save but change nothing; Scout's voice is set in Settings → Voice.
+- **Cloud speech to text and a wizard step.** Talk to Scout turns speech into text on this
+  computer only (no ElevenLabs Scribe), and Welcome has no microphone or speaker step. A pet's reply
+  style and voice id save but change nothing; Scout's voice is set in Settings → Voice.
 - **Per-pet tool grants (Phase 5).** Connected apps work (see
   [Connections](#connections-your-apps-over-mcp)), but there is no per-pet allow list and no
   "always allow": every change asks.

@@ -34,6 +34,8 @@ test.beforeAll(async () => {
       ...process.env,
       TAGALONG_FAKE_PROVIDERS: '1',
       TAGALONG_FAKE_TTS: '1',
+      // Talk to Scout hears a fixed question, through Chromium's fake microphone.
+      TAGALONG_FAKE_STT: '1',
       // Scripts the fake pet to reach for list_windows before it answers, which is the
       // only way a tool call travels the real socket to the real host in this suite.
       // Every tool test feeds the toolset a fake host and every host test feeds the
@@ -128,6 +130,30 @@ test('clicking Scout opens its bubble, and clicking again keeps it open', async 
   await pet.click();
   await avatar.waitForTimeout(400);
   expect(await panelVisible()).toBe(true);
+
+  await avatar.evaluate(() => window.tagalongHost.hidePanel());
+});
+
+test('talking to Scout: the mic listens, Scout hears the question and answers', async () => {
+  const avatar = await windowFor('avatar');
+  // Held keys cannot be simulated on a CI desktop; the mic button takes the same path.
+  await avatar.evaluate(() => window.tagalongHost.togglePanel());
+
+  const panel = await windowFor('panel');
+  const mic = panel.getByRole('button', { name: 'Talk to Scout' });
+  await mic.waitFor({ state: 'visible', timeout: 30_000 });
+  await mic.click();
+  await expect(panel.getByRole('button', { name: 'Stop listening' })).toBeVisible();
+  await expect(panel.getByText(/Listening/)).toBeVisible();
+  await panel.waitForTimeout(800);
+  await panel.getByRole('button', { name: 'Stop listening' }).click();
+
+  // TAGALONG_FAKE_STT hears the same question every time, and the bubble shows it.
+  await expect(panel.getByText('What am I looking at?')).toBeVisible({ timeout: 30_000 });
+  await expect(panel.getByText(/This is the fake pet/)).toBeVisible({ timeout: 30_000 });
+  await expect(panel.getByText(/Hold Ctrl\+Shift\+Alt\+Space to reply/)).toBeVisible({
+    timeout: 30_000,
+  });
 
   await avatar.evaluate(() => window.tagalongHost.hidePanel());
 });

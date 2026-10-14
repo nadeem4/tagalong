@@ -5,9 +5,13 @@ import type { ContextSnapshot, PetRemarkParams, RoutineResultParams } from '@tag
 import './app.css';
 import '../../shared/ipc';
 import { playLine } from './voice-player';
+import { useTalk } from './talk';
 
 /** The full chat's height; the bubble measures its own. Matches main's PANEL_HEIGHT. */
 const CHAT_HEIGHT = 520;
+
+/** The talk key until settings say otherwise. Matches main's DEFAULT_TALK_HOTKEY. */
+const DEFAULT_TALK_KEY = 'CommandOrControl+Shift+Alt+Space';
 
 /** The ask key as a person reads it on this platform. */
 function readable(accelerator: string, platform: string): string {
@@ -45,6 +49,20 @@ function Panel() {
   // Scout talks: one line at a time; main decides who says it, or that it stays quiet.
   const [speaking, setSpeaking] = useState(false);
   const [voice] = useState(() => new SpeechQueue({ play: playLine, onSpeaking: setSpeaking }));
+  // Talk to Scout: the talk key held, or the mic button. Talking cuts Scout off at once.
+  const [talkKey, setTalkKey] = useState(readable(DEFAULT_TALK_KEY, 'win32'));
+  const [microphoneId, setMicrophoneId] = useState<string | undefined>(undefined);
+  const { talk, cancel: cancelTalk } = useTalk({
+    keyLabel: talkKey,
+    microphoneId,
+    onBegin: () => {
+      voice.stop();
+      setGreeting(false);
+      setLine(null);
+      setRemark(null);
+      setRoutine(null);
+    },
+  });
 
   // The stop key cuts Scout off mid-sentence, and a watch that fires is said aloud.
   useEffect(() => window.tagalongHost.onStopVoice(() => voice.stop()), [voice]);
@@ -166,6 +184,8 @@ function Panel() {
         setPetId(preferred?.id ?? null);
         if (preferred !== undefined) setPetName(preferred.name);
         setHotkeyLabel(readable(view.settings.hotkeys.ask, view.platform));
+        setTalkKey(readable(view.settings.hotkeys.talk ?? DEFAULT_TALK_KEY, view.platform));
+        setMicrophoneId(view.settings.voice.microphoneId);
       })
       .catch((error: unknown) => console.error('could not list pets', error));
   }, []);
@@ -265,10 +285,12 @@ function Panel() {
               onCollapse={() => setMode('bubble')}
               onClose={() => {
                 voice.stop();
+                cancelTalk();
                 void window.tagalongHost.hidePanel();
               }}
               tail={side === 'left' ? 'right' : 'left'}
-              onSay={(said) => voice.say(said)}
+              onSay={(said, how) => voice.say(said, how)}
+              talk={talk}
               speaking={speaking}
               onStopSpeaking={() => voice.stop()}
               {...(snapshot !== null ? { snapshot } : {})}

@@ -148,8 +148,9 @@ app's own client is `apps/desktop/src/main/engine-client.ts`. Read
 | In this build                                                                                                                          | Not in this build                                                   |
 | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | Windows desktop app with a Welcome window and an NSIS installer                                                                        | macOS and Linux (the installer configs exist but are unverified)    |
-| One companion, Scout, that hands work to experts (Claude Code) and brings the answer back                                              | Voice input: push to talk                                           |
+| One companion, Scout, that hands work to experts (Claude Code) and brings the answer back                                              | Speech to text through ElevenLabs                                   |
 | Scout talks: answers read aloud in a calm British voice, made on this computer, or through ElevenLabs with your own key                |                                                                     |
+| Talk to Scout: hold a key, ask out loud, hear a short spoken answer; speech is turned into text on this computer                       |                                                                     |
 | Scout thinks through your Claude Code sign-in, or OpenRouter, Nebius Token Factory, Anthropic or an OpenAI-compatible service          | Per-pet tool grants (ask me, always allow)                          |
 | Connections: Scout uses your apps over MCP (Notion, GitHub, Linear, Claude Code's servers); every change asks first                    |                                                                     |
 | Routines: Scout does things on its own, on a schedule or when something happens, and tells you in the bubble, aloud or by notification |                                                                     |
@@ -226,6 +227,14 @@ Kokoro, made on this computer: the first time Scout speaks it downloads the voic
 90 MB) and uses the Windows voice until that is done. Turn it off, pick a voice, preview it or
 change the speed in **Home → Settings → Voice**.
 
+**Talk to Scout.** Hold `Ctrl+Shift+Alt+Space` (or click the mic in the bubble), say your
+question and let go (or click again). The bubble shows what it heard, and Scout answers out loud
+the way a person talks: short sentences, one question back at most, details left in the bubble.
+It starts speaking on the first sentence rather than waiting for the whole answer. Talking while
+Scout speaks cuts it off. When it is done the bubble says "Hold Ctrl+Shift+Alt+Space to reply":
+the microphone never opens on its own. Your speech is turned into text on this computer, by a
+Whisper model downloaded the first time (about 80 MB); the recording is never sent or kept.
+
 **Memory.** Tell Scout "I prefer short answers" and it remembers across restarts.
 
 Earlier versions shipped a crew of three (Scout, Ink and Bolt). Ink and Bolt are removed on
@@ -233,14 +242,16 @@ upgrade, and their conversations stay on disk.
 
 ## Hotkeys
 
-| Key                | What it does                                                                           |
-| ------------------ | -------------------------------------------------------------------------------------- |
-| `Ctrl+Shift+Space` | **Ask.** Opens the bubble with the text you have selected and the active window's name |
-| `Ctrl+Shift+Alt+P` | **Pause sight.** Nothing is read until you press it again (also in the tray)           |
-| `Ctrl+Shift+Alt+M` | **Stop speaking.** Scout stops talking at once and drops what it was about to say      |
-| `Alt+Shift+Space`  | In Chrome, with the extension: opens the side panel with your selection                |
+| Key                           | What it does                                                                           |
+| ----------------------------- | -------------------------------------------------------------------------------------- |
+| `Ctrl+Shift+Space`            | **Ask.** Opens the bubble with the text you have selected and the active window's name |
+| `Ctrl+Shift+Alt+P`            | **Pause sight.** Nothing is read until you press it again (also in the tray)           |
+| `Ctrl+Shift+Alt+M`            | **Stop speaking.** Scout stops talking at once and drops what it was about to say      |
+| `Ctrl+Shift+Alt+Space` (hold) | **Talk to Scout.** Listens while held; let go and Scout answers out loud               |
+| `Alt+Shift+Space`             | In Chrome, with the extension: opens the side panel with your selection                |
 
-Every key can be changed in **Home → Settings → Shortcuts**, and the change works at once.
+Every key can be changed in **Home → Settings → Shortcuts** (the talk key under **Voice**), and the
+change works at once.
 
 ## Home: one window for everything
 
@@ -297,8 +308,8 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   - **You**: what Scout calls you. Empty means no name.
   - **Privacy**: the hello when Tagalong opens, keeping an eye on things, screen memory, and what
     Scout never looks at.
-  - **Voice**: **Scout talks** (on by default), the voice (George or Fable) with **▶ Preview**, and
-    the speed.
+  - **Voice**: **Scout talks** (on by default), the voice (George or Fable) with **▶ Preview**, the
+    speed, the **Talk to Scout** key and the microphone it listens on.
   - **Shortcuts**: the ask, pause and stop-speaking keys.
   - **Browser extension (optional)**: the pairing token for the Chrome extension.
   - **Advanced**, closed by default: summaries, API keys (add, replace or remove, and a base URL),
@@ -374,6 +385,8 @@ Then click the toolbar button, or select text and press `Alt+Shift+Space`. More 
 - What you ask goes only to the provider Scout runs on. There is no Tagalong server.
 - Scout's voice is made on your computer. With an ElevenLabs key and voice, only the words Scout
   says are sent to ElevenLabs, never your screen or your questions.
+- When you talk to Scout, your speech is turned into text on your computer. The audio never leaves
+  it and is never stored; only the text goes to Scout's provider, like a typed question.
 - API keys are encrypted with the OS keychain.
 - `Ctrl+Shift+Alt+P` pauses all sight at once.
 - Tagalong never moves your mouse or types for you. Scout does not click, type or drive other
@@ -393,6 +406,8 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 | Scout ignores the screenshot, or warns it cannot see           | Its model is text-only. Give it a vision model in Settings (Nemotron Nano 2 VL on Token Factory) or move it to Claude.                          |
 | A hotkey does nothing                                          | Settings and the bubble name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).           |
 | Scout is silent                                                | Check **Scout talks** in Home → Settings → Voice, and your sound output. The stop key only silences the current answer.                         |
+| Talk to Scout says it could not open the microphone            | Windows Settings → Privacy → Microphone: let desktop apps use it. Pick the right microphone in Home → Settings → Voice.                         |
+| The first spoken question takes a while                        | The first time, Tagalong downloads its speech model (about 80 MB). After that it is read from disk.                                             |
 | Scout's voice changes after the first answers                  | The first time it speaks, Scout downloads its voice (about 90 MB) and uses the Windows voice until then. Offline, it keeps the Windows voice.   |
 | The Chrome side panel says "Disconnected"                      | The desktop app must be running. If it is, copy the pairing token again from Settings and paste it into the extension's options.                |
 | "Windows protected your PC" when installing                    | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                            |

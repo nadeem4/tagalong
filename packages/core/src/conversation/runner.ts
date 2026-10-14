@@ -114,6 +114,8 @@ export interface RunAsk {
   background?: boolean | undefined;
   /** Set when a routine started the turn; rides on `turn.started` and reaches the tools. */
   routine?: RoutineTurnContext | undefined;
+  /** The question was spoken (Talk to Scout): the answer is shaped to be heard. */
+  spoken?: boolean | undefined;
 }
 
 export interface TurnOutcome {
@@ -355,6 +357,7 @@ export class ConversationRunner {
       settings,
       memories,
       ...(snapshot ? { snapshot } : {}),
+      spoken: ask.spoken,
     });
 
     // One for the first call; every tool round trip and every consult adds another.

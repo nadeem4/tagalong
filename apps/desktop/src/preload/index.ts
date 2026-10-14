@@ -28,6 +28,7 @@ import type {
   HostView,
   ModelList,
   SpeakPreview,
+  TranscribeResult,
   SpeakResult,
   TagalongHostApi,
 } from '../shared/ipc';
@@ -231,6 +232,14 @@ const host: TagalongHostApi = {
     ipcRenderer.on(IPC.stopVoiceEvent, listener);
     return () => void ipcRenderer.off(IPC.stopVoiceEvent, listener);
   },
+  onTalk: (handler) => {
+    const listener = (_event: IpcRendererEvent, at: number): void => handler(at);
+    ipcRenderer.on(IPC.talkEvent, listener);
+    return () => void ipcRenderer.off(IPC.talkEvent, listener);
+  },
+  prepareListening: () => ipcRenderer.invoke(IPC.prepareListening) as Promise<{ ready: boolean }>,
+  transcribe: (samples: Float32Array) =>
+    ipcRenderer.invoke(IPC.transcribe, samples) as Promise<TranscribeResult>,
 };
 
 contextBridge.exposeInMainWorld('tagalong', bridge);

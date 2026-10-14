@@ -3,6 +3,7 @@ import {
   DEFAULT_ASK_HOTKEY,
   DEFAULT_PAUSE_SIGHT_HOTKEY,
   DEFAULT_STOP_VOICE_HOTKEY,
+  DEFAULT_TALK_HOTKEY,
   HotkeyManager,
   describeHotkeyProblems,
   registerHotkey,
@@ -102,6 +103,7 @@ const BOTH = {
   ask: DEFAULT_ASK_HOTKEY,
   pauseSight: DEFAULT_PAUSE_SIGHT_HOTKEY,
   stopVoice: DEFAULT_STOP_VOICE_HOTKEY,
+  talk: DEFAULT_TALK_HOTKEY,
 };
 
 describe('HotkeyManager', () => {
@@ -113,11 +115,12 @@ describe('HotkeyManager', () => {
       onAsk: triggers.onAsk ?? (() => {}),
       onPauseSight: triggers.onPauseSight ?? (() => {}),
       onStopVoice: triggers.onStopVoice ?? (() => {}),
+      onTalk: () => {},
       registrar: registrarToUse,
     });
   }
 
-  it('binds the three hotkeys, ask, pause and stop voice, and reports each as registered', () => {
+  it('binds the four hotkeys, ask, pause, stop voice and talk, and reports each as registered', () => {
     const reg = recordingRegistrar();
 
     const outcomes = manager(reg).apply(BOTH);
@@ -128,11 +131,13 @@ describe('HotkeyManager', () => {
       { accelerator: DEFAULT_ASK_HOTKEY, action: 'ask', registered: true },
       { accelerator: DEFAULT_PAUSE_SIGHT_HOTKEY, action: 'pauseSight', registered: true },
       { accelerator: DEFAULT_STOP_VOICE_HOTKEY, action: 'stopVoice', registered: true },
+      { accelerator: DEFAULT_TALK_HOTKEY, action: 'talk', registered: true },
     ]);
     expect([...reg.bound.keys()]).toEqual([
       DEFAULT_ASK_HOTKEY,
       DEFAULT_PAUSE_SIGHT_HOTKEY,
       DEFAULT_STOP_VOICE_HOTKEY,
+      DEFAULT_TALK_HOTKEY,
     ]);
   });
 
@@ -167,7 +172,12 @@ describe('HotkeyManager', () => {
     expect(reg.unregistered).toEqual([DEFAULT_ASK_HOTKEY]);
     expect(registerAfter).toHaveBeenCalledExactlyOnceWith('Alt+Space', expect.any(Function));
     expect([...reg.bound.keys()].sort()).toEqual(
-      ['Alt+Space', DEFAULT_PAUSE_SIGHT_HOTKEY, DEFAULT_STOP_VOICE_HOTKEY].sort(),
+      [
+        'Alt+Space',
+        DEFAULT_PAUSE_SIGHT_HOTKEY,
+        DEFAULT_STOP_VOICE_HOTKEY,
+        DEFAULT_TALK_HOTKEY,
+      ].sort(),
     );
   });
 
@@ -214,6 +224,7 @@ describe('the stop voice hotkey', () => {
       onAsk: () => {},
       onPauseSight: () => {},
       onStopVoice,
+      onTalk: () => {},
       registrar: reg,
     }).apply(BOTH);
     reg.bound.get(DEFAULT_STOP_VOICE_HOTKEY)?.();
@@ -225,6 +236,33 @@ describe('the stop voice hotkey', () => {
       { accelerator: 'X', action: 'stopVoice', registered: false },
     ]);
     expect(problem).toContain('Stop speaking (X)');
+  });
+});
+
+describe('the talk hotkey', () => {
+  it('defaults to Ctrl+Shift+Alt+Space, apart from the ask key, and fires on every press', () => {
+    expect(DEFAULT_TALK_HOTKEY).toBe('CommandOrControl+Shift+Alt+Space');
+    expect(DEFAULT_TALK_HOTKEY).not.toBe(DEFAULT_ASK_HOTKEY);
+    const reg = recordingRegistrar();
+    const onTalk = vi.fn();
+    new HotkeyManager({
+      onAsk: () => {},
+      onPauseSight: () => {},
+      onStopVoice: () => {},
+      onTalk,
+      registrar: reg,
+    }).apply(BOTH);
+    // Held down, the key repeats: each repeat reaches the bubble, which tells them apart.
+    reg.bound.get(DEFAULT_TALK_HOTKEY)?.();
+    reg.bound.get(DEFAULT_TALK_HOTKEY)?.();
+    expect(onTalk).toHaveBeenCalledTimes(2);
+  });
+
+  it('is named in words when it cannot be registered', () => {
+    const problem = describeHotkeyProblems([
+      { accelerator: 'X', action: 'talk', registered: false },
+    ]);
+    expect(problem).toContain('Talk to Scout (X)');
   });
 });
 

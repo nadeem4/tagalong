@@ -6,6 +6,7 @@ import WebSocket from 'ws';
 import { PROTOCOL_VERSION, RPC_ERROR_CODES } from '@tagalong/protocol';
 import { listRoles, recommendedModel, roleFor } from './roles';
 import { Engine, type EngineOptions } from './engine';
+import { SPOKEN_HEADING } from './conversation/prompt-assembler';
 import { fakeMcpServer } from './connections/fake-server';
 import { openDatabase } from './memory/db';
 import {
@@ -518,6 +519,30 @@ describe('keep an eye over rpc', () => {
     const quiet = await host.call('keepAnEye.notNow', {});
     const until = Date.parse((quiet['result'] as { quietUntil: string }).quietUntil);
     expect(until - Date.now()).toBeGreaterThan(59 * 60_000);
+  });
+});
+
+describe('a spoken ask over rpc', () => {
+  it('reaches the prompt as spoken mode', async () => {
+    const systems: string[] = [];
+    const fake = new FakeBrainProvider({ text: 'Sure thing.' });
+    const recording: BrainProvider = {
+      id: 'fake',
+      capabilities: fake.capabilities,
+      listModels: () => fake.listModels(),
+      complete: (req, handlers, signal) => {
+        systems.push(req.system);
+        return fake.complete(req, handlers, signal);
+      },
+    };
+    const e = await boot(recording);
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+
+    await host.call('ask', { petId: 'scout', input: { text: 'what is this' }, spoken: true });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+
+    expect(systems[0]).toContain(SPOKEN_HEADING);
   });
 });
 

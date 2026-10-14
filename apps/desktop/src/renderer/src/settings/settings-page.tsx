@@ -208,6 +208,8 @@ export function SettingsPage({
         askHotkey: field('askHotkey'),
         pauseSightHotkey: field('pauseSightHotkey'),
         stopVoiceHotkey: field('stopVoiceHotkey'),
+        talkHotkey: field('talkHotkey'),
+        microphoneId: field('microphoneId'),
         voiceEnabled: form.get('voiceEnabled') !== null,
         voice: field('voice'),
         voiceSpeed: field('voiceSpeed'),
@@ -316,7 +318,7 @@ export function SettingsPage({
           />
           <YouSection settings={settings} />
           <PrivacySection settings={settings} platform={view.platform} />
-          <VoiceSection settings={settings} />
+          <VoiceSection settings={settings} hotkeyError={view.hotkeyError} />
           <ShortcutsSection settings={settings} hotkeyError={view.hotkeyError} />
           <BrowserSection token={view.pairingToken} />
           <AdvancedSection open={advanced} onToggle={() => setAdvanced((open) => !open)}>

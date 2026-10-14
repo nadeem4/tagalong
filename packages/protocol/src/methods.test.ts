@@ -211,6 +211,17 @@ describe('ask input', () => {
     expect(paramsSchemaFor('ask').safeParse({ petId: 'scout', input: {} }).success).toBe(false);
   });
 
+  it('marks a spoken ask, and leaves a typed one unmarked', () => {
+    const spoken = paramsSchemaFor('ask').parse({
+      petId: 'scout',
+      input: { text: 'what is this' },
+      spoken: true,
+    });
+    expect(spoken.spoken).toBe(true);
+    const typed = paramsSchemaFor('ask').parse({ petId: 'scout', input: { text: 'hi' } });
+    expect(typed.spoken).toBeUndefined();
+  });
+
   it('rejects an ask with no pet', () => {
     expect(paramsSchemaFor('ask').safeParse({ input: { text: 'hi' } }).success).toBe(false);
   });

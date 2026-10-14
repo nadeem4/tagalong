@@ -37,6 +37,7 @@ export const SETTINGS_DEFAULTS = {
     ask: 'CommandOrControl+Shift+Space',
     pauseSight: 'CommandOrControl+Shift+Alt+P',
     stopVoice: 'CommandOrControl+Shift+Alt+M',
+    talk: 'CommandOrControl+Shift+Alt+Space',
   },
   avatar: { x: null, y: null },
   /**
@@ -240,6 +241,11 @@ const settingsFields = {
     pauseSight: z.string().min(1).optional(),
     /** Stops Scout speaking at once. Optional for the same reasons as `pauseSight`. */
     stopVoice: z.string().min(1).optional(),
+    /**
+     * Talk to Scout: held down, the microphone listens; let go, Scout hears the question.
+     * Optional for the same reasons as `pauseSight`.
+     */
+    talk: z.string().min(1).optional(),
   }),
   /** Remembered avatar position; null means "dock to the default edge". */
   avatar: z.object({ x: z.number().nullable(), y: z.number().nullable() }),
@@ -301,6 +307,8 @@ const settingsFields = {
     speed: z.number().min(MIN_VOICE_SPEED).max(MAX_VOICE_SPEED),
     /** A voice from the person's ElevenLabs library. Empty: ElevenLabs is not used. */
     elevenLabsVoiceId: z.string().trim(),
+    /** The microphone Talk to Scout listens on. Absent: the system default microphone. */
+    microphoneId: z.string().optional(),
   }),
   /** What Scout calls the person; empty for no name. */
   userName: z.string().trim().max(MAX_USER_NAME_CHARS),

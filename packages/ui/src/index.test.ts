@@ -28,6 +28,7 @@ describe('ui package surface', () => {
         'officeTokens',
         'SpeechQueue',
         'toSpeakable',
+        'PushToTalk',
       ].sort(),
     );
   });

@@ -7,6 +7,8 @@ import {
   MAX_SELECTION_CHARS,
   MEMORY_HEADING,
   NOTES_HEADING,
+  SPOKEN_HEADING,
+  SPOKEN_MODE,
   TRUNCATION_MARKER,
   assemblePrompt,
 } from './prompt-assembler';
@@ -117,6 +119,29 @@ describe('assemblePrompt system prompt', () => {
 
     const unnamed = assemblePrompt({ pet, history: [userMessage('hi')], settings }).system;
     expect(unnamed).not.toContain('The person’s name');
+  });
+
+  it('adds the spoken-mode block only to a turn that came from voice', () => {
+    const spoken = assemblePrompt({
+      pet,
+      history: [userMessage('what is this')],
+      settings,
+      spoken: true,
+    }).system;
+    expect(spoken).toContain(SPOKEN_HEADING);
+    expect(spoken).toContain('check the card');
+    // Last, so it outranks the reply style for this one turn.
+    expect(spoken.trimEnd().endsWith(SPOKEN_MODE.trimEnd())).toBe(true);
+
+    const typed = assemblePrompt({ pet, history: [userMessage('hi')], settings }).system;
+    expect(typed).not.toContain(SPOKEN_HEADING);
+    const unspoken = assemblePrompt({
+      pet,
+      history: [userMessage('hi')],
+      settings,
+      spoken: false,
+    }).system;
+    expect(unspoken).not.toContain(SPOKEN_HEADING);
   });
 
   it("falls back to the generalist's instructions for a role the library does not have", () => {

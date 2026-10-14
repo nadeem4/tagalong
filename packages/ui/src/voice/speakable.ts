@@ -2,7 +2,7 @@
 export const REST_IN_BUBBLE = 'The rest is in the bubble.';
 
 /** Said when nothing in an answer can be read aloud: it was all code, a list or a table. */
-const ONLY_IN_BUBBLE = 'The answer is in the bubble.';
+export const ONLY_IN_BUBBLE = 'The answer is in the bubble.';
 
 /** How many sentences are spoken before the rest is left to the bubble. */
 const MAX_SENTENCES = 2;
@@ -17,8 +17,11 @@ const SHORT_LINE = 40;
  * Turns a bubble line into what Scout says aloud: markdown stripped, code blocks, lists,
  * tables and bare URLs left out, and only the first sentence or two. Anything cut ends
  * with "The rest is in the bubble.", so a listener who is not looking knows to look.
+ *
+ * `whole` is a piece of a spoken answer (Talk to Scout), said as it streams: shaped the
+ * same way but never cut, and nothing at all when the piece has nothing to say.
  */
-export function toSpeakable(text: string): string {
+export function toSpeakable(text: string, { whole = false }: { whole?: boolean } = {}): string {
   if (text.trim() === '') return '';
   let cut = false;
 
@@ -43,6 +46,7 @@ export function toSpeakable(text: string): string {
     .replace(/\s+([.,!?;:])/g, '$1')
     .trim();
 
+  if (whole) return plain;
   if (plain === '') return ONLY_IN_BUBBLE;
 
   const sentences = (plain.match(/[^.!?]*[.!?]+["')\]]*(?=\s|$)|[^.!?]+$/g) ?? [plain])

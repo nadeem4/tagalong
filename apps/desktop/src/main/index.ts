@@ -46,6 +46,9 @@ import { elevenLabsTts } from './voice/elevenlabs';
 import { loadKokoro } from './voice/kokoro';
 import { LazyLocalVoice, createVoiceService } from './voice/voice';
 import type { VoiceService } from './voice/voice';
+import { LazyLocalStt, createListenService } from './voice/listen';
+import type { ListenService } from './voice/listen';
+import { loadWhisper } from './voice/whisper';
 import { checkClaudeSignIn } from './claude-sign-in';
 import {
   companionOn,
@@ -59,6 +62,7 @@ import type { EngineHost } from './engine-host';
 import {
   DEFAULT_PAUSE_SIGHT_HOTKEY,
   DEFAULT_STOP_VOICE_HOTKEY,
+  DEFAULT_TALK_HOTKEY,
   HotkeyManager,
   describeHotkeyProblems,
 } from './hotkeys';
@@ -120,6 +124,8 @@ interface Desktop {
   perceptionMemory: PerceptionMemory;
   /** Turns Scout's lines into audio for the panel to play. */
   voice: VoiceService;
+  /** Talk to Scout: turns what the panel recorded into text, on this computer. */
+  listen: ListenService;
 }
 
 let desktop: Desktop | null = null;
@@ -130,6 +136,13 @@ let desktop: Desktop | null = null;
  * Two engines would fight over the same port and the same SQLite file, so the lock is
  * taken before anything else happens.
  */
+// The fake ears need no real microphone: Chromium's fake device stands in for one, and
+// the permission prompt answers itself. Switches only take effect before the app is ready.
+if (process.env.TAGALONG_FAKE_STT === '1') {
+  app.commandLine.appendSwitch('use-fake-device-for-media-stream');
+  app.commandLine.appendSwitch('use-fake-ui-for-media-stream');
+}
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
@@ -229,6 +242,7 @@ async function start(): Promise<void> {
       onAsk: () => void openPanelWithContext(),
       onPauseSight: () => toggleSightPause(),
       onStopVoice: () => stopVoice(),
+      onTalk: () => talkPressed(),
     }),
     hotkeyError: null,
     sightPause,
@@ -241,6 +255,11 @@ async function start(): Promise<void> {
       // The model downloads into the data dir on first use, never at start.
       local: new LazyLocalVoice(() => loadKokoro(join(dataDir, 'voice'))),
       elevenLabs: (apiKey, voiceId) => elevenLabsTts(apiKey, voiceId),
+    }),
+    // The speech model downloads beside the voice, on the first Talk to Scout.
+    listen: createListenService({
+      env: process.env,
+      local: new LazyLocalStt(() => loadWhisper(join(dataDir, 'voice'))),
     }),
   };
 
@@ -377,6 +396,7 @@ function applyHotkeys(settings: Settings): string | null {
     ask: settings.hotkeys.ask,
     pauseSight: settings.hotkeys.pauseSight ?? DEFAULT_PAUSE_SIGHT_HOTKEY,
     stopVoice: settings.hotkeys.stopVoice ?? DEFAULT_STOP_VOICE_HOTKEY,
+    talk: settings.hotkeys.talk ?? DEFAULT_TALK_HOTKEY,
   });
 
   desktop.hotkeyError = describeHotkeyProblems(outcomes);
@@ -389,6 +409,21 @@ function applyHotkeys(settings: Settings): string | null {
     if (!window.isDestroyed()) window.webContents.send(IPC.hotkeyProblemEvent, desktop.hotkeyError);
   }
   return desktop.hotkeyError;
+}
+
+/**
+ * The talk key, on every press, repeats included: the bubble comes up with the keyboard, so
+ * it sees the key come up, and the panel tells a held key from a fresh press. The
+ * microphone only ever opens in the panel, on this key or its mic button.
+ */
+function talkPressed(): void {
+  if (desktop === null || desktop.panel === null || desktop.avatar === null) return;
+  const { panel, avatar } = desktop;
+  if (!panel.isVisible() || !panel.isFocused()) {
+    avatar.show();
+    showPanelBeside(panel, avatar);
+  }
+  panel.webContents.send(IPC.talkEvent, Date.now());
 }
 
 /** The stop key: every window that is speaking stops at once and drops what it had queued. */
@@ -734,13 +769,17 @@ function registerIpc(): void {
 
   ipcMain.handle(
     IPC.ask,
-    async (_event, input: { petId: string; conversationId?: string; text?: string }) => {
+    async (
+      _event,
+      input: { petId: string; conversationId?: string; text?: string; spoken?: boolean },
+    ) => {
       const snapshot = required().pendingSnapshot;
       return engine().client.call('ask', {
         petId: input.petId,
         ...(input.conversationId !== undefined ? { conversationId: input.conversationId } : {}),
         input: { text: input.text ?? '' },
         ...(snapshot !== null ? { snapshot } : {}),
+        ...(input.spoken === true ? { spoken: true } : {}),
       });
     },
   );
@@ -972,6 +1011,24 @@ function registerIpc(): void {
   // Only the line itself reaches a speech engine: never the screen or the conversation.
   ipcMain.handle(IPC.speak, (_event, text: string, preview?: SpeakPreview) =>
     required().voice.speak(String(text), preview),
+  );
+
+  // Talk to Scout started: note the window you are on, as the ask key does (never the
+  // selection: copying it would press keys while the talk key is held), and start loading
+  // the speech model while the person talks.
+  ipcMain.handle(IPC.prepareListening, async () => {
+    const current = required();
+    await captureForPanel(current, ['activeWindow']).catch((error: unknown) =>
+      console.warn('[main] could not note the window for a spoken question', error),
+    );
+    return current.listen.prepare();
+  });
+
+  // The recording, as 16 kHz samples. Turned into text here and dropped: never sent, never kept.
+  ipcMain.handle(IPC.transcribe, (_event, samples: Float32Array) =>
+    required().listen.transcribe(
+      samples instanceof Float32Array ? samples : new Float32Array(samples),
+    ),
   );
 
   ipcMain.handle(IPC.savePet, async (_event, pet: Pet): Promise<Pet> => {

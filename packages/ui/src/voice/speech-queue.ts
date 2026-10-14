@@ -24,8 +24,9 @@ export class SpeechQueue {
     this.#onSpeaking = options.onSpeaking ?? (() => undefined);
   }
 
-  say(text: string): void {
-    const line = toSpeakable(text);
+  /** `whole` says a piece of a spoken answer in full, rather than its first sentences. */
+  say(text: string, options: { whole?: boolean } = {}): void {
+    const line = toSpeakable(text, options);
     if (line === '') return;
     this.#waiting.push(line);
     if (this.#current === null) this.#next();

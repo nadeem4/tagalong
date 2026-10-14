@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { MAX_VOICE_SPEED, MIN_VOICE_SPEED } from '@tagalong/protocol';
+import { useEffect, useState } from 'react';
+import { MAX_VOICE_SPEED, MIN_VOICE_SPEED, SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import type { Settings, VoiceId } from '@tagalong/protocol';
+import { listMicrophones } from '../mic';
 import { playLine } from '../voice-player';
-import { Section, Tip, useInvalid } from './section';
+import { Info, Section, Tip, useInvalid } from './section';
 
 /** What ▶ Preview says, in the voice and at the speed the form shows. */
 const PREVIEW_LINE = 'Certainly. I shall keep an eye on things and let you know what I find.';
@@ -15,10 +16,26 @@ const VOICES: readonly { id: VoiceId; label: string }[] = [
 
 /**
  * Scout talks: on or off, which voice, how fast. Preview plays the form's choice before it
- * is saved. ElevenLabs, the bring-your-own-key voice, is under Advanced.
+ * is saved. ElevenLabs, the bring-your-own-key voice, is under Advanced. Then Talk to
+ * Scout: the key you hold to speak, and which microphone listens.
  */
-export function VoiceSection({ settings }: { settings: Settings }) {
+export function VoiceSection({
+  settings,
+  hotkeyError,
+}: {
+  settings: Settings;
+  hotkeyError?: string | undefined;
+}) {
   const [talks, setTalks] = useState(settings.voice.enabled);
+  const talkKey = settings.hotkeys.talk ?? SETTINGS_DEFAULTS.hotkeys.talk;
+  const talkRefused = hotkeyError?.includes(`(${talkKey})`) === true;
+  const [microphones, setMicrophones] = useState<{ id: string; label: string }[]>([]);
+  useEffect(() => {
+    listMicrophones()
+      .then(setMicrophones)
+      .catch((error: unknown) => console.warn('[voice] could not list microphones', error));
+  }, []);
+  const picked = settings.voice.microphoneId ?? '';
   const [voice, setVoice] = useState<VoiceId>(settings.voice.voice);
   const [speed, setSpeed] = useState(settings.voice.speed);
   const [previewing, setPreviewing] = useState(false);
@@ -95,6 +112,47 @@ export function VoiceSection({ settings }: { settings: Settings }) {
           {speedField.message}
         </div>
       </div>
+      <div className="tg-grid">
+        <div>
+          <div className="tg-labelrow">
+            <label htmlFor="f-talkHotkey">Talk to Scout</label>
+            <Info tip="talk" label="About talking to Scout" />
+          </div>
+          <input
+            id="f-talkHotkey"
+            name="talkHotkey"
+            defaultValue={talkKey}
+            {...(talkRefused
+              ? { 'aria-invalid': true as const, 'aria-describedby': 'hotkey-error' }
+              : {})}
+          />
+        </div>
+        <div>
+          <label htmlFor="f-microphone">Microphone</label>
+          <select id="f-microphone" name="microphoneId" defaultValue={picked}>
+            <option value="">System default</option>
+            {microphones.map((microphone) => (
+              <option key={microphone.id} value={microphone.id}>
+                {microphone.label}
+              </option>
+            ))}
+            {picked !== '' && !microphones.some((microphone) => microphone.id === picked) && (
+              <option value={picked}>The microphone picked before</option>
+            )}
+          </select>
+        </div>
+      </div>
+      <p className="tg-help">
+        Hold the key and speak; let go and Scout answers out loud. Your speech is turned into text
+        on this PC, and the recording is never sent or kept.
+      </p>
+      <Tip tip="talk">
+        Hold the key, or click the mic in the bubble, and say your question. Let go (or click again)
+        and Scout answers in short spoken sentences, with any detail in the bubble. Talking while
+        Scout speaks cuts it off. The microphone only listens while you hold the key or after you
+        click the mic: never on its own. The first time, Tagalong downloads a small speech model
+        (about 80 MB) that turns your voice into text on this PC.
+      </Tip>
     </Section>
   );
 }

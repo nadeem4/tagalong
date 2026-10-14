@@ -63,9 +63,10 @@ FTS5 arrived with Phase 4 recall), the pet registry (`pets/registry.ts`), settin
 interface (`settings/settings.ts`), the brain providers (`providers/`) and the expert connectors (`experts/`). `Engine.boot` in `engine.ts`
 wires all of it together and is the only thing a host starts. The diagram's PetBus is not one class:
 Phase 4 built it as `crew/` (handoff, consult, roundtable) on top of the runner — see "The crew" below.
-`McpManager` and `ApprovalPolicy` (Phase 5), and the STT provider (Phase 3) do not exist yet. Text
-to speech was built in the desktop host rather than in core, because the local voice is a native
-ONNX runtime the pure core must not load; see "Scout talks" below. The Chrome extension
+`McpManager` and `ApprovalPolicy` (Phase 5) do not exist yet. Text to speech and speech to text
+were built in the desktop host rather than in core, because the local voice and the local speech
+model are a native ONNX runtime the pure core must not load; core only knows that a turn was
+spoken (`ask`'s `spoken`). See "Scout talks" and "Talk to Scout" below. The Chrome extension
 landed in Phase 6, which ran fifth; see "The browser host" below.
 
 ## Package responsibilities
@@ -1108,21 +1109,21 @@ built from `officeTokens`, so Settings has no palette of its own.
 `SettingsPage` holds the form state and the save. The sections come in the design's order, and each
 is one file under `apps/desktop/src/renderer/src/settings/`:
 
-| File                     | Section                                                                                                                                                                                                |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `brain-section.tsx`      | How Scout thinks: Scout's own provider and model (`brain.ts#scoutBrain`) with a status chip, or a service picker and key when no Claude sign-in is found                                               |
-| `you-section.tsx`        | You: **What should Scout call you?** (`settings.userName`, empty for no name, cut to 40 characters), with an ⓘ note. When set, `prompt-assembler.ts` adds one line after the pet's name: use it rarely |
-| `privacy-section.tsx`    | The rolling memory switch, the blind spots as chips from `BLIND_SPOTS` labels, and the pause sight key                                                                                                 |
-| `voice-section.tsx`      | Scout talks (a switch), the voice (George or Fable) with ▶ Preview (`voice-player.ts#playLine` with the form's voice and speed), and the speed slider                                                  |
-| `shortcuts-section.tsx`  | The three global hotkeys (ask, pause sight, stop speaking); a `hotkeyError` marks the field whose combination it names                                                                                 |
-| `browser-section.tsx`    | The Chrome extension's pairing token                                                                                                                                                                   |
-| `advanced-section.tsx`   | Advanced: a disclosure button (`aria-expanded`), closed by default, holding the five below and **Open Welcome again**                                                                                  |
-| `summaries-section.tsx`  | One grouped list: Same as Scout, Haiku and Sonnet on the Claude sign-in, then each keyed service that has a key                                                                                        |
-| `keys-section.tsx`       | One row per keyed service: Key stored or No key, add or replace, base URL, and Remove key (an empty key deletes the stored one)                                                                        |
-| `elevenlabs-section.tsx` | The ElevenLabs key (stored as `elevenlabs.apiKey`, never read back) and the voice ID from the person's library                                                                                         |
-| `sight-section.tsx`      | What a look at several monitors sends, and the window text budget                                                                                                                                      |
-| `watches-section.tsx`    | Minutes of screen to remember and the watch limits                                                                                                                                                     |
-| `section.tsx`            | The section list, the panel, the ⓘ button and its inline note (one open at a time), and `useInvalid` for a refused field                                                                               |
+| File                     | Section                                                                                                                                                                                                                                                                                     |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `brain-section.tsx`      | How Scout thinks: Scout's own provider and model (`brain.ts#scoutBrain`) with a status chip, or a service picker and key when no Claude sign-in is found                                                                                                                                    |
+| `you-section.tsx`        | You: **What should Scout call you?** (`settings.userName`, empty for no name, cut to 40 characters), with an ⓘ note. When set, `prompt-assembler.ts` adds one line after the pet's name: use it rarely                                                                                      |
+| `privacy-section.tsx`    | The rolling memory switch, the blind spots as chips from `BLIND_SPOTS` labels, and the pause sight key                                                                                                                                                                                      |
+| `voice-section.tsx`      | Scout talks (a switch), the voice (George or Fable) with ▶ Preview (`voice-player.ts#playLine` with the form's voice and speed), the speed slider, the Talk to Scout key (`hotkeys.talk`) and the microphone (`voice.microphoneId`, `mic.ts#listMicrophones`, blank for the system default) |
+| `shortcuts-section.tsx`  | Three global hotkeys (ask, pause sight, stop speaking; the talk key is under Voice); a `hotkeyError` marks the field whose combination it names                                                                                                                                             |
+| `browser-section.tsx`    | The Chrome extension's pairing token                                                                                                                                                                                                                                                        |
+| `advanced-section.tsx`   | Advanced: a disclosure button (`aria-expanded`), closed by default, holding the five below and **Open Welcome again**                                                                                                                                                                       |
+| `summaries-section.tsx`  | One grouped list: Same as Scout, Haiku and Sonnet on the Claude sign-in, then each keyed service that has a key                                                                                                                                                                             |
+| `keys-section.tsx`       | One row per keyed service: Key stored or No key, add or replace, base URL, and Remove key (an empty key deletes the stored one)                                                                                                                                                             |
+| `elevenlabs-section.tsx` | The ElevenLabs key (stored as `elevenlabs.apiKey`, never read back) and the voice ID from the person's library                                                                                                                                                                              |
+| `sight-section.tsx`      | What a look at several monitors sends, and the window text budget                                                                                                                                                                                                                           |
+| `watches-section.tsx`    | Minutes of screen to remember and the watch limits                                                                                                                                                                                                                                          |
+| `section.tsx`            | The section list, the panel, the ⓘ button and its inline note (one open at a time), and `useInvalid` for a refused field                                                                                                                                                                    |
 
 **How Scout thinks** reads the companion pet (`settings.defaultPetId`), never `settings.providerId`,
 which the engine ignores. Whether the Claude sign-in works comes from `main/claude-sign-in.ts`:
@@ -1531,6 +1532,71 @@ flowchart LR
   desktop app, external to the main bundle and imported only when Scout first speaks.
   `onnxruntime-node`'s DLLs and sharp's `@img` binaries are unpacked from `app.asar`. The model is
   not bundled.
+
+## Talk to Scout
+
+A spoken conversation on our own pipeline, with the configured provider still the brain: speech to
+text on this computer, a Scout turn in spoken mode, and the answer said sentence by sentence as it
+streams. The microphone opens only on the talk key (held) or the bubble's mic button.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
+flowchart LR
+  subgraph Main["Main process"]
+    HK["hotkeys.talk: every press"] --> TE["IPC talkEvent(at)"]
+    PRE["prepareListening: active window, warm model"]
+    LS["createListenService: LazyLocalStt (Whisper) or fake"]
+  end
+  subgraph Panel["Panel renderer"]
+    TE --> PTT["PushToTalk: held, repeat, fresh press, click"]
+    PTT --> MIC["mic.ts: getUserMedia, MediaRecorder, 16 kHz mono"]
+    PTT --> PRE
+    MIC -- "IPC transcribe(samples)" --> LS
+    LS -- "text" --> CB["CompanionBubble: ask with spoken: true"]
+    CB --> SS["SpokenStream: sentence by sentence"]
+    SS --> Q["SpeechQueue (whole)"]
+  end
+  CB -- "ask spoken" --> E["Engine: SPOKEN_MODE in the system prompt"]
+  E -- "turn.delta" --> CB
+```
+
+- **Hold to talk** (`main/hotkeys.ts`, `ui/voice/push-to-talk.ts`). `hotkeys.talk`, default
+  `Ctrl+Shift+Alt+Space` (not the ask key held: the ask key opens the bubble on a press). A global
+  shortcut reports presses only, repeating while the key is held, so main forwards every press as
+  `IPC.talkEvent` with its time and brings the bubble up with the keyboard. `PushToTalk` in the
+  panel turns presses into start and stop: the first press starts; presses within
+  `FRESH_PRESS_MS` (1.1 s) of the last are the key repeating; the first `keyup` in the bubble is the
+  release; a later fresh press stops if the release was missed. The mic button toggles. Listening
+  ends on its own after 30 s.
+- **Barge-in.** Starting to listen calls `SpeechQueue.stop()`: Scout stops mid-sentence. A spoken
+  question sent while an answer still runs is a new ask for the same pet, which the runner already
+  interrupts.
+- **The ears** (`renderer/src/mic.ts`, `main/voice/listen.ts`, `main/voice/whisper.ts`). The panel
+  records with `getUserMedia` (the microphone from `voice.microphoneId`, or the system default) and
+  `MediaRecorder`, decodes it and resamples to 16 kHz mono with an `OfflineAudioContext`, and sends
+  the `Float32Array` over `IPC.transcribe`. `prepareListening`, called when listening starts, notes
+  the active window (never the selection: copying it would press keys while the talk key is held)
+  and warms the model. `createListenService` skips silence and clicks shorter than 0.3 s, strips
+  Whisper's `[BLANK_AUDIO]`-style markers and reports a failure instead of throwing.
+  `LazyLocalStt` loads `onnx-community/whisper-base.en` (Apache-2.0, q8, about 77 MB) through
+  `@huggingface/transformers` on the CPU, downloading it into `<userData>/voice` on first use; a
+  failed load is tried again next time. Nothing is stored. `TAGALONG_FAKE_STT=1` hears
+  `FAKE_TRANSCRIPT` and adds Chromium's `use-fake-device-for-media-stream` and
+  `use-fake-ui-for-media-stream` switches, so the e2e suite needs no model and no microphone.
+  ElevenLabs Scribe is not wired in.
+- **Spoken mode** (`core/conversation/prompt-assembler.ts`). `ask` takes `spoken: true`; the runner
+  passes it to `assemblePrompt`, which appends `SPOKEN_MODE` (headed `SPOKEN_HEADING`) last in the
+  system prompt for that turn only: short sentences and contractions, no markdown or lists in what
+  is said, details after it as a list or code block (shown, not read), one question back at most,
+  tools as usual and "check the card" for a confirmation, and a note that the words came from
+  speech recognition. A typed turn never gets it.
+- **Speaking as it streams** (`ui/voice/spoken-stream.ts`). For a spoken question the bubble feeds
+  each `turn.delta` to a `SpokenStream`, which hands over each complete sentence (a mark followed by
+  a space, or a line break) at once, skips code fences even when they arrive in pieces, and says
+  "The answer is in the bubble." when nothing was speakable. Each piece goes through
+  `SpeechQueue.say(text, { whole: true })`: shaped by `toSpeakable` but never cut to two sentences.
+  The finished answer is not said again; the bubble shows what it heard and, after the answer,
+  "Hold <key> to reply". The microphone never reopens on its own.
 
 ## Packaging (Phase 7)
 
