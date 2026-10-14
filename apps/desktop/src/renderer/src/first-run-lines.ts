@@ -1,6 +1,7 @@
 import type { Settings, WelcomeStep } from '@tagalong/protocol';
 import type { ClaudeSignIn, ProviderChoice } from '../../shared/ipc';
 import type { FirstRunAnswer } from './first-run';
+import type { ListenFailure } from './setup-ears';
 
 /** Everything a line depends on. The key itself is never here, so no line can carry it. */
 export interface LineContext {
@@ -232,4 +233,25 @@ export function chipLabel(
     default:
       return STEP_NAMES[step];
   }
+}
+
+export const LISTENING_HINT =
+  'Answer by voice, typing or a tap and I move on. Tap a step above to change it.';
+
+export function listenFailed(why: ListenFailure): string {
+  switch (why) {
+    case 'no-mic':
+      return 'I can’t find a microphone, so let’s type. Tap or type your answers.';
+    case 'denied':
+      return 'I wasn’t allowed to use the microphone, so let’s type. You can allow it later in Windows settings.';
+    case 'model-failed':
+      return 'My listening model didn’t download, so let’s type for now.';
+  }
+}
+
+/** The header's listening line: the download while it runs, then that Scout is listening. */
+export function listeningHint(progress: number | null): string {
+  return progress === null
+    ? 'Listening for your answer'
+    : `Getting my ears ready… ${Math.round(progress * 100)}%. Type or tap meanwhile.`;
 }

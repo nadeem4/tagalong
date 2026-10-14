@@ -62,6 +62,12 @@ async function answer(page: Page, text: string): Promise<void> {
 
 const heading = (page: Page, name: string) => page.getByRole('heading', { name });
 
+/** The first question: no mic in CI (no fake speech), so setup is answered by typing. */
+async function chooseTyping(page: Page): Promise<void> {
+  await expect(heading(page, 'Talk or type?')).toBeVisible(ENGINE);
+  await page.getByRole('button', { name: 'I’ll type' }).click();
+}
+
 test.describe('setup by typing, signed in to Claude', () => {
   test.describe.configure({ mode: 'serial' });
   let app: ElectronApplication;
@@ -77,8 +83,9 @@ test.describe('setup by typing, signed in to Claude', () => {
     rmSync(dataDir, { recursive: true, force: true });
   });
 
-  test('a new install opens setup alone, at the name, and a typed name moves it on', async () => {
+  test('a new install opens setup alone, asks talk or type, and a typed name moves it on', async () => {
     const setup = await windowFor(app, 'onboarding');
+    await chooseTyping(setup);
     await expect(heading(setup, 'What should I call you?')).toBeVisible(ENGINE);
     await windowFor(app, 'avatar');
     expect(await visible(app, 'avatar')).toBe(false);
@@ -99,6 +106,7 @@ test.describe('setup by typing, signed in to Claude', () => {
     app = await launch(dataDir, 'signed-in');
     const setup = await windowFor(app, 'onboarding');
     await expect(heading(setup, 'How should I think?')).toBeVisible(ENGINE);
+    await expect(setup.getByRole('button', { name: 'Typing' })).toBeVisible();
     await expect(setup.getByRole('button', { name: 'You: Alex' })).toBeVisible();
   });
 
@@ -129,12 +137,12 @@ test.describe('setup by typing, signed in to Claude', () => {
   test('every answer was saved as given, and setup does not open again', async () => {
     await quit(app);
     const saved = JSON.parse(readFileSync(join(dataDir, 'settings.json'), 'utf8')) as {
-      welcome: { done: boolean; brain?: string };
+      welcome: { done: boolean; brain?: string; answerBy?: string };
       userName: string;
       userNameDeclined: boolean;
       voice: { enabled: boolean };
     };
-    expect(saved.welcome).toMatchObject({ done: true, brain: 'claude-code' });
+    expect(saved.welcome).toMatchObject({ done: true, brain: 'claude-code', answerBy: 'type' });
     expect(saved.userName).toBe('');
     expect(saved.userNameDeclined).toBe(true);
     expect(saved.voice.enabled).toBe(false);
@@ -161,6 +169,7 @@ test.describe('setup by typing, without Claude Code', () => {
 
   test('offers install or a key, and a key tested once moves setup on', async () => {
     const setup = await windowFor(app, 'onboarding');
+    await chooseTyping(setup);
     await expect(heading(setup, 'What should I call you?')).toBeVisible(ENGINE);
     await answer(setup, 'rather not');
     await expect(setup.getByRole('status')).toHaveText(/didn’t find Claude Code/, ENGINE);

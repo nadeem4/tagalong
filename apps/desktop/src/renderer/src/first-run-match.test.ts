@@ -77,6 +77,16 @@ describe('negation', () => {
       matchChoice('not Claude', choicesFor('think', 'signed-in', false, providers)),
     ).toBeNull();
   });
+
+  it('counts haven’t, hasn’t, didn’t and cannot as negations too', () => {
+    const missing = choicesFor('think', 'not-installed', false, providers);
+    expect(matchChoice('I haven’t installed it', missing)).toBeNull();
+    expect(matchChoice('it hasn’t installed', missing)).toBeNull();
+    expect(
+      matchChoice('I didn’t sign in', choicesFor('think', 'signed-out', false, providers)),
+    ).toBeNull();
+    expect(matchChoice('I cannot talk', step('answer'))).toBeNull();
+  });
 });
 
 describe('nameFrom refusals', () => {
@@ -119,5 +129,27 @@ describe('nameFrom', () => {
     expect(nameFrom('sk-or-v1-0123456789abcdef0123456789')).toBeNull();
     expect(nameFrom('I really do not know what to say here')).toBeNull();
     expect(nameFrom('')).toBeNull();
+  });
+});
+
+describe('choicesFor think sign-in answers', () => {
+  const ask = (said: string, signIn: Parameters<typeof choicesFor>[1]) =>
+    matchChoice(said, choicesFor('think', signIn, false, providers));
+
+  it('hears sign in when signed out, and refuses a mix with the key', () => {
+    expect(ask('sign in', 'signed-out')).toBe('sign-in');
+    expect(ask('use a key', 'signed-out')).toBe('key');
+    expect(ask('sign in with a key', 'signed-out')).toBeNull();
+  });
+
+  it('hears install and check when not installed', () => {
+    expect(ask('install it', 'not-installed')).toBe('install');
+    expect(ask('I installed it, check again', 'not-installed')).toBe('check');
+    expect(ask('check', 'not-installed')).toBe('check');
+  });
+
+  it('hears check again when unknown, and keeps sign in meaning Claude when signed in', () => {
+    expect(ask('check again', null)).toBe('check');
+    expect(ask('sign in', 'signed-in')).toBe('claude-code');
   });
 });

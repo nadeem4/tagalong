@@ -440,8 +440,8 @@ async function start(): Promise<void> {
 let stopKeepAnEye = (): void => undefined;
 /** Stops the Always-listening guard on quit. */
 let stopListeningGuard = (): void => undefined;
-/** Why Always listening waits: a call or full screen in front, or the pets hidden. */
-let listeningWhy = { blocked: false, petsShown: false };
+/** Why Always listening waits: a call or full screen in front, the pets hidden, or setup open. */
+let listeningWhy = { blocked: false, petsShown: false, setupOpen: false };
 let pauseListening: (change: Partial<typeof listeningWhy>) => void = () => undefined;
 
 /**
@@ -541,10 +541,16 @@ function applyHotkeys(settings: Settings): string | null {
 /**
  * The talk key, on every press, repeats included: the bubble comes up with the keyboard, so
  * it sees the key come up, and the panel tells a held key from a fresh press. The
- * microphone only ever opens in the panel, on this key or its mic button.
+ * microphone only ever opens in the panel, on this key or its mic button. While setup is open
+ * the key brings setup forward instead: setup may be listening, and one mic is enough.
  */
 function talkPressed(): void {
-  if (desktop === null || desktop.panel === null || desktop.avatar === null) return;
+  if (desktop === null) return;
+  if (desktop.onboardingWindow !== null && !desktop.onboardingWindow.isDestroyed()) {
+    desktop.onboardingWindow.focus();
+    return;
+  }
+  if (desktop.panel === null || desktop.avatar === null) return;
   const { panel, avatar } = desktop;
   if (!panel.isVisible() || !panel.isFocused()) {
     avatar.show();
@@ -776,7 +782,10 @@ function openOnboarding(): void {
     return;
   }
   const window = createOnboardingWindow();
+  // Always listening waits while setup is open, so the two never share the voice process.
+  pauseListening({ setupOpen: true });
   window.on('closed', () => {
+    pauseListening({ setupOpen: false });
     if (desktop === null) return;
     desktop.onboardingWindow = null;
     // Closed without Start, Scout still arrives: an install never ends with nothing on screen.

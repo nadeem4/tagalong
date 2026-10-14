@@ -57,6 +57,33 @@ export function answered(run: FirstRun, nameDeclined: boolean): FirstRun {
   );
 }
 
+/**
+ * Setup listens only once "Talk to me" was chosen in this run (or a resumed one), and never
+ * on Try it. Past the Answer step is what keeps a re-run of a finished setup from listening
+ * before you choose again: it reopens with Answer as the furthest step reached.
+ */
+export function listensNow(run: FirstRun, settings: Settings): boolean {
+  return (
+    run.steps.includes('answer') &&
+    settings.welcome.answerBy === 'talk' &&
+    indexOf(run, run.reached) > indexOf(run, 'answer') &&
+    run.current !== 'try'
+  );
+}
+
+/**
+ * Runs steps one at a time, each after the one before has settled, failed or not. Setup's
+ * saves go through one, so each patch is built from the settings the last save returned.
+ */
+export function oneAtATime(): <T>(step: () => Promise<T>) => Promise<T> {
+  let last: Promise<unknown> = Promise.resolve();
+  return (step) => {
+    const next = last.then(step);
+    last = next.catch(() => undefined);
+    return next;
+  };
+}
+
 /** A step chip: only a step already reached opens. */
 export function goTo(run: FirstRun, step: WelcomeStep): FirstRun {
   const at = indexOf(run, step);

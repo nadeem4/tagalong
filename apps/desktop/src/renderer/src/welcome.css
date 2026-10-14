@@ -91,6 +91,32 @@ body:has(.first-run) {
   color: #f2c14e;
 }
 
+/* Listening, right of the chips: the download while it runs, then a red dot while the mic is open. */
+
+.first-run__listening {
+  margin: 0 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #a3aac4;
+}
+
+.first-run__dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: #e5484d;
+  animation: first-run-pulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes first-run-pulse {
+  to {
+    opacity: 0.35;
+  }
+}
+
 /* Two columns: Scout and what it says on the left, the question and its answers on the right. */
 
 .first-run__body {
@@ -223,6 +249,51 @@ body:has(.first-run) {
     600 13px 'Onest',
     sans-serif;
   text-align: center;
+}
+
+/* A setting in setup (Always listening on the keys step): the Settings switch, gold when on. */
+
+.first-run__setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid #2e3558;
+  border-radius: 12px;
+  background: #1a1f3a;
+}
+
+.first-run__setting p {
+  margin: 0;
+}
+
+.first-run__setting .first-run__note {
+  margin-top: 3px;
+}
+
+.first-run__switch {
+  min-width: 64px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid #2e3558;
+  border-radius: 8px;
+  background: transparent;
+  color: #a3aac4;
+  font:
+    600 13px 'Onest',
+    sans-serif;
+  cursor: pointer;
+}
+
+.first-run__switch:disabled {
+  cursor: default;
+}
+
+.first-run__switch[aria-checked='true'] {
+  border-color: #f2c14e;
+  background: #f2c14e;
+  color: #12162b;
 }
 
 /* The key: typed or pasted, tested once, never shown or spoken. */
