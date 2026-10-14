@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 // Floors for the host and the shared UI sit just below what they measure today, so CI
 // passes now and fails the moment coverage drops. Raise them as coverage grows.
-const desktopHostFloor = { statements: 52, branches: 57, functions: 43, lines: 52 };
+const desktopHostFloor = { statements: 59, branches: 62, functions: 49, lines: 60 };
 const uiFloor = { statements: 92, branches: 85, functions: 91, lines: 94 };
 
 export default defineConfig({
