@@ -1,8 +1,10 @@
 import type { LazyLocalVoice } from '../voice';
+import type { EarsMessage } from './ears-host';
 import type { FromWorker, ToWorker } from './messages';
 
 export interface WorkerDeps {
   kokoro: Pick<LazyLocalVoice, 'warm' | 'loaded' | 'speak'>;
+  ears: (message: EarsMessage) => void;
 }
 
 /** The voice process's side: runs each call and posts its answer, or why it failed. */
@@ -24,7 +26,10 @@ export function createWorkerHandler(deps: WorkerDeps, post: (message: FromWorker
     }
   };
   return (message: ToWorker): void => {
-    if (message.kind !== 'call') return;
+    if (message.kind !== 'call') {
+      deps.ears(message);
+      return;
+    }
     run(message).then(
       (value) => post({ kind: 'result', id: message.id, value }),
       (error: unknown) =>

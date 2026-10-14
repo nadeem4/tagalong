@@ -1,4 +1,4 @@
-import type { VoiceId } from '@tagalong/protocol';
+import type { EarsEvent, ListenMode, VoiceId } from '@tagalong/protocol';
 
 /** What main sends the voice process. */
 export type ToWorker =
@@ -10,13 +10,18 @@ export type ToWorker =
       text: string;
       voice: VoiceId;
       speed: number;
-    };
+    }
+  | { kind: 'ears.listen'; mode: ListenMode }
+  | { kind: 'ears.frame'; samples: Float32Array }
+  | { kind: 'ears.stop' };
 
 /** What the voice process sends back. */
 export type FromWorker =
   | { kind: 'result'; id: number; value: unknown }
   | { kind: 'error'; id: number; message: string }
-  | { kind: 'kokoro.ready' };
+  | { kind: 'kokoro.ready' }
+  | { kind: 'ears'; event: EarsEvent; text?: string }
+  | { kind: 'ears.status'; status: 'loading' | 'ready' | 'failed'; message?: string };
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 

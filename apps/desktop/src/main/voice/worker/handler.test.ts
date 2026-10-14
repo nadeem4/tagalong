@@ -11,9 +11,10 @@ function setup(loaded = true) {
     loaded: vi.fn(async () => loaded),
     speak: vi.fn(async () => AUDIO),
   };
-  const handle = createWorkerHandler({ kokoro }, (m) => posted.push(m));
+  const ears = vi.fn();
+  const handle = createWorkerHandler({ kokoro, ears }, (m) => posted.push(m));
   const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
-  return { posted, kokoro, handle, settle };
+  return { posted, kokoro, ears, handle, settle };
 }
 
 describe('createWorkerHandler', () => {
@@ -58,5 +59,11 @@ describe('createWorkerHandler', () => {
     });
     await settle();
     expect(posted).toEqual([{ kind: 'error', id: 3, message: 'not loaded' }]);
+  });
+
+  it('passes ears messages to the ears', () => {
+    const { ears, handle } = setup();
+    handle({ kind: 'ears.stop' });
+    expect(ears).toHaveBeenCalledWith({ kind: 'ears.stop' });
   });
 });
