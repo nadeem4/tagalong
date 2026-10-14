@@ -61,6 +61,11 @@ describe('scoutSays', () => {
 });
 
 describe('optionsFor', () => {
+  it('names the pet that suggests', () => {
+    const note = optionsFor('think', { ...ctx, petName: 'Pixel' }, providers)[0]?.note;
+    expect(note).toContain('Pixel’s suggestion');
+  });
+
   it('marks Scout’s suggestion and offers a key instead', () => {
     expect(
       optionsFor('think', ctx, providers).map((option) => [option.id, option.suggested === true]),

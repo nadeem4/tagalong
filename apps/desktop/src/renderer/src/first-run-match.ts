@@ -23,11 +23,19 @@ export function normalise(text: string): string {
 export function matchChoice(text: string, choices: readonly Choice[]): string | null {
   const heard = ` ${normalise(text)} `;
   if (heard.trim() === '') return null;
-  const hits = choices.filter((choice) =>
-    choice.says.some((phrase) => heard.includes(` ${normalise(phrase)} `)),
+  const phrases = choices.map((choice) => choice.says.map((phrase) => ` ${normalise(phrase)} `));
+  // A negated phrase ("don't talk") is not a vote for anything, and not for its opposite.
+  if (phrases.flat().some((phrase) => NEGATORS.some((no) => heard.includes(` ${no}${phrase}`)))) {
+    return null;
+  }
+  const hits = choices.filter((_, index) =>
+    phrases[index]!.some((phrase) => heard.includes(phrase)),
   );
   return hits.length === 1 ? hits[0]!.id : null;
 }
+
+/** "no" is left out: it is also an answer ("No. Text only."). */
+const NEGATORS = ['dont', 'do not', 'not', 'never', 'wont', 'cant'];
 
 const ANSWER: Choice[] = [
   { id: 'talk', says: ['talk', 'talk to me', 'speak', 'voice', 'out loud'] },
@@ -82,6 +90,7 @@ export function choicesFor(
 const DECLINES = [
   'rather not',
   'id rather not',
+  'i would rather not',
   'no',
   'no thanks',
   'nope',
@@ -90,6 +99,19 @@ const DECLINES = [
   'prefer not',
   'id prefer not',
 ];
+const NOT_NAMES = new Set([
+  'yes',
+  'yes please',
+  'nope',
+  'ok',
+  'okay',
+  'sure',
+  'hello',
+  'hi',
+  'nothing',
+  'dunno',
+  'i dont know',
+]);
 const LEAD_IN = /^(?:my name is|my name['’]s|call me|i['’]m|i am|it['’]s|it is)\s+/i;
 
 /**
@@ -101,6 +123,7 @@ export function nameFrom(text: string): { name: string } | 'declined' | null {
   if (heard === '') return null;
   if (DECLINES.some((phrase) => heard === phrase || heard.startsWith(`${phrase} `)))
     return 'declined';
+  if (NOT_NAMES.has(heard) || /^(?:(?:i am|im|i) )?(?:not|dont|never)\b/.test(heard)) return null;
   const said = text
     .trim()
     .replace(LEAD_IN, '')

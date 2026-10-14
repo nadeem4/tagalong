@@ -56,6 +56,34 @@ describe('choicesFor think', () => {
   });
 });
 
+describe('negation', () => {
+  it('never counts a negated phrase as a vote', () => {
+    expect(matchChoice('don’t talk', step('voice'))).toBeNull();
+    expect(matchChoice('don’t talk to me', step('answer'))).toBeNull();
+    expect(matchChoice('I’m not ready', step('keys'))).toBeNull();
+    expect(
+      matchChoice('not Claude', choicesFor('think', 'signed-in', false, providers)),
+    ).toBeNull();
+  });
+});
+
+describe('nameFrom refusals', () => {
+  it('does not save a refusal or a greeting as a name', () => {
+    for (const text of [
+      'I’m not telling',
+      'I don’t know',
+      'yes please',
+      'hello',
+      'nothing',
+      'dunno',
+      'Never mind',
+    ]) {
+      expect(nameFrom(text)).toBeNull();
+    }
+    expect(nameFrom('I would rather not')).toBe('declined');
+  });
+});
+
 describe('nameFrom', () => {
   it('takes the name typed, as written', () => {
     expect(nameFrom('Alex')).toEqual({ name: 'Alex' });

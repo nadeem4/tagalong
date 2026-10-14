@@ -129,7 +129,7 @@ export function optionsFor(
             {
               id: 'claude-code',
               label: 'Claude, with your sign-in',
-              note: 'Found on this computer · signed in · Scout’s suggestion',
+              note: `Found on this computer · signed in · ${ctx.petName}’s suggestion`,
               suggested: true,
             },
             KEY_OPTION,
