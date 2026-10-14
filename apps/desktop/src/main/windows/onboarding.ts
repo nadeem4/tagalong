@@ -18,7 +18,7 @@ export function createOnboardingWindow(): BrowserWindow {
     x: Math.round(area.x + (area.width - WIDTH) / 2),
     y: Math.round(area.y + Math.max(0, (area.height - HEIGHT) / 2)),
     show: false,
-    title: 'Welcome to Tagalong',
+    title: 'Set up Tagalong',
     webPreferences: {
       preload: PRELOAD_PATH,
       contextIsolation: true,

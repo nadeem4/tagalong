@@ -85,6 +85,18 @@ export function scoutSays(step: WelcomeStep, ctx: LineContext): { title: string;
   }
 }
 
+/** What Scout says about a key it could not check. Never the key itself. */
+export const KEY_LINES = {
+  empty: 'Paste a key first.',
+  untested: 'I couldn’t test that key just now. Try again.',
+} as const;
+
+const BACK_OPTION: StepOption = {
+  id: 'back',
+  label: 'Back',
+  note: 'To the other ways I can think',
+};
+
 const KEY_OPTION: StepOption = {
   id: 'key',
   label: 'An API key',
@@ -115,13 +127,16 @@ export function optionsFor(
       return [];
     case 'think':
       if (ctx.picking) {
-        return providers
-          .filter((provider) => provider.needsKey)
-          .map((provider) =>
-            provider.hasKey
-              ? { id: provider.id, label: provider.label, note: 'Key stored' }
-              : { id: provider.id, label: provider.label },
-          );
+        return [
+          ...providers
+            .filter((provider) => provider.needsKey)
+            .map((provider) =>
+              provider.hasKey
+                ? { id: provider.id, label: provider.label, note: 'Key stored' }
+                : { id: provider.id, label: provider.label },
+            ),
+          BACK_OPTION,
+        ];
       }
       switch (ctx.signIn) {
         case 'signed-in':

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Settings } from '@tagalong/protocol';
 import type { ProviderChoice } from '../../shared/ipc';
 import {
+  KEY_LINES,
   chipLabel,
   echoFor,
   notCaught,
@@ -90,7 +91,13 @@ describe('optionsFor', () => {
     expect(optionsFor('think', { ...ctx, picking: true }, providers)).toEqual([
       { id: 'openrouter', label: 'OpenRouter' },
       { id: 'anthropic', label: 'Anthropic', note: 'Key stored' },
+      { id: 'back', label: 'Back', note: 'To the other ways I can think' },
     ]);
+  });
+
+  it('says plainly when there is no key to check, or the check could not run', () => {
+    expect(KEY_LINES.empty).toBe('Paste a key first.');
+    expect(KEY_LINES.untested).toBe('I couldn’t test that key just now. Try again.');
   });
 
   it('offers Rather not on the name step', () => {

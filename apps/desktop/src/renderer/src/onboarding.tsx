@@ -14,6 +14,7 @@ import { answerPatch, answered, chipState, goTo, startFirstRun } from './first-r
 import type { FirstRun, FirstRunAnswer } from './first-run';
 import { choicesFor, matchChoice, nameFrom } from './first-run-match';
 import {
+  KEY_LINES,
   STEP_NAMES,
   chipLabel,
   echoFor,
@@ -30,8 +31,6 @@ import type { ClaudeSignIn, HostView } from '../../shared/ipc';
 const CLAUDE_INSTALL = 'https://claude.com/claude-code';
 /** While Claude Code is signed out, Scout checks this often and moves on once it is in. */
 const SIGN_IN_POLL_MS = 3_000;
-/** Said when the key test itself could not run; the key is never in it. */
-const KEY_TEST_FAILED = 'I couldn’t test that key just now. Try again.';
 
 const messageOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -55,6 +54,10 @@ function FirstRunWindow() {
   const [aside, setAside] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Keys saved in this window: a key that failed its test is still stored, so Check key retests it.
+  const [savedKeys, setSavedKeys] = useState<readonly string[]>([]);
+  const answerInput = useRef<HTMLInputElement>(null);
+  const keyInput = useRef<HTMLInputElement>(null);
   // Setup's lines are spoken the way the bubble's are: got ready one ahead, one at a time.
   const [voice] = useState(() => new SpeechQueue({ prepare: (text) => prepareLine(text) }));
   const finishing = useRef(false);
@@ -84,6 +87,17 @@ function FirstRunWindow() {
     return () => clearInterval(timer);
   }, [current, signIn]);
 
+  // A sign-in that lands while the services are listed brings Claude's suggestion back.
+  useEffect(() => {
+    if (signIn === 'signed-in' && keyFor === null) setPicking(false);
+  }, [signIn]);
+
+  // Focus follows the question: the key field when it is open, otherwise the answer pill.
+  useEffect(() => {
+    if (busy) return;
+    (keyFor !== null ? keyInput : answerInput).current?.focus();
+  }, [current, picking, keyFor, busy]);
+
   const providers = view?.providers ?? [];
   const scout = view?.pets.find((pet) => pet.id === view.settings.defaultPetId);
   const context: LineContext | null =
@@ -100,8 +114,9 @@ function FirstRunWindow() {
   const says = run !== null && context !== null ? scoutSays(run.current, context) : null;
   const line = aside ?? says?.line ?? '';
 
-  // Each line Scout says is also spoken, while Scout talks.
-  const speaks = settings?.voice.enabled === true;
+  // Each line Scout says is also spoken, while Scout talks. The voice step's line is the
+  // sample of how Scout sounds, so it is spoken either way.
+  const speaks = settings?.voice.enabled === true || current === 'voice';
   useEffect(() => {
     if (line === '' || !speaks) return;
     voice.stop();
@@ -112,6 +127,7 @@ function FirstRunWindow() {
   async function finish(saved: Settings): Promise<void> {
     if (finishing.current) return;
     finishing.current = true;
+    setProblem(null);
     voice.stop();
     try {
       await window.tagalongHost.finishWelcome(saved.welcome.brain ?? 'claude-code');
@@ -169,6 +185,11 @@ function FirstRunWindow() {
       case 'think':
         if (id === 'claude-code') return void give({ step: 'think', brain: 'claude-code' });
         if (id === 'key') return setPicking(true);
+        if (id === 'back') {
+          setPicking(false);
+          setKeyFor(null);
+          return setKey('');
+        }
         if (id === 'sign-in') {
           return void window.tagalongHost
             .openClaudeSignIn()
@@ -200,12 +221,18 @@ function FirstRunWindow() {
   async function testKey(): Promise<void> {
     if (keyFor === null) return;
     const pasted = key.trim();
-    const stored = providers.find((provider) => provider.id === keyFor)?.hasKey === true;
-    if (pasted === '' && !stored) return;
+    const stored =
+      savedKeys.includes(keyFor) ||
+      providers.find((provider) => provider.id === keyFor)?.hasKey === true;
+    if (pasted === '' && !stored) return setAside(KEY_LINES.empty);
     setBusy(true);
     setProblem(null);
+    setAside(null);
     try {
-      if (pasted !== '') await window.tagalongHost.saveApiKey(keyFor, pasted);
+      if (pasted !== '') {
+        await window.tagalongHost.saveApiKey(keyFor, pasted);
+        setSavedKeys((saved) => [...saved, keyFor]);
+      }
       setKey('');
     } catch (error) {
       setProblem(messageOf(error));
@@ -215,15 +242,13 @@ function FirstRunWindow() {
     let passed = false;
     try {
       const result = await window.tagalongHost.checkKey(keyFor);
+      // What went wrong with the key is Scout's to say, once, in its bubble; the alert
+      // below is for the window itself failing (a save, a sign-in, finishing).
       if (result.ok) passed = true;
-      else {
-        setProblem(result.message);
-        setAside(result.message);
-      }
+      else setAside(result.message);
     } catch {
       // The test itself could not run: say so plainly, and stay on this step.
-      setProblem(KEY_TEST_FAILED);
-      setAside(KEY_TEST_FAILED);
+      setAside(KEY_LINES.untested);
     }
     setBusy(false);
     if (passed) await give({ step: 'think', brain: keyFor });
@@ -333,6 +358,7 @@ function FirstRunWindow() {
               <label>
                 <span>Your {context.keyLabel} key</span>
                 <input
+                  ref={keyInput}
                   type="password"
                   value={key}
                   autoComplete="off"
@@ -350,11 +376,22 @@ function FirstRunWindow() {
               {problem}
             </p>
           )}
+          {run.current === 'try' && problem !== null && (
+            <button
+              type="button"
+              className="first-run__primary first-run__retry"
+              autoFocus
+              onClick={() => void finish(settings)}
+            >
+              Try again
+            </button>
+          )}
           <div className="first-run__grow" />
           {keyFor === null && run.current !== 'try' && (
             <form
               onSubmit={(event) => {
                 event.preventDefault();
+                if (busy) return;
                 const text = typed;
                 setTyped('');
                 heard(text);
@@ -363,13 +400,14 @@ function FirstRunWindow() {
               <label className="first-run__answer">
                 <span className="first-run__hidden">Answer {context.petName}</span>
                 <input
+                  ref={answerInput}
                   type="text"
                   placeholder={run.current === 'name' ? 'Type your name' : 'Or type your answer'}
                   value={typed}
                   maxLength={120}
                   autoComplete="off"
                   spellCheck={false}
-                  disabled={busy}
+                  readOnly={busy}
                   onChange={(event) => setTyped(event.target.value)}
                 />
               </label>

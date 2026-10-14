@@ -51,6 +51,12 @@ describe('choicesFor think', () => {
     expect(picking.map((choice) => choice.id)).not.toContain('claude-code');
   });
 
+  it('goes back from the keyed services when asked', () => {
+    const picking = choicesFor('think', 'signed-in', true, providers);
+    expect(matchChoice('go back', picking)).toBe('back');
+    expect(matchChoice('back', picking)).toBe('back');
+  });
+
   it('has nothing to match on the name step: the name is free text', () => {
     expect(choicesFor('name', null, false, providers)).toEqual([]);
   });

@@ -275,6 +275,10 @@ body:has(.first-run) {
   cursor: default;
 }
 
+.first-run__retry {
+  align-self: flex-start;
+}
+
 .first-run__error {
   margin: 0;
   padding: 10px 12px;

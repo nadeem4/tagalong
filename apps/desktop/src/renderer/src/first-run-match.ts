@@ -52,6 +52,7 @@ const CLAUDE: Choice = {
   id: 'claude-code',
   says: ['claude', 'claude code', 'sign in', 'my sign in', 'yes', 'sure', 'ok', 'okay'],
 };
+const BACK: Choice = { id: 'back', says: ['back', 'go back'] };
 const KEY: Choice = { id: 'key', says: ['key', 'api', 'api key', 'a key'] };
 const SERVICE_WORDS: Readonly<Record<string, readonly string[]>> = {
   anthropic: ['anthropic'],
@@ -74,12 +75,15 @@ export function choicesFor(
       return KEYS;
     case 'think':
       if (picking) {
-        return providers
-          .filter((provider) => provider.needsKey)
-          .map((provider) => ({
-            id: provider.id,
-            says: SERVICE_WORDS[provider.id] ?? [provider.label],
-          }));
+        return [
+          ...providers
+            .filter((provider) => provider.needsKey)
+            .map((provider) => ({
+              id: provider.id,
+              says: SERVICE_WORDS[provider.id] ?? [provider.label],
+            })),
+          BACK,
+        ];
       }
       return signIn === 'signed-in' ? [CLAUDE, KEY] : [KEY];
     default:
