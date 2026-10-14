@@ -413,10 +413,17 @@ voice model (about 90 MB) into `%APPDATA%\Tagalong\voice`; ElevenLabs (V.6) bill
 2. **Expected:** each preview plays in the chosen voice and speed before saving; with Scout talks off
    the answer is silent, and Preview still plays.
 
+### V.5b. Who speaks: System voice
+
+1. **Action:** on a fresh profile, in Settings → Voice pick **The system voice** under **Who speaks**, then press **▶ Preview**.
+2. **Expected:** the preview plays in the system voice and no Kokoro download starts, with no Save needed (the voice folder under `%APPDATA%\Tagalong` stays empty).
+
 ### V.6. ElevenLabs (your own key)
 
-1. **Action:** in Settings → Advanced → ElevenLabs voice, paste your key and a voice ID from your
-   ElevenLabs library; Save; ask a question. Then remove the key.
+1. **Action:** in Settings → Voice pick **ElevenLabs, with your key** under **Who speaks**; in
+   Settings → Advanced → ElevenLabs voice, paste your key and a voice ID from your ElevenLabs
+   library; Save; ask a question. Then remove the key. Preview with ElevenLabs picked uses the
+   saved key and voice ID.
 2. **Expected:** the answer is spoken in that voice (the ElevenLabs history shows only the spoken
    words). With the key removed, or a wrong voice ID, Scout speaks with the local voice again.
    With the network cut while ElevenLabs is set, the local voice takes over within 15 seconds.

@@ -222,7 +222,7 @@ flowchart LR
   downloaded again next time. The download fetches the model only; no text is sent. Speech is made on the CPU.
 - **The system voice.** While the model downloads, or if it cannot load, the panel speaks through
   the operating system's own voice (a British male voice such as Microsoft George when installed).
-- **ElevenLabs (optional).** Only with your own key and a voice ID you picked from your ElevenLabs
+- **ElevenLabs (optional).** Used when picked under Settings → Voice → **Who speaks**, or when an older install already had a voice ID, and only with your own key and a voice ID you picked from your ElevenLabs
   library, both under Settings → Advanced. Each spoken line is sent to ElevenLabs' Flash model and
   billed to your account. The key is encrypted with the OS keychain like the others. If ElevenLabs
   fails, Scout uses Kokoro.

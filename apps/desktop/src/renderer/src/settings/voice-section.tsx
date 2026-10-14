@@ -1,12 +1,22 @@
 import { useEffect, useState } from 'react';
-import { MAX_VOICE_SPEED, MIN_VOICE_SPEED, SETTINGS_DEFAULTS } from '@tagalong/protocol';
-import type { Settings, VoiceId } from '@tagalong/protocol';
+import {
+  MAX_VOICE_SPEED,
+  MIN_VOICE_SPEED,
+  SETTINGS_DEFAULTS,
+  adaptersFor,
+  chosenMouth,
+} from '@tagalong/protocol';
+import type { MouthId, Settings, VoiceId } from '@tagalong/protocol';
 import { listMicrophones } from '../mic';
+import { voiceFacts } from '../settings-form';
 import { playLine } from '../voice-player';
 import { Info, Section, Tip, useInvalid } from './section';
 
 /** What ▶ Preview says, in the voice and at the speed the form shows. */
 const PREVIEW_LINE = 'Certainly. I shall keep an eye on things and let you know what I find.';
+
+const MOUTHS = adaptersFor('mouth');
+const EARS = adaptersFor('ears');
 
 /** The local voices, as a person picks them. */
 const VOICES: readonly { id: VoiceId; label: string }[] = [
@@ -36,6 +46,7 @@ export function VoiceSection({
       .catch((error: unknown) => console.warn('[voice] could not list microphones', error));
   }, []);
   const picked = settings.voice.microphoneId ?? '';
+  const [mouth, setMouth] = useState<string>(chosenMouth(settings.voice));
   const [voice, setVoice] = useState<VoiceId>(settings.voice.voice);
   const [speed, setSpeed] = useState(settings.voice.speed);
   const [previewing, setPreviewing] = useState(false);
@@ -43,7 +54,7 @@ export function VoiceSection({
 
   const preview = (): void => {
     setPreviewing(true);
-    playLine(PREVIEW_LINE, new AbortController().signal, { voice, speed })
+    playLine(PREVIEW_LINE, new AbortController().signal, { voice, speed, mouth: mouth as MouthId })
       .catch((error: unknown) => console.warn('[voice] preview failed', error))
       .finally(() => setPreviewing(false));
   };
@@ -72,10 +83,42 @@ export function VoiceSection({
       <Tip tip="voice">
         Scout says its answers, its hello, a watch that fires and an expert that finished. Code,
         lists and long text stay in the bubble: Scout says the first sentence or two and &ldquo;The
-        rest is in the bubble.&rdquo; The voice runs on this computer. The first time it speaks it
-        downloads the voice model (about 90 MB) and uses the system voice until that is done.
-        Closing the bubble or the stop key silences it at once.
+        rest is in the bubble.&rdquo; Under Who speaks, the local voice runs on this computer and
+        downloads its model (about 90 MB) the first time it is used, speaking with the system voice
+        until that is done; ElevenLabs needs your key; the system voice needs nothing. Closing the
+        bubble or the stop key silences it at once.
       </Tip>
+      <div className="tg-grid">
+        <div>
+          <label htmlFor="f-mouth">Who speaks</label>
+          <select
+            id="f-mouth"
+            name="mouth"
+            value={mouth}
+            onChange={(event) => setMouth(event.target.value)}
+          >
+            {MOUTHS.map((adapter) => (
+              <option key={adapter.id} value={adapter.id}>
+                {adapter.label}
+              </option>
+            ))}
+          </select>
+          <p className="tg-help">
+            {voiceFacts(MOUTHS.find((adapter) => adapter.id === mouth) ?? MOUTHS[0]!)}
+          </p>
+        </div>
+        <div>
+          <label htmlFor="f-ears">Who listens</label>
+          <select id="f-ears" name="ears" defaultValue={settings.voice.ears ?? 'sherpa'}>
+            {EARS.map((adapter) => (
+              <option key={adapter.id} value={adapter.id}>
+                {adapter.label}
+              </option>
+            ))}
+          </select>
+          <p className="tg-help">{voiceFacts(EARS[0]!)}</p>
+        </div>
+      </div>
       <div className="tg-grid">
         <div>
           <label htmlFor="f-voice">Voice</label>

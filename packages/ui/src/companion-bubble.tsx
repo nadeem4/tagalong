@@ -1,8 +1,10 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { Pushable } from '@tagalong/protocol';
 import type {
   ConnectorConfirmParams,
   ContextSnapshot,
+  Mouth,
   RoutineProposedParams,
 } from '@tagalong/protocol';
 import { ANSWER_CSS, Answer } from './answer';
@@ -56,10 +58,11 @@ export interface CompanionBubbleProps {
   tail?: 'left' | 'right';
   /**
    * A line the bubble says, for the host to speak aloud: each finished answer, the hello,
-   * and an expert's finish. Called once per line, with the text as shown. A spoken answer
-   * is said as it streams, a sentence at a time, each with `whole`: say all of it.
+   * and an expert's finish. Called once per line, with the text as shown.
    */
-  onSay?: (text: string, options?: { whole: boolean }) => void;
+  onSay?: (text: string) => void;
+  /** Speaks the answer to a spoken question, sentence by sentence as it streams. */
+  mouth?: Mouth;
   /** Whether the host is speaking now: the bubble shows it, with a way to stop. */
   speaking?: boolean;
   onStopSpeaking?: () => void;
@@ -145,6 +148,7 @@ export function CompanionBubble({
   onClose,
   tail,
   onSay,
+  mouth,
   speaking = false,
   onStopSpeaking,
   resume,
@@ -168,7 +172,7 @@ export function CompanionBubble({
   const conversation = useRef<string | undefined>(resume?.conversationId);
   const mine = useRef<string | null>(null);
   // A spoken question's answer, said sentence by sentence as it streams.
-  const spoken = useRef<SpokenStream | null>(null);
+  const spoken = useRef<{ stream: SpokenStream; lines: Pushable<string> } | null>(null);
   // The last answer was to a spoken question: the bubble offers the key to reply.
   const [spokenReply, setSpokenReply] = useState(false);
   // The question was spoken: the bubble shows what it heard, so a mishearing is visible.
@@ -212,7 +216,7 @@ export function CompanionBubble({
         return;
       case 'turn.delta':
         if (event.turnId !== mine.current) return;
-        spoken.current?.push(event.text);
+        spoken.current?.stream.push(event.text);
         setReply((current) =>
           current.state === 'running' ? { ...current, text: current.text + event.text } : current,
         );
@@ -224,7 +228,8 @@ export function CompanionBubble({
         if (spoken.current === null) {
           onSay?.(event.text);
         } else {
-          spoken.current.end();
+          spoken.current.stream.end();
+          spoken.current.lines.end();
           spoken.current = null;
           setSpokenReply(true);
         }
@@ -232,6 +237,7 @@ export function CompanionBubble({
       case 'turn.error':
         if (event.turnId !== mine.current) return;
         mine.current = null;
+        spoken.current?.lines.end();
         spoken.current = null;
         setReply({ state: 'failed', text: event.message });
         return;
@@ -342,7 +348,12 @@ export function CompanionBubble({
     setSpokenReply(false);
     setAskedAloud(asSpoken);
     mine.current = null;
-    spoken.current = asSpoken ? new SpokenStream((line) => onSay?.(line, { whole: true })) : null;
+    spoken.current?.lines.end();
+    if (asSpoken && mouth !== undefined) {
+      const lines = new Pushable<string>();
+      mouth.speak(lines);
+      spoken.current = { stream: new SpokenStream((line) => lines.push(line)), lines };
+    } else spoken.current = null;
     bridge
       .ask({
         petId,
@@ -381,6 +392,7 @@ export function CompanionBubble({
   // and nothing more of it is said.
   const bargeIn = useEffectEvent(() => {
     if (reply.state !== 'running') return;
+    spoken.current?.lines.end();
     spoken.current = null;
     if (mine.current !== null) void bridge.interrupt(mine.current);
     // The bubble keeps what was said so far and ignores the rest of the stopped turn.

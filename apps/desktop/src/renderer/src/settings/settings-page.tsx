@@ -210,6 +210,8 @@ export function SettingsPage({
         stopVoiceHotkey: field('stopVoiceHotkey'),
         talkHotkey: field('talkHotkey'),
         microphoneId: field('microphoneId'),
+        mouth: field('mouth'),
+        ears: field('ears'),
         voiceEnabled: form.get('voiceEnabled') !== null,
         voice: field('voice'),
         voiceSpeed: field('voiceSpeed'),

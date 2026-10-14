@@ -8,6 +8,7 @@ import {
   Settings,
   SettingsPatch,
 } from './settings';
+import { chosenMouth } from './voice';
 
 describe('Settings providerBaseUrls', () => {
   it('starts empty, so every preset uses its built-in base URL', () => {
@@ -414,6 +415,20 @@ describe('Settings.keepAnEye', () => {
 
 describe('Settings.voice', () => {
   const voiceWith = (change: object) => ({ voice: { ...SETTINGS_DEFAULTS.voice, ...change } });
+
+  it('stores which mouth and which ears were picked, and refuses unknown ones', () => {
+    const parsed = Settings.parse(voiceWith({ mouth: 'system', ears: 'sherpa' })).voice;
+    expect(parsed.mouth).toBe('system');
+    expect(parsed.ears).toBe('sherpa');
+    expect(Settings.safeParse(voiceWith({ mouth: 'gpt-live' })).success).toBe(false);
+    expect(Settings.safeParse(voiceWith({ ears: 'whisper' })).success).toBe(false);
+  });
+
+  it('keeps an ElevenLabs voice speaking for a settings file from before the picker', () => {
+    const old = Settings.parse({ voice: { ...SETTINGS_DEFAULTS.voice, elevenLabsVoiceId: 'v1' } });
+    expect(old.voice).not.toHaveProperty('mouth');
+    expect(chosenMouth(old.voice)).toBe('elevenlabs');
+  });
 
   it('talks by default, in the calm British voice, a touch slower than normal', () => {
     expect(Settings.parse({}).voice).toEqual({

@@ -43,10 +43,13 @@ export default defineConfig({
       // package.json `main` points at dist/main.js, so electron-vite owns dist/ and the
       // TypeScript project emits its declarations to out/ instead.
       outDir: 'dist',
-      lib: { entry: 'src/main/index.ts' },
+      // The voice models run in their own process, whose entry sits beside main.js.
+      lib: {
+        entry: { main: 'src/main/index.ts', 'voice-worker': 'src/main/voice/worker/main.ts' },
+      },
       rollupOptions: {
         external: NATIVE_DEPS,
-        output: { entryFileNames: 'main.js', format: 'es' },
+        output: { entryFileNames: '[name].js', format: 'es' },
       },
     },
   },

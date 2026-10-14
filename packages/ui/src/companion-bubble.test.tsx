@@ -28,6 +28,18 @@ function renderBubble(
   );
 }
 
+function spokenMouth() {
+  const spokenLines: string[] = [];
+  const mouth = {
+    speak: (text: AsyncIterable<string>) =>
+      void (async () => {
+        for await (const line of text) spokenLines.push(line);
+      })(),
+    stop: vi.fn(),
+  };
+  return { mouth, spokenLines };
+}
+
 const done = (turnId: string, text: string) =>
   ({
     type: 'turn.completed',
@@ -554,8 +566,14 @@ describe('CompanionBubble, talking to Scout', () => {
   it('asks what it heard as a spoken question, and says the answer sentence by sentence', async () => {
     const bridge = createFakeHostBridge();
     const onSay = vi.fn();
+    const { mouth, spokenLines } = spokenMouth();
     const host = heard();
-    renderBubble(bridge, { onSay, snapshot: SNAPSHOT, talk: talk({ onHeard: host.onHeard }) });
+    renderBubble(bridge, {
+      onSay,
+      mouth,
+      snapshot: SNAPSHOT,
+      talk: talk({ onHeard: host.onHeard }),
+    });
     await act(async () => host.hear('what is this test?'));
     expect(bridge.asks).toEqual([
       { petId: 'scout', text: 'what is this test?', snapshot: SNAPSHOT, spoken: true },
@@ -572,20 +590,22 @@ describe('CompanionBubble, talking to Scout', () => {
       bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: 'It checks shutdown. It' });
     });
     // The first sentence is on its way to the voice before the answer is done.
-    expect(onSay).toHaveBeenCalledExactlyOnceWith('It checks shutdown.', { whole: true });
+    await act(async () => undefined);
+    expect(spokenLines).toEqual(['It checks shutdown.']);
 
     act(() => {
       bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: '’s green.' });
       bridge.emit(done('turn-1', 'It checks shutdown. It’s green.'));
     });
-    expect(onSay).toHaveBeenCalledTimes(2);
-    expect(onSay).toHaveBeenLastCalledWith('It’s green.', { whole: true });
+    await act(async () => undefined);
+    expect(spokenLines).toEqual(['It checks shutdown.', 'It’s green.']);
+    expect(onSay).not.toHaveBeenCalled();
     expect(screen.getByText('Hold Ctrl+Shift+Alt+Space to reply')).toBeInTheDocument();
   });
 
   it('barge-in: talking while Scout answers stops that turn and says no more of it', async () => {
     const bridge = createFakeHostBridge();
-    const onSay = vi.fn();
+    const { mouth, spokenLines } = spokenMouth();
     const host = heard();
     const listeners = new Set<() => void>();
     const onListen = (handler: () => void) => {
@@ -597,7 +617,7 @@ describe('CompanionBubble, talking to Scout', () => {
         <CompanionBubble
           petId="scout"
           petName="Scout"
-          onSay={onSay}
+          mouth={mouth}
           talk={talk({ onHeard: host.onHeard, onListen })}
         />
       </HostBridgeProvider>,
@@ -612,7 +632,8 @@ describe('CompanionBubble, talking to Scout', () => {
       });
       bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: 'It checks shutdown. It' });
     });
-    expect(onSay).toHaveBeenCalledOnce();
+    await act(async () => undefined);
+    expect(spokenLines).toEqual(['It checks shutdown.']);
 
     act(() => listeners.forEach((listen) => listen()));
     expect(bridge.interrupts).toEqual(['turn-1']);
@@ -621,7 +642,8 @@ describe('CompanionBubble, talking to Scout', () => {
       bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: ' also checks restarts.' });
       bridge.emit({ ...done('turn-1', 'It checks shutdown. It also'), stopReason: 'aborted' });
     });
-    expect(onSay).toHaveBeenCalledOnce();
+    await act(async () => undefined);
+    expect(spokenLines).toEqual(['It checks shutdown.']);
     expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
   });
 
