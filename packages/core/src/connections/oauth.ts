@@ -141,7 +141,10 @@ export class SecretOAuthProvider implements OAuthClientProvider {
 
 export interface Loopback {
   redirectUrl: string;
-  /** The code the app sent back, once its state matches. Rejects after `timeoutMs`. */
+  /**
+   * The code the app sent back, once its state matches. Rejects at once on an `error`
+   * redirect with that state, and after `timeoutMs` otherwise.
+   */
   code(expectedState: () => string, timeoutMs: number): Promise<string>;
   close(): void;
 }
@@ -158,16 +161,24 @@ const FAILED_PAGE =
  * app's sign-in page sends the browser here with a code; the server is closed after.
  */
 export async function startLoopback(): Promise<Loopback> {
-  const received: { code: string; state: string }[] = [];
+  // An `error` redirect (the person said no, the app refused) is kept too, so the wait ends
+  // at once instead of at the timeout. Only one carrying the right state counts.
+  const received: { code?: string; error?: string; state: string }[] = [];
   let notify: (() => void) | undefined;
   const server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
     const code = url.searchParams.get('code');
+    const error = url.searchParams.get('error');
+    const state = url.searchParams.get('state') ?? '';
+    if (url.pathname === '/callback' && code === null && error !== null) {
+      received.push({ error: error.slice(0, 100), state });
+      notify?.();
+    }
     if (url.pathname !== '/callback' || code === null) {
       response.writeHead(400, { 'content-type': 'text/html' }).end(FAILED_PAGE);
       return;
     }
-    received.push({ code, state: url.searchParams.get('state') ?? '' });
+    received.push({ code, state });
     notify?.();
     response.writeHead(200, { 'content-type': 'text/html' }).end(DONE_PAGE);
   });
@@ -182,7 +193,8 @@ export async function startLoopback(): Promise<Loopback> {
           const match = received.find((r) => r.state === expectedState());
           if (match === undefined) return;
           clearTimeout(timer);
-          resolve(match.code);
+          if (match.code !== undefined) resolve(match.code);
+          else reject(new Error(`the app refused the sign-in: ${match.error ?? 'unknown error'}`));
         };
         notify = check;
         check();

@@ -159,6 +159,66 @@ describe('pairing', () => {
   });
 });
 
+describe('host scoping', () => {
+  const extensionHello = {
+    host: 'extension' as const,
+    version: '0.0.0',
+    capabilities: ['selection', 'pageText', 'activeWindow'] as const,
+    token: TOKEN,
+  };
+
+  it('lets the extension call only what its side panel uses', async () => {
+    const turnId = '11111111-2222-4333-8444-555555555555';
+    const s = await start({
+      handlers: {
+        ask: () => ({ turnId }),
+        'settings.set': () => {
+          throw new Error('must not run');
+        },
+      },
+    });
+    const client = await TestClient.connect(s.port);
+    await client.call('hello', extensionHello);
+
+    const asked = await client.call('ask', { petId: 'scout', input: { text: 'hi' } });
+    expect((asked['result'] as Record<string, unknown>)['turnId']).toBe(turnId);
+
+    for (const method of [
+      'settings.set',
+      'tool.approve',
+      'connections.add',
+      'routines.save',
+      'experts.upsert',
+      'handoffs.confirm',
+    ]) {
+      const res = await client.call(method, {});
+      expect((res['error'] as Record<string, unknown>)['code']).toBe(RPC_ERROR_CODES.unauthorized);
+    }
+  });
+
+  it('keeps every method for the desktop', async () => {
+    const s = await start({ handlers: { 'settings.get': () => ({}) as never } });
+    const client = await TestClient.connect(s.port);
+    await client.call('hello', hello());
+    const res = await client.call('settings.get', {});
+    expect(res['error']).toBeUndefined();
+  });
+
+  it('closes a connection that never says hello', async () => {
+    const s = await start({ helloTimeoutMs: 50 });
+    const client = await TestClient.connect(s.port);
+    await client.closed();
+    expect(s.sessions()).toHaveLength(0);
+  });
+
+  it('closes a connection that sends a large message before hello', async () => {
+    const s = await start();
+    const client = await TestClient.connect(s.port);
+    client.send({ jsonrpc: '2.0', id: 1, method: 'hello', params: { pad: 'x'.repeat(70_000) } });
+    await client.closed();
+  });
+});
+
 describe('rpc routing', () => {
   it('routes a call to its handler and returns the result', async () => {
     const turnId = '11111111-2222-4333-8444-555555555555';

@@ -57,7 +57,9 @@ in front — the extension reads the tab in front: your selection, the URL and t
 main text with menus and footers stripped, capped at 40,000 characters. The sight bar names what is
 attached before you send. Nothing is read from tabs you are not on, the extension never runs in a
 page you did not ask about, and the capture exclusion list applies to tab titles too. It talks only to
-`127.0.0.1`.
+`127.0.0.1`, and the engine lets it do only what its side panel needs (ask, stop, and read the pet
+and role lists): it cannot change settings, approve a tool, add a connection, an expert or a
+routine, or start a hand-off.
 The extension's public privacy policy, for the Chrome Web Store, is
 [chrome-web-store/privacy-policy.md](chrome-web-store/privacy-policy.md).
 
@@ -95,7 +97,9 @@ The extension's public privacy policy, for the Chrome Web Store, is
 - **Experts run sealed.** An expert run of Claude Code gets only the tools its mode allows (read and
   search; plus edit when you allowed edits; web search and fetch for a routine's research), none of
   your MCP servers, none of the project folder's `.claude` settings (so a project cannot grant
-  itself permissions or run hooks), and no hooks from your own settings either.
+  itself permissions or run hooks), and no hooks from your own settings either. Its answer, its
+  error and its progress steps pass through `hideSecrets` before they are kept in Activity or shown,
+  so a key it read in a file is not repeated back.
 - **A monitor with an excluded window on it.** If a password manager is open and visible on your
   second screen, that whole screen is blanked in the full-view capture — not just when it is the
   window you are working in. The blanked screen is replaced with a flat panel reading BLOCKED, so
@@ -145,19 +149,22 @@ when Scout calls one of their tools in a turn you started.
   app.
 - **Changes ask first.** A tool the app marks read-only runs at once. Every other tool, including
   any the app says nothing about, shows a card in Scout's bubble saying which app, which tool and
-  what Scout filled in; it runs only on **Allow once**. Cancel, or two minutes without an answer,
-  and nothing changes.
+  what Scout filled in, every argument in full (long ones scroll); it runs only on **Allow once**.
+  Cancel, or two minutes without an answer, and nothing changes. A change too long to show in full
+  (over 4,000 characters) is not offered at all.
 - **What comes back** is treated as data, not instructions: Scout is told never to follow anything
-  written in it. It goes to Scout's brain provider like any window text, and is not stored.
+  written in it, and the app cannot end that fence early. An app's error message is fenced the
+  same way. It goes to Scout's brain provider like any window text, and is not stored.
 - **Tokens and keys.** Sign-in tokens, a pasted key and a local tool's secret values are kept in
   the OS keychain through Electron safe storage (`connection.<id>.*`), never in settings, the
   database, the repository or logs. **Disconnect** deletes them.
 - **Sign-in** opens the app's own page in your system browser, which sends you back to a one-time
-  address on `127.0.0.1`. Tagalong never sees your password.
+  address on `127.0.0.1`. Tagalong never sees your password. Only a reply carrying this sign-in's
+  own random state is accepted.
 - **Found on this PC** reads Claude Code's `~/.claude.json` read-only, and never copies a key out
   of it: a value written there in full is left behind, and you are asked for it if the app needs it.
 - **Activity** records each call as the app, the tool, read or write, and whether it worked. Not
-  what was sent or what came back.
+  what was sent or what came back, and not an app's error text either.
 
 ## Routines: what runs on its own
 

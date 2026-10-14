@@ -114,7 +114,29 @@ export interface EngineServerOptions {
   engineVersion: string;
   listPets: () => Pet[];
   handlers: MethodHandlers;
+  /** How long a connection may stay open without a hello. Defaults to 10 seconds. */
+  helloTimeoutMs?: number;
 }
+
+/**
+ * What the Chrome extension may call: what its side panel actually uses. The token is the
+ * same for every host, so this is what keeps a compromised extension from changing
+ * settings, approving tools, adding connections, routines or experts.
+ */
+export const EXTENSION_METHODS: ReadonlySet<string> = new Set([
+  'ask',
+  'interrupt',
+  'pets.list',
+  'roles.list',
+  'roles.recommendModel',
+  'notices.rolesUpgrade',
+  'notices.dismiss',
+]);
+
+const HELLO_TIMEOUT_MS = 10_000;
+
+/** A hello is a few hundred bytes; anything this big before one is not a host. */
+const MAX_BYTES_BEFORE_HELLO = 64 * 1024;
 
 /** How long the engine waits for a host to answer perception.capture. */
 const CAPTURE_TIMEOUT_MS = 5_000;
@@ -287,8 +309,20 @@ export class EngineServer {
     const connection: Connection = { socket, session: undefined };
     this.#connections.add(connection);
 
-    socket.on('message', (raw) => void this.#dispatch(connection, String(raw)));
+    const helloTimer = setTimeout(() => {
+      if (connection.session === undefined) socket.terminate();
+    }, this.#options.helloTimeoutMs ?? HELLO_TIMEOUT_MS);
+    // Never what keeps the process alive at shutdown.
+    helloTimer.unref();
+    socket.on('message', (raw: Buffer | ArrayBuffer | Buffer[]) => {
+      if (connection.session === undefined && byteLength(raw) > MAX_BYTES_BEFORE_HELLO) {
+        socket.terminate();
+        return;
+      }
+      void this.#dispatch(connection, String(raw));
+    });
     socket.on('close', () => {
+      clearTimeout(helloTimer);
       connection.session?.abandon('host disconnected');
       this.#connections.delete(connection);
     });
@@ -334,6 +368,16 @@ export class EngineServer {
 
     if (!(method in hostToCoreMethods)) {
       this.#fail(connection.socket, id, RPC_ERROR_CODES.methodNotFound, `unknown method ${method}`);
+      return;
+    }
+
+    if (connection.session.host === 'extension' && !EXTENSION_METHODS.has(method)) {
+      this.#fail(
+        connection.socket,
+        id,
+        RPC_ERROR_CODES.unauthorized,
+        `${method} is not available to the extension`,
+      );
       return;
     }
 
@@ -418,4 +462,9 @@ function describe(error: { issues: readonly { path: PropertyKey[]; message: stri
   return error.issues
     .map((issue) => `${issue.path.map(String).join('.') || '(root)'}: ${issue.message}`)
     .join('; ');
+}
+
+function byteLength(raw: Buffer | ArrayBuffer | Buffer[]): number {
+  if (Array.isArray(raw)) return raw.reduce((total, part) => total + part.length, 0);
+  return raw instanceof ArrayBuffer ? raw.byteLength : raw.length;
 }

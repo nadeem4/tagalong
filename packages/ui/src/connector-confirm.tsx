@@ -31,7 +31,10 @@ export function ConnectorConfirmCard({
           <div>
             <dt>Details</dt>
             <dd>
-              <span className="handoff-brief connector-details">{filled.join('\n')}</span>
+              {/* Every argument in full; long ones scroll. Focusable so the keyboard can too. */}
+              <span className="handoff-brief connector-details" tabIndex={0}>
+                {filled.join('\n')}
+              </span>
             </dd>
           </div>
         )}

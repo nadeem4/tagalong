@@ -111,6 +111,28 @@ describe('HandoffManager', () => {
     });
   });
 
+  it('hides keys in the answer, the error and the steps before they are kept or shown', async () => {
+    const key = 'sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789';
+    const m = manager(new FakeConnector({ steps: [`Searching for ${key}`], text: `Key: ${key}` }));
+    const { handoffId } = m.start({
+      expertId: 'claude-code',
+      petId: 'scout',
+      brief: { ask: 'x' },
+      folder: 'C:\\r',
+    });
+    await vi.waitFor(() => expect(finished()).toBeDefined());
+    const failed = manager(new FakeConnector({ error: `bad key ${key}` }));
+    events = [];
+    failed.start({ expertId: 'claude-code', petId: 'scout', brief: { ask: 'y' }, folder: 'C:\\r' });
+    await vi.waitFor(() => expect(finished()).toBeDefined());
+
+    expect(JSON.stringify(events)).not.toContain(key);
+    expect(JSON.stringify(activity.list({}).entries)).not.toContain(key);
+    expect(activity.list({}).entries.find((e) => e.id === handoffId)).toMatchObject({
+      answer: expect.stringContaining('[hidden'),
+    });
+  });
+
   it('reports a failure as an error', async () => {
     const { handoffId } = manager(new FakeConnector({ error: 'not signed in' })).start({
       expertId: 'claude-code',
