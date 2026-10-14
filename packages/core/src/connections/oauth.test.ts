@@ -32,17 +32,22 @@ describe('the sign-in loopback', () => {
 
   it('never accepts a forged state on its own', async () => {
     loopback = await startLoopback();
-    const waiting = loopback.code(() => 'right-state', 200);
+    // The expectation is attached first, so the rejection is never unhandled.
+    const refused = expect(loopback.code(() => 'right-state', 200)).rejects.toThrow(
+      'sign-in timed out',
+    );
     await visit('code=evil&state=forged');
-    await expect(waiting).rejects.toThrow('sign-in timed out');
+    await refused;
   });
 
   it('stops waiting at once when the app sends an error back', async () => {
     loopback = await startLoopback();
-    const waiting = loopback.code(() => 'right-state', 60_000);
+    const refused = expect(loopback.code(() => 'right-state', 60_000)).rejects.toThrow(
+      'access_denied',
+    );
     const status = await visit('error=access_denied&state=right-state');
     expect(status).toBe(400);
-    await expect(waiting).rejects.toThrow('access_denied');
+    await refused;
   });
 
   it('does not let an error with a forged state stop the sign-in', async () => {
