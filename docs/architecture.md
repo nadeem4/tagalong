@@ -1627,7 +1627,9 @@ flowchart LR
   ends on its own after 30 s. When listening ends some other way while the key is still held (the
   30 s limit, the microphone or the ears failing), `end()` leaves it spent: the key's repeats start
   nothing, so a failure does not reopen the mic at the repeat rate; the key coming up, or a fresh
-  press, clears it.
+  press, clears it (the bubble passes every `keyup` on, listening or not), and the mic button starts
+  listening from it. Stopping with no question pending goes back to idle, never "Turning that into
+  text…".
 - **Barge-in.** Starting to listen, and the ears' `speechStart`, call `SpeechQueue.stop()`: Scout stops mid-sentence. The
   bubble subscribes to `talk.onListen`; when listening starts while an answer still streams it
   also interrupts that turn (`bridge.interrupt`), drops its `SpokenStream` and keeps what was shown so far, so no later
