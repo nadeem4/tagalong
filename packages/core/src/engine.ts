@@ -265,6 +265,10 @@ export class Engine {
     // Home's activity record is written before the broadcast, so a host that re-reads
     // activity.list on a notification already finds the row.
     const activity = new ActivityLog(db, store);
+    // Nothing runs yet, so anything still marked running was cut short by a crash or quit.
+    activity.interrupted();
+    const routineStore = new RoutineStore(db);
+    routineStore.interrupted();
     const emit: TurnEventSink = (event) => {
       activity.observe(event);
       live.server?.broadcast(event.method, event.params);
@@ -375,7 +379,7 @@ export class Engine {
 
     // Routines run as Scout turns in the background, on the system clock and time zone.
     const routines = new Routines({
-      store: new RoutineStore(db),
+      store: routineStore,
       clock: systemWatchClock,
       timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
       pet: () => pets.get(settings.get().defaultPetId),

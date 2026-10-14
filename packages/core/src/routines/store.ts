@@ -120,4 +120,9 @@ export class RoutineStore {
   runFinished(id: string, state: 'done' | 'error'): void {
     this.db.prepare('UPDATE routines SET last_state = ? WHERE id = ?').run(state, id);
   }
+
+  /** At boot: a run still marked running was cut short by a crash or a quit. */
+  interrupted(): void {
+    this.db.prepare("UPDATE routines SET last_state = 'error' WHERE last_state = 'running'").run();
+  }
 }

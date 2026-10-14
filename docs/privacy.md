@@ -218,7 +218,8 @@ flowchart LR
 - **Kokoro, on this computer (default).** The Kokoro-82M model (Apache-2.0, quantised, about
   90 MB) is downloaded from Hugging Face the first time Scout speaks, into the `voice` folder of
   the app's data directory (`%APPDATA%\Tagalong\voice` on Windows), and read from there afterwards.
-  The download fetches the model only; no text is sent. Speech is made on the CPU.
+  If the model cannot load (an interrupted download, say), its folder is deleted and it is
+  downloaded again next time. The download fetches the model only; no text is sent. Speech is made on the CPU.
 - **The system voice.** While the model downloads, or if it cannot load, the panel speaks through
   the operating system's own voice (a British male voice such as Microsoft George when installed).
 - **ElevenLabs (optional).** Only with your own key and a voice ID you picked from your ElevenLabs

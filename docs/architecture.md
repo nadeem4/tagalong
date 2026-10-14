@@ -409,7 +409,10 @@ Two connectors exist so far:
   keeps working. Letting an expert reuse the person's MCP servers is left to the Expert catalog
   feature. Tool calls become progress steps
   ("Reading src/main.ts"), edited paths become `changedFiles`, and the `result` event is the answer.
-  A run that ends without a result reports what claude printed on stderr. Aborting kills the process.
+  A run that ends without a result reports what claude printed on stderr. Aborting kills the process
+  (on Windows the whole tree, with `taskkill /T`). `spawnChild` starts claude through `cross-spawn`,
+  which finds npm's `claude.cmd` shim on Windows and quotes every argument for it; a write to a
+  process that already exited is swallowed, since the exit code already reports the failure.
 - **`FakeConnector`** (`experts/fake.ts`) replays scripted steps and an answer or an error. Tests use
   it, and the claude tests inject a fake `spawn`, so no test starts a real claude.
 
@@ -445,8 +448,10 @@ directly: every hand-off is a `handoff.proposed` card the person confirms with `
 or a routine's one pre-approved research run. `HandoffManager.start` refuses a hand-off with no folder at all, and an unknown or switched-off expert with `-32602`, writes an `expert` row to the
 activity log, and returns `{ handoffId }` at once (the row's id). The expert's steps arrive as
 `handoff.progress { handoffId, expertId, step }` and the end as `handoff.finished { handoffId,
-expertId, state: done | error | stopped, text?, changedFiles?, error? }`. `handoffs.cancel` aborts a
-running one; shutdown cancels all of them and waits until each has written how it ended, so nothing
+expertId, state: done | error | stopped, text?, changedFiles?, error? }`. A hand-off still running
+after `HANDOFF_TIMEOUT_MS` (30 minutes) is aborted and ends as `error`, "Claude Code took longer than
+30 minutes, so it was stopped."; a connector that throws ends as `error` too, never as a crash.
+`handoffs.cancel` aborts a running one; shutdown cancels all of them and waits until each has written how it ended, so nothing
 writes to a closed database. `experts.test` runs the connector's `check()`.
 
 In fake mode (`TAGALONG_FAKE_PROVIDERS=1`) every expert is a `FakeConnector`, so a test or a demo
@@ -626,7 +631,8 @@ missed while it was new or off runs. App routines read the window list from the 
 and a window the host marked `blocked` or that `findCaptureBlock` refuses never triggers anything.
 `handoffFinished` runs the `expert` routines with the expert's name and the first 600 characters of
 its answer, except for a hand-off a routine itself started; `watchFired` runs the `watch` routines
-with the watch's message. One run per routine at a time.
+with the watch's message. One run per routine at a time. A routine's own turn is never offered
+`watch_for`, so a watch routine cannot start the watch that sets it off again.
 
 **A run.** The instruction becomes the text of a Scout turn, headed `[Routine "<name>", <when>]`,
 with the topics, what triggered it, whether it ran late, and the line that the person is not
@@ -735,6 +741,12 @@ preload can only be CommonJS while the package is ESM, the preload is built to `
 The host also degrades rather than dying. If the engine refuses to boot — the ordinary first run with no
 API key stored — the app still starts, opens the settings window, and reports why; settings reads and
 writes fall back to `SettingsStore` directly so the user can fix the thing that blocked the boot.
+
+`SettingsStore` (`core/settings/settings.ts`) never lets its own file stop a boot. A save writes
+`settings.json.tmp` and renames it over `settings.json`, after copying the old, valid file to
+`settings.json.bak`, so a crash mid-save leaves the old file whole. A file that is not valid JSON or
+fails the schema is logged and read as the `.bak`, then as the defaults; it is left on disk, and the
+next save moves it to `settings.json.corrupt` instead of overwriting a hand edit.
 
 ### The attach policy
 
@@ -1126,7 +1138,10 @@ already finds the row, and writes everything from the notifications the engine a
 
 A consult's full answer is in no notification (`turn.toolResult` carries a 120-character summary), so
 the consult tool reports it through one hook, `AskPetDeps.answered`, which the runner passes through
-from `consult.answered` and the engine wires to `ActivityLog.consultAnswered`. Text is clipped at 4,000
+from `consult.answered` and the engine wires to `ActivityLog.consultAnswered`. At boot, before
+anything runs, `ActivityLog.interrupted` closes every row still `running` (a crash or a quit cut it
+short) as `error`, "Interrupted: Tagalong closed before this finished.", and
+`RoutineStore.interrupted` does the same for a routine's `last_state`. Text is clipped at 4,000
 characters. `activity.list { before?, limit = 30 (max 100) }` answers `{ entries, next? }`, newest
 first; `next` is the id to pass as `before` for the page after. An `expert` row is written by
 `HandoffManager` through `expertStarted` and `expertFinished`, not from a notification: it keeps the
@@ -1556,7 +1571,8 @@ flowchart LR
   Kokoro (`kokoro.ts`, `kokoro-js` with `@huggingface/transformers`, `onnx-community/Kokoro-82M-v1.0-ONNX`,
   q8, CPU) is `LazyLocalVoice`: the first line starts the download into `<userData>/voice` and
   answers `fallback`; once loaded every line is a WAV. A failed load is tried again on the next
-  line. With **Scout talks** off, `speak` answers `off`, except for a Settings preview.
+  line, and a failed load first deletes that model's folder under `<userData>/voice`
+  (`voice/model-cache.ts`), so an interrupted download is fetched again. With **Scout talks** off, `speak` answers `off`, except for a Settings preview.
 - **How it plays** (`renderer/src/voice-player.ts`). Audio is decoded with `AudioContext` and played
   through an `AnalyserNode`, whose level is written to the CSS variable `--tg-voice-level` each
   frame; the bubble's speaking indicator (three bars beside ×, a **Stop speaking** button) scales
@@ -1615,7 +1631,8 @@ flowchart LR
   Whisper's `[BLANK_AUDIO]`-style markers and reports a failure instead of throwing.
   `LazyLocalStt` loads `onnx-community/whisper-base.en` (Apache-2.0, q8, about 77 MB) through
   `@huggingface/transformers` on the CPU, downloading it into `<userData>/voice` on first use; a
-  failed load is tried again next time. Nothing is stored. `TAGALONG_FAKE_STT=1` hears
+  failed load deletes the model's folder and is tried again (downloaded afresh) next time. Nothing
+  is stored. `TAGALONG_FAKE_STT=1` hears
   `FAKE_TRANSCRIPT` and adds Chromium's `use-fake-device-for-media-stream` and
   `use-fake-ui-for-media-stream` switches, so the e2e suite needs no model and no microphone.
   ElevenLabs Scribe is not wired in.

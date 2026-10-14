@@ -1,5 +1,6 @@
 import { SECRET_FILES } from '@tagalong/protocol';
-import { spawn as nodeSpawn } from 'node:child_process';
+import { spawn as nodeSpawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import crossSpawn from 'cross-spawn';
 import { existsSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -236,9 +237,22 @@ function describeTool(name: string, input: ToolInput | undefined): string | unde
   }
 }
 
+/**
+ * Starts a process without a shell. cross-spawn finds npm's `claude.cmd` shim on Windows,
+ * which a plain spawn misses, and quotes every argument for cmd.exe so the JSON settings
+ * and the deny rules arrive intact.
+ */
 export function spawnChild(command: string, args: string[], { cwd }: { cwd: string }): ChildRun {
-  const child = nodeSpawn(command, args, { cwd, windowsHide: true });
+  // Default stdio is three pipes, so none of the streams is null.
+  const child = crossSpawn(command, args, {
+    cwd,
+    windowsHide: true,
+  }) as ChildProcessWithoutNullStreams;
+  // A process that exits before reading the brief fails the write with EOF or EPIPE. The
+  // exit code already says the run failed; unhandled, the error would take the engine down.
+  child.stdin.on('error', () => undefined);
   let stderr = '';
+  let killed = false;
   child.stderr.setEncoding('utf8');
   child.stderr.on('data', (chunk: string) => (stderr += chunk));
   // A missing binary arrives as an 'error' event; the exit promise reports it as a failed run.
@@ -247,7 +261,7 @@ export function spawnChild(command: string, args: string[], { cwd }: { cwd: stri
       stderr = error.code === 'ENOENT' ? `"${command}" was not found on the PATH.` : error.message;
       resolve(-1);
     });
-    child.on('close', (code) => resolve(child.killed ? null : code));
+    child.on('close', (code) => resolve(killed ? null : code));
   });
   return {
     write: (text) => {
@@ -256,6 +270,16 @@ export function spawnChild(command: string, args: string[], { cwd }: { cwd: stri
     lines: createInterface({ input: child.stdout }),
     exit,
     stderr: () => stderr,
-    kill: () => child.kill(),
+    kill: () => {
+      killed = true;
+      // An npm shim runs claude under cmd.exe, so on Windows the whole tree must go.
+      if (process.platform === 'win32' && child.pid !== undefined) {
+        nodeSpawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
+          windowsHide: true,
+        }).on('error', () => child.kill());
+      } else {
+        child.kill();
+      }
+    },
   };
 }

@@ -78,6 +78,20 @@ describe('RoutineStore', () => {
     expect(routines.get(saved.id)?.lastState).toBe('done');
   });
 
+  it('marks a run left running by a crash as failed', () => {
+    const { routines } = store();
+    const running = routines.save(PAPERS, T0);
+    const finished = routines.save({ ...PAPERS, name: 'Evening papers' }, T0);
+    routines.runStarted(running.id, T0 + 10, 'activity-1');
+    routines.runStarted(finished.id, T0 + 10, 'activity-2');
+    routines.runFinished(finished.id, 'done');
+
+    routines.interrupted();
+
+    expect(routines.get(running.id)?.lastState).toBe('error');
+    expect(routines.get(finished.id)?.lastState).toBe('done');
+  });
+
   it('deletes', () => {
     const { routines } = store();
     const saved = routines.save(PAPERS, T0);

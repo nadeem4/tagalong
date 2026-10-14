@@ -915,6 +915,31 @@ the next start is a fresh install. Rename it back at the end to keep your histor
 3. **Expected:** the form has no folder box, and **Let it edit files by default** and **On** are
    switches. The hand-off card offers no remembered default and opens the folder picker.
 
+### S.9. A broken settings file does not stop the app
+
+1. **Setup:** quit Tagalong. In `%APPDATA%\Tagalong`, replace the contents of `settings.json` with
+   `{ not json`.
+2. **Action:** start Tagalong, change any setting and save.
+3. **Expected:** the app starts with the settings from `settings.json.bak` (or the defaults on a
+   first save), and after the save the broken text is in `settings.json.corrupt` and
+   `settings.json` is valid again.
+
+### S.10. Nothing spins forever after a crash
+
+1. **Setup:** start a hand-off to Claude Code, then end Tagalong from Task Manager while it runs.
+2. **Action:** start Tagalong and open Home → Activity.
+3. **Expected:** the hand-off reads "Interrupted: Tagalong closed before this finished." and is not
+   running. A routine that was running shows its last run as failed.
+
+### S.11. Claude Code installed with npm
+
+1. **Setup:** Claude Code installed with `npm install -g @anthropic-ai/claude-code` (so `claude` is
+   `claude.cmd`).
+2. **Action:** confirm a hand-off to Claude Code.
+3. **Expected:** it runs. With `claude` not installed at all the hand-off ends with a plain error
+   and the app keeps running. A hand-off still running after 30 minutes stops with "Claude Code
+   took longer than 30 minutes, so it was stopped."
+
 ## Greeting
 
 ### G.1. The intro after Welcome, in three beats
@@ -1254,7 +1279,8 @@ and Morning papers needs Claude Code installed and signed in.
 4. **When an expert finishes**: hand Claude Code a task; when it finishes, the routine runs with its
    answer.
 5. **When a watch fires**: start a watch ("tell me when this finishes"); when it fires, the routine
-   runs.
+   runs. Even if its instruction says "watch for it again", the routine's turn cannot start a
+   watch, so it runs once per watch and never loops.
 
 ### R5. Missed runs and quiet times
 
