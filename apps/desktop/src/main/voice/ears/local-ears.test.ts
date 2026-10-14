@@ -7,11 +7,9 @@ const LOUD = new Float32Array(EARS_FRAME).fill(0.3);
 const QUIET = new Float32Array(EARS_FRAME);
 
 /** A VAD that hears speech in loud frames; an STT that says one word per loud frame. */
-function parts(turnScore: () => Promise<number> = async () => 0.9): EarsParts & { said: string[] } {
-  const said: string[] = [];
+function parts(turnScore: () => Promise<number> = async () => 0.9): EarsParts {
   let words = 0;
   return {
-    said,
     vad: { accept: async (frame) => frame[0] !== 0 },
     stt: {
       accept: (frame) => void (frame[0] !== 0 && (words += 1)),

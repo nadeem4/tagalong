@@ -8,7 +8,7 @@ import { RemoteEars } from './remote-ears';
 const MAX_LISTEN_MS = 30_000;
 
 const FIRST_TIME =
-  'The first time, Tagalong downloads its speech models (about 45 MB). Speech is turned into text on this PC.';
+  'The first time, Tagalong downloads its speech models (about 43 MB). Speech is turned into text on this PC.';
 const NOTHING_HEARD = 'I didn’t catch that. Hold the key and try again.';
 const NO_MICROPHONE =
   'The microphone could not be opened. Check that Windows lets apps use it, or pick another in Settings.';

@@ -330,7 +330,11 @@ export function CompanionBubble({
     <p role="status" className="bubble-listening" data-state={talk.state}>
       {talk.state !== 'idle' && <span className="bubble-listening-dot" aria-hidden="true" />}
       {[talkLine, talk.note].filter((part) => part !== null).join(' ')}
-      {talk.partial ? <span className="bubble-partial">{talk.partial}</span> : null}
+      {talk.partial ? (
+        <span className="bubble-partial" aria-live="off">
+          {talk.partial}
+        </span>
+      ) : null}
     </p>
   );
   const replyHint = talk !== undefined && spokenReply && reply.state === 'done' && (
