@@ -73,6 +73,7 @@ export const IPC = {
   getSightPaused: 'tagalong:get-sight-paused',
   toggleSightPause: 'tagalong:toggle-sight-pause',
   hotkeyProblemEvent: 'tagalong:hotkey-problem-event',
+  settingsChangedEvent: 'tagalong:settings-changed-event',
   deletePet: 'tagalong:pets:delete',
   selectPet: 'tagalong:pets:select',
   activePetEvent: 'tagalong:active-pet-event',
@@ -220,6 +221,8 @@ export interface TagalongHostApi {
    * corrected the binding, which is the same lie as never showing it at all.
    */
   onHotkeyProblem(handler: (problem: string | null) => void): () => void;
+  /** Fires after every settings save, so an open window applies it without a restart. */
+  onSettingsChanged(handler: (settings: Settings) => void): () => void;
   /**
    * Flips sight off or on, returning the state it moved to.
    *

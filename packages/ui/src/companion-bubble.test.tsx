@@ -583,6 +583,48 @@ describe('CompanionBubble, talking to Scout', () => {
     expect(screen.getByText('Hold Ctrl+Shift+Alt+Space to reply')).toBeInTheDocument();
   });
 
+  it('barge-in: talking while Scout answers stops that turn and says no more of it', async () => {
+    const bridge = createFakeHostBridge();
+    const onSay = vi.fn();
+    const host = heard();
+    const listeners = new Set<() => void>();
+    const onListen = (handler: () => void) => {
+      listeners.add(handler);
+      return () => void listeners.delete(handler);
+    };
+    render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble
+          petId="scout"
+          petName="Scout"
+          onSay={onSay}
+          talk={talk({ onHeard: host.onHeard, onListen })}
+        />
+      </HostBridgeProvider>,
+    );
+    await act(async () => host.hear('what is this test?'));
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'turn-1',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      });
+      bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: 'It checks shutdown. It' });
+    });
+    expect(onSay).toHaveBeenCalledOnce();
+
+    act(() => listeners.forEach((listen) => listen()));
+    expect(bridge.interrupts).toEqual(['turn-1']);
+
+    act(() => {
+      bridge.emit({ type: 'turn.delta', turnId: 'turn-1', text: ' also checks restarts.' });
+      bridge.emit({ ...done('turn-1', 'It checks shutdown. It also'), stopReason: 'aborted' });
+    });
+    expect(onSay).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
+  });
+
   it('leaves a typed question unspoken, with no reply hint', async () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge, { talk: talk() });

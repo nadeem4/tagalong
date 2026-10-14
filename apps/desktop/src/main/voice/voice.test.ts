@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
-import { ELEVENLABS_MODEL, elevenLabsTts } from './elevenlabs';
+import { ELEVENLABS_MODEL, ELEVENLABS_TIMEOUT_MS, elevenLabsTts } from './elevenlabs';
 import { LazyLocalVoice, createVoiceService, fakeTts, silentWav } from './voice';
 import type { LocalSynth, Tts } from './voice';
 
@@ -195,6 +195,20 @@ describe('elevenLabsTts', () => {
     await expect(
       elevenLabsTts('bad', 'v', fetchFn).speak('Hi.', SETTINGS_DEFAULTS.voice),
     ).rejects.toThrow(/401/);
+  });
+
+  it('gives up on a request that hangs, so the caller can fall back', async () => {
+    const hanging = (_url: string | URL | Request, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) =>
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason)),
+      );
+    await expect(
+      elevenLabsTts('xi-key', 'v', hanging as typeof fetch, 20).speak(
+        'Hi.',
+        SETTINGS_DEFAULTS.voice,
+      ),
+    ).rejects.toThrow();
+    expect(ELEVENLABS_TIMEOUT_MS).toBe(15_000);
   });
 });
 

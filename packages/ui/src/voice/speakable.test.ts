@@ -23,6 +23,7 @@ describe('toSpeakable', () => {
       `Three things: ${REST_IN_BUBBLE}`,
     );
     expect(toSpeakable('Steps:\n1. open\n2. save')).toBe(`Steps: ${REST_IN_BUBBLE}`);
+    expect(toSpeakable('Options:\n• fast\n• slow')).toBe(`Options: ${REST_IN_BUBBLE}`);
   });
 
   it('speaks the first two sentences of a long answer, then points at the bubble', () => {
