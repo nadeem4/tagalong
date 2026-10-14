@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { CompanionBubble, GreetingLine, HostBridgeProvider, SpeechQueue } from '@tagalong/ui';
-import type { ContextSnapshot, PetRemarkParams } from '@tagalong/protocol';
+import type { ContextSnapshot, PetRemarkParams, RoutineResultParams } from '@tagalong/protocol';
 import './app.css';
 import '../../shared/ipc';
 import { playLine } from './voice-player';
@@ -32,6 +32,13 @@ function Panel() {
   const [line, setLine] = useState<string | null>(null);
   // A line Scout says on its own, from keeping an eye on things, with Not now on it.
   const [remark, setRemark] = useState<PetRemarkParams | null>(null);
+  // A routine's result: a quiet line that opens to the full answer in its conversation.
+  const [routine, setRoutine] = useState<RoutineResultParams | null>(null);
+  const [resume, setResume] = useState<{
+    conversationId: string;
+    question: string;
+    answer: string;
+  } | null>(null);
   // Which side of the pet this window sits on; the speech tail points the other way, at it.
   const [side, setSide] = useState<'left' | 'right'>('left');
   const root = useRef<HTMLDivElement>(null);
@@ -93,6 +100,19 @@ function Panel() {
     [voice],
   );
 
+  useEffect(
+    () =>
+      window.tagalongHost.onRoutine((result, how) => {
+        if (how.speak) voice.say(result.text || result.line);
+        if (!how.line) return;
+        setMode('bubble');
+        setLine(null);
+        setRemark(null);
+        setRoutine(result);
+      }),
+    [voice],
+  );
+
   // The window follows what is shown: the chat at its full height, the bubble at its own.
   useEffect(() => {
     if (mode === 'chat') {
@@ -122,6 +142,8 @@ function Panel() {
       setGreeting(false);
       setLine(null);
       setRemark(null);
+      setRoutine(null);
+      setResume(null);
     });
   }, []);
 
@@ -167,7 +189,31 @@ function Panel() {
               </button>
             </p>
           )}
-          {remark !== null ? (
+          {routine !== null ? (
+            <GreetingLine
+              petName={petName}
+              text={routine.line}
+              tail={side === 'left' ? 'right' : 'left'}
+              holdMs={12_000}
+              onDone={() => {
+                setRoutine(null);
+                voice.stop();
+                void window.tagalongHost.hidePanel();
+              }}
+              onOpen={() => {
+                setRoutine(null);
+                setResume(
+                  routine.conversationId === undefined
+                    ? null
+                    : {
+                        conversationId: routine.conversationId,
+                        question: routine.name,
+                        answer: routine.text,
+                      },
+                );
+              }}
+            />
+          ) : remark !== null ? (
             <GreetingLine
               petName={petName}
               text={remark.text}
@@ -207,6 +253,7 @@ function Panel() {
             />
           ) : (
             <CompanionBubble
+              key={resume?.conversationId ?? 'bubble'}
               petId={petId}
               petName={petName}
               greeting={greeting}
@@ -225,6 +272,7 @@ function Panel() {
               speaking={speaking}
               onStopSpeaking={() => voice.stop()}
               {...(snapshot !== null ? { snapshot } : {})}
+              {...(resume !== null ? { resume } : {})}
             />
           )}
         </div>

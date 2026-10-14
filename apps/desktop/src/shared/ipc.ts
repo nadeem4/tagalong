@@ -3,6 +3,8 @@ import type {
   ContextSnapshot,
   Pet,
   PetRemarkParams,
+  RoutineProposedParams,
+  RoutineResultParams,
   Settings,
   SettingsPatch,
   VoiceId,
@@ -35,6 +37,16 @@ export const IPC = {
   setConnectionEnabled: 'tagalong:connections:set-enabled',
   signInConnection: 'tagalong:connections:sign-in',
   removeConnection: 'tagalong:connections:remove',
+  listRoutines: 'tagalong:routines:list',
+  saveRoutine: 'tagalong:routines:save',
+  deleteRoutine: 'tagalong:routines:delete',
+  setRoutineEnabled: 'tagalong:routines:set-enabled',
+  runRoutine: 'tagalong:routines:run',
+  confirmRoutine: 'tagalong:routines:confirm',
+  dismissRoutine: 'tagalong:routines:dismiss',
+  editRoutine: 'tagalong:routines:edit',
+  routineEvent: 'tagalong:panel:routine',
+  routineDraftEvent: 'tagalong:office:routine-draft',
   turnEvent: 'tagalong:turn-event',
   getContext: 'tagalong:context:get',
   capture: 'tagalong:capture',
@@ -263,6 +275,15 @@ export interface TagalongHostApi {
   onGreetLine(handler: (text: string) => void): () => void;
   /** Main hands the bubble one line Scout says on its own, from keeping an eye on things. */
   onRemark(handler: (remark: PetRemarkParams) => void): () => void;
+  /**
+   * A routine's result, for the bubble: `line` shows the quiet line beside Scout, `speak`
+   * says it aloud. Either may be false; main has already decided.
+   */
+  onRoutine(
+    handler: (result: RoutineResultParams, how: { line: boolean; speak: boolean }) => void,
+  ): () => void;
+  /** Home opens on Routines with Scout's card in the form, from the card's Edit. */
+  onRoutineDraft(handler: (proposal: RoutineProposedParams) => void): () => void;
   /** "Not now" on a remark: Scout stays quiet for an hour. */
   remarkNotNow(): Promise<void>;
   /** The person took a remark's offer: its brief goes to the hand-off card, unsent. */

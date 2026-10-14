@@ -12,18 +12,27 @@ import {
   screen,
   shell,
 } from 'electron';
-import { ConnectionsAddParams, ContextSnapshot, HandoffFinishedParams } from '@tagalong/protocol';
+import {
+  ConnectionsAddParams,
+  ContextSnapshot,
+  HandoffFinishedParams,
+  RoutineDraft,
+  RoutineResultParams,
+} from '@tagalong/protocol';
 import type {
   Expert,
   PerceptionTarget,
   Pet,
   Role,
+  RoutineDraftInput,
+  RoutineProposedParams,
   Settings,
   SettingsPatch,
 } from '@tagalong/protocol';
 import { SettingsStore, WATCH_MODEL_DEFAULTS, getRole } from '@tagalong/core';
 import { systemClock } from './awareness/clock';
 import { handoffNotice } from './handoff-notice';
+import { routineDelivery } from './routine-delivery';
 import { nativeCodec } from './awareness/native-codec';
 import { PerceptionMemory } from './awareness/perception-memory';
 import { RollingMemory } from './awareness/rolling-memory';
@@ -415,6 +424,9 @@ function forwardToRenderers(notification: { method: string; params: unknown }): 
   if (notification.method === 'handoff.proposed') bringUpBubble(true);
   // A change Scout wants to make in a connected app: the confirm card must be seen.
   if (notification.method === 'connector.confirm') bringUpBubble(true);
+  // A routine Scout wrote: the card waits in the bubble for Save.
+  if (notification.method === 'routine.proposed') bringUpBubble(true);
+  if (notification.method === 'routine.result') deliverRoutine(notification.params);
 
   // The renderer speaks the UI package's TurnEvent shape: the wire params plus the
   // method as a discriminant.
@@ -454,6 +466,38 @@ function announceHandoff(params: unknown): void {
   const notice = handoffNotice(parsed.data);
   if (notice !== null && Notification.isSupported()) {
     new Notification({ ...notice, silent: false }).show();
+  }
+}
+
+/**
+ * A routine ran: the quiet line beside Scout, its voice, a Windows notification, as the
+ * routine chose (Activity already has it). The engine held it while a call or a full-screen
+ * app was in front. Clicking the notification opens the bubble on the full answer.
+ */
+function deliverRoutine(params: unknown): void {
+  const parsed = RoutineResultParams.safeParse(params);
+  const current = desktop;
+  if (!parsed.success || current === null) return;
+  const result = parsed.data;
+  const { panel, avatar } = current;
+  const how = routineDelivery(result, {
+    avatarVisible: avatar?.isVisible() === true,
+    panelVisible: panel?.isVisible() === true,
+  });
+  if (panel !== null && (how.line || how.speak)) {
+    panel.webContents.send(IPC.routineEvent, result, { line: how.line, speak: how.speak });
+    if (how.line && avatar !== null) showPanelQuietly(panel, avatar);
+  }
+  if (how.notice !== null && Notification.isSupported()) {
+    const notice = new Notification({ ...how.notice, silent: false });
+    notice.on('click', () => {
+      const shown = desktop;
+      if (shown?.panel == null || shown.avatar == null) return;
+      shown.avatar.show();
+      shown.panel.webContents.send(IPC.routineEvent, result, { line: true, speak: false });
+      showPanelBeside(shown.panel, shown.avatar);
+    });
+    notice.show();
   }
 }
 
@@ -805,6 +849,52 @@ function registerIpc(): void {
   ipcMain.handle(IPC.removeConnection, async (_event, id: string) => {
     const { removed } = await engine().client.call('connections.remove', { id });
     return removed;
+  });
+
+  // Home's Routines page and the routine card. Saving, here or on the card, is consent.
+  ipcMain.handle(IPC.listRoutines, async () => {
+    const { routines } = await engine().client.call('routines.list', {});
+    return routines;
+  });
+  ipcMain.handle(IPC.saveRoutine, async (_event, routine: RoutineDraftInput & { id?: string }) => {
+    const { routine: saved } = await engine().client.call('routines.save', {
+      routine: { ...RoutineDraft.parse(routine), ...(routine.id ? { id: routine.id } : {}) },
+    });
+    return saved;
+  });
+  ipcMain.handle(IPC.deleteRoutine, async (_event, id: string) => {
+    const { deleted } = await engine().client.call('routines.delete', { id });
+    return deleted;
+  });
+  ipcMain.handle(IPC.setRoutineEnabled, async (_event, id: string, enabled: boolean) => {
+    const { routine } = await engine().client.call('routines.setEnabled', { id, enabled });
+    return routine;
+  });
+  ipcMain.handle(IPC.runRoutine, async (_event, id: string) => {
+    const { started } = await engine().client.call('routines.runNow', { id });
+    return started;
+  });
+  ipcMain.handle(
+    IPC.confirmRoutine,
+    async (_event, proposalId: string, routine?: RoutineDraftInput) =>
+      engine().client.call('routines.confirm', {
+        proposalId,
+        ...(routine !== undefined ? { routine: RoutineDraft.parse(routine) } : {}),
+      }),
+  );
+  ipcMain.handle(IPC.dismissRoutine, async (_event, proposalId: string) => {
+    await engine().client.call('routines.dismiss', { proposalId });
+  });
+  // The card's Edit: Home opens on Routines with the card's routine in the form.
+  ipcMain.handle(IPC.editRoutine, (_event, proposal: RoutineProposedParams) => {
+    openOffice('routines');
+    const window = required().officeWindow;
+    if (window === null) return;
+    if (window.webContents.isLoading()) {
+      window.webContents.once('did-finish-load', () =>
+        window.webContents.send(IPC.routineDraftEvent, proposal),
+      );
+    } else window.webContents.send(IPC.routineDraftEvent, proposal);
   });
 
   ipcMain.handle(IPC.getContext, () => required().pendingSnapshot);
