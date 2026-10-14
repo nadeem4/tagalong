@@ -174,7 +174,7 @@ picks up at the same step, and Scout arrives on your screen either way.
    clear it under **Settings → You**.
 2. **How should I think?** Scout checks your real Claude sign-in. If Claude Code is installed and
    signed in, it suggests that and needs no key. Signed out, **Sign in to Claude** opens a terminal
-   and Scout moves on once you are in. Not installed, install Claude Code or use **An API key**:
+   and Scout then suggests Claude once you are in. Not installed, install Claude Code or use **An API key**:
    pick OpenRouter, Nebius Token Factory or Anthropic and paste a key. It goes into the operating
    system's keychain and is tested once with one tiny request; if the service turns it down, Scout
    says so and you stay on the step.

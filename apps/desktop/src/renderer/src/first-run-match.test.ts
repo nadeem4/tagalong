@@ -24,6 +24,12 @@ describe('matchChoice', () => {
     expect(matchChoice('don’t talk, I’ll type', step('answer'))).toBeNull();
     expect(matchChoice('banana', step('voice'))).toBeNull();
     expect(matchChoice('   ', step('keys'))).toBeNull();
+    expect(matchChoice('okay no', step('keys'))).toBeNull();
+    expect(matchChoice('okay, no thanks', step('keys'))).toBeNull();
+    const think = choicesFor('think', 'signed-in', false, providers);
+    expect(matchChoice('okay no', think)).toBeNull();
+    expect(matchChoice('okay, no thanks', think)).toBeNull();
+    expect(matchChoice('nope, sure', think)).toBeNull();
   });
 
   it('matches whole words only', () => {

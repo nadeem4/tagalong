@@ -1444,7 +1444,7 @@ list until voice answers join in.
   `claude-sign-in.ts`) runs `claude auth status --json`, which makes no model call, and reports
   `signed-in`, `signed-out`, `not-installed` or `unknown`. Signed in, Scout suggests Claude. Signed
   out, **Sign in to Claude** (`openClaudeSignIn`) opens a terminal, and Scout checks every three
-  seconds and moves on by itself once the sign-in is in. Not installed, it offers **Install Claude
+  seconds and, once the sign-in is in, switches to suggesting Claude and waits for a tap or an answer. Not installed, it offers **Install Claude
   Code**, a check again, or an API key. Under `TAGALONG_FAKE_PROVIDERS=1` the check reads as signed
   in unless `TAGALONG_FAKE_SIGN_IN` names another state, so no test runs this machine's `claude`.
 - **A pasted key** is saved to the OS keychain (`saveApiKey`) and tested once with

@@ -67,7 +67,7 @@ in the answer box and pressing Enter, or by tapping a card.
 ### W.2. The name, "Rather not" and the echo
 
 1. **Action:** type `Alex` and press Enter.
-2. **Expected:** Scout echoes "Got it, I'll call you Alex.", the step becomes **How should I think?**
+2. **Expected:** Scout echoes "Got it, I’ll call you Alex.", the step becomes **How should I think?**
    and the first chip reads **You: Alex**.
 3. **Action:** tap that chip, then **Rather not**.
 4. **Expected:** setup returns to **How should I think?** and the chip reads **No name**. Scout never

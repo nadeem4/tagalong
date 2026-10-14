@@ -28,6 +28,9 @@ export function matchChoice(text: string, choices: readonly Choice[]): string | 
   if (phrases.flat().some((phrase) => NEGATORS.some((no) => heard.includes(` ${no}${phrase}`)))) {
     return null;
   }
+  // A "no" that no choice lists is a refusal of something, not a vote for "okay".
+  const refuses = / (?:no|nope) /;
+  if (refuses.test(heard) && !phrases.flat().some((phrase) => refuses.test(phrase))) return null;
   const hits = choices.filter((_, index) =>
     phrases[index]!.some((phrase) => heard.includes(phrase)),
   );

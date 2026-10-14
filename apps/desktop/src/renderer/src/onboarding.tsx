@@ -59,7 +59,16 @@ function FirstRunWindow() {
   const answerInput = useRef<HTMLInputElement>(null);
   const keyInput = useRef<HTMLInputElement>(null);
   // Setup's lines are spoken the way the bubble's are: got ready one ahead, one at a time.
-  const [voice] = useState(() => new SpeechQueue({ prepare: (text) => prepareLine(text) }));
+  // The voice step's line is the sample of how Scout sounds: an empty preview has main speak it
+  // even while voice is off.
+  const stepNow = useRef<WelcomeStep | undefined>(undefined);
+  const [voice] = useState(
+    () =>
+      new SpeechQueue({
+        prepare: (text) =>
+          stepNow.current === 'voice' ? prepareLine(text, {}) : prepareLine(text),
+      }),
+  );
   const finishing = useRef(false);
 
   useEffect(() => {
@@ -76,15 +85,28 @@ function FirstRunWindow() {
 
   // Signed out: Scout waits, checking now and then, and suggests Claude once it is in.
   const current = run?.current;
+  stepNow.current = current;
   useEffect(() => {
     if (current !== 'think' || signIn !== 'signed-out') return;
-    const timer = setInterval(() => {
+    // Each check starts the next wait only once it has finished, so checks never overlap.
+    let timer: ReturnType<typeof setTimeout>;
+    let stopped = false;
+    const poll = (): void => {
       void window.tagalongHost
         .checkClaudeSignIn()
-        .then(setSignIn)
-        .catch(() => undefined);
-    }, SIGN_IN_POLL_MS);
-    return () => clearInterval(timer);
+        .then((state) => {
+          if (!stopped) setSignIn(state);
+        })
+        .catch(() => undefined)
+        .then(() => {
+          if (!stopped) timer = setTimeout(poll, SIGN_IN_POLL_MS);
+        });
+    };
+    timer = setTimeout(poll, SIGN_IN_POLL_MS);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
   }, [current, signIn]);
 
   // A sign-in that lands while the services are listed brings Claude's suggestion back.

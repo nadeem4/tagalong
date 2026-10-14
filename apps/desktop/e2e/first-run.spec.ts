@@ -25,8 +25,11 @@ function launch(dataDir: string, signIn: string): Promise<ElectronApplication> {
 
 async function quit(app: ElectronApplication): Promise<void> {
   const closed = app.waitForEvent('close');
-  await app.evaluate(({ app: electronApp }) => electronApp.quit());
-  await closed;
+  // The evaluate can reject as the process exits; the close event is what matters.
+  await Promise.all([
+    closed,
+    app.evaluate(({ app: electronApp }) => electronApp.quit()).catch(() => undefined),
+  ]);
 }
 
 async function windowFor(app: ElectronApplication, name: string): Promise<Page> {
