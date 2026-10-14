@@ -14,7 +14,7 @@ export interface SidePanelAppProps {
 }
 
 /**
- * The side panel: connection state, the crew, and the shared chat panel.
+ * The side panel: connection state, and the shared chat panel for Scout.
  *
  * The panel reads the page it opened beside as soon as it is connected, so "summarise this"
  * with nothing selected is answered from the page text. The sight bar names what is
@@ -22,13 +22,13 @@ export interface SidePanelAppProps {
  */
 export function SidePanelApp({ bridge, openOptions }: SidePanelAppProps) {
   const [status, setStatus] = useState<ConnectionStatus>({ state: 'connecting' });
-  const [petId, setPetId] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<ContextSnapshot | undefined>(undefined);
-  // The crew as last seen connected. Kept through a disconnect so the conversation on screen
+  // The pets as last seen connected. Kept through a disconnect so the conversation on screen
   // survives the app restarting: an ask made meanwhile fails in the chat, readably.
   const [pets, setPets] = useState<Pet[]>([]);
   const connected = status.state === 'connected';
-  const activePet = pets.find((pet) => pet.id === petId) ?? pets[0];
+  // Scout: the companion the engine lists first.
+  const activePet = pets[0];
 
   useEffect(
     () =>
@@ -70,11 +70,9 @@ export function SidePanelApp({ bridge, openOptions }: SidePanelAppProps) {
           )}
         </header>
         {activePet !== undefined && (
-          // One timeline for the whole crew: switching pets, or a handoff, keeps the thread.
           <ChatPanel
             petId={activePet.id}
             pets={pets}
-            onPetChange={setPetId}
             {...(snapshot !== undefined ? { snapshot } : {})}
             lookTargets={PAGE_TARGETS}
             lookLabel="Read this page"

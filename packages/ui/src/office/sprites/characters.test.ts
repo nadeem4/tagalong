@@ -18,17 +18,9 @@ function pet(overrides: Partial<Pet>): Pet {
 }
 
 describe('characterFor', () => {
-  it('gives each default pet its own character from the office design', () => {
+  it('gives Scout its own character: the orange fox', () => {
     expect(characterFor(pet({ id: 'scout' }))).toBe(CHARACTERS['scout']);
-    expect(characterFor(pet({ id: 'ink' }))).toBe(CHARACTERS['ink']);
-    expect(characterFor(pet({ id: 'bolt' }))).toBe(CHARACTERS['bolt']);
-  });
-
-  it('draws Scout as the orange fox, Ink as the black cat and Bolt in a headset', () => {
     expect(CHARACTERS['scout']?.sprite.palette['f']).toBe('#E8873A');
-    expect(CHARACTERS['ink']?.sprite.palette['f']).toBe('#3B3B52');
-    expect(CHARACTERS['bolt']?.sprite.palette['f']).toBe('#4C7BD9');
-    expect(CHARACTERS['bolt']?.sprite.overlay?.length).toBeGreaterThan(0);
   });
 
   it('recolours the base body from any other pet’s colour', () => {
@@ -38,7 +30,7 @@ describe('characterFor', () => {
     expect(character.sprite.palette['o']).toBe(shade('#5dbb63', -0.6));
   });
 
-  it('draws the character only: the job label comes from the pet’s role, not its id', () => {
+  it('draws the character only', () => {
     expect(Object.keys(characterFor(pet({ id: 'scout' })))).toEqual(['sprite']);
     expect(Object.keys(characterFor(pet({ id: 'sage' })))).toEqual(['sprite']);
   });

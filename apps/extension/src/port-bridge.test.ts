@@ -87,42 +87,7 @@ describe('createPortBridge', () => {
     await expect(stopped).resolves.toBeUndefined();
   });
 
-  it('lists roles and asks for a recommended model through engine calls', async () => {
-    const p = fakePort();
-    const bridge = createPortBridge(p.port);
-    const roles = bridge.listRoles();
-    expect(p.sent.at(-1)).toMatchObject({ method: 'roles.list', params: {} });
-    reply(p, { roles: [] });
-    await expect(roles).resolves.toEqual([]);
-
-    const recommended = bridge.recommendModel('writer', 'nebius');
-    expect(p.sent.at(-1)).toMatchObject({
-      method: 'roles.recommendModel',
-      params: { roleId: 'writer', providerId: 'nebius' },
-    });
-    reply(p, { model: 'nemotron' });
-    await expect(recommended).resolves.toEqual({ model: 'nemotron' });
-  });
-
-  it('relays the roles notice and its dismissal to the engine', async () => {
-    const p = fakePort();
-    const bridge = createPortBridge(p.port);
-
-    const notice = bridge.rolesNotice();
-    expect(p.sent.at(-1)).toMatchObject({ method: 'notices.rolesUpgrade', params: {} });
-    reply(p, { notice: null });
-    await expect(notice).resolves.toBeNull();
-
-    const dismissed = bridge.dismissRolesNotice();
-    expect(p.sent.at(-1)).toMatchObject({
-      method: 'notices.dismiss',
-      params: { notice: 'rolesUpgrade' },
-    });
-    reply(p, { dismissed: true });
-    await expect(dismissed).resolves.toBeUndefined();
-  });
-
-  it('turns turn and crew notifications into the events the chat panel consumes', () => {
+  it('turns turn notifications into the events the chat panel consumes, and drops the rest', () => {
     const p = fakePort();
     const bridge = createPortBridge(p.port);
     const events: TurnEvent[] = [];
@@ -135,10 +100,7 @@ describe('createPortBridge', () => {
     });
     stop();
     p.deliver({ type: 'notification', method: 'turn.delta', params: { turnId: 't', text: '!' } });
-    expect(events).toEqual([
-      { type: 'turn.delta', turnId: 't', text: 'Hi' },
-      { type: 'pet.message', fromPetId: 'scout', toPetId: 'ink', kind: 'handoff', text: 'over' },
-    ]);
+    expect(events).toEqual([{ type: 'turn.delta', turnId: 't', text: 'Hi' }]);
   });
 
   it('reports connection status and shortcut context to their subscribers', () => {

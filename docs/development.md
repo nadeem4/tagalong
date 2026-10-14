@@ -48,9 +48,9 @@ tagalong/
       settings/settings.ts          # SettingsStore, SecretStore, InMemorySecretStore
     ui/src/
       index.ts, host-bridge.ts      # HostBridge contract and its React context
-      pet-avatar.tsx, message-list.tsx, composer.tsx, sight-bar.tsx, chat-panel.tsx
+      dock-pet.tsx, companion-bubble.tsx, message-list.tsx, composer.tsx, sight-bar.tsx, chat-panel.tsx
       home/                         # Home: HomeView, themes, the activity view, agent controls
-      office/                       # the Office theme: tokens, sprites/, layout, status, components
+      office/                       # design tokens, PixelSprite and Scout's sprite
       test-support/fake-host-bridge.ts
   apps/
     desktop/
@@ -82,7 +82,7 @@ tagalong/
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/protocol` | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC, plus the method catalog. Depends only on zod.                                                                                                   |
 | `packages/core`     | The Tagalong Engine: pets, conversation runner, prompt assembly, SQLite memory, host protocol server, pairing, provider adapters. Pure Node. Speech to text, the inter-pet bus, and the MCP client arrive in later phases. |
-| `packages/ui`       | React components shared by hosts: `PetAvatar`, `MessageList`, `Composer`, `SightBar`, `ChatPanel`, Home's `HomeView` (with its themes), and the `HostBridge` context.                                                      |
+| `packages/ui`       | React components shared by hosts: `DockPet`, `CompanionBubble`, `MessageList`, `Composer`, `SightBar`, `ChatPanel`, Home's `HomeView`, and the `HostBridge` context.                                                       |
 | `apps/desktop`      | Electron host. Runs the engine in the main process, dials it over the loopback socket, and owns the avatar, panel, settings window, tray, hotkey, secret storage and Scout's voice.                                        |
 | `apps/extension`    | Chrome MV3 host. Connects to the running engine and speaks the protocol only. Side panel, pairing page, on-demand page reader, and the open-panel shortcut.                                                                |
 

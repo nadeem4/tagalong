@@ -10,10 +10,8 @@ the steps to submit it. Each claim here matches the code in `apps/extension/src`
 - **There is no icon.** The manifest has no `icons` or `action.default_icon` entry, and the build
   ships no image. The store needs a 128x128 icon, and Chrome shows a plain letter without one. Add
   icons (16, 32, 48, 128) to the manifest before the first upload.
-- **The manifest description is not the short description below.** The store takes the summary
-  from the manifest `description`. Today it reads "Your Tagalong crew in the browser: exact
-  selections, page text, and a side panel." Either keep that, or change the manifest to the short
-  description below in the same change that bumps the version.
+- **The manifest description is the short description below.** The store takes the summary from
+  the manifest `description`; keep the two the same.
 
 ## Store listing
 
@@ -34,7 +32,7 @@ Tagalong is a desktop companion. Scout sees what you are working on, answers que
 What it does:
 - Gives Scout the exact text you selected on a page, not a copy through the clipboard.
 - Reads the main text of the page you are on, with menus and footers stripped, when you ask.
-- Puts your Tagalong crew in Chrome's side panel, with the same pets, memory and settings as the desktop app.
+- Puts Scout in Chrome's side panel, with the same memory and settings as the desktop app.
 
 How it works:
 - Click the toolbar button to open the side panel beside the page.
@@ -131,7 +129,7 @@ Do not reuse desktop screenshots that show other windows' contents or real secre
 | Image            | Size     | Format      | What it shows                                                                                                               |
 | ---------------- | -------- | ----------- | --------------------------------------------------------------------------------------------------------------------------- |
 | Store icon       | 128x128  | PNG         | The Tagalong mark (Scout), 96x96 artwork with 16 px transparent padding. The same file belongs in the manifest `icons`.     |
-| Screenshot 1     | 1280x800 | PNG or JPEG | A real article in Chrome with the side panel open, connected, the crew showing and the sight bar naming the attached page.  |
+| Screenshot 1     | 1280x800 | PNG or JPEG | A real article in Chrome with the side panel open, connected, Scout answering and the sight bar naming the attached page.   |
 | Screenshot 2     | 1280x800 | PNG or JPEG | Text selected on a page, the panel opened with `Alt+Shift+Space`, the exact selection in the sight bar, and Scout's answer. |
 | Screenshot 3     | 1280x800 | PNG or JPEG | The options page: the pairing form, "Connected to Tagalong", and the "Reading tabs" section.                                |
 | Screenshot 4     | 1280x800 | PNG or JPEG | The desktop app and Chrome side by side, so it is plain the extension works with the desktop app. Optional.                 |

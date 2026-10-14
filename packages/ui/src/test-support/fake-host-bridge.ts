@@ -8,8 +8,6 @@ import type {
   PerceptionTarget,
   Pet,
   ProjectCandidate,
-  Role,
-  RolesUpgradeNotice,
   RoutineDraftInput,
   RoutineProposedParams,
   RoutineView,
@@ -27,8 +25,6 @@ export interface FakeHostBridge extends HostBridge {
   readonly captures: readonly (readonly PerceptionTarget[])[];
   /** What the next capture() resolves to; null stands in for a blocked window. */
   nextCapture: ContextSnapshot | null;
-  /** How many times the roles notice was dismissed. */
-  dismissedNotices: number;
   /** Home's activity, newest first; a test pushes or edits entries, then emits an event. */
   activity: ActivityEntry[];
   /** How many times the activity was listed. */
@@ -64,11 +60,6 @@ export function createFakeHostBridge(
   options: {
     pets?: Pet[];
     capture?: ContextSnapshot | null;
-    roles?: Role[];
-    /** What recommendModel answers; absent answers `{}`, like a provider with no tiers. */
-    recommend?: (roleId: string, providerId: string) => { model?: string; visionModel?: string };
-    /** The unseen roles notice; absent means none, as on a fresh install. */
-    rolesNotice?: RolesUpgradeNotice | null;
     /** Home's activity, newest first. */
     activity?: ActivityEntry[];
     experts?: Expert[];
@@ -90,7 +81,6 @@ export function createFakeHostBridge(
   const stoppedWatches: string[] = [];
   const captures: (readonly PerceptionTarget[])[] = [];
   let turnCount = 0;
-  let notice = options.rolesNotice ?? null;
   const testedExperts: string[] = [];
   const confirmedHandoffs: ConfirmHandoff[] = [];
   const dismissedHandoffs: string[] = [];
@@ -159,13 +149,6 @@ export function createFakeHostBridge(
     listPets() {
       return Promise.resolve(options.pets ?? []);
     },
-    listRoles() {
-      return Promise.resolve(options.roles ?? []);
-    },
-    recommendModel(roleId, providerId) {
-      return Promise.resolve(options.recommend?.(roleId, providerId) ?? {});
-    },
-    dismissedNotices: 0,
     activity: [...(options.activity ?? [])],
     activityReads: 0,
     listActivity(params = {}) {
@@ -313,14 +296,6 @@ export function createFakeHostBridge(
     },
     editRoutine(proposal) {
       editedRoutines.push(proposal);
-      return Promise.resolve();
-    },
-    rolesNotice() {
-      return Promise.resolve(notice);
-    },
-    dismissRolesNotice() {
-      notice = null;
-      fake.dismissedNotices += 1;
       return Promise.resolve();
     },
     emit(event) {

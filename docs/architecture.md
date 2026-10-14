@@ -75,7 +75,7 @@ landed in Phase 6, which ran fifth; see "The browser host" below.
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
 | packages/protocol | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC envelopes, plus the method and notification catalog                                                                                                                                                            | anything except zod                              |
 | packages/core     | Engine facade, conversation runner, prompt assembler, SQLite memory, pet registry, settings and SecretStore, pairing, websocket server, brain providers                                                                                                                                  | electron, react, DOM globals                     |
-| packages/ui       | React components — `PetAvatar`, `MessageList`, `Composer`, `SightBar`, `ChatPanel` — plus the `HostBridge` contract and its context, and a fake bridge for host tests                                                                                                                    | electron, sockets, node APIs                     |
+| packages/ui       | React components — `DockPet`, `CompanionBubble`, `HomeView`, `MessageList`, `Composer`, `SightBar`, `ChatPanel` — plus the `HostBridge` contract and its context, and a fake bridge for host tests                                                                                       | electron, sockets, node APIs                     |
 | apps/desktop      | Electron host. Runs the engine in the main process, dials it over the loopback socket, owns avatar, panel and settings windows, the tray, the two global hotkeys (ask and pause sight), perception with exclusions and capture announcements, and safeStorage secrets, one folder per OS | nothing from core internals, only its public API |
 | apps/extension    | Chrome MV3 host. Connects to the running engine from its service worker, supplies the exact selection and page text on demand, renders pets in the side panel, pairs from its options page                                                                                               | core at all; it speaks the protocol only         |
 
@@ -724,23 +724,22 @@ every window, and what makes the two hosts interchangeable.
 the settings or the voice live in `main/ipc/`, one module per area, each a `register…Ipc(handle, deps)`
 that takes `ipcMain.handle` and what it reads as arguments, so it is unit tested without Electron:
 
-| Module           | Channels                                                                           |
-| ---------------- | ---------------------------------------------------------------------------------- |
-| `turns.ts`       | ask, stop a watch, interrupt, a remark's Not now and accept                        |
-| `crew.ts`        | pets, roles, the roles notice, save and delete a pet, switch Scout, finish Welcome |
-| `experts.ts`     | Activity, the Experts tab, the hand-off card, project search                       |
-| `connections.ts` | connected apps and the answer to a change Scout asked to make                      |
-| `routines.ts`    | Home's Routines page and the routine card, including its Edit                      |
-| `settings.ts`    | the settings view, saving settings and keys, model lists                           |
-| `voice.ts`       | speak, prepare to listen, transcribe                                               |
+| Module           | Channels                                                      |
+| ---------------- | ------------------------------------------------------------- |
+| `turns.ts`       | ask, stop a watch, interrupt, a remark's Not now and accept   |
+| `crew.ts`        | pets, save a pet, switch Scout, finish Welcome                |
+| `experts.ts`     | Activity, the Experts tab, the hand-off card, project search  |
+| `connections.ts` | connected apps and the answer to a change Scout asked to make |
+| `routines.ts`    | Home's Routines page and the routine card, including its Edit |
+| `settings.ts`    | the settings view, saving settings and keys, model lists      |
+| `voice.ts`       | speak, prepare to listen, transcribe                          |
 
 The handlers that move windows, open dialogs or read the screen stay in `index.ts`.
 
 The preload exposes exactly two globals, and the split between them is deliberate:
 
 - `window.tagalong` is precisely the `HostBridge` interface that `@tagalong/ui` consumes — `ask`,
-  `capture`, `interrupt`, `listPets`, `listRoles`, `recommendModel`, `rolesNotice`,
-  `dismissRolesNotice`, `onTurnEvent`. Nothing more. `capture` is how the panel's
+  `capture`, `interrupt`, `listPets`, `onTurnEvent`, and the optional Home calls. Nothing more. `capture` is how the panel's
   Look button reaches the screen; it resolves to null when the window is excluded, so the sight bar
   can say capture is blocked here instead of quietly showing nothing.
 - `window.tagalongHost` carries everything specific to this host — the captured snapshot, the settings
@@ -1037,19 +1036,13 @@ state: running | done | stopped, round, rounds, modelCalls }` after every turn. 
 answer is written into the transcript as "(Ink could not answer: …)" and the table carries on.
 Interrupting the turn in flight — the panel's Stop button — or `stop()` cancels every remaining turn.
 
-### The crew in the hosts
+### The companion in the hosts
 
-`ChatPanel` in `packages/ui` is one timeline for the whole crew, in both hosts. It lists the crew
-(from the host, or `bridge.listPets()`), shows the active pet's name and colour with a `CrewStrip` to
-switch, threads each pet's follow-ups into the conversation `turn.started` reported for it, labels each
-answer `Name · model`, draws handoff bubbles, consult cards and round markers from `pet.message`, moves
-to the target pet on a handoff (and tells the host through `onPetChange`), offers a **Hand off…** menu
-under each answer that writes `@Name ` into the composer, and a **Crew** button that sends
-`/crew <text>`. While a roundtable runs (`crew.status` running) the composer waits and **Stop**
-interrupts the turn in flight, which ends the run. The footer shows `crew.status.modelCalls`, or a single
-turn's `modelCalls` when it was more than one. `HostBridge.onTurnEvent` now also delivers
-`pet.message` and `crew.status`; the desktop forwards every notification and the extension's port
-bridge lets these two through.
+`ChatPanel` in `packages/ui` is the Chrome side panel's chat with Scout. It names the speaker from
+the pets (from the host, or `bridge.listPets()`), continues the conversation `turn.started` reported,
+labels each answer `Name · model`, shows Watching chips and fired watches, and **Stop** interrupts the
+turn in flight. The footer shows a turn's `modelCalls` when it was more than one. The extension's port
+bridge forwards only `turn.*` notifications to it.
 
 The desktop avatar window holds the companion alone: `DockPet` (`@tagalong/ui`) draws its pixel
 character (`characterFor`) at 4x, with a face and a tag per mood (`withMood`,
@@ -1262,7 +1255,7 @@ tenth of the raw bitmap. A blocked display's placeholder is never stored.
 
 Pausing sight stops the timer and clears the ring; turning memory off clears it; quitting disposes it.
 Nothing in the folder imports `fs`, and a test asserts that. While it records, every avatar shows a
-small red dot (`PetAvatar recording`), driven by `onRecordingChange` over IPC.
+small red dot (`DockPet recording`), driven by `onRecordingChange` over IPC.
 
 `PerceptionMemory` answers the two methods. Recall reads the rolling ring. Diff takes a fresh frame —
 reusing one taken in the last second, since a watch asks twice per tick — and compares it with the
@@ -1518,9 +1511,7 @@ flowchart LR
 The panel window (`panel.html`) shows `CompanionBubble` (`@tagalong/ui`). **Open full chat** shows
 the same component `expanded`: a header with the companion's name and **Back to bubble**, the whole
 conversation (each question on the right, each answer below it, hand-off cards inline) and the chips
-above a **Message** box. It is the same component, so it is the same conversation. The old
-`ChatPanel`, with the crew strip, `@` hand-offs and `/crew`, is now only used by the Chrome
-extension's side panel.
+above a **Message** box. It is the same component, so it is the same conversation. `ChatPanel` is only used by the Chrome extension's side panel.
 
 - **What it can see, as chips.** The hotkey's snapshot becomes chips: the app and window title,
   selected text, a screenshot. Removing a chip drops that part from the ask (`without`); a new

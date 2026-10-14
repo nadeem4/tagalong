@@ -11,8 +11,6 @@ import type {
   Pet,
   PetRemarkParams,
   ProjectCandidate,
-  Role,
-  RolesUpgradeNotice,
   RoutineDraftInput,
   RoutineProposedParams,
   RoutineResultParams,
@@ -63,14 +61,6 @@ const bridge: HostBridge = {
     ipcRenderer.invoke(IPC.capture, targets) as Promise<ContextSnapshot | null>,
   interrupt: (turnId: string) => ipcRenderer.invoke(IPC.interrupt, turnId) as Promise<void>,
   listPets: () => ipcRenderer.invoke(IPC.listPets) as Promise<Pet[]>,
-  listRoles: () => ipcRenderer.invoke(IPC.listRoles) as Promise<Role[]>,
-  recommendModel: (roleId: string, providerId: string) =>
-    ipcRenderer.invoke(IPC.recommendModel, roleId, providerId) as Promise<{
-      model?: string;
-      visionModel?: string;
-    }>,
-  rolesNotice: () => ipcRenderer.invoke(IPC.rolesNotice) as Promise<RolesUpgradeNotice | null>,
-  dismissRolesNotice: () => ipcRenderer.invoke(IPC.dismissRolesNotice) as Promise<void>,
   stopWatch: (watchId: string) => ipcRenderer.invoke(IPC.stopWatch, watchId) as Promise<void>,
   // Home.
   listActivity: (params: { before?: string; limit?: number } = {}) =>
@@ -165,7 +155,6 @@ const host: TagalongHostApi = {
   saveApiKey: (providerId: string, apiKey: string) =>
     ipcRenderer.invoke(IPC.saveApiKey, providerId, apiKey) as Promise<void>,
   savePet: (pet: Pet) => ipcRenderer.invoke(IPC.savePet, pet) as Promise<Pet>,
-  deletePet: (petId: string) => ipcRenderer.invoke(IPC.deletePet, petId) as Promise<boolean>,
   selectPet: (petId: string) => ipcRenderer.invoke(IPC.selectPet, petId) as Promise<void>,
   onActivePet: (handler) => {
     const listener = (_event: IpcRendererEvent, petId: string): void => handler(petId);

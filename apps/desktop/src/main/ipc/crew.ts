@@ -1,5 +1,5 @@
 import { getRole } from '@tagalong/core';
-import type { Pet, Role, Settings, SettingsPatch } from '@tagalong/protocol';
+import type { Pet, Settings, SettingsPatch } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
 import type { FoundAgent } from '../../shared/ipc';
 import { companionOn, welcomeCrew, welcomeExperts } from '../welcome';
@@ -18,7 +18,7 @@ export interface CrewIpcDeps {
   welcomed: () => void;
 }
 
-/** The pets, their roles, and the two steps that move Scout to a brain. */
+/** The pets, and the two steps that move Scout to a brain. */
 export function registerCrewIpc(handle: IpcHandle, deps: CrewIpcDeps): void {
   const { engine, refreshStrip } = deps;
 
@@ -27,34 +27,10 @@ export function registerCrewIpc(handle: IpcHandle, deps: CrewIpcDeps): void {
     return result.pets;
   });
 
-  handle(IPC.listRoles, async (): Promise<Role[]> => {
-    const result = await engine().call('roles.list', {});
-    return result.roles;
-  });
-
-  handle(IPC.recommendModel, async (_event, roleId: string, providerId: string) =>
-    engine().call('roles.recommendModel', { roleId, providerId }),
-  );
-
-  handle(IPC.rolesNotice, async () => {
-    const result = await engine().call('notices.rolesUpgrade', {});
-    return result.notice;
-  });
-
-  handle(IPC.dismissRolesNotice, async (): Promise<void> => {
-    await engine().call('notices.dismiss', { notice: 'rolesUpgrade' });
-  });
-
   handle(IPC.savePet, async (_event, pet: Pet): Promise<Pet> => {
     const saved = (await engine().call('pets.upsert', { pet })).pet;
     refreshStrip();
     return saved;
-  });
-
-  handle(IPC.deletePet, async (_event, petId: string): Promise<boolean> => {
-    const { deleted } = await engine().call('pets.delete', { petId });
-    refreshStrip();
-    return deleted;
   });
 
   // Settings' "no sign-in found": the key is stored first, then Scout moves to that service.

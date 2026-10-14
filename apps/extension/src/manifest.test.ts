@@ -33,6 +33,12 @@ describe('manifest', () => {
     expect(command?.description.length).toBeGreaterThan(0);
   });
 
+  it('describes Scout, not a crew, within the store summary limit', () => {
+    expect(manifest.description).toContain('Scout');
+    expect(manifest.description).not.toMatch(/crew/i);
+    expect(manifest.description.length).toBeLessThanOrEqual(132);
+  });
+
   it('lets extension pages open sockets to loopback and nowhere else', () => {
     expect(manifest.content_security_policy.extension_pages).toContain('ws://127.0.0.1:*');
   });
