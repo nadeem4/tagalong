@@ -51,7 +51,7 @@ const BRIEF_CHARS = 120;
 const GREETING_INSTRUCTIONS = [
   'You are a small desktop companion. The app has just opened; write the one line you say.',
   'One sentence, under 20 words. Warm and plain. No emoji, no markdown, no quotation marks.',
-  'If a hand-off finished, mention it by the expert’s name. Otherwise greet for the time of day and how long they were away.',
+  'If a hand-off finished, mention it by the expert’s name, and any routines that ran. Otherwise greet for the time of day and how long they were away.',
   'If the person’s name is given, you may greet them by it.',
   'If Tagalong closed unexpectedly last time, say that first, calmly, in a few words. If it was updated, say what is new.',
   'Use only the facts given. Never invent facts: no tasks, files, results or plans that are not listed.',
@@ -95,13 +95,18 @@ export function fallbackGreeting(context: GreetingContext): string {
   const name = context.userName?.trim() ?? '';
   const named = name.length > 0 ? `, ${name}` : '';
   const timeOfDay =
-    part === 'late night' ? `Working late${named}?` : `${part[0]!.toUpperCase()}${part.slice(1)}${named}.`;
+    part === 'late night'
+      ? `Working late${named}?`
+      : `${part[0]!.toUpperCase()}${part.slice(1)}${named}.`;
   if (context.scenario === 'crash') return `${timeOfDay} ${crashLine(context.interrupted ?? 0)}`;
   if (context.scenario === 'update' && context.update !== undefined) {
     const { version, whatsNew } = context.update;
-    return [timeOfDay, `I’ve been updated to ${version}.`, whatsNew.trim()].filter(Boolean).join(' ');
+    return [timeOfDay, `I’ve been updated to ${version}.`, whatsNew.trim()]
+      .filter(Boolean)
+      .join(' ');
   }
-  const opening = days >= 1 ? `Back after ${days === 1 ? 'a day' : `${days} days`}${named}.` : timeOfDay;
+  const opening =
+    days >= 1 ? `Back after ${days === 1 ? 'a day' : `${days} days`}${named}.` : timeOfDay;
   const ran = routinesLine(context.routines ?? []);
   const [first, ...rest] = context.handoffs;
   const handed =
@@ -136,7 +141,9 @@ function facts(context: GreetingContext): string {
   const routines = context.routines ?? [];
   const happened = [
     ...(context.scenario === 'crash'
-      ? [`Last time, Tagalong closed unexpectedly. Tasks it cut short: ${context.interrupted ?? 0}.`]
+      ? [
+          `Last time, Tagalong closed unexpectedly. Tasks it cut short: ${context.interrupted ?? 0}.`,
+        ]
       : []),
     ...(context.scenario === 'update' && context.update !== undefined
       ? [

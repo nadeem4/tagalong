@@ -131,12 +131,14 @@ The extension's public privacy policy, for the Chrome Web Store, is
   turn still answers instead of failing.
 - API keys live in the OS keychain through Electron safe storage, the ElevenLabs key included.
 - The hello Scout says as Tagalong opens reads nothing on screen. The summaries model is sent only
-  the time of day, how long since Tagalong last opened, and the names and briefs of expert hand-offs
-  that finished meanwhile. Turn it off under Settings → Privacy → **Say hello when Tagalong opens**.
+  the time of day, how long since Tagalong last opened, the names and briefs of expert hand-offs
+  that finished meanwhile, the names of routines that ran, whether Tagalong closed unexpectedly last
+  time and how many tasks stopped, and, after an update, the new version and its what's-new text. Turn it off under Settings → Privacy → **Say hello when Tagalong opens**.
   While Scout talks is on, the hello is also spoken (below).
 - Tagalong records, in its local settings file, whether the last launch closed cleanly and which
-  app version it ran, so Scout can say it crashed or was updated. Nothing about this leaves the
-  computer except the words of the launch line, which reach the brain inside its prompt.
+  app version it ran, so Scout can say it crashed or was updated. The markers themselves
+  stay in that file on this computer; only the facts listed above reach the brain you chose, inside
+  the prompt that writes the line.
 - The name you give Scout (Welcome, or Settings → **You**; optional) is stored locally in settings.
   It is sent to the AI provider only as part of Scout's prompt: one line in its system prompt, and
   in the hello's facts when Tagalong opens. Clear the box and it is gone from both.

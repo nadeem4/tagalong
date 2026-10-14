@@ -330,10 +330,6 @@ export const TurnWarningParams = z.object({
   code: z.string().min(1),
   message: z.string(),
 });
-/**
- * The line a pet says when the app opens, after the first time. `model` when the summaries
- * model wrote it, `fallback` when a handwritten line stood in. It reads no screen.
- */
 /** What the host recorded about the last launch, for the line said as this one opens. */
 export const GreetingLaunch = z.object({
   /** The last launch never recorded a clean close. */
@@ -346,6 +342,10 @@ export const GreetingLaunch = z.object({
   whatsNew: z.string(),
 });
 export type GreetingLaunch = z.infer<typeof GreetingLaunch>;
+/**
+ * The line a pet says when the app opens, after the first time. `model` when the summaries
+ * model wrote it, `fallback` when a handwritten line stood in. It reads no screen.
+ */
 export const GreetingComposeParams = z.object({
   petId: z.string().min(1),
   launch: GreetingLaunch.optional(),

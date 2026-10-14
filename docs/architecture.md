@@ -1455,13 +1455,17 @@ flowchart LR
   signed out of Claude, so I can’t think yet.", "I can’t find Claude Code on this computer…", "I
   have no API key…") with `fix: 'Fix it'`; the panel shows that as a button on the line that
   opens Settings (the same offer button the bubble uses for a hand-off). The engine's
-  `greeting/scenario.ts#launchScenario` picks one scenario from the recorded facts: a crash, else an
-  update (`lastVersion` differs from the running version), else away (a day or more since
+  `greeting/scenario.ts#launchScenario` picks one scenario from the recorded facts: an update (`lastVersion` differs from the
+  running version; first, because an installer ends a running tray app by force, so that launch
+  also reads as a crash), else a crash, else away (a day or more since
   `awaySince`), else normal. The handwritten line for each: "I closed unexpectedly last time…"
-  (naming the tasks it cut short), "Morning. I’ve been updated to x.y.z." (the time of day first) plus `WHATS_NEW`
+  (saying how many tasks stopped), "Morning. I’ve been updated to x.y.z." (the time of day first) plus `WHATS_NEW`
   (`apps/desktop/src/main/whats-new.ts`, edited by hand in each release), "Back after a day.", with
   the routines that ran while away named. With Always listening on, `launchLine` answers
   `LISTENING_LINE` first and none of the scenario lines show.
+  The Claude sign-in check starts at the top of `start()` (the promise is kept in `signInCheck`), so
+  by greet time a cold `claude auth status` has had the boot time; `brainReadiness`'s 1 s race
+  still starts at greet time.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%

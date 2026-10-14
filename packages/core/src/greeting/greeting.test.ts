@@ -166,6 +166,7 @@ describe('composeGreeting', () => {
     expect(request.system).toMatch(/under 20 words/i);
     expect(request.system).toMatch(/no emoji/i);
     expect(request.system).toMatch(/never invent/i);
+    expect(request.system).toMatch(/routines that ran/i);
     const facts = JSON.stringify(request.messages);
     expect(facts).toContain('morning');
     expect(facts).toContain('Claude Code');
@@ -321,8 +322,14 @@ describe('composeGreeting', () => {
       pet: scout,
       summarizer: null,
       provider: u.resolve,
-      context: { ...morning, scenario: 'update', update: { version: '0.5.0', whatsNew: 'Voice setup.' } },
+      context: {
+        ...morning,
+        scenario: 'update',
+        update: { version: '0.5.0', whatsNew: 'Voice setup.' },
+      },
     });
-    expect(JSON.stringify(u.requests[0]!.messages)).toContain('updated to 0.5.0. What is new: Voice setup.');
+    expect(JSON.stringify(u.requests[0]!.messages)).toContain(
+      'updated to 0.5.0. What is new: Voice setup.',
+    );
   });
 });

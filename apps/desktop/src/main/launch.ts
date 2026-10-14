@@ -77,7 +77,10 @@ export function brainLine(brain: BrainReadiness, composed: string, userName: str
     case 'signed-out':
       return { text: `${hi}I’m signed out of Claude, so I can’t think yet.`, fix: 'Fix it' };
     case 'no-sign-in':
-      return { text: `${hi}I can’t find Claude Code on this computer, so I can’t think yet.`, fix: 'Fix it' };
+      return {
+        text: `${hi}I can’t find Claude Code on this computer, so I can’t think yet.`,
+        fix: 'Fix it',
+      };
     case 'no-key':
       return { text: `${hi}I have no API key, so I can’t think yet.`, fix: 'Fix it' };
     default:

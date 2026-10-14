@@ -30,7 +30,12 @@ export async function checkClaudeSignIn(
   }
 }
 
-const SIGN_IN_STATES: readonly ClaudeSignIn[] = ['signed-in', 'signed-out', 'not-installed', 'unknown'];
+const SIGN_IN_STATES: readonly ClaudeSignIn[] = [
+  'signed-in',
+  'signed-out',
+  'not-installed',
+  'unknown',
+];
 
 /**
  * The sign-in a test asks for: `TAGALONG_FAKE_SIGN_IN` names a state, and fake providers

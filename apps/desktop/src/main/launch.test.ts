@@ -37,8 +37,16 @@ describe('recordLaunch', () => {
   });
 
   it('never stops a launch when the settings file cannot be written', () => {
-    const broken = { get: () => Settings.parse({}), set: () => { throw new Error('EPERM'); } };
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const broken = {
+      get: () => Settings.parse({}),
+      set: () => {
+        throw new Error('EPERM');
+      },
+    };
     expect(recordLaunch(broken, '0.5.0')).toEqual({ crashed: false, lastVersion: null });
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });
 
@@ -56,18 +64,36 @@ describe('recordCleanClose', () => {
 });
 
 const pet = (providerId: string) =>
-  Pet.parse({ id: 'scout', name: 'Scout', avatar: '🐾', roleId: 'companion', model: 'haiku', providerId });
+  Pet.parse({
+    id: 'scout',
+    name: 'Scout',
+    avatar: '🐾',
+    roleId: 'companion',
+    model: 'haiku',
+    providerId,
+  });
 
 describe('brainReadiness', () => {
-  const ask = (providerId: string, signIn: () => Promise<'signed-in' | 'signed-out' | 'not-installed' | 'unknown'>, stored: string[] = []) =>
-    brainReadiness({ pet: pet(providerId), providers: providerChoices(new Set(stored)), signIn, budgetMs: 1_000 });
+  const ask = (
+    providerId: string,
+    signIn: () => Promise<'signed-in' | 'signed-out' | 'not-installed' | 'unknown'>,
+    stored: string[] = [],
+  ) =>
+    brainReadiness({
+      pet: pet(providerId),
+      providers: providerChoices(new Set(stored)),
+      signIn,
+      budgetMs: 1_000,
+    });
 
   it('reads the Claude sign-in for a Scout that thinks with it', async () => {
     expect(await ask('claude-code', async () => 'signed-in')).toBe('ready');
     expect(await ask('claude-code', async () => 'signed-out')).toBe('signed-out');
     expect(await ask('claude-code', async () => 'not-installed')).toBe('no-sign-in');
     expect(await ask('claude-code', async () => 'unknown')).toBe('unknown');
-    expect(await ask('claude-code', () => Promise.reject(new Error('spawn failed')))).toBe('unknown');
+    expect(await ask('claude-code', () => Promise.reject(new Error('spawn failed')))).toBe(
+      'unknown',
+    );
   });
 
   it('reads whether a keyed Scout has its key, without running claude', async () => {

@@ -3,7 +3,12 @@ import type { SecretStore } from '@tagalong/core';
 import type { Settings, SettingsPatch } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
 import type { HostView, ModelList } from '../../shared/ipc';
-import { ELEVENLABS_SECRET_KEY, providerChoices, secretKeyFor, storedKeys } from '../provider-choices';
+import {
+  ELEVENLABS_SECRET_KEY,
+  providerChoices,
+  secretKeyFor,
+  storedKeys,
+} from '../provider-choices';
 import type { EngineCall, IpcHandle } from './handle';
 
 export interface SettingsIpcDeps {

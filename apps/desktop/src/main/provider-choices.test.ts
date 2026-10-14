@@ -1,6 +1,11 @@
 import { InMemorySecretStore } from '@tagalong/core';
 import { describe, expect, it } from 'vitest';
-import { ELEVENLABS_SECRET_KEY, providerChoices, secretKeyFor, storedKeys } from './provider-choices';
+import {
+  ELEVENLABS_SECRET_KEY,
+  providerChoices,
+  secretKeyFor,
+  storedKeys,
+} from './provider-choices';
 
 describe('providerChoices', () => {
   it('offers the Claude Code sign-in first, then the presets, Anthropic and the fake', () => {

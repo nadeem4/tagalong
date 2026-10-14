@@ -97,7 +97,9 @@ describe('fakeSignIn', () => {
 
   it('runs the real check only when no fake is set', async () => {
     const check = vi.fn(async () => 'signed-in' as const);
-    expect(await signInFor({ TAGALONG_FAKE_SIGN_IN: 'not-installed' }, check)).toBe('not-installed');
+    expect(await signInFor({ TAGALONG_FAKE_SIGN_IN: 'not-installed' }, check)).toBe(
+      'not-installed',
+    );
     expect(check).not.toHaveBeenCalled();
     expect(await signInFor({}, check)).toBe('signed-in');
   });

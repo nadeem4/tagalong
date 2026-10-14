@@ -41,7 +41,9 @@ export function providerChoices(stored: ReadonlySet<string>): ProviderChoice[] {
 }
 
 /** The providers with a key stored. Only the fact crosses on; the key never does. */
-export async function storedKeys(secrets: { get(key: string): Promise<string | null> }): Promise<Set<string>> {
+export async function storedKeys(secrets: {
+  get(key: string): Promise<string | null>;
+}): Promise<Set<string>> {
   const stored = new Set<string>();
   for (const choice of providerChoices(new Set())) {
     const secretKey = secretKeyFor(choice.id);

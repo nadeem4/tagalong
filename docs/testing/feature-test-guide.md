@@ -312,7 +312,7 @@ change".
 ### G.5. After a crash
 
 1. **Action:** end Tagalong in Task Manager, then start it.
-2. **Expected:** "I closed unexpectedly last time…", naming any task that stopped.
+2. **Expected:** "I closed unexpectedly last time…", saying how many tasks stopped ("one task stopped. It's in Activity."). After an update over a running app (G.6), the update line wins over this one.
 
 ### G.6. After an update
 

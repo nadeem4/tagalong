@@ -1,7 +1,8 @@
 /**
  * What happened since Tagalong last ran, worked out from recorded facts alone, so the
- * launch line never guesses. One scenario per launch: a crash matters most, then an
- * update, then time away.
+ * launch line never guesses. One scenario per launch: an update matters most (an installer
+ * ends a running tray app by force, so a crash over a new version is the update), then a
+ * crash, then time away.
  */
 export type LaunchScenario = 'normal' | 'away' | 'crash' | 'update';
 
@@ -19,8 +20,8 @@ export interface LaunchFacts {
 }
 
 export function launchScenario(facts: LaunchFacts): LaunchScenario {
-  if (facts.crashed) return 'crash';
   if (facts.lastVersion !== null && facts.lastVersion !== facts.version) return 'update';
+  if (facts.crashed) return 'crash';
   if (facts.awaySince !== null && facts.now.getTime() - facts.awaySince.getTime() >= DAY_MS) {
     return 'away';
   }

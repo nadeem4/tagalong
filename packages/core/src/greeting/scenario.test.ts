@@ -4,7 +4,13 @@ import type { LaunchFacts } from './scenario';
 
 const now = new Date(2026, 9, 14, 9);
 const hoursAgo = (hours: number) => new Date(now.getTime() - hours * 3_600_000);
-const plain: LaunchFacts = { crashed: false, lastVersion: '0.4.0', version: '0.4.0', now, awaySince: hoursAgo(2) };
+const plain: LaunchFacts = {
+  crashed: false,
+  lastVersion: '0.4.0',
+  version: '0.4.0',
+  now,
+  awaySince: hoursAgo(2),
+};
 
 describe('launchScenario', () => {
   it('is a normal launch when nothing happened', () => {
@@ -25,9 +31,11 @@ describe('launchScenario', () => {
     expect(launchScenario({ ...plain, lastVersion: null, version: '0.5.0' })).toBe('normal');
   });
 
-  it('puts a crash first, then an update, then days away', () => {
+  it('puts an update over a crash (an installer ends the app by force), a crash over days away', () => {
     const everything = { ...plain, crashed: true, version: '0.5.0', awaySince: hoursAgo(72) };
-    expect(launchScenario(everything)).toBe('crash');
+    expect(launchScenario(everything)).toBe('update');
     expect(launchScenario({ ...everything, crashed: false })).toBe('update');
+    expect(launchScenario({ ...everything, version: '0.4.0' })).toBe('crash');
+    expect(launchScenario({ ...everything, lastVersion: null })).toBe('crash');
   });
 });

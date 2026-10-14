@@ -135,6 +135,8 @@ interface Desktop {
 }
 
 let desktop: Desktop | null = null;
+/** The Claude sign-in check, started at boot so a cold `claude` has had time before the greeting. */
+let signInCheck: ReturnType<typeof signInFor> | null = null;
 
 /**
  * A second launch focuses the pet that is already running.
@@ -181,6 +183,8 @@ app.on('before-quit', () => {
 });
 
 async function start(): Promise<void> {
+  signInCheck = signInFor(process.env);
+  signInCheck.catch(() => undefined); // a failure here reads as unknown at greet time, never unhandled
   const sightPause = new SightPause();
   // Gated at the source, so every present and future reader is covered by construction.
   // Nothing downstream is handed the ungated adapter, which is what makes forgetting to
@@ -475,7 +479,7 @@ async function greetOnLaunch(host: EngineHost): Promise<void> {
         return brainReadiness({
           pet: pets.find((pet) => pet.id === settings.defaultPetId),
           providers: providerChoices(await storedKeys(current.secrets)),
-          signIn: () => signInFor(process.env),
+          signIn: () => signInCheck ?? signInFor(process.env),
           budgetMs: SIGN_IN_BUDGET_MS,
         });
       })().catch(() => 'unknown' as const);
