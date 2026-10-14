@@ -59,8 +59,16 @@ its result.
   Only the first sentence or two; code, lists and long text stay in the bubble.
 - Talk to Scout: hold a key (or click the mic) and ask out loud. It should feel like talking to a
   person, not an agent: Scout answers in short spoken sentences, starts speaking on the first one,
-  asks one question back at most and leaves detail in the bubble. Talking cuts Scout off. The
-  microphone never opens without a key press or a click; the bubble offers the key to reply.
+  asks one question back at most and leaves detail in the bubble. Talking cuts Scout off. Scout
+  listens continuously only after you switch Always listening on, once, in the bubble. It stays
+  on until you switch it off, and Scout never switches it on itself. A clear mark on Scout shows
+  the whole time. Listening pauses during calls and full screen. Scout acts only on what starts
+  with its name ("Scout, what is this?"); everything else is dropped on the computer and goes
+  nowhere. "Scout, stop" switches it off. Audio is understood on the computer and never sent or
+  stored. Otherwise the microphone opens only on the talk key or the mic in the text box, and
+  those need no name. The bubble offers the key to reply.
+- The bubble's header has Always listening (off by default) and Seeing (sight on or paused);
+  Settings has both, plus who speaks and who listens.
 - Home, the control centre: Overview, Scout (how it thinks), Experts, Routines, Connections,
   Activity (every hand-off and its thread), Settings.
 - Routines: when + what + where the result goes. A schedule (daily, weekdays, chosen days at a

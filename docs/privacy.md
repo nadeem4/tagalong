@@ -231,19 +231,25 @@ flowchart LR
 
 ## Talking to Scout: your microphone
 
-The microphone is used only while you hold the talk key (`Ctrl+Shift+Alt+Space` by default,
-Settings → Voice) or after you click the mic in the bubble, until you let go or click again (at
-most 30 seconds). It never opens on its own: there is no wake word and no always-on listening, and
-after an answer the bubble only offers the key to reply.
+Scout listens continuously only after you switch **Always listening** on, once, in the bubble
+(or in Settings → Privacy). It is remembered until you switch it off. A clear mark on Scout shows
+the whole time it is on, and Scout never switches it on itself. Audio is understood on the
+computer and is never sent or stored.
+
+Otherwise the microphone is used only while you hold the talk key (`Ctrl+Shift+Alt+Space` by
+default, Settings → Voice) or after you click the mic in the text box, until you let go or click
+again (at most 30 seconds). Hold-to-talk and the mic button need no name, whether or not Always
+listening is on. After an answer the bubble only offers the key to reply.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%
 flowchart LR
-  K["Talk key held, or mic clicked"] --> R["Microphone frames, in memory"]
-  R --> V["The voice process on this computer: Silero, Moonshine, Smart Turn"]
-  V --> T["Text of the question"]
-  T --> P["Scout's provider, like a typed question"]
-  V -.->|"dropped as heard"| X["Nothing kept"]
+  K["Talk key held, mic clicked, or Always listening on"] --> M["Mic (echo cancellation)"]
+  M --> V["Voice process on this computer: VAD, Moonshine, Smart Turn"]
+  V --> T["Text"]
+  T -->|"addressed to Scout, or asked by key or mic button"| P["Scout's provider, like a typed question"]
+  T -.->|"not addressed (Always listening)"| D["Dropped"]
+  V -.->|"audio dropped as heard"| X["Nothing kept"]
 ```
 
 - **On this computer.** While you talk, the microphone's audio streams in memory, a frame at a
@@ -260,6 +266,31 @@ flowchart LR
 - The microphone is the one picked in Settings → Voice, or the system default. Windows' own
   microphone privacy setting applies.
 - There is no cloud speech to text: ElevenLabs is used for Scout's voice only, never for yours.
+
+### Always listening
+
+Off by default. You switch it on in the bubble's header or in Settings → Privacy, once. It stays
+on, across restarts, until you switch it off. When it is on at launch, Scout's first line says it
+is listening and how to stop, and the mark shows from the first second.
+
+- **The mark.** A small green dot on Scout shows the whole time. It is solid while Scout listens
+  and an outline while listening is paused. It is never hidden.
+- **Only Scout's name counts.** Scout acts only on what starts with "Scout" (optionally "hey
+  Scout" or "ok Scout"). Everything else is dropped on the computer and goes nowhere. "Scout's
+  plan" or "Scout-like" is talk about Scout, not to it, so it is dropped too. Only the
+  addressed question, with the name taken off, goes to Scout's provider as text, as typing does.
+  So you can have a conversation that is not for Scout without it leaving the computer, but
+  anything you say that starts with "Scout" is sent.
+- **"Scout, stop".** Saying "Scout, stop" (or "Scout, stop listening") switches Always listening
+  off. So does the switch in the bubble or Settings.
+- **Paused for calls and full screen.** Every 2 seconds, from window titles only, Scout checks
+  whether the front window is a call (Teams, Zoom, Google Meet) or fills the screen. If so, the
+  microphone closes and the mark turns to an outline until the call or full screen ends.
+- **Deaf while the system voice speaks.** The system voice is not echo-cancelled, so Scout
+  ignores what it hears while that voice is speaking. Kokoro and ElevenLabs are echo-cancelled,
+  so you can interrupt them by saying "Scout".
+- **Hold-to-talk and the mic button need no name**, in every case.
+- **Models and size.** The same three models as above, about 43 MB in all, run on the CPU.
 
 ## Keeping an eye on things
 
