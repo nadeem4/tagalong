@@ -15,7 +15,6 @@ const scout = (providerId: string, model: string): Pet =>
     name: 'Scout',
     avatar: '🦊',
     roleId: 'companion',
-    roleVersion: 1,
     providerId,
     model,
   });

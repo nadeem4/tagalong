@@ -22,8 +22,7 @@ const pet: Pet = {
   notes: 'You are Scout.',
   model: 'fake-model',
   providerId: 'fake',
-  roleId: 'generalist',
-  roleVersion: 1,
+  roleId: 'companion',
   toolGrants: {},
   replyStyle: 'text',
 };
@@ -123,6 +122,8 @@ function runner(provider: BrainProvider, host: PerceptionHost): ConversationRunn
       exclusions: () => ({ processNames: [], titlePatterns: [] }),
       now: () => NOW,
     },
+    // The awareness tools themselves are under test, not which role lists them.
+    toolsFor: (_pet, tools) => tools,
   });
 }
 
@@ -206,6 +207,7 @@ describe('watch_for in a turn', () => {
       provider: observed.provider,
       emit: (event) => events.push(event),
       watch: { manager, hosts: () => [host] },
+      toolsFor: (_pet, tools) => tools,
     });
 
     await run.run({ pet, text: 'tell me when this finishes' }).done;

@@ -27,8 +27,6 @@ export const MAX_USER_NAME_CHARS = 40;
 export const SETTINGS_DEFAULTS = {
   enginePort: 47321,
   defaultPetId: 'scout',
-  providerId: 'anthropic',
-  defaultModel: 'claude-opus-5',
   /** Every OpenAI-compatible preset on its own base URL until the user says otherwise. */
   providerBaseUrls: {} as Record<string, string>,
   pageTextBudget: 40_000,
@@ -208,13 +206,6 @@ const settingsFields = {
   /** Pet used when a host asks without naming one. */
   defaultPetId: z.string().min(1),
   /**
-   * Not read by the engine since each pet names its own provider and model (`Pet`).
-   * Kept so settings files written before that still parse.
-   */
-  providerId: z.string().min(1),
-  /** Not read by the engine; see `providerId`. */
-  defaultModel: z.string().min(1),
-  /**
    * Base URL overrides for the OpenAI-compatible presets, keyed by provider id
    * (`nebius`, `openrouter`). An absent entry means the preset's own URL. This is what
    * makes "any OpenAI-format service" a settings change: a URL here, a key in the
@@ -321,8 +312,6 @@ const settingsFields = {
 export const Settings = z.object({
   enginePort: settingsFields.enginePort.default(SETTINGS_DEFAULTS.enginePort),
   defaultPetId: settingsFields.defaultPetId.default(SETTINGS_DEFAULTS.defaultPetId),
-  providerId: settingsFields.providerId.default(SETTINGS_DEFAULTS.providerId),
-  defaultModel: settingsFields.defaultModel.default(SETTINGS_DEFAULTS.defaultModel),
   providerBaseUrls: settingsFields.providerBaseUrls.prefault({
     ...SETTINGS_DEFAULTS.providerBaseUrls,
   }),

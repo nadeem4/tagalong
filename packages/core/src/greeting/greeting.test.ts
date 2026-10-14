@@ -14,7 +14,6 @@ const scout: Pet = {
   visionModel: 'sonnet-vision',
   providerId: 'claude-code',
   roleId: 'companion',
-  roleVersion: 1,
   toolGrants: {},
   replyStyle: 'text',
 };

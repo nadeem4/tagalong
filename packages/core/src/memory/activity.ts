@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
-import { ActivityEntry } from '@tagalong/protocol';
-import type { ActivityKind, ActivityListResult, ActivityState } from '@tagalong/protocol';
+import { ActivityEntry, ActivityKind } from '@tagalong/protocol';
+import type { ActivityListResult, ActivityState } from '@tagalong/protocol';
 import type { ConnectorResult } from '../experts/connector';
 import type { TurnEvent } from '../conversation/runner';
 import type { ConversationStore } from './store';
@@ -11,6 +11,12 @@ export const ACTIVITY_TEXT_CHARS = 4_000;
 
 /** The error on a row a crash or a quit left running. */
 const INTERRUPTED = 'Interrupted: Tagalong closed before this finished.';
+
+/**
+ * The kinds the list shows. A crew-era install also holds consults, handoffs and
+ * roundtables; they stay on disk and out of the list.
+ */
+const LISTED = ActivityKind.options.map((kind) => `'${kind}'`).join(', ');
 
 interface ActivityRow {
   id: string;
@@ -41,10 +47,8 @@ interface ActivityRow {
 interface NewEntry {
   kind: ActivityKind;
   petId: string;
-  toPetId?: string | undefined;
   turnId?: string | undefined;
   conversationId?: string | undefined;
-  runId?: string | undefined;
   providerId?: string | undefined;
   model?: string | undefined;
   text?: string | undefined;
@@ -56,10 +60,10 @@ function clip(text: string | undefined): string | null {
 }
 
 /**
- * The durable record behind Home's activity view: every turn, consult, handoff and
- * roundtable, written from the notifications the engine already sends (`observe` sits in
- * front of the broadcast) plus one hook for a consult's answer, which no notification
- * carries in full. Rows live in the `activity` table (migration 7) and survive a restart.
+ * The durable record behind Home's activity view: every turn, written from the
+ * notifications the engine already sends (`observe` sits in front of the broadcast), and
+ * every hand-off to an expert, app call and routine run, written by their own hooks. Rows
+ * live in the `activity` table (migration 7) and survive a restart.
  */
 export class ActivityLog {
   constructor(
@@ -70,7 +74,7 @@ export class ActivityLog {
   observe(event: TurnEvent): void {
     switch (event.method) {
       case 'turn.started': {
-        const { turnId, petId, conversationId, providerId, model, runId } = event.params;
+        const { turnId, petId, conversationId, providerId, model } = event.params;
         // The runner stores the question before it announces the turn.
         const last = this.store.lastMessages(conversationId, 1)[0];
         const question =
@@ -82,7 +86,6 @@ export class ActivityLog {
           petId,
           turnId,
           conversationId,
-          runId,
           providerId,
           model,
           text: question,
@@ -98,7 +101,6 @@ export class ActivityLog {
              WHERE turn_id = ? AND kind = 'turn' AND state = 'running'`,
           )
           .run(state, clip(text.length > 0 ? text : undefined), modelCalls ?? null, now(), turnId);
-        this.#finishHandoff(turnId, state);
         return;
       }
       case 'turn.error': {
@@ -109,53 +111,11 @@ export class ActivityLog {
              WHERE turn_id = ? AND kind = 'turn' AND state = 'running'`,
           )
           .run(clip(message), now(), turnId);
-        this.#finishHandoff(turnId, 'error');
-        return;
-      }
-      case 'pet.message': {
-        const { kind, fromPetId, toPetId, text, turnId, conversationId, runId } = event.params;
-        if (kind === 'roundtable') {
-          // One row per run: the first round marker opens it, later ones only name rounds.
-          if (runId === undefined || this.#hasRun(runId)) return;
-          this.#insert({ kind: 'roundtable', petId: fromPetId, runId });
-          return;
-        }
-        this.#insert({ kind, petId: fromPetId, toPetId, turnId, conversationId, text });
-        return;
-      }
-      case 'crew.status': {
-        const { runId, state, modelCalls } = event.params;
-        this.db
-          .prepare(
-            `UPDATE activity SET state = ?, model_calls = ?, finished_at = ?
-             WHERE run_id = ? AND kind = 'roundtable'`,
-          )
-          .run(state, modelCalls, state === 'running' ? null : now(), runId);
         return;
       }
       default:
         return;
     }
-  }
-
-  /** The consulted pet's reply, or why there was none, on the oldest open consult. */
-  consultAnswered(turnId: string, toPetId: string, outcome: { ok: boolean; text: string }): void {
-    const row = this.db
-      .prepare<[string, string], { id: string }>(
-        `SELECT id FROM activity WHERE kind = 'consult' AND state = 'running'
-         AND turn_id = ? AND to_pet_id = ? ORDER BY rowid ASC LIMIT 1`,
-      )
-      .get(turnId, toPetId);
-    if (row === undefined) return;
-    this.db
-      .prepare(`UPDATE activity SET state = ?, answer = ?, error = ?, finished_at = ? WHERE id = ?`)
-      .run(
-        outcome.ok ? 'done' : 'error',
-        outcome.ok ? clip(outcome.text) : null,
-        outcome.ok ? null : clip(outcome.text),
-        now(),
-        row.id,
-      );
   }
 
   /** A companion handed a brief to an expert. Returns the entry's id, for `expertFinished`. */
@@ -302,7 +262,8 @@ export class ActivityLog {
             .get(params.before)?.rowid;
     const rows = this.db
       .prepare<[number, number], ActivityRow>(
-        'SELECT * FROM activity WHERE rowid < ? ORDER BY rowid DESC LIMIT ?',
+        `SELECT * FROM activity WHERE rowid < ? AND kind IN (${LISTED})
+         ORDER BY rowid DESC LIMIT ?`,
       )
       .all(cursor ?? Number.MAX_SAFE_INTEGER, limit + 1);
     const entries = rows.slice(0, limit).map(toEntry);
@@ -313,43 +274,21 @@ export class ActivityLog {
   #insert(entry: NewEntry): void {
     this.db
       .prepare(
-        `INSERT INTO activity (id, kind, state, pet_id, to_pet_id, turn_id, conversation_id,
-           run_id, provider_id, model, text, started_at)
-         VALUES (?, ?, 'running', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO activity (id, kind, state, pet_id, turn_id, conversation_id, provider_id,
+           model, text, started_at)
+         VALUES (?, ?, 'running', ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         randomUUID(),
         entry.kind,
         entry.petId,
-        entry.toPetId ?? null,
         entry.turnId ?? null,
         entry.conversationId ?? null,
-        entry.runId ?? null,
         entry.providerId ?? null,
         entry.model ?? null,
         clip(entry.text),
         now(),
       );
-  }
-
-  #hasRun(runId: string): boolean {
-    return (
-      this.db
-        .prepare<[string], { id: string }>(
-          "SELECT id FROM activity WHERE run_id = ? AND kind = 'roundtable'",
-        )
-        .get(runId) !== undefined
-    );
-  }
-
-  /** A handoff is done when the turn it started is. */
-  #finishHandoff(turnId: string, state: ActivityState): void {
-    this.db
-      .prepare(
-        `UPDATE activity SET state = ?, finished_at = ?
-         WHERE turn_id = ? AND kind = 'handoff' AND state = 'running'`,
-      )
-      .run(state, now(), turnId);
   }
 }
 
@@ -365,10 +304,8 @@ function toEntry(row: ActivityRow): ActivityEntry {
     kind: row.kind,
     state: row.state,
     petId: row.pet_id,
-    ...optional('toPetId', row.to_pet_id),
     ...optional('turnId', row.turn_id),
     ...optional('conversationId', row.conversation_id),
-    ...optional('runId', row.run_id),
     ...optional('providerId', row.provider_id),
     ...optional('model', row.model),
     ...optional('text', row.text),

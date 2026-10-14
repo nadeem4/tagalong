@@ -95,8 +95,8 @@ describe('createPortBridge', () => {
     p.deliver({ type: 'notification', method: 'turn.delta', params: { turnId: 't', text: 'Hi' } });
     p.deliver({
       type: 'notification',
-      method: 'pet.message',
-      params: { fromPetId: 'scout', toPetId: 'ink', kind: 'handoff', text: 'over' },
+      method: 'routines.changed',
+      params: { routines: [] },
     });
     stop();
     p.deliver({ type: 'notification', method: 'turn.delta', params: { turnId: 't', text: '!' } });

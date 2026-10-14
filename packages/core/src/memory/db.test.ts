@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import Database from 'better-sqlite3';
-import { rolesUpgradeNotice } from '../pets/roles-notice';
 import { DB_FILENAME, LATEST_SCHEMA_VERSION, migrate, openDatabase } from './db';
 
 let dataDir: string;
@@ -50,7 +49,6 @@ describe('openDatabase', () => {
         'memories_fts_docsize',
         'memories_fts_idx',
         'messages',
-        'notices',
         'pet_seeds',
         'pets',
         'projects',
@@ -124,8 +122,6 @@ describe('migrate', () => {
         roleId: 'generalist',
         notes: 'You are Pip.',
       });
-      // Migration 6 runs right after and records what 5 did, for the one-time notice.
-      expect(rolesUpgradeNotice(db)?.pets.map((pet) => pet.petId)).toEqual(['pip']);
     } finally {
       db.close();
     }
@@ -185,11 +181,18 @@ describe('migrate', () => {
     }
   });
 
-  it('records no roles notice on a fresh database', () => {
+  it('drops the crew-era roles notice in migration 14', () => {
     const db = new Database(':memory:');
     try {
       migrate(db);
-      expect(rolesUpgradeNotice(db)).toBeNull();
+      db.prepare('DELETE FROM schema_version WHERE version >= 14').run();
+      db.exec(`CREATE TABLE notices (id TEXT PRIMARY KEY, json TEXT NOT NULL,
+        created_at TEXT NOT NULL, dismissed_at TEXT)`);
+      db.prepare("INSERT INTO notices VALUES ('roles-upgrade', '{}', 'x', NULL)").run();
+
+      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+
+      expect(tableNames(db)).not.toContain('notices');
     } finally {
       db.close();
     }

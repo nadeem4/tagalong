@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 import { PROTOCOL_VERSION, RPC_ERROR_CODES } from '@tagalong/protocol';
 import type { Pet } from '@tagalong/protocol';
-import { EngineServer, RpcFailure } from './ws-server';
+import { EXTENSION_METHODS, EngineServer, RpcFailure } from './ws-server';
 import type { EngineServerOptions, HostSession } from './ws-server';
 
 const TOKEN = 'a'.repeat(64);
@@ -13,8 +13,7 @@ const SCOUT: Pet = {
   avatar: '🔎',
   model: 'claude-sonnet-5',
   providerId: 'anthropic',
-  roleId: 'generalist',
-  roleVersion: 1,
+  roleId: 'companion',
   toolGrants: {},
   replyStyle: 'text',
 };
@@ -194,6 +193,10 @@ describe('host scoping', () => {
       const res = await client.call(method, {});
       expect((res['error'] as Record<string, unknown>)['code']).toBe(RPC_ERROR_CODES.unauthorized);
     }
+  });
+
+  it('allows the extension ask, interrupt and pets.list, and nothing else', () => {
+    expect([...EXTENSION_METHODS].sort()).toEqual(['ask', 'interrupt', 'pets.list']);
   });
 
   it('keeps every method for the desktop', async () => {

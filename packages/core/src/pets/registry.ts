@@ -1,13 +1,5 @@
 import type { Database } from 'better-sqlite3';
 import { Pet } from '@tagalong/protocol';
-import { getRole } from '../roles';
-
-/** The library version of a role a default pet ships with. */
-function roleVersion(roleId: string): number {
-  const role = getRole(roleId);
-  if (role === undefined) throw new Error(`no role "${roleId}" in the role library`);
-  return role.version;
-}
 
 /**
  * The companion, and the only pet a fresh install has. Scout sees what you are doing,
@@ -22,7 +14,6 @@ export const SCOUT: Pet = {
   avatar: '🦊',
   color: '#E8873A',
   roleId: 'companion',
-  roleVersion: roleVersion('companion'),
   model: 'haiku',
   providerId: 'claude-code',
   toolGrants: {},
@@ -30,7 +21,7 @@ export const SCOUT: Pet = {
 };
 
 /** What a fresh install starts with: one companion. */
-export const DEFAULT_CREW: readonly Pet[] = [SCOUT];
+export const DEFAULT_PETS: readonly Pet[] = [SCOUT];
 
 interface PetRow {
   readonly id: string;
@@ -51,8 +42,8 @@ export class PetRegistry {
 
   /**
    * Inserts default pets that were never seeded before. Existing rows are left alone, so
-   * a pet the user has edited survives every later boot, and a default the user deleted
-   * stays deleted: `pet_seeds` remembers it was offered once.
+   * a pet the user has edited survives every later boot, and a default that was removed
+   * (Ink and Bolt, in migration 11) stays removed: `pet_seeds` remembers it was offered once.
    */
   seedDefaults(): void {
     const insert = this.#db.prepare(
@@ -69,7 +60,7 @@ export class PetRegistry {
     );
     const now = new Date().toISOString();
     this.#db.transaction(() => {
-      for (const pet of DEFAULT_CREW) {
+      for (const pet of DEFAULT_PETS) {
         if (seeded.has(pet.id)) continue;
         insert.run(pet.id, JSON.stringify(pet), now);
         record.run(pet.id, now);
@@ -98,11 +89,6 @@ export class PetRegistry {
       )
       .run(validated.id, JSON.stringify(validated), new Date().toISOString());
     return validated;
-  }
-
-  /** Returns whether a row actually went, so pets.delete can answer honestly. */
-  delete(id: string): boolean {
-    return this.#db.prepare('DELETE FROM pets WHERE id = ?').run(id).changes > 0;
   }
 
   /**

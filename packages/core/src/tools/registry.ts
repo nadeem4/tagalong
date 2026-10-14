@@ -4,7 +4,7 @@ import type { MemoryStore } from '../memory/memories';
 import { roleFor } from '../roles';
 import { recallTools, watchForTool, type WatchToolDeps } from './builtin/awareness';
 import { connectorTools, type ConnectorToolDeps } from './builtin/connections';
-import { askPetTool, rememberTool, type AskPetDeps } from './builtin/crew';
+import { rememberTool } from './builtin/memory';
 import { enabledExperts, handToExpertTool, type ExpertToolDeps } from './builtin/experts';
 import { perceptionTools, type PerceptionToolsOptions } from './builtin/perception';
 import { changeRoutineTool, createRoutineTool, type RoutineToolDeps } from './builtin/routines';
@@ -17,7 +17,7 @@ import type { Tool, ToolContext, ToolOutcome } from './tool';
 export type ToolFilter = (pet: Pet, tools: readonly Tool[]) => readonly Tool[];
 
 /**
- * The default filter: exactly the tools the pet's role lists (the generalist's for a role
+ * The default filter: exactly the tools the pet's role lists (the companion's for a role
  * the library does not have), minus any the pet's grants turn off. A grant cannot add a
  * tool the role does not list. A role may list a group (`connections`) for all its tools,
  * and a grant can switch the group off. Registry order is kept.
@@ -39,8 +39,6 @@ export interface ToolRegistryOptions {
   memory?: MemoryStore | undefined;
   /** Gives every pet `watch_for`. */
   watch?: WatchToolDeps | undefined;
-  /** Gives every pet `ask_pet`, when there is another pet to ask. */
-  consult?: AskPetDeps | undefined;
   /** Gives a pet whose role lists it `hand_to_expert`, when an expert is switched on. */
   experts?: ExpertToolDeps | undefined;
   /** The tools of the person's connected apps, for a role that lists `connections`. */
@@ -55,8 +53,6 @@ export interface ToolRegistryOptions {
 export interface TurnRequest extends ToolContext {
   /** False when the provider cannot call tools: such a turn is sent none at all. */
   toolSupport: boolean;
-  /** False keeps `ask_pet` off this turn. Roundtable turns already hear from every pet. */
-  allowConsult?: boolean | undefined;
 }
 
 export interface ToolCall {
@@ -75,9 +71,8 @@ export interface TurnTools {
 /**
  * Builds the full set of tools for a turn and dispatches them one way.
  *
- * Built per turn rather than once, because two things only a turn knows shape the set:
- * whether its provider can call tools at all, and who the caller is (`ask_pet` lists the
- * other pets in its description).
+ * Built per turn rather than once, because what only a turn knows shapes the set: whether
+ * its provider can call tools at all, who the caller is, and whether a routine started it.
  */
 export class ToolRegistry {
   readonly #options: ToolRegistryOptions;
@@ -90,7 +85,7 @@ export class ToolRegistry {
     const tools = turn.toolSupport
       ? (this.#options.toolsFor ?? toolsFor)(turn.pet, this.#all(turn))
       : [];
-    const { toolSupport: _support, allowConsult: _consult, ...ctx } = turn;
+    const { toolSupport: _support, ...ctx } = turn;
     return {
       tools,
       definitions: tools.map((tool) => tool.definition),
@@ -110,16 +105,12 @@ export class ToolRegistry {
 
   /** Every built-in this engine is wired for, in the order the model has always seen. */
   #all(turn: TurnRequest): Tool[] {
-    const { perception, memory, watch, consult, experts, connections, routines } = this.#options;
+    const { perception, memory, watch, experts, connections, routines } = this.#options;
     const tools: Tool[] = [];
     if (perception) tools.push(...perceptionTools(perception), ...recallTools(perception));
     if (memory) tools.push(rememberTool(memory));
     // A routine's own turn never starts a watch: a watch routine could set off itself.
     if (watch && turn.routine === undefined) tools.push(watchForTool(watch));
-    const others = consult?.pets().filter((pet) => pet.id !== turn.pet.id) ?? [];
-    if (consult && turn.allowConsult !== false && others.length > 0) {
-      tools.push(askPetTool(consult, turn.pet));
-    }
     const switchedOn = experts ? enabledExperts(experts) : [];
     if (experts && switchedOn.length > 0) tools.push(handToExpertTool(experts, switchedOn));
     if (connections) tools.push(...connectorTools(connections));

@@ -11,7 +11,6 @@ import {
   ToolRegistry,
   type PerceptionToolsOptions,
   type ToolFilter,
-  type AskPetDeps,
   type WatchToolDeps,
   type ExpertToolDeps,
   type ConnectorToolDeps,
@@ -31,9 +30,7 @@ export type TurnEvent =
   | { method: 'turn.toolResult'; params: NotificationParamsOf<'turn.toolResult'> }
   | { method: 'turn.completed'; params: NotificationParamsOf<'turn.completed'> }
   | { method: 'turn.warning'; params: NotificationParamsOf<'turn.warning'> }
-  | { method: 'turn.error'; params: NotificationParamsOf<'turn.error'> }
-  | { method: 'pet.message'; params: NotificationParamsOf<'pet.message'> }
-  | { method: 'crew.status'; params: NotificationParamsOf<'crew.status'> };
+  | { method: 'turn.error'; params: NotificationParamsOf<'turn.error'> };
 
 /** Injected rather than inherited from an EventEmitter: one sink, no subscription bookkeeping. */
 export type TurnEventSink = (event: TurnEvent) => void;
@@ -59,7 +56,7 @@ export interface ConversationRunnerOptions {
    */
   perception?: PerceptionToolsOptions | undefined;
   /**
-   * Phase 4. The crew's memory: recalled into every prompt, written by the `remember`
+   * Phase 4. The pet's memory: recalled into every prompt, written by the `remember`
    * tool and by preferences the user states. Optional so turn-mechanics tests stay small.
    */
   memory?: MemoryStore | undefined;
@@ -68,18 +65,6 @@ export interface ConversationRunnerOptions {
    * hangs off this, and nothing it does may slow the reply that just finished.
    */
   afterTurn?: ((turn: { pet: Pet; conversationId: string }) => void) | undefined;
-  /**
-   * Phase 4. Lets every pet consult another with `ask_pet`. `pets` is read per turn;
-   * `timeoutMs` exists for tests and defaults to sixty seconds. `answered` hears each
-   * consult's reply, or why there was none, for Home's activity record.
-   */
-  consult?:
-    | {
-        pets: () => readonly Pet[];
-        timeoutMs?: number | undefined;
-        answered?: AskPetDeps['answered'];
-      }
-    | undefined;
   /** Phase 3B. Gives every pet `watch_for`, which starts a watch on its behalf. */
   watch?: WatchToolDeps | undefined;
   /** Gives a companion `hand_to_expert`, which briefs an expert and hands the work over. */
@@ -98,15 +83,6 @@ export interface RunAsk {
   /** Omitted for the first ask; the runner opens a conversation and reports its id. */
   conversationId?: string | undefined;
   snapshot?: ContextSnapshot | undefined;
-  /** Phase 4. Ties the turn to a crew run, and rides on its `turn.started`. */
-  runId?: string | undefined;
-  /**
-   * Called with the turn's ids just before `turn.started` goes out, so a crew feature can
-   * announce what is about to happen — a handoff bubble — ahead of the answer itself.
-   */
-  beforeStart?: ((ids: { turnId: string; conversationId: string }) => void) | undefined;
-  /** False keeps `ask_pet` off this turn. Roundtable turns already hear from every pet. */
-  allowConsult?: boolean | undefined;
   /**
    * A turn nobody is watching, such as a routine's: it does not stop the pet's turn in
    * progress, and a question the person asks does not stop it.
@@ -125,7 +101,7 @@ export interface TurnOutcome {
   /** `error` is the runner's own reason: the provider never returned a stop reason. */
   stopReason: BrainResult['stopReason'] | 'error';
   usage: { inputTokens: number; outputTokens: number };
-  /** Model calls the turn made: the first, each tool round trip, each consult. */
+  /** Model calls the turn made: the first, and each tool round trip. */
   modelCalls?: number;
   error?: { code: string; message: string };
 }
@@ -180,8 +156,6 @@ export class ConversationRunner {
 
   constructor(options: ConversationRunnerOptions) {
     this.#options = options;
-    const consult = options.consult;
-    const provider = options.provider;
     this.#tools = new ToolRegistry({
       perception: options.perception,
       memory: options.memory,
@@ -190,19 +164,6 @@ export class ConversationRunner {
       connections: options.connections,
       routines: options.routines,
       toolsFor: options.toolsFor,
-      consult: consult && {
-        pets: consult.pets,
-        provider: (pet) => (typeof provider === 'function' ? provider(pet) : provider),
-        settings: () => options.settings.get(),
-        memory: options.memory,
-        timeoutMs: consult.timeoutMs,
-        answered: consult.answered,
-        announce: (from, to, question, turnId) =>
-          options.emit({
-            method: 'pet.message',
-            params: { fromPetId: from.id, toPetId: to.id, kind: 'consult', text: question, turnId },
-          }),
-      },
     });
   }
 
@@ -257,7 +218,6 @@ export class ConversationRunner {
       controller,
       background: ask.background === true,
     });
-    ask.beforeStart?.({ turnId, conversationId });
     this.#options.emit({
       method: 'turn.started',
       params: {
@@ -266,7 +226,6 @@ export class ConversationRunner {
         conversationId,
         providerId: ask.pet.providerId,
         model: ask.pet.model,
-        ...(ask.runId === undefined ? {} : { runId: ask.runId }),
         ...(ask.routine === undefined ? {} : { routineId: ask.routine.routineId }),
       },
     });
@@ -360,7 +319,7 @@ export class ConversationRunner {
       spoken: ask.spoken,
     });
 
-    // One for the first call; every tool round trip and every consult adds another.
+    // One for the first call; every tool round trip adds another.
     let modelCalls = 1;
     const tools = this.#tools.forTurn({
       pet: ask.pet,
@@ -368,13 +327,9 @@ export class ConversationRunner {
       signal,
       snapshot,
       vision: canSee,
-      countCall: () => {
-        modelCalls += 1;
-      },
       // A provider without tool support is never sent tools: some reject the field
       // outright, and the rest would only be told about an ability they cannot use.
       toolSupport: provider.capabilities.tools,
-      allowConsult: ask.allowConsult,
       ...(ask.routine !== undefined ? { routine: ask.routine } : {}),
     });
     const request =

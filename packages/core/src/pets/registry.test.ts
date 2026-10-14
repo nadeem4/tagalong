@@ -4,8 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Database } from 'better-sqlite3';
 import { openDatabase } from '../memory/db';
-import { getRole } from '../roles';
-import { DEFAULT_CREW, PetRegistry, SCOUT } from './registry';
+import { DEFAULT_PETS, PetRegistry, SCOUT } from './registry';
 
 let dir: string;
 let db: Database;
@@ -29,10 +28,9 @@ describe('PetRegistry seeding', () => {
   });
 
   it('starts Scout as the Companion, thinking on the Claude Code sign-in', () => {
-    expect(DEFAULT_CREW).toEqual([SCOUT]);
+    expect(DEFAULT_PETS).toEqual([SCOUT]);
     expect(SCOUT).toMatchObject({
       roleId: 'companion',
-      roleVersion: getRole('companion')?.version,
       providerId: 'claude-code',
       model: 'haiku',
       toolGrants: {},
@@ -41,10 +39,10 @@ describe('PetRegistry seeding', () => {
     expect(SCOUT.notes).toBeUndefined();
   });
 
-  it('does not bring back a default pet the user deleted', () => {
+  it('does not bring back a default pet that was removed', () => {
     const registry = new PetRegistry(db);
     registry.seedDefaults();
-    registry.delete('scout');
+    db.prepare("DELETE FROM pets WHERE id = 'scout'").run();
 
     registry.seedDefaults();
 
@@ -80,8 +78,7 @@ describe('PetRegistry CRUD', () => {
       notes: 'You read code.',
       model: 'claude-opus-5',
       providerId: 'anthropic',
-      roleId: 'generalist',
-      roleVersion: 1,
+      roleId: 'companion',
       toolGrants: {},
       replyStyle: 'text' as const,
     };
@@ -105,13 +102,17 @@ describe('PetRegistry CRUD', () => {
     expect(new PetRegistry(db).get('nobody')).toBeNull();
   });
 
-  it('deletes a pet and reports whether anything went', () => {
-    const registry = new PetRegistry(db);
-    registry.seedDefaults();
+  it('loads a crew-era pet row, dropping its role version and voice id', () => {
+    db.prepare('INSERT INTO pets (id, json, updated_at) VALUES (?, ?, ?)').run(
+      'scout',
+      JSON.stringify({ ...SCOUT, roleVersion: 1, voiceId: 'fox' }),
+      '2026-10-01T00:00:00.000Z',
+    );
 
-    expect(registry.delete('scout')).toBe(true);
-    expect(registry.delete('scout')).toBe(false);
-    expect(registry.list().map((pet) => pet.id)).toEqual([]);
+    const scout = new PetRegistry(db).get('scout');
+
+    expect(scout).toEqual(SCOUT);
+    expect(scout).not.toHaveProperty('roleVersion');
   });
 
   it('lists pets in a stable order', () => {
@@ -120,8 +121,7 @@ describe('PetRegistry CRUD', () => {
       avatar: '*',
       model: 'claude-opus-5',
       providerId: 'anthropic',
-      roleId: 'generalist',
-      roleVersion: 1,
+      roleId: 'companion',
       toolGrants: {},
       replyStyle: 'text' as const,
     };

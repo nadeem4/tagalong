@@ -9,17 +9,15 @@ const pet = (id: string, name: string): Pet => ({
   id,
   name,
   avatar: '🐾',
-  roleId: 'generalist',
-  roleVersion: 1,
+  roleId: 'companion',
   model: 'fake',
   providerId: 'fake',
   toolGrants: {},
   replyStyle: 'text',
 });
-const CREW = [pet('scout', 'Scout'), pet('ink', 'Ink'), pet('bolt', 'Bolt')];
+const PETS = [pet('scout', 'Scout'), pet('ink', 'Ink')];
 const T1 = '10000000-0000-4000-8000-000000000001';
 const T2 = '10000000-0000-4000-8000-000000000002';
-const RUN = '10000000-0000-4000-8000-0000000000aa';
 const AT = '2026-10-07T10:00:00.000Z';
 
 const entry = (fields: Partial<ActivityEntry> & Pick<ActivityEntry, 'id' | 'kind'>) =>
@@ -34,32 +32,18 @@ const TURN = entry({
   text: 'What does this error mean?',
   answer: 'The port is taken.',
 });
-const CONSULT = entry({
+const HANDED = entry({
   id: 'e2',
-  kind: 'consult',
-  toPetId: 'bolt',
-  turnId: T1,
-  text: 'Which port does the engine use?',
-  answer: '47321.',
+  kind: 'expert',
+  expertId: 'claude-code',
+  expertName: 'Claude Code',
+  text: 'Fix the failing test',
 });
-const HANDOFF = entry({
-  id: 'e3',
-  kind: 'handoff',
-  toPetId: 'ink',
-  turnId: T2,
-  text: 'The user wants a reply drafted.',
-});
-const INK_TURN = entry({ id: 'e4', kind: 'turn', petId: 'ink', turnId: T2, answer: 'Dear team…' });
-const TABLE = entry({ id: 'e5', kind: 'roundtable', petId: 'ink', runId: RUN, modelCalls: 4 });
-const TABLE_TURNS = [
-  entry({ id: 'e6', kind: 'turn', petId: 'bolt', runId: RUN, answer: 'Dock it right.' }),
-  entry({ id: 'e7', kind: 'turn', petId: 'ink', runId: RUN, answer: 'Dock it left.' }),
-];
 
 async function renderActivity(bridge: FakeHostBridge) {
   render(
     <HostBridgeProvider bridge={bridge}>
-      <ActivityView pets={CREW} />
+      <ActivityView pets={PETS} />
     </HostBridgeProvider>,
   );
   return screen.findByRole('list', { name: 'Activity' }).catch(() => null);
@@ -68,23 +52,17 @@ async function renderActivity(bridge: FakeHostBridge) {
 const row = (name: RegExp) => screen.getByRole('button', { name });
 
 describe('ActivityView', () => {
-  it('lists turns, consults, handoffs and roundtables, newest first, in words', async () => {
-    const bridge = createFakeHostBridge({
-      activity: [TABLE, INK_TURN, HANDOFF, CONSULT, TURN],
-    });
+  it('lists turns and hand-offs, newest first, in words', async () => {
+    const bridge = createFakeHostBridge({ activity: [HANDED, TURN] });
     await renderActivity(bridge);
     const list = screen.getByRole('list', { name: 'Activity' });
     const lines = within(list)
       .getAllByRole('button')
       .map((button) => button.textContent ?? '');
-    expect(lines[0]).toContain('Ink started a roundtable');
-    expect(lines[1]).toContain('Ink answered');
-    expect(lines[2]).toContain('Scout handed off to Ink');
-    expect(lines[3]).toContain('Scout asked Bolt');
-    expect(lines[4]).toContain('Scout answered');
-    expect(lines[4]).toContain('fake-model');
-    expect(lines[4]).toContain('3 calls');
-    expect(lines[0]).toContain('4 calls');
+    expect(lines[0]).toContain('Scout handed off to Claude Code');
+    expect(lines[1]).toContain('Scout answered');
+    expect(lines[1]).toContain('fake-model');
+    expect(lines[1]).toContain('3 calls');
   });
 
   it('opens a turn’s thread on click: the question and the answer', async () => {
@@ -96,32 +74,6 @@ describe('ActivityView', () => {
     const thread = screen.getByRole('region', { name: 'Scout answered' });
     expect(thread).toHaveTextContent('What does this error mean?');
     expect(thread).toHaveTextContent('The port is taken.');
-  });
-
-  it('shows who asked whom in a consult, with the question and the answer', async () => {
-    await renderActivity(createFakeHostBridge({ activity: [CONSULT] }));
-    fireEvent.click(row(/Scout asked Bolt/));
-    const thread = screen.getByRole('region', { name: 'Scout asked Bolt' });
-    expect(thread).toHaveTextContent('Which port does the engine use?');
-    expect(thread).toHaveTextContent('Bolt answered');
-    expect(thread).toHaveTextContent('47321.');
-  });
-
-  it('shows a handoff’s summary and the answer the other pet gave', async () => {
-    await renderActivity(createFakeHostBridge({ activity: [INK_TURN, HANDOFF] }));
-    fireEvent.click(row(/Scout handed off to Ink/));
-    const thread = screen.getByRole('region', { name: 'Scout handed off to Ink' });
-    expect(thread).toHaveTextContent('The user wants a reply drafted.');
-    expect(thread).toHaveTextContent('Dear team…');
-  });
-
-  it('reads a roundtable as its turns in order', async () => {
-    await renderActivity(
-      createFakeHostBridge({ activity: [TABLE, ...[...TABLE_TURNS].reverse()] }),
-    );
-    fireEvent.click(row(/Ink started a roundtable/));
-    const thread = screen.getByRole('region', { name: 'Ink started a roundtable' });
-    expect(thread.textContent).toMatch(/Bolt.*Dock it right\..*Ink.*Dock it left\./);
   });
 
   it('shows a brief handed to an expert, its answer and the files it changed', async () => {
@@ -240,7 +192,7 @@ describe('ActivityView', () => {
   it('says so when nothing has happened yet', async () => {
     render(
       <HostBridgeProvider bridge={createFakeHostBridge()}>
-        <ActivityView pets={CREW} />
+        <ActivityView pets={PETS} />
       </HostBridgeProvider>,
     );
     expect(await screen.findByText(/Nothing yet/)).toBeInTheDocument();
@@ -251,7 +203,7 @@ describe('ActivityView', () => {
     delete (bridge as { listActivity?: unknown }).listActivity;
     render(
       <HostBridgeProvider bridge={bridge}>
-        <ActivityView pets={CREW} />
+        <ActivityView pets={PETS} />
       </HostBridgeProvider>,
     );
     expect(screen.getByText(/not available here/)).toBeInTheDocument();

@@ -15,8 +15,7 @@ export const FAKE_TURN_PET: Pet = {
   color: '#3b82f6',
   providerId: 'fake',
   model: 'fake-model',
-  roleId: 'generalist',
-  roleVersion: 1,
+  roleId: 'companion',
   toolGrants: {},
   replyStyle: 'text',
 };
@@ -30,16 +29,20 @@ export function fakeTurn(overrides: Partial<TurnRequest> = {}): TurnRequest {
     pet: FAKE_TURN_PET,
     turnId: 'turn-1',
     signal: new AbortController().signal,
-    countCall: () => undefined,
     toolSupport: true,
     ...overrides,
   };
 }
 
-/** The tools one fake turn gets from a registry wired with `options`, ready to `run`. */
+/**
+ * The tools one fake turn gets from a registry wired with `options`, ready to `run`. Every
+ * wired tool, unless `options` names a filter: a tool's test is not about the role library.
+ */
 export function fakeTurnTools(
   options: ToolRegistryOptions,
   overrides: Partial<TurnRequest> = {},
 ): TurnTools {
-  return new ToolRegistry(options).forTurn(fakeTurn(overrides));
+  return new ToolRegistry({ toolsFor: (_pet, tools) => tools, ...options }).forTurn(
+    fakeTurn(overrides),
+  );
 }

@@ -15,8 +15,7 @@ const pet = (id: string, extra: Partial<Pet> = {}): Pet =>
     id,
     name: id[0]!.toUpperCase() + id.slice(1),
     avatar: '🐾',
-    roleId: 'generalist',
-    roleVersion: 1,
+    roleId: 'companion',
     model: 'anthropic/claude-haiku-4.5',
     providerId: 'openrouter',
     ...extra,
@@ -91,7 +90,6 @@ describe('welcomeCrew', () => {
     expect(scout).toMatchObject({
       id: 'scout',
       roleId: 'companion',
-      roleVersion: 3,
       providerId: 'claude-code',
       model: 'haiku',
     });

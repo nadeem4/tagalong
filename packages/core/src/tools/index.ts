@@ -31,13 +31,7 @@ export {
   type PerceptionToolsOptions,
 } from './builtin/perception';
 export { RECALL_SCREEN, WATCH_FOR, WHAT_CHANGED, type WatchToolDeps } from './builtin/awareness';
-export {
-  ASK_PET,
-  CONSULT_TIMEOUT_MS,
-  NESTED_CONSULT_REFUSED,
-  REMEMBER,
-  type AskPetDeps,
-} from './builtin/crew';
+export { REMEMBER } from './builtin/memory';
 export { HAND_TO_EXPERT, type ExpertToolDeps } from './builtin/experts';
 export { CHANGE_ROUTINE, CREATE_ROUTINE, type RoutineToolDeps } from './builtin/routines';
 export {

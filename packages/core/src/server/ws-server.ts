@@ -123,15 +123,7 @@ export interface EngineServerOptions {
  * same for every host, so this is what keeps a compromised extension from changing
  * settings, approving tools, adding connections, routines or experts.
  */
-export const EXTENSION_METHODS: ReadonlySet<string> = new Set([
-  'ask',
-  'interrupt',
-  'pets.list',
-  'roles.list',
-  'roles.recommendModel',
-  'notices.rolesUpgrade',
-  'notices.dismiss',
-]);
+export const EXTENSION_METHODS: ReadonlySet<string> = new Set(['ask', 'interrupt', 'pets.list']);
 
 const HELLO_TIMEOUT_MS = 10_000;
 

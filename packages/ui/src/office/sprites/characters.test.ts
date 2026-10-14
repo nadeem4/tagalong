@@ -8,7 +8,6 @@ function pet(overrides: Partial<Pet>): Pet {
     name: 'Pet',
     avatar: '🐾',
     roleId: 'generalist',
-    roleVersion: 1,
     model: 'fake',
     providerId: 'fake',
     toolGrants: {},

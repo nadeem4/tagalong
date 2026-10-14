@@ -12,7 +12,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
   - [Fake provider (no key)](#fake-provider-no-key)
 - [Phase H: model providers](#phase-h-model-providers)
 - [Phase 6: Browser Host](#phase-6-browser-host)
-- [Phase 4: Crew](#phase-4-crew)
+- [Phase 4: Memory](#phase-4-memory)
 - [Phase 3B: Awareness](#phase-3b-awareness)
 - [Phase 7: onboarding and installer](#phase-7-onboarding-and-installer)
 - [Voice: Scout talks](#voice-scout-talks)
@@ -179,13 +179,12 @@ any tab.
    the port empty.
 3. **Expected:** within two seconds the connection line reads "Connected to Tagalong <version>."
 
-### 6.4. The side panel shows the crew
+### 6.4. The side panel shows Scout
 
 1. **Setup:** paired (6.3); the article tab in front.
 2. **Action:** click the Tagalong toolbar button.
-3. **Expected:** the side panel opens. Its header says "Connected to Tagalong …" and has a **Pet**
-   picker listing every pet (emoji and name). The sight bar says "Seeing" and names
-   `page "<article title>"`.
+3. **Expected:** the side panel opens. Its header says "Connected to Tagalong …"; there is no pet
+   picker, and questions go to Scout. The sight bar says "Seeing" and names `page "<article title>"`.
 
 ### 6.5. Ask about the whole page with nothing selected
 
@@ -277,180 +276,28 @@ any tab.
    current one." and the side panel header shows the same with a **Pair with the Tagalong app**
    button. Paste the real token again to recover.
 
-### 6.15. Switching pets in the side panel
+## Phase 4: Memory
 
-1. **Setup:** at least two pets (the default crew has three); side panel open and connected.
-2. **Action:** click the second avatar in the crew strip at the top of the chat (its tooltip names
-   the pet) and ask "Who are you?".
-3. **Expected:** the header names that pet in its colour; the answer comes in its role and is
-   labelled with its name and model. Earlier messages stay on screen: the crew shares one timeline.
+Covers memory and recall, and conversation summaries. Phase 4 also built a crew (more pets, `@Name`
+hand-offs, `ask_pet` consults and `/crew` roundtables); the crew has been removed, and so have its
+tests.
 
-## Phase 4: Crew
-
-Covers the default crew, memory and recall, conversation summaries, handoff, consult, the roundtable,
-the crew strip, the pet editor and the model-call counter (tasks 44–51).
-
-**Test configuration.** [OpenRouter + Claude](#openrouter--claude-the-default-for-this-guide). One test, 4.13,
-uses a mixed crew on OpenRouter and Nebius Token Factory. Per-pet voices are not built, so nothing in
-this phase speaks; every "voice" in the phase page is checked as text.
+**Test configuration.** [OpenRouter + Claude](#openrouter--claude-the-default-for-this-guide).
 
 **Before you start:**
 
 1. Quit Tagalong. Rename `%APPDATA%\Tagalong` to `Tagalong.before-phase-4` so the app starts as a
    fresh install (rename it back afterwards to keep your old history).
 2. Launch with `pnpm dev:desktop` (no `TAGALONG_FAKE_PROVIDERS`).
-3. Skip the setup wizard (Phase 7 tests it). Open Settings from the tray, paste your **OpenRouter
-   API key** and click Save.
 
-### 4.1. A fresh install seeds three pets
-
-1. **Setup:** the fresh data directory from _Before you start_.
-2. **Action:** look at the desktop, then open Settings.
-3. **Expected:** the desktop shows **three** avatars side by side — 🔎 Scout, ✒️ Ink, ⚡ Bolt, Scout
-   first — each with a coloured underline (blue, purple, amber). Settings shows three pet sections:
-   Scout on **Token Factory** / `nvidia/nemotron-3-super-120b-a12b`, Ink on **OpenRouter** /
-   `anthropic/claude-sonnet-5`, Bolt on **Token Factory** / `nvidia/Nemotron-Nano-V2-12b`.
-
-### 4.2. Put the whole crew on OpenRouter + Claude
-
-1. **Setup:** Settings open, OpenRouter key stored (Scout's note says "N models from OpenRouter"
-   once its provider is OpenRouter).
-2. **Action:** for **Scout** and **Bolt**, set **Provider** to OpenRouter, **Model id** to a Claude
-   id from the live list (for example `anthropic/claude-sonnet-5`), and clear **Vision model id**.
-   Leave Ink as it is (check its model id appears in the live list; if not, pick a Claude id that
-   does). Click Save.
-3. **Expected:** "Saved." with no error. Hovering each desktop avatar shows `Name · model` with the
-   Claude id.
-
-### 4.3. The crew strip opens the panel on a pet
-
-1. **Setup:** 4.2 done.
-2. **Action:** click Ink's avatar on the desktop.
-3. **Expected:** the panel opens beside the strip; its header reads **✒️ Ink** in purple and the
-   Ink button in the panel's strip is ringed. Click Bolt in the panel's strip: the header changes to
-   **⚡ Bolt** in amber.
-
-### 4.4. Every answer names the pet and the model
+### 4.1. A stated preference survives a restart _(acceptance 4)_
 
 1. **Setup:** panel open on Scout.
-2. **Action:** select a paragraph on a web page, press `Ctrl+Shift+Space`, ask "Explain this".
-3. **Expected:** while it streams and after it settles, a small label above the answer reads
-   `Scout · <the Claude id you chose>` in Scout's blue.
-
-### 4.5. Follow-ups continue the same conversation
-
-1. **Setup:** right after 4.4, panel still open.
-2. **Action:** ask "What did I just ask you?".
-3. **Expected:** Scout restates the previous question. (Before Phase 4 every ask opened a new
-   conversation and this failed.)
-
-### 4.6. Handoff with `@Ink` keeps the context _(acceptance 1)_
-
-1. **Setup:** open a page with an email or a forum post. Select it, press `Ctrl+Shift+Space`, and ask
-   Scout "Explain this page". Wait for the answer.
-2. **Action:** type `@Ink draft a reply to this` and press Enter.
-3. **Expected:**
-   - A dashed bubble appears: **"Scout handed this to Ink"** followed by two paragraphs — what you
-     asked Scout (naming the page) and Scout's latest answer.
-   - The header switches to **✒️ Ink**.
-   - Ink's answer, labelled `Ink · <model>`, is a draft reply that refers to the specific content of
-     the page — names, dates or points that only appear on it — without you pasting it again.
-   - Ask Ink "make it warmer": Ink revises its own draft (same conversation).
-
-### 4.7. The Hand off menu
-
-1. **Setup:** any answer from Scout on screen.
-2. **Action:** under the answer, open **Hand off…** and choose **⚡ Bolt**.
-3. **Expected:** the composer now contains `@Bolt ` with the cursor ready; type "check this for bugs"
-   and send — the handoff bubble and a Bolt answer follow as in 4.6.
-
-### 4.8. Consult: Bolt asks Ink _(acceptance 2)_
-
-1. **Setup:** panel on Bolt (click Bolt in the strip). Copy a small code diff to the screen and select
-   it.
-2. **Action:** press `Ctrl+Shift+Space` and ask: "Write a commit message for this change. Ask Ink to
-   polish the wording before you answer."
-3. **Expected:**
-   - A small amber card appears above Bolt's answer: **"Bolt consulted Ink: …"** with the question.
-   - Bolt's answer contains a polished commit message.
-   - The footer under the composer shows **"3 model calls"** (or more if Bolt also used a tool).
-   - Ink does not get a bubble of its own: a consult is not a handoff, and the panel stays on Bolt.
-
-### 4.9. A consult that fails is reported to the caller, not to you
-
-1. **Setup:** in Settings set **Ink**'s provider to **Token Factory** with no Token Factory key
-   stored. Save.
-2. **Action:** on Bolt, ask "Ask Ink to suggest a name for a logging library, then give me your pick."
-3. **Expected:** the consult card appears; Bolt still answers on its own, and may say Ink could not be
-   reached. No red error replaces Bolt's answer. Set Ink back to OpenRouter afterwards.
-
-### 4.10. Roundtable with `/crew` _(acceptance 3, text only)_
-
-1. **Setup:** crew as in 4.2, panel open on Scout.
-2. **Action:** type `/crew Should a desktop companion's chat panel dock left or right of the
-avatar?` and press Enter.
-3. **Expected:**
-   - A divider **"Round 1 of 2"**, then three answers in order — Scout, Bolt, Ink (the asked pet first,
-     then the rest alphabetically) — each labelled with its own name and model, each avatar on the
-     desktop lighting amber while it speaks.
-   - The second and third pets refer to what the earlier ones said.
-   - A divider **"Synthesis by Scout"**, then one paragraph from Scout that summarises agreement and
-     disagreement and recommends one side.
-   - While it runs the composer is disabled and a **Stop** button is shown; afterwards both return to
-     normal and the footer reads **"4 model calls"**.
-
-### 4.11. Stop a roundtable
-
-1. **Setup:** as 4.10.
-2. **Action:** start `/crew Tabs or spaces?` and press **Stop** while the second pet is answering.
-3. **Expected:** the stream stops; a divider **"Roundtable stopped"** appears; no further pet answers
-   and no synthesis follows; the composer is enabled again.
-
-### 4.12. The Crew button
-
-1. **Setup:** panel open, composer empty.
-2. **Action:** click **Crew**.
-3. **Expected:** the composer reads `/crew ` ready for a question. Clear it, type "Is it worth adding
-   dark mode?", click **Crew** again: a roundtable starts on that question exactly as in 4.10.
-
-### 4.13. Roundtable across providers: OpenRouter + Nebius Nemotron _(hackathon demo)_
-
-_This test changes the test configuration on purpose._
-
-1. **Setup:** store a **Token Factory API key** as well (Settings, Save). Then set:
-   - **Scout** — Token Factory, `nvidia/nemotron-3-super-120b-a12b`, vision model
-     `nvidia/Nemotron-Nano-V2-12b`
-   - **Bolt** — Token Factory, `nvidia/Nemotron-Nano-V2-12b`, vision model empty
-   - **Ink** — OpenRouter, a Claude id from the live list
-
-   Click Save. (These are the fresh-install defaults; if you never changed them, nothing to do.)
-
-2. **Action:** on Scout, run `/crew What is the single most useful feature a screen companion could
-add next?`.
-3. **Expected:**
-   - Three answers labelled `Scout · nvidia/nemotron-3-super-120b-a12b`,
-     `Bolt · nvidia/Nemotron-Nano-V2-12b` and `Ink · <Claude id>` — three models from two providers.
-   - The synthesis is by Scout on Nemotron 3 Super; the footer reads **"4 model calls"**.
-   - Repeat with the Token Factory key removed: Scout's and Bolt's turns fail, the transcript Ink sees
-     says "(Scout could not answer: …)", Ink still answers, and the run ends without hanging.
-
-### 4.14. A stated preference survives a restart _(acceptance 4)_
-
-1. **Setup:** crew as in 4.2; panel on Scout.
 2. **Action:** say "I prefer short answers." Wait for the reply. Quit Tagalong from the tray and
    launch it again. Open the panel on Scout and ask "Explain how DNS works."
 3. **Expected:** the DNS answer is noticeably short (a few sentences, no long lists).
 
-### 4.15. Shared memories reach every pet; private ones do not
-
-1. **Setup:** 4.14 done.
-2. **Action:** on Scout, say "Remember for the whole crew that I deploy on Fridays." Then click Ink
-   in the strip and ask "When do I usually deploy?". Then ask Ink "Do I prefer long or short answers?".
-3. **Expected:** Scout calls the `remember` tool (the reply confirms it saved it to the crew notebook).
-   Ink answers **Fridays**. Ink does **not** know about the short-answers preference, which is
-   private to Scout (it may guess, but must not claim you told it).
-
-### 4.16. Long conversations are folded into a summary
+### 4.2. Long conversations are folded into a summary
 
 1. **Setup:** a tool that opens SQLite (`sqlite3`, or DB Browser for SQLite).
 2. **Action:** in one Scout conversation, exchange at least **10** questions and answers (20 messages)
@@ -461,7 +308,7 @@ add next?`.
    follow-up that depends on the start of the conversation: it still answers correctly (recall
    carries the summary).
 
-### 4.17. Choose a different summarizer
+### 4.3. Choose a different summarizer
 
 1. **Setup:** Settings open, an OpenRouter key stored, Claude Code installed and signed in.
 2. **Action:** open **Advanced**, then the **Summarize with** list.
@@ -470,33 +317,6 @@ add next?`.
    Services with no key are not listed. Pick `anthropic/claude-haiku-4.5` and Save: "Saved. Scout uses
    it from the next ask." Reopen Settings: the choice is still selected. Pick **Same as Scout** and
    Save to go back.
-
-### 4.18. Edit a pet
-
-1. **Setup:** Settings open.
-2. **Action:** for Bolt change **Name** to `Sparky`, **Emoji** to `🔧`, **Colour** to green, and add
-   "Always answer in British English." to **Notes (optional, private)**. Save.
-3. **Expected:** the desktop strip re-draws with 🔧 and a green underline; the panel header reads
-   **🔧 Sparky** in green; a new question to Sparky is answered in British spelling. **Reply style**
-   and **Voice id** save without error but change nothing audible (Scout's voice is set in Settings → Voice).
-
-### 4.19. Add, hide and delete pets
-
-1. **Setup:** Settings open.
-2. **Action:** click **Add a pet**, name it `Pip`, give it OpenRouter and a Claude id, Save. Then untick
-   **Show on the desktop strip** for Pip and Save. Then click **Delete Ink**, Save, and restart the app.
-3. **Expected:** after the first save a fourth avatar appears on the strip; after the second it is gone
-   from the strip but Pip still appears in the panel's strip and answers; after the restart Ink is gone
-   everywhere and does **not** come back (deleted defaults are not re-seeded). `@Ink` is now ordinary
-   text sent to the current pet.
-
-### 4.20. The side panel speaks crew too
-
-1. **Setup:** the Chrome extension paired (Phase 6); a page open beside the side panel.
-2. **Action:** in the side panel ask Scout "Summarise this page", then type `@Ink draft a tweet about
-it`, then run `/crew Is this article convincing?`.
-3. **Expected:** the same handoff bubble, labels, round dividers, synthesis and model-call count as in
-   the desktop panel.
 
 ## Phase 3B: Awareness
 
@@ -766,7 +586,7 @@ the next start is a fresh install. Rename it back at the end to keep your histor
 1. **Setup:** the wizard on "Three keys to remember".
 2. **Action:** compare it with the hotkey boxes in Settings.
 3. **Expected:** two keys — `Ctrl + Shift + Space` (Ask) and `Ctrl + Shift + Alt + P` (Pause
-   sight) — the same as Settings, plus a line on `@Ink` handoff and `/crew`. If you rebound a key earlier, the wizard shows
+   sight) — the same as Settings. If you rebound a key earlier, the wizard shows
    your binding.
 
 ### 7.8. Rolling memory from the wizard
@@ -1191,11 +1011,6 @@ OpenRouter key and a Token Factory key at hand. Tick each line.
 - [ ] **Vision routing.** Click Scout and ask "what is on my screen?". It describes
       the screen with no "cannot see images" warning: Super handed the picture to Nemotron Nano 2 VL
       (the Token Factory usage page shows the Nano VL call).
-- [ ] **Crew roundtable on mixed models.** Type `/crew What should I build next?`. Three answers
-      labelled with three models from two providers, each reacting to the others, then a synthesis by
-      Scout; the footer reads "4 model calls".
-- [ ] **Handoff.** Type `@Ink turn that into a short announcement`. A handoff bubble, then Ink's draft
-      on Claude.
 - [ ] **Watch mode on Nemotron Nano.** In `cmd` run `ping -n 45 127.0.0.1 && echo BUILD DONE`, then ask
       Scout "tell me when this command finishes". The Watching chip names
       `nvidia/nemotron-3-nano-30b-a3b`; within ten seconds of `BUILD DONE` a card and a Windows

@@ -1,20 +1,10 @@
 import { z } from 'zod';
 
 /**
- * What the crew did, as Home's activity view lists it: each turn, each consult (`ask_pet`),
- * each handoff (`@Name`), each roundtable (`/crew`), each brief a companion handed
- * to an expert, each call to a connected app (`connector`), and each routine run (`routine`). Meetings are not here: they do not
- * exist in the engine yet, and the view keeps their empty state instead.
+ * What Scout did, as Home's activity view lists it: each turn, each brief handed to an
+ * expert, each call to a connected app (`connector`), and each routine run (`routine`).
  */
-export const ActivityKind = z.enum([
-  'turn',
-  'consult',
-  'handoff',
-  'roundtable',
-  'expert',
-  'connector',
-  'routine',
-]);
+export const ActivityKind = z.enum(['turn', 'expert', 'connector', 'routine']);
 export type ActivityKind = z.infer<typeof ActivityKind>;
 
 export const ActivityState = z.enum(['running', 'done', 'error', 'stopped']);
@@ -24,19 +14,15 @@ export const ActivityEntry = z.object({
   id: z.string().min(1),
   kind: ActivityKind,
   state: ActivityState,
-  /** Who acted: the pet answering a turn, the asker of a consult, the pet handing off. */
+  /** Who acted: the pet answering a turn, or handing off. */
   petId: z.string().min(1),
-  /** The pet asked, or handed to. */
-  toPetId: z.string().min(1).optional(),
   turnId: z.uuid().optional(),
   conversationId: z.uuid().optional(),
-  /** Set on a roundtable and on each of its turns, so the run's turns can be read together. */
-  runId: z.uuid().optional(),
   providerId: z.string().min(1).optional(),
   model: z.string().min(1).optional(),
-  /** A turn's question, a consult's question, a handoff's summary. */
+  /** A turn's question, a hand-off's brief. */
   text: z.string().optional(),
-  /** A turn's or a consult's answer. */
+  /** A turn's or an expert's answer. */
   answer: z.string().optional(),
   /** An `expert` entry: the expert, and its name when the brief went, so a rename or a
    * deletion later does not rewrite the log. */

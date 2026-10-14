@@ -24,7 +24,6 @@ const SCOUT: Pet = {
   providerId: 'fake',
   model: 'fake-model',
   roleId: 'companion',
-  roleVersion: 1,
   toolGrants: {},
   replyStyle: 'text',
 };

@@ -13,8 +13,7 @@ const pet = (id: string): Pet =>
     id,
     name: id,
     avatar: '🐾',
-    roleId: 'generalist',
-    roleVersion: 1,
+    roleId: 'companion',
     model: 'anthropic/claude-haiku-4.5',
     providerId: 'openrouter',
   });

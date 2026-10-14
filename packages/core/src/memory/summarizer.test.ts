@@ -19,8 +19,7 @@ const scout: Pet = {
   notes: 'You are Scout.',
   model: 'nvidia/nemotron-3-super-120b-a12b',
   providerId: 'nebius',
-  roleId: 'generalist',
-  roleVersion: 1,
+  roleId: 'companion',
   toolGrants: {},
   replyStyle: 'text',
 };

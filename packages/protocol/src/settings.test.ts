@@ -34,8 +34,6 @@ describe('Settings', () => {
     const s = Settings.parse({});
     expect(s.enginePort).toBe(47321);
     expect(s.defaultPetId).toBe('scout');
-    expect(s.providerId).toBe('anthropic');
-    expect(s.defaultModel).toBe('claude-opus-5');
     expect(s.pageTextBudget).toBe(40_000);
     expect(s.historyMessages).toBe(20);
     expect(s.hotkeys.ask).toBe('CommandOrControl+Shift+Space');
@@ -57,15 +55,21 @@ describe('Settings', () => {
     expect(s.hotkeys).toEqual({ ask: 'Alt+Space' });
   });
 
+  it('drops the crew-era providerId and defaultModel from an older settings file', () => {
+    const s = Settings.parse({ providerId: 'anthropic', defaultModel: 'claude-opus-5' });
+    expect(s).not.toHaveProperty('providerId');
+    expect(s).not.toHaveProperty('defaultModel');
+  });
+
   it('keeps explicit values', () => {
     const s = Settings.parse({
       enginePort: 50000,
-      providerId: 'fake',
+      userName: 'Ada',
       hotkeys: { ask: 'Alt+Space' },
       avatar: { x: 12, y: 34 },
     });
     expect(s.enginePort).toBe(50000);
-    expect(s.providerId).toBe('fake');
+    expect(s.userName).toBe('Ada');
     expect(s.hotkeys.ask).toBe('Alt+Space');
     expect(s.avatar).toEqual({ x: 12, y: 34 });
   });
@@ -143,7 +147,7 @@ describe('Settings.screenshotRetention', () => {
 
 describe('SettingsPatch', () => {
   it('accepts a single field', () => {
-    expect(SettingsPatch.parse({ providerId: 'fake' })).toEqual({ providerId: 'fake' });
+    expect(SettingsPatch.parse({ userName: 'Ada' })).toEqual({ userName: 'Ada' });
   });
 
   it('accepts an empty patch', () => {
@@ -155,7 +159,7 @@ describe('SettingsPatch', () => {
   });
 
   it('never invents the new privacy fields when they are omitted', () => {
-    const patch = SettingsPatch.parse({ providerId: 'fake' });
+    const patch = SettingsPatch.parse({ userName: 'Ada' });
     expect(patch).not.toHaveProperty('captureExclusions');
     expect(patch).not.toHaveProperty('screenshotRetention');
   });

@@ -1,5 +1,4 @@
 import type { Database } from 'better-sqlite3';
-import { getRole } from '../roles';
 
 /**
  * The personas Scout, Ink and Bolt shipped with before roles, frozen here because the
@@ -21,7 +20,10 @@ export const LEGACY_DEFAULT_PERSONAS: Readonly<Record<string, string>> = {
     'Be direct; skip the pleasantries.',
 };
 
-/** The role each default pet takes on. Any other pet becomes a generalist. */
+/**
+ * The role each default pet took on. Any other pet became a generalist. Frozen: these roles
+ * went with the crew, and a pet still naming one works as the companion (`roleFor`).
+ */
 const DEFAULT_ROLES: Readonly<Record<string, string>> = {
   scout: 'generalist',
   ink: 'writer',
@@ -32,8 +34,7 @@ const FALLBACK_ROLE = 'generalist';
 
 /**
  * Migration 5: every stored pet without a role gets one. Default pets take their mapped
- * role and any other pet becomes a generalist; `roleVersion` comes from the role library;
- * `toolAllowlist`, which nothing read, is dropped; and `persona` moves to `notes` unless it
+ * role and any other pet becomes a generalist; `toolAllowlist`, which nothing read, is dropped; and `persona` moves to `notes` unless it
  * is the default pet's shipped persona or blank. A pet that already has a role is left alone.
  */
 export function upgradePetsToRoles(db: Database): void {
@@ -44,9 +45,8 @@ export function upgradePetsToRoles(db: Database): void {
     if (typeof stored.roleId === 'string') continue;
 
     const { persona, toolAllowlist: _allowlist, ...rest } = stored;
-    const roleId = Object.hasOwn(DEFAULT_ROLES, row.id) ? DEFAULT_ROLES[row.id] : FALLBACK_ROLE;
-    const role = getRole(roleId ?? FALLBACK_ROLE);
-    if (role === undefined) throw new Error(`no role "${roleId}" in the role library`);
+    const roleId =
+      (Object.hasOwn(DEFAULT_ROLES, row.id) ? DEFAULT_ROLES[row.id] : undefined) ?? FALLBACK_ROLE;
 
     const text = typeof persona === 'string' ? persona.trim() : '';
     const shipped = Object.hasOwn(LEGACY_DEFAULT_PERSONAS, row.id)
@@ -56,8 +56,7 @@ export function upgradePetsToRoles(db: Database): void {
 
     const upgraded = {
       ...rest,
-      roleId: role.id,
-      roleVersion: role.version,
+      roleId,
       toolGrants: {},
       ...(keepNotes ? { notes: text } : {}),
     };

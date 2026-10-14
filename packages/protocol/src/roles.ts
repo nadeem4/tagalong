@@ -28,20 +28,3 @@ export const Role = z.object({
   instructions: z.string().min(1),
 });
 export type Role = z.infer<typeof Role>;
-
-/** Phase 8. Every role in the engine's library, for the role picker and the office labels. */
-export const RolesListParams = z.object({});
-export const RolesListResult = z.object({ roles: z.array(Role) });
-
-/**
- * Phase 8. The model a pet with this role would start on, on this provider, so a form can
- * prefill it. Both fields are absent when the provider has no tier table, such as `fake`.
- */
-export const RolesRecommendModelParams = z.object({
-  roleId: z.string().min(1),
-  providerId: z.string().min(1),
-});
-export const RolesRecommendModelResult = z.object({
-  model: z.string().min(1).optional(),
-  visionModel: z.string().min(1).optional(),
-});

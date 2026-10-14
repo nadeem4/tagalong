@@ -5,8 +5,7 @@ const valid = {
   id: 'scout',
   name: 'Scout',
   avatar: '🔎',
-  roleId: 'generalist',
-  roleVersion: 1,
+  roleId: 'companion',
   model: 'claude-sonnet-5',
   providerId: 'anthropic',
 };
@@ -35,10 +34,9 @@ describe('Pet', () => {
     expect(Pet.safeParse({ ...valid, toolGrants: { watch_for: 'ask' } }).success).toBe(false);
   });
 
-  it('carries a role and its version', () => {
+  it('carries a role', () => {
     const parsed = Pet.parse(valid);
-    expect(parsed.roleId).toBe('generalist');
-    expect(parsed.roleVersion).toBe(1);
+    expect(parsed.roleId).toBe('companion');
     const { roleId: _roleId, ...withoutRole } = valid;
     expect(Pet.safeParse(withoutRole).success).toBe(false);
   });
@@ -47,6 +45,12 @@ describe('Pet', () => {
     const parsed = Pet.parse({ ...valid, persona: 'You are Scout.', toolAllowlist: [] });
     expect(parsed).not.toHaveProperty('persona');
     expect(parsed).not.toHaveProperty('toolAllowlist');
+  });
+
+  it('still parses a crew-era pet, dropping its role version and voice id', () => {
+    const parsed = Pet.parse({ ...valid, roleVersion: 2, voiceId: 'fox' });
+    expect(parsed).not.toHaveProperty('roleVersion');
+    expect(parsed).not.toHaveProperty('voiceId');
   });
 
   it('rejects an unknown reply style', () => {
@@ -89,7 +93,6 @@ describe('Pet.watchModel', () => {
     name: 'Scout',
     avatar: 'S',
     roleId: 'generalist',
-    roleVersion: 1,
     model: 'nvidia/nemotron-3-super-120b-a12b',
     providerId: 'nebius',
   };

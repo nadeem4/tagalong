@@ -12,9 +12,9 @@ export type ToolGrant = z.infer<typeof ToolGrant>;
  * One companion. A pet is entirely data: role, notes, model, and grants.
  * Adding a pet never means adding code.
  *
- * Stored pets saved before Phase 8 carried `persona` and `toolAllowlist`; parsing drops
- * unknown keys, so such JSON still parses, and the roles migration moves `persona` to
- * `notes` where the user had changed it.
+ * Parsing drops unknown keys, so a pet saved by an older version still parses: before
+ * Phase 8 that meant `persona` and `toolAllowlist` (the roles migration moved `persona` to
+ * `notes`), and before the crew went, `roleVersion` and `voiceId`.
  */
 export const Pet = z.object({
   id: z.string().min(1),
@@ -22,17 +22,15 @@ export const Pet = z.object({
   /** Emoji or an asset key the host knows how to render. */
   avatar: z.string().min(1),
   /**
-   * Phase 4. The pet's colour in the crew strip and the panel header, as `#rrggbb`.
-   * Optional so a pet saved before the crew existed still parses; hosts pick a neutral one.
+   * The pet's colour, as `#rrggbb`: its sprite's fur when it has no character of its own.
+   * Optional so a pet saved without one still parses; hosts pick a neutral one.
    */
   color: z
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/, 'a colour is #rrggbb')
     .optional(),
-  /** Phase 8. The role this pet does: a role library id such as `backend-engineer`. */
+  /** The role this pet does: a role library id, `companion` for Scout. */
   roleId: z.string().min(1),
-  /** Phase 8. The role's version when the pet last took it on. */
-  roleVersion: z.number().int().positive(),
   /** Phase 8. The user's own private notes for this pet, added to its instructions. */
   notes: z.string().optional(),
   /** The model that answers text turns. */
@@ -48,10 +46,8 @@ export const Pet = z.object({
    * Token Factory, Claude Haiku on OpenRouter and Anthropic.
    */
   watchModel: z.string().min(1).optional(),
-  /** BrainProvider id: 'nebius', 'anthropic' or 'fake'. Each pet picks its own. */
+  /** BrainProvider id: 'claude-code', 'nebius', 'anthropic' or 'fake'. */
   providerId: z.string().min(1),
-  /** Phase 3. */
-  voiceId: z.string().optional(),
   /**
    * Phase 8. Tool id to `off` or `allowed`. A tool the role lists and this map leaves out is
    * allowed, so the default `{}` means every tool the role lists.

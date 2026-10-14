@@ -9,7 +9,7 @@ at the same time cannot see each other.
 
 ## Why this is enforceable
 
-A pet holds nothing between turns (see [pet-communication.md](pet-communication.md)). Everything it
+A pet holds nothing between turns. Everything it
 knows on a turn was put into that turn's prompt by one function, the prompt assembler. So isolation
 is a property of **what the assembler is allowed to load**, and that can be tested.
 
@@ -45,7 +45,7 @@ path that loads something and forgets to drop it. A final check rejects any load
 | -------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | A meeting's messages appear in another meeting     | Thread rule above, plus the final `threadId` check                                            |
 | A pet sees a meeting it never attended             | Minutes are visible only to attendees; transcripts only by `threadId`                         |
-| A pet is in two meetings at once and mixes them    | The per-pet lock: one room at a time (see [meetings.md](meetings.md))                         |
+| A pet is in two meetings at once and mixes them    | The per-pet lock: one room at a time                                                          |
 | A pet repeats what it heard in an earlier meeting  | **Allowed by design**, like a colleague. It happens in a visible message, so the user sees it |
 | A pet writes something to the shared notebook      | The write is a tool call that appears in the thread, so it is never silent                    |
 | A quick question carries the asker's meeting along | The asked pet gets only the question text, no thread, no tools                                |

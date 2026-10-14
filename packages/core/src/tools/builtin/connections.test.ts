@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Connection } from '@tagalong/protocol';
 import { getRole } from '../../roles';
 import { FAKE_TURN_PET, fakeTurnTools } from '../fake-turn';
+import { toolsFor } from '../registry';
 import type { ConnectorToolDeps } from './connections';
 
 const notion: Connection = {
@@ -79,10 +80,10 @@ describe('connector tools', () => {
 
   it('only for a role that lists connections, and not when its grant is off', () => {
     expect(getRole('companion')?.tools).toContain('connections');
-    const generalist = fakeTurnTools({ connections: deps().value });
-    expect(generalist.definitions.some((d) => d.name.startsWith('notion__'))).toBe(false);
+    const listed = fakeTurnTools({ connections: deps().value, toolsFor }, { pet: companion });
+    expect(listed.definitions.some((d) => d.name.startsWith('notion__'))).toBe(true);
     const off = fakeTurnTools(
-      { connections: deps().value },
+      { connections: deps().value, toolsFor },
       { pet: { ...companion, toolGrants: { connections: 'off' } } },
     );
     expect(off.definitions.some((d) => d.name.startsWith('notion__'))).toBe(false);

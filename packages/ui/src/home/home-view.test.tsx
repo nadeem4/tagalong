@@ -10,7 +10,6 @@ const SCOUT: Pet = {
   name: 'Scout',
   avatar: '🦊',
   roleId: 'companion',
-  roleVersion: 1,
   model: 'haiku',
   providerId: 'claude-code',
   toolGrants: {},
