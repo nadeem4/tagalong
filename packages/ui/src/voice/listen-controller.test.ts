@@ -81,8 +81,7 @@ describe('ListenController, held', () => {
     expect(ears.made[0]?.ears.stopped).toBe(true);
     ears.say('turnEnd', ' what is this ');
     expect(calls.speechStart).toHaveBeenCalledOnce();
-    expect(calls.partial).toHaveBeenCalledOnce();
-    expect(calls.partial).toHaveBeenCalledWith('what is');
+    expect(calls.partial.mock.calls).toEqual([['what is', 'held']]);
     expect(calls.heard).toHaveBeenCalledWith('what is this');
     expect(controller.mode).toBeNull();
   });
@@ -295,16 +294,108 @@ describe('ListenController, always', () => {
     expect(controller.mode).toBe('always');
   });
 
-  it('ignores the talk key while already listening all the time, and never opens a second mic', async () => {
-    const { controller, openMic } = setup();
+  it('the talk key asks without the name while listening all the time, then listening resumes', async () => {
+    const order: string[] = [];
+    const { controller, ears, calls } = setup(
+      vi.fn(async () => {
+        order.push(`open, always stopped: ${String(ears.made[0]?.ears.stopped)}`);
+        return fakeMic();
+      }),
+    );
+    controller.setAlways(true);
+    await tick();
+    controller.hold();
+    await tick();
+    expect(controller.mode).toBe('held');
+    expect(ears.made.map((made) => made.mode)).toEqual(['always', 'held']);
+    // The always session ends before the held one opens its mic: the voice process runs them in order.
+    expect(order).toEqual(['open, always stopped: false', 'open, always stopped: true']);
+    ears.say('partial', 'what is');
+    controller.release();
+    await tick();
+    expect(controller.mode).toBe('always');
+    expect(ears.made.map((made) => made.mode)).toEqual(['always', 'held', 'always']);
+    ears.say('turnEnd', 'what is this');
+    expect(calls.partial.mock.calls).toEqual([['what is', 'held']]);
+    expect(calls.heard.mock.calls).toEqual([['what is this']]);
+    // Always listening goes on as before: only "Scout" asks.
+    await tick();
+    ears.say('turnEnd', 'what is that');
+    ears.say('turnEnd', 'Scout, and that?');
+    expect(calls.heard.mock.calls).toEqual([['what is this'], ['and that?']]);
+  });
+
+  it('cancel while listening all the time keeps listening', async () => {
+    const { controller, ears, openMic } = setup();
+    controller.setAlways(true);
+    await tick();
+    controller.cancel();
+    await tick();
+    expect(controller.mode).toBe('always');
+    expect(openMic).toHaveBeenCalledOnce();
+    expect(ears.made[0]?.ears.stopped).toBe(false);
+  });
+
+  it('cancel drops a question held while listening all the time, and listening resumes', async () => {
+    const { controller, ears, calls } = setup();
+    controller.setAlways(true);
+    await tick();
+    controller.hold();
+    await tick();
+    controller.cancel();
+    await tick();
+    expect(controller.mode).toBe('always');
+    expect(ears.made[1]?.ears.stopped).toBe(true);
+    ears.say('turnEnd', 'what is this');
+    expect(calls.heard).not.toHaveBeenCalled();
+  });
+
+  it('ending the session mid-turn after "Scout" cut Scout off lets the bubble go', async () => {
+    const { controller, ears, calls } = setup();
+    controller.setAlways(true);
+    await tick();
+    ears.say('partial', 'Scout, wh');
+    controller.setPaused(true);
+    expect(calls.dropped).toHaveBeenCalledOnce();
+    controller.setPaused(false);
+    await tick();
+    // A session ended with nothing addressed drops nothing.
+    controller.setDeaf(true);
+    expect(calls.dropped).toHaveBeenCalledOnce();
+  });
+
+  it('the ears failing ends the always session but leaves it switched on: the next change retries', async () => {
+    const { controller, ears, openMic } = setup();
+    controller.setAlways(true);
+    await tick();
+    expect(controller.earsFailed()).toBe('always');
+    await tick();
+    expect(controller.mode).toBeNull();
+    expect(ears.made[0]?.ears.stopped).toBe(true);
+    expect(openMic).toHaveBeenCalledOnce();
+    // The system voice speaking and stopping, a call, or the switch: listening tries again.
+    controller.setDeaf(true);
+    controller.setDeaf(false);
+    await tick();
+    expect(controller.mode).toBe('always');
+    expect(openMic).toHaveBeenCalledTimes(2);
+  });
+
+  it('the ears failing drops a held question and every released one, without resuming', async () => {
+    const { controller, ears, calls } = setup();
     controller.setAlways(true);
     await tick();
     controller.hold();
     await tick();
     controller.release();
+    controller.hold();
     await tick();
-    expect(openMic).toHaveBeenCalledOnce();
-    expect(controller.mode).toBe('always');
+    expect(controller.earsFailed()).toBe('held');
+    await tick();
+    expect(controller.mode).toBeNull();
+    ears.say('turnEnd', 'late');
+    expect(calls.heard).not.toHaveBeenCalled();
+    expect(controller.earsFailed()).toBeNull();
   });
 
   it('still lets the talk key work during a call, and does not reopen afterwards on its own', async () => {
@@ -346,7 +437,10 @@ describe('ListenController, always', () => {
     ears.say('partial', 'hey scout, what is');
     ears.say('turnEnd', 'Hey Scout, what is this?');
     expect(calls.speechStart).toHaveBeenCalledOnce();
-    expect(calls.partial.mock.calls).toEqual([['Hey Scout, what'], ['hey scout, what is']]);
+    expect(calls.partial.mock.calls).toEqual([
+      ['Hey Scout, what', 'always'],
+      ['hey scout, what is', 'always'],
+    ]);
     expect(calls.heard.mock.calls).toEqual([['what is this?']]);
     // The next turn barges in again.
     ears.say('turnEnd', 'scout, and that?');
@@ -399,7 +493,7 @@ describe('ListenController, always', () => {
     ears.say('partial', 'Scout, the held');
     ears.say('turnEnd', 'Scout, the held one');
     expect(calls.heard.mock.calls).toEqual([['Scout, the held one']]);
-    expect(calls.partial.mock.calls).toEqual([['Scout, the held']]);
+    expect(calls.partial.mock.calls).toEqual([['Scout, the held', 'held']]);
     expect(calls.speechStart).not.toHaveBeenCalled();
     await tick();
     ears.say('turnEnd', 'Scout, the always one');

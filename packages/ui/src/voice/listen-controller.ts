@@ -9,14 +9,17 @@ export interface ListenControllerOptions {
   openMic(): Promise<ListenMic>;
   /** Speech started: Scout stops talking. */
   onSpeechStart(): void;
-  /** The words heard so far. */
-  onPartial(text: string): void;
+  /** The words heard so far, and the session's mode: held words are shown as said. */
+  onPartial(text: string, mode: ListenMode): void;
   onHeard(text: string): void;
   onNothingHeard(): void;
   onMicFailed(error: unknown): void;
   /** "Scout, stop" was heard while listening all the time. */
   onStopListening(): void;
-  /** A turn that had stopped Scout ended with nothing to send. */
+  /**
+   * A turn that had stopped Scout ended with nothing to send, or its session ended mid-turn
+   * (a call, the switch, the system voice, the talk key).
+   */
   onDropped(): void;
 }
 
@@ -40,8 +43,10 @@ interface Session {
 /**
  * When the microphone is open, and what happens to what it hears. The mic opens on `hold`
  * (the talk key, the mic button) and closes on `release` or `cancel`; with Always listening
- * on (`setAlways`) it stays open, except during a call or full screen (`setPaused`) and while
- * the system voice speaks (`setDeaf`). Nothing heard after a session ends reaches the bubble.
+ * on (`setAlways`) it stays open, except during a call or full screen, or with the pets hidden
+ * (`setPaused`), and while the system voice speaks (`setDeaf`). The talk key still asks
+ * without the name then: the always session ends for the held question and comes back after
+ * it. Nothing heard after a session ends reaches the bubble.
  */
 export class ListenController {
   readonly #options: ListenControllerOptions;
@@ -65,8 +70,11 @@ export class ListenController {
     return this.#session?.mode ?? null;
   }
 
+  /** The talk key or the mic button: a question that needs no name, even while always listening. */
   hold(): void {
-    if (this.#session !== null) return;
+    if (this.#session?.mode === 'held') return;
+    // The voice process runs sessions in order: the always session stops before this one listens.
+    this.#end();
     this.#start('held');
   }
 
@@ -88,12 +96,26 @@ export class ListenController {
 
   /**
    * Drops the question being asked, and any released question whose words have not come
-   * (models that failed to load, a voice process that died): none of them is heard later.
+   * (the bubble closed, a voice process that died): none of them is heard later. Always
+   * listening is not a question: it goes on (or comes back after the held one).
    */
   cancel(): void {
-    for (const waiting of this.#released) waiting.live = false;
-    this.#released.clear();
+    this.#dropReleased();
+    if (this.#session?.mode === 'held') this.#end();
+    this.#sync();
+  }
+
+  /**
+   * The ears failed (the first download offline, models that would not start): every
+   * question is dropped and the mic closes. Always listening stays switched on but does not
+   * retry at once, which would fail again; the next switch, call or system voice tries again
+   * (the voice process tries its download again). Returns what was listening.
+   */
+  earsFailed(): ListenMode | null {
+    const mode = this.mode;
+    this.#dropReleased();
     this.#end();
+    return mode;
   }
 
   /** Always listening, as the person switched it. */
@@ -102,7 +124,7 @@ export class ListenController {
     this.#sync();
   }
 
-  /** A call or a full-screen window: the mic closes until it is over. */
+  /** A call or a full-screen window, or the pets hidden: the mic closes until it is over. */
   setPaused(paused: boolean): void {
     this.#paused = paused;
     this.#sync();
@@ -125,7 +147,15 @@ export class ListenController {
     else if (!wanted && session?.mode === 'always') this.#end();
   }
 
-  /** Ends the current session at once: the mic closes and nothing it hears counts. */
+  #dropReleased(): void {
+    for (const waiting of this.#released) waiting.live = false;
+    this.#released.clear();
+  }
+
+  /**
+   * Ends the current session at once: the mic closes and nothing it hears counts. A turn that
+   * had already cut Scout off lets the bubble go, as its words will never be asked.
+   */
   #end(): void {
     const session = this.#session;
     if (session === null) return;
@@ -134,6 +164,10 @@ export class ListenController {
     void session.mic.then((mic) => mic?.close());
     // A mic that never opened never listened: a stop now could end another session.
     if (session.opened) session.ears.stop();
+    if (session.barged) {
+      session.barged = false;
+      this.#options.onDropped();
+    }
   }
 
   /**
@@ -169,7 +203,7 @@ export class ListenController {
     ears.on('partial', (text) => {
       if (!session.live || text === undefined || text === '') return;
       if (mode === 'always' && this.#addressed(session, text) === null) return;
-      this.#options.onPartial(text);
+      this.#options.onPartial(text, mode);
     });
     ears.on('turnEnd', (text = '') => {
       if (!session.live) return;
