@@ -64,7 +64,9 @@ export function registerCrewIpc(handle: IpcHandle, deps: CrewIpcDeps): void {
     for (const expert of welcomeExperts(await deps.findAgents(), experts)) {
       await client.call('experts.upsert', { expert });
     }
-    const patch: SettingsPatch = { hiddenPets, welcome: { done: true } };
+    // The whole record is kept: a patch replaces `welcome`, and setup reads it again later.
+    const welcome = { ...deps.settings().welcome, done: true, step: 'try' as const };
+    const patch: SettingsPatch = { hiddenPets, welcome };
     deps.setSettings((await client.call('settings.set', { patch })).settings);
     refreshStrip();
     deps.welcomed();

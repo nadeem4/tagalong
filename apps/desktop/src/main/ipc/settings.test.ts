@@ -19,6 +19,7 @@ function setup({ engineUp = true, problem = null as string | null, folder = 'C:\
     'settings.set': { settings: ENGINE_SETTINGS },
     'pets.list': { pets: [PET] },
     'models.list': { models: ['m1'], source: 'live' },
+    'providers.check': { ok: true },
   });
   const secrets = new InMemorySecretStore();
   const settingsStore = {
@@ -131,6 +132,22 @@ describe('registerSettingsIpc: keys and models', () => {
     expect(await down.invoke(IPC.listModels, 'openrouter')).toEqual({
       models: [],
       source: 'fallback',
+    });
+  });
+});
+
+describe('registerSettingsIpc: checkKey', () => {
+  it('asks the engine to test the key once', async () => {
+    const { invoke, calls } = setup();
+    expect(await invoke(IPC.checkKey, 'openrouter')).toEqual({ ok: true });
+    expect(calls).toContainEqual(['providers.check', { providerId: 'openrouter' }]);
+  });
+
+  it('says plainly that it could not test with no engine', async () => {
+    const { invoke } = setup({ engineUp: false });
+    expect(await invoke(IPC.checkKey, 'openrouter')).toEqual({
+      ok: false,
+      message: 'Tagalong’s engine isn’t running, so I couldn’t test the key.',
     });
   });
 });

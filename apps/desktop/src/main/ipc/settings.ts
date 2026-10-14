@@ -1,6 +1,6 @@
 import { WATCH_MODEL_DEFAULTS } from '@tagalong/core';
 import type { SecretStore } from '@tagalong/core';
-import type { Settings, SettingsPatch } from '@tagalong/protocol';
+import type { ProvidersCheckResult, Settings, SettingsPatch } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
 import type { HostView, ModelList } from '../../shared/ipc';
 import {
@@ -91,6 +91,14 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
     if (secretKey === undefined) throw new Error(`'${providerId}' does not take an API key`);
     if (apiKey.length === 0) await secrets.delete(secretKey);
     else await secrets.set(secretKey, apiKey);
+  });
+
+  handle(IPC.checkKey, async (_event, providerId: string): Promise<ProvidersCheckResult> => {
+    const host = deps.host();
+    if (host === null) {
+      return { ok: false, message: 'Tagalong’s engine isn’t running, so I couldn’t test the key.' };
+    }
+    return host.client.call('providers.check', { providerId });
   });
 
   handle(IPC.listModels, async (_event, providerId: string): Promise<ModelList> => {
