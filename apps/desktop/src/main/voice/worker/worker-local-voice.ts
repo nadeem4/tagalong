@@ -30,6 +30,12 @@ export class WorkerLocalVoice implements LocalVoice {
   }
 
   async speak(text: string, { voice, speed }: SpeakOptions): Promise<SpokenAudio> {
-    return (await this.#worker.call({ kind: 'call', method: 'kokoro.speak', text, voice, speed })) as SpokenAudio;
+    return (await this.#worker.call({
+      kind: 'call',
+      method: 'kokoro.speak',
+      text,
+      voice,
+      speed,
+    })) as SpokenAudio;
   }
 }

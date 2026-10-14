@@ -32,7 +32,14 @@ describe('createWorkerHandler', () => {
 
   it('speaks a line in the voice and speed asked for', async () => {
     const { posted, kokoro, handle, settle } = setup();
-    handle({ kind: 'call', id: 7, method: 'kokoro.speak', text: 'Hi.', voice: 'bm_fable', speed: 1 });
+    handle({
+      kind: 'call',
+      id: 7,
+      method: 'kokoro.speak',
+      text: 'Hi.',
+      voice: 'bm_fable',
+      speed: 1,
+    });
     await settle();
     expect(kokoro.speak).toHaveBeenCalledWith('Hi.', { voice: 'bm_fable', speed: 1 });
     expect(posted).toContainEqual({ kind: 'result', id: 7, value: AUDIO });
@@ -41,7 +48,14 @@ describe('createWorkerHandler', () => {
   it('answers a failure as an error with its message, never a silent drop', async () => {
     const { posted, kokoro, handle, settle } = setup();
     kokoro.speak.mockRejectedValueOnce(new Error('not loaded'));
-    handle({ kind: 'call', id: 3, method: 'kokoro.speak', text: 'x', voice: 'bm_george', speed: 1 });
+    handle({
+      kind: 'call',
+      id: 3,
+      method: 'kokoro.speak',
+      text: 'x',
+      voice: 'bm_george',
+      speed: 1,
+    });
     await settle();
     expect(posted).toEqual([{ kind: 'error', id: 3, message: 'not loaded' }]);
   });

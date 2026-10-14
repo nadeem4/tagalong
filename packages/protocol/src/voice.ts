@@ -121,7 +121,10 @@ export function mouthOrder(chosen: MouthId): MouthId[] {
  * The mouth the person picked. A settings file from before the picker has no `mouth`: one
  * with an ElevenLabs voice set was speaking with ElevenLabs, and keeps doing so.
  */
-export function chosenMouth(voice: { mouth?: MouthId | undefined; elevenLabsVoiceId: string }): MouthId {
+export function chosenMouth(voice: {
+  mouth?: MouthId | undefined;
+  elevenLabsVoiceId: string;
+}): MouthId {
   return voice.mouth ?? (voice.elevenLabsVoiceId !== '' ? 'elevenlabs' : LOCAL_MOUTH);
 }
 
