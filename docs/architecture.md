@@ -1427,9 +1427,13 @@ flowchart LR
   It stays until **Got it** or a hotkey question. **Try it now** captures the active window and a screenshot
   (`capture(['activeWindow', 'screenshot'])`) and asks "What am I working on, and what could you
   hand to an expert?" in the same bubble; when the screen cannot be seen it asks without it.
-- **Every later launch says one quiet line.** When Welcome is done and `settings.greeting` is on
-  (`welcome.ts#shouldGreetOnLaunch`, default on), main calls `greeting.compose` for the default pet,
-  sends the text as `greetLineEvent` (the preload keeps one that arrives before the panel subscribes)
+- **Every later launch says one quiet line.** `welcome.ts#launchLine` picks it. With Always
+  listening on at launch (`settings.listening.always`) it is the listening line,
+  `LISTENING_LINE` ("I’m listening. Say “Scout, stop”, or switch off Always listening in my
+  bubble."), even when the greeting is switched off, and nothing is composed. Otherwise, when
+  Welcome is done and `settings.greeting` is on (`welcome.ts#shouldGreetOnLaunch`, default on),
+  main calls `greeting.compose` for the default pet. Either way main sends the text as
+  `greetLineEvent` (the preload keeps one that arrives before the panel subscribes)
   and shows the panel with `showPanelQuietly`. The panel renders `GreetingLine`: `role="status"`,
   fades after about seven seconds unless pointed at or focused, opens the ask bubble on a click.
   Then main stores `lastOpenedAt`, whether or not it greeted, and on `before-quit` it stores

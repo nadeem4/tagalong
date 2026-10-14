@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Pet, Settings } from '@tagalong/protocol';
 import type { Role } from '@tagalong/protocol';
 import {
   companionOn,
+  LISTENING_LINE,
   findAgents,
+  launchLine,
   shouldGreetOnLaunch,
   shouldOpenWelcome,
   welcomeCrew,
@@ -76,6 +78,37 @@ describe('shouldGreetOnLaunch', () => {
     expect(shouldGreetOnLaunch(Settings.parse({ welcome: { done: true }, greeting: false }))).toBe(
       false,
     );
+  });
+});
+
+describe('launchLine', () => {
+  it('says Scout is listening and how to stop, when Always listening is on, even with the greeting off', async () => {
+    expect(LISTENING_LINE).toBe(
+      'I’m listening. Say “Scout, stop”, or switch off Always listening in my bubble.',
+    );
+    for (const greeting of [true, false]) {
+      const compose = vi.fn(async () => 'Morning.');
+      const settings = Settings.parse({
+        welcome: { done: true },
+        greeting,
+        listening: { always: true },
+      });
+      expect(await launchLine(settings, compose)).toBe(LISTENING_LINE);
+      expect(compose).not.toHaveBeenCalled();
+    }
+  });
+
+  it('says the composed greeting when listening is off and the greeting is allowed', async () => {
+    const compose = vi.fn(async () => 'Morning.');
+    expect(await launchLine(Settings.parse({ welcome: { done: true } }), compose)).toBe('Morning.');
+    expect(compose).toHaveBeenCalledOnce();
+  });
+
+  it('says nothing when listening is off and the greeting is switched off', async () => {
+    const compose = vi.fn(async () => 'Morning.');
+    const settings = Settings.parse({ welcome: { done: true }, greeting: false });
+    expect(await launchLine(settings, compose)).toBeNull();
+    expect(compose).not.toHaveBeenCalled();
   });
 });
 

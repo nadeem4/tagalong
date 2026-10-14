@@ -38,7 +38,7 @@ import type { WorkerProcess } from './voice/worker/messages';
 import { WorkerLocalVoice } from './voice/worker/worker-local-voice';
 import type { VoiceService } from './voice/voice';
 import { checkClaudeSignIn } from './claude-sign-in';
-import { findAgents, shouldGreetOnLaunch, shouldOpenWelcome } from './welcome';
+import { findAgents, launchLine, shouldOpenWelcome } from './welcome';
 import type { EngineHost } from './engine-host';
 import {
   DEFAULT_PAUSE_SIGHT_HOTKEY,
@@ -427,10 +427,13 @@ async function greetOnLaunch(host: EngineHost): Promise<void> {
   const current = desktop;
   if (current === null) return;
   try {
-    if (shouldGreetOnLaunch(current.settings)) {
-      const { text } = await host.client.call('greeting.compose', {
-        petId: current.settings.defaultPetId,
-      });
+    // With Always listening on, the first line says so and how to stop, greeting or not.
+    const text = await launchLine(
+      current.settings,
+      async () =>
+        (await host.client.call('greeting.compose', { petId: current.settings.defaultPetId })).text,
+    );
+    if (text !== null) {
       const { panel, avatar } = current;
       if (panel !== null && avatar !== null && avatar.isVisible() && !panel.isVisible()) {
         if (panel.webContents.isLoading()) {
