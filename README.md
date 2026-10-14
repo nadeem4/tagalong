@@ -176,9 +176,8 @@ waits until you are done with it, then arrives on your screen.
 4. **What should I call you?** Optional: type your first name, or skip it. Scout uses it rarely,
    in a hello or a moment that warrants it. Change or clear it under **Settings → You**.
 5. **One key to remember.** Ctrl+Shift+Space asks Scout about whatever is on your screen.
-6. **Start.** Scout docks on your screen and introduces itself in its bubble in three short beats
-   (**Next** between them): where it lives, how it hands real work to an expert, and the key to
-   press. **Try it now** has Scout look at your screen and say what it could hand to an expert;
+6. **Start.** Scout docks on your screen and invites one real question about your
+   screen in a single line in its bubble, with the key to press. **Try it now** has Scout look at your screen and say what it could hand to an expert;
    **Got it** sends it back to the dock. If Claude Code is installed it becomes Scout's first
    expert, so hand-offs work straight away.
 

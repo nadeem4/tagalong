@@ -264,18 +264,16 @@ change".
 
 ## Greeting
 
-### G.1. The intro after Welcome, in three beats
+### G.1. The invitation after setup, in one line
 
 1. **Setup:** a fresh install (empty `%APPDATA%\Tagalong`).
-2. **Action:** finish Welcome with **Start**.
-3. **Expected:** Scout's bubble opens beside it without taking the keyboard and types in "Hi, I'm
-   Scout. I sit in the corner of your screen and keep an eye on what you're working on, never on
-   passwords or private windows." **Next** shows "Ask me about whatever you're on. When it needs
-   real work, I brief an expert, like Claude Code, and bring the answer back." **Next** again shows
-   "Press Ctrl+Shift+Space anytime." with **Try it now** (focused) and **Got it**. Three dots show
-   which beat you are on. Tab reaches every button.
+2. **Action:** finish setup with **Try it**.
+3. **Expected:** Scout's bubble opens beside it without taking the keyboard and types in one line:
+   "Here I am. Ask me one real thing about your screen. Press Ctrl+Shift+Space anytime." (with
+   your name after "Here I am," when you gave one), with **Try it now** (focused) and **Got it**.
+   There is no **Next**. Tab reaches both buttons.
 4. **Reduced motion:** with Windows Settings → Accessibility → Visual effects → **Animation effects**
-   off, each beat appears whole, with no typing.
+   off, the line appears whole, with no typing.
 
 ### G.2. A later launch says one quiet line
 

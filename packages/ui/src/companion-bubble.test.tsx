@@ -55,10 +55,8 @@ const ask = (text: string) => {
   fireEvent.keyDown(input, { key: 'Enter' });
 };
 
-const BEAT_ONE =
-  'Hi, I’m Scout. I sit in the corner of your screen and keep an eye on what you’re working on, never on passwords or private windows.';
-const BEAT_TWO =
-  'Ask me about whatever you’re on. When it needs real work, I brief an expert, like Claude Code, and bring the answer back.';
+const INVITE =
+  'Here I am. Ask me one real thing about your screen. Press Ctrl+Shift+Space anytime.';
 
 /** Says whether the person asked for reduced motion; jsdom has no matchMedia of its own. */
 function prefersReducedMotion(reduce: boolean): void {
@@ -68,19 +66,13 @@ function prefersReducedMotion(reduce: boolean): void {
   );
 }
 
-/** Steps through the intro's first two beats to the last one. */
-function toLastBeat(): void {
-  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-}
-
-describe('CompanionBubble intro', () => {
+describe('CompanionBubble invitation after setup', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
-  it('introduces itself in three beats after Welcome, with Next between them', () => {
+  it('invites one real question in one line, with no Next', () => {
     prefersReducedMotion(true);
     const onDismiss = vi.fn();
     renderBubble(createFakeHostBridge(), {
@@ -88,53 +80,34 @@ describe('CompanionBubble intro', () => {
       hotkeyLabel: 'Ctrl+Shift+Space',
       onDismiss,
     });
-
-    expect(screen.getByRole('status')).toHaveTextContent(BEAT_ONE);
-    expect(screen.queryByRole('button', { name: 'Got it' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-
-    expect(screen.getByRole('status')).toHaveTextContent(BEAT_TWO);
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-
-    expect(screen.getByRole('status')).toHaveTextContent('Press Ctrl+Shift+Space anytime.');
+    expect(screen.getByRole('status')).toHaveTextContent(INVITE);
     expect(screen.queryByRole('button', { name: 'Next' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Try it now' })).toHaveFocus();
     fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
     expect(onDismiss).toHaveBeenCalledOnce();
   });
 
-  it('types each beat in, while a screen reader hears the whole line at once', () => {
+  it('types the line in, while a screen reader hears it whole', () => {
     prefersReducedMotion(false);
     vi.useFakeTimers();
-    renderBubble(createFakeHostBridge(), { greeting: true });
-
+    renderBubble(createFakeHostBridge(), { greeting: true, hotkeyLabel: 'Ctrl+Shift+Space' });
     const shown = screen.getByTestId('intro-typed');
     expect(shown.closest('[aria-hidden="true"]')).not.toBeNull();
-    expect(shown.textContent!.length).toBeLessThan(BEAT_ONE.length);
-    expect(screen.getByRole('status')).toHaveTextContent(BEAT_ONE);
-
+    expect(shown.textContent!.length).toBeLessThan(INVITE.length);
     act(() => vi.advanceTimersByTime(10_000));
-    expect(shown).toHaveTextContent(BEAT_ONE);
+    expect(shown).toHaveTextContent(INVITE);
   });
 
-  it('greets by name in the first beat when the person gave one', () => {
+  it('greets by name when the person gave one', () => {
     prefersReducedMotion(true);
-    renderBubble(createFakeHostBridge(), { greeting: true, userName: 'Nadeem' });
+    renderBubble(createFakeHostBridge(), {
+      greeting: true,
+      hotkeyLabel: 'Ctrl+Shift+Space',
+      userName: 'Nadeem',
+    });
     expect(screen.getByRole('status')).toHaveTextContent(
-      BEAT_ONE.replace('Hi, I’m Scout.', 'Hi Nadeem, I’m Scout.'),
+      INVITE.replace('Here I am.', 'Here I am, Nadeem.'),
     );
-  });
-
-  it('keeps the first beat unchanged with no name', () => {
-    prefersReducedMotion(true);
-    renderBubble(createFakeHostBridge(), { greeting: true, userName: '' });
-    expect(screen.getByRole('status')).toHaveTextContent(BEAT_ONE);
-  });
-
-  it('shows each beat whole, with no typing, when motion is reduced', () => {
-    prefersReducedMotion(true);
-    renderBubble(createFakeHostBridge(), { greeting: true });
-    expect(screen.getByTestId('intro-typed')).toHaveTextContent(BEAT_ONE);
   });
 });
 
@@ -143,7 +116,6 @@ describe('CompanionBubble', () => {
     const bridge = createFakeHostBridge({ capture: SNAPSHOT });
     const onDismiss = vi.fn();
     renderBubble(bridge, { greeting: true, onDismiss });
-    toLastBeat();
 
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Try it now' })));
 
@@ -157,7 +129,6 @@ describe('CompanionBubble', () => {
   it('still tries it when it cannot see the screen, without a snapshot', async () => {
     const bridge = createFakeHostBridge({ capture: null });
     renderBubble(bridge, { greeting: true });
-    toLastBeat();
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Try it now' })));
     expect(bridge.asks).toEqual([{ petId: 'scout', text: TRY_IT }]);
   });
@@ -485,14 +456,11 @@ describe('CompanionBubble voice', () => {
     expect(onSay).not.toHaveBeenCalled();
   });
 
-  it('says each beat of the hello aloud, once, as it appears', () => {
+  it('says the invitation aloud once', () => {
     const onSay = vi.fn();
     renderBubble(createFakeHostBridge(), { greeting: true, onSay });
     expect(onSay).toHaveBeenCalledOnce();
-    expect(onSay.mock.calls[0]?.[0]).toMatch(/^Hi, I’m Scout\./);
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    expect(onSay).toHaveBeenCalledTimes(2);
-    expect(onSay.mock.calls[1]?.[0]).toMatch(/^Ask me about whatever/);
+    expect(onSay.mock.calls[0]?.[0]).toBe(INVITE);
   });
 
   it('shows that it is speaking, and stops when asked', () => {
