@@ -999,7 +999,11 @@ character (`characterFor`) at 4x, with a face and a tag per mood (`withMood`,
 while the companion answers or an expert has a task, eyes down; **Done** when a hand-off finishes, a
 happy squint, until the pet is clicked. The mood comes from `dockMood(nextDock(...))`
 (`renderer/src/dock.ts`), a pure reducer over turn and hand-off notifications and capture notices.
-The sight-paused mark and the recording dot stay. The pet is alive: it blinks every three to six
+The sight-paused mark and the recording dot stay, and so does the listening mark: while Always
+listening is on, `DockPet`'s `listening` prop draws a small green dot (`dock-pet__listening`), solid
+while on and an outline while paused, and the pet's name reads "…, listening" or "…, listening
+paused". The avatar reads `getListening` on mount and follows `onListening`, so the mark shows
+from the first second. The pet is alive: it blinks every three to six
 seconds (`withBlink`) in moods with open eyes, breathes with a 1 px rise when idle or seeing, bobs
 faster while working and hops three times when done; `prefers-reduced-motion` stops all of it.
 
@@ -1592,7 +1596,7 @@ flowchart LR
   subgraph Main["Main process"]
     HK["hotkeys.talk: every press"] --> TE["IPC talkEvent(at)"]
     IPCV["ipc/voice.ts: earsListen notes the active window; micFrame, earsStop"]
-    FE["forwardEars: to every window"]
+    FE["forwardEars: to every window; words addressed to Scout bring the bubble up"]
   end
   subgraph Worker["Voice process"]
     EH["createEarsHost: one session at a time"] --> LE["LocalEars (FakeEars under TAGALONG_FAKE_STT)"]
@@ -1674,6 +1678,17 @@ flowchart LR
   being held and any released question still waiting for its words, and shows the message. The
   voice process posts `loading` only when the model files are not on disk yet, and the panel then
   says the first-time download (about 43 MB).
+- **Always listening, in main** (`main/always-listening.ts`, `main/ipc/voice.ts`). One
+  `AlwaysListening` state (`{ on, paused }`) is built from the saved `settings.listening.always`
+  before any window opens. Only the person switches it: `getListening` and `setListening(on)` (a
+  boolean, anything else refused with "Always listening is on or off.") on the voice IPC. Each
+  change goes to every window as `IPC.listeningEvent`, and when `on` changes main saves it with
+  `settings.set { listening: { always } }`; `paused` is never saved. `startListeningGuard` checks
+  the front window every 2 s while it is on and pauses listening for a call or a full-screen
+  window (`listeningBlocked`), stopped on quit. `forwardEars` takes an `onSpoken` callback: a
+  `partial` or `turnEnd` whose words are addressed to Scout (`addressedToScout`, from
+  `@tagalong/protocol`) brings the hidden bubble up with `showPanelBeside`; bare speech or talk
+  that does not start with the name never does.
 - **The ears, in the voice process** (`main/voice/worker/ears-host.ts`, `main/voice/ears/`).
   `createEarsHost` opens an inbox for frames at each listen, so the first words are not lost while
   the models load, and runs one session at a time. Letting go of a held question only ends its

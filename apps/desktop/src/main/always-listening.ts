@@ -1,10 +1,8 @@
 import { isMeeting } from '@tagalong/core';
 import type { WindowEntry } from '@tagalong/protocol';
+import type { ListeningState } from '../shared/ipc';
 
-export interface ListeningState {
-  on: boolean;
-  paused: boolean;
-}
+export type { ListeningState };
 
 /**
  * Whether Scout listens all the time, and whether that is paused for a call or full

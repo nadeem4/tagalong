@@ -12,6 +12,8 @@ export interface DockPetProps {
   sightPaused?: boolean;
   /** Rolling memory holds the last minutes of the screen: never allowed to be invisible. */
   recording?: boolean;
+  /** Always listening is on, or paused for a call or full screen: shown the whole time. */
+  listening?: 'on' | 'paused' | undefined;
   /** How often it blinks. Left out, every three to six seconds, never in step. */
   blinkEveryMs?: number;
 }
@@ -49,6 +51,7 @@ export function DockPet({
   mood,
   sightPaused = false,
   recording = false,
+  listening,
   blinkEveryMs,
 }: DockPetProps) {
   const [blinking, setBlinking] = useState(false);
@@ -88,7 +91,7 @@ export function DockPet({
   const tag = mood === 'idle' ? undefined : TAGS[mood];
   const label = `${pet.name} ${WORDS[mood]}${sightPaused ? ', sight paused' : ''}${
     recording && !sightPaused ? ', recording the screen' : ''
-  }`;
+  }${listening === 'on' ? ', listening' : listening === 'paused' ? ', listening paused' : ''}`;
   return (
     <span
       role="img"
@@ -156,6 +159,14 @@ export function DockPet({
           }}
         />
       )}
+      {listening !== undefined && (
+        <span
+          className="dock-pet__listening"
+          data-testid="listening-mark"
+          data-state={listening}
+          aria-hidden="true"
+        />
+      )}
     </span>
   );
 }
@@ -177,5 +188,10 @@ const DOCK_CSS = `
 @keyframes dock-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1px); } }
 @keyframes dock-busy { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
 @keyframes dock-hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-8px); } }
-@media (prefers-reduced-motion: reduce) { .dock-body { animation: none !important; } }
+/* Always listening: a solid dot while on, an outline while paused. Never hidden. */
+.dock-pet__listening { position: absolute; bottom: 4px; right: 4px; width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; border: 2px solid #7DD87F; background: #7DD87F; box-shadow: 0 0 0 1px #fff; }
+.dock-pet__listening[data-state='on'] { animation: dock-listening 2.4s ease-in-out infinite; }
+.dock-pet__listening[data-state='paused'] { background: transparent; }
+@keyframes dock-listening { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+@media (prefers-reduced-motion: reduce) { .dock-body, .dock-pet__listening { animation: none !important; } }
 `;

@@ -66,6 +66,18 @@ describe('DockPet', () => {
     expect(screen.getByTestId('recording-dot')).toBeInTheDocument();
     expect(screen.getByRole('img')).toHaveAccessibleName('Scout is idle, recording the screen');
   });
+
+  it('shows that Scout is listening the whole time it is, and when that is paused', () => {
+    const { rerender } = render(<DockPet pet={SCOUT} mood="idle" listening="on" />);
+    expect(screen.getByTestId('listening-mark')).toHaveAttribute('data-state', 'on');
+    expect(screen.getByRole('img')).toHaveAccessibleName('Scout is idle, listening');
+    rerender(<DockPet pet={SCOUT} mood="idle" listening="paused" />);
+    expect(screen.getByTestId('listening-mark')).toHaveAttribute('data-state', 'paused');
+    expect(screen.getByRole('img')).toHaveAccessibleName('Scout is idle, listening paused');
+    rerender(<DockPet pet={SCOUT} mood="idle" />);
+    expect(screen.queryByTestId('listening-mark')).toBeNull();
+    expect(screen.getByRole('img')).toHaveAccessibleName('Scout is idle');
+  });
 });
 
 describe('a living pet', () => {

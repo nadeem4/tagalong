@@ -1,5 +1,7 @@
+import { addressedToScout } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
 import type { SpeakPreview } from '../../shared/ipc';
+import type { AlwaysListening } from '../always-listening';
 import type { VoiceWorker } from '../voice/worker/client';
 import type { VoiceService } from '../voice/voice';
 import type { IpcHandle, IpcOn } from './handle';
@@ -9,6 +11,8 @@ export interface VoiceIpcDeps {
   worker: () => Pick<VoiceWorker, 'send' | 'call'>;
   /** Notes the window you are on, as the ask key does. */
   noteActiveWindow: () => Promise<unknown>;
+  /** Always listening: only the person switches it, from the bubble. */
+  listening: () => Pick<AlwaysListening, 'state' | 'set'>;
   on: IpcOn;
 }
 
@@ -60,6 +64,12 @@ export function registerVoiceIpc(handle: IpcHandle, deps: VoiceIpcDeps): void {
 
   handle(IPC.earsStop, () => inOrder(() => deps.worker().send({ kind: 'ears.stop' })));
 
+  handle(IPC.getListening, () => deps.listening().state);
+  handle(IPC.setListening, (_event, on: unknown) => {
+    if (typeof on !== 'boolean') throw new Error('Always listening is on or off.');
+    return deps.listening().set(on);
+  });
+
   // A download, not a listening step: it stays out of the ordering queue. Progress comes back
   // through forwardEars as IPC.earsProgressEvent.
   handle(IPC.ensureEars, async () => {
@@ -67,13 +77,26 @@ export function registerVoiceIpc(handle: IpcHandle, deps: VoiceIpcDeps): void {
   });
 }
 
-/** What the ears say goes to the windows; a dead voice process is said plainly. */
+/**
+ * What the ears say goes to the windows; a dead voice process is said plainly. `onSpoken`
+ * hears words addressed to Scout, so the bubble can come up: never bare speech, never talk
+ * that does not start with the name.
+ */
 export function forwardEars(
   worker: Pick<VoiceWorker, 'onMessage' | 'onExit'>,
   send: (channel: string, payload: unknown) => void,
+  onSpoken?: () => void,
 ): void {
   worker.onMessage((message) => {
     if (message.kind === 'ears') {
+      if (
+        onSpoken !== undefined &&
+        (message.event === 'partial' || message.event === 'turnEnd') &&
+        message.text !== undefined &&
+        addressedToScout(message.text) !== null
+      ) {
+        onSpoken();
+      }
       send(
         IPC.earsEvent,
         message.text === undefined

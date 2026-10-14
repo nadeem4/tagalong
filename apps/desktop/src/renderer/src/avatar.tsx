@@ -2,6 +2,7 @@ import { StrictMode, useEffect, useReducer, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { DockPet } from '@tagalong/ui';
 import type { Pet } from '@tagalong/protocol';
+import type { ListeningState } from '../../shared/ipc';
 // Bundled, not fetched: the dock's tags are Onest 600, Latin subset only.
 import '@fontsource/onest/latin-600.css';
 import './app.css';
@@ -24,6 +25,7 @@ function Avatar() {
   const [dock, send] = useReducer(nextDock, IDLE_DOCK);
   const [sightPaused, setSightPaused] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [listening, setListening] = useState<ListeningState>({ on: false, paused: false });
   const drag = useRef<DragState | null>(null);
   const dragged = useRef(false);
 
@@ -55,6 +57,15 @@ function Avatar() {
       .then(setRecording)
       .catch((error: unknown) => console.error('could not read rolling memory state', error));
     return window.tagalongHost.onRecording(setRecording);
+  }, []);
+
+  // Always listening, read on mount too: the mark shows from the first second it is on.
+  useEffect(() => {
+    window.tagalongHost
+      .getListening()
+      .then(setListening)
+      .catch((error: unknown) => console.error('could not read Always listening', error));
+    return window.tagalongHost.onListening(setListening);
   }, []);
 
   useEffect(() => window.tagalong.onTurnEvent((event) => send(event)), []);
@@ -122,7 +133,13 @@ function Avatar() {
           void window.tagalongHost.selectPet(pet.id);
         }}
       >
-        <DockPet pet={pet} mood={dockMood(dock)} sightPaused={sightPaused} recording={recording} />
+        <DockPet
+          pet={pet}
+          mood={dockMood(dock)}
+          sightPaused={sightPaused}
+          recording={recording}
+          listening={listening.on ? (listening.paused ? 'paused' : 'on') : undefined}
+        />
       </button>
     </div>
   );

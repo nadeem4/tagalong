@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { IPC } from '../../shared/ipc';
+import { AlwaysListening } from '../always-listening';
 import type { FromWorker } from '../voice/worker/messages';
 import { fakeIpc } from './fake-ipc';
 import { forwardEars, registerVoiceIpc } from './voice';
@@ -8,13 +9,15 @@ function setup(noteActiveWindow: () => Promise<unknown> = () => Promise.resolve(
   const ipc = fakeIpc();
   const voice = { speak: vi.fn(() => Promise.resolve({ kind: 'off' as const })) };
   const worker = { send: vi.fn(), call: vi.fn(async () => true as unknown) };
+  const listening = new AlwaysListening();
   registerVoiceIpc(ipc.handle, {
     voice: () => voice,
     worker: () => worker,
     noteActiveWindow,
+    listening: () => listening,
     on: ipc.on,
   });
-  return { ...ipc, voice, worker };
+  return { ...ipc, voice, worker, listening };
 }
 
 describe('registerVoiceIpc', () => {
@@ -82,6 +85,14 @@ describe('registerVoiceIpc', () => {
       'ears.stop',
     ]);
   });
+
+  it('switches Always listening only when asked, with a boolean', async () => {
+    const { invoke } = setup();
+    expect(await invoke(IPC.getListening)).toEqual({ on: false, paused: false });
+    expect(await invoke(IPC.setListening, true)).toEqual({ on: true, paused: false });
+    await expect(invoke(IPC.setListening, 'yes')).rejects.toThrow('on or off');
+    expect(await invoke(IPC.getListening)).toEqual({ on: true, paused: false });
+  });
 });
 
 describe('forwardEars', () => {
@@ -114,5 +125,21 @@ describe('forwardEars', () => {
         { status: 'failed', message: 'Listening stopped unexpectedly. Try again.' },
       ],
     ]);
+  });
+
+  it('brings the bubble up only for words addressed to Scout, never for bare speech', () => {
+    const listeners: ((m: FromWorker) => void)[] = [];
+    const onSpoken = vi.fn();
+    forwardEars(
+      { onMessage: (l) => (listeners.push(l), () => undefined), onExit: () => () => undefined },
+      () => undefined,
+      onSpoken,
+    );
+    listeners.forEach((l) => l({ kind: 'ears', event: 'speechStart' }));
+    listeners.forEach((l) => l({ kind: 'ears', event: 'partial', text: 'what' }));
+    listeners.forEach((l) => l({ kind: 'ears', event: 'turnEnd', text: 'what is Scout doing' }));
+    expect(onSpoken).not.toHaveBeenCalled();
+    listeners.forEach((l) => l({ kind: 'ears', event: 'partial', text: 'Scout, what' }));
+    expect(onSpoken).toHaveBeenCalledOnce();
   });
 });
