@@ -1458,7 +1458,7 @@ flowchart LR
   `greeting/scenario.ts#launchScenario` picks one scenario from the recorded facts: a crash, else an
   update (`lastVersion` differs from the running version), else away (a day or more since
   `awaySince`), else normal. The handwritten line for each: "I closed unexpectedly last time…"
-  (naming the tasks it cut short), "I’ve been updated to x.y.z." plus `WHATS_NEW`
+  (naming the tasks it cut short), "Morning. I’ve been updated to x.y.z." (the time of day first) plus `WHATS_NEW`
   (`apps/desktop/src/main/whats-new.ts`, edited by hand in each release), "Back after a day.", with
   the routines that ran while away named. With Always listening on, `launchLine` answers
   `LISTENING_LINE` first and none of the scenario lines show.
@@ -1470,6 +1470,7 @@ flowchart LR
   R --> G["greetOnLaunch"]
   G --> L{"Always listening on?"}
   L -- "yes" --> LL["LISTENING_LINE"]
+  L -- "no, greeting off" --> NL["no line"]
   L -- "no" --> P1["brainReadiness (1 s sign-in race)"]
   L -- "no" --> P2["greeting.compose with launch facts"]
   P2 --> SC{"launchScenario"}

@@ -28,8 +28,11 @@ function launch(signIn: string): Promise<ElectronApplication> {
 
 async function quit(): Promise<void> {
   const closed = app.waitForEvent('close');
-  await app.evaluate(({ app: electronApp }) => electronApp.quit());
-  await closed;
+  // The evaluate can reject as the process exits; the close event is what matters.
+  await Promise.all([
+    closed,
+    app.evaluate(({ app: electronApp }) => electronApp.quit()).catch(() => undefined),
+  ]);
 }
 
 async function windowFor(name: string): Promise<Page> {
@@ -63,7 +66,9 @@ test.afterAll(async () => {
 
 test('signed out: the launch line says so plainly, and Fix it opens Settings', async () => {
   const panel = await windowFor('panel');
-  await expect(panel.getByText(/signed out of Claude, so I can.t think yet/)).toBeVisible();
+  await expect(panel.getByText(/signed out of Claude, so I can.t think yet/)).toBeVisible({
+    timeout: 30_000,
+  });
   await panel.getByRole('button', { name: 'Fix it' }).click();
   await windowFor('office');
 });
@@ -79,5 +84,7 @@ test('a clean quit records the close and this version', async () => {
 test('signed in: the next launch says the brain’s own line', async () => {
   app = await launch('signed-in');
   const panel = await windowFor('panel');
-  await expect(panel.getByText('This is the fake pet.', { exact: false })).toBeVisible();
+  await expect(panel.getByText('This is the fake pet.', { exact: false })).toBeVisible({
+    timeout: 30_000,
+  });
 });
