@@ -178,6 +178,23 @@ describe('LocalEars, held', () => {
     expect(p.turn.complete).not.toHaveBeenCalled();
   });
 
+  it('ends the turn once, with its words, when the mic ends without a stop', async () => {
+    const { events, feed, mic } = hear('held', parts());
+    await feed(LOUD, 2);
+    mic.end();
+    await feed(QUIET, 0);
+    expect(events.filter((e) => e.startsWith('turnEnd'))).toEqual(['turnEnd:word word']);
+  });
+
+  it('still gives exactly one turn end when stop comes first and the mic ends after', async () => {
+    const { ears, events, feed, mic } = hear('held', parts());
+    await feed(LOUD, 2);
+    ears.stop();
+    mic.end();
+    await feed(QUIET, 0);
+    expect(events.filter((e) => e.startsWith('turnEnd'))).toEqual(['turnEnd:word word']);
+  });
+
   it('ends with an empty turn when nothing was said, so the bubble can say so', async () => {
     const { ears, events, feed } = hear('held', parts());
     await feed(QUIET, 5);

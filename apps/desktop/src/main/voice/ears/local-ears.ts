@@ -77,6 +77,8 @@ export class LocalEars implements Ears {
         if (run !== this.#run) return;
         await this.#frame(frame, run);
       }
+      // A held mic that ends means listening stopped.
+      if (run === this.#run && this.#mode === 'held') this.stop();
     })().catch((error: unknown) => console.warn('[ears] listening stopped', error));
   }
 

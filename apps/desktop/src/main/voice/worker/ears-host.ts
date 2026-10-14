@@ -21,7 +21,8 @@ export function createEarsHost(options: {
   post: (message: FromWorker) => void;
 }): (message: EarsMessage) => void {
   let parts: Promise<EarsParts> | null = null;
-  let session: { ears: Ears | null; inbox: Pushable<Float32Array>; stopped: boolean } | null = null;
+  let session: { ears: Ears | null; inbox: Pushable<Float32Array>; superseded: boolean } | null =
+    null;
 
   const wire = (ears: Ears): Ears => {
     for (const event of ['speechStart', 'partial', 'final', 'turnEnd'] as EarsEvent[])
@@ -40,17 +41,19 @@ export function createEarsHost(options: {
       const current = session;
       session = null;
       if (current === null) return;
-      current.stopped = true;
       current.ears?.stop();
       current.inbox.end();
       return;
     }
-    session?.ears?.stop();
-    session?.inbox.end();
+    if (session !== null) {
+      session.superseded = true;
+      session.ears?.stop();
+      session.inbox.end();
+    }
     const current = {
       ears: null as Ears | null,
       inbox: new Pushable<Float32Array>(MAX_BUFFERED_FRAMES),
-      stopped: false,
+      superseded: false,
     };
     session = current;
     if (options.fake) {
@@ -62,10 +65,12 @@ export function createEarsHost(options: {
     parts ??= options.load();
     parts.then(
       (loaded) => {
+        if (current.superseded) return;
         options.post({ kind: 'ears.status', status: 'ready' });
+        // A session stopped before the load has an ended inbox: its buffered words still
+        // play through, and the mic ending ends the turn.
         current.ears = wire(new LocalEars(loaded, message.mode));
         current.ears.listen(current.inbox);
-        if (current.stopped) current.ears.stop();
       },
       (error: unknown) => {
         parts = null;

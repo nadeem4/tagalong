@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EARS_FRAME } from '@tagalong/protocol';
 import { createEarsHost } from './ears-host';
+import type { EarsParts } from '../ears/local-ears';
 import type { FromWorker } from './messages';
 
 const LOUD = new Float32Array(EARS_FRAME).fill(0.3);
@@ -32,6 +33,34 @@ describe('createEarsHost', () => {
     host({ kind: 'ears.listen', mode: 'held' });
     await tick();
     expect(load).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the words when the key is released before the models have loaded', async () => {
+    const posted: FromWorker[] = [];
+    let release: (parts: EarsParts) => void = () => undefined;
+    const load = vi.fn(() => new Promise<EarsParts>((resolve) => (release = resolve)));
+    const host = createEarsHost({ fake: false, load, post: (m) => posted.push(m) });
+    host({ kind: 'ears.listen', mode: 'held' });
+    host({ kind: 'ears.frame', samples: LOUD });
+    host({ kind: 'ears.stop' });
+    release(await partsOnce()());
+    await tick();
+    await tick();
+    expect(posted.at(-1)).toEqual({ kind: 'ears', event: 'turnEnd', text: 'hello there' });
+  });
+
+  it('never wires a session that a second listen replaced during the load', async () => {
+    const posted: FromWorker[] = [];
+    let release: (parts: EarsParts) => void = () => undefined;
+    const load = vi.fn(() => new Promise<EarsParts>((resolve) => (release = resolve)));
+    const host = createEarsHost({ fake: false, load, post: (m) => posted.push(m) });
+    host({ kind: 'ears.listen', mode: 'held' });
+    host({ kind: 'ears.frame', samples: LOUD });
+    host({ kind: 'ears.listen', mode: 'held' });
+    release(await partsOnce()());
+    await tick();
+    expect(posted.filter((m) => m.kind === 'ears')).toEqual([]);
+    expect(posted.filter((m) => m.kind === 'ears.status' && m.status === 'ready')).toHaveLength(1);
   });
 
   it('says plainly when the models cannot load, and tries again next time', async () => {
