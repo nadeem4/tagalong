@@ -454,8 +454,9 @@ function showRemark(params: unknown): void {
 /**
  * A later launch: Scout says one line beside itself without taking the keyboard, and the
  * launch is remembered (the quit is too, in before-quit) so the next one knows how long you
- * were away and which hand-offs finished since. The line reads no
- * screen, and the engine falls back to a handwritten one, so this never waits on a brain.
+ * were away and which hand-offs finished since. The line reads no screen. It waits for the
+ * composed line and for the sign-in check (at most SIGN_IN_BUDGET_MS), both in parallel; the
+ * engine falls back to a handwritten line, so no brain is ever waited on past that.
  */
 async function greetOnLaunch(host: EngineHost): Promise<void> {
   const current = desktop;

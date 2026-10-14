@@ -100,7 +100,9 @@ describe('launchLine', () => {
 
   it('says the composed greeting when listening is off and the greeting is allowed', async () => {
     const compose = vi.fn(async () => ({ text: 'Morning.' }));
-    expect(await launchLine(Settings.parse({ welcome: { done: true } }), compose)).toEqual({ text: 'Morning.' });
+    expect(await launchLine(Settings.parse({ welcome: { done: true } }), compose)).toEqual({
+      text: 'Morning.',
+    });
     expect(compose).toHaveBeenCalledOnce();
   });
 

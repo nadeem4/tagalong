@@ -290,6 +290,29 @@ change".
    Claude Code.
 5. **Time away:** leave Tagalong running for a day or more, quit it, and start it again a few
    minutes later. The line greets for the time of day; it does not say "Back after a day".
+6. **Always listening:** with Always listening on, the listening line comes first and the scenario
+   lines in G.5 to G.8 do not show.
+
+### G.5. After a crash
+
+1. **Action:** end Tagalong in Task Manager, then start it.
+2. **Expected:** "I closed unexpectedly last time…", naming any task that stopped.
+
+### G.6. After an update
+
+1. **Action:** install a newer build over the old one and start it.
+2. **Expected:** "I've been updated to x.y.z." plus the what's-new line.
+
+### G.7. Days away with routines
+
+1. **Action:** let a routine run, quit, then change the clock forward a day or wait a day, and start.
+2. **Expected:** "Back after a day. Morning papers ran while you were away."
+
+### G.8. Signed out
+
+1. **Action:** run `claude auth logout`, then restart Tagalong.
+2. **Expected:** within about a second, "I'm signed out of Claude, so I can't think yet." with
+   **Fix it**, which opens Settings.
 
 ### G.3. The greeting can be switched off
 

@@ -1437,20 +1437,67 @@ flowchart LR
   and shows the panel with `showPanelQuietly`. The panel renders `GreetingLine`: `role="status"`,
   fades after about seven seconds unless pointed at or focused, opens the ask bubble on a click.
   Then main stores `lastOpenedAt`, whether or not it greeted, and on `before-quit` it stores
-  `lastClosedAt`. In the engine, `greeting/greeting.ts#composeGreeting` reads no screen: only the
-  local time of day, the time away (`awaySince`: the later of `lastClosedAt` and `lastOpenedAt`, so
-  a crash that recorded no quit falls back to the last launch), and
-  `ActivityLog#expertsFinishedSince(lastOpenedAt)` (expert hand-offs that finished well since the
-  last launch, at most five, brief only), plus `settings.userName` when set (the model may greet by it,
-  and the handwritten line becomes "Morning, Nadeem."). It makes one call to the summaries model (`settings.summarizer`,
-  else the pet's own provider and model, text only), like `Summarizer`: 60 tokens, tools refused,
-  a 1.2-second budget (`GREETING_TIMEOUT_MS`): an `AbortSignal.timeout` raced against the call, so a
-  brain slow to notice the abort is not waited for either. A cold `claude -p` takes longer than
-  that, so with the Claude Code sign-in the handwritten line is what is usually said, at once. The prompt asks for one sentence under 20 words, warm, no
-  emoji, naming a finished hand-off if any, and never inventing facts. A failure, a timeout, an empty
-  reply or one that is too long or has an emoji falls back to `fallbackGreeting`: "Morning." /
-  "Afternoon." / "Evening." / "Working late?" or "Back after N days.", then "I'm here when you need
-  me.", "Nothing waiting for you." or the hand-off that finished.
+  `lastClosedAt`.
+  The launch record (`launch.ts`): first thing at start `recordLaunch` reads whether the last launch
+  closed cleanly and which version it ran, then stores `closedCleanly: false` and `lastVersion`
+  (the running version). `recordCleanClose` stores `closedCleanly: true` and `lastClosedAt` on
+  `before-quit` and on the avatar window's `session-end` (Windows ending the session). A
+  `closedCleanly` still false at the next start is a crash. A settings file that cannot be read
+  or written reads as a plain launch. Known gap: a Windows logoff while the engine is down
+  (degraded mode: no avatar window, so no `session-end`) can read as a crash next launch.
+  `greetOnLaunch` passes `launchLine` a compose closure that runs two things in parallel:
+  `greeting.compose { petId, launch? }` (`launch` is `{ crashed, lastVersion, version, whatsNew }`
+  plus the interrupted tasks counted at boot and the names of routines that ran) and
+  `brainReadiness` (the default pet's provider needs a key and has none, Claude Code is not
+  found, or the Claude sign-in check says signed out; the sign-in check gets
+  `SIGN_IN_BUDGET_MS`, 1 s, and a slow or failing check reads as `unknown`, never as a problem).
+  `brainLine(brain, composed, userName)` then returns the composed line, or a plain one ("I’m
+  signed out of Claude, so I can’t think yet.", "I can’t find Claude Code on this computer…", "I
+  have no API key…") with `fix: 'Fix it'`; the panel shows that as a button on the line that
+  opens Settings (the same offer button the bubble uses for a hand-off). The engine's
+  `greeting/scenario.ts#launchScenario` picks one scenario from the recorded facts: a crash, else an
+  update (`lastVersion` differs from the running version), else away (a day or more since
+  `awaySince`), else normal. The handwritten line for each: "I closed unexpectedly last time…"
+  (naming the tasks it cut short), "I’ve been updated to x.y.z." plus `WHATS_NEW`
+  (`apps/desktop/src/main/whats-new.ts`, edited by hand in each release), "Back after a day.", with
+  the routines that ran while away named. With Always listening on, `launchLine` answers
+  `LISTENING_LINE` first and none of the scenario lines show.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
+flowchart LR
+  S["Start"] --> R["recordLaunch"]
+  R --> G["greetOnLaunch"]
+  G --> L{"Always listening on?"}
+  L -- "yes" --> LL["LISTENING_LINE"]
+  L -- "no" --> P1["brainReadiness (1 s sign-in race)"]
+  L -- "no" --> P2["greeting.compose with launch facts"]
+  P2 --> SC{"launchScenario"}
+  SC --> C1["crash / update / away / normal"]
+  P1 --> BL["brainLine"]
+  C1 --> BL
+  BL -- "can't think" --> FX["plain line with Fix it"]
+  BL -- "ready or unknown" --> CL["composed line"]
+  LL --> PN["panel"]
+  FX --> PN
+  CL --> PN
+```
+
+In the engine, `greeting/greeting.ts#composeGreeting` reads no screen: only the
+local time of day, the time away (`awaySince`: the later of `lastClosedAt` and `lastOpenedAt`, so
+a crash that recorded no quit falls back to the last launch), and
+`ActivityLog#expertsFinishedSince(lastOpenedAt)` (expert hand-offs that finished well since the
+last launch, at most five, brief only), plus `settings.userName` when set (the model may greet by it,
+and the handwritten line becomes "Morning, Nadeem."). It makes one call to the summaries model (`settings.summarizer`,
+else the pet's own provider and model, text only), like `Summarizer`: 60 tokens, tools refused,
+a 1.2-second budget (`GREETING_TIMEOUT_MS`): an `AbortSignal.timeout` raced against the call, so a
+brain slow to notice the abort is not waited for either. A cold `claude -p` takes longer than
+that, so with the Claude Code sign-in the handwritten line is what is usually said, at once. The prompt asks for one sentence under 20 words, warm, no
+emoji, naming a finished hand-off if any, and never inventing facts. A failure, a timeout, an empty
+reply or one that is too long or has an emoji falls back to `fallbackGreeting`: "Morning." /
+"Afternoon." / "Evening." / "Working late?" or "Back after N days.", then "I'm here when you need
+me.", "Nothing waiting for you." or the hand-off that finished.
+
 - **A new key answers the next question.** `KeyedProviderResolver` re-reads the keychain before every
   `ask` and rebuilds a provider only when its key or base URL changed, so a key pasted in Welcome is
   used without a restart.
@@ -1858,7 +1905,7 @@ flowchart LR
   keyboard.
 - **The launch line.** `welcome.ts#launchLine` returns `LISTENING_LINE` when
   `settings.listening.always` is on, even with the greeting off, so Scout's first line says it is
-  listening and how to stop. The panel is created hidden at launch, so the microphone and the mark
+  listening and how to stop; it wins over the crash, update, days-away and signed-out lines. The panel is created hidden at launch, so the microphone and the mark
   are there from the first second.
 - **The mark.** `DockPet`'s `listening` prop (`'on'` or `'paused'`) draws `dock-pet__listening`,
   solid while on and outlined while paused, and adds "listening" or "listening paused" to the pet's

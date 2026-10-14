@@ -808,7 +808,10 @@ export interface GreetingLineProps {
   holdMs?: number;
   /** A remark Scout made on its own: Not now quiets it for an hour and closes the line. */
   onNotNow?: () => void;
-  /** A task an expert could take. Its button opens the hand-off card; nothing is sent yet. */
+  /**
+   * A button on the line. For a task an expert could take it opens the hand-off card (nothing
+   * is sent yet); for a launch line that cannot think, Fix it opens Settings.
+   */
   offer?: { label: string; onAccept: () => void };
 }
 
