@@ -40,6 +40,18 @@ export function providerChoices(stored: ReadonlySet<string>): ProviderChoice[] {
   ];
 }
 
+/** The providers with a key stored. Only the fact crosses on; the key never does. */
+export async function storedKeys(secrets: { get(key: string): Promise<string | null> }): Promise<Set<string>> {
+  const stored = new Set<string>();
+  for (const choice of providerChoices(new Set())) {
+    const secretKey = secretKeyFor(choice.id);
+    if (secretKey === undefined) continue;
+    const value = await secrets.get(secretKey);
+    if (value !== null && value.length > 0) stored.add(choice.id);
+  }
+  return stored;
+}
+
 /**
  * Where the ElevenLabs key is kept. It is the voice's key, not a brain's, so it lives here
  * rather than in core's SECRET_KEYS: the engine never reads it.

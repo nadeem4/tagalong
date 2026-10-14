@@ -174,6 +174,13 @@ export interface ProviderChoice {
  */
 export type ClaudeSignIn = 'signed-in' | 'signed-out' | 'not-installed' | 'unknown';
 
+/** The line main hands the bubble as the app opens: the words, and a fix when Scout cannot think. */
+export interface GreetLine {
+  text: string;
+  /** The fix button's label; it opens Home's Settings, where the brain is fixed. */
+  fix?: string;
+}
+
 /** A coding agent Welcome looked for on this computer. */
 export interface FoundAgent {
   id: string;

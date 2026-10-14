@@ -44,7 +44,7 @@ import { VoiceWorker } from './voice/worker/client';
 import type { WorkerProcess } from './voice/worker/messages';
 import { WorkerLocalVoice } from './voice/worker/worker-local-voice';
 import type { VoiceService } from './voice/voice';
-import { checkClaudeSignIn } from './claude-sign-in';
+import { signInFor } from './claude-sign-in';
 import { findAgents, launchLine, shouldOpenWelcome } from './welcome';
 import type { EngineHost } from './engine-host';
 import {
@@ -979,7 +979,7 @@ function registerIpc(): void {
   ipcMain.handle(IPC.openOffice, () => openOffice());
 
   ipcMain.handle(IPC.findAgents, () => findAgents());
-  ipcMain.handle(IPC.checkClaudeSignIn, () => checkClaudeSignIn());
+  ipcMain.handle(IPC.checkClaudeSignIn, () => signInFor(process.env));
 
   // The pet is dragged by hand (a drag region would swallow its clicks), and its bubble
   // moves with it, so it keeps speaking from the pet.

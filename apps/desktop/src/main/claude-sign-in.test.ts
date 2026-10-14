@@ -1,8 +1,8 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { checkClaudeSignIn, parseAuthStatus } from './claude-sign-in';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { checkClaudeSignIn, fakeSignIn, parseAuthStatus, signInFor } from './claude-sign-in';
 
 const SIGNED_IN = JSON.stringify({ loggedIn: true, authMethod: 'claude.ai', email: 'a@b.c' });
 const SIGNED_OUT = JSON.stringify({ loggedIn: false });
@@ -85,4 +85,20 @@ describe('checkClaudeSignIn with the real runner', () => {
       expect(await checkClaudeSignIn()).toBe('signed-out');
     },
   );
+});
+
+describe('fakeSignIn', () => {
+  it('lets a test pick the sign-in state, and fake providers read as signed in', () => {
+    expect(fakeSignIn({ TAGALONG_FAKE_SIGN_IN: 'signed-out' })).toBe('signed-out');
+    expect(fakeSignIn({ TAGALONG_FAKE_PROVIDERS: '1' })).toBe('signed-in');
+    expect(fakeSignIn({ TAGALONG_FAKE_SIGN_IN: 'nonsense' })).toBeUndefined();
+    expect(fakeSignIn({})).toBeUndefined();
+  });
+
+  it('runs the real check only when no fake is set', async () => {
+    const check = vi.fn(async () => 'signed-in' as const);
+    expect(await signInFor({ TAGALONG_FAKE_SIGN_IN: 'not-installed' }, check)).toBe('not-installed');
+    expect(check).not.toHaveBeenCalled();
+    expect(await signInFor({}, check)).toBe('signed-in');
+  });
 });

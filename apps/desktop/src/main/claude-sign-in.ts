@@ -30,6 +30,26 @@ export async function checkClaudeSignIn(
   }
 }
 
+const SIGN_IN_STATES: readonly ClaudeSignIn[] = ['signed-in', 'signed-out', 'not-installed', 'unknown'];
+
+/**
+ * The sign-in a test asks for: `TAGALONG_FAKE_SIGN_IN` names a state, and fake providers
+ * read as signed in, so no test ever runs this machine's claude.
+ */
+export function fakeSignIn(env: Record<string, string | undefined>): ClaudeSignIn | undefined {
+  const forced = SIGN_IN_STATES.find((state) => state === env.TAGALONG_FAKE_SIGN_IN);
+  if (forced !== undefined) return forced;
+  return env.TAGALONG_FAKE_PROVIDERS === '1' ? 'signed-in' : undefined;
+}
+
+export function signInFor(
+  env: Record<string, string | undefined>,
+  check: () => Promise<ClaudeSignIn> = checkClaudeSignIn,
+): Promise<ClaudeSignIn> {
+  const fake = fakeSignIn(env);
+  return fake === undefined ? check() : Promise.resolve(fake);
+}
+
 /** Reads `loggedIn` from the status JSON; anything else is unknown. */
 export function parseAuthStatus(stdout: string): ClaudeSignIn {
   try {

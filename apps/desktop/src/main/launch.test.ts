@@ -1,6 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
-import { Settings, type SettingsPatch } from '@tagalong/protocol';
-import { recordCleanClose, recordLaunch } from './launch';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Pet, Settings, type SettingsPatch } from '@tagalong/protocol';
+import { brainLine, brainReadiness, recordCleanClose, recordLaunch } from './launch';
+import { providerChoices } from './provider-choices';
+
+afterEach(() => vi.useRealTimers());
 
 function store(initial: Record<string, unknown> = {}) {
   let current = Settings.parse(initial);
@@ -49,5 +52,57 @@ describe('recordCleanClose', () => {
 
   it('does nothing without a store: a second instance quits before it has one', () => {
     expect(() => recordCleanClose(null, new Date())).not.toThrow();
+  });
+});
+
+const pet = (providerId: string) =>
+  Pet.parse({ id: 'scout', name: 'Scout', avatar: '🐾', roleId: 'companion', model: 'haiku', providerId });
+
+describe('brainReadiness', () => {
+  const ask = (providerId: string, signIn: () => Promise<'signed-in' | 'signed-out' | 'not-installed' | 'unknown'>, stored: string[] = []) =>
+    brainReadiness({ pet: pet(providerId), providers: providerChoices(new Set(stored)), signIn, budgetMs: 1_000 });
+
+  it('reads the Claude sign-in for a Scout that thinks with it', async () => {
+    expect(await ask('claude-code', async () => 'signed-in')).toBe('ready');
+    expect(await ask('claude-code', async () => 'signed-out')).toBe('signed-out');
+    expect(await ask('claude-code', async () => 'not-installed')).toBe('no-sign-in');
+    expect(await ask('claude-code', async () => 'unknown')).toBe('unknown');
+    expect(await ask('claude-code', () => Promise.reject(new Error('spawn failed')))).toBe('unknown');
+  });
+
+  it('reads whether a keyed Scout has its key, without running claude', async () => {
+    const signIn = vi.fn(async () => 'signed-out' as const);
+    expect(await ask('openrouter', signIn)).toBe('no-key');
+    expect(await ask('openrouter', signIn, ['openrouter'])).toBe('ready');
+    expect(signIn).not.toHaveBeenCalled();
+  });
+
+  it('gives up on a slow sign-in check within the budget, so the greeting is not late', async () => {
+    vi.useFakeTimers();
+    const pending = ask('claude-code', () => new Promise(() => undefined));
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(await pending).toBe('unknown');
+  });
+});
+
+describe('brainLine', () => {
+  it('says the brain’s line when Scout can think, or could not be checked', () => {
+    expect(brainLine('ready', 'Morning.', '')).toEqual({ text: 'Morning.' });
+    expect(brainLine('unknown', 'Morning.', '')).toEqual({ text: 'Morning.' });
+  });
+
+  it('says plainly why Scout cannot think, with a fix', () => {
+    expect(brainLine('signed-out', 'Morning.', 'Alex')).toEqual({
+      text: 'Hi Alex. I’m signed out of Claude, so I can’t think yet.',
+      fix: 'Fix it',
+    });
+    expect(brainLine('no-sign-in', 'Morning.', '')).toEqual({
+      text: 'I can’t find Claude Code on this computer, so I can’t think yet.',
+      fix: 'Fix it',
+    });
+    expect(brainLine('no-key', 'Morning.', '')).toEqual({
+      text: 'I have no API key, so I can’t think yet.',
+      fix: 'Fix it',
+    });
   });
 });
