@@ -5,6 +5,7 @@ import type {
   ListenMode,
   Pet,
   PetRemarkParams,
+  ProvidersCheckResult,
   RoutineProposedParams,
   RoutineResultParams,
   Settings,
@@ -53,6 +54,7 @@ export const IPC = {
   hostView: 'tagalong:host:view',
   saveSettings: 'tagalong:settings:save',
   saveApiKey: 'tagalong:secret:api-key',
+  checkKey: 'tagalong:secret:check-key',
   savePet: 'tagalong:pets:save',
   listModels: 'tagalong:models:list',
   openSettings: 'tagalong:settings:open',
@@ -87,6 +89,7 @@ export const IPC = {
   openLink: 'tagalong:link:open',
   showExtensionFolder: 'tagalong:extension:show',
   checkClaudeSignIn: 'tagalong:claude:sign-in',
+  openClaudeSignIn: 'tagalong:claude:open-sign-in',
   switchScout: 'tagalong:pets:switch-scout',
   speak: 'tagalong:voice:speak',
   stopVoiceEvent: 'tagalong:voice:stop',
@@ -264,6 +267,10 @@ export interface TagalongHostApi {
   saveSettings(patch: SettingsPatch): Promise<Settings>;
   /** An empty key deletes the stored one. */
   saveApiKey(providerId: string, apiKey: string): Promise<void>;
+  /** Setup's one test of the key just saved for `providerId`. */
+  checkKey(providerId: string): Promise<ProvidersCheckResult>;
+  /** Opens a terminal that signs in to Claude Code; setup waits and checks again. */
+  openClaudeSignIn(): Promise<void>;
   savePet(pet: Pet): Promise<Pet>;
   /** Phase 4. A click on the crew strip: makes that pet the panel's and opens the panel. */
   selectPet(petId: string): Promise<void>;

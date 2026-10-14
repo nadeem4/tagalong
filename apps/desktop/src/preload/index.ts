@@ -12,6 +12,7 @@ import type {
   Pet,
   PetRemarkParams,
   ProjectCandidate,
+  ProvidersCheckResult,
   RoutineDraftInput,
   RoutineProposedParams,
   RoutineResultParams,
@@ -157,6 +158,9 @@ const host: TagalongHostApi = {
   saveSettings: (patch: SettingsPatch) => ipcRenderer.invoke(IPC.saveSettings, patch),
   saveApiKey: (providerId: string, apiKey: string) =>
     ipcRenderer.invoke(IPC.saveApiKey, providerId, apiKey) as Promise<void>,
+  checkKey: (providerId: string) =>
+    ipcRenderer.invoke(IPC.checkKey, providerId) as Promise<ProvidersCheckResult>,
+  openClaudeSignIn: () => ipcRenderer.invoke(IPC.openClaudeSignIn) as Promise<void>,
   savePet: (pet: Pet) => ipcRenderer.invoke(IPC.savePet, pet) as Promise<Pet>,
   selectPet: (petId: string) => ipcRenderer.invoke(IPC.selectPet, petId) as Promise<void>,
   onActivePet: (handler) => {

@@ -24,6 +24,10 @@ export const MAX_ROLLING_MEMORY_MINUTES = 30;
 /** Ceiling on the name Scout calls the person: a first name, not a paragraph. */
 export const MAX_USER_NAME_CHARS = 40;
 
+/** The guided first run, in order. `answer` is offered only when setup can listen. */
+export const WELCOME_STEPS = ['answer', 'name', 'think', 'voice', 'keys', 'try'] as const;
+export type WelcomeStep = (typeof WELCOME_STEPS)[number];
+
 /** Default value for every setting, in one place so the patch schema can stay defaults-free. */
 export const SETTINGS_DEFAULTS = {
   enginePort: 47321,
@@ -138,6 +142,8 @@ export const SETTINGS_DEFAULTS = {
    * here, on this computer; it reaches the AI provider only inside Scout's prompt.
    */
   userName: '',
+  /** "Rather not" in setup: Scout never asks for a name again. */
+  userNameDeclined: false,
   /**
    * Whether Scout listens all the time. Off by default: only the person switches it on,
    * and it stays on across restarts until they switch it off. Scout never switches it on.
@@ -299,8 +305,17 @@ const settingsFields = {
   }),
   /** Phase 7. Set when the setup wizard is finished or skipped; Settings can rerun it. */
   onboarding: z.object({ done: z.boolean() }),
-  /** Set when the Welcome window is finished; the tray can open it again. */
-  welcome: z.object({ done: z.boolean() }),
+  /**
+   * The guided first run: whether it is finished, the furthest step reached (where it
+   * resumes), how the person answers, and the brain picked. A patch replaces the whole
+   * object, so every writer spreads the current one first.
+   */
+  welcome: z.object({
+    done: z.boolean(),
+    step: z.enum(WELCOME_STEPS).optional(),
+    answerBy: z.enum(['talk', 'type']).optional(),
+    brain: z.string().min(1).optional(),
+  }),
   /** Whether Scout greets you on a launch after the first; Welcome's intro shows regardless. */
   greeting: z.boolean(),
   /** When Tagalong last opened; null before the first launch that recorded it. */
@@ -332,6 +347,8 @@ const settingsFields = {
   }),
   /** What Scout calls the person; empty for no name. */
   userName: z.string().trim().max(MAX_USER_NAME_CHARS),
+  /** Set by "Rather not": the name is never asked for again. */
+  userNameDeclined: z.boolean(),
   /** Whether Scout listens all the time, hearing only turns that start with its name. */
   listening: z.object({ always: z.boolean() }),
 };
@@ -369,6 +386,7 @@ export const Settings = z.object({
   keepAnEye: settingsFields.keepAnEye.default(SETTINGS_DEFAULTS.keepAnEye),
   voice: settingsFields.voice.prefault({ ...SETTINGS_DEFAULTS.voice }),
   userName: settingsFields.userName.default(SETTINGS_DEFAULTS.userName),
+  userNameDeclined: settingsFields.userNameDeclined.default(SETTINGS_DEFAULTS.userNameDeclined),
   listening: settingsFields.listening.prefault({ ...SETTINGS_DEFAULTS.listening }),
 });
 export type Settings = z.infer<typeof Settings>;

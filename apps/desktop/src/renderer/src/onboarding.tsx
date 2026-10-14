@@ -1,232 +1,456 @@
-import { StrictMode, useEffect, useState } from 'react';
+import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { MAX_USER_NAME_CHARS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
-import { PixelSprite, characterFor } from '@tagalong/ui';
-// Bundled, not fetched: Welcome's two typefaces ship inside the app, Latin subset only.
+import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
+import type { Settings, WelcomeStep } from '@tagalong/protocol';
+import { PixelSprite, SpeechQueue, characterFor } from '@tagalong/ui';
+// Bundled, not fetched: setup's two typefaces ship inside the app, Latin subset only.
 import '@fontsource/onest/latin-400.css';
 import '@fontsource/onest/latin-600.css';
 import '@fontsource/pixelify-sans/latin-400.css';
 import '@fontsource/pixelify-sans/latin-700.css';
 import './app.css';
 import './welcome.css';
-import { brainOptions, canStart, defaultBrain, welcomeNamePatch } from './welcome-flow';
-import type { BrainOption } from './welcome-flow';
-import type { FoundAgent, HostView } from '../../shared/ipc';
+import { answerPatch, answered, chipState, goTo, startFirstRun } from './first-run';
+import type { FirstRun, FirstRunAnswer } from './first-run';
+import { choicesFor, matchChoice, nameFrom } from './first-run-match';
+import {
+  KEY_LINES,
+  STEP_NAMES,
+  chipLabel,
+  echoFor,
+  notCaught,
+  optionsFor,
+  readableKey,
+  scoutSays,
+} from './first-run-lines';
+import type { LineContext } from './first-run-lines';
+import { prepareLine } from './voice-player';
+import { installVoiceSeam } from './voice-seam';
+import type { ClaudeSignIn, HostView } from '../../shared/ipc';
 
-/** Where each agent is installed from, for its "How to add" link. */
-const INSTALL_LINKS: Readonly<Record<string, string>> = {
-  'claude-code': 'https://claude.com/claude-code',
-  'gemini-cli': 'https://github.com/google-gemini/gemini-cli',
-  codex: 'https://github.com/openai/codex',
-};
+const CLAUDE_INSTALL = 'https://claude.com/claude-code';
+/** While Claude Code is signed out, Scout checks this often and moves on once it is in. */
+const SIGN_IN_POLL_MS = 3_000;
+
+const messageOf = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 /**
- * Welcome: the first window a new install shows. Scout says what it does, lists the
- * coding agents found on this computer, picks how it thinks (a sign-in where one is
- * found, so nothing is typed), names the one key to remember, and starts. Everything here
- * can be changed later in Home and Settings; the tray opens Welcome again.
+ * Setup, driven by Scout: it asks each question aloud and in its bubble, suggests an answer
+ * when it can, and moves on by itself once you answer by typing or a tap. No Next button;
+ * the step chips are the way back. Every answer is saved as it is given, so closing the
+ * window resumes at the same step next launch.
  */
-function Welcome() {
+function FirstRunWindow() {
   const [view, setView] = useState<HostView | null>(null);
-  const [agents, setAgents] = useState<FoundAgent[] | null>(null);
-  const [brain, setBrain] = useState<string | undefined>(undefined);
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [run, setRun] = useState<FirstRun | null>(null);
+  const [signIn, setSignIn] = useState<ClaudeSignIn | null>(null);
+  const [picking, setPicking] = useState(false);
+  const [keyFor, setKeyFor] = useState<string | null>(null);
   const [key, setKey] = useState('');
-  const [name, setName] = useState('');
+  const [typed, setTyped] = useState('');
+  const [echo, setEcho] = useState<string | null>(null);
+  const [aside, setAside] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Keys saved in this window: a key that failed its test is still stored, so Check key retests it.
+  const [savedKeys, setSavedKeys] = useState<readonly string[]>([]);
+  const answerInput = useRef<HTMLInputElement>(null);
+  const keyInput = useRef<HTMLInputElement>(null);
+  // Setup's lines are spoken the way the bubble's are: got ready one ahead, one at a time.
+  // The voice step's line is the sample of how Scout sounds: an empty preview has main speak it
+  // even while voice is off.
+  const stepNow = useRef<WelcomeStep | undefined>(undefined);
+  const [voice] = useState(
+    () =>
+      new SpeechQueue({
+        prepare: (text) =>
+          stepNow.current === 'voice' ? prepareLine(text, {}) : prepareLine(text),
+      }),
+  );
+  const finishing = useRef(false);
 
   useEffect(() => {
-    Promise.all([window.tagalongHost.getHostView(), window.tagalongHost.findAgents()])
-      .then(([loaded, found]) => {
+    Promise.all([window.tagalongHost.getHostView(), window.tagalongHost.checkClaudeSignIn()])
+      .then(([loaded, state]) => {
         setView(loaded);
-        setAgents(found);
-        setBrain(defaultBrain(brainOptions(found, loaded.providers)));
+        setSettings(loaded.settings);
+        setSignIn(state);
+        // Milestone 2 answers by typing or a tap; listening joins in Milestone 3.
+        setRun(startFirstRun(loaded.settings, false));
       })
-      .catch((error: unknown) => setProblem(`Tagalong could not start Welcome: ${String(error)}`));
+      .catch((error: unknown) => setProblem(`Tagalong could not start setup: ${String(error)}`));
   }, []);
 
-  if (view === null || agents === null) {
+  // Signed out: Scout waits, checking now and then, and suggests Claude once it is in.
+  const current = run?.current;
+  stepNow.current = current;
+  useEffect(() => {
+    if (current !== 'think' || signIn !== 'signed-out') return;
+    // Each check starts the next wait only once it has finished, so checks never overlap.
+    let timer: ReturnType<typeof setTimeout>;
+    let stopped = false;
+    const poll = (): void => {
+      void window.tagalongHost
+        .checkClaudeSignIn()
+        .then((state) => {
+          if (!stopped) setSignIn(state);
+        })
+        .catch(() => undefined)
+        .then(() => {
+          if (!stopped) timer = setTimeout(poll, SIGN_IN_POLL_MS);
+        });
+    };
+    timer = setTimeout(poll, SIGN_IN_POLL_MS);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
+  }, [current, signIn]);
+
+  // A sign-in that lands while the services are listed brings Claude's suggestion back.
+  useEffect(() => {
+    if (signIn === 'signed-in' && keyFor === null) setPicking(false);
+  }, [signIn]);
+
+  // Focus follows the question: the key field when it is open, otherwise the answer pill.
+  useEffect(() => {
+    if (busy) return;
+    (keyFor !== null ? keyInput : answerInput).current?.focus();
+  }, [current, picking, keyFor, busy]);
+
+  const providers = view?.providers ?? [];
+  const scout = view?.pets.find((pet) => pet.id === view.settings.defaultPetId);
+  const context: LineContext | null =
+    run === null || settings === null
+      ? null
+      : {
+          petName: scout?.name ?? 'Scout',
+          first: run.steps[0] === run.current,
+          signIn,
+          picking,
+          keyLabel: providers.find((provider) => provider.id === keyFor)?.label ?? null,
+          askKey: readableKey(settings.hotkeys.ask || SETTINGS_DEFAULTS.hotkeys.ask),
+        };
+  const says = run !== null && context !== null ? scoutSays(run.current, context) : null;
+  const line = aside ?? says?.line ?? '';
+
+  // Each line Scout says is also spoken, while Scout talks. The voice step's line is the
+  // sample of how Scout sounds, so it is spoken either way.
+  const speaks = settings?.voice.enabled === true || current === 'voice';
+  useEffect(() => {
+    if (line === '' || !speaks) return;
+    voice.stop();
+    voice.say(line);
+  }, [line, speaks, voice]);
+  useEffect(() => () => voice.stop(), [voice]);
+
+  async function finish(saved: Settings): Promise<void> {
+    if (finishing.current) return;
+    finishing.current = true;
+    setProblem(null);
+    voice.stop();
+    try {
+      await window.tagalongHost.finishWelcome(saved.welcome.brain ?? 'claude-code');
+    } catch (error) {
+      finishing.current = false;
+      setProblem(messageOf(error));
+    }
+  }
+
+  // Reaching Try it finishes setup: Scout goes to its corner for the first real question.
+  useEffect(() => {
+    if (current === 'try' && settings !== null) void finish(settings);
+  }, [current]);
+
+  async function give(answer: FirstRunAnswer): Promise<void> {
+    if (run === null || settings === null) return;
+    const declined = answer.step === 'name' ? answer.name === '' : settings.userNameDeclined;
+    const after = answered(run, declined);
+    setBusy(true);
+    try {
+      const saved = await window.tagalongHost.saveSettings(answerPatch(answer, settings, after));
+      setSettings(saved);
+      setEcho(echoFor(answer, providers));
+      setAside(null);
+      setProblem(null);
+      setPicking(false);
+      setKeyFor(null);
+      setRun(after);
+    } catch (error) {
+      setProblem(messageOf(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function checkSignIn(): void {
+    void window.tagalongHost
+      .checkClaudeSignIn()
+      .then(setSignIn)
+      .catch((error: unknown) => setProblem(messageOf(error)));
+  }
+
+  function pick(id: string): void {
+    if (run === null) return;
+    setAside(null);
+    switch (run.current) {
+      case 'answer':
+        return void give({ step: 'answer', by: id === 'talk' ? 'talk' : 'type' });
+      case 'name':
+        return void give({ step: 'name', name: '' });
+      case 'voice':
+        return void give({ step: 'voice', talk: id === 'talk' });
+      case 'keys':
+        return void give({ step: 'keys' });
+      case 'think':
+        if (id === 'claude-code') return void give({ step: 'think', brain: 'claude-code' });
+        if (id === 'key') return setPicking(true);
+        if (id === 'back') {
+          setPicking(false);
+          setKeyFor(null);
+          return setKey('');
+        }
+        if (id === 'sign-in') {
+          return void window.tagalongHost
+            .openClaudeSignIn()
+            .catch((error: unknown) => setProblem(messageOf(error)));
+        }
+        if (id === 'install') return void window.tagalongHost.openLink(CLAUDE_INSTALL);
+        if (id === 'check') return checkSignIn();
+        setKey('');
+        return setKeyFor(id);
+      default:
+        return;
+    }
+  }
+
+  /** The one way an answer comes in: typed text now, heard speech too in Milestone 3. */
+  function heard(text: string): void {
+    if (run === null || context === null) return;
+    if (run.current === 'name') {
+      const name = nameFrom(text);
+      if (name === null) return setAside(notCaught('name', context));
+      return void give({ step: 'name', name: name === 'declined' ? '' : name.name });
+    }
+    const id = matchChoice(text, choicesFor(run.current, signIn, picking, providers));
+    if (id === null) return setAside(notCaught(run.current, context));
+    pick(id);
+  }
+
+  /** Saves the pasted key, if any, and tests it once. Only a passing test moves setup on. */
+  async function testKey(): Promise<void> {
+    if (keyFor === null) return;
+    const pasted = key.trim();
+    const stored =
+      savedKeys.includes(keyFor) ||
+      providers.find((provider) => provider.id === keyFor)?.hasKey === true;
+    if (pasted === '' && !stored) return setAside(KEY_LINES.empty);
+    setBusy(true);
+    setProblem(null);
+    setAside(null);
+    try {
+      if (pasted !== '') {
+        await window.tagalongHost.saveApiKey(keyFor, pasted);
+        setSavedKeys((saved) => [...saved, keyFor]);
+      }
+      setKey('');
+    } catch (error) {
+      setProblem(messageOf(error));
+      setBusy(false);
+      return;
+    }
+    let passed = false;
+    try {
+      const result = await window.tagalongHost.checkKey(keyFor);
+      // What went wrong with the key is Scout's to say, once, in its bubble; the alert
+      // below is for the window itself failing (a save, a sign-in, finishing).
+      if (result.ok) passed = true;
+      else setAside(result.message);
+    } catch {
+      // The test itself could not run: say so plainly, and stay on this step.
+      setAside(KEY_LINES.untested);
+    }
+    setBusy(false);
+    if (passed) await give({ step: 'think', brain: keyFor });
+  }
+
+  if (run === null || settings === null || context === null || says === null) {
     return (
-      <main className="welcome">
-        <p className="welcome__note">{problem ?? 'Looking around this computer…'}</p>
+      <main className="first-run">
+        <p className="first-run__loading" role="status">
+          {problem ?? 'Looking around this computer…'}
+        </p>
       </main>
     );
   }
 
-  const options = brainOptions(agents, view.providers);
-  const chosen = options.find((option) => option.id === brain);
-  const scout = view.pets.find((pet) => pet.id === view.settings.defaultPetId);
-  const askKey = view.settings.hotkeys.ask || SETTINGS_DEFAULTS.hotkeys.ask;
-
-  const start = async (): Promise<void> => {
-    if (brain === undefined) return;
-    setBusy(true);
-    setProblem(null);
-    try {
-      if (chosen?.needsKey === true) await window.tagalongHost.saveApiKey(brain, key.trim());
-      const named = welcomeNamePatch(name);
-      if (named !== null) await window.tagalongHost.saveSettings(named);
-      await window.tagalongHost.finishWelcome(brain);
-    } catch (error) {
-      setProblem(error instanceof Error ? error.message : String(error));
-      setBusy(false);
+  const chip = (step: WelcomeStep) => {
+    const state = chipState(run, step);
+    if (state === 'done') {
+      return (
+        <button
+          key={step}
+          type="button"
+          className="first-run__chip is-done"
+          aria-label={`${STEP_NAMES[step]}: ${chipLabel(step, settings, providers)}. Change it`}
+          disabled={busy}
+          onClick={() => {
+            setRun(goTo(run, step));
+            setAside(null);
+            setEcho(null);
+            setProblem(null);
+            setPicking(false);
+            setKeyFor(null);
+          }}
+        >
+          {chipLabel(step, settings, providers)}
+        </button>
+      );
     }
+    return (
+      <span
+        key={step}
+        className={state === 'current' ? 'first-run__chip is-current' : 'first-run__chip'}
+        {...(state === 'current' ? { 'aria-current': 'step' as const } : {})}
+      >
+        {STEP_NAMES[step]}
+      </span>
+    );
   };
 
   return (
-    <main className="welcome">
-      <header className="welcome__hello">
-        <div className="welcome__tile">
-          {scout !== undefined && <PixelSprite sprite={characterFor(scout).sprite} scale={4} />}
-        </div>
-        <div>
-          <h1>Hi, I’m {scout?.name ?? 'Scout'}.</h1>
-          <p>
-            I sit on your screen and see what you’re working on. Ask me anything. I hand the work to
-            the right agent and tell you what came back.
-          </p>
-        </div>
+    <main className="first-run">
+      <header className="first-run__top">
+        <nav className="first-run__steps" aria-label="Setup steps">
+          {run.steps.map(chip)}
+        </nav>
       </header>
-
-      <section aria-labelledby="found">
-        <h2 id="found">Found on this computer</h2>
-        <ul className="welcome__list">
-          {agents.map((agent) => (
-            <li key={agent.id}>
-              <span className={agent.found ? 'welcome__dot is-found' : 'welcome__dot'} />
-              <span className="welcome__name">
-                {agent.label}
-                <small>
-                  {agent.found
-                    ? agent.canThink
-                      ? 'Ready'
-                      : 'Found. Hand-offs to it come soon.'
-                    : 'Not installed'}
-                </small>
-              </span>
-              {!agent.found && INSTALL_LINKS[agent.id] !== undefined && (
-                <button
-                  type="button"
-                  className="welcome__link"
-                  onClick={() => void window.tagalongHost.openLink(INSTALL_LINKS[agent.id]!)}
-                >
-                  How to add
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section aria-labelledby="think">
-        <h2 id="think">How I think</h2>
-        <BrainPicker options={options} brain={brain} onPick={setBrain} />
-        {chosen?.needsKey === true && (
-          <label className="welcome__key">
-            <span>{chosen.label}</span>
-            <input
-              type="password"
-              value={key}
-              autoComplete="off"
-              onChange={(event) => setKey(event.target.value)}
+      <div className="first-run__body">
+        <aside className="first-run__scout" aria-label={context.petName}>
+          {echo !== null && <p className="first-run__echo">{echo}</p>}
+          <p className="first-run__says" role="status" aria-live="polite">
+            {line}
+          </p>
+          {scout !== undefined && (
+            <PixelSprite
+              className="first-run__sprite"
+              sprite={characterFor(scout).sprite}
+              scale={6}
             />
-          </label>
-        )}
-      </section>
-
-      <section aria-labelledby="name">
-        <h2 id="name">What should I call you?</h2>
-        <label className="welcome__key">
-          <span>Optional. Skip it and I use no name.</span>
-          <input
-            type="text"
-            aria-label="What should Scout call you?"
-            placeholder="Your first name"
-            value={name}
-            maxLength={MAX_USER_NAME_CHARS}
-            autoComplete="given-name"
-            onChange={(event) => setName(event.target.value)}
-          />
-        </label>
-      </section>
-
-      <section aria-labelledby="key">
-        <h2 id="key">One key to remember</h2>
-        <p className="welcome__keys">
-          {askKey
-            .replace('CommandOrControl', 'Ctrl')
-            .split('+')
-            .map((part) => (
-              <kbd key={part}>{part}</kbd>
+          )}
+        </aside>
+        <section className="first-run__step" aria-labelledby="step-title">
+          <h1 id="step-title">{says.title}</h1>
+          <div className="first-run__options">
+            {optionsFor(run.current, context, providers).map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className={
+                  option.suggested === true ? 'first-run__option is-suggested' : 'first-run__option'
+                }
+                {...(picking ? { 'aria-pressed': option.id === keyFor } : {})}
+                disabled={busy}
+                onClick={() => pick(option.id)}
+              >
+                <span className="first-run__label">{option.label}</span>
+                {option.note !== undefined && (
+                  <span className="first-run__note">{option.note}</span>
+                )}
+              </button>
             ))}
-          <span>Ask me about whatever is on your screen.</span>
-        </p>
-      </section>
-
-      {problem !== null && (
-        <p className="welcome__error" role="alert">
-          {problem}
-        </p>
-      )}
-
-      <footer className="welcome__footer">
-        <button
-          type="button"
-          className="welcome__start"
-          disabled={busy || brain === undefined || !canStart(options, brain, key)}
-          onClick={() => void start()}
-        >
-          {busy ? 'Starting…' : 'Start'}
-        </button>
-        <p className="welcome__note">
-          I look at your screen when you press the key. Otherwise I follow window titles only and
-          speak up rarely. Everything here can be changed later in Home.
-        </p>
-      </footer>
+          </div>
+          {run.current === 'keys' && (
+            <p className="first-run__keys" aria-label={context.askKey}>
+              {context.askKey.split('+').map((part) => (
+                <kbd key={part}>{part}</kbd>
+              ))}
+            </p>
+          )}
+          {run.current === 'think' && keyFor !== null && (
+            <form
+              className="first-run__key"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void testKey();
+              }}
+            >
+              <label>
+                <span>Your {context.keyLabel} key</span>
+                <input
+                  ref={keyInput}
+                  type="password"
+                  value={key}
+                  autoComplete="off"
+                  spellCheck={false}
+                  onChange={(event) => setKey(event.target.value)}
+                />
+              </label>
+              <button type="submit" className="first-run__primary" disabled={busy}>
+                {busy ? 'Testing…' : 'Check key'}
+              </button>
+            </form>
+          )}
+          {problem !== null && (
+            <p className="first-run__error" role="alert">
+              {problem}
+            </p>
+          )}
+          {run.current === 'try' && problem !== null && (
+            <button
+              type="button"
+              className="first-run__primary first-run__retry"
+              autoFocus
+              onClick={() => void finish(settings)}
+            >
+              Try again
+            </button>
+          )}
+          <div className="first-run__grow" />
+          {keyFor === null && run.current !== 'try' && (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (busy) return;
+                const text = typed;
+                setTyped('');
+                heard(text);
+              }}
+            >
+              <label className="first-run__answer">
+                <span className="first-run__hidden">Answer {context.petName}</span>
+                <input
+                  ref={answerInput}
+                  type="text"
+                  placeholder={run.current === 'name' ? 'Type your name' : 'Or type your answer'}
+                  value={typed}
+                  maxLength={120}
+                  autoComplete="off"
+                  spellCheck={false}
+                  readOnly={busy}
+                  onChange={(event) => setTyped(event.target.value)}
+                />
+              </label>
+            </form>
+          )}
+          <p className="first-run__hint">
+            Answer by typing or a tap and I move on. Tap a step above to change it.
+          </p>
+        </section>
+      </div>
     </main>
-  );
-}
-
-function BrainPicker({
-  options,
-  brain,
-  onPick,
-}: {
-  options: readonly BrainOption[];
-  brain: string | undefined;
-  onPick: (id: string) => void;
-}) {
-  return (
-    <div className="welcome__list" role="radiogroup" aria-label="How Scout thinks">
-      {options.map((option) => (
-        <label key={option.id} className="welcome__choice">
-          <input
-            type="radio"
-            name="brain"
-            checked={brain === option.id}
-            onChange={() => onPick(option.id)}
-          />
-          <span className="welcome__name">
-            {option.label}
-            <small>
-              {option.needsKey
-                ? 'Paste a key below'
-                : option.id === 'claude-code'
-                  ? 'No key needed'
-                  : 'Key stored'}
-            </small>
-          </span>
-        </label>
-      ))}
-    </div>
   );
 }
 
 const container = document.getElementById('root');
 if (container !== null) {
+  // Voice reaches this window the way it reaches the bubble; Milestone 3 switches listening on.
+  installVoiceSeam();
   createRoot(container).render(
     <StrictMode>
-      <Welcome />
+      <FirstRunWindow />
     </StrictMode>,
   );
 }

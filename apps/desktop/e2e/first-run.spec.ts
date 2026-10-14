@@ -1,43 +1,51 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
+const ENGINE = { timeout: 30_000 };
 
-let app: ElectronApplication;
-let dataDir: string;
-
-test.beforeAll(async () => {
-  // A new install: an empty user-data directory, and Welcome left to open by itself. Its
-  // own directory also gives it its own single-instance lock, apart from the smoke suite.
-  dataDir = mkdtempSync(join(tmpdir(), 'tagalong-first-run-'));
-  app = await electron.launch({
+function launch(dataDir: string, signIn: string): Promise<ElectronApplication> {
+  // Each run has its own user-data directory, which also gives it its own single-instance
+  // lock, apart from the smoke suite. The Claude sign-in is faked, never read from this machine.
+  return electron.launch({
     args: ['.', `--user-data-dir=${dataDir}`],
     cwd: appDir,
-    env: { ...process.env, TAGALONG_FAKE_PROVIDERS: '1', TAGALONG_FAKE_TTS: '1' },
+    env: {
+      ...process.env,
+      TAGALONG_FAKE_PROVIDERS: '1',
+      TAGALONG_FAKE_TTS: '1',
+      TAGALONG_FAKE_SIGN_IN: signIn,
+    },
   });
-});
+}
 
-test.afterAll(async () => {
-  await app.close();
-  rmSync(dataDir, { recursive: true, force: true });
-});
+async function quit(app: ElectronApplication): Promise<void> {
+  const closed = app.waitForEvent('close').catch(() => undefined);
+  // The evaluate can reject as the process exits; the close event is what matters.
+  void app.evaluate(({ app: electronApp }) => electronApp.quit()).catch(() => undefined);
+  // Teardown must never hang: if the app has not gone in 15 s, end the process.
+  const timer = setTimeout(() => app.process().kill(), 15_000);
+  try {
+    await closed;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
-async function windowFor(name: string): Promise<Page> {
+async function windowFor(app: ElectronApplication, name: string): Promise<Page> {
   for (let attempt = 0; attempt < 60; attempt += 1) {
-    for (const page of app.windows()) {
-      if (page.url().includes(`${name}.html`)) return page;
-    }
+    for (const page of app.windows()) if (page.url().includes(`${name}.html`)) return page;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   throw new Error(`no ${name} window appeared`);
 }
 
 /** Whether the window for an entry point is on screen. */
-async function visible(name: string): Promise<boolean> {
+function visible(app: ElectronApplication, name: string): Promise<boolean> {
   return app.evaluate(
     ({ BrowserWindow }, page) =>
       BrowserWindow.getAllWindows().some(
@@ -47,17 +55,121 @@ async function visible(name: string): Promise<boolean> {
   );
 }
 
-test('a new install shows Welcome alone; Scout arrives when Welcome is done', async () => {
-  const welcome = await windowFor('onboarding');
-  await expect(welcome.getByRole('button', { name: 'Start' })).toBeVisible();
-  await windowFor('avatar');
-  expect(await visible('avatar')).toBe(false);
+async function answer(page: Page, text: string): Promise<void> {
+  await page.getByLabel('Answer Scout').fill(text);
+  await page.getByLabel('Answer Scout').press('Enter');
+}
 
-  // Closed without Start, Scout still comes: never an install with nothing on screen.
-  await app.evaluate(({ BrowserWindow }) => {
-    for (const w of BrowserWindow.getAllWindows()) {
-      if (w.webContents.getURL().includes('onboarding.html')) w.close();
-    }
+const heading = (page: Page, name: string) => page.getByRole('heading', { name });
+
+test.describe('setup by typing, signed in to Claude', () => {
+  test.describe.configure({ mode: 'serial' });
+  let app: ElectronApplication;
+  let dataDir: string;
+
+  test.beforeAll(async () => {
+    dataDir = mkdtempSync(join(tmpdir(), 'tagalong-first-run-'));
+    app = await launch(dataDir, 'signed-in');
   });
-  await expect.poll(() => visible('avatar')).toBe(true);
+
+  test.afterAll(async () => {
+    await quit(app);
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  test('a new install opens setup alone, at the name, and a typed name moves it on', async () => {
+    const setup = await windowFor(app, 'onboarding');
+    await expect(heading(setup, 'What should I call you?')).toBeVisible(ENGINE);
+    await windowFor(app, 'avatar');
+    expect(await visible(app, 'avatar')).toBe(false);
+    await answer(setup, 'Alex');
+    await expect(heading(setup, 'How should I think?')).toBeVisible(ENGINE);
+    await expect(setup.getByRole('button', { name: 'You: Alex' })).toBeVisible();
+    await expect(setup.getByText('Got it, I’ll call you Alex.')).toBeVisible();
+  });
+
+  test('closed, Scout still arrives, and the next launch resumes at the same step', async () => {
+    await app.evaluate(({ BrowserWindow }) => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        if (w.webContents.getURL().includes('onboarding.html')) w.close();
+      }
+    });
+    await expect.poll(() => visible(app, 'avatar'), ENGINE).toBe(true);
+    await quit(app);
+    app = await launch(dataDir, 'signed-in');
+    const setup = await windowFor(app, 'onboarding');
+    await expect(heading(setup, 'How should I think?')).toBeVisible(ENGINE);
+    await expect(setup.getByRole('button', { name: 'You: Alex' })).toBeVisible();
+  });
+
+  test('a step chip goes back, and Rather not returns to where you were', async () => {
+    const setup = await windowFor(app, 'onboarding');
+    await setup.getByRole('button', { name: 'You: Alex' }).click();
+    await expect(heading(setup, 'What should I call you?')).toBeVisible();
+    await setup.getByRole('button', { name: 'Rather not' }).click();
+    await expect(heading(setup, 'How should I think?')).toBeVisible();
+    await expect(setup.getByRole('button', { name: 'No name' })).toBeVisible();
+  });
+
+  test('an unclear answer is asked again, then typing finishes setup and Scout invites a question', async () => {
+    const setup = await windowFor(app, 'onboarding');
+    await answer(setup, 'banana');
+    await expect(setup.getByRole('status')).toHaveText(/didn’t catch that/);
+    await answer(setup, 'claude');
+    await expect(heading(setup, 'Should I talk?')).toBeVisible();
+    await setup.getByRole('button', { name: 'Text only' }).click();
+    await expect(heading(setup, 'One key to remember')).toBeVisible();
+    await answer(setup, 'got it');
+    await expect.poll(() => visible(app, 'onboarding'), ENGINE).toBe(false);
+    await expect.poll(() => visible(app, 'avatar'), ENGINE).toBe(true);
+    const panel = await windowFor(app, 'panel');
+    await expect(panel.getByRole('button', { name: 'Try it now' })).toBeVisible(ENGINE);
+  });
+
+  test('every answer was saved as given, and setup does not open again', async () => {
+    await quit(app);
+    const saved = JSON.parse(readFileSync(join(dataDir, 'settings.json'), 'utf8')) as {
+      welcome: { done: boolean; brain?: string };
+      userName: string;
+      userNameDeclined: boolean;
+      voice: { enabled: boolean };
+    };
+    expect(saved.welcome).toMatchObject({ done: true, brain: 'claude-code' });
+    expect(saved.userName).toBe('');
+    expect(saved.userNameDeclined).toBe(true);
+    expect(saved.voice.enabled).toBe(false);
+    app = await launch(dataDir, 'signed-in');
+    await expect.poll(() => visible(app, 'avatar'), ENGINE).toBe(true);
+    expect(await visible(app, 'onboarding')).toBe(false);
+  });
+});
+
+test.describe('setup by typing, without Claude Code', () => {
+  test.describe.configure({ mode: 'serial' });
+  let app: ElectronApplication;
+  let dataDir: string;
+
+  test.beforeAll(async () => {
+    dataDir = mkdtempSync(join(tmpdir(), 'tagalong-first-run-key-'));
+    app = await launch(dataDir, 'not-installed');
+  });
+
+  test.afterAll(async () => {
+    await quit(app);
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  test('offers install or a key, and a key tested once moves setup on', async () => {
+    const setup = await windowFor(app, 'onboarding');
+    await expect(heading(setup, 'What should I call you?')).toBeVisible(ENGINE);
+    await answer(setup, 'rather not');
+    await expect(setup.getByRole('status')).toHaveText(/didn’t find Claude Code/, ENGINE);
+    await expect(setup.getByRole('button', { name: /Install Claude Code/ })).toBeVisible();
+    await setup.getByRole('button', { name: /An API key/ }).click();
+    await setup.getByRole('button', { name: 'OpenRouter' }).click();
+    await setup.getByLabel('Your OpenRouter key').fill('sk-or-test');
+    await setup.getByRole('button', { name: 'Check key' }).click();
+    await expect(heading(setup, 'Should I talk?')).toBeVisible(ENGINE);
+    await expect(setup.getByRole('button', { name: 'OpenRouter' })).toBeVisible();
+  });
 });

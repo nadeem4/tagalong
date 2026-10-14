@@ -176,7 +176,7 @@ handler.
 The catalog in `packages/protocol/src/methods.ts` is the whole surface:
 
 - **Host to core:** `hello`, `ask`, `interrupt`, `pets.list`, `pets.upsert`,
-  `settings.get`, `settings.set`, `models.list`, `tool.approve` (`once` or `deny`), `watch.stop`
+  `settings.get`, `settings.set`, `models.list`, `providers.check` (setup's one tiny test of a pasted key: `{ ok: true }` or `{ ok: false, message }` in plain words), `tool.approve` (`once` or `deny`), `watch.stop`
   (Phase 3B), and for Home `activity.list` (see [Activity](#activity)), and for experts `experts.list`,
   `experts.upsert`, `experts.delete`, `experts.test`, `handoffs.cancel`,
   `handoffs.confirm`, `handoffs.dismiss` and `projects.search` (see
@@ -1381,52 +1381,95 @@ installer, and listing the workspace packages there would ship their whole trees
 
 ## Welcome (first run)
 
-A fresh install opens Welcome, a renderer page (`onboarding.html`) in an ordinary framed window
-centred on the screen under the cursor. Main opens it from `start` when `shouldOpenWelcome(settings,
-env)` says so: the protocol setting `welcome.done` is false and `TAGALONG_SKIP_ONBOARDING` is not
-`1`. Welcome replaced the Phase 7 setup wizard, so an install that finished the wizard
-(`onboarding.done`) still sees Welcome once. **Open Welcome again** on Home's Settings page opens it
-again.
+A fresh install opens setup, a renderer page (`onboarding.html`, titled "Set up Tagalong") in an
+ordinary framed window centred on the screen under the cursor. Main opens it from `start` when
+`shouldOpenWelcome(settings, env)` says so: the protocol setting `welcome.done` is false and
+`TAGALONG_SKIP_ONBOARDING` is not `1`. It replaced the Phase 7 setup wizard, so an install that
+finished the wizard (`onboarding.done`) still sees it once. **Open Welcome again** on Home's
+Settings page opens it again, from the top.
 
-Welcome is alone on screen: the pet's window is created hidden (`createAvatarWindow({ hidden })`)
-and `scoutWaits` is set. Scout arrives on **Start**, or when Welcome is closed without it, so an
-install never ends with nothing on screen. Only that first Welcome hides Scout; closing a Welcome
-opened again from Home leaves the pet as it was.
+Setup is alone on screen: the pet's window is created hidden (`createAvatarWindow({ hidden })`)
+and `scoutWaits` is set. Scout arrives when setup finishes, or when the window is closed without
+finishing, so an install never ends with nothing on screen. Only that first setup hides Scout;
+closing one opened again from Home leaves the pet as it was.
+
+Setup is guided by Scout itself, in one window, with no Next button. Scout asks each question
+aloud and in its bubble, suggests an answer when it can, and moves on by itself once the question
+is answered by typing or a tap. The step chips along the top are the way back.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000'}}}%%
-flowchart LR
-  O[Open] -->|findAgents| A[Agents found here]
-  A --> B[How Scout thinks]
-  B -->|saveApiKey, only for a keyed provider| S[Start]
-  S -->|finishWelcome| D[Scout, the Companion, docked alone]
-  D --> P[Hello in Scout's bubble]
+stateDiagram-v2
+  [*] --> name
+  name --> think: answered, or Rather not
+  think --> voice: Claude, or a key that passed
+  voice --> keys: Yes, talk or Text only
+  keys --> try: Got it
+  try --> [*]: finishWelcome
+  think --> name: chip
+  voice --> think: chip
+  voice --> name: chip
+  keys --> voice: chip
 ```
 
-- **Agents found here.** `main/welcome.ts#findAgents` looks for `claude`, `gemini` and `codex` on the
-  PATH with `where` (or `which`), which also finds npm's `.cmd` shims. Nothing is run and nothing is
-  sent. Each agent says whether the companion can think through its sign-in (`canThink`); only Claude
-  Code can so far.
-- **How Scout thinks.** `renderer/src/welcome-flow.ts#brainOptions` offers each found sign-in first,
-  then every provider that takes a key; `defaultBrain` picks a sign-in, else a provider whose key is
-  stored, else the first provider. A sign-in needs nothing typed, so on a computer with Claude Code
-  the whole of Welcome is one click. Other providers' sign-ins (Gemini CLI, Codex) slot in by adding
-  a brain provider and setting `brain` on their entry in `AGENTS`.
-- **Start** (`finishWelcome(providerId)`) makes the default pet the Companion on that provider, on
-  the model its role's tier recommends there (`welcomeCrew`, using `recommendedModel`), hides every
-  other pet (they stay in Home), adds Claude Code as an expert when it is installed and none exists
-  (`welcomeExperts`: no folder, read-only), sets `welcome.done`, closes Welcome, and sends the panel `greetEvent` and shows it without
-  focus (`showPanelQuietly`): Scout introduces itself in its bubble (`companion-bubble.tsx#Intro`),
-  in three handwritten beats typed in with **Next** between them (where it lives and that it keeps
-  an eye on your work but never on passwords or private windows; that it briefs an expert like
-  Claude Code and brings the answer back; the key to press). With a name saved, beat one opens
-  "Hi Nadeem, I'm Scout." Welcome's optional **What should I call you?** field saves
-  `settings.userName` (`welcome-flow.ts#welcomeNamePatch`, trimmed and cut to 40 characters)
-  before `finishWelcome`, and the panel reads it fresh on `greetEvent`. Under `prefers-reduced-motion` each
-  beat appears whole; a visually hidden `role="status"` carries each beat whole for screen readers.
-  It stays until **Got it** or a hotkey question. **Try it now** captures the active window and a screenshot
-  (`capture(['activeWindow', 'screenshot'])`) and asks "What am I working on, and what could you
-  hand to an expert?" in the same bubble; when the screen cannot be seen it asks without it.
+A chip goes back to any step already reached; answering there returns setup to the step it had
+reached. Milestone 2 is typing only, so the "Talk or type?" step (`answer`) is left out of the
+list until voice answers join in.
+
+- **The step machine** (`renderer/src/first-run.ts`) is pure: which steps this computer offers
+  (`stepsFor`), the step on screen and the furthest one reached. `startFirstRun` opens at the step
+  reached last time (a finished setup, or a new one, starts at the top). `answered` moves on, or
+  back to where you had got to; `goTo` serves the chips; `answerPatch` is what one answer saves.
+  Each answer is saved at once through `saveSettings`, so closing the window mid-setup resumes at
+  the same step on the next launch. The patch replaces the whole `welcome` record, so
+  `answerPatch` rebuilds it from the current one and never undoes `done`. The record is
+  `settings.welcome` (`done`, the `step` reached, `answerBy`, `brain`) and
+  `settings.userNameDeclined` ("Rather not": the name is never asked again, and setup steps past
+  it by itself).
+- **Matching** (`first-run-match.ts`) uses no AI. Typed text is lowercased, split into whole
+  words and compared with each choice's phrases; a match needs exactly one choice. A negation
+  ("don't talk") or a refusal is not a vote for anything, and not for its opposite, so Scout asks
+  again (`notCaught`). The name step has its own reader (`nameFrom`): a lead-in ("call me") is
+  stripped, a decline reads as declined, and anything that is not a name (digits, a pasted key, a
+  sentence) is asked about again rather than saved.
+- **Lines** (`first-run-lines.ts`) hold everything Scout says and offers: the title and line per
+  step (`scoutSays`), the option cards (`optionsFor`), the echo of the last answer, the chip
+  labels. A line never carries a key. Each line is also spoken while Scout talks; the voice
+  step's line is the sample of how Scout sounds, so it is spoken either way.
+- **`heard(text)`** in `onboarding.tsx` is the one way an answer comes in. Typing and a tap call
+  it today; Milestone 3 feeds it the words the voice engine's ears hear, with no other change to
+  the window. `installVoiceSeam()` runs in the setup window so voice reaches it the way it
+  reaches the bubble.
+- **How Scout thinks** reads the real Claude sign-in. `checkClaudeSignIn` (IPC; main
+  `claude-sign-in.ts`) runs `claude auth status --json`, which makes no model call, and reports
+  `signed-in`, `signed-out`, `not-installed` or `unknown`. Signed in, Scout suggests Claude. Signed
+  out, **Sign in to Claude** (`openClaudeSignIn`) opens a terminal, and Scout checks every three
+  seconds and, once the sign-in is in, switches to suggesting Claude and waits for a tap or an answer. Not installed, it offers **Install Claude
+  Code**, a check again, or an API key. Under `TAGALONG_FAKE_PROVIDERS=1` the check reads as signed
+  in unless `TAGALONG_FAKE_SIGN_IN` names another state, so no test runs this machine's `claude`.
+- **A pasted key** is saved to the OS keychain (`saveApiKey`) and tested once with
+  `checkKey(providerId)`, which calls the engine's `providers.check`: one tiny request, on Scout
+  as it would think with that provider, and a plain failure message when it fails (for example
+  "OpenRouter turned that key down…"). Only a passing test moves setup on; a failing one stays
+  on the step and the message shows in Scout's bubble alone. A window error (a failed save,
+  sign-in or finish) shows in a red alert instead.
+- **Finish.** Reaching **Try it** calls `finishWelcome(providerId)`, which makes the default pet
+  the Companion on that provider, on the model its role's tier recommends there (`welcomeCrew`,
+  using `recommendedModel`), hides every other pet (they stay in Home), adds Claude Code as an
+  expert when it is installed and none exists (`welcomeExperts`, via `main/welcome.ts#findAgents`,
+  which looks for `claude`, `gemini` and `codex` on the PATH with `where` or `which`; nothing is run
+  and nothing is sent), keeps the whole `welcome` record and sets `done`, closes setup, and sends
+  the panel `greetEvent`, shown without focus (`showPanelQuietly`). Scout then says one invitation
+  line, typed in at 22 ms a character (`companion-bubble.tsx#TryItInvite`): "Here I am, Alex. Ask
+  me one real thing about your screen. Press the ask key anytime." with **Try it now**
+  (focused) and **Got it**. It stays until **Got it** or a hotkey question. **Try it now**
+  captures the active window and a screenshot (`capture(['activeWindow', 'screenshot'])`) and asks
+  "What am I working on, and what could you hand to an expert?" in the same bubble; when the
+  screen cannot be seen it asks without it. The line is read whole by a screen reader through a
+  hidden `role="status"`, and appears whole under `prefers-reduced-motion`. The older three-beat
+  intro went: setup now says who Scout is and the key to press, so the bubble only invites.
+  The invitation is not a launch line: the next launch with Always listening on says the
+  listening line.
 - **Every later launch says one quiet line.** `welcome.ts#launchLine` picks it. With Always
   listening on at launch (`settings.listening.always`) it is the listening line,
   `LISTENING_LINE` ("I’m listening. Say “Scout, stop”, or switch off Always listening in my

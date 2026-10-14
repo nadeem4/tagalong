@@ -94,13 +94,19 @@ its result.
   authenticator apps, remote desktop) are never seen, titles included; your own exclusions add to
   them.
 - Everything is stored locally. Screenshots are not kept by default.
-- Scout introduces itself once, in three handwritten beats after Welcome. Each later launch it says
+- A new install is set up by Scout itself in one window: no Next button, each question asked
+  aloud and in its bubble, answered by typing or a tap; the step chips go back, and closing
+  resumes at the same step. It asks your name plainly and says why ("Rather not" means it is never
+  asked again), checks the real Claude sign-in (suggests it, waits for a sign-in, or offers
+  install or an API key, which is tested once with one tiny request), plays a sample voice line,
+  teaches the one key, then lands in the corner and invites one real question. Each later launch it says
   one short line that fits what happened: the time of day, days away with the hand-offs and
   routines that finished, a crash and what it cut short, an update and what is new, or, plainly
   with a fix, that it is signed out or has no key. It fades, reads no screen for this, and
   Settings turns it off.
-- Scout can know your name: optional in Welcome, editable in Settings → You. It uses it rarely (a
-  hello, a moment that warrants it), and the intro and the launch line greet you by it.
+- Scout can know your name: optional in setup ("Rather not" is remembered), editable in Settings → You. It
+  uses it rarely (a hello, a moment that warrants it), and the invitation and the launch line
+  greet you by it.
 - Speech runs on the computer (Kokoro, downloaded on first use); ElevenLabs is an optional
   bring-your-own-key voice that receives only the words spoken. Speech to text runs on the
   computer too (Moonshine, with Silero VAD and Smart Turn, downloaded on first use); the words show

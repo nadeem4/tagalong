@@ -19,7 +19,11 @@ const pet = (id: string): Pet =>
   });
 
 const SCOUT = pet('scout');
-const SETTINGS = { defaultPetId: 'scout' } as Settings;
+const SETTINGS = {
+  defaultPetId: 'scout',
+  welcome: { done: false, step: 'keys', answerBy: 'type', brain: 'claude-code' },
+} as Settings;
+const FINISHED = { done: true, step: 'try', answerBy: 'type', brain: 'claude-code' } as const;
 const CLAUDE: FoundAgent = { id: 'claude-code', label: 'Claude Code', found: true, canThink: true };
 
 function setup(answers: Partial<Record<HostToCoreMethod, unknown>> = {}) {
@@ -28,7 +32,7 @@ function setup(answers: Partial<Record<HostToCoreMethod, unknown>> = {}) {
     'pets.list': { pets: [SCOUT, pet('sage')] },
     'pets.upsert': { pet: SCOUT },
     'experts.list': { experts: [] },
-    'settings.set': { settings: { ...SETTINGS, welcome: { done: true } } },
+    'settings.set': { settings: { ...SETTINGS, welcome: FINISHED } },
     ...answers,
   });
   const order: string[] = [];
@@ -73,7 +77,7 @@ describe('registerCrewIpc', () => {
     await expect(invoke(IPC.switchScout, 'nebius')).rejects.toThrow('There is no scout to switch.');
   });
 
-  it('finishes Welcome: Scout docks alone, Claude Code becomes an expert, then hello', async () => {
+  it('finishes Welcome: keeps the setup record and marks it done, Scout docks alone, then hello', async () => {
     const { invoke, calls, deps, order } = setup();
     await invoke(IPC.finishWelcome, 'claude-code');
     const companion = getRole('companion')!;
@@ -88,9 +92,9 @@ describe('registerCrewIpc', () => {
       ['pets.upsert', { pet: scout }],
       ['experts.list', {}],
       ['experts.upsert', { expert: expect.objectContaining({ id: 'claude-code' }) }],
-      ['settings.set', { patch: { hiddenPets, welcome: { done: true } } }],
+      ['settings.set', { patch: { hiddenPets, welcome: FINISHED } }],
     ]);
-    expect(deps.setSettings).toHaveBeenCalledWith({ ...SETTINGS, welcome: { done: true } });
+    expect(deps.setSettings).toHaveBeenCalledWith({ ...SETTINGS, welcome: FINISHED });
     expect(order).toEqual(['setSettings', 'refreshStrip', 'welcomed']);
   });
 });

@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import crossSpawn from 'cross-spawn';
 import type { ClaudeSignIn } from '../shared/ipc';
 
@@ -98,4 +99,41 @@ function runClaude(args: string[]): Promise<ClaudeRun> {
       finish(code === 0 ? { stdout } : { stdout, errorCode: code ?? 'failed' }),
     );
   });
+}
+
+/** What starting a process needs to give back here: let go of it, and hear its failure. */
+export type SpawnLike = (
+  command: string,
+  args: string[],
+  options: { detached: boolean; stdio: 'ignore'; windowsHide: boolean },
+) => { unref(): void; on(event: 'error', listener: (error: Error) => void): unknown };
+
+/** A visible terminal running `claude auth login`: the person signs in there, not in Tagalong. */
+export function claudeSignInCommand(platform: NodeJS.Platform): {
+  command: string;
+  args: string[];
+} {
+  if (platform === 'win32') {
+    return {
+      command: 'cmd.exe',
+      args: ['/c', 'start', 'Claude sign-in', 'cmd', '/k', 'claude auth login'],
+    };
+  }
+  if (platform === 'darwin') {
+    return {
+      command: 'osascript',
+      args: ['-e', 'tell application "Terminal" to do script "claude auth login"'],
+    };
+  }
+  return { command: 'x-terminal-emulator', args: ['-e', 'claude auth login'] };
+}
+
+export function openClaudeSignIn(
+  start: SpawnLike = spawn as unknown as SpawnLike,
+  platform: NodeJS.Platform = process.platform,
+): void {
+  const { command, args } = claudeSignInCommand(platform);
+  const child = start(command, args, { detached: true, stdio: 'ignore', windowsHide: false });
+  child.on('error', (error) => console.warn('[main] could not open the Claude sign-in:', error));
+  child.unref();
 }

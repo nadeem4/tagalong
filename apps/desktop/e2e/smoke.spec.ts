@@ -474,24 +474,18 @@ test('sight detail and the window text budget save and read back', async () => {
   }
 });
 
-test('Welcome opens on request: the agents found here, how Scout thinks, one key', async () => {
+test('Setup opens on request: the steps are listed and an answer box waits', async () => {
   const panel = await windowFor('panel');
   await panel.evaluate(() => window.tagalongHost.openOnboarding());
-  const welcome = await windowFor('onboarding');
+  const setup = await windowFor('onboarding');
 
-  await expect(welcome.getByRole('heading', { level: 1 })).toContainText('Hi, I’m');
-  const found = welcome.getByRole('region', { name: 'Found on this computer' });
-  await expect(found).toContainText('Claude Code');
-  await expect(found).toContainText('Gemini CLI');
-  await expect(found).toContainText('Codex');
-  // Whatever is installed on the runner, Scout always has a way to think on offer.
-  await expect(welcome.getByRole('radiogroup', { name: 'How Scout thinks' })).toContainText(
-    'API key',
-  );
-  await expect(welcome.getByRole('button', { name: 'Start' })).toBeVisible();
+  await expect(setup).toHaveTitle('Set up Tagalong');
+  await expect(setup.getByRole('navigation', { name: 'Setup steps' })).toBeVisible();
+  await expect(setup.getByRole('heading', { level: 1 })).not.toBeEmpty();
+  await expect(setup.getByLabel('Answer Scout')).toBeVisible();
 
-  // Start is not pressed: it would make Scout the Companion and hide the crew the rest of
-  // the suite talks to.
+  // Nothing is answered: finishing would make Scout the Companion and hide the crew the
+  // rest of the suite talks to.
   await app.evaluate(({ BrowserWindow }) => {
     for (const w of BrowserWindow.getAllWindows()) {
       if (w.webContents.getURL().includes('onboarding.html')) w.close();

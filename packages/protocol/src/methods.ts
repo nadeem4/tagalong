@@ -167,6 +167,14 @@ export const ModelsListResult = z.object({
   source: z.enum(['live', 'fallback']),
 });
 
+/** Setup's one test of a pasted key: a tiny real request, then ok or a plain reason. */
+export const ProvidersCheckParams = z.object({ providerId: z.string().min(1) });
+export const ProvidersCheckResult = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true) }),
+  z.object({ ok: z.literal(false), message: z.string().min(1) }),
+]);
+export type ProvidersCheckResult = z.infer<typeof ProvidersCheckResult>;
+
 /** The person's answer to `connector.confirm`. `once` runs that one change; `deny` cancels it. */
 export const ToolApproveParams = z.object({
   approvalId: z.uuid(),
@@ -403,6 +411,7 @@ export const hostToCoreMethods = {
   'settings.get': { params: SettingsGetParams, result: SettingsGetResult },
   'settings.set': { params: SettingsSetParams, result: SettingsSetResult },
   'models.list': { params: ModelsListParams, result: ModelsListResult },
+  'providers.check': { params: ProvidersCheckParams, result: ProvidersCheckResult },
   'tool.approve': { params: ToolApproveParams, result: ToolApproveResult },
   'watch.stop': { params: WatchStopParams, result: WatchStopResult },
   'activity.list': { params: ActivityListParams, result: ActivityListResult },

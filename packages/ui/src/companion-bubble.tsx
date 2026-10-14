@@ -44,7 +44,7 @@ export interface CompanionBubbleProps {
   petName: string;
   /** What the hotkey captured. Each part shows as a chip the person can remove. */
   snapshot?: ContextSnapshot;
-  /** The one-time hello after Welcome, instead of the question box. */
+  /** The one-line invitation after setup, instead of the question box. */
   greeting?: boolean;
   /** The ask key as a person reads it, for the hello. */
   hotkeyLabel?: string;
@@ -459,8 +459,7 @@ export function CompanionBubble({
   if (greeting && !tried) {
     return (
       <Speech tail={tail}>
-        <Intro
-          petName={petName}
+        <TryItInvite
           hotkeyLabel={hotkeyLabel}
           userName={userName}
           onTry={() => void tryIt()}
@@ -683,7 +682,7 @@ function reducedMotion(): boolean {
   );
 }
 
-/** How fast a beat types in: quick enough to read along, slow enough to feel spoken. */
+/** How fast a line types in: quick enough to read along, slow enough to feel spoken. */
 const TYPE_MS = 22;
 
 /** `text` revealed a character at a time, or whole at once when motion is reduced. */
@@ -709,12 +708,11 @@ function useTyped(text: string): string {
 }
 
 /**
- * The first hello, once, after Welcome: three short beats typed into the bubble, with Next
- * between them, ending on the key to press. Handwritten, so it works before any brain does.
- * A screen reader hears each beat whole; the typing is for the eyes only.
+ * After setup, once: one line typed into the bubble that invites a real question about the
+ * screen, with Try it now and Got it. Setup already said who Scout is and the key to press.
+ * A screen reader hears the line whole; the typing is for the eyes only.
  */
-function Intro({
-  petName,
+function TryItInvite({
   hotkeyLabel,
   userName,
   onTry,
@@ -722,43 +720,36 @@ function Intro({
   onSay,
   indicator,
 }: {
-  petName: string;
   hotkeyLabel: string;
   userName: string;
   onTry: () => void;
   onDismiss?: () => void;
-  /** Each beat is said aloud once, as it appears. */
+  /** The line is said aloud once, as it appears. */
   onSay?: (text: string) => void;
   /** The speaking indicator, while Scout speaks. */
   indicator?: ReactNode;
 }) {
-  const beats = [
-    `${userName.trim() === '' ? 'Hi,' : `Hi ${userName.trim()},`} I’m ${petName}. I sit in the corner of your screen and keep an eye on what you’re working on, never on passwords or private windows.`,
-    'Ask me about whatever you’re on. When it needs real work, I brief an expert, like Claude Code, and bring the answer back.',
-    `Press ${hotkeyLabel} anytime.`,
-  ];
-  const [beat, setBeat] = useState(0);
-  const text = beats[beat] ?? '';
+  const name = userName.trim();
+  const text = `${name === '' ? 'Here I am.' : `Here I am, ${name}.`} Ask me one real thing about your screen. Press ${hotkeyLabel} anytime.`;
   const typed = useTyped(text);
-  const last = beat === beats.length - 1;
   const primary = useRef<HTMLButtonElement>(null);
-  const said = useRef(-1);
+  const said = useRef(false);
   const say = useEffectEvent(() => {
-    if (said.current >= beat) return;
-    said.current = beat;
+    if (said.current) return;
+    said.current = true;
     onSay?.(text);
   });
-  useEffect(() => say(), [beat]);
   useEffect(() => {
-    if (last) primary.current?.focus();
-  }, [last]);
+    say();
+    primary.current?.focus();
+  }, []);
   return (
     <div className="bubble bubble--intro">
       <style>{BUBBLE_CSS}</style>
       <div className="bubble-hello">
         <p className="bubble-text bubble-typed" aria-hidden="true">
           <span data-testid="intro-typed">{typed}</span>
-          {/* Holds the bubble at the beat's full height, so it does not grow as it types. */}
+          {/* Holds the bubble at the line's full height, so it does not grow as it types. */}
           <span className="bubble-ghost">{text.slice(typed.length)}</span>
         </p>
         <p role="status" className="bubble-sr">
@@ -766,29 +757,12 @@ function Intro({
         </p>
       </div>
       <div className="bubble-row">
-        <span className="bubble-steps" aria-hidden="true">
-          {beats.map((_, index) => (
-            <span key={index} className="bubble-step" data-on={index === beat} />
-          ))}
-        </span>
-        {last ? (
-          <>
-            <button ref={primary} type="button" className="bubble-primary" onClick={onTry}>
-              Try it now
-            </button>
-            <button type="button" className="bubble-quiet" onClick={onDismiss}>
-              Got it
-            </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            className="bubble-quiet bubble-next"
-            onClick={() => setBeat((index) => index + 1)}
-          >
-            Next
-          </button>
-        )}
+        <button ref={primary} type="button" className="bubble-primary" onClick={onTry}>
+          Try it now
+        </button>
+        <button type="button" className="bubble-quiet" onClick={onDismiss}>
+          Got it
+        </button>
         {indicator}
       </div>
     </div>
@@ -1041,10 +1015,6 @@ const BUBBLE_CSS = `
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
-.bubble-steps { display: inline-flex; gap: 6px; margin-right: auto; }
-.bubble-step { width: 6px; height: 6px; border-radius: 50%; background: ${t.color.fieldLine}; }
-.bubble-step[data-on='true'] { background: ${t.color.gold}; }
-.bubble-next { align-self: center; }
 .bubble--line { padding: 10px 8px 10px 14px; transition: opacity ${LEAVE_MS}ms ease, transform ${LEAVE_MS}ms ease; }
 .bubble--line[data-leaving='true'] { opacity: 0; transform: translateY(4px); }
 .bubble--line .bubble-top { align-items: center; }

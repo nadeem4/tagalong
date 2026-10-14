@@ -51,7 +51,7 @@ import { VoiceWorker } from './voice/worker/client';
 import type { WorkerProcess } from './voice/worker/messages';
 import { WorkerLocalVoice } from './voice/worker/worker-local-voice';
 import type { VoiceService } from './voice/voice';
-import { signInFor } from './claude-sign-in';
+import { openClaudeSignIn, signInFor } from './claude-sign-in';
 import { findAgents, launchLine, shouldOpenWelcome } from './welcome';
 import type { EngineHost } from './engine-host';
 import {
@@ -169,7 +169,11 @@ if (!app.requestSingleInstanceLock()) {
 // The pets live in the tray, so closing a window is never a reason to quit.
 app.on('window-all-closed', () => {});
 
+/** Set once quit begins, so a closing window never starts anything new on the way out. */
+let quitting = false;
+
 app.on('before-quit', () => {
+  quitting = true;
   desktop?.hotkeys.dispose();
   desktop?.voiceWorker.stop();
   stopKeepAnEye();
@@ -776,8 +780,9 @@ function openOnboarding(): void {
     if (desktop === null) return;
     desktop.onboardingWindow = null;
     // Closed without Start, Scout still arrives: an install never ends with nothing on screen.
-    // Only the first Welcome hides it, so this never undoes the tray's Hide Scout.
-    if (desktop.scoutWaits) desktop.avatar?.show();
+    // Only the first Welcome hides it, so this never undoes the tray's Hide Scout. Not while
+    // quitting: the close is the app going away, and showing a window then can stall the exit.
+    if (desktop.scoutWaits && !quitting) desktop.avatar?.show();
     desktop.scoutWaits = false;
   });
   desktop.onboardingWindow = window;
@@ -1006,6 +1011,7 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.findAgents, () => findAgents());
   ipcMain.handle(IPC.checkClaudeSignIn, () => signInFor(process.env));
+  ipcMain.handle(IPC.openClaudeSignIn, () => openClaudeSignIn());
 
   // The pet is dragged by hand (a drag region would swallow its clicks), and its bubble
   // moves with it, so it keeps speaking from the pet.

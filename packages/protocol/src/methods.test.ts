@@ -29,6 +29,7 @@ const HOST_TO_CORE = [
   'settings.get',
   'settings.set',
   'models.list',
+  'providers.check',
   'tool.approve',
   'watch.stop',
   'activity.list',
@@ -634,5 +635,17 @@ describe('perception.captureWindow', () => {
         notes: ['a blind spot'],
       }).image,
     ).toBeUndefined();
+  });
+});
+
+describe('providers.check', () => {
+  it('names the provider, and answers ok or a plain message', () => {
+    expect(paramsSchemaFor('providers.check').parse({ providerId: 'openrouter' })).toEqual({
+      providerId: 'openrouter',
+    });
+    expect(resultSchemaFor('providers.check').parse({ ok: true })).toEqual({ ok: true });
+    const failed = { ok: false, message: 'OpenRouter turned that key down.' };
+    expect(resultSchemaFor('providers.check').parse(failed)).toEqual(failed);
+    expect(resultSchemaFor('providers.check').safeParse({ ok: false }).success).toBe(false);
   });
 });
