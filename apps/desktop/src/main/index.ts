@@ -29,7 +29,7 @@ import { extensionFolder, isAllowedLink } from './links';
 import { ELEVENLABS_SECRET_KEY } from './provider-choices';
 import { elevenLabsTts } from './voice/elevenlabs';
 import { kokoroDownloaded, loadKokoro } from './voice/kokoro';
-import { LazyLocalVoice, createVoiceService } from './voice/voice';
+import { LazyLocalVoice, createVoiceService, elevenLabsMouth, localMouth } from './voice/voice';
 import type { VoiceService } from './voice/voice';
 import { LazyLocalStt, createListenService } from './voice/listen';
 import type { ListenService } from './voice/listen';
@@ -239,14 +239,23 @@ async function start(): Promise<void> {
     sightPause,
     rolling,
     perceptionMemory,
-    voice: createVoiceService({
-      env: process.env,
-      settings: () => (desktop?.settings ?? settings).voice,
-      elevenLabsKey: () => secrets.get(ELEVENLABS_SECRET_KEY).catch(() => null),
+    voice: (() => {
       // The model downloads into the data dir on first use, never at start.
-      local: new LazyLocalVoice(() => loadKokoro(join(dataDir, 'voice'))),
-      elevenLabs: (apiKey, voiceId) => elevenLabsTts(apiKey, voiceId),
-    }),
+      const local = new LazyLocalVoice(() => loadKokoro(join(dataDir, 'voice')));
+      return createVoiceService({
+        env: process.env,
+        settings: () => (desktop?.settings ?? settings).voice,
+        local,
+        mouths: {
+          kokoro: localMouth(local),
+          elevenlabs: elevenLabsMouth(
+            () => secrets.get(ELEVENLABS_SECRET_KEY).catch(() => null),
+            () => (desktop?.settings ?? settings).voice.elevenLabsVoiceId,
+            (apiKey, voiceId) => elevenLabsTts(apiKey, voiceId),
+          ),
+        },
+      });
+    })(),
     // The speech model downloads beside the voice, on the first Talk to Scout.
     listen: createListenService({
       env: process.env,

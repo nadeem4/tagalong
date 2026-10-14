@@ -1,7 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
+import type { MouthId } from '@tagalong/protocol';
 import { ELEVENLABS_MODEL, ELEVENLABS_TIMEOUT_MS, elevenLabsTts } from './elevenlabs';
-import { LazyLocalVoice, createVoiceService, fakeTts, silentWav } from './voice';
+import {
+  LazyLocalVoice,
+  createVoiceService,
+  elevenLabsMouth,
+  fakeTts,
+  localMouth,
+  silentWav,
+} from './voice';
 import type { LocalSynth, Tts } from './voice';
 
 const AUDIO = { audio: new Uint8Array([1, 2, 3]), mime: 'audio/wav' };
@@ -23,17 +31,29 @@ function service({
   env = {},
   key = null as string | null,
   voiceId = '',
+  mouth = undefined as MouthId | undefined,
   ready = true,
   spoken = [] as string[],
   elevenLabs = (apiKey: string, id: string) => tts(`eleven(${apiKey},${id})`, spoken),
 } = {}) {
   const local = localVoice(ready, spoken);
+  const settings = () => ({
+    ...SETTINGS_DEFAULTS.voice,
+    elevenLabsVoiceId: voiceId,
+    ...(mouth !== undefined ? { mouth } : {}),
+  });
   const voice = createVoiceService({
     env,
-    settings: () => ({ ...SETTINGS_DEFAULTS.voice, elevenLabsVoiceId: voiceId }),
-    elevenLabsKey: async () => key,
+    settings,
     local,
-    elevenLabs,
+    mouths: {
+      kokoro: localMouth(local),
+      elevenlabs: elevenLabsMouth(
+        async () => key,
+        () => settings().elevenLabsVoiceId,
+        elevenLabs,
+      ),
+    },
   });
   return { voice, local, spoken };
 }
@@ -103,12 +123,19 @@ describe('createVoiceService', () => {
 
   it('stays quiet when Scout talks is off, but still plays a preview', async () => {
     const spoken: string[] = [];
+    const local = localVoice(true, spoken);
     const voice = createVoiceService({
       env: {},
       settings: () => ({ ...SETTINGS_DEFAULTS.voice, enabled: false }),
-      elevenLabsKey: async () => null,
-      local: localVoice(true, spoken),
-      elevenLabs: () => tts('eleven', spoken),
+      local,
+      mouths: {
+        kokoro: localMouth(local),
+        elevenlabs: elevenLabsMouth(
+          async () => null,
+          () => '',
+          () => tts('eleven', spoken),
+        ),
+      },
     });
     expect(await voice.speak('Hi.')).toEqual({ kind: 'off' });
     expect((await voice.speak('Preview.', {})).kind).toBe('audio');
@@ -125,9 +152,15 @@ describe('createVoiceService', () => {
     const voice = createVoiceService({
       env: {},
       settings: () => SETTINGS_DEFAULTS.voice,
-      elevenLabsKey: async () => null,
       local,
-      elevenLabs: () => local,
+      mouths: {
+        kokoro: localMouth(local),
+        elevenlabs: elevenLabsMouth(
+          async () => null,
+          () => '',
+          () => local,
+        ),
+      },
     });
     await voice.speak('Hi.', { voice: 'bm_fable', speed: 1.1 });
     await voice.speak('Hi.');
@@ -158,11 +191,50 @@ describe('createVoiceService', () => {
     createVoiceService({
       env: {},
       settings: () => ({ ...SETTINGS_DEFAULTS.voice, enabled: false }),
-      elevenLabsKey: async () => null,
       local,
-      elevenLabs: () => local,
+      mouths: {
+        kokoro: localMouth(local),
+        elevenlabs: elevenLabsMouth(
+          async () => null,
+          () => '',
+          () => local,
+        ),
+      },
     }).warmAtStart(true);
     expect(local.warm).not.toHaveBeenCalled();
+  });
+
+  it('uses the system voice straight away when the person picked it, and never loads Kokoro', async () => {
+    const { voice, local, spoken } = service({ mouth: 'system' });
+    expect(await voice.speak('Hello.')).toEqual({ kind: 'fallback' });
+    expect(spoken).toEqual([]);
+    expect(local.warm).not.toHaveBeenCalled();
+    voice.warmAtStart(true);
+    expect(local.warm).not.toHaveBeenCalled();
+  });
+
+  it('falls from a chosen ElevenLabs with no key to Kokoro', async () => {
+    const { voice, spoken } = service({ mouth: 'elevenlabs', voiceId: 'voice-1' });
+    await voice.speak('Hi.');
+    expect(spoken).toEqual(['kokoro:Hi.']);
+  });
+
+  it('falls to the system voice when the chosen voice and Kokoro both throw', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { voice, local } = service({
+      key: 'xi-key',
+      voiceId: 'voice-1',
+      elevenLabs: () => ({
+        speak: async () => {
+          throw new Error('500');
+        },
+      }),
+    });
+    local.speak = async () => {
+      throw new Error('onnx failed');
+    };
+    expect(await voice.speak('Hi.')).toEqual({ kind: 'fallback' });
+    warn.mockRestore();
   });
 });
 

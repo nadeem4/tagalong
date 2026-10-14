@@ -1535,10 +1535,18 @@ flowchart LR
   Got it, the speaking indicator and the stop key (`hotkeys.stopVoice`, default
   `Ctrl+Shift+Alt+M`, broadcast as `IPC.stopVoiceEvent`) all call it.
 - **Who says it** (`main/voice/voice.ts`, `createVoiceService`). `TAGALONG_FAKE_TTS=1` means
-  `fakeTts`, a short silent WAV: no download, no network. Otherwise ElevenLabs when an
-  `elevenlabs.apiKey` is stored and `voice.elevenLabsVoiceId` is set (`elevenlabs.ts`: the
-  streaming endpoint, `eleven_flash_v2_5`, only the text and a speed sent, given up after
-  `ELEVENLABS_TIMEOUT_MS`, 15 s); on failure or timeout, Kokoro.
+  `fakeTts`, a short silent WAV: no download, no network. Otherwise the service walks
+  `mouthOrder(chosenMouth(voice))` from `@tagalong/protocol`: the chosen mouth, then Kokoro, then
+  the system voice, each once. `chosenMouth` is `voice.mouth` when the person picked one; a settings
+  file from before the picker has none, so one with `elevenLabsVoiceId` set keeps speaking with
+  ElevenLabs and any other is Kokoro. Each id except `system` is a `MouthEngine` in the
+  `MouthEngines` registry (`kokoro`: `localMouth`; `elevenlabs`: `elevenLabsMouth`), with
+  `usable()` and `speak()`; a mouth that is not usable, not ready (`speak` answers `null`) or that
+  throws (logged) is skipped quietly for the next. `system` is the window's, not main's: reaching it
+  answers `fallback`, and a person who picked it never loads Kokoro (`warmAtStart` skips it).
+  ElevenLabs is usable when an `elevenlabs.apiKey` is stored and `voice.elevenLabsVoiceId` is set
+  (`elevenlabs.ts`: the streaming endpoint, `eleven_flash_v2_5`, only the text and a speed sent,
+  given up after `ELEVENLABS_TIMEOUT_MS`, 15 s).
   Kokoro (`kokoro.ts`, `kokoro-js` with `@huggingface/transformers`, `onnx-community/Kokoro-82M-v1.0-ONNX`,
   q8, CPU) is `LazyLocalVoice`: the first line starts the download into `<userData>/voice` and
   answers `fallback`; once loaded every line is a WAV. At start, `warmAtStart` loads it when an
