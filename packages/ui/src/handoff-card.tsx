@@ -285,5 +285,6 @@ export const HANDOFF_CSS = `
   font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; font-size: 12px; color: #A3AAC4;
 }
 .handoff-steps li:last-child { color: #E9ECF5; }
+.connector-details { white-space: pre-wrap; overflow-wrap: anywhere; }
 .handoff-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #F2C14E; }
 `;

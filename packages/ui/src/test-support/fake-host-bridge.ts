@@ -1,5 +1,8 @@
 import type {
   ActivityEntry,
+  ConnectionState,
+  ConnectionsAddParams,
+  ConnectionsListResult,
   ContextSnapshot,
   Expert,
   PerceptionTarget,
@@ -35,6 +38,13 @@ export interface FakeHostBridge extends HostBridge {
   readonly confirmedHandoffs: readonly ConfirmHandoff[];
   readonly dismissedHandoffs: readonly string[];
   readonly cancelledHandoffs: readonly string[];
+  /** Every answer to a connector confirm card, in order. */
+  readonly approvals: readonly { approvalId: string; decision: 'once' | 'deny' }[];
+  /** Home's connections; a test edits them, then emits `connections.changed`. */
+  connections: ConnectionsListResult;
+  readonly addedConnections: readonly ConnectionsAddParams[];
+  readonly signIns: readonly string[];
+  readonly removedConnections: readonly string[];
 }
 
 /**
@@ -59,6 +69,9 @@ export function createFakeHostBridge(
     pickFolder?: () => string | null;
     /** What a project search answers; absent answers nothing found. */
     searchProjects?: (query: string) => ProjectCandidate[];
+    connections?: Partial<ConnectionsListResult>;
+    /** What adding answers; absent answers a connected connection with no tools. */
+    addConnection?: (params: ConnectionsAddParams) => ConnectionState;
   } = {},
 ): FakeHostBridge {
   const handlers = new Set<(event: TurnEvent) => void>();
@@ -72,6 +85,17 @@ export function createFakeHostBridge(
   const confirmedHandoffs: ConfirmHandoff[] = [];
   const dismissedHandoffs: string[] = [];
   const cancelledHandoffs: string[] = [];
+  const approvals: { approvalId: string; decision: 'once' | 'deny' }[] = [];
+  const addedConnections: ConnectionsAddParams[] = [];
+  const signIns: string[] = [];
+  const removedConnections: string[] = [];
+  const update = (id: string, patch: Partial<ConnectionState>): ConnectionState => {
+    const list = fake.connections.connections;
+    const index = list.findIndex((c) => c.id === id);
+    const next = { ...list[index]!, ...patch };
+    list[index] = next;
+    return next;
+  };
 
   const fake: FakeHostBridge = {
     asks,
@@ -167,6 +191,57 @@ export function createFakeHostBridge(
     },
     searchProjects(query) {
       return Promise.resolve(options.searchProjects?.(query) ?? []);
+    },
+    approvals,
+    approveTool(approvalId, decision) {
+      approvals.push({ approvalId, decision });
+      return Promise.resolve();
+    },
+    connections: {
+      connections: [...(options.connections?.connections ?? [])],
+      popular: [...(options.connections?.popular ?? [])],
+      found: [...(options.connections?.found ?? [])],
+    },
+    addedConnections,
+    signIns,
+    removedConnections,
+    listConnections() {
+      return Promise.resolve(structuredClone(fake.connections));
+    },
+    addConnection(params) {
+      addedConnections.push(params);
+      const added: ConnectionState = options.addConnection?.(params) ?? {
+        id: params.id ?? params.name.toLowerCase(),
+        name: params.name,
+        transport:
+          params.transport.type === 'http'
+            ? params.transport
+            : {
+                ...params.transport,
+                args: params.transport.args ?? [],
+                env: params.transport.env ?? {},
+              },
+        auth: params.auth,
+        secretNames: [],
+        enabled: true,
+        // An OAuth app is still signing in in the browser when add answers.
+        status: params.auth === 'oauth' ? 'connecting' : 'connected',
+        tools: [],
+      };
+      fake.connections.connections.push(added);
+      return Promise.resolve(added);
+    },
+    setConnectionEnabled(id, enabled) {
+      return Promise.resolve(update(id, { enabled, status: enabled ? 'connected' : 'off' }));
+    },
+    signInConnection(id) {
+      signIns.push(id);
+      return Promise.resolve(update(id, { status: 'connecting' }));
+    },
+    removeConnection(id) {
+      removedConnections.push(id);
+      fake.connections.connections = fake.connections.connections.filter((c) => c.id !== id);
+      return Promise.resolve(true);
     },
     rolesNotice() {
       return Promise.resolve(notice);

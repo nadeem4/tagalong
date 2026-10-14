@@ -3,6 +3,9 @@ import type { ReactNode } from 'react';
 import type {
   ActivityListResult,
   Brief,
+  ConnectionState,
+  ConnectionsAddParams,
+  ConnectionsListResult,
   ContextSnapshot,
   CoreToHostNotification,
   Expert,
@@ -27,7 +30,9 @@ type TurnNotification =
   | 'watch.status'
   | 'handoff.proposed'
   | 'handoff.progress'
-  | 'handoff.finished';
+  | 'handoff.finished'
+  | 'connector.confirm'
+  | 'connections.changed';
 
 /**
  * Derived from the protocol catalog rather than restated, so a new turn.* notification
@@ -107,6 +112,18 @@ export interface HostBridge {
   cancelHandoff?(handoffId: string): Promise<void>;
   /** Projects on this computer matching a name or path, for "Change project". */
   searchProjects?(query: string): Promise<ProjectCandidate[]>;
+  /** The person's answer to a connector confirm card: run it once, or cancel it. */
+  approveTool?(approvalId: string, decision: 'once' | 'deny'): Promise<void>;
+  /**
+   * Home's Connections page: the person's apps over MCP, the Popular list and the servers
+   * found in Claude Code. All optional: a host without Home never shows the page.
+   */
+  listConnections?(): Promise<ConnectionsListResult>;
+  addConnection?(params: ConnectionsAddParams): Promise<ConnectionState>;
+  setConnectionEnabled?(id: string, enabled: boolean): Promise<ConnectionState>;
+  signInConnection?(id: string): Promise<ConnectionState>;
+  /** Disconnect: tokens and keys deleted, the connection forgotten. */
+  removeConnection?(id: string): Promise<boolean>;
 }
 
 export interface ConfirmHandoff {

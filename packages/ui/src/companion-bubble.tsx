@@ -1,8 +1,9 @@
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { ContextSnapshot } from '@tagalong/protocol';
+import type { ConnectorConfirmParams, ContextSnapshot } from '@tagalong/protocol';
 import { ANSWER_CSS, Answer } from './answer';
 import { HANDOFF_CSS, HandoffStatus, ProposalCard, type Handoff } from './handoff-card';
+import { ConnectorConfirmCard } from './connector-confirm';
 import { useHostBridge } from './host-bridge';
 import type { TurnEvent } from './host-bridge';
 import { officeTokens as t } from './office/tokens';
@@ -119,6 +120,8 @@ export function CompanionBubble({
   const [removed, setRemoved] = useState<ReadonlySet<Chip['id']>>(new Set());
   const [reply, setReply] = useState<Reply>({ state: 'idle' });
   const [handoff, setHandoff] = useState<Handoff | null>(null);
+  // A change Scout wants to make in a connected app, waiting for Allow once or Cancel.
+  const [confirm, setConfirm] = useState<ConnectorConfirmParams | null>(null);
   const [past, setPast] = useState<Exchange[]>([]);
   const [question, setQuestion] = useState<string | null>(null);
   // Try it now ends the hello here, even when the screen could not be seen.
@@ -134,7 +137,19 @@ export function CompanionBubble({
   }
 
   const onTurnEvent = useEffectEvent((event: TurnEvent) => {
+    if (
+      (event.type === 'turn.completed' || event.type === 'turn.error') &&
+      event.turnId === confirm?.turnId
+    ) {
+      setConfirm(null);
+    }
     switch (event.type) {
+      case 'connector.confirm': {
+        if (event.petId !== petId) return;
+        const { type: _type, ...params } = event;
+        setConfirm(params);
+        return;
+      }
       case 'turn.started':
         if (event.petId !== petId || reply.state !== 'running') return;
         mine.current = event.turnId;
@@ -319,8 +334,16 @@ export function CompanionBubble({
       )}
     </>
   );
+  const answerConfirm = (decision: 'once' | 'deny'): void => {
+    if (confirm === null) return;
+    void bridge.approveTool?.(confirm.approvalId, decision);
+    setConfirm(null);
+  };
   const handoffCard = (
     <>
+      {confirm !== null && (
+        <ConnectorConfirmCard key={confirm.approvalId} confirm={confirm} onAnswer={answerConfirm} />
+      )}
       {handoff?.phase === 'proposed' && (
         <ProposalCard
           key={handoff.proposal.proposalId}

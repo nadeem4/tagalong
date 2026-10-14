@@ -7,15 +7,17 @@ import { characterFor } from '../office/sprites/characters';
 import { SETTINGS_CSS } from '../settings/settings-styles';
 import { ActivityView } from './activity-view';
 import { brainLabel, modelLabel } from './brain-label';
+import { ConnectionsPanel } from './connections-panel';
 import { ExpertsPanel } from './experts-panel';
 import { HOME_CSS } from './home-styles';
 
-export type HomePage = 'overview' | 'scout' | 'experts' | 'activity' | 'settings';
+export type HomePage = 'overview' | 'scout' | 'experts' | 'connections' | 'activity' | 'settings';
 
 const PAGES: readonly { id: HomePage; label: (name: string) => string }[] = [
   { id: 'overview', label: () => 'Overview' },
   { id: 'scout', label: (name) => name },
   { id: 'experts', label: () => 'Experts' },
+  { id: 'connections', label: () => 'Connections' },
   { id: 'activity', label: () => 'Activity' },
   { id: 'settings', label: () => 'Settings' },
 ];
@@ -47,9 +49,9 @@ export interface HomeViewProps {
 }
 
 /**
- * Home: the one window for everything. The companion in the corner, and five pages: an
- * overview, how the companion thinks, the experts it hands work to, what happened, and
- * the app's settings.
+ * Home: the one window for everything. The companion in the corner, and six pages: an
+ * overview, how the companion thinks, the experts it hands work to, the apps it can use,
+ * what happened, and the app's settings.
  */
 export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps) {
   const bridge = useHostBridge();
@@ -121,6 +123,7 @@ export function HomeView({ host, settings, page: asked, onPage }: HomeViewProps)
           />
         )}
         {page === 'experts' && <ExpertsPanel />}
+        {page === 'connections' && <ConnectionsPanel />}
         {page === 'activity' && <ActivityView pets={pets} />}
         {page === 'settings' && settings}
       </main>
@@ -209,7 +212,11 @@ function Overview({
           <p key={entry.id} className="home-card__row">
             <span>
               <strong>{entry.kind === 'expert' ? (entry.expertName ?? 'Expert') : name}</strong>
-              {entry.text !== undefined ? ` · ${entry.text}` : ''}
+              {entry.kind === 'connector'
+                ? ` · ${entry.access === 'read' ? 'read' : 'changed'} ${entry.app ?? 'an app'}`
+                : entry.text !== undefined
+                  ? ` · ${entry.text}`
+                  : ''}
             </span>
             <span>{STATE_WORDS[entry.state]}</span>
           </p>

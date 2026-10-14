@@ -104,6 +104,19 @@ export const HOME_CSS = `
 .home-switch .tg-note { margin: 0; }
 .home-switch__label { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; }
 .home-danger { margin-left: auto; display: flex; gap: ${t.space.md}px; }
+.home-conns__list { list-style: none; margin: 0 0 ${t.space.lg}px; padding: 0; display: flex; flex-direction: column; }
+.home-conn {
+  display: flex; flex-direction: column; gap: ${t.space.md}px;
+  padding: ${t.space.lg}px 0; border-bottom: 1px solid ${t.color.panelLine};
+}
+.home-conn__head { display: flex; align-items: center; gap: ${t.space.lg}px; }
+.home-conn__head .tg-chip { flex: none; }
+.home-conn__head .tg-error { font-weight: 400; }
+.home-conn__actions { display: flex; align-items: center; gap: ${t.space.md}px; }
+.home-conn__form { display: flex; flex-direction: column; padding-top: ${t.space.md}px; }
+.home-conn__url { overflow-wrap: anywhere; color: ${t.color.panelText}; }
+.home-conns details > summary { cursor: pointer; margin: 0; }
+.home-conns__advanced { margin-top: ${t.space.xl}px; }
 .home-controls { border-radius: 0; }
 .home-controls * { box-sizing: border-box; }
 .home-controls .tg-pet { grid-template-columns: minmax(0, 1fr); }
