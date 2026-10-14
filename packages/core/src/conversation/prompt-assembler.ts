@@ -291,7 +291,8 @@ function renderDisplays(snapshot: ContextSnapshot, detail: Settings['sightDetail
     if (display.blocked !== undefined) {
       // Named rather than called empty: a pet shown a grey rectangle with no explanation
       // will guess what was behind it, and the guess is about a window the user asked
-      // Tagalong never to look at.
+      // Tagalong never to look at. The id stays so the numbering matches the composite;
+      // naming it enables nothing, because the host refuses a crop of a blocked display.
       return `${ordinal} id=${display.id} ${size} blocked by ${display.blocked.entry}`;
     }
 

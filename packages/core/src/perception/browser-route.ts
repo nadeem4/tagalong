@@ -4,7 +4,7 @@ import type {
   ContextSnapshotPatch,
   HostCapability,
 } from '@tagalong/protocol';
-import { findCaptureBlock, type CaptureBlock } from './exclusions';
+import { appCaptureBlock, type CaptureBlock } from './exclusions';
 import { isBrowserProcess } from './inventory';
 import type { PerceptionHost } from './host';
 
@@ -62,7 +62,7 @@ export async function captureSelection(options: RouteOptions): Promise<Selection
   const { hosts } = options;
   const identityHost = desktopFor(hosts, 'activeWindow');
   const identity = identityHost === undefined ? {} : await identityHost.capture(['activeWindow']);
-  const block = findCaptureBlock(asActiveWindow(identity.app), options.exclusions);
+  const block = appCaptureBlock(identity.app, options.exclusions);
   if (block !== null) return { blocked: block };
 
   const browser = hosts.find(isBrowserHost);
@@ -104,6 +104,7 @@ export async function browserContextFor(
   if (snapshot.host === 'extension') return unlessExcluded(snapshot, options.exclusions);
   if (snapshot.host !== 'desktop') return snapshot;
   if (snapshot.app === undefined || !isBrowserProcess(snapshot.app.name)) return snapshot;
+  if (snapshot.app.blocked !== undefined) return snapshot;
   const browser = options.hosts.find(isBrowserHost);
   if (browser === undefined) return snapshot;
 
@@ -112,7 +113,9 @@ export async function browserContextFor(
     options.timeoutMs,
   );
   if (read === null) return snapshot;
-  if (findCaptureBlock(asActiveWindow(read.app), options.exclusions) !== null) return snapshot;
+  if (appCaptureBlock(read.app, options.exclusions) !== null) {
+    return { ...snapshot, app: { name: snapshot.app.name } };
+  }
 
   return {
     ...snapshot,
@@ -125,24 +128,17 @@ export async function browserContextFor(
 
 /**
  * The side panel reads its tab itself, so the exclusion list is applied here, where the
- * extension's snapshot first meets it: an excluded tab keeps only which tab it was, never
- * what was on it.
+ * extension's snapshot first meets it: an excluded tab keeps only which app it was in,
+ * never its title or what was on it.
  */
 function unlessExcluded(snapshot: ContextSnapshot, exclusions: CaptureExclusions): ContextSnapshot {
-  if (findCaptureBlock(asActiveWindow(snapshot.app), exclusions) === null) return snapshot;
+  if (appCaptureBlock(snapshot.app, exclusions) === null) return snapshot;
   return {
     id: snapshot.id,
     capturedAt: snapshot.capturedAt,
     host: snapshot.host,
-    ...(snapshot.app !== undefined ? { app: snapshot.app } : {}),
-  };
-}
-
-function asActiveWindow(app: ContextSnapshotPatch['app']) {
-  if (app === undefined) return undefined;
-  return {
-    processName: app.name,
-    ...(app.windowTitle === undefined ? {} : { title: app.windowTitle }),
+    // Which app, never the blocked tab's title.
+    ...(snapshot.app !== undefined ? { app: { name: snapshot.app.name } } : {}),
   };
 }
 

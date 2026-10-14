@@ -106,3 +106,21 @@ function matchSecretFile(title: string | undefined): CaptureBlock | null {
   }
   return null;
 }
+
+/**
+ * The block on a snapshot's `app`: the host's own mark when it set one (it leaves a blocked
+ * window's title out, so the title rules cannot match again here), else the rules.
+ */
+export function appCaptureBlock(
+  app:
+    | { name: string; windowTitle?: string | undefined; blocked?: CaptureBlock | undefined }
+    | undefined,
+  exclusions: CaptureExclusions,
+): CaptureBlock | null {
+  if (app === undefined) return null;
+  if (app.blocked !== undefined) return app.blocked;
+  return findCaptureBlock(
+    { processName: app.name, ...(app.windowTitle === undefined ? {} : { title: app.windowTitle }) },
+    exclusions,
+  );
+}

@@ -8,7 +8,7 @@ import type {
   PerceptionRecallParams,
 } from '@tagalong/protocol';
 import { captureNotice } from './capture-notice';
-import { DESKTOP_CAPABILITIES, capturePatch } from './context';
+import { DESKTOP_CAPABILITIES, answerCapture, capturePatch } from './context';
 import { EngineClient } from './engine-client';
 import type { EngineNotification } from './engine-client';
 import type { Platform } from './platform/index';
@@ -76,10 +76,10 @@ export async function startEngineHost(options: StartEngineHostOptions): Promise<
       return displays === undefined ? { windows } : { windows, displays };
     },
     captureRegion: async (params) => {
-      const image = await options.platform.captureRegion(params);
+      const image = await options.platform.captureRegion(params, options.captureExclusions());
       if (image === null) {
-        // A refusal the pet can repeat. Throwing would surface as a dead turn instead of
-        // a tool result saying which display could not be cropped.
+        // A refusal the pet can repeat: the tool result says which display could not be
+        // cropped. A blocked display lands here too, without saying what blocked it.
         throw new Error(`no crop available for display ${params.displayId}`);
       }
       return { image: { mime: 'image/png', ...image } };
@@ -98,9 +98,10 @@ export async function startEngineHost(options: StartEngineHostOptions): Promise<
       return shot;
     },
     capture: async (what) => {
-      const { patch, blocked, paused } = await capturePatch(options.platform, what, {
+      const captured = await capturePatch(options.platform, what, {
         exclusions: options.captureExclusions(),
       });
+      const { blocked, paused } = captured;
       options.onCapture(
         captureNotice({
           at: new Date(),
@@ -109,7 +110,7 @@ export async function startEngineHost(options: StartEngineHostOptions): Promise<
           paused,
         }),
       );
-      return patch;
+      return answerCapture(what, captured);
     },
     recall: options.recall,
     diff: options.diff,

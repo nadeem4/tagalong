@@ -32,7 +32,12 @@ function host(
   };
 }
 
-function desktop(app = { name: 'chrome.exe', windowTitle: 'Release notes - Google Chrome' }) {
+function desktop(
+  app: ContextSnapshotPatch['app'] = {
+    name: 'chrome.exe',
+    windowTitle: 'Release notes - Google Chrome',
+  },
+) {
   return host(['selection', 'activeWindow', 'clipboard', 'screenshot'], (what) =>
     Promise.resolve({
       ...(what.includes('activeWindow') ? { app } : {}),
@@ -132,6 +137,14 @@ describe('captureSelection', () => {
     expect(e.asked).toEqual([]);
   });
 
+  it('refuses when the desktop marks the front window blocked without its title', async () => {
+    const d = desktop({ name: 'chrome.exe', blocked: { rule: 'titlePattern', entry: '*Bank*' } });
+    const e = extension();
+    const result = await captureSelection({ hosts: [d, e], exclusions: NO_EXCLUSIONS });
+    expect(result).toEqual({ blocked: { rule: 'titlePattern', entry: '*Bank*' } });
+    expect(e.asked).toEqual([]);
+  });
+
   it('works with only the extension connected', async () => {
     const e = extension();
     const result = await captureSelection({ hosts: [e], exclusions: NO_EXCLUSIONS });
@@ -210,8 +223,10 @@ describe('browserContextFor', () => {
       id: own.id,
       capturedAt: own.capturedAt,
       host: 'extension',
-      app: own.app,
+      // The app stays, the tab's title does not: a blocked title never reaches the prompt.
+      app: { name: 'chrome' },
     });
+    expect(filled?.app?.windowTitle).toBeUndefined();
   });
 
   it('drops what the extension read when the tab it read is excluded', async () => {
@@ -226,7 +241,24 @@ describe('browserContextFor', () => {
       hosts: [e],
       exclusions: { processNames: [], titlePatterns: ['*Bank*'] },
     });
-    expect(filled).toBe(ASKED);
+    expect(filled).toEqual({ ...ASKED, app: { name: 'chrome.exe' } });
+    expect(filled?.app?.windowTitle).toBeUndefined();
+  });
+
+  it('asks the extension nothing when the desktop already marked the window blocked', async () => {
+    let asked = false;
+    const e = extension(() => {
+      asked = true;
+      return Promise.resolve({ selection: 'balance', page: PAGE });
+    });
+    const blocked: ContextSnapshot = {
+      ...ASKED,
+      app: { name: 'chrome.exe', blocked: { rule: 'titlePattern', entry: '*Vault*' } },
+    };
+    delete (blocked as { selection?: string }).selection;
+    const filled = await browserContextFor(blocked, { hosts: [e], exclusions: NO_EXCLUSIONS });
+    expect(filled).toBe(blocked);
+    expect(asked).toBe(false);
   });
 
   it('passes an ask with no snapshot through', async () => {

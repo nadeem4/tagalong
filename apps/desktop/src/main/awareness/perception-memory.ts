@@ -194,11 +194,10 @@ export class PerceptionMemory {
     box: PixelRect,
   ): Promise<CapturedImage> {
     try {
-      const native = await this.#options.platform.captureRegion({
-        displayId,
-        rect: bounds,
-        maxLongSide: AFTER_CROP_LONG_SIDE,
-      });
+      const native = await this.#options.platform.captureRegion(
+        { displayId, rect: bounds, maxLongSide: AFTER_CROP_LONG_SIDE },
+        this.#options.exclusions(),
+      );
       if (native !== null) return { mime: 'image/png', ...native };
     } catch {
       // Fall through to the frame's own pixels: a blurry crop beats none.

@@ -147,6 +147,39 @@ function refusalsByDisplay(windows: readonly WindowEntry[]): Map<number, Capture
   return refusals;
 }
 
+/** The ports deciding whether a display may be photographed. */
+export type DisplayRefusalDeps = Pick<
+  DisplaysCaptureDeps,
+  'getActiveWindow' | 'listWindows' | 'exclusions'
+> & { screen: Pick<DisplaysCaptureDeps['screen'], 'getDisplayMatching'> };
+
+export interface DisplayRefusal {
+  (displayId: number): { focused: boolean; refusal: CaptureBlock | null };
+  /** A refusal on any display, for a screen that cannot be placed on one. */
+  any?: CaptureBlock | null;
+}
+
+/**
+ * One decision for every capture of a whole display, a crop included: a display is refused
+ * when a visible blocked window is on it, or when it holds the focused window and that
+ * window is blocked.
+ */
+export async function displayRefusals(deps: DisplayRefusalDeps): Promise<DisplayRefusal> {
+  const [active, windows] = await Promise.all([deps.getActiveWindow(), deps.listWindows()]);
+  const blocked = findCaptureBlock(
+    active === null ? undefined : { processName: active.appName, title: active.title },
+    deps.exclusions,
+  );
+  const focusedId = active === null ? null : deps.screen.getDisplayMatching(active.bounds).id;
+  const blockedByWindow = refusalsByDisplay(windows);
+  const refusalFor: DisplayRefusal = (displayId) => {
+    const focused = focusedId !== null && displayId === focusedId;
+    return { focused, refusal: blockedByWindow.get(displayId) ?? (focused ? blocked : null) };
+  };
+  refusalFor.any = blocked ?? blockedByWindow.values().next().value ?? null;
+  return refusalFor;
+}
+
 /**
  * Captures every display at once, plus a composite that shows how they are arranged.
  *
@@ -175,13 +208,7 @@ export async function captureDisplaysWith(
     return { displays: [], composite: null };
   }
 
-  const [active, windows] = await Promise.all([deps.getActiveWindow(), deps.listWindows()]);
-  const blocked = findCaptureBlock(
-    active === null ? undefined : { processName: active.appName, title: active.title },
-    deps.exclusions,
-  );
-  const focusedId = active === null ? null : deps.screen.getDisplayMatching(active.bounds).id;
-  const blockedByWindow = refusalsByDisplay(windows);
+  const refusalFor = await displayRefusals(deps);
 
   // The bound goes into the request rather than being applied afterwards: asking for three
   // full 4K bitmaps only to shrink them costs tens of megabytes a look.
@@ -191,8 +218,7 @@ export async function captureDisplaysWith(
   });
 
   const captured: CapturedDisplay[] = displays.map((display) => {
-    const focused = focusedId !== null && display.id === focusedId;
-    const refusal = blockedByWindow.get(display.id) ?? (focused ? blocked : null);
+    const { focused, refusal } = refusalFor(display.id);
     const source = sources.find((candidate) => candidate.display_id === String(display.id));
 
     if (refusal !== null) {

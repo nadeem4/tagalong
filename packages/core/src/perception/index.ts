@@ -1,5 +1,6 @@
 /** Pure capture-policy rules. Nothing here touches a screen; hosts do the capturing. */
 export {
+  appCaptureBlock,
   findCaptureBlock,
   normalizeProcessName,
   type ActiveWindow,

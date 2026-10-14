@@ -1,3 +1,6 @@
+import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
+
+import { displayRefusals } from './displays';
 import { fitWithin } from './downscale';
 import type { PixelSize } from './downscale';
 import type { ActiveWindowInfo, CapturedImage, WindowBounds } from './index';
@@ -37,6 +40,9 @@ export interface WindowCaptureDeps {
   desktopCapturer: DesktopCapturerPort;
   screen: ScreenPort;
   getActiveWindow: () => Promise<ActiveWindowInfo | null>;
+  /** For the screen fallback: a display with a blocked window on it is never photographed. */
+  listWindows: () => Promise<readonly WindowEntry[]>;
+  exclusions: CaptureExclusions;
   log?: (message: string) => void;
 }
 
@@ -72,16 +78,26 @@ async function pickSource(
     if (match !== undefined) return match;
   }
 
+  // A whole screen shows more than the window: the same per-display refusal as a full view
+  // runs first, and a screen it cannot place is refused while anything at all is blocked.
+  // No screenshot beats a leaked one.
+  const refusalFor = await displayRefusals(deps);
+  const allowed = (source: CaptureSource): boolean => {
+    const id = Number(source.display_id);
+    const refused =
+      source.display_id === '' || !Number.isFinite(id)
+        ? (refusalFor.any ?? null)
+        : refusalFor(id).refusal;
+    return usable(source) && refused === null;
+  };
   const screens = await deps.desktopCapturer.getSources({ types: ['screen'], thumbnailSize });
   if (active !== null) {
     const display = deps.screen.getDisplayMatching(active.bounds);
-    const onDisplay = screens.find(
-      (source) => source.display_id === String(display.id) && usable(source),
-    );
-    if (onDisplay !== undefined) return onDisplay;
+    const onDisplay = screens.find((source) => source.display_id === String(display.id));
+    if (onDisplay !== undefined && usable(onDisplay)) return allowed(onDisplay) ? onDisplay : null;
   }
   // Windows sometimes reports a blank display_id, so a single usable screen still counts.
-  return screens.find(usable) ?? null;
+  return screens.find(allowed) ?? null;
 }
 
 /**

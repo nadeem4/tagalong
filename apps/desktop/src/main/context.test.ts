@@ -5,6 +5,7 @@ import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
 import {
   DESKTOP_CAPABILITIES,
   MAX_SCREENSHOT_LONG_SIDE,
+  answerCapture,
   captureAskSnapshot,
   capturePatch,
 } from './context';
@@ -121,7 +122,10 @@ describe('captureAskSnapshot', () => {
       },
     );
 
-    expect(captureActiveWindowImage).toHaveBeenCalledWith(MAX_SCREENSHOT_LONG_SIDE);
+    expect(captureActiveWindowImage).toHaveBeenCalledWith(
+      MAX_SCREENSHOT_LONG_SIDE,
+      NOTHING_EXCLUDED,
+    );
     expect(snapshot.screenshot).toEqual({
       mime: 'image/png',
       base64: 'cG5n',
@@ -155,6 +159,9 @@ describe('captureAskSnapshot', () => {
     expect(captureActiveWindowImage).not.toHaveBeenCalled();
     expect(snapshot.screenshot).toBeUndefined();
     expect(blocked).toEqual({ rule: 'processName', entry: '1Password.exe' });
+    // Which app, never the blocked window's title.
+    expect(snapshot.app).toEqual({ name: '1Password.exe', blocked });
+    expect(snapshot.app?.windowTitle).toBeUndefined();
   });
 
   it('never copies the selection out of a window it must not look at, such as a .env file', async () => {
@@ -177,6 +184,7 @@ describe('captureAskSnapshot', () => {
     expect(captureSelection).not.toHaveBeenCalled();
     expect(snapshot.selection).toBeUndefined();
     expect(blocked).toEqual({ rule: 'titlePattern', entry: '.env' });
+    expect(snapshot.app?.windowTitle).toBeUndefined();
   });
 
   it('blocks a web vault by its window title, not by the browser it runs in', async () => {
@@ -188,12 +196,13 @@ describe('captureAskSnapshot', () => {
       }),
     });
 
-    const { blocked } = await captureAskSnapshot(platform, {
+    const { snapshot, blocked } = await captureAskSnapshot(platform, {
       screenshot: true,
       exclusions: PASSWORD_MANAGER,
     });
 
     expect(blocked).toEqual({ rule: 'titlePattern', entry: '*Vault*' });
+    expect(snapshot.app).toEqual({ name: 'chrome.exe', blocked });
   });
 
   it('keeps the rest of the snapshot when the screenshot itself fails', async () => {
@@ -301,13 +310,14 @@ describe('capturePatch', () => {
       }),
     });
 
-    const { patch, blocked } = await capturePatch(platform, ['screenshot'], {
+    const { patch, blocked } = await capturePatch(platform, ['screenshot', 'activeWindow'], {
       exclusions: PASSWORD_MANAGER,
     });
 
     expect(captureActiveWindowImage).not.toHaveBeenCalled();
     expect(patch.screenshot).toBeUndefined();
     expect(blocked).toEqual({ rule: 'processName', entry: '1Password.exe' });
+    expect(patch.app).toEqual({ name: '1Password.exe', blocked });
   });
 });
 
@@ -774,6 +784,20 @@ describe('capturePatch while sight is paused', () => {
     expect(result.patch.screenshot).toBeUndefined();
     expect(result.patch.displays).toBeUndefined();
     expect(result.patch.windows).toBeUndefined();
+  });
+
+  it('answers a paused screenshot with the pause, like every other screen tool', async () => {
+    const result = await capturePatch(pausedPlatform(), ['screenshot'], {
+      exclusions: NOTHING_EXCLUDED,
+    });
+    expect(() => answerCapture(['screenshot'], result)).toThrow(/sight is paused/);
+  });
+
+  it('still answers an ungated read while paused', async () => {
+    const result = await capturePatch(pausedPlatform(), ['selection', 'activeWindow'], {
+      exclusions: NOTHING_EXCLUDED,
+    });
+    expect(answerCapture(['selection', 'activeWindow'], result)).toBe(result.patch);
   });
 
   it('does not complain that the displays failed, because they did not', async () => {

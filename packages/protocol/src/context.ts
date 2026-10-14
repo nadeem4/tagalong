@@ -107,6 +107,11 @@ export const ContextSnapshot = z.object({
     .object({
       name: z.string().min(1),
       windowTitle: z.string().optional(),
+      /**
+       * Set by the desktop when the window is a blind spot or excluded. Its title is then
+       * left out, so this is how the engine still knows to refuse.
+       */
+      blocked: CaptureBlock.optional(),
     })
     .optional(),
   selection: z.string().max(MAX_SELECTION_CHARS).optional(),
