@@ -320,9 +320,10 @@ is listening and how to stop, and the mark shows from the first second.
 Setup's first question is "Talk or type?". **Talk to me** is setup's permission to use the
 microphone; **I'll type** (or a fresh setup that has not been answered yet) leaves it closed.
 
-- **Only after "Talk to me".** Setup listens only once you chose it in this setup. Opening setup
-  again later starts with the microphone closed, even if you chose to talk last time, until you
-  choose again.
+- **Only after "Talk to me".** Setup listens only once you chose it. If you close setup part way
+  after choosing it, setup carries on listening when it opens again: the red dot shows and the
+  answer chip says Talking, and **I’ll type** stops it. Opening a finished setup again starts with
+  the microphone closed until you choose again.
 - **The model first, then the mic.** The first time, the same three speech models as above
   (about 43 MB) download before the microphone opens; the header shows the download, and you can
   type or tap meanwhile. Only then does the mic open.

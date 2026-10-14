@@ -1459,9 +1459,10 @@ reached. The "Talk or type?" step (`answer`) is offered when the window has the 
   `partial` (barge-in only) and `turnEnd` (the answer), from `IPC.earsEvent`, which reaches every
   window; the controller ignores events outside its own session.
 - **When setup listens** is derived, never started on a tap: `listensNow(run, settings)`
-  (`first-run.ts`) is true once "Talk to me" was saved as `welcome.answerBy` in this run (the step
-  reached is past `answer`, so a re-run of a finished setup starts with the mic closed) and the
-  step is not Try it. One effect on that value is the only place `onboarding.tsx` starts or stops
+  (`first-run.ts`) is true once "Talk to me" was saved as `welcome.answerBy` and the step
+  reached is past `answer`. An unfinished setup closed part way therefore resumes listening at the
+  next launch (red dot, "Talking" chip); a re-run of a finished setup starts with the mic closed.
+  It is also off on the Try it step. One effect on that value is the only place `onboarding.tsx` starts or stops
   the ears, so "Talk to me", "I'll type", a resume, the chips and Try it all go through it;
   `finish` also stops them before `finishWelcome`. The ears are disposed on unmount and on the
   page's `pagehide` (React runs no cleanup when a window closes), which closes the mic. The
