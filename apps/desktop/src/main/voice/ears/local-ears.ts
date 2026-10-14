@@ -79,7 +79,11 @@ export class LocalEars implements Ears {
       }
       // A held mic that ends means listening stopped.
       if (run === this.#run && this.#mode === 'held') this.stop();
-    })().catch((error: unknown) => console.warn('[ears] listening stopped', error));
+    })().catch((error: unknown) => {
+      console.warn('[ears] listening stopped', error);
+      // A held listen always ends with one turn, with what was heard so far.
+      if (run === this.#run && this.#mode === 'held') this.stop();
+    });
   }
 
   stop(): void {

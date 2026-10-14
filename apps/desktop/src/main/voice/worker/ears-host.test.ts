@@ -118,6 +118,84 @@ describe('createEarsHost', () => {
     ]);
   });
 
+  it('keeps the order when a session is skipped between two others', async () => {
+    const posted: FromWorker[] = [];
+    const seen: string[] = [];
+    let closeA: (words: string) => void = () => undefined;
+    let texts = 0;
+    const parts: EarsParts = {
+      vad: { accept: async (f) => f[0] !== 0 },
+      stt: {
+        accept: () => undefined,
+        text: () => {
+          texts += 1;
+          if (texts === 1) return new Promise<string>((resolve) => (closeA = resolve));
+          return Promise.resolve('second');
+        },
+        reset: () => void seen.push('reset'),
+      },
+      turn: { complete: async () => 1 },
+    };
+    const host = createEarsHost({
+      fake: false,
+      load: async () => parts,
+      post: (m) => posted.push(m),
+    });
+    host({ kind: 'ears.listen', mode: 'held' });
+    await settle();
+    host({ kind: 'ears.frame', samples: LOUD });
+    await settle();
+    host({ kind: 'ears.listen', mode: 'held' }); // A is stopped, its words still being read
+    host({ kind: 'ears.listen', mode: 'held' }); // B skipped
+    host({ kind: 'ears.frame', samples: LOUD });
+    await settle();
+    expect(earsEvents(posted)).toEqual(['speechStart']);
+    closeA('first');
+    await settle();
+    host({ kind: 'ears.stop' });
+    await settle();
+    expect(earsEvents(posted)).toEqual([
+      'speechStart',
+      'final:first',
+      'turnEnd:first',
+      'speechStart',
+      'final:second',
+      'turnEnd:second',
+    ]);
+  });
+
+  it('ends a stopped session whose drain fails, and the next listen still works', async () => {
+    const posted: FromWorker[] = [];
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    let first = true;
+    const parts: EarsParts = {
+      vad: {
+        accept: async (f) => {
+          if (first) {
+            first = false;
+            throw new Error('vad broke');
+          }
+          return f[0] !== 0;
+        },
+      },
+      stt: { accept: () => undefined, text: async () => 'again', reset: () => undefined },
+      turn: { complete: async () => 1 },
+    };
+    let release: (parts: EarsParts) => void = () => undefined;
+    const load = () => new Promise<EarsParts>((resolve) => (release = resolve));
+    const host = createEarsHost({ fake: false, load, post: (m) => posted.push(m) });
+    host({ kind: 'ears.listen', mode: 'held' });
+    host({ kind: 'ears.frame', samples: LOUD });
+    host({ kind: 'ears.stop' });
+    host({ kind: 'ears.listen', mode: 'held' });
+    host({ kind: 'ears.frame', samples: LOUD });
+    release(parts);
+    await settle();
+    host({ kind: 'ears.stop' });
+    await settle();
+    expect(earsEvents(posted)).toEqual(['turnEnd:', 'speechStart', 'final:again', 'turnEnd:again']);
+  });
+
   it('says plainly when the models cannot load, and tries again next time', async () => {
     const posted: FromWorker[] = [];
     const load = vi

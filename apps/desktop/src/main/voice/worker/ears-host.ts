@@ -82,7 +82,8 @@ export function createEarsHost(options: {
       return;
     }
     const after = previous;
-    previous = done;
+    // Even a session skipped at once finishes only after the one before it.
+    previous = after.then(() => done);
     if (parts === null) options.post({ kind: 'ears.status', status: 'loading' });
     const loading = (parts ??= options.load());
     loading.then(
@@ -95,9 +96,14 @@ export function createEarsHost(options: {
           }
           // A session stopped before this point has an ended inbox: its buffered words still
           // play through, and the mic ending ends the turn.
-          current.ears = wire(new LocalEars(loaded, current.mode));
-          if (current.mode === 'held') current.ears.on('turnEnd', current.finish);
-          current.ears.listen(current.inbox);
+          try {
+            current.ears = wire(new LocalEars(loaded, current.mode));
+            if (current.mode === 'held') current.ears.on('turnEnd', current.finish);
+            current.ears.listen(current.inbox);
+          } catch (error) {
+            console.warn('[ears] could not start listening', error);
+            current.finish();
+          }
         });
       },
       (error: unknown) => {
