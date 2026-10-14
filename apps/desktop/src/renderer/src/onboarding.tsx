@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
-import type { Settings, WelcomeStep } from '@tagalong/protocol';
+import type { Settings, SettingsPatch, WelcomeStep } from '@tagalong/protocol';
 import { PixelSprite, SpeechQueue, characterFor } from '@tagalong/ui';
 // Bundled, not fetched: setup's two typefaces ship inside the app, Latin subset only.
 import '@fontsource/onest/latin-400.css';
@@ -10,7 +10,15 @@ import '@fontsource/pixelify-sans/latin-400.css';
 import '@fontsource/pixelify-sans/latin-700.css';
 import './app.css';
 import './welcome.css';
-import { answerPatch, answered, chipState, goTo, listensNow, startFirstRun } from './first-run';
+import {
+  answerPatch,
+  answered,
+  chipState,
+  goTo,
+  listensNow,
+  oneAtATime,
+  startFirstRun,
+} from './first-run';
 import type { FirstRun, FirstRunAnswer } from './first-run';
 import { choicesFor, matchChoice, nameFrom } from './first-run-match';
 import {
@@ -62,8 +70,12 @@ function FirstRunWindow() {
   const [busy, setBusy] = useState(false);
   // 'off'; a fraction while the speech model downloads; null while the mic is open.
   const [listening, setListening] = useState<SetupListening>('off');
-  // Always listening, as main holds it: switched here, saved by main.
-  const [always, setAlways] = useState(false);
+  // Listening failed in this window: it stays off until "Talk to me" is chosen again.
+  const [earsFailed, setEarsFailed] = useState(false);
+  // Always listening, as main holds it (null until known): switched here, saved by main.
+  const [always, setAlways] = useState<boolean | null>(null);
+  // Setup's saves run one at a time, so a failure's save and an answer's never overwrite each other.
+  const [saves] = useState(oneAtATime);
   // Keys saved in this window: a key that failed its test is still stored, so Check key retests it.
   const [savedKeys, setSavedKeys] = useState<readonly string[]>([]);
   const answerInput = useRef<HTMLInputElement>(null);
@@ -144,7 +156,19 @@ function FirstRunWindow() {
   busyRef.current = busy;
   const heardRef = useRef<(text: string) => void>(() => undefined);
 
-  // Setup's ears, made once. Closing the window disposes them, and that closes the mic.
+  /** Every save of setup's settings: one at a time, each patch built from the latest settings. */
+  function save(patchFor: (now: Settings) => SettingsPatch): Promise<Settings> {
+    return saves(async () => {
+      const now = settingsRef.current;
+      if (now === null) throw new Error('Setup has not loaded yet.');
+      const saved = await window.tagalongHost.saveSettings(patchFor(now));
+      settingsRef.current = saved;
+      setSettings(saved);
+      return saved;
+    });
+  }
+
+  // Setup's ears, made once. Unmounting or the page going away disposes them, closing the mic.
   const ears = useRef<SetupEars | null>(null);
   useEffect(() => {
     const made = setupEars({
@@ -159,17 +183,29 @@ function FirstRunWindow() {
       onSpeechStart: () => voice.stop(),
       onState: setListening,
       onFailure: (why) => {
+        setEarsFailed(true);
         setAside(listenFailed(why));
         void typeInstead();
       },
     });
     ears.current = made;
-    return () => made.dispose();
+    let disposed = false;
+    const dispose = (): void => {
+      if (disposed) return;
+      disposed = true;
+      made.dispose();
+    };
+    // React runs no cleanup when the window closes; pagehide does.
+    window.addEventListener('pagehide', dispose);
+    return () => {
+      window.removeEventListener('pagehide', dispose);
+      dispose();
+    };
   }, []);
 
   // Listening follows what was saved, and this is the only place it starts or stops: "Talk
   // to me", "I'll type", a resume, the chips and Try it all come through here.
-  const wants = run !== null && settings !== null && listensNow(run, settings);
+  const wants = !earsFailed && run !== null && settings !== null && listensNow(run, settings);
   useEffect(() => {
     if (wants) ears.current?.start();
     else ears.current?.stop();
@@ -177,12 +213,8 @@ function FirstRunWindow() {
 
   /** Listening failed: answers are typed from here, and the Answer chip says so. */
   async function typeInstead(): Promise<void> {
-    const now = settingsRef.current;
-    if (now === null) return;
     try {
-      setSettings(
-        await window.tagalongHost.saveSettings({ welcome: { ...now.welcome, answerBy: 'type' } }),
-      );
+      await save((now) => ({ welcome: { ...now.welcome, answerBy: 'type' } }));
     } catch (error) {
       setProblem(messageOf(error));
     }
@@ -240,8 +272,9 @@ function FirstRunWindow() {
     const after = answered(run, declined);
     setBusy(true);
     try {
-      const saved = await window.tagalongHost.saveSettings(answerPatch(answer, settings, after));
-      setSettings(saved);
+      await save((now) => answerPatch(answer, now, after));
+      // "Talk to me" chosen again is the retry after a failure.
+      if (answer.step === 'answer' && answer.by === 'talk') setEarsFailed(false);
       setEcho(echoFor(answer, providers));
       setAside(null);
       setProblem(null);
@@ -458,16 +491,17 @@ function FirstRunWindow() {
                 type="button"
                 role="switch"
                 className="first-run__switch"
-                aria-checked={always}
+                aria-checked={always === true}
                 aria-labelledby="always-listening"
+                disabled={always === null}
                 onClick={() =>
                   void window.tagalongHost
-                    .setListening(!always)
+                    .setListening(always !== true)
                     .then((state) => setAlways(state.on))
                     .catch((error: unknown) => setProblem(messageOf(error)))
                 }
               >
-                {always ? 'On' : 'Off'}
+                {always === null ? '…' : always ? 'On' : 'Off'}
               </button>
             </div>
           )}

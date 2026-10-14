@@ -71,6 +71,19 @@ export function listensNow(run: FirstRun, settings: Settings): boolean {
   );
 }
 
+/**
+ * Runs steps one at a time, each after the one before has settled, failed or not. Setup's
+ * saves go through one, so each patch is built from the settings the last save returned.
+ */
+export function oneAtATime(): <T>(step: () => Promise<T>) => Promise<T> {
+  let last: Promise<unknown> = Promise.resolve();
+  return (step) => {
+    const next = last.then(step);
+    last = next.catch(() => undefined);
+    return next;
+  };
+}
+
 /** A step chip: only a step already reached opens. */
 export function goTo(run: FirstRun, step: WelcomeStep): FirstRun {
   const at = indexOf(run, step);

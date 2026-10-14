@@ -99,10 +99,11 @@ its result.
   resumes at the same step. It first asks "Talk or type?": "Talk to me" is setup's permission to
   use the microphone, and it listens for your answers only from then on, with the speech model
   ready before the mic opens. No microphone, a refused permission or a model that will not
-  download is said plainly, and setup carries on by typing. It asks your name plainly and says why ("Rather not" means it is never
-  asked again), checks the real Claude sign-in (suggests it, waits for a sign-in, or offers
-  install or an API key, which is tested once with one tiny request), plays a sample voice line,
-  teaches the one key, then lands in the corner and invites one real question. Each later launch it says
+  download is said plainly, and setup carries on by typing. It asks your name plainly and says
+  why ("Rather not" means it is never asked again), checks the real Claude sign-in (suggests it,
+  waits for a sign-in, or offers install or an API key, which is tested once with one tiny
+  request), plays a sample voice line, teaches the one key beside an Always listening switch
+  (off by default; Scout never switches it on itself), then lands in the corner and invites one real question. Each later launch it says
   one short line that fits what happened: the time of day, days away with the hand-offs and
   routines that finished, a crash and what it cut short, an update and what is new, or, plainly
   with a fix, that it is signed out or has no key. It fades, reads no screen for this, and

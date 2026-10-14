@@ -286,6 +286,10 @@ body:has(.first-run) {
   cursor: pointer;
 }
 
+.first-run__switch:disabled {
+  cursor: default;
+}
+
 .first-run__switch[aria-checked='true'] {
   border-color: #f2c14e;
   background: #f2c14e;

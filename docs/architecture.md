@@ -1463,14 +1463,20 @@ reached. The "Talk or type?" step (`answer`) is offered when the window has the 
   reached is past `answer`, so a re-run of a finished setup starts with the mic closed) and the
   step is not Try it. One effect on that value is the only place `onboarding.tsx` starts or stops
   the ears, so "Talk to me", "I'll type", a resume, the chips and Try it all go through it;
-  `finish` also stops them before `finishWelcome`, and unmounting disposes them. The header then
-  shows `listeningHint`: the download percentage, then a red dot and "Listening for your answer"
-  while the mic is open. A failure has Scout say `listenFailed(why)` in its bubble and saves
+  `finish` also stops them before `finishWelcome`. The ears are disposed on unmount and on the
+  page's `pagehide` (React runs no cleanup when a window closes), which closes the mic. The
+  header then shows `listeningHint`: the download percentage, then a red dot and "Listening for
+  your answer" while the mic is open. A failure has Scout say `listenFailed(why)` in its bubble,
+  turns listening off for this window even if the next save fails, and saves
   `welcome.answerBy: 'type'` (the step does not move), so the Answer chip says "Typing", a resume
   does not retry, and the chip then "Talk to me" is the retry.
+- **Saves one at a time.** Every setup save (an answer, or the failure's switch to typing) goes
+  through one `oneAtATime()` queue (`first-run.ts`), and each patch is built from the settings the
+  previous save returned. The patch replaces the whole `welcome` record, so two saves in flight
+  would otherwise undo each other's `step`, `brain` or `answerBy`.
 - **The keys step's Always listening switch** goes through `getListening`, `setListening` and
   `onListening` on the voice IPC, as the bubble's switch does; main saves it. It never calls
-  `saveSettings`.
+  `saveSettings`, and it is disabled until main's state is known.
 - **Main's two setup guards** (`main/index.ts`). While the setup window is open, the talk key
   (`talkPressed`) focuses setup and returns, so the bubble never opens a second mic over setup's.
   And `openOnboarding` calls `pauseListening({ setupOpen: true })`, and `{ setupOpen: false }`

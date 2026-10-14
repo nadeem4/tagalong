@@ -6,6 +6,7 @@ import {
   chipState,
   goTo,
   listensNow,
+  oneAtATime,
   startFirstRun,
   stepsFor,
 } from './first-run';
@@ -181,5 +182,31 @@ describe('listensNow', () => {
 
   it('never listens without the Answer step', () => {
     expect(listensNow(answered(startFirstRun(talk, false), false), talk)).toBe(false);
+  });
+});
+
+describe('oneAtATime', () => {
+  it('runs each step only after the one before has settled, failed or not', async () => {
+    const queue = oneAtATime();
+    const order: string[] = [];
+    let fail = (): void => undefined;
+    const first = queue(
+      () =>
+        new Promise<string>((_, reject) => {
+          order.push('first');
+          fail = () => reject(new Error('save failed'));
+        }),
+    );
+    const second = queue(async () => {
+      order.push('second');
+      return 'saved';
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(order).toEqual(['first']);
+    fail();
+    await expect(first).rejects.toThrow('save failed');
+    await expect(second).resolves.toBe('saved');
+    expect(order).toEqual(['first', 'second']);
   });
 });
