@@ -14,6 +14,7 @@ import {
   type AskPetDeps,
   type WatchToolDeps,
   type ExpertToolDeps,
+  type ConnectorToolDeps,
 } from '../tools';
 import { assemblePrompt } from './prompt-assembler';
 
@@ -81,6 +82,8 @@ export interface ConversationRunnerOptions {
   watch?: WatchToolDeps | undefined;
   /** Gives a companion `hand_to_expert`, which briefs an expert and hands the work over. */
   experts?: ExpertToolDeps | undefined;
+  /** The tools of the person's connected apps, for a role that lists `connections`. */
+  connections?: ConnectorToolDeps | undefined;
   /** Narrows a pet's tools for a turn. Absent: every pet gets every tool. Phase 8 roles. */
   toolsFor?: ToolFilter | undefined;
 }
@@ -170,6 +173,7 @@ export class ConversationRunner {
       memory: options.memory,
       watch: options.watch,
       experts: options.experts,
+      connections: options.connections,
       toolsFor: options.toolsFor,
       consult: consult && {
         pets: consult.pets,

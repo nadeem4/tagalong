@@ -3,6 +3,7 @@ import type { BrainTool } from '../providers';
 import type { MemoryStore } from '../memory/memories';
 import { roleFor } from '../roles';
 import { recallTools, watchForTool, type WatchToolDeps } from './builtin/awareness';
+import { connectorTools, type ConnectorToolDeps } from './builtin/connections';
 import { askPetTool, rememberTool, type AskPetDeps } from './builtin/crew';
 import { enabledExperts, handToExpertTool, type ExpertToolDeps } from './builtin/experts';
 import { perceptionTools, type PerceptionToolsOptions } from './builtin/perception';
@@ -17,11 +18,17 @@ export type ToolFilter = (pet: Pet, tools: readonly Tool[]) => readonly Tool[];
 /**
  * The default filter: exactly the tools the pet's role lists (the generalist's for a role
  * the library does not have), minus any the pet's grants turn off. A grant cannot add a
- * tool the role does not list. Registry order is kept.
+ * tool the role does not list. A role may list a group (`connections`) for all its tools,
+ * and a grant can switch the group off. Registry order is kept.
  */
 export const toolsFor: ToolFilter = (pet, tools) => {
   const listed = roleFor(pet.roleId).tools;
-  return tools.filter((tool) => listed.includes(tool.id) && pet.toolGrants[tool.id] !== 'off');
+  return tools.filter((tool) => {
+    if (tool.group !== undefined && listed.includes(tool.group)) {
+      return pet.toolGrants[tool.group] !== 'off' && pet.toolGrants[tool.id] !== 'off';
+    }
+    return listed.includes(tool.id) && pet.toolGrants[tool.id] !== 'off';
+  });
 };
 
 export interface ToolRegistryOptions {
@@ -35,6 +42,8 @@ export interface ToolRegistryOptions {
   consult?: AskPetDeps | undefined;
   /** Gives a pet whose role lists it `hand_to_expert`, when an expert is switched on. */
   experts?: ExpertToolDeps | undefined;
+  /** The tools of the person's connected apps, for a role that lists `connections`. */
+  connections?: ConnectorToolDeps | undefined;
   /** Defaults to `toolsFor`: the tools its role lists, minus any its grants switch off. */
   toolsFor?: ToolFilter | undefined;
 }
@@ -98,7 +107,7 @@ export class ToolRegistry {
 
   /** Every built-in this engine is wired for, in the order the model has always seen. */
   #all(turn: TurnRequest): Tool[] {
-    const { perception, memory, watch, consult, experts } = this.#options;
+    const { perception, memory, watch, consult, experts, connections } = this.#options;
     const tools: Tool[] = [];
     if (perception) tools.push(...perceptionTools(perception), ...recallTools(perception));
     if (memory) tools.push(rememberTool(memory));
@@ -109,6 +118,7 @@ export class ToolRegistry {
     }
     const switchedOn = experts ? enabledExperts(experts) : [];
     if (experts && switchedOn.length > 0) tools.push(handToExpertTool(experts, switchedOn));
+    if (connections) tools.push(...connectorTools(connections));
     return tools;
   }
 }

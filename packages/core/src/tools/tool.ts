@@ -41,6 +41,11 @@ export interface Tool {
   readonly id: string;
   readonly definition: BrainTool;
   readonly kind: ToolKind;
+  /**
+   * A family a role can list as one entry instead of tool by tool: `connections` for the
+   * tools of the person's connected apps, whose names are not known until they connect.
+   */
+  readonly group?: string;
   run(input: unknown, ctx: ToolContext): Promise<ToolOutcome>;
 }
 

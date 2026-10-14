@@ -51,6 +51,14 @@ import {
   looksLikeProject,
 } from './projects/finder';
 import type { MethodHandlers } from './server/ws-server';
+import {
+  Approvals,
+  ConnectionManager,
+  ConnectionStore,
+  POPULAR_CONNECTORS,
+  readClaudeCodeConnectors,
+  type TransportFor,
+} from './connections';
 import { readOrCreatePairingToken } from './server/pairing';
 
 /** Key the Anthropic API key is filed under in the host's SecretStore. */
@@ -136,6 +144,12 @@ export interface EngineOptions {
   connectorFor?: ((expert: Expert) => Connector) | undefined;
   /** Where the project finder looks for code. Tests point it at a temporary folder. */
   projectRoots?: (() => string[]) | undefined;
+  /** Opens the system browser for an app's sign-in. The host owns it. */
+  openBrowser?: ((url: string) => void | Promise<void>) | undefined;
+  /** Tests connect to in-memory MCP servers instead of the network. */
+  connectorTransport?: TransportFor | undefined;
+  /** Claude Code's config, read-only, for Found on this PC. Defaults to `~/.claude.json`. */
+  claudeCodeConfigPath?: string | undefined;
 }
 
 /**
@@ -175,6 +189,7 @@ export class Engine {
   readonly #token: string;
   readonly #watches: WatchManager;
   readonly #handoffs: HandoffManager;
+  readonly #connections: ConnectionManager;
 
   private constructor(parts: {
     db: Database;
@@ -185,7 +200,9 @@ export class Engine {
     token: string;
     watches: WatchManager;
     handoffs: HandoffManager;
+    connections: ConnectionManager;
   }) {
+    this.#connections = parts.connections;
     this.#watches = parts.watches;
     this.#handoffs = parts.handoffs;
     this.#db = parts.db;
@@ -281,6 +298,19 @@ export class Engine {
       emit: (event) => live.server?.broadcast(event.method, event.params),
       log: (message) => console.warn(`[engine] ${message}`),
     });
+    // The person's apps over MCP. Each connects on its own; one that fails never stops boot.
+    const connections = new ConnectionManager({
+      store: new ConnectionStore(db),
+      secrets: options.secretStore,
+      emit: (list) => live.server?.broadcast('connections.changed', { connections: list }),
+      openBrowser: options.openBrowser,
+      transportFor: options.connectorTransport,
+      env: options.env ?? process.env,
+    });
+    void connections.start();
+    const approvals = new Approvals((params) =>
+      live.server?.broadcast('connector.confirm', params),
+    );
     const runner = new ConversationRunner({
       store,
       settings,
@@ -299,6 +329,12 @@ export class Engine {
         experts: () => experts.list(),
         routes,
         propose: (params) => handoffs.propose(params),
+      },
+      connections: {
+        tools: () => connections.tools(),
+        call: (id, name, args, signal) => connections.call(id, name, args, signal),
+        confirm: (params, signal) => approvals.ask(params, signal),
+        record: (entry) => activity.connectorCalled(entry),
       },
       // Both lookups are lazy: hosts connect and drop between turns, and the exclusion
       // list is edited while the app runs, so neither can be captured at boot.
@@ -330,6 +366,9 @@ export class Engine {
       connectorFor,
       resolve,
       keepAnEye,
+      connections,
+      approvals,
+      claudeCodeConfigPath: options.claudeCodeConfigPath,
       refreshProviders: async () => keyed?.refresh(),
       models: (providerId) =>
         listModels(providerId, options.secretStore, settings, options.env ?? process.env),
@@ -354,6 +393,7 @@ export class Engine {
       token: readOrCreatePairingToken(options.dataDir),
       watches,
       handoffs,
+      connections,
     });
   }
 
@@ -378,6 +418,7 @@ export class Engine {
   async shutdown(): Promise<void> {
     this.#watches.stopAll();
     await this.#handoffs.stopAll();
+    await this.#connections.closeAll();
     this.#runner.interruptAll();
     await this.#server.close();
     this.#db.close();
@@ -414,12 +455,23 @@ function buildHandlers(parts: {
   resolve: ProviderResolver;
   models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
   keepAnEye: KeepAnEye;
+  connections: ConnectionManager;
+  approvals: Approvals;
+  claudeCodeConfigPath: string | undefined;
   /** Re-reads provider keys, so a key saved since the last ask is used by this one. */
   refreshProviders: () => Promise<void>;
 }): MethodHandlers {
   const { db, activity, runner, store, emit, pets, settings, models, hosts, watches } = parts;
   const { refreshProviders, experts, routes, handoffs, projects, connectorFor, resolve } = parts;
-  const { keepAnEye } = parts;
+  const { keepAnEye, connections, approvals } = parts;
+  /** A manager refusal (an id taken, none such) as an invalidParams error the host shows. */
+  const plainly = async <T>(work: () => Promise<T>): Promise<T> => {
+    try {
+      return await work();
+    } catch (error) {
+      throw new RpcFailure(RPC_ERROR_CODES.invalidParams, (error as Error).message);
+    }
+  };
 
   return {
     ask: async (params) => {
@@ -539,5 +591,34 @@ function buildHandlers(parts: {
     },
     'keepAnEye.notNow': () => ({ quietUntil: keepAnEye.notNow().toISOString() }),
     'keepAnEye.accept': (params) => ({ proposed: keepAnEye.accept(params.remarkId) }),
+
+    // Found on this PC: Claude Code's servers, read-only, minus those already added here.
+    'connections.list': () => {
+      const list = connections.list();
+      const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+      const found = readClaudeCodeConnectors(parts.claudeCodeConfigPath).filter(
+        (entry) =>
+          !list.some(
+            (c) =>
+              same(c.name, entry.name) ||
+              (c.transport.type === 'http' &&
+                entry.transport.type === 'http' &&
+                same(c.transport.url, entry.transport.url)),
+          ),
+      );
+      return { connections: list, popular: [...POPULAR_CONNECTORS], found };
+    },
+    'connections.add': (params) =>
+      plainly(async () => ({ connection: await connections.add(params) })),
+    'connections.setEnabled': (params) =>
+      plainly(async () => ({
+        connection: await connections.setEnabled(params.id, params.enabled),
+      })),
+    'connections.signIn': (params) =>
+      plainly(async () => ({ connection: await connections.signIn(params.id) })),
+    'connections.remove': async (params) => ({ removed: await connections.remove(params.id) }),
+    'tool.approve': (params) => ({
+      accepted: approvals.answer(params.approvalId, params.decision),
+    }),
   };
 }

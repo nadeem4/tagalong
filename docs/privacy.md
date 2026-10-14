@@ -123,6 +123,31 @@ The extension's public privacy policy, for the Chrome Web Store, is
   It is sent to the AI provider only as part of Scout's prompt: one line in its system prompt, and
   in the hello's facts when Tagalong opens. Clear the box and it is gone from both.
 
+## Connected apps: what goes to them
+
+Apps you connect in Home, Connections (Notion, GitHub, Linear, a local tool) are reached only
+when Scout calls one of their tools in a turn you started.
+
+- **What is sent.** Only the arguments Scout fills in for that tool, such as a search query or a
+  page title. Nothing on screen is sent on its own. Keys, passwords and card numbers are hidden in
+  the arguments before they leave, and blind spots are never read, so their content cannot reach an
+  app.
+- **Changes ask first.** A tool the app marks read-only runs at once. Every other tool, including
+  any the app says nothing about, shows a card in Scout's bubble saying which app, which tool and
+  what Scout filled in; it runs only on **Allow once**. Cancel, or two minutes without an answer,
+  and nothing changes.
+- **What comes back** is treated as data, not instructions: Scout is told never to follow anything
+  written in it. It goes to Scout's brain provider like any window text, and is not stored.
+- **Tokens and keys.** Sign-in tokens, a pasted key and a local tool's secret values are kept in
+  the OS keychain through Electron safe storage (`connection.<id>.*`), never in settings, the
+  database, the repository or logs. **Disconnect** deletes them.
+- **Sign-in** opens the app's own page in your system browser, which sends you back to a one-time
+  address on `127.0.0.1`. Tagalong never sees your password.
+- **Found on this PC** reads Claude Code's `~/.claude.json` read-only, and never copies a key out
+  of it: a value written there in full is left behind, and you are asked for it if the app needs it.
+- **Activity** records each call as the app, the tool, read or write, and whether it worked. Not
+  what was sent or what came back.
+
 ## Scout's voice: what is spoken, and where it goes
 
 Scout says its bubble lines aloud while **Scout talks** is on (Settings → Voice, on by default).
