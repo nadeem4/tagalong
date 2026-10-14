@@ -5,18 +5,12 @@ import type { ContextSnapshot, PetRemarkParams, RoutineResultParams } from '@tag
 import './app.css';
 import '../../shared/ipc';
 import { playLine } from './voice-player';
+import { DEFAULT_TALK_KEY, panelSettings, readable } from './panel-settings';
+import type { PanelSettings } from './panel-settings';
 import { useTalk } from './talk';
 
 /** The full chat's height; the bubble measures its own. Matches main's PANEL_HEIGHT. */
 const CHAT_HEIGHT = 520;
-
-/** The talk key until settings say otherwise. Matches main's DEFAULT_TALK_HOTKEY. */
-const DEFAULT_TALK_KEY = 'CommandOrControl+Shift+Alt+Space';
-
-/** The ask key as a person reads it on this platform. */
-function readable(accelerator: string, platform: string): string {
-  return accelerator.replace('CommandOrControl', platform === 'darwin' ? 'Cmd' : 'Ctrl');
-}
 
 /**
  * The companion's bubble beside the pet, with the full chat one click behind it. The
@@ -52,6 +46,13 @@ function Panel() {
   // Talk to Scout: the talk key held, or the mic button. Talking cuts Scout off at once.
   const [talkKey, setTalkKey] = useState(readable(DEFAULT_TALK_KEY, 'win32'));
   const [microphoneId, setMicrophoneId] = useState<string | undefined>(undefined);
+  const platform = useRef('win32');
+  function apply(next: PanelSettings): void {
+    setHotkeyLabel(next.hotkeyLabel);
+    setTalkKey(next.talkKey);
+    setMicrophoneId(next.microphoneId);
+    setUserName(next.userName);
+  }
   const { talk, cancel: cancelTalk } = useTalk({
     keyLabel: talkKey,
     microphoneId,
@@ -183,12 +184,20 @@ function Panel() {
         const preferred = pets.find((pet) => pet.id === view.settings.defaultPetId) ?? pets[0];
         setPetId(preferred?.id ?? null);
         if (preferred !== undefined) setPetName(preferred.name);
-        setHotkeyLabel(readable(view.settings.hotkeys.ask, view.platform));
-        setTalkKey(readable(view.settings.hotkeys.talk ?? DEFAULT_TALK_KEY, view.platform));
-        setMicrophoneId(view.settings.voice.microphoneId);
+        platform.current = view.platform;
+        apply(panelSettings(view.settings, view.platform));
       })
       .catch((error: unknown) => console.error('could not list pets', error));
   }, []);
+
+  // A save in Settings or Home reaches an open panel at once: keys, microphone, name.
+  useEffect(
+    () =>
+      window.tagalongHost.onSettingsChanged((settings) =>
+        apply(panelSettings(settings, platform.current)),
+      ),
+    [],
+  );
 
   // A click on the desktop crew strip picks the pet this panel talks to.
   useEffect(() => window.tagalongHost.onActivePet(setPetId), []);

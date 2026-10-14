@@ -1552,7 +1552,8 @@ flowchart LR
 - **Who says it** (`main/voice/voice.ts`, `createVoiceService`). `TAGALONG_FAKE_TTS=1` means
   `fakeTts`, a short silent WAV: no download, no network. Otherwise ElevenLabs when an
   `elevenlabs.apiKey` is stored and `voice.elevenLabsVoiceId` is set (`elevenlabs.ts`: the
-  streaming endpoint, `eleven_flash_v2_5`, only the text and a speed sent); on failure, Kokoro.
+  streaming endpoint, `eleven_flash_v2_5`, only the text and a speed sent, given up after
+  `ELEVENLABS_TIMEOUT_MS`, 15 s); on failure or timeout, Kokoro.
   Kokoro (`kokoro.ts`, `kokoro-js` with `@huggingface/transformers`, `onnx-community/Kokoro-82M-v1.0-ONNX`,
   q8, CPU) is `LazyLocalVoice`: the first line starts the download into `<userData>/voice` and
   answers `fallback`; once loaded every line is a WAV. A failed load is tried again on the next
@@ -1603,9 +1604,14 @@ flowchart LR
   `FRESH_PRESS_MS` (1.1 s) of the last are the key repeating; the first `keyup` in the bubble is the
   release; a later fresh press stops if the release was missed. The mic button toggles. Listening
   ends on its own after 30 s.
-- **Barge-in.** Starting to listen calls `SpeechQueue.stop()`: Scout stops mid-sentence. A spoken
-  question sent while an answer still runs is a new ask for the same pet, which the runner already
-  interrupts.
+- **Barge-in.** Starting to listen calls `SpeechQueue.stop()`: Scout stops mid-sentence. The
+  bubble subscribes to `talk.onListen`; when listening starts while an answer still streams it
+  also interrupts that turn (`bridge.interrupt`), drops its `SpokenStream` and keeps what was shown so far, so no later
+  sentence of the old answer is said. A spoken question sent while an answer still runs is a new
+  ask for the same pet, which the runner already interrupts.
+- **Settings on the fly.** Main sends `IPC.settingsChangedEvent` with the saved settings to every
+  window after each save; the panel reads the ask and talk keys, the microphone and the user's name
+  from it (`renderer/src/panel-settings.ts`), as it does at open, so none needs a restart.
 - **The ears** (`renderer/src/mic.ts`, `main/voice/listen.ts`, `main/voice/whisper.ts`). The panel
   records with `getUserMedia` (the microphone from `voice.microphoneId`, or the system default) and
   `MediaRecorder`, decodes it and resamples to 16 kHz mono with an `OfflineAudioContext`, and sends
@@ -1627,7 +1633,9 @@ flowchart LR
   speech recognition. A typed turn never gets it.
 - **Speaking as it streams** (`ui/voice/spoken-stream.ts`). For a spoken question the bubble feeds
   each `turn.delta` to a `SpokenStream`, which hands over each complete sentence (a mark followed by
-  a space, or a line break) at once, skips code fences even when they arrive in pieces, and says
+  a space, or a line break) at once, skips code fences even when they arrive in pieces, drops a
+  list item or table row whole (judged by how its line starts, `-`, `*`, `+`, `•`, `1.`, `1)` or
+  `|`, waiting for more when a line start could still be a marker), and says
   "The answer is in the bubble." when nothing was speakable. Each piece goes through
   `SpeechQueue.say(text, { whole: true })`: shaped by `toSpeakable` but never cut to two sentences.
   The finished answer is not said again; the bubble shows what it heard and, after the answer,

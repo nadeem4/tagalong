@@ -23,6 +23,8 @@ export interface BubbleTalk {
   state: 'idle' | 'listening' | 'hearing';
   /** Subscribes to each spoken question as it is heard; returns an unsubscribe function. */
   onHeard: (handler: (text: string) => void) => () => void;
+  /** Subscribes to each start of listening, for barge-in; returns an unsubscribe function. */
+  onListen?: (handler: () => void) => () => void;
   /** A line about the microphone: nothing heard, the model downloading, a failure. */
   note: string | null;
   /** The talk key as a person reads it, for "Hold … to reply". */
@@ -374,6 +376,19 @@ export function CompanionBubble({
   });
   const onHeard = talk?.onHeard;
   useEffect(() => onHeard?.((text) => askHeard(text)), [onHeard]);
+
+  // Barge-in: talking over Scout stops the answer still streaming, not only its voice,
+  // and nothing more of it is said.
+  const bargeIn = useEffectEvent(() => {
+    if (reply.state !== 'running') return;
+    spoken.current = null;
+    if (mine.current !== null) void bridge.interrupt(mine.current);
+    // The bubble keeps what was said so far and ignores the rest of the stopped turn.
+    mine.current = null;
+    setReply({ state: 'done', text: reply.text });
+  });
+  const onListen = talk?.onListen;
+  useEffect(() => onListen?.(() => bargeIn()), [onListen]);
 
   const tryIt = async (): Promise<void> => {
     setTried(true);
