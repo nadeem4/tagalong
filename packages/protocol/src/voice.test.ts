@@ -11,7 +11,7 @@ import {
 describe('voice adapters', () => {
   it('lists each adapter once, with plain facts for Settings', () => {
     expect(VOICE_ADAPTERS.map((adapter) => `${adapter.slot}:${adapter.id}`)).toEqual([
-      'ears:sherpa',
+      'ears:local',
       'mouth:kokoro',
       'mouth:elevenlabs',
       'mouth:system',
@@ -22,7 +22,7 @@ describe('voice adapters', () => {
       costs: true,
       screenshots: false,
     });
-    expect(adaptersFor('ears')).toEqual([expect.objectContaining({ id: 'sherpa', offline: true })]);
+    expect(adaptersFor('ears')).toEqual([expect.objectContaining({ id: 'local', offline: true })]);
   });
 
   it('has a Live slot but no Live adapter yet', () => {

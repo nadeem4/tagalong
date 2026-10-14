@@ -109,7 +109,7 @@ export function VoiceSection({
         </div>
         <div>
           <label htmlFor="f-ears">Who listens</label>
-          <select id="f-ears" name="ears" defaultValue={settings.voice.ears ?? 'sherpa'}>
+          <select id="f-ears" name="ears" defaultValue={settings.voice.ears ?? 'local'}>
             {EARS.map((adapter) => (
               <option key={adapter.id} value={adapter.id}>
                 {adapter.label}

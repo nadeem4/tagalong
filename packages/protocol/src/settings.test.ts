@@ -417,9 +417,9 @@ describe('Settings.voice', () => {
   const voiceWith = (change: object) => ({ voice: { ...SETTINGS_DEFAULTS.voice, ...change } });
 
   it('stores which mouth and which ears were picked, and refuses unknown ones', () => {
-    const parsed = Settings.parse(voiceWith({ mouth: 'system', ears: 'sherpa' })).voice;
+    const parsed = Settings.parse(voiceWith({ mouth: 'system', ears: 'local' })).voice;
     expect(parsed.mouth).toBe('system');
-    expect(parsed.ears).toBe('sherpa');
+    expect(parsed.ears).toBe('local');
     expect(Settings.safeParse(voiceWith({ mouth: 'gpt-live' })).success).toBe(false);
     expect(Settings.safeParse(voiceWith({ ears: 'whisper' })).success).toBe(false);
   });
