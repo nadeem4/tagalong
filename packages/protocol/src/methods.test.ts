@@ -55,6 +55,13 @@ const HOST_TO_CORE = [
   'connections.setEnabled',
   'connections.signIn',
   'connections.remove',
+  'routines.list',
+  'routines.save',
+  'routines.delete',
+  'routines.setEnabled',
+  'routines.runNow',
+  'routines.confirm',
+  'routines.dismiss',
 ] as const;
 
 const CORE_TO_HOST = ['perception.capture'] as const;
@@ -78,6 +85,9 @@ const CORE_TO_HOST_NOTIFICATIONS = [
   'pet.remark',
   'connections.changed',
   'connector.confirm',
+  'routine.proposed',
+  'routine.result',
+  'routines.changed',
 ] as const;
 
 describe('method catalog', () => {

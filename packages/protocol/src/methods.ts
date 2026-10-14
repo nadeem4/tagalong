@@ -57,6 +57,25 @@ import {
   WatchStopParams,
   WatchStopResult,
 } from './awareness';
+import {
+  RoutineProposedParams,
+  RoutineResultParams,
+  RoutinesChangedParams,
+  RoutinesConfirmParams,
+  RoutinesConfirmResult,
+  RoutinesDeleteParams,
+  RoutinesDeleteResult,
+  RoutinesDismissParams,
+  RoutinesDismissResult,
+  RoutinesListParams,
+  RoutinesListResult,
+  RoutinesRunNowParams,
+  RoutinesRunNowResult,
+  RoutinesSaveParams,
+  RoutinesSaveResult,
+  RoutinesSetEnabledParams,
+  RoutinesSetEnabledResult,
+} from './routines';
 import { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './limits';
 import {
   NoticesDismissParams,
@@ -288,6 +307,8 @@ export const TurnStartedParams = z.object({
   model: z.string().min(1).optional(),
   /** Phase 4. Set when the turn is part of a crew run — a roundtable, or a handoff. */
   runId: z.uuid().optional(),
+  /** Set when a routine started the turn: no bubble takes it for the person's own question. */
+  routineId: z.uuid().optional(),
 });
 export const TurnDeltaParams = z.object({ turnId: z.uuid(), text: z.string() });
 /** Phase 3. index orders chunks so the host can play them without gaps. */
@@ -460,6 +481,13 @@ export const hostToCoreMethods = {
   },
   'connections.signIn': { params: ConnectionsSignInParams, result: ConnectionsSignInResult },
   'connections.remove': { params: ConnectionsRemoveParams, result: ConnectionsRemoveResult },
+  'routines.list': { params: RoutinesListParams, result: RoutinesListResult },
+  'routines.save': { params: RoutinesSaveParams, result: RoutinesSaveResult },
+  'routines.delete': { params: RoutinesDeleteParams, result: RoutinesDeleteResult },
+  'routines.setEnabled': { params: RoutinesSetEnabledParams, result: RoutinesSetEnabledResult },
+  'routines.runNow': { params: RoutinesRunNowParams, result: RoutinesRunNowResult },
+  'routines.confirm': { params: RoutinesConfirmParams, result: RoutinesConfirmResult },
+  'routines.dismiss': { params: RoutinesDismissParams, result: RoutinesDismissResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostMethods = {
@@ -500,6 +528,9 @@ export const coreToHostNotifications = {
   'pet.remark': { params: PetRemarkParams },
   'connections.changed': { params: ConnectionsChangedParams },
   'connector.confirm': { params: ConnectorConfirmParams },
+  'routine.proposed': { params: RoutineProposedParams },
+  'routine.result': { params: RoutineResultParams },
+  'routines.changed': { params: RoutinesChangedParams },
 } as const satisfies Record<string, NotificationSpec>;
 
 export type HostToCoreMethod = keyof typeof hostToCoreMethods;
