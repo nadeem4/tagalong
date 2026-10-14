@@ -24,12 +24,16 @@ function launch(dataDir: string, signIn: string): Promise<ElectronApplication> {
 }
 
 async function quit(app: ElectronApplication): Promise<void> {
-  const closed = app.waitForEvent('close');
+  const closed = app.waitForEvent('close').catch(() => undefined);
   // The evaluate can reject as the process exits; the close event is what matters.
-  await Promise.all([
-    closed,
-    app.evaluate(({ app: electronApp }) => electronApp.quit()).catch(() => undefined),
-  ]);
+  void app.evaluate(({ app: electronApp }) => electronApp.quit()).catch(() => undefined);
+  // Teardown must never hang: if the app has not gone in 15 s, end the process.
+  const timer = setTimeout(() => app.process().kill(), 15_000);
+  try {
+    await closed;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function windowFor(app: ElectronApplication, name: string): Promise<Page> {
@@ -69,7 +73,7 @@ test.describe('setup by typing, signed in to Claude', () => {
   });
 
   test.afterAll(async () => {
-    await app.close().catch(() => undefined);
+    await quit(app);
     rmSync(dataDir, { recursive: true, force: true });
   });
 
@@ -151,7 +155,7 @@ test.describe('setup by typing, without Claude Code', () => {
   });
 
   test.afterAll(async () => {
-    await app.close().catch(() => undefined);
+    await quit(app);
     rmSync(dataDir, { recursive: true, force: true });
   });
 
