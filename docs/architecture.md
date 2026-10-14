@@ -1688,7 +1688,8 @@ flowchart LR
   the frames still flow through the real voice process. ElevenLabs Scribe is not wired in.
 - **Voice seam for other windows** (`renderer/src/voice-seam.ts`). `installVoiceSeam()` puts
   `window.tagalongVoice` on a window (the panel calls it at start; the first-run window will call it
-  in its own): `ears` (a `RemoteEars` in `held` mode), `openMic(deviceId?)` (the `openMic` above,
+  in its own): `ears` (`listen` and `stop` go to one `RemoteEars` in `held` mode; `on` subscribes to the ears
+  events for good, so handlers set once keep hearing every question), `openMic(deviceId?)` (the `openMic` above,
   resolving to a `MicStream` with `close()`) and `ensureEars(onProgress)`, which downloads the ears'
   model files if missing. `ensureEars` goes `TagalongHostApi.ensureEars` → `IPC.ensureEars` → the
   `ears.ensure` worker call, outside the listening order queue; the voice process runs

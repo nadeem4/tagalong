@@ -18,8 +18,19 @@ declare global {
 
 /** Puts `window.tagalongVoice` on a window; the first-run window will call it too. */
 export function installVoiceSeam(target: Window = window): void {
+  // A RemoteEars lets go of its handlers after a held question's turnEnd, so this long-lived
+  // ears subscribes for good itself and hands only listen and stop to one RemoteEars.
+  const remote = new RemoteEars(target.tagalongHost, 'held');
+  const ears: Ears = {
+    on: (event, handler) =>
+      void target.tagalongHost.onEarsEvent((said, text) => {
+        if (said === event) handler(text);
+      }),
+    listen: (mic) => remote.listen(mic),
+    stop: () => remote.stop(),
+  };
   target.tagalongVoice = {
-    ears: new RemoteEars(target.tagalongHost, 'held'),
+    ears,
     openMic,
     ensureEars: (onProgress) => target.tagalongHost.ensureEars(onProgress),
   };
