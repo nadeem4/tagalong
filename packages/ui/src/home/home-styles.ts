@@ -117,6 +117,40 @@ export const HOME_CSS = `
 .home-conn__url { overflow-wrap: anywhere; color: ${t.color.panelText}; }
 .home-conns details > summary { cursor: pointer; margin: 0; }
 .home-conns__advanced { margin-top: ${t.space.xl}px; }
+.home-templates {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: ${t.space.md}px;
+  margin: 0 0 ${t.space.xl}px;
+}
+.home-template {
+  display: flex; flex-direction: column; gap: ${t.space.xs}px; padding: ${t.space.lg}px ${t.space.xl}px;
+  border: 2px solid ${t.color.panelLine}; border-radius: ${t.radius.row}px; background: #fff;
+  color: ${t.color.panelText}; font-family: ${t.font.ui}; text-align: left; cursor: pointer;
+}
+.home-template:hover { background: ${t.color.panelTile}; }
+.home-template__name { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; }
+.home-template__line { font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; line-height: 1.4; }
+.home-routine__when { display: flex; flex-wrap: wrap; gap: ${t.space.lg}px; }
+.home-routine__when label { flex: 1 1 200px; }
+.home-routine input[type='time'] {
+  width: 100%; min-height: ${t.size.fieldHeight}px; padding: 0 ${t.space.lg}px;
+  border: 1px solid ${t.color.panelLine}; border-radius: ${t.radius.field}px;
+  background: ${t.color.panelTile}; color: ${t.color.panelText};
+  font-family: ${t.font.ui}; font-size: ${t.fontSize.field}px;
+}
+.home-days { display: flex; flex-wrap: wrap; gap: ${t.space.sm}px; margin: 0 0 ${t.space.lg}px; }
+.home-day {
+  min-width: 52px; height: 32px; padding: 0 ${t.space.md}px; border-radius: ${t.radius.field}px;
+  border: 1px solid ${t.color.panelMuted}; background: transparent; color: ${t.color.panelText};
+  font-family: ${t.font.ui}; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; cursor: pointer;
+}
+.home-day[aria-pressed='true'] { background: ${t.color.gold}; border-color: ${t.color.gold}; color: ${t.color.goldInk}; }
+.home-routine__more { align-self: flex-start; margin: 0 0 ${t.space.lg}px; font-size: ${t.fontSize.small}px; }
+.home-routine__deliver { margin: 0 0 ${t.space.lg}px; padding: 0; border: 0; }
+.home-routine__deliver legend {
+  margin-bottom: ${t.space.xs}px; padding: 0; color: ${t.color.panelMuted}; font-size: ${t.fontSize.small}px;
+}
+.home-routine__deliver .tg-check { margin-bottom: ${t.space.sm}px; }
+.home-routine__runs { flex-wrap: wrap; margin: 0; }
 .home-controls { border-radius: 0; }
 .home-controls * { box-sizing: border-box; }
 .home-controls .tg-pet { grid-template-columns: minmax(0, 1fr); }
