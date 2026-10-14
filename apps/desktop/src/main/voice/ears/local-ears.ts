@@ -113,8 +113,7 @@ export class LocalEars implements Ears {
       this.#parts.stt.accept(frame);
       this.#stretch += 1;
       if (this.#stretch >= MAX_STRETCH_FRAMES) {
-        this.#closing = this.#closeStretch(run, false);
-        await this.#closing;
+        await this.#close(run);
         return;
       }
       this.#sincePartial += 1;
@@ -134,14 +133,18 @@ export class LocalEars implements Ears {
     if (this.#inSpeech) {
       this.#keep(frame);
       this.#parts.stt.accept(frame);
-      if (this.#quiet === PAUSE_FRAMES) {
-        this.#closing = this.#closeStretch(run, false);
-        await this.#closing;
-      }
+      if (this.#quiet === PAUSE_FRAMES) await this.#close(run);
       return;
     }
     if (this.#mode === 'always' && this.#quiet >= PAUSE_FRAMES + GIVE_UP_FRAMES)
       this.#endTurn(false);
+  }
+
+  /** Close a stretch from the frame loop; `stop` waits on `#closing`, which never rejects. */
+  #close(run: number): Promise<void> {
+    const closing = this.#closeStretch(run, false);
+    this.#closing = closing.catch(() => undefined);
+    return closing;
   }
 
   async #closeStretch(run: number, stopping: boolean): Promise<void> {
@@ -178,6 +181,7 @@ export class LocalEars implements Ears {
     this.#quiet = 0;
     this.#sincePartial = 0;
     this.#stretch = 0;
+    this.#closing = undefined;
     this.#lastPartial = '';
     this.#heard = [];
     this.#audio = [];

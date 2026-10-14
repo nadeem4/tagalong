@@ -127,6 +127,29 @@ describe('LocalEars, noise and failing models', () => {
     expect(events.at(-1)).toBe('turnEnd:word word');
   });
 
+  it('recovers after a failed transcription: the next held turn keeps its words', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const p = parts();
+    const real = p.stt.text;
+    let failOnce = true;
+    p.stt.text = async () => {
+      if (!failOnce) return real();
+      failOnce = false;
+      throw new Error('onnx');
+    };
+    const { ears, events, feed } = hear('held', p);
+    await feed(LOUD, 2);
+    await feed(QUIET, PAUSE_FRAMES);
+    const mic = new Pushable<Float32Array>();
+    ears.listen(mic);
+    mic.push(LOUD);
+    await feed(LOUD, 0);
+    ears.stop();
+    await feed(QUIET, 0);
+    expect(events.at(-1)).toBe('turnEnd:word');
+    warn.mockRestore();
+  });
+
   it('still ends a held turn when the speech model fails on stop', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const p = parts();
