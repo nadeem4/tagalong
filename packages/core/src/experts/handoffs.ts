@@ -12,6 +12,9 @@ import { RpcFailure } from '../server/ws-server';
 import { renderBrief, type Brief, type Connector, type ConnectorResult } from './connector';
 import type { ExpertStore } from './store';
 
+/** How long a hand-off may run before it is stopped and marked failed. */
+export const HANDOFF_TIMEOUT_MS = 30 * 60 * 1000;
+
 export type HandoffEvent =
   | { method: 'handoff.proposed'; params: HandoffProposedParams }
   | { method: 'handoff.progress'; params: { handoffId: string; expertId: string; step: string } }
@@ -193,17 +196,37 @@ export class HandoffManager {
   ): Promise<void> {
     const { activity, emit } = this.options;
     const expertId = expert.id;
-    const sent = await this.options
-      .connectorFor(expert, research ? { research: true } : undefined)
-      .send(
-        brief,
-        (step) =>
-          emit({
-            method: 'handoff.progress',
-            params: { handoffId, expertId, step: hideSecrets(step) },
-          }),
-        signal,
-      );
+    // Past the limit the run is cancelled like a stop, but recorded as a failure.
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      this.#running.get(handoffId)?.abort();
+    }, HANDOFF_TIMEOUT_MS);
+    let sent: ConnectorResult;
+    try {
+      sent = await this.options
+        .connectorFor(expert, research ? { research: true } : undefined)
+        .send(
+          brief,
+          (step) =>
+            emit({
+              method: 'handoff.progress',
+              params: { handoffId, expertId, step: hideSecrets(step) },
+            }),
+          signal,
+        );
+    } catch (error) {
+      sent = { ok: false, error: `${expert.name} could not run: ${(error as Error).message}` };
+    } finally {
+      clearTimeout(timer);
+    }
+    if (timedOut) {
+      const minutes = Math.round(HANDOFF_TIMEOUT_MS / 60_000);
+      sent = {
+        ok: false,
+        error: `${expert.name} took longer than ${minutes} minutes, so it was stopped.`,
+      };
+    }
     // An expert reads files for itself, so its answer can carry a key it read: hidden
     // before it is stored, shown or handed back to the companion.
     const result: ConnectorResult = sent.ok
@@ -211,7 +234,7 @@ export class HandoffManager {
       : { ...sent, error: hideSecrets(sent.error) };
     this.#running.delete(handoffId);
 
-    if (signal.aborted) {
+    if (signal.aborted && !timedOut) {
       activity.expertFinished(handoffId, result, 'stopped');
       emit({ method: 'handoff.finished', params: { handoffId, expertId, state: 'stopped' } });
       return;

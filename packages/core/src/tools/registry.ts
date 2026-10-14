@@ -114,7 +114,8 @@ export class ToolRegistry {
     const tools: Tool[] = [];
     if (perception) tools.push(...perceptionTools(perception), ...recallTools(perception));
     if (memory) tools.push(rememberTool(memory));
-    if (watch) tools.push(watchForTool(watch));
+    // A routine's own turn never starts a watch: a watch routine could set off itself.
+    if (watch && turn.routine === undefined) tools.push(watchForTool(watch));
     const others = consult?.pets().filter((pet) => pet.id !== turn.pet.id) ?? [];
     if (consult && turn.allowConsult !== false && others.length > 0) {
       tools.push(askPetTool(consult, turn.pet));

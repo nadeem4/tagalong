@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Settings, SettingsPatch } from '@tagalong/protocol';
 
@@ -43,9 +43,11 @@ function describeIssues(issues: readonly { path: PropertyKey[]; message: string 
 /**
  * Settings as a JSON file in the host-supplied data dir.
  *
- * A corrupt or schema-invalid file is an error the user must see, never something to
- * paper over with defaults: silently resetting would throw away a hand-edited config
- * and hide the typo that caused it.
+ * Saves are atomic: the new text goes to a temp file that is renamed over the old
+ * one, and the previous good file is kept as `settings.json.bak`. A corrupt or
+ * schema-invalid file never stops boot: the store reads the `.bak` instead, then the
+ * defaults, and logs why. The bad file stays on disk; the next save moves it to
+ * `settings.json.corrupt` so a hand edit with a typo is never thrown away.
  */
 export class SettingsStore {
   readonly #dataDir: string;
@@ -63,30 +65,11 @@ export class SettingsStore {
 
   /** Current settings, with every absent field filled in from the defaults. */
   get(): Settings {
-    const text = this.#read();
-    if (text === null) return Settings.parse({});
-
-    let json: unknown;
-    try {
-      json = JSON.parse(text);
-    } catch (error) {
-      throw new Error(
-        `Settings file ${this.#file} is not valid JSON: ${(error as Error).message}`,
-        {
-          cause: error,
-        },
-      );
-    }
-
-    const parsed = Settings.safeParse(json);
-    if (!parsed.success) {
-      throw new Error(
-        `Settings file ${this.#file} does not match the settings schema:\n` +
-          describeIssues(parsed.error.issues),
-        { cause: parsed.error },
-      );
-    }
-    return parsed.data;
+    const main = this.#load(this.#file);
+    if (main.ok) return main.settings;
+    console.warn(`[settings] ${main.problem}\nUsing the last good copy or the defaults.`);
+    const backup = this.#load(`${this.#file}.bak`);
+    return backup.ok ? backup.settings : Settings.parse({});
   }
 
   /** Merges a patch over the current values and persists the result. */
@@ -98,17 +81,43 @@ export class SettingsStore {
 
     const merged = Settings.parse({ ...this.get(), ...parsedPatch.data });
     mkdirSync(this.#dataDir, { recursive: true });
-    writeFileSync(this.#file, `${JSON.stringify(merged, null, 2)}\n`, 'utf8');
+    const temp = `${this.#file}.tmp`;
+    writeFileSync(temp, `${JSON.stringify(merged, null, 2)}\n`, 'utf8');
+    const current = this.#load(this.#file);
+    if (!current.ok) renameSync(this.#file, `${this.#file}.corrupt`);
+    else if (current.exists) copyFileSync(this.#file, `${this.#file}.bak`);
+    renameSync(temp, this.#file);
     return merged;
   }
 
-  /** Returns the file text, or null when the file does not exist yet. */
-  #read(): string | null {
+  /** Reads and validates one settings file; a missing file reads as the defaults. */
+  #load(
+    file: string,
+  ): { ok: true; settings: Settings; exists: boolean } | { ok: false; problem: string } {
+    let text: string;
     try {
-      return readFileSync(this.#file, 'utf8');
+      text = readFileSync(file, 'utf8');
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return { ok: true, settings: Settings.parse({}), exists: false };
+      }
       throw error;
     }
+
+    let json: unknown;
+    try {
+      json = JSON.parse(text);
+    } catch (error) {
+      return { ok: false, problem: `${file} is not valid JSON: ${(error as Error).message}` };
+    }
+
+    const parsed = Settings.safeParse(json);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        problem: `${file} does not match the settings schema:\n${describeIssues(parsed.error.issues)}`,
+      };
+    }
+    return { ok: true, settings: parsed.data, exists: true };
   }
 }

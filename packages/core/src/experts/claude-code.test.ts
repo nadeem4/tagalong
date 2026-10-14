@@ -1,6 +1,9 @@
 import { SECRET_FILES } from '@tagalong/protocol';
-import { describe, expect, it } from 'vitest';
-import { ClaudeCodeConnector, type ChildRun, type SpawnFn } from './claude-code';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ClaudeCodeConnector, spawnChild, type ChildRun, type SpawnFn } from './claude-code';
 
 interface Spawned {
   command: string;
@@ -282,4 +285,84 @@ describe('ClaudeCodeConnector.check', () => {
       await new ClaudeCodeConnector({ folder: 'C:\\r', spawn, folderExists: () => true }).check(),
     ).toEqual({ ok: false, error: 'Claude Code did not start: boom' });
   });
+});
+
+describe('spawnChild', () => {
+  let dir: string;
+  let path: string | undefined;
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'tagalong-spawn-'));
+    path = process.env.PATH;
+  });
+
+  afterEach(() => {
+    process.env.PATH = path;
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('reports a missing command as a failed run, even after writing the brief', async () => {
+    const child = spawnChild('tagalong-no-such-command', ['-p'], { cwd: dir });
+    child.write('x'.repeat(1 << 20));
+    for await (const line of child.lines) void line;
+    expect(await child.exit).toBe(-1);
+    expect(child.stderr()).toMatch(/not found on the PATH/);
+  });
+
+  it('survives a process that exits before reading the brief', async () => {
+    const child = spawnChild(process.execPath, ['-e', 'setTimeout(() => process.exit(3), 200)'], {
+      cwd: dir,
+    });
+    const errors: unknown[] = [];
+    const onUncaught = (error: unknown) => errors.push(error);
+    process.on('uncaughtException', onUncaught);
+    try {
+      child.write('x'.repeat(1 << 22));
+      for await (const line of child.lines) void line;
+      expect(await child.exit).toBe(3);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    } finally {
+      process.off('uncaughtException', onUncaught);
+    }
+    expect(errors).toEqual([]);
+  });
+
+  it.runIf(process.platform === 'win32')(
+    'runs an npm .cmd shim on Windows, with every argument intact',
+    async () => {
+      writeFileSync(
+        join(dir, 'echo-args.js'),
+        'process.stdin.resume();process.stdin.on("end",()=>console.log(JSON.stringify(process.argv.slice(2))));',
+      );
+      writeFileSync(join(dir, 'fake-claude.cmd'), '@node "%~dp0echo-args.js" %*\r\n');
+      process.env.PATH = `${dir};${path ?? ''}`;
+      const args = ['--settings', '{"disableAllHooks":true}', 'Read(**/.env)', 'mcp__*', 'a b'];
+
+      const child = spawnChild('fake-claude', args, { cwd: dir });
+      child.write('brief');
+      const lines: string[] = [];
+      for await (const line of child.lines) lines.push(line);
+
+      expect(await child.exit).toBe(0);
+      expect(JSON.parse(lines.join(''))).toEqual(args);
+    },
+  );
+
+  it.runIf(process.platform === 'win32')(
+    'kills the whole process tree under a .cmd shim',
+    async () => {
+      writeFileSync(join(dir, 'wait.js'), 'setInterval(() => console.log("working"), 100);');
+      writeFileSync(join(dir, 'slow-claude.cmd'), '@node "%~dp0wait.js" %*\r\n');
+      process.env.PATH = `${dir};${path ?? ''}`;
+
+      const child = spawnChild('slow-claude', [], { cwd: dir });
+      child.write('');
+      for await (const line of child.lines) {
+        void line;
+        child.kill();
+      }
+
+      expect(await child.exit).toBeNull();
+    },
+  );
 });

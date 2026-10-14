@@ -9,6 +9,9 @@ import type { ConversationStore } from './store';
 /** A pasted file stays readable in Home without filling the table. */
 export const ACTIVITY_TEXT_CHARS = 4_000;
 
+/** The error on a row a crash or a quit left running. */
+const INTERRUPTED = 'Interrupted: Tagalong closed before this finished.';
+
 interface ActivityRow {
   id: string;
   kind: string;
@@ -259,6 +262,18 @@ export class ActivityLog {
         now(),
         id,
       );
+  }
+
+  /**
+   * At boot, before anything runs: a row still `running` belongs to a run that a crash or
+   * a quit cut short, so it would otherwise spin forever. Returns how many were closed.
+   */
+  interrupted(): number {
+    return this.db
+      .prepare(
+        `UPDATE activity SET state = 'error', error = ?, finished_at = ? WHERE state = 'running'`,
+      )
+      .run(INTERRUPTED, now()).changes;
   }
 
   /**

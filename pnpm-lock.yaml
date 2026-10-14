@@ -148,6 +148,9 @@ importers:
       better-sqlite3:
         specifier: 13.0.3
         version: 13.0.3
+      cross-spawn:
+        specifier: 7.0.6
+        version: 7.0.6
       openai:
         specifier: 7.27.0
         version: 7.27.0(undici@8.10.2)(ws@8.21.3)(zod@4.6.2)
@@ -158,6 +161,9 @@ importers:
       '@types/better-sqlite3':
         specifier: 9.6.0
         version: 9.6.0
+      '@types/cross-spawn':
+        specifier: 6.0.6
+        version: 6.0.6
       '@types/ws':
         specifier: 8.18.1
         version: 8.18.1
@@ -1596,6 +1602,9 @@ packages:
 
   '@types/chrome@0.3.4':
     resolution: {integrity: sha512-dcySM5R3WAUVYFjylu6tvI4D03hPKjgAqk+tKZ/tm/vxL4mLgbnSsOEQ3J7V99qP/U3Oo9IORstJLmX2hPaDlA==}
+
+  '@types/cross-spawn@6.0.6':
+    resolution: {integrity: sha512-fXRhhUkG4H3TQk5dBhQ7m/JDdSNHKwR2BBia62lhwEIq9xGiQKLxd6LymNhn47SjXhsUEPmxi+PKw2OkW4LLjA==}
 
   '@types/debug@4.1.13':
     resolution: {integrity: sha512-KSVgmQmzMwPlmtljOomayoR89W4FynCAi3E8PPs7vmDVPe84hT+vGPKkJfThkmXs0x0jAaa9U8uW8bbfyS2fWw==}
@@ -5831,6 +5840,10 @@ snapshots:
     dependencies:
       '@types/filesystem': 0.0.36
       '@types/har-format': 1.2.16
+
+  '@types/cross-spawn@6.0.6':
+    dependencies:
+      '@types/node': 22.20.2
 
   '@types/debug@4.1.13':
     dependencies:
