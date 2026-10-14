@@ -21,8 +21,7 @@ source of truth for HOW.**
 | Task board (74 tasks, `Phase` + `Order` + `Acceptance`) | Notion database `Tagalong Tasks` (`collection://77eeaf1d-3ff5-4681-a3da-798819627121`)                                                               |
 | Decision log                                            | Notion database `Tagalong Decisions` (`collection://47551ad7-8cb0-4f67-a411-c651c15146d9`)                                                           |
 | Issue log                                               | Notion database [`Tagalong Issues`](https://app.notion.com/p/fbe46b28758244c586dde6f27f9696ac) (`collection://081abced-a751-43c3-90af-8ea129b6a226`) |
-| Local design copy                                       | `docs/specs/2026-09-11-tagalong-design.md`                                                                                                           |
-| Per-phase sign-off                                      | `docs/acceptance/phase-N.md`                                                                                                                         |
+| Manual tests for the current build                      | `docs/testing/feature-test-guide.md`                                                                                                                 |
 
 Fetch the phase page before starting the phase. Fetch the task rows before starting each task.
 
@@ -45,8 +44,9 @@ Fetch the phase page before starting the phase. Fetch the task rows before start
    error, blocker and workaround of the phase, including the process mistakes, not only the
    ones still unfixed at the end. The repo must **not** carry an issue log of its own — no
    issues folder under `docs/`; errors live in Notion, where they can be filtered and reopened.
-4. Run the phase acceptance script. Write `docs/acceptance/phase-N.md` with each checkbox
-   ticked, the date, and notes from the real run. The acceptance record stays in the repo.
+4. Run the phase acceptance script and record the result, with the date and notes from the
+   real run, on the phase's Notion page. Add or update the feature's steps in
+   `docs/testing/feature-test-guide.md`.
 5. Push, then report to the human: what shipped, what the acceptance run showed, what is
    blocked on them.
 6. Stop and wait. The human may amend the next phase before it starts.
@@ -78,7 +78,7 @@ Fetch the phase page before starting the phase. Fetch the task rows before start
   updates. No `Co-Authored-By: Claude`, no "Generated with", no "🤖", no "written by an agent"
   note. The work is the user's and ships under their name alone. Naming Anthropic as a **vendor**
   is different and fine — the `AnthropicProvider`, the Claude API, the model ids, and the
-  legal-and-compliance note about Claude Max in `docs/specs/` all stay. The test is authorship,
+  Claude sign-in all stay. The test is authorship,
   not the word: say who built it, never that an AI did.
 
 ## Where code goes in packages/core

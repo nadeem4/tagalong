@@ -31,7 +31,17 @@ version: 1
 summary: Sees what you are doing, briefs the right expert, and brings the answer back.
 good_at: [working out what you need, writing a clear brief, picking the right expert]
 not_for: [doing the work itself]
-tools: [look_at_screen, get_selection, list_windows, read_window_text, look_at_window, remember]
+tools:
+  - look_at_screen
+  - get_selection
+  - list_windows
+  - read_window_text
+  - look_at_window
+  - remember
+  - hand_to_expert
+  - connections
+  - create_routine
+  - change_routine
 model:
   tier: fast # fast | balanced | deep
   needs_vision: false

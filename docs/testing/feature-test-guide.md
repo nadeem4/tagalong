@@ -1,676 +1,159 @@
 # Tagalong feature test guide
 
-Step-by-step manual tests for what each phase adds, written so someone who did not build the
+Step-by-step manual tests for what this build does, written so someone who did not build the
 feature can run it and know whether it passed. Each step lists **Setup**, **Action** and
 **Expected**. A step passes only if everything under Expected is true.
 
 ## Contents
 
 - [Configuration](#configuration)
-  - [OpenRouter + Claude (the default for this guide)](#openrouter--claude-the-default-for-this-guide)
-  - [Nebius Token Factory + Nemotron](#nebius-token-factory--nemotron)
-  - [Fake provider (no key)](#fake-provider-no-key)
-- [Phase H: model providers](#phase-h-model-providers)
-- [Phase 6: Browser Host](#phase-6-browser-host)
-- [Phase 4: Memory](#phase-4-memory)
-- [Phase 3B: Awareness](#phase-3b-awareness)
-- [Phase 7: onboarding and installer](#phase-7-onboarding-and-installer)
+- [First run: Welcome](#first-run-welcome)
+- [Scout's brain](#scouts-brain)
+- [Hand-offs to Claude Code](#hand-offs-to-claude-code)
+- [Settings](#settings)
+- [Greeting](#greeting)
+- [Keeping an eye on things](#keeping-an-eye-on-things)
 - [Voice: Scout talks](#voice-scout-talks)
 - [Talk to Scout](#talk-to-scout)
 - [Connections: your apps over MCP](#connections-your-apps-over-mcp)
 - [Routines](#routines)
-- [Demo run: the hackathon story](#demo-run-the-hackathon-story)
+- [Memory](#memory)
+- [Screen memory](#screen-memory)
+- [The Chrome extension](#the-chrome-extension)
+- [Installer](#installer)
 - [Not in this build](#not-in-this-build)
 
 ## Configuration
 
-Every test runs on the Windows desktop app, either installed (Phase 7) or from source with
-`pnpm dev:desktop` **without** `TAGALONG_FAKE_PROVIDERS`. Keys are entered in the setup wizard or in
-Settings (tray → **Settings**); a saved key is used from the next question, with no restart.
+Every test runs on the Windows desktop app, either installed ([Installer](#installer)) or from
+source with `pnpm dev:desktop` **without** `TAGALONG_FAKE_PROVIDERS`, unless a step says otherwise.
+Home opens from the tray (**Open Tagalong**); Settings is a page in Home. A saved key or brain is
+used from the next question, with no restart.
 
-### OpenRouter + Claude (the default for this guide)
+**The default for this guide: the Claude sign-in.** Install Claude Code, run `claude` once and sign
+in (`claude auth status` says `"loggedIn": true`). On a fresh install Scout thinks with it on Haiku.
 
-Unless a step says otherwise, run every test with **OpenRouter and a Claude model**.
+**OpenRouter + Claude.** Get a key at <https://openrouter.ai/keys>, paste it in Home → Settings →
+Advanced → API keys → OpenRouter, then on Home's **Scout** page set **Thinks with** to OpenRouter
+and **Model** to a Claude id (for example `anthropic/claude-sonnet-5`). Save.
 
-1. Get a key at <https://openrouter.ai/keys> and paste it into **OpenRouter API key**.
-2. For each pet under test set **Provider** to OpenRouter and **Model id** to a Claude id, for example
-   `anthropic/claude-sonnet-5`. Leave **Vision model id** empty: on OpenRouter every model is treated
-   as seeing, and Claude does.
-3. Save.
+**Nebius Token Factory + Nemotron.** Get a key at <https://tokenfactory.nebius.com/> (API keys),
+store it the same way, and pick Token Factory on the Scout page. Its text models cannot see, and
+Home sets no vision model, so screenshots are dropped with a warning (H5).
 
-**Where the model ids come from.** OpenRouter's catalog, <https://openrouter.ai/models>, which is also
-what `GET https://openrouter.ai/api/v1/models` returns. The model box in Settings and in the wizard
-lists those ids live once the key is stored, and its note says "N models from OpenRouter"; "Built-in
-list" means the key or base URL was refused.
+**Fake provider (no key).** Steps marked _fake provider_ need no key: launch from source with
+`TAGALONG_FAKE_PROVIDERS=1` (PowerShell: `$env:TAGALONG_FAKE_PROVIDERS = '1'`). Scout streams a
+scripted answer, hand-offs go to a scripted expert, and nothing leaves the machine. Keeping an eye
+on things is off under it unless `TAGALONG_KEEP_AN_EYE=1` is also set.
 
-### Nebius Token Factory + Nemotron
+**A fresh profile.** Run `pnpm --filter @tagalong/desktop start:fresh` (a new temp data folder each
+time), or quit Tagalong and rename `%APPDATA%\Tagalong` (rename it back afterwards).
 
-Steps marked _hackathon demo_ also use Nebius Token Factory with NVIDIA Nemotron.
+## First run: Welcome
 
-1. Get a key at <https://tokenfactory.nebius.com/> (API keys) and paste it into **Token Factory API
-   key**.
-2. For a pet on Nemotron set **Provider** to Token Factory and pick its models:
+### W.1. Welcome opens on a fresh install
 
-| Role                      | Model id                            | Model                                |
-| ------------------------- | ----------------------------------- | ------------------------------------ |
-| Text (a pet's main model) | `nvidia/nemotron-3-super-120b-a12b` | Nemotron 3 Super                     |
-| Vision (sees screenshots) | `nvidia/Nemotron-Nano-V2-12b`       | Nemotron Nano 2 VL                   |
-| Watch checks              | `nvidia/nemotron-3-nano-30b-a3b`    | Nemotron 3 Nano (small, cheap, text) |
+1. **Setup:** a fresh profile.
+2. **Action:** start Tagalong.
+3. **Expected:** one window opens with Scout's pixel figure and **Hi, I'm Scout.**, then four parts:
+   **Found on this computer** (Claude Code, Gemini CLI and Codex, each Ready, "Found. Hand-offs to it
+   come soon." or Not installed with **How to add**), **How I think**, **What should I call you?**
+   (optional) and **One key to remember** (`Ctrl Shift Space`). Scout itself is not on screen yet.
 
-**Where the model ids come from.** Token Factory's model list, `GET
-https://api.tokenfactory.nebius.com/v1/models`, which Settings and the wizard show live once the key
-is stored ("N models from Token Factory"). The Super id is the one Nebius published with Nemotron 3
-Super; the Nano 2 VL and Nemotron 3 Nano ids could not be checked when they were written. If the live
-list names them differently, use the listed id and record the difference in Notion Issues. A pet on
-Super needs the Nano 2 VL id as its **Vision model id** to see pictures (the wizard sets it for you).
+### W.2. How I think
 
-### Fake provider (no key)
+1. **Setup:** W.1, Claude Code installed and signed in.
+2. **Action:** read the choices under **How I think**.
+3. **Expected:** **Claude Code sign-in** first, picked, "No key needed"; then one row per keyed
+   service (OpenRouter, Token Factory, Anthropic), each "Paste a key below" or "Key stored".
+4. **Action:** pick OpenRouter. **Expected:** a key box appears and **Start** stays disabled until
+   something is typed in it.
+5. **Without Claude Code** (not on PATH): the sign-in row is missing and a keyed service is picked.
 
-Steps marked _fake provider_ need no key: launch from source with `TAGALONG_FAKE_PROVIDERS=1`
-(PowerShell: `$env:TAGALONG_FAKE_PROVIDERS = '1'`). Every pet then streams a scripted answer and
-nothing leaves the machine.
+### W.3. Start, the intro and the first expert
 
-## Phase H: model providers
+1. **Setup:** W.1, Claude Code sign-in picked, `Nadeem` typed in **What should I call you?**.
+2. **Action:** press **Start**.
+3. **Expected:** Welcome closes, Scout docks on the desktop and its intro opens (see G.1), greeting
+   you by name. In Home → Experts, Claude Code is listed (Welcome adds it when it is installed). Home
+   → Scout shows **Claude Code** and **Haiku (quick, recommended)**.
+4. **Action:** quit and start Tagalong again. **Expected:** Welcome does not open; one launch line
+   appears instead (G.2).
 
-Covers the OpenAI-compatible provider, the OpenRouter and Token Factory presets, per-pet models and
-vision routing (PR #22).
+### W.4. Welcome again
 
-**Before you start:** launch without `TAGALONG_FAKE_PROVIDERS` (`pnpm dev:desktop`), then open
-Settings from the tray.
+1. **Action:** Home → Settings → Advanced → **Open Welcome again**.
+2. **Expected:** Welcome opens again; **Start** finishes it as in W.3.
 
-### H1. OpenRouter key and live model list
+## Scout's brain
 
-1. **Setup:** an OpenRouter API key.
-2. **Action:** paste it into **OpenRouter API key**, click Save, close and reopen Settings.
-3. **Expected:** the key box says "one is stored"; Scout's note says "N models from OpenRouter". If
-   it says "Built-in list", the key or base URL was refused — stop and fix that first.
+### H1. A key and the live model list
 
-### H2. OpenRouter + Claude: text
+1. **Setup:** an OpenRouter key.
+2. **Action:** Home → Settings → Advanced → API keys → OpenRouter → **Add key**, paste, Save. Open
+   Home's **Scout** page and pick OpenRouter.
+3. **Expected:** the key row says **Key stored**. The **Model** list holds OpenRouter's live models
+   (hundreds of ids), not a handful of built-in ones.
 
-1. **Setup:** Scout's **Provider** is OpenRouter, **Model ID** is a Claude id taken from the live
-   list, **Vision model ID** is empty. Saved.
+### H2. Text
+
+1. **Setup:** Scout on the default configuration.
 2. **Action:** press `Ctrl+Shift+Space` and ask a question.
-3. **Expected:** the answer streams and ends with no error.
+3. **Expected:** the answer streams into the bubble and ends with no error.
 
-### H3. OpenRouter + Claude: look
+### H3. Look
 
 1. **Setup:** as H2.
 2. **Action:** click Scout and ask "what is on my screen?".
-3. **Expected:** Scout calls `look_at_screen`; the answer describes the screen, with **no** "cannot
-   see images" warning.
+3. **Expected:** Scout looks (a capture shows on Scout and in the tray tooltip) and describes the
+   screen, with **no** "cannot see images" warning.
 
-### H4. OpenRouter + Claude: an image inside a tool result
+### H4. What do you see?
 
-1. **Setup:** as H2.
-2. **Action:** click Scout and ask it to zoom in on something small on your screen.
-3. **Expected:** Scout calls `look_closer`; the tool result shows as "1 image"; the answer describes
-   the zoomed detail.
-
-### H5. OpenRouter + Claude: a tool without an image
-
-1. **Setup:** as H2.
-2. **Action:** with windows on two screens and one minimized, ask "What do you see?".
-3. **Expected:** Scout calls `list_windows` only (no screenshot, no `read_window_text`) and answers
-   briefly per screen, numbered as the composite labels them, then what is minimized, for example
-   "Screen 1: VS Code on engine.ts, Chrome behind it. Screen 2: Slack. Minimized: Outlook."
+1. **Setup:** windows on two screens, one minimized.
+2. **Action:** ask "What do you see?".
+3. **Expected:** a short answer per screen, numbered as Windows numbers them, then what is
+   minimized, for example "Screen 1: VS Code on engine.ts, Chrome behind it. Screen 2: Slack.
+   Minimized: Outlook." No screenshot is taken.
 4. **Action:** ask "can you read the task in Chrome?".
-5. **Expected:** Scout calls `read_window_text` on that one window and answers from its text.
-
-### H6. Token Factory + Nemotron
-
-_Not the default configuration: this step uses Nebius Token Factory._
-
-1. **Setup:** paste a key into **Token Factory API key**, Save, reopen Settings; the note
-   says "models from Token Factory". Set Scout's **Provider** to Token Factory, **Model ID** to
-   `nvidia/nemotron-3-super-120b-a12b`, **Vision model ID** to the Nemotron Nano 2 VL id from the
-   live list (if it is not `nvidia/Nemotron-Nano-V2-12b`, correct `NEMOTRON_VISION_MODEL`). Save.
-2. **Action:** (a) `Ctrl+Shift+Space` with a question; (b) "what is on my screen?"; (c) ask to
-   zoom in on something small; (d) clear the vision model id, save, ask (b) again.
-3. **Expected:** (a) answered by Super; (b) answered with no warning, the request goes to Nano VL
-   (check the Token Factory usage page); (c) the turn starts on Super and continues on Nano VL after
-   `look_closer`; (d) the "Scout cannot see images" warning and a text-only answer.
-
-### H7. Settings edge cases
-
-1. **Setup:** Settings open.
-2. **Action:** (a) enter a bad base URL such as `openrouter.ai` and save; (b) blank the box and save;
-   (c) remove the key (clear the box, Save) and ask.
-3. **Expected:** (a) refused on save with a message naming the service; (b) back to the default;
-   (c) the turn error "No … API key is stored. Add one in Settings." and the app keeps running.
-
-## Phase 6: Browser Host
-
-Covers the Chrome extension: build and load, pairing, the side panel, exact selections and page
-text, the shortcut, the desktop hotkey in Chrome, disconnect and recovery, and the opt-in to read
-any tab.
-
-**Before you start:**
-
-- Windows with Chrome 116 or newer, and the desktop app running (installed, or `pnpm dev:desktop`)
-  with the [test configuration](#openrouter--claude-the-default-for-this-guide).
-- A long article open in a Chrome tab — for example a Wikipedia article — referred to below as
-  _the article_.
-- In the desktop app's Settings, the capture exclusion list includes the title pattern `*Bank*`
-  (used in 6.12; remove it afterwards if you do not want it).
-
-### 6.1. Build and load the unpacked extension
-
-1. **Setup:** a checkout with dependencies installed (`pnpm install`).
-2. **Action:** run `pnpm --filter @tagalong/extension build`. In Chrome open `chrome://extensions`,
-   switch on **Developer mode**, click **Load unpacked**, choose `apps/extension/dist`. Pin Tagalong
-   from the puzzle-piece menu.
-3. **Expected:** the build ends without errors and `apps/extension/dist` holds `manifest.json`,
-   `service-worker.js`, `sidepanel.html`, `options.html` and `page-reader.js`. The Tagalong card shows
-   no errors, and a new tab opens with the options page ("Pair Tagalong with this browser"). Its
-   connection line says "Not paired. …".
-
-### 6.2. Refuse a bad token
-
-1. **Setup:** the options page from 6.1.
-2. **Action:** type `hello` into **Pairing token** and click **Save and connect**.
-3. **Expected:** "That is not a pairing token. Copy the 64-character token from Tagalong Settings."
-   The connection line still says "Not paired".
-
-### 6.3. Pair
-
-1. **Setup:** the desktop app running.
-2. **Action:** in the desktop app, tray → **Settings** → **Browser extension** → **Copy token**.
-   (The button changes to "Copied".) Paste into the options page and click **Save and connect**. Leave
-   the port empty.
-3. **Expected:** within two seconds the connection line reads "Connected to Tagalong <version>."
-
-### 6.4. The side panel shows Scout
-
-1. **Setup:** paired (6.3); the article tab in front.
-2. **Action:** click the Tagalong toolbar button.
-3. **Expected:** the side panel opens. Its header says "Connected to Tagalong …"; there is no pet
-   picker, and questions go to Scout. The sight bar says "Seeing" and names `page "<article title>"`.
-
-### 6.5. Ask about the whole page with nothing selected
-
-1. **Setup:** 6.4, with nothing selected on the article.
-2. **Action:** in the side panel ask "Summarise this page in three bullet points."
-3. **Expected:** the answer streams into the panel and summarises **the article's** content — not a
-   generic answer, not "I can't see the page". No screenshot is involved: the sight bar shows no
-   thumbnail, and the panel's Look button reads **Read this page**, not "Look at screen".
-
-### 6.6. Exact selection with the extension shortcut
-
-1. **Setup:** close the side panel. On the article, select one sentence that contains punctuation or
-   quotes.
-2. **Action:** press `Alt+Shift+Space`.
-3. **Expected:** the side panel opens; the sight bar shows "Seeing", the selection's character count
-   and `page "<article title>"`. Ask "Quote back exactly what I selected." The answer contains the
-   sentence exactly as you selected it.
-
-### 6.7. Shortcut is listed and rebindable
-
-1. **Setup:** none.
-2. **Action:** open `chrome://extensions/shortcuts`.
-3. **Expected:** Tagalong lists "Open Tagalong with the selection attached" bound to
-   `Alt+Shift+Space`. (`Ctrl+Shift+Space` is the desktop app's global hotkey and is deliberately not
-   used here.)
-
-### 6.8. The desktop hotkey in Chrome gets the exact selection and the page
-
-1. **Setup:** on the options page, click **Allow reading any tab when I ask** and accept Chrome's
-   prompt; the line after the button reads "On." Open a **new** tab with a different article, select a
-   sentence, and leave Chrome in front.
-2. **Action:** press the desktop hotkey `Ctrl+Shift+Space` and ask "What did I select, and what is
-   this page about?".
-3. **Expected:** the desktop panel opens as usual. The answer quotes the selection exactly and
-   describes the page — evidence the engine used the extension's page text, which the desktop host
-   cannot read on its own.
-
-### 6.9. The desktop hotkey falls back when the extension cannot read the tab
-
-1. **Setup:** on the options page click **Stop reading other tabs** (the line reads "Off."). Open a
-   new tab, load a page, select a sentence — do **not** click the toolbar button on this tab.
-2. **Action:** press `Ctrl+Shift+Space` and ask "What did I select?".
-3. **Expected:** the answer still quotes the selection (from the desktop's clipboard read), arrives
-   without a noticeable delay, and shows no error. The page text is not used.
-
-### 6.10. Quit the desktop app: the panel shows disconnected
-
-1. **Setup:** the side panel open with at least one question and answer in it.
-2. **Action:** quit the desktop app from the tray.
-3. **Expected:** within a few seconds the header turns red and reads "Disconnected: could not reach
-   the Tagalong app. Retrying in Ns. Is the Tagalong app running?". The earlier conversation stays on
-   screen. Sending a message now shows "not connected to the Tagalong app …" in the chat instead of
-   hanging.
-
-### 6.11. The panel recovers when the app returns
-
-1. **Setup:** 6.10.
-2. **Action:** start the desktop app again and wait.
-3. **Expected:** within about 30 seconds (usually one or two) the header reads "Connected to
-   Tagalong …" again, without reloading the panel. A new question is answered.
-
-### 6.12. Exclusions apply to browser tabs
-
-1. **Setup:** the `*Bank*` title pattern in the exclusion list; any page whose tab title contains
-   "Bank", with a sentence selected; the all-tabs opt-in from 6.8 **On**.
-2. **Action:** press `Ctrl+Shift+Space` and ask "What did I select?".
-3. **Expected:** the desktop reports capture is blocked for this window; the answer does not contain
-   the selected sentence or the page's text.
-4. **Action:** on the same tab open the side panel and ask "What does this page say?".
-5. **Expected:** the answer does not contain the page's text: the engine strips a side-panel ask made
-   on an excluded tab down to the browser's name before the pet sees it.
-6. **Action:** ask "What is the title of this tab?".
-7. **Expected:** Scout cannot say: neither the desktop nor the side panel sends a blocked window's
-   title, only the app's name.
-
-### 6.13. Pages Chrome does not let extensions read
-
-1. **Setup:** the side panel open.
-2. **Action:** switch to a `chrome://settings` tab, then click **Read this page**.
-3. **Expected:** the sight bar says "Capture did not work" (switching tabs first clears the previous
-   page from the chip). Nothing from the previous page is attached to the next ask.
-
-### 6.14. A wrong token is rejected
-
-1. **Setup:** paired and connected.
-2. **Action:** on the options page, replace the token with 64 `f` characters and click **Save and
-   connect**.
-3. **Expected:** the connection line reads "The Tagalong app rejected the pairing token. Paste the
-   current one." and the side panel header shows the same with a **Pair with the Tagalong app**
-   button. Paste the real token again to recover.
-
-## Phase 4: Memory
-
-Covers memory and recall, and conversation summaries. Phase 4 also built a crew (more pets, `@Name`
-hand-offs, `ask_pet` consults and `/crew` roundtables); the crew has been removed, and so have its
-tests.
-
-**Test configuration.** [OpenRouter + Claude](#openrouter--claude-the-default-for-this-guide).
-
-**Before you start:**
-
-1. Quit Tagalong. Rename `%APPDATA%\Tagalong` to `Tagalong.before-phase-4` so the app starts as a
-   fresh install (rename it back afterwards to keep your old history).
-2. Launch with `pnpm dev:desktop` (no `TAGALONG_FAKE_PROVIDERS`).
-
-### 4.1. A stated preference survives a restart _(acceptance 4)_
-
-1. **Setup:** panel open on Scout.
-2. **Action:** say "I prefer short answers." Wait for the reply. Quit Tagalong from the tray and
-   launch it again. Open the panel on Scout and ask "Explain how DNS works."
-3. **Expected:** the DNS answer is noticeably short (a few sentences, no long lists).
-
-### 4.2. Long conversations are folded into a summary
-
-1. **Setup:** a tool that opens SQLite (`sqlite3`, or DB Browser for SQLite).
-2. **Action:** in one Scout conversation, exchange at least **10** questions and answers (20 messages)
-   about one topic. Wait ten seconds after the tenth answer. Open `%APPDATA%\Tagalong\tagalong.db` and
-   run `SELECT kind, text FROM memories WHERE kind = 'summary';` and
-   `SELECT COUNT(*) FROM messages WHERE summarized_at IS NOT NULL;`.
-3. **Expected:** one `summary` row describing the topic, and **16** summarised messages. Ask Scout a
-   follow-up that depends on the start of the conversation: it still answers correctly (recall
-   carries the summary).
-
-### 4.3. Choose a different summarizer
-
-1. **Setup:** Settings open, an OpenRouter key stored, Claude Code installed and signed in.
-2. **Action:** open **Advanced**, then the **Summarize with** list.
-3. **Expected:** the list starts with **Same as Scout (default)**, then a **Claude sign-in** group
-   with **Haiku** and **Sonnet** (no Opus), then an **OpenRouter** group with its live models.
-   Services with no key are not listed. Pick `anthropic/claude-haiku-4.5` and Save: "Saved. Scout uses
-   it from the next ask." Reopen Settings: the choice is still selected. Pick **Same as Scout** and
-   Save to go back.
-
-## Phase 3B: Awareness
-
-Covers rolling memory and its recording dot, `recall_screen` and `what_changed`, watch mode with its
-Watching chip, the watch check model, the Awareness settings, and the image token estimate in the
-sight bar (tasks 87, 81, 88, 82, 89, 85, 90).
-
-**Test configuration.** [OpenRouter + Claude](#openrouter--claude-the-default-for-this-guide). Test 3B.16 runs a
-watch on **Nebius Token Factory with Nemotron 3 Nano** as the check model. Voice (Phase 3) is not built,
-so a watch that fires is **shown, not spoken** — every "spoken" expectation in the phase page is checked
-as a card, a toast and an avatar alert.
-
-**Before you start:**
-
-1. Launch with `pnpm dev:desktop` (no `TAGALONG_FAKE_PROVIDERS`). You need a Windows desktop with a
-   terminal (Windows Terminal or `cmd`) and a browser.
-2. Open Settings from the tray. Store your **OpenRouter API key**, then set **Scout** to **Provider**
-   OpenRouter, **Model id** a Claude id from the live list (for example `anthropic/claude-sonnet-5`),
-   **Vision model id** empty, and **Watch check model** empty. Click Save.
-3. Keep `%APPDATA%\Tagalong` open in Explorer: several tests check that nothing new is written there.
-
-### 3B.1. The Awareness settings and their defaults
-
-1. **Setup:** Settings open.
-2. **Action:** scroll to **Awareness**, then to Scout's section.
-3. **Expected:**
-   - **Rolling memory** is unticked, **Minutes to remember** is 10, **Checks per watch** 60,
-     **Watches at once** 3, **Watch timeout** 30.
-   - Scout's **Watch check model** box is empty and its grey placeholder reads
-     `anthropic/claude-haiku-4.5`; the note under it names OpenRouter's default.
-   - Switching Scout's **Provider** to Token Factory (do not save) changes the placeholder to
-     `nvidia/nemotron-3-nano-30b-a3b`. Switch it back.
-
-### 3B.2. Turning rolling memory on shows the red dot, without a restart
-
-1. **Setup:** 3B.1; the desktop avatars visible.
-2. **Action:** tick **Rolling memory**, click Save. Do not restart.
-3. **Expected:** within a second every pet avatar shows a **small red dot** in its bottom-left corner.
-   Hovering an avatar's label says it is recording the screen. No new file appears in
-   `%APPDATA%\Tagalong` (only `tagalong.db`, `settings.json`, `secrets.json`, `pairing.token` and the
-   logs that were there before).
-
-### 3B.3. "What was I reading five minutes ago?" _(acceptance 1)_
-
-1. **Setup:** rolling memory on (3B.2). In the browser, open a page with a distinctive title — for
-   example the Wikipedia article "Transformer (deep learning architecture)" — and leave it in front for
-   one minute. Then switch to a different app (Notepad, say) and wait **five minutes**.
-2. **Action:** press `Ctrl+Shift+Space`, ask Scout: `what was I reading five minutes ago?`
-3. **Expected:**
-   - The panel shows a `recall_screen` tool row (with "1 image" or "2 images" as its summary).
-   - The answer names the Wikipedia article (title or content), and **states a time** — a clock time or
-     "about five minutes ago" — rather than describing it as what is on screen now.
-   - It does not describe Notepad as what you were reading.
-
-### 3B.4. Asking further back than memory reaches
-
-1. **Setup:** rolling memory on; set **Minutes to remember** to **1**, Save (no restart). Wait 90 s.
-2. **Action:** ask Scout: `what was on my screen ten minutes ago?`
-3. **Expected:** the answer says memory only reaches back about a minute and describes the oldest
-   moment it has, with its time. It does not invent a ten-minute-old screen. Set the minutes back to
-   **10** and Save.
-
-### 3B.5. Rolling memory off
-
-1. **Setup:** in Settings → Privacy switch **Remember the last few minutes of the screen** off, Save.
-2. **Action:** confirm the red dot is gone from every avatar, then ask Scout:
-   `what was I doing two minutes ago?`
-3. **Expected:** the dot disappeared on save. The answer says rolling memory is off and that it can be
-   turned on in Settings under Privacy. Switch **Remember the last few minutes of the screen** on
-   again and Save before continuing.
-
-### 3B.6. What changed on screen
-
-1. **Setup:** rolling memory on for at least two minutes. Leave a terminal in front showing a prompt.
-2. **Action:** in the terminal run `echo the quick brown fox`, then ask Scout:
-   `what changed on my main screen in the last minute?` (if Scout asks which display, answer "1" or
-   tell it to list the displays).
-3. **Expected:** the panel shows a `what_changed` tool row (summary "2 images"). The answer mentions
-   the new terminal line and names the two times it compared. Asking the same about a screen you did
-   not touch answers that nothing changed.
-
-### 3B.7. Excluded apps are never recorded
-
-1. **Setup:** rolling memory on. A password manager on the exclusion list installed (KeePass,
-   Bitwarden or 1Password — any of the defaults), or add `notepad.exe` to the exclusion list in
-   `settings.json` and restart.
-2. **Action:** bring the excluded app to the front for **30 seconds**, with something recognisable in
-   it. Then switch away and ask Scout: `what was on my screen 15 seconds ago?`
-3. **Expected:** the answer does not describe the excluded app's contents. It either describes an
-   older moment (with its time) or another display, or says nothing was recorded for that moment.
-
-### 3B.8. Pause stops recording and clears it _(acceptance 3)_
-
-1. **Setup:** rolling memory on for at least a minute; red dots visible.
-2. **Action:** press the pause hotkey `Ctrl+Shift+Alt+P`. Then ask Scout:
-   `what was on my screen thirty seconds ago?`
-3. **Expected:** the red dots **disappear** and the grey paused eye appears. The answer says nothing is
-   remembered — memory starts empty after a pause — and does not describe the screen from before the
-   pause.
-4. **Action:** press `Ctrl+Shift+Alt+P` again, wait 10 seconds, ask the same question.
-5. **Expected:** the red dots **come back**. The answer describes only the last few seconds since the
-   resume, and says memory does not reach back thirty seconds.
-
-### 3B.9. Quit and restart: the buffer is empty _(acceptance 4)_
-
-1. **Setup:** rolling memory on for at least two minutes.
-2. **Action:** quit Tagalong from the tray. Check `%APPDATA%\Tagalong`: no new frame or image file is
-   there. Start it again, wait 10 seconds, and ask Scout: `what was I doing five minutes ago?`
-3. **Expected:** no image files on disk. After the restart the answer says memory only reaches back
-   a few seconds (since the app started) — nothing from before the restart. The red dots are back
-   because the setting is still on.
-
-### 3B.10. Watch a long command finish _(acceptance 2, text only)_
-
-1. **Setup:** Scout on OpenRouter + Claude, **Watch check model** empty (so checks run on
-   `anthropic/claude-haiku-4.5`). Open `cmd` and keep it on your main screen.
-2. **Action:** in `cmd`, run `ping -n 45 127.0.0.1 && echo BUILD DONE` (about 45 seconds). While it
-   runs, press `Ctrl+Shift+Space` and ask Scout: `tell me when this command finishes`.
-3. **Expected:**
-   - Scout replies briefly that it is watching. A blue **Watching** chip appears in the panel:
-     `Watching Scout: "…finishes" … 0/60 checks · anthropic/claude-haiku-4.5` with a **Stop** button.
-     Scout's avatar shows a ⏱ mark.
-   - While ping prints a line every second the check count stays at or near **0**: the screen keeps
-     changing, so no check is made.
-   - Within **10 seconds** of `BUILD DONE` appearing: a card from Scout with an ⏰ heading
-     ("watching for …") and a one-sentence reason, a Windows notification "Tagalong — a watch fired",
-     a red **!** on Scout's avatar, and the chip disappears. The panel comes up if it was hidden.
-   - The chip's count before it vanished was a **handful** (1–3), not dozens.
-   - Nothing is spoken (Phase 3 is not built).
-4. **Action:** click Scout's avatar. **Expected:** the red **!** goes away.
-
-### 3B.11. Stop a watch
-
-1. **Setup:** start a watch as in 3B.10 with a command that never ends: `ping -t 127.0.0.1`.
-2. **Action:** click **Stop** on the Watching chip. Then press `Ctrl+C` in `cmd`.
-3. **Expected:** the chip disappears at once and no card appears afterwards — stopping is final. The
-   ⏱ mark on Scout's avatar goes.
-
-### 3B.12. At most three watches at once
-
-1. **Setup:** three terminals each running `ping -t 127.0.0.1`.
-2. **Action:** ask Scout to watch each one ("tell me when this stops"), one after another, then a
-   fourth time.
-3. **Expected:** three Watching chips. The fourth request is refused: Scout says it is already watching
-   three things, the most at once, and that one can be stopped from its chip. Stop all three.
-
-### 3B.13. A watch times out
-
-1. **Setup:** `ping -t 127.0.0.1` running.
-2. **Action:** ask Scout: `watch this terminal for the word FINISHED, but give up after one minute`.
-3. **Expected:** a chip appears. About a minute later it disappears and the panel shows a grey line
-   saying nothing matched before the timeout. No card, no notification.
-
-### 3B.14. A watch that runs out of checks
-
-1. **Setup:** in Settings set **Checks per watch** to **2**, Save (no restart). In `cmd` run
-   `for /l %i in (1,1,50) do @(echo step %i & timeout /t 12 >nul)` — a line every 12 s.
-2. **Action:** ask Scout: `tell me when this prints step 99`.
-3. **Expected:** the chip counts `1/2`, then `2/2` checks as lines appear, then disappears with a line
-   saying it checked 2 times without seeing it. Set **Checks per watch** back to **60**.
-
-### 3B.15. A per-pet watch check model
-
-1. **Setup:** Settings, Scout's **Watch check model**: type `anthropic/claude-haiku-4.5` explicitly
-   (or another small model from the list). Save.
-2. **Action:** reopen Settings; then start a watch as in 3B.10.
-3. **Expected:** the box still holds the model you typed. The Watching chip names that model. Clear the
-   box and Save: the placeholder default is used again on the next watch.
-
-### 3B.16. A watch on Token Factory with Nemotron 3 Nano as the check model _(hackathon demo)_
-
-_This test changes the test configuration on purpose._
-
-1. **Setup:** store a **Token Factory API key** (Settings, Save). Set Scout to **Provider**
-   Token Factory, **Model id** `nvidia/nemotron-3-super-120b-a12b`, **Vision model id**
-   `nvidia/Nemotron-Nano-V2-12b`, **Watch check model** empty. Confirm that
-   `nvidia/nemotron-3-nano-30b-a3b` appears in the live model list Scout's note mentions; if Token
-   Factory names Nemotron 3 Nano differently, type the listed id into **Watch check model** and note
-   the difference in Notion Issues. Click Save.
-2. **Action:** in `cmd` run `ping -n 45 127.0.0.1 && echo BUILD DONE`, keep that window in front, and
-   ask Scout: `tell me when this command finishes`.
-3. **Expected:**
-   - The Watching chip names **`nvidia/nemotron-3-nano-30b-a3b`** as the check model.
-   - Within 10 seconds of `BUILD DONE`, the card, notification and avatar alert of 3B.10 appear, with
-     a reason that quotes or describes the terminal's last line — Nano read the terminal's text, since
-     it cannot see pictures.
-   - In the Token Factory usage page, the watch's calls are on Nemotron 3 Nano (a handful), not on
-     Nemotron 3 Super.
-   - If `cmd` publishes no text to the accessibility tree on your machine, the check falls back to a
-     picture on `nvidia/Nemotron-Nano-V2-12b`; the watch still fires. Note which one happened.
-
-### 3B.17. Estimated image tokens in the sight bar
-
-1. **Setup:** any pet; the panel closed.
-2. **Action:** press `Ctrl+Shift+Space` (no picture), then press **Look at screen** in the sight bar,
-   reading the sight bar each time.
-3. **Expected:** no token estimate with the key alone. After **Look at screen** the bar shows
-   `~N image tokens` where N is about width × height ÷ 750 of the screenshot named beside it (a
-   1568×882 shot shows about 1,844).
-
-## Phase 7: onboarding and installer
-
-Covers the setup wizard (task 69) and the Windows installer (task 71). The wizard tests run from
-source or installed; 7.12 onward need the installer.
-
-**Test configuration.** [OpenRouter + Claude](#openrouter--claude-the-default-for-this-guide), plus a
-Token Factory key for 7.6.
-
-**Before you start:** quit Tagalong and rename `%APPDATA%\Tagalong` to `Tagalong.before-phase-7`, so
-the next start is a fresh install. Rename it back at the end to keep your history.
-
-### 7.1. The wizard opens on a fresh install
-
-1. **Setup:** the fresh profile.
-2. **Action:** start Tagalong (`pnpm dev:desktop`, or the installed app).
-3. **Expected:** a window titled **Welcome to Tagalong** opens in the middle of the screen, reading
-   "Step 1 of 7". The pets and the tray icon are there behind it.
-
-### 7.2. Welcome states what Tagalong does and the privacy promise
-
-1. **Setup:** 7.1.
-2. **Action:** read the first step.
-3. **Expected:** a paragraph on what Tagalong does, then **The privacy promise** with six points:
-   nothing read until you ask, screenshots not written to disk, password managers never captured, keys
-   in the OS keychain, requests only to the chosen provider, one key pauses sight. Buttons: **Skip
-   setup** and **Next**.
-
-### 7.3. The provider step will not continue without a key
-
-1. **Setup:** click **Next**.
-2. **Action:** with every key box empty, click **Next**. Then click **Get an API key from OpenRouter**.
-3. **Expected:** three cards — OpenRouter, Nebius Token Factory, Anthropic — each with a key box and a
-   **Get an API key from …** button. **Next** shows the red line "Paste an API key for at least one provider, or
-   press Skip setup…" and stays on the step. **Get an API key from OpenRouter** opens
-   `https://openrouter.ai/keys` in your default browser, not inside Tagalong.
-
-### 7.4. A pasted key fills the crew step with the live model list
-
-1. **Setup:** 7.3.
-2. **Action:** select the **OpenRouter** radio, paste your OpenRouter key, click **Next**.
-3. **Expected:** "Step 3 of 7 — Meet your crew" with three sections — 🔎 Scout, ✒️ Ink, ⚡ Bolt — each
-   with **Provider** OpenRouter and a Claude model id already filled in (`anthropic/claude-sonnet-5`
-   for Scout and Ink, `anthropic/claude-haiku-4.5` for Bolt). The note under each says "N models from
-   OpenRouter" (N in the hundreds), and the model box offers them as you type.
-
-### 7.5. The crew picks are saved
-
-1. **Setup:** 7.4.
-2. **Action:** change Bolt's model to another Claude id from the list. Click **Next**. Open Settings
-   from the tray.
-3. **Expected:** the wizard moves on with no error. Settings shows Scout, Ink and Bolt on OpenRouter
-   with the models from the crew step, and every **Vision model id** empty. The OpenRouter key box says
-   "one is stored".
-
-### 7.6. A Nemotron pet gets its vision model automatically _(hackathon demo)_
-
-1. **Setup:** in the wizard, click **Back** to the provider step.
-2. **Action:** paste a Token Factory key too, click **Next**. On the crew step set Scout to **Nebius
-   Token Factory**: the model fills in as `nvidia/nemotron-3-super-120b-a12b`. Set Bolt to Token Factory
-   (`nvidia/Nemotron-Nano-V2-12b`). Leave Ink on OpenRouter. Click **Next**, then open Settings.
-3. **Expected:** the crew step's notes say "N models from Token Factory" for Scout and Bolt. Settings
-   shows Scout with **Vision model id** `nvidia/Nemotron-Nano-V2-12b` (set by the wizard), Bolt with an
-   empty vision model (its model already sees), and Ink unchanged.
-
-### 7.7. The hotkeys step matches Settings
-
-1. **Setup:** the wizard on "Three keys to remember".
-2. **Action:** compare it with the hotkey boxes in Settings.
-3. **Expected:** two keys — `Ctrl + Shift + Space` (Ask) and `Ctrl + Shift + Alt + P` (Pause
-   sight) — the same as Settings. If you rebound a key earlier, the wizard shows
-   your binding.
-
-### 7.8. Rolling memory from the wizard
-
-1. **Setup:** the wizard on "Rolling memory (optional)".
-2. **Action:** tick **Turn on rolling memory**, set minutes to `5`, click **Next**. Then go **Back**,
-   set minutes to `0`, click **Next**.
-3. **Expected:** after the first **Next** a small red dot appears on every pet within a second, and
-   Settings → Awareness shows rolling memory on with 5 minutes. The second **Next** is refused with
-   "Rolling memory keeps between 1 and 30 minutes." Set it back to 5 (or untick it) to continue.
-
-### 7.9. The Chrome extension step
-
-1. **Setup:** the wizard on "Chrome extension (optional)".
-2. **Action:** read the folder named in step 2 and click **Show folder**. Click **Copy token**.
-3. **Expected:** installed: the folder is `…\Programs\Tagalong\resources\extension` and Explorer
-   opens on it, holding `manifest.json`. From source with the extension built: `apps\extension\dist`;
-   not built: the step says how to build it instead of naming a folder. The token matches **Settings →
-   Browser extension**. Loading that folder unpacked and pairing with the token works as in 6.1–6.3.
-
-### 7.10. A first answer without a terminal _(task 69 acceptance)_
-
-1. **Setup:** the wizard on "You are set". No restart since 7.1.
-2. **Action:** click **Ask Scout something**. Ask "What can you do?".
-3. **Expected:** the wizard closes, the panel opens beside the pets on Scout, and the answer streams
-   and completes, labelled with Scout's model. No error about a missing key, and no restart was needed
-   for the key pasted in 7.4.
-
-### 7.11. Skip, and the wizard does not come back by itself
-
-1. **Setup:** quit Tagalong, delete `%APPDATA%\Tagalong` again, start it.
-2. **Action:** click **Skip setup** on the first step. Quit and start Tagalong again.
-3. **Expected:** the wizard closes at once. On the next start it does not open. The pets are on the
-   fresh-install defaults (Scout and Bolt on Token Factory, Ink on OpenRouter).
-
-### 7.12. Rerun the wizard from the tray and from Settings
-
-1. **Setup:** 7.11 done, an OpenRouter key stored in Settings.
-2. **Action:** tray → **Setup wizard**. Go to the provider step and click **Next** without typing a key.
-   Close the wizard with the window's X. Then Settings → **Run the setup wizard again**.
-3. **Expected:** the wizard opens both times. The provider step lets you through because a key is
-   already stored ("stored — type to replace"). On the crew step, pets already on a provider with a key
-   keep their current model; the others move to your main provider. Closing with X keeps what earlier
-   steps saved.
-
-### 7.13. Build the Windows installer
-
-1. **Setup:** Windows with Node.js 22 and pnpm 10; a clean checkout of this branch; `pnpm install`.
-2. **Action:** `pnpm package:win` from the repository root.
-3. **Expected:** it ends without errors and `apps\desktop\release\Tagalong-Setup-0.0.0-x64.exe` exists
-   (about 125 MB). The log shows "fetching the get-windows binding for win32-x64" succeeding and
-   "skipped dependencies rebuild reason=npmRebuild is set to false". In
-   `apps\desktop\release\win-unpacked\resources` there are `app.asar`, `app.asar.unpacked` (holding
-   `better-sqlite3\prebuilds\win32-x64.node` and `get-windows\lib\binding\napi-9-win32-unknown-x64`)
-   and `extension`.
-
-### 7.14. Install on a fresh Windows machine _(Phase 7 acceptance 1)_
-
-1. **Setup:** a Windows machine or Windows Sandbox that has never run Tagalong, with no Node.js and no
-   terminal open. Copy the installer from 7.13 onto it.
-2. **Action:** double-click the installer. If SmartScreen appears, **More info → Run anyway**. Keep the
-   default install folder, finish, and complete the wizard with an OpenRouter key through 7.10.
-3. **Expected:** no administrator prompt. Tagalong installs to
-   `%LOCALAPPDATA%\Programs\Tagalong`, adds Start menu and desktop shortcuts, and starts when the
-   installer finishes. The wizard opens, and a first answer arrives — all without a terminal.
-
-### 7.15. Native modules work in the installed app _(task 71 acceptance)_
-
-1. **Setup:** the installed app from 7.14.
-2. **Action:** (a) ask Scout "remember that my favourite colour is teal", quit from the tray, start
-   Tagalong from the Start menu, ask "what is my favourite colour?". (b) Put Notepad beside a browser,
-   click into Notepad, press `Ctrl+Shift+Space` and ask "which app am I in? Take a screenshot".
-3. **Expected:** (a) "teal" — conversations and memories persist, so SQLite (`better-sqlite3`) loaded
-   from the packaged app. (b) The sight bar names Notepad and the screenshot is of the Notepad window,
-   not the whole screen — the active-window binding (`get-windows`) loaded. Selecting text and pressing
-   `Ctrl+Shift+Space` shows the selection, so the selection helper (`libnut`) loaded.
-
-### 7.16. Uninstall keeps your data; reinstall picks it up
-
-1. **Setup:** the installed app with a conversation in it.
-2. **Action:** quit Tagalong, uninstall it from **Settings → Apps**, then install it again.
-3. **Expected:** the uninstall removes the program folder and shortcuts but leaves
-   `%APPDATA%\Tagalong`. After reinstalling, the wizard does not open (it was finished), and the pets,
-   keys and history are as before.
+5. **Expected:** Scout reads that one window's text and answers from it.
+
+### H5. Token Factory + Nemotron
+
+_Not the default configuration._
+
+1. **Setup:** a Token Factory key stored; Scout on Token Factory with
+   `nvidia/nemotron-3-super-120b-a12b`.
+2. **Action:** (a) `Ctrl+Shift+Space` with a question; (b) "what is on my screen?".
+3. **Expected:** (a) answered by Nemotron 3 Super; (b) Scout says it cannot see images and answers
+   from the window list and text. Nothing breaks.
+
+### H6. Edge cases
+
+1. **Setup:** Home → Settings → Advanced → API keys.
+2. **Action:** (a) type `openrouter.ai` in OpenRouter's base URL box and Save; (b) blank it and Save;
+   (c) **Remove key** on OpenRouter with Scout on it, then ask.
+3. **Expected:** (a) refused with a message naming the service; (b) back to the default; (c) the
+   answer is the error "No OpenRouter API key is stored. Add one in Settings." and the app keeps
+   running.
+
+## Hand-offs to Claude Code
+
+### E.1. Scout briefs, you press Send
+
+1. **Setup:** Claude Code installed; it is listed and **On** in Home → Experts. A code file open in
+   an editor whose title names a project folder.
+2. **Action:** ask Scout "can you find why this test fails and fix it?".
+3. **Expected:** a hand-off card in the bubble: **Agent** Claude Code, **Project** (guessed from the
+   window, or **Choose the project to work in**), **Access** (**Reads only** until you press
+   **Allow edits**), and the **Brief**, which you can edit. Nothing runs until **Send**.
+4. **Action:** press **Cancel**. **Expected:** nothing runs.
+5. **Action:** ask again and press **Send**. **Expected:** the card shows Claude Code's steps; when
+   it finishes, Scout says "Claude Code has finished." and the answer shows in the bubble. Home →
+   Activity lists the hand-off with its thread.
+
+_Fake provider:_ the same flow runs with a scripted expert that "read the brief and has nothing to
+change".
 
 ## Settings
 
@@ -859,14 +342,10 @@ On by default. Not active under `TAGALONG_FAKE_PROVIDERS=1` unless `TAGALONG_KEE
 4. **Expected:** no further lines; the window list is no longer taken. The ⓘ note explains what is
    followed and when a window is read.
 
-### K.4b. Blind screens stay blind up close
+### K.4b. Paused sight is said plainly
 
-1. **Setup:** two monitors; 1Password (or any excluded app) open and visible on the second.
-2. **Action:** ask Scout to look closer at the second display (for example "zoom into the top left
-   of display 2").
-3. **Expected:** Scout says it could not crop that display; nothing from it is shown.
-4. **Action:** pause sight (`Ctrl+Shift+Alt+P`) and ask "look at my screen".
-5. **Expected:** Scout says sight is paused, not that the screen was empty.
+1. **Action:** pause sight (`Ctrl+Shift+Alt+P`) and ask "look at my screen".
+2. **Expected:** Scout says sight is paused, not that the screen was empty.
 
 ### K.5. Hand it over
 
@@ -904,13 +383,13 @@ voice model (about 90 MB) into `%APPDATA%\Tagalong\voice`; ElevenLabs (V.6) bill
    next press Escape.
 2. **Expected:** speech stops at once each time, and nothing queued is spoken afterwards.
 
-### V.4. The hello, an expert finishing and a watch
+### V.4. The hello, an expert finishing and a remark
 
 1. **Action:** finish Welcome and step through the intro with **Next**; restart Tagalong; hand a
-   task to Claude Code; start a watch ("tell me when this finishes").
+   task to Claude Code; cause a line from keeping an eye on things (K.1).
 2. **Expected:** each intro beat is spoken as it appears; the line on a later launch is spoken;
-   "Claude Code has finished." and the start of its answer are spoken; the watch's message is
-   spoken when it fires; a line from keeping an eye on things (K.1) is spoken, and its × stops it.
+   "Claude Code has finished." and the start of its answer are spoken; the K.1 line is spoken, and
+   its × stops it.
 
 ### V.5. Settings → Voice
 
@@ -996,29 +475,6 @@ downloads the speech model (about 80 MB) into `%APPDATA%\Tagalong\voice`. With
 3. **Action:** with the bubble open, pick another microphone and change your name in Settings;
    Save, then talk to Scout without restarting.
 4. **Expected:** the new microphone is used and Scout uses the new name.
-
-## Demo run: the hackathon story
-
-A short end-to-end run of the story the hackathon demo tells. Run it on the installed app, with an
-OpenRouter key and a Token Factory key at hand. Tick each line.
-
-- [ ] **Install and set up.** Install from the NSIS installer (7.14). In the wizard paste both keys;
-      crew: Scout on Token Factory `nvidia/nemotron-3-super-120b-a12b`, Bolt on Token Factory
-      `nvidia/Nemotron-Nano-V2-12b`, Ink on OpenRouter `anthropic/claude-sonnet-5`. Finish with **Ask
-      Scout something**.
-- [ ] **Nemotron on Token Factory.** Select a paragraph anywhere, press `Ctrl+Shift+Space`, ask Scout
-      to explain it. The answer is labelled `Scout · nvidia/nemotron-3-super-120b-a12b`.
-- [ ] **Vision routing.** Click Scout and ask "what is on my screen?". It describes
-      the screen with no "cannot see images" warning: Super handed the picture to Nemotron Nano 2 VL
-      (the Token Factory usage page shows the Nano VL call).
-- [ ] **Watch mode on Nemotron Nano.** In `cmd` run `ping -n 45 127.0.0.1 && echo BUILD DONE`, then ask
-      Scout "tell me when this command finishes". The Watching chip names
-      `nvidia/nemotron-3-nano-30b-a3b`; within ten seconds of `BUILD DONE` a card and a Windows
-      notification arrive after a handful of checks.
-- [ ] **Chrome.** In the side panel on an article, ask Scout "summarise this page". The summary is of
-      that article.
-- [ ] **Privacy.** Press `Ctrl+Shift+Alt+P`: the pets' eye turns grey and a look is refused. Press it
-      again to resume.
 
 ## Connections: your apps over MCP
 
@@ -1123,16 +579,19 @@ and Morning papers needs Claude Code installed and signed in.
 3. A routine **When Tagalong opens** runs once at each launch.
 4. **When an expert finishes**: hand Claude Code a task; when it finishes, the routine runs with its
    answer.
-5. **When a watch fires**: start a watch ("tell me when this finishes"); when it fires, the routine
-   runs. Even if its instruction says "watch for it again", the routine's turn cannot start a
-   watch, so it runs once per watch and never loops.
+5. **When a watch fires** can be saved, but Scout cannot start a watch in this build, so it is not
+   testable here.
 
 ### R5. Missed runs and quiet times
 
-1. Make a routine **Every day** at a time two minutes ahead, then put the PC to sleep for five
-   minutes. On waking, it runs once and its line says "(ran late)".
-2. Quit Tagalong before a routine's time and start it after: it runs once, late. Quit and start
-   again: it does not run again.
+A run counts as late only when it starts **more than five minutes** after its time
+(`LATE_AFTER_MS`); the scheduler looks every 15 seconds.
+
+1. Make a routine **Every day** at a time one minute ahead, then put the PC to sleep and wake it at
+   least **seven minutes** after that time. On waking, it runs once (within about 15 seconds) and its
+   line says "(ran late)". Woken sooner, it still runs once, without "(ran late)".
+2. Quit Tagalong before a routine's time and start it more than five minutes after: it runs once,
+   with "(ran late)". Quit and start again: it does not run again.
 3. Start a Teams or Zoom call, or a full-screen video, and **Run now**: nothing shows until the call
    or the full screen ends, then the line appears.
 
@@ -1159,17 +618,214 @@ and Morning papers needs Claude Code installed and signed in.
    that writes a file), confirm a hand-off to Claude Code there: the hook does not run, and none
    of your own MCP servers show up in the expert's steps.
 
+## Memory
+
+### M.1. A stated preference survives a restart
+
+1. **Setup:** the bubble open.
+2. **Action:** say "I prefer short answers." Wait for the reply. Quit Tagalong from the tray and
+   start it again. Ask "Explain how DNS works."
+3. **Expected:** the DNS answer is noticeably short (a few sentences, no long lists).
+
+### M.2. Long conversations are folded into a summary
+
+1. **Setup:** a tool that opens SQLite (`sqlite3`, or DB Browser for SQLite).
+2. **Action:** in one conversation, exchange at least **10** questions and answers (20 messages)
+   about one topic. Wait ten seconds after the tenth answer. Open `%APPDATA%\Tagalong\tagalong.db` and
+   run `SELECT kind, text FROM memories WHERE kind = 'summary';` and
+   `SELECT COUNT(*) FROM messages WHERE summarized_at IS NOT NULL;`.
+3. **Expected:** one `summary` row describing the topic, and **16** summarised messages. A
+   follow-up that depends on the start of the conversation is still answered correctly.
+
+### M.3. Choose a different summarizer
+
+1. **Setup:** an OpenRouter key stored, Claude Code installed and signed in.
+2. **Action:** Home → Settings → **Advanced** → **Summaries** → **Summarize with**.
+3. **Expected:** the list starts with **Same as Scout (default)**, then a Claude sign-in group with
+   Haiku and Sonnet (no Opus), then OpenRouter's live models. Services with no key are not listed.
+   Pick one and Save; reopen Settings: the choice is still selected. Pick **Same as Scout** and Save
+   to go back.
+
+## Screen memory
+
+Scout cannot recall from screen memory or start watches in this build (see
+[Not in this build](#not-in-this-build)); these steps check only the recording itself.
+
+### SM.1. The settings and their defaults
+
+1. **Action:** Home → Settings → Privacy, then Advanced → **Screen memory and watches**.
+2. **Expected:** **Remember the last few minutes of the screen** is **Off**. Under Advanced:
+   **Minutes of screen to remember** 10, **Checks per watch** 60, **Watches at once** 3, **Watch
+   gives up after (minutes)** 30.
+
+### SM.2. Turning it on shows the red dot, without a restart
+
+1. **Action:** switch **Remember the last few minutes of the screen** on, Save. Do not restart.
+2. **Expected:** within a second a **small red dot** shows on Scout; its label says it is recording
+   the screen. No new file appears in `%APPDATA%\Tagalong`.
+
+### SM.3. Pause and quit throw it away
+
+1. **Action:** press `Ctrl+Shift+Alt+P`. **Expected:** the red dot goes and a **Paused** mark shows.
+   Press it again: the dot comes back.
+2. **Action:** quit Tagalong and look in `%APPDATA%\Tagalong`. **Expected:** no frame or image file.
+3. **Action:** switch it off and Save. **Expected:** the dot goes on save.
+
+## The Chrome extension
+
+**Before you start:** Chrome 116 or newer, the desktop app running, and a long article open in a
+Chrome tab (for example a Wikipedia article), called _the article_ below. In Home → Settings →
+Privacy, add the title pattern `*Bank*` to your exclusions (used in X.12; remove it afterwards).
+
+### X.1. Build and load the unpacked extension
+
+1. **Setup:** a checkout with dependencies installed (`pnpm install`).
+2. **Action:** run `pnpm --filter @tagalong/extension build`. In Chrome open `chrome://extensions`,
+   switch on **Developer mode**, click **Load unpacked**, choose `apps/extension/dist`. Pin Tagalong.
+   (Installed app: load `%LOCALAPPDATA%\Programs\Tagalong\resources\extension` instead.)
+3. **Expected:** `apps/extension/dist` holds `manifest.json`, `service-worker.js`, `sidepanel.html`,
+   `options.html` and `page-reader.js`. The Tagalong card shows no errors, and a new tab opens with
+   the options page ("Pair Tagalong with this browser"), whose connection line says "Not paired. …".
+
+### X.2. Refuse a bad token
+
+1. **Action:** type `hello` into **Pairing token** and click **Save and connect**.
+2. **Expected:** "That is not a pairing token. Copy the 64-character token from Tagalong Settings."
+   The connection line still says "Not paired".
+
+### X.3. Pair
+
+1. **Action:** in Home → Settings → **Browser extension (optional)**, click **Copy** (it changes to
+   "Copied"). Paste into the options page and click **Save and connect**. Leave the port empty.
+2. **Expected:** within two seconds the connection line reads "Connected to Tagalong <version>."
+
+### X.4. The side panel shows Scout
+
+1. **Setup:** paired; the article tab in front.
+2. **Action:** click the Tagalong toolbar button.
+3. **Expected:** the side panel opens. Its header says "Connected to Tagalong …"; questions go to
+   Scout. The sight bar says "Seeing" and names `page "<article title>"`.
+
+### X.5. Ask about the whole page with nothing selected
+
+1. **Action:** in the side panel ask "Summarise this page in three bullet points."
+2. **Expected:** the answer summarises **the article**, not a generic answer. No screenshot is
+   involved, and the panel's look button reads **Read this page**.
+
+### X.6. Exact selection with the extension shortcut
+
+1. **Setup:** close the side panel. Select one sentence with punctuation or quotes on the article.
+2. **Action:** press `Alt+Shift+Space`, then ask "Quote back exactly what I selected."
+3. **Expected:** the side panel opens with the selection's character count and the page in the sight
+   bar; the answer contains the sentence exactly.
+
+### X.7. The shortcut is listed and rebindable
+
+1. **Action:** open `chrome://extensions/shortcuts`.
+2. **Expected:** "Open Tagalong with the selection attached" bound to `Alt+Shift+Space`.
+
+### X.8. The desktop hotkey in Chrome gets the exact selection and the page
+
+1. **Setup:** on the options page click **Allow reading any tab when I ask** and accept Chrome's
+   prompt ("On."). Open a **new** tab with another article, select a sentence, leave Chrome in front.
+2. **Action:** press `Ctrl+Shift+Space` and ask "What did I select, and what is this page about?".
+3. **Expected:** the desktop bubble opens as usual; the answer quotes the selection exactly and
+   describes the page.
+
+### X.9. The desktop hotkey falls back when the extension cannot read the tab
+
+1. **Setup:** click **Stop reading other tabs** ("Off."). Open a new tab, select a sentence; do
+   **not** click the toolbar button there.
+2. **Action:** press `Ctrl+Shift+Space` and ask "What did I select?".
+3. **Expected:** the answer still quotes the selection (from the desktop's clipboard read), with no
+   noticeable delay and no error.
+
+### X.10. Quit the desktop app: the panel shows disconnected
+
+1. **Setup:** the side panel open with a question and answer in it.
+2. **Action:** quit the desktop app from the tray.
+3. **Expected:** within a few seconds the header reads "Disconnected: could not reach the Tagalong
+   app. Retrying in Ns. Is the Tagalong app running?". The conversation stays. Sending now shows
+   "not connected to the Tagalong app …" instead of hanging.
+
+### X.11. The panel recovers when the app returns
+
+1. **Action:** start the desktop app again and wait.
+2. **Expected:** within about 30 seconds (usually one or two) the header reads "Connected to
+   Tagalong …" again, without reloading the panel.
+
+### X.12. Exclusions apply to browser tabs
+
+1. **Setup:** the `*Bank*` pattern; a tab whose title contains "Bank", a sentence selected; reading
+   any tab **On**.
+2. **Action:** press `Ctrl+Shift+Space` and ask "What did I select?".
+3. **Expected:** capture is blocked for this window; the answer has neither the selection nor the
+   page's text.
+4. **Action:** open the side panel on that tab and ask "What does this page say?", then "What is the
+   title of this tab?".
+5. **Expected:** neither answer contains the page's text or its title, only the browser's name.
+
+### X.13. Pages Chrome does not let extensions read
+
+1. **Action:** switch to a `chrome://settings` tab and click **Read this page**.
+2. **Expected:** the sight bar says "Capture did not work"; nothing from the previous page is
+   attached to the next ask.
+
+### X.14. A wrong token is rejected
+
+1. **Action:** on the options page, replace the token with 64 `f` characters, **Save and connect**.
+2. **Expected:** "The Tagalong app rejected the pairing token. Paste the current one." and the side
+   panel header shows the same with a **Pair with the Tagalong app** button. Paste the real token to
+   recover.
+
+## Installer
+
+### I.1. Build the Windows installer
+
+1. **Setup:** Windows with Node.js 22 and pnpm 10; a clean checkout; `pnpm install`.
+2. **Action:** `pnpm package:win` from the repository root.
+3. **Expected:** it ends without errors and `apps\desktop\release\Tagalong-Setup-0.0.0-x64.exe`
+   exists. In `apps\desktop\release\win-unpacked\resources` there are `app.asar`,
+   `app.asar.unpacked` (holding `better-sqlite3`'s and `get-windows`' Windows binaries) and
+   `extension`.
+
+### I.2. Install on a fresh Windows machine
+
+1. **Setup:** a Windows machine or Windows Sandbox that has never run Tagalong, with no Node.js.
+2. **Action:** run the installer (SmartScreen: **More info → Run anyway**), keep the default folder,
+   finish, and complete Welcome.
+3. **Expected:** no administrator prompt. Tagalong installs to `%LOCALAPPDATA%\Programs\Tagalong`,
+   adds Start menu and desktop shortcuts, starts when the installer finishes, opens Welcome, and a
+   first answer arrives — all without a terminal.
+
+### I.3. Native modules work in the installed app
+
+1. **Action:** (a) ask Scout "remember that my favourite colour is teal", quit, start from the Start
+   menu, ask "what is my favourite colour?". (b) Put Notepad beside a browser, click into Notepad,
+   select some text and press `Ctrl+Shift+Space`, then ask "which app am I in?".
+2. **Expected:** (a) "teal": SQLite (`better-sqlite3`) loaded. (b) The bubble names Notepad and
+   shows the selection: the active-window binding (`get-windows`) and the selection helper (`libnut`)
+   loaded.
+
+### I.4. Uninstall keeps your data; reinstall picks it up
+
+1. **Action:** quit Tagalong, uninstall it from Windows **Settings → Apps**, then install it again.
+2. **Expected:** the uninstall removes the program folder and shortcuts but leaves
+   `%APPDATA%\Tagalong`. After reinstalling, Welcome does not open, and keys and history are as
+   before.
+
 ## Not in this build
 
-These appear in the plan but are not built; do not test them here.
+Do not test these here.
 
-- **Cloud speech to text and a wizard step.** Talk to Scout turns speech into text on this
-  computer only (no ElevenLabs Scribe), and Welcome has no microphone or speaker step. A pet's reply
-  style and voice id save but change nothing; Scout's voice is set in Settings → Voice.
-- **Per-pet tool grants (Phase 5).** Connected apps work (see
-  [Connections](#connections-your-apps-over-mcp)), but there is no per-pet allow list and no
-  "always allow": every change asks.
-- **macOS and Linux platform code (tasks 67, 68).** The app stops at launch on both; the dmg, AppImage
-  and deb configs exist but are unverified.
-- **Cost dashboard (task 72).** The panel counts model calls per run and the sight bar estimates image
-  tokens, but there is no per-pet, per-day usage view or price table.
+- **Screen recall and watches for Scout.** `recall_screen`, `what_changed`, `watch_for` and
+  `look_closer` are built in the engine, but the Companion role does not list them, so "what was I
+  reading five minutes ago?" or "tell me when this finishes" does not work. A routine **When a watch
+  fires** can be saved but has nothing to fire it.
+- **A vision model for a text-only brain.** Home has no vision model field; Nemotron text models
+  drop pictures with a warning.
+- **Cloud speech to text and a microphone step in Welcome.** Speech is turned into text on this
+  computer only.
+- **"Always allow" for connected apps.** Every change asks.
+- **macOS and Linux.** The app stops at launch on both; their installer configs are unverified.
+- **Cost dashboard.** The side panel estimates image tokens, but there is no usage view.

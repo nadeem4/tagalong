@@ -64,7 +64,7 @@ desktop app and the Chrome extension run on it. It holds:
   confirm;
 - connected apps over MCP (Notion, GitHub, Linear, or any MCP server): reads run at once, every
   change waits for Allow once;
-- watches, and a local WebSocket server that speaks the JSON-RPC protocol defined in
+- routines, and a local WebSocket server that speaks the JSON-RPC protocol defined in
   `packages/protocol` (zod schemas).
 
 ```mermaid
@@ -151,12 +151,12 @@ app's own client is `apps/desktop/src/main/engine-client.ts`. Read
 | One companion, Scout, that hands work to experts (Claude Code) and brings the answer back                                              | Speech to text through ElevenLabs                                   |
 | Scout talks: answers read aloud in a calm British voice, made on this computer, or through ElevenLabs with your own key                |                                                                     |
 | Talk to Scout: hold a key, ask out loud, hear a short spoken answer; speech is turned into text on this computer                       |                                                                     |
-| Scout thinks through your Claude Code sign-in, or OpenRouter, Nebius Token Factory, Anthropic or an OpenAI-compatible service          | Per-pet tool grants (ask me, always allow)                          |
+| Scout thinks through your Claude Code sign-in, or OpenRouter, Nebius Token Factory, Anthropic or an OpenAI-compatible service          | An "always allow" for changes in connected apps                     |
 | Connections: Scout uses your apps over MCP (Notion, GitHub, Linear, Claude Code's servers); every change asks first                    |                                                                     |
 | Routines: Scout does things on its own, on a schedule or when something happens, and tells you in the bubble, aloud or by notification |                                                                     |
 | Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                                      | A cost dashboard                                                    |
-| Vision routing: a text-only Nemotron model reads pictures with Nemotron Nano 2 VL                                                      | Data export and delete-all in Settings                              |
-| Memory across restarts, rolling screen memory (opt-in), watches ("tell me when this finishes")                                         | Code signing (the installer is unsigned) and an app icon of its own |
+| Vision routing in the engine: a text-only model hands pictures to a vision model it names (Home sets none yet)                         | Data export and delete-all in Settings                              |
+| Memory across restarts, rolling screen memory (opt-in; Scout cannot recall from it or start watches yet)                               | Code signing (the installer is unsigned) and an app icon of its own |
 | The Chrome extension: Scout in Chrome's side panel, reading the page you are on                                                        |                                                                     |
 
 # Using Tagalong
@@ -220,7 +220,7 @@ one window when you settle on it or its title reads like trouble, and most of th
 nothing. **Not now** on the line quiets it for an hour; when it offers help, **Hand it over** opens
 the hand-off card, and nothing is sent until you press **Send**. See [Privacy](#privacy).
 **Scout talks.** Scout reads its answers aloud, so you can look away: the answer, its hello, a
-line it says on its own, a watch that fires and an expert that finished. It never reads code, lists or long text; it says the
+line it says on its own, a routine's result and an expert that finished. It never reads code, lists or long text; it says the
 first sentence or two and "The rest is in the bubble." Bars beside the × show while it speaks;
 click them, close the bubble or press `Ctrl+Shift+Alt+M` to stop it at once. The voice is
 Kokoro, made on this computer: the first time Scout speaks it downloads the voice model (about
@@ -237,9 +237,8 @@ Whisper model downloaded the first time (about 80 MB); the recording is never se
 
 **Memory.** Tell Scout "I prefer short answers" and it remembers across restarts.
 
-Earlier versions shipped a crew of three (Scout, Ink and Bolt) with hand-offs between pets and
-roundtables. The crew is gone: Ink and Bolt are removed on upgrade, their conversations stay on disk,
-and Scout hands work to experts instead.
+Upgrading from an earlier build removes its other companions, Ink and Bolt; their conversations
+stay on disk.
 
 ## Hotkeys
 
@@ -332,9 +331,9 @@ API keys**, encrypted with the OS keychain, and only ever sent to the provider t
 If Scout answers "model not found", open Settings and pick the id from the live list next to the
 model box: it is the authority.
 
-**Pictures on a text-only model.** Nemotron 3 Super cannot see. On it, Scout gets a **vision model**
-(Nemotron Nano 2 VL by default), and any turn that carries a screenshot goes there instead. Claude
-sees on its own and needs no vision model.
+**Pictures on a text-only model.** Nemotron 3 Super and Nano cannot see, and Home sets no vision
+model, so on them a screenshot is dropped with a warning and Scout answers from text. Claude sees on
+its own.
 
 Any other OpenAI-compatible service also works: in **Settings → Advanced → API keys**, put its base
 URL in one of the base URL boxes, store its key there, and pick its model on the Scout page.
@@ -354,16 +353,13 @@ needs the desktop app running.
 Then click the toolbar button, or select text and press `Alt+Shift+Space`. More in
 [The Chrome extension in detail](docs/development.md#the-chrome-extension-in-detail).
 
-## Watches and screen memory
+## Screen memory
 
-- **Watches.** Ask "tell me when this finishes" and Scout watches the screen for you. Tagalong
-  compares the screen on your machine every five seconds and only asks a small, cheap model
-  (Nemotron 3 Nano on Token Factory, Claude Haiku elsewhere) once something changed and settled.
-  When it happens you get a notification and a card in the bubble. A **Watching** chip shows the
-  checks spent and has **Stop**.
-- **Screen memory** (off by default; turn it on in **Home → Settings → Privacy**). Tagalong keeps a
-  small picture of each screen every five seconds, in memory only, for the last ten minutes, so you
-  can ask "what was I reading five minutes ago?". A red dot on Scout shows while it records.
+**Screen memory** (off by default; turn it on in **Home → Settings → Privacy**). Tagalong keeps a
+small picture of each screen every five seconds, in memory only, for the last ten minutes. A red dot
+on Scout shows while it records. The engine's tools that read it back (and its watches) are built
+but not offered to Scout yet, so asking "what was I reading five minutes ago?" does not work in this
+build.
 
 ## Privacy
 
@@ -404,7 +400,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | Scout says "No … API key is stored"                            | Paste that provider's key in Welcome or Settings. It works on the next question.                                                                |
 | Scout says the model was not found, or the provider refused it | Open Settings and pick the model from the live list next to the model box.                                                                      |
-| Scout ignores the screenshot, or warns it cannot see           | Its model is text-only. Give it a vision model in Settings (Nemotron Nano 2 VL on Token Factory) or move it to Claude.                          |
+| Scout ignores the screenshot, or warns it cannot see           | Its model is text-only. Move it to Claude (the sign-in, OpenRouter or Anthropic) on Home's Scout page.                                          |
 | A hotkey does nothing                                          | Settings and the bubble name any key another app already owns; pick another. Check that sight is not paused (tray → **Pause sight**).           |
 | Scout is silent                                                | Check **Scout talks** in Home → Settings → Voice, and your sound output. The stop key only silences the current answer.                         |
 | Talk to Scout says it could not open the microphone            | Windows Settings → Privacy → Microphone: let desktop apps use it. Pick the right microphone in Home → Settings → Voice.                         |
@@ -421,7 +417,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 
 - [Developer guide](docs/development.md): build, run, test and package from source.
 - [Architecture](docs/architecture.md): how the engine and its hosts fit together today.
-- [Design](docs/specs/2026-09-11-tagalong-design.md) and
-  [feature test guide](docs/testing/feature-test-guide.md).
-- [Concepts](docs/concepts/): how pets remember, meet and talk to each other.
+- [Feature test guide](docs/testing/feature-test-guide.md): manual tests for this build.
+- [Concepts](docs/concepts/): how Scout remembers, and its role and tools.
+- [Product](PRODUCT.md) and [design system](DESIGN.md).
 - [Privacy in detail](docs/privacy.md): exactly what is read, when, and what never is.

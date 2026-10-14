@@ -15,10 +15,10 @@ tagalong/
   eslint.config.js
   .github/workflows/ci.yml
   docs/
-    architecture.md
-    acceptance/                     # per-phase sign-off
+    architecture.md, development.md, privacy.md
+    concepts/                       # memory, roles and tools
+    testing/feature-test-guide.md   # manual tests for the current build
     chrome-web-store/               # store listing kit and the extension's privacy policy
-    specs/2026-09-11-tagalong-design.md
   packages/
     protocol/src/
       index.ts                      # PROTOCOL_VERSION, ENGINE_HOST, DEFAULT_ENGINE_PORT, engineUrl
@@ -30,6 +30,8 @@ tagalong/
       settings.ts                   # Settings, SettingsPatch, SETTINGS_DEFAULTS
       methods.ts                    # the method and notification catalog
       roles.ts                      # Role, ModelTier
+                                    # plus activity, awareness, blind-spots, connections, experts,
+                                    # limits and routines schemas
     core/roles/                     # companion.md, the one role: YAML header plus instructions
     core/scripts/gen-roles.mjs      # compiles core/roles/*.md into src/roles/library.generated.ts
     core/src/
@@ -41,16 +43,25 @@ tagalong/
       connections/                  # MCP client: manager, OAuth + loopback, approvals, catalog, Claude Code reader, fake server
                                     # (Home's page: ui/src/home/connections-panel.tsx; the bubble's card: ui/src/connector-confirm.tsx)
       memory/                       # db.ts (numbered migrations), store.ts (ConversationStore)
+      experts/                      # hand-offs, the Claude Code connector, the fake connector
+      routines/                     # the scheduler, schedules and triggers, the routine store
+      greeting/, keep-an-eye/       # the launch line; the remark from watching window titles
+      watch/, projects/, privacy/   # watches, the project finder, the blind spots
       pets/registry.ts              # PetRegistry, the default pet Scout
       roles/                        # library.generated.ts, getRole, roleFor, recommendedModel, tiers.ts
-      providers/                    # brain.ts, anthropic.ts, openai-compatible.ts, presets.ts, nebius-models.ts, vision-routing.ts, fake.ts, registry.ts, errors.ts
+      providers/                    # brain.ts, claude-code-brain.ts, anthropic.ts, openai-compatible.ts,
+                                    # presets.ts, nebius-models.ts, vision-routing.ts, watch-models.ts,
+                                    # fake.ts, registry.ts, errors.ts
       server/                       # ws-server.ts (EngineServer), pairing.ts
       settings/settings.ts          # SettingsStore, SecretStore, InMemorySecretStore
     ui/src/
       index.ts, host-bridge.ts      # HostBridge contract and its React context
       dock-pet.tsx, companion-bubble.tsx, message-list.tsx, composer.tsx, sight-bar.tsx, chat-panel.tsx
-      home/                         # Home: HomeView, themes, the activity view, agent controls
-      office/                       # design tokens, PixelSprite and Scout's sprite
+      handoff-card.tsx, connector-confirm.tsx, routine-card.tsx, answer.tsx
+      home/                         # Home: HomeView and its Experts, Routines, Connections, Activity pages
+      settings/settings-styles.ts   # the Settings sheet, used by Home's Settings page
+      voice/                        # push to talk, the speech queue, what is spoken aloud
+      office/                       # design tokens, PixelSprite and Scout's sprite (old folder name)
       test-support/fake-host-bridge.ts
   apps/
     desktop/
@@ -64,12 +75,14 @@ tagalong/
       e2e/fixtures/notes-mcp.mjs    # a tiny stdio MCP server with one write tool, for cards.spec.ts
       src/main/                     # index.ts, engine-host.ts, engine-client.ts, context.ts,
                                     # hotkeys.ts, secret-store.ts, tray-icon.ts, tray-menu.ts,
-                                    # onboarding.ts,
-                                    # links.ts, platform/, windows/
+                                    # welcome.ts, claude-sign-in.ts, keep-an-eye.ts,
+                                    # routine-delivery.ts, links.ts, awareness/, ipc/,
+                                    # platform/, voice/, windows/
       src/main/platform/            # capture, downscale, composite, canvas, label, displays,
                                     # window-helper, window-list, selection, win32
       src/preload/index.ts          # exposes window.tagalong and window.tagalongHost
-      src/renderer/                 # avatar/panel/settings/onboarding/office HTML, src/*.tsx
+      src/renderer/                 # avatar (Scout), panel (the bubble), onboarding (Welcome),
+                                    # office (Home) and settings HTML, src/*.tsx
       src/shared/ipc.ts             # IPC channel names and the host-only API type
     extension/                      # Chrome MV3 host, built by Vite into dist/ (load unpacked)
       src/manifest.ts               # the manifest as data; the build writes dist/manifest.json
@@ -78,20 +91,19 @@ tagalong/
       src/content/page-reader.ts    # injected on demand: selection, URL, title, page text
 ```
 
-| Package             | Responsibility                                                                                                                                                                                                             |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol` | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC, plus the method catalog. Depends only on zod.                                                                                                   |
-| `packages/core`     | The Tagalong Engine: pets, conversation runner, prompt assembly, SQLite memory, host protocol server, pairing, provider adapters. Pure Node. Speech to text, the inter-pet bus, and the MCP client arrive in later phases. |
-| `packages/ui`       | React components shared by hosts: `DockPet`, `CompanionBubble`, `MessageList`, `Composer`, `SightBar`, `ChatPanel`, Home's `HomeView`, and the `HostBridge` context.                                                       |
-| `apps/desktop`      | Electron host. Runs the engine in the main process, dials it over the loopback socket, and owns the avatar, panel, settings window, tray, hotkey, secret storage and Scout's voice.                                        |
-| `apps/extension`    | Chrome MV3 host. Connects to the running engine and speaks the protocol only. Side panel, pairing page, on-demand page reader, and the open-panel shortcut.                                                                |
+| Package             | Responsibility                                                                                                                                                                                              |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/protocol` | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC, plus the method catalog. Depends only on zod.                                                                                    |
+| `packages/core`     | The Tagalong Engine: Scout, conversation runner, prompt assembly, SQLite memory, experts and hand-offs, connected apps (MCP client), routines, host protocol server, pairing, provider adapters. Pure Node. |
+| `packages/ui`       | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, `MessageList`, `Composer`, `SightBar`, `ChatPanel`, Home's `HomeView`, and the `HostBridge` context.                          |
+| `apps/desktop`      | Electron host. Runs the engine in the main process, dials it over the loopback socket, and owns Scout's window, the bubble, Home, Welcome, the tray, hotkeys, secret storage, and Scout's voice and ears.   |
+| `apps/extension`    | Chrome MV3 host. Connects to the running engine and speaks the protocol only. Side panel, pairing page, on-demand page reader, and the open-panel shortcut.                                                 |
 
 ## How to run
 
 Prerequisites:
 
-- Windows 11 (primary dev target; macOS and Linux arrive in Phase 7 — `createPlatform` throws on any
-  other platform today)
+- Windows 11 (the only supported platform; `createPlatform` throws on any other platform today)
 - Node.js 22 or newer (`node -v`)
 - pnpm 10 — the root `packageManager` field pins the exact version. Two ways to get it:
   - `corepack enable` — only works from an **elevated** shell. From a normal shell on Windows it fails
@@ -142,7 +154,7 @@ the root `vitest.config.ts`.
 | ------------------------------------------------------ | ------------------------------------------------- |
 | `packages/core/src`                                    | 70 / 70 / 70 / 70                                 |
 | `packages/protocol/src`                                | 70 / 70 / 70 / 70                                 |
-| `packages/ui/src`                                      | 92 / 85 / 91 / 94                                 |
+| `packages/ui/src`                                      | 91 / 83 / 90 / 93                                 |
 | `apps/desktop/src/main` and `apps/desktop/src/preload` | 59 / 62 / 49 / 60                                 |
 
 The `packages/ui` and desktop host floors sit just below what they measured when they were added.
@@ -181,14 +193,21 @@ against the protocol's `Role` schema. A test fails while the generated file is s
   it first.
 - **macOS dmg and Linux AppImage/deb are configured but unverified**, and would not run anyway: there
   is no macOS or Linux platform adapter in this build.
-- CI does not build the installer yet. The two workflow steps that would (build it on
-  `windows-latest`, upload it as the `tagalong-windows-installer` artifact) are in
-  [docs/acceptance/phase-7.md](acceptance/phase-7.md#ci-steps-for-the-installer), to be added to
-  `.github/workflows/ci.yml` by hand.
+- CI does not build the installer yet.
 
-The suites run offline on fakes: `TAGALONG_FAKE_PROVIDERS=1` (a scripted pet and a scripted expert),
+### End-to-end tests and fakes
+
+CI (`.github/workflows/ci.yml`) runs install, lint, format check, typecheck, the tests with coverage,
+build, and then the Electron end-to-end suites. `apps/desktop/e2e/` holds four Playwright suites
+that launch the built app: `smoke.spec.ts` (the bubble, talking, capture, pause, hotkeys, Welcome on
+request, Home),
+`first-run.spec.ts` (Welcome and Scout's intro on an empty data folder), `hotkey-recovery.spec.ts`
+(a key another app owns) and `cards.spec.ts`. Run them with `pnpm --filter @tagalong/desktop
+test:e2e`.
+
+The suites run offline on fakes: `TAGALONG_FAKE_PROVIDERS=1` (a scripted brain and a scripted expert),
 `TAGALONG_FAKE_TTS=1`, `TAGALONG_FAKE_STT=1`, and `TAGALONG_FAKE_TOOL` with `TAGALONG_FAKE_TOOL_INPUT`,
-which make the fake pet call one tool before it answers. `cards.spec.ts` uses the last pair to bring
+which make the fake brain call one tool before it answers. `cards.spec.ts` uses the last pair to bring
 up each card: `hand_to_expert`, a connected app's `notes__add_note`, and `create_routine`. Each card
 gets its own launch, since the tool is read once at start. The native folder picker is stubbed
 through `app.evaluate`, so the hand-off card's Browse picks a temporary folder. When an e2e suite
@@ -199,9 +218,8 @@ Quit any running Tagalong before `pnpm test:e2e`. The main process takes a singl
 second copy quits immediately and Playwright reports the confusing
 `electron.launch: Target page, context or browser has been closed` instead of naming the real cause.
 
-The Home smoke test saves screenshots of Home to `apps/desktop/test-results/office.png` (a turn in flight) and `home.png` (the activity view after it)
-(gitignored) for design review. When the primary display is too small for the office's 1280x800 page,
-the test moves the window to the tallest display before taking it.
+The smoke suite saves screenshots of Home to `apps/desktop/test-results/` (gitignored) for design
+review: `home.png`, `connections.png` and `routines.png`.
 
 ## Running the desktop app
 
@@ -237,13 +255,14 @@ you normally never call it yourself.
 
 **`TAGALONG_FAKE_PROVIDERS=1`.** With this set, `createProvider` returns the scripted
 `FakeBrainProvider` whatever settings say: no API key, no network, and a deterministic word-by-word
-stream. It is how the Playwright smoke suite runs, and the easiest way to see the app work before you
-have a key. Without it, each pet asks the provider it names, with that provider's key from the OS
-keychain. A fresh install's Scout runs on Nemotron through Nebius Token Factory, so until a Token
-Factory key is stored its turns end with "No Token Factory API key is stored. Add one in Settings."
-The engine itself boots without any key.
+stream. Hand-offs go to a scripted expert, so no Claude Code usage is spent. It is how the
+Playwright suites run, and the easiest way to see the app work before you have a key. Keeping an eye
+on things is off under it unless `TAGALONG_KEEP_AN_EYE=1` is set too. Without it, Scout asks the
+provider it names, with that provider's key from the OS keychain. A fresh install's Scout thinks
+with the Claude sign-in (`claude-code`, Haiku), which needs Claude Code installed and signed in;
+Welcome offers a keyed provider instead. The engine itself boots without any key.
 
-### Choosing a pet's brain
+### Choosing Scout's brain
 
 Home's Scout page picks Scout's **provider** (each says whether it needs a key) and **model**.
 Keys live in **Settings → Advanced → API keys**: one row per keyed provider, with Add or Replace
@@ -251,12 +270,13 @@ key, a base URL box for each OpenAI-compatible preset, and **Remove key**. Setti
 thinks** card shows the brain Scout really uses and whether the Claude Code sign-in works
 (`claude auth status --json`, run locally with no model call).
 
-| Provider     | Base URL (overridable)                    | Key                  | Models                                                  |
-| ------------ | ----------------------------------------- | -------------------- | ------------------------------------------------------- |
-| `openrouter` | `https://openrouter.ai/api/v1`            | `OPENROUTER_API_KEY` | anything OpenRouter serves, e.g. a Claude model         |
-| `nebius`     | `https://api.tokenfactory.nebius.com/v1/` | `NEBIUS_API_KEY`     | Nemotron 3 Super for text, Nemotron Nano 2 VL for sight |
-| `anthropic`  | the Anthropic API                         | Anthropic key        | Claude, directly                                        |
-| `fake`       | none                                      | none                 | scripted, offline                                       |
+| Provider      | Base URL (overridable)                    | Key                  | Models                                                  |
+| ------------- | ----------------------------------------- | -------------------- | ------------------------------------------------------- |
+| `claude-code` | none: runs the `claude` CLI               | your Claude sign-in  | `haiku`, `sonnet`, `opus`                               |
+| `openrouter`  | `https://openrouter.ai/api/v1`            | `OPENROUTER_API_KEY` | anything OpenRouter serves, e.g. a Claude model         |
+| `nebius`      | `https://api.tokenfactory.nebius.com/v1/` | `NEBIUS_API_KEY`     | Nemotron 3 Super for text, Nemotron Nano 2 VL for sight |
+| `anthropic`   | the Anthropic API                         | Anthropic key        | Claude, directly                                        |
+| `fake`        | none                                      | none                 | scripted, offline                                       |
 
 Both presets go through one `OpenAiCompatibleProvider`, so any other OpenAI-format service is a
 settings change: put its URL in one of the base URL boxes, store its key, and type its model id. The
@@ -264,119 +284,102 @@ model box suggests ids from the service's own `GET /models` once a key is stored
 showing the built-in list instead.
 
 **Vision routing.** A turn that carries a picture — a screenshot, or an image a tool such as
-`look_closer` returns — goes to the pet's model if that model can see, and otherwise to its vision
-model. On Token Factory only Nemotron Nano 2 VL sees, so Scout answers words on Super and pictures on
-Nano VL. On OpenRouter every model is treated as seeing, so a Claude pet answers everything on the one
-model and needs no vision model. A pet with no model that can see never sends pixels: the screenshot
-is dropped with a warning.
+`look_closer` returns — goes to Scout's model if that model can see, and otherwise to its vision
+model (`Pet.visionModel`). On Token Factory only Nemotron Nano 2 VL sees; Home sets no vision model,
+so Scout on a Nemotron text model drops pictures with a warning. On OpenRouter every model is
+treated as seeing, so Claude answers everything on the one model. With no model that can see, pixels
+are never sent: the screenshot is dropped with a warning.
 
-A pet's provider and model apply on its next ask, and so does a new key or base URL: the engine
+Scout's provider and model apply on its next ask, and so does a new key or base URL: the engine
 re-reads the keychain before every ask, so no restart is needed.
 
 The Nemotron Nano 2 VL id (`nvidia/Nemotron-Nano-V2-12b`) and the OpenRouter fallback ids could not be
 checked when they were written; they live in `packages/core/src/providers/nebius-models.ts` and
 `presets.ts`. The live list in Settings is the authority.
 
-Once running: the pet sits on screen as a small always-on-top window, `Ctrl+Shift+Space` captures the
-selection and the active window and opens the chat panel beside it, Escape or focus loss hides the
-panel (unless a turn is still streaming), and the tray menu shows or hides the pets, opens settings,
-and quits.
+Once running: Scout sits on screen as a small always-on-top window, `Ctrl+Shift+Space` captures the
+selection and the active window and opens the bubble beside it, Escape or focus loss hides the
+bubble (unless a turn is still streaming), and the tray menu opens Home (**Open Tagalong**), pauses
+sight, shows or hides Scout, and quits.
 
 | Hotkey                        | What rides along                                   | Roughly what it costs |
 | ----------------------------- | -------------------------------------------------- | --------------------- |
 | `Ctrl+Shift+Space`            | Selection and the active window                    | text only             |
 | `Ctrl+Shift+Alt+P`            | Nothing — turns all sight off, and on again        | nothing               |
+| `Ctrl+Shift+Alt+M`            | Nothing — Scout stops speaking                     | nothing               |
 | `Ctrl+Shift+Alt+Space` (hold) | The active window, and the spoken question as text | text only             |
 
 The ask key exists for the one thing only a key can do: read the selection and the window you are on
-before the bubble takes the focus. A click on the pet captures nothing, because it has just put the
-pet's own window in front. Screenshots (about 1,500 extra input tokens), the window list (a few
-seconds to enumerate) and other monitors are the pet's own tools, taken only when a question needs
+before the bubble takes the focus. A click on Scout captures nothing, because it has just put
+Scout's own window in front. Screenshots (about 1,500 extra input tokens), the window list (a few
+seconds to enumerate) and other monitors are Scout's own tools, taken only when a question needs
 them. The pause key takes sight away entirely — see [Pausing sight](privacy.md#pausing-sight).
 **With several monitors, a look sends** (Settings → Advanced → Sight detail) decides whether a capture of every
 display attaches only the composite and the focused display, or every display.
 
-Both accelerators are editable in the settings window and rebind while the app runs — no
+Every accelerator is editable in Home → Settings → Shortcuts and rebinds while the app runs — no
 restart — and an accelerator another application already owns is reported rather than silently
 dropped, without costing the other.
 
 **A hotkey that cannot be registered never stops Tagalong from starting.** The only way to store an
 accelerator Windows refuses is to type it into Settings, so an app that refused to open because of
 one would leave you locked out of the window that fixes it, with the settings file as the only way
-back. Instead the app starts, the other three keys work, and the failure appears in the panel and in
+back. Instead the app starts, the other keys work, and the failure appears in the bubble and in
 Settings naming which binding broke and what it was bound to. Correcting it takes effect
 immediately, with no restart.
 
 ### Scout
 
-A fresh install starts with one pet, **Scout**, the companion, on the Claude Code sign-in. Earlier
-versions shipped a crew (Ink and Bolt, `@Name` hand-offs between pets, `ask_pet` consults and
-`/crew` roundtables); all of that is gone. Scout hands work to experts instead (see "Experts" in
-[architecture.md](architecture.md#experts-and-connectors)).
+A fresh install starts with one companion, **Scout**, on the Claude Code sign-in. Scout hands work
+to experts (see "Experts" in [architecture.md](architecture.md#experts-and-connectors)).
 
-Pets remember. Tell one "I prefer short answers" and it keeps that across restarts; a pet can also
+Scout remembers. Tell it "I prefer short answers" and it keeps that across restarts; it can also
 save facts on its own. Memories live in the same
 SQLite file as conversations (`tagalong.db` in the data dir).
 
 ### Awareness: rolling memory and watches
 
-Two Phase 3B features let a pet know about time, not only about now. Rolling memory's switch is in
-Settings → **Privacy**; its minutes and the watch limits are under **Advanced → Screen memory and
-watches**. Both take effect on save.
+Rolling memory's switch is in Settings → **Privacy** (**Remember the last few minutes of the
+screen**); its minutes and the watch limits are under **Advanced → Screen memory and watches**. Both
+take effect on save.
 
 - **Rolling memory** (off by default). Turn it on and the desktop keeps the last few minutes — ten by
-  default, at most thirty — of every screen in memory, so you can ask "what was I reading five
-  minutes ago?". The pet answers with `recall_screen` and names the time of the frame it describes;
-  `what_changed` shows it only the part of a screen that changed since a moment ago. A small red dot
-  on the pets shows while it records.
-- **Watches.** Ask "tell me when this finishes" and the pet calls `watch_for`. Tagalong compares the
-  screen on this machine every five seconds and asks a model nothing until the watched region has
-  changed and then held still; then one small, cheap model answers yes or no. On yes the panel shows
-  the result as a card from the pet, a system notification pops up, and the pet's avatar shows an
-  alert. A **Watching** chip in the panel counts the checks spent and has a **Stop** button. While
-  **Scout talks** is on, the panel also says the watch's message aloud.
-
-The check model is configurable per pet (Settings → the pet → **Watch check model**). Blank uses the
-pet's provider's default, chosen to be small and cheap because a watch may ask it many times:
-
-| Pet's provider | Default watch check model                                                                               |
-| -------------- | ------------------------------------------------------------------------------------------------------- |
-| Token Factory  | `nvidia/nemotron-3-nano-30b-a3b` (Nemotron 3 Nano; reads the watched window's text, Nano VL for pixels) |
-| OpenRouter     | `anthropic/claude-haiku-4.5`                                                                            |
-| Anthropic      | `claude-haiku-4-5`                                                                                      |
-
-A text-only check model such as Nemotron 3 Nano is handed the last 4,000 characters of the window that
-was in front when the watch began — exactly what a terminal says — and a picture goes to the pet's vision
-model only when there is no text to read. The Token Factory ids are unverified against the live model list;
-the Settings picker shows the live one once a key is stored.
+  default, at most thirty — of every screen in memory, never on disk. A small red dot on Scout shows
+  while it records.
+- **The engine's time tools.** `recall_screen`, `what_changed` and `watch_for` (a watch compares the
+  screen every five seconds and asks one small model yes or no only once the region has changed and
+  held still) are built and tested, but the Companion role does not list them, so Scout is not
+  offered them today. The watch limits below still save.
 
 | Watch limit (Settings)         | Default | What it bounds                                    |
 | ------------------------------ | ------- | ------------------------------------------------- |
 | Checks per watch               | 60      | Model calls one watch may make before it gives up |
-| Watches at once                | 3       | A fourth is refused, and the pet says so          |
-| Timeout when the pet names one | 30 min  | How long a watch runs before it ends on its own   |
+| Watches at once                | 3       | A fourth is refused                               |
+| Watch gives up after (minutes) | 30      | How long a watch runs before it ends on its own   |
+
+A watch's check model is `Pet.watchModel`, else the provider's default (`watchModelsFor` in
+`packages/core/src/providers/watch-models.ts`); Home has no field for it.
 
 ### The two cost controls
 
 Both live in Settings under **Advanced → Sight detail** and both take effect on save, with no restart: they are read at the
 moment of each capture rather than at boot.
 
-| Setting                               | Default                            | What raising it costs                                                                                                                                                                   |
-| ------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **What a look at every screen sends** | Composite plus the focused display | `Every screen` sends one picture per monitor, so a three-monitor desk pays roughly three times the image cost on every look at every screen                                             |
-| **Window text budget**                | 8,000 characters                   | How much of a window a read returns when the pet does not ask for less. Roughly one token per four characters, so the default is about 2,000 tokens per read, and the ceiling is 40,000 |
+| Setting                               | Default                            | What raising it costs                                                                                                                                                                 |
+| ------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **What a look at every screen sends** | Composite plus the focused display | `Every screen` sends one picture per monitor, so a three-monitor desk pays roughly three times the image cost on every look at every screen                                           |
+| **Window text budget**                | 8,000 characters                   | How much of a window a read returns when Scout does not ask for less. Roughly one token per four characters, so the default is about 2,000 tokens per read, and the ceiling is 40,000 |
 
-Before you send, the sight bar shows roughly what the attached pictures cost — `~1,843 image tokens ·
-3 images` — at width × height ÷ 750 per image, so a look at every screen on three monitors is visibly
-dearer than a single screenshot.
+In the Chrome side panel, the sight bar shows roughly what the attached pictures cost — `~1,843
+image tokens · 3 images` — at width × height ÷ 750 per image.
 
-The budget is a ceiling, not a target — a pet that only needs the top of a terminal asks for less,
-and the number it does not ask for is the one set here.
+The budget is a ceiling, not a target — Scout asks for less when it only needs the top of a
+terminal, and the number it does not ask for is the one set here.
 
-Capture is never silent. Every capture, including one a pet's own tool asked for, badges the avatar
+Capture is never silent. Every capture, including one Scout's own tool asked for, shows on Scout
 and updates the tray tooltip to say what was read and when. Before any screenshot the host checks the
 focused window against the capture exclusions in settings (password managers and the Windows
-credential prompts by default); when one matches, no picture is taken at all and the panel is told
+credential prompts by default); when one matches, no picture is taken at all and the bubble is told
 that capture is blocked here, naming only the exclusion entry that matched.
 
 ### The pairing token
@@ -394,13 +397,13 @@ gets the same error.
 
 The token exists because **loopback is not a permission boundary**. Any process running as the user
 can open a socket to `127.0.0.1:47321` — binding to loopback only keeps other machines out, not other
-programs on this one. Without the token, any local program could drive the user's pets, read their
+programs on this one. Without the token, any local program could drive Scout, read the user's
 conversations, and spend their API budget. Comparison is constant-time, because a plain `===` leaks
 the length of the shared prefix through timing.
 
 ## The Chrome extension in detail
 
-The extension is a second host for the same engine: same pets, same memory, same settings. It gives
+The extension is a second host for the same engine: same Scout, same memory, same settings. It gives
 Scout the **exact** selection and the readable text of the page you are on, and puts Scout in
 Chrome's side panel.
 
@@ -425,8 +428,8 @@ After a rebuild, click the reload arrow on the Tagalong card in `chrome://extens
 
 ### Pair it, once
 
-1. In the desktop app, open **Settings** from the tray. Under **Browser extension**, click **Copy
-   token**.
+1. In the desktop app, open Home (tray → **Open Tagalong**) → **Settings**. Under **Browser
+   extension (optional)**, click **Copy** beside the pairing token.
 2. Chrome opens the extension's options page on first use (or right-click the toolbar button →
    **Options**). Paste the token and click **Save and connect**. Leave the port empty unless you
    moved the engine off `47321`.
@@ -439,7 +442,7 @@ After a rebuild, click the reload arrow on the Tagalong card in `chrome://extens
 | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | Click the toolbar button                    | The side panel opens with Scout and attaches the page it opened beside (selection, title, readable text).                   |
 | Select text, press `Alt+Shift+Space`        | The side panel opens with that exact selection and the page title in the sight bar.                                         |
-| Press the desktop hotkey `Ctrl+Shift+Space` | The desktop panel opens as before; when Chrome is in front, the engine swaps in the exact selection and adds the page text. |
+| Press the desktop hotkey `Ctrl+Shift+Space` | The desktop bubble opens as usual; when Chrome is in front, the engine swaps in the exact selection and adds the page text. |
 | Click **Read this page** / **Clear**        | Re-reads the tab, or sends the next ask with nothing attached.                                                              |
 
 `Ctrl+Shift+Space` stays the desktop app's: it is a global hotkey and Chrome never sees it, so the
@@ -457,26 +460,26 @@ public privacy policy is [docs/chrome-web-store/privacy-policy.md](chrome-web-st
 
 ## Environment variables
 
-`.env.example` is a **reference list of the variables the project will use**, not a file the app loads.
-Nothing reads `.env.local` today: there is no dotenv dependency, and no code in `packages/` or `apps/`
+`.env.example` is a **reference list of the variables the project uses**, not a file the app loads.
+Nothing reads `.env.local`: there is no dotenv dependency, and no code in `packages/` or `apps/`
 opens a `.env` file. Copying it therefore changes nothing at runtime.
 
-Four environment variables are read today, all straight from `process.env`:
-`TAGALONG_FAKE_PROVIDERS` in `packages/core/src/providers/registry.ts`, `TAGALONG_SKIP_ONBOARDING`
-in `apps/desktop/src/main/welcome.ts`, `TAGALONG_FAKE_TTS` in
-`apps/desktop/src/main/voice/voice.ts`, and `TAGALONG_FAKE_STT` in
-`apps/desktop/src/main/voice/listen.ts` (and `main/index.ts`, for the fake microphone). **Set them in the shell you launch from**, as shown above.
+Seven environment variables are read, all straight from the process environment. **Set them in the
+shell you launch from**, as shown above.
 
-| Variable                     | Status today                                                                                                                                                                  |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TAGALONG_FAKE_PROVIDERS=1`  | **Read.** Forces the fake brain provider, for tests and demos. No keys or network needed. Must be set in the shell environment.                                               |
-| `TAGALONG_SKIP_ONBOARDING=1` | **Read.** Keeps Welcome shut. The Electron smoke tests set it.                                                                                                                |
-| `TAGALONG_FAKE_TTS=1`        | **Read.** Scout's voice becomes a short silent clip: no model download, no ElevenLabs call, no sound. Every Electron suite sets it.                                           |
-| `TAGALONG_FAKE_STT=1`        | **Read.** Talk to Scout hears "What am I looking at?" every time: no speech model download, and Chromium's fake microphone stands in for a real one. The smoke suite sets it. |
-| `ANTHROPIC_API_KEY`          | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment.                       |
-| `OPENROUTER_API_KEY`         | **Not read.** The key for the `openrouter` provider, entered in Settings and stored like the Anthropic key.                                                                   |
-| `NEBIUS_API_KEY`             | **Not read.** The key for the `nebius` provider (Token Factory), entered in Settings and stored like the Anthropic key.                                                       |
-| `ELEVENLABS_API_KEY`         | **Not read.** The optional ElevenLabs voice's key is entered in Settings → Advanced and stored like the others (`elevenlabs.apiKey`).                                         |
+| Variable                     | Status today                                                                                                                                                                                                       |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `TAGALONG_FAKE_PROVIDERS=1`  | **Read** (`packages/core/src/providers/registry.ts`, `engine.ts`). Forces the fake brain and a fake expert, for tests and demos. No keys, network or Claude Code usage.                                            |
+| `TAGALONG_FAKE_TOOL`         | **Read** (`providers/registry.ts`). Under the fake brain, the name of one tool it calls before it answers. `cards.spec.ts` and the smoke suite set it.                                                             |
+| `TAGALONG_FAKE_TOOL_INPUT`   | **Read** (`providers/registry.ts`). The JSON input for that tool call; bad JSON means no input.                                                                                                                    |
+| `TAGALONG_KEEP_AN_EYE=1`     | **Read** (`apps/desktop/src/main/keep-an-eye.ts`). Keeps an eye on things under the fake brain, where it is otherwise off.                                                                                         |
+| `TAGALONG_SKIP_ONBOARDING=1` | **Read** (`apps/desktop/src/main/welcome.ts`). Keeps Welcome shut. The Electron suites other than first-run set it.                                                                                                |
+| `TAGALONG_FAKE_TTS=1`        | **Read** (`voice/voice.ts`). Scout's voice becomes a short silent clip: no model download, no ElevenLabs call, no sound. Every Electron suite sets it.                                                             |
+| `TAGALONG_FAKE_STT=1`        | **Read** (`voice/listen.ts`, `main/index.ts`). Talk to Scout hears "What am I looking at?" every time: no speech model download, and Chromium's fake microphone stands in for a real one. The smoke suite sets it. |
+| `ANTHROPIC_API_KEY`          | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment.                                                            |
+| `OPENROUTER_API_KEY`         | **Not read.** The key for the `openrouter` provider, entered in Settings and stored like the Anthropic key.                                                                                                        |
+| `NEBIUS_API_KEY`             | **Not read.** The key for the `nebius` provider (Token Factory), entered in Settings and stored like the Anthropic key.                                                                                            |
+| `ELEVENLABS_API_KEY`         | **Not read.** The optional ElevenLabs voice's key is entered in Settings → Advanced and stored like the others (`elevenlabs.apiKey`).                                                                              |
 
 Secrets never enter git. In the app they live in the OS keychain through Electron `safeStorage`, written
 as ciphertext to `secrets.json`; if the OS has no encryption backend the store refuses to write at all
@@ -484,14 +487,14 @@ rather than leaving a key readable on disk.
 
 ## How to add a host
 
-A host is anything that can show a pet and capture what the user is looking at: the Electron app, the
+A host is anything that can show Scout and capture what the user is looking at: the Electron app, the
 Chrome extension, or something new. Adding one never touches the core.
 
 1. Implement the **Perception** contract: answer `perception.capture` for selection, active window,
-   clipboard, page text, and (from Phase 2) screenshot, returning a `ContextSnapshotPatch` from
+   clipboard, page text and screenshot, returning a `ContextSnapshotPatch` from
    `packages/protocol`. Advertise only what you can actually read, in the `capabilities` array of
    `hello`.
-2. Implement the **Presentation** contract: render pets, stream reply deltas, and show approval cards.
+2. Implement the **Presentation** contract: render Scout, stream reply deltas, and show the cards.
    The shared React components in `packages/ui` do this already — hand them a `HostBridge` and nothing
    else.
 3. Speak the JSON-RPC protocol over the localhost WebSocket the engine exposes
@@ -505,19 +508,20 @@ Chrome extension, or something new. Adding one never touches the core.
 Providers are the swappable edges of the engine. Each one is an interface in `packages/core` with more
 than one planned implementation.
 
-- **BrainProvider** for the AI engine. Existing: `openrouter` and `nebius` (two presets of the
-  OpenAI-compatible `OpenAiCompatibleProvider`), `anthropic`, and `fake` (tests and demos); `ollama`
-  is planned after Phase 5. Another OpenAI-format service needs no code — see
-  [Choosing a pet's brain](#choosing-a-pets-brain); a new named preset is one entry in
-  `packages/core/src/providers/presets.ts`.
+- **BrainProvider** for the AI engine. Existing: `claude-code` (the Claude sign-in, through the
+  `claude` CLI), `openrouter` and `nebius` (two presets of the OpenAI-compatible
+  `OpenAiCompatibleProvider`), `anthropic`, and `fake` (tests and demos). Another OpenAI-format
+  service needs no code — see [Choosing Scout's brain](#choosing-scouts-brain); a new named preset
+  is one entry in `packages/core/src/providers/presets.ts`.
 - **Text to speech** lives in the desktop host, not in core: `Tts` in
   `apps/desktop/src/main/voice/voice.ts` (`speak(text, { voice, speed })` returns encoded audio),
   with Kokoro (`LazyLocalVoice` over `kokoro.ts`), ElevenLabs (`elevenlabs.ts`) and `fakeTts`.
-  `createVoiceService` picks one; see [Scout talks](architecture.md#scout-talks). Speech to text
-  (push to talk) does not exist yet.
+  `createVoiceService` picks one; see [Scout talks](architecture.md#scout-talks).
+- **Speech to text** also lives in the desktop host: Whisper base.en on this computer
+  (`voice/whisper.ts`, `voice/listen.ts`), or the fake under `TAGALONG_FAKE_STT=1`.
 
 Implement `BrainProvider`, register it in `packages/core/src/providers/registry.ts`, give it a
-`SECRET_KEYS` entry if it takes a key, and select it per pet in settings. Do not widen the interface for a provider that is not being built.
+`SECRET_KEYS` entry if it takes a key, and pick it for Scout in Home. Do not widen the interface for a provider that is not being built.
 
 ## How to add a tool
 
@@ -537,8 +541,8 @@ docs to update. The design is in [concepts/roles-and-tools.md](concepts/roles-an
   browser globals. An ESLint `no-restricted-imports` rule enforces it.
 - **Tools go through the registry.** `conversation/` and `engine.ts` import tools only from
   `tools/registry` or the `tools` index, never from `tools/builtin/*`. ESLint enforces it too.
-- **Docs are part of done.** Update `README.md`, `docs/architecture.md`, and the relevant
-  `docs/acceptance/phase-N.md` with every change.
+- **Docs are part of done.** Update `README.md`, `docs/architecture.md`, and
+  `docs/testing/feature-test-guide.md` with every change.
 - **Commits** use Conventional Commits, for example `feat(core): add PromptAssembler`.
 - **Diagrams** are Mermaid with a black and white theme only.
 
@@ -546,23 +550,21 @@ docs to update. The design is in [concepts/roles-and-tools.md](concepts/roles-an
 
 What is still standing, recorded here so nobody rediscovers it.
 
-- **No Tailwind build in the desktop renderer.** `@tagalong/ui` is written against Tailwind utility
-  classes, but the desktop renderer has no Tailwind toolchain, so those class names resolve to nothing.
+- **No Tailwind build in the desktop renderer.** `@tagalong/ui`'s chat components (`ChatPanel`,
+  `MessageList`, `Composer`, `SightBar`) are written against Tailwind utility classes, but the
+  desktop renderer has no Tailwind toolchain, so those class names resolve to nothing.
   `apps/desktop/src/renderer/src/app.css` hand-writes the structural rules the utilities would have
   supplied — enough for a usable panel, but the components are unstyled beyond that until the build
   gains Tailwind.
-- **No approval cards in the side panel yet.** They arrive with Phase 5 (Hands), in `packages/ui`,
-  and the side panel will show them without extension changes — its bridge already relays every
-  `turn.*` event and every engine call.
+- **No cards in the side panel.** The side panel's `ChatPanel` draws no hand-off, connector confirm
+  or routine card; only the desktop bubble does.
 - **No Fast Refresh in dev.** `@vitejs/plugin-react` 6.x imports `vite/internal`, which only exists in
   Vite 8, while electron-vite 5 pins Vite 7. The renderer config therefore drops the plugin and uses
   Vite's own esbuild transform (`esbuild: { jsx: 'automatic' }`) for JSX. Everything builds and runs;
   the only loss is Fast Refresh during `pnpm dev:desktop`.
-
-- **A watch covers a whole display or a rectangle the pet names.** The phase plan also offers the
-  focused window as a region and drag-to-select; the window inventory carries no window bounds, so
-  the focused window is used for the text-only check and to pick the display instead, and
-  drag-to-select is deferred.
+- **Scout is not offered the time tools.** `recall_screen`, `what_changed`, `watch_for`,
+  `look_closer`, `list_displays` and `look_at_display` are built, but the Companion role does not
+  list them.
 - **The installer is unsigned and uses Electron's default icon.** SmartScreen warns on first run.
 - **Windows only.** The macOS and Linux installers are configured, but there is no platform adapter for
   either, so the app stops at launch there.
@@ -572,22 +574,8 @@ What is still standing, recorded here so nobody rediscovers it.
   on `TAGALONG_FAKE_TTS=1` and `TAGALONG_FAKE_STT=1`, so the Kokoro and Whisper downloads, synthesis
   and transcription are only exercised on a real run.
 
-## Delivery phases
+## Roadmap
 
-Each phase has its own Notion page with step-by-step instructions and an acceptance script. Work them in
-order; each one ends with something testable end to end.
-
-0. **Setup** — monorepo, CI, conventions, keys. _(complete)_
-1. **Foundation** — protocol, core engine, text-only ask with one pet on Windows. _(complete)_
-2. **Sight** — screenshots, vision, exclusions, capture indicator. _(complete)_
-3. **Voice** — push to talk, streaming speech, interruption. _(Scout talks, with stop, is built;
-   push to talk is not)_
-   3B. **Awareness** — rolling memory, `recall_screen` and `what_changed`, watch mode. _(built; watch
-   alerts are spoken)_
-4. **Crew** — multiple pets, memory, handoff, consult, roundtable. _(built, then removed: one
-   companion, Scout, kept the memory)_
-5. **Hands** — MCP client, allowlists, approval cards, action log.
-6. **Browser Host** — Chrome extension on the same engine. _(built; runs fifth, after 2B)_
-7. **Polish and Cross-platform** — macOS, Linux, onboarding, packaging, cost dashboard. _(setup
-   wizard and Windows installer built; macOS, Linux, complete settings, cost dashboard and the
-   release checklist are not in this build)_
+The plan and its phases live in Notion. What this build does and does not do is in the
+[README](../README.md#what-is-in-this-build) and the
+[feature test guide](testing/feature-test-guide.md).

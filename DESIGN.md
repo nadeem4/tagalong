@@ -1,6 +1,6 @@
 ---
 name: Tagalong
-description: Scout, a pixel-art AI companion on your screen, with Home as its calm control centre.
+description: Scout, one pixel-art AI companion on your screen, with Home as its calm control centre.
 colors:
   shell-navy: '#12162B'
   shell-text: '#E9ECF5'
@@ -13,39 +13,61 @@ colors:
   field-line: '#2E3558'
   gold: '#F2C14E'
   gold-ink: '#12162B'
-  chip-free: '#E6E9F2'
-  chip-free-ink: '#4A5168'
+  sky: '#7CB8F2'
+  soft-text: '#C9CEE0'
+  done-green: '#7DD87F'
+  paused-grey: '#6B7290'
+  recording-red: '#E5484D'
+  disabled-line: '#2A3050'
+  quote-line: '#3A4270'
+  navy-error-fill: '#3A1D2A'
+  navy-error-ink: '#FFB4C0'
   panel-white: '#F6F7FB'
+  card-white: '#FFFFFF'
   panel-text: '#12162B'
   panel-muted: '#5A6178'
   panel-line: '#E0E3EC'
   panel-tile: '#E6E9F2'
+  chip: '#E6E9F2'
+  chip-ink: '#4A5168'
+  link: '#3D4A8A'
+  ok-fill: '#E3F1E6'
+  ok-ink: '#1F5A2E'
+  warn-fill: '#FFF4D6'
+  warn-ink: '#5C4600'
+  err-fill: '#FDE7E5'
+  err-ink: '#8A1C12'
+  ready-green: '#2F9E44'
   scrollbar-thumb: '#CDD2DE'
 typography:
-  office-title:
+  welcome-title:
     fontFamily: "'Pixelify Sans', 'Onest', sans-serif"
-    fontSize: '20px'
+    fontSize: '28px'
     fontWeight: 700
     letterSpacing: '0.5px'
-  pet-name:
-    fontFamily: "'Pixelify Sans', 'Onest', sans-serif"
-    fontSize: '17px'
+  page-title:
+    fontFamily: "'Onest', system-ui, sans-serif"
+    fontSize: '20px'
     fontWeight: 600
+  companion-name:
+    fontFamily: "'Pixelify Sans', 'Onest', sans-serif"
+    fontSize: '18px'
+    fontWeight: 700
+    letterSpacing: '0.5px'
   panel-heading-pixel:
     fontFamily: "'Pixelify Sans', 'Onest', sans-serif"
     fontSize: '15px'
     fontWeight: 600
     letterSpacing: '1px'
-  room-label:
+  card-label:
     fontFamily: "'Pixelify Sans', 'Onest', sans-serif"
-    fontSize: '13px'
-    fontWeight: 700
-    letterSpacing: '1px'
-  job-class:
-    fontFamily: "'Pixelify Sans', 'Onest', sans-serif"
-    fontSize: '11px'
+    fontSize: '12px'
     fontWeight: 400
     letterSpacing: '1px'
+  subhead:
+    fontFamily: "'Onest', system-ui, sans-serif"
+    fontSize: '15px'
+    fontWeight: 600
   title:
     fontFamily: "'Onest', system-ui, sans-serif"
     fontSize: '14px'
@@ -67,12 +89,18 @@ typography:
     fontFamily: "'Onest', system-ui, sans-serif"
     fontSize: '11px'
     fontWeight: 600
+  mono:
+    fontFamily: "ui-monospace, 'Cascadia Mono', Consolas, monospace"
+    fontSize: '12px'
+    fontWeight: 400
 rounded:
-  small: '8px'
+  control-sm: '6px'
   field: '8px'
   row: '10px'
   tile: '10px'
   chip: '10px'
+  card: '12px'
+  pill: '999px'
 spacing:
   xxs: '2px'
   hair: '3px'
@@ -91,269 +119,357 @@ components:
     rounded: '{rounded.field}'
     padding: '0 16px'
     height: '40px'
-  button-primary-disabled:
+  button-quiet:
     backgroundColor: 'transparent'
-    textColor: '{colors.disabled-ink}'
+    textColor: '{colors.panel-text}'
+    typography: '{typography.title}'
     rounded: '{rounded.field}'
     padding: '0 16px'
     height: '40px'
-  toggle:
+  field:
+    backgroundColor: '{colors.panel-tile}'
+    textColor: '{colors.panel-text}'
+    rounded: '{rounded.field}'
+    padding: '0 12px'
+    height: '40px'
+  chip:
+    backgroundColor: '{colors.chip}'
+    textColor: '{colors.chip-ink}'
+    typography: '{typography.label-min}'
+    rounded: '{rounded.chip}'
+    padding: '2px 8px'
+  chip-ok:
+    backgroundColor: '{colors.ok-fill}'
+    textColor: '{colors.ok-ink}'
+    typography: '{typography.label-min}'
+    rounded: '{rounded.chip}'
+    padding: '2px 8px'
+  chip-warn:
+    backgroundColor: '{colors.warn-fill}'
+    textColor: '{colors.warn-ink}'
+    typography: '{typography.label-min}'
+    rounded: '{rounded.chip}'
+    padding: '2px 8px'
+  chip-err:
+    backgroundColor: '{colors.err-fill}'
+    textColor: '{colors.err-ink}'
+    typography: '{typography.label-min}'
+    rounded: '{rounded.chip}'
+    padding: '2px 8px'
+  switch:
+    backgroundColor: 'transparent'
+    textColor: '{colors.panel-muted}'
+    rounded: '{rounded.field}'
+    padding: '0 12px'
+    height: '32px'
+  switch-on:
+    backgroundColor: '{colors.gold}'
+    textColor: '{colors.gold-ink}'
+    rounded: '{rounded.field}'
+    padding: '0 12px'
+    height: '32px'
+  dock-tag-seeing:
+    backgroundColor: '{colors.sky}'
+    textColor: '{colors.gold-ink}'
+    typography: '{typography.label-min}'
+    rounded: '{rounded.pill}'
+    padding: '2px 7px'
+  dock-tag-working:
+    backgroundColor: '{colors.gold}'
+    textColor: '{colors.gold-ink}'
+    typography: '{typography.label-min}'
+    rounded: '{rounded.pill}'
+    padding: '2px 7px'
+  dock-tag-done:
+    backgroundColor: '{colors.done-green}'
+    textColor: '{colors.gold-ink}'
+    typography: '{typography.label-min}'
+    rounded: '{rounded.pill}'
+    padding: '2px 7px'
+  dock-paused:
+    backgroundColor: '{colors.paused-grey}'
+    textColor: '{colors.shell-text}'
+    typography: '{typography.label-min}'
+    rounded: '{rounded.pill}'
+    padding: '2px 6px'
+  bubble:
+    backgroundColor: '{colors.shell-navy}'
+    textColor: '{colors.shell-text}'
+    typography: '{typography.body-lead}'
+    rounded: '{rounded.card}'
+    padding: '14px 16px'
+    width: '420px'
+  bubble-primary:
+    backgroundColor: '{colors.gold}'
+    textColor: '{colors.gold-ink}'
+    rounded: '{rounded.field}'
+    padding: '0 16px'
+    height: '36px'
+  bubble-quiet:
+    backgroundColor: 'transparent'
+    textColor: '{colors.soft-text}'
+    typography: '{typography.label}'
+    rounded: '{rounded.control-sm}'
+    padding: '0 10px'
+    height: '28px'
+  bubble-field:
+    backgroundColor: '{colors.field-navy}'
+    textColor: '{colors.shell-text}'
+    rounded: '{rounded.field}'
+    padding: '0 12px'
+    height: '44px'
+  bubble-chip:
+    backgroundColor: '{colors.avatar-tile}'
+    textColor: '{colors.soft-text}'
+    typography: '{typography.label}'
+    rounded: '{rounded.pill}'
+    padding: '0 4px 0 10px'
+    height: '28px'
+  home-nav:
+    backgroundColor: '{colors.sidebar-navy}'
+    textColor: '{colors.shell-text}'
+    width: '232px'
+    padding: '20px 12px'
+  home-nav-item:
     backgroundColor: 'transparent'
     textColor: '{colors.shell-muted}'
     rounded: '{rounded.field}'
     padding: '0 12px'
     height: '40px'
-  toggle-pressed:
-    backgroundColor: 'transparent'
-    textColor: '{colors.gold}'
-    rounded: '{rounded.field}'
-    padding: '0 12px'
-    height: '40px'
-  field:
-    backgroundColor: '{colors.field-navy}'
-    textColor: '{colors.shell-text}'
-    rounded: '{rounded.field}'
-    padding: '0 12px'
-    height: '40px'
-  party-row:
-    backgroundColor: 'transparent'
-    textColor: '{colors.shell-text}'
-    rounded: '{rounded.row}'
-    padding: '8px'
-  party-row-selected:
+  home-nav-item-current:
     backgroundColor: '{colors.row-active}'
     textColor: '{colors.shell-text}'
-    rounded: '{rounded.row}'
-    padding: '8px'
-  avatar-tile:
-    backgroundColor: '{colors.avatar-tile}'
-    rounded: '{rounded.tile}'
-    padding: '4px'
-  room-chip-free:
-    backgroundColor: '{colors.chip-free}'
-    textColor: '{colors.chip-free-ink}'
-    typography: '{typography.label-min}'
-    rounded: '{rounded.chip}'
-    padding: '2px 8px'
-  party-list:
-    backgroundColor: '{colors.sidebar-navy}'
-    width: '280px'
-    padding: '16px 14px'
-  header:
-    backgroundColor: '{colors.shell-navy}'
-    height: '64px'
-    padding: '0 20px'
-  meetings-panel:
-    backgroundColor: '{colors.panel-white}'
-    textColor: '{colors.panel-text}'
-  home-tab:
-    backgroundColor: 'transparent'
-    textColor: '{colors.panel-muted}'
-    typography: '{typography.body}'
-    height: '40px'
+    typography: '{typography.title}'
+    rounded: '{rounded.field}'
     padding: '0 12px'
-  home-tab-selected:
-    backgroundColor: 'transparent'
-    textColor: '{colors.panel-text}'
-    typography: '{typography.body}'
     height: '40px'
-    padding: '0 12px'
-  activity-entry:
+  home-card:
+    backgroundColor: '{colors.card-white}'
+    textColor: '{colors.panel-text}'
+    rounded: '{rounded.card}'
+    padding: '16px 20px'
+  home-entry:
     backgroundColor: 'transparent'
     textColor: '{colors.panel-text}'
     rounded: '{rounded.row}'
     padding: '8px'
-  activity-entry-open:
+  home-entry-open:
     backgroundColor: '{colors.panel-tile}'
     textColor: '{colors.panel-text}'
     rounded: '{rounded.row}'
     padding: '8px'
-  roles-notice:
-    backgroundColor: '{colors.sidebar-navy}'
-    textColor: '{colors.shell-text}'
-    rounded: '{rounded.tile}'
-    width: '660px'
-    padding: '24px 28px'
+  home-template:
+    backgroundColor: '{colors.card-white}'
+    textColor: '{colors.panel-text}'
+    rounded: '{rounded.row}'
+    padding: '12px 16px'
+  home-day:
+    backgroundColor: 'transparent'
+    textColor: '{colors.panel-text}'
+    typography: '{typography.label}'
+    rounded: '{rounded.field}'
+    padding: '0 8px'
+    height: '32px'
+  home-day-pressed:
+    backgroundColor: '{colors.gold}'
+    textColor: '{colors.gold-ink}'
+    typography: '{typography.label}'
+    rounded: '{rounded.field}'
+    padding: '0 8px'
+    height: '32px'
+  welcome-start:
+    backgroundColor: '{colors.gold}'
+    textColor: '{colors.gold-ink}'
+    rounded: '{rounded.field}'
+    padding: '0 28px'
+    height: '44px'
 ---
 
 # Design System: Tagalong
 
-> The crew-era Office (the floor, rooms, furniture, desk plates, job-class inks, the cursor and the roles notice) was removed with the crew. Tagalong is one companion, Scout. Where this document still describes the office, it is history; `packages/ui/src/office/tokens.ts` is the source of truth for what remains.
-
 ## Overview
 
-**Creative North Star: "The Party in the Glass Office"**
+**Creative North Star: "A Pixel Friend in Modern Chrome"**
 
-Tagalong's crew is a 16-bit party with job classes, working in a contemporary office drawn in pixel art. The characters are expressive game sprites; the room they sit in is modern (pale concrete floor, white desks with monitors, glass-walled meeting rooms, plants, a small lounge); the interface around them is crisp, modern product chrome. The game lives inside the frame, never on the frame: the shell is a deep ink-navy app with clean sans type, off-white panels and one gold accent, and the pixel world is the picture it holds.
+Tagalong is one companion, Scout, a 16x16 pixel-art figure (orange fur, pointed ears, a green shirt with a gold badge) that sits on the desktop and opens a speech bubble beside itself. The figure is the only game-like thing in the product; everything around it is calm, modern product chrome: a deep ink-navy for Scout's own surfaces (the dock tags, the bubble, Welcome, Home's nav), a cool off-white for reading (Home's pages and Settings), clean Onest type and one warm gold.
 
-Every colour, font, size, spacing step, radius and timing comes from one source, `packages/ui/src/office/tokens.ts` (`officeTokens`); components read only from there. Sprite palettes are character and furniture art and live with the sprites, not in the tokens. Sprites are plain data (a map of rows, a palette, optional overlay pixels) rendered as a CSS `box-shadow` on a single 1px element and scaled up by a whole number. No images, no canvas, no 3D.
+Tokens live in `packages/ui/src/office/tokens.ts` (`officeTokens`; the `office/` folder name is historical). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav and Welcome hard-code several hex values, recorded below as hard-coded. Sprites are plain data (rows, a palette, optional overlay pixels) drawn by `PixelSprite` as a CSS `box-shadow` on one 1px element, scaled by a whole number. No images, no canvas.
 
-The main surface is **Home**, the control centre: a 64px top bar, a 280px agent list, the themed scene in the centre (the Office floor today) and a light right panel with three tabs: Activity, the picked agent's controls, and Meetings. Status is always an icon plus a word. Motion is a stepped two-frame idle, off whenever the user asks for stillness.
+Scout's state is always a face plus a word: the eyes change per mood, a small tag says Seeing, Working or Done, and the accessible name says it in full. Motion is small and soft (a breath, a bob, a hop) and stops for reduced motion.
 
 **Key Characteristics:**
 
-- Ink-navy shell, off-white panels, pale concrete floor: three grounds, one per job.
-- Gold (`gold`) means selection and attention, and nothing else.
-- One colour per job class, used only on that class's label.
-- Pixel type for names and short labels; Onest for everything you read.
-- Sprites as data, drawn at integer scale only.
-- Stepped, never eased, motion; stops for reduced motion and the Still office toggle.
+- One pixel figure; modern chrome around it.
+- Navy for Scout's surfaces, off-white for reading.
+- Gold for the primary action, an on state and Scout's active marks; sky blue for focus and fields inside the bubble.
+- Pixel type for names, titles and short uppercase labels; Onest for every sentence and control.
+- Sprites as data, drawn at whole-number scales only (4 on the dock and Welcome, 3 in Home's nav, 2 in Activity).
+- Flat: tone and hairlines, no drop shadows.
 
 ## Colors
 
-A cool ink-navy shell and cool off-white panels frame a warm-grey concrete floor; a single warm gold carries selection, and each job class owns one saturated label colour.
+A cool ink-navy family and a cool off-white family, one warm gold, and a few signal colours (sky, green, red) that always travel with a word.
 
 ### Primary
 
-- **Party Gold** (gold): the selection ring on the chosen party row, the cursor that hops above the selected pet, the focus outline, text selection, the primary button fill and a pressed toggle's border and label. Ink on gold is always **Gold Ink** (gold-ink), the shell navy.
+- **Gold** (gold): the primary button fill (`tg-btn`, `bubble-primary`, Welcome's Start), a switch that is on, a pressed day toggle, the pressed mic, the Working tag, the listening dot, the speaking bars, the current intro step, the hand-off working dot, text selection and the focus ring in Settings. Ink on gold is always **Gold Ink** (gold-ink).
 
 ### Secondary
 
+- **Sky** (sky, hard-coded): inside the bubble, the focus ring, the ask field's border, links in an answer, the "hearing" listening dot; also the Seeing tag, the "Your companion" line in Home's nav and Welcome's link buttons.
+- **Done Green** (done-green, hard-coded): the Done tag on the dock and a found agent's dot in Welcome.
+- **Recording Red** (recording-red, hard-coded): the 8px rolling-memory dot on the dock, with a 1px white ring.
+
 ### Neutral
 
-- **Ink Navy** (shell-navy): the page and top bar; the darkest ground.
-- **Sidebar Navy** (sidebar-navy): the agent list, one step lighter than the page.
-- **Active Row Navy** (row-active): a hovered or selected party row.
-- **Avatar Tile** (avatar-tile): the square behind each party sprite.
-- **Field Navy** (field-navy) with **Field Line** (field-line): text inputs and the unpressed toggle border.
-- **Shell Line** (shell-line): the hairline under the top bar.
-- **Frost Text** (shell-text) and **Shell Muted** (shell-muted): primary and secondary text on navy; muted also carries status lines, placeholders and the party heading.
-- **Disabled Ink / Disabled Line** (disabled-ink, disabled-line): a disabled control's label and border; dimmer than muted, still 3:1 on the page.
-- **Free Chip** (chip-free / chip-free-ink): the "Free" status chip beside a room name.
-- **Panel White** (panel-white), **Panel Text** (panel-text), **Panel Muted** (panel-muted), **Panel Line** (panel-line), **Panel Tile** (panel-tile): the light meetings panel and its dividers.
-- **Scrollbar Thumb** (scrollbar-thumb): the 8px scrollbar.
+- **Ink Navy** (shell-navy, `color.page`): the bubble, the speech tail, Welcome, the standalone Settings bar.
+- **Sidebar Navy** (sidebar-navy): Home's nav, the full chat's header.
+- **Active Row Navy** (row-active): the current page in Home's nav (hard-coded there as `#1E2442`).
+- **Avatar Tile** (avatar-tile): the tile behind Scout in Home and Welcome, bubble chips, your own messages in the chat, inline code, hover on bubble icon buttons (mostly hard-coded as `#222845`).
+- **Field Navy / Field Line** (field-navy, field-line): fields and code blocks on navy; the bubble border, the tail edge, quiet-button borders, intro step dots.
+- **Shell Line** (shell-line): hairlines in the chat and the hand-off rows (hard-coded as `#262C4A`).
+- **Frost Text / Shell Muted / Soft Text** (shell-text, shell-muted, soft-text): text on navy, strongest to softest. Soft Text (`#C9CEE0`) is hard-coded: quiet-button labels, chips, heard speech, the brief.
+- **Paused Grey** (paused-grey, hard-coded): the dock's Paused chip and Welcome's disabled label and empty dots. **Disabled Line** (disabled-line): Welcome's disabled Start fill.
+- **Quote Line** (quote-line, hard-coded): answer blockquote rule; Welcome key-cap border.
+- **Navy Error** (navy-error-fill, navy-error-ink, hard-coded): error messages in the bubble and Welcome.
+- **Panel White / Card White** (panel-white, card-white): Home's page ground and its cards (white is hard-coded `#fff`).
+- **Panel Text / Panel Muted / Panel Line / Panel Tile** (panel-text, panel-muted, panel-line, panel-tile): text, secondary text, dividers and light fills on the light pages; Panel Tile is also the light field fill and the hover fill.
+- **Link** (link): links and disclosure text on the light pages.
+- **Status fills** (ok-, warn-, err- fill and ink; chip and chip-ink for neutral): status chips and alerts.
+- **Ready Green** (ready-green, hard-coded): the Overview's 8px ready dot, gold when something needs you.
+- **Scrollbar Thumb** (scrollbar-thumb): the 8px scrollbar in Settings.
 
 ### Named Rules
 
-**The Gold Means You Rule.** Gold marks what is selected, focused or needs the user: the selected row, the cursor, the focus ring, the primary action, a pressed toggle. It never decorates, never fills a panel, and never names a job class.
+**The Gold Means Active Rule.** Gold marks the one primary action, a control that is on or pressed, or Scout doing something right now. It never decorates and never fills more than a button, a chip or a dot.
 
-**The Three Grounds Rule.** Navy is chrome (bar, agent list), off-white is reading (panels, threads, the activity view, agent controls), pale concrete is the world (the floor). A new surface picks the ground for its job; it does not invent a fourth.
+**The Two Grounds Rule.** Navy is Scout's own voice (dock, bubble, Welcome, Home's nav); off-white is where you read and change things (Home's pages, Settings). A new surface picks one of the two.
 
 ## Typography
 
-**Display Font:** Pixelify Sans (with Onest, sans-serif), weights 400, 600, 700
-**Body Font:** Onest (with system-ui, sans-serif), weights 400, 600
+**Display Font:** Pixelify Sans (with Onest, sans-serif)
+**Body Font:** Onest (with system-ui, sans-serif)
+**Mono:** ui-monospace, Cascadia Mono, Consolas
 
-Both are bundled from `@fontsource` (Latin subset) so the window makes no network request.
+Home and the standalone Settings window bundle Onest 400/600 and Pixelify Sans 400/600/700 from `@fontsource` (Latin subset). Welcome bundles only Pixelify Sans 400; the bubble and dock windows bundle neither, so they fall back to the system stack.
 
-**Character:** A chunky pixel face gives the crew and their rooms game voice; a clean geometric sans keeps every sentence, control and number modern and easy to read.
+**Character:** A chunky pixel face gives Scout a name and a voice; a clean geometric sans keeps every sentence and control modern.
 
 ### Hierarchy
 
-- **Office title** (Pixelify 700, 20px, 0.5px tracking): the office name in the top bar, beside a 2x pet sprite.
-- **Pet name** (Pixelify 600, 17px): a pet's name in the agent list; also the empty-state line in the meetings panel.
-- **Panel heading, pixel** (Pixelify 600, 15px, 1px tracking, uppercase): short panel headings such as "AGENTS · 3".
-- **Room label** (Pixelify 700, 13px, 1px tracking, uppercase): meeting room names on the floor.
-- **Job class** (Pixelify 400, 11px, 1px tracking, uppercase): the job label under a pet name, in its class ink; desk name plates use the same style in Name Plate.
-- **Title** (Onest 600, 14px): buttons, inputs and the meetings panel's heading.
-- **Body lead** (Onest 400, 14px, 1.5 line height, max 300px): explanatory paragraphs such as empty-state text.
-- **Body** (Onest 400, 13px): header meta (rooms free), the toggle label, notices.
-- **Label** (Onest 400, 12px): status lines, panel sublines, the call meter labels.
-- **Label min** (Onest 600, 11px): room status chips. 11px is the floor; nothing in the office goes smaller.
+- **Welcome title** (Pixelify 700, 28px, 0.5px): "Hi, I'm Scout." in Welcome.
+- **Page title** (Onest 600, 20px): each Home page's heading.
+- **Companion name** (Pixelify 700, 18px, 0.5px): Scout's name in Home's nav; the chat header uses the same face at 16px.
+- **Panel heading, pixel** (Pixelify 600, 15px, 1px, uppercase): Settings section headings.
+- **Card label** (Pixelify 400, 12px, 1px, uppercase): Home card headings ("EXPERTS", "RECENT") and Welcome's section headings.
+- **Subhead** (Onest 600, 15px): Settings sub-headings, alert titles.
+- **Title** (Onest 600, 14px): buttons, nav items, Activity headlines, template names.
+- **Body lead** (Onest 400, 14px, 1.5): bubble text, answers, Home notes.
+- **Body** (Onest 400, 13px): card text, previews, the chat's messages, help text (1.55).
+- **Label** (Onest 400, 12px): meta lines, field labels, quiet bubble buttons, bubble chips.
+- **Label min** (Onest 600, 11px): chips, dock tags, bubble hints.
+- **Mono** (12px): an expert's live steps in the hand-off card; inline code in answers is 12.5px.
 
 ### Named Rules
 
-**The Pixel Is A Name Rule.** Pixelify Sans is for names and short labels only: pet names, job classes, room labels, desk plates, the office title and short panel headings. Sentences, controls, inputs, statuses and numbers are Onest.
+**The Pixel Is A Name Rule.** Pixelify Sans sets names, titles and short uppercase headings only. Sentences, controls, fields, statuses and numbers are Onest.
 
 **The 11px Floor Rule.** No functional text below 11px (`fontSize.min`).
 
 ## Layout
 
-Home is a fixed three-column desktop window (1440x800 by default) under a 64px top bar. The agent list is a fixed 280px column on Sidebar Navy; the theme's scene sits in the centre at its natural pixel size; the right panel takes the remaining width, with its tabs (Activity, the picked agent's name, Meetings) across the top. The top bar aligns its title block ("Home") to the agent column, then runs the assign field (flexible), the Assign button, the Still office toggle and the rooms-free meta.
+- **Dock:** Scout at scale 4 (64px) inside a 20px top and 4px side/bottom padding that leaves room for the tag; the avatar window's button is 96px square.
+- **Bubble:** a 420px-wide window (`PANEL_WIDTH`) that sizes its own height (80 to 520px; the full chat takes 520px). It has 10px of padding on the side the tail points to.
+- **Home:** a 1440x800 window (min 880x600). A fixed 232px nav (20px by 12px padding) and a fluid main column (24px by 32px padding, 20px between blocks). Overview cards sit in an auto-fit grid (min 260px, 16px gap); routine templates in an auto-fill grid (min 220px, 8px gap). Embedded Settings sits in the main column, max 820px.
+- **Welcome:** a 640x700 window, one column, 28px by 36px padding, 20px between sections, the Start button pinned to the bottom.
+- **Standalone Settings:** 1080x760, opened only when Tagalong starts without its engine; a 64px bar over a 280px nav (`size.headerHeight`, `size.partyWidth`).
 
-**The Chrome Never Moves Rule.** Home is fixed chrome around one themed scene. The top bar, the agent list, the right panel and every control keep the same place, size and look in every theme; a theme (`Theme` in `packages/ui/src/home/theme.ts`: an id, a name, a layout, sprites, scene tokens and one Scene renderer) only changes the centre scene. A theme never adds a control, and the chrome never reads a theme's scene tokens. The Office is the only theme today; a Restaurant or a Factory would be one more registry entry.
+Spacing runs on the token scale (2, 3, 4, 6, 8, 12, 16, 20, 24). The bubble and cards also use 14px, 28px and 32px, hard-coded. Controls are 40px tall in Home and Settings, 36px for the bubble's primary button, 44px for the bubble field and Welcome's Start, 28px for quiet bubble controls.
 
-Spacing runs on a small 2-to-24px scale (xxs 2, hair 3, xs 4, sm 6, md 8, lg 12, xl 16, xxl 20, xxxl 24). Controls are 40px tall. Party rows gap 6px; inside a row the sprite and text gap 12px.
-
-Sprites are drawn at whole-number scales (`spriteScale`).
-
-**The Integer Scale Rule.** A sprite is drawn at a whole-number scale (`spriteScale`) and nothing else. Pixel art scaled by a fraction smears.
+**The Integer Scale Rule.** A sprite is drawn at a whole-number scale and nothing else: 4 on the dock and in Welcome, 3 in Home's nav, 2 (`spriteScale.tile`) in Activity.
 
 ## Elevation & Depth
 
-Flat. The chrome uses tonal layering, not shadows: the page navy, a lighter sidebar navy, a lighter active-row navy, and hairline dividers (Shell Line on navy, Panel Line on off-white). The only `box-shadow`s are structural: every sprite is itself a box-shadow (one unblurred 1px shadow per pixel), and a meeting room's glass carries an inset 2px Room Shine highlight. Depth in the world comes from the pixel art (desk fronts, chair backs, the glass tint), not from the chrome.
+Flat. Depth is tonal: navy steps (page, sidebar, active row, tile) and hairlines (Shell Line and Field Line on navy, Panel Line on the light pages). The bubble is separated from the desktop by a 1px Field Line border, not a shadow.
 
 ### Shadow Vocabulary
 
-- **Sprite pixel** (`box-shadow: <x>px <y>px 0 0 <colour>`, one per painted pixel): how every character is drawn.
-- **Glass shine** (`box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.55)`): inside a meeting room's glass wall.
+- **Sprite pixel** (`box-shadow: <x>px <y>px 0 0 <colour>`, one per painted pixel): how Scout is drawn.
+- **Recording ring** (`box-shadow: 0 0 0 1px #fff`): the white ring around the recording dot.
 
-**The No Lift Rule.** Chrome never floats: no drop shadows on panels, rows, buttons or cards. Hierarchy is tone and hairlines.
+**The No Lift Rule.** No drop shadows on the bubble, cards, buttons or the nav.
 
 ## Shapes
 
-Modern chrome, square world. Controls and inputs use gently rounded 8px corners; party rows, avatar tiles and chips use 10px. The pixel world has no radius at all: rooms are square glass rectangles, the floor is a square 2px grid, call-meter segments are square blocks. Selection is a 2px gold border following the row's 10px radius. Icons are 14 to 16px stroked line SVGs (1.6 stroke, currentColor).
+Gently rounded chrome, square pixels. The bubble, Home cards and Welcome's tile use 12px; fields and primary buttons 8px; activity entries, templates, chips and Home's Scout tile 10px; quiet bubble buttons, icon buttons, key caps and error boxes 6px; dock tags and bubble chips are pills. 12px, 6px and the pill are hard-coded. The bubble's tail is a 14px square rotated 45 degrees with two bordered edges, 34px from the bottom, on the side Scout is on. Your own chat messages round three corners at 12px and the one nearest you at 4px. Icons are 14px stroked SVGs (1.6 stroke, currentColor).
 
 ## Components
 
-### Buttons
+### Scout on the dock (signature)
 
-Calm and solid; gold only where the action is primary.
+`DockPet` draws Scout's sprite at scale 4 with `role="img"` and a full label ("Scout is looking at your screen, sight paused"). Scout's palette (in `office/sprites/characters.ts`): outline and nose `#2A1B14`, fur `#E8873A`, inner ear `#F6B8A0`, muzzle `#FFF1E0`, eyes `#1B1B2A`, shirt `#3E8E5A` and `#2E6B44`, badge Gold. Moods change only the eye rows: idle, listening (eyes up), working (eyes down), done (a happy squint). A tag sits top right: **Seeing** on Sky, **Working** on Gold, **Done** on Done Green, all in Gold Ink, Onest 600 11px. **Paused** is a Paused Grey pill top left; the Recording Red dot sits bottom left while rolling memory is on and sight is not paused.
 
-- **Shape:** gently rounded (8px), 40px tall.
-- **Primary:** Party Gold fill and border, Gold Ink label, Onest 600 14px, 16px side padding.
-- **Disabled:** transparent fill, Disabled Line border, Disabled Ink label, not-allowed cursor.
-- **Toggle (Still office):** transparent with a Field Line border and Shell Muted label (Onest 600 13px, 12px padding); hover lifts the label to Frost Text; pressed (`aria-pressed`) turns border and label gold.
-- **Focus:** every focusable element shows a 2px gold outline at 2px offset.
+### The bubble
 
-### Inputs / Fields
+Ink Navy, 1px Field Line border, 12px radius, 14px by 16px padding, 12px gap, with the speech tail. States:
 
-- **Style:** Field Navy fill, 1px Field Line border, 8px radius, 40px tall, Onest 14px, Shell Muted placeholder.
-- **Focus:** the shared 2px gold outline.
-- **Disabled:** not-allowed cursor; a title explains why.
+- **Ask:** chips for what Scout can see (Avatar Tile pills, Soft Text, each with a 24px round remove button), then the field: Field Navy, a 1px Sky border, 44px, 14px text, with a 12px Shell Muted label. Gold **primary** (36px, 8px radius, 600) and **quiet** buttons (28px, 6px radius, 1px Field Line border, Soft Text 12px). A 28px close button (Shell Muted, Avatar Tile on hover).
+- **Answer:** Markdown at 14px/1.5, up to 260px then scrolling; code on Avatar Tile, code blocks on Field Navy, tables with Field Line borders, links in Sky (shown as text with the address on hover). Errors are a Navy Error box.
+- **Full chat:** the bubble at full height with a Sidebar Navy header (Scout's name in Pixelify 16px), a scrolling log (your messages right-aligned on Avatar Tile) and a footer with the field, both behind Shell Line hairlines.
+- **Intro:** three beats typed in at 22ms a character, held at full height so the bubble does not grow, with three 6px step dots (current one Gold), Next, then Try it now and Got it.
+- **Launch line:** one short line in a compact bubble (10px 8px 10px 14px padding) that fades out over 300ms.
+- **Listening and speaking:** a 28px mic button (Gold when on), heard speech in a Soft Text pill, an 8px pulsing dot (Gold while listening, Sky while hearing) and three 3px speaking bars in Gold driven by `--tg-voice-level`.
 
-### Navigation: Agent List
+### Cards in the bubble
 
-- **Style:** a `nav` ("Agents") on Sidebar Navy, 280px wide, headed by a pixel panel heading with the crew count ("AGENTS · 3"). Picking a row selects that agent in the scene and opens its controls in the right panel. A full-width **Add agent** button (toggle style) sits under the rows.
-- **Row:** a real button (`aria-pressed`) with a 2px transparent border, 10px radius and 8px padding: avatar tile (Avatar Tile, 4px padding, sprite at 3x), then pet name (pixel 17px), job class (pixel 11px in its class ink) and status line.
-- **Hover:** Active Row Navy fill. **Selected:** Active Row Navy fill and a gold border.
+The hand-off card, connector confirm card and routine card share `HANDOFF_CSS`: a lead sentence, then a definition list of rows between Shell Line hairlines (12px Shell Muted labels in a 56px column, 72px for the routine card; 13px values with 11px notes), a quiet button per row where a value can change, and one Gold primary plus quiet Cancel: **Send** for a hand-off, **Allow once** for a connector change, **Save** (or Pause, Turn on, Delete) for a routine. While an expert works, a Gold dot leads "Claude Code is on it" and its steps list in mono, the newest in Frost Text. Long details scroll inside 160px and take keyboard focus.
 
-### Status Line
+### Home
 
-Status is an icon and a word, never colour alone: a 14px stroked SVG plus "Working" or "At desk", Onest 12px in Shell Muted. A pet's monitor on the floor is lit (teal screen) while it is working.
+- **Nav:** Sidebar Navy, 232px. Scout's 56px Avatar Tile tile (sprite at 3) with the name and "Your companion" in Sky, then the seven pages (Overview, Scout, Experts, Routines, Connections, Activity, Settings) as 40px buttons in Onest 14px Shell Muted; hover Frost Text; current (`aria-current="page"`) on Active Row Navy in 600.
+- **Cards:** white, 1px Panel Line, 12px radius, 16px by 20px padding, a pixel card label, 13px Panel Muted text and a quiet button. The Overview card leads with a status dot and a word ("Ready").
+- **Activity:** entries are full-width buttons (`aria-expanded`), 10px radius, 8px padding: Scout's sprite at 2, an Onest 600 14px headline, a 12px meta line (a 14px state icon, the state word, tool, model, calls, time) and a 13px one-line preview. Hover and open fill Panel Tile; the open thread is indented behind a 2px Panel Line rule. "Show older" is a 40px quiet button.
+- **Routines:** template tiles (white, 2px Panel Line border, 10px radius, Panel Tile on hover) and day toggles (32px, min 52px, 1px Panel Muted border; Gold when pressed).
+- **Experts and Connections:** rows between Panel Line hairlines with status chips and switches.
 
-### Chips
+### Settings controls
 
-- **Room status:** Free Chip fill, Free Chip Ink label, Onest 600 11px, 2px 8px padding, 10px radius, beside the room's pixel label.
+Scoped under `.tg-settings`. **Primary** (`tg-btn`): Gold, 40px, 8px, Onest 600 14px, 16px padding. **Quiet** (`tg-btn-quiet`): transparent with a 1px border (Panel Muted on light pages, Field Line on navy). **Fields:** Panel Tile fill, 1px Panel Line border, 8px, 40px, 14px; invalid gets a 2px Err Ink border. **Chips:** 11px 600 pills at 10px radius, neutral, ok, warn or err, always with a word. **Switches** (`role="switch"`): 32px, min 64px, Panel Muted outline; on is Gold. **Choices:** 2px Panel Line border, Gold when checked. Embedded in Home, each section is a white card with a 12px radius and 24px by 28px padding. Alerts use the warn and err fills; ⓘ buttons are 24px round.
 
-### Right Panel Tabs
+### Welcome
 
-Off-white, under the top bar's right side: Activity, the picked agent's name, Meetings. Each tab is Onest 600 13px in Panel Muted, 40px tall, with a 2px transparent bottom border; the selected tab is Panel Text over a 2px gold underline (gold is selection). Left and right arrows move between tabs; every panel stays mounted.
+Ink Navy, one column. Scout at scale 4 on an 84px Avatar Tile tile beside the Welcome title and a Soft Text paragraph. Each section has a pixel card label over a Field Navy list (1px Field Line, 8px radius, 52px rows). Found agents show a 10px dot, filled Done Green when found. Link buttons are 32px with Sky text; key caps are Avatar Tile with a 3px bottom border. Start is Gold, 44px, 28px padding, 15px 600; disabled it turns Disabled Line with Paused Grey text.
 
-### Activity View
+## Motion
 
-The Activity tab lists what the crew did, newest first, on Panel White. Each entry is a real button (`aria-expanded`) with a 10px radius and 8px padding: the pet's sprite at 2x, a headline in Onest 600 14px ("Scout answered", "Scout asked Bolt", "Scout handed off to Ink", "Ink started a roundtable"), a meta line in Onest 12px Panel Muted (a 14px state icon and its word, Working, Done, Failed or Stopped, then the model, the call count and the time), and a one-line Onest 13px preview. Hover and open fill Panel Tile. Open, the thread sits below, indented past the sprite behind a 2px Panel Line rule: small Onest 600 12px labels ("Asked", "Bolt answered") over Onest 13px text at 1.5 line height. "Show older" (quiet button) pages back.
+- **Dock:** idle and listening breathe (2.8s ease-in-out, 1px up, endless); working bobs (0.9s, 2px); done hops three times (0.7s ease-out, 8px). Blinks last 140ms, every 3 to 6 seconds, only with open eyes (idle, listening).
+- **Bubble:** the intro and launch line enter over 220ms (fade and 4px rise, ease-out); the launch line leaves over 300ms (fade and 4px drop). Intro text types at 22ms a character. The listening dot pulses (1.2s, to 35% opacity); speaking bars follow the voice level with a 90ms linear transition.
 
-### Agent Controls
+Under `prefers-reduced-motion: reduce`: the dock body stops, the bubble appears and leaves without moving, the dot stops pulsing, the bars hold at 60%, and intro beats appear whole. The blink still runs.
 
-The picked agent's tab is the Settings pet editor in one column on Panel White: role picker, brain with the Recommended or Your choice chip, tool switches, notes, the directory card (static, not sticky), look and reply, a **Desktop pet** group, then "Save Name" (primary gold) and a quiet "Delete Name" that asks once more.
+## Accessibility
 
-### Meetings Panel
-
-Off-white reading surface: a heading block (Onest 600 14px plus a 12px muted subline) over a Panel Line divider, the thread area, and a call meter of 12 square 10px-tall segments (Meter Off when unlit) between "Calls" and a count. Empty state: two crew sprites at 3x, a pixel "No meetings yet" line and a 300px Onest paragraph.
-
-### Pixel Sprite (signature)
-
-Any sprite is data: `rows` (one character per pixel, `.` transparent), a `palette` mapping characters to colours, and optional `overlay` pixels (`[x, y, key]`) painted on top so characters share one 16x16 body and differ by palette and a few pixels. `PixelSprite` draws it as a box-shadow on one 1px element scaled by `transform: scale(n)` with n a whole number; it is `aria-hidden`, and the name beside it is what assistive tech reads. Characters live in `sprites/characters.ts` keyed by pet id (adding a character is adding an entry).
+- **Reduced motion** is honoured everywhere above.
+- **Status is never colour alone:** dock tags are words, the Paused chip says Paused, the recording dot has a title and is in Scout's label, Activity states are an icon plus a word, chips carry words, the Overview dot sits beside "Ready".
+- **Focus rings:** 2px at 2px offset, Gold in Settings (`.tg-settings :focus-visible`) and Sky in the bubble. Home's own nav and cards, and Welcome, set no focus style and fall back to the browser outline.
+- **The sprite:** `PixelSprite` is `aria-hidden`; on the dock the wrapper is `role="img"` with Scout's name and state. Intro beats are announced whole through a hidden status line while the visible text types. The chat log is `role="log"`; errors are `role="alert"`; expert steps are `aria-live="polite"`.
 
 ## Do's and Don'ts
 
 ### Do:
 
-- **Do** take every colour, size, space, radius and timing from `officeTokens`; add a token before adding a value.
-- **Do** draw characters as sprite data (rows, palette, overlay) through `PixelSprite`, at a whole-number `spriteScale`.
-- **Do** reserve gold for selection, focus, the cursor and the one primary action on a surface.
-- **Do** pair every status with an icon and a word.
-- **Do** keep pixel type to names and short labels; set sentences, controls and numbers in Onest.
-- **Do** make every idle animation stepped and stop it for `prefers-reduced-motion` and the Still office setting.
-- **Do** build Hire a pet, Pet settings and the chat panel from these tokens: navy chrome, off-white reading panels, 40px gold primary button, 8px fields, the gold focus ring, party-row selection for choosing a pet or class, sprites at scale 3 for previews and 2 for small marks, and character ink for job labels.
+- **Do** take colours, sizes, spacing and radii from `officeTokens`; add a token before adding another hard-coded value.
+- **Do** draw Scout as sprite data through `PixelSprite`, at a whole-number scale.
+- **Do** keep gold for the one primary action, an on or pressed control, and Scout's active marks.
+- **Do** pair every status with a word (and an icon where there is room).
+- **Do** keep pixel type to names, titles and short uppercase headings; set sentences and controls in Onest.
+- **Do** stop every animation under `prefers-reduced-motion`.
+- **Do** build new bubble cards from `HANDOFF_CSS`: a lead sentence, labelled rows, one Gold primary and a quiet Cancel.
 
 ### Don't:
 
-- **Don't** scale a sprite by a fraction, smooth it, or replace it with an image or icon.
-- **Don't** use gold for decoration, job classes, or fills larger than a button.
+- **Don't** scale a sprite by a fraction, smooth it, or replace it with an image.
+- **Don't** use gold for decoration or fills larger than a button.
 - **Don't** signal state by colour alone.
-- **Don't** set body copy, inputs, errors or any sentence in Pixelify Sans, or any text below 11px.
-- **Don't** ease the idle motion or add motion that cannot be stopped.
-- **Don't** add drop shadows to chrome; separate with tone and hairlines.
-- **Don't** reintroduce the wooden, old-RPG office or the generic chat-sidebar assistant look.
+- **Don't** set sentences, fields or errors in Pixelify Sans, or any text below 11px.
+- **Don't** add drop shadows; separate with tone and hairlines.

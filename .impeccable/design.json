@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-07T15:14:13.734Z",
+  "generatedAt": "2026-10-14T08:02:58.827Z",
   "title": "Design System: Tagalong",
   "extensions": {
     "colorMeta": {
@@ -8,6 +8,7 @@
         "role": "neutral",
         "displayName": "Ink Navy",
         "canonical": "#12162B",
+        "source": "officeTokens.color.page",
         "tonalRamp": [
           "oklch(15% 0.042 274.0)",
           "oklch(26% 0.042 274.0)",
@@ -23,6 +24,7 @@
         "role": "neutral",
         "displayName": "Frost Text",
         "canonical": "#E9ECF5",
+        "source": "officeTokens.color.text",
         "tonalRamp": [
           "oklch(15% 0.013 271.3)",
           "oklch(26% 0.013 271.3)",
@@ -38,6 +40,7 @@
         "role": "neutral",
         "displayName": "Shell Muted",
         "canonical": "#A3AAC4",
+        "source": "officeTokens.color.textMuted",
         "tonalRamp": [
           "oklch(15% 0.038 273.5)",
           "oklch(26% 0.038 273.5)",
@@ -53,6 +56,7 @@
         "role": "neutral",
         "displayName": "Shell Line",
         "canonical": "#262C4A",
+        "source": "officeTokens.color.line",
         "tonalRamp": [
           "oklch(15% 0.055 274.1)",
           "oklch(26% 0.055 274.1)",
@@ -68,6 +72,7 @@
         "role": "neutral",
         "displayName": "Sidebar Navy",
         "canonical": "#171C33",
+        "source": "officeTokens.color.sidebar",
         "tonalRamp": [
           "oklch(15% 0.045 273.2)",
           "oklch(26% 0.045 273.2)",
@@ -83,6 +88,7 @@
         "role": "neutral",
         "displayName": "Active Row Navy",
         "canonical": "#1E2442",
+        "source": "officeTokens.color.rowActive",
         "tonalRamp": [
           "oklch(15% 0.056 273.5)",
           "oklch(26% 0.056 273.5)",
@@ -98,6 +104,7 @@
         "role": "neutral",
         "displayName": "Avatar Tile",
         "canonical": "#222845",
+        "source": "officeTokens.color.avatarTile",
         "tonalRamp": [
           "oklch(15% 0.054 273.7)",
           "oklch(26% 0.054 273.7)",
@@ -113,6 +120,7 @@
         "role": "neutral",
         "displayName": "Field Navy",
         "canonical": "#1A1F3A",
+        "source": "officeTokens.color.field",
         "tonalRamp": [
           "oklch(15% 0.052 274.1)",
           "oklch(26% 0.052 274.1)",
@@ -128,6 +136,7 @@
         "role": "neutral",
         "displayName": "Field Line",
         "canonical": "#2E3558",
+        "source": "officeTokens.color.fieldLine",
         "tonalRamp": [
           "oklch(15% 0.062 274.1)",
           "oklch(26% 0.062 274.1)",
@@ -139,40 +148,11 @@
           "oklch(95% 0.062 274.1)"
         ]
       },
-      "disabled-ink": {
-        "role": "neutral",
-        "displayName": "Disabled Ink",
-        "canonical": "#6B7290",
-        "tonalRamp": [
-          "oklch(15% 0.047 274.5)",
-          "oklch(26% 0.047 274.5)",
-          "oklch(37% 0.047 274.5)",
-          "oklch(48% 0.047 274.5)",
-          "oklch(60% 0.047 274.5)",
-          "oklch(72% 0.047 274.5)",
-          "oklch(84% 0.047 274.5)",
-          "oklch(95% 0.047 274.5)"
-        ]
-      },
-      "disabled-line": {
-        "role": "neutral",
-        "displayName": "Disabled Line",
-        "canonical": "#2A3050",
-        "tonalRamp": [
-          "oklch(15% 0.058 274.6)",
-          "oklch(26% 0.058 274.6)",
-          "oklch(37% 0.058 274.6)",
-          "oklch(48% 0.058 274.6)",
-          "oklch(60% 0.058 274.6)",
-          "oklch(72% 0.058 274.6)",
-          "oklch(84% 0.058 274.6)",
-          "oklch(95% 0.058 274.6)"
-        ]
-      },
       "gold": {
         "role": "primary",
-        "displayName": "Party Gold",
+        "displayName": "Gold",
         "canonical": "#F2C14E",
+        "source": "officeTokens.color.gold",
         "tonalRamp": [
           "oklch(15% 0.141 85.4)",
           "oklch(26% 0.141 85.4)",
@@ -188,6 +168,7 @@
         "role": "primary",
         "displayName": "Gold Ink",
         "canonical": "#12162B",
+        "source": "officeTokens.color.goldInk",
         "tonalRamp": [
           "oklch(15% 0.042 274.0)",
           "oklch(26% 0.042 274.0)",
@@ -199,140 +180,155 @@
           "oklch(95% 0.042 274.0)"
         ]
       },
-      "concrete-floor": {
-        "role": "neutral",
-        "displayName": "Pale Concrete",
-        "canonical": "#DCDBD7",
+      "sky": {
+        "role": "secondary",
+        "displayName": "Sky",
+        "canonical": "#7CB8F2",
+        "source": "hard-coded",
         "tonalRamp": [
-          "oklch(15% 0.006 95.1)",
-          "oklch(26% 0.006 95.1)",
-          "oklch(37% 0.006 95.1)",
-          "oklch(48% 0.006 95.1)",
-          "oklch(60% 0.006 95.1)",
-          "oklch(72% 0.006 95.1)",
-          "oklch(84% 0.006 95.1)",
-          "oklch(95% 0.006 95.1)"
+          "oklch(15% 0.104 248.5)",
+          "oklch(26% 0.104 248.5)",
+          "oklch(37% 0.104 248.5)",
+          "oklch(48% 0.104 248.5)",
+          "oklch(60% 0.104 248.5)",
+          "oklch(72% 0.104 248.5)",
+          "oklch(84% 0.104 248.5)",
+          "oklch(95% 0.104 248.5)"
         ]
       },
-      "floor-grid": {
+      "soft-text": {
         "role": "neutral",
-        "displayName": "Floor Grid",
-        "canonical": "#D0CFCA",
+        "displayName": "Soft Text",
+        "canonical": "#C9CEE0",
+        "source": "hard-coded",
         "tonalRamp": [
-          "oklch(15% 0.007 97.4)",
-          "oklch(26% 0.007 97.4)",
-          "oklch(37% 0.007 97.4)",
-          "oklch(48% 0.007 97.4)",
-          "oklch(60% 0.007 97.4)",
-          "oklch(72% 0.007 97.4)",
-          "oklch(84% 0.007 97.4)",
-          "oklch(95% 0.007 97.4)"
+          "oklch(15% 0.026 273.5)",
+          "oklch(26% 0.026 273.5)",
+          "oklch(37% 0.026 273.5)",
+          "oklch(48% 0.026 273.5)",
+          "oklch(60% 0.026 273.5)",
+          "oklch(72% 0.026 273.5)",
+          "oklch(84% 0.026 273.5)",
+          "oklch(95% 0.026 273.5)"
         ]
       },
-      "wall": {
-        "role": "neutral",
-        "displayName": "Wall Navy",
-        "canonical": "#2B3150",
+      "done-green": {
+        "role": "secondary",
+        "displayName": "Done Green",
+        "canonical": "#7DD87F",
+        "source": "hard-coded",
         "tonalRamp": [
-          "oklch(15% 0.056 274.5)",
-          "oklch(26% 0.056 274.5)",
-          "oklch(37% 0.056 274.5)",
-          "oklch(48% 0.056 274.5)",
-          "oklch(60% 0.056 274.5)",
-          "oklch(72% 0.056 274.5)",
-          "oklch(84% 0.056 274.5)",
-          "oklch(95% 0.056 274.5)"
+          "oklch(15% 0.151 144.5)",
+          "oklch(26% 0.151 144.5)",
+          "oklch(37% 0.151 144.5)",
+          "oklch(48% 0.151 144.5)",
+          "oklch(60% 0.151 144.5)",
+          "oklch(72% 0.151 144.5)",
+          "oklch(84% 0.151 144.5)",
+          "oklch(95% 0.151 144.5)"
         ]
       },
-      "room-glass": {
+      "paused-grey": {
         "role": "neutral",
-        "displayName": "Room Glass",
-        "canonical": "#9FCBE0",
+        "displayName": "Paused Grey",
+        "canonical": "#6B7290",
+        "source": "hard-coded",
         "tonalRamp": [
-          "oklch(15% 0.055 228.7)",
-          "oklch(26% 0.055 228.7)",
-          "oklch(37% 0.055 228.7)",
-          "oklch(48% 0.055 228.7)",
-          "oklch(60% 0.055 228.7)",
-          "oklch(72% 0.055 228.7)",
-          "oklch(84% 0.055 228.7)",
-          "oklch(95% 0.055 228.7)"
+          "oklch(15% 0.047 274.5)",
+          "oklch(26% 0.047 274.5)",
+          "oklch(37% 0.047 274.5)",
+          "oklch(48% 0.047 274.5)",
+          "oklch(60% 0.047 274.5)",
+          "oklch(72% 0.047 274.5)",
+          "oklch(84% 0.047 274.5)",
+          "oklch(95% 0.047 274.5)"
         ]
       },
-      "room-fill": {
-        "role": "neutral",
-        "displayName": "Room Fill",
-        "canonical": "rgba(176, 214, 232, 0.22)"
-      },
-      "room-shine": {
-        "role": "neutral",
-        "displayName": "Room Shine",
-        "canonical": "rgba(255, 255, 255, 0.55)"
-      },
-      "room-label": {
-        "role": "neutral",
-        "displayName": "Room Label",
-        "canonical": "#2B3150",
+      "recording-red": {
+        "role": "secondary",
+        "displayName": "Recording Red",
+        "canonical": "#E5484D",
+        "source": "hard-coded",
         "tonalRamp": [
-          "oklch(15% 0.056 274.5)",
-          "oklch(26% 0.056 274.5)",
-          "oklch(37% 0.056 274.5)",
-          "oklch(48% 0.056 274.5)",
-          "oklch(60% 0.056 274.5)",
-          "oklch(72% 0.056 274.5)",
-          "oklch(84% 0.056 274.5)",
-          "oklch(95% 0.056 274.5)"
+          "oklch(15% 0.193 23.0)",
+          "oklch(26% 0.193 23.0)",
+          "oklch(37% 0.193 23.0)",
+          "oklch(48% 0.193 23.0)",
+          "oklch(60% 0.193 23.0)",
+          "oklch(72% 0.193 23.0)",
+          "oklch(84% 0.193 23.0)",
+          "oklch(95% 0.193 23.0)"
         ]
       },
-      "chip-free": {
+      "disabled-line": {
         "role": "neutral",
-        "displayName": "Free Chip",
-        "canonical": "#E6E9F2",
+        "displayName": "Disabled Line",
+        "canonical": "#2A3050",
+        "source": "hard-coded",
         "tonalRamp": [
-          "oklch(15% 0.013 271.3)",
-          "oklch(26% 0.013 271.3)",
-          "oklch(37% 0.013 271.3)",
-          "oklch(48% 0.013 271.3)",
-          "oklch(60% 0.013 271.3)",
-          "oklch(72% 0.013 271.3)",
-          "oklch(84% 0.013 271.3)",
-          "oklch(95% 0.013 271.3)"
+          "oklch(15% 0.058 274.6)",
+          "oklch(26% 0.058 274.6)",
+          "oklch(37% 0.058 274.6)",
+          "oklch(48% 0.058 274.6)",
+          "oklch(60% 0.058 274.6)",
+          "oklch(72% 0.058 274.6)",
+          "oklch(84% 0.058 274.6)",
+          "oklch(95% 0.058 274.6)"
         ]
       },
-      "chip-free-ink": {
+      "quote-line": {
         "role": "neutral",
-        "displayName": "Free Chip Ink",
-        "canonical": "#4A5168",
+        "displayName": "Quote Line",
+        "canonical": "#3A4270",
+        "source": "hard-coded",
         "tonalRamp": [
-          "oklch(15% 0.039 271.5)",
-          "oklch(26% 0.039 271.5)",
-          "oklch(37% 0.039 271.5)",
-          "oklch(48% 0.039 271.5)",
-          "oklch(60% 0.039 271.5)",
-          "oklch(72% 0.039 271.5)",
-          "oklch(84% 0.039 271.5)",
-          "oklch(95% 0.039 271.5)"
+          "oklch(15% 0.078 274.8)",
+          "oklch(26% 0.078 274.8)",
+          "oklch(37% 0.078 274.8)",
+          "oklch(48% 0.078 274.8)",
+          "oklch(60% 0.078 274.8)",
+          "oklch(72% 0.078 274.8)",
+          "oklch(84% 0.078 274.8)",
+          "oklch(95% 0.078 274.8)"
         ]
       },
-      "name-plate": {
+      "navy-error-fill": {
         "role": "neutral",
-        "displayName": "Name Plate",
-        "canonical": "#3F465C",
+        "displayName": "Navy Error Fill",
+        "canonical": "#3A1D2A",
+        "source": "hard-coded",
         "tonalRamp": [
-          "oklch(15% 0.038 270.9)",
-          "oklch(26% 0.038 270.9)",
-          "oklch(37% 0.038 270.9)",
-          "oklch(48% 0.038 270.9)",
-          "oklch(60% 0.038 270.9)",
-          "oklch(72% 0.038 270.9)",
-          "oklch(84% 0.038 270.9)",
-          "oklch(95% 0.038 270.9)"
+          "oklch(15% 0.049 352.5)",
+          "oklch(26% 0.049 352.5)",
+          "oklch(37% 0.049 352.5)",
+          "oklch(48% 0.049 352.5)",
+          "oklch(60% 0.049 352.5)",
+          "oklch(72% 0.049 352.5)",
+          "oklch(84% 0.049 352.5)",
+          "oklch(95% 0.049 352.5)"
+        ]
+      },
+      "navy-error-ink": {
+        "role": "neutral",
+        "displayName": "Navy Error Ink",
+        "canonical": "#FFB4C0",
+        "source": "hard-coded",
+        "tonalRamp": [
+          "oklch(15% 0.088 8.6)",
+          "oklch(26% 0.088 8.6)",
+          "oklch(37% 0.088 8.6)",
+          "oklch(48% 0.088 8.6)",
+          "oklch(60% 0.088 8.6)",
+          "oklch(72% 0.088 8.6)",
+          "oklch(84% 0.088 8.6)",
+          "oklch(95% 0.088 8.6)"
         ]
       },
       "panel-white": {
         "role": "neutral",
         "displayName": "Panel White",
         "canonical": "#F6F7FB",
+        "source": "officeTokens.color.panel",
         "tonalRamp": [
           "oklch(15% 0.005 275.0)",
           "oklch(26% 0.005 275.0)",
@@ -344,10 +340,27 @@
           "oklch(95% 0.005 275.0)"
         ]
       },
+      "card-white": {
+        "role": "neutral",
+        "displayName": "Card White",
+        "canonical": "#FFFFFF",
+        "source": "hard-coded",
+        "tonalRamp": [
+          "oklch(15% 0.000 0)",
+          "oklch(26% 0.000 0)",
+          "oklch(37% 0.000 0)",
+          "oklch(48% 0.000 0)",
+          "oklch(60% 0.000 0)",
+          "oklch(72% 0.000 0)",
+          "oklch(84% 0.000 0)",
+          "oklch(95% 0.000 0)"
+        ]
+      },
       "panel-text": {
         "role": "neutral",
         "displayName": "Panel Text",
         "canonical": "#12162B",
+        "source": "officeTokens.color.panelText",
         "tonalRamp": [
           "oklch(15% 0.042 274.0)",
           "oklch(26% 0.042 274.0)",
@@ -363,6 +376,7 @@
         "role": "neutral",
         "displayName": "Panel Muted",
         "canonical": "#5A6178",
+        "source": "officeTokens.color.panelMuted",
         "tonalRamp": [
           "oklch(15% 0.038 271.7)",
           "oklch(26% 0.038 271.7)",
@@ -378,6 +392,7 @@
         "role": "neutral",
         "displayName": "Panel Line",
         "canonical": "#E0E3EC",
+        "source": "officeTokens.color.panelLine",
         "tonalRamp": [
           "oklch(15% 0.013 271.3)",
           "oklch(26% 0.013 271.3)",
@@ -393,6 +408,7 @@
         "role": "neutral",
         "displayName": "Panel Tile",
         "canonical": "#E6E9F2",
+        "source": "officeTokens.color.panelTile",
         "tonalRamp": [
           "oklch(15% 0.013 271.3)",
           "oklch(26% 0.013 271.3)",
@@ -404,10 +420,11 @@
           "oklch(95% 0.013 271.3)"
         ]
       },
-      "meter-off": {
+      "chip": {
         "role": "neutral",
-        "displayName": "Meter Off",
-        "canonical": "#E0E3EC",
+        "displayName": "Neutral Chip",
+        "canonical": "#E6E9F2",
+        "source": "officeTokens.color.chipFree",
         "tonalRamp": [
           "oklch(15% 0.013 271.3)",
           "oklch(26% 0.013 271.3)",
@@ -417,12 +434,157 @@
           "oklch(72% 0.013 271.3)",
           "oklch(84% 0.013 271.3)",
           "oklch(95% 0.013 271.3)"
+        ]
+      },
+      "chip-ink": {
+        "role": "neutral",
+        "displayName": "Neutral Chip Ink",
+        "canonical": "#4A5168",
+        "source": "officeTokens.color.chipFreeInk",
+        "tonalRamp": [
+          "oklch(15% 0.039 271.5)",
+          "oklch(26% 0.039 271.5)",
+          "oklch(37% 0.039 271.5)",
+          "oklch(48% 0.039 271.5)",
+          "oklch(60% 0.039 271.5)",
+          "oklch(72% 0.039 271.5)",
+          "oklch(84% 0.039 271.5)",
+          "oklch(95% 0.039 271.5)"
+        ]
+      },
+      "link": {
+        "role": "neutral",
+        "displayName": "Link",
+        "canonical": "#3D4A8A",
+        "source": "officeTokens.color.link",
+        "tonalRamp": [
+          "oklch(15% 0.106 272.6)",
+          "oklch(26% 0.106 272.6)",
+          "oklch(37% 0.106 272.6)",
+          "oklch(48% 0.106 272.6)",
+          "oklch(60% 0.106 272.6)",
+          "oklch(72% 0.106 272.6)",
+          "oklch(84% 0.106 272.6)",
+          "oklch(95% 0.106 272.6)"
+        ]
+      },
+      "ok-fill": {
+        "role": "neutral",
+        "displayName": "OK Fill",
+        "canonical": "#E3F1E6",
+        "source": "officeTokens.color.okFill",
+        "tonalRamp": [
+          "oklch(15% 0.021 152.2)",
+          "oklch(26% 0.021 152.2)",
+          "oklch(37% 0.021 152.2)",
+          "oklch(48% 0.021 152.2)",
+          "oklch(60% 0.021 152.2)",
+          "oklch(72% 0.021 152.2)",
+          "oklch(84% 0.021 152.2)",
+          "oklch(95% 0.021 152.2)"
+        ]
+      },
+      "ok-ink": {
+        "role": "neutral",
+        "displayName": "OK Ink",
+        "canonical": "#1F5A2E",
+        "source": "officeTokens.color.okInk",
+        "tonalRamp": [
+          "oklch(15% 0.094 149.0)",
+          "oklch(26% 0.094 149.0)",
+          "oklch(37% 0.094 149.0)",
+          "oklch(48% 0.094 149.0)",
+          "oklch(60% 0.094 149.0)",
+          "oklch(72% 0.094 149.0)",
+          "oklch(84% 0.094 149.0)",
+          "oklch(95% 0.094 149.0)"
+        ]
+      },
+      "warn-fill": {
+        "role": "neutral",
+        "displayName": "Warn Fill",
+        "canonical": "#FFF4D6",
+        "source": "officeTokens.color.warnFill",
+        "tonalRamp": [
+          "oklch(15% 0.041 90.2)",
+          "oklch(26% 0.041 90.2)",
+          "oklch(37% 0.041 90.2)",
+          "oklch(48% 0.041 90.2)",
+          "oklch(60% 0.041 90.2)",
+          "oklch(72% 0.041 90.2)",
+          "oklch(84% 0.041 90.2)",
+          "oklch(95% 0.041 90.2)"
+        ]
+      },
+      "warn-ink": {
+        "role": "neutral",
+        "displayName": "Warn Ink",
+        "canonical": "#5C4600",
+        "source": "officeTokens.color.warnInk",
+        "tonalRamp": [
+          "oklch(15% 0.083 88.1)",
+          "oklch(26% 0.083 88.1)",
+          "oklch(37% 0.083 88.1)",
+          "oklch(48% 0.083 88.1)",
+          "oklch(60% 0.083 88.1)",
+          "oklch(72% 0.083 88.1)",
+          "oklch(84% 0.083 88.1)",
+          "oklch(95% 0.083 88.1)"
+        ]
+      },
+      "err-fill": {
+        "role": "neutral",
+        "displayName": "Error Fill",
+        "canonical": "#FDE7E5",
+        "source": "officeTokens.color.errFill",
+        "tonalRamp": [
+          "oklch(15% 0.024 23.8)",
+          "oklch(26% 0.024 23.8)",
+          "oklch(37% 0.024 23.8)",
+          "oklch(48% 0.024 23.8)",
+          "oklch(60% 0.024 23.8)",
+          "oklch(72% 0.024 23.8)",
+          "oklch(84% 0.024 23.8)",
+          "oklch(95% 0.024 23.8)"
+        ]
+      },
+      "err-ink": {
+        "role": "neutral",
+        "displayName": "Error Ink",
+        "canonical": "#8A1C12",
+        "source": "officeTokens.color.errInk",
+        "tonalRamp": [
+          "oklch(15% 0.147 29.8)",
+          "oklch(26% 0.147 29.8)",
+          "oklch(37% 0.147 29.8)",
+          "oklch(48% 0.147 29.8)",
+          "oklch(60% 0.147 29.8)",
+          "oklch(72% 0.147 29.8)",
+          "oklch(84% 0.147 29.8)",
+          "oklch(95% 0.147 29.8)"
+        ]
+      },
+      "ready-green": {
+        "role": "neutral",
+        "displayName": "Ready Green",
+        "canonical": "#2F9E44",
+        "source": "hard-coded",
+        "tonalRamp": [
+          "oklch(15% 0.162 146.4)",
+          "oklch(26% 0.162 146.4)",
+          "oklch(37% 0.162 146.4)",
+          "oklch(48% 0.162 146.4)",
+          "oklch(60% 0.162 146.4)",
+          "oklch(72% 0.162 146.4)",
+          "oklch(84% 0.162 146.4)",
+          "oklch(95% 0.162 146.4)"
         ]
       },
       "scrollbar-thumb": {
         "role": "neutral",
         "displayName": "Scrollbar Thumb",
         "canonical": "#CDD2DE",
+        "source": "officeTokens.color.scrollbarThumb",
         "tonalRamp": [
           "oklch(15% 0.017 267.8)",
           "oklch(26% 0.017 267.8)",
@@ -433,143 +595,56 @@
           "oklch(84% 0.017 267.8)",
           "oklch(95% 0.017 267.8)"
         ]
-      },
-      "scrim": {
-        "role": "neutral",
-        "displayName": "Scrim",
-        "canonical": "rgba(18, 22, 43, 0.72)"
-      },
-      "job-generalist": {
-        "role": "secondary",
-        "displayName": "Generalist Teal",
-        "canonical": "#4FD1C1",
-        "tonalRamp": [
-          "oklch(15% 0.116 183.8)",
-          "oklch(26% 0.116 183.8)",
-          "oklch(37% 0.116 183.8)",
-          "oklch(48% 0.116 183.8)",
-          "oklch(60% 0.116 183.8)",
-          "oklch(72% 0.116 183.8)",
-          "oklch(84% 0.116 183.8)",
-          "oklch(95% 0.116 183.8)"
-        ]
-      },
-      "job-writer": {
-        "role": "secondary",
-        "displayName": "Writer Violet",
-        "canonical": "#A996F5",
-        "tonalRamp": [
-          "oklch(15% 0.136 291.8)",
-          "oklch(26% 0.136 291.8)",
-          "oklch(37% 0.136 291.8)",
-          "oklch(48% 0.136 291.8)",
-          "oklch(60% 0.136 291.8)",
-          "oklch(72% 0.136 291.8)",
-          "oklch(84% 0.136 291.8)",
-          "oklch(95% 0.136 291.8)"
-        ]
-      },
-      "job-backend": {
-        "role": "secondary",
-        "displayName": "Backend Amber",
-        "canonical": "#F6B85A",
-        "tonalRamp": [
-          "oklch(15% 0.132 75.4)",
-          "oklch(26% 0.132 75.4)",
-          "oklch(37% 0.132 75.4)",
-          "oklch(48% 0.132 75.4)",
-          "oklch(60% 0.132 75.4)",
-          "oklch(72% 0.132 75.4)",
-          "oklch(84% 0.132 75.4)",
-          "oklch(95% 0.132 75.4)"
-        ]
-      },
-      "job-frontend": {
-        "role": "secondary",
-        "displayName": "Frontend Pink",
-        "canonical": "#F28DB8",
-        "tonalRamp": [
-          "oklch(15% 0.132 353.7)",
-          "oklch(26% 0.132 353.7)",
-          "oklch(37% 0.132 353.7)",
-          "oklch(48% 0.132 353.7)",
-          "oklch(60% 0.132 353.7)",
-          "oklch(72% 0.132 353.7)",
-          "oklch(84% 0.132 353.7)",
-          "oklch(95% 0.132 353.7)"
-        ]
-      },
-      "job-companion": {
-        "role": "secondary",
-        "displayName": "Companion Sky",
-        "canonical": "#7CB8F2",
-        "tonalRamp": [
-          "oklch(15% 0.098 250)",
-          "oklch(26% 0.098 250)",
-          "oklch(37% 0.098 250)",
-          "oklch(48% 0.098 250)",
-          "oklch(60% 0.098 250)",
-          "oklch(72% 0.098 250)",
-          "oklch(84% 0.098 250)",
-          "oklch(95% 0.098 250)"
-        ]
-      },
-      "job-researcher": {
-        "role": "secondary",
-        "displayName": "Researcher Green",
-        "canonical": "#7DD87F",
-        "tonalRamp": [
-          "oklch(15% 0.151 144.5)",
-          "oklch(26% 0.151 144.5)",
-          "oklch(37% 0.151 144.5)",
-          "oklch(48% 0.151 144.5)",
-          "oklch(60% 0.151 144.5)",
-          "oklch(72% 0.151 144.5)",
-          "oklch(84% 0.151 144.5)",
-          "oklch(95% 0.151 144.5)"
-        ]
       }
     },
     "typographyMeta": {
-      "office-title": {
-        "displayName": "Office title",
-        "purpose": "The office name in the top bar."
+      "welcome-title": {
+        "displayName": "Welcome title",
+        "purpose": "The greeting at the top of Welcome."
       },
-      "pet-name": {
-        "displayName": "Pet name",
-        "purpose": "A pet's name in the party list; pixel empty-state lines."
+      "page-title": {
+        "displayName": "Page title",
+        "purpose": "Each Home page's heading."
+      },
+      "companion-name": {
+        "displayName": "Companion name",
+        "purpose": "Scout's name in Home's nav (16px in the chat header)."
       },
       "panel-heading-pixel": {
         "displayName": "Panel heading (pixel)",
-        "purpose": "Short uppercase panel headings such as PARTY · 3."
+        "purpose": "Uppercase Settings section headings."
       },
-      "room-label": {
-        "displayName": "Room label",
-        "purpose": "Meeting room names on the floor."
+      "card-label": {
+        "displayName": "Card label",
+        "purpose": "Uppercase Home card headings and Welcome's section headings."
       },
-      "job-class": {
-        "displayName": "Job class",
-        "purpose": "Job labels in the class ink; desk name plates."
+      "subhead": {
+        "displayName": "Subhead",
+        "purpose": "Settings sub-headings and alert titles."
       },
       "title": {
         "displayName": "Title",
-        "purpose": "Buttons, inputs and the meetings panel heading."
+        "purpose": "Buttons, nav items, Activity headlines, template names."
       },
       "body-lead": {
         "displayName": "Body lead",
-        "purpose": "Explanatory paragraphs, max 300px."
+        "purpose": "Bubble text, answers, Home notes."
       },
       "body": {
         "displayName": "Body",
-        "purpose": "Header meta, toggle label, notices."
+        "purpose": "Card text, previews, chat messages, help text."
       },
       "label": {
         "displayName": "Label",
-        "purpose": "Status lines, panel sublines, meter labels."
+        "purpose": "Meta lines, field labels, quiet bubble buttons, bubble chips."
       },
       "label-min": {
         "displayName": "Label min",
-        "purpose": "Room status chips; the 11px floor."
+        "purpose": "Chips, dock tags, bubble hints; the 11px floor."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "An expert's live steps in the hand-off card."
       }
     },
     "shadows": [
@@ -579,51 +654,94 @@
         "purpose": "One unblurred 1px shadow per painted sprite pixel, on a 1px element scaled by a whole number."
       },
       {
-        "name": "glass-shine",
-        "value": "inset 0 0 0 2px rgba(255, 255, 255, 0.55)",
-        "purpose": "The inner highlight of a meeting room's glass wall."
+        "name": "recording-ring",
+        "value": "0 0 0 1px #fff",
+        "purpose": "The white ring around the dock's recording dot."
       }
     ],
     "motion": [
       {
-        "name": "idle-bob",
-        "value": "1.1s steps(1) infinite; translateY(-3px) at 50%",
-        "purpose": "Seated pets' two-frame idle. Never eased."
+        "name": "dock-breathe",
+        "value": "2.8s ease-in-out infinite; translateY(-1px) at 50%",
+        "purpose": "Scout idle or listening."
       },
       {
-        "name": "bob-stagger",
-        "value": "0.23s",
-        "purpose": "Animation delay between neighbouring pets so the crew does not move in lockstep."
+        "name": "dock-busy",
+        "value": "0.9s ease-in-out infinite; translateY(-2px) at 50%",
+        "purpose": "Scout while an expert works."
       },
       {
-        "name": "cursor-hop",
-        "value": "0.7s steps(1) infinite; translateY(3px) at 50%",
-        "purpose": "The gold cursor above the selected pet."
+        "name": "dock-hop",
+        "value": "0.7s ease-out, 3 times; translateY(-8px) at 40%",
+        "purpose": "Scout when an answer is back."
       },
       {
-        "name": "stillness",
-        "value": "animation: none",
-        "purpose": "Applied under prefers-reduced-motion: reduce and when the Still office toggle is on."
+        "name": "blink",
+        "value": "140ms, every 3 to 6s (random)",
+        "purpose": "Eyes shut briefly in idle and listening moods."
+      },
+      {
+        "name": "bubble-in",
+        "value": "220ms ease-out; opacity 0 and translateY(4px) to rest",
+        "purpose": "The intro and the launch line entering."
+      },
+      {
+        "name": "line-leave",
+        "value": "300ms ease; opacity 0 and translateY(4px)",
+        "purpose": "The launch line leaving."
+      },
+      {
+        "name": "intro-typing",
+        "value": "22ms per character",
+        "purpose": "Intro beats typing in; whole at once under reduced motion."
+      },
+      {
+        "name": "listening-pulse",
+        "value": "1.2s ease-in-out infinite; opacity 0.35 at 50%",
+        "purpose": "The listening dot."
+      },
+      {
+        "name": "voice-bars",
+        "value": "transform 90ms linear, scaleY from --tg-voice-level",
+        "purpose": "The speaking indicator."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "animation: none; transition: none",
+        "purpose": "Applied under prefers-reduced-motion: reduce to the dock body, bubble entry and leave, the pulse and the bars (bars hold at scaleY(0.6))."
       }
     ],
     "focus": {
-      "value": "2px solid #F2C14E, offset 2px",
-      "purpose": "Every focusable element."
+      "settings": {
+        "value": "2px solid #F2C14E, offset 2px",
+        "purpose": "Every focusable element inside .tg-settings."
+      },
+      "bubble": {
+        "value": "2px solid #7CB8F2, offset 2px",
+        "purpose": "Bubble buttons and the mic (hard-coded)."
+      },
+      "note": "Home's own nav and cards and the Welcome window set no focus style; they show the browser default."
     },
     "spriteScale": {
-      "logo": 2,
-      "party": 3,
-      "floor": 3,
-      "furniture": 3,
-      "plant": 3,
-      "cursor": 2,
+      "dock": 4,
+      "welcome": 4,
+      "homeNav": 3,
       "tile": 2
     },
     "sizes": {
-      "headerHeight": "64px",
-      "partyWidth": "280px",
+      "homeWindow": "1440x800 (min 880x600)",
+      "homeNavWidth": "232px",
+      "bubbleWindowWidth": "420px",
+      "bubbleHeight": "80px to 520px",
+      "welcomeWindow": "640x700",
+      "standaloneSettingsWindow": "1080x760",
+      "headerHeight": "64px (standalone Settings only)",
+      "partyWidth": "280px (standalone Settings nav only)",
       "fieldHeight": "40px",
-      "meterHeight": "10px",
+      "bubbleFieldHeight": "44px",
+      "bubblePrimaryHeight": "36px",
+      "focusRing": "2px",
+      "focusOffset": "2px",
       "emptyTextWidth": "300px",
       "scrollbar": "8px"
     },
@@ -634,105 +752,116 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "The one gold action on a surface (Assign), shown enabled and disabled.",
-      "html": "<button class=\"ds-btn-primary\">Assign</button> <button class=\"ds-btn-primary\" disabled>Assign</button>",
-      "css": ".ds-btn-primary { height: 40px; padding: 0 16px; border-radius: 8px; font-family: 'Onest', system-ui, sans-serif; font-size: 14px; font-weight: 600; border: 1px solid #F2C14E; background: #F2C14E; color: #12162B; cursor: pointer; } .ds-btn-primary:focus-visible { outline: 2px solid #F2C14E; outline-offset: 2px; } .ds-btn-primary:disabled { background: transparent; border-color: #2A3050; color: #6B7290; cursor: not-allowed; }"
+      "description": "tg-btn: the one gold action on a light page or in Settings.",
+      "html": "<button class=\"ds-tg-btn\">Save</button>",
+      "css": ".ds-tg-btn { height: 40px; padding: 0 16px; border-radius: 8px; border: 1px solid #F2C14E; background: #F2C14E; color: #12162B; font-family: 'Onest', system-ui, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; } .ds-tg-btn:focus-visible { outline: 2px solid #F2C14E; outline-offset: 2px; }"
     },
     {
-      "name": "Toggle",
+      "name": "Quiet Button",
       "kind": "button",
-      "refersTo": "toggle",
-      "description": "A pressed or unpressed setting in the chrome (Still office).",
-      "html": "<div class=\"ds-shell\"><button class=\"ds-toggle\" aria-pressed=\"false\">Still office</button><button class=\"ds-toggle\" aria-pressed=\"true\">Still office</button></div>",
-      "css": ".ds-shell { background: #12162B; padding: 12px; display: flex; gap: 8px; } .ds-toggle { height: 40px; padding: 0 12px; border-radius: 8px; font-family: 'Onest', system-ui, sans-serif; font-size: 13px; font-weight: 600; border: 1px solid #2E3558; background: transparent; color: #A3AAC4; cursor: pointer; white-space: nowrap; } .ds-toggle:hover { color: #E9ECF5; } .ds-toggle:focus-visible { outline: 2px solid #F2C14E; outline-offset: 2px; } .ds-toggle[aria-pressed='true'] { border-color: #F2C14E; color: #F2C14E; }"
+      "refersTo": "button-quiet",
+      "description": "tg-btn-quiet on a light page: transparent with a Panel Muted border.",
+      "html": "<div class=\"ds-light\"><button class=\"ds-tg-quiet\">Manage experts</button></div>",
+      "css": ".ds-light { background: #F6F7FB; padding: 12px; } .ds-tg-quiet { height: 40px; padding: 0 16px; border-radius: 8px; border: 1px solid #5A6178; background: transparent; color: #12162B; font-family: 'Onest', system-ui, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; } .ds-tg-quiet:focus-visible { outline: 2px solid #F2C14E; outline-offset: 2px; }"
     },
     {
       "name": "Field",
       "kind": "input",
       "refersTo": "field",
-      "description": "Text input on the navy chrome.",
-      "html": "<div class=\"ds-shell-f\"><input class=\"ds-field\" placeholder=\"Assign a task\" /></div>",
-      "css": ".ds-shell-f { background: #12162B; padding: 12px; } .ds-field { height: 40px; width: 320px; box-sizing: border-box; padding: 0 12px; border-radius: 8px; font-family: 'Onest', system-ui, sans-serif; font-size: 14px; background: #1A1F3A; border: 1px solid #2E3558; color: #E9ECF5; } .ds-field::placeholder { color: #A3AAC4; opacity: 1; } .ds-field:focus-visible { outline: 2px solid #F2C14E; outline-offset: 2px; }"
+      "description": "A text field on a light page (tg-field): Panel Tile fill, Panel Line border.",
+      "html": "<label class=\"ds-tg-label\"><span>Your name</span><input class=\"ds-tg-field\" placeholder=\"Optional\" /></label>",
+      "css": ".ds-tg-label { display: block; width: 320px; font-family: 'Onest', system-ui, sans-serif; } .ds-tg-label span { display: block; margin-bottom: 4px; font-size: 12px; color: #5A6178; } .ds-tg-field { width: 100%; box-sizing: border-box; min-height: 40px; padding: 0 12px; border: 1px solid #E0E3EC; border-radius: 8px; background: #E6E9F2; color: #12162B; font-family: 'Onest', system-ui, sans-serif; font-size: 14px; } .ds-tg-field::placeholder { color: #5A6178; opacity: 1; } .ds-tg-field:focus-visible { outline: 2px solid #F2C14E; outline-offset: 2px; }"
     },
     {
-      "name": "Party Row",
-      "kind": "nav",
-      "refersTo": "party-row",
-      "description": "A pet in the party list: sprite tile, pixel name, job class in its class ink, status icon plus word. Selected is ringed gold.",
-      "html": "<nav class=\"ds-party\" aria-label=\"Party\"><div class=\"ds-party-h\">PARTY · 2</div><button class=\"ds-row\" aria-pressed=\"true\"><span class=\"ds-tile\"></span><span class=\"ds-txt\"><span class=\"ds-name\">Bolt</span><span class=\"ds-job\" style=\"color:#F6B85A\">BACKEND ENGINEER</span><span class=\"ds-status\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" aria-hidden=\"true\"><path d=\"M5 2v7h7M5 9v5M12 9v5M5 6h5\"/></svg>At desk</span></span></button><button class=\"ds-row\" aria-pressed=\"false\"><span class=\"ds-tile\"></span><span class=\"ds-txt\"><span class=\"ds-name\">Scout</span><span class=\"ds-job\" style=\"color:#4FD1C1\">GENERALIST</span><span class=\"ds-status\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" aria-hidden=\"true\"><rect x=\"1.5\" y=\"3.5\" width=\"13\" height=\"9\" rx=\"1.5\"/><path d=\"M4.5 6.5h1M7.5 6.5h1M10.5 6.5h1M5 9.5h6\"/></svg>Working</span></span></button></nav>",
-      "css": ".ds-party { width: 280px; box-sizing: border-box; padding: 16px 14px; background: #171C33; display: flex; flex-direction: column; gap: 6px; } .ds-party-h { font-family: 'Pixelify Sans', 'Onest', sans-serif; font-size: 15px; font-weight: 600; letter-spacing: 1px; color: #A3AAC4; padding: 0 6px 8px; } .ds-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px; border: 2px solid transparent; border-radius: 10px; background: transparent; cursor: pointer; text-align: left; font-family: 'Onest', system-ui, sans-serif; color: #E9ECF5; } .ds-row:hover { background: #1E2442; } .ds-row[aria-pressed='true'] { background: #1E2442; border-color: #F2C14E; } .ds-row:focus-visible { outline: 2px solid #F2C14E; outline-offset: 2px; } .ds-tile { width: 48px; height: 48px; padding: 4px; border-radius: 10px; background: #222845; flex: none; } .ds-txt { display: flex; flex-direction: column; gap: 3px; } .ds-name { font-family: 'Pixelify Sans', 'Onest', sans-serif; font-size: 17px; font-weight: 600; } .ds-job { font-family: 'Pixelify Sans', 'Onest', sans-serif; font-size: 11px; letter-spacing: 1px; } .ds-status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #A3AAC4; }"
-    },
-    {
-      "name": "Room Chip",
+      "name": "Status Chips",
       "kind": "chip",
-      "refersTo": "room-chip-free",
-      "description": "A meeting room's pixel label with its status chip, on the concrete floor.",
-      "html": "<div class=\"ds-floor\"><span class=\"ds-room\">ROOM 1</span><span class=\"ds-chip\">Free</span></div>",
-      "css": ".ds-floor { background: #DCDBD7; padding: 16px; display: flex; align-items: center; gap: 8px; } .ds-room { font-family: 'Pixelify Sans', 'Onest', sans-serif; font-size: 13px; font-weight: 700; letter-spacing: 1px; color: #2B3150; } .ds-chip { font-family: 'Onest', system-ui, sans-serif; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: #E6E9F2; color: #4A5168; }"
+      "refersTo": "chip",
+      "description": "tg-chip in its four kinds: neutral, ok, warn, err. Always a word.",
+      "html": "<span class=\"ds-chip\">Off</span> <span class=\"ds-chip ds-chip--ok\">Connected</span> <span class=\"ds-chip ds-chip--warn\">Needs sign-in</span> <span class=\"ds-chip ds-chip--err\">Error</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; background: #E6E9F2; color: #4A5168; font-family: 'Onest', system-ui, sans-serif; font-size: 11px; font-weight: 600; } .ds-chip--ok { background: #E3F1E6; color: #1F5A2E; } .ds-chip--warn { background: #FFF4D6; color: #5C4600; } .ds-chip--err { background: #FDE7E5; color: #8A1C12; }"
     },
     {
-      "name": "Meetings Panel",
-      "kind": "card",
-      "refersTo": "meetings-panel",
-      "description": "The off-white reading panel: heading block, thread, segmented call meter.",
-      "html": "<aside class=\"ds-panel\"><div class=\"ds-ph\"><span class=\"ds-pt\">Meetings</span><span class=\"ds-pm\">None yet</span></div><div class=\"ds-body\"><p class=\"ds-empty\">No meetings yet</p><p class=\"ds-lead\">When pets meet, their meetings appear here.</p></div><div class=\"ds-meter\"><span class=\"ds-pm\">Calls</span><span class=\"ds-segs\"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class=\"ds-pm\">None yet</span></div></aside>",
-      "css": ".ds-panel { width: 400px; background: #F6F7FB; color: #12162B; font-family: 'Onest', system-ui, sans-serif; display: flex; flex-direction: column; } .ds-ph { display: flex; flex-direction: column; gap: 2px; padding: 10px 20px; border-bottom: 1px solid #E0E3EC; } .ds-pt { font-size: 14px; font-weight: 600; } .ds-pm { font-size: 12px; color: #5A6178; } .ds-body { padding: 24px 32px; text-align: center; } .ds-empty { font-family: 'Pixelify Sans', 'Onest', sans-serif; font-size: 17px; font-weight: 600; margin: 0 0 12px; } .ds-lead { font-size: 14px; line-height: 1.5; color: #5A6178; max-width: 300px; margin: 0 auto; } .ds-meter { display: flex; align-items: center; gap: 10px; padding: 12px 16px 16px; border-top: 1px solid #E0E3EC; } .ds-segs { flex: 1; display: flex; gap: 3px; } .ds-segs i { flex: 1; height: 10px; background: #E0E3EC; }"
+      "name": "Switch and Day Toggle",
+      "kind": "button",
+      "refersTo": "switch",
+      "description": "tg-switch (role=\"switch\") and a routine day toggle; on or pressed turns gold.",
+      "html": "<div class=\"ds-light\"><button class=\"ds-switch\" role=\"switch\" aria-checked=\"false\">Off</button> <button class=\"ds-switch\" role=\"switch\" aria-checked=\"true\">On</button> <button class=\"ds-day\" aria-pressed=\"false\">Mon</button> <button class=\"ds-day\" aria-pressed=\"true\">Tue</button></div>",
+      "css": ".ds-light { background: #F6F7FB; padding: 12px; display: flex; gap: 6px; } .ds-switch, .ds-day { height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid #5A6178; background: transparent; font-family: 'Onest', system-ui, sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; } .ds-switch { min-width: 64px; color: #5A6178; } .ds-day { min-width: 52px; padding: 0 8px; color: #12162B; } .ds-switch[aria-checked='true'], .ds-day[aria-pressed='true'] { background: #F2C14E; border-color: #F2C14E; color: #12162B; } .ds-switch:focus-visible, .ds-day:focus-visible { outline: 2px solid #F2C14E; outline-offset: 2px; }"
     },
     {
-      "name": "Home Tab",
+      "name": "Scout on the Dock",
       "kind": "custom",
-      "refersTo": "home-tab",
-      "description": "A tab in Home's right panel (Activity, the picked agent's name, Meetings): Onest 600 13px in Panel Muted on Panel White, 40px tall; the selected tab reads Panel Text over a 2px gold underline. Arrow keys move between tabs.",
-      "html": "<div class=\"ds-tabs\"><button class=\"ds-tab\" aria-selected=\"true\">Activity</button><button class=\"ds-tab\" aria-selected=\"false\">Scout</button><button class=\"ds-tab\" aria-selected=\"false\">Meetings</button></div>",
-      "css": ".ds-tabs { display: flex; gap: 4px; padding: 0 12px; background: #F6F7FB; border-bottom: 1px solid #E0E3EC; } .ds-tab { height: 40px; padding: 0 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; font-family: 'Onest', system-ui, sans-serif; font-size: 13px; font-weight: 600; color: #5A6178; } .ds-tab[aria-selected='true'] { color: #12162B; border-bottom-color: #F2C14E; }"
+      "refersTo": "dock-tag-working",
+      "description": "Scout drawn as box-shadow pixels at scale 4, with a mood tag (Seeing, Working, Done) and a breathing idle that stops for reduced motion.",
+      "html": "<span class=\"ds-dock\" role=\"img\" aria-label=\"Scout has an expert working\"><span class=\"ds-dock-body\"><span class=\"ds-sprite\"><span class=\"ds-px\"></span></span></span><span class=\"ds-dock-tag\">Working</span></span>",
+      "css": ".ds-dock { position: relative; display: inline-flex; padding: 20px 4px 4px; } .ds-dock-body { display: block; transform-origin: 50% 100%; animation: ds-busy 0.9s ease-in-out infinite; } .ds-sprite { position: relative; display: block; width: 64px; height: 64px; } .ds-px { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; transform: scale(4); box-shadow: 2px 0px 0 0 #2A1B14, 3px 0px 0 0 #2A1B14, 12px 0px 0 0 #2A1B14, 13px 0px 0 0 #2A1B14, 1px 1px 0 0 #2A1B14, 2px 1px 0 0 #F6B8A0, 3px 1px 0 0 #F6B8A0, 4px 1px 0 0 #2A1B14, 11px 1px 0 0 #2A1B14, 12px 1px 0 0 #F6B8A0, 13px 1px 0 0 #F6B8A0, 14px 1px 0 0 #2A1B14, 1px 2px 0 0 #2A1B14, 2px 2px 0 0 #E8873A, 3px 2px 0 0 #E8873A, 4px 2px 0 0 #E8873A, 5px 2px 0 0 #2A1B14, 6px 2px 0 0 #2A1B14, 7px 2px 0 0 #2A1B14, 8px 2px 0 0 #2A1B14, 9px 2px 0 0 #2A1B14, 10px 2px 0 0 #2A1B14, 11px 2px 0 0 #E8873A, 12px 2px 0 0 #E8873A, 13px 2px 0 0 #E8873A, 14px 2px 0 0 #2A1B14, 0px 3px 0 0 #2A1B14, 1px 3px 0 0 #E8873A, 2px 3px 0 0 #E8873A, 3px 3px 0 0 #E8873A, 4px 3px 0 0 #E8873A, 5px 3px 0 0 #E8873A, 6px 3px 0 0 #E8873A, 7px 3px 0 0 #E8873A, 8px 3px 0 0 #E8873A, 9px 3px 0 0 #E8873A, 10px 3px 0 0 #E8873A, 11px 3px 0 0 #E8873A, 12px 3px 0 0 #E8873A, 13px 3px 0 0 #E8873A, 14px 3px 0 0 #E8873A, 15px 3px 0 0 #2A1B14, 0px 4px 0 0 #2A1B14, 1px 4px 0 0 #E8873A, 2px 4px 0 0 #E8873A, 3px 4px 0 0 #E8873A, 4px 4px 0 0 #E8873A, 5px 4px 0 0 #E8873A, 6px 4px 0 0 #E8873A, 7px 4px 0 0 #E8873A, 8px 4px 0 0 #E8873A, 9px 4px 0 0 #E8873A, 10px 4px 0 0 #E8873A, 11px 4px 0 0 #E8873A, 12px 4px 0 0 #E8873A, 13px 4px 0 0 #E8873A, 14px 4px 0 0 #E8873A, 15px 4px 0 0 #2A1B14, 0px 5px 0 0 #2A1B14, 1px 5px 0 0 #E8873A, 2px 5px 0 0 #E8873A, 3px 5px 0 0 #1B1B2A, 4px 5px 0 0 #1B1B2A, 5px 5px 0 0 #E8873A, 6px 5px 0 0 #E8873A, 7px 5px 0 0 #E8873A, 8px 5px 0 0 #E8873A, 9px 5px 0 0 #E8873A, 10px 5px 0 0 #E8873A, 11px 5px 0 0 #1B1B2A, 12px 5px 0 0 #1B1B2A, 13px 5px 0 0 #E8873A, 14px 5px 0 0 #E8873A, 15px 5px 0 0 #2A1B14, 0px 6px 0 0 #2A1B14, 1px 6px 0 0 #E8873A, 2px 6px 0 0 #E8873A, 3px 6px 0 0 #1B1B2A, 4px 6px 0 0 #1B1B2A, 5px 6px 0 0 #E8873A, 6px 6px 0 0 #E8873A, 7px 6px 0 0 #E8873A, 8px 6px 0 0 #E8873A, 9px 6px 0 0 #E8873A, 10px 6px 0 0 #E8873A, 11px 6px 0 0 #1B1B2A, 12px 6px 0 0 #1B1B2A, 13px 6px 0 0 #E8873A, 14px 6px 0 0 #E8873A, 15px 6px 0 0 #2A1B14, 0px 7px 0 0 #2A1B14, 1px 7px 0 0 #E8873A, 2px 7px 0 0 #E8873A, 3px 7px 0 0 #FFF1E0, 4px 7px 0 0 #FFF1E0, 5px 7px 0 0 #FFF1E0, 6px 7px 0 0 #FFF1E0, 7px 7px 0 0 #FFF1E0, 8px 7px 0 0 #FFF1E0, 9px 7px 0 0 #FFF1E0, 10px 7px 0 0 #FFF1E0, 11px 7px 0 0 #FFF1E0, 12px 7px 0 0 #FFF1E0, 13px 7px 0 0 #E8873A, 14px 7px 0 0 #E8873A, 15px 7px 0 0 #2A1B14, 1px 8px 0 0 #2A1B14, 2px 8px 0 0 #E8873A, 3px 8px 0 0 #E8873A, 4px 8px 0 0 #FFF1E0, 5px 8px 0 0 #FFF1E0, 6px 8px 0 0 #FFF1E0, 7px 8px 0 0 #2A1B14, 8px 8px 0 0 #2A1B14, 9px 8px 0 0 #FFF1E0, 10px 8px 0 0 #FFF1E0, 11px 8px 0 0 #FFF1E0, 12px 8px 0 0 #E8873A, 13px 8px 0 0 #E8873A, 14px 8px 0 0 #2A1B14, 2px 9px 0 0 #2A1B14, 3px 9px 0 0 #E8873A, 4px 9px 0 0 #E8873A, 5px 9px 0 0 #FFF1E0, 6px 9px 0 0 #FFF1E0, 7px 9px 0 0 #FFF1E0, 8px 9px 0 0 #FFF1E0, 9px 9px 0 0 #FFF1E0, 10px 9px 0 0 #FFF1E0, 11px 9px 0 0 #E8873A, 12px 9px 0 0 #E8873A, 13px 9px 0 0 #2A1B14, 3px 10px 0 0 #2A1B14, 4px 10px 0 0 #2A1B14, 5px 10px 0 0 #2A1B14, 6px 10px 0 0 #2A1B14, 7px 10px 0 0 #2A1B14, 8px 10px 0 0 #2A1B14, 9px 10px 0 0 #2A1B14, 10px 10px 0 0 #2A1B14, 11px 10px 0 0 #2A1B14, 12px 10px 0 0 #2A1B14, 2px 11px 0 0 #2A1B14, 3px 11px 0 0 #3E8E5A, 4px 11px 0 0 #3E8E5A, 5px 11px 0 0 #3E8E5A, 6px 11px 0 0 #3E8E5A, 7px 11px 0 0 #F2C14E, 8px 11px 0 0 #F2C14E, 9px 11px 0 0 #3E8E5A, 10px 11px 0 0 #3E8E5A, 11px 11px 0 0 #3E8E5A, 12px 11px 0 0 #3E8E5A, 13px 11px 0 0 #2A1B14, 1px 12px 0 0 #2A1B14, 2px 12px 0 0 #3E8E5A, 3px 12px 0 0 #2E6B44, 4px 12px 0 0 #2E6B44, 5px 12px 0 0 #3E8E5A, 6px 12px 0 0 #3E8E5A, 7px 12px 0 0 #3E8E5A, 8px 12px 0 0 #3E8E5A, 9px 12px 0 0 #3E8E5A, 10px 12px 0 0 #3E8E5A, 11px 12px 0 0 #2E6B44, 12px 12px 0 0 #2E6B44, 13px 12px 0 0 #3E8E5A, 14px 12px 0 0 #2A1B14, 1px 13px 0 0 #2A1B14, 2px 13px 0 0 #3E8E5A, 3px 13px 0 0 #3E8E5A, 4px 13px 0 0 #3E8E5A, 5px 13px 0 0 #3E8E5A, 6px 13px 0 0 #3E8E5A, 7px 13px 0 0 #3E8E5A, 8px 13px 0 0 #3E8E5A, 9px 13px 0 0 #3E8E5A, 10px 13px 0 0 #3E8E5A, 11px 13px 0 0 #3E8E5A, 12px 13px 0 0 #3E8E5A, 13px 13px 0 0 #3E8E5A, 14px 13px 0 0 #2A1B14, 2px 14px 0 0 #2A1B14, 3px 14px 0 0 #E8873A, 4px 14px 0 0 #E8873A, 5px 14px 0 0 #2A1B14, 10px 14px 0 0 #2A1B14, 11px 14px 0 0 #E8873A, 12px 14px 0 0 #E8873A, 13px 14px 0 0 #2A1B14, 2px 15px 0 0 #2A1B14, 3px 15px 0 0 #2A1B14, 4px 15px 0 0 #2A1B14, 5px 15px 0 0 #2A1B14, 10px 15px 0 0 #2A1B14, 11px 15px 0 0 #2A1B14, 12px 15px 0 0 #2A1B14, 13px 15px 0 0 #2A1B14; } .ds-dock-tag { position: absolute; top: 0; right: -8px; padding: 2px 7px; border-radius: 999px; background: #F2C14E; color: #12162B; font-family: 'Onest', system-ui, sans-serif; font-size: 11px; font-weight: 600; white-space: nowrap; } @keyframes ds-busy { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } } @media (prefers-reduced-motion: reduce) { .ds-dock-body { animation: none; } }"
+    },
+    {
+      "name": "Bubble (ask)",
+      "kind": "card",
+      "refersTo": "bubble",
+      "description": "The bubble on Ink Navy: a chip for what Scout sees, the Sky-bordered field, a gold primary and a quiet button. Focus is Sky in the bubble.",
+      "html": "<div class=\"ds-bubble\"><ul class=\"ds-bubble-chips\"><li class=\"ds-bubble-chip\"><span>Visual Studio Code</span><button aria-label=\"Do not send Visual Studio Code\">×</button></li></ul><label class=\"ds-bubble-field\"><span>Ask Scout</span><input /></label><div class=\"ds-bubble-row\"><button class=\"ds-bubble-primary\">Ask</button><button class=\"ds-bubble-quiet\">Not now</button></div></div>",
+      "css": ".ds-bubble { width: 380px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; background: #12162B; color: #E9ECF5; border: 1px solid #2E3558; border-radius: 12px; font-family: 'Onest', system-ui, sans-serif; } .ds-bubble-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; } .ds-bubble-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 4px 0 10px; border-radius: 999px; background: #222845; color: #C9CEE0; font-size: 12px; } .ds-bubble-chip button { width: 24px; height: 24px; border: 0; border-radius: 50%; background: transparent; color: #A3AAC4; cursor: pointer; } .ds-bubble-field { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #A3AAC4; } .ds-bubble-field input { height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid #7CB8F2; border-radius: 8px; background: #1A1F3A; color: #E9ECF5; font: inherit; font-size: 14px; } .ds-bubble-row { display: flex; align-items: center; gap: 12px; } .ds-bubble-primary { height: 36px; padding: 0 16px; border: 0; border-radius: 8px; background: #F2C14E; color: #12162B; font: inherit; font-weight: 600; cursor: pointer; } .ds-bubble-quiet { min-height: 28px; padding: 0 10px; border: 1px solid #2E3558; border-radius: 6px; background: transparent; color: #C9CEE0; font: inherit; font-size: 12px; cursor: pointer; } .ds-bubble-primary:focus-visible, .ds-bubble-quiet:focus-visible, .ds-bubble-chip button:focus-visible { outline: 2px solid #7CB8F2; outline-offset: 2px; }"
+    },
+    {
+      "name": "Hand-off Card",
+      "kind": "card",
+      "refersTo": "bubble",
+      "description": "HANDOFF_CSS inside the bubble: a lead sentence, labelled rows between Shell Line hairlines, Send and Cancel. The connector confirm and routine cards use the same rows.",
+      "html": "<section class=\"ds-bubble ds-handoff\" aria-label=\"Hand to Claude Code\"><p class=\"ds-text\">I’ll ask Claude Code to look into it. Is this right?</p><dl class=\"ds-rows\"><div><dt>Agent</dt><dd>Claude Code</dd></div><div><dt>Project</dt><dd>tagalong<small>C:\\projects\\tagalong</small></dd><button class=\"ds-bubble-quiet\">Change</button></div><div><dt>Access</dt><dd>Reads only</dd><button class=\"ds-bubble-quiet\">Allow edits</button></div></dl><div class=\"ds-bubble-row\"><button class=\"ds-bubble-primary\">Send</button><button class=\"ds-bubble-quiet\">Cancel</button></div></section>",
+      "css": ".ds-bubble { width: 380px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; background: #12162B; color: #E9ECF5; border: 1px solid #2E3558; border-radius: 12px; font-family: 'Onest', system-ui, sans-serif; } .ds-text { margin: 0; font-size: 14px; line-height: 1.5; } .ds-rows { margin: 0; border-top: 1px solid #262C4A; } .ds-rows > div { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #262C4A; } .ds-rows dt { width: 56px; flex: none; font-size: 12px; color: #A3AAC4; } .ds-rows dd { flex: 1; min-width: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; } .ds-rows small { font-size: 11px; color: #A3AAC4; } .ds-bubble-row { display: flex; align-items: center; gap: 12px; } .ds-bubble-primary { height: 36px; padding: 0 16px; border: 0; border-radius: 8px; background: #F2C14E; color: #12162B; font: inherit; font-weight: 600; cursor: pointer; } .ds-bubble-quiet { flex: none; min-height: 28px; padding: 0 10px; border: 1px solid #2E3558; border-radius: 6px; background: transparent; color: #C9CEE0; font: inherit; font-size: 12px; cursor: pointer; } .ds-bubble-primary:focus-visible, .ds-bubble-quiet:focus-visible { outline: 2px solid #7CB8F2; outline-offset: 2px; }"
+    },
+    {
+      "name": "Home Nav",
+      "kind": "nav",
+      "refersTo": "home-nav",
+      "description": "Home's 232px Sidebar Navy nav: Scout's tile and name, then the seven pages; the current page sits on Active Row Navy.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Tagalong\"><div class=\"ds-who\"><span class=\"ds-tile\"></span><span><strong>Scout</strong><small>Your companion</small></span></div><button class=\"ds-item\" aria-current=\"page\">Overview</button><button class=\"ds-item\">Scout</button><button class=\"ds-item\">Experts</button><button class=\"ds-item\">Routines</button><button class=\"ds-item\">Connections</button><button class=\"ds-item\">Activity</button><button class=\"ds-item\">Settings</button></nav>",
+      "css": ".ds-nav { width: 232px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; padding: 20px 12px; background: #171C33; color: #E9ECF5; font-family: 'Onest', system-ui, sans-serif; } .ds-who { display: flex; align-items: center; gap: 12px; padding: 0 6px 16px; } .ds-who > span:last-child { display: flex; flex-direction: column; gap: 2px; } .ds-who strong { font-family: 'Pixelify Sans', 'Onest', sans-serif; font-size: 18px; letter-spacing: 0.5px; } .ds-who small { font-size: 12px; color: #7CB8F2; } .ds-tile { width: 56px; height: 56px; flex: none; border-radius: 10px; background: #222845; } .ds-item { height: 40px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: #A3AAC4; text-align: left; cursor: pointer; font-family: 'Onest', system-ui, sans-serif; font-size: 14px; } .ds-item:hover { color: #E9ECF5; } .ds-item[aria-current='page'] { background: #1E2442; color: #E9ECF5; font-weight: 600; }"
+    },
+    {
+      "name": "Home Card",
+      "kind": "card",
+      "refersTo": "home-card",
+      "description": "An Overview card: white, Panel Line border, 12px radius, a pixel card label, a status dot with its word, and a quiet button.",
+      "html": "<div class=\"ds-page\"><section class=\"ds-card\" aria-label=\"Scout\"><h2 class=\"ds-card-label\">SCOUT</h2><p class=\"ds-lead\"><span class=\"ds-dot\" aria-hidden=\"true\"></span> Ready</p><p>Looks at your screen when you ask it something. Never at its blind spots.</p><button class=\"ds-quiet\">Change how Scout thinks</button></section></div>",
+      "css": ".ds-page { background: #F6F7FB; padding: 24px 32px; } .ds-card { width: 320px; display: flex; flex-direction: column; gap: 8px; padding: 16px 20px; border: 1px solid #E0E3EC; border-radius: 12px; background: #fff; color: #12162B; font-family: 'Onest', system-ui, sans-serif; } .ds-card p { margin: 0; font-size: 13px; color: #5A6178; } .ds-card-label { margin: 0; font-family: 'Pixelify Sans', 'Onest', sans-serif; font-size: 12px; font-weight: 400; letter-spacing: 1px; color: #5A6178; } .ds-card p.ds-lead { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #12162B; } .ds-dot { width: 8px; height: 8px; border-radius: 50%; background: #2F9E44; } .ds-quiet { align-self: flex-start; height: 40px; padding: 0 16px; border-radius: 8px; border: 1px solid #5A6178; background: transparent; color: #12162B; font-family: 'Onest', system-ui, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; }"
     },
     {
       "name": "Activity Entry",
       "kind": "custom",
-      "refersTo": "activity-entry",
-      "description": "One thing the crew did, in Home's activity view: the pet's sprite at 2x, a headline (\"Scout asked Bolt\"), a state icon and word with the model, calls and time, and a one-line preview. A real button with aria-expanded; open, it shows the thread under a Panel Line rule.",
-      "html": "<button class=\"ds-entry\" aria-expanded=\"false\"><span class=\"ds-entry__title\">Scout answered</span><span class=\"ds-entry__meta\">Done · fake-model · 2 calls · 11:27</span><span class=\"ds-entry__preview\">what windows do I have open?</span></button>",
-      "css": ".ds-entry { display: flex; flex-direction: column; gap: 2px; width: 320px; padding: 8px; border: 2px solid transparent; border-radius: 10px; background: #F6F7FB; text-align: left; font-family: 'Onest', system-ui, sans-serif; color: #12162B; } .ds-entry:hover { background: #E6E9F2; } .ds-entry__title { font-size: 14px; font-weight: 600; } .ds-entry__meta { font-size: 12px; color: #5A6178; } .ds-entry__preview { font-size: 13px; color: #5A6178; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }"
-    },
-    {
-      "name": "Pixel Sprite Cursor",
-      "kind": "custom",
-      "refersTo": "avatar-tile",
-      "description": "A sprite drawn as box-shadow pixels on a 1px element at integer scale: the gold cursor, hopping in two stepped frames.",
-      "html": "<div class=\"ds-stage\"><span class=\"ds-cursor\"></span></div>",
-      "css": ".ds-stage { background: #DCDBD7; padding: 24px; height: 40px; } .ds-cursor { display: block; width: 1px; height: 1px; transform-origin: 0 0; transform: scale(2); box-shadow: 0px 0px 0 0 #F2C14E, 1px 0px 0 0 #F2C14E, 2px 0px 0 0 #F2C14E, 3px 0px 0 0 #F2C14E, 4px 0px 0 0 #F2C14E, 5px 0px 0 0 #F2C14E, 6px 0px 0 0 #F2C14E, 1px 1px 0 0 #F2C14E, 2px 1px 0 0 #F2C14E, 3px 1px 0 0 #F2C14E, 4px 1px 0 0 #F2C14E, 5px 1px 0 0 #F2C14E, 2px 2px 0 0 #F2C14E, 3px 2px 0 0 #F2C14E, 4px 2px 0 0 #F2C14E, 3px 3px 0 0 #F2C14E; animation: ds-hop 0.7s steps(1) infinite; } @keyframes ds-hop { 0% { translate: 0 0; } 50% { translate: 0 3px; } } @media (prefers-reduced-motion: reduce) { .ds-cursor { animation: none; } }"
+      "refersTo": "home-entry",
+      "description": "One thing that happened: a headline, an icon plus state word with tool, model, calls and time, and a one-line preview. A real button with aria-expanded.",
+      "html": "<button class=\"ds-entry\" aria-expanded=\"false\"><span class=\"ds-entry-tile\"></span><span class=\"ds-entry-body\"><span class=\"ds-entry-title\">Scout answered</span><span class=\"ds-entry-meta\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M3 8.5l3 3 7-7\"/></svg>Done · 2 calls · 11:27</span><span class=\"ds-entry-preview\">what windows do I have open?</span></span></button>",
+      "css": ".ds-entry { display: flex; align-items: flex-start; gap: 12px; width: 360px; padding: 8px; border: 2px solid transparent; border-radius: 10px; background: transparent; cursor: pointer; text-align: left; font-family: 'Onest', system-ui, sans-serif; color: #12162B; } .ds-entry:hover, .ds-entry[aria-expanded='true'] { background: #E6E9F2; } .ds-entry-tile { flex: none; width: 32px; height: 32px; } .ds-entry-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; } .ds-entry-title { font-size: 14px; font-weight: 600; } .ds-entry-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #5A6178; } .ds-entry-preview { font-size: 13px; color: #5A6178; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }"
     }
   ],
   "narrative": {
-    "northStar": "The Party in the Glass Office",
-    "overview": "Tagalong's crew is a 16-bit party with job classes, working in a contemporary office drawn in pixel art. The characters are expressive game sprites; the room they sit in is modern (pale concrete floor, white desks with monitors, glass-walled meeting rooms, plants, a small lounge); the interface around them is crisp, modern product chrome. The game lives inside the frame, never on the frame: the shell is a deep ink-navy app with clean sans type, off-white panels and one gold accent, and the pixel world is the picture it holds.\n\nEvery colour, font, size, spacing step, radius and timing comes from one source, `packages/ui/src/office/tokens.ts` (`officeTokens`); components read only from there. Sprite palettes are character and furniture art and live with the sprites, not in the tokens. Sprites are plain data (a map of rows, a palette, optional overlay pixels) rendered as a CSS `box-shadow` on a single 1px element and scaled up by a whole number. No images, no canvas, no 3D.\n\nThe surface is dense but calm: a 64px top bar, a 280px party list, the office floor in the centre and a light meetings panel on the right. Status is always an icon plus a word. Motion is a stepped two-frame idle, off whenever the user asks for stillness.",
+    "northStar": "A Pixel Friend in Modern Chrome",
+    "overview": "Tagalong is one companion, Scout, a 16x16 pixel-art figure (orange fur, pointed ears, a green shirt with a gold badge) that sits on the desktop and opens a speech bubble beside itself. The figure is the only game-like thing in the product; everything around it is calm, modern product chrome: a deep ink-navy for Scout's own surfaces (the dock tags, the bubble, Welcome, Home's nav), a cool off-white for reading (Home's pages and Settings), clean Onest type and one warm gold.\n\nTokens live in `packages/ui/src/office/tokens.ts` (`officeTokens`; the `office/` folder name is historical). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav and Welcome hard-code several hex values, recorded below as hard-coded. Sprites are plain data (rows, a palette, optional overlay pixels) drawn by `PixelSprite` as a CSS `box-shadow` on one 1px element, scaled by a whole number. No images, no canvas.\n\nScout's state is always a face plus a word: the eyes change per mood, a small tag says Seeing, Working or Done, and the accessible name says it in full. Motion is small and soft (a breath, a bob, a hop) and stops for reduced motion.",
     "keyCharacteristics": [
-      "Ink-navy shell, off-white panels, pale concrete floor: three grounds, one per job.",
-      "Gold (`gold`) means selection and attention, and nothing else.",
-      "One colour per job class, used only on that class's label.",
-      "Pixel type for names and short labels; Onest for everything you read.",
-      "Sprites as data, drawn at integer scale only.",
-      "Stepped, never eased, motion; stops for reduced motion and the Still office toggle."
+      "One pixel figure; modern chrome around it.",
+      "Navy for Scout's surfaces, off-white for reading.",
+      "Gold for the primary action, an on state and Scout's active marks; sky blue for focus and fields inside the bubble.",
+      "Pixel type for names, titles and short uppercase labels; Onest for every sentence and control.",
+      "Sprites as data, drawn at whole-number scales only (4 on the dock and Welcome, 3 in Home's nav, 2 in Activity).",
+      "Flat: tone and hairlines, no drop shadows."
     ],
     "rules": [
       {
-        "name": "The Gold Means You Rule",
-        "body": "Gold marks what is selected, focused or needs the user: the selected row, the cursor, the focus ring, the primary action, a pressed toggle. It never decorates, never fills a panel, and never names a job class.",
+        "name": "The Gold Means Active Rule",
+        "body": "Gold marks the one primary action, a control that is on or pressed, or Scout doing something right now. It never decorates and never fills more than a button, a chip or a dot.",
         "section": "colors"
       },
       {
-        "name": "The One Colour Per Class Rule",
-        "body": "Each job class owns exactly one label ink, keyed by role id in the office tokens (`roleInk`), used only on that class's job label. The ink belongs to the role, never to a pet, so two pets with the same role share it. Adding a class means adding one ink that reads on the sidebar navy and stays clearly distinct from gold.",
-        "section": "colors"
-      },
-      {
-        "name": "The Three Grounds Rule",
-        "body": "Navy is chrome (bar, party list), off-white is reading (panels, threads), pale concrete is the world (the floor). A new surface picks the ground for its job; it does not invent a fourth.",
+        "name": "The Two Grounds Rule",
+        "body": "Navy is Scout's own voice (dock, bubble, Welcome, Home's nav); off-white is where you read and change things (Home's pages, Settings). A new surface picks one of the two.",
         "section": "colors"
       },
       {
         "name": "The Pixel Is A Name Rule",
-        "body": "Pixelify Sans is for names and short labels only: pet names, job classes, room labels, desk plates, the office title and short panel headings. Sentences, controls, inputs, statuses and numbers are Onest.",
+        "body": "Pixelify Sans sets names, titles and short uppercase headings only. Sentences, controls, fields, statuses and numbers are Onest.",
         "section": "typography"
       },
       {
@@ -742,37 +871,30 @@
       },
       {
         "name": "The Integer Scale Rule",
-        "body": "A sprite is drawn at a whole-number scale (`spriteScale`) and nothing else. Pixel art scaled by a fraction smears.",
+        "body": "A sprite is drawn at a whole-number scale and nothing else: 4 on the dock and in Welcome, 3 in Home's nav, 2 (`spriteScale.tile`) in Activity.",
         "section": "layout"
       },
       {
         "name": "The No Lift Rule",
-        "body": "Chrome never floats: no drop shadows on panels, rows, buttons or cards. Hierarchy is tone and hairlines.",
+        "body": "No drop shadows on the bubble, cards, buttons or the nav.",
         "section": "elevation"
-      },
-      {
-        "name": "The Chrome Never Moves Rule",
-        "body": "Home is fixed chrome around one themed scene. The top bar, the agent list, the right panel (Activity, the picked agent's controls, Meetings) and every control keep the same place, size and look in every theme; a theme (Office today) only changes the centre scene: its layout, sprites and scene colours. A theme never adds a control, and the chrome never reads a theme's tokens.",
-        "section": "layout"
       }
     ],
     "dos": [
-      "**Do** take every colour, size, space, radius and timing from `officeTokens`; add a token before adding a value.",
-      "**Do** draw characters and furniture as sprite data (rows, palette, overlay) through `PixelSprite`, at a whole-number `spriteScale`.",
-      "**Do** reserve gold for selection, focus, the cursor and the one primary action on a surface.",
-      "**Do** give each job class one label ink, and pair every status with an icon and a word.",
-      "**Do** keep pixel type to names and short labels; set sentences, controls and numbers in Onest.",
-      "**Do** make every idle animation stepped and stop it for `prefers-reduced-motion` and the Still office setting.",
-      "**Do** build Hire a pet, Pet settings and the chat panel from these tokens: navy chrome, off-white reading panels, 40px gold primary button, 8px fields, the gold focus ring, party-row selection for choosing a pet or class, sprites at scale 3 for previews and 2 for small marks, and character ink for job labels."
+      "**Do** take colours, sizes, spacing and radii from `officeTokens`; add a token before adding another hard-coded value.",
+      "**Do** draw Scout as sprite data through `PixelSprite`, at a whole-number scale.",
+      "**Do** keep gold for the one primary action, an on or pressed control, and Scout's active marks.",
+      "**Do** pair every status with a word (and an icon where there is room).",
+      "**Do** keep pixel type to names, titles and short uppercase headings; set sentences and controls in Onest.",
+      "**Do** stop every animation under `prefers-reduced-motion`.",
+      "**Do** build new bubble cards from `HANDOFF_CSS`: a lead sentence, labelled rows, one Gold primary and a quiet Cancel."
     ],
     "donts": [
-      "**Don't** scale a sprite by a fraction, smooth it, or replace it with an image or icon.",
-      "**Don't** use gold for decoration, job classes, or fills larger than a button.",
+      "**Don't** scale a sprite by a fraction, smooth it, or replace it with an image.",
+      "**Don't** use gold for decoration or fills larger than a button.",
       "**Don't** signal state by colour alone.",
-      "**Don't** set body copy, inputs, errors or any sentence in Pixelify Sans, or any text below 11px.",
-      "**Don't** ease the idle motion or add motion that cannot be stopped.",
-      "**Don't** add drop shadows to chrome; separate with tone and hairlines.",
-      "**Don't** reintroduce the wooden, old-RPG office or the generic chat-sidebar assistant look."
+      "**Don't** set sentences, fields or errors in Pixelify Sans, or any text below 11px.",
+      "**Don't** add drop shadows; separate with tone and hairlines."
     ]
   }
 }
