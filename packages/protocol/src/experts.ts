@@ -65,19 +65,6 @@ export const ExpertsTestResult = z.object({
   error: z.string().optional(),
 });
 
-/** A companion hands a brief to an expert. Progress and the result arrive as notifications. */
-export const HandoffsStartParams = z.object({
-  expertId: z.string().min(1),
-  /** The companion handing off. */
-  petId: z.string().min(1),
-  brief: Brief,
-  /** The project to work in. Without one the hand-off is refused. */
-  folder: z.string().min(1).optional(),
-  /** Overrides the expert's own setting for this one hand-off. */
-  canEdit: z.boolean().optional(),
-});
-export const HandoffsStartResult = z.object({ handoffId: z.uuid() });
-
 export const HandoffsCancelParams = z.object({ handoffId: z.uuid() });
 export const HandoffsCancelResult = z.object({ cancelled: z.boolean() });
 

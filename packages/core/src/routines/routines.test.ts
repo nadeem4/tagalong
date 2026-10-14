@@ -347,6 +347,7 @@ describe('Routines, handing to an expert', () => {
     const saved = t.store.save({ ...PAPERS, handTo: 'researcher' }, MONDAY_759);
     await t.routines.runNow(saved.id);
     expect(t.asks[0]?.preApprovedExpertId).toBe('researcher');
+    expect(t.asks[0]?.instruction).toBe(PAPERS.what);
     expect(t.asks[0]?.text).toContain('Researcher');
     expect(t.asks[0]?.text).toContain('read-only');
   });

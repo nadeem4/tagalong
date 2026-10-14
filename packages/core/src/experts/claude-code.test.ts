@@ -72,11 +72,19 @@ describe('ClaudeCodeConnector', () => {
       '--verbose',
       '--permission-mode',
       'dontAsk',
+      '--tools',
+      'Read,Glob,Grep',
+      '--strict-mcp-config',
+      '--setting-sources',
+      'user',
+      '--settings',
+      '{"disableAllHooks":true}',
       '--allowedTools',
       'Read',
       'Glob',
       'Grep',
       '--disallowedTools',
+      'mcp__*',
       ...SECRET_FILES.flatMap((file) => [`Read(**/${file})`, `Edit(**/${file})`]),
     ]);
     expect(call?.stdin).toBe('Explain main.ts');
@@ -101,10 +109,18 @@ describe('ClaudeCodeConnector', () => {
       '--verbose',
       '--permission-mode',
       'dontAsk',
+      '--tools',
+      'WebSearch,WebFetch',
+      '--strict-mcp-config',
+      '--setting-sources',
+      'user',
+      '--settings',
+      '{"disableAllHooks":true}',
       '--allowedTools',
       'WebSearch',
       'WebFetch',
       '--disallowedTools',
+      'mcp__*',
       ...SECRET_FILES.flatMap((file) => [`Read(**/${file})`, `Edit(**/${file})`]),
     ]);
   });
@@ -119,6 +135,7 @@ describe('ClaudeCodeConnector', () => {
     ).toEqual(['--permission-mode', 'acceptEdits']);
     expect(args).toContain('Edit');
     expect(args).toContain('Write');
+    expect(args[args.indexOf('--tools') + 1]).toBe('Read,Glob,Grep,Edit,Write');
   });
 
   it('uses the command it was given', async () => {

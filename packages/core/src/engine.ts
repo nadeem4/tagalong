@@ -389,6 +389,7 @@ export class Engine {
           routine: {
             routineId: ask.routineId,
             expertId: ask.preApprovedExpertId,
+            instruction: ask.instruction,
             handedOff: ask.handedOff,
           },
         });
@@ -635,7 +636,6 @@ function buildHandlers(parts: {
       }
       return connectorFor(expert).check();
     },
-    'handoffs.start': (params) => handoffs.start(params),
     'handoffs.cancel': (params) => ({ cancelled: handoffs.cancel(params.handoffId) }),
     'handoffs.confirm': (params) => handoffs.confirm(params),
     'handoffs.dismiss': (params) => ({ dismissed: handoffs.dismiss(params.proposalId) }),

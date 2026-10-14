@@ -41,6 +41,8 @@ export interface RoutineAsk {
   routineId: string;
   /** The expert the saved card allowed: read-only, no project, no card. */
   preApprovedExpertId?: string | undefined;
+  /** The routine's saved instruction, which the pre-approved brief is built from. */
+  instruction: string;
   /** Called by the turn when it handed the work to that expert. */
   handedOff: (handoffId: string) => void;
 }
@@ -397,8 +399,8 @@ export class Routines {
       ...(expert !== undefined
         ? [
             `You may hand this to ${expert.name} (expert_id ${expert.id}) with hand_to_expert: ` +
-              'it is already approved, read-only, with web search and no project. Say in one ' +
-              'line that it is on it; its answer reaches the person on its own.',
+              'it is already approved once per run, read-only, with web search and no project. ' +
+              'Say in one line that it is on it; its answer reaches the person on its own.',
           ]
         : []),
     ].join('\n');
@@ -424,6 +426,7 @@ export class Routines {
         pet,
         text: this.#prompt(routine, context),
         routineId: routine.id,
+        instruction: routine.what,
         ...(routine.handTo !== undefined ? { preApprovedExpertId: routine.handTo } : {}),
         handedOff: (handoffId) => handoffs.push(handoffId),
       });

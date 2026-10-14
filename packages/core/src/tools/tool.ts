@@ -22,6 +22,8 @@ export interface RoutineTurnContext {
   routineId: string;
   /** The expert the routine's card allowed: read-only, no project, no card. */
   expertId?: string | undefined;
+  /** The routine's saved instruction: the pre-approved brief is built from it. */
+  instruction?: string | undefined;
   /** The hand-off the turn started with that expert, so the routine waits for its answer. */
   handedOff: (handoffId: string) => void;
 }

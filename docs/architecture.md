@@ -164,7 +164,7 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   [Roles over RPC](concepts/roles-and-tools.md#roles-over-rpc)), `notices.rolesUpgrade` and
   `notices.dismiss` (see [The roles notice](concepts/roles-and-tools.md#the-roles-notice)), and
   for Home `activity.list` (see [Activity](#activity)), and for experts `experts.list`,
-  `experts.upsert`, `experts.delete`, `experts.test`, `handoffs.start`, `handoffs.cancel`,
+  `experts.upsert`, `experts.delete`, `experts.test`, `handoffs.cancel`,
   `handoffs.confirm`, `handoffs.dismiss` and `projects.search` (see
   [Experts and connectors](#experts-and-connectors)), and `greeting.compose { petId }` →
   `{ text, source: 'model' | 'fallback' }`, the line said as the app opens (see Welcome below), and
@@ -382,7 +382,15 @@ Two connectors exist so far:
 --verbose` in the expert's folder and writes the brief to stdin, so a long brief needs no quoting
   and hits no command-line limit. Read-only is the default: `--permission-mode dontAsk` with only
   `Read`, `Glob` and `Grep` allowed, so anything else is refused without a prompt. An expert that may
-  edit runs with `acceptEdits` and adds `Edit` and `Write`. Tool calls become progress steps
+  edit runs with `acceptEdits` and adds `Edit` and `Write`. Every run is sealed: `--tools` names
+  exactly those built-in tools, so no other tool exists in the run; `--strict-mcp-config` with no
+  `--mcp-config` loads none of the person's MCP servers, and `--disallowedTools mcp__*` backs it up;
+  `--setting-sources user` skips the project's and folder's `.claude/settings.json` and
+  `settings.local.json`, so a project cannot add permissions or hooks; and
+  `--settings '{"disableAllHooks":true}'` turns off hooks from user settings too (only managed,
+  organisation-wide hooks are beyond it). User settings stay so sign-in such as `apiKeyHelper`
+  keeps working. Letting an expert reuse the person's MCP servers is left to the Expert catalog
+  feature. Tool calls become progress steps
   ("Reading src/main.ts"), edited paths become `changedFiles`, and the `result` event is the answer.
   A run that ends without a result reports what claude printed on stderr. Aborting kills the process.
 - **`FakeConnector`** (`experts/fake.ts`) replays scripted steps and an answer or an error. Tests use
@@ -415,8 +423,9 @@ before, most recent first (`ProjectMemory`, table `projects`, migration 10). `se
 `pyproject.toml`, `Cargo.toml` or `go.mod` is a project. The scan is cached for ten minutes and capped
 at 2,000 projects. `EngineOptions.projectRoots` points it elsewhere in tests.
 
-**Hand-offs.** `HandoffManager` (`experts/handoffs.ts`) runs them. `handoffs.start { expertId, petId,
-brief, folder?, canEdit? }` refuses a hand-off with no folder at all, and an unknown or switched-off expert with `-32602`, writes an `expert` row to the
+**Hand-offs.** `HandoffManager` (`experts/handoffs.ts`) runs them. There is no RPC that starts one
+directly: every hand-off is a `handoff.proposed` card the person confirms with `handoffs.confirm`,
+or a routine's one pre-approved research run. `HandoffManager.start` refuses a hand-off with no folder at all, and an unknown or switched-off expert with `-32602`, writes an `expert` row to the
 activity log, and returns `{ handoffId }` at once (the row's id). The expert's steps arrive as
 `handoff.progress { handoffId, expertId, step }` and the end as `handoff.finished { handoffId,
 expertId, state: done | error | stopped, text?, changedFiles?, error? }`. `handoffs.cancel` aborts a
@@ -611,13 +620,17 @@ paper") continues it. `create_routine` and `change_routine` are not offered on a
   work, so the read tools of connected apps run as they do in any turn.
 - A write tool of a connected app still shows the **Allow once** card, every time.
 - `hand_to_expert` on a routine's turn starts the expert at once only when it is the routine's
-  `handTo` and the tool deps have `startReadOnly`: `HandoffManager.startReadOnly` drops the folder,
+  `handTo`, the tool deps have `startReadOnly`, and the run has not used its one pre-approved
+  hand-off yet (a `WeakSet` of the turn's `RoutineTurnContext`). The brief is only the routine's
+  saved `what` (`RoutineTurnContext.instruction`) plus the model's `ask`, never the screen, files or
+  a selection. `HandoffManager.startReadOnly` drops the folder,
   forces `canEdit: false`, and asks `connectorFor(expert, { research: true })`, which is
   `ClaudeCodeConnector` with `research: true`: it runs in an empty folder of its own
   (`%TEMP%\tagalong-research`), allowed only `WebSearch` and `WebFetch`, with `--permission-mode
 dontAsk`, so it cannot read a project or edit a file. The run then waits for that hand-off's
   `handoff.finished`, adds the expert's answer to the conversation, and delivers it. Any other
-  expert, or a routine without `handTo`, gets the normal hand-off card.
+  expert, a second hand-off in the same run, or a routine without `handTo`, gets the normal
+  hand-off card.
 - `handTo` is set only from the card or the form that saved it, never by a run.
 
 **Delivery.** A finished run becomes `routine.result { routineId, name, petId, conversationId,

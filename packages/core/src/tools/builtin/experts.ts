@@ -1,6 +1,12 @@
 import type { Brief, Expert } from '@tagalong/protocol';
 import type { BrainTool } from '../../providers';
-import { defineTool, type Tool, type ToolContext, type ToolOutcome } from '../tool';
+import {
+  defineTool,
+  type RoutineTurnContext,
+  type Tool,
+  type ToolContext,
+  type ToolOutcome,
+} from '../tool';
 
 /**
  * The companion's one way to get work done: it never does the work itself, it writes a
@@ -27,6 +33,9 @@ export interface ExpertToolDeps {
    */
   startReadOnly?(params: { expertId: string; petId: string; brief: Brief }): { handoffId: string };
 }
+
+/** Routine runs that already used their one pre-approved hand-off. */
+const preApprovedUsed = new WeakSet<RoutineTurnContext>();
 
 /** The experts a turn can hand to: only those switched on. */
 export function enabledExperts(deps: ExpertToolDeps): Expert[] {
@@ -128,11 +137,25 @@ export function handToExpertTool(deps: ExpertToolDeps, experts: readonly Expert[
       });
     }
 
-    const brief = briefFrom(parsed, ctx);
     const routine = ctx.routine;
-    if (routine?.expertId === expert.id && deps.startReadOnly !== undefined) {
+    if (
+      routine?.expertId === expert.id &&
+      deps.startReadOnly !== undefined &&
+      !preApprovedUsed.has(routine)
+    ) {
+      // One unattended hand-off per run, briefed only from what the person saved plus the
+      // model's request: no screen context, no files.
+      preApprovedUsed.add(routine);
+      const ask =
+        routine.instruction === undefined
+          ? parsed.ask
+          : `The saved routine asks: ${routine.instruction}\n\nThis run: ${parsed.ask}`;
       try {
-        const { handoffId } = deps.startReadOnly({ expertId: expert.id, petId: ctx.pet.id, brief });
+        const { handoffId } = deps.startReadOnly({
+          expertId: expert.id,
+          petId: ctx.pet.id,
+          brief: { ask },
+        });
         routine.handedOff(handoffId);
       } catch (error) {
         return Promise.resolve({
@@ -147,6 +170,7 @@ export function handToExpertTool(deps: ExpertToolDeps, experts: readonly Expert[
       });
     }
 
+    const brief = briefFrom(parsed, ctx);
     try {
       deps.propose({ expertId: expert.id, petId: ctx.pet.id, brief });
     } catch (error) {
