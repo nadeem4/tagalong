@@ -51,3 +51,12 @@ jobs:
       - name: Smoke test (Electron end-to-end)
         run: pnpm --filter @tagalong/desktop test:e2e
         timeout-minutes: 10
+
+      # What Playwright saw when a suite failed: page snapshots and screenshots.
+      - name: Upload e2e results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: apps/desktop/test-results
+          if-no-files-found: ignore

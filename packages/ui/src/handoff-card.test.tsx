@@ -161,6 +161,30 @@ describe('the hand-off card', () => {
     );
   });
 
+  it('keeps the answer of an expert that finished before Send heard back', async () => {
+    const bridge = createFakeHostBridge();
+    let answer: (value: { handoffId: string }) => void = () => undefined;
+    bridge.confirmHandoff = () => new Promise((resolve) => (answer = resolve));
+    renderBubble(bridge);
+    propose(bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    act(() =>
+      bridge.emit({
+        type: 'handoff.finished',
+        handoffId: 'handoff-1',
+        expertId: 'claude-code',
+        state: 'done',
+        text: 'Nothing to change.',
+      }),
+    );
+    await act(async () => answer({ handoffId: 'handoff-1' }));
+
+    expect(screen.getByRole('region', { name: 'Claude Code finished' })).toHaveTextContent(
+      'Nothing to change.',
+    );
+    expect(screen.queryByRole('region', { name: 'Claude Code is on it' })).toBeNull();
+  });
+
   it('says plainly when the expert could not finish', async () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge);
