@@ -148,6 +148,32 @@ when Scout calls one of their tools in a turn you started.
 - **Activity** records each call as the app, the tool, read or write, and whether it worked. Not
   what was sent or what came back.
 
+## Routines: what runs on its own
+
+A routine is something Scout does for you at a time or when something happens, such as new papers
+every weekday at 8. Nothing becomes a routine until you press **Save**, on Scout's card or in Home.
+
+- **What saving allows.** Saving is your consent for the routine's read-only work: each run is one
+  of Scout's turns, so it may read your connected apps' read-only tools, as Scout does when you ask.
+  A tool that changes something still shows **Allow once** every time, and does nothing if you are
+  not there to press it.
+- **Experts.** A routine hands work to an expert without asking only when its card said so ("May
+  hand to: Researcher, read-only, no project"). That expert then runs in an empty folder of its own,
+  with web search and web fetch only: it cannot read your projects or edit any file. Any other
+  hand-off shows the usual card and waits for Send.
+- **What a run sees.** The routine's own words and topics, and, for a trigger, what triggered it: the
+  first 600 characters of an expert's answer, or a watch's message. A routine that waits for an app
+  or site reads window titles only, every 15 seconds, never a picture or window text, and never a
+  blind spot's title.
+- **Where results go.** Only where the routine says: a line in Scout's bubble, Scout's voice, a
+  Windows notification. Each run is also a row in Activity, and its answer is kept in Scout's
+  conversation on this computer so you can ask about it later. Results wait while a full-screen app
+  or a call is in front.
+- **Missed runs.** If the computer was asleep or Tagalong was closed, a routine runs once when it is
+  back, and says it ran late. Never more than once.
+- Routines are kept in the database on this computer (`routines` table). Delete one in Home, or ask
+  Scout to, and it is gone.
+
 ## Scout's voice: what is spoken, and where it goes
 
 Scout says its bubble lines aloud while **Scout talks** is on (Settings → Voice, on by default).
