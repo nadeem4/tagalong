@@ -215,6 +215,21 @@ describe('expert hand-offs', () => {
   });
 });
 
+describe('routines for the greeting', () => {
+  it('lists the routines that ran well since a time, by name, for the greeting', () => {
+    const before = new Date(Date.now() - 60_000).toISOString();
+    const routineId = randomUUID();
+    const done = log.routineStarted({ routineId, petId: 'scout', name: 'Morning papers' });
+    log.routineFinished(done, { state: 'done', answer: 'Three new papers.' });
+    const failed = log.routineStarted({ routineId, petId: 'scout', name: 'Inbox sweep' });
+    log.routineFinished(failed, { state: 'error', error: 'No key for Scout.' });
+    log.routineStarted({ routineId, petId: 'scout', name: 'Still running' });
+
+    expect(log.routinesFinishedSince(before)).toEqual(['Morning papers']);
+    expect(log.routinesFinishedSince(new Date(Date.now() + 60_000).toISOString())).toEqual([]);
+  });
+});
+
 describe('connector calls', () => {
   it('records the app, the tool, read or write, and how it ended, never the content', () => {
     log.connectorCalled({

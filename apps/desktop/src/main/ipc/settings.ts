@@ -3,7 +3,12 @@ import type { SecretStore } from '@tagalong/core';
 import type { Settings, SettingsPatch } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
 import type { HostView, ModelList } from '../../shared/ipc';
-import { ELEVENLABS_SECRET_KEY, providerChoices, secretKeyFor } from '../provider-choices';
+import {
+  ELEVENLABS_SECRET_KEY,
+  providerChoices,
+  secretKeyFor,
+  storedKeys,
+} from '../provider-choices';
 import type { EngineCall, IpcHandle } from './handle';
 
 export interface SettingsIpcDeps {
@@ -37,13 +42,7 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
   handle(IPC.hostView, async (): Promise<HostView> => {
     const secrets = deps.secrets();
     const settings = await readSettings();
-    const stored = new Set<string>();
-    for (const choice of providerChoices(new Set())) {
-      const secretKey = secretKeyFor(choice.id);
-      if (secretKey === undefined) continue;
-      const value = await secrets.get(secretKey);
-      if (value !== null && value.length > 0) stored.add(choice.id);
-    }
+    const stored = await storedKeys(secrets);
     // Pets live in the engine's database; with no engine the form shows keys and URLs
     // only, which is exactly what someone fixing a failed boot needs.
     const host = deps.host();

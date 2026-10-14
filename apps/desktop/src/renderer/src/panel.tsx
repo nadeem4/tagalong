@@ -14,6 +14,7 @@ import '@fontsource/onest/latin-600.css';
 import '@fontsource/pixelify-sans/latin-700.css';
 import './app.css';
 import '../../shared/ipc';
+import type { GreetLine } from '../../shared/ipc';
 import { prepareLine } from './voice-player';
 import { DEFAULT_TALK_KEY, panelSettings, readable } from './panel-settings';
 import type { PanelSettings } from './panel-settings';
@@ -38,7 +39,7 @@ function Panel() {
   const [hotkeyProblem, setHotkeyProblem] = useState<string | null>(null);
   const [mode, setMode] = useState<'bubble' | 'chat'>('bubble');
   const [greeting, setGreeting] = useState(false);
-  const [line, setLine] = useState<string | null>(null);
+  const [line, setLine] = useState<GreetLine | null>(null);
   // A line Scout says on its own, from keeping an eye on things, with Not now on it.
   const [remark, setRemark] = useState<PetRemarkParams | null>(null);
   // A routine's result: a quiet line that opens to the full answer in its conversation.
@@ -123,10 +124,10 @@ function Panel() {
   // A later launch: one quiet line, which fades and hides the window unless touched.
   useEffect(
     () =>
-      window.tagalongHost.onGreetLine((text) => {
+      window.tagalongHost.onGreetLine((next) => {
         setMode('bubble');
-        setLine(text);
-        mouth.say(text);
+        setLine(next);
+        mouth.say(next.text);
       }),
     [mouth],
   );
@@ -294,7 +295,7 @@ function Panel() {
           ) : line !== null ? (
             <GreetingLine
               petName={petName}
-              text={line}
+              text={line.text}
               tail={side === 'left' ? 'right' : 'left'}
               onDone={() => {
                 setLine(null);
@@ -302,6 +303,19 @@ function Panel() {
                 void window.tagalongHost.hidePanel();
               }}
               onOpen={() => setLine(null)}
+              {...(line.fix !== undefined
+                ? {
+                    offer: {
+                      label: line.fix,
+                      onAccept: () => {
+                        setLine(null);
+                        mouth.stop();
+                        void window.tagalongHost.openSettings();
+                        void window.tagalongHost.hidePanel();
+                      },
+                    },
+                  }
+                : {})}
             />
           ) : (
             <CompanionBubble

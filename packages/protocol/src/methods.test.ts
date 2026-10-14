@@ -180,6 +180,31 @@ describe('greeting.compose', () => {
       resultSchemaFor('greeting.compose').safeParse({ text: '', source: 'model' }).success,
     ).toBe(false);
   });
+
+  it('carries what main recorded about the last launch, when it has it', () => {
+    const launch = {
+      crashed: true,
+      lastVersion: '0.3.0',
+      version: '0.4.0',
+      whatsNew: 'Setup by voice.',
+    };
+    expect(paramsSchemaFor('greeting.compose').parse({ petId: 'scout', launch })).toEqual({
+      petId: 'scout',
+      launch,
+    });
+    expect(
+      paramsSchemaFor('greeting.compose').parse({
+        petId: 'scout',
+        launch: { ...launch, lastVersion: null },
+      }),
+    ).toEqual({ petId: 'scout', launch: { ...launch, lastVersion: null } });
+    expect(
+      paramsSchemaFor('greeting.compose').safeParse({
+        petId: 'scout',
+        launch: { ...launch, version: '' },
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe('ask input', () => {

@@ -113,6 +113,14 @@ export const SETTINGS_DEFAULTS = {
   /** When Tagalong was last quit, so the greeting can say how long you were away. */
   lastClosedAt: null,
   /**
+   * Whether the last launch closed cleanly. Main sets it false as each launch starts and
+   * true on a clean quit, so false at the next start means the last one crashed. True for a
+   * settings file from before it, so an upgrade is never read as a crash.
+   */
+  closedCleanly: true,
+  /** The app version the last launch ran, so the greeting can say Tagalong was updated. */
+  lastVersion: null,
+  /**
    * Whether Scout keeps an eye on things: it follows window titles (never pixels) and,
    * rarely, reads one window and says one short line. On by default; off means no
    * tracking at all.
@@ -299,6 +307,10 @@ const settingsFields = {
   lastOpenedAt: z.iso.datetime().nullable(),
   /** When Tagalong was last quit; null before the first quit that recorded it. */
   lastClosedAt: z.iso.datetime().nullable(),
+  /** False while a launch is running; still false at the next start after a crash. */
+  closedCleanly: z.boolean(),
+  /** The version the last launch ran; null before the first launch that recorded it. */
+  lastVersion: z.string().min(1).nullable(),
   /** Whether Scout follows window titles and now and then says one useful line. */
   keepAnEye: z.boolean(),
   /** Whether Scout speaks its bubble, in which voice and how fast. */
@@ -352,6 +364,8 @@ export const Settings = z.object({
   greeting: settingsFields.greeting.default(SETTINGS_DEFAULTS.greeting),
   lastOpenedAt: settingsFields.lastOpenedAt.default(SETTINGS_DEFAULTS.lastOpenedAt),
   lastClosedAt: settingsFields.lastClosedAt.default(SETTINGS_DEFAULTS.lastClosedAt),
+  closedCleanly: settingsFields.closedCleanly.default(SETTINGS_DEFAULTS.closedCleanly),
+  lastVersion: settingsFields.lastVersion.default(SETTINGS_DEFAULTS.lastVersion),
   keepAnEye: settingsFields.keepAnEye.default(SETTINGS_DEFAULTS.keepAnEye),
   voice: settingsFields.voice.prefault({ ...SETTINGS_DEFAULTS.voice }),
   userName: settingsFields.userName.default(SETTINGS_DEFAULTS.userName),

@@ -532,3 +532,20 @@ describe('Settings.listening', () => {
     });
   });
 });
+
+describe('Settings.closedCleanly and lastVersion', () => {
+  it('reads a settings file from before them as a clean close on no known version', () => {
+    const settings = Settings.parse({ welcome: { done: true } });
+    expect(settings.closedCleanly).toBe(true);
+    expect(settings.lastVersion).toBeNull();
+  });
+
+  it('ride in a patch alone', () => {
+    expect(SettingsPatch.parse({ closedCleanly: false })).toEqual({ closedCleanly: false });
+    expect(SettingsPatch.parse({ lastVersion: '0.4.0' })).toEqual({ lastVersion: '0.4.0' });
+  });
+
+  it('refuse an empty version', () => {
+    expect(SettingsPatch.safeParse({ lastVersion: '' }).success).toBe(false);
+  });
+});

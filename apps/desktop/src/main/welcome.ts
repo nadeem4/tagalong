@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { recommendedModel } from '@tagalong/core';
 import { Pet } from '@tagalong/protocol';
 import type { Expert, Role, Settings } from '@tagalong/protocol';
-import type { FoundAgent } from '../shared/ipc';
+import type { FoundAgent, GreetLine } from '../shared/ipc';
 
 /**
  * The Welcome window's main-process half: which coding agents are on this computer, when
@@ -74,9 +74,9 @@ export const LISTENING_LINE =
  */
 export async function launchLine(
   settings: Settings,
-  compose: () => Promise<string>,
-): Promise<string | null> {
-  if (settings.listening.always) return LISTENING_LINE;
+  compose: () => Promise<GreetLine>,
+): Promise<GreetLine | null> {
+  if (settings.listening.always) return { text: LISTENING_LINE };
   return shouldGreetOnLaunch(settings) ? compose() : null;
 }
 

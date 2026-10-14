@@ -174,6 +174,13 @@ export interface ProviderChoice {
  */
 export type ClaudeSignIn = 'signed-in' | 'signed-out' | 'not-installed' | 'unknown';
 
+/** The line main hands the bubble as the app opens: the words, and a fix when Scout cannot think. */
+export interface GreetLine {
+  text: string;
+  /** The fix button's label; it opens Home's Settings, where the brain is fixed. */
+  fix?: string;
+}
+
 /** A coding agent Welcome looked for on this computer. */
 export interface FoundAgent {
   id: string;
@@ -295,8 +302,8 @@ export interface TagalongHostApi {
   fitPanel(height: number): Promise<void>;
   /** Main asks the bubble for its one-time hello, right after Welcome. */
   onGreet(handler: () => void): () => void;
-  /** Main hands the bubble one line to say quietly as the app opens, on a later launch. */
-  onGreetLine(handler: (text: string) => void): () => void;
+  /** Main hands the bubble the launch line, with a fix when Scout cannot think. */
+  onGreetLine(handler: (line: GreetLine) => void): () => void;
   /** Main hands the bubble one line Scout says on its own, from keeping an eye on things. */
   onRemark(handler: (remark: PetRemarkParams) => void): () => void;
   /**

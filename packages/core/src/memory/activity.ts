@@ -251,6 +251,18 @@ export class ActivityLog {
       .map((row) => ({ expertName: row.expert_name ?? 'An expert', text: row.text ?? '' }));
   }
 
+  /** The routines that ran well after `since`, oldest first, at most five: their names only. */
+  routinesFinishedSince(since: string): string[] {
+    return this.db
+      .prepare<[string], { text: string | null }>(
+        `SELECT text FROM activity
+         WHERE kind = 'routine' AND state = 'done' AND finished_at > ?
+         ORDER BY finished_at ASC LIMIT 5`,
+      )
+      .all(since)
+      .map((row) => row.text ?? 'A routine');
+  }
+
   /** Newest first; `before` is the `next` of the page before. */
   list(params: { before?: string | undefined; limit?: number | undefined }): ActivityListResult {
     const limit = params.limit ?? 30;

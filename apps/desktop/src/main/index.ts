@@ -25,6 +25,14 @@ import {
 } from './always-listening';
 import { systemClock } from './awareness/clock';
 import { handoffNotice } from './handoff-notice';
+import {
+  brainLine,
+  brainReadiness,
+  recordCleanClose,
+  recordLaunch,
+  SIGN_IN_BUDGET_MS,
+} from './launch';
+import type { PreviousLaunch } from './launch';
 import { routineDelivery } from './routine-delivery';
 import { nativeCodec } from './awareness/native-codec';
 import { PerceptionMemory } from './awareness/perception-memory';
@@ -34,7 +42,8 @@ import { captureAskSnapshot, capturePatch } from './context';
 import { startEngineHost } from './engine-host';
 import { keepAnEyeAllowed, startKeepAnEye } from './keep-an-eye';
 import { extensionFolder, isAllowedLink } from './links';
-import { ELEVENLABS_SECRET_KEY } from './provider-choices';
+import { ELEVENLABS_SECRET_KEY, providerChoices, storedKeys } from './provider-choices';
+import { WHATS_NEW } from './whats-new';
 import { elevenLabsTts } from './voice/elevenlabs';
 import { kokoroDownloaded } from './voice/kokoro';
 import { createVoiceService, elevenLabsMouth, localMouth } from './voice/voice';
@@ -42,7 +51,7 @@ import { VoiceWorker } from './voice/worker/client';
 import type { WorkerProcess } from './voice/worker/messages';
 import { WorkerLocalVoice } from './voice/worker/worker-local-voice';
 import type { VoiceService } from './voice/voice';
-import { checkClaudeSignIn } from './claude-sign-in';
+import { signInFor } from './claude-sign-in';
 import { findAgents, launchLine, shouldOpenWelcome } from './welcome';
 import type { EngineHost } from './engine-host';
 import {
@@ -90,6 +99,8 @@ interface Desktop {
   bootError: string | null;
   platform: Platform;
   settingsStore: SettingsStore;
+  /** What the last launch left behind: whether it crashed, and which version it ran. */
+  previousLaunch: PreviousLaunch;
   /** The settings the running app is using; refreshed whenever they are saved. */
   settings: Settings;
   secrets: SafeStorageSecretStore;
@@ -124,6 +135,8 @@ interface Desktop {
 }
 
 let desktop: Desktop | null = null;
+/** The Claude sign-in check, started at boot so a cold `claude` has had time before the greeting. */
+let signInCheck: ReturnType<typeof signInFor> | null = null;
 
 /**
  * A second launch focuses the pet that is already running.
@@ -165,15 +178,13 @@ app.on('before-quit', () => {
   desktop?.rolling.dispose();
   desktop?.perceptionMemory.clear();
   // The next launch's greeting counts the time away from now, not from when this one opened.
-  try {
-    desktop?.settingsStore.set({ lastClosedAt: new Date().toISOString() });
-  } catch (error) {
-    console.warn('[main] could not remember this quit:', error);
-  }
+  recordCleanClose(desktop?.settingsStore, new Date());
   void desktop?.host?.shutdown();
 });
 
 async function start(): Promise<void> {
+  signInCheck = signInFor(process.env);
+  signInCheck.catch(() => undefined); // a failure here reads as unknown at greet time, never unhandled
   const sightPause = new SightPause();
   // Gated at the source, so every present and future reader is covered by construction.
   // Nothing downstream is handed the ungated adapter, which is what makes forgetting to
@@ -183,6 +194,8 @@ async function start(): Promise<void> {
   const secrets = new SafeStorageSecretStore(dataDir);
   const settingsStore = new SettingsStore(dataDir);
 
+  // Before anything else reads or writes settings: what the last launch left, then this one.
+  const previousLaunch = recordLaunch(settingsStore, app.getVersion());
   const settings = settingsStore.get();
   // From the saved setting, before any window opens, so the mark on Scout shows from the
   // first second listening is on.
@@ -242,6 +255,7 @@ async function start(): Promise<void> {
     bootError,
     platform,
     settingsStore,
+    previousLaunch,
     settings,
     secrets,
     avatar: null,
@@ -382,6 +396,9 @@ async function start(): Promise<void> {
         .catch((error: unknown) => console.warn('[main] could not persist avatar position', error));
     },
   });
+  // Windows ends a session (shutdown, restart, sign-out) without before-quit; that is a
+  // clean close too, not a crash.
+  desktop.avatar.on('session-end', () => recordCleanClose(desktop?.settingsStore, new Date()));
   // The pets hidden (the tray's Hide pets, or Welcome first): listening waits for them.
   const avatar = desktop.avatar;
   avatar.on('show', () => pauseListening({ petsShown: true }));
@@ -441,26 +458,41 @@ function showRemark(params: unknown): void {
 /**
  * A later launch: Scout says one line beside itself without taking the keyboard, and the
  * launch is remembered (the quit is too, in before-quit) so the next one knows how long you
- * were away and which hand-offs finished since. The line reads no
- * screen, and the engine falls back to a handwritten one, so this never waits on a brain.
+ * were away and which hand-offs finished since. The line reads no screen. It waits for the
+ * composed line and for the sign-in check (at most SIGN_IN_BUDGET_MS), both in parallel; the
+ * engine falls back to a handwritten line, so no brain is ever waited on past that.
  */
 async function greetOnLaunch(host: EngineHost): Promise<void> {
   const current = desktop;
   if (current === null) return;
   try {
     // With Always listening on, the first line says so and how to stop, greeting or not.
-    const text = await launchLine(
-      current.settings,
-      async () =>
-        (await host.client.call('greeting.compose', { petId: current.settings.defaultPetId })).text,
-    );
-    if (text !== null) {
+    const line = await launchLine(current.settings, async () => {
+      const { settings, previousLaunch } = current;
+      // Compose first, then check the brain beside it, so a slow check never delays the line.
+      const composing = host.client.call('greeting.compose', {
+        petId: settings.defaultPetId,
+        launch: { ...previousLaunch, version: app.getVersion(), whatsNew: WHATS_NEW },
+      });
+      const readiness = (async () => {
+        const { pets } = await host.client.call('pets.list', {});
+        return brainReadiness({
+          pet: pets.find((pet) => pet.id === settings.defaultPetId),
+          providers: providerChoices(await storedKeys(current.secrets)),
+          signIn: () => signInCheck ?? signInFor(process.env),
+          budgetMs: SIGN_IN_BUDGET_MS,
+        });
+      })().catch(() => 'unknown' as const);
+      const [brain, composed] = await Promise.all([readiness, composing]);
+      return brainLine(brain, composed.text, settings.userName);
+    });
+    if (line !== null) {
       const { panel, avatar } = current;
       if (panel !== null && avatar !== null && avatar.isVisible() && !panel.isVisible()) {
         if (panel.webContents.isLoading()) {
           await new Promise<void>((resolve) => panel.webContents.once('did-finish-load', resolve));
         }
-        panel.webContents.send(IPC.greetLineEvent, text);
+        panel.webContents.send(IPC.greetLineEvent, line);
         showPanelQuietly(panel, avatar);
       }
     }
@@ -973,7 +1005,7 @@ function registerIpc(): void {
   ipcMain.handle(IPC.openOffice, () => openOffice());
 
   ipcMain.handle(IPC.findAgents, () => findAgents());
-  ipcMain.handle(IPC.checkClaudeSignIn, () => checkClaudeSignIn());
+  ipcMain.handle(IPC.checkClaudeSignIn, () => signInFor(process.env));
 
   // The pet is dragged by hand (a drag region would swallow its clicks), and its bubble
   // moves with it, so it keeps speaking from the pet.

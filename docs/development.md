@@ -210,7 +210,7 @@ that starts with "Scout" is heard and answered, switched off) and `cards.spec.ts
 test:e2e`.
 
 The suites run offline on fakes: `TAGALONG_FAKE_PROVIDERS=1` (a scripted brain and a scripted expert),
-`TAGALONG_FAKE_TTS=1`, `TAGALONG_FAKE_STT=1`, and `TAGALONG_FAKE_TOOL` with `TAGALONG_FAKE_TOOL_INPUT`,
+`TAGALONG_FAKE_TTS=1`, `TAGALONG_FAKE_STT=1`, `TAGALONG_FAKE_SIGN_IN` (the Claude Code sign-in check reads as the state it names), and `TAGALONG_FAKE_TOOL` with `TAGALONG_FAKE_TOOL_INPUT`,
 which make the fake brain call one tool before it answers. `cards.spec.ts` uses the last pair to bring
 up each card: `hand_to_expert`, a connected app's `notes__add_note`, and `create_routine`. Each card
 gets its own launch, since the tool is read once at start. The native folder picker is stubbed
@@ -468,11 +468,12 @@ public privacy policy is [docs/chrome-web-store/privacy-policy.md](chrome-web-st
 Nothing reads `.env.local`: there is no dotenv dependency, and no code in `packages/` or `apps/`
 opens a `.env` file. Copying it therefore changes nothing at runtime.
 
-Seven environment variables are read, all straight from the process environment. **Set them in the
+Eight environment variables are read, all straight from the process environment. **Set them in the
 shell you launch from**, as shown above.
 
 | Variable                     | Status today                                                                                                                                                                                                                                                                                                                                                                                               |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TAGALONG_FAKE_SIGN_IN`      | **Read** (`apps/desktop/src/main/claude-sign-in.ts#fakeSignIn`), in any build. One of `signed-in`, `signed-out`, `not-installed` or `unknown` stands in for the Claude Code sign-in check, so no claude binary runs. Under `TAGALONG_FAKE_PROVIDERS=1` the check reads as `signed-in` unless this says otherwise.                                                                                          |
 | `TAGALONG_FAKE_PROVIDERS=1`  | **Read** (`packages/core/src/providers/registry.ts`, `engine.ts`). Forces the fake brain and a fake expert, for tests and demos. No keys, network or Claude Code usage.                                                                                                                                                                                                                                    |
 | `TAGALONG_FAKE_TOOL`         | **Read** (`providers/registry.ts`). Under the fake brain, the name of one tool it calls before it answers. `cards.spec.ts` and the smoke suite set it.                                                                                                                                                                                                                                                     |
 | `TAGALONG_FAKE_TOOL_INPUT`   | **Read** (`providers/registry.ts`). The JSON input for that tool call; bad JSON means no input.                                                                                                                                                                                                                                                                                                            |

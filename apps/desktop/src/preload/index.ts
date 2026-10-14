@@ -27,6 +27,7 @@ import type {
   ClaudeSignIn,
   EarsStatus,
   FoundAgent,
+  GreetLine,
   HostView,
   ListeningState,
   ModelList,
@@ -42,9 +43,9 @@ import type {
  * compromised page can reach exactly the calls listed here and nothing else.
  */
 /** A launch greeting that arrived before the panel subscribed, kept until it does. */
-const greetLine = heldUntilHeard<string>();
-ipcRenderer.on(IPC.greetLineEvent, (_event: IpcRendererEvent, text: string) =>
-  greetLine.arrived(text),
+const greetLine = heldUntilHeard<GreetLine>();
+ipcRenderer.on(IPC.greetLineEvent, (_event: IpcRendererEvent, line: GreetLine) =>
+  greetLine.arrived(line),
 );
 
 /** Home's page and Scout's card, which a fresh Home window can be sent before React listens. */

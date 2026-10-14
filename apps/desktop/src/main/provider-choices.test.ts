@@ -1,5 +1,11 @@
+import { InMemorySecretStore } from '@tagalong/core';
 import { describe, expect, it } from 'vitest';
-import { ELEVENLABS_SECRET_KEY, providerChoices, secretKeyFor } from './provider-choices';
+import {
+  ELEVENLABS_SECRET_KEY,
+  providerChoices,
+  secretKeyFor,
+  storedKeys,
+} from './provider-choices';
 
 describe('providerChoices', () => {
   it('offers the Claude Code sign-in first, then the presets, Anthropic and the fake', () => {
@@ -65,5 +71,14 @@ describe('secretKeyFor', () => {
 
   it('refuses a provider that takes no key', () => {
     expect(secretKeyFor('fake')).toBeUndefined();
+  });
+});
+
+describe('storedKeys', () => {
+  it('names the providers with a key in the keychain, and never returns a key', async () => {
+    const secrets = new InMemorySecretStore();
+    await secrets.set(secretKeyFor('openrouter')!, 'sk-or');
+    await secrets.set(secretKeyFor('anthropic')!, '');
+    expect(await storedKeys(secrets)).toEqual(new Set(['openrouter']));
   });
 });
