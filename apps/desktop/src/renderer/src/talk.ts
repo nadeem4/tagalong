@@ -43,10 +43,17 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
     hearers.add(handler);
     return () => void hearers.delete(handler);
   });
+  // The bubble listens for each start of listening: talking over Scout stops its answer.
+  const [listeners] = useState(() => new Set<() => void>());
+  const [onListen] = useState(() => (handler: () => void) => {
+    listeners.add(handler);
+    return () => void listeners.delete(handler);
+  });
 
   const [control] = useState(() => {
     const begin = (): void => {
       latest.current.onBegin();
+      for (const listen of listeners) listen();
       setState('listening');
       setNote(null);
       window.tagalongHost
@@ -129,6 +136,7 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
     talk: {
       state,
       onHeard,
+      onListen,
       note,
       keyLabel: options.keyLabel,
       onMic: () => control.act(ptt.click()),

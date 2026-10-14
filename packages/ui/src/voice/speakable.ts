@@ -30,7 +30,7 @@ export function toSpeakable(text: string, { whole = false }: { whole?: boolean }
     return '\n';
   });
   const lines = withoutCode.split('\n').filter((line) => {
-    const listOrTable = /^\s*(?:[-*+]|\d+[.)])\s+/.test(line) || /^\s*\|/.test(line);
+    const listOrTable = /^\s*(?:[-*+•]|\d+[.)])\s+/.test(line) || /^\s*\|/.test(line);
     if (listOrTable) cut = true;
     return !listOrTable;
   });

@@ -997,6 +997,10 @@ function registerIpc(): void {
     if (patch.defaultPetId !== undefined) refreshStrip();
     // Rolling memory starts, stops or trims the moment the user saves, not after a restart.
     if (patch.rollingMemory !== undefined) current.rolling.configure(saved.rollingMemory);
+    // An open panel reads its keys, microphone and the user's name from here, not a restart.
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(IPC.settingsChangedEvent, saved);
+    }
     return saved;
   });
 

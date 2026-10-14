@@ -17,6 +17,7 @@ import type {
   RoutineProposedParams,
   RoutineResultParams,
   RoutineView,
+  Settings,
   SettingsPatch,
 } from '@tagalong/protocol';
 import type { AskInput, HostBridge, TurnEvent } from '@tagalong/ui';
@@ -136,6 +137,11 @@ const host: TagalongHostApi = {
     const listener = (_event: IpcRendererEvent, problem: string | null): void => handler(problem);
     ipcRenderer.on(IPC.hotkeyProblemEvent, listener);
     return () => void ipcRenderer.off(IPC.hotkeyProblemEvent, listener);
+  },
+  onSettingsChanged: (handler) => {
+    const listener = (_event: IpcRendererEvent, settings: Settings): void => handler(settings);
+    ipcRenderer.on(IPC.settingsChangedEvent, listener);
+    return () => void ipcRenderer.off(IPC.settingsChangedEvent, listener);
   },
   getRecording: () => ipcRenderer.invoke(IPC.getRecording) as Promise<boolean>,
   onRecording: (handler) => {

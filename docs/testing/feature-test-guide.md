@@ -1054,7 +1054,8 @@ voice model (about 90 MB) into `%APPDATA%\Tagalong\voice`; ElevenLabs (V.6) bill
 
 1. **Action:** ask for "a bulleted list of five fruits, then a code sample".
 2. **Expected:** Scout says the sentence before the list and "The rest is in the bubble." No list
-   item or code is read.
+   item or code is read. In a spoken question (hold the talk key) ask for "three numbered steps,
+   each two sentences long": no part of any step is read, not even its second sentence.
 
 ### V.3. Stopping
 
@@ -1083,6 +1084,7 @@ voice model (about 90 MB) into `%APPDATA%\Tagalong\voice`; ElevenLabs (V.6) bill
    ElevenLabs library; Save; ask a question. Then remove the key.
 2. **Expected:** the answer is spoken in that voice (the ElevenLabs history shows only the spoken
    words). With the key removed, or a wrong voice ID, Scout speaks with the local voice again.
+   With the network cut while ElevenLabs is set, the local voice takes over within 15 seconds.
 
 ## Talk to Scout
 
@@ -1113,6 +1115,10 @@ downloads the speech model (about 80 MB) into `%APPDATA%\Tagalong\voice`. With
 1. **Action:** ask a typed question that gets a long answer; while Scout speaks, hold the talk key.
 2. **Expected:** Scout stops speaking at once, the bubble listens, and the new spoken question is
    answered.
+3. **Action:** ask a spoken question with a long answer and hold the talk key again while it is
+   still streaming, then say nothing and let go.
+4. **Expected:** Scout stops and says nothing more of the old answer; the bubble keeps what was
+   shown so far and no Stop button remains.
 
 ### T.4. Reply, never an open mic
 
@@ -1146,6 +1152,9 @@ downloads the speech model (about 80 MB) into `%APPDATA%\Tagalong\voice`. With
 1. **Action:** change **Talk to Scout** to another combination, Save, and hold the new key.
 2. **Expected:** the new key works at once; the bubble's reply hint names it. A key another app owns is
    reported in Shortcuts and the field is marked.
+3. **Action:** with the bubble open, pick another microphone and change your name in Settings;
+   Save, then talk to Scout without restarting.
+4. **Expected:** the new microphone is used and Scout uses the new name.
 
 ## Demo run: the hackathon story
 

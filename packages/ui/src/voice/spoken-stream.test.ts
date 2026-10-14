@@ -44,6 +44,31 @@ describe('SpokenStream', () => {
     expect(said).toEqual(['Two steps, they’re in the bubble.']);
   });
 
+  it('never reads any part of a list item, however its sentences split', () => {
+    const { said, stream: s } = stream();
+    s.push('Two steps.\n1. Install it. Then wait.\n2. Run ');
+    s.push('the tests.\n- Use foo. It is fast.\n• Or bar.\n| a. b. |\nThat’s all.');
+    s.end();
+    expect(said).toEqual(['Two steps.', 'That’s all.']);
+  });
+
+  it('never reads a list item whose marker arrives in pieces', () => {
+    const { said, stream: s } = stream();
+    s.push('Here.\n1');
+    s.push('. Install');
+    s.push(' it. Then go.\nDone.');
+    s.end();
+    expect(said).toEqual(['Here.', 'Done.']);
+  });
+
+  it('still reads a line that only starts like a number', () => {
+    const { said, stream: s } = stream();
+    s.push('3.5 seconds, roughly. ');
+    s.push('Fast enough.');
+    s.end();
+    expect(said).toEqual(['3.5 seconds, roughly.', 'Fast enough.']);
+  });
+
   it('points at the bubble when nothing in the answer could be said', () => {
     const { said, stream: s } = stream();
     s.push('```\ncode only\n```');
