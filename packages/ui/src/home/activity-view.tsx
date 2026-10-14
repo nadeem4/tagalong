@@ -19,6 +19,7 @@ function changesActivity(event: TurnEvent): boolean {
     case 'pet.message':
     case 'crew.status':
     case 'handoff.finished':
+    case 'routine.result':
       return true;
     case 'turn.toolResult':
       return event.tool === 'ask_pet';
@@ -51,6 +52,11 @@ function headline(entry: ActivityEntry, name: (petId: string) => string): string
       if (entry.state === 'error') return `${who} could not reach ${app}`;
       if (entry.state === 'stopped') return `${who} did not change ${app}`;
       return entry.access === 'read' ? `${who} read ${app}` : `${who} changed ${app}`;
+    }
+    case 'routine': {
+      const name = entry.text ?? 'A routine';
+      if (entry.state === 'error') return `${name} did not run`;
+      return entry.state === 'running' ? `${who} is running ${name}` : `${who} ran ${name}`;
     }
     case 'turn':
       return {
