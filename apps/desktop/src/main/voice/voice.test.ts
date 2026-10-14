@@ -243,6 +243,20 @@ describe('LazyLocalVoice', () => {
     generate: async () => ({ toWav: () => new Uint8Array([9]).buffer }),
   };
 
+  it('says when a warm-up has finished, and whether it loaded', async () => {
+    const ok = new LazyLocalVoice(async () => ({ generate: async () => ({ toWav: () => new ArrayBuffer(0) }) }));
+    expect(await ok.loaded()).toBe(false);
+    ok.warm();
+    expect(await ok.loaded()).toBe(true);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const broken = new LazyLocalVoice(async () => {
+      throw new Error('download failed');
+    });
+    broken.warm();
+    expect(await broken.loaded()).toBe(false);
+    warn.mockRestore();
+  });
+
   it('is not ready until the model has loaded, and loads it once', async () => {
     const load = vi.fn(async () => synth);
     const local = new LazyLocalVoice(load);

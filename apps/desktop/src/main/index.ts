@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   BrowserWindow,
   Menu,
@@ -11,6 +12,7 @@ import {
   ipcMain,
   screen,
   shell,
+  utilityProcess,
 } from 'electron';
 import { ContextSnapshot, HandoffFinishedParams, RoutineResultParams } from '@tagalong/protocol';
 import type { PerceptionTarget, Settings, SettingsPatch } from '@tagalong/protocol';
@@ -28,8 +30,11 @@ import { keepAnEyeAllowed, startKeepAnEye } from './keep-an-eye';
 import { extensionFolder, isAllowedLink } from './links';
 import { ELEVENLABS_SECRET_KEY } from './provider-choices';
 import { elevenLabsTts } from './voice/elevenlabs';
-import { kokoroDownloaded, loadKokoro } from './voice/kokoro';
-import { LazyLocalVoice, createVoiceService, elevenLabsMouth, localMouth } from './voice/voice';
+import { kokoroDownloaded } from './voice/kokoro';
+import { createVoiceService, elevenLabsMouth, localMouth } from './voice/voice';
+import { VoiceWorker } from './voice/worker/client';
+import type { WorkerProcess } from './voice/worker/messages';
+import { WorkerLocalVoice } from './voice/worker/worker-local-voice';
 import type { VoiceService } from './voice/voice';
 import { LazyLocalStt, createListenService } from './voice/listen';
 import type { ListenService } from './voice/listen';
@@ -109,6 +114,8 @@ interface Desktop {
   perceptionMemory: PerceptionMemory;
   /** Turns Scout's lines into audio for the panel to play. */
   voice: VoiceService;
+  /** The process the voice models run in; stopped on quit. */
+  voiceWorker: VoiceWorker;
   /** Talk to Scout: turns what the panel recorded into text, on this computer. */
   listen: ListenService;
 }
@@ -148,6 +155,7 @@ app.on('window-all-closed', () => {});
 
 app.on('before-quit', () => {
   desktop?.hotkeys.dispose();
+  desktop?.voiceWorker.stop();
   stopKeepAnEye();
   // Memory only, and gone on quit: nothing here was ever written anywhere to clean up.
   desktop?.rolling.dispose();
@@ -213,6 +221,15 @@ async function start(): Promise<void> {
     console.error('[main] the engine did not start:', bootError);
   }
 
+  // The voice models run in their own process; it starts the first time Scout speaks.
+  const voiceWorker = new VoiceWorker(
+    () =>
+      utilityProcess.fork(fileURLToPath(new URL('./voice-worker.js', import.meta.url)), [], {
+        serviceName: 'Tagalong voice',
+        env: { ...process.env, TAGALONG_VOICE_DIR: join(dataDir, 'voice') },
+      }) as unknown as WorkerProcess,
+  );
+
   desktop = {
     host,
     bootError,
@@ -239,9 +256,10 @@ async function start(): Promise<void> {
     sightPause,
     rolling,
     perceptionMemory,
+    voiceWorker,
     voice: (() => {
       // The model downloads into the data dir on first use, never at start.
-      const local = new LazyLocalVoice(() => loadKokoro(join(dataDir, 'voice')));
+      const local = new WorkerLocalVoice(voiceWorker);
       return createVoiceService({
         env: process.env,
         settings: () => (desktop?.settings ?? settings).voice,

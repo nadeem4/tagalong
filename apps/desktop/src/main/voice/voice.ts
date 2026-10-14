@@ -54,6 +54,12 @@ export class LazyLocalVoice implements LocalVoice {
     return this.#synth !== null;
   }
 
+  /** Waits for a warm-up under way, if any; true when the model is loaded. */
+  async loaded(): Promise<boolean> {
+    await this.#loading;
+    return this.#synth !== null;
+  }
+
   warm(): void {
     if (this.#synth !== null || this.#loading !== null) return;
     this.#loading = this.#load().then(

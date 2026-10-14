@@ -1513,9 +1513,13 @@ flowchart LR
   end
   subgraph Main["Main process"]
     VS["createVoiceService"] --> EL["elevenLabsTts"]
-    VS --> KO["LazyLocalVoice: Kokoro"]
+    VS --> WL["WorkerLocalVoice via VoiceWorker"]
     VS --> FK["fakeTts"]
   end
+  subgraph VP["Voice process (utilityProcess)"]
+    KO["LazyLocalVoice: Kokoro"]
+  end
+  WL -- "parentPort messages" --> KO
   PL -- "IPC speak(text)" --> VS
 ```
 
@@ -1554,6 +1558,15 @@ flowchart LR
   so the first lines are Kokoro rather than the system voice; it never starts a download. A failed load is tried again on the next
   line, and a failed load first deletes that model's folder under `<userData>/voice`
   (`voice/model-cache.ts`), so an interrupted download is fetched again. With **Scout talks** off, `speak` answers `off`, except for a Settings preview.
+- **Where it runs** (`main/voice/worker/`). Kokoro never loads in main. `VoiceWorker` (`client.ts`)
+  forks `dist/voice-worker.js` as an Electron `utilityProcess` the first time a call needs it, so
+  nothing loads at launch. `WorkerLocalVoice` is the `LocalVoice` main sees: `warm` and `speak` are
+  calls over the process's message port, `ready()` turns true on the process's `kokoro.ready` and
+  false when it exits. `createWorkerHandler` (`handler.ts`) is the process's side, wrapped by the
+  bootstrap `main.ts` around `LazyLocalVoice`; a failure comes back as an error message, so the line
+  falls to the next mouth. If the process exits, every call waiting fails at once and the next call
+  forks a fresh one; quitting calls `stop()`, which kills it. The model folder reaches it as
+  `TAGALONG_VOICE_DIR` (`<userData>/voice`), through the fork's `env`.
 - **How it plays** (`renderer/src/voice-player.ts`). Audio is decoded with `AudioContext` and played
   through an `AnalyserNode`, whose level is written to the CSS variable `--tg-voice-level` each
   frame; the bubble's speaking indicator (three bars beside ×, a **Stop speaking** button) scales
@@ -1561,7 +1574,8 @@ flowchart LR
   `speechSynthesis`, choosing an en-GB male voice (`pickSystemVoice`: Microsoft George first) or
   the default.
 - **Packaging.** `kokoro-js` and `@huggingface/transformers` are runtime dependencies of the
-  desktop app, external to the main bundle and imported only when Scout first speaks.
+  desktop app, external to the bundles and imported only when Scout first speaks. The main build has
+  two entries, `dist/main.js` and `dist/voice-worker.js`; `electron-builder.json` packages all of `dist`.
   `onnxruntime-node`'s DLLs and sharp's `@img` binaries are unpacked from `app.asar`. The model is
   not bundled.
 

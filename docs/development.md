@@ -78,6 +78,8 @@ tagalong/
                                     # welcome.ts, claude-sign-in.ts, keep-an-eye.ts,
                                     # routine-delivery.ts, links.ts, awareness/, ipc/,
                                     # platform/, voice/, windows/
+      src/main/voice/worker/        # the voice process: client.ts (VoiceWorker), messages.ts,
+                                    # handler.ts, worker-local-voice.ts, main.ts (its bootstrap)
       src/main/platform/            # capture, downscale, composite, canvas, label, displays,
                                     # window-helper, window-list, selection, win32
       src/preload/index.ts          # exposes window.tagalong and window.tagalongHost
