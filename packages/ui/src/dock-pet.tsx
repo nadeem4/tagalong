@@ -52,8 +52,10 @@ export function DockPet({
   blinkEveryMs,
 }: DockPetProps) {
   const [blinking, setBlinking] = useState(false);
-  // Blinks in moods with open eyes; working looks down at the task and done squints.
-  const canBlink = mood === 'idle' || mood === 'listening';
+  // Blinks in moods with open eyes; working looks down at the task and done squints. A
+  // blink is motion too, so it stops with the rest when the system asks for less.
+  const [still] = useState(reducedMotion);
+  const canBlink = !still && (mood === 'idle' || mood === 'listening');
 
   useEffect(() => {
     if (!canBlink) return;
@@ -155,6 +157,15 @@ export function DockPet({
         />
       )}
     </span>
+  );
+}
+
+/** Whether the person asked the system for less motion. */
+function reducedMotion(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
   );
 }
 

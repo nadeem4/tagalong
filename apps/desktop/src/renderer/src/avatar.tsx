@@ -2,6 +2,8 @@ import { StrictMode, useEffect, useReducer, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { DockPet } from '@tagalong/ui';
 import type { Pet } from '@tagalong/protocol';
+// Bundled, not fetched: the dock's tags are Onest 600, Latin subset only.
+import '@fontsource/onest/latin-600.css';
 import './app.css';
 import '../../shared/ipc';
 import { visibleCrew } from './crew';
