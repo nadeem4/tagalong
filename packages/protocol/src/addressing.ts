@@ -4,12 +4,19 @@
  * Imports nothing.
  */
 
-const PUNCTUATION = '\\s,.!?:;\\-';
+/** Whitespace and any Unicode punctuation: commas, dashes, ellipses, quotes. */
+const PUNCTUATION = '\\s\\p{P}';
 
-/** "Scout" at the start, after an optional "hey", "ok" or "okay"; the rest is captured. */
-const ADDRESSED = new RegExp(`^\\s*(?:(?:hey|okay|ok)\\b[${PUNCTUATION}]*)?scout\\b(.*)$`, 'is');
-const LEADING_PUNCTUATION = new RegExp(`^[${PUNCTUATION}]+`);
-const STOP = new RegExp(`^stop(?:\\s+listening)?[${PUNCTUATION}]*$`, 'i');
+/**
+ * "Scout" at the start, after an optional "hey", "ok" or "okay"; the rest is captured.
+ * Not "Scout's" or "Scout-like": that is talk about Scout, not to it.
+ */
+const ADDRESSED = new RegExp(
+  `^\\s*(?:(?:hey|okay|ok)\\b[${PUNCTUATION}]*)?scout\\b(?!['’-])(.*)$`,
+  'isu',
+);
+const LEADING_PUNCTUATION = new RegExp(`^[${PUNCTUATION}]+`, 'u');
+const STOP = new RegExp(`^stop(?:\\s+listening)?[${PUNCTUATION}]*$`, 'iu');
 
 /**
  * What follows the name, ready to send as the question; null when the turn does not start
