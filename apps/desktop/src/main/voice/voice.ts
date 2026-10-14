@@ -119,6 +119,14 @@ export function createVoiceService(options: VoiceServiceOptions) {
   const { env, settings, elevenLabsKey, local, elevenLabs } = options;
   return {
     /**
+     * At start: loads the local voice when an earlier run downloaded it, so Scout's first
+     * lines are Kokoro rather than the system voice. Never starts a download.
+     */
+    warmAtStart(downloaded: boolean): void {
+      if (env.TAGALONG_FAKE_TTS === '1' || !settings().enabled || !downloaded) return;
+      local.warm();
+    },
+    /**
      * Says one line. `preview` is Settings' ▶ Preview, which plays even while Scout talks
      * is off, in the voice and speed the form shows rather than the saved ones.
      */

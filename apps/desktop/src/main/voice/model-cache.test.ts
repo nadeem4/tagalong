@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { loadOrForget } from './model-cache';
+import { isDownloaded, loadOrForget } from './model-cache';
 
 let cacheDir: string;
 
@@ -20,6 +20,15 @@ function partial(model: string): string {
   writeFileSync(join(dir, 'model.onnx'), 'half a file');
   return dir;
 }
+
+describe('isDownloaded', () => {
+  it('says whether a model’s file is in the cache, without fetching anything', () => {
+    expect(isDownloaded(cacheDir, 'acme/model', 'model.onnx')).toBe(false);
+    partial('acme/model');
+    expect(isDownloaded(cacheDir, 'acme/model', 'model.onnx')).toBe(true);
+    expect(isDownloaded(cacheDir, 'acme/model', 'onnx/model_quantized.onnx')).toBe(false);
+  });
+});
 
 describe('loadOrForget', () => {
   it('returns what the loader loaded and keeps the cache', async () => {

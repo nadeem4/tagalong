@@ -1,8 +1,16 @@
-import { loadOrForget } from './model-cache';
+import { isDownloaded, loadOrForget } from './model-cache';
 import type { LocalSynth } from './voice';
 
 /** Kokoro-82M (Apache-2.0), as ONNX. The q8 weights are about 90 MB. */
 export const KOKORO_MODEL = 'onnx-community/Kokoro-82M-v1.0-ONNX';
+
+/** The q8 weights, the last and largest file a download writes. */
+const KOKORO_WEIGHTS = 'onnx/model_quantized.onnx';
+
+/** Whether Kokoro was downloaded on an earlier run, so loading it now fetches nothing. */
+export function kokoroDownloaded(cacheDir: string): boolean {
+  return isDownloaded(cacheDir, KOKORO_MODEL, KOKORO_WEIGHTS);
+}
 
 /**
  * Loads Kokoro on the CPU, downloading the model into `cacheDir` the first time and

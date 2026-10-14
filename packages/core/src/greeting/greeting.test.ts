@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Pet } from '@tagalong/protocol';
 import { BrainError, FakeBrainProvider } from '../providers';
 import type { BrainProvider, BrainRequest } from '../providers';
-import { composeGreeting, fallbackGreeting } from './greeting';
+import { GREETING_TIMEOUT_MS, composeGreeting, fallbackGreeting } from './greeting';
 import type { GreetingContext } from './greeting';
 
 const scout: Pet = {
@@ -237,5 +237,27 @@ describe('composeGreeting', () => {
       timeoutMs: 10,
     });
     expect(result.source).toBe('fallback');
+  });
+
+  it('gives the brain about a second, then says the fallback', () => {
+    expect(GREETING_TIMEOUT_MS).toBeLessThanOrEqual(1_500);
+  });
+
+  it('says the fallback in time even when the brain ignores being stopped', async () => {
+    // A cold `claude -p` may not answer the abort at once; the greeting must not wait on it.
+    const deaf: BrainProvider = {
+      id: 'deaf',
+      capabilities: { vision: false, tools: false, streaming: true },
+      listModels: () => Promise.resolve([]),
+      complete: () => new Promise(() => undefined),
+    };
+    const result = await composeGreeting({
+      pet: scout,
+      summarizer: null,
+      provider: () => deaf,
+      context: morning,
+      timeoutMs: 10,
+    });
+    expect(result).toEqual({ text: 'Morning. I’m here when you need me.', source: 'fallback' });
   });
 });

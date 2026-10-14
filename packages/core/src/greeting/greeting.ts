@@ -26,8 +26,12 @@ export interface GreetingContext {
   userName?: string;
 }
 
-/** A greeting is a nicety: if the brain has not answered in eight seconds, say the fallback. */
-export const GREETING_TIMEOUT_MS = 8_000;
+/**
+ * A greeting is a nicety, said as the app opens: if the brain has not answered in this
+ * long, say the fallback. A cold `claude -p` takes several seconds to start, so with the
+ * Claude Code sign-in the fallback is what is usually said, at once rather than late.
+ */
+export const GREETING_TIMEOUT_MS = 1_200;
 
 const GREETING_MAX_TOKENS = 60;
 const MAX_WORDS = 25;
@@ -127,8 +131,13 @@ export async function composeGreeting(options: {
   const fallback: GreetingComposeResult = { text: fallbackGreeting(context), source: 'fallback' };
   const { visionModel: _unused, ...textOnly } =
     summarizer === null ? pet : { ...pet, ...summarizer };
+  const signal = AbortSignal.timeout(options.timeoutMs ?? GREETING_TIMEOUT_MS);
+  // The budget holds even for a brain slow to notice the abort: the fallback goes out then.
+  const outOfTime = new Promise<null>((resolve) =>
+    signal.addEventListener('abort', () => resolve(null), { once: true }),
+  );
   try {
-    const result = await options.provider(textOnly).complete(
+    const asked = options.provider(textOnly).complete(
       {
         model: textOnly.model,
         system: GREETING_INSTRUCTIONS,
@@ -139,9 +148,11 @@ export async function composeGreeting(options: {
         onText: () => undefined,
         onToolUse: () => Promise.resolve({ content: 'No tools here.', isError: true }),
       },
-      AbortSignal.timeout(options.timeoutMs ?? GREETING_TIMEOUT_MS),
+      signal,
     );
-    const text = result.stopReason === 'end' ? usable(result.text) : null;
+    asked.catch(() => undefined);
+    const result = await Promise.race([asked, outOfTime]);
+    const text = result?.stopReason === 'end' ? usable(result.text) : null;
     return text === null ? fallback : { text, source: 'model' };
   } catch {
     return fallback;

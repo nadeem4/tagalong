@@ -281,8 +281,9 @@ change".
 
 1. **Setup:** an install that finished Welcome. Quit Tagalong.
 2. **Action:** start Tagalong again, and keep typing in another window.
-3. **Expected:** one short line appears beside Scout (for example "Morning. I'm here when you need
-   me."); your typing is not interrupted. It fades after about seven seconds. Pointing at it keeps it;
+3. **Expected:** one short line appears beside Scout within about a second of Scout appearing (for
+   example "Morning. I'm here when you need me."), with the Claude Code sign-in too; your typing is
+   not interrupted. It fades after about seven seconds. Pointing at it keeps it;
    clicking it opens the bubble to ask; × closes it. With no brain set up, or one that fails, a
    handwritten line appears instead. Nothing is captured (no capture dot, nothing in Activity).
 4. **After a hand-off:** finish a hand-off to Claude Code, quit, start again. The line mentions
@@ -381,7 +382,21 @@ voice model (about 90 MB) into `%APPDATA%\Tagalong\voice`; ElevenLabs (V.6) bill
 
 1. **Action:** while Scout speaks, press `Ctrl+Shift+Alt+M`; on the next answer click the bars; on the
    next press Escape.
-2. **Expected:** speech stops at once each time, and nothing queued is spoken afterwards.
+2. **Expected:** speech stops at once each time, and nothing queued is spoken afterwards, not even
+   the next line that was already being got ready.
+
+### V.3a. No pause between lines
+
+1. **Setup:** the Kokoro voice downloaded (V.1).
+2. **Action:** ask a spoken question (hold the talk key) whose answer runs to several sentences.
+3. **Expected:** each sentence follows the last without a pause of a second or more between them.
+
+### V.3b. Kokoro from the first line
+
+1. **Setup:** the Kokoro voice downloaded (V.1), and Scout talks on. Quit Tagalong.
+2. **Action:** start Tagalong and, after a few seconds, ask Scout something.
+3. **Expected:** the answer is spoken by Kokoro, not the system voice. On a fresh profile, starting
+   Tagalong downloads nothing into `%APPDATA%\Tagalong\voice` until Scout first speaks.
 
 ### V.4. The hello, an expert finishing and a remark
 

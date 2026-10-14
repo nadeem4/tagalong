@@ -28,7 +28,7 @@ import { keepAnEyeAllowed, startKeepAnEye } from './keep-an-eye';
 import { extensionFolder, isAllowedLink } from './links';
 import { ELEVENLABS_SECRET_KEY } from './provider-choices';
 import { elevenLabsTts } from './voice/elevenlabs';
-import { loadKokoro } from './voice/kokoro';
+import { kokoroDownloaded, loadKokoro } from './voice/kokoro';
 import { LazyLocalVoice, createVoiceService } from './voice/voice';
 import type { VoiceService } from './voice/voice';
 import { LazyLocalStt, createListenService } from './voice/listen';
@@ -255,6 +255,9 @@ async function start(): Promise<void> {
   };
 
   rolling.configure(settings.rollingMemory);
+  // Kokoro loads now only when an earlier run downloaded it, so Scout's first lines are
+  // Kokoro rather than the system voice. A first download still waits for the first line.
+  desktop.voice.warmAtStart(kokoroDownloaded(join(dataDir, 'voice')));
 
   // The avatar greys its eye and the tray shows a checkmark, so both follow one state
   // rather than each remembering to ask.

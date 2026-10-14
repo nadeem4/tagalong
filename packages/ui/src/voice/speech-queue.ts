@@ -1,26 +1,32 @@
-import { mergeShortLines, toSpeakable } from './speakable';
+import { SHORT_LINE, mergeShortLines, toSpeakable } from './speakable';
+
+/** One line's audio, being got ready: playing it resolves when it is said or the signal aborts it. */
+export type PreparedLine = (signal: AbortSignal) => Promise<void>;
 
 export interface SpeechQueueOptions {
-  /** Speaks one line, resolving when it has been said or the signal aborts it. */
-  play: (text: string, signal: AbortSignal) => Promise<void>;
+  /** Starts getting one line's audio at once, and returns how to play it. */
+  prepare: (text: string) => PreparedLine;
   /** Fires when Scout starts and stops speaking, for the speaking indicator. */
   onSpeaking?: (speaking: boolean) => void;
 }
 
 /**
  * Scout's lines, spoken one at a time. Each line is shaped for speech first; short lines
- * waiting together are merged. `stop` cuts the current line and drops the rest, which is
- * what dismissing the bubble and the stop key do.
+ * waiting together are merged. The next line is got ready while the current one plays, so
+ * there is no pause between them for synthesis; a short one waits, since a line after it
+ * may still join it. `stop` cuts the current line and drops the rest, the one got ready
+ * included, which is what dismissing the bubble, the stop key and barge-in do.
  */
 export class SpeechQueue {
-  readonly #play: SpeechQueueOptions['play'];
+  readonly #prepare: SpeechQueueOptions['prepare'];
   readonly #onSpeaking: (speaking: boolean) => void;
   #waiting: string[] = [];
+  #ahead: PreparedLine | null = null;
   #current: AbortController | null = null;
   #speaking = false;
 
   constructor(options: SpeechQueueOptions) {
-    this.#play = options.play;
+    this.#prepare = options.prepare;
     this.#onSpeaking = options.onSpeaking ?? (() => undefined);
   }
 
@@ -30,27 +36,43 @@ export class SpeechQueue {
     if (line === '') return;
     this.#waiting.push(line);
     if (this.#current === null) this.#next();
+    else this.#getAheadReady();
   }
 
   stop(): void {
     this.#waiting = [];
+    this.#ahead = null;
     const current = this.#current;
     this.#current = null;
     current?.abort();
     this.#setSpeaking(false);
   }
 
-  #next(): void {
+  /** Takes the next line off the waiting list, unless it is short and could still grow. */
+  #take(whenShort: boolean): PreparedLine | null {
     const [line, ...rest] = mergeShortLines(this.#waiting);
-    if (line === undefined) {
+    if (line === undefined || (!whenShort && line.length < SHORT_LINE)) return null;
+    this.#waiting = rest;
+    return this.#prepare(line);
+  }
+
+  #getAheadReady(): void {
+    this.#ahead ??= this.#take(false);
+  }
+
+  #next(): void {
+    const line = this.#ahead ?? this.#take(true);
+    this.#ahead = null;
+    if (line === null) {
       this.#setSpeaking(false);
       return;
     }
-    this.#waiting = rest;
     const controller = new AbortController();
     this.#current = controller;
     this.#setSpeaking(true);
-    this.#play(line, controller.signal)
+    const playing = line(controller.signal);
+    this.#getAheadReady();
+    playing
       .catch((error: unknown) => console.warn('[voice] a line could not be spoken', error))
       .then(() => {
         if (this.#current !== controller) return;

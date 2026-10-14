@@ -8,7 +8,7 @@ import '@fontsource/onest/latin-600.css';
 import '@fontsource/pixelify-sans/latin-700.css';
 import './app.css';
 import '../../shared/ipc';
-import { playLine } from './voice-player';
+import { prepareLine } from './voice-player';
 import { DEFAULT_TALK_KEY, panelSettings, readable } from './panel-settings';
 import type { PanelSettings } from './panel-settings';
 import { useTalk } from './talk';
@@ -46,7 +46,9 @@ function Panel() {
   const root = useRef<HTMLDivElement>(null);
   // Scout talks: one line at a time; main decides who says it, or that it stays quiet.
   const [speaking, setSpeaking] = useState(false);
-  const [voice] = useState(() => new SpeechQueue({ play: playLine, onSpeaking: setSpeaking }));
+  const [voice] = useState(
+    () => new SpeechQueue({ prepare: (text) => prepareLine(text), onSpeaking: setSpeaking }),
+  );
   // Talk to Scout: the talk key held, or the mic button. Talking cuts Scout off at once.
   const [talkKey, setTalkKey] = useState(readable(DEFAULT_TALK_KEY, 'win32'));
   const [microphoneId, setMicrophoneId] = useState<string | undefined>(undefined);

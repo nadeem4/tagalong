@@ -11,7 +11,7 @@ const MAX_SENTENCES = 2;
 const MAX_CHARS = 200;
 
 /** Below this a line is short enough that the local voice says it badly on its own. */
-const SHORT_LINE = 40;
+export const SHORT_LINE = 40;
 
 /**
  * Turns a bubble line into what Scout says aloud: markdown stripped, code blocks, lists,
