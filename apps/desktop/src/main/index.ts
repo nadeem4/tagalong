@@ -221,7 +221,7 @@ async function start(): Promise<void> {
     console.error('[main] the engine did not start:', bootError);
   }
 
-  // The voice models run in their own process; it starts the first time Scout speaks.
+  // The voice models run in their own process; it starts when first needed: at launch if an earlier run downloaded Kokoro, otherwise on Scout's first line.
   const voiceWorker = new VoiceWorker(
     () =>
       utilityProcess.fork(fileURLToPath(new URL('./voice-worker.js', import.meta.url)), [], {

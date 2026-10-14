@@ -83,9 +83,10 @@ export function VoiceSection({
       <Tip tip="voice">
         Scout says its answers, its hello, a watch that fires and an expert that finished. Code,
         lists and long text stay in the bubble: Scout says the first sentence or two and &ldquo;The
-        rest is in the bubble.&rdquo; The voice runs on this computer. The first time it speaks it
-        downloads the voice model (about 90 MB) and uses the system voice until that is done.
-        Closing the bubble or the stop key silences it at once.
+        rest is in the bubble.&rdquo; Under Who speaks, the local voice runs on this computer and
+        downloads its model (about 90 MB) the first time it is used, speaking with the system voice
+        until that is done; ElevenLabs needs your key; the system voice needs nothing. Closing the
+        bubble or the stop key silences it at once.
       </Tip>
       <div className="tg-grid">
         <div>

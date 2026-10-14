@@ -26,12 +26,15 @@ export function ElevenLabsSection({
         <h3 className="tg-sub">ElevenLabs voice (optional)</h3>
         <Info tip="elevenlabs" label="About the ElevenLabs voice" />
       </div>
-      <p className="tg-help">Your own ElevenLabs key and voice, instead of the local voice.</p>
+      <p className="tg-help">
+        Your own ElevenLabs key and voice, used when you pick ElevenLabs under Who speaks.
+      </p>
       <Tip tip="elevenlabs">
-        With a key and a voice ID, Scout speaks through ElevenLabs&apos; fast Flash model. Only the
-        words Scout says are sent, never your screen or your questions, and ElevenLabs bills your
-        account for them. Pick a voice in your ElevenLabs voice library, such as a British male
-        voice, and paste its voice ID here. If ElevenLabs fails, Scout uses the local voice.
+        Pick ElevenLabs, with your key under Settings → Voice → Who speaks, then add a key and a
+        voice ID here and Scout speaks through ElevenLabs&apos; fast Flash model. Only the words
+        Scout says are sent, never your screen or your questions, and ElevenLabs bills your account
+        for them. Pick a voice in your ElevenLabs voice library, such as a British male voice, and
+        paste its voice ID here. If ElevenLabs fails, Scout uses the local voice.
       </Tip>
       <div className="tg-grid">
         <div>

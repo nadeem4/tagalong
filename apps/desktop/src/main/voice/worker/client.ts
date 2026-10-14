@@ -1,8 +1,8 @@
 import type { FromWorker, ToWorker, WorkerCall, WorkerProcess } from './messages';
 
 /**
- * Main's end of the voice process. The process starts on first use, so nothing loads at
- * launch. If it dies, every call still waiting fails at once (the line falls to the next
+ * Main's end of the voice process. The process starts when first needed: at launch if an
+ * earlier run downloaded Kokoro, otherwise on Scout's first line. If it dies, every call still waiting fails at once (the line falls to the next
  * voice), listeners hear about it, and the next call starts a fresh process.
  */
 export class VoiceWorker {

@@ -420,8 +420,10 @@ voice model (about 90 MB) into `%APPDATA%\Tagalong\voice`; ElevenLabs (V.6) bill
 
 ### V.6. ElevenLabs (your own key)
 
-1. **Action:** in Settings → Advanced → ElevenLabs voice, paste your key and a voice ID from your
-   ElevenLabs library; Save; ask a question. Then remove the key.
+1. **Action:** in Settings → Voice pick **ElevenLabs, with your key** under **Who speaks**; in
+   Settings → Advanced → ElevenLabs voice, paste your key and a voice ID from your ElevenLabs
+   library; Save; ask a question. Then remove the key. Preview with ElevenLabs picked uses the
+   saved key and voice ID.
 2. **Expected:** the answer is spoken in that voice (the ElevenLabs history shows only the spoken
    words). With the key removed, or a wrong voice ID, Scout speaks with the local voice again.
    With the network cut while ElevenLabs is set, the local voice takes over within 15 seconds.
