@@ -110,7 +110,7 @@ pnpm lint            # ESLint across every package
 pnpm format:check    # Prettier check (pnpm format rewrites)
 pnpm typecheck       # TypeScript project references, no emit, plus the test project
 pnpm test            # Vitest across every package and app
-pnpm test:coverage   # Vitest with v8 coverage; packages/core and packages/protocol must stay above 70%
+pnpm test:coverage   # Vitest with v8 coverage and per-package floors (see Coverage below); CI runs this
 pnpm build           # build every package (tsc -b, and electron-vite for the desktop app)
 pnpm dev:desktop     # run the Electron host in development
 pnpm package:win     # build everything, then the Windows NSIS installer (run on Windows)
@@ -129,6 +129,23 @@ pnpm ensure-electron  # fetch the Electron binary on its own
 pnpm package:win      # fetch-native, electron-vite build, electron-builder --win nsis
 pnpm package:dir      # an unpacked app in release/, for checking what gets packaged
 ```
+
+### Coverage
+
+`pnpm test:coverage` runs every package's tests once, from the root, and checks a floor per area.
+CI runs it in place of `pnpm test`, so a drop below any floor fails the build. The floors live in
+the root `vitest.config.ts`.
+
+| Area                                                   | Floor (statements / branches / functions / lines) |
+| ------------------------------------------------------ | ------------------------------------------------- |
+| `packages/core/src`                                    | 70 / 70 / 70 / 70                                 |
+| `packages/protocol/src`                                | 70 / 70 / 70 / 70                                 |
+| `packages/ui/src`                                      | 92 / 85 / 91 / 94                                 |
+| `apps/desktop/src/main` and `apps/desktop/src/preload` | 52 / 57 / 43 / 52                                 |
+
+The `packages/ui` and desktop host floors sit just below what they measured when they were added.
+Raise them when coverage grows; never lower them to make a change pass. The desktop renderer and
+the extension are not measured: the Playwright suites cover them.
 
 Inside `packages/core`:
 
