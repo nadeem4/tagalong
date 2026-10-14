@@ -1624,7 +1624,10 @@ flowchart LR
   panel turns presses into start and stop: the first press starts; presses within
   `FRESH_PRESS_MS` (1.1 s) of the last are the key repeating; the first `keyup` in the bubble is the
   release; a later fresh press stops if the release was missed. The mic button toggles. Listening
-  ends on its own after 30 s.
+  ends on its own after 30 s. When listening ends some other way while the key is still held (the
+  30 s limit, the microphone or the ears failing), `end()` leaves it spent: the key's repeats start
+  nothing, so a failure does not reopen the mic at the repeat rate; the key coming up, or a fresh
+  press, clears it.
 - **Barge-in.** Starting to listen, and the ears' `speechStart`, call `SpeechQueue.stop()`: Scout stops mid-sentence. The
   bubble subscribes to `talk.onListen`; when listening starts while an answer still streams it
   also interrupts that turn (`bridge.interrupt`), drops its `SpokenStream` and keeps what was shown so far, so no later
@@ -1662,12 +1665,19 @@ flowchart LR
   still noting the window. `forwardEars` sends the voice process's `ears` messages as
   `IPC.earsEvent` and its `ears.status` (loading, ready, failed) as `IPC.earsStatusEvent` to every
   open window; each `ListenController` ignores events outside its own session. If the voice process
-  dies, or the models fail to load, the windows hear a `failed` status ("Listening stopped
-  unexpectedly. Try again." for a dead process); the panel then cancels, which drops the question
-  being held and any released question still waiting for its words, and shows the message. The panel says the first-time download (about 45 MB) while the status is loading.
+  dies, or the models fail to load, the windows hear a `failed` status with a plain line ("Listening
+  stopped unexpectedly. Try again." for a dead process; `ears-host.ts#EARS_DOWNLOAD_FAILED` when the
+  first-time download fails, `EARS_START_FAILED` when models already on disk cannot start; the raw
+  error goes to the voice process's log only); the panel then cancels, which drops the question
+  being held and any released question still waiting for its words, and shows the message. The
+  voice process posts `loading` only when the model files are not on disk yet, and the panel then
+  says the first-time download (about 43 MB).
 - **The ears, in the voice process** (`main/voice/worker/ears-host.ts`, `main/voice/ears/`).
   `createEarsHost` opens an inbox for frames at each listen, so the first words are not lost while
-  the models load, and runs one session at a time. `LocalEars` (`local-ears.ts`) is the `Ears`
+  the models load, and runs one session at a time. Letting go of a held question only ends its
+  inbox: the ears still hear the frames queued behind a slow live-words decode, then end the turn as
+  a held mic ending does, so the last words are kept; a replaced session or always listening is
+  stopped at once. `LocalEars` (`local-ears.ts`) is the `Ears`
   implementation behind three seams that fakes test: `Vad` (speech or not, per 512-sample frame),
   `StreamingStt` (words so far for the current stretch) and `EndOfTurn` (how sure the person is done,
   from the last 8 s). The real parts are loaded in the voice process only, never in tests, and each
@@ -1676,14 +1686,16 @@ flowchart LR
   `@huggingface/transformers`, q8, CPU, its decodes chained so a second `text()` waits for the first),
   `smart-turn.ts` (Smart Turn v3.2: the last 8 s normalised to zero mean and unit variance, left-padded
   to 8 s, log-mel features from Transformers.js's `WhisperFeatureExtractor`, output already a
-  probability) and `load-ears.ts` (`loadEars(dir)`: fetch what is missing with `ensureFiles`, then
-  load the three parts). **Variant C** was chosen over sherpa-onnx, whose bundled onnxruntime 1.28
+  probability) and `load-ears.ts` (`loadEars(dir, ensure)`: fetch what is missing, then load the
+  three parts). The voice process makes one `sharedEnsureFiles(dir, EARS_FILES)` and gives it to
+  both `loadEars` and the `ears.ensure` call, so a listen during a Settings prefetch joins that
+  download instead of writing the same `.part` files. **Variant C** was chosen over sherpa-onnx, whose bundled onnxruntime 1.28
   clashes with the 1.21 that Transformers.js pins when both load in one process. The model files
   (about 43 MB, `model-files.ts#EARS_FILES`) are downloaded once on first use into `<userData>/voice`,
   the Transformers.js cache Kokoro also uses: `ears/silero-vad/`, `ears/smart-turn-v3/` and Moonshine
   at `onnx-community/moonshine-tiny-ONNX/`. Nothing heard is stored. `TAGALONG_FAKE_STT=1` makes the
   voice process use `FakeEars` (no model, no download; held, it hears `FAKE_TRANSCRIPT`, "What am I
-  looking at?", when stopped) and main adds Chromium's `use-fake-device-for-media-stream` and
+  looking at?", when its mic ends or it is stopped) and main adds Chromium's `use-fake-device-for-media-stream` and
   `use-fake-ui-for-media-stream` switches, so the e2e suite needs no model and no microphone while
   the frames still flow through the real voice process. ElevenLabs Scribe is not wired in.
 - **Voice seam for other windows** (`renderer/src/voice-seam.ts`). `installVoiceSeam()` puts
@@ -1692,8 +1704,8 @@ flowchart LR
   events for good, so handlers set once keep hearing every question), `openMic(deviceId?)` (the `openMic` above,
   resolving to a `MicStream` with `close()`) and `ensureEars(onProgress)`, which downloads the ears'
   model files if missing. `ensureEars` goes `TagalongHostApi.ensureEars` → `IPC.ensureEars` → the
-  `ears.ensure` worker call, outside the listening order queue; the voice process runs
-  `ensureFiles(dir, EARS_FILES, fetch, onProgress)` and posts each `ears.progress` fraction, which
+  `ears.ensure` worker call, outside the listening order queue; the voice process runs the shared
+  `ensureFiles` (above) with `onProgress` and posts each `ears.progress` fraction, which
   `forwardEars` sends as `IPC.earsProgressEvent` (`{ fraction }`) and the preload hands to
   `onProgress` until the call settles. Progress is file by file (bytes of the files done over all
   bytes, never above 1) and ends at exactly 1, also when every file was already there. Under

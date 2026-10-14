@@ -432,7 +432,7 @@ voice model (about 90 MB) into `%APPDATA%\Tagalong\voice`; ElevenLabs (V.6) bill
 
 Run from source **without** `TAGALONG_FAKE_STT` and `TAGALONG_FAKE_TTS`, with a microphone and
 speakers. The fake brain is fine for T.1 to T.6; T.7 needs a real one. The first spoken question
-downloads the speech models (Silero VAD, Moonshine tiny and Smart Turn, about 45 MB) into
+downloads the speech models (Silero VAD, Moonshine tiny and Smart Turn, about 43 MB) into
 `%APPDATA%\Tagalong\voice`. With `TAGALONG_FAKE_STT=1` every held question is heard as "What am I
 looking at?" and Chromium's fake microphone stands in for a real one.
 
@@ -441,13 +441,13 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 1. **Setup:** a fresh profile, so the speech models are not downloaded yet.
 2. **Action:** hold `Ctrl+Shift+Alt+Space`, say "what am I looking at?", let go.
 3. **Expected:** the bubble opens with a pulsing dot and "Listening…" while the key is held, and a
-   note that the first time downloads the speech models (about 45 MB). Once they have loaded, the
+   note that the first time downloads the speech models (about 43 MB). Once they have loaded, the
    words you are saying appear under "Listening…" as you talk. On letting go it says "Turning that
    into text…", then shows what it heard and answers. Windows shows the microphone in use only
    while the key is held.
 4. **Action:** hold the key again and ask a second question, now that the models are downloaded.
 5. **Expected:** no download note; your words show live while you talk, and the answer follows the
-   release.
+   release. Quit and start Tagalong again, then hold the key: still no download note.
 
 ### T.2. Spoken answers start early and sound spoken
 
@@ -486,6 +486,21 @@ looking at?" and Chromium's fake microphone stands in for a real one.
    Settings and talk again.
 2. **Expected:** silence: "I didn't catch that." and nothing is asked. The picked microphone is used.
    With access off, the bubble says the microphone could not be opened.
+
+### T.6a. When listening cannot start
+
+1. **Setup:** a fresh profile (the speech models not downloaded yet), and the network off.
+2. **Action:** hold the talk key for about five seconds, then let go.
+3. **Expected:** the bubble says "I couldn’t download my listening models. Check the internet
+   connection and try again." It does not flicker or keep retrying while the key is held, and the
+   Windows microphone icon goes away soon after the message (no raw "fetch failed" text).
+4. **Action:** turn the network on and hold the key again.
+5. **Expected:** the first-time download note shows, then listening works as in T.1.
+6. **Action:** hold the key and, while speaking, end the `Tagalong` voice process (Task Manager →
+   the `Tagalong` utility process using the most memory while listening).
+7. **Expected:** the bubble says "Listening stopped unexpectedly. Try again." and does not reopen the
+   microphone while the key is still held. Let go and hold the key again: listening works (the voice
+   process starts again).
 
 ### T.7. Confirmations in a spoken turn
 
