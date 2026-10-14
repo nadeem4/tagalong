@@ -30,9 +30,9 @@ export function engineInfo(port?: number): EngineInfo {
 
 export { ANTHROPIC_KEY, Engine, type EngineOptions } from './engine';
 
-export { DEFAULT_CREW, PetRegistry, SCOUT } from './pets/registry';
+export { DEFAULT_PETS, PetRegistry, SCOUT } from './pets/registry';
 
-export { getRole, listRoles, recommendedModel, type RecommendedModel } from './roles';
+export { getRole, recommendedModel, type RecommendedModel } from './roles';
 
 export {
   InMemorySecretStore,

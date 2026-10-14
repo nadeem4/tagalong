@@ -26,16 +26,11 @@ const HOST_TO_CORE = [
   'interrupt',
   'pets.list',
   'pets.upsert',
-  'pets.delete',
   'settings.get',
   'settings.set',
   'models.list',
   'tool.approve',
   'watch.stop',
-  'roles.list',
-  'roles.recommendModel',
-  'notices.rolesUpgrade',
-  'notices.dismiss',
   'activity.list',
   'experts.list',
   'experts.upsert',
@@ -68,14 +63,11 @@ const CORE_TO_HOST = ['perception.capture'] as const;
 const CORE_TO_HOST_NOTIFICATIONS = [
   'turn.started',
   'turn.delta',
-  'turn.audio',
   'turn.toolRequest',
   'turn.toolResult',
   'turn.completed',
   'turn.error',
   'turn.warning',
-  'pet.message',
-  'crew.status',
   'watch.fired',
   'watch.status',
   'handoff.proposed',
@@ -288,16 +280,6 @@ describe('notification schemas', () => {
     expect(notificationParamsSchemaFor('turn.warning').safeParse(bad).success).toBe(false);
   });
 
-  it('validates a pet.message handoff payload', () => {
-    const parsed = notificationParamsSchemaFor('pet.message').parse({
-      fromPetId: 'scout',
-      toPetId: 'ink',
-      kind: 'handoff',
-      text: 'over to you',
-    });
-    expect(parsed.kind).toBe('handoff');
-  });
-
   it('carries who said what and on which model in turn.started', () => {
     const parsed = notificationParamsSchemaFor('turn.started').parse({
       turnId,
@@ -305,7 +287,6 @@ describe('notification schemas', () => {
       conversationId: turnId,
       providerId: 'openrouter',
       model: 'anthropic/claude-sonnet-5',
-      runId: turnId,
     });
     expect(parsed.model).toBe('anthropic/claude-sonnet-5');
     expect(parsed.providerId).toBe('openrouter');
@@ -321,39 +302,21 @@ describe('notification schemas', () => {
     });
     expect(parsed.modelCalls).toBe(3);
   });
+});
 
-  it('links a pet.message to the turn and run it belongs to', () => {
-    const parsed = notificationParamsSchemaFor('pet.message').parse({
-      fromPetId: 'scout',
-      toPetId: 'ink',
-      kind: 'roundtable',
-      text: 'Round 1',
-      turnId,
-      conversationId: turnId,
-      runId: turnId,
-      round: 1,
-    });
-    expect(parsed.round).toBe(1);
-  });
+describe('tool.approve', () => {
+  const approvalId = '11111111-2222-4333-8444-555555555555';
 
-  it('validates a crew.status for a roundtable', () => {
-    const parsed = notificationParamsSchemaFor('crew.status').parse({
-      runId: turnId,
-      kind: 'roundtable',
-      state: 'running',
-      round: 2,
-      rounds: 2,
-      modelCalls: 4,
-    });
-    expect(parsed.state).toBe('running');
+  it('takes once or deny, and refuses the never-offered always', () => {
+    expect(paramsSchemaFor('tool.approve').parse({ approvalId, decision: 'once' }).decision).toBe(
+      'once',
+    );
+    expect(paramsSchemaFor('tool.approve').parse({ approvalId, decision: 'deny' }).decision).toBe(
+      'deny',
+    );
     expect(
-      notificationParamsSchemaFor('crew.status').safeParse({ ...parsed, state: 'paused' }).success,
+      paramsSchemaFor('tool.approve').safeParse({ approvalId, decision: 'always' }).success,
     ).toBe(false);
-  });
-
-  it('rejects an unknown pet.message kind', () => {
-    const bad = { fromPetId: 'a', toPetId: 'b', kind: 'gossip', text: '' };
-    expect(notificationParamsSchemaFor('pet.message').safeParse(bad).success).toBe(false);
   });
 });
 

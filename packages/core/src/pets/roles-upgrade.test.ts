@@ -1,6 +1,5 @@
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getRole } from '../roles';
 import { LEGACY_DEFAULT_PERSONAS, upgradePetsToRoles } from './roles-upgrade';
 
 let db: Database.Database;
@@ -43,14 +42,14 @@ describe('upgradePetsToRoles', () => {
     ['scout', 'generalist'],
     ['ink', 'writer'],
     ['bolt', 'backend-engineer'],
-  ])('gives the default %s the %s role at its library version', (id, roleId) => {
+  ])('gives the default %s the %s role', (id, roleId) => {
     storeLegacy(id, { persona: LEGACY_DEFAULT_PERSONAS[id] });
 
     upgradePetsToRoles(db);
 
     const pet = stored(id);
     expect(pet.roleId).toBe(roleId);
-    expect(pet.roleVersion).toBe(getRole(roleId)?.version);
+    expect(pet).not.toHaveProperty('roleVersion');
     expect(pet.toolGrants).toEqual({});
   });
 
@@ -79,7 +78,6 @@ describe('upgradePetsToRoles', () => {
 
     const pet = stored('pip');
     expect(pet.roleId).toBe('generalist');
-    expect(pet.roleVersion).toBe(getRole('generalist')?.version);
     expect(pet.notes).toBe('You are Pip.');
   });
 

@@ -14,8 +14,7 @@ const pet = (providerId: string): Pet => ({
   notes: 'p',
   model: 'm',
   providerId,
-  roleId: 'generalist',
-  roleVersion: 1,
+  roleId: 'companion',
   toolGrants: {},
   replyStyle: 'text',
 });

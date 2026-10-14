@@ -75,19 +75,7 @@ import {
   RoutinesSetEnabledResult,
 } from './routines';
 import { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './limits';
-import {
-  NoticesDismissParams,
-  NoticesDismissResult,
-  NoticesRolesUpgradeParams,
-  NoticesRolesUpgradeResult,
-} from './notices';
 import { Pet } from './pet';
-import {
-  RolesListParams,
-  RolesListResult,
-  RolesRecommendModelParams,
-  RolesRecommendModelResult,
-} from './roles';
 import { CaptureBlock, Settings, SettingsPatch } from './settings';
 
 /** What a host tells the engine it is able to perceive or play. */
@@ -160,9 +148,6 @@ export const PetsListResult = z.object({ pets: z.array(Pet) });
 export const PetsUpsertParams = z.object({ pet: Pet });
 export const PetsUpsertResult = z.object({ pet: Pet });
 
-export const PetsDeleteParams = z.object({ petId: z.string().min(1) });
-export const PetsDeleteResult = z.object({ deleted: z.boolean() });
-
 export const SettingsGetParams = Empty;
 export const SettingsGetResult = z.object({ settings: Settings });
 
@@ -182,13 +167,10 @@ export const ModelsListResult = z.object({
   source: z.enum(['live', 'fallback']),
 });
 
-/**
- * The person's answer to `connector.confirm`. `once` runs that one change; `deny` cancels
- * it. `always` is not offered yet and counts as `once`: nothing is remembered.
- */
+/** The person's answer to `connector.confirm`. `once` runs that one change; `deny` cancels it. */
 export const ToolApproveParams = z.object({
   approvalId: z.uuid(),
-  decision: z.enum(['once', 'always', 'deny']),
+  decision: z.enum(['once', 'deny']),
 });
 export const ToolApproveResult = z.object({ accepted: z.boolean() });
 
@@ -299,25 +281,13 @@ export const TurnStartedParams = z.object({
   turnId: z.uuid(),
   petId: z.string().min(1),
   conversationId: z.uuid(),
-  /**
-   * Phase 4. The brain answering, so a panel can say which pet and which model said what —
-   * a crew spans providers, and "Ink · anthropic/claude-sonnet-5" is the point of showing it.
-   */
+  /** The brain answering, so a panel can say which model said what: "Scout · haiku". */
   providerId: z.string().min(1).optional(),
   model: z.string().min(1).optional(),
-  /** Phase 4. Set when the turn is part of a crew run — a roundtable, or a handoff. */
-  runId: z.uuid().optional(),
   /** Set when a routine started the turn: no bubble takes it for the person's own question. */
   routineId: z.uuid().optional(),
 });
 export const TurnDeltaParams = z.object({ turnId: z.uuid(), text: z.string() });
-/** Phase 3. index orders chunks so the host can play them without gaps. */
-export const TurnAudioParams = z.object({
-  turnId: z.uuid(),
-  index: z.number().int().nonnegative(),
-  mime: z.string().min(1),
-  base64: z.string().min(1),
-});
 /** Phase 5. */
 export const TurnToolRequestParams = z.object({
   turnId: z.uuid(),
@@ -339,10 +309,7 @@ export const TurnCompletedParams = z.object({
     inputTokens: z.number().int().nonnegative(),
     outputTokens: z.number().int().nonnegative(),
   }),
-  /**
-   * Phase 4. How many model calls this turn made, counting tool round trips and any pet it
-   * consulted. Crew features multiply calls; the panel footer adds these up.
-   */
+  /** How many model calls this turn made, counting tool round trips. */
   modelCalls: z.number().int().nonnegative().optional(),
 });
 export const TurnErrorParams = z.object({
@@ -363,37 +330,6 @@ export const TurnWarningParams = z.object({
   code: z.string().min(1),
   message: z.string(),
 });
-/**
- * Phase 4. One pet addressing another, shown as a bubble or a card.
- *
- * `handoff`: `text` is the summary the target received; `turnId` and `conversationId` are
- * the target's new turn and conversation. `consult`: `text` is the question; `turnId` is
- * the caller's turn. `roundtable`: `text` names the round; `toPetId` is who speaks next.
- */
-export const PetMessageParams = z.object({
-  fromPetId: z.string().min(1),
-  toPetId: z.string().min(1),
-  kind: z.enum(['handoff', 'consult', 'roundtable']),
-  text: z.string(),
-  turnId: z.uuid().optional(),
-  conversationId: z.uuid().optional(),
-  runId: z.uuid().optional(),
-  round: z.number().int().positive().optional(),
-});
-
-/**
- * Phase 4. Progress of a crew run, so a host can show it is still going, offer to stop it,
- * and count what it cost. `round` and `rounds` count the synthesis as the last round.
- */
-export const CrewStatusParams = z.object({
-  runId: z.uuid(),
-  kind: z.enum(['roundtable']),
-  state: z.enum(['running', 'done', 'stopped']),
-  round: z.number().int().nonnegative(),
-  rounds: z.number().int().positive(),
-  modelCalls: z.number().int().nonnegative(),
-});
-
 /**
  * The line a pet says when the app opens, after the first time. `model` when the summaries
  * model wrote it, `fallback` when a handwritten line stood in. It reads no screen.
@@ -449,16 +385,11 @@ export const hostToCoreMethods = {
   interrupt: { params: InterruptParams, result: InterruptResult },
   'pets.list': { params: PetsListParams, result: PetsListResult },
   'pets.upsert': { params: PetsUpsertParams, result: PetsUpsertResult },
-  'pets.delete': { params: PetsDeleteParams, result: PetsDeleteResult },
   'settings.get': { params: SettingsGetParams, result: SettingsGetResult },
   'settings.set': { params: SettingsSetParams, result: SettingsSetResult },
   'models.list': { params: ModelsListParams, result: ModelsListResult },
   'tool.approve': { params: ToolApproveParams, result: ToolApproveResult },
   'watch.stop': { params: WatchStopParams, result: WatchStopResult },
-  'roles.list': { params: RolesListParams, result: RolesListResult },
-  'roles.recommendModel': { params: RolesRecommendModelParams, result: RolesRecommendModelResult },
-  'notices.rolesUpgrade': { params: NoticesRolesUpgradeParams, result: NoticesRolesUpgradeResult },
-  'notices.dismiss': { params: NoticesDismissParams, result: NoticesDismissResult },
   'activity.list': { params: ActivityListParams, result: ActivityListResult },
   'experts.list': { params: ExpertsListParams, result: ExpertsListResult },
   'experts.upsert': { params: ExpertsUpsertParams, result: ExpertsUpsertResult },
@@ -511,14 +442,11 @@ export const coreToHostMethods = {
 export const coreToHostNotifications = {
   'turn.started': { params: TurnStartedParams },
   'turn.delta': { params: TurnDeltaParams },
-  'turn.audio': { params: TurnAudioParams },
   'turn.toolRequest': { params: TurnToolRequestParams },
   'turn.toolResult': { params: TurnToolResultParams },
   'turn.completed': { params: TurnCompletedParams },
   'turn.error': { params: TurnErrorParams },
   'turn.warning': { params: TurnWarningParams },
-  'pet.message': { params: PetMessageParams },
-  'crew.status': { params: CrewStatusParams },
   'watch.fired': { params: WatchFiredParams },
   'watch.status': { params: WatchStatusParams },
   'handoff.proposed': { params: HandoffProposedParams },

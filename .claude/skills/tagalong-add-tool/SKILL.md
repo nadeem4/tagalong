@@ -19,7 +19,7 @@ runner is a tool in the wrong shape.
 | ------------------------------------- | ------------------------- |
 | What is on screen now                 | `builtin/perception.ts`   |
 | The screen over time: recall, watches | `builtin/awareness.ts`    |
-| The crew: memory, other pets          | `builtin/crew.ts`         |
+| Memory: what the pet remembers        | `builtin/memory.ts`       |
 | None of these                         | a new `builtin/<area>.ts` |
 
 Helper code that exists only for the tool lives in the same file. Code with other users (exclusions,

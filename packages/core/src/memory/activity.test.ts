@@ -36,11 +36,11 @@ function asked(petId: string, text: string): string {
   return conversation.id;
 }
 
-function started(petId: string, conversationId: string, extra: { runId?: string } = {}): string {
+function started(petId: string, conversationId: string): string {
   const turnId = randomUUID();
   log.observe({
     method: 'turn.started',
-    params: { turnId, petId, conversationId, providerId: 'fake', model: 'fake-model', ...extra },
+    params: { turnId, petId, conversationId, providerId: 'fake', model: 'fake-model' },
   });
   return turnId;
 }
@@ -113,106 +113,21 @@ describe('ActivityLog: turns', () => {
   });
 });
 
-describe('ActivityLog: the crew', () => {
-  it('records a consult with its question, then its answer', () => {
-    const turnId = started('scout', asked('scout', 'help me word this'));
-    log.observe({
-      method: 'pet.message',
-      params: { fromPetId: 'scout', toPetId: 'ink', kind: 'consult', text: 'Tighter?', turnId },
-    });
-    log.consultAnswered(turnId, 'ink', { ok: true, text: 'Cut the second clause.' });
-    const consult = log.list({}).entries.find((entry) => entry.kind === 'consult');
-    expect(consult).toMatchObject({
-      petId: 'scout',
-      toPetId: 'ink',
-      turnId,
-      text: 'Tighter?',
-      answer: 'Cut the second clause.',
-      state: 'done',
-    });
-  });
+describe('ActivityLog: crew-era rows', () => {
+  it('leaves consults, handoffs and roundtables a crew-era install recorded out of the list', () => {
+    const add = db.prepare(
+      `INSERT INTO activity (id, kind, state, pet_id, to_pet_id, run_id, text, started_at)
+       VALUES (?, ?, 'done', 'scout', ?, ?, 'old', ?)`,
+    );
+    add.run('c1', 'consult', 'ink', null, '2026-09-01T00:00:00.000Z');
+    add.run('h1', 'handoff', 'bolt', null, '2026-09-01T00:00:01.000Z');
+    add.run('r1', 'roundtable', null, randomUUID(), '2026-09-01T00:00:02.000Z');
+    const turnId = started('scout', asked('scout', 'still here?'));
 
-  it('records a consult that went unanswered as an error', () => {
-    const turnId = started('scout', asked('scout', 'q'));
-    log.observe({
-      method: 'pet.message',
-      params: {
-        fromPetId: 'scout',
-        toPetId: 'bolt',
-        kind: 'consult',
-        text: 'Is it the port?',
-        turnId,
-      },
-    });
-    log.consultAnswered(turnId, 'bolt', {
-      ok: false,
-      text: 'Bolt did not answer within 60 seconds.',
-    });
-    expect(log.list({}).entries.find((entry) => entry.kind === 'consult')).toMatchObject({
-      state: 'error',
-      error: 'Bolt did not answer within 60 seconds.',
-    });
-  });
+    const { entries, next } = log.list({});
 
-  it('records a handoff, finished when the receiving turn is', () => {
-    const conversationId = asked('ink', 'Scout handed this over to you.');
-    const turnId = randomUUID();
-    log.observe({
-      method: 'pet.message',
-      params: {
-        fromPetId: 'scout',
-        toPetId: 'ink',
-        kind: 'handoff',
-        text: 'The user asked for a cover letter.',
-        turnId,
-        conversationId,
-      },
-    });
-    log.observe({
-      method: 'turn.started',
-      params: { turnId, petId: 'ink', conversationId, providerId: 'fake', model: 'fake-model' },
-    });
-    completed(turnId, 'Here it is.');
-    const handoff = log.list({}).entries.find((entry) => entry.kind === 'handoff');
-    expect(handoff).toMatchObject({
-      petId: 'scout',
-      toPetId: 'ink',
-      text: 'The user asked for a cover letter.',
-      state: 'done',
-    });
-  });
-
-  it('records a roundtable once, with its state and calls from crew.status', () => {
-    const runId = randomUUID();
-    log.observe({
-      method: 'crew.status',
-      params: { runId, kind: 'roundtable', state: 'running', round: 0, rounds: 2, modelCalls: 0 },
-    });
-    for (const [toPetId, round] of [
-      ['scout', 1],
-      ['scout', 2],
-    ] as const) {
-      log.observe({
-        method: 'pet.message',
-        params: {
-          fromPetId: 'scout',
-          toPetId,
-          kind: 'roundtable',
-          text: `Round ${round}`,
-          runId,
-          round,
-        },
-      });
-    }
-    started('scout', asked('scout', 'The user put this question to the whole crew'), { runId });
-    log.observe({
-      method: 'crew.status',
-      params: { runId, kind: 'roundtable', state: 'done', round: 2, rounds: 2, modelCalls: 4 },
-    });
-    const tables = log.list({}).entries.filter((entry) => entry.kind === 'roundtable');
-    expect(tables).toHaveLength(1);
-    expect(tables[0]).toMatchObject({ petId: 'scout', runId, state: 'done', modelCalls: 4 });
-    expect(log.list({}).entries.find((entry) => entry.kind === 'turn')?.runId).toBe(runId);
+    expect(entries.map((entry) => entry.turnId)).toEqual([turnId]);
+    expect(next).toBeUndefined();
   });
 });
 

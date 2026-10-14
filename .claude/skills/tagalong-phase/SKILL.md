@@ -88,12 +88,11 @@ Fetch the phase page before starting the phase. Fetch the task rows before start
 | `conversation/` | `ConversationRunner` and the prompt assembler: one turn, start to finish |
 | `tools/`        | the `Tool` shape, `ToolRegistry`, and every built-in tool in `builtin/`  |
 | `perception/`   | capture policy: exclusions, retention, inventory, text layer, routing    |
-| `crew/`         | handoff, roundtable, crew commands                                       |
 | `watch/`        | `WatchManager`, the poll behind `watch_for`                              |
 | `memory/`       | the database, conversation store, memories, recall, summaries            |
 | `providers/`    | `BrainProvider` and its implementations                                  |
 | `server/`       | the WebSocket server and pairing                                         |
-| `pets/`         | `PetRegistry` and the default crew                                       |
+| `pets/`         | `PetRegistry` and the default pet, Scout                                 |
 | `settings/`     | `SettingsStore` and the secret store                                     |
 | `engine.ts`     | boots and wires the parts                                                |
 

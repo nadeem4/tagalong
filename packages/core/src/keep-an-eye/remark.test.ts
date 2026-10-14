@@ -12,7 +12,6 @@ const scout: Pet = {
   visionModel: 'claude-opus-5',
   providerId: 'anthropic',
   roleId: 'companion',
-  roleVersion: 1,
   toolGrants: {},
   replyStyle: 'text',
 };

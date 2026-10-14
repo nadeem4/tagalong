@@ -22,8 +22,7 @@ const scout: Pet = {
   notes: 'You are Scout.',
   model: 'fake-model',
   providerId: 'fake',
-  roleId: 'generalist',
-  roleVersion: 1,
+  roleId: 'companion',
   toolGrants: {},
   replyStyle: 'text',
 };

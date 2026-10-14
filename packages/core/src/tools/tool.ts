@@ -6,7 +6,7 @@ import type { BrainContentBlock, BrainTool } from '../providers';
  *
  * The rule: a tool is `write` when it leaves something behind after the turn — a memory
  * filed, a watch started. Everything that only looks, reads or asks is `read`, even when
- * it costs a model call (`ask_pet` stores nothing; the caller's answer is the record).
+ * it costs a model call.
  * Phase 8 grants will lean on this, so decide it by the state, not by how risky it feels.
  */
 export type ToolKind = 'read' | 'write';
@@ -30,7 +30,7 @@ export interface RoutineTurnContext {
 
 /** What one turn hands every tool it runs. */
 export interface ToolContext {
-  /** The pet whose turn it is: memories are filed under it, a consult names it as caller. */
+  /** The pet whose turn it is: memories are filed under it. */
   pet: Pet;
   turnId: string;
   signal: AbortSignal;
@@ -42,8 +42,6 @@ export interface ToolContext {
    * it burns tokens and teaches it nothing.
    */
   vision?: boolean | undefined;
-  /** Counts a nested model call a tool makes toward the turn. */
-  countCall: () => void;
   /** Set on a turn a routine started. */
   routine?: RoutineTurnContext | undefined;
 }

@@ -8,8 +8,7 @@ const pet = (id: string): Pet => ({
   avatar: '*',
   model: 'm',
   providerId: 'fake',
-  roleId: 'generalist',
-  roleVersion: 1,
+  roleId: 'companion',
   toolGrants: {},
   replyStyle: 'text',
 });

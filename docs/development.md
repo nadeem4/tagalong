@@ -30,7 +30,7 @@ tagalong/
       settings.ts                   # Settings, SettingsPatch, SETTINGS_DEFAULTS
       methods.ts                    # the method and notification catalog
       roles.ts                      # Role, ModelTier
-    core/roles/                     # one Markdown file per role: YAML header plus instructions
+    core/roles/                     # companion.md, the one role: YAML header plus instructions
     core/scripts/gen-roles.mjs      # compiles core/roles/*.md into src/roles/library.generated.ts
     core/src/
       index.ts                      # the public facade hosts import
@@ -42,7 +42,7 @@ tagalong/
                                     # (Home's page: ui/src/home/connections-panel.tsx; the bubble's card: ui/src/connector-confirm.tsx)
       memory/                       # db.ts (numbered migrations), store.ts (ConversationStore)
       pets/registry.ts              # PetRegistry, the default pet Scout
-      roles/                        # library.generated.ts, listRoles, getRole, recommendedModel, tiers.ts
+      roles/                        # library.generated.ts, getRole, roleFor, recommendedModel, tiers.ts
       providers/                    # brain.ts, anthropic.ts, openai-compatible.ts, presets.ts, nebius-models.ts, vision-routing.ts, fake.ts, registry.ts, errors.ts
       server/                       # ws-server.ts (EngineServer), pairing.ts
       settings/settings.ts          # SettingsStore, SecretStore, InMemorySecretStore
@@ -307,33 +307,15 @@ back. Instead the app starts, the other three keys work, and the failure appears
 Settings naming which binding broke and what it was bound to. Correcting it takes effect
 immediately, with no restart.
 
-### The crew
+### Scout
 
-A fresh install starts with three pets on three different brains: **Scout** (explainer, Nemotron 3
-Super on Token Factory), **Ink** (writer, Claude through OpenRouter) and **Bolt** (coder, Nemotron Nano
-2 VL on Token Factory). Each needs its provider's key; a pet whose key is missing says so on its turn
-and the others keep working. Edit, add or delete pets in Settings. Deleting a default pet is permanent:
-it is not re-seeded on the next boot.
-
-The crew docks on the desktop as a strip of avatars, one per pet, that moves as one; click a pet to
-open the panel on it. The panel header names the active pet in its colour, every answer is labelled
-with the pet and the model that wrote it (`Ink · anthropic/claude-sonnet-5`), and:
-
-| Do this                                   | What happens                                                                                      |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Type `@Ink draft a reply to this`         | Ink takes over in a new conversation with a summary of the thread and the page; a bubble shows it |
-| Pick **Hand off…** under an answer        | The composer fills with `@Name ` so you can add the request                                       |
-| Ask anything                              | A pet may consult another mid-answer (`ask_pet`); a small card says who it asked                  |
-| Type `/crew <question>` or press **Crew** | Every pet answers in turn, seeing the others, and the pet you asked closes with a synthesis       |
-| Press **Stop** during a roundtable        | The turn in flight stops and the rest are cancelled                                               |
-
-Crew features multiply model calls, so the panel footer shows **N model calls** for any run that made
-more than one. A roundtable of three pets costs four calls by default. Settings edits every pet — name,
-emoji, colour, notes, provider, model, reply style, voice id (stored for Phase 3) — adds and deletes
-pets, and chooses which pets show on the desktop strip.
+A fresh install starts with one pet, **Scout**, the companion, on the Claude Code sign-in. Earlier
+versions shipped a crew (Ink and Bolt, `@Name` hand-offs between pets, `ask_pet` consults and
+`/crew` roundtables); all of that is gone. Scout hands work to experts instead (see "Experts" in
+[architecture.md](architecture.md#experts-and-connectors)).
 
 Pets remember. Tell one "I prefer short answers" and it keeps that across restarts; a pet can also
-save facts on its own, privately or in the crew notebook every pet reads. Memories live in the same
+save facts on its own. Memories live in the same
 SQLite file as conversations (`tagalong.db` in the data dir).
 
 ### Awareness: rolling memory and watches
@@ -419,7 +401,7 @@ the length of the shared prefix through timing.
 ## The Chrome extension in detail
 
 The extension is a second host for the same engine: same pets, same memory, same settings. It gives
-pets the **exact** selection and the readable text of the page you are on, and puts the crew in
+Scout the **exact** selection and the readable text of the page you are on, and puts Scout in
 Chrome's side panel.
 
 **It needs the desktop app running.** The extension holds no engine of its own; it connects to the
@@ -455,7 +437,7 @@ After a rebuild, click the reload arrow on the Tagalong card in `chrome://extens
 
 | Do this                                     | What happens                                                                                                                |
 | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Click the toolbar button                    | The side panel opens with the crew and attaches the page it opened beside (selection, title, readable text).                |
+| Click the toolbar button                    | The side panel opens with Scout and attaches the page it opened beside (selection, title, readable text).                   |
 | Select text, press `Alt+Shift+Space`        | The side panel opens with that exact selection and the page title in the sight bar.                                         |
 | Press the desktop hotkey `Ctrl+Shift+Space` | The desktop panel opens as before; when Chrome is in front, the engine swaps in the exact selection and adds the page text. |
 | Click **Read this page** / **Clear**        | Re-reads the tab, or sends the next ask with nothing attached.                                                              |
@@ -602,7 +584,8 @@ order; each one ends with something testable end to end.
    push to talk is not)_
    3B. **Awareness** — rolling memory, `recall_screen` and `what_changed`, watch mode. _(built; watch
    alerts are spoken)_
-4. **Crew** — multiple pets, memory, handoff, consult, roundtable. _(built)_
+4. **Crew** — multiple pets, memory, handoff, consult, roundtable. _(built, then removed: one
+   companion, Scout, kept the memory)_
 5. **Hands** — MCP client, allowlists, approval cards, action log.
 6. **Browser Host** — Chrome extension on the same engine. _(built; runs fifth, after 2B)_
 7. **Polish and Cross-platform** — macOS, Linux, onboarding, packaging, cost dashboard. _(setup

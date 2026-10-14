@@ -12,7 +12,6 @@ const scout: Pet = {
   model: 'anthropic/claude-sonnet-5',
   providerId: 'openrouter',
   roleId: 'generalist',
-  roleVersion: 1,
   toolGrants: {},
   replyStyle: 'text',
 };

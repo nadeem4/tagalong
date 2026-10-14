@@ -15,8 +15,7 @@ const pet = (id: string, name: string): Pet => ({
   avatar: '🐣',
   providerId: 'fake',
   model: 'fake-model',
-  roleId: 'generalist',
-  roleVersion: 1,
+  roleId: 'companion',
   toolGrants: {},
   replyStyle: 'text',
 });

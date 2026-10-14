@@ -34,7 +34,7 @@ flowchart LR
     R["ConversationRunner"]
     P["PromptAssembler"]
     M["Memory: SQLite + FTS5"]
-    B["PetBus: handoff, consult, roundtable"]
+    B["Experts: briefs and hand-offs"]
     T["McpManager + ApprovalPolicy"]
     PR["Providers: Brain, STT, TTS"]
   end
@@ -61,8 +61,8 @@ The diagram is the finished shape. What exists after Phase 1: the server (`serve
 (`conversation/prompt-assembler.ts`), memory as plain SQLite tables (`memory/db.ts`, `memory/store.ts` —
 FTS5 arrived with Phase 4 recall), the pet registry (`pets/registry.ts`), settings and the SecretStore
 interface (`settings/settings.ts`), the brain providers (`providers/`) and the expert connectors (`experts/`). `Engine.boot` in `engine.ts`
-wires all of it together and is the only thing a host starts. The diagram's PetBus is not one class:
-Phase 4 built it as `crew/` (handoff, consult, roundtable) on top of the runner — see "The crew" below.
+wires all of it together and is the only thing a host starts. The diagram's Experts box is
+`experts/`: Scout briefs an expert and hands the work over — see "Experts and connectors" below.
 `McpManager` and `ApprovalPolicy` (Phase 5) do not exist yet. Text to speech and speech to text
 were built in the desktop host rather than in core, because the local voice and the local speech
 model are a native ONNX runtime the pure core must not load; core only knows that a turn was
@@ -168,25 +168,23 @@ seconds is closed, and so is one that sends more than 64 KiB before it.
 
 Methods are scoped by host kind. The desktop may call every method. A session that said
 `host: 'extension'` may call only `EXTENSION_METHODS` (`server/ws-server.ts`): `ask`, `interrupt`,
-`pets.list`, `roles.list`, `roles.recommendModel`, `notices.rolesUpgrade` and `notices.dismiss`,
-which is what its side panel uses. Anything else, such as `settings.set`, `tool.approve`,
+and `pets.list`, which is what its side panel uses. Anything else, such as `settings.set`, `tool.approve`,
 `connections.*`, `routines.*`, `experts.*` or `handoffs.*`, gets `-32000` and never reaches a
 handler.
 
 The catalog in `packages/protocol/src/methods.ts` is the whole surface:
 
-- **Host to core:** `hello`, `ask`, `interrupt`, `pets.list`, `pets.upsert`, `pets.delete`,
-  `settings.get`, `settings.set`, `models.list`, `tool.approve` (Phase 5), `watch.stop`
-  (Phase 3B), and from Phase 8 `roles.list` and `roles.recommendModel` (see
-  [Roles over RPC](concepts/roles-and-tools.md#roles-over-rpc)), `notices.rolesUpgrade` and
-  `notices.dismiss` (see [The roles notice](concepts/roles-and-tools.md#the-roles-notice)), and
-  for Home `activity.list` (see [Activity](#activity)), and for experts `experts.list`,
+- **Host to core:** `hello`, `ask`, `interrupt`, `pets.list`, `pets.upsert`,
+  `settings.get`, `settings.set`, `models.list`, `tool.approve` (`once` or `deny`), `watch.stop`
+  (Phase 3B), and for Home `activity.list` (see [Activity](#activity)), and for experts `experts.list`,
   `experts.upsert`, `experts.delete`, `experts.test`, `handoffs.cancel`,
   `handoffs.confirm`, `handoffs.dismiss` and `projects.search` (see
   [Experts and connectors](#experts-and-connectors)), and `greeting.compose { petId }` →
   `{ text, source: 'model' | 'fallback' }`, the line said as the app opens (see Welcome below), and
   `keepAnEye.observe { windows }`, `keepAnEye.notNow` and `keepAnEye.accept { remarkId }` (see
-  [Keeping an eye on things](#keeping-an-eye-on-things)). Protocol 0.10.0.
+  [Keeping an eye on things](#keeping-an-eye-on-things)), and the `connections.*` and
+  `routines.*` methods. Protocol 0.13.0: the crew's `pets.delete`, `roles.list`,
+  `roles.recommendModel`, `notices.rolesUpgrade` and `notices.dismiss` are gone.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
   `perception.listWindows` and `perception.readText`, then `perception.captureWindow`, and from Phase 3B `perception.recall` and
   `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
@@ -199,8 +197,9 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   the model already has that, and forwarding an 8,000-character window read to every open window would
   be megabytes of IPC to render one line.
 - **Core to host notifications:** `turn.started`, `turn.delta`, `turn.completed`, `turn.error`,
-  `turn.warning`, plus `turn.audio` (Phase 3), `turn.toolRequest` and `turn.toolResult` (Phase 5),
-  `pet.message` and `crew.status` (Phase 4), and `watch.fired` and `watch.status` (Phase 3B).
+  `turn.warning`, plus `turn.toolRequest` and `turn.toolResult` (Phase 5), and `watch.fired` and
+  `watch.status` (Phase 3B). The crew's `pet.message` and `crew.status`, and the never-sent
+  `turn.audio`, are gone.
   `turn.warning` carries the same `{ code, message }` as `turn.error`
   but does not end the turn — a host that aborts on it throws away a reply that is still coming.
 
@@ -279,7 +278,7 @@ the person's own list, so clearing that list never removes them.
 ### Secrets on the way out
 
 `guardBrain` (`packages/core/src/providers/guard.ts`) wraps every provider the engine resolves, for
-turns, summaries, `/crew` and watches alike. It passes the system prompt, every text block and every
+turns, summaries and watches alike. It passes the system prompt, every text block and every
 tool result, including those handed back mid-turn through `onToolUse`, through `hideSecrets`
 (`packages/core/src/privacy/secrets.ts`), which replaces keys, tokens, private keys, connection-string
 passwords, secret settings and card numbers with markers like `[hidden: API key]`. One wrapper at the
@@ -317,7 +316,8 @@ API (a process per step) and is the default for a fresh install where Claude Cod
 Other sign-ins (Gemini CLI, Codex) are meant to follow the same shape under their own ids.
 
 **Each pet picks its own.** `Pet.providerId`, `Pet.model` and the optional `Pet.visionModel` decide
-the brain; `Settings.providerId` and `defaultModel` are no longer read. The engine resolves a pet's
+the brain; settings carry no provider or model of their own (an older file's `providerId` and
+`defaultModel` are dropped on load). The engine resolves a pet's
 provider on its first turn and caches it per id. Keys come from the SecretStore entries in
 `SECRET_KEYS` (`anthropic.apiKey`, `nebius.apiKey`, `openrouter.apiKey`), read at boot; base URLs come
 from `Settings.providerBaseUrls`, falling back to the preset's. A provider that cannot be built — no
@@ -916,17 +916,18 @@ Since Phase 2B, a display is blanked when **any window on it that the user can s
 only when the foreground window is. The foreground check remains as a floor beneath the inventory, so
 that a helper which cannot run does not silently remove the protection Phase 2 already shipped.
 
-## The crew (Phase 4)
+## Pets and memory
 
-Phase 4 turns one companion into a crew. Everything below lives in `packages/core`; hosts only render
-what the engine broadcasts.
+Phase 4 built a crew of pets; the crew is gone and one companion, Scout, remains. Everything below
+lives in `packages/core`; hosts only render what the engine broadcasts.
 
-### The registry and the default crew
+### The registry and the companion
 
 `pets/registry.ts` keeps each pet as a validated JSON blob in the `pets` table and exposes it through
-`pets.list`, `pets.upsert` and `pets.delete`. `pets.upsert` refuses a `roleId` the role library does
-not have with RPC error `-32602`, and stamps a new pet (or one changing role) with that role's
-library `version`. A fresh install is seeded with one pet: Scout, the Companion, on
+`pets.list` and `pets.upsert`. `pets.upsert` refuses a `roleId` the role library does not have with
+RPC error `-32602`. The library holds one role, `companion`; a pet still naming a crew-era role
+(`generalist`, `writer` and the rest) works as the companion (`roleFor`). Parsing drops unknown keys,
+so a pet stored with the crew-era `roleVersion` or `voiceId` still loads. A fresh install is seeded with one pet: Scout, the Companion, on
 `claude-code` with the `haiku` model, so it thinks through the person's Claude Code sign-in and needs
 no key (Welcome moves it to a keyed provider when Claude Code is missing).
 
@@ -934,13 +935,13 @@ Seeding is remembered per pet in `pet_seeds` (migration 2), so a pet the user ed
 overwritten and a default the user deleted stays deleted. Migration 5 gives every stored pet a role
 and keeps an edited persona as the pet's notes. Migration 11 deletes Ink and Bolt, the crew's other
 two defaults from before the one-companion design; their conversations stay, and `pet_seeds` keeps
-them from being seeded again. The crew machinery (hand-offs between pets, consults, `/crew`) still
-works for any pets a database holds, but a fresh install has only the companion. Each
-pet carries an optional `color` (`#rrggbb`) for the strip and the panel.
+them from being seeded again. Migration 6 recorded a one-time roles notice; it now does nothing, and
+migration 14 drops the `notices` table. Each pet carries an optional `color` (`#rrggbb`) for its
+sprite.
 
 ### Memory
 
-`memory/memories.ts` is the crew's memory: `memories(id, scope, pet_id, kind, text, created_at)` with
+`memory/memories.ts` is the pet's memory: `memories(id, scope, pet_id, kind, text, created_at)` with
 an external-content FTS5 index (`memories_fts`, porter stemming) kept in step by triggers (migration 3).
 `scope` is `pet` (private, `pet_id` set) or `crew` (the shared notebook, `pet_id` null); `kind` is
 `fact`, `preference` or `summary`. Every read — `recent(petId)` and `search(petId, text)` — filters on
@@ -958,8 +959,8 @@ prompt under `## What you remember`, labelled `(preference)`, `(fact)` or `(fact
 crew)`, and caps the whole section — heading included — at 2,000 characters. Last, so a remembered
 "short answers" reads as overriding the generic reply-style rule above it.
 
-Memories are written two ways. The `remember` tool (`tools/builtin/crew.ts`) is offered to every
-pet whose provider supports tools: `{ text, kind: fact | preference, shared? }`, filed under the
+Memories are written two ways. The `remember` tool (`tools/builtin/memory.ts`) is offered to every
+pet whose role lists it and whose provider supports tools: `{ text, kind: fact | preference, shared? }`, filed under the
 calling pet or, with `shared: true`, in the crew notebook. Under it sits a deterministic safety net:
 when the user's own message states a lasting preference — "I prefer…", "from now on…", "remember
 that…", "always answer…" — the runner files that sentence as a private `preference` before the turn
@@ -978,63 +979,10 @@ while recall carries the gist. Rows stay on disk. A failure — no key, a timeou
 reply — changes nothing and the next turn tries again; concurrent schedules share one job.
 
 The brain is `settings.summarizer` (`{ providerId, model }`) when set, and otherwise the pet's own
-provider and model. The phase page named `claude-haiku-4-5`; defaulting to the pet's own brain means a
-crew on Token Factory and OpenRouter never needs a third key for housekeeping.
+provider and model, so housekeeping never needs a key of its own.
 
-### Handoff
-
-`crew/commands.ts` reads the crew syntax at the start of an ask, in core, so every host gets it: a
-leading `@Name` (a pet's name or id, any case) other than the pet being asked is a handoff, and
-`/crew <question>` is a roundtable. A mention of the pet already being asked is stripped; an unknown
-mention, or one mid-sentence, is ordinary text.
-
-`crew/handoff.ts` builds the `HandoffPayload` — `{ fromPetId, toPetId, summary, request, snapshot }` —
-from the stored thread without a model call. The summary is two paragraphs: what the user asked (first
-and latest questions, and the page or app they were in), then the source pet's latest answer, clipped
-to 700 characters. The snapshot is the one attached to this ask, or else the latest one in the thread.
-`startHandoff` opens a new conversation for the target, whose first user message is the summary plus
-the request, and broadcasts `pet.message { kind: 'handoff', text: summary, turnId, conversationId }`
-through the runner's `beforeStart` hook — so it reaches hosts _before_ the target's `turn.started`
-and the panel draws the bubble ahead of the answer.
-
-`turn.started` now carries `providerId` and `model` (and `runId` for crew runs), so a panel can label
-every answer with who said it and on what.
-
-### Consult
-
-`tools/builtin/crew.ts` gives every pet an `ask_pet(petId, question)` tool whenever the crew has someone else
-to ask and the turn allows it (roundtable turns pass `allowConsult: false`). Its description lists the
-other pets as directory cards: id, name, role, summary, good at and not for, never their notes or memories. A call runs one nested turn for the target:
-its own role instructions and notes, provider, model and recalled memories, the caller's question framed as "X is
-consulting you mid-answer", and the caller's screen context as text only — no pixels. The nested turn
-is offered **no tools**, which is the depth limit: a consulted pet cannot consult, and a nested
-`ask_pet` it invents anyway is answered with an error result. It has 60 seconds (`AbortSignal.any` of
-the caller's signal and a timeout); a timeout, a provider error or an empty reply comes back to the
-caller as an error tool result — "Ink did not answer within 60 seconds. Answer without it." — and the
-caller carries on. Nothing of the nested turn is stored. The consult is broadcast as `pet.message
-{ kind: 'consult', text: question, turnId: callerTurn }` before it runs, so the panel draws a small
-card above the caller's answer.
-
-`turn.completed.modelCalls` counts what a turn cost: one for the first call, one per tool round trip,
-one per consult. The panel footer shows "N model calls" whenever a run made more than one.
-
-### Roundtable
-
-`crew/roundtable.ts` runs `/crew <question>`. The asking pet speaks first and writes the synthesis; the
-rest of the crew follows in registry order. Rounds include the synthesis and are clamped to 2..3: the
-default is one discussion round and the synthesis, and three rounds adds a second pass in which each
-pet responds to the others. Every turn is an ordinary runner turn on the pet's own provider and model,
-tagged with the run's `runId` and with `allowConsult: false`, so a mixed crew — Nemotron 3 Super,
-Claude through OpenRouter, Nemotron Nano — takes turns on three brains. Each pet keeps one
-conversation for the run, and its prompt carries the transcript so far (each answer clipped to 800
-characters); the user's snapshot rides on each pet's first turn only, so a screenshot is not paid for
-twice per pet.
-
-Hosts follow the run through `pet.message { kind: 'roundtable', round, text: 'Round 1 of 2' |
-'Synthesis by Scout' }` — sent before the turn that opens the round — and `crew.status { runId,
-state: running | done | stopped, round, rounds, modelCalls }` after every turn. A pet that cannot
-answer is written into the transcript as "(Ink could not answer: …)" and the table carries on.
-Interrupting the turn in flight — the panel's Stop button — or `stop()` cancels every remaining turn.
+`turn.started` carries `providerId` and `model`, so a panel can label every answer with who said it
+and on what.
 
 ### The companion in the hosts
 
@@ -1140,23 +1088,18 @@ flowchart LR
 pet_id, to_pet_id, turn_id, conversation_id, run_id, provider_id, model, text, answer, error,
 model_calls, started_at, finished_at, expert_id, expert_name, changed_files, app, tool, access,
 routine_id)` (migration 7, rebuilt by migrations 8, 12 and 13 to add the expert, app and routine
-columns), ordered by rowid. `kind` is `turn`, `consult`, `handoff`, `roundtable`, `expert`,
-`connector` or `routine`; `state` is `running`, `done`, `error` or `stopped`. `ActivityLog.observe`
-sits in the engine's event sink in front of the broadcast, so a host that re-reads on a notification
-already finds the row, and writes everything from the notifications the engine already sends:
+columns), ordered by rowid. `kind` is `turn`, `expert`, `connector` or `routine`; a crew-era install
+also holds `consult`, `handoff` and `roundtable` rows, which stay on disk and out of the list. `state`
+is `running`, `done`, `error` or `stopped`. `ActivityLog.observe` sits in the engine's event sink in
+front of the broadcast, so a host that re-reads on a notification already finds the row, and writes
+turns from the notifications the engine already sends:
 
-| Notification                       | Recorded                                                           |
-| ---------------------------------- | ------------------------------------------------------------------ |
-| `turn.started`                     | a `turn` row: pet, model, run, and the question just stored        |
-| `turn.completed` / `turn.error`    | the turn's answer and calls, or its error; a handoff to it is done |
-| `pet.message` `consult`            | a `consult` row: who asked whom, and the question                  |
-| `pet.message` `handoff`            | a `handoff` row: from, to, the summary, the target's turn          |
-| `pet.message` `roundtable` (first) | one `roundtable` row per run, started by the asking pet            |
-| `crew.status`                      | the roundtable's state and model calls                             |
+| Notification                    | Recorded                                               |
+| ------------------------------- | ------------------------------------------------------ |
+| `turn.started`                  | a `turn` row: pet, model, and the question just stored |
+| `turn.completed` / `turn.error` | the turn's answer and calls, or its error              |
 
-A consult's full answer is in no notification (`turn.toolResult` carries a 120-character summary), so
-the consult tool reports it through one hook, `AskPetDeps.answered`, which the runner passes through
-from `consult.answered` and the engine wires to `ActivityLog.consultAnswered`. At boot, before
+At boot, before
 anything runs, `ActivityLog.interrupted` closes every row still `running` (a crash or a quit cut it
 short) as `error`, "Interrupted: Tagalong closed before this finished.", and
 `RoutineStore.interrupted` does the same for a routine's `last_state`. Text is clipped at 4,000
@@ -1289,7 +1232,8 @@ A blind pet gets the same facts as text and is told it has not seen the pictures
 ### Watch mode
 
 `packages/core/src/watch/` holds it. `watch_for(condition, displayId?, rect?, timeoutMinutes?)` is a
-crew-style tool, because the watch belongs to the pet that called it; without a `displayId` it
+tool that knows its caller, because the watch belongs to the pet that called it. No shipped role lists
+it since the crew's roles went, so the companion is not offered it today. Without a `displayId` it
 watches the display of the window in front and remembers that window for a text-only check. The
 `WatchManager` belongs to the engine, not the turn — a watch outlives the reply that started it — and
 runs on an injected clock, so every timing rule below is unit tested with a fake one.

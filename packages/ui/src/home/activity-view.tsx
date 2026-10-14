@@ -33,14 +33,7 @@ const WORDS: Record<ActivityState, string> = {
 
 function headline(entry: ActivityEntry, name: (petId: string) => string): string {
   const who = name(entry.petId);
-  const to = entry.toPetId === undefined ? '' : name(entry.toPetId);
   switch (entry.kind) {
-    case 'consult':
-      return `${who} asked ${to}`;
-    case 'handoff':
-      return `${who} handed off to ${to}`;
-    case 'roundtable':
-      return `${who} started a roundtable`;
     case 'expert':
       return `${who} handed off to ${entry.expertName ?? 'an expert'}`;
     case 'connector': {
@@ -91,10 +84,10 @@ function time(iso: string): string {
 }
 
 /**
- * Home's activity view: what the crew did, newest first — every turn (who, the model, how
- * many calls), every consult (who asked whom, the question and the answer), every handoff
- * and every roundtable — each opening its thread on click. Read from the engine's record
- * with `listActivity`, re-read whenever a turn, a crew message or a crew run is reported.
+ * Home's activity view: what Scout did, newest first — every turn (who, the model, how many
+ * calls), every hand-off to an expert, app call and routine run — each opening its thread
+ * on click. Read from the engine's record with `listActivity`, re-read whenever a turn, a
+ * hand-off or a routine run is reported.
  */
 export function ActivityView({ pets }: { pets: readonly Pet[] }) {
   const bridge = useHostBridge();
@@ -157,14 +150,14 @@ export function ActivityView({ pets }: { pets: readonly Pet[] }) {
     return <Note>Activity is not available here.</Note>;
   }
   if (failed && page === null) {
-    return <Note>Tagalong could not read the crew’s activity. Reopen Home to try again.</Note>;
+    return <Note>Tagalong could not read Scout’s activity. Reopen Home to try again.</Note>;
   }
-  if (page === null) return <Note>Reading the crew’s activity…</Note>;
+  if (page === null) return <Note>Reading Scout’s activity…</Note>;
   if (page.entries.length === 0) {
     return (
       <Note>
-        Nothing yet. Every answer, every question one pet asks another, and every handoff shows up
-        here as it happens.
+        Nothing yet. Every answer, every hand-off to an expert and every routine run shows up here
+        as it happens.
       </Note>
     );
   }
@@ -176,7 +169,6 @@ export function ActivityView({ pets }: { pets: readonly Pet[] }) {
           <Entry
             key={entry.id}
             entry={entry}
-            all={page.entries}
             pets={pets}
             name={name}
             open={open === entry.id}
@@ -217,14 +209,12 @@ function Note({ children }: { children: ReactNode }) {
 
 function Entry({
   entry,
-  all,
   pets,
   name,
   open,
   onToggle,
 }: {
   entry: ActivityEntry;
-  all: readonly ActivityEntry[];
   pets: readonly Pet[];
   name: (petId: string) => string;
   open: boolean;
@@ -261,14 +251,12 @@ function Entry({
             <StateIcon state={entry.state} />
             {[WORDS[entry.state], ...meta].join(' · ')}
           </span>
-          {entry.text !== undefined && entry.kind !== 'roundtable' && (
-            <span className="home-entry__preview">{entry.text}</span>
-          )}
+          {entry.text !== undefined && <span className="home-entry__preview">{entry.text}</span>}
         </span>
       </button>
       {open && (
         <section id={threadId} aria-label={title} className="home-thread">
-          <Thread entry={entry} all={all} name={name} />
+          <Thread entry={entry} name={name} />
         </section>
       )}
     </li>
@@ -284,17 +272,8 @@ function Said({ who, text }: { who: string; text: string }) {
   );
 }
 
-function Thread({
-  entry,
-  all,
-  name,
-}: {
-  entry: ActivityEntry;
-  all: readonly ActivityEntry[];
-  name: (petId: string) => string;
-}) {
+function Thread({ entry, name }: { entry: ActivityEntry; name: (petId: string) => string }) {
   const who = name(entry.petId);
-  const to = entry.toPetId === undefined ? '' : name(entry.toPetId);
   const failure =
     entry.error === undefined ? null : <Said who="What went wrong" text={entry.error} />;
   switch (entry.kind) {
@@ -306,40 +285,6 @@ function Thread({
           {failure}
         </>
       );
-    case 'consult':
-      return (
-        <>
-          {entry.text !== undefined && <Said who={`${who} asked`} text={entry.text} />}
-          {entry.answer !== undefined && <Said who={`${to} answered`} text={entry.answer} />}
-          {failure}
-        </>
-      );
-    case 'handoff': {
-      const reply = all.find((other) => other.kind === 'turn' && other.turnId === entry.turnId);
-      return (
-        <>
-          {entry.text !== undefined && <Said who={`What ${to} was told`} text={entry.text} />}
-          {reply?.answer !== undefined && <Said who={`${to} answered`} text={reply.answer} />}
-        </>
-      );
-    }
-    case 'roundtable': {
-      const turns = all
-        .filter((other) => other.kind === 'turn' && other.runId === entry.runId)
-        .reverse();
-      if (turns.length === 0) return <p className="home-said">No turns to show yet.</p>;
-      return (
-        <>
-          {turns.map((turn) => (
-            <Said
-              key={turn.id}
-              who={name(turn.petId)}
-              text={turn.answer ?? turn.error ?? WORDS[turn.state]}
-            />
-          ))}
-        </>
-      );
-    }
     case 'expert': {
       const expert = entry.expertName ?? 'The expert';
       return (

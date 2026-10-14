@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 import { PROTOCOL_VERSION, RPC_ERROR_CODES } from '@tagalong/protocol';
-import { listRoles, recommendedModel, roleFor } from './roles';
 import { Engine, type EngineOptions } from './engine';
 import { SPOKEN_HEADING } from './conversation/prompt-assembler';
 import { fakeMcpServer } from './connections/fake-server';
@@ -49,31 +48,6 @@ async function boot(provider?: BrainProvider, extra: Partial<EngineOptions> = {}
     ...extra,
   });
   return engine;
-}
-
-/**
- * The crew machinery (hand-offs between pets, /crew, watches) still works with more than
- * one pet; a fresh install has only Scout, the Companion. These tests add the crew they
- * need: Scout as a Generalist, Ink a Writer, Bolt a Backend engineer, all on the fake.
- */
-async function addCrew(host: TestHost): Promise<void> {
-  const base = {
-    avatar: '*',
-    model: 'fake-model',
-    providerId: 'fake',
-    roleVersion: 1,
-    toolGrants: {},
-    replyStyle: 'text' as const,
-  };
-  await host.call('pets.upsert', {
-    pet: { ...base, id: 'scout', name: 'Scout', roleId: 'generalist' },
-  });
-  await host.call('pets.upsert', {
-    pet: { ...base, id: 'ink', name: 'Ink', roleId: 'writer', model: 'anthropic/claude-sonnet-5' },
-  });
-  await host.call('pets.upsert', {
-    pet: { ...base, id: 'bolt', name: 'Bolt', roleId: 'backend-engineer' },
-  });
 }
 
 /** Minimal host: speaks the real wire format so the test exercises the real server. */
@@ -563,128 +537,34 @@ describe('a spoken ask over rpc', () => {
   });
 });
 
-describe('handoff over rpc', () => {
-  it('hands Scout’s thread to Ink when the user types @Ink, with the context intact', async () => {
-    const seen: { model: string; text: string }[] = [];
-    const fake = new FakeBrainProvider({ text: 'An answer.' });
-    const recording: BrainProvider = {
-      id: 'fake',
-      capabilities: fake.capabilities,
-      listModels: () => fake.listModels(),
-      complete: (req, handlers, signal) => {
-        seen.push({ model: req.model, text: JSON.stringify(req.messages) });
-        return fake.complete(req, handlers, signal);
-      },
-    };
-    const e = await boot(recording);
-    const host = await TestHost.connect(e.port);
-    await host.call('hello', helloParams(e.pairingToken));
-    await addCrew(host);
-
-    await host.call('ask', { petId: 'scout', input: { text: 'Explain the release notes' } });
-    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
-    const started = host.notifications.find((n) => n.method === 'turn.started');
-    const conversationId = started?.params['conversationId'];
-
-    await host.call('ask', {
-      petId: 'scout',
-      conversationId,
-      input: { text: '@Ink draft a reply to this' },
-    });
-    await vi.waitFor(
-      () => expect(host.methods().filter((m) => m === 'turn.completed')).toHaveLength(2),
-      { timeout: 5000 },
-    );
-
-    const handoff = host.notifications.find((n) => n.method === 'pet.message');
-    expect(handoff?.params).toMatchObject({ kind: 'handoff', fromPetId: 'scout', toPetId: 'ink' });
-    const inkStart = host.notifications.filter((n) => n.method === 'turn.started')[1];
-    expect(inkStart?.params).toMatchObject({ petId: 'ink', model: 'anthropic/claude-sonnet-5' });
-    expect(inkStart?.params['conversationId']).not.toBe(conversationId);
-    expect(seen[1]?.model).toBe('anthropic/claude-sonnet-5');
-    expect(seen[1]?.text).toContain('Explain the release notes');
-    expect(seen[1]?.text).toContain('draft a reply to this');
-  });
-});
-
-describe('roundtable over rpc', () => {
-  it('runs /crew across the whole crew and ends with the asking pet’s synthesis', async () => {
-    const e = await boot();
-    const host = await TestHost.connect(e.port);
-    await host.call('hello', helloParams(e.pairingToken));
-    await addCrew(host);
-
-    await host.call('ask', { petId: 'ink', input: { text: '/crew Should the panel dock left?' } });
-    await vi.waitFor(
-      () =>
-        expect(
-          host.notifications.some(
-            (n) => n.method === 'crew.status' && n.params['state'] === 'done',
-          ),
-        ).toBe(true),
-      { timeout: 10000 },
-    );
-
-    const speakers = host.notifications
-      .filter((n) => n.method === 'turn.started')
-      .map((n) => n.params['petId']);
-    expect(speakers).toEqual(['ink', 'bolt', 'scout', 'ink']);
-    const done = host.notifications.find(
-      (n) => n.method === 'crew.status' && n.params['state'] === 'done',
-    );
-    expect(done?.params['modelCalls']).toBe(4);
-  });
-});
-
 describe('activity over rpc', () => {
-  it('lists each turn, the handoff and the roundtable, newest first, and pages', async () => {
+  it('lists each turn, newest first, and pages', async () => {
     const e = await boot();
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
-    await addCrew(host);
     const completedCount = () => host.methods().filter((m) => m === 'turn.completed').length;
 
     await host.call('ask', { petId: 'scout', input: { text: 'Explain the release notes' } });
     await vi.waitFor(() => expect(completedCount()).toBe(1), { timeout: 5000 });
-    await host.call('ask', { petId: 'scout', input: { text: '@Ink draft a reply' } });
+    await host.call('ask', { petId: 'scout', input: { text: 'And the changelog?' } });
     await vi.waitFor(() => expect(completedCount()).toBe(2), { timeout: 5000 });
-    await host.call('ask', { petId: 'ink', input: { text: '/crew Dock left?' } });
-    await vi.waitFor(
-      () =>
-        expect(
-          host.notifications.some(
-            (n) => n.method === 'crew.status' && n.params['state'] === 'done',
-          ),
-        ).toBe(true),
-      { timeout: 10000 },
-    );
 
     const res = await host.call('activity.list', {});
     const entries = (res['result'] as { entries: Record<string, unknown>[] }).entries;
-    const kinds = entries.map((entry) => entry['kind']);
-    // Newest first: the roundtable's four turns and the run itself, then the handoff, then
-    // the turns before it.
-    expect(kinds.at(-1)).toBe('turn');
+    expect(entries.map((entry) => entry['text'])).toEqual([
+      'And the changelog?',
+      'Explain the release notes',
+    ]);
     expect(entries.at(-1)).toMatchObject({
+      kind: 'turn',
       petId: 'scout',
       state: 'done',
-      text: 'Explain the release notes',
       model: expect.any(String) as string,
     });
-    expect(entries.find((entry) => entry['kind'] === 'handoff')).toMatchObject({
-      petId: 'scout',
-      toPetId: 'ink',
-      state: 'done',
-    });
-    expect(entries.find((entry) => entry['kind'] === 'roundtable')).toMatchObject({
-      petId: 'ink',
-      state: 'done',
-      modelCalls: 4,
-    });
 
-    const page = await host.call('activity.list', { limit: 2 });
+    const page = await host.call('activity.list', { limit: 1 });
     const first = page['result'] as { entries: unknown[]; next?: string };
-    expect(first.entries).toHaveLength(2);
+    expect(first.entries).toHaveLength(1);
     expect(first.next).toBeDefined();
   });
 });
@@ -722,7 +602,7 @@ describe('memory across a restart', () => {
 });
 
 describe('pets and settings over rpc', () => {
-  it('lists the seeded crew', async () => {
+  it('lists the seeded companion', async () => {
     const e = await boot();
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
@@ -733,7 +613,7 @@ describe('pets and settings over rpc', () => {
     expect(pets).toHaveLength(1);
   });
 
-  it('round-trips an upsert and a delete through rpc, and the delete survives a restart', async () => {
+  it('round-trips an upsert through rpc, and it survives a restart', async () => {
     const e = await boot();
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
@@ -745,22 +625,19 @@ describe('pets and settings over rpc', () => {
       model: 'fake-model',
       providerId: 'fake',
       color: '#22c55e',
-      roleId: 'generalist',
-      roleVersion: 1,
+      roleId: 'companion',
       toolGrants: {},
       replyStyle: 'text',
     };
 
     const saved = await host.call('pets.upsert', { pet: pip });
     expect((saved['result'] as { pet: unknown }).pet).toEqual(pip);
-    const deleted = await host.call('pets.delete', { petId: 'scout' });
-    expect(deleted['result']).toEqual({ deleted: true });
 
     await e.shutdown();
     engine = undefined;
     const again = await boot();
     const ids = again.pets.map((pet) => pet.id);
-    expect(ids).toEqual(['pip']);
+    expect(ids).toEqual(['pip', 'scout']);
   });
 
   it('round-trips a settings patch', async () => {
@@ -768,14 +645,14 @@ describe('pets and settings over rpc', () => {
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
 
-    await host.call('settings.set', { patch: { defaultModel: 'claude-haiku-4-5' } });
+    await host.call('settings.set', { patch: { userName: 'Ada' } });
     const res = await host.call('settings.get', {});
     const settings = (res['result'] as Record<string, unknown>)['settings'] as Record<
       string,
       unknown
     >;
 
-    expect(settings['defaultModel']).toBe('claude-haiku-4-5');
+    expect(settings['userName']).toBe('Ada');
     // A patch must not reset the fields it left out.
     expect(settings['defaultPetId']).toBe('scout');
   });
@@ -795,47 +672,10 @@ describe('roles over rpc', () => {
     avatar: '🐣',
     model: 'fake-model',
     providerId: 'fake',
-    roleId: 'writer',
-    roleVersion: 99,
+    roleId: 'companion',
     toolGrants: {},
     replyStyle: 'text',
     ...overrides,
-  });
-
-  it('lists the whole role library', async () => {
-    const { host } = await connected();
-    const res = await host.call('roles.list', {});
-    expect(res['result']).toEqual({ roles: listRoles() });
-  });
-
-  it('recommends the role’s model, and a vision model when the role needs to see', async () => {
-    const { host } = await connected();
-    for (const roleId of ['writer', 'frontend-engineer']) {
-      const res = await host.call('roles.recommendModel', { roleId, providerId: 'nebius' });
-      expect(res['result']).toEqual(recommendedModel(roleFor(roleId), 'nebius'));
-    }
-    const sees = await host.call('roles.recommendModel', {
-      roleId: 'frontend-engineer',
-      providerId: 'nebius',
-    });
-    expect((sees['result'] as Record<string, unknown>)['visionModel']).toBeDefined();
-  });
-
-  it('recommends nothing on a provider without a tier table', async () => {
-    const { host } = await connected();
-    const res = await host.call('roles.recommendModel', { roleId: 'writer', providerId: 'fake' });
-    expect(res['result']).toEqual({});
-  });
-
-  it('refuses to recommend for a role that does not exist', async () => {
-    const { host } = await connected();
-    const res = await host.call('roles.recommendModel', {
-      roleId: 'wizard',
-      providerId: 'nebius',
-    });
-    const error = res['error'] as Record<string, unknown>;
-    expect(error['code']).toBe(RPC_ERROR_CODES.invalidParams);
-    expect(String(error['message'])).toContain('wizard');
   });
 
   it('refuses a pet whose role is not in the library, and saves nothing', async () => {
@@ -847,82 +687,14 @@ describe('roles over rpc', () => {
     expect(e.pets.map((pet) => pet.id)).not.toContain('pip');
   });
 
-  it('stamps a new pet with its role’s library version', async () => {
+  it('refuses the crew-era methods: they are gone', async () => {
     const { host } = await connected();
-    const res = await host.call('pets.upsert', { pet: draft() });
-    const pet = (res['result'] as { pet: Record<string, unknown> }).pet;
-    expect(pet['roleVersion']).toBe(roleFor('writer').version);
-  });
-
-  it('keeps an existing pet’s role version, and restamps it when the role changes', async () => {
-    const { host } = await connected();
-    await host.call('pets.upsert', { pet: draft() });
-
-    const kept = await host.call('pets.upsert', { pet: draft({ name: 'Pippa', roleVersion: 7 }) });
-    expect((kept['result'] as { pet: Record<string, unknown> }).pet['roleVersion']).toBe(7);
-
-    const moved = await host.call('pets.upsert', {
-      pet: draft({ roleId: 'researcher', roleVersion: 7 }),
-    });
-    expect((moved['result'] as { pet: Record<string, unknown> }).pet['roleVersion']).toBe(
-      roleFor('researcher').version,
-    );
-  });
-});
-
-describe('the roles notice over rpc', () => {
-  /** Leaves `dir` holding a database from before roles, with Ink's persona edited. */
-  function storePreRolesInstall(): void {
-    const db = openDatabase(dir);
-    db.prepare('DELETE FROM schema_version WHERE version >= 5').run();
-    db.exec('DROP TABLE notices');
-    const legacy = {
-      id: 'ink',
-      name: 'Ink',
-      avatar: '✒️',
-      model: 'fake-model',
-      providerId: 'fake',
-      persona: 'Write like a pirate.',
-      toolAllowlist: [],
-      replyStyle: 'text',
-    };
-    db.prepare('INSERT INTO pets (id, json, updated_at) VALUES (?, ?, ?)').run(
-      'ink',
-      JSON.stringify(legacy),
-      '2026-09-11T00:00:00.000Z',
-    );
-    db.prepare('INSERT INTO pet_seeds (id, seeded_at) VALUES (?, ?)').run('ink', '2026-09-11');
-    db.close();
-  }
-
-  async function connected(): Promise<TestHost> {
-    const e = await boot();
-    const host = await TestHost.connect(e.port);
-    await host.call('hello', helloParams(e.pairingToken));
-    return host;
-  }
-
-  it('has no notice on a fresh install', async () => {
-    const host = await connected();
-    const res = await host.call('notices.rolesUpgrade', {});
-    expect(res['result']).toEqual({ notice: null });
-  });
-
-  it('tells an upgraded install what the upgrade did, until it is dismissed', async () => {
-    storePreRolesInstall();
-    const host = await connected();
-
-    const res = await host.call('notices.rolesUpgrade', {});
-    expect(res['result']).toEqual({
-      notice: {
-        pets: [{ petId: 'ink', name: 'Ink', roleId: 'writer', keptNotes: true, madeByYou: false }],
-      },
-    });
-
-    const dismissed = await host.call('notices.dismiss', { notice: 'rolesUpgrade' });
-    expect(dismissed['result']).toEqual({ dismissed: true });
-    const after = await host.call('notices.rolesUpgrade', {});
-    expect(after['result']).toEqual({ notice: null });
+    for (const method of ['pets.delete', 'roles.list', 'roles.recommendModel', 'notices.dismiss']) {
+      const res = await host.call(method, {});
+      expect((res['error'] as Record<string, unknown>)['code']).toBe(
+        RPC_ERROR_CODES.methodNotFound,
+      );
+    }
   });
 });
 
@@ -1037,79 +809,6 @@ describe('the browser host', () => {
 
     expect(deskAsked).toEqual([['activeWindow']]);
     expect(asked).toEqual([['selection']]);
-  });
-});
-
-describe('watch mode over rpc', () => {
-  it('starts a watch from watch_for, announces it, and stops it on watch.stop', async () => {
-    const e = await boot(
-      new FakeBrainProvider({
-        text: 'I will tell you.',
-        toolCall: {
-          id: 'call-w',
-          name: 'watch_for',
-          input: { condition: 'the build finishes', displayId: 1 },
-        },
-      }),
-    );
-    const host = await TestHost.connect(e.port);
-    const asked: string[] = [];
-    host.onRequest = (method) => {
-      asked.push(method);
-      return { changeRatio: 0, afterAt: new Date().toISOString() };
-    };
-    await host.call('hello', {
-      ...helloParams(e.pairingToken),
-      capabilities: ['activeWindow', 'displays', 'recall'] as const,
-    });
-
-    await addCrew(host);
-    await host.call('ask', { petId: 'scout', input: { text: 'tell me when it finishes' } });
-    await vi.waitFor(() => expect(host.methods()).toContain('watch.status'), { timeout: 5000 });
-
-    expect(asked).toContain('perception.diff');
-    const status = host.notifications.find((n) => n.method === 'watch.status')!;
-    expect(status.params).toMatchObject({
-      petId: 'scout',
-      condition: 'the build finishes',
-      state: 'watching',
-      maxChecks: 60,
-    });
-
-    const stop = await host.call('watch.stop', { watchId: status.params['watchId'] });
-    expect(stop['result']).toEqual({ stopped: true });
-    await vi.waitFor(() =>
-      expect(host.notifications.map((n) => n.params['state'])).toContain('stopped'),
-    );
-    const again = await host.call('watch.stop', { watchId: status.params['watchId'] });
-    expect(again['result']).toEqual({ stopped: false });
-  });
-});
-
-describe('watch limits without a restart', () => {
-  it('applies a limit saved through settings.set to the next watch', async () => {
-    const e = await boot(
-      new FakeBrainProvider({
-        text: 'Watching.',
-        toolCall: { id: 'call-l', name: 'watch_for', input: { condition: 'done', displayId: 1 } },
-      }),
-    );
-    const host = await TestHost.connect(e.port);
-    host.onRequest = () => ({ changeRatio: 0, afterAt: new Date().toISOString() });
-    await host.call('hello', {
-      ...helloParams(e.pairingToken),
-      capabilities: ['displays', 'recall'] as const,
-    });
-
-    await host.call('settings.set', {
-      patch: { watch: { maxChecks: 7, maxConcurrent: 1, defaultTimeoutMinutes: 5 } },
-    });
-    await addCrew(host);
-    await host.call('ask', { petId: 'scout', input: { text: 'tell me when it is done' } });
-    await vi.waitFor(() => expect(host.methods()).toContain('watch.status'), { timeout: 5000 });
-
-    const status = host.notifications.find((n) => n.method === 'watch.status')!;
-    expect(status.params['maxChecks']).toBe(7);
   });
 });
 

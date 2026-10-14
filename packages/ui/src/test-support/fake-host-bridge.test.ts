@@ -39,7 +39,6 @@ describe('createFakeHostBridge', () => {
           model: 'claude-opus-5',
           providerId: 'anthropic',
           roleId: 'generalist',
-          roleVersion: 1,
           toolGrants: {},
           replyStyle: 'text',
         },

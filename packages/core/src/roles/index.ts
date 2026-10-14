@@ -6,22 +6,17 @@ import { MODEL_TIERS } from './tiers';
 export { ROLE_LIBRARY };
 export { MODEL_TIERS, type ProviderTiers } from './tiers';
 
-/** Every role Tagalong ships, in id order. */
-export function listRoles(): readonly Role[] {
-  return ROLE_LIBRARY;
-}
-
 /** The role with this id, or undefined when there is none. */
 export function getRole(id: string): Role | undefined {
   return ROLE_LIBRARY.find((role) => role.id === id);
 }
 
 /** The role every pet falls back to when its own is missing from the library. */
-export const FALLBACK_ROLE_ID = 'generalist';
+export const FALLBACK_ROLE_ID = 'companion';
 
 /**
- * The role a pet with this role id works as: its own, or the generalist when the library
- * has no such role (a role removed in a later version, or a hand-edited database).
+ * The role a pet with this role id works as: its own, or the companion when the library
+ * has no such role (a crew-era role such as `writer`, or a hand-edited database).
  */
 export function roleFor(roleId: string): Role {
   const role = getRole(roleId) ?? getRole(FALLBACK_ROLE_ID);

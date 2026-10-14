@@ -43,8 +43,8 @@ export class Approvals {
     });
   }
 
-  /** True when a waiting change was answered. `always` is not offered and counts as once. */
-  answer(approvalId: string, decision: 'once' | 'always' | 'deny'): boolean {
+  /** True when a waiting change was answered. */
+  answer(approvalId: string, decision: 'once' | 'deny'): boolean {
     const finish = this.#waiting.get(approvalId);
     if (finish === undefined) return false;
     finish(decision === 'deny' ? 'cancelled' : 'allowed');

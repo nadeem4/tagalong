@@ -1,6 +1,6 @@
 # Concepts
 
-How Tagalong's pets remember, meet and talk to each other. These pages describe the model behind
+How Tagalong's companion remembers and what it may use. These pages describe the model behind
 the code; [../architecture.md](../architecture.md) describes how the engine and its hosts are built
 today.
 
@@ -9,18 +9,15 @@ Each page starts with a status line:
 - **Built**: matches the code on `main`.
 - **Design**: agreed, not built yet. The page is updated to match the code when its phase ships.
 
-| Page                                             | Status         | Covers                                                                  |
-| ------------------------------------------------ | -------------- | ----------------------------------------------------------------------- |
-| [Memory](memory.md)                              | Built + design | The kinds of memory a pet has, summarising, recall, vector search       |
-| [Meetings](meetings.md)                          | Design         | Meeting rooms, how a meeting starts, runs and ends, joining as the user |
-| [Pet communication](pet-communication.md)        | Design         | Quick questions vs meetings, the message envelope, how hosts are told   |
-| [Context isolation](context-isolation.md)        | Design         | What each turn can see, and the guards that stop context leaking        |
-| [Roles, directory and tools](roles-and-tools.md) | Design         | Role files, how pets choose who to ask, the tools module, model per pet |
+| Page                                      | Status         | Covers                                                            |
+| ----------------------------------------- | -------------- | ----------------------------------------------------------------- |
+| [Memory](memory.md)                       | Built + design | The kinds of memory a pet has, summarising, recall, vector search |
+| [Context isolation](context-isolation.md) | Design         | What each turn can see, and the guards that stop context leaking  |
+| [Roles and tools](roles-and-tools.md)     | Built          | The companion's role file, model per pet, the tools module        |
 
 ## The model in one paragraph
 
-Tagalong is a simulated office. Pets are colleagues: each has one role, a desk, and its own memory.
-When pets need to talk something through they book a meeting room; when they need to do the work
-they go back to their desks. A pet remembers what it was told in meetings it attended, like a real
-colleague, and nothing else. All of it runs inside the engine on the user's machine: pets never
-talk to each other directly, and nothing is shared that the user cannot see in the panel.
+Tagalong is one companion, Scout, that sits beside the person's work. Scout sees what they are
+doing, answers small things itself, and briefs an expert such as Claude Code for the real work. The
+crew of pets, meeting rooms and pet-to-pet messages this folder once described were removed. All of
+it runs inside the engine on the user's machine, and nothing is shared that the user cannot see.

@@ -92,7 +92,6 @@ export function companionOn(current: Pet, providerId: string, companion: Role): 
   return Pet.parse({
     ...rest,
     roleId: companion.id,
-    roleVersion: companion.version,
     providerId,
     model: recommended?.model ?? current.model,
     ...(recommended?.visionModel === undefined ? {} : { visionModel: recommended.visionModel }),

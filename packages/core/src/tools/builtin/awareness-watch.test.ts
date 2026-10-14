@@ -12,8 +12,7 @@ const pet: Pet = {
   avatar: '🐾',
   model: 'claude-opus-5',
   providerId: 'anthropic',
-  roleId: 'generalist',
-  roleVersion: 1,
+  roleId: 'companion',
   toolGrants: {},
   replyStyle: 'text',
 };

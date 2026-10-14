@@ -21,8 +21,7 @@ const pet: Pet = {
   notes: 'You are Scout, a terse field guide.',
   model: 'claude-opus-5',
   providerId: 'anthropic',
-  roleId: 'generalist',
-  roleVersion: 1,
+  roleId: 'companion',
   toolGrants: {},
   replyStyle: 'text',
 };
@@ -73,19 +72,19 @@ describe('assemblePrompt system prompt', () => {
     expect(system.toLowerCase()).toContain('concise');
     expect(system).toMatch(/never claim/i);
     expect(system).toMatch(/clicked|typed/i);
-    expect(system).toContain(getRole('generalist')!.instructions);
+    expect(system).toContain(getRole('companion')!.instructions);
     expect(system).toContain('Your name is Scout.');
     expect(system).toContain(`${NOTES_HEADING}\n${pet.notes}`);
   });
 
   it('orders the role instructions, then the name, then the notes, then the reply style', () => {
     const { system } = assemblePrompt({
-      pet: { ...pet, roleId: 'writer' },
+      pet,
       history: [userMessage('hi')],
       settings,
     });
 
-    const role = system.indexOf(getRole('writer')!.instructions);
+    const role = system.indexOf(getRole('companion')!.instructions);
     const name = system.indexOf('Your name is Scout.');
     const notes = system.indexOf(NOTES_HEADING);
     const style = system.indexOf('Your reply is read on screen.');
@@ -144,13 +143,14 @@ describe('assemblePrompt system prompt', () => {
     expect(unspoken).not.toContain(SPOKEN_HEADING);
   });
 
-  it("falls back to the generalist's instructions for a role the library does not have", () => {
+  it("falls back to the companion's instructions for a role the library does not have", () => {
+    // A crew-era role, still on a pet saved before the crew went.
     const { system } = assemblePrompt({
-      pet: { ...pet, roleId: 'astronaut' },
+      pet: { ...pet, roleId: 'writer' },
       history: [userMessage('hi')],
       settings,
     });
-    expect(system).toContain(getRole('generalist')!.instructions);
+    expect(system).toContain(getRole('companion')!.instructions);
   });
 
   it('swaps in the reply-style rule the pet asked for', () => {

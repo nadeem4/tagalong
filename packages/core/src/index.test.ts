@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PROTOCOL_VERSION } from '@tagalong/protocol';
-import { engineInfo, getRole, listRoles, recommendedModel } from './index';
+import { engineInfo, getRole, recommendedModel } from './index';
 
 describe('engineInfo', () => {
   it('reports the protocol version it was built against', () => {
@@ -17,10 +17,9 @@ describe('engineInfo', () => {
 });
 
 describe('role helpers', () => {
-  it('are exported for hosts: the library, a lookup and the recommended model', () => {
-    expect(listRoles().map((role) => role.id)).toContain('generalist');
-    const writer = getRole('writer');
-    expect(writer?.name).toBe('Writer');
-    expect(recommendedModel(writer!, 'anthropic')?.model).toBe('claude-sonnet-5');
+  it('are exported for hosts: a lookup and the recommended model', () => {
+    const companion = getRole('companion');
+    expect(companion?.name).toBe('Companion');
+    expect(recommendedModel(companion!, 'anthropic')?.model).toBe('claude-haiku-4-5');
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Settings, type Pet } from '@tagalong/protocol';
+import type { Pet } from '@tagalong/protocol';
 import type { MemoryStore, NewMemory } from '../memory/memories';
 import { FakeBrainProvider } from '../providers';
 import { FakeClock } from '../watch/fake-clock';
@@ -8,8 +8,6 @@ import { FAKE_TURN_PET, fakeTurn } from './fake-turn';
 import { ToolRegistry, toolsFor, type ToolRegistryOptions } from './registry';
 import type { Tool } from './tool';
 import { getRole } from '../roles';
-
-const ink: Pet = { ...FAKE_TURN_PET, id: 'ink', name: 'Ink', notes: 'You polish prose.' };
 
 /** Only `addOnce` is reached by the tools; the rest of the store is not under test here. */
 function fakeMemory(): MemoryStore & { saved: NewMemory[] } {
@@ -37,16 +35,13 @@ function everything(overrides: Partial<ToolRegistryOptions> = {}): ToolRegistryO
       }),
       hosts,
     },
-    consult: {
-      pets: () => [FAKE_TURN_PET, ink],
-      provider: () => new FakeBrainProvider({ text: 'ok' }),
-      settings: () => Settings.parse({}),
-    },
+    // Every wired tool: what the role library narrows is the toolsFor tests' business.
+    toolsFor: (_pet, tools) => tools,
     ...overrides,
   };
 }
 
-const ALL_THIRTEEN = [
+const ALL_TOOLS = [
   'look_at_screen',
   'get_selection',
   'list_displays',
@@ -59,15 +54,14 @@ const ALL_THIRTEEN = [
   'what_changed',
   'remember',
   'watch_for',
-  'ask_pet',
 ];
 
 describe('ToolRegistry.forTurn', () => {
-  it('builds all thirteen built-in tools, in the order the model has always seen them', () => {
+  it('builds every built-in tool, in the order the model has always seen them', () => {
     const turn = new ToolRegistry(everything()).forTurn(fakeTurn());
 
-    expect(turn.tools.map((tool) => tool.id)).toEqual(ALL_THIRTEEN);
-    expect(turn.definitions.map((definition) => definition.name)).toEqual(ALL_THIRTEEN);
+    expect(turn.tools.map((tool) => tool.id)).toEqual(ALL_TOOLS);
+    expect(turn.definitions.map((definition) => definition.name)).toEqual(ALL_TOOLS);
   });
 
   it('gives every tool one shape whose id is the name the model sees', () => {
@@ -82,7 +76,7 @@ describe('ToolRegistry.forTurn', () => {
     const writes = tools.filter((tool) => tool.kind === 'write').map((tool) => tool.id);
 
     expect(writes).toEqual(['remember', 'watch_for']);
-    expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(11);
+    expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(10);
   });
 
   it('gives a companion its tools, ending with the routine tools; all three are write', () => {
@@ -116,7 +110,7 @@ describe('ToolRegistry.forTurn', () => {
       experts: experts.experts,
       propose: () => ({ proposalId: '7c9e6679-7425-40de-944b-e07fc1f90ae7' }),
     };
-    const tools = new ToolRegistry(everything({ experts, routines })).forTurn(
+    const tools = new ToolRegistry(everything({ experts, routines, toolsFor })).forTurn(
       fakeTurn({ pet: { ...FAKE_TURN_PET, roleId: 'companion' } }),
     ).tools;
     expect(tools.map((tool) => tool.id)).toEqual([
@@ -147,22 +141,6 @@ describe('ToolRegistry.forTurn', () => {
     expect(turn.definitions).toEqual([]);
   });
 
-  it('leaves ask_pet off a turn that may not consult, and off a crew of one', () => {
-    const roundtable = new ToolRegistry(everything()).forTurn(fakeTurn({ allowConsult: false }));
-    expect(roundtable.tools.map((tool) => tool.id)).not.toContain('ask_pet');
-
-    const alone = new ToolRegistry(
-      everything({
-        consult: {
-          pets: () => [FAKE_TURN_PET],
-          provider: () => new FakeBrainProvider({ text: 'ok' }),
-          settings: () => Settings.parse({}),
-        },
-      }),
-    ).forTurn(fakeTurn());
-    expect(alone.tools.map((tool) => tool.id)).not.toContain('ask_pet');
-  });
-
   it('dispatches by name with the turn as context', async () => {
     const memory = fakeMemory();
     const turn = new ToolRegistry({ memory }).forTurn(fakeTurn());
@@ -187,27 +165,24 @@ describe('ToolRegistry.forTurn', () => {
 
 describe('toolsFor', () => {
   const ids = (pet: Pet): string[] =>
-    new ToolRegistry(everything()).forTurn(fakeTurn({ pet })).tools.map((tool) => tool.id);
-
-  it('hands a generalist every tool, since its role lists all thirteen', () => {
-    const tools = new ToolRegistry(everything()).forTurn(fakeTurn()).tools;
-    expect(toolsFor(FAKE_TURN_PET, tools)).toEqual(tools);
-  });
+    new ToolRegistry(everything({ toolsFor }))
+      .forTurn(fakeTurn({ pet }))
+      .tools.map((tool) => tool.id);
+  const companion = getRole('companion')!;
 
   it('gives a pet exactly the tools its role lists, in the registry order', () => {
-    const writer = getRole('writer')!;
-    expect(ids({ ...FAKE_TURN_PET, roleId: 'writer' })).toEqual(
-      ALL_THIRTEEN.filter((id) => writer.tools.includes(id)),
+    expect(ids({ ...FAKE_TURN_PET, roleId: 'companion' })).toEqual(
+      ALL_TOOLS.filter((id) => companion.tools.includes(id)),
     );
   });
 
   it('never offers or runs a tool outside the role', async () => {
     const memory = fakeMemory();
-    const turn = new ToolRegistry(everything({ memory })).forTurn(
-      fakeTurn({ pet: { ...FAKE_TURN_PET, roleId: 'writer' } }),
+    const turn = new ToolRegistry(everything({ memory, toolsFor })).forTurn(
+      fakeTurn({ pet: { ...FAKE_TURN_PET, roleId: 'companion' } }),
     );
     const offered = turn.definitions.map((definition) => definition.name);
-    for (const name of offered) expect(getRole('writer')!.tools).toContain(name);
+    for (const name of offered) expect(companion.tools).toContain(name);
     expect(offered).not.toContain('watch_for');
 
     const outcome = await turn.run({ name: 'watch_for', input: { condition: 'a build ends' } });
@@ -226,21 +201,24 @@ describe('toolsFor', () => {
   it("takes away a role's tool the pet's grants turn off", () => {
     const granted = ids({
       ...FAKE_TURN_PET,
-      roleId: 'backend-engineer',
-      toolGrants: { watch_for: 'off', remember: 'allowed' },
+      roleId: 'companion',
+      toolGrants: { remember: 'off', look_at_screen: 'allowed' },
     });
-    expect(granted).not.toContain('watch_for');
-    expect(granted).toContain('remember');
+    expect(granted).not.toContain('remember');
+    expect(granted).toContain('look_at_screen');
   });
 
   it('cannot grant a tool the role does not list', () => {
     expect(
-      ids({ ...FAKE_TURN_PET, roleId: 'writer', toolGrants: { watch_for: 'allowed' } }),
+      ids({ ...FAKE_TURN_PET, roleId: 'companion', toolGrants: { watch_for: 'allowed' } }),
     ).not.toContain('watch_for');
   });
 
-  it("gives a pet with a role the library does not have the generalist's tools", () => {
-    expect(ids({ ...FAKE_TURN_PET, roleId: 'astronaut' })).toEqual(ALL_THIRTEEN);
+  it("gives a pet with a role the library does not have the companion's tools", () => {
+    // A crew-era role, still on a pet saved before the crew went.
+    expect(ids({ ...FAKE_TURN_PET, roleId: 'writer' })).toEqual(
+      ids({ ...FAKE_TURN_PET, roleId: 'companion' }),
+    );
   });
 
   it('is the one place a turn is narrowed: what it drops is neither offered nor run', async () => {
@@ -252,7 +230,7 @@ describe('toolsFor', () => {
     const memory = fakeMemory();
     const turn = new ToolRegistry(everything({ memory, toolsFor: readOnly })).forTurn(fakeTurn());
 
-    expect(seen).toEqual([{ pet: FAKE_TURN_PET, ids: ALL_THIRTEEN }]);
+    expect(seen).toEqual([{ pet: FAKE_TURN_PET, ids: ALL_TOOLS }]);
     expect(turn.definitions.map((definition) => definition.name)).not.toContain('remember');
     expect(turn.definitions.map((definition) => definition.name)).not.toContain('watch_for');
 

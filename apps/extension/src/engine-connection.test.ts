@@ -15,8 +15,7 @@ const PET: Pet = {
   notes: 'A cheerful helper.',
   providerId: 'fake',
   model: 'fake-1',
-  roleId: 'generalist',
-  roleVersion: 1,
+  roleId: 'companion',
   toolGrants: {},
   replyStyle: 'text',
 };

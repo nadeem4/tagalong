@@ -25,18 +25,10 @@ describe('ActivityEntry', () => {
     expect(ActivityEntry.parse(turn)).toEqual(turn);
   });
 
-  it('takes a consult from one pet to another, still running', () => {
-    const consult = {
-      id: 'a2',
-      kind: 'consult',
-      state: 'running',
-      petId: 'scout',
-      toPetId: 'ink',
-      turnId: T1,
-      text: 'How would you word this?',
-      startedAt: '2026-10-07T10:00:01.000Z',
-    };
-    expect(ActivityEntry.parse(consult)).toEqual(consult);
+  it('refuses a crew-era kind: consults, handoffs and roundtables are gone', () => {
+    for (const kind of ['consult', 'handoff', 'roundtable']) {
+      expect(ActivityEntry.safeParse({ ...turn, kind }).success).toBe(false);
+    }
   });
 
   it('refuses a kind the engine does not record, such as a meeting', () => {

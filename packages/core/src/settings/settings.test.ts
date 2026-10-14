@@ -24,19 +24,38 @@ describe('SettingsStore.get', () => {
   });
 
   it('reads values written by a previous run', () => {
-    writeFileSync(file, JSON.stringify({ providerId: 'fake', enginePort: 50000 }), 'utf8');
+    writeFileSync(file, JSON.stringify({ userName: 'Ada', enginePort: 50000 }), 'utf8');
     const store = new SettingsStore(dataDir);
-    expect(store.get().providerId).toBe('fake');
+    expect(store.get().userName).toBe('Ada');
     expect(store.get().enginePort).toBe(50000);
-    expect(store.get().defaultModel).toBe(SETTINGS_DEFAULTS.defaultModel);
+    expect(store.get().historyMessages).toBe(SETTINGS_DEFAULTS.historyMessages);
+  });
+
+  it('loads a crew-era file, dropping the fields Tagalong no longer has', () => {
+    writeFileSync(
+      file,
+      JSON.stringify({
+        providerId: 'anthropic',
+        defaultModel: 'claude-opus-5',
+        defaultPetId: 'scout',
+        hiddenPets: ['ink', 'bolt'],
+        enginePort: 50000,
+      }),
+      'utf8',
+    );
+    const settings = new SettingsStore(dataDir).get();
+    expect(settings.enginePort).toBe(50000);
+    expect(settings.hiddenPets).toEqual(['ink', 'bolt']);
+    expect(settings).not.toHaveProperty('providerId');
+    expect(settings).not.toHaveProperty('defaultModel');
   });
 
   it('falls back to the last good copy when the file is malformed', () => {
     const store = new SettingsStore(dataDir);
-    store.set({ providerId: 'fake' });
+    store.set({ userName: 'Ada' });
     store.set({ enginePort: 50000 });
     writeFileSync(file, '{ not json', 'utf8');
-    expect(store.get().providerId).toBe('fake');
+    expect(store.get().userName).toBe('Ada');
   });
 
   it('falls back to the defaults when the file fails the schema and no backup exists', () => {
@@ -52,21 +71,21 @@ describe('SettingsStore.get', () => {
 
   it('keeps an invalid file aside before the next save replaces it', () => {
     writeFileSync(file, '{ not json', 'utf8');
-    new SettingsStore(dataDir).set({ providerId: 'fake' });
+    new SettingsStore(dataDir).set({ userName: 'Ada' });
     expect(readFileSync(`${file}.corrupt`, 'utf8')).toBe('{ not json');
-    expect(new SettingsStore(dataDir).get().providerId).toBe('fake');
+    expect(new SettingsStore(dataDir).get().userName).toBe('Ada');
   });
 });
 
 describe('SettingsStore.set', () => {
   it('merges a patch over current values and persists it', () => {
     const store = new SettingsStore(dataDir);
-    store.set({ providerId: 'fake' });
+    store.set({ userName: 'Ada' });
     store.set({ enginePort: 50000 });
 
     expect(new SettingsStore(dataDir).get()).toEqual({
       ...SETTINGS_DEFAULTS,
-      providerId: 'fake',
+      userName: 'Ada',
       enginePort: 50000,
     });
   });
@@ -79,12 +98,12 @@ describe('SettingsStore.set', () => {
   it('leaves omitted fields untouched', () => {
     const store = new SettingsStore(dataDir);
     store.set({ avatar: { x: 12, y: 34 } });
-    expect(store.set({ providerId: 'fake' }).avatar).toEqual({ x: 12, y: 34 });
+    expect(store.set({ userName: 'Ada' }).avatar).toEqual({ x: 12, y: 34 });
   });
 
   it('keeps the previous good file as a .bak and leaves no temp file', () => {
     const store = new SettingsStore(dataDir);
-    store.set({ providerId: 'fake' });
+    store.set({ userName: 'Ada' });
     store.set({ enginePort: 50000 });
     expect(JSON.parse(readFileSync(`${file}.bak`, 'utf8')).enginePort).toBe(
       SETTINGS_DEFAULTS.enginePort,
@@ -122,7 +141,7 @@ describe('InMemorySecretStore', () => {
     const secrets = new InMemorySecretStore();
 
     await secrets.set('anthropic.apiKey', 'sk-ant-supersecret');
-    store.set({ providerId: 'anthropic' });
+    store.set({ userName: 'Ada' });
 
     const onDisk = readFileSync(file, 'utf8');
     expect(onDisk).not.toContain('sk-ant-supersecret');

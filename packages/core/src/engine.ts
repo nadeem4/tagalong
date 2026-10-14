@@ -1,7 +1,7 @@
 import { guardBrain } from './providers/guard';
 import type { Database } from 'better-sqlite3';
 import { DEFAULT_ENGINE_PORT, RPC_ERROR_CODES, Settings } from '@tagalong/protocol';
-import type { Expert, Pet, Role } from '@tagalong/protocol';
+import type { Expert, Pet } from '@tagalong/protocol';
 import { openDatabase } from './memory/db';
 import { ActivityLog } from './memory/activity';
 import { ConversationStore } from './memory/store';
@@ -25,15 +25,11 @@ import type { BrainProvider } from './providers';
 import type { ProviderResolver } from './conversation/runner';
 import { ConversationRunner } from './conversation';
 import type { TurnEventSink } from './conversation/runner';
-import { parseCrewCommand } from './crew/commands';
-import { startHandoff } from './crew/handoff';
-import { startRoundtable } from './crew/roundtable';
 import { browserContextFor } from './perception';
 import type { PerceptionHost } from './perception';
 import { WatchManager, systemWatchClock } from './watch';
 import { KeepAnEye } from './keep-an-eye/keep-an-eye';
-import { dismissRolesNotice, rolesUpgradeNotice } from './pets/roles-notice';
-import { getRole, listRoles, recommendedModel } from './roles';
+import { getRole } from './roles';
 import { EngineServer, RpcFailure } from './server/ws-server';
 import {
   ClaudeCodeConnector,
@@ -117,23 +113,15 @@ function routinesOf(live: { routines?: Routines }): Routines {
   return live.routines;
 }
 
-/** The library role with this id, or an invalidParams refusal naming the id. */
-function knownRole(roleId: string): Role {
-  const role = getRole(roleId);
-  if (role === undefined) {
-    throw new RpcFailure(RPC_ERROR_CODES.invalidParams, `no role '${roleId}' in the role library`);
+/** A pet about to be saved, with its role checked: an unknown role is an invalidParams refusal. */
+function withRole(pet: Pet): Pet {
+  if (getRole(pet.roleId) === undefined) {
+    throw new RpcFailure(
+      RPC_ERROR_CODES.invalidParams,
+      `no role '${pet.roleId}' in the role library`,
+    );
   }
-  return role;
-}
-
-/**
- * A pet about to be saved, with its role checked. A new pet, or one moving to another role,
- * takes on that role's library version; an existing pet keeps the version it was sent with.
- */
-function withRole(pet: Pet, existing: Pet | null): Pet {
-  const role = knownRole(pet.roleId);
-  if (existing !== null && existing.roleId === pet.roleId) return pet;
-  return { ...pet, roleVersion: role.version };
+  return pet;
 }
 
 export interface EngineOptions {
@@ -340,10 +328,6 @@ export class Engine {
       memory,
       // Off the request path: the reply is already on screen when the summary starts.
       afterTurn: ({ pet, conversationId }) => void summarizer.schedule(conversationId, pet),
-      consult: {
-        pets: () => pets.list(),
-        answered: (turnId, toPetId, outcome) => activity.consultAnswered(turnId, toPetId, outcome),
-      },
       watch: { manager: watches, hosts },
       // Read per turn: experts are added and switched off while the app runs.
       experts: {
@@ -428,11 +412,8 @@ export class Engine {
     live.routines = routines;
 
     const handlers = buildHandlers({
-      db,
       activity,
       runner,
-      store,
-      emit,
       pets,
       settings,
       hosts,
@@ -517,12 +498,8 @@ export class Engine {
 }
 
 function buildHandlers(parts: {
-  /** For the one-time notices; everything else reaches it through its own store. */
-  db: Database;
   activity: ActivityLog;
   runner: ConversationRunner;
-  store: ConversationStore;
-  emit: TurnEventSink;
   pets: PetRegistry;
   settings: SettingsStore;
   /** Lazy, like the toolset's: the extension connects and drops while the app runs. */
@@ -544,7 +521,7 @@ function buildHandlers(parts: {
   /** Re-reads provider keys, so a key saved since the last ask is used by this one. */
   refreshProviders: () => Promise<void>;
 }): MethodHandlers {
-  const { db, activity, runner, store, emit, pets, settings, models, hosts, watches } = parts;
+  const { activity, runner, pets, settings, models, hosts, watches } = parts;
   const { refreshProviders, experts, routes, handoffs, projects, connectorFor, resolve } = parts;
   const { keepAnEye, connections, approvals, routines } = parts;
   /** A manager refusal (an id taken, none such) as an invalidParams error the host shows. */
@@ -567,32 +544,10 @@ function buildHandlers(parts: {
         hosts: hosts(),
         exclusions: settings.get().captureExclusions,
       });
-      // Phase 3 transcribes params.input.audio; Phase 1 is text only.
-      const command = parseCrewCommand(params.input.text ?? '', pets.list(), pet.id);
-      if (command.kind === 'handoff') {
-        const handle = startHandoff(
-          { runner, store, emit },
-          {
-            from: pet,
-            to: command.target,
-            conversationId: params.conversationId,
-            request: command.request,
-            snapshot,
-          },
-        );
-        return { turnId: handle.turnId };
-      }
-      if (command.kind === 'roundtable') {
-        // The whole crew, the asked pet first; the run reports itself through crew.status.
-        const run = startRoundtable(
-          { runner, emit },
-          { starter: pet, pets: pets.list(), question: command.question, snapshot },
-        );
-        return { turnId: run.firstTurnId };
-      }
+      // Talk to Scout transcribes in the host; an ask arrives as text.
       const handle = runner.run({
         pet,
-        text: command.text,
+        text: params.input.text ?? '',
         conversationId: params.conversationId,
         snapshot,
         spoken: params.spoken,
@@ -604,23 +559,12 @@ function buildHandlers(parts: {
     interrupt: (params) => ({ aborted: runner.interrupt(params.turnId) }),
 
     'pets.list': () => ({ pets: pets.list() }),
-    'pets.upsert': (params) => ({
-      pet: pets.upsert(withRole(params.pet, pets.get(params.pet.id))),
-    }),
-    'pets.delete': (params) => ({ deleted: pets.delete(params.petId) }),
+    'pets.upsert': (params) => ({ pet: pets.upsert(withRole(params.pet)) }),
 
     'settings.get': () => ({ settings: settings.get() }),
     'settings.set': (params) => ({ settings: settings.set(params.patch) }),
     'models.list': (params) => models(params.providerId),
     'watch.stop': (params) => ({ stopped: watches.stop(params.watchId) }),
-
-    'roles.list': () => ({ roles: [...listRoles()] }),
-    'roles.recommendModel': (params) =>
-      recommendedModel(knownRole(params.roleId), params.providerId) ?? {},
-
-    'notices.rolesUpgrade': () => ({ notice: rolesUpgradeNotice(db) }),
-    // `rolesUpgrade` is the only notice so far; the params schema refuses any other name.
-    'notices.dismiss': () => ({ dismissed: dismissRolesNotice(db) }),
 
     'activity.list': (params) => activity.list(params),
 

@@ -1,57 +1,43 @@
-# Roles, directory and tools
+# Roles and tools
 
-**Status: partly built** for Phase 8 (Roles). The role files, the generated role library, the tier
-table and its lookup helpers, [the tools module](#the-tools-module), giving a pet a role, the
-directory, filtering a turn's tools by role and grants, [roles over RPC](#roles-over-rpc), the
-office's job labels, and picking a role, the recommended model, the tool switches and the directory
-card preview, now in each agent's controls in Home (see [Home](../architecture.md#home)),
-[the one-time roles notice](#the-roles-notice) for upgraded installs and
-[roles in the setup wizard](#roles-in-the-setup-wizard) are **built**. The design page with the full
-task list lives in the Notion plan.
+**Status: built.** The role file, the generated role library, the tier table and its lookup
+helpers, giving a pet a role, filtering a turn's tools by role and grants, and
+[the tools module](#the-tools-module).
 
-## Roles
+The crew-era roles (Generalist, Backend engineer, Frontend engineer, Writer, Researcher), the
+`ask_pet` tool and its teammate directory, the `roles.list` and `roles.recommendModel` methods, the
+office's job labels and the one-time roles notice were removed with the crew.
 
-Every pet has exactly one role. A user who wants more roles creates more pets. Tagalong ships the
-roles; custom roles are parked for later, and the file format already allows them.
+## The role
 
-The first six:
-
-| Role              | Good at                                     | Recommended brain       |
-| ----------------- | ------------------------------------------- | ----------------------- |
-| Generalist        | Explaining, summarising, answering anything | Balanced                |
-| Backend engineer  | APIs, databases, stack traces, CI           | Deep                    |
-| Frontend engineer | UI code, CSS, browser bugs, accessibility   | Balanced, sees pictures |
-| Writer            | Emails, docs, rewrites, release notes       | Balanced                |
-| Researcher        | Reading pages and papers, comparing sources | Deep                    |
-| Companion         | Working out what you need, briefing experts | Fast                    |
-
-The Companion never does the work itself. Its tools are only the ones that look (screen, selection,
-windows), `remember`, `hand_to_expert`, which writes a brief and hands it to an expert such as
-Claude Code, the tools of the person's connected apps (`connections`), whose changes always ask
-first, and `create_routine` and `change_routine`, which show a routine card the person saves; it has no `ask_pet` and nothing that writes files or runs code. Its own figure and
-bubble show up in its screenshots, so its instructions tell it to look past them and never mention
-itself or Tagalong unless asked.
+Tagalong ships one role, the **Companion**, and one pet, Scout, works as it. The Companion never does
+the work itself. Its tools are only the ones that look (screen, selection, windows), `remember`,
+`hand_to_expert`, which writes a brief and hands it to an expert such as Claude Code, the tools of
+the person's connected apps (`connections`), whose changes always ask first, and `create_routine`
+and `change_routine`, which show a routine card the person saves; it has nothing that writes files or
+runs code. Its own figure and bubble show up in its screenshots, so its instructions tell it to look
+past them and never mention itself or Tagalong unless asked.
 
 ### The role file
 
-**Built.** One Markdown file per role in `packages/core/roles/`. The YAML header is data; the body is the
-role's instructions.
+One Markdown file per role in `packages/core/roles/` (today only `companion.md`). The YAML header is
+data; the body is the role's instructions.
 
 ```markdown
 ---
-id: backend-engineer
-name: Backend engineer
+id: companion
+name: Companion
 version: 1
-summary: Fixes servers, databases and broken builds.
-good_at: [APIs, databases, stack traces, CI pipelines]
-not_for: [visual design, marketing copy]
-tools: [look_at_screen, get_selection, read_window_text, list_windows, watch_for, remember, ask_pet]
+summary: Sees what you are doing, briefs the right expert, and brings the answer back.
+good_at: [working out what you need, writing a clear brief, picking the right expert]
+not_for: [doing the work itself]
+tools: [look_at_screen, get_selection, list_windows, read_window_text, look_at_window, remember]
 model:
-  tier: deep # fast | balanced | deep
+  tier: fast # fast | balanced | deep
   needs_vision: false
 ---
 
-You are a backend engineer. Read the error first, name the cause in one line, then show the fix.
+You are a companion: you sit beside the person's work, ...
 ```
 
 A script compiles the files into `packages/core/src/roles/library.generated.ts`, which is
@@ -65,177 +51,59 @@ The script is `packages/core/scripts/gen-roles.mjs`. After editing a role file, 
 camelCase (`good_at` becomes `goodAt`, `model.needs_vision` becomes `model.needsVision`) and the
 body becomes `instructions`.
 
-`packages/core/src/roles/` reads the library: `listRoles()`, `getRole(id)` (undefined for an
-unknown id), `roleFor(id)` (the generalist for an unknown id) and
-`recommendedModel(role, providerId)`. `listRoles`, `getRole` and `recommendedModel` are exported from
-`@tagalong/core` for hosts.
-
-### Roles over RPC
-
-**Built.** Two host-to-core methods put the library on the wire, so a host never bundles it:
-
-| Method                 | Params                   | Result                                             |
-| ---------------------- | ------------------------ | -------------------------------------------------- |
-| `roles.list`           | `{}`                     | `{ roles: Role[] }`, the whole library             |
-| `roles.recommendModel` | `{ roleId, providerId }` | `{ model?, visionModel? }` from `recommendedModel` |
-
-`roles.recommendModel` answers `{}` for a provider with no tier table, such as `fake`, and refuses an
-unknown role with RPC error `-32602` (invalid params). `pets.upsert` refuses a pet whose `roleId` is
-not in the library the same way, and saves nothing. A new pet, or one whose role changed, is saved
-with that role's library `version` as its `roleVersion`; an existing pet keeping its role keeps the
-`roleVersion` it was sent with.
-
-The `HostBridge` in `@tagalong/ui` carries both as `listRoles()` and
-`recommendModel(roleId, providerId)`. The desktop wires them through IPC and the preload like
-`listPets`; the extension relays them over its port like any other engine call; the fake bridge
-takes `roles` and a `recommend` function.
-
-### Job labels in the office
-
-**Built.** Home's agent list labels each pet with its role's name in capitals, looked up in
-`listRoles()` by `pet.roleId`; a pet whose role is not in the library reads `GENERALIST`, as it
-works. Each label's colour comes from `officeTokens.roleInk`, keyed by role id (generalist teal,
-writer violet, backend engineer amber, frontend engineer pink, researcher green), so two pets with
-the same role share a colour whatever their ids. A role with no ink of its own uses the muted text
-colour.
+`packages/core/src/roles/` reads the library: `getRole(id)` (undefined for an unknown id),
+`roleFor(id)` (the companion for an unknown id, such as a crew-era `writer`) and
+`recommendedModel(role, providerId)`. `getRole` and `recommendedModel` are exported from
+`@tagalong/core` for hosts; Welcome uses them to move Scout to a provider on the right model.
+`pets.upsert` refuses a pet whose `roleId` is not in the library with RPC error `-32602`.
 
 ### What the role decides
 
-**Built.** A pet's role sets two things on every turn:
+A pet's role sets two things on every turn:
 
 - **Its instructions.** The system prompt is the base rules, then the role's `instructions`, then
   `Your name is <name>.`, then the pet's `notes` under the heading "The user's notes for you" when
-  there are any, then the reply-style rule and the recalled memories as before.
+  there are any, then the reply-style rule and the recalled memories.
 - **Its tools.** `toolsFor` gives the pet exactly the tools its role lists, minus any its
   `toolGrants` set to `off`. A grant cannot add a tool the role does not list.
 
-A pet whose `roleId` is not in the library works as a generalist, for both.
-
-## The directory: how pets know who can do what
-
-**Built**, except the last three card fields, which are still design.
-
-Like colleagues reading a team directory, each pet sees a card for every teammate it can reach. The
-cards are one line each in the `ask_pet` tool's description, after the pet's id (what `petId`
-takes):
-
-| Card field       | Comes from                                       | Status |
-| ---------------- | ------------------------------------------------ | ------ |
-| Name             | The pet                                          | Built  |
-| Role and summary | The role file                                    | Built  |
-| Good at, not for | The role file                                    | Built  |
-| Can reach        | The pet's granted tools                          | Design |
-| Sees pictures    | The pet's model                                  | Design |
-| Brain            | The pet's model: fast, balanced, deep, or custom | Design |
-
-A pet's notes and memories are never on its card.
-
-To decide who to ask, a pet is told, in one short paragraph of the same description, to apply in
-order:
-
-1. **Access first.** Only a pet with the tool the job needs can do it.
-2. **Best role match** among those.
-3. **Two parts, two people.** A task needing two roles is a meeting with both.
-4. **Tie-break** on the cheaper brain.
-5. **No one fits:** say so rather than ask the wrong pet.
+A pet whose `roleId` is not in the library works as the companion, for both.
 
 ## Model per pet
 
-The model is a pet setting, not a role setting: two Backend engineers can run on different
-providers. The role only recommends.
+The model is a pet setting, not a role setting. The role only recommends: it names a `tier` (fast,
+balanced, deep) and whether it needs pictures, and a table in `packages/core/src/roles/tiers.ts` maps
+tiers to models for each provider, read by `recommendedModel(role, providerId)`:
 
-- Each role names a `tier` (fast, balanced, deep) and whether it needs pictures.
-- **Built:** a table in `packages/core/src/roles/tiers.ts` maps tiers to models for each provider,
-  and `recommendedModel(role, providerId)` reads it:
+| Provider    | Fast                             | Balanced                            | Deep                                |
+| ----------- | -------------------------------- | ----------------------------------- | ----------------------------------- |
+| OpenRouter  | `anthropic/claude-haiku-4.5`     | `anthropic/claude-sonnet-5`         | `anthropic/claude-opus-5`           |
+| Anthropic   | `claude-haiku-4-5`               | `claude-sonnet-5`                   | `claude-opus-5`                     |
+| Claude Code | `haiku`                          | `sonnet`                            | `opus`                              |
+| Nebius      | `nvidia/nemotron-3-nano-30b-a3b` | `nvidia/nemotron-3-super-120b-a12b` | `nvidia/nemotron-3-super-120b-a12b` |
 
-  | Provider   | Fast                             | Balanced                            | Deep                                |
-  | ---------- | -------------------------------- | ----------------------------------- | ----------------------------------- |
-  | OpenRouter | `anthropic/claude-haiku-4.5`     | `anthropic/claude-sonnet-5`         | `anthropic/claude-opus-5`           |
-  | Anthropic  | `claude-haiku-4-5`               | `claude-sonnet-5`                   | `claude-opus-5`                     |
-  | Nebius     | `nvidia/nemotron-3-nano-30b-a3b` | `nvidia/nemotron-3-super-120b-a12b` | `nvidia/nemotron-3-super-120b-a12b` |
-
-  On Nebius, a role that needs pictures also gets `nvidia/Nemotron-Nano-V2-12b` as its vision
-  model, because the tier model cannot see. OpenRouter and Anthropic models see on their own.
-
-- **Built:** `roles.recommendModel` answers that lookup over RPC, so a form can prefill the model.
-- **Built:** Home's agent controls show each pet's model as **Recommended** when it is the one that lookup gives
-  for the pet's role and provider, and **Your choice** otherwise. **Use recommended** sets the
-  recommended model and its vision model (clearing the vision model when the recommendation needs
-  none). The user can still type or pick any model on the provider's live list.
-- **Built:** the setup wizard prefills each pet's recommended model when it moves to a provider (see
-  [Roles in the setup wizard](#roles-in-the-setup-wizard)).
-- Design from here on. Prefilling the recommended model when a pet is added, and setting a vision
-  model automatically when the role needs pictures and the chosen model cannot see.
+On Nebius, a role that needs pictures also gets `nvidia/Nemotron-Nano-V2-12b` as its vision model,
+because the tier model cannot see.
 
 ## What a pet stores
 
-**Built.** The pet is stored as JSON in the `pets` table of `tagalong.db`, validated by the `Pet`
-schema in `packages/protocol/src/pet.ts`:
+The pet is stored as JSON in the `pets` table of `tagalong.db`, validated by the `Pet` schema in
+`packages/protocol/src/pet.ts`: `id`, `name`, `avatar`, `color`, `roleId`, `notes`, `providerId`,
+`model`, `visionModel`, `watchModel`, `toolGrants` (tool id → `off` or `allowed`; the default `{}`
+allows every tool the role lists) and `replyStyle`. The schema drops keys it does not know, so a pet
+stored by an older version still parses: `persona` and `toolAllowlist` from before roles, and
+`roleVersion` and `voiceId` from the crew.
 
-| Field                                              | Change in Phase 8                                                                    |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `roleId`, `roleVersion`                            | New                                                                                  |
-| `toolGrants`                                       | New: tool id → `off` or `allowed`; the default `{}` allows every tool the role lists |
-| `toolAllowlist`                                    | Removed: never read                                                                  |
-| `persona`                                          | Becomes optional `notes`; a persona the user edited is kept as notes                 |
-| `name`, `avatar`, `color`                          | Unchanged                                                                            |
-| `providerId`, `model`, `visionModel`, `watchModel` | Unchanged                                                                            |
-
-A fresh install has one pet, Scout, as the Companion, with no notes. (Before the one-companion
-design the crew also had Ink, a Writer, and Bolt, a Backend engineer; migration 11 removes them.) Home's agent controls edit the notes as "Notes (optional, private)"; a new pet starts as a
-Generalist.
-
-Database migration 5 (`packages/core/src/pets/roles-upgrade.ts`) upgrades pets stored before roles.
-For every pet without a `roleId` it:
-
-- gives Scout, Ink and Bolt (by id) their roles above, and any other pet the Generalist role;
-- sets `roleVersion` from the role library and `toolGrants` to `{}`;
-- drops `toolAllowlist`;
-- moves `persona` to `notes`, unless it is blank or is that default pet's shipped persona unchanged.
-  A pet the user created always keeps a non-blank persona as notes.
-
-A stored pet that still carries a `persona` or `toolAllowlist` key parses: the schema drops keys it
-does not know.
+A fresh install has one pet, Scout, as the Companion, with no notes. Database migration 5
+(`packages/core/src/pets/roles-upgrade.ts`) gave pets stored before roles a role id and moved an
+edited `persona` to `notes`; migration 11 removed Ink and Bolt; migration 14 drops the roles notice's
+table.
 
 Logins and API keys stay encrypted in `secrets.json`, never in the pet.
 
-### The roles notice
-
-**Built.** An install upgraded to roles is told once what changed, over Home.
-
-- **What is recorded.** Database migration 6 (`packages/core/src/pets/roles-notice.ts`) runs in the
-  same `migrate` call as migration 5 and records, in a `notices` table, one row per stored pet:
-  `{ petId, name, roleId, keptNotes, madeByYou }`. `keptNotes` is true when migration 5 kept the
-  persona as notes; `madeByYou` is true for any pet that is not Scout, Ink or Bolt. A fresh install has
-  no pets while the migrations run (the crew is seeded after), so it records nothing and never sees the
-  notice. Migration 5 itself was left as shipped, because it had already run on existing databases.
-- **Over RPC.** `notices.rolesUpgrade` (`{}` → `{ notice: { pets } | null }`) answers the notice while
-  it is unseen; `notices.dismiss` (`{ notice: 'rolesUpgrade' }` → `{ dismissed }`) marks it seen for
-  good. The `HostBridge` carries them as `rolesNotice()` and `dismissRolesNotice()`; the desktop wires
-  them through IPC and the preload, the extension relays them over its port, and the fake bridge takes
-  a `rolesNotice` option.
-- **Where it shows.** At launch the desktop opens Home when a notice is pending, and Home
-  shows it as a modal dialog: "Your crew has roles now", one sentence, a row per pet (sprite,
-  name, arrow, the role in its ink, and "Default persona replaced by the role", "Your edited persona is
-  kept as notes" or, for a pet the user made, "Your persona is kept as notes; pick a better role any
-  time"), a **What changed?** disclosure, **Review my crew** (opens the first agent's controls in Home) and **Got it**. Either
-  button, or Escape, dismisses it.
-
-### Roles in the setup wizard
-
-**Built.** The wizard's **Meet your crew** step shows each pet's role: its name in the role's ink and
-its summary. When the provider step is left, the wizard asks `roles.recommendModel` for each pet's role
-on every keyed provider. A pet moving to a provider starts on its role's recommended model, with a
-**Recommended** chip that goes away once the model is edited; the model stays editable, with the
-provider's live list beside it. A pet already on a provider with a key keeps its model, so a rerun of
-the wizard does not undo a choice made in Settings. There is no hiring step: the wizard keeps its seven
-steps.
-
 ## The tools module
 
-**Status: built**, with roles and grants filtering each turn's tools.
-
-All 13 built-in tools live in one module, in one shape, and reach a turn one way:
+All built-in tools live in one module, in one shape, and reach a turn one way:
 
 ```text
 packages/core/src/tools/
@@ -248,25 +116,27 @@ packages/core/src/tools/
     perception.ts  look_at_screen, get_selection, list_displays, look_at_display,
                    look_closer, list_windows, read_window_text, look_at_window
     awareness.ts   recall_screen, what_changed, watch_for
-    crew.ts        remember, ask_pet
+    memory.ts      remember
     experts.ts     hand_to_expert
     connections.ts <connection>__<tool>: every tool of the person's connected apps
     routines.ts    create_routine, change_routine
 ```
 
+The companion's role lists only some of them; `list_displays`, `look_at_display`, `look_closer`,
+`recall_screen`, `what_changed` and `watch_for` are built but no shipped role offers them.
+
 - **Kind.** A tool is `write` when it leaves stored state behind after the turn: `remember` files a
   memory, `watch_for` starts a watch, `hand_to_expert` starts a hand-off and remembers which expert
   took that kind of task, and `create_routine` and `change_routine` lead to a saved routine once the
-  person presses Save. The other eleven are `read`; `ask_pet` costs a model call but stores nothing.
+  person presses Save. The rest are `read`.
 - **Context.** Every tool runs with the turn's pet, turn id, abort signal, snapshot, whether the
-  pet's brain can see, a counter for nested model calls, and, on a routine's turn, the routine
-  (`ToolContext.routine`): the expert its card allowed and where a hand-off reports.
+  pet's brain can see, and, on a routine's turn, the routine (`ToolContext.routine`): the expert its
+  card allowed and where a hand-off reports.
 - **Which tools a turn gets.** The registry builds what the engine is wired for, in a fixed order,
-  and returns none when the pet's provider cannot call tools. `ask_pet` is left off roundtable
-  turns and off a crew of one. `hand_to_expert` is built only when an expert is switched on, and
-  lists every such expert and what it is good at in its description. The routine tools are left off
-  a routine's own turn, and `change_routine` is built only when a routine is saved. An unknown name
-  is refused by name.
+  and returns none when the pet's provider cannot call tools. `hand_to_expert` is built only when an
+  expert is switched on, and lists every such expert and what it is good at in its description. The
+  routine tools are left off a routine's own turn, and `change_routine` is built only when a routine
+  is saved. An unknown name is refused by name.
 - **`toolsFor(pet, tools)`** is the single place a turn's tools are narrowed: the tools the pet's
   role lists, minus any its grants turn off (see [What the role decides](#what-the-role-decides)).
   A role can list a group instead of single tools: `connections` gives it every tool of the
@@ -279,6 +149,3 @@ The runner asks the registry for a turn's tools and dispatches through it. An ES
 `conversation/` and `engine.ts` importing tools only from `tools/registry` or the `tools` index,
 never from `tools/builtin/*`. To add a built-in, follow the repo skill
 `.claude/skills/tagalong-add-tool/SKILL.md`.
-
-Tools that need a login (GitHub, Notion and others) come from Home, Connections: the person
-connects an app once, and the Companion gets its tools. Reads run at once; every change asks first.

@@ -52,10 +52,9 @@ which is what makes the isolation rules in [context-isolation.md](context-isolat
 A turn contains, in order:
 
 1. The pet's role instructions, its name, and its notes (see [roles-and-tools.md](roles-and-tools.md)).
-2. The teammate directory: the pets this pet can reach, in the `ask_pet` tool's description.
-3. Recalled memories, within a budget (below).
-4. The thread: the last `historyMessages` messages of this conversation or meeting.
-5. The context the user attached: selection, window, screenshot, page text.
+2. Recalled memories, within a budget (below).
+3. The thread: the last `historyMessages` messages of this conversation.
+4. The context the user attached: selection, window, screenshot, page text.
 
 Screen memory is never placed in a prompt automatically. A pet reaches it only by calling
 `recall_screen` or `what_changed`, which the user can see in the panel.

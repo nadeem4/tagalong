@@ -1,7 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
-import { recordRolesNotice } from '../pets/roles-notice';
 import { upgradePetsToRoles } from '../pets/roles-upgrade';
 
 /** The SQLite file a host finds in its data dir. */
@@ -56,8 +55,9 @@ const MIGRATIONS: readonly Migration[] = [
   `ALTER TABLE messages ADD COLUMN summarized_at TEXT;`,
   // Phase 8. Every stored pet gets a role; an edited persona becomes the pet's notes.
   upgradePetsToRoles,
-  // Phase 8. Records what migration 5 did, for the one-time "Your crew has roles now" notice.
-  recordRolesNotice,
+  // Phase 8. Recorded what migration 5 did, for a one-time notice that went with the crew.
+  // Now does nothing; kept so every later migration keeps its number.
+  () => undefined,
   // Home. What the crew did — turns, consults, handoffs, roundtables — for the activity
   // view. Written by ActivityLog; rowid orders the rows, newest last. IF NOT EXISTS so a
   // database rolled back past it (the roles tests rewind to version 4) migrates again.
@@ -102,6 +102,8 @@ const MIGRATIONS: readonly Migration[] = [
   `DELETE FROM pets WHERE id IN ('ink', 'bolt')`,
   addConnections,
   addRoutines,
+  // The roles notice went with the crew; an install that had one drops its table.
+  `DROP TABLE IF EXISTS notices`,
 ];
 
 /** The columns migration 7 gave `activity`, in order. */

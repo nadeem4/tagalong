@@ -55,7 +55,7 @@ extension.
 `packages/core` is the engine. It is pure Node, with no Electron, React or DOM, and both the
 desktop app and the Chrome extension run on it. It holds:
 
-- the companion and its pets, and the role library they are built from;
+- the companion, Scout, and the role it works as;
 - the conversation runner, which assembles each prompt, calls the model and runs tools;
 - memory: conversations, long-term memories and summaries, in SQLite;
 - providers: Claude Code sign-in, Anthropic, OpenRouter, Nebius Token Factory and any
@@ -237,8 +237,9 @@ Whisper model downloaded the first time (about 80 MB); the recording is never se
 
 **Memory.** Tell Scout "I prefer short answers" and it remembers across restarts.
 
-Earlier versions shipped a crew of three (Scout, Ink and Bolt). Ink and Bolt are removed on
-upgrade, and their conversations stay on disk.
+Earlier versions shipped a crew of three (Scout, Ink and Bolt) with hand-offs between pets and
+roundtables. The crew is gone: Ink and Bolt are removed on upgrade, their conversations stay on disk,
+and Scout hands work to experts instead.
 
 ## Hotkeys
 
