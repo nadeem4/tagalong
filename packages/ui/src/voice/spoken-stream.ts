@@ -5,16 +5,19 @@ const FENCE = '```';
 /** The end of a sentence that is surely over: its mark and a space after it, or a line break. */
 const SENTENCE_END = /[.!?]+["')\]’”]*\s|\n/;
 
-/** A line that is a list item or a table row, judged from its start. */
-const LIST_LINE = /^[ \t]*(?:(?:[-*+•]|\d+[.)])\s|\|)/;
+/**
+ * A line that is a list item, a table row or a quote, judged from its start. A quote holds a
+ * translation into another language, which the English voice would mangle.
+ */
+const LIST_LINE = /^[ \t]*(?:(?:[-*+•]|\d+[.)])\s|\||>)/;
 
 /** A line start that could still turn out to be a list marker once more arrives. */
 const MAYBE_LIST = /^[ \t]*(?:[-*+•]|\d+[.)]?)?$/;
 
 /**
  * A spoken answer, said sentence by sentence while it streams: the first complete sentence
- * goes to the voice at once rather than after the whole reply. Code blocks and list lines
- * are left to the bubble, whole: a list item is judged by how its line starts, so none of
+ * goes to the voice at once rather than after the whole reply. Code blocks, list lines and
+ * quoted (`>`) lines are left to the bubble, whole: a list item is judged by how its line starts, so none of
  * its sentences is read. Markdown is stripped from the rest.
  */
 export class SpokenStream {

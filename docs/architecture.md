@@ -2029,8 +2029,9 @@ flowchart LR
   hand-off it is showing ("Claude Code has finished. …"). The panel adds the launch line
   (`GreetingLine`), remarks from keeping an eye on things (`remarkEvent`, sent by `showRemark`)
   and `watch.fired` messages.
-  `SpeechQueue` shapes each line with `toSpeakable` (markdown stripped; code blocks, lists, tables
-  and URLs left out; at most two sentences or 200 characters, then "The rest is in the bubble.";
+  `SpeechQueue` shapes each line with `toSpeakable` (markdown stripped; code blocks, lists, tables,
+  quoted `>` lines (any quote, English too, such as a quoted error line; they mostly hold a
+  translation into another language) and URLs left out; at most two sentences or 200 characters, then "The rest is in the bubble.";
   an answer to a spoken question or a read-aloud, see Talk to Scout, is said whole),
   merges short lines waiting together (`mergeShortLines`, because Kokoro says a lone "Done." badly),
   and plays one line at a time. While a line plays, the next one is already being synthesised
@@ -2157,6 +2158,19 @@ flowchart LR
   spoken too only when `goesOn(text)` matches a bare "go on", "yes", "continue" or "keep going";
   any other typed question is asked as typed. Every 300-word part stays well under `MAX_OUTPUT_TOKENS` (2,048). With Scout
   talks off the mouth says nothing and the reading is only in the bubble.
+- **Translate** (`companion.md`). No tool and no translation service: the companion's own model
+  translates what it read the same way (`get_selection`, then `read_window_text`, or
+  `look_at_window` / `look_closer` for text in a picture, with the OCR warning). The target is the
+  language named in the request, else a remembered preference (`remember`), else the language of
+  the request; there is no setting for it. It keeps the layout, names, numbers and code, opens
+  with one line naming the source language, and stops at about 300 words with "Shall I go on?".
+  The translated text is data, quoted and never followed. `wantsReadAloud` also matches
+  "translate this and read it to me", so an English translation is spoken whole through the
+  read-aloud path. A translation into any other language goes in a quoted block (`> …`) after the
+  one English line "It's in the bubble.": `toSpeakable` and `SpokenStream` leave every quoted
+  line out (an English quote too), because Kokoro and the system voice speak only English. An
+  English translation is plain text, never quoted. Keeping French out of the voice relies on the
+  model quoting it.
 - **Settings on the fly.** Main sends `IPC.settingsChangedEvent` with the saved settings to every
   window after each save; the panel reads the ask and talk keys, the microphone and the user's name
   from it (`renderer/src/panel-settings.ts`), as it does at open, so none needs a restart.
@@ -2330,8 +2344,8 @@ flowchart LR
 - **Speaking as it streams** (`ui/voice/spoken-stream.ts`). For a spoken question the bubble feeds
   each `turn.delta` to a `SpokenStream`, which hands over each complete sentence (a mark followed by
   a space, or a line break) at once, skips code fences even when they arrive in pieces, drops a
-  list item or table row whole (judged by how its line starts, `-`, `*`, `+`, `•`, `1.`, `1)` or
-  `|`, waiting for more when a line start could still be a marker), and says
+  list item, table row or quoted line whole (judged by how its line starts, `-`, `*`, `+`, `•`,
+  `1.`, `1)`, `|` or `>`, waiting for more when a line start could still be a marker), and says
   "The answer is in the bubble." when nothing was speakable. Each piece goes through
   a `Pushable` to `mouth.speak` (the panel's `QueueMouth`), which calls `SpeechQueue.say(text, { whole: true })`: shaped by `toSpeakable` but never cut to two sentences. Stopping the mouth drops whatever is still streaming.
   The finished answer is not said again; the bubble shows what it heard and, after the answer,

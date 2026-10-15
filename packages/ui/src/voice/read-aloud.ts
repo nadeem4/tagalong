@@ -1,10 +1,11 @@
 /**
- * A request that starts with "read" or "say" (after "Scout,", "can you" or "please") and ends
- * within a few words in "aloud", "to me" or "out loud": "read this to me", not "read the logs
- * and explain the error to me".
+ * A request that starts with "read" or "say" (after "Scout,", "can you" or "please"), or with
+ * "translate this and read", and ends within a few words in "aloud", "to me" or "out loud":
+ * "read this to me" or "translate it and read it to me", not "read the logs and explain the
+ * error to me".
  */
 const READ_ALOUD =
-  /^(?:(?:hey\s+)?scout\W*\s*)?(?:(?:can|could|would|will)\s+you\s+)?(?:please\s+)?(?:read|say)\b(?:\s+(?!and\b|then\b)[\w'’-]+){0,4}?\s+(?:aloud|to me|out loud)(?:\s+please)?\W*$/i;
+  /^(?:(?:hey\s+)?scout\W*\s*)?(?:(?:can|could|would|will)\s+you\s+)?(?:please\s+)?(?:translate\b(?:\s+(?!and\b|then\b)[\w'’-]+){0,4}?\s+and\s+(?:then\s+)?)?(?:read|say)\b(?:\s+(?!and\b|then\b)[\w'’-]+){0,4}?\s+(?:aloud|to me|out loud)(?:\s+please)?\W*$/i;
 
 /** A short "go on" in reply to "Shall I go on?": nothing else rides along with it. */
 const GOES_ON = /^(?:please\s+)?(?:go on|yes|continue|keep going)(?:\W+please)?\W*$/i;
