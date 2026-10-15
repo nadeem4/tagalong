@@ -31,6 +31,7 @@ import { browserContextFor } from './perception';
 import type { PerceptionHost } from './perception';
 import { WatchManager, systemWatchClock } from './watch';
 import { KeepAnEye } from './keep-an-eye/keep-an-eye';
+import { moodForHandoff } from './keep-an-eye/mood';
 import { getRole } from './roles';
 import { EngineServer, RpcFailure } from './server/ws-server';
 import {
@@ -294,7 +295,13 @@ export class Engine {
       connectorFor,
       emit: (event) => {
         live.server?.broadcast(event.method, event.params);
-        if (event.method === 'handoff.finished') live.routines?.handoffFinished(event.params);
+        if (event.method !== 'handoff.finished') return;
+        live.routines?.handoffFinished(event.params);
+        // A wince at an error, a cheer when tests pass; a plain finish keeps the done face.
+        const mood = moodForHandoff(event.params);
+        if (mood !== null) {
+          live.server?.broadcast('pet.mood', { petId: settings.get().defaultPetId, mood });
+        }
       },
       projects,
     });

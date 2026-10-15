@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Expert, Settings } from '@tagalong/protocol';
-import type { Brief, Pet, PetRemarkParams, WindowEntry } from '@tagalong/protocol';
+import type { Brief, Pet, PetMoodParams, PetRemarkParams, WindowEntry } from '@tagalong/protocol';
 import { FakeBrainProvider } from '../providers';
 import type { BrainProvider, BrainRequest } from '../providers';
 import type { PerceptionHost } from '../perception';
@@ -34,6 +34,7 @@ function setup(options: { reply?: string; settings?: Partial<Settings>; experts?
   const reads: Array<string | undefined> = [];
   const requests: BrainRequest[] = [];
   const remarks: PetRemarkParams[] = [];
+  const moods: PetMoodParams[] = [];
   const proposals: Array<{ expertId: string; petId: string; brief: Brief }> = [];
   const state = { blocked: false };
   const host: PerceptionHost = {
@@ -75,16 +76,33 @@ function setup(options: { reply?: string; settings?: Partial<Settings>; experts?
       proposals.push(params);
       return { proposalId: 'p-1' };
     },
-    emit: (event) => remarks.push(event.params),
+    emit: (event) => {
+      if (event.method === 'pet.remark') remarks.push(event.params);
+      else moods.push(event.params);
+    },
   });
   const at = async (ms: number, windows: WindowEntry[]) => {
     clock.t = ms;
     await eye.observe(windows);
   };
-  return { eye, at, reads, requests, remarks, proposals, state, clock };
+  return { eye, at, reads, requests, remarks, moods, proposals, state, clock };
 }
 
 describe('KeepAnEye', () => {
+  it('reacts to a title with a mood, with no read and no model call', async () => {
+    const { at, reads, requests, moods } = setup({ settings: { keepAnEye: true } });
+    await at(0, [win('w-1', 'npm test - 12 passed', { processName: 'WindowsTerminal.exe' })]);
+    expect(moods).toEqual([{ petId: 'scout', mood: 'cheer' }]);
+    expect(reads).toEqual([]);
+    expect(requests).toEqual([]);
+  });
+
+  it('shows no mood while keeping an eye is off', async () => {
+    const { at, moods } = setup({ settings: { keepAnEye: false } });
+    await at(0, [win('w-1', 'Build failed')]);
+    expect(moods).toEqual([]);
+  });
+
   it('reads the window the person settled on, asks once, and says the line', async () => {
     const { at, reads, requests, remarks } = setup({
       reply: 'parser.ts imports a missing ./lexer.',

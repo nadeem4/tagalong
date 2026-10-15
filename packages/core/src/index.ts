@@ -143,7 +143,7 @@ export {
   type TurnOutcome,
 } from './conversation';
 
-export { isMeeting } from './keep-an-eye/lookout';
+export { callOrFullScreenInFront, isMeeting } from './keep-an-eye/lookout';
 
 export {
   WATCH_CHANGE_THRESHOLD,

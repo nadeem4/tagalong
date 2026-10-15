@@ -391,6 +391,9 @@ clicks or types.
   one useful thing to say; most of the time there is not. At most one line every ten minutes,
   never twice about one window, quiet over full-screen apps and calls, and **Not now** quiets it for
   an hour. Turn it off under **Settings → Privacy → Keep an eye on things**.
+- **Scout's moods** need nothing new: it winces at a failing build and cheers when tests pass, from
+  the same titles, and dozes after five minutes with no input or when the screen locks (one idle
+  time number from the OS, kept on this computer).
 - Scout never looks at its built-in blind spots: password managers, the Windows sign-in and security
   prompts, secret files such as `.env` and SSH keys, private browsing, authenticator apps and Remote
   Desktop. They are always on and listed in Settings; you can add your own.

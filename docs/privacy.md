@@ -365,6 +365,18 @@ tracking at all: the window list is not even taken.
   considered, its title included, and its text is never read.
 - **Nothing is delegated on its own.** When the line offers help, **Hand it over** opens the usual
   hand-off card; nothing goes to an expert until you press Send there.
+- **Scout's moods use the same titles.** A wince when the window in front newly reads like a failed
+  build, a cheer when it reads like passing tests: from the title alone, with no window text read
+  and no model called, at most once a minute, and never for a blind spot, a call or full screen.
+  A finished hand-off can make Scout wince or cheer too, from the expert's own reply, which is
+  already on this computer.
+
+### Dozing: your idle time
+
+Scout dozes when you have been away for five minutes or the screen is locked. For this the desktop
+reads one number from the operating system every fifteen seconds, how long since the last key or
+mouse input, and hears the lock and unlock events. Nothing on screen is read, the number is never
+stored, and it never leaves this computer.
 
 ## Rolling memory: what the buffer holds
 

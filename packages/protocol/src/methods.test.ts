@@ -82,6 +82,7 @@ const CORE_TO_HOST_NOTIFICATIONS = [
   'routine.proposed',
   'routine.result',
   'routines.changed',
+  'pet.mood',
 ] as const;
 
 describe('method catalog', () => {
@@ -103,6 +104,23 @@ describe('method catalog', () => {
     expect(Object.keys(hostToCoreMethods).sort()).toEqual([...HOST_TO_CORE].sort());
     expect(Object.keys(coreToHostNotifications).sort()).toEqual(
       [...CORE_TO_HOST_NOTIFICATIONS].sort(),
+    );
+  });
+});
+
+describe('pet.mood', () => {
+  it('carries a wince or a cheer for one pet, and nothing else', () => {
+    const wince = { petId: 'scout', mood: 'wince' };
+    expect(notificationParamsSchemaFor('pet.mood').parse(wince)).toEqual(wince);
+    expect(notificationParamsSchemaFor('pet.mood').parse({ ...wince, mood: 'cheer' })).toEqual({
+      petId: 'scout',
+      mood: 'cheer',
+    });
+    expect(
+      notificationParamsSchemaFor('pet.mood').safeParse({ ...wince, mood: 'dozing' }).success,
+    ).toBe(false);
+    expect(notificationParamsSchemaFor('pet.mood').safeParse({ mood: 'wince' }).success).toBe(
+      false,
     );
   });
 });

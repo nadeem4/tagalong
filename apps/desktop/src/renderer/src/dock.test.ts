@@ -42,6 +42,41 @@ describe('the dock', () => {
   });
 });
 
+describe('moods on the dock', () => {
+  const away = (dock = IDLE_DOCK) => nextDock(dock, { type: 'presence.away' });
+  const wince = (dock = IDLE_DOCK) => nextDock(dock, { type: 'pet.mood', mood: 'wince' });
+
+  it('dozes while the person is away, and wakes when they come back', () => {
+    expect(dockMood(away())).toBe('dozing');
+    expect(dockMood(nextDock(away(), { type: 'presence.back' }))).toBe('idle');
+  });
+
+  it('winces or cheers until the reaction is over', () => {
+    expect(dockMood(wince())).toBe('wince');
+    expect(dockMood(nextDock(IDLE_DOCK, { type: 'pet.mood', mood: 'cheer' }))).toBe('cheer');
+    expect(dockMood(nextDock(wince(), { type: 'reacted' }))).toBe('idle');
+    expect(nextDock(IDLE_DOCK, { type: 'pet.mood', mood: 'sulk' })).toBe(IDLE_DOCK);
+  });
+
+  it('keeps the order: seeing, working, a reaction, done, dozing, idle', () => {
+    const working = nextDock(IDLE_DOCK, { type: 'turn.started', turnId: T, petId: 'scout' });
+    const done = nextDock(nextDock(IDLE_DOCK, { type: 'handoff.progress', handoffId: H }), {
+      type: 'handoff.finished',
+      handoffId: H,
+    });
+    expect(dockMood(nextDock(wince(away(working)), { type: 'seeing' }))).toBe('listening');
+    expect(dockMood(wince(away(working)))).toBe('working');
+    expect(dockMood(wince(away(done)))).toBe('wince');
+    expect(dockMood(away(done))).toBe('done');
+    expect(dockMood(away())).toBe('dozing');
+  });
+
+  it('does not hide working while the person is away', () => {
+    const working = nextDock(IDLE_DOCK, { type: 'turn.started', turnId: T, petId: 'scout' });
+    expect(dockMood(away(working))).toBe('working');
+  });
+});
+
 describe('dragging the pet', () => {
   it('stays a click until the pointer moves past the threshold', () => {
     const start = startDrag({ x: 100, y: 100 });

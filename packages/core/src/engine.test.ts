@@ -8,6 +8,7 @@ import { defaultConnectorFor, Engine, type EngineOptions } from './engine';
 import { ClaudeCodeConnector, FakeConnector } from './experts';
 import { SPOKEN_HEADING } from './conversation/prompt-assembler';
 import { fakeMcpServer } from './connections/fake-server';
+import { FakeConnector } from './experts';
 import { ActivityLog } from './memory/activity';
 import { openDatabase } from './memory/db';
 import { ConversationStore } from './memory/store';
@@ -931,6 +932,48 @@ describe('a companion handing work to an expert', () => {
     );
     expect(handed).toMatchObject({ petId: 'scout', expertName: 'Claude Code', state: 'done' });
     expect(String(handed?.['text'])).toContain('Why does the build fail?');
+  });
+});
+
+describe('a mood from a finished hand-off', () => {
+  it('cheers when the expert reports the tests pass', async () => {
+    const provider = new FakeBrainProvider({
+      text: 'Claude Code has it.',
+      toolCall: {
+        id: 'call-1',
+        name: 'hand_to_expert',
+        input: { ask: 'Fix the parser test', task_kind: 'fix-code' },
+      },
+    });
+    const e = await boot(provider, {
+      connectorFor: () => new FakeConnector({ steps: [], text: 'Fixed it. All tests pass.' }),
+    });
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('experts.upsert', {
+      expert: { id: 'claude-code', name: 'Claude Code', connection: { type: 'claude-code' } },
+    });
+    const listed = await host.call('pets.list', {});
+    const scout = (listed['result'] as { pets: Record<string, unknown>[] }).pets.find(
+      (pet) => pet['id'] === 'scout',
+    );
+    await host.call('pets.upsert', { pet: { ...scout, roleId: 'companion' } });
+    await host.call('ask', { petId: 'scout', input: { text: 'Fix the parser test' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('handoff.proposed'), {
+      timeout: 5000,
+    });
+    const proposed = host.notifications.find((n) => n.method === 'handoff.proposed')!;
+    await host.call('handoffs.confirm', {
+      proposalId: proposed.params['proposalId'],
+      folder: 'C:\\projects\\ai_pet',
+      canEdit: false,
+    });
+
+    await vi.waitFor(() => expect(host.methods()).toContain('pet.mood'));
+    expect(host.notifications.find((n) => n.method === 'pet.mood')?.params).toEqual({
+      petId: 'scout',
+      mood: 'cheer',
+    });
   });
 });
 

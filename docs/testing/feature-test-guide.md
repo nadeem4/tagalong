@@ -516,6 +516,44 @@ On by default. Not active under `TAGALONG_FAKE_PROVIDERS=1` unless `TAGALONG_KEE
 3. **Expected:** the hand-off card opens with the task and the window title; nothing runs until you
    press **Send**.
 
+## Scout's moods
+
+Title moods need **Keep an eye on things** on and sight not paused, as in K.1.
+
+### M.1. Scout dozes while you are away
+
+1. **Action:** touch nothing for five minutes (or lock the screen with `Win+L`).
+2. **Expected:** within about fifteen seconds of the five minutes (at once on lock), Scout's eyes
+   close to a line and it breathes more slowly; no tag, no "z". Its name reads "Scout is dozing".
+   Move the mouse (or unlock): it wakes within fifteen seconds (at once on unlock).
+3. **Action:** with Always listening on, repeat.
+4. **Expected:** the green listening dot stays on Scout the whole time it dozes.
+
+### M.2. A failing then passing test run
+
+1. **Action:** in a terminal in front, set the title to a failure
+   (`$host.UI.RawUI.WindowTitle = 'npm test - 2 failed'`).
+2. **Expected:** within about five seconds Scout winces (`> <`, one small shake) for about four
+   seconds, with no words. Setting the same title again does nothing.
+3. **Action:** a minute later, set `$host.UI.RawUI.WindowTitle = 'npm test - 12 passed'`.
+4. **Expected:** Scout cheers (a happy squint, two hops) for about four seconds. A second change
+   inside the same minute gets no reaction.
+5. **Action:** put a video full screen or join a call, then cause a failure title behind it.
+6. **Expected:** no reaction.
+
+### M.3. An expert's error
+
+1. **Setup:** Claude Code switched on as an expert.
+2. **Action:** hand off a task that fails (for example, a folder Claude Code cannot open).
+3. **Expected:** when it ends with an error, Scout winces for about four seconds, then shows the
+   usual **Done** face. A hand-off whose reply says the tests pass makes it cheer instead.
+
+### M.4. Reduced motion
+
+1. **Action:** Windows Settings → Accessibility → Visual effects → **Animation effects** off, then
+   repeat M.1 and M.2.
+2. **Expected:** the faces change but nothing moves and Scout never blinks.
+
 ## Voice: Scout talks
 
 Run from source **without** `TAGALONG_FAKE_TTS` (it makes every line silent), with speakers on. The

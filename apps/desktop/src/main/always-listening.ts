@@ -1,4 +1,4 @@
-import { isMeeting } from '@tagalong/core';
+import { callOrFullScreenInFront } from '@tagalong/core';
 import type { Settings, SettingsPatch, WindowEntry } from '@tagalong/protocol';
 import type { ListeningState } from '../shared/ipc';
 import type { EngineCall } from './ipc/handle';
@@ -55,8 +55,7 @@ export class AlwaysListening {
  * front window that counts, so a Teams window in front pauses listening even with no call.
  */
 export function listeningBlocked(windows: readonly WindowEntry[]): boolean {
-  const front = windows.find((window) => window.state === 'foreground');
-  return front !== undefined && (front.fullScreen === true || isMeeting(front));
+  return callOrFullScreenInFront(windows);
 }
 
 /**

@@ -27,9 +27,15 @@ const MOTION: Readonly<Record<DockMood, string>> = {
   listening: 'breathe',
   working: 'busy',
   done: 'hop',
+  dozing: 'doze',
+  wince: 'shake',
+  cheer: 'cheer',
 };
 
-const TAGS: Readonly<Record<Exclude<DockMood, 'idle'>, { text: string; color: string }>> = {
+/** The moods with a tag; dozing, wince and cheer react on the face alone. */
+type TaggedMood = 'listening' | 'working' | 'done';
+
+const TAGS: Readonly<Record<TaggedMood, { text: string; color: string }>> = {
   listening: { text: 'Seeing', color: '#7CB8F2' },
   working: { text: 'Working', color: t.color.gold },
   done: { text: 'Done', color: '#7DD87F' },
@@ -40,11 +46,19 @@ const WORDS: Readonly<Record<DockMood, string>> = {
   listening: 'is looking at your screen',
   working: 'has an expert working',
   done: 'has an answer for you',
+  dozing: 'is dozing',
+  wince: 'winces',
+  cheer: 'is cheering',
 };
+
+function isTagged(mood: DockMood): mood is TaggedMood {
+  return mood in TAGS;
+}
 
 /**
  * The companion on the dock: its pixel character, with a face and a small tag for what it
- * is doing (seeing, working, done), plus the sight-paused and recording marks.
+ * is doing (seeing, working, done), a face alone for its moods (dozing, wince, cheer), plus
+ * the sight-paused, recording and listening marks, which show in every mood.
  */
 export function DockPet({
   pet,
@@ -55,8 +69,9 @@ export function DockPet({
   blinkEveryMs,
 }: DockPetProps) {
   const [blinking, setBlinking] = useState(false);
-  // Blinks in moods with open eyes; working looks down at the task and done squints. A
-  // blink is motion too, so it stops with the rest when the system asks for less.
+  // Blinks in moods with open eyes; working looks down at the task, done and cheer squint,
+  // dozing and wince have their eyes shut. A blink is motion too, so it stops with the rest
+  // when the system asks for less.
   const [still] = useState(reducedMotion);
   const canBlink = !still && (mood === 'idle' || mood === 'listening');
 
@@ -88,7 +103,7 @@ export function DockPet({
     const faced = withMood(characterFor(pet).sprite, mood);
     return blinking && canBlink ? withBlink(faced) : faced;
   }, [pet, mood, blinking, canBlink]);
-  const tag = mood === 'idle' ? undefined : TAGS[mood];
+  const tag = isTagged(mood) ? TAGS[mood] : undefined;
   const label = `${pet.name} ${WORDS[mood]}${sightPaused ? ', sight paused' : ''}${
     recording && !sightPaused ? ', recording the screen' : ''
   }${listening === 'on' ? ', listening' : listening === 'paused' ? ', listening paused' : ''}`;
@@ -185,9 +200,13 @@ const DOCK_CSS = `
 .dock-body[data-motion='breathe'] { animation: dock-breathe 2.8s ease-in-out infinite; }
 .dock-body[data-motion='busy'] { animation: dock-busy 0.9s ease-in-out infinite; }
 .dock-body[data-motion='hop'] { animation: dock-hop 0.7s ease-out 3; }
+.dock-body[data-motion='doze'] { animation: dock-breathe 5s ease-in-out infinite; }
+.dock-body[data-motion='shake'] { animation: dock-shake 0.4s ease-in-out 1; }
+.dock-body[data-motion='cheer'] { animation: dock-hop 0.7s ease-out 2; }
 @keyframes dock-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1px); } }
 @keyframes dock-busy { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
 @keyframes dock-hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-8px); } }
+@keyframes dock-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-2px); } 75% { transform: translateX(2px); } }
 /* Always listening: a solid dot while on, an outline while paused. Never hidden. */
 .dock-pet__listening { position: absolute; bottom: 4px; right: 4px; width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; border: 2px solid #7DD87F; background: #7DD87F; box-shadow: 0 0 0 1px #fff; }
 .dock-pet__listening[data-state='on'] { animation: dock-listening 2.4s ease-in-out infinite; }

@@ -10,6 +10,7 @@ import {
   app,
   dialog,
   ipcMain,
+  powerMonitor,
   screen,
   shell,
   utilityProcess,
@@ -23,6 +24,7 @@ import {
   saveListening,
   startListeningGuard,
 } from './always-listening';
+import { watchPresence } from './presence';
 import { systemClock } from './awareness/clock';
 import { handoffNotice } from './handoff-notice';
 import {
@@ -180,6 +182,7 @@ app.on('before-quit', () => {
   stopKeepAnEye();
   stopListeningGuard();
   pointerOverlay?.dispose();
+  stopPresence();
   // Memory only, and gone on quit: nothing here was ever written anywhere to clean up.
   desktop?.rolling.dispose();
   desktop?.perceptionMemory.clear();
@@ -411,6 +414,11 @@ async function start(): Promise<void> {
   avatar.on('show', () => pauseListening({ petsShown: true }));
   avatar.on('hide', () => pauseListening({ petsShown: false }));
   pauseListening({ petsShown: avatar.isVisible() });
+  // Away from the keyboard or locked: Scout dozes. One number from the OS, nothing on screen.
+  stopPresence = watchPresence(powerMonitor, (event) => {
+    const pet = desktop?.avatar;
+    if (pet != null && !pet.isDestroyed()) pet.webContents.send(IPC.turnEvent, event);
+  });
 
   // Deliberately not a modal, and deliberately not fatal. The only way to store an
   // accelerator that cannot be registered is to type it into Settings, so refusing to
@@ -443,6 +451,8 @@ async function start(): Promise<void> {
 let stopKeepAnEye = (): void => undefined;
 /** Stops the Always-listening guard on quit. */
 let stopListeningGuard = (): void => undefined;
+/** Stops reading the idle time on quit. */
+let stopPresence = (): void => undefined;
 /** Why Always listening waits: a call or full screen in front, the pets hidden, or setup open. */
 let listeningWhy = { blocked: false, petsShown: false, setupOpen: false };
 let pauseListening: (change: Partial<typeof listeningWhy>) => void = () => undefined;

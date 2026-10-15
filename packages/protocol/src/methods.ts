@@ -425,6 +425,16 @@ export const PetRemarkParams = z.object({
 });
 export type PetRemarkParams = z.infer<typeof PetRemarkParams>;
 
+/**
+ * A short reaction on the pet's face, with no words: a wince at a failing build or an
+ * expert's error, a cheer when tests pass. The host clears it after a few seconds.
+ */
+export const PetMoodParams = z.object({
+  petId: z.string().min(1),
+  mood: z.enum(['wince', 'cheer']),
+});
+export type PetMoodParams = z.infer<typeof PetMoodParams>;
+
 // ---------------------------------------------------------------------------
 // The catalog
 // ---------------------------------------------------------------------------
@@ -518,6 +528,7 @@ export const coreToHostNotifications = {
   'routine.proposed': { params: RoutineProposedParams },
   'routine.result': { params: RoutineResultParams },
   'routines.changed': { params: RoutinesChangedParams },
+  'pet.mood': { params: PetMoodParams },
 } as const satisfies Record<string, NotificationSpec>;
 
 export type HostToCoreMethod = keyof typeof hostToCoreMethods;
