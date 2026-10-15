@@ -43,6 +43,8 @@ export const Brief = z.object({
       app: z.string().optional(),
       windowTitle: z.string().optional(),
       selection: z.string().optional(),
+      /** The end of the window's text, read only when the person took a Stuck? offer. */
+      windowText: z.string().max(4000).optional(),
     })
     .optional(),
   /** Paths that matter, relative to the expert's folder where they can be. */

@@ -1426,6 +1426,9 @@ flowchart LR
   R --> M["One call to the summaries model"]
   M -- "NOTHING" --> X
   M -- "one line" --> P["pet.remark: a quiet line with Not now"]
+  O --> S{"StuckWatch: a trouble title in front for 3 min?"}
+  S -- "yes" --> Q["pet.remark: a fixed line with Hand it over"]
+  Q -- "Hand it over" --> H["readText, hideSecrets, handoff.proposed to Coder"]
 ```
 
 - **The feed.** `apps/desktop/src/main/keep-an-eye.ts#startKeepAnEye` lists windows every 5 s with
@@ -1457,6 +1460,24 @@ flowchart LR
   and `'rested'`), which
   main forwards to every window like every notification. Title moods run only while keeping an eye
   is on and sight is not paused, so there is no second tracker.
+- **Stuck?** (`stuck.ts#StuckWatch`). After moods and before the `Lookout`, every `observe` passes
+  the same titles to `StuckWatch`, with no read and no model call. It remembers when each
+  non-minimized `looksLikeTrouble` window (keyed by id and title, so a rerun with a new title starts
+  again) was first seen, and forgets it once it is closed or minimized. When such a window is in
+  front and has been up `STUCK_MS` (3 min), it fires once for that window, at most once every
+  `STUCK_COOLDOWN_MS` (30 min), never during **Not now**, never while `callOrFullScreenInFront` is
+  true, and never for a blind spot (`blind`). It returns the window and a `projectHint`: the trouble
+  title, plus the last window in front without trouble (usually the editor). `KeepAnEye` then sends
+  a handwritten `pet.remark` ("That error’s still up. Want me to hand it to Coder?") with the offer
+  "Fix the error in <title>", but only with an expert switched on (until then it keeps counting and
+  uses up neither the error nor the 30 minutes). `pickCoder` chooses the enabled
+  expert named Coder, else one whose `goodAt` mentions code, else the first enabled one.
+  `keepAnEye.accept` is async: for a stuck offer it reads the window only then, through the same
+  recorded hosts (`readText`, last `REMARK_TEXT_CHARS`; a `blocked` or failed read just leaves the
+  text out), passes it through `hideSecrets`, and puts it in the brief's own `context.windowText`
+  (max 4,000; `renderBrief` adds it as "The end of that window"). `HandoffManager.propose` takes the
+  optional `projectHint` for `projects.suggest`, so the card arrives with the project picked and, under the brief, "Includes the end of the error
+  window"; nothing runs until **Send**.
 - **The call** (`remark.ts#composeRemark`). Reads the last 4,000 characters of that window through
   the host's `readText` (a `blocked` read ends it), then one call to `settings.summarizer`, else the
   pet's own provider and model, text only, like `Summarizer`: 80 tokens, tools refused, a 15 s

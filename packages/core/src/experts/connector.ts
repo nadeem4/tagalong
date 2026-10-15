@@ -47,9 +47,10 @@ export const CANCELLED: ConnectorResult = { ok: false, error: 'Cancelled.' };
 /** The brief as plain text, the form every connector can pass on, with any secret hidden. */
 export function renderBrief(brief: Brief): string {
   const sections = [brief.ask];
-  const { app, windowTitle, selection } = brief.context ?? {};
+  const { app, windowTitle, selection, windowText } = brief.context ?? {};
   const looking = [app && `App: ${app}`, windowTitle && `Window: ${windowTitle}`].filter(Boolean);
   if (looking.length > 0) sections.push(`What I was looking at:\n${looking.join('\n')}`);
+  if (windowText) sections.push(`The end of that window:\n${windowText}`);
   if (selection) sections.push(`Selected text:\n${selection}`);
   if (brief.files && brief.files.length > 0) {
     sections.push(`Files that matter:\n${brief.files.map((f) => `- ${f}`).join('\n')}`);

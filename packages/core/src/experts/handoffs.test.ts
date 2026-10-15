@@ -370,6 +370,21 @@ describe('proposals', () => {
     ]);
   });
 
+  it('guesses the project from a hint when one is given, not the trouble window', () => {
+    const { handoffs } = proposing(new FakeConnector({ text: 'x' }));
+    handoffs.propose({
+      expertId: 'claude-code',
+      petId: 'scout',
+      brief: { ask: 'Fix the error in Build failed', context: { windowTitle: 'Build failed' } },
+      projectHint: 'lexer.ts - ai_pet - Visual Studio Code',
+    });
+    expect(projects.suggest).toHaveBeenLastCalledWith('lexer.ts - ai_pet - Visual Studio Code');
+    const proposed = events[0];
+    expect(proposed?.method === 'handoff.proposed' && proposed.params.projects).toEqual([
+      { name: 'ai_pet', path: 'C:\\projects\\ai_pet', reason: 'screen' },
+    ]);
+  });
+
   it('ignores an old expert’s default folder: only the guesses are offered', () => {
     const { handoffs } = proposing(new FakeConnector({ text: 'x' }), 'D:\\default');
     handoffs.propose({ expertId: 'claude-code', petId: 'scout', brief });

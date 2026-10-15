@@ -788,8 +788,8 @@ function buildHandlers(parts: {
       wellbeing.notNow();
       return { quietUntil: keepAnEye.notNow().toISOString() };
     },
-    'keepAnEye.accept': (params) => ({
-      proposed: keepAnEye.accept(params.remarkId) || wellbeing.accept(params.remarkId),
+    'keepAnEye.accept': async (params) => ({
+      proposed: (await keepAnEye.accept(params.remarkId)) || wellbeing.accept(params.remarkId),
     }),
     'wellbeing.observe': (params) => {
       wellbeing.observe(params);

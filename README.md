@@ -431,6 +431,9 @@ such as `.env` are refused.
   one useful thing to say; most of the time there is not. At most one line every ten minutes,
   never twice about one window, quiet over full-screen apps and calls, and **Not now** quiets it for
   an hour. Turn it off under **Settings → Privacy → Keep an eye on things**.
+- **Stuck?** When an error has stayed in front for three minutes, Scout offers once to hand it to
+  Coder, from the title alone. Only **Hand it over** reads that window (secrets hidden) into the
+  hand-off card, with the project picked; nothing runs until **Send**.
 - **Scout's moods** need nothing new: it winces at a failing build and cheers when tests pass, from
   the same titles, and dozes after five minutes with no input or when the screen locks (one idle
   time number from the OS, kept on this computer).

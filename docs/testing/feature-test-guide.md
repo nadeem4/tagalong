@@ -535,6 +535,27 @@ On by default. Not active under `TAGALONG_FAKE_PROVIDERS=1` unless `TAGALONG_KEE
 3. **Expected:** the hand-off card opens with the task and the window title; nothing runs until you
    press **Send**.
 
+### K.6. Stuck? Hand the error to Coder
+
+1. **Setup:** an expert named Coder (Home → Experts → Add expert → Coder) switched on; a project
+   open in the editor (for example `ai_pet` in VS Code).
+2. **Action:** click the editor, then bring a terminal to the front whose title reads like trouble
+   (for example run `title npm test - 2 failed` in `cmd`) and print an error in it. Leave it in front
+   for three minutes.
+3. **Expected:** Scout says "That error’s still up. Want me to hand it to Coder?" with **Hand it
+   over** and **Not now**. Apart from the one look keeping an eye takes when the title first reads
+   like trouble (K.1), **What Scout saw** shows no new read of the terminal before the click.
+4. **Action:** press **Hand it over**.
+5. **Expected:** the hand-off card opens to Coder with "Fix the error in npm test - 2 failed" and
+   the editor's project already picked and "Includes the end of the error window" under the brief;
+   **What Scout saw** now shows one more read of the terminal.
+   Nothing runs until **Send**; after Send, Coder's brief ends with the terminal's last lines, any
+   key in them hidden.
+6. **Action:** leave a second error up for three minutes within half an hour, and separately press
+   **Not now** on the line.
+7. **Expected:** no second Stuck? line within thirty minutes; none for an hour after Not now; none
+   over a Teams call or a full-screen window.
+
 ## Scout's moods
 
 Title moods need **Keep an eye on things** on and sight not paused, as in K.1.

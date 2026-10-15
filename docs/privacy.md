@@ -412,6 +412,14 @@ tracking at all: the window list is not even taken.
   considered, its title included, and its text is never read.
 - **Nothing is delegated on its own.** When the line offers help, **Hand it over** opens the usual
   hand-off card; nothing goes to an expert until you press Send there.
+- **Stuck? reads nothing until you click.** When an error title (as above) has stayed in front for
+  three minutes, Scout says one fixed line, "That error’s still up. Want me to hand it to Coder?",
+  from the title alone: no window text is read and no model is called. Only if you press **Hand it
+  over** does Scout read that one window's text (the last 4,000 characters), hide any key, token or
+  password in it, and put it in the brief on the hand-off card, which says "Includes the end of the error window". The read is logged in **What Scout
+  saw** like every other read, and nothing goes to the expert until you press **Send**. At most once
+  every thirty minutes, never twice for the same error, and never during Not now, a call, full
+  screen or a blind spot.
 - **Scout's moods use the same titles.** A wince when the window in front newly reads like a failed
   build, a cheer when it reads like passing tests: from the title alone, with no window text read
   and no model called, at most once a minute, and never for a blind spot, a call or full screen.
