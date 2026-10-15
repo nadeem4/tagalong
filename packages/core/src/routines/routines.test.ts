@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type {
   CaptureExclusions,
   Expert,
@@ -11,10 +11,16 @@ import type {
   WindowEntry,
 } from '@tagalong/protocol';
 import type { Meeting } from '../meetings/calendar-feed';
+import * as lookout from '../keep-an-eye/lookout';
 import { migrate } from '../memory/db';
 import { FakeClock } from '../watch/fake-clock';
 import { Routines, ROUTINE_TICK_MS, type RoutineAsk, type RoutineEvent } from './routines';
 import { RoutineStore } from './store';
+
+vi.mock('../keep-an-eye/lookout', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../keep-an-eye/lookout')>();
+  return { ...real, callOrFullScreenInFront: vi.fn(real.callOrFullScreenInFront) };
+});
 
 const SCOUT: Pet = {
   id: 'scout',
@@ -326,6 +332,16 @@ describe('Routines, delivering', () => {
     expect(t.results()).toHaveLength(0);
     front = [win('notes.md - Code', { state: 'foreground' })];
     await t.clock.advance(ROUTINE_TICK_MS);
+    expect(t.results()).toHaveLength(1);
+  });
+
+  it('asks the shared call and full-screen rule, the one Keeping an eye and moods use', async () => {
+    const windows = [win('notes.md - Code', { state: 'foreground' })];
+    const t = setup({ windows: () => windows });
+    const saved = t.store.save({ ...PAPERS, when: { type: 'watch' } }, MONDAY_759);
+    vi.mocked(lookout.callOrFullScreenInFront).mockClear();
+    await t.routines.runNow(saved.id);
+    expect(lookout.callOrFullScreenInFront).toHaveBeenCalledWith(windows);
     expect(t.results()).toHaveLength(1);
   });
 

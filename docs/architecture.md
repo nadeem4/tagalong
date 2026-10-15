@@ -714,12 +714,10 @@ dontAsk`, so it cannot read a project or edit a file. The run then waits for tha
 **Delivery.** A finished run becomes `routine.result { routineId, name, petId, conversationId,
 state, line, text, late, deliver, activityId }`. `line` is the routine's name and the answer's first
 sentence (`Morning papers (ran late): ...`, or `Morning papers did not run: ...`). Results wait in
-memory while no host is connected, or while the window in front is full screen or a call (`isMeeting`,
-the same check keeping an eye on things uses), and go out on the first tick that is clear. A meeting
+memory while no host is connected, or while the window in front is full screen or a call
+(`callOrFullScreenInFront`, the same check keeping an eye on things uses), and go out on the first tick that is clear. A meeting
 prep still waiting when its meeting starts is useless later, so it goes out then with `deliver`
-set to a Windows notification only, which the desktop never speaks (`routineDelivery`). The moods
-work lifts the call and full-screen check into one `callOrFullScreenInFront` helper; once that is
-on main, this check uses it too. Activity
+set to a Windows notification only, which the desktop never speaks (`routineDelivery`). Activity
 has one `routine` row per run: the name, the state, the answer or the error, and the conversation.
 
 **Scout's card.** `create_routine` (`tools/builtin/routines.ts`) takes `{ name, when, what, topics?,
@@ -1419,8 +1417,8 @@ flowchart LR
   (`isMeeting`: Teams or Zoom by process, Google Meet or a Zoom meeting by title). A window the host
   marked `blocked`, or that `findCaptureBlock` refuses (blind spots and the person's exclusions), is
   never considered, its title included. The call and full-screen check is one function,
-  `callOrFullScreenInFront(windows)` (exported from `@tagalong/core`): the `Lookout`, moods and
-  Always listening all use it.
+  `callOrFullScreenInFront(windows)` (exported from `@tagalong/core`): the `Lookout`, moods,
+  routine delivery and Always listening all use it.
 - **Moods** (`mood.ts`). Before the `Lookout`, every `observe` passes the same titles to
   `MoodWatch`, with no read and no model call: the front window's title newly matching
   `looksLikeTrouble` is a wince; newly matching passing words (`passed`, `passing`, `succeeded`,

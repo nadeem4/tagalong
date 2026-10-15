@@ -15,7 +15,7 @@ import {
   type WindowEntry,
 } from '@tagalong/protocol';
 import { RoutineDraft } from '@tagalong/protocol';
-import { isMeeting } from '../keep-an-eye/lookout';
+import { callOrFullScreenInFront } from '../keep-an-eye/lookout';
 import type { Meeting } from '../meetings/calendar-feed';
 import { findCaptureBlock } from '../perception/exclusions';
 import { RpcFailure } from '../server/ws-server';
@@ -478,8 +478,7 @@ export class Routines {
     if (this.#pending.length === 0) return;
     const windows = await this.#options.windows();
     if (windows === null) return;
-    const front = windows.find((w) => w.state === 'foreground');
-    if (front !== undefined && (front.fullScreen === true || isMeeting(front))) {
+    if (callOrFullScreenInFront(windows)) {
       const now = this.#options.clock.now();
       for (let i = this.#pending.length - 1; i >= 0; i -= 1) {
         const held = this.#pending[i]!;
