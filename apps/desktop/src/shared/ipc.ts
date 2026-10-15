@@ -126,6 +126,8 @@ export const IPC = {
   // The health check: whether the voice models are on disk, and whether the extension is in.
   voiceModels: 'tagalong:voice:models',
   hostsStatus: 'tagalong:hosts:status',
+  // Change settings by talking: Apply on Scout's settings card, a click only.
+  applySettings: 'tagalong:settings:apply',
 } as const;
 
 /** What the figure hands its preload on a drop: the files, and the drag's link and text. */

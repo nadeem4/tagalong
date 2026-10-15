@@ -213,6 +213,31 @@ describe('createVoiceService', () => {
     expect(local.warm).not.toHaveBeenCalled();
   });
 
+  it('picks a mouth applied from a settings card on the next line, without a restart', async () => {
+    const spoken: string[] = [];
+    const local = localVoice(true, spoken);
+    let voiceSettings: typeof SETTINGS_DEFAULTS.voice & { mouth?: MouthId } = {
+      ...SETTINGS_DEFAULTS.voice,
+    };
+    const voice = createVoiceService({
+      env: {},
+      settings: () => voiceSettings,
+      local,
+      mouths: {
+        kokoro: localMouth(local),
+        elevenlabs: elevenLabsMouth(
+          async () => null,
+          () => '',
+          () => tts('eleven', spoken),
+        ),
+      },
+    });
+    expect((await voice.speak('One.')).kind).toBe('audio');
+    voiceSettings = { ...voiceSettings, mouth: 'system' };
+    expect(await voice.speak('Two.')).toEqual({ kind: 'fallback' });
+    expect(spoken).toEqual(['kokoro:One.']);
+  });
+
   it('a preview with the system voice picked uses it, and never loads Kokoro, even when Kokoro is saved', async () => {
     const { voice, local, spoken } = service({ mouth: 'kokoro' });
     expect(await voice.speak('Hello.', { mouth: 'system' })).toEqual({ kind: 'fallback' });

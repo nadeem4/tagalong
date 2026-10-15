@@ -18,6 +18,8 @@ export const SightKind = z.enum([
   'sent_to_expert',
   /** Pointing at something: the host read a window's element names to find the one asked. */
   'read_element_names',
+  /** Not a look: the person applied a settings card Scout showed. `title` names the settings. */
+  'changed_by_talk',
 ]);
 export type SightKind = z.infer<typeof SightKind>;
 

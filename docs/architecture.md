@@ -988,6 +988,35 @@ hotkeys, and it is covered by a smoke test rather than a unit test — every uni
 registrar and applies the bindings itself, which proves the manager rebinds and never that a save
 reaches it.
 
+#### Changed by talking
+
+"Talk a bit slower and call me Sam" reaches the same save. The companion's `change_settings` tool
+(`core/src/tools/builtin/settings.ts`) holds the **chat allowlist**: the voice fields
+(`voice.enabled`, `voice`, `speed`, `elevenLabsVoiceId`, `mouth`, `ears`), `listening.always` (off
+only), `userName`, `greeting`, the four hotkeys, `keepAnEye`, `sightDetail`, `windowTextBudget`,
+`rollingMemory.enabled` and `minutes`, `screenshotRetention`, `captureExclusions.add` (add only),
+`wellbeing.enabled`, `sightLog.days` (lower only), `pickUp` and `budget.dailyUsd`. Anything else is
+refused by name, and keys, logins, provider URLs, the model and the calendar link get "changed only
+in Settings"; the tool's deps are only `{ get, emit }`, so it has no path to the `SecretStore`.
+
+The tool validates each change, lays it over the current value of its object (so `voice.speed`
+alone keeps every other voice field, and the same for hotkeys), checks the result with
+`SettingsPatch.safeParse` and emits `settings.proposed` with the patch and one row per change
+(`label`, `from`, `to`, `loosens`, an optional `note`). It saves nothing. A change that lets Scout see,
+keep or spend more (keep an eye on, screen memory on or longer, screenshots kept, sight detail
+`all`, pick-up on, a spending cap raised or removed) is `loosens`, and on a routine's own turn
+such a change is refused. Its description lists the current values, secrets scrubbed, so Scout can
+say "your voice speed is 0.95" without a read tool.
+
+Main brings the bubble up on `settings.proposed`. **Apply** on the card calls
+`HostBridge.applySettings(patch)`, which desktop maps to `IPC.applySettings`
+(`main/ipc/apply-settings.ts`): `listening` is taken out of the patch and switched off through
+`AlwaysListening.set(false)`, the same path as the bubble's switch, because saving the file alone
+would leave the microphone open; the rest goes through the `saveSettings` handler (rebinding hotkeys,
+reconfiguring rolling memory, broadcasting to open windows) with `settings.set { byTalk: true }`,
+and the engine writes a **Changed by talk** row (the setting names, never values) to the log of what
+Scout saw. The card never switches Always listening on. Core holds no proposal; Cancel is local.
+
 ### The platform adapter
 
 Everything OS-specific sits behind `Platform` in `src/main/platform/`. `createPlatform` throws on any
@@ -1326,7 +1355,7 @@ started at or after a time (and before `untilIso`), oldest first: the daily brie
 `memory/sight-log.ts` keeps Home's record of Scout's own looking in `sight_log(id, kind, at, app,
 title, provider_id, model, expert_name, windows, chars, images, source)` (migration 15). Metadata
 only: there is no column for text, pixels or a brief. `kind` is `listed_windows`, `read_text`,
-`screenshot`, `sent_to_ai`, `sent_to_expert` or `read_element_names` (`SightKind` in `protocol/src/sight-log.ts`); the
+`screenshot`, `sent_to_ai`, `sent_to_expert`, `read_element_names` or `changed_by_talk` (a settings card applied; `settings.set { byTalk }`) (`SightKind` in `protocol/src/sight-log.ts`); the
 column has no CHECK, so a new kind is one enum entry and no migration. `SightLog.record` hides secrets
 in a title with `hideSecrets` and drops the title of a window `findCaptureBlock` refuses (blind spots
 plus the person's exclusions), keeping the app. It prunes rows older than `sightLog.days` (default 7,
@@ -2004,6 +2033,11 @@ above a **Message** box. It is the same component, so it is the same conversatio
   `date.ts`" and its answer, then "Reviewer says" and its answer) and `onSay` speaks once. If step 1
   fails or is stopped, the card says "Reviewer did not start." A step that hands on raises no
   Windows notification (`handoffNotice` returns null for it); the last step's does.
+- **The settings card** (`settings-card.tsx`). A `settings.proposed` for this pet shows each setting
+  now → after. **Apply** calls `applySettings` with the card's patch; a row marked as letting Scout
+  see or keep more shows that line and the button reads **Turn on**. **Cancel** changes nothing.
+  Apply is a click only: a spoken "yes" is just another question. See
+  [Changed by talking](#changed-by-talking).
 - **Attached to the pet.** `panelPosition` puts the window right against the pet (no gap) and
   reports which side it is on; main sends that as `panelSideEvent`, and the bubble draws a speech
   tail on the side facing the pet, so it reads as the pet speaking. It moves with the pet when the

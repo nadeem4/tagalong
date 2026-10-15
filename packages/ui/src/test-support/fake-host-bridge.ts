@@ -13,6 +13,7 @@ import type {
   RoutineProposedParams,
   RoutineView,
   SightLogEntry,
+  SettingsPatch,
 } from '@tagalong/protocol';
 import type { AskInput, ConfirmHandoff, HostBridge, TurnEvent } from '../host-bridge';
 
@@ -58,6 +59,8 @@ export interface FakeHostBridge extends HostBridge {
   readonly copied: readonly string[];
   /** Every calendar link Home handed over, in order. */
   readonly calendarLinks: readonly (string | null)[];
+  /** Every patch a settings card applied, in order. */
+  readonly appliedSettings: readonly SettingsPatch[];
 }
 
 /**
@@ -107,6 +110,7 @@ export function createFakeHostBridge(
   const editedRoutines: RoutineProposedParams[] = [];
   const copied: string[] = [];
   const calendarLinks: (string | null)[] = [];
+  const appliedSettings: SettingsPatch[] = [];
   let calendar: CalendarCheckResult = options.calendar ?? { linked: false, meetings: 0 };
   let routineCount = 0;
   const toView = (draft: RoutineDraftInput & { id?: string }): RoutineView => {
@@ -328,6 +332,11 @@ export function createFakeHostBridge(
       return Promise.resolve(deleted);
     },
     copied,
+    appliedSettings,
+    applySettings(patch) {
+      appliedSettings.push(patch);
+      return Promise.resolve();
+    },
     copyText(text) {
       copied.push(text);
       return Promise.resolve();

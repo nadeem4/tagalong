@@ -16,6 +16,7 @@ import {
 import { perceptionTools, type PerceptionToolsOptions } from './builtin/perception';
 import { pointAtTool } from './builtin/pointing';
 import { changeRoutineTool, createRoutineTool, type RoutineToolDeps } from './builtin/routines';
+import { changeSettingsTool, type SettingsToolDeps } from './builtin/settings';
 import type { Tool, ToolContext, ToolOutcome } from './tool';
 
 /**
@@ -57,6 +58,11 @@ export interface ToolRegistryOptions {
   day?: DayToolDeps | undefined;
   /** Gives a pet whose role lists it `search_history`, the searchable work memory. */
   history?: HistoryToolDeps | undefined;
+  /**
+   * Gives a pet whose role lists it `change_settings`, which shows the settings card. It is
+   * offered on a routine's turn too, but refuses there anything that loosens privacy.
+   */
+  changeSettings?: SettingsToolDeps | undefined;
   /** Defaults to `toolsFor`: the tools its role lists, minus any its grants switch off. */
   toolsFor?: ToolFilter | undefined;
 }
@@ -117,8 +123,17 @@ export class ToolRegistry {
 
   /** Every built-in this engine is wired for, in the order the model has always seen. */
   #all(turn: TurnRequest): Tool[] {
-    const { perception, memory, watch, experts, connections, routines, day, history } =
-      this.#options;
+    const {
+      perception,
+      memory,
+      watch,
+      experts,
+      connections,
+      routines,
+      day,
+      history,
+      changeSettings,
+    } = this.#options;
     const tools: Tool[] = [];
     if (perception) tools.push(...perceptionTools(perception), ...recallTools(perception));
     if (memory) tools.push(rememberTool(memory));
@@ -142,6 +157,7 @@ export class ToolRegistry {
     if (experts?.steer && running.length > 0 && turn.routine === undefined) {
       tools.push(tellExpertTool(experts, running));
     }
+    if (changeSettings) tools.push(changeSettingsTool(changeSettings));
     return tools;
   }
 }

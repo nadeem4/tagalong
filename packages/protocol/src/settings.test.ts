@@ -7,8 +7,10 @@ import {
   SETTINGS_DEFAULTS,
   Settings,
   SettingsPatch,
+  SettingsProposedParams,
   WELCOME_STEPS,
 } from './settings';
+import { SettingsSetParams } from './methods';
 import { chosenMouth } from './voice';
 
 describe('Settings providerBaseUrls', () => {
@@ -635,5 +637,43 @@ describe('Settings.wellbeing', () => {
       wellbeing: { enabled: true },
     });
     expect(SettingsPatch.safeParse({ wellbeing: { enabled: 'yes' } }).success).toBe(false);
+  });
+});
+
+describe('SettingsProposedParams', () => {
+  const proposal = {
+    proposalId: '50000000-0000-4000-8000-000000000001',
+    petId: 'scout',
+    patch: { voice: { ...SETTINGS_DEFAULTS.voice, speed: 0.85 }, userName: 'Sam' },
+    rows: [
+      { setting: 'voice.speed', label: 'Voice speed', from: '0.95', to: '0.85', loosens: false },
+      { setting: 'userName', label: 'Your name', from: '(none)', to: 'Sam', loosens: false },
+      {
+        setting: 'pickUp',
+        label: 'Pick up where you left off',
+        from: 'Off',
+        to: 'On',
+        loosens: true,
+        note: 'Keeps window titles',
+      },
+    ],
+  };
+
+  it('round-trips a patch and its now-and-after rows', () => {
+    expect(SettingsProposedParams.parse(JSON.parse(JSON.stringify(proposal)))).toEqual(proposal);
+  });
+
+  it('refuses a patch that is not a valid settings patch, and a card with no rows', () => {
+    expect(
+      SettingsProposedParams.safeParse({ ...proposal, patch: { voice: { speed: 9 } } }).success,
+    ).toBe(false);
+    expect(SettingsProposedParams.safeParse({ ...proposal, rows: [] }).success).toBe(false);
+  });
+});
+
+describe('SettingsSetParams', () => {
+  it('may say the patch came from a card Scout showed, for the privacy log', () => {
+    expect(SettingsSetParams.parse({ patch: { userName: 'Sam' }, byTalk: true }).byTalk).toBe(true);
+    expect(SettingsSetParams.parse({ patch: {} }).byTalk).toBeUndefined();
   });
 });

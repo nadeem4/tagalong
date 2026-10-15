@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
-import { PROTOCOL_VERSION, RPC_ERROR_CODES } from '@tagalong/protocol';
+import { PROTOCOL_VERSION, RPC_ERROR_CODES, SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import { defaultConnectorFor, Engine, type EngineOptions } from './engine';
 import { ClaudeCodeConnector, FakeConnector } from './experts';
 import { SPOKEN_HEADING } from './conversation/prompt-assembler';
@@ -466,6 +466,33 @@ describe('routines over rpc', () => {
     };
     const row = activity.entries.find((entry) => entry.kind === 'routine');
     expect(row).toMatchObject({ state: 'done', conversationId: result?.['conversationId'] });
+  });
+
+  it('shows Scout’s settings card and saves nothing until the host applies it', async () => {
+    const e = await boot(
+      new FakeBrainProvider({
+        text: 'Check the card and click Apply.',
+        toolCall: {
+          id: 'call-1',
+          name: 'change_settings',
+          input: { changes: [{ setting: 'voice.speed', value: 0.85 }] },
+        },
+      }),
+    );
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('ask', { petId: 'scout', input: { text: 'talk a bit slower' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('settings.proposed'), {
+      timeout: 5000,
+    });
+    const card = host.notifications.find((n) => n.method === 'settings.proposed')?.params as {
+      patch: { voice: { speed: number } };
+    };
+    expect(card.patch.voice.speed).toBe(0.85);
+    const now = (await host.call('settings.get', {}))['result'] as {
+      settings: { voice: { speed: number } };
+    };
+    expect(now.settings.voice.speed).toBe(SETTINGS_DEFAULTS.voice.speed);
   });
 
   it('shows Scout’s routine card and saves it only on Save', async () => {
@@ -1888,6 +1915,22 @@ describe('what Scout saw over rpc', () => {
     );
     const left = entriesOf(await host.call('sightLog.list', {})).map((row) => row['id']);
     for (const row of rows) expect(left).not.toContain(row['id']);
+  });
+
+  it('writes a "changed by talk" row when a settings card is applied, and none otherwise', async () => {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('settings.set', { patch: { greeting: false } });
+    expect(entriesOf(await host.call('sightLog.list', {}))).toEqual([]);
+    await host.call('settings.set', {
+      patch: { userName: 'Sam', voice: { ...SETTINGS_DEFAULTS.voice, speed: 0.85 } },
+      byTalk: true,
+    });
+    const rows = entriesOf(await host.call('sightLog.list', {}));
+    expect(rows).toEqual([
+      expect.objectContaining({ kind: 'changed_by_talk', title: 'userName, voice' }),
+    ]);
   });
 
   it('is refused to the browser extension', async () => {

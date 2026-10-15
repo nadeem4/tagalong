@@ -438,3 +438,32 @@ export type Settings = z.infer<typeof Settings>;
  */
 export const SettingsPatch = z.object(settingsFields).partial();
 export type SettingsPatch = z.infer<typeof SettingsPatch>;
+
+/**
+ * One row of the settings card: a change Scout proposed, as the person reads it. `from` and
+ * `to` are display text. `loosens` marks a change that lets Scout see, keep or spend more:
+ * the card says so and its button reads Turn on.
+ */
+export const SettingsChangeRow = z.object({
+  /** The allowlisted setting, such as `voice.speed`. */
+  setting: z.string().min(1),
+  label: z.string().min(1),
+  from: z.string(),
+  to: z.string(),
+  loosens: z.boolean(),
+  /** A line under the row, such as "needs an ElevenLabs key in Settings". */
+  note: z.string().min(1).optional(),
+});
+export type SettingsChangeRow = z.infer<typeof SettingsChangeRow>;
+
+/**
+ * Change settings by talking: the card Scout shows. Nothing is saved until the person
+ * clicks Apply; the host saves `patch` through its ordinary settings path.
+ */
+export const SettingsProposedParams = z.object({
+  proposalId: z.uuid(),
+  petId: z.string().min(1),
+  patch: SettingsPatch,
+  rows: z.array(SettingsChangeRow).min(1),
+});
+export type SettingsProposedParams = z.infer<typeof SettingsProposedParams>;

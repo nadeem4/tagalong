@@ -18,6 +18,7 @@ import {
   type RoutineToolDeps,
   type DayToolDeps,
   type HistoryToolDeps,
+  type SettingsToolDeps,
 } from '../tools';
 import { assemblePrompt } from './prompt-assembler';
 
@@ -79,6 +80,8 @@ export interface ConversationRunnerOptions {
   day?: DayToolDeps | undefined;
   /** Gives a companion `search_history`, the searchable work memory. */
   history?: HistoryToolDeps | undefined;
+  /** Gives a companion `change_settings`, which shows the settings card. */
+  changeSettings?: SettingsToolDeps | undefined;
   /** Narrows a pet's tools for a turn. Absent: every pet gets every tool. Phase 8 roles. */
   toolsFor?: ToolFilter | undefined;
 }
@@ -161,6 +164,7 @@ export class ConversationRunner {
       routines: options.routines,
       day: options.day,
       history: options.history,
+      changeSettings: options.changeSettings,
       toolsFor: options.toolsFor,
     });
   }

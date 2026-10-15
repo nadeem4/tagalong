@@ -37,6 +37,7 @@ export { CHANGE_ROUTINE, CREATE_ROUTINE, type RoutineToolDeps } from './builtin/
 export { POINT_AT } from './builtin/pointing';
 export { RECALL_DAY, estimateSpan, type DayToolDeps } from './builtin/day';
 export { SEARCH_HISTORY, type HistoryToolDeps } from './builtin/history';
+export { CHANGE_SETTINGS, CHAT_SETTINGS, type SettingsToolDeps } from './builtin/settings';
 export {
   CONNECTIONS_GROUP,
   CONNECTOR_SEPARATOR,

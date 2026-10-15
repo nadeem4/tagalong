@@ -686,6 +686,8 @@ function forwardToRenderers(notification: { method: string; params: unknown }): 
   if (notification.method === 'connector.confirm') bringUpBubble(true);
   // A routine Scout wrote: the card waits in the bubble for Save.
   if (notification.method === 'routine.proposed') bringUpBubble(true);
+  // Settings Scout would change: the card waits in the bubble for Apply.
+  if (notification.method === 'settings.proposed') bringUpBubble(true);
   if (notification.method === 'routine.result') deliverRoutine(notification.params);
 
   // The renderer speaks the UI package's TurnEvent shape: the wire params plus the
@@ -1058,6 +1060,9 @@ function registerIpc(): void {
       for (const window of BrowserWindow.getAllWindows()) {
         if (!window.isDestroyed()) window.webContents.send(IPC.settingsChangedEvent, settings);
       }
+    },
+    listeningOff: () => {
+      required().listening.set(false);
     },
   });
   registerVoiceIpc(handle, {

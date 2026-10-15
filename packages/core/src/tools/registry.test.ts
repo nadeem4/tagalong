@@ -8,6 +8,7 @@ import { FAKE_TURN_PET, fakeTurn } from './fake-turn';
 import { ToolRegistry, toolsFor, type ToolRegistryOptions } from './registry';
 import type { Tool } from './tool';
 import { getRole } from '../roles';
+import { SETTINGS_DEFAULTS, Settings } from '@tagalong/protocol';
 
 /** Only `addOnce` is reached by the tools; the rest of the store is not under test here. */
 function fakeMemory(): MemoryStore & { saved: NewMemory[] } {
@@ -42,6 +43,7 @@ function everything(overrides: Partial<ToolRegistryOptions> = {}): ToolRegistryO
       now: () => new Date(0),
     },
     history: { history: { search: () => [] } },
+    changeSettings: { get: () => Settings.parse(SETTINGS_DEFAULTS), emit: () => undefined },
     // Every wired tool: what the role library narrows is the toolsFor tests' business.
     toolsFor: (_pet, tools) => tools,
     ...overrides,
@@ -64,6 +66,7 @@ const ALL_TOOLS = [
   'point_at',
   'recall_day',
   'search_history',
+  'change_settings',
 ];
 
 describe('ToolRegistry.forTurn', () => {
@@ -95,11 +98,11 @@ describe('ToolRegistry.forTurn', () => {
     const tools = new ToolRegistry(everything()).forTurn(fakeTurn()).tools;
     const writes = tools.filter((tool) => tool.kind === 'write').map((tool) => tool.id);
 
-    expect(writes).toEqual(['remember', 'watch_for']);
+    expect(writes).toEqual(['remember', 'watch_for', 'change_settings']);
     expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(13);
   });
 
-  it('gives a companion its tools, then the routine tools (write), point_at, recall_day and search_history', () => {
+  it('gives a companion its tools, then the routine tools (write), point_at, recall_day, search_history and change_settings', () => {
     const experts = {
       experts: () => [
         {
@@ -158,13 +161,14 @@ describe('ToolRegistry.forTurn', () => {
       'point_at',
       'recall_day',
       'search_history',
+      'change_settings',
     ]);
-    for (const id of ['hand_to_expert', 'create_routine', 'change_routine']) {
+    for (const id of ['hand_to_expert', 'create_routine', 'change_routine', 'change_settings']) {
       expect(tools.find((tool) => tool.id === id)?.kind).toBe('write');
     }
   });
 
-  it('appends tell_expert last, and only while a hand-off is running', () => {
+  it('offers tell_expert just before change_settings, and only while a hand-off is running', () => {
     const base = {
       experts: () => [],
       routes: { get: () => null, remember: () => undefined },
@@ -182,7 +186,7 @@ describe('ToolRegistry.forTurn', () => {
         .forTurn(fakeTurn())
         .tools.map((tool) => tool.id);
     expect(ids([])).toEqual(ALL_TOOLS);
-    expect(ids([run])).toEqual([...ALL_TOOLS, 'tell_expert']);
+    expect(ids([run])).toEqual([...ALL_TOOLS.slice(0, -1), 'tell_expert', 'change_settings']);
   });
 
   it('builds only what is wired: no perception options, no perception tools', () => {
@@ -251,6 +255,13 @@ describe('toolsFor', () => {
     expect(turn.definitions.map((definition) => definition.name)).not.toContain('watch_for');
     const outcome = await turn.run({ name: 'watch_for', input: { condition: 'a build ends' } });
     expect(outcome.isError).toBe(true);
+  });
+
+  it('still offers change_settings on a routine’s turn: the tool refuses loosening there', () => {
+    const turn = new ToolRegistry(everything()).forTurn(
+      fakeTurn({ routine: { routineId: 'r', handedOff: () => undefined } }),
+    );
+    expect(turn.definitions.map((definition) => definition.name)).toContain('change_settings');
   });
 
   it('never offers watch_for to the companion on a routine’s turn, though its role lists it', () => {

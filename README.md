@@ -155,6 +155,7 @@ app's own client is `apps/desktop/src/main/engine-client.ts`. Read
 | Connections: Scout uses your apps over MCP (Notion, GitHub, Linear, Claude Code's servers); every change asks first                    |                                                                     |
 | Routines: Scout does things on its own, on a schedule or when something happens, and tells you in the bubble, aloud or by notification |                                                                     |
 | Spend: Home shows what Scout and the experts used, and an optional daily budget pauses proactive comments and routines                 |                                                                     |
+| Change settings by talking: "talk a bit slower" shows a card, and nothing changes until you click Apply                                |                                                                     |
 | Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                                      | ElevenLabs voice cost on the Spend card                             |
 | Vision routing in the engine: a text-only model hands pictures to a vision model it names (Home sets none yet)                         | Data export and delete-all in Settings                              |
 | Memory across restarts, rolling screen memory Scout recalls from (opt-in), and watches Scout starts                                    | Code signing (the installer is unsigned) and an app icon of its own |

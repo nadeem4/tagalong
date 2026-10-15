@@ -23,7 +23,7 @@ describe('SightLogEntry', () => {
     expect(Object.keys(SightLogEntry.shape)).not.toContain('image');
   });
 
-  it('names the six kinds of looking and sending', () => {
+  it('names the kinds of looking and sending, and a settings change made by talk', () => {
     expect(SightKind.options).toEqual([
       'listed_windows',
       'read_text',
@@ -31,6 +31,7 @@ describe('SightLogEntry', () => {
       'sent_to_ai',
       'sent_to_expert',
       'read_element_names',
+      'changed_by_talk',
     ]);
   });
 

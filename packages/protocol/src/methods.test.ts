@@ -94,6 +94,7 @@ const CORE_TO_HOST_NOTIFICATIONS = [
   'routines.changed',
   'pet.mood',
   'pickUp.ready',
+  'settings.proposed',
 ] as const;
 
 describe('method catalog', () => {
