@@ -1821,7 +1821,8 @@ above a **Message** box. It is the same component, so it is the same conversatio
 - **"Scout, what's wrong?"** (the health check). `wantsHealthCheck` (`ui/health-ask.ts`) runs in
   `submit`, for typed and spoken questions alike, and matches only the whole question ("what's
   wrong", "are you ok", "health check", "why can't you hear me", with or without "Scout"; never
-  "what's wrong with this code"). On a match the bubble calls `bridge.checkHealth()` instead of
+  "what's wrong with this code", nor words that also fit the person's work, such as "what's
+  broken?", "is anything broken?" or "are you working?"). On a match the bubble calls `bridge.checkHealth()` instead of
   `ask`: no turn, no tool and no model call, so it works when the brain is down. A host without
   `checkHealth` (the extension) asks Scout as before. The desktop's `checkHealth`
   (`renderer/src/health-facts.ts#gatherHealth`) reads, at once and from calls that already exist:
@@ -1830,7 +1831,8 @@ above a **Message** box. It is the same component, so it is the same conversatio
   `listMicrophones` against `voice.microphoneId`, the `voiceModels` IPC (`{ mouth, ears }`, a look on
   disk with `kokoroDownloaded` and `filesPresent(EARS_FILES)`, never a download) and the engine's
   `hosts.status` (`{ extension }`, from the server's sessions; desktop only, not in
-  `EXTENSION_METHODS`). A call that fails gives an `unknown` row; `gatherHealth` never throws. The
+  `EXTENSION_METHODS`). Every call gets 5 s; one that fails or takes longer gives an `unknown`
+  row for its own check only, so one slow call never hangs the card; `gatherHealth` never throws. The
   pure `healthRows(facts)` (`ui/health.ts`) turns that into one row per check, `ok`, `broken`,
   `info` or `unknown`, and `HealthCard` shows them under "Two things need you." or "Everything's
   working.", which is the only line said aloud. The ears count only once Always listening is on or

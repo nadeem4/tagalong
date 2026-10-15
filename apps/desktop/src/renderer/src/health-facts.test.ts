@@ -149,6 +149,55 @@ describe('gatherHealth', () => {
     }
   });
 
+  it('gives up on any call that hangs: that row is unknown, the rest still read', async () => {
+    vi.useFakeTimers();
+    try {
+      const hang = () => new Promise<never>(() => undefined);
+      const pending = gatherHealth(
+        deps({
+          listExperts: hang,
+          listConnections: hang,
+          listMicrophones: hang,
+          voiceModels: hang,
+          hostsStatus: hang,
+          testBudgetMs: 5_000,
+        }),
+      );
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(await pending).toEqual({
+        brain: 'ready',
+        experts: 'unknown',
+        connections: 'unknown',
+        voice: 'unknown',
+        microphone: 'unknown',
+        extension: 'unknown',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('gives up on a host view that hangs, and says the brain is unknown', async () => {
+    vi.useFakeTimers();
+    try {
+      let settled = false;
+      const pending = gatherHealth(
+        deps({
+          getHostView: () => new Promise<never>(() => undefined),
+          testBudgetMs: 5_000,
+        }),
+      ).then((facts) => {
+        settled = true;
+        return facts;
+      });
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(settled).toBe(true);
+      expect((await pending).brain).toBe('unknown');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('never carries a key, only whether one is stored', async () => {
     const facts = await gatherHealth(
       deps({

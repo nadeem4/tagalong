@@ -14,7 +14,7 @@ export interface HealthDeps {
   listMicrophones(): Promise<{ id: string }[]>;
   voiceModels(): Promise<VoiceModels>;
   hostsStatus(): Promise<{ extension: boolean }>;
-  /** How long one expert's test, or the sign-in check, may take before it counts as failed. */
+  /** How long each call (one expert's test, the sign-in, every read) may take before it fails. */
   testBudgetMs: number;
 }
 
@@ -39,15 +39,6 @@ async function within<T, F>(work: () => Promise<T>, ms: number, fallback: F): Pr
   }
 }
 
-/** Never rejects: a call that fails is `unknown` for its own row only. */
-async function attempt<T>(work: () => Promise<T>): Promise<T | 'unknown'> {
-  try {
-    return await work();
-  } catch {
-    return 'unknown';
-  }
-}
-
 async function brainOf(
   view: HostView | 'unknown',
   deps: HealthDeps,
@@ -65,7 +56,7 @@ async function brainOf(
 }
 
 async function expertsOf(deps: HealthDeps): Promise<HealthFacts['experts']> {
-  const experts = await attempt(() => deps.listExperts());
+  const experts = await within(() => deps.listExperts(), deps.testBudgetMs, 'unknown' as const);
   if (experts === 'unknown') return 'unknown';
   return Promise.all(
     experts
@@ -86,6 +77,9 @@ async function expertsOf(deps: HealthDeps): Promise<HealthFacts['experts']> {
  * no model call. Never throws. Never reads a key: only whether one is stored.
  */
 export async function gatherHealth(deps: HealthDeps): Promise<HealthFacts> {
+  // Every call gets the budget: one that hangs is `unknown` for its own row, never the card.
+  const attempt = <T>(work: () => Promise<T>) =>
+    within(work, deps.testBudgetMs, 'unknown' as const);
   const [view, experts, connections, microphones, models, hosts] = await Promise.all([
     attempt(() => deps.getHostView()),
     expertsOf(deps),

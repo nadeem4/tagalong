@@ -267,13 +267,13 @@ _Not the default configuration._
    Chrome extension not paired.
 2. **Action:** (a) type "Scout, what's wrong?" in the bubble; (b) press **Fix it** on the Brain
    row; (c) ask again and press **Fix it** on the Voice row; (d) say "are you OK?" with the talk
-   key; (e) type "what's wrong with this code?".
+   key; (e) type "what's wrong with this code?", then "what's broken?".
 3. **Expected:** (a) at once, with no "thinking", a card starting "Two things need you.", then a
    row each for Brain ("I'm signed out of Claude."), Experts, Connections, Voice ("The ElevenLabs
    voice has no key."), Microphone and Browser extension ("Not connected (optional)", grey, with
    **Set up**); only the first line is spoken; no key appears anywhere on the card. (b) Home opens
    on Settings, scrolled to How Scout thinks. (c) Home opens at Settings › Voice. (d) the same card.
-   (e) Scout answers it as a normal question. With everything fixed, the card says "Everything's
+   (e) Scout answers both as normal questions; no card. With everything fixed, the card says "Everything's
    working.". With the engine stopped, the rows it cannot read say "I couldn't check this." and the
    card still shows.
 

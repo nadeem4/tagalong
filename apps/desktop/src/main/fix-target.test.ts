@@ -18,7 +18,26 @@ describe('fixPage', () => {
   });
 
   it('refuses anything not on the list, rather than open a page a window named', () => {
-    for (const target of ['advanced', 'settings#brain', '../x', 42, null, {}]) {
+    const odd = [
+      'advanced',
+      'settings#brain',
+      'experts#x',
+      'Brain',
+      ' brain',
+      '../x',
+      'https://example.com',
+      '__proto__',
+      'constructor',
+      'toString',
+      'hasOwnProperty',
+      '',
+      42,
+      null,
+      {},
+      ['brain'],
+      { toString: () => 'brain' },
+    ];
+    for (const target of odd) {
       expect(() => fixPage(target)).toThrow('Tagalong has no fix');
     }
   });
