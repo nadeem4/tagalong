@@ -32,6 +32,15 @@ describe('routineDelivery', () => {
     });
   });
 
+  it('sends a meeting prep held by a call as a notification only, never aloud', () => {
+    // The engine turns a prep that waited past its meeting's start into notification only.
+    expect(routineDelivery(result({ notification: true }), shown)).toEqual({
+      line: false,
+      speak: false,
+      notice: { title: 'Morning papers', body: 'Two new papers. The first matters most.' },
+    });
+  });
+
   it('never covers a bubble in use, or a hidden Scout: a notification says it instead', () => {
     expect(
       routineDelivery(result({ bubble: true }), { avatarVisible: true, panelVisible: true }),

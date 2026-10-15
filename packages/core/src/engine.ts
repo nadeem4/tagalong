@@ -66,6 +66,7 @@ import { SightLog } from './memory/sight-log';
 import { recordSnapshot, sightedHosts } from './perception/record-sight';
 import { recordBrain } from './providers/record-brain';
 import { recordExpertSends } from './experts/record-expert';
+import { CalendarFeed, httpsFetchText, type FetchText } from './meetings/calendar-feed';
 
 /** Key the Anthropic API key is filed under in the host's SecretStore. */
 export const ANTHROPIC_KEY = SECRET_KEYS.anthropic!;
@@ -154,6 +155,8 @@ export interface EngineOptions {
   connectorTransport?: TransportFor | undefined;
   /** Claude Code's config, read-only, for Found on this PC. Defaults to `~/.claude.json`. */
   claudeCodeConfigPath?: string | undefined;
+  /** How Meeting prep's .ics link is fetched. Tests pass a fake; never the network. */
+  calendarFetch?: FetchText | undefined;
 }
 
 /**
@@ -408,11 +411,19 @@ export class Engine {
       },
     });
 
+    // Meeting prep's calendar: the .ics link from the keychain, fetched every 15 min at most.
+    const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const calendar = new CalendarFeed({
+      secrets: options.secretStore,
+      fetchText: options.calendarFetch ?? httpsFetchText(),
+      clock: systemWatchClock,
+      timeZone,
+    });
     // Routines run as Scout turns in the background, on the system clock and time zone.
     const routines = new Routines({
       store: routineStore,
       clock: systemWatchClock,
-      timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+      timeZone,
       pet: () => pets.get(settings.get().defaultPetId),
       experts: () => experts.list(),
       exclusions: () => settings.get().captureExclusions,
@@ -443,6 +454,7 @@ export class Engine {
       windows: listHostWindows,
       emit: (event) => live.server?.broadcast(event.method, event.params),
       log: (message) => console.warn(`[engine] ${message}`),
+      meetings: calendar,
     });
     live.routines = routines;
 
@@ -482,6 +494,7 @@ export class Engine {
       interruptedAtBoot,
       routines,
       pickUp,
+      calendar,
       claudeCodeConfigPath: options.claudeCodeConfigPath,
       sightLog,
       checkResolve: guarded,
@@ -571,6 +584,7 @@ function buildHandlers(parts: {
   connectorFor: (expert: Expert) => Connector;
   routines: Routines;
   pickUp: PickUp;
+  calendar: CalendarFeed;
   /** The guarded resolver turns use, for the one-off greeting call. */
   resolve: ProviderResolver;
   models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
@@ -590,6 +604,7 @@ function buildHandlers(parts: {
   const { refreshProviders, experts, routes, handoffs, projects, connectorFor, resolve } = parts;
   const { keepAnEye, connections, approvals, routines, interruptedAtBoot, pickUp } = parts;
   const { sightLog, checkResolve } = parts;
+  const { calendar } = parts;
   /** A manager refusal (an id taken, none such) as an invalidParams error the host shows. */
   const plainly = async <T>(work: () => Promise<T>): Promise<T> => {
     try {
@@ -795,5 +810,11 @@ function buildHandlers(parts: {
     'sightLog.list': (params) => ({ entries: sightLog.list(params.limit) }),
     'sightLog.delete': (params) => ({ deleted: sightLog.delete(params.id) }),
     'sightLog.clear': () => ({ deleted: sightLog.clear() }),
+    // Meeting prep's link goes to the keychain, never to settings; the answer never holds it.
+    'calendar.setLink': async (params) => {
+      await calendar.setLink(params.link);
+      return calendar.check();
+    },
+    'calendar.check': () => calendar.check(),
   };
 }

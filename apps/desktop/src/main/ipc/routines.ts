@@ -56,6 +56,11 @@ export function registerRoutineIpc(handle: IpcHandle, deps: RoutineIpcDeps): voi
   handle(IPC.dismissRoutine, async (_event, proposalId: string) => {
     await engine().call('routines.dismiss', { proposalId });
   });
+  // Meeting prep's link: straight to the engine, which keeps it in the keychain.
+  handle(IPC.setCalendarLink, (_event, link: string | null) =>
+    engine().call('calendar.setLink', { link }),
+  );
+  handle(IPC.checkCalendar, () => engine().call('calendar.check', {}));
   // The card's Edit: Home opens on Routines with the card's routine in the form.
   handle(IPC.editRoutine, (_event, proposal: RoutineProposedParams) => {
     deps.openOffice('routines');

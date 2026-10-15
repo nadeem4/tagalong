@@ -137,3 +137,37 @@ export function dueSlot(
   const latest = latestDue(schedule, now, timeZone);
   return latest !== null && latest > lastHandled ? latest : null;
 }
+
+/** A meeting's start, the one thing meeting routines time against. Epoch ms. */
+interface Timed {
+  readonly start: number;
+}
+
+/**
+ * The meetings a "minutes before" routine is due for now: inside their lead time, not yet
+ * started, and later than the last meeting it ran for. Meetings that start together are
+ * due together, so they share one run.
+ */
+export function dueMeetings<T extends Timed>(
+  meetings: readonly T[],
+  minutesBefore: number,
+  lastHandled: number,
+  now: number,
+): T[] {
+  const lead = minutesBefore * 60_000;
+  return meetings.filter((m) => m.start - lead <= now && now < m.start && m.start > lastHandled);
+}
+
+/** When a "minutes before" routine runs next, from the meetings known, or null. */
+export function nextMeetingRun(
+  meetings: readonly Timed[],
+  minutesBefore: number,
+  lastHandled: number,
+  now: number,
+): number | null {
+  const starts = meetings
+    .map((m) => m.start)
+    .filter((start) => start > now && start > lastHandled)
+    .sort((a, b) => a - b);
+  return starts[0] === undefined ? null : Math.max(starts[0] - minutesBefore * 60_000, now);
+}

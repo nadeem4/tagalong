@@ -183,7 +183,7 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   [Experts and connectors](#experts-and-connectors)), and `greeting.compose { petId }` →
   `{ text, source: 'model' | 'fallback' }`, the line said as the app opens (see Welcome below), and
   `keepAnEye.observe { windows }`, `keepAnEye.notNow` and `keepAnEye.accept { remarkId }` (see
-  [Keeping an eye on things](#keeping-an-eye-on-things)), and the `connections.*` and
+  [Keeping an eye on things](#keeping-an-eye-on-things)), and the `connections.*`, `calendar.*` and
   `routines.*` methods. Protocol 0.13.0: the crew's `pets.delete`, `roles.list`,
   `roles.recommendModel`, `notices.rolesUpgrade` and `notices.dismiss` are gone.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
@@ -602,7 +602,8 @@ A routine is **when** + **what** + **where the result goes**: "every weekday at 
 on AI agents and explain the best one simply". Each run is one Scout turn with Scout's normal tools.
 Everything lives in `packages/core/src/routines/`, pure and on an injected clock; the schemas are in
 `packages/protocol/src/routines.ts`. There is no cron and no workflow engine: a schedule is days of
-the week and a time, and the triggers are a fixed set of four.
+the week and a time, and the triggers are a fixed set of five: Tagalong opens, an app appears, an
+expert finishes, a watch fires, and minutes before each meeting.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000'}}}%%
@@ -611,18 +612,21 @@ flowchart LR
   K -- "routines.confirm (Save)" --> S[(routines table)]
   H["Home: routines.save"] --> S
   S --> R["Routines: tick every 15 s"]
-  R -- "schedule slot, launch, app appears, expert finishes, watch fires" --> T["Background Scout turn"]
+  F["CalendarFeed: .ics link from the keychain, every 15 min"] --> R
+  R -- "schedule slot, launch, app appears, expert finishes, watch fires, meeting soon" --> T["Background Scout turn"]
   T -- "pre-approved hand-off" --> E["Expert, read-only, web, no project"]
   T --> Q["Result waits while a call or full screen is in front"]
   E --> Q
   Q -- "routine.result" --> B["Bubble line, voice, notification"]
+  Q -- "meeting prep past its start" --> N["Notification only"]
   T --> A["Activity: routine row"]
 ```
 
 **The data.** `Routine` is `{ id, name, enabled, when, what, topics, deliver, handTo?, uses,
 createdAt }`. `when` is `{ type: 'schedule', days, time }` (days are `Date#getDay` numbers, `time` is
 `HH:MM`, 24-hour; daily, weekdays and weekly are all this one shape), `{ type: 'launch' }`,
-`{ type: 'app', match }`, `{ type: 'expert' }` or `{ type: 'watch' }`. `deliver` is `{ bubble, voice,
+`{ type: 'app', match }`, `{ type: 'expert' }`, `{ type: 'watch' }` or `{ type: 'meeting',
+minutesBefore }` (an integer from 5 to 60; Home offers 10 and 30). `deliver` is `{ bubble, voice,
 notification }`; Activity always gets the run. `handTo` is the one expert the routine may hand to
 without a card, and `uses` is display only, for the card. `RoutineStore` keeps one row each in the
 `routines` table (migration 13): the definition as JSON, and beside it `last_due_at` (the latest
@@ -636,7 +640,25 @@ what the person saved. Migration 13 also rebuilds `activity` with `routine` amon
 the first of a time the clocks repeat in autumn and moves a time they skip in spring forward by the
 gap (01:30 on the night London skips 01:00 to 02:00 runs at 02:30). `dueSlot(when, lastHandled, now)`
 is the latest slot at or before now that is newer than the last one handled, or null: a PC that slept
-through three mornings runs the routine once, for the latest morning.
+through three mornings runs the routine once, for the latest morning. `dueMeetings` and
+`nextMeetingRun` do the same for meeting routines, against meeting starts instead of slots.
+
+**Meeting prep's calendar** (`packages/core/src/meetings/calendar-feed.ts`). The source is the
+person's secret .ics link, not a calendar MCP server: Google's needs the person's own Cloud project,
+and polling a server would cost a model turn each time, while a `GET` parsed by code costs nothing.
+`CalendarFeed` reads the link from the `SecretStore` under `calendar.ics` (never `Settings`, so
+`settings.get` never returns it) and fetches it through an injected `FetchText` at most once every
+`FEED_REFRESH_MS` (15 min), https only, with a 10 s time limit and a 2 MB cap (`httpsFetchText` is
+the real one; tests pass a fake and fixture strings). `parseMeetings` uses `ical.js` (pinned
+exactly; pure JS, no dependencies) to expand RRULE, EXDATE, moved instances (RECURRENCE-ID) and
+VTIMEZONE, falling back to the IANA zone a TZID names, or the person's, through `zonedToEpoch`. It
+keeps the next 36 hours, and leaves out all-day events, cancelled ones and solo blocks (fewer than
+two people among the attendees and organizer, and no description). A description is cut at 600
+characters. A failed fetch keeps the last good list and sets `problem()`, a plain line such as
+"Could not read your calendar: the calendar host answered 404." that never holds the link; Home
+shows it on the routine's row. `calendar.setLink { link }` (https or null) keeps or forgets the
+link and fetches once; it and `calendar.check {}` answer `{ linked, meetings, error? }`, never the
+link.
 
 **The scheduler** (`Routines`). `start()` at boot runs the `launch` routines and ticks at once, then
 every `ROUTINE_TICK_MS` (15 s). A tick runs each enabled schedule routine with a due slot, writing
@@ -649,12 +671,22 @@ missed while it was new or off runs. App routines read the window list from the 
 and a window the host marked `blocked` or that `findCaptureBlock` refuses never triggers anything.
 `handoffFinished` runs the `expert` routines with the expert's name and the first 600 characters of
 its answer, except for a hand-off a routine itself started; `watchFired` runs the `watch` routines
-with the watch's message. One run per routine at a time. A routine's own turn is never offered
+with the watch's message. Meeting routines run on the same tick: when `start - minutesBefore <=
+now < start` and `start > last_due_at`, `last_due_at` is set to the start before the run, so the
+existing column means no migration and no second run across ticks or a restart, and meetings that
+start together share one run. A meeting that has started is never prepped late. **Run now** on a
+meeting routine preps for the next meeting there is, or says there is none. One run per routine at a
+time. A routine's own turn is never offered
 `watch_for`, so a watch routine cannot start the watch that sets it off again.
 
 **A run.** The instruction becomes the text of a Scout turn, headed `[Routine "<name>", <when>]`,
 with the topics, what triggered it, whether it ran late, and the line that the person is not
-watching. It goes to `ConversationRunner.run` with `background: true` (it neither stops the
+watching. For a meeting, what triggered it is each meeting's title, start in the person's time,
+attendees, room or link, and description, inside a `<calendar_data>` fence with the line that it is
+invite text, not instructions, because anyone can send an invite; a fence tag inside the text is
+turned into full-width brackets, the same way as `<app_data>`. The routine's `what` asks for the
+four parts (agenda, last thread, related docs, open questions), found through Scout's memory and
+connected apps' read tools. It goes to `ConversationRunner.run` with `background: true` (it neither stops the
 person's own turn nor is stopped by it) and `routine: { routineId, expertId, handedOff }`, which
 rides on `turn.started` as `routineId` and reaches the tools as `ToolContext.routine`. It runs in a
 new conversation of Scout's, whose id comes back with the result, so a follow-up ("explain the second
@@ -683,19 +715,26 @@ dontAsk`, so it cannot read a project or edit a file. The run then waits for tha
 state, line, text, late, deliver, activityId }`. `line` is the routine's name and the answer's first
 sentence (`Morning papers (ran late): ...`, or `Morning papers did not run: ...`). Results wait in
 memory while no host is connected, or while the window in front is full screen or a call (`isMeeting`,
-the same check keeping an eye on things uses), and go out on the first tick that is clear. Activity
+the same check keeping an eye on things uses), and go out on the first tick that is clear. A meeting
+prep still waiting when its meeting starts is useless later, so it goes out then with `deliver`
+set to a Windows notification only, which the desktop never speaks (`routineDelivery`). The moods
+work lifts the call and full-screen check into one `callOrFullScreenInFront` helper; once that is
+on main, this check uses it too. Activity
 has one `routine` row per run: the name, the state, the answer or the error, and the conversation.
 
 **Scout's card.** `create_routine` (`tools/builtin/routines.ts`) takes `{ name, when, what, topics?,
 result?, hand_to?, uses? }`, where `when.type` is `daily`, `weekdays`, `weekly` (with `days` such as
-`["mon", "thu"]`), `launch`, `app` (with `match`), `expert` or `watch`. It validates the draft against
+`["mon", "thu"]`), `launch`, `app` (with `match`), `expert`, `watch` or `meeting` (with
+`minutes_before`, 10 when left out). Scout never asks for the calendar link in chat: it is pasted in
+Home's Meeting prep form. It validates the draft against
 `RoutineDraft`, refuses an expert that is not switched on by naming the ones that are, and calls
 `Routines.propose`, which emits `routine.proposed { proposalId, petId, action, routine, routineId?,
 handToName? }` and saves nothing. `change_routine { name, action, ...fields }` finds a saved routine
 by name (its description lists them) and proposes `update` (the change laid over the saved one),
 `pause`, `resume` or `delete`. `routines.confirm { proposalId, routine? }` does what the card said,
 with the person's edit when there is one; `routines.dismiss` drops it. Home's methods are
-`routines.list` (with `lastRunAt`, `lastState`, `lastActivityId` and, for schedules, `nextRunAt`),
+`routines.list` (with `lastRunAt`, `lastState`, `lastActivityId`, for schedules and meetings
+`nextRunAt`, and for meetings `problem` when the calendar cannot be read),
 `routines.save`, `routines.delete`, `routines.setEnabled` and `routines.runNow` (answers at once; the
 result arrives as `routine.result`). Every change is broadcast as `routines.changed`.
 

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { coreToHostNotifications, hostToCoreMethods } from './methods';
-import { Routine, RoutineDraft, describeDeliver, describeWhen } from './routines';
+import {
+  CalendarCheckResult,
+  CalendarSetLinkParams,
+  Routine,
+  RoutineDraft,
+  describeDeliver,
+  describeWhen,
+} from './routines';
 
 const BASE = {
   id: '6f1c2f4e-8a7b-4c1d-9e2f-3a4b5c6d7e8f',
@@ -26,6 +33,7 @@ describe('Routine', () => {
       { type: 'app', match: 'Outlook' },
       { type: 'expert' },
       { type: 'watch' },
+      { type: 'meeting', minutesBefore: 10 },
     ]) {
       expect(Routine.safeParse({ ...BASE, when }).success).toBe(true);
     }
@@ -41,6 +49,9 @@ describe('Routine', () => {
       { type: 'schedule', days: [1], time: '24:00' },
       { type: 'schedule', days: [7], time: '08:00' },
       { type: 'app', match: '  ' },
+      { type: 'meeting', minutesBefore: 4 },
+      { type: 'meeting', minutesBefore: 61 },
+      { type: 'meeting', minutesBefore: 7.5 },
     ];
     for (const when of bad) expect(Routine.safeParse({ ...BASE, when }).success).toBe(false);
   });
@@ -66,6 +77,7 @@ describe('describeWhen', () => {
     expect(describeWhen({ type: 'app', match: 'Outlook' })).toBe('When Outlook appears');
     expect(describeWhen({ type: 'expert' })).toBe('When an expert finishes');
     expect(describeWhen({ type: 'watch' })).toBe('When a watch fires');
+    expect(describeWhen({ type: 'meeting', minutesBefore: 10 })).toBe('10 min before each meeting');
   });
 });
 
@@ -80,6 +92,24 @@ describe('describeDeliver', () => {
   });
 });
 
+describe('the calendar link', () => {
+  it('takes an https link, or null to forget it, and nothing else', () => {
+    expect(
+      CalendarSetLinkParams.safeParse({ link: 'https://calendar.google.com/x/basic.ics' }).success,
+    ).toBe(true);
+    expect(CalendarSetLinkParams.safeParse({ link: null }).success).toBe(true);
+    expect(CalendarSetLinkParams.safeParse({ link: 'http://example.com/a.ics' }).success).toBe(
+      false,
+    );
+    expect(CalendarSetLinkParams.safeParse({ link: 'not a link' }).success).toBe(false);
+  });
+
+  it('a check says whether a link is kept, never the link itself', () => {
+    const shape = Object.keys(CalendarCheckResult.shape).sort();
+    expect(shape).toEqual(['error', 'linked', 'meetings']);
+  });
+});
+
 describe('the routine methods', () => {
   it('are catalogued', () => {
     for (const method of [
@@ -90,6 +120,8 @@ describe('the routine methods', () => {
       'routines.runNow',
       'routines.confirm',
       'routines.dismiss',
+      'calendar.setLink',
+      'calendar.check',
     ]) {
       expect(Object.keys(hostToCoreMethods)).toContain(method);
     }

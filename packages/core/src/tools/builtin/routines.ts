@@ -38,15 +38,20 @@ const WHEN_SCHEMA = {
   description:
     'daily, weekdays or weekly (with days) at a 24-hour time; or a trigger: launch (Tagalong ' +
     'opens), app (a window whose title or app name contains match appears), expert (an expert ' +
-    'finishes), watch (a watch fires).',
+    'finishes), watch (a watch fires), meeting (minutes_before each meeting on the calendar ' +
+    'linked in Home; the person pastes that link in the Meeting prep form, never in chat).',
   properties: {
     type: {
       type: 'string',
-      enum: ['daily', 'weekdays', 'weekly', 'launch', 'app', 'expert', 'watch'],
+      enum: ['daily', 'weekdays', 'weekly', 'launch', 'app', 'expert', 'watch', 'meeting'],
     },
     time: { type: 'string', description: 'HH:MM, 24-hour, such as 08:00.' },
     days: { type: 'array', items: { type: 'string', enum: DAY_IDS } },
     match: { type: 'string', description: 'For app: part of the window title or app name.' },
+    minutes_before: {
+      type: 'integer',
+      description: 'For meeting: 5 to 60 minutes before each meeting. Default 10.',
+    },
   },
   required: ['type'],
 };
@@ -152,8 +157,12 @@ function whenFrom(value: unknown): RoutineWhen | string {
       return { type: when['type'] };
     case 'app':
       return { type: 'app', match: typeof when['match'] === 'string' ? when['match'] : '' };
+    case 'meeting': {
+      const minutes = when['minutes_before'] ?? 10;
+      return { type: 'meeting', minutesBefore: typeof minutes === 'number' ? minutes : NaN };
+    }
     default:
-      return 'when.type must be daily, weekdays, weekly, launch, app, expert or watch.';
+      return 'when.type must be daily, weekdays, weekly, launch, app, expert, watch or meeting.';
   }
 }
 

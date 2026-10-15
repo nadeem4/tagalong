@@ -73,6 +73,10 @@ import {
   RoutinesSaveResult,
   RoutinesSetEnabledParams,
   RoutinesSetEnabledResult,
+  CalendarCheckParams,
+  CalendarCheckResult,
+  CalendarSetLinkParams,
+  CalendarSetLinkResult,
 } from './routines';
 import { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './limits';
 import {
@@ -510,6 +514,8 @@ export const hostToCoreMethods = {
   'sightLog.list': { params: SightLogListParams, result: SightLogListResult },
   'sightLog.delete': { params: SightLogDeleteParams, result: SightLogDeleteResult },
   'sightLog.clear': { params: SightLogClearParams, result: SightLogClearResult },
+  'calendar.setLink': { params: CalendarSetLinkParams, result: CalendarSetLinkResult },
+  'calendar.check': { params: CalendarCheckParams, result: CalendarCheckResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostMethods = {

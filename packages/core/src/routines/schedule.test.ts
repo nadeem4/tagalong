@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dueSlot, latestDue, nextDue, zonedToEpoch } from './schedule';
+import { dueMeetings, dueSlot, latestDue, nextDue, nextMeetingRun, zonedToEpoch } from './schedule';
 
 const LONDON = 'Europe/London';
 const NEW_YORK = 'America/New_York';
@@ -89,5 +89,26 @@ describe('dueSlot', () => {
     expect(iso(dueSlot(WEEKDAYS_8, monday8, at('2026-10-15T09:00:00Z'), LONDON))).toBe(
       '2026-10-15T07:00:00.000Z',
     );
+  });
+});
+
+describe('meetings', () => {
+  const MIN = 60_000;
+  const ten = { start: at('2026-10-12T09:00:00Z') };
+  const half = { start: at('2026-10-12T09:30:00Z') };
+
+  it('is due inside the lead time, before the start, once per meeting', () => {
+    expect(dueMeetings([ten, half], 10, 0, ten.start - 11 * MIN)).toEqual([]);
+    expect(dueMeetings([ten, half], 10, 0, ten.start - 10 * MIN)).toEqual([ten]);
+    expect(dueMeetings([ten, half], 10, ten.start, ten.start - 5 * MIN)).toEqual([]);
+    expect(dueMeetings([ten, half], 10, 0, ten.start)).toEqual([]);
+  });
+
+  it('runs next at the lead time before the next meeting not yet handled', () => {
+    expect(nextMeetingRun([half, ten], 10, 0, ten.start - 60 * MIN)).toBe(ten.start - 10 * MIN);
+    expect(nextMeetingRun([half, ten], 10, ten.start, ten.start - 5 * MIN)).toBe(
+      half.start - 10 * MIN,
+    );
+    expect(nextMeetingRun([], 10, 0, ten.start)).toBeNull();
   });
 });

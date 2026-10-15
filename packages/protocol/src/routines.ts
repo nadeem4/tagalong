@@ -3,7 +3,7 @@ import { z } from 'zod';
 /**
  * Routines: when + what + where the result goes. "Every weekday at 8, give me new papers on
  * AI agents." The engine runs each one as a Scout turn on a schedule or a trigger; the person
- * never writes cron, only picks days and a time, or one of four triggers.
+ * never writes cron, only picks days and a time, or one of five triggers.
  */
 
 /** Days of the week as `Date#getDay` numbers: 0 is Sunday. */
@@ -24,6 +24,11 @@ export const RoutineWhen = z.discriminatedUnion('type', [
   z.object({ type: z.literal('expert') }),
   /** A watch fires. */
   z.object({ type: z.literal('watch') }),
+  /**
+   * Minutes before each meeting on the calendar linked in Home (an .ics link kept in the
+   * keychain, never in a routine or in settings). Home offers 10 and 30.
+   */
+  z.object({ type: z.literal('meeting'), minutesBefore: z.number().int().min(5).max(60) }),
 ]);
 export type RoutineWhen = z.infer<typeof RoutineWhen>;
 
@@ -72,8 +77,10 @@ export const RoutineView = Routine.extend({
   lastState: z.enum(['running', 'done', 'error']).optional(),
   /** The Activity entry of the last run. */
   lastActivityId: z.string().min(1).optional(),
-  /** Schedules only. */
+  /** Schedules and meetings. */
   nextRunAt: z.iso.datetime().optional(),
+  /** What stops it, in plain words: a calendar that cannot be read. Meeting routines only. */
+  problem: z.string().min(1).optional(),
 });
 export type RoutineView = z.infer<typeof RoutineView>;
 
@@ -103,6 +110,8 @@ export function describeWhen(when: RoutineWhen): string {
       return 'When an expert finishes';
     case 'watch':
       return 'When a watch fires';
+    case 'meeting':
+      return `${when.minutesBefore} min before each meeting`;
   }
 }
 
@@ -189,6 +198,29 @@ export const RoutineResultParams = z.object({
   activityId: z.string().min(1).optional(),
 });
 export type RoutineResultParams = z.infer<typeof RoutineResultParams>;
+
+/**
+ * Meeting prep's calendar: a secret .ics link the engine keeps in the keychain under
+ * `calendar.ics`. It is never in settings, never returned, and only https is taken. Null
+ * forgets it. Saving fetches it once, so the answer says whether it reads.
+ */
+export const CalendarSetLinkParams = z.object({
+  link: z
+    .url({ protocol: /^https$/, error: 'the calendar link must start with https://' })
+    .max(2_000)
+    .nullable(),
+});
+
+/** Whether a link is kept and how many meetings it holds in the next 36 hours; never the link. */
+export const CalendarCheckResult = z.object({
+  linked: z.boolean(),
+  meetings: z.number().int().min(0),
+  /** Why it could not be read, in plain words. */
+  error: z.string().min(1).optional(),
+});
+export type CalendarCheckResult = z.infer<typeof CalendarCheckResult>;
+export const CalendarSetLinkResult = CalendarCheckResult;
+export const CalendarCheckParams = z.object({});
 
 /** Something about the routines changed: Home lists them again. */
 export const RoutinesChangedParams = z.looseObject({});

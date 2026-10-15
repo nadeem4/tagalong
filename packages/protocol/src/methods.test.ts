@@ -64,6 +64,8 @@ const HOST_TO_CORE = [
   'sightLog.list',
   'sightLog.delete',
   'sightLog.clear',
+  'calendar.setLink',
+  'calendar.check',
 ] as const;
 
 const CORE_TO_HOST = ['perception.capture'] as const;
