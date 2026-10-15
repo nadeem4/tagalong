@@ -32,6 +32,15 @@ describe('findElementScript', () => {
     );
   });
 
+  it('makes PowerShell per-monitor DPI aware before UI Automation loads', () => {
+    // UI Automation makes the process system-aware, whose rectangles on a monitor with a
+    // different scale are virtualized; screenToDipRect needs true physical pixels.
+    const script = findElementScript(42, 'Export');
+    const aware = script.indexOf('SetProcessDpiAwarenessContext([IntPtr]-4)');
+    expect(aware).toBeGreaterThan(-1);
+    expect(aware).toBeLessThan(script.indexOf('UIAutomationClient'));
+  });
+
   it('tries an exact name first, then the same name ignoring case', () => {
     const script = findElementScript(42, 'Export');
     const exact = script.indexOf('PropertyCondition($nameProp, $name)');

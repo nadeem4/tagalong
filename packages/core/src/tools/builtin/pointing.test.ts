@@ -33,15 +33,21 @@ function text(content: unknown): string {
 }
 
 describe(POINT_AT, () => {
-  it('offers exactly one of two shapes: a named element in a window, or a display rectangle', () => {
+  it('offers both shapes in one flat object schema the providers accept', () => {
     const definition = toolset([pointer()]).definitions.find((tool) => tool.name === POINT_AT);
-    const schema = definition?.inputSchema as {
-      oneOf?: Array<{ required?: string[] }>;
+    const schema = definition?.inputSchema as Record<string, unknown> & {
+      properties?: Record<string, unknown>;
+      required?: string[];
     };
-    expect(schema.oneOf?.map((shape) => shape.required)).toEqual([
-      ['windowId', 'name'],
-      ['displayId', 'rect'],
-    ]);
+    // The Anthropic and OpenAI APIs reject a tool whose input schema has oneOf, anyOf or
+    // allOf at the top level, which would fail every turn that offers point_at.
+    expect(schema.type).toBe('object');
+    for (const key of ['oneOf', 'anyOf', 'allOf']) expect(schema).not.toHaveProperty(key);
+    expect(Object.keys(schema.properties ?? {}).sort()).toEqual(
+      ['displayId', 'label', 'name', 'rect', 'windowId'].sort(),
+    );
+    // Exactly one shape is enforced when the call is parsed, not by the schema.
+    expect(schema.required ?? []).toEqual([]);
   });
 
   it('is a read tool: it leaves nothing stored behind', () => {

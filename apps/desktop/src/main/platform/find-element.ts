@@ -22,13 +22,26 @@ function safeHandle(handle: number): number {
 }
 
 /**
+ * Per-monitor DPI awareness (v2), set before UI Automation loads. Windows PowerShell starts
+ * unaware and UI Automation then makes it system-aware, and a system-aware process gets
+ * rectangles on a monitor of a different scale virtualized, not in physical pixels. Best
+ * effort: if it cannot be set, single-scale desks still come out right.
+ */
+const PER_MONITOR_AWARE = String.raw`
+try {
+  Add-Type -Namespace Tagalong -Name Dpi -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr value);'
+  [void][Tagalong.Dpi]::SetProcessDpiAwarenessContext([IntPtr]-4)
+} catch {}
+`;
+
+/**
  * The script: the window by handle, then its first descendant whose name matches exactly,
  * then the same name ignoring case. The name arrives as base64 and is decoded inside
  * PowerShell, so text a model chose never becomes code.
  */
 export function findElementScript(handle: number, name: string): string {
   const encoded = Buffer.from(name, 'utf8').toString('base64');
-  return `${WALK_PRELUDE}
+  return `${PER_MONITOR_AWARE}${WALK_PRELUDE}
 $w = Get-TagalongWindow ${safeHandle(handle)}
 if ($null -eq $w) { '{"status":"gone"}' } else {
   $name = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encoded}'))

@@ -2041,15 +2041,18 @@ matters for the hackathon, and carries best-effort, unverified dmg, AppImage and
 ## Point, don't click
 
 `point_at` (`packages/core/src/tools/builtin/pointing.ts`, kind `read`) shows the person where
-something is: a ring with a short label around it, for six seconds. It takes one of two inputs and
-calls the core-to-host method `screen.pointAt` on a host that advertises the `pointer` capability:
+something is: a ring with a short label around it, for six seconds. It takes one of two inputs
+(one flat object schema, since the provider APIs refuse `oneOf` at the top of a tool schema;
+exactly one pair is enforced when the call is parsed) and calls the core-to-host method `screen.pointAt` on a host that advertises the `pointer` capability:
 
 - `{ windowId, name, label? }`, preferred. The desktop host finds the element by its UI Automation
   name inside that window (`platform/find-element.ts`): the inventory's exclusion check first, then a
   script that starts from the window's handle (the same walk prelude as `window-text.ts`), takes the
   first exact name match and falls back to a case-insensitive one. The name reaches PowerShell as
-  base64, never as code. A minimized window is not searched; the answer asks for it to be brought
-  forward.
+  base64, never as code. The script makes PowerShell per-monitor DPI aware (v2) before UI
+  Automation loads, because UI Automation otherwise leaves it system-aware and a system-aware
+  process gets rectangles on a monitor of a different scale virtualized, not in physical pixels.
+  A minimized window is not searched; the answer asks for it to be brought forward.
 - `{ displayId, rect, label? }`, in the display's own pixels, as `look_closer` takes, for something
   only a picture shows.
 

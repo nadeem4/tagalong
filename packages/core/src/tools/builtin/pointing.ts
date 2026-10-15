@@ -28,40 +28,39 @@ const DEFINITION: BrainTool = {
     'on their screen for a few seconds. Prefer naming the element: give a windowId from ' +
     'list_windows and the exact name of the button, menu or field as it reads on screen. ' +
     'Only for something a picture alone shows, give a displayId and a rect in that ' +
-    "display's own pixels, as look_closer takes. Say where it is in words too.",
+    "display's own pixels, as look_closer takes. Give one pair or the other, never both. " +
+    'Say where it is in words too.',
+  // One flat object: the provider APIs refuse oneOf/anyOf/allOf at the top of a tool schema.
+  // "Exactly one of the two pairs" is enforced when the call is parsed (paramsOf).
   inputSchema: {
     type: 'object',
-    oneOf: [
-      {
-        type: 'object',
-        properties: {
-          windowId: { type: 'string', description: 'A window id from list_windows.' },
-          name: { type: 'string', description: 'The element’s name as it reads on screen.' },
-          label: LABEL,
-        },
-        required: ['windowId', 'name'],
-        additionalProperties: false,
+    properties: {
+      windowId: {
+        type: 'string',
+        description: 'A window id from list_windows. Goes with name.',
       },
-      {
-        type: 'object',
-        properties: {
-          displayId: { type: 'number', description: 'A display id from list_displays.' },
-          rect: {
-            type: 'object',
-            properties: {
-              x: { type: 'number' },
-              y: { type: 'number' },
-              width: { type: 'number' },
-              height: { type: 'number' },
-            },
-            required: ['x', 'y', 'width', 'height'],
-          },
-          label: LABEL,
-        },
-        required: ['displayId', 'rect'],
-        additionalProperties: false,
+      name: {
+        type: 'string',
+        description: 'The element’s name as it reads on screen. Goes with windowId.',
       },
-    ],
+      displayId: {
+        type: 'number',
+        description: 'A display id from list_displays. Goes with rect, instead of windowId.',
+      },
+      rect: {
+        type: 'object',
+        description: "In that display's own pixels. Goes with displayId.",
+        properties: {
+          x: { type: 'number' },
+          y: { type: 'number' },
+          width: { type: 'number' },
+          height: { type: 'number' },
+        },
+        required: ['x', 'y', 'width', 'height'],
+      },
+      label: LABEL,
+    },
+    additionalProperties: false,
   },
 };
 

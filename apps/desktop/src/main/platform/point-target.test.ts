@@ -60,6 +60,68 @@ describe('screenRectToTarget', () => {
     });
   });
 
+  /**
+   * Windows' own mapping on a mixed-DPI desk: a 150% primary, physically 2560 wide (1707 DIP),
+   * with a 100% monitor to its right. Physical and DIP origins differ for the second one
+   * (2560 against 1707), so a rect made local with the wrong origin, or scaled by the
+   * primary's factor, lands somewhere else.
+   */
+  const mixed = [
+    { id: 1, physical: { x: 0, y: 0 }, dip: { x: 0, y: 0, width: 1707, height: 960 }, scale: 1.5 },
+    {
+      id: 2,
+      physical: { x: 2560, y: 0 },
+      dip: { x: 1707, y: 0, width: 1920, height: 1080 },
+      scale: 1,
+    },
+  ];
+  const mixedDisplays: PointDisplay[] = mixed.map((d) => ({
+    id: d.id,
+    bounds: d.dip,
+    scaleFactor: d.scale,
+  }));
+  const windowsToDip = (rect: { x: number; y: number; width: number; height: number }) => {
+    const d = rect.x >= 2560 ? mixed[1]! : mixed[0]!;
+    return {
+      x: d.dip.x + (rect.x - d.physical.x) / d.scale,
+      y: d.dip.y + (rect.y - d.physical.y) / d.scale,
+      width: rect.width / d.scale,
+      height: rect.height / d.scale,
+    };
+  };
+
+  it('puts an element on a 100% monitor beside a 150% primary at its own local DIP place', () => {
+    expect(
+      screenRectToTarget({ x: 2660, y: 100, width: 200, height: 50 }, mixedDisplays, windowsToDip),
+    ).toEqual({ displayId: 2, screen: 2, rect: { x: 100, y: 100, width: 200, height: 50 } });
+  });
+
+  it('puts an element on the 150% primary at its pixels over 1.5', () => {
+    expect(
+      screenRectToTarget({ x: 300, y: 150, width: 150, height: 60 }, mixedDisplays, windowsToDip),
+    ).toEqual({ displayId: 1, screen: 1, rect: { x: 200, y: 100, width: 100, height: 40 } });
+  });
+
+  it('gives a rect across two monitors to the one holding most of it, clamped to it', () => {
+    // 1650..1750 DIP: 57 on the primary, 43 on the second.
+    const target = screenRectToTarget(
+      { x: 2475, y: 0, width: 150, height: 30 },
+      mixedDisplays,
+      // Straddling: Windows maps by the rect's origin monitor.
+      (rect) => ({
+        x: rect.x / 1.5,
+        y: rect.y / 1.5,
+        width: rect.width / 1.5,
+        height: rect.height / 1.5,
+      }),
+    );
+    expect(target).toEqual({
+      displayId: 1,
+      screen: 1,
+      rect: { x: 1650, y: 0, width: 57, height: 20 },
+    });
+  });
+
   it('clamps a rect that runs off the edge', () => {
     const target = screenRectToTarget(
       { x: 1900, y: 1060, width: 100, height: 100 },
@@ -85,6 +147,26 @@ describe('displayRectToTarget', () => {
       width: Math.round(120 / scale),
       height: Math.round(60 / scale),
     });
+  });
+
+  it("uses that display's own scale and origin on a negative-origin second monitor", () => {
+    // A 200% primary, and a 150% monitor up and to the left of it.
+    const displays: PointDisplay[] = [
+      { id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 }, scaleFactor: 2 },
+      { id: 2, bounds: { x: -1280, y: -200, width: 1280, height: 720 }, scaleFactor: 1.5 },
+    ];
+    // Its own pixels, as look_closer takes them: (300, 150) is 200, 100 DIP into it.
+    expect(displayRectToTarget(2, { x: 300, y: 150, width: 150, height: 90 }, displays)).toEqual({
+      displayId: 2,
+      screen: 2,
+      rect: { x: 200, y: 100, width: 100, height: 60 },
+    });
+  });
+
+  it('clamps a display rect that runs past its right edge', () => {
+    expect(displayRectToTarget(1, { x: 1800, y: 0, width: 400, height: 100 }, at(2))?.rect).toEqual(
+      { x: 900, y: 0, width: 60, height: 50 },
+    );
   });
 
   it('answers null for an unknown display or a rect off it', () => {

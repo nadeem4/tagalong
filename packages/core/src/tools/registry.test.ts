@@ -72,6 +72,16 @@ describe('ToolRegistry.forTurn', () => {
     }
   });
 
+  it('gives every tool a plain object schema, with no oneOf, anyOf or allOf at the top', () => {
+    // The Anthropic and OpenAI APIs refuse the whole request when one tool's schema has them.
+    for (const definition of new ToolRegistry(everything()).forTurn(fakeTurn()).definitions) {
+      expect(definition.inputSchema['type'], definition.name).toBe('object');
+      for (const key of ['oneOf', 'anyOf', 'allOf']) {
+        expect(definition.inputSchema, definition.name).not.toHaveProperty(key);
+      }
+    }
+  });
+
   it('marks only the tools that change stored state as write', () => {
     const tools = new ToolRegistry(everything()).forTurn(fakeTurn()).tools;
     const writes = tools.filter((tool) => tool.kind === 'write').map((tool) => tool.id);

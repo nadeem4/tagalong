@@ -146,6 +146,39 @@ describe('PointerOverlay', () => {
     expect(windows).toHaveLength(2);
   });
 
+  it('leaves the ring and its Esc alone when a different display goes', () => {
+    const { pointer, windows, registered } = overlay();
+    pointer.show(ring(1));
+    pointer.displayRemoved(2);
+    expect(windows[0]).toMatchObject({ visible: true, destroyed: false });
+    expect(registered.has('Escape')).toBe(true);
+  });
+
+  it('on quit, lets go of Esc, stops the timer and destroys every window', async () => {
+    const { pointer, clock, windows, registered } = overlay();
+    pointer.show(ring(1));
+    pointer.show(ring(2));
+    pointer.dispose();
+    expect(registered.has('Escape')).toBe(false);
+    expect(windows.map((window) => window.destroyed)).toEqual([true, true]);
+    await clock.advance(POINTER_MS);
+    expect(registered.has('Escape')).toBe(false);
+    expect(windows.map((window) => window.visible)).toEqual([false, false]);
+  });
+
+  it('never unregisters an Esc it did not get', () => {
+    const unregister = vi.fn();
+    const pointer = new PointerOverlay({
+      clock: new FakeClock(0),
+      createWindow: (displayId) => new FakeRingWindow(displayId),
+      shortcuts: { register: () => false, unregister },
+    });
+    pointer.show(ring(1));
+    pointer.hide();
+    pointer.dispose();
+    expect(unregister).not.toHaveBeenCalled();
+  });
+
   it('still shows the ring when Esc cannot be registered', () => {
     const clock = new FakeClock(0);
     const window = new FakeRingWindow(1);
