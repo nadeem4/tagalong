@@ -15,6 +15,10 @@ import { RoutineCard } from './routine-card';
 import { PickUpCard } from './pick-up-card';
 import { DropCard, type DropOffer } from './drop-card';
 import { useHostBridge } from './host-bridge';
+import { wantsHealthCheck } from './health-ask';
+import { healthHeadline, healthRows } from './health';
+import type { FixTarget, HealthRow } from './health';
+import { HealthCard } from './health-card';
 import type { TurnEvent } from './host-bridge';
 import { officeTokens as t } from './office/tokens';
 import { SpokenStream } from './voice/spoken-stream';
@@ -204,6 +208,10 @@ export function CompanionBubble({
   const [spokenReply, setSpokenReply] = useState(false);
   // The question was spoken: the bubble shows what it heard, so a mishearing is visible.
   const [askedAloud, setAskedAloud] = useState(false);
+  // "Scout, what's wrong?": the health card, its rows null while the facts are read.
+  const [health, setHealth] = useState<{ rows: HealthRow[] | null } | null>(null);
+  // Each question bumps it, so a check that finishes late never covers a newer answer.
+  const healthRun = useRef(0);
 
   // A new drop opens its card again; a button or Cancel closes it.
   const [openDrop, setOpenDrop] = useState(drop);
@@ -424,6 +432,12 @@ export function CompanionBubble({
       const answered = { question, answer: reply.text, failed: reply.state === 'failed' };
       setPast((current) => [...current, answered]);
     }
+    healthRun.current += 1;
+    setHealth(null);
+    if (bridge.checkHealth !== undefined && wantsHealthCheck(text)) {
+      checkHealth(text, asSpoken);
+      return;
+    }
     setQuestion(text);
     setReply({ state: 'running', turnId: null, text: '' });
     setSpokenReply(false);
@@ -454,6 +468,40 @@ export function CompanionBubble({
           text: error instanceof Error ? error.message : 'Tagalong could not reach its engine.',
         }),
       );
+  };
+
+  /**
+   * "Scout, what's wrong?": the health card instead of a turn, read from the host with no
+   * model call, so it works when Scout cannot think. An answer still running is stopped.
+   * Only the headline is said; the card's rows are for reading.
+   */
+  const checkHealth = (text: string, asSpoken: boolean): void => {
+    if (mine.current !== null) void bridge.interrupt(mine.current);
+    mine.current = null;
+    spoken.current?.lines.end();
+    spoken.current = null;
+    setQuestion(text);
+    setAskedAloud(asSpoken);
+    setSpokenReply(false);
+    setReply({ state: 'idle' });
+    setHealth({ rows: null });
+    const run = healthRun.current;
+    const read = bridge.checkHealth?.() ?? Promise.reject(new Error('no health check'));
+    read
+      .then((facts) => {
+        if (run !== healthRun.current) return;
+        const rows = healthRows(facts);
+        const headline = healthHeadline(rows);
+        setHealth({ rows });
+        // Kept as the answer, so the full chat's history shows what the check said.
+        setReply({ state: 'done', text: headline });
+        onSay?.(headline);
+      })
+      .catch(() => {
+        if (run !== healthRun.current) return;
+        setHealth(null);
+        setReply({ state: 'failed', text: 'I couldn’t run the health check.' });
+      });
   };
 
   const send = (): void => {
@@ -527,7 +575,7 @@ export function CompanionBubble({
       ))}
     </ul>
   );
-  const answer = (
+  const turnAnswer = (
     <>
       {reply.state === 'running' && (
         <div className="bubble-answer" aria-live="polite">
@@ -553,6 +601,18 @@ export function CompanionBubble({
       )}
     </>
   );
+  // A health check answers with its card, in the answer's place.
+  const answer =
+    health === null ? (
+      turnAnswer
+    ) : (
+      <HealthCard
+        rows={health.rows}
+        {...(bridge.openFix !== undefined
+          ? { onFix: (target: FixTarget) => void bridge.openFix?.(target) }
+          : {})}
+      />
+    );
   const answerConfirm = (decision: 'once' | 'deny'): void => {
     if (confirm === null) return;
     void bridge.approveTool?.(confirm.approvalId, decision);

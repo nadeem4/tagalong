@@ -78,16 +78,18 @@ export function brainLine(
 ): GreetLine {
   const name = userName.trim();
   const hi = name === '' ? '' : `Hi ${name}. `;
+  // Fix it lands on Settings' How Scout thinks section.
+  const fix = { fix: 'Fix it', fixTarget: 'brain' } as const;
   switch (brain) {
     case 'signed-out':
-      return { text: `${hi}I’m signed out of Claude, so I can’t think yet.`, fix: 'Fix it' };
+      return { text: `${hi}I’m signed out of Claude, so I can’t think yet.`, ...fix };
     case 'no-sign-in':
       return {
         text: `${hi}I can’t find Claude Code on this computer, so I can’t think yet.`,
-        fix: 'Fix it',
+        ...fix,
       };
     case 'no-key':
-      return { text: `${hi}I have no API key, so I can’t think yet.`, fix: 'Fix it' };
+      return { text: `${hi}I have no API key, so I can’t think yet.`, ...fix };
     default:
       return pickUp === undefined ? { text: composed } : { text: composed, pickUp };
   }

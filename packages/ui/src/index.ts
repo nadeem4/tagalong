@@ -56,3 +56,6 @@ export type { TalkAction } from './voice/push-to-talk';
 export { ListenController } from './voice/listen-controller';
 export type { ListenControllerOptions, ListenMic } from './voice/listen-controller';
 export { officeTokens } from './office/tokens';
+
+/** "Scout, what's wrong?": what a host reads for the health card, and where Fix it lands. */
+export type { FixTarget, HealthCheckId, HealthFacts, HealthRow } from './health';

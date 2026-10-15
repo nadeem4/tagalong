@@ -2,7 +2,7 @@ import { guardBrain } from './providers/guard';
 import { checkKey } from './providers/check-key';
 import type { Database } from 'better-sqlite3';
 import { DEFAULT_ENGINE_PORT, RPC_ERROR_CODES, Settings } from '@tagalong/protocol';
-import type { Expert, Pet } from '@tagalong/protocol';
+import type { Expert, HostKind, Pet } from '@tagalong/protocol';
 import { openDatabase } from './memory/db';
 import { ActivityLog } from './memory/activity';
 import { ConversationStore } from './memory/store';
@@ -509,6 +509,7 @@ export class Engine {
       routines,
       pickUp,
       calendar,
+      hostKinds: () => live.server?.sessions().map((session) => session.host) ?? [],
       claudeCodeConfigPath: options.claudeCodeConfigPath,
       sightLog,
       checkResolve: guarded,
@@ -613,6 +614,8 @@ function buildHandlers(parts: {
   approvals: Approvals;
   /** Runs boot found still running and closed as interrupted. */
   interruptedAtBoot: number;
+  /** Which hosts are connected now, for the health check's browser row. */
+  hostKinds: () => readonly HostKind[];
   claudeCodeConfigPath: string | undefined;
   /** Re-reads provider keys, so a key saved since the last ask is used by this one. */
   refreshProviders: () => Promise<void>;
@@ -625,6 +628,7 @@ function buildHandlers(parts: {
   const { keepAnEye, connections, approvals, routines, interruptedAtBoot, pickUp } = parts;
   const { sightLog, checkResolve } = parts;
   const { calendar } = parts;
+  const { hostKinds } = parts;
   /** A manager refusal (an id taken, none such) as an invalidParams error the host shows. */
   const plainly = async <T>(work: () => Promise<T>): Promise<T> => {
     try {
@@ -836,5 +840,8 @@ function buildHandlers(parts: {
       return calendar.check();
     },
     'calendar.check': () => calendar.check(),
+
+    // The health check's browser row. Not in EXTENSION_METHODS, so only the desktop asks.
+    'hosts.status': () => ({ extension: hostKinds().includes('extension') }),
   };
 }

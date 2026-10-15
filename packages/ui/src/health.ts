@@ -1,0 +1,166 @@
+import type { ConnectionStatus, MouthId } from '@tagalong/protocol';
+
+/** Where a Fix it button lands: a Settings section, or a Home page. */
+export type FixTarget = 'brain' | 'voice' | 'browser' | 'privacy' | 'experts' | 'connections';
+
+/**
+ * What the health check read, from calls the host already makes. Each is `unknown` when its
+ * call failed. Never a key or a secret: only whether one is stored.
+ */
+export interface HealthFacts {
+  brain: 'ready' | 'signed-out' | 'no-sign-in' | 'no-key' | 'unknown';
+  /** The experts that are on, each with whether it answered its test. */
+  experts: readonly { name: string; ok: boolean }[] | 'unknown';
+  connections: readonly { name: string; status: ConnectionStatus }[] | 'unknown';
+  voice:
+    | {
+        enabled: boolean;
+        mouth: MouthId;
+        /** Whether an ElevenLabs key is stored. */
+        elevenLabsKey: boolean;
+        /** Whether the local voice's model is downloaded. */
+        mouthReady: boolean;
+        /** Whether listening or Talk to Scout is in use, so the ears matter. */
+        earsUsed: boolean;
+        earsReady: boolean;
+      }
+    | 'unknown';
+  microphone: { count: number; pickedMissing: boolean } | 'unknown';
+  extension: boolean | 'unknown';
+}
+
+export type HealthCheckId =
+  'brain' | 'experts' | 'connections' | 'voice' | 'microphone' | 'extension';
+
+/** `info` and `unknown` rows are never counted as needing the person. */
+export interface HealthRow {
+  id: HealthCheckId;
+  label: string;
+  state: 'ok' | 'broken' | 'info' | 'unknown';
+  line: string;
+  fix?: FixTarget;
+}
+
+const UNKNOWN = 'I couldn’t check this.';
+
+const LABELS: Record<HealthCheckId, string> = {
+  brain: 'Brain',
+  experts: 'Experts',
+  connections: 'Connections',
+  voice: 'Voice',
+  microphone: 'Microphone',
+  extension: 'Browser extension',
+};
+
+const make = (
+  id: HealthCheckId,
+  state: HealthRow['state'],
+  line: string,
+  fix?: FixTarget,
+): HealthRow => ({
+  id,
+  label: LABELS[id],
+  state,
+  line,
+  ...(fix !== undefined && (state === 'broken' || state === 'info') ? { fix } : {}),
+});
+
+/** "Coder", "Coder and Writer", "Coder, Writer and Tester". */
+function names(list: readonly string[]): string {
+  if (list.length <= 1) return list.join('');
+  return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1] ?? ''}`;
+}
+
+function brainRow(brain: HealthFacts['brain']): HealthRow {
+  switch (brain) {
+    case 'ready':
+      return make('brain', 'ok', 'I can think.');
+    case 'signed-out':
+      return make('brain', 'broken', 'I’m signed out of Claude.', 'brain');
+    case 'no-sign-in':
+      return make('brain', 'broken', 'I can’t find Claude Code on this computer.', 'brain');
+    case 'no-key':
+      return make('brain', 'broken', 'I have no API key.', 'brain');
+    default:
+      return make('brain', 'unknown', UNKNOWN);
+  }
+}
+
+function expertsRow(experts: HealthFacts['experts']): HealthRow {
+  if (experts === 'unknown') return make('experts', 'unknown', UNKNOWN);
+  if (experts.length === 0) return make('experts', 'broken', 'No experts are on.', 'experts');
+  const down = experts.filter((expert) => !expert.ok).map((expert) => expert.name);
+  return down.length > 0
+    ? make('experts', 'broken', `${names(down)} can’t be reached.`, 'experts')
+    : make('experts', 'ok', 'My experts can be reached.');
+}
+
+function connectionsRow(connections: HealthFacts['connections']): HealthRow {
+  if (connections === 'unknown') return make('connections', 'unknown', UNKNOWN);
+  const problems = connections.flatMap((connection) =>
+    connection.status === 'needs-sign-in'
+      ? [`${connection.name} needs you to sign in again.`]
+      : connection.status === 'error'
+        ? [`${connection.name} isn’t working.`]
+        : [],
+  );
+  if (problems.length > 0) return make('connections', 'broken', problems.join(' '), 'connections');
+  return make(
+    'connections',
+    'ok',
+    connections.length === 0 ? 'No apps connected.' : 'My apps are connected.',
+  );
+}
+
+function voiceRow(voice: HealthFacts['voice']): HealthRow {
+  if (voice === 'unknown') return make('voice', 'unknown', UNKNOWN);
+  const problems: string[] = [];
+  if (voice.enabled && voice.mouth === 'elevenlabs' && !voice.elevenLabsKey) {
+    problems.push('The ElevenLabs voice has no key.');
+  }
+  if (voice.earsUsed && !voice.earsReady) problems.push('My ears’ model isn’t downloaded.');
+  if (problems.length > 0) return make('voice', 'broken', problems.join(' '), 'voice');
+  if (!voice.enabled) return make('voice', 'info', 'Voice is off.', 'voice');
+  if (voice.mouth === 'kokoro' && !voice.mouthReady) {
+    return make('voice', 'ok', 'My voice downloads the first time I speak.');
+  }
+  return make('voice', 'ok', 'I can talk.');
+}
+
+function microphoneRow(microphone: HealthFacts['microphone']): HealthRow {
+  if (microphone === 'unknown') return make('microphone', 'unknown', UNKNOWN);
+  if (microphone.pickedMissing) {
+    return make('microphone', 'broken', 'The one you picked is unplugged.', 'voice');
+  }
+  if (microphone.count === 0) return make('microphone', 'broken', 'No microphone found.', 'voice');
+  return make('microphone', 'ok', 'A microphone is ready.');
+}
+
+function extensionRow(extension: HealthFacts['extension']): HealthRow {
+  if (extension === 'unknown') return make('extension', 'unknown', UNKNOWN);
+  return extension
+    ? make('extension', 'ok', 'Connected.')
+    : make('extension', 'info', 'Not connected (optional)', 'browser');
+}
+
+/** One row per check, in the card's order. Pure: no call, no model. */
+export function healthRows(facts: HealthFacts): HealthRow[] {
+  return [
+    brainRow(facts.brain),
+    expertsRow(facts.experts),
+    connectionsRow(facts.connections),
+    voiceRow(facts.voice),
+    microphoneRow(facts.microphone),
+    extensionRow(facts.extension),
+  ];
+}
+
+const COUNT = ['One', 'Two', 'Three', 'Four', 'Five', 'Six'];
+
+/** The card's first line, and the only one said aloud. */
+export function healthHeadline(rows: readonly HealthRow[]): string {
+  const broken = rows.filter((row) => row.state === 'broken').length;
+  if (broken === 0) return 'Everything’s working.';
+  const count = COUNT[broken - 1] ?? String(broken);
+  return broken === 1 ? `${count} thing needs you.` : `${count} things need you.`;
+}

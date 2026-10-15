@@ -457,6 +457,14 @@ export const PetMoodParams = z.object({
 });
 export type PetMoodParams = z.infer<typeof PetMoodParams>;
 
+/**
+ * The health check: whether the browser extension is connected right now. Desktop only (the
+ * extension may not ask); nothing else about a host is said.
+ */
+export const HostsStatusParams = z.object({});
+export const HostsStatusResult = z.object({ extension: z.boolean() });
+export type HostsStatusResult = z.infer<typeof HostsStatusResult>;
+
 // ---------------------------------------------------------------------------
 // The catalog
 // ---------------------------------------------------------------------------
@@ -518,6 +526,7 @@ export const hostToCoreMethods = {
   'calendar.setLink': { params: CalendarSetLinkParams, result: CalendarSetLinkResult },
   'calendar.check': { params: CalendarCheckParams, result: CalendarCheckResult },
   'usage.summary': { params: UsageSummaryParams, result: UsageSummaryResult },
+  'hosts.status': { params: HostsStatusParams, result: HostsStatusResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostMethods = {

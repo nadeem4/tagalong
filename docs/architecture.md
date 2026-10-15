@@ -185,7 +185,9 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   `keepAnEye.observe { windows }`, `keepAnEye.notNow` and `keepAnEye.accept { remarkId }` (see
   [Keeping an eye on things](#keeping-an-eye-on-things)), and the `connections.*`, `calendar.*` and
   `routines.*` methods. Protocol 0.13.0: the crew's `pets.delete`, `roles.list`,
-  `roles.recommendModel`, `notices.rolesUpgrade` and `notices.dismiss` are gone.
+  `roles.recommendModel`, `notices.rolesUpgrade` and `notices.dismiss` are gone. `hosts.status`
+  → `{ extension }` says whether the browser extension is connected, for the health check (see
+  [The companion's bubble](#the-companions-bubble)); the extension may not call it.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
   `perception.listWindows` and `perception.readText`, then `perception.captureWindow`, and from Phase 3B `perception.recall` and
   `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
@@ -1685,8 +1687,9 @@ reached. The "Talk or type?" step (`answer`) is offered when the window has the 
   `SIGN_IN_BUDGET_MS`, 1 s, and a slow or failing check reads as `unknown`, never as a problem).
   `brainLine(brain, composed, userName)` then returns the composed line, or a plain one ("I’m
   signed out of Claude, so I can’t think yet.", "I can’t find Claude Code on this computer…", "I
-  have no API key…") with `fix: 'Fix it'`; the panel shows that as a button on the line that
-  opens Settings (the same offer button the bubble uses for a hand-off). The engine's
+  have no API key…") with `fix: 'Fix it'` and `fixTarget: 'brain'`; the panel shows that as a
+  button on the line that opens Settings at How Scout thinks (`openSettings('brain')`, the same
+  offer button the bubble uses for a hand-off). The engine's
   `greeting/scenario.ts#launchScenario` picks one scenario from the recorded facts: an update (`lastVersion` differs from the
   running version; first, because an installer ends a running tray app by force, so that launch
   also reads as a crash), else a crash, else a pick-up (a snapshot is ready: see
@@ -1815,6 +1818,30 @@ above a **Message** box. It is the same component, so it is the same conversatio
   bubble's height through `fitPanel`, and main resizes the window and places it with
   `panelPosition`: beside the pet on the side with room, its bottom level with the pet's, clamped to
   the work area. The full chat asks for 520 px.
+- **"Scout, what's wrong?"** (the health check). `wantsHealthCheck` (`ui/health-ask.ts`) runs in
+  `submit`, for typed and spoken questions alike, and matches only the whole question ("what's
+  wrong", "are you ok", "health check", "why can't you hear me", with or without "Scout"; never
+  "what's wrong with this code"). On a match the bubble calls `bridge.checkHealth()` instead of
+  `ask`: no turn, no tool and no model call, so it works when the brain is down. A host without
+  `checkHealth` (the extension) asks Scout as before. The desktop's `checkHealth`
+  (`renderer/src/health-facts.ts#gatherHealth`) reads, at once and from calls that already exist:
+  `getHostView` (settings, whether an ElevenLabs key is stored, never the key), the sign-in through
+  `scoutBrain`, `listExperts` then `testExpert` for each one that is on (5 s each), `listConnections`,
+  `listMicrophones` against `voice.microphoneId`, the `voiceModels` IPC (`{ mouth, ears }`, a look on
+  disk with `kokoroDownloaded` and `filesPresent(EARS_FILES)`, never a download) and the engine's
+  `hosts.status` (`{ extension }`, from the server's sessions; desktop only, not in
+  `EXTENSION_METHODS`). A call that fails gives an `unknown` row; `gatherHealth` never throws. The
+  pure `healthRows(facts)` (`ui/health.ts`) turns that into one row per check, `ok`, `broken`,
+  `info` or `unknown`, and `HealthCard` shows them under "Two things need you." or "Everything's
+  working.", which is the only line said aloud. The ears count only once Always listening is on or
+  a microphone was picked. The browser extension's row is `info` ("Not connected (optional)") and
+  never counted. Each broken row has **Fix it**, the extension row **Set up**; both call
+  `openFix(target)`, which is `openSettings(target)`.
+- **Fix it targets.** `openSettings(target?)` takes a `FixTarget` (`brain`, `voice`, `browser`,
+  `privacy`, `experts`, `connections`). Main checks it against an allowlist (`main/fix-target.ts#fixPage`,
+  anything else is refused) and opens Home on `settings#<section>` or the Experts or Connections
+  page; Home (`office.tsx`, `home-target.ts`) scrolls to the Settings `Section` with that id once it
+  is drawn. With no target it opens Settings, as before.
 
 ## Scout talks
 

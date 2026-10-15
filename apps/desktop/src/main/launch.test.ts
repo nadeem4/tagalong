@@ -121,14 +121,17 @@ describe('brainLine', () => {
     expect(brainLine('signed-out', 'Morning.', 'Alex')).toEqual({
       text: 'Hi Alex. I’m signed out of Claude, so I can’t think yet.',
       fix: 'Fix it',
+      fixTarget: 'brain',
     });
     expect(brainLine('no-sign-in', 'Morning.', '')).toEqual({
       text: 'I can’t find Claude Code on this computer, so I can’t think yet.',
       fix: 'Fix it',
+      fixTarget: 'brain',
     });
     expect(brainLine('no-key', 'Morning.', '')).toEqual({
       text: 'I have no API key, so I can’t think yet.',
       fix: 'Fix it',
+      fixTarget: 'brain',
     });
   });
 

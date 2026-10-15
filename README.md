@@ -252,6 +252,12 @@ again.
 
 **Memory.** Tell Scout "I prefer short answers" and it remembers across restarts.
 
+**"Scout, what's wrong?"** Ask that (or "are you OK?", or "health check"), typed or spoken, and the
+bubble shows a health card: its sign-in, your experts, your connections, its voice, your
+microphone and the browser extension, each with a plain line, starting "Two things need you." or
+"Everything's working." **Fix it** on a row opens the place that fixes it. It calls no model and
+reads no screen, so it works even when Scout cannot think.
+
 Upgrading from an earlier build removes its other companions, Ink and Bolt; their conversations
 stay on disk.
 
