@@ -126,6 +126,23 @@ describe('the role files', () => {
     expect(instructions).toContain('read_window_text that window');
   });
 
+  it('tell the companion how to answer "what needs me" from connected apps, read only', () => {
+    const instructions = getRole('companion')?.instructions ?? '';
+    expect(instructions).toContain('For "what needs me"');
+    expect(instructions).toContain('grouped by app, oldest first');
+    expect(instructions).toContain('at most 15 per app ("and 6 more")');
+    expect(instructions).toContain(
+      'pull requests asking for your review, and issues assigned to you',
+    );
+    expect(instructions).toContain('Linear: open issues assigned to you');
+    expect(instructions).toContain(
+      "Notion: comments or pages that mention you, if its tools offer that. If they don't, say so.",
+    );
+    expect(instructions).toContain(
+      'Never call a tool that changes anything here. Send no screen content.',
+    );
+  });
+
   it('tell the companion what a hidden marker means', () => {
     const instructions = getRole('companion')?.instructions ?? '';
     expect(instructions).toContain('[hidden: ...]');

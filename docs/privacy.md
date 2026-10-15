@@ -177,6 +177,9 @@ when Scout calls one of their tools in a turn you started.
   of it: a value written there in full is left behind, and you are asked for it if the app needs it.
 - **Activity** records each call as the app, the tool, read or write, and whether it worked. Not
   what was sent or what came back, and not an app's error text either.
+- **"What needs me?"** (asked, or the **What needs me** routine) calls only the apps' read tools,
+  with no screen content in what it sends; what comes back goes to Scout's brain provider like any
+  other app answer.
 
 ## Routines: what runs on its own
 

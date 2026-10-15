@@ -1169,6 +1169,21 @@ Privacy, add the title pattern `*Bank*` to your exclusions (used in X.12; remove
    `%APPDATA%\Tagalong`. After reinstalling, Welcome does not open, and keys and history are as
    before.
 
+## What needs me? _(real brain)_
+
+Needs GitHub connected (Home → Connections → GitHub, with a token) and a real provider for Scout.
+
+1. Ask Scout "What needs me?". The answer is one list grouped by app, oldest first, one line each
+   with how long it has waited: pull requests asking for your review and issues assigned to you.
+   No confirm card appears.
+2. Linear and Notion, when not connected, are named once at the end. Switch GitHub's sign-in off
+   (or use a revoked token): the answer says GitHub needs you to sign in again.
+3. With Notion connected: mentions are listed if its tools offer them; otherwise Scout says it
+   can't get them.
+4. Home → Routines → **New routine** → **What needs me**. Name, **Weekdays** at **09:00** and the
+   instruction are filled in. **Save**, then **Run now**: the same list arrives as the routine's
+   line, with no confirm card, and Activity shows only read rows for the apps.
+
 ## Not in this build
 
 Do not test these here.

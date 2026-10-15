@@ -134,6 +134,21 @@ const TEMPLATES: readonly Template[] = [
     }),
   },
   {
+    id: 'needs-me',
+    name: 'What needs me',
+    line: 'Reviews, issues and mentions waiting on you, across your connected apps.',
+    form: () => ({
+      ...BLANK,
+      name: 'What needs me',
+      kind: 'weekdays',
+      time: '09:00',
+      what:
+        'List what is waiting on me across my connected apps: reviews requested, issues assigned ' +
+        'to me, mentions. One line each, oldest first.',
+      uses: ['GitHub', 'Linear', 'Notion'],
+    }),
+  },
+  {
     id: 'summary',
     name: 'End-of-day summary',
     line: 'What you worked on today, and a first step for tomorrow.',
