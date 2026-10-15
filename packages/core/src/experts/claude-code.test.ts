@@ -319,6 +319,24 @@ describe('ClaudeCodeConnector', () => {
     });
   });
 
+  it('reads a result whose usage is missing, null or malformed without failing the run', async () => {
+    const send = async (usage: unknown) => {
+      const { spawn } = fakeSpawn([{ ...result('Done.'), usage }]);
+      return new ClaudeCodeConnector({ folder: 'C:\\r', spawn }).send({ ask: 'x' }, () => {});
+    };
+    const done = { ok: true, text: 'Done.', changedFiles: [] };
+    expect(await send(null)).toEqual(done);
+    expect(await send('lots')).toEqual(done);
+    expect(await send({ input_tokens: '12', output_tokens: -3 })).toEqual({
+      ...done,
+      usage: { model: '', inputTokens: 0, outputTokens: 0 },
+    });
+    expect(await send({ output_tokens: 9 })).toEqual({
+      ...done,
+      usage: { model: '', inputTokens: 0, outputTokens: 9 },
+    });
+  });
+
   it('keeps the tokens of a run that ended in an error', async () => {
     const { spawn } = fakeSpawn([
       { ...result('Ran out of turns.', true), usage: { input_tokens: 5, output_tokens: 7 } },

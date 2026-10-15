@@ -82,7 +82,8 @@ describe('meterBrain', () => {
       toolCall: { id: 't1', name: 'read_window_text', input: {} },
     });
     const seeing: BrainProvider = Object.assign(inner, { canSee: (m: string) => m === 'v' });
-    const metered = meterBrain(seeing, () => undefined);
+    const calls: MeteredCall[] = [];
+    const metered = meterBrain(seeing, (c) => calls.push(c));
     expect(metered.id).toBe('fake');
     expect(metered.capabilities).toEqual(inner.capabilities);
     expect(metered.canSee?.('v')).toBe(true);
@@ -95,5 +96,8 @@ describe('meterBrain', () => {
     expect(result.text).toBe('one two');
     expect(texts.join('')).toBe('one two');
     expect(tools).toEqual(['read_window_text']);
+    // The tool loop runs inside one call, so it is one record with every round's tokens.
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ inputTokens: result.usage.inputTokens });
   });
 });

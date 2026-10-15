@@ -2358,14 +2358,19 @@ flowchart LR
   `HandoffManager` records it as an `expert` row. Every expert run goes through `HandoffManager`; a
   new connector should fill `usage` when its tool reports tokens.
 - **Prices.** `usage/prices.ts` is a small table keyed `providerId/model`, dollars per million input
-  and output tokens, with the date it was last checked. It covers Anthropic's `claude-opus-5`,
-  `claude-sonnet-5` and `claude-haiku-4-5` and OpenRouter's two Anthropic fallbacks. Anything else,
-  Token Factory's Nemotron models included, has no price (`null`): the card says "price unknown" and
-  never guesses. `claude-code`, as Scout's brain or as an expert, is always `null`: it is the
+  and output tokens, with the date it was last checked against Anthropic's published rates. It
+  covers the current family on an Anthropic key (`claude-opus-5-5` $4/$20, `claude-sonnet-5-5`
+  $2/$10, `claude-haiku-5-5` $0.10/$0.50, rising to $0.50/$2.50 for a call whose prompt passes 100k
+  tokens), the models Settings offers there (`claude-opus-5`, `claude-sonnet-5`,
+  `claude-haiku-4-5`), and OpenRouter's Anthropic fallbacks and role tiers
+  (`anthropic/claude-opus-5`, `anthropic/claude-sonnet-5`, `anthropic/claude-haiku-4.5`). Anything
+  else, Token Factory's Nemotron models included, has no price (`null`): the card says "price
+  unknown" and never guesses. Prompt-cache reads and writes are not priced apart: Scout's Anthropic
+  provider reports uncached input tokens only, so its dollars can run a little low on cached turns. `claude-code`, as Scout's brain or as an expert, is always `null`: it is the
   person's plan, shown as tokens, never dollars (Claude Code's `total_cost_usd` is ignored). The
   cost is worked out once, when the row is written.
-- **Storage.** `usage(id, at, source CHECK IN ('scout','expert'), provider_id, model, input_tokens,
-output_tokens, cost_usd REAL NULL)` with an index on `at`. `UsageLog.summary()` groups today and
+- **Storage.** Migration 17: `usage(id, at, source CHECK IN ('scout','expert'), provider_id, model,
+input_tokens, output_tokens, cost_usd REAL NULL)` with an index on `at`. `UsageLog.summary()` groups today and
   this month by source and provider in the person's time zone (local midnight, not UTC);
   `todayUsd()` sums priced rows only.
 - **The cap.** `budget.dailyUsd` in settings, `null` (off) by default. `budgetSpent(usage, cap)` is

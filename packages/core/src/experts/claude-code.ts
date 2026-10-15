@@ -271,7 +271,7 @@ interface StreamEvent {
   result?: string;
   /** On the `system` init event: the model the run uses. */
   model?: unknown;
-  usage?: {
+  usage?: null | {
     input_tokens?: number;
     output_tokens?: number;
     cache_creation_input_tokens?: number;
@@ -287,7 +287,8 @@ interface StreamEvent {
  */
 function usageOf(event: StreamEvent, model: string): { usage?: ConnectorUsage } {
   const usage = event.usage;
-  if (usage === undefined) return {};
+  // The stream is untrusted JSON: a null or non-object usage is no usage, never a crash.
+  if (typeof usage !== 'object' || usage === null) return {};
   const count = (n: number | undefined) => (typeof n === 'number' && n > 0 ? Math.round(n) : 0);
   return {
     usage: {
