@@ -16,7 +16,8 @@ function fakeAudio(failAt: 'context' | 'worklet' | 'node' | 'worklet-abort') {
         addModule: async () => {
           if (failAt === 'worklet') throw new Error('worklet blocked');
           // A worklet that would not load rejects with an AbortError.
-          if (failAt === 'worklet-abort') throw new DOMException('worklet not fetched', 'AbortError');
+          if (failAt === 'worklet-abort')
+            throw new DOMException('worklet not fetched', 'AbortError');
         },
       };
       destination = {};
