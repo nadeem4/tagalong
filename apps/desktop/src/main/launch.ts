@@ -1,4 +1,4 @@
-import type { Pet, Settings, SettingsPatch } from '@tagalong/protocol';
+import type { Pet, PickUpReadyParams, Settings, SettingsPatch } from '@tagalong/protocol';
 import type { ClaudeSignIn, GreetLine, ProviderChoice } from '../shared/ipc';
 
 /** The slice of the settings store the launch record needs. */
@@ -70,7 +70,12 @@ export async function brainReadiness(deps: {
 }
 
 /** The brain's line, or a plain one saying why Scout cannot think, with a fix. */
-export function brainLine(brain: BrainReadiness, composed: string, userName: string): GreetLine {
+export function brainLine(
+  brain: BrainReadiness,
+  composed: string,
+  userName: string,
+  pickUp?: PickUpReadyParams,
+): GreetLine {
   const name = userName.trim();
   const hi = name === '' ? '' : `Hi ${name}. `;
   switch (brain) {
@@ -84,6 +89,6 @@ export function brainLine(brain: BrainReadiness, composed: string, userName: str
     case 'no-key':
       return { text: `${hi}I have no API key, so I can’t think yet.`, fix: 'Fix it' };
     default:
-      return { text: composed };
+      return pickUp === undefined ? { text: composed } : { text: composed, pickUp };
   }
 }

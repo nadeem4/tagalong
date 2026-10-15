@@ -1026,6 +1026,30 @@ monitor.
 8. **Action:** turn on Windows' **Animation effects: Off** and ask again. **Expected:** the ring
    appears and disappears without a pulse or a fade.
 
+## Pick up where you left off
+
+### PU.1. Back the next morning, Scout offers what you were in
+
+1. **Setup:** Settings → Privacy → **Pick up where you left off** is On. Open a git project in VS
+   Code with a file in front. Ask Scout something that ends in a hand-off card and close the card
+   without pressing Send. Leave Tagalong running for at least 15 minutes, then quit it.
+2. **Action:** to skip the six-hour wait, close Tagalong and, in `%APPDATA%\Tagalong\tagalong.db`
+   (any SQLite tool), set `taken_at` in the `pick_up` row to seven hours ago. Start Tagalong.
+   **Expected:** instead of the usual hello, one line beside Scout names the project, its branch
+   and the file, and the unsent hand-off, with **Pick up** and **Not now**. An update or crash
+   line, or the "Fix it" line, would come first instead; the pick-up line then follows once that
+   line has gone (for an update or crash, within about a minute), once only.
+3. **Action:** press **Pick up**. **Expected:** the bubble shows a card with one row per item.
+   Nothing has opened yet.
+4. **Action:** press **Open in VS Code**. **Expected:** VS Code opens that folder with its own
+   open files, and the button says **Opened**. Nothing is typed or clicked for you.
+5. **Action:** press **Brief again**. **Expected:** the normal hand-off card with the old ask.
+   Nothing runs until you press Send.
+6. **Action:** repeat step 2 and press **Not now**. Restart again. **Expected:** the ordinary hello.
+   The pick-up is offered once.
+7. **Action:** switch the setting Off and save. **Expected:** the `pick_up` row is gone and no
+   pick-up is ever offered. A password manager or `.env` window in front is never named.
+
 ## The Chrome extension
 
 **Before you start:** Chrome 116 or newer, the desktop app running, and a long article open in a

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Pet, Settings, type SettingsPatch } from '@tagalong/protocol';
+import { Pet, Settings, type PickUpReadyParams, type SettingsPatch } from '@tagalong/protocol';
 import { brainLine, brainReadiness, recordCleanClose, recordLaunch } from './launch';
 import { providerChoices } from './provider-choices';
 
@@ -127,6 +127,18 @@ describe('brainLine', () => {
       fix: 'Fix it',
     });
     expect(brainLine('no-key', 'Morning.', '')).toEqual({
+      text: 'I have no API key, so I can’t think yet.',
+      fix: 'Fix it',
+    });
+  });
+
+  it('carries a pick-up when Scout can think, and drops it for the Fix it line', () => {
+    const pickUp: PickUpReadyParams = {
+      text: 'Yesterday you were in ai_pet.',
+      items: [{ id: 'p1', kind: 'project', name: 'ai_pet', path: 'C:\\ai_pet', editor: 'vscode' }],
+    };
+    expect(brainLine('ready', pickUp.text, '', pickUp)).toEqual({ text: pickUp.text, pickUp });
+    expect(brainLine('no-key', pickUp.text, '', pickUp)).toEqual({
       text: 'I have no API key, so I can’t think yet.',
       fix: 'Fix it',
     });

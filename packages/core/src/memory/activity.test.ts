@@ -215,6 +215,44 @@ describe('expert hand-offs', () => {
   });
 });
 
+describe('hand-offs left half done, for a pick-up', () => {
+  it('lists the ones that stopped or failed since a time, by expert and ask alone', () => {
+    const before = new Date(Date.now() - 60_000).toISOString();
+    const stopped = log.expertStarted({
+      petId: 'scout',
+      expertId: 'claude-code',
+      expertName: 'Claude Code',
+      text: 'Fix the e2e tests\n\nSelected text:\ntoken=abc',
+    });
+    log.expertFinished(stopped, { ok: false, error: 'stopped' }, 'stopped');
+    const failed = log.expertStarted({
+      petId: 'scout',
+      expertId: 'claude-code',
+      expertName: 'Claude Code',
+      text: 'Write the docs',
+    });
+    log.expertFinished(failed, { ok: false, error: 'not signed in' });
+    const done = log.expertStarted({
+      petId: 'scout',
+      expertId: 'claude-code',
+      expertName: 'Claude Code',
+      text: 'Done one',
+    });
+    log.expertFinished(done, { ok: true, text: 'ok', changedFiles: [] });
+
+    expect(log.expertsLeftSince(before)).toEqual([
+      {
+        expertId: 'claude-code',
+        expertName: 'Claude Code',
+        ask: 'Fix the e2e tests',
+        state: 'stopped',
+      },
+      { expertId: 'claude-code', expertName: 'Claude Code', ask: 'Write the docs', state: 'error' },
+    ]);
+    expect(log.expertsLeftSince(new Date(Date.now() + 60_000).toISOString())).toEqual([]);
+  });
+});
+
 describe('routines for the greeting', () => {
   it('lists the routines that ran well since a time, by name, for the greeting', () => {
     const before = new Date(Date.now() - 60_000).toISOString();

@@ -221,6 +221,7 @@ export function SettingsPage({
         summarizer: field('summarizer'),
         greeting: form.get('greeting') !== null,
         keepAnEye: form.get('keepAnEye') !== null,
+        pickUp: form.get('pickUp') !== null,
         userName: field('userName'),
         rollingMemoryEnabled: form.get('rollingMemoryEnabled') !== null,
         rollingMemoryMinutes: field('rollingMemoryMinutes'),

@@ -20,6 +20,7 @@ import {
 } from './providers';
 import type { BrainProvider } from './providers';
 import { InMemorySecretStore } from './settings/settings';
+import { PickUpStore } from './pick-up/store';
 
 let dir: string;
 let engine: Engine | undefined;
@@ -1106,6 +1107,117 @@ describe('greeting.compose', () => {
     expect((res['result'] as { text: string }).text).toContain(
       'I’ve been updated to 0.5.0. Setup by voice.',
     );
+  });
+});
+
+describe('pick up where you left off', () => {
+  const launch = { crashed: false, lastVersion: '0.4.0', version: '0.4.0', whatsNew: '' };
+
+  /** A snapshot taken eight hours ago, as a quit last night would leave it. */
+  function seedSnapshot(): void {
+    const seeded = openDatabase(dir);
+    const at = Date.now() - 8 * 3_600_000;
+    new PickUpStore(seeded).save({
+      startedAt: at - 3_600_000,
+      takenAt: at,
+      projects: [{ name: 'ai_pet', path: 'C:\\projects\\ai_pet', editor: 'vscode', file: 'a.ts' }],
+      handoffs: [
+        {
+          expertId: 'claude-code',
+          expertName: 'Claude Code',
+          ask: 'Fix the tests',
+          state: 'unsent',
+        },
+      ],
+    });
+    seeded.close();
+  }
+
+  function counting(): { provider: BrainProvider; calls: () => number } {
+    let calls = 0;
+    const provider: BrainProvider = {
+      id: 'fake',
+      capabilities: { vision: false, tools: false, streaming: true },
+      listModels: () => Promise.resolve([]),
+      complete: () => {
+        calls += 1;
+        return Promise.resolve({
+          text: 'Morning.',
+          stopReason: 'end',
+          usage: { inputTokens: 1, outputTokens: 1 },
+        });
+      },
+    } as unknown as BrainProvider;
+    return { provider, calls: () => calls };
+  }
+
+  it('says the pick-up as the launch line, handwritten, with no model call', async () => {
+    seedSnapshot();
+    const { provider, calls } = counting();
+    const e = await boot(provider);
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const res = await host.call('greeting.compose', { petId: 'scout', launch });
+    const result = res['result'] as {
+      text: string;
+      source: string;
+      pickUp?: { text: string; items: { kind: string; id: string }[] };
+    };
+    expect(result.source).toBe('fallback');
+    expect(result.text).toContain('ai_pet');
+    expect(result.pickUp?.text).toBe(result.text);
+    expect(result.pickUp?.items.map((item) => item.kind)).toEqual(['project', 'handoff']);
+    expect(calls()).toBe(0);
+
+    // Once: the next launch line is an ordinary one.
+    const again = await host.call('greeting.compose', { petId: 'scout', launch });
+    expect((again['result'] as { pickUp?: unknown }).pickUp).toBeUndefined();
+  });
+
+  it('lets an update line win over the pick-up, which then waits', async () => {
+    seedSnapshot();
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const updated = { ...launch, version: '0.5.0', whatsNew: 'New things.' };
+    const res = await host.call('greeting.compose', { petId: 'scout', launch: updated });
+    expect((res['result'] as { pickUp?: unknown }).pickUp).toBeUndefined();
+  });
+
+  it('briefs again into the hand-off card, never starting it, and Not now drops it', async () => {
+    seedSnapshot();
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('experts.upsert', {
+      expert: { id: 'claude-code', name: 'Claude Code', connection: { type: 'claude-code' } },
+    });
+    const res = await host.call('greeting.compose', { petId: 'scout', launch });
+    const items = (res['result'] as { pickUp: { items: { kind: string; id: string }[] } }).pickUp
+      .items;
+    const handoff = items.find((item) => item.kind === 'handoff');
+    const rebrief = await host.call('pickUp.rebrief', { itemId: handoff?.id });
+    expect(rebrief['result']).toEqual({ proposed: true });
+    await vi.waitFor(() => expect(host.methods()).toContain('handoff.proposed'));
+    expect(host.methods()).not.toContain('handoff.finished');
+    expect(await host.call('pickUp.dismiss', {})).toMatchObject({ result: { dismissed: true } });
+    const after = await host.call('pickUp.rebrief', { itemId: handoff?.id });
+    expect(after['result']).toEqual({ proposed: false });
+  });
+
+  it('deletes the snapshot when switched off, and offers nothing', async () => {
+    seedSnapshot();
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('settings.set', { patch: { pickUp: false } });
+    const res = await host.call('greeting.compose', { petId: 'scout', launch });
+    expect((res['result'] as { pickUp?: unknown }).pickUp).toBeUndefined();
+    await e.shutdown();
+    engine = undefined;
+    const db = openDatabase(dir);
+    expect(new PickUpStore(db).get()).toBeNull();
+    db.close();
   });
 });
 

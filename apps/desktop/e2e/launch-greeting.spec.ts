@@ -1,4 +1,6 @@
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -87,4 +89,33 @@ test('signed in: the next launch says the brain’s own line', async () => {
   await expect(panel.getByText('This is the fake pet.', { exact: false })).toBeVisible({
     timeout: 30_000,
   });
+});
+
+test('back after a long break: the launch line offers to pick up, and the card opens on a click', async () => {
+  await quit();
+  // A snapshot from eight hours ago, as last night's session would leave it. Written by
+  // Electron run as Node; better-sqlite3's prebuilt N-API binary loads there as in the app.
+  const takenAt = new Date(Date.now() - 8 * 3_600_000).toISOString();
+  const snapshot = JSON.stringify({
+    projects: [{ name: 'ai_pet', path: dataDir, editor: 'other', branch: 'feat/pick-up' }],
+    handoffs: [],
+  });
+  const seed =
+    "const D = require('better-sqlite3'); const db = new D(process.argv[1]);" +
+    " db.prepare('INSERT OR REPLACE INTO pick_up (id, started_at, taken_at, json) VALUES (1, ?, ?, ?)')" +
+    '.run(process.argv[2], process.argv[2], process.argv[3]); db.close();';
+  const electronPath = createRequire(import.meta.url)('electron') as unknown as string;
+  execFileSync(electronPath, ['-e', seed, join(dataDir, 'tagalong.db'), takenAt, snapshot], {
+    cwd: appDir,
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+  });
+
+  app = await launch('signed-in');
+  const panel = await windowFor('panel');
+  await expect(panel.getByText(/you were in ai_pet on feat\/pick-up/)).toBeVisible({
+    timeout: 30_000,
+  });
+  await panel.getByRole('button', { name: 'Pick up' }).click();
+  await expect(panel.getByRole('region', { name: 'Pick up where you left off' })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Open the ai_pet folder' })).toBeVisible();
 });

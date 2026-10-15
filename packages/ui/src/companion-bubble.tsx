@@ -5,12 +5,14 @@ import type {
   ConnectorConfirmParams,
   ContextSnapshot,
   Mouth,
+  PickUpReadyParams,
   RoutineProposedParams,
 } from '@tagalong/protocol';
 import { ANSWER_CSS, Answer } from './answer';
 import { HANDOFF_CSS, HandoffStatus, ProposalCard, type Handoff } from './handoff-card';
 import { ConnectorConfirmCard } from './connector-confirm';
 import { RoutineCard } from './routine-card';
+import { PickUpCard } from './pick-up-card';
 import { useHostBridge } from './host-bridge';
 import type { TurnEvent } from './host-bridge';
 import { officeTokens as t } from './office/tokens';
@@ -79,6 +81,10 @@ export interface CompanionBubbleProps {
   talk?: BubbleTalk;
   /** Whether Scout may look at the screen: the Seeing switch in the header. */
   seeing?: { on: boolean; onToggle: () => void };
+  /** Pick up where you left off: the card Pick up on the line opened. */
+  pickUp?: PickUpReadyParams;
+  /** The pick-up card is done: Not now, or Brief again handed it to the hand-off card. */
+  onPickUpDone?: () => void;
 }
 
 /** A question and how it was answered, once it is over. */
@@ -160,6 +166,8 @@ export function CompanionBubble({
   resume,
   talk,
   seeing,
+  pickUp,
+  onPickUpDone,
 }: CompanionBubbleProps) {
   const bridge = useHostBridge();
   const [draft, setDraft] = useState('');
@@ -525,6 +533,7 @@ export function CompanionBubble({
   };
   const handoffCard = (
     <>
+      {pickUp !== undefined && <PickUpCard pickUp={pickUp} onDone={() => onPickUpDone?.()} />}
       {confirm !== null && (
         <ConnectorConfirmCard key={confirm.approvalId} confirm={confirm} onAnswer={answerConfirm} />
       )}

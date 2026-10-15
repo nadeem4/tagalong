@@ -326,6 +326,14 @@ describe('buildSettingsPatch userName', () => {
   });
 });
 
+describe('buildSettingsPatch pickUp', () => {
+  it('carries the pick-up switch when the form shows it, and leaves it alone otherwise', () => {
+    expect(buildSettingsPatch({ ...values, pickUp: false }).pickUp).toBe(false);
+    expect(buildSettingsPatch({ ...values, pickUp: true }).pickUp).toBe(true);
+    expect(buildSettingsPatch(values).pickUp).toBeUndefined();
+  });
+});
+
 describe('buildSettingsPatch keepAnEye', () => {
   it('carries the keep-an-eye switch when the form shows it', () => {
     expect(buildSettingsPatch({ ...values, keepAnEye: false }).keepAnEye).toBe(false);

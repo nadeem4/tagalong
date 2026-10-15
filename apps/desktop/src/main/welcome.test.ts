@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Pet, Settings } from '@tagalong/protocol';
-import type { Role } from '@tagalong/protocol';
+import type { PickUpReadyParams, Role } from '@tagalong/protocol';
 import {
   companionOn,
   LISTENING_LINE,
@@ -96,6 +96,19 @@ describe('launchLine', () => {
       expect(await launchLine(settings, compose)).toEqual({ text: LISTENING_LINE });
       expect(compose).not.toHaveBeenCalled();
     }
+  });
+
+  it('keeps the listening line over a pick-up, which then waits for the engine’s first tick', async () => {
+    const pickUp: PickUpReadyParams = {
+      text: 'Yesterday you were in ai_pet.',
+      items: [{ id: 'p1', kind: 'project', name: 'ai_pet', path: 'C:\\ai_pet', editor: 'vscode' }],
+    };
+    const compose = vi.fn(async () => ({ text: pickUp.text, pickUp }));
+    const settings = Settings.parse({ welcome: { done: true }, listening: { always: true } });
+    expect(await launchLine(settings, compose)).toEqual({ text: LISTENING_LINE });
+    expect(compose).not.toHaveBeenCalled();
+    const off = Settings.parse({ welcome: { done: true } });
+    expect(await launchLine(off, compose)).toEqual({ text: pickUp.text, pickUp });
   });
 
   it('says the composed greeting when listening is off and the greeting is allowed', async () => {

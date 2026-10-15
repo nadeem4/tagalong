@@ -251,6 +251,46 @@ export class ActivityLog {
       .map((row) => ({ expertName: row.expert_name ?? 'An expert', text: row.text ?? '' }));
   }
 
+  /**
+   * The hand-offs that ended stopped or failed after `since` (an interrupted run included),
+   * oldest first, at most three: for a pick-up. Only the ask, the first part of the brief;
+   * the selected text and the window it carried are left out.
+   */
+  expertsLeftSince(since: string): {
+    expertId: string;
+    expertName: string;
+    ask: string;
+    state: 'stopped' | 'error';
+  }[] {
+    return this.db
+      .prepare<
+        [string],
+        {
+          expert_id: string | null;
+          expert_name: string | null;
+          text: string | null;
+          state: 'stopped' | 'error';
+        }
+      >(
+        `SELECT expert_id, expert_name, text, state FROM activity
+         WHERE kind = 'expert' AND state IN ('stopped', 'error') AND finished_at > ?
+         ORDER BY finished_at ASC LIMIT 3`,
+      )
+      .all(since)
+      .flatMap((row) => {
+        const ask = (row.text ?? '').split('\n\n')[0]?.trim() ?? '';
+        if (row.expert_id === null || ask === '') return [];
+        return [
+          {
+            expertId: row.expert_id,
+            expertName: row.expert_name ?? 'An expert',
+            ask,
+            state: row.state,
+          },
+        ];
+      });
+  }
+
   /** The routines that ran well after `since`, oldest first, at most five: their names only. */
   routinesFinishedSince(since: string): string[] {
     return this.db

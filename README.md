@@ -400,6 +400,10 @@ clicks or types.
 - **Scout's moods** need nothing new: it winces at a failing build and cheers when tests pass, from
   the same titles, and dozes after five minutes with no input or when the screen locks (one idle
   time number from the OS, kept on this computer).
+- **Pick up where you left off** is on by default: Scout keeps one note, from window titles only,
+  of the projects open in your editor and the hand-offs left half done. Back after six hours or
+  more, it says one line about it, once; nothing opens until you click on the card. Turn it off
+  under **Settings → Privacy → Pick up where you left off**, which also deletes the note.
 - Scout never looks at its built-in blind spots: password managers, the Windows sign-in and security
   prompts, secret files such as `.env` and SSH keys, private browsing, authenticator apps and Remote
   Desktop. They are always on and listed in Settings; you can add your own.

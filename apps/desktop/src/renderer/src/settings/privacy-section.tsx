@@ -95,6 +95,7 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
   const [remember, setRemember] = useState(settings.rollingMemory.enabled);
   const [greet, setGreet] = useState(settings.greeting);
   const [watching, setWatching] = useState(settings.keepAnEye);
+  const [picking, setPicking] = useState(settings.pickUp);
   const pauseKey = settings.hotkeys.pauseSight ?? SETTINGS_DEFAULTS.hotkeys.pauseSight;
   return (
     <Section id="privacy">
@@ -158,6 +159,37 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
         app or a call is in front. Not now on the line quiets it for an hour. Blind spots are never
         considered, titles included. The same titles make Scout wince when a build fails and cheer
         when tests pass, with no read and no model call. Off means no tracking at all. On by
+        default.
+      </Tip>
+      <hr className="tg-divider" />
+      <div className="tg-setting">
+        <div className="tg-setting__text">
+          <div className="tg-titlerow">
+            <h3 className="tg-sub" id="pick-up-label">
+              Pick up where you left off
+            </h3>
+            <Info tip="pickUp" label="About picking up where you left off" />
+          </div>
+          <p className="tg-help">Back after a long break, one line on what you were in.</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          className="tg-switch"
+          aria-checked={picking}
+          aria-labelledby="pick-up-label"
+          onClick={() => setPicking((on) => !on)}
+        >
+          {picking ? 'On' : 'Off'}
+        </button>
+        {picking && <input type="hidden" name="pickUp" value="on" />}
+      </div>
+      <Tip tip="pickUp">
+        Every ten minutes Scout notes, from window titles only, which projects you have open in your
+        editor (folder, branch and file name) and which hand-offs are unsent or stopped. One such
+        note is kept, on this computer. When you are back after six hours or more, Scout says one
+        line about it, once; each item on the card opens only when you click it, and Brief again
+        only fills in the hand-off card. Blind spots are never noted. Off deletes the note. On by
         default.
       </Tip>
       <hr className="tg-divider" />

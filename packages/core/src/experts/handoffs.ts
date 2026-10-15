@@ -109,6 +109,19 @@ export class HandoffManager {
     return started;
   }
 
+  /**
+   * The briefs still waiting for Send, for a pick-up: who and the ask, nothing else. The
+   * selection and the window a brief carried stay here.
+   */
+  pending(): { expertId: string; expertName: string; ask: string }[] {
+    return [...this.#proposals.values()].flatMap((proposal) => {
+      const expert = this.options.experts.get(proposal.expertId);
+      return expert === null
+        ? []
+        : [{ expertId: expert.id, expertName: expert.name, ask: proposal.brief.ask }];
+    });
+  }
+
   /** True when a waiting proposal was dropped. */
   dismiss(proposalId: string): boolean {
     return this.#proposals.delete(proposalId);

@@ -33,6 +33,8 @@ export interface SettingsFormValues {
   greeting?: boolean;
   /** Whether Scout keeps an eye on things. Absent leaves the setting alone. */
   keepAnEye?: boolean;
+  /** Whether Scout keeps a pick-up snapshot. Absent leaves the setting alone. */
+  pickUp?: boolean;
   /** What Scout calls you. Blank clears it; absent leaves the setting alone. */
   userName?: string;
   /** Phase 3B. Present together when the form shows rolling memory and the watches. */
@@ -125,6 +127,7 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
     ...(values.summarizer !== undefined ? { summarizer: parseSummarizer(values.summarizer) } : {}),
     ...(values.greeting !== undefined ? { greeting: values.greeting } : {}),
     ...(values.keepAnEye !== undefined ? { keepAnEye: values.keepAnEye } : {}),
+    ...(values.pickUp !== undefined ? { pickUp: values.pickUp } : {}),
     ...(values.userName !== undefined ? { userName: cleanUserName(values.userName) } : {}),
     ...(values.rollingMemoryMinutes !== undefined
       ? {

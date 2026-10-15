@@ -35,3 +35,4 @@ export * from './activity';
 export * from './experts';
 export * from './connections';
 export * from './routines';
+export * from './pick-up';
