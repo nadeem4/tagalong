@@ -1762,9 +1762,13 @@ flowchart LR
   q8, CPU) is `LazyLocalVoice`: the first line starts the download into `<userData>/voice` and
   answers `fallback`; once loaded every line is a WAV. At start, `warmAtStart` loads it when an
   earlier run downloaded it (`kokoroDownloaded`: its q8 weights are on disk) and Scout talks is on,
-  so the first lines are Kokoro rather than the system voice; it never starts a download. A failed load is tried again on the next
-  line, and a failed load first deletes that model's folder under `<userData>/voice`
-  (`voice/model-cache.ts`), so an interrupted download is fetched again. With **Scout talks** off, `speak` answers `off`, except for a Settings preview.
+  so the first lines are Kokoro rather than the system voice; it never starts a download. Its files
+  (`model-files.ts#KOKORO_FILES`: config, tokenizer and the q8 weights) go through their own
+  `sharedEnsureFiles` in the voice process, checked like the ears' (see **Integrity** below), and
+  `loadKokoro` sets `env.allowRemoteModels = false` and `env.localModelPath` to the voice folder
+  before `from_pretrained`, so transformers.js reads only checked files. Its voices come from the
+  `kokoro-js` package. A failed load (offline, or `ModelIntegrityError`) is tried again on the next
+  line, and the line falls to the next mouth. With **Scout talks** off, `speak` answers `off`, except for a Settings preview.
 - **Where it runs** (`main/voice/worker/`). Kokoro never loads in main. `VoiceWorker` (`client.ts`)
   forks `dist/voice-worker.js` as an Electron `utilityProcess` when first needed: at launch if an earlier
   run downloaded Kokoro, otherwise on Scout's first line. `WorkerLocalVoice` is the `LocalVoice` main sees: `warm` and `speak` are
@@ -1978,7 +1982,16 @@ flowchart LR
   clashes with the 1.21 that Transformers.js pins when both load in one process. The model files
   (about 43 MB, `model-files.ts#EARS_FILES`) are downloaded once on first use into `<userData>/voice`,
   the Transformers.js cache Kokoro also uses: `ears/silero-vad/`, `ears/smart-turn-v3/` and Moonshine
-  at `onnx-community/moonshine-tiny-ONNX/`. Nothing heard is stored. `TAGALONG_FAKE_STT=1` makes the
+  at `onnx-community/moonshine-tiny-ONNX/`. **Integrity:** every `ModelFile` has a URL pinned to a
+  40-hex Hugging Face commit (`resolve/<commit>/`, never `resolve/main/`), its exact `bytes` and a
+  `sha256` constant read once from the HF tree API for that commit (the LFS `oid`; small JSON files
+  hashed at that commit and matched to their git blob id), never fetched at run time. `ensureFiles`
+  hashes each file on disk and deletes a mismatch; a download whose hash is wrong is never written,
+  is fetched once more, and a second bad copy throws `ModelIntegrityError`, which `ears-host` posts
+  as `EARS_MODEL_DAMAGED` ("The speech model I downloaded was damaged. Check the connection and try
+  again."). `sharedEnsureFiles` remembers a successful check, so the files are hashed once per voice
+  process. `loadOrtParts` sets `env.allowRemoteModels = false` too. Bumping a model means a new
+  commit and new hashes. Nothing heard is stored. `TAGALONG_FAKE_STT=1` makes the
   voice process use `FakeEars` (no model, no download; held, it hears `FAKE_TRANSCRIPT`, "What am I
   looking at?", when its mic ends or it is stopped) and main adds Chromium's `use-fake-device-for-media-stream` and
   `use-fake-ui-for-media-stream` switches, so the e2e suite needs no model and no microphone while

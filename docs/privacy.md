@@ -231,10 +231,10 @@ flowchart LR
 ```
 
 - **Kokoro, on this computer (default).** The Kokoro-82M model (Apache-2.0, quantised, about
-  90 MB) is downloaded from Hugging Face the first time Scout speaks, into the `voice` folder of
+  92 MB) is downloaded from Hugging Face the first time Scout speaks, into the `voice` folder of
   the app's data directory (`%APPDATA%\Tagalong\voice` on Windows), and read from there afterwards.
-  If the model cannot load (an interrupted download, say), its folder is deleted and it is
-  downloaded again next time. The download fetches the model only; no text is sent. Speech is made on the CPU.
+  The download fetches the model only; no text is sent. Speech is made on the CPU. Its files are
+  checked like the listening models (see **Model files are checked** under "Talking to Scout" below).
 - **The system voice.** While the model downloads, or if it cannot load, the panel speaks through
   the operating system's own voice (a British male voice such as Microsoft George when installed).
 - **ElevenLabs (optional).** Used when picked under Settings → Voice → **Who speaks**, or when an older install already had a voice ID, and only with your own key and a voice ID you picked from your ElevenLabs
@@ -276,6 +276,14 @@ flowchart LR
   downloaded from Hugging Face (`onnx-community/silero-vad`, `onnx-community/moonshine-tiny-ONNX`,
   `pipecat-ai/smart-turn-v3`) the first time you talk to Scout, into the same `voice` folder as the
   voice. The download fetches the models only; no audio is sent.
+- **Model files are checked.** Every model file (listening and Kokoro) is fetched from one fixed
+  Hugging Face commit, never from a branch that can move, and must match a SHA-256 written into the
+  app. A file that does not match is never kept: it is deleted and fetched once more. If the
+  listening models are still wrong, the bubble says "The speech model I downloaded was damaged.
+  Check the connection and try again."; if Kokoro's are, Scout keeps speaking in the system voice. The files on disk are checked again once each
+  time the voice process starts. The model library is told never to fetch anything itself, so it
+  only reads files that were checked. Kokoro's voices come with the app's own packages. A copy an
+  older version downloaded is checked like any other and replaced if it does not match.
 - **The audio never leaves the computer and is never stored.** It lives in memory until it has been
   turned into text, and is then dropped. Before you start to speak, only the last quarter of a
   second is held in memory (so the first syllable of a word is not cut off), each frame dropped as

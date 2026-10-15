@@ -618,7 +618,9 @@ What is still standing, recorded here so nobody rediscovers it.
 The ears use three models, about 43 MB in all (43,001,836 bytes). They are not shipped in the
 installer. The first time listening is used, `apps/desktop/src/main/voice/ears/model-files.ts`
 downloads the missing files into the voice folder, each as a `.part` file renamed only when the
-download is complete, so an interrupted download is retried cleanly. Nothing is fetched at launch or
+download is complete, so an interrupted download is retried cleanly. Each file is pinned to one
+Hugging Face commit and checked against a SHA-256 in that file; `KOKORO_FILES` does the same for
+the voice (92,364,770 bytes). Nothing is fetched at launch or
 in tests. Audio is never sent anywhere; only these model files are downloaded.
 
 | File                                                                          | Source                               | Bytes          | Licence      |
@@ -637,7 +639,10 @@ in tests. Audio is never sent anywhere; only these model files are downloaded.
 Silero VAD (MIT) spots speech, Moonshine tiny (MIT) turns it into text through transformers.js, and
 Smart Turn (BSD-2-Clause) decides when a turn has ended. The Moonshine files sit in the
 transformers.js cache layout under the voice folder, the same cache Kokoro uses. The byte counts are
-minimums: a file a few bytes larger is accepted, a shorter one is rejected as incomplete.
+exact at the pinned commit. To bump a model, pick the new commit, read each file's SHA-256 from
+`https://huggingface.co/api/models/<repo>/tree/<commit>` (the LFS `oid`; hash a small non-LFS file
+at that commit and check it against its git blob `oid`), and change the URL, `bytes` and `sha256`
+together. The static test in `model-files.test.ts` rejects a `resolve/main` URL.
 
 ## Roadmap
 

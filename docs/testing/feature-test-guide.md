@@ -558,7 +558,7 @@ Title moods need **Keep an eye on things** on and sight not paused, as in K.1.
 
 Run from source **without** `TAGALONG_FAKE_TTS` (it makes every line silent), with speakers on. The
 fake brain is fine: `TAGALONG_FAKE_PROVIDERS=1` keeps the answers free. The first line downloads the
-voice model (about 90 MB) into `%APPDATA%\Tagalong\voice`; ElevenLabs (V.6) bills your own account.
+voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APPDATA%\Tagalong\voice`; ElevenLabs (V.6) bills your own account.
 
 ### V.1. Scout reads an answer aloud
 
@@ -704,6 +704,23 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 7. **Expected:** the bubble says "Listening stopped unexpectedly. Try again." and does not reopen the
    microphone while the key is still held. Let go and hold the key again: listening works (the voice
    process starts again).
+
+### T.6b. A damaged model file is replaced
+
+1. **Setup:** listening has worked once (T.1), so the speech models are in
+   `%APPDATA%\Tagalong\voice`. Quit Tagalong.
+2. **Action:** open `%APPDATA%\Tagalong\voice\ears\silero-vad\model.onnx` in a text editor, change
+   one character, save, then start Tagalong and hold the talk key.
+3. **Expected:** the first-time download note does not show (the file is still there), the damaged
+   file is downloaded again (about 2 MB), and listening works as in T.1. The file's size matches the
+   original again.
+4. **Action:** do the same to `%APPDATA%\Tagalong\voice\onnx-community\Kokoro-82M-v1.0-ONNX\config.json`,
+   start Tagalong and ask Scout something.
+5. **Expected:** the answer is spoken by Kokoro (after the file is fetched again, the first line or
+   two may use the system voice), and `config.json` is back to its original content.
+6. **Note:** the "The speech model I downloaded was damaged. Check the connection and try again."
+   message shows only when the fresh copy is wrong twice (a proxy that alters downloads); unit tests
+   in `model-files.test.ts` and `ears-host.test.ts` cover it.
 
 ### T.7. Confirmations in a spoken turn
 
