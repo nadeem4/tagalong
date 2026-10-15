@@ -274,7 +274,7 @@ flowchart LR
   `pipecat-ai/smart-turn-v3`) the first time you talk to Scout, into the same `voice` folder as the
   voice. The download fetches the models only; no audio is sent.
 - **The audio never leaves the computer and is never stored.** It lives in memory until it has been
-  turned into text, and is then dropped. While nobody is speaking, only the last quarter of a
+  turned into text, and is then dropped. Before you start to speak, only the last quarter of a
   second is held in memory (so the first syllable of a word is not cut off), each frame dropped as
   a newer one comes. Only the text goes on, to Scout's provider, exactly as if
   you had typed it, with the name of the window you are on (never the selected text).

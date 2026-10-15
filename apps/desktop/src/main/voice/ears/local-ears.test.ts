@@ -307,6 +307,19 @@ describe('LocalEars, the start of a word', () => {
     expect(events.filter((e) => e.startsWith('turnEnd'))).toEqual([]);
   });
 
+  it('never carries audio from a turn that ended into the next one', async () => {
+    const { p, heard } = recording();
+    const { events, feed } = hear('always', p);
+    await feed(soft(0.05), 3);
+    await feed(LOUD, 2);
+    await feed(soft(0.02), PAUSE_FRAMES);
+    expect(events.filter((e) => e.startsWith('turnEnd'))).toHaveLength(1);
+    const before = heard.length;
+    await feed(soft(0.08), 1);
+    await feed(LOUD, 1);
+    expect(levels(heard.slice(before))).toEqual(['0.08', '0.30']);
+  });
+
   it('feeds nothing while nobody speaks', async () => {
     const { p, heard } = recording();
     const { feed } = hear('always', p);
