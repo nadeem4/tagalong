@@ -11,6 +11,8 @@ import {
   PerceptionListWindowsResult,
   PerceptionReadTextParams,
   PerceptionReadTextResult,
+  ScreenPointAtParams,
+  ScreenPointAtResult,
   coreToHostMethods,
   coreToHostNotifications,
   hostToCoreMethods,
@@ -400,6 +402,7 @@ describe('the core-to-host catalog after 3B', () => {
       'perception.listWindows',
       'perception.readText',
       'perception.recall',
+      'screen.pointAt',
     ]);
   });
 });
@@ -647,5 +650,70 @@ describe('providers.check', () => {
     const failed = { ok: false, message: 'OpenRouter turned that key down.' };
     expect(resultSchemaFor('providers.check').parse(failed)).toEqual(failed);
     expect(resultSchemaFor('providers.check').safeParse({ ok: false }).success).toBe(false);
+  });
+});
+
+describe('screen.pointAt', () => {
+  it('knows the pointer capability', () => {
+    expect(HostCapability.safeParse('pointer').success).toBe(true);
+  });
+
+  it('points at an element by its name inside one window, with an optional label', () => {
+    const parsed = ScreenPointAtParams.parse({ windowId: 'w-1', name: 'Export', label: 'Export' });
+    expect(parsed).toEqual({ windowId: 'w-1', name: 'Export', label: 'Export' });
+  });
+
+  it('points at a rectangle of one display, in its own pixels', () => {
+    const parsed = ScreenPointAtParams.parse({
+      displayId: 2528732444,
+      rect: { x: -10, y: 20, width: 30, height: 40 },
+    });
+    expect(parsed).toEqual({
+      displayId: 2528732444,
+      rect: { x: -10, y: 20, width: 30, height: 40 },
+    });
+  });
+
+  it('rejects a rectangle with a negative or zero size', () => {
+    for (const rect of [
+      { x: 0, y: 0, width: -5, height: 10 },
+      { x: 0, y: 0, width: 10, height: 0 },
+    ]) {
+      expect(ScreenPointAtParams.safeParse({ displayId: 1, rect }).success).toBe(false);
+    }
+  });
+
+  it('rejects a label over 40 characters, an empty name, and a mix of both shapes', () => {
+    expect(
+      ScreenPointAtParams.safeParse({ windowId: 'w-1', name: 'x', label: 'a'.repeat(41) }).success,
+    ).toBe(false);
+    expect(ScreenPointAtParams.safeParse({ windowId: 'w-1', name: '' }).success).toBe(false);
+    expect(
+      ScreenPointAtParams.safeParse({
+        windowId: 'w-1',
+        name: 'Export',
+        displayId: 1,
+        rect: { x: 0, y: 0, width: 1, height: 1 },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('answers shown on a screen, or not shown with the reason', () => {
+    expect(ScreenPointAtResult.parse({ shown: true, screen: 2 })).toEqual({
+      shown: true,
+      screen: 2,
+    });
+    const refused = ScreenPointAtResult.parse({
+      shown: false,
+      blocked: { rule: 'processName', entry: '1Password.exe' },
+      notes: ['a blind spot'],
+    });
+    expect(refused.blocked?.entry).toBe('1Password.exe');
+    expect(ScreenPointAtResult.safeParse({ shown: true, screen: 0 }).success).toBe(false);
+  });
+
+  it('is a core-to-host method', () => {
+    expect(coreToHostMethods['screen.pointAt'].params).toBe(ScreenPointAtParams);
+    expect(coreToHostMethods['screen.pointAt'].result).toBe(ScreenPointAtResult);
   });
 });

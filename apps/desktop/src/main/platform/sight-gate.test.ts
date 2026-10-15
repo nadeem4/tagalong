@@ -29,6 +29,7 @@ function openPlatform(): Platform {
       source: 'uia' as const,
     }),
     lookAtWindow: async () => ({ windowId: 'w-1' }),
+    findElement: async () => ({ found: true, rect: { x: 0, y: 0, width: 10, height: 10 } }),
   };
 }
 
@@ -57,6 +58,8 @@ function callOf(platform: Platform, method: keyof Platform): () => Promise<unkno
       return () => platform.readWindowText({ maxChars: 8000 }, NOTHING_EXCLUDED);
     case 'lookAtWindow':
       return () => platform.lookAtWindow({ windowId: 'w-1', maxLongSide: 1568 }, NOTHING_EXCLUDED);
+    case 'findElement':
+      return () => platform.findElement({ windowId: 'w-1', name: 'Export' }, NOTHING_EXCLUDED);
   }
 }
 
@@ -80,6 +83,7 @@ describe('SIGHT_POLICY', () => {
         'lookAtWindow',
         'readClipboard',
         'readWindowText',
+        'findElement',
       ].sort(),
     );
   });
@@ -94,6 +98,8 @@ describe('SIGHT_POLICY', () => {
         'captureRegion',
         'readWindowText',
         'lookAtWindow',
+        // Element names are screen content too: a paused Scout cannot point.
+        'findElement',
       ].sort(),
     );
   });

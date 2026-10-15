@@ -54,6 +54,7 @@ const ALL_TOOLS = [
   'what_changed',
   'remember',
   'watch_for',
+  'point_at',
 ];
 
 describe('ToolRegistry.forTurn', () => {
@@ -76,10 +77,10 @@ describe('ToolRegistry.forTurn', () => {
     const writes = tools.filter((tool) => tool.kind === 'write').map((tool) => tool.id);
 
     expect(writes).toEqual(['remember', 'watch_for']);
-    expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(10);
+    expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(11);
   });
 
-  it('gives a companion its tools, ending with the routine tools; all three are write', () => {
+  it('gives a companion its tools, then the routine tools (write), then point_at', () => {
     const experts = {
       experts: () => [
         {
@@ -129,6 +130,7 @@ describe('ToolRegistry.forTurn', () => {
       'hand_to_expert',
       'create_routine',
       'change_routine',
+      'point_at',
     ]);
     for (const id of ['hand_to_expert', 'create_routine', 'change_routine']) {
       expect(tools.find((tool) => tool.id === id)?.kind).toBe('write');

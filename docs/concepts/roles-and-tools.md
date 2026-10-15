@@ -13,9 +13,9 @@ office's job labels and the one-time roles notice were removed with the crew.
 Tagalong ships one role, the **Companion**, and one pet, Scout, works as it. The Companion never does
 the work itself. Its tools are only the ones that look (screen, selection, windows), `remember`,
 `hand_to_expert`, which writes a brief and hands it to an expert such as Claude Code, the tools of
-the person's connected apps (`connections`), whose changes always ask first, and `create_routine`
-and `change_routine`, which show a routine card the person saves; it has nothing that writes files or
-runs code. Its own figure and bubble show up in its screenshots, so its instructions tell it to look
+the person's connected apps (`connections`), whose changes always ask first, `create_routine`
+and `change_routine`, which show a routine card the person saves, and `point_at`, which draws a ring
+around something on screen and never clicks; it has nothing that writes files or runs code. Its own figure and bubble show up in its screenshots, so its instructions tell it to look
 past them and never mention itself or Tagalong unless asked.
 
 ### The role file
@@ -42,6 +42,7 @@ tools:
   - connections
   - create_routine
   - change_routine
+  - point_at
 model:
   tier: fast # fast | balanced | deep
   needs_vision: false
@@ -130,10 +131,10 @@ packages/core/src/tools/
     experts.ts     hand_to_expert
     connections.ts <connection>__<tool>: every tool of the person's connected apps
     routines.ts    create_routine, change_routine
+    pointing.ts    point_at
 ```
 
-The companion's role lists only some of them; `list_displays`, `look_at_display`, `look_closer`,
-`recall_screen`, `what_changed` and `watch_for` are built but no shipped role offers them.
+The companion's role lists every one of them; `point_at` comes last, after `change_routine`.
 
 - **Kind.** A tool is `write` when it leaves stored state behind after the turn: `remember` files a
   memory, `watch_for` starts a watch, `hand_to_expert` starts a hand-off and remembers which expert

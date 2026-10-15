@@ -1,4 +1,4 @@
-import { app, shell } from 'electron';
+import { app, screen, shell } from 'electron';
 import { isSignInPage } from './links';
 import { Engine } from '@tagalong/core';
 import type { SecretStore } from '@tagalong/core';
@@ -12,6 +12,8 @@ import { DESKTOP_CAPABILITIES, answerCapture, capturePatch } from './context';
 import { EngineClient } from './engine-client';
 import type { EngineNotification } from './engine-client';
 import type { Platform } from './platform/index';
+import { answerPointAt } from './platform/point-target';
+import type { PointTarget } from './platform/point-target';
 import type { CaptureNotice } from '../shared/ipc';
 
 export interface EngineHost {
@@ -32,6 +34,8 @@ export interface StartEngineHostOptions {
   /** Phase 3B: rolling memory and the watch diff, answered from in-memory frames. */
   recall: (params: PerceptionRecallParams) => Promise<unknown>;
   diff: (params: PerceptionDiffParams) => Promise<unknown>;
+  /** Point, don't click: draws the ring on the overlay. Only draws. */
+  showRing: (ring: PointTarget & { label: string }) => void;
 }
 
 /**
@@ -114,6 +118,17 @@ export async function startEngineHost(options: StartEngineHostOptions): Promise<
     },
     recall: options.recall,
     diff: options.diff,
+    pointAt: (params) =>
+      answerPointAt(
+        {
+          findElement: (asked) => options.platform.findElement(asked, options.captureExclusions()),
+          displays: () => screen.getAllDisplays(),
+          // UI Automation reports screen pixels; Windows knows each monitor's scale.
+          toDip: (rect) => screen.screenToDipRect(null, rect),
+          show: options.showRing,
+        },
+        params,
+      ),
     onNotification: options.onNotification,
   });
 

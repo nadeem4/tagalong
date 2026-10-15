@@ -136,7 +136,7 @@ function toolset(
 }
 
 describe('the full-view toolset', () => {
-  it('offers the five full-view tools after the Phase 2 pair, then the Phase 3B pair', () => {
+  it('offers the five full-view tools after the Phase 2 pair, then the Phase 3B pair, then point_at', () => {
     expect(toolset([fullViewHost()]).definitions.map((tool) => tool.name)).toEqual([
       LOOK_AT_SCREEN,
       GET_SELECTION,
@@ -148,6 +148,7 @@ describe('the full-view toolset', () => {
       LOOK_AT_WINDOW,
       'recall_screen',
       'what_changed',
+      'point_at',
     ]);
   });
 

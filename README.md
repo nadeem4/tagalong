@@ -373,6 +373,10 @@ is watching, and tells you when it happens. A watch stops on its own when it fir
 minutes by default). A routine **When a watch fires** runs then too. Scout can also zoom in on small
 text and look at your other monitor ("what's on my other screen?"). Blind spots still apply.
 
+**Point, don't click.** Ask "where's the export button?" and Scout tells you, and a soft ring with a
+short label shows around it for a few seconds (`Esc` puts it away). Scout never moves the mouse,
+clicks or types.
+
 ## Privacy
 
 - Nothing on screen is read until you press a hotkey or ask, except screen memory and watches, which

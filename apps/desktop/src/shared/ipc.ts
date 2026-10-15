@@ -104,7 +104,15 @@ export const IPC = {
   getListening: 'tagalong:voice:get-listening',
   setListening: 'tagalong:voice:set-listening',
   listeningEvent: 'tagalong:voice:listening',
+  // Point, don't click: the ring to draw on one display's overlay. Main to renderer only.
+  pointerShow: 'tagalong:pointer:show',
 } as const;
+
+/** One ring: where on its display, in DIP relative to the display's corner, and its label. */
+export interface PointerRing {
+  rect: { x: number; y: number; width: number; height: number };
+  label: string;
+}
 
 /** Always listening: switched on by the person, and paused while a call or full screen is in front. */
 export interface ListeningState {
@@ -357,6 +365,8 @@ export interface TagalongHostApi {
   setListening(on: boolean): Promise<ListeningState>;
   /** Fires whenever Always listening is switched, paused or resumed. */
   onListening(handler: (state: ListeningState) => void): () => void;
+  /** The pointer overlay: a ring to draw. It only draws; nothing is clicked or typed. */
+  onPointer(handler: (ring: PointerRing) => void): () => void;
 }
 
 declare global {

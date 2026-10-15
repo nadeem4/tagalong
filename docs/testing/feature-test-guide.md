@@ -19,6 +19,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Routines](#routines)
 - [Memory](#memory)
 - [Screen memory](#screen-memory)
+- [Point, don't click](#point-dont-click)
 - [The Chrome extension](#the-chrome-extension)
 - [Installer](#installer)
 - [Not in this build](#not-in-this-build)
@@ -924,6 +925,29 @@ monitor.
    With one monitor it says there is only one.
 5. **Action:** put a blind-spot window (for example a password manager) in front and ask about it.
    **Expected:** Scout says it cannot see it.
+
+## Point, don't click
+
+### PT.1. Scout rings a button on the other monitor, on mixed DPI
+
+1. **Setup:** two monitors at different scales (for example a laptop at 150% and a monitor at
+   100%). Open Excel or Paint on the second monitor, not minimized.
+2. **Action:** ask Scout "where's the export button?" (or a button that window really has, such as
+   "where's Save?"). **Expected:** Scout answers in words, and a gold ring with a short label
+   appears tightly around that button on the right monitor. The mouse does not move and nothing is
+   clicked or typed.
+3. **Action:** wait. **Expected:** the ring fades after about 6 seconds. Ask again and press `Esc`
+   instead: the ring goes at once, and `Esc` still works normally in other apps afterwards.
+4. **Action:** ask again, then send another message while the ring shows. **Expected:** the ring
+   goes when the new message starts.
+5. **Action:** press `Ctrl+Shift+Space` while a ring shows and ask "what do you see?".
+   **Expected:** the screenshot does not show the ring.
+6. **Action:** minimize the window and ask again. **Expected:** Scout says which app it is in and
+   asks you to bring it forward and ask again. No ring.
+7. **Action:** ask Scout to point at something in a password manager. **Expected:** Scout says it
+   cannot see that window. No ring.
+8. **Action:** turn on Windows' **Animation effects: Off** and ask again. **Expected:** the ring
+   appears and disappears without a pulse or a fade.
 
 ## The Chrome extension
 

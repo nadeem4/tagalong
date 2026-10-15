@@ -77,8 +77,8 @@ describe('perception tool definitions', () => {
     const names = toolset([]).definitions.map((tool) => tool.name);
     expect(names.slice(0, 2)).toEqual([LOOK_AT_SCREEN, GET_SELECTION]);
     // Seven since Phase 2B; nine since Phase 3B added recall_screen and what_changed; ten
-    // with look_at_window.
-    expect(names).toHaveLength(10);
+    // with look_at_window; eleven with point_at.
+    expect(names).toHaveLength(11);
   });
 
   it('describes each tool so a model knows when to reach for it', () => {

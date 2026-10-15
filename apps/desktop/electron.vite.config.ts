@@ -80,6 +80,7 @@ export default defineConfig({
           settings: 'src/renderer/settings.html',
           onboarding: 'src/renderer/onboarding.html',
           office: 'src/renderer/office.html',
+          pointer: 'src/renderer/pointer.html',
         },
       },
     },

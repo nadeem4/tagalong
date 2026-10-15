@@ -79,6 +79,7 @@ import {
 import { AVATAR_SIZE, resolveAvatarPosition, stripWidth } from './windows/position';
 import { moveWindow } from './windows/move';
 import { createOfficeWindow } from './windows/office';
+import { createPointerOverlay } from './windows/pointer';
 import { createOnboardingWindow } from './windows/onboarding';
 import { createSettingsWindow } from './windows/settings';
 import { registerConnectionIpc } from './ipc/connections';
@@ -178,6 +179,7 @@ app.on('before-quit', () => {
   desktop?.voiceWorker.stop();
   stopKeepAnEye();
   stopListeningGuard();
+  pointerOverlay?.dispose();
   // Memory only, and gone on quit: nothing here was ever written anywhere to clean up.
   desktop?.rolling.dispose();
   desktop?.perceptionMemory.clear();
@@ -237,6 +239,7 @@ async function start(): Promise<void> {
       onCapture: announceCapture,
       recall: (params) => perceptionMemory.recall(params),
       diff: (params) => perceptionMemory.diff(params),
+      showRing: (ring) => pointer().show(ring),
     });
   } catch (error) {
     // A missing API key is the ordinary first run, not a crash. Quitting here would leave
@@ -572,11 +575,20 @@ function refreshStrip(): void {
   if (avatar !== null && avatar !== undefined && !avatar.isDestroyed()) avatar.webContents.reload();
 }
 
+/** Point, don't click: the ring overlay, made the first time Scout points. */
+let pointerOverlay: ReturnType<typeof createPointerOverlay> | null = null;
+function pointer(): ReturnType<typeof createPointerOverlay> {
+  pointerOverlay ??= createPointerOverlay();
+  return pointerOverlay;
+}
+
 /** Turn notifications drive the UI, and main is the only thing holding the socket. */
 function forwardToRenderers(notification: { method: string; params: unknown }): void {
   const params = (notification.params ?? {}) as { turnId?: string };
   if (notification.method === 'turn.started' && params.turnId !== undefined) {
     desktop?.activeTurns.add(params.turnId);
+    // The next message puts the last ring away.
+    pointerOverlay?.hide();
   }
   if (
     (notification.method === 'turn.completed' || notification.method === 'turn.error') &&
