@@ -1456,7 +1456,8 @@ reached. The "Talk or type?" step (`answer`) is offered when the window has the 
   (`setAlways(true)`). `stop()` is `setAlways(false)`, which closes the mic; a download that ends
   after a stop is ignored. Every failure (`onMicFailed`, `ensureEars` rejecting, or an
   `IPC.earsStatusEvent` of `failed` while on) is `stop()` then `onFailure` with `no-mic`, `denied`
-  (`NotAllowedError` or `SecurityError`, `micFailure`) or `model-failed`. The Ears events used are
+  (`NotAllowedError` or `SecurityError`, `micFailure`), `busy` (`NotReadableError` or
+  `AbortError`: another app holds the microphone) or `model-failed`. The Ears events used are
   `partial` (barge-in only) and `turnEnd` (the answer), from `IPC.earsEvent`, which reaches every
   window; the controller ignores events outside its own session.
 - **When setup listens** is derived, never started on a tap: `listensNow(run, settings)`
@@ -1802,8 +1803,12 @@ flowchart LR
   question being held and every released one whose words have not come yet, so none of them is asked
   later, and leaves an always session running (or brings it back after the held one). `earsFailed`
   (models that failed to load, a voice process that died) drops every question too and ends the
-  always session without switching it off and without retrying at once; the next `setAlways`,
-  `setPaused` or `setDeaf` starts it again, and the voice process tries its download again. A mic that opens after the release is closed unused and is
+  always session without switching it off and without retrying at once. It retries on its own
+  after `retryMs` (30 s by default, doubling up to five minutes, through the injectable
+  `setTimer`); switching off cancels the retry and a question heard starts the wait over. The next
+  `setAlways`, `setPaused` or `setDeaf` starts it again sooner, and the voice process tries its
+  download again. `onMicOpen(mode)` is called once the mic has really opened and the ears listen,
+  never for a mic that fails or opens after a release. A mic that opens after the release is closed unused and is
   heard as nothing said; one that opens after a cancel is closed unused too. Every window hears the one stream of ears
   events and the voice process runs sessions one after another, so a held session takes a turnEnd only
   once it has been released: a released question's words that arrive after the next press began go to
@@ -1833,9 +1838,12 @@ flowchart LR
   mid-turn (a pause, the switch, the system voice, the talk key) after an addressed `partial` cut
   Scout off calls `onDropped`, so its words leave the bubble. Only talk addressed to Scout counts
   (`addressedToScout` from `@tagalong/protocol`): bare `speechStart` does nothing, the first addressed
-  `partial` of a turn cuts Scout off and each one shows, an unaddressed turn goes nowhere, and an
+  `partial` of a turn cuts Scout off and each one shows, except one that may still grow into "stop
+  listening" (`mightBeStop`: "Scout, st", "Scout, stop list"), which neither cuts Scout off nor
+  shows; an unaddressed turn goes nowhere, and an
   addressed turnEnd asks what follows the name, or, for "Scout, stop" (`isStopListening`), calls
-  `onStopListening`, which switches Always listening off through `setListening(false)`. A turn that
+  `onStopListening`, which switches Always listening off through `setListening(false)`, and
+  `onDropped`, so a stop that cut Scout off lets the bubble go. A turn that
   cut Scout off but ends unaddressed or empty calls `onDropped`, and the bubble clears its words. The system
   voice is not echo-cancelled, so `voice-player.ts` reports it speaking (`onSystemVoice`,
   `systemVoiceSpeaking`) for `setDeaf`: Scout never answers or cuts off its own words.
@@ -1844,7 +1852,11 @@ flowchart LR
   to `setPaused`; the panel window is created hidden at launch (`createPanelWindow` in
   `main/index.ts`), so with Always listening saved on, the microphone opens from the start. It
   passes `onSystemVoice` to `setDeaf`, and returns `talk.always` (`{ on, paused, onToggle }`,
-  `onToggle` calling `setListening(!on)`) for the bubble's switch. Closing the bubble cancels the
+  `onToggle` calling `setListening(!on)`) for the bubble's switch. The talk key cuts Scout off on
+  the press, but the state turns `listening` (the dot and "Listening…") only in `onMicOpen`, once
+  the mic is really open. A mic that will not open shows `micNote(error)`: "Another app is using
+  the microphone…" when it is busy (`NotReadableError`, `AbortError`), otherwise that it could not
+  be opened. Closing the bubble cancels the
   question being asked, never always listening. The decisions sit in `talk-rules.ts`, unit tested:
   `settles` (a heard question clears the words and the state unless a held question has started, so
   an always question and a held question heard after the always session resumed both settle),
@@ -1885,7 +1897,8 @@ flowchart LR
   `partial` or `turnEnd` whose words are addressed to Scout (`addressedToScout`, from
   `@tagalong/protocol`) brings the hidden bubble up beside a visible pet with `showPanelQuietly`,
   without taking the keyboard, as a remark or the launch line does; bare speech, talk that does
-  not start with the name, and "Scout, stop" never do.
+  not start with the name, "Scout, stop", and a partial that may still become it
+  (`mightBeStop`, such as "Scout, st") never do.
 - **The ears, in the voice process** (`main/voice/worker/ears-host.ts`, `main/voice/ears/`).
   `createEarsHost` opens an inbox for frames at each listen, so the first words are not lost while
   the models load, and runs one session at a time. Letting go of a held question only ends its
@@ -1992,7 +2005,8 @@ flowchart LR
   not echo-cancelled). `addressedToScout` (`@tagalong/protocol`) accepts a turn that starts with
   "Scout", after an optional "hey", "ok" or "okay", and returns the rest as the question; "Scout's"
   and "Scout-like" are not addressed. `isStopListening` matches "stop" or "stop listening" after
-  the name. An unaddressed turn goes nowhere.
+  the name; `mightBeStop` is true for words that may still grow into "stop listening" ("st",
+  "stop list"), so such a partial is not a question yet. An unaddressed turn goes nowhere.
 - **Hold-to-talk and the mic button need no name**, in every case. They are the `held` mode, not
   the `always` mode, and `addressedToScout` is never applied to them: pressed while an always
   session runs, it ends for the held question and comes back after it.

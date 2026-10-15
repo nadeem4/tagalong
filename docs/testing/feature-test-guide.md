@@ -161,6 +161,15 @@ by tapping a card, or, after **Talk to me**, by saying it (W.9). W.1 to W.8 type
    type. Tap or type your answers." The listening line goes, the Answer chip reads **Typing**, and
    setup carries on by typing at the same step. Closing and relaunching does not try again.
 
+### W.10a. The microphone is busy
+
+1. **Setup:** a fresh profile; another app holds the microphone exclusively (for example a
+   recorder with exclusive mode on in Windows Sound settings).
+2. **Action:** tap **Talk to me**.
+3. **Expected:** Scout says plainly "Another app is using the microphone, so let's type. Tap or
+   type your answers." (not that it can't find one). The chip reads **Typing** and typing
+   carries on.
+
 ### W.11. Permission denied
 
 1. **Setup:** a fresh profile; Windows Settings → Privacy & security → Microphone → let desktop
@@ -619,7 +628,11 @@ looking at?" and Chromium's fake microphone stands in for a real one.
    microphone, Save, and talk again. Then turn off microphone access for desktop apps in Windows
    Settings and talk again.
 2. **Expected:** silence: "I didn't catch that." and nothing is asked. The picked microphone is used.
-   With access off, the bubble says the microphone could not be opened.
+   With access off, the bubble says the microphone could not be opened. With another app holding
+   the microphone exclusively, it says instead "Another app is using the microphone. Close it and
+   try again, or pick another in Settings."
+3. **Edge:** on a slow microphone, press the key: the dot and "Listening…" show only once the
+   microphone has opened, never before it.
 
 ### T.6a. When listening cannot start
 
@@ -673,8 +686,10 @@ looking at?" and Chromium's fake microphone stands in for a real one.
     Scout finishes a line in the system voice.
 12. **Edge:** on a fresh install with no internet, switch **Always listening** on. The bubble says
     the first-time download, then "I couldn’t download my listening models…" once; it does not
-    go back to the download note or repeat as Scout finishes lines. Connect, switch Always
-    listening off and on: the models download and listening works.
+    go back to the download note or repeat as Scout finishes lines. Connect and wait: within
+    about 30 s (the wait doubles each failure, up to five minutes) it tries again on its own and
+    listening works, with the switch untouched. Switching Always listening off and on retries
+    at once.
 13. **Action:** with Always listening on, close the bubble with ×.
 14. **Expected:** the mark stays solid and listening goes on: say "Scout, what is this?" and the
     bubble comes back with the question.
@@ -716,6 +731,10 @@ Run with a real microphone and without `TAGALONG_FAKE_STT`. Switch **Always list
 14. **Expected:** the mark goes and both switches show off. Quit and start Tagalong: it stays off.
     Switch it on, quit and start again: Scout's first line says it is listening and how to stop,
     and the mark shows at once.
+15. **Action:** switch Always listening on, close the bubble with ×, and say "Scout, stop"
+    slowly.
+16. **Expected:** the bubble never comes up, not even for a moment on "Scout, st…", and no "st"
+    shows; listening switches off.
 
 ## Connections: your apps over MCP
 
