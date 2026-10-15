@@ -555,7 +555,7 @@ Ask Scout "What did we do today?" (or yesterday) and it reads back the records a
 window titles in the log of what Scout saw, your questions (the first 120 characters), which experts
 got which ask and how they ended, routines and app calls by name, and what pick-up last saw (only
 when pick-up is on). Those titles, questions and asks go to **Scout's own model** to be summed up,
-like any tool result. Answers from experts, turns and routines are not included, nor the selection
+like any tool result, with any key, token or password in them hidden first. Answers from experts, turns and routines are not included, nor the selection
 or window a brief carried. Nothing new is recorded for it, and the hours are an estimate from the
 first to the last look: Scout only knows what it looked at or was asked.
 

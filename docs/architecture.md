@@ -1227,8 +1227,8 @@ characters. `activity.list { before?, limit = 30 (max 100) }` answers `{ entries
 first; `next` is the id to pass as `before` for the page after. An `expert` row is written by
 `HandoffManager` through `expertStarted` and `expertFinished`, not from a notification: it keeps the
 expert's name at the time, the brief as text, the answer and the files changed. Meetings are not recorded: they do not
-exist yet. `ActivityLog.since(startIso, limit = 200)` returns the listed kinds that started at or
-after a time, oldest first: the daily briefing's one query.
+exist yet. `ActivityLog.since(startIso, limit = 200, untilIso?)` returns the listed kinds that
+started at or after a time (and before `untilIso`), oldest first: the daily briefing's one query.
 
 ### What Scout saw
 
@@ -2414,13 +2414,15 @@ starts. A removed or rescaled display loses its window. The ring is `renderer/sr
 
 `recall_day({ day?: 'today' | 'yesterday' })` (`packages/core/src/tools/builtin/day.ts`, kind
 `read`) answers "What did we do today?" from records Tagalong already keeps. There is no new table
-and nothing is tracked in the background. The day runs from local midnight (an injected `now()`);
-yesterday ends at today's midnight. It reads:
+and nothing is tracked in the background. The day runs from one local midnight to the next (an
+injected `now()`, stepped by calendar date, so a day the clocks change is 23 or 25 hours); both
+ends are bounds in the queries, so a busy today never uses up yesterday's row limit. Every
+question, ask, routine name and title it quotes goes through `hideSecrets` first. It reads:
 
 | Source                                            | What the briefing uses                                                                                                                                                                                                                          |
 | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SightLog.list(1000, dayStart)`                   | looks grouped by app and title with a count (a blind spot is its app alone), at most 12 groups; the first to the last row gives "about N hours", called an estimate (`estimateSpan`, breaks included)                                           |
-| `ActivityLog.since(dayStart)`                     | `turn` rows: the question only, clipped to 120 characters, the current turn's left out; `expert` rows: name, the ask (the brief's first part), state and how many files changed; `routine` and `connector` rows by name. No answer is passed on |
+| `SightLog.list(1000, dayStart, dayEnd)`           | looks grouped by app and title with a count (a blind spot is its app alone), at most 12 groups; the first to the last row gives "about N hours", called an estimate (`estimateSpan`, breaks included)                                           |
+| `ActivityLog.since(dayStart, 200, dayEnd)`        | `turn` rows: the question only, clipped to 120 characters, the current turn's left out; `expert` rows: name, the ask (the brief's first part), state and how many files changed; `routine` and `connector` rows by name. No answer is passed on |
 | `PickUpStore.get()`, when `settings.pickUp` is on | the projects and branch pick-up last saw                                                                                                                                                                                                        |
 | `HandoffManager.pending()`                        | briefs waiting for Send                                                                                                                                                                                                                         |
 

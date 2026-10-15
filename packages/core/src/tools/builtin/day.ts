@@ -1,5 +1,6 @@
 import type { ActivityEntry, SightLogEntry } from '@tagalong/protocol';
 import type { PickUpSnapshot } from '../../pick-up/store';
+import { hideSecrets } from '../../privacy/secrets';
 import type { BrainTool } from '../../providers';
 import { defineTool, type Tool } from '../tool';
 
@@ -19,9 +20,10 @@ const SIGHT_LIMIT = 1_000;
 const MAX_GROUPS = 12;
 
 export interface DayToolDeps {
-  activity: { since(startIso: string, limit?: number): ActivityEntry[] };
-  /** Newest first, rows at or after `since`. */
-  sightLog: { list(limit?: number, since?: string): SightLogEntry[] };
+  /** Oldest first, rows at or after `startIso` and before `untilIso`. */
+  activity: { since(startIso: string, limit?: number, untilIso?: string): ActivityEntry[] };
+  /** Newest first, rows at or after `since` and before `until`. */
+  sightLog: { list(limit?: number, since?: string, until?: string): SightLogEntry[] };
   /** The pick-up snapshot. Absent, or null, when `settings.pickUp` is off. */
   pickUp?: { get(): PickUpSnapshot | null } | undefined;
   handoffs: { pending(): { expertId: string; expertName: string; ask: string }[] };
@@ -85,16 +87,18 @@ function dayOf(input: unknown): 'today' | 'yesterday' | null {
 
 function briefing(deps: DayToolDeps, day: 'today' | 'yesterday', turnId: string): string {
   const now = deps.now();
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
-  const start = new Date(today);
+  // Local midnights, by calendar date, so a day the clocks change is 23 or 25 hours long.
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
   if (day === 'yesterday') start.setDate(start.getDate() - 1);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
   const startIso = start.toISOString();
-  const endIso = day === 'yesterday' ? today.toISOString() : null;
-  const inDay = (at: string) => endIso === null || at < endIso;
+  const endIso = end.toISOString();
 
-  const sights = deps.sightLog.list(SIGHT_LIMIT, startIso).filter((row) => inDay(row.at));
-  const rows = deps.activity.since(startIso).filter((row) => inDay(row.startedAt));
+  // Bounded at both ends in the query, so the rows of a later day never use up the limit.
+  const sights = deps.sightLog.list(SIGHT_LIMIT, startIso, endIso);
+  const rows = deps.activity.since(startIso, undefined, endIso);
   const label = day === 'today' ? 'Today' : 'Yesterday';
 
   const sections: string[] = [];
@@ -122,7 +126,7 @@ function briefing(deps: DayToolDeps, day: 'today' | 'yesterday', turnId: string)
       'Routines',
       rows
         .filter((row) => row.kind === 'routine')
-        .map((r) => `${r.text ?? 'A routine'} (${r.state})`),
+        .map((r) => `${clip(r.text ?? 'A routine')} (${r.state})`),
     ),
   );
   sections.push(...section('Apps Scout called', appCalls(rows)));
@@ -184,8 +188,9 @@ function askOf(text: string | undefined): string {
   return clip((text ?? '').split('\n\n')[0] ?? '');
 }
 
+/** Flattened, its secrets hidden, then cut to a line. */
 function clip(text: string): string {
-  const flat = text.replace(/\s+/g, ' ').trim();
+  const flat = hideSecrets(text).replace(/\s+/g, ' ').trim();
   return flat.length <= LINE_CHARS ? flat : `${flat.slice(0, LINE_CHARS - 1)}…`;
 }
 

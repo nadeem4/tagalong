@@ -379,6 +379,11 @@ describe('ActivityLog.since, for the daily briefing', () => {
     ).run();
 
     expect(log.since('2026-10-15T00:00:00.000Z').map((entry) => entry.id)).toEqual([first, second]);
+    expect(
+      log
+        .since('2026-10-15T00:00:00.000Z', 200, '2026-10-15T10:00:00.000Z')
+        .map((entry) => entry.id),
+    ).toEqual([first]);
   });
 
   it('stops at the limit, keeping the oldest', () => {

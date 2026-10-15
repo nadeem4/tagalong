@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { ActivityEntry, SightLogEntry } from '@tagalong/protocol';
 import type { PickUpSnapshot } from '../../pick-up/store';
 import { fakeTurnTools } from '../fake-turn';
@@ -33,6 +33,7 @@ interface World {
   pending?: { expertId: string; expertName: string; ask: string }[];
   snapshot?: PickUpSnapshot | null;
   pickUpOff?: boolean;
+  now?: Date;
 }
 
 /** Fakes that keep the stores' contracts: since-bounded, sight newest first, activity oldest first. */
@@ -41,26 +42,26 @@ function deps(world: World = {}): DayToolDeps & { asked: string[] } {
   return {
     asked,
     sightLog: {
-      list: (limit = 200, since = '') => {
-        asked.push(`sight ${since}`);
+      list: (limit = 200, since = '', until = '9999') => {
+        asked.push(`sight ${since}`, `sight until ${until}`);
         return (world.sights ?? [])
-          .filter((row) => row.at >= since)
+          .filter((row) => row.at >= since && row.at < until)
           .sort((a, b) => b.at.localeCompare(a.at))
           .slice(0, limit);
       },
     },
     activity: {
-      since: (start, limit = 200) => {
-        asked.push(`activity ${start}`);
+      since: (start, limit = 200, until = '9999') => {
+        asked.push(`activity ${start}`, `activity until ${until}`);
         return (world.rows ?? [])
-          .filter((row) => row.startedAt >= start)
+          .filter((row) => row.startedAt >= start && row.startedAt < until)
           .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
           .slice(0, limit);
       },
     },
     handoffs: { pending: () => world.pending ?? [] },
     ...(world.pickUpOff === true ? {} : { pickUp: { get: () => world.snapshot ?? null } }),
-    now: () => NOW,
+    now: () => world.now ?? NOW,
   };
 }
 
@@ -263,6 +264,104 @@ describe(RECALL_DAY, () => {
     const outcome = await fakeTurnTools({ day: wired }).run({ name: RECALL_DAY, input: {} });
     expect(outcome.isError).toBe(true);
     expect(outcome.content).toContain('could not read');
+  });
+});
+
+describe(`${RECALL_DAY}, review fixes`, () => {
+  it('reads yesterday bounded in the query, so a busy today cannot crowd it out', async () => {
+    const busy = Array.from({ length: 1_200 }, (_, n) =>
+      sight(new Date(2026, 9, 15, 8, 0, n).toISOString(), { app: 'Today.exe' }),
+    );
+    const outcome = await recall(
+      {
+        sights: [
+          ...busy,
+          sight(local(14, 9), { app: 'Code.exe', title: 'ai_pet' }),
+          sight(local(14, 12), { app: 'Code.exe', title: 'ai_pet' }),
+        ],
+      },
+      { day: 'yesterday' },
+    );
+    expect(outcome.content).toContain('Code.exe: ai_pet (2 looks)');
+    expect(outcome.content).toContain('about 3 hours');
+    expect(outcome.asked).toContain(`sight until ${local(15, 0)}`);
+    expect(outcome.asked).toContain(`activity until ${local(15, 0)}`);
+  });
+
+  it('bounds today at the next midnight too', async () => {
+    const outcome = await recall({
+      sights: [sight(local(16, 1), { app: 'Skewed.exe' }), sight(local(15, 9), { app: 'A.exe' })],
+    });
+    expect(outcome.content).not.toContain('Skewed.exe');
+    expect(outcome.asked).toContain(`sight until ${local(16, 0)}`);
+  });
+
+  it('just after midnight, today is the new day and yesterday the one before', async () => {
+    const now = new Date(2026, 9, 15, 0, 5);
+    const today = await recall({ now });
+    expect(today.asked).toEqual(
+      expect.arrayContaining([`sight ${local(15, 0)}`, `sight until ${local(16, 0)}`]),
+    );
+    const yesterday = await recall({ now }, { day: 'yesterday' });
+    expect(yesterday.asked).toEqual(
+      expect.arrayContaining([`sight ${local(14, 0)}`, `sight until ${local(15, 0)}`]),
+    );
+  });
+
+  describe('across a clock change, in the person’s time zone', () => {
+    const saved = process.env.TZ;
+    afterEach(() => {
+      if (saved === undefined) delete process.env.TZ;
+      else process.env.TZ = saved;
+    });
+
+    it('gives a 25-hour yesterday when the clocks went back', async () => {
+      process.env.TZ = 'Europe/London';
+      // 25 October 2026: BST ends at 02:00, so the day runs 23:00Z to 00:00Z next day.
+      const outcome = await recall(
+        { now: new Date('2026-10-26T10:00:00.000Z') },
+        { day: 'yesterday' },
+      );
+      expect(outcome.asked).toEqual(
+        expect.arrayContaining([
+          'sight 2026-10-24T23:00:00.000Z',
+          'sight until 2026-10-26T00:00:00.000Z',
+        ]),
+      );
+    });
+
+    it('gives a 23-hour yesterday when the clocks went forward', async () => {
+      process.env.TZ = 'Europe/London';
+      // 29 March 2026: BST starts at 01:00, so the day runs 00:00Z to 23:00Z.
+      const outcome = await recall(
+        { now: new Date('2026-03-30T10:00:00.000Z') },
+        { day: 'yesterday' },
+      );
+      expect(outcome.asked).toEqual(
+        expect.arrayContaining([
+          'sight 2026-03-29T00:00:00.000Z',
+          'sight until 2026-03-29T23:00:00.000Z',
+        ]),
+      );
+    });
+  });
+
+  it('hides secrets in the questions, briefs and routine names it quotes', async () => {
+    const key = `sk-${'a'.repeat(30)}`;
+    const token = `ghp_${'b'.repeat(36)}`;
+    const outcome = await recall({
+      rows: [
+        activity(local(15, 9), { text: `why does ${key} fail?` }),
+        activity(local(15, 10), { kind: 'routine', text: `Check ${token}` }),
+        activity(local(15, 11), { kind: 'expert', expertName: 'X', text: `use ${key}` }),
+      ],
+      pending: [{ expertId: 'cc', expertName: 'Claude Code', ask: `rotate ${token}` }],
+    });
+    const content = outcome.content as string;
+    expect(content).not.toContain(key);
+    expect(content).not.toContain(token);
+    expect(content).toContain('[hidden: API key]');
+    expect(content).toContain('[hidden: access token]');
   });
 });
 

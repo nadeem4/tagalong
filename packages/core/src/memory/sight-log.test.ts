@@ -65,6 +65,9 @@ describe('SightLog', () => {
     const entries = sight.list(200, '2026-10-15T00:00:00.000Z');
     expect(entries.map((e) => e.kind)).toEqual(['screenshot', 'read_text']);
     expect(sight.list(1, '2026-10-15T00:00:00.000Z').map((e) => e.kind)).toEqual(['screenshot']);
+    expect(
+      sight.list(200, '2026-10-15T00:00:00.000Z', '2026-10-15T08:00:00.000Z').map((e) => e.kind),
+    ).toEqual(['read_text']);
   });
 
   it('keeps the brain and the expert a send went to', () => {
