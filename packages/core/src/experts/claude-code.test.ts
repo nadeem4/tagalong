@@ -513,6 +513,61 @@ describe('ClaudeCodeConnector', () => {
       expect(calls[0]?.ended).toBe(true);
     });
 
+    // Each `result` of a live session reports that turn's tokens only (claude 2.1.300), so
+    // the run's usage is the sum over every turn, not the last one.
+    it('adds up the tokens of every turn in the session', async () => {
+      const { spawn } = turnSpawn([
+        [
+          { type: 'system', subtype: 'init', model: 'claude-sonnet-5' },
+          {
+            ...result('Used moment.'),
+            usage: { input_tokens: 2, cache_read_input_tokens: 600, output_tokens: 3 },
+          },
+        ],
+        [
+          {
+            ...result('Switched to dayjs.'),
+            usage: { input_tokens: 2, cache_creation_input_tokens: 4000, output_tokens: 350 },
+          },
+        ],
+        [result('Also fixed the test.')],
+      ]);
+      const { notes } = queue([['use dayjs, not moment'], ['fix the test too']]);
+      const out = await new ClaudeCodeConnector({ folder: 'C:\\r', spawn }).send(
+        { ask: 'Fix the dates' },
+        () => {},
+        undefined,
+        notes,
+      );
+
+      expect(out).toEqual({
+        ok: true,
+        text: 'Also fixed the test.',
+        changedFiles: [],
+        usage: { model: 'claude-sonnet-5', inputTokens: 4604, outputTokens: 353 },
+      });
+    });
+
+    it('keeps the earlier turns’ tokens when a later turn ends in an error', async () => {
+      const { spawn } = turnSpawn([
+        [{ ...result('Used moment.'), usage: { input_tokens: 10, output_tokens: 20 } }],
+        [{ ...result('Ran out of turns.', true), usage: { input_tokens: 1, output_tokens: 2 } }],
+      ]);
+      const { notes } = queue([['use dayjs']]);
+      const out = await new ClaudeCodeConnector({ folder: 'C:\\r', spawn }).send(
+        { ask: 'x' },
+        () => {},
+        undefined,
+        notes,
+      );
+
+      expect(out).toEqual({
+        ok: false,
+        error: 'Ran out of turns.',
+        usage: { model: '', inputTokens: 11, outputTokens: 22 },
+      });
+    });
+
     it('ends stdin after the first result when no note is waiting', async () => {
       const { spawn, calls } = turnSpawn([[result('Done.')], [result('never')]]);
       const { notes, taken } = queue([]);

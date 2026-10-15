@@ -2636,8 +2636,9 @@ flowchart LR
   `provider.id`, `request.model` and `result.usage`, aborted calls included; a call that throws
   records nothing, and a record that fails never fails the call. The experts': `ClaudeCodeConnector`
   reads `usage` from the stream-json `result` event (cache reads and writes count as input) and the
-  model from the `system` init event into the optional `ConnectorResult.usage`, and
-  `HandoffManager` records it as an `expert` row. Every expert run goes through `HandoffManager`; a
+  model from the `system` init event into the optional `ConnectorResult.usage`. Each `result`
+  counts only its own turn, so a run that took notes from the person adds up every turn's tokens.
+  `HandoffManager` then records it as an `expert` row. Every expert run goes through `HandoffManager`; a
   new connector should fill `usage` when its tool reports tokens.
 - **Prices.** `usage/prices.ts` is a small table keyed `providerId/model`, dollars per million input
   and output tokens, with the date it was last checked against Anthropic's published rates. It

@@ -227,6 +227,8 @@ export class ClaudeCodeConnector implements Connector {
       const changed = new Set<string>();
       let final: ConnectorResult | undefined;
       let model = '';
+      // Every `result` reports its own turn's tokens, so a session that took notes adds up.
+      let spent: ConnectorUsage | undefined;
 
       // A line it wrote is said only once a tool follows: the text before a `result` is the
       // answer, which Scout reads out when the run finishes.
@@ -255,7 +257,15 @@ export class ClaudeCodeConnector implements Connector {
         } else if (event.type === 'result') {
           toSay = undefined;
           const text = event.result ?? '';
-          const usage = usageOf(event, model);
+          const turn = usageOf(event, model);
+          if (turn) {
+            spent = {
+              model,
+              inputTokens: (spent?.inputTokens ?? 0) + turn.inputTokens,
+              outputTokens: (spent?.outputTokens ?? 0) + turn.outputTokens,
+            };
+          }
+          const usage = spent ? { usage: spent } : {};
           final = event.is_error
             ? { ok: false, error: text, ...usage }
             : { ok: true, text, changedFiles: [...changed], ...usage };
@@ -334,24 +344,23 @@ interface StreamEvent {
 }
 
 /**
- * The run's tokens from its `result` event, for the cost meter. Cache reads and writes
- * count as input: on a cached run `input_tokens` alone is a handful. Tokens only, never
- * `total_cost_usd`: on the person's plan that number is not money they pay.
+ * One turn's tokens from its `result` event, for the cost meter: in a live session each
+ * `result` counts only its own turn. Cache reads and writes count as input: on a cached run
+ * `input_tokens` alone is a handful. Tokens only, never `total_cost_usd`: on the person's
+ * plan that number is not money they pay.
  */
-function usageOf(event: StreamEvent, model: string): { usage?: ConnectorUsage } {
+function usageOf(event: StreamEvent, model: string): ConnectorUsage | undefined {
   const usage = event.usage;
   // The stream is untrusted JSON: a null or non-object usage is no usage, never a crash.
-  if (typeof usage !== 'object' || usage === null) return {};
+  if (typeof usage !== 'object' || usage === null) return undefined;
   const count = (n: number | undefined) => (typeof n === 'number' && n > 0 ? Math.round(n) : 0);
   return {
-    usage: {
-      model,
-      inputTokens:
-        count(usage.input_tokens) +
-        count(usage.cache_creation_input_tokens) +
-        count(usage.cache_read_input_tokens),
-      outputTokens: count(usage.output_tokens),
-    },
+    model,
+    inputTokens:
+      count(usage.input_tokens) +
+      count(usage.cache_creation_input_tokens) +
+      count(usage.cache_read_input_tokens),
+    outputTokens: count(usage.output_tokens),
   };
 }
 
