@@ -4,6 +4,7 @@ import type { MemoryStore } from '../memory/memories';
 import { roleFor } from '../roles';
 import { recallTools, watchForTool, type WatchToolDeps } from './builtin/awareness';
 import { connectorTools, type ConnectorToolDeps } from './builtin/connections';
+import { recallDayTool, type DayToolDeps } from './builtin/day';
 import { rememberTool } from './builtin/memory';
 import { enabledExperts, handToExpertTool, type ExpertToolDeps } from './builtin/experts';
 import { perceptionTools, type PerceptionToolsOptions } from './builtin/perception';
@@ -46,6 +47,8 @@ export interface ToolRegistryOptions {
   connections?: ConnectorToolDeps | undefined;
   /** Gives a pet whose role lists them `create_routine` and `change_routine`. */
   routines?: RoutineToolDeps | undefined;
+  /** Gives a pet whose role lists it `recall_day`, the daily briefing. */
+  day?: DayToolDeps | undefined;
   /** Defaults to `toolsFor`: the tools its role lists, minus any its grants switch off. */
   toolsFor?: ToolFilter | undefined;
 }
@@ -106,7 +109,7 @@ export class ToolRegistry {
 
   /** Every built-in this engine is wired for, in the order the model has always seen. */
   #all(turn: TurnRequest): Tool[] {
-    const { perception, memory, watch, experts, connections, routines } = this.#options;
+    const { perception, memory, watch, experts, connections, routines, day } = this.#options;
     const tools: Tool[] = [];
     if (perception) tools.push(...perceptionTools(perception), ...recallTools(perception));
     if (memory) tools.push(rememberTool(memory));
@@ -123,6 +126,7 @@ export class ToolRegistry {
     }
     // Appended last: the order is what the model has always seen.
     if (perception) tools.push(pointAtTool(perception));
+    if (day) tools.push(recallDayTool(day));
     return tools;
   }
 }

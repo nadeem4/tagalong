@@ -16,6 +16,7 @@ import {
   type ConnectorToolDeps,
   type RoutineTurnContext,
   type RoutineToolDeps,
+  type DayToolDeps,
 } from '../tools';
 import { assemblePrompt } from './prompt-assembler';
 
@@ -73,6 +74,8 @@ export interface ConversationRunnerOptions {
   connections?: ConnectorToolDeps | undefined;
   /** Gives a companion `create_routine` and `change_routine`, which show the routine card. */
   routines?: RoutineToolDeps | undefined;
+  /** Gives a companion `recall_day`, the daily briefing over the records already kept. */
+  day?: DayToolDeps | undefined;
   /** Narrows a pet's tools for a turn. Absent: every pet gets every tool. Phase 8 roles. */
   toolsFor?: ToolFilter | undefined;
 }
@@ -153,6 +156,7 @@ export class ConversationRunner {
       experts: options.experts,
       connections: options.connections,
       routines: options.routines,
+      day: options.day,
       toolsFor: options.toolsFor,
     });
   }

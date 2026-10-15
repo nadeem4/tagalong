@@ -53,6 +53,23 @@ describe('SightLog', () => {
     expect(entries[1]).not.toHaveProperty('app');
   });
 
+  it('lists only the rows at or after since, newest first, for the daily briefing', () => {
+    const sight = log();
+    now = new Date('2026-10-14T23:59:00.000Z');
+    sight.record({ kind: 'listed_windows', windows: 3 });
+    now = new Date('2026-10-15T00:00:00.000Z');
+    sight.record({ kind: 'read_text', app: 'Code.exe' });
+    now = new Date('2026-10-15T08:00:00.000Z');
+    sight.record({ kind: 'screenshot', app: 'Code.exe', images: 1 });
+
+    const entries = sight.list(200, '2026-10-15T00:00:00.000Z');
+    expect(entries.map((e) => e.kind)).toEqual(['screenshot', 'read_text']);
+    expect(sight.list(1, '2026-10-15T00:00:00.000Z').map((e) => e.kind)).toEqual(['screenshot']);
+    expect(
+      sight.list(200, '2026-10-15T00:00:00.000Z', '2026-10-15T08:00:00.000Z').map((e) => e.kind),
+    ).toEqual(['read_text']);
+  });
+
   it('keeps the brain and the expert a send went to', () => {
     const sight = log();
     sight.record({

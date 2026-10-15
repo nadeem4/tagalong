@@ -549,6 +549,16 @@ there is no switch, because it holds no content and an off switch would weaken t
   not what was already sent, and does not touch your conversations.
 - The Chrome extension cannot read or delete the log.
 
+## What did we do today?
+
+Ask Scout "What did we do today?" (or yesterday) and it reads back the records above: the apps and
+window titles in the log of what Scout saw, your questions (the first 120 characters), which experts
+got which ask and how they ended, routines and app calls by name, and what pick-up last saw (only
+when pick-up is on). Those titles, questions and asks go to **Scout's own model** to be summed up,
+like any tool result, with any key, token or password in them hidden first. Answers from experts, turns and routines are not included, nor the selection
+or window a brief carried. Nothing new is recorded for it, and the hours are an estimate from the
+first to the last look: Scout only knows what it looked at or was asked.
+
 ## Pausing sight
 
 `Ctrl+Shift+Alt+P` turns every kind of looking off, and pressing it again turns it back on. The

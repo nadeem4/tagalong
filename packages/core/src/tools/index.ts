@@ -35,6 +35,7 @@ export { REMEMBER } from './builtin/memory';
 export { HAND_TO_EXPERT, type ExpertToolDeps } from './builtin/experts';
 export { CHANGE_ROUTINE, CREATE_ROUTINE, type RoutineToolDeps } from './builtin/routines';
 export { POINT_AT } from './builtin/pointing';
+export { RECALL_DAY, estimateSpan, type DayToolDeps } from './builtin/day';
 export {
   CONNECTIONS_GROUP,
   CONNECTOR_SEPARATOR,

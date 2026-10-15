@@ -36,6 +36,13 @@ flowchart LR
   R -. "recall_screen, what_changed, when asked" .-> W
 ```
 
+### The daily briefing reads, never stores
+
+"What did we do today?" (`recall_day`) keeps nothing of its own. It reads the log of what Scout
+saw (`sight_log`), the activity record (`activity`: questions, hand-offs, routines and app calls,
+never their answers), the pick-up snapshot (`pick_up`, only while pick-up is on) and the briefs
+waiting for Send (in memory). Screen memory is not read.
+
 ## Working memory: building one turn
 
 Every turn is assembled from scratch by the prompt assembler

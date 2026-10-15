@@ -1319,6 +1319,21 @@ monitor.
 6. **Action:** with Linear connected too, ask "file this as a bug" without naming an app.
    **Expected:** Scout asks in one line whether GitHub or Linear.
 
+## What did we do today?
+
+### DB.1. A day read back _(real brain)_
+
+1. **Setup:** use Tagalong for a while: ask Scout a couple of questions about windows (so it
+   looks), hand one task to an expert and stop another.
+2. **Action:** ask "What did we do today?". **Expected:** two or three lines: about how many hours
+   (called an estimate), the main apps and projects, what the expert did and that one run stopped,
+   and anything still open. Scout says it only knows what it looked at or was asked. No expert
+   answer text is quoted.
+3. **Action:** ask "And yesterday?". **Expected:** yesterday's day only, or "nothing on record" on a
+   fresh install.
+4. **Action:** turn pick-up off in Settings and ask again. **Expected:** no project or branch from
+   pick-up; a brief waiting for Send is still named.
+
 ## The Chrome extension
 
 **Before you start:** Chrome 116 or newer, the desktop app running, and a long article open in a

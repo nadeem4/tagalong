@@ -89,11 +89,16 @@ export class SightLog implements SightRecorder {
       );
   }
 
-  /** Newest first. A row a later version wrote with an unknown kind is left out. */
-  list(limit = 200): SightLogEntry[] {
+  /**
+   * Newest first; with `since` and `until`, only rows at or after `since` and before `until`
+   * (the daily briefing's day). A row a later version wrote with an unknown kind is left out.
+   */
+  list(limit = 200, since = '', until = '9999'): SightLogEntry[] {
     return this.db
-      .prepare<[number], Row>('SELECT * FROM sight_log ORDER BY at DESC, rowid DESC LIMIT ?')
-      .all(limit)
+      .prepare<[string, string, number], Row>(
+        'SELECT * FROM sight_log WHERE at >= ? AND at < ? ORDER BY at DESC, rowid DESC LIMIT ?',
+      )
+      .all(since, until, limit)
       .flatMap((row) => {
         const parsed = SightLogEntry.safeParse(toEntry(row));
         return parsed.success ? [parsed.data] : [];
