@@ -286,9 +286,9 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   project folder: each task picks its project, and you confirm before anything is sent.
 - **Routines**: things Scout does for you on its own, such as new papers every weekday at 8.
   - **New routine** starts from a template (**Morning papers**, **Today's calendar**, **Reviews
-    waiting on GitHub**, **What needs me** at 09:00 on weekdays, **End-of-day summary**) or **Blank**. Pick **When** (every day, weekdays,
-    chosen days at a time, or when Tagalong opens, an app or site appears, an expert finishes, a
-    watch fires), say **What** in your own words, and where the **Result goes**: Scout's bubble,
+    waiting on GitHub**, **What needs me** at 09:00 on weekdays, **End-of-day summary**) or
+    **Blank**. Pick **When** (every day, weekdays, chosen days at a time, or when Tagalong opens, an
+    app or site appears, an expert finishes, a watch fires), say **What** in your own words, and where the **Result goes**: Scout's bubble,
     read aloud, a Windows notification. Activity always keeps each run.
   - **May hand to** lets each run hand work to one expert without asking, read-only, with web search
     and no project, so it never touches your files. Morning papers uses this to search the web with

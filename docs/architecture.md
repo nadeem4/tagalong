@@ -719,9 +719,10 @@ question, answer }`, so a follow-up continues the routine's conversation. Home's
 follows `routines.changed`. **New routine** offers the templates, which live in the UI only: Morning
 papers (weekdays 08:00, with Topics and `handTo` set to the first Claude Code expert switched on),
 Today's calendar, Reviews waiting on GitHub, What needs me (weekdays 09:00, `uses` GitHub, Linear and
-Notion; it only reads, so a run never meets a confirm card), End-of-day summary, and Blank. The form has Name, When
-(every day, weekdays, chosen days with a time; or one of the four triggers, with the app or site to
-match), What, Topics, Result goes to, and May hand to.
+Notion; it only reads, so a run meets no confirm card unless an app leaves its reads unmarked),
+End-of-day summary, and Blank. The form has Name, When (every day, weekdays, chosen days with a
+time; or one of the four triggers, with the app or site to match), What, Topics, Result goes to, and
+May hand to.
 
 **Morning papers gets its papers** the simplest way that works with what exists: through a Claude
 Code expert as the routine's `handTo`, read-only with web search and no project.
