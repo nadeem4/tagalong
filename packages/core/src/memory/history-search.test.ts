@@ -51,6 +51,13 @@ describe('historyQuery', () => {
     expect(historyQuery('a* OR b) NEAR(x - y AND')).toBe('"or" "near" "and"');
     expect(historyQuery('title:secret')).toBe('"title" "secret"');
     expect(historyQuery('  ** "" ()  ')).toBeNull();
+    expect(historyQuery('^vector (rust')).toBe('"vector" "rust"');
+    expect(historyQuery('NEAR(vector rust, 2)')).toBe('"near" "vector" "rust"');
+    expect(historyQuery('   \t\n ')).toBeNull();
+    expect(historyQuery('')).toBeNull();
+    // A pasted paragraph is cut to its first 16 distinct words.
+    const many = Array.from({ length: 30 }, (_, i) => `w${i}`).join(' ');
+    expect(historyQuery(`${many} w0`)?.split(' ')).toHaveLength(16);
   });
 });
 
@@ -96,6 +103,24 @@ describe('HistorySearch', () => {
       },
       { at: '2026-10-14T09:00:00.000Z', kind: 'asked', text: 'what is a vector index?' },
     ]);
+  });
+
+  it('indexes only the ask of a brief, never the window or selection it carried', () => {
+    activity(
+      '2026-10-14T09:05:00.000Z',
+      'expert',
+      'Fix the login bug\n\nWhat I was looking at:\nWindow: payroll.xlsx\n\nSelected text:\nsalary figures',
+    );
+    expect(history().search({ query: 'salary' })).toEqual([]);
+    expect(history().search({ query: 'payroll' })).toEqual([]);
+    expect(history().search({ query: 'login' })).toHaveLength(1);
+    db.exec("INSERT INTO activity_fts (activity_fts) VALUES ('integrity-check')");
+  });
+
+  it('leaves out crew-era rows, which Home does not list either', () => {
+    activity('2026-10-14T09:05:00.000Z', 'consult', 'vector consult');
+    activity('2026-10-14T09:06:00.000Z', 'handoff', 'vector handoff');
+    expect(history().search({ query: 'vector' })).toEqual([]);
   });
 
   it('puts the newest first across both records and keeps at most 20', () => {
@@ -145,6 +170,10 @@ describe('HistorySearch', () => {
 
     log.clear();
     expect(history().search({ query: 'cleared' })).toEqual([]);
+    // Delete all in the privacy log empties the index itself, not just the search.
+    expect(
+      db.prepare<[], { n: number }>('SELECT COUNT(*) AS n FROM sight_log_fts_docsize').get()?.n,
+    ).toBe(0);
 
     look('2026-10-01T10:00:00.000Z', 'chrome.exe', 'Vector pruned');
     now = new Date('2026-10-15T09:00:00.000Z');
@@ -202,5 +231,12 @@ describe('HistorySearch', () => {
     expect(() => history().search({ query: 'vector" OR title:* NEAR(' })).not.toThrow();
     // An operator typed by the person is just a word, never syntax.
     expect(history().search({ query: 'vector OR weather' })).toEqual([]);
+    for (const query of ['^vector', 'vector)', '(vector', 'NEAR(vector', 'app:vector', '   ']) {
+      expect(() => history().search({ query })).not.toThrow();
+    }
+    expect(history().search({ query: '(vector' })).toHaveLength(1);
+    expect(history().search({ query: '^vector' })).toHaveLength(1);
+    expect(history().search({ query: 'NEAR(vector' })).toEqual([]); // "near" is a word too
+    expect(history().search({ query: '   ' })).toEqual([]);
   });
 });

@@ -10,6 +10,19 @@ export const DB_FILENAME = 'tagalong.db';
 type Migration = string | ((db: Database.Database) => void);
 
 /**
+ * The words of an activity row that search may find (migration 18): a turn's question, a
+ * routine's name and a brief's ask (its first paragraph), never the window or selected text
+ * a brief carried, and nothing for crew-era rows or app calls. `row` is `new.` or ``.
+ */
+function activityAsk(row: string): string {
+  const brief = `instr(${row}text, char(10, 10))`;
+  return `CASE
+    WHEN ${row}kind = 'expert' AND ${brief} > 0 THEN substr(${row}text, 1, ${brief} - 1)
+    WHEN ${row}kind IN ('turn', 'expert', 'routine') THEN ${row}text
+  END`;
+}
+
+/**
  * Numbered migrations, applied in order and never edited once shipped: an installed
  * database has already run them, so a change here would only ever reach fresh installs.
  * Add a new entry instead.
@@ -164,20 +177,24 @@ const MIGRATIONS: readonly Migration[] = [
      INSERT INTO sight_log_fts (rowid, title, app) VALUES (new.rowid, new.title, new.app);
    END;
    INSERT INTO sight_log_fts (sight_log_fts) VALUES ('rebuild');
+   -- Only the asks are indexed (see activityAsk), so activity_fts is contentless: it holds
+   -- the words of the ask, not activity's whole text, and a row leaves it by rowid. The
+   -- backfill empties it first, so rerunning it is harmless.
    CREATE VIRTUAL TABLE IF NOT EXISTS activity_fts USING fts5(
-     text, content = 'activity', content_rowid = 'rowid', tokenize = 'porter unicode61'
+     text, content = '', contentless_delete = 1, tokenize = 'porter unicode61'
    );
    CREATE TRIGGER IF NOT EXISTS activity_ai AFTER INSERT ON activity BEGIN
-     INSERT INTO activity_fts (rowid, text) VALUES (new.rowid, new.text);
+     INSERT INTO activity_fts (rowid, text) VALUES (new.rowid, ${activityAsk('new.')});
    END;
    CREATE TRIGGER IF NOT EXISTS activity_ad AFTER DELETE ON activity BEGIN
-     INSERT INTO activity_fts (activity_fts, rowid, text) VALUES ('delete', old.rowid, old.text);
+     DELETE FROM activity_fts WHERE rowid = old.rowid;
    END;
-   CREATE TRIGGER IF NOT EXISTS activity_au AFTER UPDATE OF text ON activity BEGIN
-     INSERT INTO activity_fts (activity_fts, rowid, text) VALUES ('delete', old.rowid, old.text);
-     INSERT INTO activity_fts (rowid, text) VALUES (new.rowid, new.text);
+   CREATE TRIGGER IF NOT EXISTS activity_au AFTER UPDATE OF kind, text ON activity BEGIN
+     DELETE FROM activity_fts WHERE rowid = old.rowid;
+     INSERT INTO activity_fts (rowid, text) VALUES (new.rowid, ${activityAsk('new.')});
    END;
-   INSERT INTO activity_fts (activity_fts) VALUES ('rebuild');`,
+   DELETE FROM activity_fts;
+   INSERT INTO activity_fts (rowid, text) SELECT rowid, ${activityAsk('')} FROM activity;`,
 ];
 
 /** The columns migration 7 gave `activity`, in order. */

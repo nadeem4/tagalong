@@ -1067,12 +1067,15 @@ ranks the closest memory first.
 
 ### Searchable work memory
 
-The memory layer is `tagalong.db`. Migration 18 adds two external-content FTS5 indexes (porter
-unicode61), kept in step by insert, delete and update triggers in the same pattern as
-`memories_fts`, and backfilled with `'rebuild'` when the migration runs: `sight_log_fts` over
-`sight_log.title` and `app`, and `activity_fts` over `activity.text` (questions, expert briefs,
-routine names; never answers). A row deleted from Home, cleared, or pruned by the privacy log's
-retention leaves the index through its trigger.
+The memory layer is `tagalong.db`. Migration 18 adds two FTS5 indexes (porter unicode61), kept in
+step by insert, delete and update triggers and backfilled when the migration runs.
+`sight_log_fts` is an external-content index over `sight_log.title` and `app`, in the same pattern
+as `memories_fts`, rebuilt with `'rebuild'`. `activity_fts` is contentless
+(`contentless_delete = 1`) and holds only the asks in `activity.text`: a question, a routine's
+name and a brief's first paragraph (`activityAsk` in `db.ts`), so the window title and selected
+text a brief carried, answers and crew-era rows are never indexed; its backfill empties it and
+reinserts every row. A row deleted from Home, cleared, or pruned by the privacy log's retention
+leaves the index through its trigger.
 
 `search_history({ query, since? })` (`tools/builtin/history.ts`, kind `read`, appended after
 `recall_day`) answers "what was that article about vector databases I read Tuesday?" through

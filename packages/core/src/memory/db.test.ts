@@ -310,10 +310,20 @@ describe('migrate', () => {
       ).run();
       db.prepare(
         `INSERT INTO activity (id, kind, state, pet_id, text, started_at)
-         VALUES ('a1', 'turn', 'done', 'scout', 'compare pinecone and qdrant', 'x')`,
+         VALUES ('a1', 'turn', 'done', 'scout', 'compare pinecone and qdrant', 'x'),
+                ('a2', 'expert', 'done', 'scout', 'Fix login' || char(10, 10) || 'Selected text:' ||
+                  char(10) || 'salary figures', 'x')`,
       ).run();
 
       expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+
+      // The backfill indexes a brief's ask only, never the selection it carried.
+      expect(count("SELECT COUNT(*) AS n FROM activity_fts WHERE activity_fts MATCH 'login'")).toBe(
+        1,
+      );
+      expect(
+        count("SELECT COUNT(*) AS n FROM activity_fts WHERE activity_fts MATCH 'salary'"),
+      ).toBe(0);
 
       expect(
         count("SELECT COUNT(*) AS n FROM sight_log_fts WHERE sight_log_fts MATCH 'vector'"),
@@ -331,6 +341,10 @@ describe('migrate', () => {
       expect(
         count("SELECT COUNT(*) AS n FROM sight_log_fts WHERE sight_log_fts MATCH 'vector'"),
       ).toBe(1);
+      expect(
+        count("SELECT COUNT(*) AS n FROM activity_fts WHERE activity_fts MATCH 'qdrant'"),
+      ).toBe(1);
+      expect(count('SELECT COUNT(*) AS n FROM activity_fts_docsize')).toBe(2);
       db.exec("INSERT INTO sight_log_fts (sight_log_fts) VALUES ('integrity-check')");
       db.exec("INSERT INTO activity_fts (activity_fts) VALUES ('integrity-check')");
     } finally {
