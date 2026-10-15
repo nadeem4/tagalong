@@ -96,6 +96,7 @@ import type { EngineCall, IpcHandle } from './ipc/handle';
 import { registerRoutineIpc } from './ipc/routines';
 import { registerPickUpIpc } from './ipc/pick-up';
 import { PickUpAllowlist, PickUpWaiting } from './pick-up-open';
+import { registerSightLogIpc } from './ipc/sight-log';
 import { registerSettingsIpc } from './ipc/settings';
 import { registerTurnIpc } from './ipc/turns';
 import { forwardEars, registerVoiceIpc } from './ipc/voice';
@@ -1004,6 +1005,7 @@ function registerIpc(): void {
     openExternal: (url) => shell.openExternal(url),
     openPath: (folder) => shell.openPath(folder),
   });
+  registerSightLogIpc(handle, { engine });
   registerRoutineIpc(handle, {
     engine,
     openOffice: (page) => openOffice(page),

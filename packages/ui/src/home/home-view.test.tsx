@@ -75,7 +75,7 @@ function renderHome(
 }
 
 describe('HomeView', () => {
-  it('is one window: Scout and seven pages, with no crew and no office', async () => {
+  it('is one window: Scout and eight pages, with no crew and no office', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     const nav = await screen.findByRole('navigation', { name: 'Tagalong' });
     expect(within(nav).getByText('Your companion')).toBeVisible();
@@ -83,7 +83,16 @@ describe('HomeView', () => {
       within(nav)
         .getAllByRole('button')
         .map((b) => b.textContent),
-    ).toEqual(['Overview', 'Scout', 'Experts', 'Routines', 'Connections', 'Activity', 'Settings']);
+    ).toEqual([
+      'Overview',
+      'Scout',
+      'Experts',
+      'Routines',
+      'Connections',
+      'Activity',
+      'What Scout saw',
+      'Settings',
+    ]);
   });
 
   it('opens Routines with Scout’s card in the form when the host hands one over', async () => {
@@ -185,6 +194,23 @@ describe('HomeView', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
     expect(screen.getByText('The settings form')).toBeVisible();
     expect(pages).toEqual(['experts', 'settings']);
+  });
+
+  it('shows What Scout saw between Activity and Settings, kept as the host says', async () => {
+    const days: HomeHost = {
+      ...host(),
+      setup: async () => ({ ...(await host().setup()), sightLogDays: 3 }),
+    };
+    renderHome(createFakeHostBridge({ pets: [SCOUT] }), { homeHost: days });
+    const nav = await screen.findByRole('navigation', { name: 'Tagalong' });
+    const labels = within(nav)
+      .getAllByRole('button')
+      .map((button) => button.textContent);
+    expect(labels.slice(-3)).toEqual(['Activity', 'What Scout saw', 'Settings']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'What Scout saw' }));
+    expect(await screen.findByText("Scout hasn't looked at anything yet.")).toBeVisible();
+    expect(screen.getByText(/^Kept 3 days\./)).toBeVisible();
   });
 
   it('opens on the page the host asks for', async () => {

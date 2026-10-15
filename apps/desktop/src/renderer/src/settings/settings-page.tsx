@@ -228,6 +228,7 @@ export function SettingsPage({
         watchMaxChecks: field('watchMaxChecks'),
         watchMaxConcurrent: field('watchMaxConcurrent'),
         watchTimeoutMinutes: field('watchTimeoutMinutes'),
+        sightLogDays: field('sightLogDays'),
       });
       const saved = await window.tagalongHost.saveSettings(patch);
       // Empty boxes are left alone: removing a key is the Remove key button's job.

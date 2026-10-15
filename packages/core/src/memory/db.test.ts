@@ -200,6 +200,25 @@ describe('migrate', () => {
     }
   });
 
+  it('adds the log of what Scout saw in migration 15, and rerunning it changes nothing', () => {
+    const db = new Database(':memory:');
+    try {
+      migrate(db);
+      expect(LATEST_SCHEMA_VERSION).toBeGreaterThanOrEqual(15);
+      expect(tableNames(db)).toContain('sight_log');
+      db.prepare("INSERT INTO sight_log (id, kind, at) VALUES ('r1', 'screenshot', 'x')").run();
+
+      // Rolled back past 15, as a database restored from before it would be.
+      db.prepare('DELETE FROM schema_version WHERE version >= 15').run();
+      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+
+      const rows = db.prepare<[], { n: number }>('SELECT COUNT(*) AS n FROM sight_log').get();
+      expect(rows?.n).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
+
   it('adds the one pick-up row in migration 16, and rerunning it keeps the row', () => {
     const db = new Database(':memory:');
     try {

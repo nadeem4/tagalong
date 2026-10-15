@@ -426,9 +426,10 @@ The hand-off card, connector confirm card and routine card share `HANDOFF_CSS`: 
 
 ### Home
 
-- **Nav:** Sidebar Navy, 232px. Scout's 56px Avatar Tile tile (sprite at 3) with the name and "Your companion" in Sky, then the seven pages (Overview, Scout, Experts, Routines, Connections, Activity, Settings) as 40px buttons in Onest 14px Shell Muted; hover Frost Text; current (`aria-current="page"`) on Active Row Navy in 600.
+- **Nav:** Sidebar Navy, 232px. Scout's 56px Avatar Tile tile (sprite at 3) with the name and "Your companion" in Sky, then the eight pages (Overview, Scout, Experts, Routines, Connections, Activity, What Scout saw, Settings) as 40px buttons in Onest 14px Shell Muted; hover Frost Text; current (`aria-current="page"`) on Active Row Navy in 600.
 - **Cards:** white, 1px Panel Line, 12px radius, 16px by 20px padding, a pixel card label, 13px Panel Muted text and a quiet button. The Overview card leads with a status dot and a word ("Ready").
 - **Activity:** entries are full-width buttons (`aria-expanded`), 10px radius, 8px padding: Scout's sprite at 2, an Onest 600 14px headline, a 12px meta line (a 14px state icon, the state word, tool, model, calls, time) and a 13px one-line preview. Hover and open fill Panel Tile; the open thread is indented behind a 2px Panel Line rule. "Show older" is a 40px quiet button.
+- **What Scout saw:** a header (the 20px title, a 13px Panel Muted retention line, and a quiet **Delete all** that turns into **Delete all for good** / **Keep them**), then Today, Yesterday and Earlier as 12px uppercase Panel Muted labels. Each row, 10px radius, 8px padding, Panel Tile on hover: a 12px tabular time, a 16px line icon per kind in Panel Muted, the kind in Onest 600 14px, the app and window or the destination in 13px (one line, ellipsis), the counts in 12px Panel Muted, and a 28px quiet × at the end.
 - **Routines:** template tiles (white, 2px Panel Line border, 10px radius, Panel Tile on hover) and day toggles (32px, min 52px, 1px Panel Muted border; Gold when pressed).
 - **Experts and Connections:** rows between Panel Line hairlines with status chips and switches.
 

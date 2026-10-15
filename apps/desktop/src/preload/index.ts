@@ -19,6 +19,7 @@ import type {
   RoutineView,
   Settings,
   SettingsPatch,
+  SightLogEntry,
 } from '@tagalong/protocol';
 import type { AskInput, HostBridge, TurnEvent } from '@tagalong/ui';
 import { IPC } from '../shared/ipc';
@@ -115,6 +116,9 @@ const bridge: HostBridge = {
   openPickUp: (itemId: string) => ipcRenderer.invoke(IPC.openPickUp, itemId) as Promise<void>,
   rebriefPickUp: (itemId: string) => ipcRenderer.invoke(IPC.rebriefPickUp, itemId) as Promise<void>,
   dismissPickUp: () => ipcRenderer.invoke(IPC.dismissPickUp) as Promise<void>,
+  listSightLog: () => ipcRenderer.invoke(IPC.listSightLog) as Promise<SightLogEntry[]>,
+  deleteSightLog: (id: string) => ipcRenderer.invoke(IPC.deleteSightLog, id) as Promise<boolean>,
+  clearSightLog: () => ipcRenderer.invoke(IPC.clearSightLog) as Promise<number>,
   onTurnEvent: (handler: (event: TurnEvent) => void) => {
     const listener = (_event: IpcRendererEvent, turnEvent: TurnEvent): void => handler(turnEvent);
     ipcRenderer.on(IPC.turnEvent, listener);

@@ -345,6 +345,24 @@ describe('buildSettingsPatch keepAnEye', () => {
   });
 });
 
+describe('buildSettingsPatch sightLogDays', () => {
+  it('carries how many days What Scout saw keeps', () => {
+    expect(buildSettingsPatch({ ...values, sightLogDays: ' 3 ' }).sightLog).toEqual({ days: 3 });
+  });
+
+  it('refuses a number of days outside 1 to 30, naming the field', () => {
+    for (const bad of ['0', '31', '2.5', '', 'week']) {
+      expect(() => buildSettingsPatch({ ...values, sightLogDays: bad })).toThrow(
+        expect.objectContaining({ field: 'sightLogDays' }),
+      );
+    }
+  });
+
+  it('leaves it alone when the form does not show it', () => {
+    expect(buildSettingsPatch(values).sightLog).toBeUndefined();
+  });
+});
+
 describe('buildSettingsPatch awareness', () => {
   const awareness = {
     rollingMemoryEnabled: true,

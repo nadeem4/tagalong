@@ -24,6 +24,7 @@ const homeHost: HomeHost = {
       providers: view.providers
         .filter((choice) => choice.id !== 'fake')
         .map(({ id, label, needsKey }) => ({ id, label, needsKey })),
+      sightLogDays: view.settings.sightLog.days,
     };
   },
   listModels: (providerId) => window.tagalongHost.listModels(providerId),

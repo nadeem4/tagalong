@@ -932,6 +932,14 @@ describe('a companion handing work to an expert', () => {
     );
     expect(handed).toMatchObject({ petId: 'scout', expertName: 'Claude Code', state: 'done' });
     expect(String(handed?.['text'])).toContain('Why does the build fail?');
+
+    // The brief going to the expert is in the log of what Scout saw, by its size only.
+    const seen = await host.call('sightLog.list', {});
+    const sent = (seen['result'] as { entries: Record<string, unknown>[] }).entries.find(
+      (row) => row['kind'] === 'sent_to_expert',
+    );
+    expect(sent).toMatchObject({ expertName: 'Claude Code', chars: expect.any(Number) });
+    expect(JSON.stringify(sent)).not.toContain('Why does the build fail?');
   });
 });
 
@@ -1412,6 +1420,130 @@ describe('providers.check', () => {
       ok: false,
       message: expect.stringContaining('turned that key down'),
     });
+  });
+
+  it('writes no row in the log of what Scout saw: a key check sends no screen', async () => {
+    const e = await boot(new FakeBrainProvider({ text: 'ok' }));
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('providers.check', { providerId: 'openrouter' });
+    const seen = await host.call('sightLog.list', {});
+    expect(seen['result']).toEqual({ entries: [] });
+  });
+});
+
+describe('what Scout saw over rpc', () => {
+  const entriesOf = (res: Record<string, unknown>) =>
+    (res['result'] as { entries: Record<string, unknown>[] }).entries;
+
+  it('logs a look and the send that carried it, by counts only', async () => {
+    const e = await boot(
+      new FakeBrainProvider({
+        text: 'a spreadsheet',
+        toolCall: { id: 'call-1', name: 'look_at_screen', input: {} },
+      }),
+    );
+    const host = await TestHost.connect(e.port);
+    host.onRequest = () => ({
+      snapshot: {
+        app: { name: 'notepad.exe', windowTitle: 'budget.txt' },
+        screenshot: { mime: 'image/png', base64: 'iVBORw0KGgoPIXELS', width: 640, height: 480 },
+      },
+    });
+    await host.call('hello', {
+      ...helloParams(e.pairingToken),
+      capabilities: ['selection', 'activeWindow', 'screenshot'] as const,
+    });
+
+    await host.call('ask', { petId: 'scout', input: { text: 'what is this?' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+
+    const rows = entriesOf(await host.call('sightLog.list', {}));
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'screenshot',
+          app: 'notepad.exe',
+          title: 'budget.txt',
+          images: 1,
+        }),
+        expect.objectContaining({ kind: 'sent_to_ai', providerId: 'fake' }),
+      ]),
+    );
+    const stored = JSON.stringify(rows);
+    expect(stored).not.toContain('PIXELS');
+    expect(stored).not.toContain('what is this?');
+  });
+
+  it('logs the hotkey snapshot an ask arrives with: the title and the selection size', async () => {
+    const e = await boot(new FakeBrainProvider({ text: 'ok' }));
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('ask', {
+      petId: 'scout',
+      input: { text: 'explain' },
+      snapshot: {
+        id: '6f1c2f0e-2a4b-4c1d-9e8f-0a1b2c3d4e5f',
+        capturedAt: '2026-10-04T00:00:00.000Z',
+        host: 'desktop',
+        app: { name: 'Code.exe', windowTitle: 'main.ts' },
+        selection: 'const x = 1;',
+      },
+    });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+
+    const rows = entriesOf(await host.call('sightLog.list', {}));
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'read_text',
+          app: 'Code.exe',
+          title: 'main.ts',
+          chars: 12,
+        }),
+      ]),
+    );
+    expect(JSON.stringify(rows)).not.toContain('const x = 1;');
+  });
+
+  it('deletes one row and clears the rest', async () => {
+    const e = await boot(new FakeBrainProvider({ text: 'ok' }));
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('ask', { petId: 'scout', input: { text: 'hi' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+    await host.call('ask', { petId: 'scout', input: { text: 'again' } });
+    await vi.waitFor(
+      () => expect(host.methods().filter((m) => m === 'turn.completed')).toHaveLength(2),
+      { timeout: 5000 },
+    );
+
+    const rows = entriesOf(await host.call('sightLog.list', {}));
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+    const first = await host.call('sightLog.delete', { id: rows[0]!['id'] });
+    expect(first['result']).toEqual({ deleted: true });
+    const cleared = await host.call('sightLog.clear', {});
+    // At least the rest; a background summary may have added a row meanwhile.
+    expect((cleared['result'] as { deleted: number }).deleted).toBeGreaterThanOrEqual(
+      rows.length - 1,
+    );
+    const left = entriesOf(await host.call('sightLog.list', {})).map((row) => row['id']);
+    for (const row of rows) expect(left).not.toContain(row['id']);
+  });
+
+  it('is refused to the browser extension', async () => {
+    const e = await boot();
+    const ext = await TestHost.connect(e.port);
+    await ext.call('hello', {
+      host: 'extension',
+      version: '0.0.0',
+      capabilities: ['selection', 'pageText', 'activeWindow'],
+      token: e.pairingToken,
+    });
+    for (const method of ['sightLog.list', 'sightLog.delete', 'sightLog.clear']) {
+      const res = await ext.call(method, method === 'sightLog.delete' ? { id: 'x' } : {});
+      expect(res['error']).toMatchObject({ code: RPC_ERROR_CODES.unauthorized });
+    }
   });
 });
 

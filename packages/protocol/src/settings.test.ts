@@ -585,3 +585,21 @@ describe('Settings.pickUp', () => {
     expect(SettingsPatch.safeParse({ pickUp: 'off' }).success).toBe(false);
   });
 });
+
+describe('Settings.sightLog', () => {
+  it('keeps the log of what Scout saw for 7 days by default', () => {
+    expect(Settings.parse({}).sightLog).toEqual({ days: 7 });
+  });
+
+  it('accepts 1 to 30 days and refuses anything outside', () => {
+    expect(Settings.parse({ sightLog: { days: 1 } }).sightLog.days).toBe(1);
+    expect(Settings.parse({ sightLog: { days: 30 } }).sightLog.days).toBe(30);
+    expect(Settings.safeParse({ sightLog: { days: 0 } }).success).toBe(false);
+    expect(Settings.safeParse({ sightLog: { days: 31 } }).success).toBe(false);
+    expect(Settings.safeParse({ sightLog: { days: 2.5 } }).success).toBe(false);
+  });
+
+  it('rides in a patch alone', () => {
+    expect(SettingsPatch.parse({ sightLog: { days: 3 } })).toEqual({ sightLog: { days: 3 } });
+  });
+});

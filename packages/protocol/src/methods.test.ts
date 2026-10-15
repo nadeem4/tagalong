@@ -61,6 +61,9 @@ const HOST_TO_CORE = [
   'routines.dismiss',
   'pickUp.rebrief',
   'pickUp.dismiss',
+  'sightLog.list',
+  'sightLog.delete',
+  'sightLog.clear',
 ] as const;
 
 const CORE_TO_HOST = ['perception.capture'] as const;

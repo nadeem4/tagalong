@@ -11,9 +11,17 @@ import { ConnectionsPanel } from './connections-panel';
 import { ExpertsPanel } from './experts-panel';
 import { HOME_CSS } from './home-styles';
 import { RoutinesPanel } from './routines-panel';
+import { SightLogView } from './sight-log-view';
 
 export type HomePage =
-  'overview' | 'scout' | 'experts' | 'routines' | 'connections' | 'activity' | 'settings';
+  | 'overview'
+  | 'scout'
+  | 'experts'
+  | 'routines'
+  | 'connections'
+  | 'activity'
+  | 'sightLog'
+  | 'settings';
 
 const PAGES: readonly { id: HomePage; label: (name: string) => string }[] = [
   { id: 'overview', label: () => 'Overview' },
@@ -22,6 +30,7 @@ const PAGES: readonly { id: HomePage; label: (name: string) => string }[] = [
   { id: 'routines', label: () => 'Routines' },
   { id: 'connections', label: () => 'Connections' },
   { id: 'activity', label: () => 'Activity' },
+  { id: 'sightLog', label: (name) => `What ${name} saw` },
   { id: 'settings', label: () => 'Settings' },
 ];
 
@@ -37,6 +46,8 @@ export interface HomeHost {
     companionId: string;
     /** `needsKey` marks a service that thinks on an API key, so the picker can say so. */
     providers: readonly HomeProvider[];
+    /** How many days What Scout saw keeps its rows, as set. Absent: the default. */
+    sightLogDays?: number;
   }>;
   listModels(providerId: string): Promise<{ models: string[]; source: 'live' | 'fallback' }>;
   savePet(pet: Pet): Promise<Pet>;
@@ -59,9 +70,9 @@ export interface HomeViewProps {
 }
 
 /**
- * Home: the one window for everything. The companion in the corner, and seven pages: an
+ * Home: the one window for everything. The companion in the corner, and eight pages: an
  * overview, how the companion thinks, the experts it hands work to, what it does on its own,
- * the apps it can use, what happened, and the app's settings.
+ * the apps it can use, what happened, what it looked at and sent, and the app's settings.
  */
 export function HomeView({ host, settings, page: asked, onPage, routineDraft }: HomeViewProps) {
   const bridge = useHostBridge();
@@ -146,6 +157,13 @@ export function HomeView({ host, settings, page: asked, onPage, routineDraft }: 
         )}
         {page === 'connections' && <ConnectionsPanel />}
         {page === 'activity' && <ActivityView pets={pets} />}
+        {page === 'sightLog' && (
+          <SightLogView
+            name={name}
+            {...(setup?.sightLogDays === undefined ? {} : { days: setup.sightLogDays })}
+            providerLabel={(providerId) => providerLabel(setup, providerId)}
+          />
+        )}
         {page === 'settings' && settings}
       </main>
     </div>

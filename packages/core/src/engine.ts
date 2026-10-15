@@ -62,6 +62,10 @@ import { readOrCreatePairingToken } from './server/pairing';
 import { RoutineStore, Routines } from './routines';
 import { PickUp, readBranch } from './pick-up/pick-up';
 import { PickUpStore } from './pick-up/store';
+import { SightLog } from './memory/sight-log';
+import { recordSnapshot, sightedHosts } from './perception/record-sight';
+import { recordBrain } from './providers/record-brain';
+import { recordExpertSends } from './experts/record-expert';
 
 /** Key the Anthropic API key is filed under in the host's SecretStore. */
 export const ANTHROPIC_KEY = SECRET_KEYS.anthropic!;
@@ -245,9 +249,17 @@ export class Engine {
 
     const store = new ConversationStore(db);
     const memory = new MemoryStore(db);
+    // What Scout saw: every look and every send, as metadata. Old rows go at boot too.
+    const sightLog = new SightLog(db, {
+      days: () => settings.get().sightLog.days,
+      exclusions: () => settings.get().captureExclusions,
+    });
+    sightLog.prune();
     // Every brain is guarded: no key, token or password in anything sent reaches a model.
-    const resolve: ProviderResolver = (pet) =>
+    const guarded: ProviderResolver = (pet) =>
       guardBrain(typeof provider === 'function' ? provider(pet) : provider);
+    // And recorded: each call writes one "Sent to AI" row.
+    const resolve: ProviderResolver = (pet) => recordBrain(guarded(pet), sightLog);
     const summarizer = new Summarizer({
       store,
       memories: memory,
@@ -272,7 +284,8 @@ export class Engine {
       activity.observe(event);
       live.server?.broadcast(event.method, event.params);
     };
-    const hosts = (): readonly PerceptionHost[] => live.server?.sessions() ?? [];
+    // Every read through a host writes a row to the log of what Scout saw.
+    const hosts = sightedHosts<PerceptionHost>(() => live.server?.sessions() ?? [], sightLog);
     // Phase 3B. Watches outlive the turn that started them, so they belong to the engine.
     const watches = new WatchManager({
       clock: systemWatchClock,
@@ -287,7 +300,10 @@ export class Engine {
       log: (message) => console.warn(`[engine] ${message}`),
     });
     const experts = new ExpertStore(db);
-    const connectorFor = options.connectorFor ?? defaultConnectorFor(options.env ?? process.env);
+    const connectorFor = recordExpertSends(
+      options.connectorFor ?? defaultConnectorFor(options.env ?? process.env),
+      sightLog,
+    );
     const projects = new ProjectFinder({
       memory: new ProjectMemory(db),
       roots: options.projectRoots ?? defaultProjectRoots,
@@ -382,7 +398,7 @@ export class Engine {
       // Both lookups are lazy: hosts connect and drop between turns, and the exclusion
       // list is edited while the app runs, so neither can be captured at boot.
       perception: {
-        hosts: () => live.server?.sessions() ?? [],
+        hosts,
         exclusions: () => settings.get().captureExclusions,
         // Lazy for the same reason: the cap is a cost control the user edits in Settings,
         // and reading it at boot would make saving it do nothing until the next launch.
@@ -467,6 +483,8 @@ export class Engine {
       routines,
       pickUp,
       claudeCodeConfigPath: options.claudeCodeConfigPath,
+      sightLog,
+      checkResolve: guarded,
       refreshProviders: async () => keyed?.refresh(),
       models: (providerId) =>
         listModels(providerId, options.secretStore, settings, options.env ?? process.env),
@@ -564,10 +582,14 @@ function buildHandlers(parts: {
   claudeCodeConfigPath: string | undefined;
   /** Re-reads provider keys, so a key saved since the last ask is used by this one. */
   refreshProviders: () => Promise<void>;
+  sightLog: SightLog;
+  /** Guarded but not recorded: a key check sends no screen, so it writes no row. */
+  checkResolve: ProviderResolver;
 }): MethodHandlers {
   const { activity, runner, pets, settings, models, hosts, watches } = parts;
   const { refreshProviders, experts, routes, handoffs, projects, connectorFor, resolve } = parts;
   const { keepAnEye, connections, approvals, routines, interruptedAtBoot, pickUp } = parts;
+  const { sightLog, checkResolve } = parts;
   /** A manager refusal (an id taken, none such) as an invalidParams error the host shows. */
   const plainly = async <T>(work: () => Promise<T>): Promise<T> => {
     try {
@@ -582,6 +604,9 @@ function buildHandlers(parts: {
       const pet = pets.get(params.petId);
       if (pet === null) throw new Error(`no pet with id '${params.petId}'`);
       await refreshProviders();
+      // The hotkey's own read, taken by the host before the ask: the one look no host
+      // method sees. Logged before the browser fills it in, which logs its own read.
+      recordSnapshot(sightLog, params.snapshot);
       // A desktop hotkey pressed in a browser gets the extension's exact selection and the
       // page text, when the extension answers within half a second.
       const snapshot = await browserContextFor(params.snapshot, {
@@ -623,7 +648,7 @@ function buildHandlers(parts: {
       const label =
         openAiPreset(params.providerId)?.label ??
         (params.providerId === 'anthropic' ? 'Anthropic' : params.providerId);
-      return checkKey({ resolve, base, providerId: params.providerId, label });
+      return checkKey({ resolve: checkResolve, base, providerId: params.providerId, label });
     },
     'watch.stop': (params) => ({ stopped: watches.stop(params.watchId) }),
 
@@ -765,5 +790,10 @@ function buildHandlers(parts: {
     'pickUp.rebrief': (params) =>
       plainly(() => Promise.resolve({ proposed: pickUp.rebrief(params.itemId) })),
     'pickUp.dismiss': () => ({ dismissed: pickUp.dismiss() }),
+
+    // What Scout saw. Deleting removes the record, not what was already sent.
+    'sightLog.list': (params) => ({ entries: sightLog.list(params.limit) }),
+    'sightLog.delete': (params) => ({ deleted: sightLog.delete(params.id) }),
+    'sightLog.clear': () => ({ deleted: sightLog.clear() }),
   };
 }
