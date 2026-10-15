@@ -41,7 +41,7 @@ function safeHandle(handle: number): number {
  * that element and never from the desktop root, so a read cannot quietly widen into an
  * enumeration of everything on screen.
  */
-const WALK_PRELUDE = String.raw`
+export const WALK_PRELUDE = String.raw`
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 $textCond = New-Object System.Windows.Automation.OrCondition(

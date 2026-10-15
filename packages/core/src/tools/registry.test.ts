@@ -54,6 +54,7 @@ const ALL_TOOLS = [
   'what_changed',
   'remember',
   'watch_for',
+  'point_at',
 ];
 
 describe('ToolRegistry.forTurn', () => {
@@ -71,15 +72,25 @@ describe('ToolRegistry.forTurn', () => {
     }
   });
 
+  it('gives every tool a plain object schema, with no oneOf, anyOf or allOf at the top', () => {
+    // The Anthropic and OpenAI APIs refuse the whole request when one tool's schema has them.
+    for (const definition of new ToolRegistry(everything()).forTurn(fakeTurn()).definitions) {
+      expect(definition.inputSchema['type'], definition.name).toBe('object');
+      for (const key of ['oneOf', 'anyOf', 'allOf']) {
+        expect(definition.inputSchema, definition.name).not.toHaveProperty(key);
+      }
+    }
+  });
+
   it('marks only the tools that change stored state as write', () => {
     const tools = new ToolRegistry(everything()).forTurn(fakeTurn()).tools;
     const writes = tools.filter((tool) => tool.kind === 'write').map((tool) => tool.id);
 
     expect(writes).toEqual(['remember', 'watch_for']);
-    expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(10);
+    expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(11);
   });
 
-  it('gives a companion its tools, ending with the routine tools; all three are write', () => {
+  it('gives a companion its tools, then the routine tools (write), then point_at', () => {
     const experts = {
       experts: () => [
         {
@@ -135,6 +146,7 @@ describe('ToolRegistry.forTurn', () => {
       'hand_to_expert',
       'create_routine',
       'change_routine',
+      'point_at',
     ]);
     for (const id of ['hand_to_expert', 'create_routine', 'change_routine']) {
       expect(tools.find((tool) => tool.id === id)?.kind).toBe('write');

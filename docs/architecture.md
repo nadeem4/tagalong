@@ -2065,3 +2065,33 @@ matters for the hackathon, and carries best-effort, unverified dmg, AppImage and
   extension's build in a checkout).
 - `publish: null`: there is no auto-update channel, and electron-builder otherwise crashes writing
   update metadata for one.
+
+## Point, don't click
+
+`point_at` (`packages/core/src/tools/builtin/pointing.ts`, kind `read`) shows the person where
+something is: a ring with a short label around it, for six seconds. It takes one of two inputs
+(one flat object schema, since the provider APIs refuse `oneOf` at the top of a tool schema;
+exactly one pair is enforced when the call is parsed) and calls the core-to-host method `screen.pointAt` on a host that advertises the `pointer` capability:
+
+- `{ windowId, name, label? }`, preferred. The desktop host finds the element by its UI Automation
+  name inside that window (`platform/find-element.ts`): the inventory's exclusion check first, then a
+  script that starts from the window's handle (the same walk prelude as `window-text.ts`), takes the
+  first exact name match and falls back to a case-insensitive one. The name reaches PowerShell as
+  base64, never as code. The script makes PowerShell per-monitor DPI aware (v2) before UI
+  Automation loads, because UI Automation otherwise leaves it system-aware and a system-aware
+  process gets rectangles on a monitor of a different scale virtualized, not in physical pixels.
+  A minimized window is not searched; the answer asks for it to be brought forward.
+- `{ displayId, rect, label? }`, in the display's own pixels, as `look_closer` takes, for something
+  only a picture shows.
+
+`platform/point-target.ts` turns the place into a display and a DIP rect relative to it:
+UI Automation's screen pixels through `screen.screenToDipRect`, a display rect divided by its
+`scaleFactor` (the inverse of `region.ts`), clamped to the display; off every screen is a refusal.
+`windows/pointer.ts` keeps one hidden overlay window per display, made the first time it is needed:
+full-bounds, transparent, frameless, not focusable, out of the taskbar, on top at `screen-saver`
+level, `setIgnoreMouseEvents(true)` so it is click-through, and `setContentProtection(true)` so
+Scout's own captures never show it. One ring at a time; it goes after six seconds (an injected
+clock), on `Esc` (a `globalShortcut` registered only while a ring shows), or when the next turn
+starts. A removed or rescaled display loses its window. The ring is `renderer/src/pointer.tsx`;
+`prefers-reduced-motion` drops its pulse and fade. Nothing here moves the mouse, clicks or types.
+`findElement` is a `sight` method of `Platform`, so pausing sight refuses it.

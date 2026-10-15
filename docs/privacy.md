@@ -424,3 +424,22 @@ platform adapter, and the adapter handed to the rest of the app is already wrapp
 path added later is covered by construction rather than by remembering. Which reads pause covers is
 a mapped type over the adapter's own methods, so adding a method without deciding what pause does to
 it does not compile.
+
+## Pointing at things
+
+When you ask where something is ("where's the export button?"), Scout can show you with a ring
+around it (`point_at`).
+
+- **What is read.** Only the names of the elements inside the one window Scout names, through
+  Windows' accessibility tree, to find the one called, say, "Export", and its rectangle. The search
+  starts at that window and never walks the rest of the desktop. Nothing else in the window is read,
+  and no picture is taken.
+- **Blind spots and exclusions apply first.** A window on the built-in blind spots or your
+  exclusion list is refused before anything in it is read, and a minimized window is not searched:
+  Scout asks you to bring it forward. Pausing sight refuses pointing too.
+- **The ring is drawn, never clicked.** The overlay is a click-through window that only draws.
+  Tagalong never moves the mouse, clicks or types for this. `Esc` is listened for, never sent, and
+  only while a ring shows.
+- **The ring stays out of Scout's own pictures.** The overlay is excluded from screen capture, so a
+  screenshot Scout takes never shows it.
+- Nothing about a point is stored.

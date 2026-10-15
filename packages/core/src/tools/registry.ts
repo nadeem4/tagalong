@@ -7,6 +7,7 @@ import { connectorTools, type ConnectorToolDeps } from './builtin/connections';
 import { rememberTool } from './builtin/memory';
 import { enabledExperts, handToExpertTool, type ExpertToolDeps } from './builtin/experts';
 import { perceptionTools, type PerceptionToolsOptions } from './builtin/perception';
+import { pointAtTool } from './builtin/pointing';
 import { changeRoutineTool, createRoutineTool, type RoutineToolDeps } from './builtin/routines';
 import type { Tool, ToolContext, ToolOutcome } from './tool';
 
@@ -120,6 +121,8 @@ export class ToolRegistry {
       const saved = routines.list();
       if (saved.length > 0) tools.push(changeRoutineTool(routines, saved));
     }
+    // Appended last: the order is what the model has always seen.
+    if (perception) tools.push(pointAtTool(perception));
     return tools;
   }
 }

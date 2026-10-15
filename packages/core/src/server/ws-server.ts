@@ -16,6 +16,7 @@ import {
   PerceptionRecallResult,
   RPC_ERROR_CODES,
   RpcRequest,
+  ScreenPointAtResult,
   hostToCoreMethods,
   notificationParamsSchemaFor,
   paramsSchemaFor,
@@ -40,6 +41,8 @@ import type {
   Pet,
   ResultOf,
   RpcId,
+  ScreenPointAtParams,
+  ScreenPointAtResult as ScreenPointAtResultType,
 } from '@tagalong/protocol';
 import { tokensMatch } from './pairing';
 
@@ -85,6 +88,8 @@ export interface HostSession {
   recall(params: RecallParams): Promise<RecallResult>;
   /** Phase 3B. How a display, or a region of it, changed since a moment ago. */
   diff(params: DiffParams): Promise<DiffResult>;
+  /** Asks the host to draw a ring around one thing on screen. It only draws. */
+  pointAt(params: ScreenPointAtParams): Promise<ScreenPointAtResultType>;
 }
 
 export type RecallParams = PerceptionRecallParamsType;
@@ -202,6 +207,12 @@ class SessionImpl implements HostSession {
     // Parsed on the way out too, so `includeImages` reaches the host with its default.
     const raw = await this.#request(id, 'perception.diff', PerceptionDiffParams.parse(params));
     return PerceptionDiffResult.parse(raw);
+  }
+
+  async pointAt(params: ScreenPointAtParams): Promise<ScreenPointAtResultType> {
+    const id = `pointAt-${this.#nextRequestId++}`;
+    const raw = await this.#request(id, 'screen.pointAt', params);
+    return ScreenPointAtResult.parse(raw);
   }
 
   /** Resolves a core-to-host request the host has answered. */

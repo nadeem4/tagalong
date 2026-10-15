@@ -42,6 +42,7 @@ function fakePlatform(overrides: Partial<Platform> = {}): Platform {
     // to fails on a missing inventory rather than on invented windows.
     listWindows: async () => ({ windows: [] }),
     lookAtWindow: async () => ({ windowId: '' }),
+    findElement: async () => ({ found: false, notes: [] }),
     ...overrides,
   };
 }
@@ -404,6 +405,10 @@ describe('DESKTOP_CAPABILITIES', () => {
 
   it('advertises recall, now that perception.recall and perception.diff are answered', () => {
     expect(DESKTOP_CAPABILITIES).toContain('recall');
+  });
+
+  it('advertises the pointer, now that screen.pointAt is answered', () => {
+    expect(DESKTOP_CAPABILITIES).toContain('pointer');
   });
 });
 

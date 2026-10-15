@@ -423,6 +423,37 @@ describe('perception.captureWindow', () => {
   });
 });
 
+describe('screen.pointAt', () => {
+  it('asks the host to point and validates its answer', async () => {
+    const s = await start();
+    const client = await TestClient.connect(s.port);
+    await client.call('hello', hello());
+    const asked: Array<{ method: string; params: unknown }> = [];
+    client.onRequest = (method, params) => {
+      asked.push({ method, params });
+      return { shown: true, screen: 2 };
+    };
+
+    const session = s.sessions()[0] as HostSession;
+    const answer = await session.pointAt({ windowId: 'w-1', name: 'Export', label: 'Export' });
+
+    expect(asked).toEqual([
+      { method: 'screen.pointAt', params: { windowId: 'w-1', name: 'Export', label: 'Export' } },
+    ]);
+    expect(answer).toEqual({ shown: true, screen: 2 });
+  });
+
+  it('rejects an answer that is not a pointing result', async () => {
+    const s = await start();
+    const client = await TestClient.connect(s.port);
+    await client.call('hello', hello());
+    client.onRequest = () => ({ shown: 'yes' });
+
+    const session = s.sessions()[0] as HostSession;
+    await expect(session.pointAt({ windowId: 'w-1', name: 'Export' })).rejects.toThrow();
+  });
+});
+
 describe('perception.recall and perception.diff', () => {
   it('asks the host for a remembered moment and validates the answer', async () => {
     const s = await start();

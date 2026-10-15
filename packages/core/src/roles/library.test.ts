@@ -30,6 +30,7 @@ const BUILT_IN_TOOLS = [
   'create_routine',
   'change_routine',
   'hand_to_expert',
+  'point_at',
   // A group: every tool of the person's connected apps.
   'connections',
 ];
@@ -89,6 +90,14 @@ describe('the role files', () => {
     expect(instructions).toContain('look_closer');
     expect(instructions).toContain('list_displays');
     expect(instructions).toContain('look_at_display');
+  });
+
+  it('give the companion point_at, after change_routine, and tell it to point, never claim a click', () => {
+    const tools = getRole('companion')?.tools ?? [];
+    expect(tools.indexOf('point_at')).toBe(tools.indexOf('change_routine') + 1);
+    const instructions = getRole('companion')?.instructions ?? '';
+    expect(instructions).toContain('point_at');
+    expect(instructions).toContain('point, never claim you clicked');
   });
 
   it('tell the companion to leave itself out of what it sees, unless asked', () => {

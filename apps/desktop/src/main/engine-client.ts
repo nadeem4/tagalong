@@ -3,6 +3,7 @@ import {
   PerceptionDiffParams,
   PerceptionCaptureWindowParams,
   PerceptionRecallParams,
+  ScreenPointAtParams,
   coreToHostNotifications,
   engineUrl,
   resultSchemaFor,
@@ -46,6 +47,8 @@ export interface EngineClientOptions {
   recall?: (params: PerceptionRecallParams) => Promise<unknown>;
   /** Phase 3B. Answers perception.diff: now against a frame from before. */
   diff?: (params: PerceptionDiffParams) => Promise<unknown>;
+  /** Answers screen.pointAt: draws a ring around one thing. Never moves, clicks or types. */
+  pointAt?: (params: ScreenPointAtParams) => Promise<unknown>;
   onNotification: (notification: EngineNotification) => void;
 }
 
@@ -215,6 +218,11 @@ export class EngineClient {
         // Parsed here so `includeImages` gets its default before it reaches the host.
         const asked = PerceptionDiffParams.parse(params);
         this.#send({ jsonrpc: '2.0', id, result: await this.#options.diff(asked) });
+        return;
+      }
+      if (method === 'screen.pointAt' && this.#options.pointAt !== undefined) {
+        const asked = ScreenPointAtParams.parse(params);
+        this.#send({ jsonrpc: '2.0', id, result: await this.#options.pointAt(asked) });
         return;
       }
       this.#send({ jsonrpc: '2.0', id, error: { code: -32601, message: `unknown ${method}` } });

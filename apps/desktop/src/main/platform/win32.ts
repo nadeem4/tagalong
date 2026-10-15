@@ -11,6 +11,8 @@ import { captureRegionWith } from './region';
 import type { RegionCaptureParams } from './region';
 import type { DisplaysCapture } from './displays';
 import { readWindowTextWith } from './read-text';
+import { findElementWith } from './find-element';
+import type { FindElementAnswer } from './find-element';
 import type { ReadTextAnswer, ReadWindowTextParams } from './read-text';
 import { captureSelectionWith } from './selection';
 import { createUiaTextLayer } from './text-layer';
@@ -139,6 +141,20 @@ export class Win32Platform implements Platform {
             handle,
             maxLongSide,
           ),
+      },
+      params,
+    );
+  }
+
+  async findElement(
+    params: { windowId: string; name: string },
+    exclusions: CaptureExclusions,
+  ): Promise<FindElementAnswer> {
+    return findElementWith(
+      {
+        // Titles are all the check needs: no text counting for a point.
+        listWindows: async () => (await this.listWindows(exclusions, { countText: false })).windows,
+        run: runPowerShellScript,
       },
       params,
     );

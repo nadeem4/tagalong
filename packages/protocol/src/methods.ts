@@ -93,6 +93,8 @@ export const HostCapability = z.enum([
   'textLayer',
   /** Phase 3B: answers perception.recall and perception.diff from its in-memory frames. */
   'recall',
+  /** Draws a ring around one thing on screen (screen.pointAt). Never moves the mouse. */
+  'pointer',
 ]);
 export type HostCapability = z.infer<typeof HostCapability>;
 
@@ -278,6 +280,39 @@ export type PerceptionReadTextResult = z.infer<typeof PerceptionReadTextResult>;
 export type PerceptionListWindowsResult = z.infer<typeof PerceptionListWindowsResult>;
 export type PerceptionCaptureRegionResult = z.infer<typeof PerceptionCaptureRegionResult>;
 export type PerceptionCaptureRegionParams = z.infer<typeof PerceptionCaptureRegionParams>;
+
+/** The longest label the ring shows beside what it points at. */
+export const POINT_LABEL_MAX = 40;
+
+/**
+ * Point, don't click: a ring around one thing on screen, drawn by the host. Nothing is moved,
+ * clicked or typed. Either an element named inside one listed window (preferred: the host
+ * finds it by its accessibility name), or a rectangle of one display in that display's own
+ * pixels, as look_closer takes, for something only a picture shows.
+ */
+export const ScreenPointAtParams = z.union([
+  z.strictObject({
+    windowId: z.string().min(1),
+    name: z.string().min(1).max(200),
+    label: z.string().max(POINT_LABEL_MAX).optional(),
+  }),
+  z.strictObject({
+    displayId: z.number().int(),
+    rect: DisplayBounds,
+    label: z.string().max(POINT_LABEL_MAX).optional(),
+  }),
+]);
+/** Shown, on which screen (numbered as the window list numbers them), or why not. */
+export const ScreenPointAtResult = z.object({
+  shown: z.boolean(),
+  screen: z.number().int().positive().optional(),
+  /** Present when an exclusion refused the window: nothing in it was read. */
+  blocked: CaptureBlock.optional(),
+  /** Why nothing was shown, in sentences the pet can repeat. */
+  notes: z.array(z.string().min(1)).optional(),
+});
+export type ScreenPointAtParams = z.infer<typeof ScreenPointAtParams>;
+export type ScreenPointAtResult = z.infer<typeof ScreenPointAtResult>;
 export type PerceptionCaptureWindowParams = z.infer<typeof PerceptionCaptureWindowParams>;
 export type PerceptionCaptureWindowResult = z.infer<typeof PerceptionCaptureWindowResult>;
 
@@ -461,6 +496,7 @@ export const coreToHostMethods = {
   'perception.readText': { params: PerceptionReadTextParams, result: PerceptionReadTextResult },
   'perception.recall': { params: PerceptionRecallParams, result: PerceptionRecallResult },
   'perception.diff': { params: PerceptionDiffParams, result: PerceptionDiffResult },
+  'screen.pointAt': { params: ScreenPointAtParams, result: ScreenPointAtResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostNotifications = {

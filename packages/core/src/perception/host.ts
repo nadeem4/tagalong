@@ -11,6 +11,8 @@ import type {
   PerceptionRecallResult,
   PerceptionReadTextResult,
   PerceptionTarget,
+  ScreenPointAtParams,
+  ScreenPointAtResult,
 } from '@tagalong/protocol';
 
 /**
@@ -46,4 +48,6 @@ export interface PerceptionHost {
   recall?(params: PerceptionRecallParams): Promise<PerceptionRecallResult>;
   /** Phase 3B, behind the `recall` capability: how a display changed since then. */
   diff?(params: PerceptionDiffParams): Promise<PerceptionDiffResult>;
+  /** Behind the `pointer` capability: a ring around one thing on screen. Only draws. */
+  pointAt?(params: ScreenPointAtParams): Promise<ScreenPointAtResult>;
 }
