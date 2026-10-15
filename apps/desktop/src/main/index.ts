@@ -104,6 +104,8 @@ import { registerTurnIpc } from './ipc/turns';
 import { dropDesk, registerDropIpc } from './drop';
 import { nodeDropFs } from './drop-io';
 import { forwardEars, registerVoiceIpc } from './ipc/voice';
+import { registerHealthIpc } from './ipc/health';
+import { fixPage } from './fix-target';
 import { IPC } from '../shared/ipc';
 import type { CaptureNotice } from '../shared/ipc';
 
@@ -845,9 +847,10 @@ function openOffice(page?: string): void {
  * Settings is a page of Home. The standalone Settings window only opens when the engine
  * failed to start, since Home cannot work without it.
  */
-function openSettingsPage(): void {
+function openSettingsPage(target?: unknown): void {
+  const page = fixPage(target);
   if (desktop?.host === null) openSettings();
-  else openOffice('settings');
+  else openOffice(page);
 }
 
 /** Opens the setup wizard, or brings the open one forward. */
@@ -1050,11 +1053,13 @@ function registerIpc(): void {
     noteActiveWindow: () => captureForPanel(required(), ['activeWindow']),
     listening: () => required().listening,
     on: (channel, listener) => ipcMain.on(channel, listener as never),
+    voiceDir: () => join(app.getPath('userData'), 'voice'),
   });
   registerClipboardIpc(handle, {
     writeText: (text) => clipboard.writeText(text),
     fromPanel: fromWindow(() => required().panel),
   });
+  registerHealthIpc(handle, { engine });
 
   ipcMain.handle(IPC.pickFolder, async (event): Promise<string | null> => {
     const owner = BrowserWindow.fromWebContents(event.sender);
@@ -1102,7 +1107,8 @@ function registerIpc(): void {
     avatar.setBounds({ x: at.x, y: at.y, width, height: AVATAR_SIZE });
   });
 
-  ipcMain.handle(IPC.openSettings, () => openSettingsPage());
+  // A Fix it names its target; fixPage refuses anything off the list.
+  ipcMain.handle(IPC.openSettings, (_event, target: unknown) => openSettingsPage(target));
   ipcMain.handle(IPC.openOnboarding, () => openOnboarding());
   ipcMain.handle(IPC.openOffice, () => openOffice());
 

@@ -126,7 +126,8 @@ export interface EngineServerOptions {
 /**
  * What the Chrome extension may call: what its side panel actually uses. The token is the
  * same for every host, so this is what keeps a compromised extension from changing
- * settings, approving tools, adding connections, routines or experts.
+ * settings, approving tools, adding connections, routines or experts. `hosts.status` (the
+ * health check's browser row) stays off it too: the extension never asks about other hosts.
  */
 export const EXTENSION_METHODS: ReadonlySet<string> = new Set(['ask', 'interrupt', 'pets.list']);
 

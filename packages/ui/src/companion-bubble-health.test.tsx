@@ -1,0 +1,125 @@
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { CompanionBubble } from './companion-bubble';
+import type { HealthFacts } from './health';
+import { HostBridgeProvider } from './host-bridge';
+import type { HostBridge } from './host-bridge';
+import { createFakeHostBridge } from './test-support/fake-host-bridge';
+
+const FACTS: HealthFacts = {
+  brain: 'signed-out',
+  experts: [{ name: 'Coder', ok: true }],
+  connections: [],
+  voice: {
+    enabled: true,
+    mouth: 'kokoro',
+    elevenLabsKey: false,
+    mouthReady: true,
+    earsUsed: false,
+    earsReady: false,
+  },
+  microphone: { count: 1, pickedMissing: false },
+  extension: false,
+};
+
+function setup(health: Partial<HostBridge> = {}, props: { onSay?: (text: string) => void } = {}) {
+  const fake = createFakeHostBridge();
+  const checkHealth = vi.fn(() => Promise.resolve(FACTS));
+  const openFix = vi.fn(() => Promise.resolve());
+  const bridge: HostBridge = Object.assign(fake, { checkHealth, openFix }, health);
+  render(
+    <HostBridgeProvider bridge={bridge}>
+      <CompanionBubble petId="scout" petName="Scout" {...props} />
+    </HostBridgeProvider>,
+  );
+  return { fake, checkHealth, openFix };
+}
+
+const ask = (text: string) => {
+  const input = screen.getByLabelText('Ask Scout');
+  fireEvent.change(input, { target: { value: text } });
+  fireEvent.keyDown(input, { key: 'Enter' });
+};
+
+const flush = () => act(async () => await Promise.resolve());
+
+describe('CompanionBubble, the health check', () => {
+  it('answers “what’s wrong?” with the health card, and asks Scout nothing', async () => {
+    const onSay = vi.fn();
+    const { fake, checkHealth } = setup({}, { onSay });
+    ask('Scout, what’s wrong?');
+    await flush();
+    expect(checkHealth).toHaveBeenCalledOnce();
+    expect(fake.asks).toEqual([]);
+    const card = screen.getByRole('region', { name: 'Health check' });
+    expect(card).toHaveTextContent('One thing needs you.');
+    expect(card).toHaveTextContent('I’m signed out of Claude.');
+    // Only the first line is said.
+    expect(onSay).toHaveBeenCalledExactlyOnceWith('One thing needs you.');
+  });
+
+  it('opens the fix the row names', async () => {
+    const { openFix } = setup();
+    ask('are you ok?');
+    await flush();
+    fireEvent.click(screen.getByRole('button', { name: 'Fix Brain' }));
+    expect(openFix).toHaveBeenCalledWith('brain');
+  });
+
+  it('leaves a real question to Scout', async () => {
+    const { fake, checkHealth } = setup();
+    ask('what’s wrong with this code?');
+    await flush();
+    expect(checkHealth).not.toHaveBeenCalled();
+    expect(fake.asks).toHaveLength(1);
+  });
+
+  it('asks Scout as before on a host with no health check', async () => {
+    const fake = createFakeHostBridge();
+    render(
+      <HostBridgeProvider bridge={fake}>
+        <CompanionBubble petId="scout" petName="Scout" />
+      </HostBridgeProvider>,
+    );
+    ask('what’s wrong?');
+    await flush();
+    expect(fake.asks).toHaveLength(1);
+  });
+
+  it('says so plainly when the check itself fails', async () => {
+    setup({ checkHealth: () => Promise.reject(new Error('gone')) });
+    ask('health check');
+    await flush();
+    await flush();
+    expect(screen.getByRole('alert')).toHaveTextContent('I couldn’t run the health check.');
+  });
+
+  it('drops a check that finishes after a newer question', async () => {
+    let finish: (facts: HealthFacts) => void = () => undefined;
+    const onSay = vi.fn();
+    setup(
+      { checkHealth: () => new Promise<HealthFacts>((resolve) => (finish = resolve)) },
+      { onSay },
+    );
+    ask('what’s wrong?');
+    await flush();
+    ask('explain this error');
+    await flush();
+    await act(async () => {
+      finish(FACTS);
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole('region', { name: 'Health check' })).toBeNull();
+    expect(onSay).not.toHaveBeenCalledWith('One thing needs you.');
+  });
+
+  it('clears the card when the next question is asked', async () => {
+    setup();
+    ask('what’s wrong?');
+    await flush();
+    expect(screen.getByRole('region', { name: 'Health check' })).toBeInTheDocument();
+    ask('explain this error');
+    await flush();
+    expect(screen.queryByRole('region', { name: 'Health check' })).toBeNull();
+  });
+});

@@ -1,6 +1,8 @@
 import { addressedToScout, isStopListening, mightBeStop } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
-import type { SpeakPreview } from '../../shared/ipc';
+import type { SpeakPreview, VoiceModels } from '../../shared/ipc';
+import { EARS_FILES, filesPresent } from '../voice/ears/model-files';
+import { kokoroDownloaded } from '../voice/kokoro';
 import type { AlwaysListening } from '../always-listening';
 import type { VoiceWorker } from '../voice/worker/client';
 import type { VoiceService } from '../voice/voice';
@@ -14,6 +16,8 @@ export interface VoiceIpcDeps {
   /** Always listening: only the person switches it, from the bubble. */
   listening: () => Pick<AlwaysListening, 'state' | 'set'>;
   on: IpcOn;
+  /** The voice models' folder, for the health check's look on disk. */
+  voiceDir?: () => string;
 }
 
 /** Scout's voice, and its ears: the mic's frames pass through main to the voice process. */
@@ -75,6 +79,15 @@ export function registerVoiceIpc(handle: IpcHandle, deps: VoiceIpcDeps): void {
   handle(IPC.ensureEars, async () => {
     await deps.worker().call({ kind: 'call', method: 'ears.ensure' });
   });
+
+  // The health check: a look on disk for each model, never a download or a voice process.
+  const voiceDir = deps.voiceDir;
+  if (voiceDir !== undefined) {
+    handle(IPC.voiceModels, (): VoiceModels => {
+      const dir = voiceDir();
+      return { mouth: kokoroDownloaded(dir), ears: filesPresent(dir, EARS_FILES) };
+    });
+  }
 }
 
 /**

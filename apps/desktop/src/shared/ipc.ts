@@ -14,7 +14,7 @@ import type {
   MouthId,
   VoiceId,
 } from '@tagalong/protocol';
-import type { DropOffer, HostBridge } from '@tagalong/ui';
+import type { DropOffer, FixTarget, HostBridge } from '@tagalong/ui';
 
 /** Channel names, in one place so main and preload cannot drift apart. */
 export const IPC = {
@@ -123,6 +123,9 @@ export const IPC = {
   // ends a move of the pet), and the card main hands the bubble for it.
   dropOnPet: 'tagalong:avatar:drop-on-pet',
   dropEvent: 'tagalong:panel:drop',
+  // The health check: whether the voice models are on disk, and whether the extension is in.
+  voiceModels: 'tagalong:voice:models',
+  hostsStatus: 'tagalong:hosts:status',
 } as const;
 
 /** What the figure hands its preload on a drop: the files, and the drag's link and text. */
@@ -216,6 +219,16 @@ export interface GreetLine {
   fix?: string;
   /** A pick-up: Pick up on the line opens its card. Never with `fix`. */
   pickUp?: PickUpReadyParams;
+  /** Where the fix button lands: the Settings section that fixes it. */
+  fixTarget?: FixTarget;
+}
+
+/** Whether the voice models are on disk, for the health check: a look, never a download. */
+export interface VoiceModels {
+  /** The local voice (Kokoro). */
+  mouth: boolean;
+  /** Every one of the ears' files. */
+  ears: boolean;
 }
 
 /** A coding agent Welcome looked for on this computer. */
@@ -313,7 +326,8 @@ export interface TagalongHostApi {
   /** Phase 4. Sizes the avatar window to hold this many pets side by side. */
   resizeStrip(visiblePets: number): Promise<void>;
   listModels(providerId: string): Promise<ModelList>;
-  openSettings(): Promise<void>;
+  /** Opens Settings, or the section or Home page a Fix it names. Main checks the target. */
+  openSettings(target?: FixTarget): Promise<void>;
   /** Opens the Welcome window, from Settings or the tray. */
   openOnboarding(): Promise<void>;
   /** Opens Home, or focuses it. The tray's Open Tagalong is the shipped way in. */
@@ -400,6 +414,10 @@ export interface TagalongHostApi {
   dropOnPet(drop: PetDrop): Promise<void>;
   /** Main hands the bubble the card for what was dropped on Scout. */
   onDrop(handler: (offer: DropOffer) => void): () => void;
+  /** The health check: whether the voice models are on disk. Never downloads. */
+  voiceModels(): Promise<VoiceModels>;
+  /** The health check: whether the browser extension is connected to the engine. */
+  hostsStatus(): Promise<{ extension: boolean }>;
 }
 
 declare global {

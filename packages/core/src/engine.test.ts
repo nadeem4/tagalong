@@ -1727,3 +1727,31 @@ describe('the calendar link', () => {
     });
   });
 });
+
+describe('hosts.status', () => {
+  const extensionHello = (token: string) => ({
+    host: 'extension' as const,
+    version: '0.0.0',
+    capabilities: ['selection', 'pageText', 'activeWindow'] as const,
+    token,
+  });
+
+  it('says whether the browser extension is connected, for the health check', async () => {
+    const e = await boot();
+    const desk = await TestHost.connect(e.port);
+    await desk.call('hello', helloParams(e.pairingToken));
+    expect((await desk.call('hosts.status', {}))['result']).toEqual({ extension: false });
+
+    const ext = await TestHost.connect(e.port);
+    await ext.call('hello', extensionHello(e.pairingToken));
+    expect((await desk.call('hosts.status', {}))['result']).toEqual({ extension: true });
+  });
+
+  it('is refused to the extension itself', async () => {
+    const e = await boot();
+    const ext = await TestHost.connect(e.port);
+    await ext.call('hello', extensionHello(e.pairingToken));
+    const res = await ext.call('hosts.status', {});
+    expect((res['error'] as { code: number }).code).toBe(RPC_ERROR_CODES.unauthorized);
+  });
+});

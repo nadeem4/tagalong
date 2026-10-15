@@ -1,5 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { IPC } from '../../shared/ipc';
+import { EARS_FILES } from '../voice/ears/model-files';
+import { KOKORO_MODEL } from '../voice/kokoro';
 import { AlwaysListening } from '../always-listening';
 import type { FromWorker } from '../voice/worker/messages';
 import { fakeIpc } from './fake-ipc';
@@ -171,5 +176,51 @@ describe('forwardEars', () => {
     expect(onSpoken).not.toHaveBeenCalled();
     // The panel still hears it, and switches listening off.
     expect(sent).toHaveLength(2);
+  });
+});
+
+describe('voiceModels, for the health check', () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  function withVoiceDir() {
+    const dir = mkdtempSync(join(tmpdir(), 'tagalong-voice-'));
+    dirs.push(dir);
+    const ipc = fakeIpc();
+    registerVoiceIpc(ipc.handle, {
+      voice: () => ({ speak: vi.fn() }),
+      worker: () => ({ send: vi.fn(), call: vi.fn() }),
+      noteActiveWindow: () => Promise.resolve(),
+      listening: () => new AlwaysListening(),
+      on: ipc.on,
+      voiceDir: () => dir,
+    });
+    return { dir, invoke: ipc.invoke };
+  }
+
+  const place = (dir: string, path: string) => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true });
+    writeFileSync(join(dir, path), 'x');
+  };
+
+  it('says neither model is downloaded in an empty voice folder, and fetches nothing', async () => {
+    const { invoke } = withVoiceDir();
+    expect(await invoke(IPC.voiceModels)).toEqual({ mouth: false, ears: false });
+  });
+
+  it('says the mouth and the ears are there once their files are', async () => {
+    const { dir, invoke } = withVoiceDir();
+    place(dir, `${KOKORO_MODEL}/onnx/model_quantized.onnx`);
+    expect(await invoke(IPC.voiceModels)).toEqual({ mouth: true, ears: false });
+    for (const file of EARS_FILES) place(dir, file.path);
+    expect(await invoke(IPC.voiceModels)).toEqual({ mouth: true, ears: true });
+  });
+
+  it('counts the ears as missing while any one file is', async () => {
+    const { dir, invoke } = withVoiceDir();
+    for (const file of EARS_FILES.slice(1)) place(dir, file.path);
+    expect(await invoke(IPC.voiceModels)).toEqual({ mouth: false, ears: false });
   });
 });

@@ -147,6 +147,12 @@ The extension's public privacy policy, for the Chrome Web Store, is
   key is saved to the OS keychain before its one test (one tiny request to that service); a key that
   fails the test stays there until you replace it or remove it in Settings. It is never
   spoken, shown or logged. Checking your Claude sign-in only reads the local sign-in and sends nothing.
+- The health check ("Scout, what's wrong?") reads no screen and calls no model. It asks only this
+  computer and the engine: whether you are signed in to Claude Code, whether a key is stored (never
+  the key), whether each expert that is on answers its no-cost test (Claude Code's `--version`), your connections' states,
+  the microphones' ids against the one you picked, whether the voice models' files are on disk, and
+  whether the browser extension is connected. Nothing it reads is stored or sent anywhere, and the
+  card never shows a key, token or secret.
 - The name you give Scout (setup, or Settings → **You**; optional) is stored locally in settings.
   It is sent to the AI provider only as part of Scout's prompt: one line in its system prompt, and
   in the hello's facts when Tagalong opens. Clear the box and it is gone from both.

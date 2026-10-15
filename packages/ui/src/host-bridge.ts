@@ -20,6 +20,7 @@ import type {
   SightLogEntry,
   UsageSummaryResult,
 } from '@tagalong/protocol';
+import type { FixTarget, HealthFacts } from './health';
 
 /**
  * The core-to-host notifications a panel renders: everything about a turn in flight, a
@@ -167,6 +168,13 @@ export interface HostBridge {
   checkCalendar?(): Promise<CalendarCheckResult>;
   /** Home's Spend card: today's and this month's usage, and the daily budget. */
   usageSummary?(): Promise<UsageSummaryResult>;
+  /**
+   * "Scout, what's wrong?": what the health card reads, from calls the host already makes.
+   * No model call, so it works when Scout cannot think. Never a key or a secret.
+   */
+  checkHealth?(): Promise<HealthFacts>;
+  /** A health card's Fix it: opens the Settings section or Home page that fixes it. */
+  openFix?(target: FixTarget): Promise<void>;
 }
 
 export interface ConfirmHandoff {

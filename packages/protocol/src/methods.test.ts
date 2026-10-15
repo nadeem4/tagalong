@@ -67,6 +67,7 @@ const HOST_TO_CORE = [
   'calendar.setLink',
   'calendar.check',
   'usage.summary',
+  'hosts.status',
 ] as const;
 
 const CORE_TO_HOST = ['perception.capture'] as const;
@@ -742,5 +743,15 @@ describe('screen.pointAt', () => {
   it('is a core-to-host method', () => {
     expect(coreToHostMethods['screen.pointAt'].params).toBe(ScreenPointAtParams);
     expect(coreToHostMethods['screen.pointAt'].result).toBe(ScreenPointAtResult);
+  });
+});
+
+describe('hosts.status', () => {
+  it('takes nothing and says only whether the extension is connected', () => {
+    expect(paramsSchemaFor('hosts.status').parse({})).toEqual({});
+    expect(resultSchemaFor('hosts.status').parse({ extension: true })).toEqual({
+      extension: true,
+    });
+    expect(resultSchemaFor('hosts.status').safeParse({}).success).toBe(false);
   });
 });

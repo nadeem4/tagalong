@@ -39,6 +39,7 @@ import type {
   SpeakPreview,
   SpeakResult,
   TagalongHostApi,
+  VoiceModels,
 } from '../shared/ipc';
 
 /**
@@ -221,7 +222,7 @@ const host: TagalongHostApi = {
     ipcRenderer.invoke(IPC.resizeStrip, visiblePets) as Promise<void>,
   listModels: (providerId: string) =>
     ipcRenderer.invoke(IPC.listModels, providerId) as Promise<ModelList>,
-  openSettings: () => ipcRenderer.invoke(IPC.openSettings) as Promise<void>,
+  openSettings: (target) => ipcRenderer.invoke(IPC.openSettings, target) as Promise<void>,
   openOnboarding: () => ipcRenderer.invoke(IPC.openOnboarding) as Promise<void>,
   openOffice: () => ipcRenderer.invoke(IPC.openOffice) as Promise<void>,
   onHomePage: (handler) => homePage.listen(handler),
@@ -299,6 +300,8 @@ const host: TagalongHostApi = {
     ipcRenderer.on(IPC.dropEvent, listener);
     return () => void ipcRenderer.off(IPC.dropEvent, listener);
   },
+  voiceModels: () => ipcRenderer.invoke(IPC.voiceModels) as Promise<VoiceModels>,
+  hostsStatus: () => ipcRenderer.invoke(IPC.hostsStatus) as Promise<{ extension: boolean }>,
 };
 
 contextBridge.exposeInMainWorld('tagalong', bridge);

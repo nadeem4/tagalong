@@ -26,9 +26,39 @@ import { DEFAULT_TALK_KEY, panelSettings, readable } from './panel-settings';
 import type { PanelSettings } from './panel-settings';
 import { useTalk } from './talk';
 import { installVoiceSeam } from './voice-seam';
+import type { FixTarget, HostBridge } from '@tagalong/ui';
+import { gatherHealth, HEALTH_TEST_BUDGET_MS } from './health-facts';
+import { listMicrophones } from './mic';
 
 /** The full chat's height; the bubble measures its own. Matches main's PANEL_HEIGHT. */
 const CHAT_HEIGHT = 520;
+
+const unavailable = (): Promise<never> => Promise.reject(new Error('not available here'));
+
+/**
+ * The bubble's bridge: the preload's, plus the health check ("Scout, what's wrong?"), read
+ * from calls Home and Settings already make, and its Fix it, which opens the right place.
+ */
+function bubbleBridge(): HostBridge {
+  const bridge = window.tagalong;
+  const host = window.tagalongHost;
+  return {
+    ...bridge,
+    checkHealth: () =>
+      gatherHealth({
+        getHostView: () => host.getHostView(),
+        checkClaudeSignIn: () => host.checkClaudeSignIn(),
+        listExperts: () => bridge.listExperts?.() ?? unavailable(),
+        testExpert: (id) => bridge.testExpert?.(id) ?? unavailable(),
+        listConnections: () => bridge.listConnections?.() ?? unavailable(),
+        listMicrophones: () => listMicrophones(),
+        voiceModels: () => host.voiceModels(),
+        hostsStatus: () => host.hostsStatus(),
+        testBudgetMs: HEALTH_TEST_BUDGET_MS,
+      }),
+    openFix: (target: FixTarget) => host.openSettings(target),
+  };
+}
 
 /**
  * The companion's bubble beside the pet, with the full chat one click behind it. The
@@ -76,6 +106,7 @@ function Panel() {
   const platform = useRef('win32');
   // Seeing: off is sight paused, the same switch as the pause key and the tray.
   const [seeing, setSeeing] = useState(true);
+  const [bridge] = useState(bubbleBridge);
   function apply(next: PanelSettings): void {
     setHotkeyLabel(next.hotkeyLabel);
     setTalkKey(next.talkKey);
@@ -255,7 +286,7 @@ function Panel() {
   if (petId === null) return <p className="settings__note">Waking the crew…</p>;
 
   return (
-    <HostBridgeProvider bridge={window.tagalong}>
+    <HostBridgeProvider bridge={bridge}>
       {/* Pinned to the bottom of the window, level with the pet, whatever the window's height:
           a window still at the full chat's height must not leave the bubble floating above. */}
       <div className="panel-anchor">
@@ -351,7 +382,7 @@ function Panel() {
                       onAccept: () => {
                         setLine(null);
                         mouth.stop();
-                        void window.tagalongHost.openSettings();
+                        void window.tagalongHost.openSettings(line.fixTarget);
                         void window.tagalongHost.hidePanel();
                       },
                     },
