@@ -228,7 +228,7 @@ line it says on its own, a routine's result and an expert that finished. It neve
 first sentence or two and "The rest is in the bubble." Bars beside the × show while it speaks;
 click them, close the bubble or press `Ctrl+Shift+Alt+M` to stop it at once. The voice is
 Kokoro, made on this computer: the first time Scout speaks it downloads the voice model (about
-90 MB) and uses the Windows voice until that is done. Turn it off, pick a voice, preview it or
+92 MB) and uses the Windows voice until that is done. Turn it off, pick a voice, preview it or
 change the speed in **Home → Settings → Voice**.
 
 **Talk to Scout.** Hold `Ctrl+Shift+Alt+Space` (or click the mic in the bubble), say your
@@ -433,7 +433,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 | Scout is silent                                                | Check **Scout talks** in Home → Settings → Voice, and your sound output. The stop key only silences the current answer.                         |
 | Talk to Scout says it could not open the microphone            | Windows Settings → Privacy → Microphone: let desktop apps use it. Pick the right microphone in Home → Settings → Voice.                         |
 | The first spoken question takes a while                        | The first time, Tagalong downloads its speech models (about 43 MB). After that they are read from disk.                                         |
-| Scout's voice changes after the first answers                  | The first time it speaks, Scout downloads its voice (about 90 MB) and uses the Windows voice until then. Offline, it keeps the Windows voice.   |
+| Scout's voice changes after the first answers                  | The first time it speaks, Scout downloads its voice (about 92 MB) and uses the Windows voice until then. Offline, it keeps the Windows voice.   |
 | The Chrome side panel says "Disconnected"                      | The desktop app must be running. If it is, copy the pairing token again from Settings and paste it into the extension's options.                |
 | "Windows protected your PC" when installing                    | The installer is unsigned. Click **More info**, then **Run anyway**.                                                                            |
 | You want Welcome again                                         | Home → Settings → Advanced → **Open Welcome again**.                                                                                            |

@@ -617,8 +617,9 @@ What is still standing, recorded here so nobody rediscovers it.
 
 The ears use three models, about 43 MB in all (43,001,836 bytes). They are not shipped in the
 installer. The first time listening is used, `apps/desktop/src/main/voice/ears/model-files.ts`
-downloads the missing files into the voice folder, each as a `.part` file renamed only when the
-download is complete, so an interrupted download is retried cleanly. Each file is pinned to one
+downloads the missing files into the voice folder, each streamed to a `.part` file, hashed as it
+arrives and renamed only when it is complete and matches, so an interrupted or damaged download
+never looks done. Each file is pinned to one
 Hugging Face commit and checked against a SHA-256 in that file; `KOKORO_FILES` does the same for
 the voice (92,364,770 bytes). Nothing is fetched at launch or
 in tests. Audio is never sent anywhere; only these model files are downloaded.

@@ -114,6 +114,43 @@ describe('ensureFiles', () => {
     expect(existsSync(join(dir, 'ears/vad.onnx.part'))).toBe(false);
   });
 
+  it('streams a download beside the file and only moves it into place once it matches', async () => {
+    const big = 'x'.repeat(200_000);
+    const files = [
+      {
+        url: 'https://example.test/vad.onnx',
+        path: 'ears/vad.onnx',
+        bytes: 200_000,
+        sha256: sha256(big),
+      },
+    ];
+    const target = join(dir, 'ears/vad.onnx');
+    const seenAtTarget: boolean[] = [];
+    const chunked = (text: string) => {
+      const pieces = [text.slice(0, 100_000), text.slice(100_000)];
+      return new Response(
+        new ReadableStream({
+          pull(controller) {
+            seenAtTarget.push(existsSync(target));
+            const next = pieces.shift();
+            if (next === undefined) controller.close();
+            else controller.enqueue(new TextEncoder().encode(next));
+          },
+        }),
+      );
+    };
+    const bodies = [`${big.slice(0, -1)}y`, big];
+    const fetchFn = vi.fn(async () => chunked(bodies.shift()!)) as unknown as typeof fetch;
+    await ensureFiles(dir, files, fetchFn);
+    expect(seenAtTarget.every((present) => !present)).toBe(true);
+    expect(readFileSync(target, 'utf8')).toBe(big);
+    expect(existsSync(`${target}.part`)).toBe(false);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    // A large file already on disk is hashed in pieces and kept.
+    await ensureFiles(dir, files, fetchFn);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
   it('replaces a corrupt file already on disk, and keeps a good one', async () => {
     mkdirSync(join(dir, 'ears'), { recursive: true });
     writeFileSync(join(dir, 'ears/vad.onnx'), 'xyz');

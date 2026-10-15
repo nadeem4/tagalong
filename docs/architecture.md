@@ -1986,8 +1986,9 @@ flowchart LR
   40-hex Hugging Face commit (`resolve/<commit>/`, never `resolve/main/`), its exact `bytes` and a
   `sha256` constant read once from the HF tree API for that commit (the LFS `oid`; small JSON files
   hashed at that commit and matched to their git blob id), never fetched at run time. `ensureFiles`
-  hashes each file on disk and deletes a mismatch; a download whose hash is wrong is never written,
-  is fetched once more, and a second bad copy throws `ModelIntegrityError`, which `ears-host` posts
+  hashes each file on disk (streamed, never read whole) and deletes a mismatch; a download is
+  streamed to `<file>.part`, hashed as it arrives and renamed into place only when it matches, so
+  bad bytes never sit at the final path. A bad copy is deleted and fetched once more, and a second bad copy throws `ModelIntegrityError`, which `ears-host` posts
   as `EARS_MODEL_DAMAGED` ("The speech model I downloaded was damaged. Check the connection and try
   again."). `sharedEnsureFiles` remembers a successful check, so the files are hashed once per voice
   process. `loadOrtParts` sets `env.allowRemoteModels = false` too. Bumping a model means a new

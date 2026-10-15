@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { createReadStream, existsSync } from 'node:fs';
+import { mkdir, open, rename, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 /**
@@ -134,32 +134,50 @@ export function filesPresent(dir: string, files: readonly ModelFile[]): boolean 
   return files.every((file) => existsSync(join(dir, file.path)));
 }
 
-const sha256Of = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+/** The SHA-256 of a file on disk, read in pieces so a 92 MB model is never held whole. */
+async function sha256OfFile(path: string): Promise<string> {
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(path)) hash.update(chunk as Buffer);
+  return hash.digest('hex');
+}
 
 /** Whether the file is on disk with its pinned hash; a damaged copy is deleted. */
 async function verified(target: string, file: ModelFile): Promise<boolean> {
   if (!existsSync(target)) return false;
-  if (sha256Of(await readFile(target)) === file.sha256) return true;
+  if ((await sha256OfFile(target)) === file.sha256) return true;
   await rm(target, { force: true });
   return false;
 }
 
 /**
- * Fetches one file, keeping it only when its SHA-256 matches. A bad copy is never written;
- * it is fetched once more, and a second bad copy throws `ModelIntegrityError`. A refused or
- * failed request throws at once. The file is written beside itself as `.part` and renamed
- * when complete, so an interrupted write leaves nothing that looks done.
+ * Fetches one file, keeping it only when its SHA-256 matches. The body is streamed to
+ * `<file>.part` and hashed as it arrives, so it is never held whole in memory, and it is
+ * renamed into place only once it matches: bad bytes never sit at the final path. A bad copy
+ * is deleted and fetched once more; a second bad copy throws `ModelIntegrityError`. A
+ * refused or failed request throws at once and leaves no `.part`.
  */
 async function download(target: string, file: ModelFile, fetchFn: typeof fetch): Promise<void> {
+  const part = `${target}.part`;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const response = await fetchFn(file.url);
     if (!response.ok) throw new Error(`${file.url} answered ${response.status}`);
-    const body = new Uint8Array(await response.arrayBuffer());
-    if (sha256Of(body) !== file.sha256) continue;
-    const part = `${target}.part`;
+    await mkdir(dirname(target), { recursive: true });
+    const hash = createHash('sha256');
     try {
-      await mkdir(dirname(target), { recursive: true });
-      await writeFile(part, body);
+      const out = await open(part, 'w');
+      try {
+        const reader = response.body?.getReader();
+        for (let next = await reader?.read(); next && !next.done; next = await reader?.read()) {
+          hash.update(next.value);
+          await out.write(next.value);
+        }
+      } finally {
+        await out.close();
+      }
+      if (hash.digest('hex') !== file.sha256) {
+        await rm(part, { force: true });
+        continue;
+      }
       await rename(part, target);
     } catch (error) {
       await rm(part, { force: true });
