@@ -127,6 +127,8 @@ const bridge: HostBridge = {
     ipcRenderer.invoke(IPC.setCalendarLink, link) as Promise<CalendarCheckResult>,
   checkCalendar: () => ipcRenderer.invoke(IPC.checkCalendar) as Promise<CalendarCheckResult>,
   usageSummary: () => ipcRenderer.invoke(IPC.usageSummary) as Promise<UsageSummaryResult>,
+  applySettings: (patch: SettingsPatch) =>
+    ipcRenderer.invoke(IPC.applySettings, patch) as Promise<void>,
   onTurnEvent: (handler: (event: TurnEvent) => void) => {
     const listener = (_event: IpcRendererEvent, turnEvent: TurnEvent): void => handler(turnEvent);
     ipcRenderer.on(IPC.turnEvent, listener);

@@ -1595,6 +1595,27 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
 6. A note given just as the expert finishes: the card shows _not passed on: Coder finished first_,
    and Scout's finish line says it could not pass the note on.
 
+## Change settings by talking _(real brain)_
+
+1. Say or type "talk a bit slower and call me Sam". The bubble shows a card: **Voice speed**
+   0.95 → 0.85 and **Your name** (none) → Sam, with **Apply** and **Cancel**. Settings has not
+   changed yet.
+2. Say "yes" (Always listening on or the talk key): nothing is applied. Click **Apply**: Scout's next
+   line is slower and it calls you Sam, with no restart. Home → What Scout saw has a **Changed by
+   talk** row naming `userName, voice`.
+3. Ask "keep my screenshots for 2 hours": the row is marked "Lets Scout see or keep more of your
+   screen" and the button reads **Turn on**. **Cancel** changes nothing.
+4. Ask for an API key, a base URL, the model or the calendar link to change: Scout says those are
+   changed only in Settings, shows no card and repeats nothing.
+5. With Always listening on, ask Scout to switch it off: a card; **Apply** closes the microphone and
+   the green mark goes. Ask it to switch it on: "Only you can switch that on", no card.
+6. Ask "keep the log of what Scout saw for 30 days" (from 7): refused, only lowering is allowed.
+   Ask for 3 days: a card.
+7. Ask "use ElevenLabs to speak" with no ElevenLabs key: the row says it needs a key in Settings.
+8. Ask "what's my voice speed?": Scout answers without a card.
+9. With the browser extension connected, ask for a change from the desktop bubble: the card shows
+   only in the desktop bubble, never in the extension's side panel.
+
 ## Not in this build
 
 Do not test these here.

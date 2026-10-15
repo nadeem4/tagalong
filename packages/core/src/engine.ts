@@ -420,6 +420,17 @@ export class Engine {
         experts: () => experts.list(),
         propose: (params) => routinesOf(live).propose(params),
       },
+      // Change settings by talking: the card only. The host saves it on Apply (settings.set).
+      changeSettings: {
+        get: () => settings.get(),
+        // The desktop only: the patch carries the current voice, hotkeys and exclusions,
+        // and only the desktop bubble can apply a card.
+        emit: (params) => {
+          for (const session of live.server?.sessions() ?? []) {
+            if (session.host === 'desktop') session.notify('settings.proposed', params);
+          }
+        },
+      },
       connections: {
         tools: () => connections.tools(),
         call: (id, name, args, signal) => connections.call(id, name, args, signal),
@@ -704,6 +715,13 @@ function buildHandlers(parts: {
     'settings.get': () => ({ settings: settings.get() }),
     'settings.set': (params) => {
       const next = settings.set(params.patch);
+      // Applied from Scout's settings card: the privacy log names which settings, never values.
+      if (params.byTalk === true) {
+        sightLog.record({
+          kind: 'changed_by_talk',
+          title: Object.keys(params.patch).sort().join(', '),
+        });
+      }
       // Switching pick-up off deletes the snapshot it kept.
       if (!next.pickUp) pickUp.clear();
       // Nudges switched off: a tired face clears now, as no more ticks will come.

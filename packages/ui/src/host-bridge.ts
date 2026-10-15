@@ -17,6 +17,7 @@ import type {
   RoutineDraftInput,
   RoutineProposedParams,
   RoutineView,
+  SettingsPatch,
   SightLogEntry,
   UsageSummaryResult,
 } from '@tagalong/protocol';
@@ -38,7 +39,8 @@ type TurnNotification =
   | 'routine.result'
   | 'routines.changed'
   | 'connections.changed'
-  | 'pet.mood';
+  | 'pet.mood'
+  | 'settings.proposed';
 
 /**
  * Derived from the protocol catalog rather than restated, so a new turn.* notification
@@ -175,6 +177,11 @@ export interface HostBridge {
   checkHealth?(): Promise<HealthFacts>;
   /** A health card's Fix it: opens the Settings section or Home page that fixes it. */
   openFix?(target: FixTarget): Promise<void>;
+  /**
+   * Apply on Scout's settings card: saves the card's patch through the host's ordinary
+   * settings path, on the person's click only. Optional: without it the card cannot apply.
+   */
+  applySettings?(patch: SettingsPatch): Promise<void>;
 }
 
 export interface ConfirmHandoff {

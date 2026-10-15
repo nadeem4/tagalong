@@ -20,6 +20,10 @@ const KINDS: Record<SightKind, { label: string; icon: string }> = {
     label: 'Read element names',
     icon: 'M2.5 2.5h11v11h-11zM5 5.5h6M5 8h6M5 10.5h3',
   },
+  changed_by_talk: {
+    label: 'Changed by talk',
+    icon: 'M3 4.5h10M3 8h10M3 11.5h10M6 3v3M10 6.5v3M5 10v3',
+  },
 };
 
 /** After these the log may have new rows. */
@@ -43,6 +47,7 @@ function where(entry: SightLogEntry, providerLabel: (providerId: string) => stri
   if (entry.kind === 'sent_to_expert') return entry.expertName ?? 'An expert';
   const named = [entry.app, entry.title].filter((part) => part !== undefined).join(' · ');
   if (named !== '') return named;
+  if (entry.kind === 'changed_by_talk') return 'Settings';
   return entry.kind === 'listed_windows' ? 'Every open window' : 'The screen';
 }
 

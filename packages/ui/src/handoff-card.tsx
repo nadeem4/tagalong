@@ -486,6 +486,8 @@ export const HANDOFF_CSS = `
 .handoff-notes em { font-style: italic; color: #A3AAC4; }
 .connector-details { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 160px; overflow-y: auto; }
 .routine-card .handoff-rows dt { width: 72px; }
+.settings-card .handoff-rows dt { width: 112px; }
+.settings-card .handoff-rows dd small.bubble-warning { color: #F2C14E; }
 .handoff-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #F2C14E; }
 .handoff-step { display: flex; flex-direction: column; gap: 4px; }
 .handoff-step-title {

@@ -10,6 +10,7 @@ import {
   storedKeys,
 } from '../provider-choices';
 import type { EngineCall, IpcHandle } from './handle';
+import { applySettings } from './apply-settings';
 
 export interface SettingsIpcDeps {
   /** The running engine, or null when it refused to boot. */
@@ -28,6 +29,10 @@ export interface SettingsIpcDeps {
   configureRolling: (rollingMemory: Settings['rollingMemory']) => void;
   /** Sends the saved settings to every open window. */
   broadcast: (settings: Settings) => void;
+  /** Always listening's off path, the same as the bubble's switch (`IPC.setListening`). */
+  listeningOff: () => void;
+  /** Whether the call came from the bubble's window: the only one with a settings card. */
+  fromPanel: (event: unknown) => boolean;
 }
 
 /** Settings, the keys, and the model lists. */
@@ -64,12 +69,13 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
     };
   });
 
-  handle(IPC.saveSettings, async (_event, patch: SettingsPatch): Promise<Settings> => {
+  /** `byTalk`: applied from Scout's settings card, so the engine logs a "Changed by talk" row. */
+  const save = async (patch: SettingsPatch, byTalk: boolean): Promise<Settings> => {
     const host = deps.host();
     const saved =
       host === null
         ? deps.settingsStore().set(patch)
-        : (await host.client.call('settings.set', { patch })).settings;
+        : (await host.client.call('settings.set', byTalk ? { patch, byTalk } : { patch })).settings;
 
     // Rebinding here is the whole point: a hotkey the user just typed has to work now,
     // not after a restart.
@@ -83,6 +89,21 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
     // An open panel reads its keys, microphone and the user's name from here, not a restart.
     deps.broadcast(saved);
     return saved;
+  };
+
+  handle(IPC.saveSettings, (_event, patch: SettingsPatch) => save(patch, false));
+
+  // Apply on Scout's settings card: a click only. Always listening goes its own off path.
+  // The patch is the renderer's, so it is checked again against the settings now.
+  handle(IPC.applySettings, (event, patch: unknown) => {
+    if (!deps.fromPanel(event)) {
+      return Promise.reject(new Error('A settings card is applied only from the bubble.'));
+    }
+    return applySettings(patch, {
+      current: readSettings,
+      listeningOff: () => deps.listeningOff(),
+      save: (rest) => save(rest, true),
+    });
   });
 
   handle(IPC.saveApiKey, async (_event, providerId: string, apiKey: string) => {

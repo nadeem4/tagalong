@@ -34,6 +34,7 @@ const BUILT_IN_TOOLS = [
   'recall_day',
   'search_history',
   'tell_expert',
+  'change_settings',
   // A group: every tool of the person's connected apps.
   'connections',
 ];
@@ -101,6 +102,15 @@ describe('the role files', () => {
     const instructions = getRole('companion')?.instructions ?? '';
     expect(instructions).toContain('point_at');
     expect(instructions).toContain('point, never claim you clicked');
+  });
+
+  it('give the companion change_settings, after tell_expert, and tell it Apply is a click', () => {
+    const tools = getRole('companion')?.tools ?? [];
+    expect(tools.indexOf('change_settings')).toBe(tools.indexOf('tell_expert') + 1);
+    const instructions = getRole('companion')?.instructions ?? '';
+    expect(instructions).toContain('change_settings');
+    expect(instructions).toContain('until they click Apply');
+    expect(instructions).toContain('only in Settings');
   });
 
   it('let the companion write short drafts itself, in a draft block, never claiming it sent them', () => {

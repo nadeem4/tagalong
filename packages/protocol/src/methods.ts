@@ -88,7 +88,7 @@ import {
   PickUpRebriefResult,
 } from './pick-up';
 import { Pet } from './pet';
-import { CaptureBlock, Settings, SettingsPatch } from './settings';
+import { CaptureBlock, Settings, SettingsPatch, SettingsProposedParams } from './settings';
 import {
   SightLogClearParams,
   SightLogClearResult,
@@ -173,7 +173,14 @@ export const PetsUpsertResult = z.object({ pet: Pet });
 export const SettingsGetParams = Empty;
 export const SettingsGetResult = z.object({ settings: Settings });
 
-export const SettingsSetParams = z.object({ patch: SettingsPatch });
+export const SettingsSetParams = z.object({
+  patch: SettingsPatch,
+  /**
+   * Set when the person clicked Apply on a card Scout showed (change settings by talking):
+   * the engine writes a "Changed by talk" row in the log of what Scout saw.
+   */
+  byTalk: z.boolean().optional(),
+});
 export const SettingsSetResult = z.object({ settings: Settings });
 
 /**
@@ -583,6 +590,7 @@ export const coreToHostNotifications = {
   'routines.changed': { params: RoutinesChangedParams },
   'pet.mood': { params: PetMoodParams },
   'pickUp.ready': { params: PickUpReadyParams },
+  'settings.proposed': { params: SettingsProposedParams },
 } as const satisfies Record<string, NotificationSpec>;
 
 export type HostToCoreMethod = keyof typeof hostToCoreMethods;

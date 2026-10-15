@@ -136,6 +136,20 @@ describe('SightLogView, the less common paths', () => {
     expect(row).toHaveTextContent('EXCEL.EXE · Budget.xlsx');
   });
 
+  it('shows a settings card applied by talk, by the settings it changed', async () => {
+    const changed: SightLogEntry[] = [
+      { id: 's1', kind: 'changed_by_talk', at: iso(now), title: 'userName, voice' },
+      { id: 's2', kind: 'changed_by_talk', at: iso(now) },
+    ];
+    renderLog(createFakeHostBridge({ sightLog: changed }));
+    const rows = within(await screen.findByRole('list', { name: 'Today' })).getAllByRole(
+      'listitem',
+    );
+    expect(rows[0]).toHaveTextContent('Changed by talk');
+    expect(rows[0]).toHaveTextContent('userName, voice');
+    expect(rows[1]).toHaveTextContent('Settings');
+  });
+
   it('names an unnamed look, a text read from pixels and an unnamed expert plainly', async () => {
     const bridge = createFakeHostBridge({
       sightLog: [

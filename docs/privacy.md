@@ -132,6 +132,34 @@ The extension's public privacy policy, for the Chrome Web Store, is
   a picture is of, it takes none while anything at all is blocked.
 - **Anything at all, while sight is paused** — see [Pausing sight](#pausing-sight).
 
+## Changing settings by talking
+
+You can ask Scout to change some settings ("talk a bit slower", "call me Sam", "stop keeping an
+eye on things"). Scout shows a card with each setting now and after, and **nothing changes until
+you click Apply**. A spoken "yes" never applies it, because a voice from a video or a call could say
+it.
+
+- **What chat can change.** Scout's voice (on or off, which voice, speed, the ElevenLabs voice,
+  who speaks and who listens), your name, the hello, the hotkeys, keeping an eye on things, sight
+  detail, the window text size, screen memory, screenshot retention, adding a capture exclusion,
+  gentle nudges, pick-up, the daily spending cap, and lowering how long the log of what Scout saw
+  is kept.
+- **What chat can never change.** API keys, logins, provider URLs, the model, the calendar link
+  (it lives in the keychain), removing a capture exclusion, raising the log's days, and the app's
+  own bookkeeping. Scout says these are changed only in Settings, never shows a card for them and
+  never repeats a key or a link. The tool has no way to read the keychain. On Apply the app checks
+  the card's changes again against this list, so a tampered card cannot reach anything else, and
+  only the bubble can apply one. The card goes to the desktop only, never the browser extension.
+- **Always listening.** Scout can switch it off through the card, never on: "Only you can switch
+  that on". The Seeing switch and the pause key are not settings; Scout points you to them.
+- **Loosening always shows a marked card.** A change that lets Scout see, keep or spend more (keep
+  an eye on things on, screen memory on or longer, screenshots kept, sight detail on every display,
+  pick-up on, a higher or no spending cap) is marked "Lets Scout see or keep more of your screen" (or
+  "spend more"), and the button reads **Turn on**. A routine running on its own can never propose
+  one.
+- **The record.** Each applied card writes a **Changed by talk** row in What Scout saw, naming the
+  settings, not their values.
+
 ## The rest
 
 - A visible indicator shows every capture.
@@ -559,6 +587,7 @@ there is no switch, because it holds no content and an off switch would weaken t
 | **Sent to AI**         | any call to Scout's provider: a turn, a summary, a watch check, keeping an eye on things, the launch line    | the provider and model, how many characters and pictures         |
 | **Sent to expert**     | a brief goes to an expert, or a note from you reaches a working one                                          | the expert's name, how many characters                           |
 | **Read element names** | Scout points at a named button or field, so the window's element names are read to find it                   | the app and the window title; not the name asked or any it found |
+| **Changed by talk**    | you click Apply on a settings card Scout showed                                                              | which settings changed (such as `userName, voice`); never values |
 
 - **Metadata only.** The table behind it (`sight_log`) has no column for text, pixels or a brief, and
   a test checks that it never gains one. A window title passes through the same secret scrubber as

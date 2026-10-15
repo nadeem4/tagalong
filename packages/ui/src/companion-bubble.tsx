@@ -7,6 +7,7 @@ import type {
   Mouth,
   PickUpReadyParams,
   RoutineProposedParams,
+  SettingsProposedParams,
 } from '@tagalong/protocol';
 import { ANSWER_CSS, Answer } from './answer';
 import {
@@ -19,6 +20,7 @@ import {
 } from './handoff-card';
 import { ConnectorConfirmCard } from './connector-confirm';
 import { RoutineCard } from './routine-card';
+import { SettingsCard } from './settings-card';
 import { PickUpCard } from './pick-up-card';
 import { DropCard, type DropOffer } from './drop-card';
 import { useHostBridge } from './host-bridge';
@@ -204,6 +206,8 @@ export function CompanionBubble({
   const [confirm, setConfirm] = useState<ConnectorConfirmParams | null>(null);
   // A routine Scout wrote or changed, waiting for Save.
   const [routine, setRoutine] = useState<RoutineProposedParams | null>(null);
+  // Settings Scout would change, waiting for Apply: a click only, never a spoken yes.
+  const [settingsCard, setSettingsCard] = useState<SettingsProposedParams | null>(null);
   const [past, setPast] = useState<Exchange[]>([]);
   // A draft's Copy, when this host can write the clipboard.
   const copyText = useMemo(
@@ -259,6 +263,12 @@ export function CompanionBubble({
         if (event.petId !== petId) return;
         const { type: _type, ...params } = event;
         setRoutine(params);
+        return;
+      }
+      case 'settings.proposed': {
+        if (event.petId !== petId) return;
+        const { type: _type, ...params } = event;
+        setSettingsCard(params);
         return;
       }
       case 'turn.started':
@@ -711,6 +721,13 @@ export function CompanionBubble({
       )}
       {routine !== null && (
         <RoutineCard key={routine.proposalId} proposal={routine} onDone={() => setRoutine(null)} />
+      )}
+      {settingsCard !== null && (
+        <SettingsCard
+          key={settingsCard.proposalId}
+          proposal={settingsCard}
+          onDone={() => setSettingsCard(null)}
+        />
       )}
       {handoff?.phase === 'proposed' && (
         <ProposalCard
