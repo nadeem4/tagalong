@@ -13,7 +13,7 @@ tagalong/
   tsconfig.base.json                # plus tsconfig.json and tsconfig.tests.json
   vitest.config.ts                  # projects: packages/*, apps/*; coverage thresholds
   eslint.config.js
-  .github/workflows/ci.yml
+  .github/workflows/ci.yml          # changes, build (Linux), e2e (Windows)
   docs/
     architecture.md, development.md, privacy.md
     concepts/                       # memory, roles and tools
@@ -198,10 +198,37 @@ against the protocol's `Role` schema. A test fails while the generated file is s
   is no macOS or Linux platform adapter in this build.
 - CI does not build the installer yet.
 
+### CI
+
+`.github/workflows/ci.yml` runs on every pull request to `main` and every push to `main`. The repo
+is private, so Actions minutes are metered, and a Windows minute bills at twice a Linux one. Three
+jobs:
+
+- **`changes`** (Linux, seconds). Asks `dorny/paths-filter` whether anything outside `docs/` that is
+  not Markdown changed. The role files in `packages/core/roles/*.md` count as code, because they
+  compile into core. When nothing counts, the other two jobs are skipped.
+- **`build`** (Linux). Install, lint, format check, typecheck (`tsc -b` and the test project), and
+  the unit tests with coverage and the floors below.
+- **`e2e`** (Windows). Starts only after `build` passes. Runs the unit tests that skip themselves off
+  Windows (`*.integration.test.ts` against a real PowerShell, and the npm `.cmd` shim cases in
+  `claude-sign-in.test.ts` and `claude-code.test.ts`), then `pnpm build` and the Electron
+  end-to-end suites.
+
+Branch protection on `main` requires `build` and `e2e`. A docs-only pull request skips both, and a
+skipped required check counts as passed, so it can merge. A `paths-ignore` trigger would not work
+here: the workflow would never start, the required checks would never report, and the pull request
+would wait forever. Docs-only changes also skip the format check, so run `pnpm format:check` locally
+before pushing Markdown.
+
+A newer push to a pull request cancels the run still going for the older one. Runs on `main` finish.
+
+A unit test that only works on Windows uses `it.runIf(process.platform === 'win32')` (or
+`describe.skipIf`), and its file joins the "Windows-only unit tests" step in `ci.yml`, so it still
+runs somewhere.
+
 ### End-to-end tests and fakes
 
-CI (`.github/workflows/ci.yml`) runs install, lint, format check, typecheck, the tests with coverage,
-build, and then the Electron end-to-end suites. `apps/desktop/e2e/` holds five Playwright suites
+The `e2e` CI job runs the Electron end-to-end suites. `apps/desktop/e2e/` holds five Playwright suites
 that launch the built app: `smoke.spec.ts` (the bubble, talking, capture, pause, hotkeys, Welcome on
 request, Home),
 `first-run.spec.ts` (Welcome and Scout's intro on an empty data folder), `hotkey-recovery.spec.ts`

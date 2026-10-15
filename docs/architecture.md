@@ -854,8 +854,9 @@ which UI Automation answers for — and counts readable characters for the inven
 
 Each capability is a free function taking its Electron dependencies as ports — `desktopCapturer`,
 `screen`, `nativeImage` — and the class only wires the real ones in. That is what lets the whole
-perception layer be tested in plain Node with no display attached, which matters because CI has no
-desktop and the one test that does use real pixels is the Playwright smoke test.
+perception layer be tested in plain Node with no display attached, which matters because the unit
+tests run on a Linux CI runner with no desktop, and the one test that does use real pixels is the
+Playwright smoke test, on the Windows runner.
 
 `captureDisplays` takes the exclusion list, and `captureActiveWindowImage` does not. The difference is
 not an inconsistency. For a single screenshot the caller checks exclusions and then either asks for a
