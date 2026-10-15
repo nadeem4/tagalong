@@ -3,15 +3,13 @@ import { ListenController, PushToTalk } from '@tagalong/ui';
 import type { BubbleTalk, TalkAction } from '@tagalong/ui';
 import { openMic } from './mic';
 import { RemoteEars } from './remote-ears';
-import { EarsNotes, FailureStreak, settles, shownPartial } from './talk-rules';
+import { EarsNotes, FailureStreak, micNote, settles, shownPartial } from './talk-rules';
 import { onSystemVoice } from './voice-player';
 
 /** A question is never longer than this: the microphone closes on its own after it. */
 const MAX_LISTEN_MS = 30_000;
 
 const NOTHING_HEARD = 'I didn’t catch that. Hold the key and try again.';
-const NO_MICROPHONE =
-  'The microphone could not be opened. Check that Windows lets apps use it, or pick another in Settings.';
 
 export interface TalkOptions {
   /** The talk key as a person reads it. */
@@ -98,7 +96,7 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
         clearTimeout(timer.current);
         if (!micFailures.fail()) return;
         console.warn('[talk] the microphone could not be opened', error);
-        done(NO_MICROPHONE);
+        done(micNote(error));
       },
       // "Scout, stop": switched off as the person would, so main saves it and tells every window.
       onStopListening: () =>
