@@ -184,7 +184,8 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   `{ text, source: 'model' | 'fallback' }`, the line said as the app opens (see Welcome below), and
   `keepAnEye.observe { windows }`, `keepAnEye.notNow` and `keepAnEye.accept { remarkId }` (see
   [Keeping an eye on things](#keeping-an-eye-on-things)), and the `connections.*`, `calendar.*` and
-  `routines.*` methods. Protocol 0.13.0: the crew's `pets.delete`, `roles.list`,
+  `routines.*` methods, and `wellbeing.observe { idleMs, windows }` (see
+  [Gentle nudges](#gentle-nudges)). Protocol 0.13.0: the crew's `pets.delete`, `roles.list`,
   `roles.recommendModel`, `notices.rolesUpgrade` and `notices.dismiss` are gone. `hosts.status`
   → `{ extension }` says whether the browser extension is connected, for the health check (see
   [The companion's bubble](#the-companions-bubble)); the extension may not call it.
@@ -1078,10 +1079,12 @@ while the companion answers or an expert has a task, eyes down; **Done** when a 
 happy squint, until the pet is clicked. Three moods have a face and no tag: **dozing** while the
 person is away (eyes closed to a line, slow breathing), **wince** for 4 s at a failing build or an
 expert's error (eyes squeezed shut, `> <`, one small shake) and **cheer** for 4 s when tests pass (a
-happy squint and two hops). The mood comes from `dockMood(nextDock(...))`
+happy squint and two hops). With gentle nudges on, **tired** is a fourth: half-lidded eyes and slow
+breathing after a long stretch or late at night, until `rested` (see Gentle nudges). The mood comes
+from `dockMood(nextDock(...))`
 (`renderer/src/dock.ts`), a pure reducer over turn and hand-off notifications, capture notices,
 `pet.mood`, and main's `presence.away`/`presence.back`, in this order: seeing > working >
-wince/cheer > done > dozing > idle. `pet.mood` sets the reaction and the avatar clears it after
+wince/cheer > tired > done > dozing > idle. `pet.mood` sets the reaction and the avatar clears it after
 `REACTION_MS` (4 s) with its own `reacted` event. Presence comes from
 `main/presence.ts#watchPresence`: `powerMonitor.getSystemIdleTime()` every 15 s (away at 5 min,
 `AWAY_AFTER_MS`, a constant) and the `lock-screen`/`unlock-screen` events, sent to the avatar on
@@ -1450,7 +1453,8 @@ flowchart LR
   a wince, "tests pass" or "N passed" with no failure is a cheer, "N failed" is a wince, anything
   else is left to the done face. A zero count says nothing either way, in a title or an expert's
   words: "12 passed, 0 failed" cheers, "0 passed" alone does not. Only windows still in the list are
-  remembered. Both send `pet.mood { petId, mood: 'wince' | 'cheer' }`, which
+  remembered. Both send `pet.mood { petId, mood: 'wince' | 'cheer' }` (gentle nudges add `'tired'`
+  and `'rested'`), which
   main forwards to every window like every notification. Title moods run only while keeping an eye
   is on and sight is not paused, so there is no second tracker.
 - **The call** (`remark.ts#composeRemark`). Reads the last 4,000 characters of that window through
@@ -1467,6 +1471,62 @@ flowchart LR
   (`keepAnEye.notNow`) and, with an offer, **Hand it over** (`keepAnEye.accept { remarkId }`), which
   calls `HandoffManager.propose`: the hand-off card opens and nothing runs until **Send**. Voice will
   speak the line at `showRemark` in `main/index.ts` once spoken replies land.
+
+### Gentle nudges
+
+Off by default (`settings.wellbeing.enabled`, Settings › Privacy, under Keep an eye on things).
+After a long unbroken stretch, or late at night, Scout looks tired and says one fixed line. No
+screen is read and no model is called, so a nudge costs nothing. The desktop only feeds the idle
+time and the titles; every decision is in `packages/core/src/wellbeing/wellbeing.ts#Wellbeing`, pure
+and on an injected clock and `hourOf`.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
+flowchart LR
+  T["Desktop every 60 s: idle time and titles"] --> O["wellbeing.observe"]
+  O --> B{"Idle 5 min or more?"}
+  B -- "yes" --> R["Stretch starts over; pet.mood rested if tired"]
+  B -- "no" --> C{"Call or full screen in front?"}
+  C -- "yes" --> H["Hold everything until a later tick"]
+  C -- "no" --> D{"90 min unbroken, or after 23:00 with 30 min active?"}
+  D -- "no" --> X["Nothing"]
+  D -- "yes" --> M["pet.mood tired, then one pet.remark"]
+```
+
+- **The feed.** `apps/desktop/src/main/presence.ts#startWellbeingTick` runs every 60 s
+  (`WELLBEING_TICK_MS`) and sends `wellbeing.observe { idleMs, windows }`: `idleMs` from
+  `powerMonitor.getSystemIdleTime()`, `windows` from `platform.listWindows(exclusions, { countText:
+false })`, the same titles-only list keeping an eye uses. Nothing is listed or sent while the
+  setting is off or sight is paused.
+- **The decision.** An `idleMs` of `BREAK_MS` (5 min) or more is a break: the stretch starts over
+  and, if Scout looked tired, `pet.mood rested`. So is a gap of `BREAK_MS` between ticks (the
+  computer slept, the setting was off, sight was paused) or a clock set back, so waking up never
+  finds an old stretch due. `STRETCH_MS` (90 min) of unbroken activity is
+  tired, with `STRETCH_LINE` ("You've been at it for an hour and a half. Stretch?") once per
+  stretch. From 23:00 to 05:00, `LATE_ACTIVE_MS` (30 min) active is tired, with `LATE_LINE` ("It's
+  late. Want me to write up where you are?") once a night; the line also counts for the stretch, so
+  one line at a time. The tired face clears after a break, or at 05:00 unless the stretch is also
+  due. "Once a night" is no second late line within 12 h, so midnight and a daylight-saving change
+  need no date math: the hour comes from the local clock each tick. **Not now** keeps the lines
+  quiet for `NOT_NOW_MS` (1 h). All of these are constants.
+- **Calls and full screen.** `callOrFullScreenInFront(windows)`, the one rule keeping an eye, moods
+  and Always listening use: with a call or a full-screen window in front, no line and no face
+  change, and what is due is given on a later tick. The time still counts toward the stretch.
+- **The output** reuses existing paths and adds no IPC or buttons. The line is a `pet.remark` (the
+  bubble's quiet line with **Not now**, shown only when the bubble is closed, and spoken like any
+  remark when voice is on); the face is `pet.mood { mood: 'tired' | 'rested' }`. The engine's
+  `keepAnEye.notNow` also calls `wellbeing.notNow()`, and `keepAnEye.accept` falls back to
+  `wellbeing.accept(remarkId)`. Switching the setting off (`settings.set`) calls
+  `wellbeing.settle()`, so a tired face never outlives it.
+- **The write-up is the expert's job.** With an expert switched on, the late line carries the
+  offer, and **Hand it over** proposes `{ ask: 'Write a short note of where I am so I can pick up
+tomorrow', context: { app, windowTitle } }` to the first enabled expert through
+  `HandoffManager.propose`: the hand-off card opens and nothing runs until **Send**. A blind spot's
+  title never goes into the brief. With no expert, the line goes without the offer.
+- **The dock.** `tired` is sticky in `renderer/src/dock.ts` until `rested`: below working and a
+  wince or cheer, above done and dozing. The face is half-lidded (a lid over open eyes) with the slow
+  doze breathing and no blink; the label reads "Scout looks tired". Tired and rested never start the
+  avatar's 4 s reaction timer.
 
 ### What an ask with pictures costs
 

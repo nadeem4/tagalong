@@ -390,6 +390,21 @@ describe('buildSettingsPatch sightLogDays', () => {
   });
 });
 
+describe('buildSettingsPatch wellbeing', () => {
+  it('carries the Gentle nudges switch when the form shows it', () => {
+    expect(buildSettingsPatch({ ...values, wellbeing: true }).wellbeing).toEqual({
+      enabled: true,
+    });
+    expect(buildSettingsPatch({ ...values, wellbeing: false }).wellbeing).toEqual({
+      enabled: false,
+    });
+  });
+
+  it('leaves it alone when the form does not show it', () => {
+    expect(buildSettingsPatch(values).wellbeing).toBeUndefined();
+  });
+});
+
 describe('buildSettingsPatch awareness', () => {
   const awareness = {
     rollingMemoryEnabled: true,

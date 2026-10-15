@@ -573,6 +573,49 @@ Title moods need **Keep an eye on things** on and sight not paused, as in K.1.
    repeat M.1 and M.2.
 2. **Expected:** the faces change but nothing moves and Scout never blinks.
 
+## Gentle nudges
+
+The thresholds (90 minutes, a 5-minute break, 23:00 to 05:00) are constants; the unit tests
+(`packages/core/src/wellbeing/wellbeing.test.ts`) shorten them through a fake clock and a fixed
+hour. By hand, check the switch, the hold during calls and the late-night offer.
+
+### N.1. Off by default
+
+1. **Action:** on a fresh profile, open Settings → Privacy.
+2. **Expected:** **Gentle nudges** sits directly below **Keep an eye on things**, switched Off. The ⓘ
+   note says what is read (idle time and titles), the limits, and that it is off by default. With it
+   off, no nudge ever appears.
+
+### N.2. A long stretch
+
+1. **Action:** switch **Gentle nudges** on, Save, then keep working for an hour and a half without a
+   five-minute break.
+2. **Expected:** within a minute of the 90 minutes, Scout's eyes droop (half-lidded, slow breathing,
+   no blink; its name reads "Scout looks tired") and one quiet line appears: "You've been at it for
+   an hour and a half. Stretch?", with **Not now**. No second line in the same stretch.
+3. **Action:** step away for five minutes, then come back.
+4. **Expected:** the tired face clears.
+5. **Action:** an hour into a new stretch, put the computer to sleep for ten minutes, then wake it.
+6. **Expected:** no line on waking; the stretch starts over.
+
+### N.3. Calls and full screen
+
+1. **Action:** with nudges on and a stretch nearly due, keep a Teams window (or a full-screen video)
+   in front past the 90 minutes.
+2. **Expected:** nothing appears and the face does not change while it is in front. Switch to
+   another window: the face and the line come within a minute.
+
+### N.4. Late at night
+
+1. **Setup:** Claude Code switched on as an expert.
+2. **Action:** after 23:00, with nudges on, work for half an hour.
+3. **Expected:** Scout looks tired and says once "It's late. Want me to write up where you are?"
+   with **Hand it over**. Pressing it opens the hand-off card with the write-up task and the window
+   title; nothing runs until **Send**. With no expert switched on, the line has no button. At 05:00
+   the tired face clears.
+4. **Action:** press **Not now** on a nudge.
+5. **Expected:** no nudge for an hour.
+
 ## Voice: Scout talks
 
 Run from source **without** `TAGALONG_FAKE_TTS` (it makes every line silent), with speakers on. The

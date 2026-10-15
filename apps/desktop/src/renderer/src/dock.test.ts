@@ -97,6 +97,34 @@ describe('something held over the pet', () => {
   });
 });
 
+describe('tired on the dock', () => {
+  const tired = (dock = IDLE_DOCK) => nextDock(dock, { type: 'pet.mood', mood: 'tired' });
+  const rested = (dock: typeof IDLE_DOCK) => nextDock(dock, { type: 'pet.mood', mood: 'rested' });
+
+  it('stays tired until rested, whatever clears a reaction', () => {
+    expect(dockMood(tired())).toBe('tired');
+    expect(dockMood(nextDock(tired(), { type: 'reacted' }))).toBe('tired');
+    expect(dockMood(nextDock(tired(), { type: 'looked' }))).toBe('tired');
+    expect(dockMood(rested(tired()))).toBe('idle');
+    expect(rested(IDLE_DOCK)).toBe(IDLE_DOCK);
+    expect(tired(tired())).toEqual(tired());
+  });
+
+  it('sits below working and a wince, and above done and dozing', () => {
+    const working = nextDock(IDLE_DOCK, { type: 'turn.started', turnId: T, petId: 'scout' });
+    const done = nextDock(nextDock(IDLE_DOCK, { type: 'handoff.progress', handoffId: H }), {
+      type: 'handoff.finished',
+      handoffId: H,
+    });
+    const wince = (dock: typeof IDLE_DOCK) => nextDock(dock, { type: 'pet.mood', mood: 'wince' });
+    expect(dockMood(tired(working))).toBe('working');
+    expect(dockMood(wince(tired()))).toBe('wince');
+    expect(dockMood(nextDock(wince(tired()), { type: 'reacted' }))).toBe('tired');
+    expect(dockMood(tired(done))).toBe('tired');
+    expect(dockMood(tired(nextDock(IDLE_DOCK, { type: 'presence.away' })))).toBe('tired');
+  });
+});
+
 describe('dragging the pet', () => {
   it('stays a click until the pointer moves past the threshold', () => {
     const start = startDrag({ x: 100, y: 100 });

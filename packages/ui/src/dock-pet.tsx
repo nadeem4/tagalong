@@ -30,9 +30,10 @@ const MOTION: Readonly<Record<DockMood, string>> = {
   dozing: 'doze',
   wince: 'shake',
   cheer: 'cheer',
+  tired: 'doze',
 };
 
-/** The moods with a tag; dozing, wince and cheer react on the face alone. */
+/** The moods with a tag; dozing, wince, cheer and tired react on the face alone. */
 type TaggedMood = 'listening' | 'working' | 'done';
 
 const TAGS: Readonly<Record<TaggedMood, { text: string; color: string }>> = {
@@ -49,6 +50,7 @@ const WORDS: Readonly<Record<DockMood, string>> = {
   dozing: 'is dozing',
   wince: 'winces',
   cheer: 'is cheering',
+  tired: 'looks tired',
 };
 
 function isTagged(mood: DockMood): mood is TaggedMood {
@@ -57,7 +59,7 @@ function isTagged(mood: DockMood): mood is TaggedMood {
 
 /**
  * The companion on the dock: its pixel character, with a face and a small tag for what it
- * is doing (seeing, working, done), a face alone for its moods (dozing, wince, cheer), plus
+ * is doing (seeing, working, done), a face alone for its moods (dozing, wince, cheer, tired), plus
  * the sight-paused, recording and listening marks, which show in every mood.
  */
 export function DockPet({
@@ -70,7 +72,7 @@ export function DockPet({
 }: DockPetProps) {
   const [blinking, setBlinking] = useState(false);
   // Blinks in moods with open eyes; working looks down at the task, done and cheer squint,
-  // dozing and wince have their eyes shut. A blink is motion too, so it stops with the rest
+  // dozing and wince have their eyes shut, tired half shut. A blink is motion too, so it stops with the rest
   // when the system asks for less.
   const [still] = useState(reducedMotion);
   const canBlink = !still && (mood === 'idle' || mood === 'listening');

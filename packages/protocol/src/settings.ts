@@ -171,6 +171,11 @@ export const SETTINGS_DEFAULTS = {
    * settings may set it ("cap me at a dollar a day").
    */
   budget: { dailyUsd: null as number | null },
+  /**
+   * Gentle nudges: after a long unbroken stretch, or late at night, Scout looks tired and
+   * says one fixed line. Off by default; it reads only the idle time and window titles.
+   */
+  wellbeing: { enabled: false },
 } as const;
 
 /** The local voices Scout can speak in: two British male voices of the Kokoro model. */
@@ -381,6 +386,8 @@ const settingsFields = {
   }),
   /** Dollars of priced spend a day before proactive work pauses; null for no cap. */
   budget: z.object({ dailyUsd: z.number().positive().max(MAX_DAILY_BUDGET_USD).nullable() }),
+  /** Whether Scout gives a gentle nudge after a long stretch or late at night. */
+  wellbeing: z.object({ enabled: z.boolean() }),
 };
 
 export const Settings = z.object({
@@ -421,6 +428,7 @@ export const Settings = z.object({
   pickUp: settingsFields.pickUp.default(SETTINGS_DEFAULTS.pickUp),
   sightLog: settingsFields.sightLog.prefault({ ...SETTINGS_DEFAULTS.sightLog }),
   budget: settingsFields.budget.prefault({ ...SETTINGS_DEFAULTS.budget }),
+  wellbeing: settingsFields.wellbeing.prefault({ ...SETTINGS_DEFAULTS.wellbeing }),
 });
 export type Settings = z.infer<typeof Settings>;
 

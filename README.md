@@ -438,6 +438,10 @@ such as `.env` are refused.
   of the projects open in your editor and the hand-offs left half done. Back after six hours or
   more, it says one line about it, once; nothing opens until you click on the card. Turn it off
   under **Settings → Privacy → Pick up where you left off**, which also deletes the note.
+- **Gentle nudges** are off by default (**Settings → Privacy → Gentle nudges**). On, Scout looks
+  tired and suggests a stretch after an hour and a half with no break, and late at night offers to
+  have your expert write up where you are. Idle time and titles only, fixed lines, no model call;
+  quiet during calls and full screen.
 - Scout never looks at its built-in blind spots: password managers, the Windows sign-in and security
   prompts, secret files such as `.env` and SSH keys, private browsing, authenticator apps and Remote
   Desktop. They are always on and listed in Settings; you can add your own.

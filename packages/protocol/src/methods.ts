@@ -449,11 +449,12 @@ export type PetRemarkParams = z.infer<typeof PetRemarkParams>;
 
 /**
  * A short reaction on the pet's face, with no words: a wince at a failing build or an
- * expert's error, a cheer when tests pass. The host clears it after a few seconds.
+ * expert's error, a cheer when tests pass. The host clears those after a few seconds.
+ * `tired` (a long stretch, or late at night) stays until `rested` clears it.
  */
 export const PetMoodParams = z.object({
   petId: z.string().min(1),
-  mood: z.enum(['wince', 'cheer']),
+  mood: z.enum(['wince', 'cheer', 'tired', 'rested']),
 });
 export type PetMoodParams = z.infer<typeof PetMoodParams>;
 
@@ -464,6 +465,17 @@ export type PetMoodParams = z.infer<typeof PetMoodParams>;
 export const HostsStatusParams = z.object({});
 export const HostsStatusResult = z.object({ extension: z.boolean() });
 export type HostsStatusResult = z.infer<typeof HostsStatusResult>;
+
+/**
+ * Gentle nudges. The host sends the idle time and the window titles once a minute, only
+ * while the setting is on and sight is not paused. Any line comes back as `pet.remark`, the
+ * face as `pet.mood` (`tired`, then `rested` after a break).
+ */
+export const WellbeingObserveParams = z.object({
+  idleMs: z.number().nonnegative(),
+  windows: z.array(WindowEntry),
+});
+export const WellbeingObserveResult = Empty;
 
 // ---------------------------------------------------------------------------
 // The catalog
@@ -527,6 +539,7 @@ export const hostToCoreMethods = {
   'calendar.check': { params: CalendarCheckParams, result: CalendarCheckResult },
   'usage.summary': { params: UsageSummaryParams, result: UsageSummaryResult },
   'hosts.status': { params: HostsStatusParams, result: HostsStatusResult },
+  'wellbeing.observe': { params: WellbeingObserveParams, result: WellbeingObserveResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostMethods = {

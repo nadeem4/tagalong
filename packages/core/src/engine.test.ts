@@ -538,6 +538,87 @@ describe('keep an eye over rpc', () => {
   });
 });
 
+describe('gentle nudges over rpc', () => {
+  const MINUTE = 60_000;
+  const editor = {
+    id: 'w-1',
+    processName: 'Code.exe',
+    title: 'parser.ts - tagalong',
+    state: 'foreground',
+    browser: false,
+  };
+
+  afterEach(() => vi.useRealTimers());
+
+  /** A booted engine with nudges on, the clock held at a local hour, and one first tick. */
+  async function nudging(hour: number) {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const start = new Date(2026, 9, 15, hour, 0).getTime();
+    vi.setSystemTime(start);
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('settings.set', { patch: { wellbeing: { enabled: true } } });
+    let minute = 0;
+    const observe = async () => {
+      vi.setSystemTime(start + minute * MINUTE);
+      await host.call('wellbeing.observe', { idleMs: 0, windows: [editor] });
+    };
+    /** One tick a minute up to `minutes`, as the host sends them: a longer gap is a break. */
+    const at = async (minutes: number) => {
+      while (minute < minutes) {
+        minute += 1;
+        await observe();
+      }
+    };
+    await observe();
+    return { host, at };
+  }
+
+  it('Not now on a remark quiets the nudges too', async () => {
+    const { host, at } = await nudging(14);
+    await at(89);
+    await host.call('keepAnEye.notNow', {});
+    await at(91);
+    await vi.waitFor(() => expect(host.methods()).toContain('pet.mood'));
+    expect(host.notifications.find((n) => n.method === 'pet.mood')?.params).toEqual({
+      petId: 'scout',
+      mood: 'tired',
+    });
+    expect(host.methods()).not.toContain('pet.remark');
+  });
+
+  it('a long stretch says the stretch line, and switching nudges off looks rested', async () => {
+    const { host, at } = await nudging(14);
+    await at(90);
+    await vi.waitFor(() => expect(host.methods()).toContain('pet.remark'));
+    expect(host.notifications.find((n) => n.method === 'pet.remark')?.params).toMatchObject({
+      text: "You've been at it for an hour and a half. Stretch?",
+    });
+    await host.call('settings.set', { patch: { wellbeing: { enabled: false } } });
+    await vi.waitFor(() =>
+      expect(
+        host.notifications.filter((n) => n.method === 'pet.mood').map((n) => n.params['mood']),
+      ).toEqual(['tired', 'rested']),
+    );
+  });
+
+  it('the late-night offer opens the hand-off card through keepAnEye.accept', async () => {
+    const { host, at } = await nudging(23);
+    await host.call('experts.upsert', {
+      expert: { id: 'claude-code', name: 'Claude Code', connection: { type: 'claude-code' } },
+    });
+    await at(30);
+    await vi.waitFor(() => expect(host.methods()).toContain('pet.remark'));
+    const remark = host.notifications.find((n) => n.method === 'pet.remark')!.params;
+    expect(remark['offer']).toBe('Write a short note of where I am so I can pick up tomorrow');
+    const accepted = await host.call('keepAnEye.accept', { remarkId: remark['remarkId'] });
+    expect(accepted['result']).toEqual({ proposed: true });
+    await vi.waitFor(() => expect(host.methods()).toContain('handoff.proposed'));
+    expect(host.methods()).not.toContain('handoff.progress');
+  });
+});
+
 describe('a spoken ask over rpc', () => {
   it('reaches the prompt as spoken mode', async () => {
     const systems: string[] = [];

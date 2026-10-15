@@ -129,7 +129,7 @@ function SightLogDays({ days }: { days: number }) {
 }
 
 /**
- * Seeing and Always listening (live), the hello on launch, keeping an eye on things, rolling memory's on/off, and what Scout
+ * Seeing and Always listening (live), the hello on launch, keeping an eye on things, gentle nudges, rolling memory's on/off, and what Scout
  * never looks at. The blind
  * spots are built in and always on, so they are listed from `BLIND_SPOTS` and nothing here
  * can switch them off.
@@ -140,6 +140,7 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
   const [greet, setGreet] = useState(settings.greeting);
   const [watching, setWatching] = useState(settings.keepAnEye);
   const [picking, setPicking] = useState(settings.pickUp);
+  const [nudging, setNudging] = useState(settings.wellbeing.enabled);
   const pauseKey = settings.hotkeys.pauseSight ?? SETTINGS_DEFAULTS.hotkeys.pauseSight;
   return (
     <Section id="privacy">
@@ -203,6 +204,39 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
         app or a call is in front. Not now on the line quiets it for an hour. Blind spots are never
         considered, titles included. The same titles make Scout wince when a build fails and cheer
         when tests pass, with no read and no model call. Off means no tracking at all. On by
+        default.
+      </Tip>
+      <hr className="tg-divider" />
+      <div className="tg-setting">
+        <div className="tg-setting__text">
+          <div className="tg-titlerow">
+            <h3 className="tg-sub" id="wellbeing-label">
+              Gentle nudges
+            </h3>
+            <Info tip="wellbeing" label="About gentle nudges" />
+          </div>
+          <p className="tg-help">After a long stretch or late at night, Scout suggests a break.</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          className="tg-switch"
+          aria-checked={nudging}
+          aria-labelledby="wellbeing-label"
+          onClick={() => setNudging((on) => !on)}
+        >
+          {nudging ? 'On' : 'Off'}
+        </button>
+        {nudging && <input type="hidden" name="wellbeing" value="on" />}
+      </div>
+      <Tip tip="wellbeing">
+        Once a minute Scout reads how long since your last key press or click, and the window titles
+        it already gets for keeping an eye: no picture, no text, no model call. After an hour and a
+        half with no five-minute break, Scout looks tired and suggests a stretch, once. After 23:00,
+        once you have been at it for half an hour, it says it is late, once a night, and offers to
+        have your expert write up where you are; nothing runs until you press Send on the card.
+        Nothing appears during a call, over a full-screen app or while sight is paused. Not now
+        quiets it for an hour. Nothing leaves this computer unless you take the offer. Off by
         default.
       </Tip>
       <hr className="tg-divider" />

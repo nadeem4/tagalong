@@ -32,6 +32,7 @@ import type { PerceptionHost } from './perception';
 import { WatchManager, systemWatchClock } from './watch';
 import { KeepAnEye } from './keep-an-eye/keep-an-eye';
 import { moodForHandoff } from './keep-an-eye/mood';
+import { Wellbeing } from './wellbeing';
 import { getRole } from './roles';
 import { EngineServer, RpcFailure } from './server/ws-server';
 import {
@@ -370,6 +371,15 @@ export class Engine {
       log: (message) => console.warn(`[engine] ${message}`),
       spentOut,
     });
+    // Gentle nudges: idle time and titles once a minute, fixed lines, no model call.
+    const wellbeing = new Wellbeing({
+      clock: { now: () => Date.now() },
+      settings: () => settings.get(),
+      pet: () => pets.get(settings.get().defaultPetId),
+      experts: () => experts.list(),
+      propose: (params) => handoffs.propose(params),
+      emit: (event) => live.server?.broadcast(event.method, event.params),
+    });
     // The person's apps over MCP. Each connects on its own; one that fails never stops boot.
     const connections = new ConnectionManager({
       store: new ConnectionStore(db),
@@ -503,6 +513,7 @@ export class Engine {
       connectorFor,
       resolve,
       keepAnEye,
+      wellbeing,
       connections,
       approvals,
       interruptedAtBoot,
@@ -610,6 +621,7 @@ function buildHandlers(parts: {
   resolve: ProviderResolver;
   models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
   keepAnEye: KeepAnEye;
+  wellbeing: Wellbeing;
   connections: ConnectionManager;
   approvals: Approvals;
   /** Runs boot found still running and closed as interrupted. */
@@ -629,6 +641,7 @@ function buildHandlers(parts: {
   const { sightLog, checkResolve } = parts;
   const { calendar } = parts;
   const { hostKinds } = parts;
+  const { wellbeing } = parts;
   /** A manager refusal (an id taken, none such) as an invalidParams error the host shows. */
   const plainly = async <T>(work: () => Promise<T>): Promise<T> => {
     try {
@@ -674,6 +687,8 @@ function buildHandlers(parts: {
       const next = settings.set(params.patch);
       // Switching pick-up off deletes the snapshot it kept.
       if (!next.pickUp) pickUp.clear();
+      // Nudges switched off: a tired face clears now, as no more ticks will come.
+      if (!next.wellbeing.enabled) wellbeing.settle();
       return { settings: next };
     },
     'models.list': (params) => models(params.providerId),
@@ -768,8 +783,18 @@ function buildHandlers(parts: {
       void keepAnEye.observe(params.windows);
       return {};
     },
-    'keepAnEye.notNow': () => ({ quietUntil: keepAnEye.notNow().toISOString() }),
-    'keepAnEye.accept': (params) => ({ proposed: keepAnEye.accept(params.remarkId) }),
+    // A nudge is a remark too, so the same Not now and offer buttons serve both.
+    'keepAnEye.notNow': () => {
+      wellbeing.notNow();
+      return { quietUntil: keepAnEye.notNow().toISOString() };
+    },
+    'keepAnEye.accept': (params) => ({
+      proposed: keepAnEye.accept(params.remarkId) || wellbeing.accept(params.remarkId),
+    }),
+    'wellbeing.observe': (params) => {
+      wellbeing.observe(params);
+      return {};
+    },
 
     // Found on this PC: Claude Code's servers, read-only, minus those already added here.
     'connections.list': () => {

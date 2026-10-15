@@ -3,7 +3,15 @@ import { CHARACTERS } from './characters';
 import { withMood, type DockMood } from './expressions';
 
 const base = CHARACTERS['scout']!.sprite;
-const MOODS: readonly DockMood[] = ['listening', 'working', 'done', 'dozing', 'wince', 'cheer'];
+const MOODS: readonly DockMood[] = [
+  'listening',
+  'working',
+  'done',
+  'dozing',
+  'wince',
+  'cheer',
+  'tired',
+];
 
 describe('the dock faces', () => {
   it.each(MOODS)('%s changes only rows 4 to 7', (mood) => {
@@ -21,5 +29,12 @@ describe('the dock faces', () => {
 
   it('closes the eyes to a line while dozing: no eye pixels left', () => {
     expect(withMood(base, 'dozing').rows.slice(4, 8).join('')).not.toContain('e');
+  });
+
+  it('half-closes the eyes when tired: a lid over open eyes', () => {
+    const face = withMood(base, 'tired').rows.slice(4, 8);
+    expect(face[1]).not.toContain('e');
+    expect(face[1]).toContain('oo');
+    expect(face[2]).toContain('ee');
   });
 });
