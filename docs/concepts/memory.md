@@ -43,6 +43,14 @@ saw (`sight_log`), the activity record (`activity`: questions, hand-offs, routin
 never their answers), the pick-up snapshot (`pick_up`, only while pick-up is on) and the briefs
 waiting for Send (in memory). Screen memory is not read.
 
+### Searchable work memory
+
+"What was that article about vector databases I read Tuesday?" (`search_history`) searches two
+FTS5 indexes in `tagalong.db` (migration 18): the window titles and apps in `sight_log`, and the
+`activity` text (questions, expert asks, routine names). Triggers keep them in step, so a row
+deleted or pruned from the log of what Scout saw is gone from search too. At most 20 hits, newest
+first, never older than the log keeps. Titles only: no page text was ever stored.
+
 ## Working memory: building one turn
 
 Every turn is assembled from scratch by the prompt assembler

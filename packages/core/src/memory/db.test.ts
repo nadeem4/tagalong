@@ -41,6 +41,11 @@ describe('openDatabase', { timeout: 20_000 }, () => {
     try {
       expect(tableNames(db)).toEqual([
         'activity',
+        'activity_fts',
+        'activity_fts_config',
+        'activity_fts_data',
+        'activity_fts_docsize',
+        'activity_fts_idx',
         'connections',
         'conversations',
         'expert_routes',
@@ -59,6 +64,11 @@ describe('openDatabase', { timeout: 20_000 }, () => {
         'routines',
         'schema_version',
         'sight_log',
+        'sight_log_fts',
+        'sight_log_fts_config',
+        'sight_log_fts_data',
+        'sight_log_fts_docsize',
+        'sight_log_fts_idx',
         'usage',
       ]);
       const row = db
@@ -278,6 +288,65 @@ describe('migrate', () => {
           )
           .run(),
       ).toThrow();
+    } finally {
+      db.close();
+    }
+  });
+
+  it('indexes what Scout saw and the activity text in migration 18, backfilling old rows', () => {
+    const db = new Database(':memory:');
+    const count = (sql: string) => db.prepare<[], { n: number }>(sql).get()?.n;
+    try {
+      migrate(db);
+      expect(LATEST_SCHEMA_VERSION).toBeGreaterThanOrEqual(18);
+      // A database from before 18: no index yet, rows already on disk.
+      db.exec(`DROP TABLE sight_log_fts; DROP TABLE activity_fts;
+        DROP TRIGGER sight_log_ai; DROP TRIGGER sight_log_ad; DROP TRIGGER sight_log_au;
+        DROP TRIGGER activity_ai; DROP TRIGGER activity_ad; DROP TRIGGER activity_au;`);
+      db.prepare('DELETE FROM schema_version WHERE version >= 18').run();
+      db.prepare(
+        `INSERT INTO sight_log (id, kind, at, app, title)
+         VALUES ('s1', 'read_text', 'x', 'chrome.exe', 'Vector databases explained')`,
+      ).run();
+      db.prepare(
+        `INSERT INTO activity (id, kind, state, pet_id, text, started_at)
+         VALUES ('a1', 'turn', 'done', 'scout', 'compare pinecone and qdrant', 'x'),
+                ('a2', 'expert', 'done', 'scout', 'Fix login' || char(10, 10) || 'Selected text:' ||
+                  char(10) || 'salary figures', 'x')`,
+      ).run();
+
+      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+
+      // The backfill indexes a brief's ask only, never the selection it carried.
+      expect(count("SELECT COUNT(*) AS n FROM activity_fts WHERE activity_fts MATCH 'login'")).toBe(
+        1,
+      );
+      expect(
+        count("SELECT COUNT(*) AS n FROM activity_fts WHERE activity_fts MATCH 'salary'"),
+      ).toBe(0);
+
+      expect(
+        count("SELECT COUNT(*) AS n FROM sight_log_fts WHERE sight_log_fts MATCH 'vector'"),
+      ).toBe(1);
+      expect(
+        count("SELECT COUNT(*) AS n FROM sight_log_fts WHERE sight_log_fts MATCH 'chrome'"),
+      ).toBe(1);
+      expect(
+        count("SELECT COUNT(*) AS n FROM activity_fts WHERE activity_fts MATCH 'qdrant'"),
+      ).toBe(1);
+
+      // Rerunning it, as a database rolled back past it would, leaves one entry per row.
+      db.prepare('DELETE FROM schema_version WHERE version >= 18').run();
+      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+      expect(
+        count("SELECT COUNT(*) AS n FROM sight_log_fts WHERE sight_log_fts MATCH 'vector'"),
+      ).toBe(1);
+      expect(
+        count("SELECT COUNT(*) AS n FROM activity_fts WHERE activity_fts MATCH 'qdrant'"),
+      ).toBe(1);
+      expect(count('SELECT COUNT(*) AS n FROM activity_fts_docsize')).toBe(2);
+      db.exec("INSERT INTO sight_log_fts (sight_log_fts) VALUES ('integrity-check')");
+      db.exec("INSERT INTO activity_fts (activity_fts) VALUES ('integrity-check')");
     } finally {
       db.close();
     }

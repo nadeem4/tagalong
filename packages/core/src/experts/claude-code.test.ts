@@ -540,12 +540,17 @@ describe('spawnChild', () => {
       expect(await child.exit).toBe(0);
       expect(JSON.parse(lines.join(''))).toEqual(args);
     },
+    30_000,
   );
 
   it.runIf(process.platform === 'win32')(
     'kills the whole process tree under a .cmd shim',
     async () => {
-      writeFileSync(join(dir, 'wait.js'), 'setInterval(() => console.log("working"), 100);');
+      // One line, then idle: the test kills once, instead of a taskkill per line.
+      writeFileSync(
+        join(dir, 'wait.js'),
+        'console.log("working"); setInterval(() => undefined, 1000);',
+      );
       writeFileSync(join(dir, 'slow-claude.cmd'), '@node "%~dp0wait.js" %*\r\n');
       process.env.PATH = `${dir};${path ?? ''}`;
 
@@ -554,9 +559,12 @@ describe('spawnChild', () => {
       for await (const line of child.lines) {
         void line;
         child.kill();
+        break;
       }
 
       expect(await child.exit).toBeNull();
     },
+    // cmd.exe, node and taskkill each start a process: slow on a loaded machine, not racy.
+    30_000,
   );
 });

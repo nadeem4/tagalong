@@ -41,6 +41,7 @@ function everything(overrides: Partial<ToolRegistryOptions> = {}): ToolRegistryO
       handoffs: { pending: () => [] },
       now: () => new Date(0),
     },
+    history: { history: { search: () => [] } },
     // Every wired tool: what the role library narrows is the toolsFor tests' business.
     toolsFor: (_pet, tools) => tools,
     ...overrides,
@@ -62,6 +63,7 @@ const ALL_TOOLS = [
   'watch_for',
   'point_at',
   'recall_day',
+  'search_history',
 ];
 
 describe('ToolRegistry.forTurn', () => {
@@ -94,10 +96,10 @@ describe('ToolRegistry.forTurn', () => {
     const writes = tools.filter((tool) => tool.kind === 'write').map((tool) => tool.id);
 
     expect(writes).toEqual(['remember', 'watch_for']);
-    expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(12);
+    expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(13);
   });
 
-  it('gives a companion its tools, then the routine tools (write), point_at and recall_day', () => {
+  it('gives a companion its tools, then the routine tools (write), point_at, recall_day and search_history', () => {
     const experts = {
       experts: () => [
         {
@@ -155,6 +157,7 @@ describe('ToolRegistry.forTurn', () => {
       'change_routine',
       'point_at',
       'recall_day',
+      'search_history',
     ]);
     for (const id of ['hand_to_expert', 'create_routine', 'change_routine']) {
       expect(tools.find((tool) => tool.id === id)?.kind).toBe('write');

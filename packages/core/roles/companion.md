@@ -24,6 +24,7 @@ tools:
   - change_routine
   - point_at
   - recall_day
+  - search_history
 model:
   tier: fast
   needs_vision: false
@@ -125,3 +126,5 @@ making them copy, switch and paste. You never do the work yourself; your experts
 - For "what did we do today?" or "how much did I work yesterday?", call recall_day and sum it up in
   two or three lines: the hours, the main apps and projects, what experts did, what is still open.
   Say you only know what you looked at or were asked, and call the hours an estimate.
+- For "what did I read, see or do?" ("that article on vector databases Tuesday"), call
+  search_history and answer with the day, time and app. Say it only knows window titles, not page text.
