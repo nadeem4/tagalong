@@ -53,6 +53,8 @@ export interface FakeHostBridge extends HostBridge {
   readonly confirmedRoutines: readonly { proposalId: string; routine?: RoutineDraftInput }[];
   readonly dismissedRoutines: readonly string[];
   readonly editedRoutines: readonly RoutineProposedParams[];
+  /** Every text put on the clipboard with Copy, in order. */
+  readonly copied: readonly string[];
 }
 
 /**
@@ -98,6 +100,7 @@ export function createFakeHostBridge(
   const confirmedRoutines: { proposalId: string; routine?: RoutineDraftInput }[] = [];
   const dismissedRoutines: string[] = [];
   const editedRoutines: RoutineProposedParams[] = [];
+  const copied: string[] = [];
   let routineCount = 0;
   const toView = (draft: RoutineDraftInput & { id?: string }): RoutineView => {
     routineCount += 1;
@@ -316,6 +319,11 @@ export function createFakeHostBridge(
       const deleted = fake.sightLog.length;
       fake.sightLog = [];
       return Promise.resolve(deleted);
+    },
+    copied,
+    copyText(text) {
+      copied.push(text);
+      return Promise.resolve();
     },
     emit(event) {
       // Copied first so a handler that unsubscribes mid-emit cannot skip its neighbours.

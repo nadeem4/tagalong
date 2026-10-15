@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Pushable } from '@tagalong/protocol';
 import type {
@@ -181,6 +181,11 @@ export function CompanionBubble({
   // A routine Scout wrote or changed, waiting for Save.
   const [routine, setRoutine] = useState<RoutineProposedParams | null>(null);
   const [past, setPast] = useState<Exchange[]>([]);
+  // A draft's Copy, when this host can write the clipboard.
+  const copyText = useMemo(
+    () => (bridge.copyText === undefined ? undefined : (text: string) => bridge.copyText!(text)),
+    [bridge],
+  );
   const [question, setQuestion] = useState<string | null>(resume?.question ?? null);
   // Try it now ends the hello here, even when the screen could not be seen.
   const [tried, setTried] = useState(false);
@@ -516,7 +521,7 @@ export function CompanionBubble({
       )}
       {reply.state === 'done' && (
         <div className="bubble-answer">
-          <Answer text={reply.text} />
+          <Answer text={reply.text} onCopy={copyText} />
         </div>
       )}
       {reply.state === 'failed' && (
@@ -619,7 +624,7 @@ export function CompanionBubble({
                 {exchange.failed ? (
                   <p className="bubble-error">{exchange.answer}</p>
                 ) : (
-                  <Answer text={exchange.answer} />
+                  <Answer text={exchange.answer} onCopy={copyText} />
                 )}
               </div>
             ))}

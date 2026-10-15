@@ -11,16 +11,19 @@ export function fakeIpc() {
     if (handlers.has(channel)) throw new Error(`${channel} is handled twice`);
     handlers.set(channel, listener);
   };
-  const invoke = async (channel: string, ...args: unknown[]): Promise<unknown> => {
+  /** As a renderer would, from the window `event` stands for. */
+  const invokeWith = async (event: unknown, channel: string, ...args: unknown[]) => {
     const listener = handlers.get(channel);
     if (listener === undefined) throw new Error(`nothing handles ${channel}`);
-    return listener({}, ...(args as never[]));
+    return listener(event, ...(args as never[]));
   };
+  const invoke = (channel: string, ...args: unknown[]): Promise<unknown> =>
+    invokeWith({}, channel, ...args);
   const ons = new Map<string, (event: unknown, ...args: never[]) => void>();
   const on: IpcOn = (channel, listener) => void ons.set(channel, listener);
   const send = (channel: string, ...args: unknown[]): void =>
     ons.get(channel)?.({}, ...(args as never[]));
-  return { handle, invoke, on, send, channels: () => [...handlers.keys()].sort() };
+  return { handle, invoke, invokeWith, on, send, channels: () => [...handlers.keys()].sort() };
 }
 
 /** An engine connection that answers each method from `answers` and records every call. */

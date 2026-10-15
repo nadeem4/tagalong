@@ -119,6 +119,7 @@ const bridge: HostBridge = {
   listSightLog: () => ipcRenderer.invoke(IPC.listSightLog) as Promise<SightLogEntry[]>,
   deleteSightLog: (id: string) => ipcRenderer.invoke(IPC.deleteSightLog, id) as Promise<boolean>,
   clearSightLog: () => ipcRenderer.invoke(IPC.clearSightLog) as Promise<number>,
+  copyText: (text: string) => ipcRenderer.invoke(IPC.copyText, text) as Promise<void>,
   onTurnEvent: (handler: (event: TurnEvent) => void) => {
     const listener = (_event: IpcRendererEvent, turnEvent: TurnEvent): void => handler(turnEvent);
     ipcRenderer.on(IPC.turnEvent, listener);

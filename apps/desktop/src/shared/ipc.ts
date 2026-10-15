@@ -114,6 +114,8 @@ export const IPC = {
   openPickUp: 'tagalong:pick-up:open',
   rebriefPickUp: 'tagalong:pick-up:rebrief',
   dismissPickUp: 'tagalong:pick-up:dismiss',
+  // Draft it for me: a draft's Copy, from the bubble only. Writes the clipboard, never reads it.
+  copyText: 'tagalong:clipboard:copy-text',
 } as const;
 
 /** One ring: where on its display, in DIP relative to the display's corner, and its label. */

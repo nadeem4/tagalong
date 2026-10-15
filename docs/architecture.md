@@ -1715,6 +1715,17 @@ above a **Message** box. It is the same component, so it is the same conversatio
   the bubble, the full chat and an expert's result, with `react-markdown` and `remark-gfm`: bold,
   lists, headings, code, tables. HTML in an answer is skipped, and a link shows as text with its
   address on hover, because a click would navigate the bubble's own window.
+- **Draft it for me.** Short drafts (an email reply, a message, a PR description, up to about 400
+  words) are the one piece of work Scout does itself (`companion.md`); anything longer goes to an
+  expert. Scout puts the draft alone in a fenced `draft` block and adds one line about Copy. `Answer`
+  renders that block as a framed `DraftBlock` with **Copy**, which shows "Copied" for 2 s (or
+  "Couldn't copy"). `Answer` takes an optional `onCopy`; without it, as in the extension, there is no
+  button. The bubble passes `HostBridge.copyText`, which on desktop is `IPC.copyText`, handled in
+  `main/ipc/clipboard.ts`: main calls `clipboard.writeText`, because `navigator.clipboard` fails while
+  the panel is unfocused. It takes only a string of at most 20,000 characters, only from the panel
+  window, and never reads the clipboard. Nothing is pasted or typed into any app. When the request
+  was spoken, `SPOKEN_MODE` keeps the draft whole in its block, and the fence keeps it out of speech
+  (`toSpeakable`, `SpokenStream`), so only the one line is said.
 - **Hand-offs in the bubble** (`handoff-card.tsx`), mockup screens 4 to 6. A `handoff.proposed` for
   this pet shows `ProposalCard`: the agent, the guessed project (name and path), the access and the
   brief. **Change project** lists the other guesses, a search box (`searchProjects`, the engine's

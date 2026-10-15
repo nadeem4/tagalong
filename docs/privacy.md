@@ -510,3 +510,17 @@ around it (`point_at`).
 - **The ring stays out of Scout's own pictures.** The overlay is excluded from screen capture, so a
   screenshot Scout takes never shows it.
 - Nothing about a point is stored.
+
+## Drafts and the clipboard
+
+When you ask Scout to draft a reply, a message or a PR description, it reads what it needs the
+usual way (your selection, then the window's text, a picture only when the text is not enough) and
+writes the draft in the bubble.
+
+- **The clipboard is written only on Copy.** Pressing **Copy** under a draft puts that draft, and
+  nothing else, on the clipboard. Main does the write (`clipboard.writeText`); it takes only text,
+  at most 20,000 characters, and only from the bubble's window.
+- **The clipboard is never read** for this, and nothing is pasted or typed into any app: pasting is
+  yours.
+- A spoken request has only its one line spoken; the draft is shown, never read aloud.
+- The draft is part of Scout's answer, so it is stored with the conversation like any answer.
