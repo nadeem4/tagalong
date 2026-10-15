@@ -51,9 +51,11 @@ describe('openDatabase', () => {
         'messages',
         'pet_seeds',
         'pets',
+        'pick_up',
         'projects',
         'routines',
         'schema_version',
+        'sight_log',
       ]);
       const row = db
         .prepare<[], { version: number }>('SELECT MAX(version) AS version FROM schema_version')
@@ -193,6 +195,33 @@ describe('migrate', () => {
       expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
 
       expect(tableNames(db)).not.toContain('notices');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('adds the one pick-up row in migration 16, and rerunning it keeps the row', () => {
+    const db = new Database(':memory:');
+    try {
+      migrate(db);
+      expect(LATEST_SCHEMA_VERSION).toBeGreaterThanOrEqual(16);
+      expect(tableNames(db)).toContain('pick_up');
+      db.prepare(
+        "INSERT INTO pick_up (id, started_at, taken_at, json) VALUES (1, 'a', 'b', '{}')",
+      ).run();
+      // One row only: the snapshot is overwritten, never added to.
+      expect(() =>
+        db
+          .prepare(
+            "INSERT INTO pick_up (id, started_at, taken_at, json) VALUES (2, 'a', 'b', '{}')",
+          )
+          .run(),
+      ).toThrow();
+
+      db.prepare('DELETE FROM schema_version WHERE version >= 16').run();
+      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+      const rows = db.prepare<[], { n: number }>('SELECT COUNT(*) AS n FROM pick_up').get();
+      expect(rows?.n).toBe(1);
     } finally {
       db.close();
     }

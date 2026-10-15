@@ -10,6 +10,7 @@ const plain: LaunchFacts = {
   version: '0.4.0',
   now,
   awaySince: hoursAgo(2),
+  pickUpReady: false,
 };
 
 describe('launchScenario', () => {
@@ -37,5 +38,18 @@ describe('launchScenario', () => {
     expect(launchScenario({ ...everything, crashed: false })).toBe('update');
     expect(launchScenario({ ...everything, version: '0.4.0' })).toBe('crash');
     expect(launchScenario({ ...everything, lastVersion: null })).toBe('crash');
+  });
+
+  it('puts a pick-up over days away, and an update or a crash over a pick-up', () => {
+    const back = { ...plain, pickUpReady: true };
+    expect(launchScenario(back)).toBe('pickUp');
+    expect(launchScenario({ ...back, awaySince: hoursAgo(72) })).toBe('pickUp');
+    expect(launchScenario({ ...back, version: '0.5.0' })).toBe('update');
+    expect(launchScenario({ ...back, crashed: true })).toBe('crash');
+  });
+
+  it('reads as before with no snapshot ready', () => {
+    expect(launchScenario({ ...plain, awaySince: hoursAgo(72) })).toBe('away');
+    expect(launchScenario(plain)).toBe('normal');
   });
 });

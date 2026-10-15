@@ -112,6 +112,9 @@ const bridge: HostBridge = {
     ipcRenderer.invoke(IPC.dismissRoutine, proposalId) as Promise<void>,
   editRoutine: (proposal: RoutineProposedParams) =>
     ipcRenderer.invoke(IPC.editRoutine, proposal) as Promise<void>,
+  openPickUp: (itemId: string) => ipcRenderer.invoke(IPC.openPickUp, itemId) as Promise<void>,
+  rebriefPickUp: (itemId: string) => ipcRenderer.invoke(IPC.rebriefPickUp, itemId) as Promise<void>,
+  dismissPickUp: () => ipcRenderer.invoke(IPC.dismissPickUp) as Promise<void>,
   onTurnEvent: (handler: (event: TurnEvent) => void) => {
     const listener = (_event: IpcRendererEvent, turnEvent: TurnEvent): void => handler(turnEvent);
     ipcRenderer.on(IPC.turnEvent, listener);

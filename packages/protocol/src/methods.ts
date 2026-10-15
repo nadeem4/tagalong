@@ -75,6 +75,13 @@ import {
   RoutinesSetEnabledResult,
 } from './routines';
 import { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './limits';
+import {
+  PickUpDismissParams,
+  PickUpDismissResult,
+  PickUpReadyParams,
+  PickUpRebriefParams,
+  PickUpRebriefResult,
+} from './pick-up';
 import { Pet } from './pet';
 import { CaptureBlock, Settings, SettingsPatch } from './settings';
 
@@ -396,6 +403,8 @@ export const GreetingComposeParams = z.object({
 export const GreetingComposeResult = z.object({
   text: z.string().min(1),
   source: z.enum(['model', 'fallback']),
+  /** Set when the line is a pick-up: what the card lists, for Pick up on the line. */
+  pickUp: PickUpReadyParams.optional(),
 });
 export type GreetingComposeResult = z.infer<typeof GreetingComposeResult>;
 
@@ -487,6 +496,8 @@ export const hostToCoreMethods = {
   'routines.runNow': { params: RoutinesRunNowParams, result: RoutinesRunNowResult },
   'routines.confirm': { params: RoutinesConfirmParams, result: RoutinesConfirmResult },
   'routines.dismiss': { params: RoutinesDismissParams, result: RoutinesDismissResult },
+  'pickUp.rebrief': { params: PickUpRebriefParams, result: PickUpRebriefResult },
+  'pickUp.dismiss': { params: PickUpDismissParams, result: PickUpDismissResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostMethods = {
@@ -529,6 +540,7 @@ export const coreToHostNotifications = {
   'routine.result': { params: RoutineResultParams },
   'routines.changed': { params: RoutinesChangedParams },
   'pet.mood': { params: PetMoodParams },
+  'pickUp.ready': { params: PickUpReadyParams },
 } as const satisfies Record<string, NotificationSpec>;
 
 export type HostToCoreMethod = keyof typeof hostToCoreMethods;

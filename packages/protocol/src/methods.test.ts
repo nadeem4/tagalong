@@ -59,6 +59,8 @@ const HOST_TO_CORE = [
   'routines.runNow',
   'routines.confirm',
   'routines.dismiss',
+  'pickUp.rebrief',
+  'pickUp.dismiss',
 ] as const;
 
 const CORE_TO_HOST = ['perception.capture'] as const;
@@ -83,6 +85,7 @@ const CORE_TO_HOST_NOTIFICATIONS = [
   'routine.result',
   'routines.changed',
   'pet.mood',
+  'pickUp.ready',
 ] as const;
 
 describe('method catalog', () => {

@@ -573,3 +573,15 @@ describe('Settings.welcome steps', () => {
     expect(SettingsPatch.parse({ userNameDeclined: true })).toEqual({ userNameDeclined: true });
   });
 });
+
+describe('Settings.pickUp', () => {
+  it('is on by default, and on for a settings file from before it', () => {
+    expect(Settings.parse({}).pickUp).toBe(true);
+    expect(Settings.parse({ keepAnEye: false }).pickUp).toBe(true);
+  });
+
+  it('can be switched off in a patch alone, and refuses a non-boolean', () => {
+    expect(SettingsPatch.parse({ pickUp: false })).toEqual({ pickUp: false });
+    expect(SettingsPatch.safeParse({ pickUp: 'off' }).success).toBe(false);
+  });
+});

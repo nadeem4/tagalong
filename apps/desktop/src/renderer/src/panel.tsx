@@ -7,7 +7,12 @@ import {
   QueueMouth,
   SpeechQueue,
 } from '@tagalong/ui';
-import type { ContextSnapshot, PetRemarkParams, RoutineResultParams } from '@tagalong/protocol';
+import type {
+  ContextSnapshot,
+  PetRemarkParams,
+  PickUpReadyParams,
+  RoutineResultParams,
+} from '@tagalong/protocol';
 // Bundled, not fetched: the bubble's two typefaces ship inside the app, Latin subset only.
 import '@fontsource/onest/latin-400.css';
 import '@fontsource/onest/latin-600.css';
@@ -44,6 +49,8 @@ function Panel() {
   const [remark, setRemark] = useState<PetRemarkParams | null>(null);
   // A routine's result: a quiet line that opens to the full answer in its conversation.
   const [routine, setRoutine] = useState<RoutineResultParams | null>(null);
+  // Pick up where you left off: the card Pick up on the line opened.
+  const [pickUp, setPickUp] = useState<PickUpReadyParams | null>(null);
   const [resume, setResume] = useState<{
     conversationId: string;
     question: string;
@@ -300,9 +307,24 @@ function Panel() {
               onDone={() => {
                 setLine(null);
                 mouth.stop();
+                // A pick-up let go (Not now, the close, or the fade) is dropped.
+                if (line.pickUp !== undefined) void window.tagalong.dismissPickUp?.();
                 void window.tagalongHost.hidePanel();
               }}
               onOpen={() => setLine(null)}
+              {...(line.pickUp !== undefined
+                ? {
+                    onNotNow: () => undefined,
+                    offer: {
+                      label: 'Pick up',
+                      // The bubble opens on the card; nothing opens until a button there.
+                      onAccept: () => {
+                        setPickUp(line.pickUp ?? null);
+                        setLine(null);
+                      },
+                    },
+                  }
+                : {})}
               {...(line.fix !== undefined
                 ? {
                     offer: {
@@ -343,6 +365,7 @@ function Panel() {
               onStopSpeaking={() => mouth.stop()}
               {...(snapshot !== null ? { snapshot } : {})}
               {...(resume !== null ? { resume } : {})}
+              {...(pickUp !== null ? { pickUp, onPickUpDone: () => setPickUp(null) } : {})}
             />
           )}
         </div>

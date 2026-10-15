@@ -129,6 +129,14 @@ export interface HostBridge {
   dismissRoutine?(proposalId: string): Promise<void>;
   /** Edit on Scout's card: Home opens on Routines with the card's routine in the form. */
   editRoutine?(proposal: RoutineProposedParams): Promise<void>;
+  /**
+   * Pick up where you left off. Open reopens one project of the current pick-up, by item id:
+   * the host opens only what that pick-up named. Brief again puts a saved ask on the hand-off
+   * card, unsent. Not now drops the offer. All optional: a host without it never shows the card.
+   */
+  openPickUp?(itemId: string): Promise<void>;
+  rebriefPickUp?(itemId: string): Promise<void>;
+  dismissPickUp?(): Promise<void>;
 }
 
 export interface ConfirmHandoff {

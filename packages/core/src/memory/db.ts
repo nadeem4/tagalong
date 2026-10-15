@@ -104,6 +104,33 @@ const MIGRATIONS: readonly Migration[] = [
   addRoutines,
   // The roles notice went with the crew; an install that had one drops its table.
   `DROP TABLE IF EXISTS notices`,
+  // Migration 15. What Scout saw: one row each time it looked or sent something away.
+  // Metadata only, by design: there is no column for text, pixels or a brief. `kind` has no
+  // CHECK, so a new kind of looking needs no migration. Written by SightLog.
+  `CREATE TABLE IF NOT EXISTS sight_log (
+     id TEXT PRIMARY KEY,
+     kind TEXT NOT NULL,
+     at TEXT NOT NULL,
+     app TEXT,
+     title TEXT,
+     provider_id TEXT,
+     model TEXT,
+     expert_name TEXT,
+     windows INTEGER,
+     chars INTEGER,
+     images INTEGER,
+     source TEXT
+   );
+   CREATE INDEX IF NOT EXISTS sight_log_at ON sight_log(at);`,
+  // Migration 16. Pick up where you left off: one row, overwritten every ten minutes, holding
+  // project names, paths, branches, file names and unsent asks from window titles. Written by
+  // PickUpStore; switching the feature off deletes the row.
+  `CREATE TABLE IF NOT EXISTS pick_up (
+     id INTEGER PRIMARY KEY CHECK (id = 1),
+     started_at TEXT NOT NULL,
+     taken_at TEXT NOT NULL,
+     json TEXT NOT NULL
+   )`,
 ];
 
 /** The columns migration 7 gave `activity`, in order. */

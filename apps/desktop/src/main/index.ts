@@ -16,7 +16,12 @@ import {
   utilityProcess,
 } from 'electron';
 import { ContextSnapshot, HandoffFinishedParams, RoutineResultParams } from '@tagalong/protocol';
-import type { PerceptionTarget, Settings, SettingsPatch } from '@tagalong/protocol';
+import type {
+  PerceptionTarget,
+  PickUpReadyParams,
+  Settings,
+  SettingsPatch,
+} from '@tagalong/protocol';
 import { SettingsStore } from '@tagalong/core';
 import {
   AlwaysListening,
@@ -89,6 +94,8 @@ import { registerCrewIpc } from './ipc/crew';
 import { registerExpertIpc } from './ipc/experts';
 import type { EngineCall, IpcHandle } from './ipc/handle';
 import { registerRoutineIpc } from './ipc/routines';
+import { registerPickUpIpc } from './ipc/pick-up';
+import { PickUpAllowlist } from './pick-up-open';
 import { registerSettingsIpc } from './ipc/settings';
 import { registerTurnIpc } from './ipc/turns';
 import { forwardEars, registerVoiceIpc } from './ipc/voice';
@@ -457,6 +464,28 @@ let stopPresence = (): void => undefined;
 let listeningWhy = { blocked: false, petsShown: false, setupOpen: false };
 let pauseListening: (change: Partial<typeof listeningWhy>) => void = () => undefined;
 
+/** The projects the pick-up last shown named: the only ones its Open may reach. */
+const pickUpAllowlist = new PickUpAllowlist();
+
+/**
+ * Back after a long break, found on a tick rather than at launch (Always listening's line went
+ * first, or the PC slept): the pick-up line beside Scout, like a remark. With the bubble open,
+ * it waits until the bubble next hides.
+ */
+function showPickUp(params: unknown): void {
+  const pickUp = params as PickUpReadyParams;
+  const panel = desktop?.panel;
+  const avatar = desktop?.avatar;
+  if (panel == null || avatar == null || !avatar.isVisible()) return;
+  if (panel.isVisible()) {
+    panel.once('hide', () => showPickUp(params));
+    return;
+  }
+  pickUpAllowlist.set(pickUp);
+  panel.webContents.send(IPC.greetLineEvent, { text: pickUp.text, pickUp });
+  showPanelQuietly(panel, avatar);
+}
+
 /**
  * Scout has one thing to say from keeping an eye on things: one quiet line beside the pet,
  * without taking the keyboard. Not while the bubble is already open: the person is busy
@@ -501,7 +530,7 @@ async function greetOnLaunch(host: EngineHost): Promise<void> {
         });
       })().catch(() => 'unknown' as const);
       const [brain, composed] = await Promise.all([readiness, composing]);
-      return brainLine(brain, composed.text, settings.userName);
+      return brainLine(brain, composed.text, settings.userName, composed.pickUp);
     });
     if (line !== null) {
       const { panel, avatar } = current;
@@ -509,6 +538,7 @@ async function greetOnLaunch(host: EngineHost): Promise<void> {
         if (panel.webContents.isLoading()) {
           await new Promise<void>((resolve) => panel.webContents.once('did-finish-load', resolve));
         }
+        if (line.pickUp !== undefined) pickUpAllowlist.set(line.pickUp);
         panel.webContents.send(IPC.greetLineEvent, line);
         showPanelQuietly(panel, avatar);
       }
@@ -610,6 +640,7 @@ function forwardToRenderers(notification: { method: string; params: unknown }): 
   if (notification.method === 'watch.fired') announceWatch(notification.params);
   if (notification.method === 'handoff.finished') announceHandoff(notification.params);
   if (notification.method === 'pet.remark') showRemark(notification.params);
+  if (notification.method === 'pickUp.ready') showPickUp(notification.params);
   // A brief to check: the bubble comes up beside the pet with the card in it.
   if (notification.method === 'handoff.proposed') bringUpBubble(true);
   // A change Scout wants to make in a connected app: the confirm card must be seen.
@@ -952,6 +983,12 @@ function registerIpc(): void {
   });
   registerExpertIpc(handle, { engine });
   registerConnectionIpc(handle, { engine });
+  registerPickUpIpc(handle, {
+    engine,
+    allowlist: pickUpAllowlist,
+    openExternal: (url) => shell.openExternal(url),
+    openPath: (folder) => shell.openPath(folder),
+  });
   registerRoutineIpc(handle, {
     engine,
     openOffice: (page) => openOffice(page),

@@ -5,6 +5,7 @@ import type {
   ListenMode,
   Pet,
   PetRemarkParams,
+  PickUpReadyParams,
   ProvidersCheckResult,
   RoutineProposedParams,
   RoutineResultParams,
@@ -106,6 +107,10 @@ export const IPC = {
   listeningEvent: 'tagalong:voice:listening',
   // Point, don't click: the ring to draw on one display's overlay. Main to renderer only.
   pointerShow: 'tagalong:pointer:show',
+  // Pick up where you left off: the card's buttons. Open names an item id, never a path.
+  openPickUp: 'tagalong:pick-up:open',
+  rebriefPickUp: 'tagalong:pick-up:rebrief',
+  dismissPickUp: 'tagalong:pick-up:dismiss',
 } as const;
 
 /** One ring: where on its display, in DIP relative to the display's corner, and its label. */
@@ -190,6 +195,8 @@ export interface GreetLine {
   text: string;
   /** The fix button's label; it opens Home's Settings, where the brain is fixed. */
   fix?: string;
+  /** A pick-up: Pick up on the line opens its card. Never with `fix`. */
+  pickUp?: PickUpReadyParams;
 }
 
 /** A coding agent Welcome looked for on this computer. */

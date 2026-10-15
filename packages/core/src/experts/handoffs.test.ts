@@ -372,6 +372,21 @@ describe('proposals', () => {
     expect(handoffs.dismiss(proposalId)).toBe(false);
   });
 
+  it('lists the briefs still waiting by their ask alone, never the selection', () => {
+    const { handoffs } = proposing(new FakeConnector({ text: 'x' }));
+    expect(handoffs.pending()).toEqual([]);
+    const secret: Brief = { ask: 'Fix the e2e tests', context: { selection: 'token=abc' } };
+    const kept = handoffs.propose({ expertId: 'claude-code', petId: 'scout', brief: secret });
+    const dropped = handoffs.propose({ expertId: 'claude-code', petId: 'scout', brief });
+    handoffs.dismiss(dropped.proposalId);
+    expect(handoffs.pending()).toEqual([
+      { expertId: 'claude-code', expertName: 'Claude Code', ask: 'Fix the e2e tests' },
+    ]);
+    expect(JSON.stringify(handoffs.pending())).not.toContain('token');
+    handoffs.confirm({ proposalId: kept.proposalId, folder: 'C:\\r', canEdit: false });
+    expect(handoffs.pending()).toEqual([]);
+  });
+
   it('refuses to start with no folder, even when an old expert carries a default one', () => {
     const { handoffs } = proposing(new FakeConnector({ text: 'x' }), 'D:\\default');
     expect(() => handoffs.start({ expertId: 'claude-code', petId: 'scout', brief })).toThrow(

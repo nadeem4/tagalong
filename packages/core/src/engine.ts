@@ -60,6 +60,8 @@ import {
 } from './connections';
 import { readOrCreatePairingToken } from './server/pairing';
 import { RoutineStore, Routines } from './routines';
+import { PickUp, readBranch } from './pick-up/pick-up';
+import { PickUpStore } from './pick-up/store';
 
 /** Key the Anthropic API key is filed under in the host's SecretStore. */
 export const ANTHROPIC_KEY = SECRET_KEYS.anthropic!;
@@ -192,6 +194,7 @@ export class Engine {
   readonly #handoffs: HandoffManager;
   readonly #connections: ConnectionManager;
   readonly #routines: Routines;
+  readonly #pickUp: PickUp;
 
   private constructor(parts: {
     db: Database;
@@ -204,7 +207,9 @@ export class Engine {
     handoffs: HandoffManager;
     connections: ConnectionManager;
     routines: Routines;
+    pickUp: PickUp;
   }) {
+    this.#pickUp = parts.pickUp;
     this.#routines = parts.routines;
     this.#connections = parts.connections;
     this.#watches = parts.watches;
@@ -306,6 +311,20 @@ export class Engine {
       projects,
     });
     const routes = new RouteMemory(db);
+    /** What is open, titles only: null with no host connected, empty when none can list. */
+    const listHostWindows = async () => {
+      const connected = hosts();
+      if (connected.length === 0) return null;
+      const lister = connected.find(
+        (host) => host.capabilities.includes('displays') && host.listWindows !== undefined,
+      );
+      if (lister?.listWindows === undefined) return [];
+      try {
+        return (await lister.listWindows()).windows;
+      } catch {
+        return [];
+      }
+    };
     // Keep an eye on things: the host sends window titles, and now and then one window is
     // read and one cheap call decides whether Scout has anything worth saying.
     const keepAnEye = new KeepAnEye({
@@ -405,23 +424,28 @@ export class Engine {
           content: [{ type: 'text', text }],
         }),
       activity,
-      windows: async () => {
-        const connected = hosts();
-        if (connected.length === 0) return null;
-        const lister = connected.find(
-          (host) => host.capabilities.includes('displays') && host.listWindows !== undefined,
-        );
-        if (lister?.listWindows === undefined) return [];
-        try {
-          return (await lister.listWindows()).windows;
-        } catch {
-          return [];
-        }
-      },
+      windows: listHostWindows,
       emit: (event) => live.server?.broadcast(event.method, event.params),
       log: (message) => console.warn(`[engine] ${message}`),
     });
     live.routines = routines;
+
+    // Pick up where you left off: one snapshot every ten minutes, offered once when you are back.
+    const pickUp = new PickUp({
+      store: new PickUpStore(db),
+      clock: systemWatchClock,
+      enabled: () => settings.get().pickUp,
+      windows: listHostWindows,
+      exclusions: () => settings.get().captureExclusions,
+      suggest: (title) => projects.suggest(title),
+      readBranch,
+      pending: () => handoffs.pending(),
+      stoppedSince: (since) => activity.expertsLeftSince(since),
+      propose: ({ expertId, ask }) =>
+        void handoffs.propose({ expertId, petId: settings.get().defaultPetId, brief: { ask } }),
+      emit: (params) => live.server?.broadcast('pickUp.ready', params),
+      log: (message) => console.warn(`[engine] ${message}`),
+    });
 
     const handlers = buildHandlers({
       activity,
@@ -441,6 +465,7 @@ export class Engine {
       approvals,
       interruptedAtBoot,
       routines,
+      pickUp,
       claudeCodeConfigPath: options.claudeCodeConfigPath,
       refreshProviders: async () => keyed?.refresh(),
       models: (providerId) =>
@@ -457,6 +482,7 @@ export class Engine {
 
     live.server = server;
     routines.start();
+    pickUp.start();
 
     return new Engine({
       db,
@@ -469,6 +495,7 @@ export class Engine {
       handoffs,
       connections,
       routines,
+      pickUp,
     });
   }
 
@@ -492,6 +519,7 @@ export class Engine {
 
   async shutdown(): Promise<void> {
     this.#routines.stop();
+    this.#pickUp.stop();
     this.#watches.stopAll();
     await this.#handoffs.stopAll();
     await this.#connections.closeAll();
@@ -524,6 +552,7 @@ function buildHandlers(parts: {
   projects: ProjectFinder;
   connectorFor: (expert: Expert) => Connector;
   routines: Routines;
+  pickUp: PickUp;
   /** The guarded resolver turns use, for the one-off greeting call. */
   resolve: ProviderResolver;
   models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
@@ -538,7 +567,7 @@ function buildHandlers(parts: {
 }): MethodHandlers {
   const { activity, runner, pets, settings, models, hosts, watches } = parts;
   const { refreshProviders, experts, routes, handoffs, projects, connectorFor, resolve } = parts;
-  const { keepAnEye, connections, approvals, routines, interruptedAtBoot } = parts;
+  const { keepAnEye, connections, approvals, routines, interruptedAtBoot, pickUp } = parts;
   /** A manager refusal (an id taken, none such) as an invalidParams error the host shows. */
   const plainly = async <T>(work: () => Promise<T>): Promise<T> => {
     try {
@@ -577,7 +606,12 @@ function buildHandlers(parts: {
     'pets.upsert': (params) => ({ pet: pets.upsert(withRole(params.pet)) }),
 
     'settings.get': () => ({ settings: settings.get() }),
-    'settings.set': (params) => ({ settings: settings.set(params.patch) }),
+    'settings.set': (params) => {
+      const next = settings.set(params.patch);
+      // Switching pick-up off deletes the snapshot it kept.
+      if (!next.pickUp) pickUp.clear();
+      return { settings: next };
+    },
     'models.list': (params) => models(params.providerId),
     // Setup's one test of a pasted key, on Scout as it would think with that provider.
     'providers.check': async (params) => {
@@ -640,7 +674,12 @@ function buildHandlers(parts: {
               version: params.launch.version,
               now,
               awaySince,
+              pickUpReady: pickUp.ready() !== null,
             });
+      // A pick-up is handwritten from what was open, with no model call, so it never
+      // invents a file. It is taken here, once.
+      const offered = scenario === 'pickUp' ? pickUp.take() : null;
+      if (offered !== null) return { text: offered.text, source: 'fallback', pickUp: offered };
       return composeGreeting({
         pet,
         summarizer,
@@ -722,5 +761,9 @@ function buildHandlers(parts: {
     },
     'routines.confirm': (params) => routines.confirm(params),
     'routines.dismiss': (params) => ({ dismissed: routines.dismiss(params.proposalId) }),
+    // Pick up: Brief again proposes the saved ask (nothing starts); Not now drops the offer.
+    'pickUp.rebrief': (params) =>
+      plainly(() => Promise.resolve({ proposed: pickUp.rebrief(params.itemId) })),
+    'pickUp.dismiss': () => ({ dismissed: pickUp.dismiss() }),
   };
 }
