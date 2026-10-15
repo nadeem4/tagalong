@@ -264,6 +264,97 @@ describe('createEarsHost', () => {
     ]);
   });
 
+  it('says listening failed when a model breaks while always listening, and loads again next time', async () => {
+    const posted: FromWorker[] = [];
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const broken: EarsParts = {
+      vad: {
+        accept: async () => {
+          throw new Error('silero broke');
+        },
+      },
+      stt: { accept: () => undefined, text: async () => '', reset: () => undefined },
+      turn: { complete: async () => 1 },
+    };
+    const load = vi.fn().mockResolvedValueOnce(broken).mockImplementation(partsOnce());
+    const host = createEarsHost({
+      fake: false,
+      load,
+      post: (m) => posted.push(m),
+      filesPresent: () => true,
+    });
+    host({ kind: 'ears.listen', mode: 'always' });
+    await settle();
+    host({ kind: 'ears.frame', samples: LOUD });
+    await settle();
+    expect(posted.filter((m) => m.kind === 'ears.status' && m.status === 'failed')).toEqual([
+      { kind: 'ears.status', status: 'failed', message: EARS_START_FAILED },
+    ]);
+    host({ kind: 'ears.stop' });
+    host({ kind: 'ears.listen', mode: 'always' });
+    await settle();
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  it('ends a held question with what was heard when a model breaks, without saying listening failed', async () => {
+    const posted: FromWorker[] = [];
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const broken: EarsParts = {
+      vad: {
+        accept: async () => {
+          throw new Error('silero broke');
+        },
+      },
+      stt: { accept: () => undefined, text: async () => '', reset: () => undefined },
+      turn: { complete: async () => 1 },
+    };
+    const host = createEarsHost({
+      fake: false,
+      load: vi.fn().mockResolvedValue(broken),
+      post: (m) => posted.push(m),
+      filesPresent: () => true,
+    });
+    host({ kind: 'ears.listen', mode: 'held' });
+    await settle();
+    host({ kind: 'ears.frame', samples: LOUD });
+    await settle();
+    expect(posted.some((m) => m.kind === 'ears.status' && m.status === 'failed')).toBe(false);
+    expect(earsEvents(posted)).toEqual(['turnEnd:']);
+  });
+
+  it('says listening failed when the ears cannot be built, and loads again next time', async () => {
+    const posted: FromWorker[] = [];
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const unbuildable: EarsParts = {
+      vad: { accept: async () => false },
+      stt: {
+        accept: () => undefined,
+        text: async () => '',
+        reset: () => {
+          throw new Error('moonshine session gone');
+        },
+      },
+      turn: { complete: async () => 1 },
+    };
+    const load = vi.fn().mockResolvedValueOnce(unbuildable).mockImplementation(partsOnce());
+    const host = createEarsHost({
+      fake: false,
+      load,
+      post: (m) => posted.push(m),
+      filesPresent: () => true,
+    });
+    host({ kind: 'ears.listen', mode: 'always' });
+    await settle();
+    expect(posted).toContainEqual({
+      kind: 'ears.status',
+      status: 'failed',
+      message: EARS_START_FAILED,
+    });
+    host({ kind: 'ears.listen', mode: 'always' });
+    await settle();
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
   it('says plainly when the models cannot download, and tries again next time', async () => {
     const posted: FromWorker[] = [];
     const load = vi

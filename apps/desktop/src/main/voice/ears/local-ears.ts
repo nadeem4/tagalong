@@ -33,6 +33,8 @@ export const PARTIAL_EVERY_FRAMES = 10;
 export const TURN_THRESHOLD = 0.5;
 /** Speech that never goes quiet (noise) is closed as a stretch after about 30 s. */
 export const MAX_STRETCH_FRAMES = 938;
+/** Silero hears speech a frame or three late: the 256 ms before it is fed in too. */
+export const PRE_ROLL_FRAMES = 8;
 /** Smart Turn reads the last 8 s. */
 const TURN_SAMPLES = 8 * EARS_SAMPLE_RATE;
 
@@ -57,12 +59,17 @@ export class LocalEars implements Ears {
   #audio: Float32Array[] = [];
   #stretch = 0;
   #closing: Promise<void> | undefined;
+  /** The last frames before speech, so the first syllable is not clipped. */
+  #preRoll: Float32Array[] = [];
   /** A listen stops once: a second stop (the host after a failed loop) is a no-op. */
   #stopped = false;
+  readonly #onFailed: ((error: unknown) => void) | undefined;
 
-  constructor(parts: EarsParts, mode: ListenMode) {
+  /** `onFailed`: a model failed while always listening, so nothing hears the mic any more. */
+  constructor(parts: EarsParts, mode: ListenMode, onFailed?: (error: unknown) => void) {
     this.#parts = parts;
     this.#mode = mode;
+    this.#onFailed = onFailed;
   }
 
   on(event: EarsEvent, handler: (text?: string) => void): void {
@@ -84,8 +91,10 @@ export class LocalEars implements Ears {
       if (run === this.#run && this.#mode === 'held') this.stop();
     })().catch((error: unknown) => {
       console.warn('[ears] listening stopped', error);
+      if (run !== this.#run) return;
       // A held listen always ends with one turn, with what was heard so far.
-      if (run === this.#run && this.#mode === 'held') this.stop();
+      if (this.#mode === 'held') this.stop();
+      else this.#onFailed?.(error);
     });
   }
 
@@ -112,11 +121,19 @@ export class LocalEars implements Ears {
   async #frame(frame: Float32Array, run: number): Promise<void> {
     const speech = await this.#parts.vad.accept(frame);
     if (run !== this.#run) return;
+    if (!speech && !this.#inSpeech) this.#ring(frame);
     if (!this.#inTurn && !speech) return;
     if (speech) {
       if (!this.#inTurn) {
         this.#inTurn = true;
         this.#emit('speechStart');
+      }
+      if (!this.#inSpeech) {
+        for (const before of this.#preRoll) {
+          this.#keep(before);
+          this.#parts.stt.accept(before);
+        }
+        this.#preRoll = [];
       }
       this.#inSpeech = true;
       this.#quiet = 0;
@@ -196,7 +213,13 @@ export class LocalEars implements Ears {
     this.#lastPartial = '';
     this.#heard = [];
     this.#audio = [];
+    this.#preRoll = [];
     this.#parts.stt.reset();
+  }
+
+  #ring(frame: Float32Array): void {
+    this.#preRoll.push(frame);
+    if (this.#preRoll.length > PRE_ROLL_FRAMES) this.#preRoll.shift();
   }
 
   #keep(frame: Float32Array): void {

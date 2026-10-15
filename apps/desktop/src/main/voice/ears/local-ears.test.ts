@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EARS_FRAME, Pushable } from '@tagalong/protocol';
-import { GIVE_UP_FRAMES, LocalEars, MAX_STRETCH_FRAMES, PAUSE_FRAMES } from './local-ears';
+import {
+  GIVE_UP_FRAMES,
+  LocalEars,
+  MAX_STRETCH_FRAMES,
+  PAUSE_FRAMES,
+  PRE_ROLL_FRAMES,
+} from './local-ears';
 import type { EarsParts } from './local-ears';
 
 const LOUD = new Float32Array(EARS_FRAME).fill(0.3);
@@ -20,8 +26,8 @@ function parts(turnScore: () => Promise<number> = async () => 0.9): EarsParts {
   };
 }
 
-function hear(mode: 'held' | 'always', p: EarsParts) {
-  const ears = new LocalEars(p, mode);
+function hear(mode: 'held' | 'always', p: EarsParts, onFailed?: (error: unknown) => void) {
+  const ears = new LocalEars(p, mode, onFailed);
   const events: string[] = [];
   for (const event of ['speechStart', 'partial', 'final', 'turnEnd'] as const)
     ears.on(event, (text) => events.push(text === undefined ? event : `${event}:${text}`));
@@ -240,5 +246,127 @@ describe('LocalEars, held', () => {
     ears.stop();
     await feed(QUIET, 0);
     expect(events).toEqual(['turnEnd:']);
+  });
+});
+
+/** Soft frames the VAD misses (below 0.1): the onset of a word Silero is late to hear. */
+const soft = (level: number) => new Float32Array(EARS_FRAME).fill(level);
+
+/** A VAD that hears speech only at 0.1 and up; an STT that records the level of every frame. */
+function recording(turnScore: () => Promise<number> = async () => 0.9) {
+  const heard: number[] = [];
+  const p: EarsParts = {
+    vad: { accept: async (frame) => frame[0]! >= 0.1 },
+    stt: {
+      accept: (frame) => void heard.push(frame[0]!),
+      text: async () => (heard.length > 0 ? 'word' : ''),
+      reset: () => undefined,
+    },
+    turn: { complete: vi.fn(turnScore) },
+  };
+  return { p, heard };
+}
+
+const levels = (values: number[]) => values.map((v) => v.toFixed(2));
+
+describe('LocalEars, the start of a word', () => {
+  it('hears the soft frames just before speech was detected, so the first syllable is kept', async () => {
+    const { p, heard } = recording();
+    const { feed } = hear('always', p);
+    await feed(soft(0.05), 1);
+    await feed(soft(0.06), 1);
+    await feed(soft(0.07), 1);
+    await feed(LOUD, 1);
+    expect(levels(heard.slice(0, 4))).toEqual(['0.05', '0.06', '0.07', '0.30']);
+  });
+
+  it('keeps only the last 256 ms before speech', async () => {
+    const { p, heard } = recording();
+    const { feed } = hear('always', p);
+    await feed(soft(0.05), 20);
+    await feed(LOUD, 1);
+    expect(PRE_ROLL_FRAMES).toBe(8);
+    expect(heard.findIndex((v) => v >= 0.1)).toBe(PRE_ROLL_FRAMES);
+  });
+
+  it('keeps the start of a second stretch in the same turn as well', async () => {
+    const scores = [0.1, 0.9];
+    const { p, heard } = recording(async () => scores.shift() ?? 0.9);
+    const { events, feed } = hear('always', p);
+    await feed(LOUD, 2);
+    await feed(QUIET, PAUSE_FRAMES);
+    await feed(QUIET, 10);
+    const before = heard.length;
+    await feed(soft(0.05), 1);
+    await feed(soft(0.06), 1);
+    await feed(soft(0.07), 1);
+    await feed(LOUD, 1);
+    const second = levels(heard.slice(before));
+    expect(second.slice(-4)).toEqual(['0.05', '0.06', '0.07', '0.30']);
+    expect(second).toHaveLength(PRE_ROLL_FRAMES + 1);
+    expect(events.filter((e) => e.startsWith('turnEnd'))).toEqual([]);
+  });
+
+  it('never carries audio from a turn that ended into the next one', async () => {
+    const { p, heard } = recording();
+    const { events, feed } = hear('always', p);
+    await feed(soft(0.05), 3);
+    await feed(LOUD, 2);
+    await feed(soft(0.02), PAUSE_FRAMES);
+    expect(events.filter((e) => e.startsWith('turnEnd'))).toHaveLength(1);
+    const before = heard.length;
+    await feed(soft(0.08), 1);
+    await feed(LOUD, 1);
+    expect(levels(heard.slice(before))).toEqual(['0.08', '0.30']);
+  });
+
+  it('feeds nothing while nobody speaks', async () => {
+    const { p, heard } = recording();
+    const { feed } = hear('always', p);
+    await feed(soft(0.05), 20);
+    expect(heard).toEqual([]);
+  });
+});
+
+describe('LocalEars, a model that fails while always listening', () => {
+  it('says it failed once, so the panel stops showing listening', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const p = parts();
+    p.vad.accept = async () => {
+      throw new Error('silero broke');
+    };
+    const onFailed = vi.fn();
+    const { feed } = hear('always', p, onFailed);
+    await feed(LOUD, 3);
+    await feed(QUIET, 0);
+    expect(onFailed).toHaveBeenCalledOnce();
+  });
+
+  it('does not call it for a held listen, which ends its turn instead', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const p = parts();
+    p.vad.accept = async () => {
+      throw new Error('silero broke');
+    };
+    const onFailed = vi.fn();
+    const { events, feed } = hear('held', p, onFailed);
+    await feed(LOUD, 1);
+    await feed(QUIET, 0);
+    expect(onFailed).not.toHaveBeenCalled();
+    expect(events).toEqual(['turnEnd:']);
+  });
+
+  it('does not call it for a listen already stopped', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const p = parts();
+    let fail: (error: Error) => void = () => undefined;
+    p.vad.accept = () => new Promise<boolean>((_, reject) => (fail = reject));
+    const onFailed = vi.fn();
+    const { ears, feed } = hear('always', p, onFailed);
+    await feed(LOUD, 1);
+    ears.stop();
+    fail(new Error('late'));
+    await feed(QUIET, 0);
+    expect(onFailed).not.toHaveBeenCalled();
   });
 });
