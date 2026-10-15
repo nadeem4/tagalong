@@ -96,6 +96,28 @@ export const WindowEntry = z.object({
 export type WindowEntry = z.infer<typeof WindowEntry>;
 
 /**
+ * Something the person dropped on Scout's figure: selected text, a link, a file or an image.
+ *
+ * Its own field rather than `selection` or `screenshot`, so Scout never calls a dropped
+ * picture "your screenshot". `text` is the text dropped, the link's address, or a text
+ * file's contents; a file Tagalong does not read (a PDF, a Word file, one too big) comes
+ * with its name, path and size only.
+ */
+export const DroppedKind = z.enum(['text', 'link', 'file', 'image']);
+export type DroppedKind = z.infer<typeof DroppedKind>;
+
+export const Dropped = z.object({
+  kind: DroppedKind,
+  name: z.string().min(1).optional(),
+  path: z.string().min(1).optional(),
+  /** In bytes, for a file. */
+  size: z.number().int().nonnegative().optional(),
+  text: z.string().max(MAX_SELECTION_CHARS).optional(),
+  image: CapturedImage.optional(),
+});
+export type Dropped = z.infer<typeof Dropped>;
+
+/**
  * What a host saw at the moment the user asked. Every field beyond the identity
  * triple is optional, because hosts advertise different capabilities.
  */
@@ -143,6 +165,8 @@ export const ContextSnapshot = z.object({
    * inside one.
    */
   windows: z.array(WindowEntry).optional(),
+  /** What the person dropped on Scout and then chose to send, with a button. */
+  dropped: Dropped.optional(),
 });
 export type ContextSnapshot = z.infer<typeof ContextSnapshot>;
 

@@ -14,7 +14,7 @@ import type {
   MouthId,
   VoiceId,
 } from '@tagalong/protocol';
-import type { HostBridge } from '@tagalong/ui';
+import type { DropOffer, HostBridge } from '@tagalong/ui';
 
 /** Channel names, in one place so main and preload cannot drift apart. */
 export const IPC = {
@@ -116,7 +116,18 @@ export const IPC = {
   dismissPickUp: 'tagalong:pick-up:dismiss',
   // Draft it for me: a draft's Copy, from the bubble only. Writes the clipboard, never reads it.
   copyText: 'tagalong:clipboard:copy-text',
+  // Drop it on Scout: a file, link or text dropped on the figure (not dropAvatar, which
+  // ends a move of the pet), and the card main hands the bubble for it.
+  dropOnPet: 'tagalong:avatar:drop-on-pet',
+  dropEvent: 'tagalong:panel:drop',
 } as const;
+
+/** What the figure hands its preload on a drop: the files, and the drag's link and text. */
+export interface PetDrop {
+  files: File[];
+  uri?: string;
+  text?: string;
+}
 
 /** One ring: where on its display, in DIP relative to the display's corner, and its label. */
 export interface PointerRing {
@@ -379,6 +390,13 @@ export interface TagalongHostApi {
   onListening(handler: (state: ListeningState) => void): () => void;
   /** The pointer overlay: a ring to draw. It only draws; nothing is clicked or typed. */
   onPointer(handler: (ring: PointerRing) => void): () => void;
+  /**
+   * Something was dropped on the figure. The preload turns each file into its path; main
+   * names the item and opens the bubble on its card, reading nothing yet.
+   */
+  dropOnPet(drop: PetDrop): Promise<void>;
+  /** Main hands the bubble the card for what was dropped on Scout. */
+  onDrop(handler: (offer: DropOffer) => void): () => void;
 }
 
 declare global {

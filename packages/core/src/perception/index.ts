@@ -3,6 +3,7 @@ export {
   appCaptureBlock,
   findCaptureBlock,
   normalizeProcessName,
+  secretFileRule,
   type ActiveWindow,
   type CaptureBlock,
 } from './exclusions';
@@ -18,6 +19,6 @@ export {
   captureSelection,
   isBrowserHost,
 } from './browser-route';
-export { mayPersistScreenshot } from './retention';
+export { hasPixels, mayPersistScreenshot, withoutPixels } from './retention';
 export { THIN_TEXT_CHARS, textLayerNotes, type TextLayerReading } from './text-layer';
 export type { PerceptionHost } from './host';

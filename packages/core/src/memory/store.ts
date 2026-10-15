@@ -7,6 +7,7 @@ import type {
   ScreenshotRetention,
 } from '@tagalong/protocol';
 import { Conversation, Message } from '@tagalong/protocol';
+import { hasPixels, withoutPixels } from '../perception/retention';
 
 interface ConversationRow {
   id: string;
@@ -139,9 +140,9 @@ export class ConversationStore {
     for (const row of rows) {
       if (row.snapshot_json === null) continue;
       const snapshot = JSON.parse(row.snapshot_json) as ContextSnapshot;
-      if (snapshot.screenshot === undefined) continue;
-      const { screenshot: _dropped, ...rest } = snapshot;
-      update.run(JSON.stringify(rest), row.id);
+      // A dropped image goes with the screenshots, by the same rule.
+      if (!hasPixels(snapshot)) continue;
+      update.run(JSON.stringify(withoutPixels(snapshot)), row.id);
       purged += 1;
     }
     return purged;

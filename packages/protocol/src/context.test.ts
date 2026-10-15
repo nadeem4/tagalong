@@ -229,3 +229,31 @@ describe('PerceptionTarget', () => {
     }
   });
 });
+
+describe('ContextSnapshot.dropped', () => {
+  const png = { mime: 'image/png', base64: 'iVBORw0KGgo=', width: 4, height: 3 };
+
+  it('parses each kind of thing dropped on Scout', () => {
+    for (const dropped of [
+      { kind: 'text', text: 'a paragraph' },
+      { kind: 'link', text: 'https://example.com/post' },
+      { kind: 'file', name: 'report.md', path: 'C:\\work\\report.md', size: 120, text: '# Hi' },
+      { kind: 'image', name: 'chart.png', path: '/home/a/chart.png', image: png },
+    ]) {
+      expect(ContextSnapshot.parse({ ...valid, dropped }).dropped).toEqual(dropped);
+    }
+  });
+
+  it('rejects an unknown kind', () => {
+    expect(ContextSnapshot.safeParse({ ...valid, dropped: { kind: 'folder' } }).success).toBe(
+      false,
+    );
+  });
+
+  it('rejects dropped text past the selection cap', () => {
+    const text = 'x'.repeat(MAX_SELECTION_CHARS + 1);
+    expect(ContextSnapshot.safeParse({ ...valid, dropped: { kind: 'text', text } }).success).toBe(
+      false,
+    );
+  });
+});

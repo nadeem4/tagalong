@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useReducer, useRef, useState } from 'react';
+import { StrictMode, useEffect, useReducer, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { DockPet } from '@tagalong/ui';
 import type { Pet } from '@tagalong/protocol';
@@ -8,8 +8,8 @@ import '@fontsource/onest/latin-600.css';
 import './app.css';
 import '../../shared/ipc';
 import { visibleCrew } from './crew';
-import { IDLE_DOCK, REACTION_MS, dockMood, moveDrag, nextDock, startDrag } from './dock';
-import type { DragState } from './dock';
+import { IDLE_DOCK, REACTION_MS, dockMood, nextDock } from './dock';
+import { petInput } from './pet-input';
 
 /** How long "Seeing" shows after a capture. */
 const SEEING_MS = 2500;
@@ -18,7 +18,9 @@ const SEEING_MS = 2500;
  * The companion on the desktop: its pixel character in a small transparent window. The pet
  * is a button that is dragged by hand rather than through a drag region, which would swallow
  * its clicks: a press that moves past a few pixels drags the pet (and its bubble), a press
- * that does not is a click, which opens the bubble and clears "Done".
+ * that does not is a click, which opens the bubble and clears "Done". A file, link or text
+ * dragged in from another app is dropped on the pet instead: Scout shows Seeing while it is
+ * held over, and the bubble opens on a card asking what to do with it.
  */
 function Avatar() {
   const [pet, setPet] = useState<Pet | null>(null);
@@ -26,8 +28,7 @@ function Avatar() {
   const [sightPaused, setSightPaused] = useState(false);
   const [recording, setRecording] = useState(false);
   const [listening, setListening] = useState<ListeningState>({ on: false, paused: false });
-  const drag = useRef<DragState | null>(null);
-  const dragged = useRef(false);
+  const [input] = useState(() => petInput(window.tagalongHost, send));
 
   useEffect(() => {
     Promise.all([window.tagalong.listPets(), window.tagalongHost.getHostView()])
@@ -122,27 +123,17 @@ function Avatar() {
         aria-label={`Ask ${pet.name}`}
         onPointerDown={(event) => {
           event.currentTarget.setPointerCapture(event.pointerId);
-          drag.current = startDrag({ x: event.screenX, y: event.screenY });
-          dragged.current = false;
+          input.pointerDown({ x: event.screenX, y: event.screenY });
         }}
-        onPointerMove={(event) => {
-          if (drag.current === null) return;
-          const { state, step } = moveDrag(drag.current, { x: event.screenX, y: event.screenY });
-          drag.current = state;
-          if (step === null) return;
-          dragged.current = true;
-          void window.tagalongHost.dragAvatar(step.dx, step.dy);
-        }}
-        onPointerUp={() => {
-          if (drag.current?.dragging === true) void window.tagalongHost.dropAvatar();
-          drag.current = null;
-        }}
+        onPointerMove={(event) => input.pointerMove({ x: event.screenX, y: event.screenY })}
+        onPointerUp={() => input.pointerUp()}
+        onDragEnter={(event) => input.dragOver(event)}
+        onDragOver={(event) => input.dragOver(event)}
+        onDragLeave={() => input.dragLeave()}
+        onDrop={(event) => input.drop(event)}
         onClick={() => {
           // The click that ends a drag is not a click on the pet.
-          if (dragged.current) {
-            dragged.current = false;
-            return;
-          }
+          if (!input.takeClick()) return;
           send({ type: 'looked' });
           void window.tagalongHost.selectPet(pet.id);
         }}

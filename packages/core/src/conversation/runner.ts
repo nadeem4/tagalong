@@ -6,7 +6,7 @@ import type { ConversationStore } from '../memory/store';
 import type { MemoryStore } from '../memory/memories';
 import { recall, statedPreference } from '../memory/recall';
 import type { SettingsStore } from '../settings/settings';
-import { mayPersistScreenshot } from '../perception';
+import { hasPixels, mayPersistScreenshot, withoutPixels } from '../perception';
 import {
   ToolRegistry,
   type PerceptionToolsOptions,
@@ -133,18 +133,6 @@ const NO_TOOLS_YET = 'No tools are available yet. Answer from the context you al
 export const VISION_UNSUPPORTED = 'vision_unsupported';
 
 /**
- * The snapshot minus its pixels.
- *
- * Rebuilt by destructuring rather than by assigning `undefined`, because
- * `exactOptionalPropertyTypes` treats a present-but-undefined `screenshot` as a different
- * thing from an absent one — and so does `JSON.stringify`, which is what reaches the row.
- */
-function withoutScreenshot(snapshot: ContextSnapshot): ContextSnapshot {
-  const { screenshot: _dropped, ...rest } = snapshot;
-  return rest;
-}
-
-/**
  * Drives one turn: store the question, assemble the prompt, stream the answer, store it.
  *
  * The runner owns the turn lifecycle so hosts never do: they send an ask, receive a
@@ -188,11 +176,12 @@ export class ConversationRunner {
     this.#options.store.purgeExpiredScreenshots(settings.screenshotRetention);
 
     // A screenshot is the most sensitive thing this app touches, so the row on disk gets
-    // one only when the user has opted into a retention window. The turn itself still
-    // sees the original: the promise is about the database, not about the pet's eyes.
+    // one only when the user has opted into a retention window; an image dropped on Scout
+    // follows the same rule. The turn itself still sees the original: the promise is about
+    // the database, not about the pet's eyes.
     const stored =
       ask.snapshot && !mayPersistScreenshot(ask.snapshot, settings.screenshotRetention)
-        ? withoutScreenshot(ask.snapshot)
+        ? withoutPixels(ask.snapshot)
         : ask.snapshot;
 
     this.#options.store.appendMessage({
@@ -306,14 +295,15 @@ export class ConversationRunner {
     const canSee = modelForTurn(provider, ask.pet, true) !== null;
 
     let snapshot = ask.snapshot;
-    if (snapshot?.screenshot && !canSee) {
-      snapshot = withoutScreenshot(snapshot);
+    if (snapshot !== undefined && hasPixels(snapshot) && !canSee) {
+      const what = snapshot.screenshot !== undefined ? 'the screenshot was' : 'the image was';
+      snapshot = withoutPixels(snapshot);
       this.#options.emit({
         method: 'turn.warning',
         params: {
           turnId,
           code: VISION_UNSUPPORTED,
-          message: `${ask.pet.name} cannot see images, so the screenshot was not sent.`,
+          message: `${ask.pet.name} cannot see images, so ${what} not sent.`,
         },
       });
     }

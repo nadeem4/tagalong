@@ -197,6 +197,29 @@ describe('ConversationStore.purgeExpiredScreenshots', () => {
     expect(store.listMessages(id)[0]?.snapshot?.screenshot).toBeUndefined();
   });
 
+  it('strips a dropped image with the screenshots while retention is off, keeping its text', () => {
+    const conversation = store.createConversation({ petId: 'scout' });
+    store.appendMessage({
+      conversationId: conversation.id,
+      role: 'user',
+      content: [{ type: 'text', text: 'Explain this.' }],
+      snapshot: {
+        ...snapshot,
+        dropped: {
+          kind: 'image',
+          name: 'chart.png',
+          path: '/w/chart.png',
+          image: { mime: 'image/png', base64: 'iVBORw0KGgoDROPPEDPIXELS', width: 8, height: 8 },
+        },
+      },
+    });
+
+    expect(store.purgeExpiredScreenshots({ mode: 'off' })).toBe(1);
+    const kept = store.listMessages(conversation.id)[0]?.snapshot?.dropped;
+    expect(kept?.image).toBeUndefined();
+    expect(kept?.name).toBe('chart.png');
+  });
+
   it('reports nothing purged when no row holds a screenshot', () => {
     const conversation = store.createConversation({ petId: 'scout' });
     store.appendMessage({

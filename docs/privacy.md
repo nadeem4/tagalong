@@ -10,10 +10,11 @@ pet started at your request, which you switch on yourself (both below). Otherwis
 screenshot and no window text read between one question and the next — each hotkey reads once, sends
 that, and stops.
 
-| You do             | It reads                                                      |
-| ------------------ | ------------------------------------------------------------- |
-| `Ctrl+Shift+Space` | The selected text and the active window's title. No picture.  |
-| Click the pet      | Nothing. The bubble opens; the pet looks only if it needs to. |
+| You do                  | It reads                                                                        |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| `Ctrl+Shift+Space`      | The selected text and the active window's title. No picture.                    |
+| Click the pet           | Nothing. The bubble opens; the pet looks only if it needs to.                   |
+| Drop something on Scout | That one item, read only after you choose ([below](#dropping-things-on-scout)). |
 
 Everything else the pet reads through its own tools, mid-answer: list what is open, read one
 window's text, take a screenshot of the window you were using or of one listed window even behind
@@ -532,3 +533,35 @@ writes the draft in the bubble.
   yours.
 - A spoken request has only its one line spoken; the draft is shown, never read aloud.
 - The draft is part of Scout's answer, so it is stored with the conversation like any answer.
+
+## Dropping things on Scout
+
+You can drag a file, an image, a link or selected text onto Scout. The bubble opens on a card
+("report.md: want me to explain it, or hand it to an expert?") with **Explain**, **Hand it to an
+expert** and **Cancel**.
+
+- **Nothing is read on the drop.** Tagalong notes the item's name and path only. The file is read
+  from disk when you press **Explain** or **Hand it to an expert**, and only that one item goes,
+  with that one question. **Cancel** sends nothing.
+- **What is read.** A text file (by its extension, up to 1 MB): its text, capped like a selection.
+  A PNG or JPEG (up to 10 MB): scaled to the screenshot size and sent as a picture. Any other file
+  (PDF, Word, a WebP or GIF, a file too big): its name, path and size only. Tagalong does not open
+  it, and an expert you hand it to reads it from the path. A link or dropped text is passed as it is.
+- **Secrets files are refused.** A file whose name matches the secret-file list (`.env`,
+  `id_rsa`, `secrets.json`, `*.pem` and the rest) gets "That looks like a secrets file, so I won’t
+  read it or pass it on." with no buttons. Secrets inside other text are still hidden on the
+  way out, like everything sent to a brain.
+- **Only a button sends it.** With Always listening on, saying "Scout, explain it" while the card
+  is open is an ordinary question and does not carry the dropped item.
+- **Hand it to an expert** goes through Scout, which writes the brief. The usual hand-off card
+  appears, and nothing reaches the expert until you press **Send**.
+- **Stored like a screenshot.** The conversation keeps the dropped item's name, path and text like
+  a selection. A dropped image is kept out of the database by the screenshot retention rule, and a
+  brain that cannot see images never gets it (Scout says so).
+- **It shows in What Scout saw.** The question that carries the item is a turn, so it is logged
+  as **Sent to AI** with its characters and pictures, like any other. The drop itself reads
+  nothing, so it adds no row.
+- **Pausing sight does not block a drop.** A drop is something you hand over on purpose, not Scout
+  reading the screen.
+- **Nothing opens by accident.** The pet's and the bubble's windows refuse to navigate, so a file
+  dropped there never opens inside Tagalong.

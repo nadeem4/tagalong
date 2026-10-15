@@ -49,6 +49,7 @@ export {
   isBrowserProcess,
   mayPersistScreenshot,
   normalizeProcessName,
+  secretFileRule,
   renderInventory,
   type ActiveWindow,
   type CaptureBlock,

@@ -53,6 +53,11 @@ export interface AskInput {
   snapshot?: ContextSnapshot;
   /** The question was spoken (Talk to Scout): Scout answers the way a person talks. */
   spoken?: boolean;
+  /**
+   * Sends the item last dropped on Scout with the question. Set only by a button on the
+   * drop card; the host reads the item then, and attaches it as `snapshot.dropped`.
+   */
+  drop?: boolean;
 }
 
 /**

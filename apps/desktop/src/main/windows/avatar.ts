@@ -1,4 +1,5 @@
 import { BrowserWindow, screen } from 'electron';
+import { guardNavigation } from '../drop';
 import { PRELOAD_PATH, loadPage } from './page';
 import { AVATAR_SIZE, resolveAvatarPosition } from './position';
 import type { Point, RememberedPosition } from './position';
@@ -59,6 +60,9 @@ export function createAvatarWindow(options: AvatarWindowOptions): BrowserWindow 
   });
 
   window.setAlwaysOnTop(true, 'floating');
+  // Things are dropped on the pet: the figure stops the drop opening the file in this
+  // window, and this is the backstop.
+  guardNavigation(window.webContents);
   window.on('moved', () => {
     const [movedX, movedY] = window.getPosition();
     if (movedX !== undefined && movedY !== undefined) options.onMoved({ x: movedX, y: movedY });

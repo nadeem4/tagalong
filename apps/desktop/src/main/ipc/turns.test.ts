@@ -34,6 +34,63 @@ describe('registerTurnIpc', () => {
     expect(calls).toEqual([['ask', { petId: 'scout', conversationId: 'c1', input: { text: '' } }]]);
   });
 
+  it('attaches the item dropped on Scout only when the ask is for it', async () => {
+    const ipc = fakeIpc();
+    const engine = fakeEngine({ ask: { turnId: 't1' } });
+    const dropped = { kind: 'file' as const, name: 'a.md', path: '/w/a.md', text: 'abc' };
+    let taken = 0;
+    registerTurnIpc(ipc.handle, {
+      engine: () => engine.client,
+      maybeEngine: () => engine.client,
+      pendingSnapshot: () => null,
+      takeDrop: () => {
+        taken += 1;
+        return Promise.resolve(dropped);
+      },
+    });
+
+    // An ordinary ask, typed or spoken, never carries the drop.
+    await ipc.invoke(IPC.ask, { petId: 'scout', text: 'Scout, explain it', spoken: true });
+    expect(taken).toBe(0);
+    expect(engine.calls[0]?.[1]).not.toHaveProperty('snapshot');
+
+    await ipc.invoke(IPC.ask, { petId: 'scout', text: 'Explain this.', drop: true });
+    expect(taken).toBe(1);
+    expect(engine.calls[1]?.[1]).toMatchObject({
+      input: { text: 'Explain this.' },
+      snapshot: { host: 'desktop', dropped },
+    });
+  });
+
+  it('adds the drop to the snapshot the hotkey captured', async () => {
+    const ipc = fakeIpc();
+    const engine = fakeEngine({ ask: { turnId: 't1' } });
+    const dropped = { kind: 'text' as const, text: 'hi' };
+    registerTurnIpc(ipc.handle, {
+      engine: () => engine.client,
+      maybeEngine: () => engine.client,
+      pendingSnapshot: () => SNAPSHOT,
+      takeDrop: () => Promise.resolve(dropped),
+    });
+    await ipc.invoke(IPC.ask, { petId: 'scout', text: 'x', drop: true });
+    expect(engine.calls[0]?.[1]).toMatchObject({ snapshot: { id: 's1', dropped } });
+  });
+
+  it('fails the ask with the read error, and asks nothing', async () => {
+    const ipc = fakeIpc();
+    const engine = fakeEngine({ ask: { turnId: 't1' } });
+    registerTurnIpc(ipc.handle, {
+      engine: () => engine.client,
+      maybeEngine: () => engine.client,
+      pendingSnapshot: () => null,
+      takeDrop: () => Promise.reject(new Error('I couldn’t read gone.md.')),
+    });
+    await expect(ipc.invoke(IPC.ask, { petId: 'scout', text: 'x', drop: true })).rejects.toThrow(
+      'gone.md',
+    );
+    expect(engine.calls).toEqual([]);
+  });
+
   it('stops a watch and interrupts a turn', async () => {
     const { invoke, calls } = setup();
     await invoke(IPC.stopWatch, 'w1');

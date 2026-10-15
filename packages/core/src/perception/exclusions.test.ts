@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { SETTINGS_DEFAULTS, type CaptureExclusions } from '@tagalong/protocol';
-import { findCaptureBlock } from './exclusions';
+import { findCaptureBlock, secretFileRule } from './exclusions';
+
+describe('secretFileRule', () => {
+  it('names the secret-file rule a file name matches', () => {
+    expect(secretFileRule('.env')).toBe('.env');
+    expect(secretFileRule('.env.local')).toBe('.env.*');
+    expect(secretFileRule('ID_RSA')).toBe('id_rsa');
+    expect(secretFileRule('secrets.json')).toBe('secrets.*');
+  });
+
+  it('passes an ordinary file', () => {
+    expect(secretFileRule('report.md')).toBeNull();
+    expect(secretFileRule('environment.md')).toBeNull();
+  });
+});
 
 const DEFAULTS: CaptureExclusions = {
   processNames: [...SETTINGS_DEFAULTS.captureExclusions.processNames],

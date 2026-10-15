@@ -1,4 +1,5 @@
 import { BrowserWindow, screen } from 'electron';
+import { guardNavigation } from '../drop';
 import { PRELOAD_PATH, loadPage } from './page';
 import { hidesOnBlur } from './bubble-focus';
 import { moveWindow } from './move';
@@ -65,6 +66,8 @@ export function createPanelWindow(options: PanelWindowOptions): BrowserWindow {
     }, 60);
   });
 
+  // A file dropped on the bubble instead of the pet must not open in it either.
+  guardNavigation(window.webContents);
   loadPage(window, 'panel');
   return window;
 }

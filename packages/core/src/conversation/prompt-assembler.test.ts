@@ -743,3 +743,64 @@ describe('the full-view attach policy', () => {
     expect(text).toContain('w-1');
   });
 });
+
+describe('assemblePrompt dropped on Scout', () => {
+  const bare = (dropped: ContextSnapshot['dropped']): ContextSnapshot => ({
+    id: randomUUID(),
+    capturedAt: new Date().toISOString(),
+    host: 'desktop',
+    ...(dropped !== undefined ? { dropped } : {}),
+  });
+  const ask = (snapshot: ContextSnapshot) =>
+    assemblePrompt({ pet, history: [userMessage('Explain this.')], snapshot, settings });
+
+  it('adds a Dropped on you section with a text file, its name, path and contents', () => {
+    const text = lastText(
+      ask(
+        bare({
+          kind: 'file',
+          name: 'report.md',
+          path: 'C:\\w\\report.md',
+          size: 9,
+          text: '# Q3 plan',
+        }),
+      ),
+    );
+    expect(text).toContain(CONTEXT_LABELS.dropped);
+    expect(text).toContain('report.md');
+    expect(text).toContain('C:\\w\\report.md');
+    expect(text).toContain('# Q3 plan');
+  });
+
+  it('says a file it did not read was not read, so Scout does not invent its contents', () => {
+    const text = lastText(ask(bare({ kind: 'file', name: 'a.pdf', path: '/a.pdf', size: 2048 })));
+    expect(text).toContain('/a.pdf');
+    expect(text).toMatch(/not read/i);
+  });
+
+  it('names a link and dropped text for what they are', () => {
+    expect(lastText(ask(bare({ kind: 'link', text: 'https://example.com/x' })))).toContain(
+      'https://example.com/x',
+    );
+    expect(lastText(ask(bare({ kind: 'text', text: 'a dropped paragraph' })))).toContain(
+      'a dropped paragraph',
+    );
+  });
+
+  it('attaches a dropped image as an image block, not as a screenshot', () => {
+    const image = { mime: 'image/png' as const, base64: 'ZHJvcA==', width: 4, height: 4 };
+    const request = ask(bare({ kind: 'image', name: 'chart.png', path: '/chart.png', image }));
+    expect(request.messages.at(-1)?.content.at(0)).toEqual({
+      type: 'image',
+      mime: 'image/png',
+      base64: 'ZHJvcA==',
+    });
+    const text = lastText(request);
+    expect(text).toContain('chart.png');
+    expect(text).not.toContain(CONTEXT_LABELS.screenshot);
+  });
+
+  it('adds nothing when nothing was dropped', () => {
+    expect(lastText(ask(bare(undefined)))).not.toContain(CONTEXT_LABELS.dropped);
+  });
+});

@@ -1,4 +1,5 @@
-import type { ContextSnapshot } from '@tagalong/protocol';
+import { randomUUID } from 'node:crypto';
+import type { ContextSnapshot, Dropped } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
 import type { EngineCall, IpcHandle } from './handle';
 
@@ -9,6 +10,11 @@ export interface TurnIpcDeps {
   maybeEngine: () => EngineCall | null;
   /** The snapshot the last hotkey captured, sent with the ask. */
   pendingSnapshot: () => ContextSnapshot | null;
+  /**
+   * Reads the item last dropped on Scout, once, for an ask from a drop card's button.
+   * Rejects with the sentence to show when it cannot be read.
+   */
+  takeDrop?: () => Promise<Dropped>;
 }
 
 /** Asking, stopping and interrupting turns, and a remark's two buttons. */
@@ -19,9 +25,28 @@ export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
     IPC.ask,
     async (
       _event,
-      input: { petId: string; conversationId?: string; text?: string; spoken?: boolean },
+      input: {
+        petId: string;
+        conversationId?: string;
+        text?: string;
+        spoken?: boolean;
+        drop?: boolean;
+      },
     ) => {
-      const snapshot = deps.pendingSnapshot();
+      const pending = deps.pendingSnapshot();
+      // Only a drop card's button sends the dropped item, and it is read only now.
+      const dropped = input.drop === true && deps.takeDrop ? await deps.takeDrop() : null;
+      const snapshot: ContextSnapshot | null =
+        dropped === null
+          ? pending
+          : {
+              ...(pending ?? {
+                id: randomUUID(),
+                capturedAt: new Date().toISOString(),
+                host: 'desktop' as const,
+              }),
+              dropped,
+            };
       return engine().call('ask', {
         petId: input.petId,
         ...(input.conversationId !== undefined ? { conversationId: input.conversationId } : {}),

@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { IpcRendererEvent } from 'electron';
 import type {
   ActivityListResult,
@@ -21,7 +21,7 @@ import type {
   SettingsPatch,
   SightLogEntry,
 } from '@tagalong/protocol';
-import type { AskInput, HostBridge, TurnEvent } from '@tagalong/ui';
+import type { AskInput, DropOffer, HostBridge, TurnEvent } from '@tagalong/ui';
 import { IPC } from '../shared/ipc';
 import { heldUntilHeard } from './held';
 import type {
@@ -279,6 +279,19 @@ const host: TagalongHostApi = {
     const listener = (_event: IpcRendererEvent, ring: PointerRing): void => handler(ring);
     ipcRenderer.on(IPC.pointerShow, listener);
     return () => void ipcRenderer.off(IPC.pointerShow, listener);
+  },
+  // File.path is gone in Electron 44: webUtils, which a sandboxed preload may use, gives
+  // the path. A File made in script, with no file behind it, gives '' and is left out.
+  dropOnPet: ({ files, uri, text }) =>
+    ipcRenderer.invoke(IPC.dropOnPet, {
+      paths: files.map((file) => webUtils.getPathForFile(file)).filter((path) => path !== ''),
+      ...(uri !== undefined ? { uri } : {}),
+      ...(text !== undefined ? { text } : {}),
+    }) as Promise<void>,
+  onDrop: (handler) => {
+    const listener = (_event: IpcRendererEvent, offer: DropOffer): void => handler(offer);
+    ipcRenderer.on(IPC.dropEvent, listener);
+    return () => void ipcRenderer.off(IPC.dropEvent, listener);
   },
 };
 
