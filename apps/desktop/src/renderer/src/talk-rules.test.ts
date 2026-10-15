@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  EarsNotes,
-  FIRST_TIME,
-  FailureStreak,
-  micNote,
-  settles,
-  shownPartial,
-} from './talk-rules';
+import { EarsNotes, FIRST_TIME, FailureStreak, micNote, settles, shownPartial } from './talk-rules';
 
 describe('settles', () => {
   it('lets the bubble go quiet when no held question is being asked', () => {

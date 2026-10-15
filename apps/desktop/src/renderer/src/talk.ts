@@ -160,7 +160,8 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
   });
 
   // The ears' models: the first time they download. A failure ends the question being asked,
-  // and the always session until the next switch, call or system voice tries again.
+  // and the always session until it retries on its own (30 s, doubling up to five minutes)
+  // or the next switch, call or system voice tries again.
   useEffect(
     () =>
       window.tagalongHost.onEarsStatus(({ status, message }) => {

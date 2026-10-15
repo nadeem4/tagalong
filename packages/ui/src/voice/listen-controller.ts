@@ -25,7 +25,19 @@ export interface ListenControllerOptions {
   onDropped(): void;
   /** Always listening: false hands over every turn whole, no "Scout" needed and "stop" is just words. Default true. */
   needsName?: boolean;
+  /** The first wait before always listening retries after the ears failed; it doubles, up to five minutes. Default 30 s. */
+  retryMs?: number;
+  /** Runs `run` after `ms`; returns a cancel. Default setTimeout. */
+  setTimer?(run: () => void, ms: number): () => void;
 }
+
+const RETRY_MS = 30_000;
+const MAX_RETRY_MS = 5 * 60_000;
+
+const setTimer = (run: () => void, ms: number): (() => void) => {
+  const timer = setTimeout(run, ms);
+  return () => clearTimeout(timer);
+};
 
 interface Session {
   mode: ListenMode;
@@ -66,9 +78,13 @@ export class ListenController {
   #always = false;
   #paused = false;
   #deaf = false;
+  /** The wait before the next retry after the ears failed, and the cancel of one pending. */
+  #retryMs: number;
+  #cancelRetry: (() => void) | null = null;
 
   constructor(options: ListenControllerOptions) {
     this.#options = options;
+    this.#retryMs = options.retryMs ?? RETRY_MS;
   }
 
   get mode(): ListenMode | null {
@@ -113,20 +129,40 @@ export class ListenController {
   /**
    * The ears failed (the first download offline, models that would not start): every
    * question is dropped and the mic closes. Always listening stays switched on but does not
-   * retry at once, which would fail again; the next switch, call or system voice tries again
-   * (the voice process tries its download again). Returns what was listening.
+   * retry at once, which would fail again: it retries on its own after a wait (30 s, then
+   * doubling up to five minutes), or sooner on the next switch, call or system voice (the
+   * voice process tries its download again). Returns what was listening.
    */
   earsFailed(): ListenMode | null {
     const mode = this.mode;
     this.#dropReleased();
     this.#end();
+    if (mode === 'always') this.#scheduleRetry();
     return mode;
   }
 
-  /** Always listening, as the person switched it. */
+  /** Always listening, as the person switched it. Off cancels a pending retry. */
   setAlways(on: boolean): void {
     this.#always = on;
+    if (!on) this.#resetRetry();
     this.#sync();
+  }
+
+  #scheduleRetry(): void {
+    this.#cancelRetry?.();
+    const wait = this.#retryMs;
+    this.#retryMs = Math.min(wait * 2, MAX_RETRY_MS);
+    this.#cancelRetry = (this.#options.setTimer ?? setTimer)(() => {
+      this.#cancelRetry = null;
+      this.#sync();
+    }, wait);
+  }
+
+  /** A question heard, or the switch off: the next failure waits the first wait again. */
+  #resetRetry(): void {
+    this.#cancelRetry?.();
+    this.#cancelRetry = null;
+    this.#retryMs = this.#options.retryMs ?? RETRY_MS;
   }
 
   /** A call or a full-screen window, or the pets hidden: the mic closes until it is over. */
@@ -229,7 +265,10 @@ export class ListenController {
           this.#options.onStopListening();
           // The stop cut Scout off, but is never asked: the bubble lets go.
           this.#options.onDropped();
-        } else this.#options.onHeard(question);
+        } else {
+          this.#resetRetry();
+          this.#options.onHeard(question);
+        }
         return;
       }
       if (!session.released) return;

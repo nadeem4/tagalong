@@ -38,6 +38,26 @@ function fakeEars() {
   };
 }
 
+/** Timers the test fires by hand: what is pending, and how long each would wait. */
+function fakeTimers() {
+  const timers: { run: () => void; ms: number; live: boolean }[] = [];
+  return {
+    set: (run: () => void, ms: number) => {
+      const timer = { run, ms, live: true };
+      timers.push(timer);
+      return () => void (timer.live = false);
+    },
+    pending: () => timers.filter((t) => t.live).map((t) => t.ms),
+    fire: () =>
+      timers
+        .filter((t) => t.live)
+        .forEach((t) => {
+          t.live = false;
+          t.run();
+        }),
+  };
+}
+
 function setup(
   openMic: () => Promise<ListenMic> = vi.fn(async () => fakeMic()),
   more: Partial<ListenControllerOptions> = {},
@@ -395,7 +415,7 @@ describe('ListenController, always', () => {
   });
 
   it('the ears failing ends the always session but leaves it switched on: the next change retries', async () => {
-    const { controller, ears, openMic } = setup();
+    const { controller, ears, openMic } = setup(undefined, { setTimer: fakeTimers().set });
     controller.setAlways(true);
     await tick();
     expect(controller.earsFailed()).toBe('always');
@@ -409,6 +429,53 @@ describe('ListenController, always', () => {
     await tick();
     expect(controller.mode).toBe('always');
     expect(openMic).toHaveBeenCalledTimes(2);
+  });
+
+  it('the ears failing retries on its own, waiting longer each time, up to five minutes', async () => {
+    const timers = fakeTimers();
+    const { controller, openMic } = setup(undefined, { setTimer: timers.set, retryMs: 1_000 });
+    controller.setAlways(true);
+    await tick();
+    controller.earsFailed();
+    expect(timers.pending()).toEqual([1_000]);
+    timers.fire();
+    await tick();
+    expect(controller.mode).toBe('always');
+    expect(openMic).toHaveBeenCalledTimes(2);
+    controller.earsFailed();
+    expect(timers.pending()).toEqual([2_000]);
+    for (let i = 0; i < 12; i += 1) {
+      timers.fire();
+      await tick();
+      controller.earsFailed();
+    }
+    expect(timers.pending()).toEqual([300_000]);
+  });
+
+  it('switching always listening off cancels the retry', async () => {
+    const timers = fakeTimers();
+    const { controller, openMic } = setup(undefined, { setTimer: timers.set });
+    controller.setAlways(true);
+    await tick();
+    controller.earsFailed();
+    expect(timers.pending()).toEqual([30_000]);
+    controller.setAlways(false);
+    expect(timers.pending()).toEqual([]);
+    await tick();
+    expect(openMic).toHaveBeenCalledOnce();
+  });
+
+  it('a question heard after a retry starts the wait over', async () => {
+    const timers = fakeTimers();
+    const { controller, ears } = setup(undefined, { setTimer: timers.set, retryMs: 1_000 });
+    controller.setAlways(true);
+    await tick();
+    controller.earsFailed();
+    timers.fire();
+    await tick();
+    ears.say('turnEnd', 'Scout, hello');
+    controller.earsFailed();
+    expect(timers.pending()).toEqual([1_000]);
   });
 
   it('the ears failing drops a held question and every released one, without resuming', async () => {
