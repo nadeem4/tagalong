@@ -133,7 +133,8 @@ export function welcomeExperts(
       name: 'Claude Code',
       goodAt: 'Code: reading, explaining, debugging and changing code in a project.',
       enabled: true,
-      connection: { type: 'claude-code', canEdit: false },
+      instructions: '',
+      connection: { type: 'claude-code', canEdit: false, canSearchWeb: false },
     },
   ];
 }

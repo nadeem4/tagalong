@@ -10,7 +10,8 @@ const CLAUDE: Expert = {
   name: 'Claude Code',
   goodAt: '',
   enabled: true,
-  connection: { type: 'claude-code', canEdit: false },
+  instructions: '',
+  connection: { type: 'claude-code', canEdit: false, canSearchWeb: false },
 };
 
 const PAPERS: RoutineView = {

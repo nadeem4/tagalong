@@ -94,7 +94,8 @@ test.describe('the hand-off card', () => {
         name: 'Claude Code',
         goodAt: 'Code',
         enabled: true,
-        connection: { type: 'claude-code', canEdit: false },
+        instructions: '',
+        connection: { type: 'claude-code', canEdit: false, canSearchWeb: false },
       }),
     );
     // The folder picker is a native dialog Playwright cannot click; it answers with a

@@ -9,7 +9,8 @@ const RESEARCHER: Expert = {
   name: 'Researcher',
   goodAt: 'Web research',
   enabled: true,
-  connection: { type: 'claude-code', canEdit: false },
+  instructions: '',
+  connection: { type: 'claude-code', canEdit: false, canSearchWeb: false },
 };
 
 const SAVED: RoutineView = {

@@ -153,7 +153,7 @@ export interface EngineOptions {
  * The connector behind an expert. Fake mode never starts a real tool, the same rule the
  * brain providers follow, so a test or a demo cannot spend the user's Claude Code usage.
  */
-function defaultConnectorFor(env: Record<string, string | undefined>) {
+export function defaultConnectorFor(env: Record<string, string | undefined>) {
   return (expert: Expert, mode?: { research: boolean }): Connector => {
     if (env.TAGALONG_FAKE_PROVIDERS === '1') {
       return new FakeConnector({
@@ -161,9 +161,11 @@ function defaultConnectorFor(env: Record<string, string | undefined>) {
         text: `${expert.name} (fake) read the brief and has nothing to change.`,
       });
     }
-    const { folder, canEdit, command } = expert.connection;
+    const { folder, canEdit, canSearchWeb, command } = expert.connection;
     return new ClaudeCodeConnector({
       canEdit,
+      canSearchWeb,
+      instructions: expert.instructions,
       ...(folder !== undefined ? { folder } : {}),
       ...(command ? { command } : {}),
       ...(mode?.research === true ? { research: true } : {}),

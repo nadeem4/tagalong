@@ -16,12 +16,29 @@ const claudeCode = {
 };
 
 describe('Expert', () => {
-  it('fills the defaults: on, read-only', () => {
+  it('fills the defaults: on, read-only, no standing instructions, no web search', () => {
     expect(Expert.parse(claudeCode)).toEqual({
       ...claudeCode,
       enabled: true,
-      connection: { ...claudeCode.connection, canEdit: false },
+      instructions: '',
+      connection: { ...claudeCode.connection, canEdit: false, canSearchWeb: false },
     });
+  });
+
+  it('keeps standing instructions up to 4000 characters, and refuses more', () => {
+    expect(
+      Expert.parse({ ...claudeCode, instructions: 'Find the cause first.' }).instructions,
+    ).toBe('Find the cause first.');
+    expect(Expert.safeParse({ ...claudeCode, instructions: 'x'.repeat(4000) }).success).toBe(true);
+    expect(Expert.safeParse({ ...claudeCode, instructions: 'x'.repeat(4001) }).success).toBe(false);
+  });
+
+  it('may search the web when the connection says so', () => {
+    const expert = Expert.parse({
+      ...claudeCode,
+      connection: { ...claudeCode.connection, canSearchWeb: true },
+    });
+    expect(expert.connection.canSearchWeb).toBe(true);
   });
 
   it('refuses an id that is not kebab-case', () => {
