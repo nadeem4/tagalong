@@ -595,6 +595,19 @@ app, oldest first, at most 15 per app, and never call a write tool or send scree
 Home's **What needs me** routine template asks the same every weekday at 09:00; an engine test pins
 that a read on a routine turn emits no `connector.confirm` while a write on the same turn still does.
 
+**"File this as a bug"** is a write worked through with its card, and needs no tool or card of its
+own. The companion's instructions tell Scout to read the window with the error (the selection, then
+`read_window_text`, as for a draft), write a title and a body (**What happened** quoted at most 40
+lines, **Where**, **Steps** marked "as seen" where it guessed, **Expected**), and call the app's
+create-issue tool, such as `github__create_issue` or `linear__create_issue`. That tool is a write, so
+`connectorTools` hides keys in every argument (`hideDeep`), builds the card text with `summaryOf`
+(every argument in full; over `MAX_CONFIRM_CHARS`, 4,000, it is refused instead) and waits on
+`deps.confirm`, which sends `connector.confirm`. Only **Allow once** calls the server; Cancel or the
+two-minute timeout returns "nothing was changed" and the server is never called. Scout uses the
+`owner/repo` shown on screen or named by the person and never guesses one; with both GitHub and
+Linear connected and neither named, it asks which. No screenshot is attached. An engine test pins
+`read_window_text`, then `connector.confirm` with the full body, before the fake server sees a call.
+
 Tests never reach a real app: `fakeMcpServer` (`connections/fake-server.ts`) is an SDK server in the
 same process over the SDK's in-memory transport, `FakeOAuthTransport` plays an app behind OAuth, and
 `EngineOptions.connectorTransport` and `claudeCodeConfigPath` point the engine at them.

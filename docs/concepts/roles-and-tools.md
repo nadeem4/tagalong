@@ -13,7 +13,9 @@ office's job labels and the one-time roles notice were removed with the crew.
 Tagalong ships one role, the **Companion**, and one pet, Scout, works as it. The Companion never does
 the work itself, with one exception: short drafts (an email reply, a message, a PR description, up
 to about 400 words), which it writes alone in a fenced `draft` block that the bubble shows with
-**Copy**. Anything longer goes to an expert, and it never says it sent, pasted or typed a draft. Its tools are only the ones that look (screen, selection, windows), `remember`,
+**Copy**. Anything longer goes to an expert, and it never says it sent, pasted or typed a draft.
+"File this as a bug" is written the same way but goes to the connected app's create-issue tool, so
+the person sees it in full on the confirm card first; it never guesses a repo. Its tools are only the ones that look (screen, selection, windows), `remember`,
 `hand_to_expert`, which writes a brief and hands it to an expert such as Claude Code, the tools of
 the person's connected apps (`connections`), whose changes always ask first, `create_routine`
 and `change_routine`, which show a routine card the person saves, and `point_at`, which draws a ring

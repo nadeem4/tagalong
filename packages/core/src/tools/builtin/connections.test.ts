@@ -224,3 +224,79 @@ describe('connector tools', () => {
     expect(outcome.isError).toBe(true);
   });
 });
+
+describe('filing a bug through the confirm card', () => {
+  const github: Connection = {
+    id: 'github',
+    name: 'GitHub',
+    transport: { type: 'http', url: 'https://api.githubcopilot.com/mcp/' },
+    auth: 'oauth',
+    secretNames: [],
+    enabled: true,
+  };
+  const githubDeps = (overrides: Partial<ConnectorToolDeps> = {}) =>
+    deps({
+      tools: () => [
+        {
+          connection: github,
+          tool: {
+            name: 'create_issue',
+            description: 'Create a new issue in a GitHub repository.',
+            access: 'write',
+            inputSchema: schema,
+          },
+        },
+      ],
+      ...overrides,
+    });
+  const errorLines = Array.from(
+    { length: 30 },
+    (_, i) => `  at step${i} (src/app.test.ts:${i + 1}:5)`,
+  );
+  const body = [
+    '**What happened:**',
+    '```',
+    ...errorLines,
+    '```',
+    '**Where:** Windows Terminal, "npm test", project tagalong',
+    '**Steps:** 1. Ran npm test (as seen)',
+    '**Expected:** the tests pass',
+  ].join('\n');
+  const issue = {
+    owner: 'nadeem4',
+    repo: 'tagalong',
+    title: 'npm test fails in app.test.ts',
+    body,
+  };
+
+  it('shows a 30-line body on the card in full, and files exactly that on Allow once', async () => {
+    const { value, calls, confirms } = githubDeps();
+    const tools = fakeTurnTools({ connections: value }, { pet: companion });
+    await tools.run({ name: 'github__create_issue', input: issue });
+    expect(confirms).toHaveLength(1);
+    expect(confirms[0]).toMatchObject({ app: 'GitHub', tool: 'create_issue' });
+    expect(confirms[0]?.summary).toContain(`body: ${body}`);
+    for (const line of errorLines) expect(confirms[0]?.summary).toContain(line);
+    expect(calls).toEqual([{ id: 'github', name: 'create_issue', args: issue }]);
+  });
+
+  it('hides a key in the body on both the card and what reaches the app', async () => {
+    const { value, calls, confirms } = githubDeps();
+    const tools = fakeTurnTools({ connections: value }, { pet: companion });
+    const leaky = `${body}\nANTHROPIC_API_KEY=sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789`;
+    await tools.run({ name: 'github__create_issue', input: { ...issue, body: leaky } });
+    expect(confirms[0]?.summary).not.toContain('sk-ant-api03');
+    expect(confirms[0]?.summary).toContain('[hidden: ');
+    expect(JSON.stringify(calls[0]?.args)).not.toContain('sk-ant-api03');
+    expect(String(calls[0]?.args['body'])).toContain('[hidden: ');
+  });
+
+  it('on Cancel never calls the app, and Scout is told nothing was filed', async () => {
+    const { value, calls, records } = githubDeps({ confirm: async () => 'cancelled' });
+    const tools = fakeTurnTools({ connections: value }, { pet: companion });
+    const outcome = await tools.run({ name: 'github__create_issue', input: issue });
+    expect(calls).toEqual([]);
+    expect(outcome.content).toContain('nothing was changed in GitHub');
+    expect(records[0]).toMatchObject({ app: 'GitHub', access: 'write', state: 'stopped' });
+  });
+});

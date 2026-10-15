@@ -23,6 +23,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [What Scout saw](#what-scout-saw)
 - [Draft it for me](#draft-it-for-me)
 - [Spend and the daily budget](#spend-and-the-daily-budget)
+- [File this as a bug](#file-this-as-a-bug)
 - [The Chrome extension](#the-chrome-extension)
 - [Installer](#installer)
 - [Not in this build](#not-in-this-build)
@@ -1296,6 +1297,27 @@ monitor.
    nothing is saved. Clear the box and save: the cap is off and the paused line goes.
 7. **Action:** with only the Claude sign-in in use, set the cap to `0.01`. **Expected:** the cap
    never trips, because the sign-in has no price.
+
+## File this as a bug
+
+### B.1. A failing `npm test` filed on GitHub _(real brain)_
+
+1. **Setup:** connect GitHub (Home → Connections → GitHub, with a token that can open issues in a
+   test repo you own). In a terminal, run `npm test` in a project with one failing test, so the
+   failure is on screen. The terminal's title or text should show the repo, or name it when you ask.
+2. **Action:** ask Scout "file this as a bug in <owner>/<repo>". **Expected:** the confirm card
+   shows GitHub, `create_issue`, the repo, a short title and the whole body: **What happened** with
+   the failure quoted, **Where** (the terminal, its window title, the project), **Steps** marked
+   "as seen" where Scout guessed, and **Expected**. Check by hand that it reads well as an issue.
+   No screenshot is attached.
+3. **Action:** press **Cancel**. **Expected:** Scout says nothing was filed, and no issue appears
+   in the repo. Activity shows a GitHub write row, stopped.
+4. **Action:** ask again and press **Allow once**. **Expected:** the issue appears in the repo,
+   exactly as on the card, and Scout says "Filed as #<number>" only after it does.
+5. **Action:** ask "file this as a bug" with no repo on screen or named. **Expected:** Scout asks
+   which repo; no card appears until you say.
+6. **Action:** with Linear connected too, ask "file this as a bug" without naming an app.
+   **Expected:** Scout asks in one line whether GitHub or Linear.
 
 ## The Chrome extension
 
