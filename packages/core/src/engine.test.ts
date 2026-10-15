@@ -8,7 +8,6 @@ import { defaultConnectorFor, Engine, type EngineOptions } from './engine';
 import { ClaudeCodeConnector, FakeConnector } from './experts';
 import { SPOKEN_HEADING } from './conversation/prompt-assembler';
 import { fakeMcpServer } from './connections/fake-server';
-import { FakeConnector } from './experts';
 import { ActivityLog } from './memory/activity';
 import { openDatabase } from './memory/db';
 import { ConversationStore } from './memory/store';
