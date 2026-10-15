@@ -501,10 +501,19 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
   const home = await windowFor('office');
   await expect(home).toHaveTitle('Home');
 
-  // One companion and seven pages; no crew and no office scene.
+  // One companion and eight pages; no crew and no office scene.
   const nav = home.getByRole('navigation', { name: 'Tagalong' });
   await expect(nav.getByRole('button')).toHaveText(
-    ['Overview', 'Scout', 'Experts', 'Routines', 'Connections', 'Activity', 'Settings'],
+    [
+      'Overview',
+      'Scout',
+      'Experts',
+      'Routines',
+      'Connections',
+      'Activity',
+      'What Scout saw',
+      'Settings',
+    ],
     { timeout: 15_000 },
   );
   const pets = await panel.evaluate(() => window.tagalong.listPets());
