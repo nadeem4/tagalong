@@ -765,8 +765,10 @@ events apart from its pointer events: a press that moves drags the pet (`dragAva
 `File` into its path with `webUtils.getPathForFile` (`File.path` is gone in Electron 44; `webUtils`
 is available to a sandboxed preload). In main, `dropDesk.offer` names the item without reading it:
 a file first, then a web link, then text; a secret file name (`SECRET_FILES`, through core's
-`secretFileRule`) becomes a refusal. Main opens the bubble (`openPanelNow`) and sends `dropEvent`
-with the card. A card's button asks with `drop: true`; only then does `dropDesk.take` read the item
+`secretFileRule`) becomes a refusal. `dropOnPet` is taken only from the figure's own window
+(`registerDropIpc`, `fromWindow`). Main opens the bubble (`openPanelNow`) and sends `dropEvent`
+with the card. A card's button asks with `drop: true`; only then does `dropDesk.take` read the item, once and
+within ten minutes of the drop (`DROP_HOLD_MS`; after that it is let go unread)
 (`readDrop`: a text file up to 1 MB, a PNG or JPEG up to 10 MB scaled by `nativeImage` to the
 screenshot long side, any other file by name, path and size) and `turns.ts` attaches it as
 `snapshot.dropped`. The prompt gets a "Dropped on you" section and, for an image, an image block;

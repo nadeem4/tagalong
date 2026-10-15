@@ -4,6 +4,8 @@ import { MAX_SELECTION_CHARS } from '@tagalong/protocol';
 import type { CapturedImage, Dropped } from '@tagalong/protocol';
 import type { DropOffer } from '@tagalong/ui';
 import { MAX_SCREENSHOT_LONG_SIDE } from './context';
+import type { IpcHandle } from './ipc/handle';
+import { IPC } from '../shared/ipc';
 
 /**
  * Drop it on Scout: a file, an image, a link or selected text dropped on the figure.
@@ -23,6 +25,9 @@ export interface DropItem {
 export const MAX_TEXT_FILE_BYTES = 1024 * 1024;
 /** An image past this is named with its size, not decoded. */
 export const MAX_IMAGE_FILE_BYTES = 10 * 1024 * 1024;
+
+/** How long a dropped item waits for a button on its card before it is let go, unread. */
+export const DROP_HOLD_MS = 10 * 60_000;
 
 export const SECRET_REFUSAL = 'That looks like a secrets file, so I won’t read it or pass it on.';
 
@@ -157,7 +162,10 @@ export async function readDrop(dropped: Dropped, fs: DropFs): Promise<DropRead> 
   const path = dropped.path;
   if (path === undefined) return { ok: true, dropped };
   const name = dropped.name ?? fileName(path);
-  if (secretFileRule(name) !== null) return { ok: false, error: SECRET_REFUSAL };
+  // Judged by the path itself, the file that would be opened, not by the name it came with.
+  if (secretFileRule(fileName(path)) !== null || secretFileRule(name) !== null) {
+    return { ok: false, error: SECRET_REFUSAL };
+  }
 
   try {
     const size = await fs.size(path);
@@ -176,26 +184,48 @@ export async function readDrop(dropped: Dropped, fs: DropFs): Promise<DropRead> 
 }
 
 /**
- * Holds the item last dropped until a button on its card takes it, once. A refusal holds
- * nothing, so a secrets file can never be sent by pressing a button on an older card.
+ * Holds the item last dropped until a button on its card takes it, once, within
+ * `DROP_HOLD_MS`. A refusal holds nothing, so a secrets file can never be sent by pressing
+ * a button on an older card, and a card left open or cancelled cannot be sent much later.
  */
-export function dropDesk(fs: DropFs) {
-  let held: Dropped | null = null;
+export function dropDesk(fs: DropFs, now: () => number = Date.now) {
+  let held: { dropped: Dropped; at: number } | null = null;
   return {
     offer(item: unknown): DropOffer | null {
       const offer = offerFor(item);
-      held = offer !== null && 'dropped' in offer ? offer.dropped : null;
+      held = offer !== null && 'dropped' in offer ? { dropped: offer.dropped, at: now() } : null;
       return offer;
     },
     async take(): Promise<Dropped> {
-      const dropped = held;
+      const taken = held;
       held = null;
-      if (dropped === null) throw new Error('Nothing was dropped on Scout to send.');
+      if (taken === null) throw new Error('Nothing was dropped on Scout to send.');
+      if (now() - taken.at > DROP_HOLD_MS) {
+        throw new Error('That drop has been waiting too long. Drop it on me again.');
+      }
+      const dropped = taken.dropped;
       const read = await readDrop(dropped, fs);
       if (!read.ok) throw new Error(read.error);
       return read.dropped;
     },
   };
+}
+
+export interface DropIpcDeps {
+  desk: Pick<ReturnType<typeof dropDesk>, 'offer'>;
+  /** Whether the call came from the figure's window, the only one things are dropped on. */
+  fromAvatar: (event: unknown) => boolean;
+  /** Opens the bubble on the card for the drop. */
+  show: (offer: DropOffer) => void;
+}
+
+/** A drop on the figure: name the item and open the bubble on its card. Nothing is read. */
+export function registerDropIpc(handle: IpcHandle, deps: DropIpcDeps): void {
+  handle(IPC.dropOnPet, (event, item: unknown) => {
+    if (!deps.fromAvatar(event)) throw new Error('Things are dropped only on the figure.');
+    const offer = deps.desk.offer(item);
+    if (offer !== null) deps.show(offer);
+  });
 }
 
 /**

@@ -101,7 +101,7 @@ import { PickUpAllowlist, PickUpWaiting } from './pick-up-open';
 import { registerSightLogIpc } from './ipc/sight-log';
 import { registerSettingsIpc } from './ipc/settings';
 import { registerTurnIpc } from './ipc/turns';
-import { dropDesk } from './drop';
+import { dropDesk, registerDropIpc } from './drop';
 import { nodeDropFs } from './drop-io';
 import { forwardEars, registerVoiceIpc } from './ipc/voice';
 import { IPC } from '../shared/ipc';
@@ -1129,12 +1129,14 @@ function registerIpc(): void {
   });
 
   // Drop it on Scout: name the item, open the bubble on its card. Nothing is read yet.
-  ipcMain.handle(IPC.dropOnPet, (_event, item: unknown) => {
-    const offer = drops.offer(item);
-    if (offer === null) return;
-    const current = required();
-    openPanelNow(current);
-    current.panel?.webContents.send(IPC.dropEvent, offer);
+  registerDropIpc(handle, {
+    desk: drops,
+    fromAvatar: fromWindow(() => required().avatar),
+    show: (offer) => {
+      const current = required();
+      openPanelNow(current);
+      current.panel?.webContents.send(IPC.dropEvent, offer);
+    },
   });
 
   ipcMain.handle(IPC.fitPanel, (_event, height: number) => {

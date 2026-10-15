@@ -1305,6 +1305,8 @@ Needs GitHub connected (Home → Connections → GitHub, with a token) and a rea
    say "Scout, explain it": Scout answers without the dropped item.
 8. Pause sight, then drop a file: the card still shows and works.
 9. Drag Scout itself to move it: no drop card opens.
+10. Drop a file, wait more than ten minutes, then press **Explain**: Scout says to drop it again,
+    and nothing is sent.
 
 ## Not in this build
 

@@ -542,7 +542,8 @@ expert** and **Cancel**.
 
 - **Nothing is read on the drop.** Tagalong notes the item's name and path only. The file is read
   from disk when you press **Explain** or **Hand it to an expert**, and only that one item goes,
-  with that one question. **Cancel** sends nothing.
+  with that one question. **Cancel** sends nothing. An item nobody sends is let go, unread, ten
+  minutes after the drop, and a button pressed later says to drop it again.
 - **What is read.** A text file (by its extension, up to 1 MB): its text, capped like a selection.
   A PNG or JPEG (up to 10 MB): scaled to the screenshot size and sent as a picture. Any other file
   (PDF, Word, a WebP or GIF, a file too big): its name, path and size only. Tagalong does not open

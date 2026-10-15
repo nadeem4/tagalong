@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { CapturedImage } from '@tagalong/protocol';
 import { MAX_SELECTION_CHARS } from '@tagalong/protocol';
+import { fakeIpc } from './ipc/fake-ipc';
+import { IPC } from '../shared/ipc';
 import {
+  DROP_HOLD_MS,
   MAX_IMAGE_FILE_BYTES,
   MAX_TEXT_FILE_BYTES,
   SECRET_REFUSAL,
@@ -9,6 +12,7 @@ import {
   guardNavigation,
   offerFor,
   readDrop,
+  registerDropIpc,
 } from './drop';
 import type { DropFs } from './drop';
 
@@ -79,6 +83,21 @@ describe('offerFor', () => {
     for (const path of ['/repo/.env', 'C:\\Users\\a\\.ssh\\id_rsa', '/repo/secrets.json']) {
       expect(offerFor({ paths: [path] })).toEqual({ refusal: SECRET_REFUSAL });
     }
+  });
+
+  it('refuses secrets files by any case, nested anywhere, by pattern too', () => {
+    for (const path of [
+      'C:\\Users\\A\\.SSH\\ID_RSA',
+      'C:\\deep\\nested\\dir\\.ENV',
+      '/srv/app/config/.env.production',
+      'D:\\certs\\Server.PEM',
+      '/home/a/keys/deploy.key',
+      'C:\\w\\Secrets.Yaml',
+    ]) {
+      expect(offerFor({ paths: [path] })).toEqual({ refusal: SECRET_REFUSAL });
+    }
+    // A name that only contains a secret word is an ordinary file.
+    expect(offerFor({ paths: ['/w/env-notes.md'] })).toMatchObject({ explain: true });
   });
 
   it('treats a non-web link as text, and gives nothing for an empty or malformed drop', () => {
@@ -156,6 +175,15 @@ describe('readDrop', () => {
     expect(reads).toEqual([]);
   });
 
+  it('judges a secrets file by its path, whatever name it arrives with', async () => {
+    const { fs, reads } = fakeFs({ '/r/.env': { size: 10, text: 'KEY=1' } });
+    expect(await readDrop({ kind: 'file', name: 'report.md', path: '/r/.env' }, fs)).toEqual({
+      ok: false,
+      error: SECRET_REFUSAL,
+    });
+    expect(reads).toEqual([]);
+  });
+
   it('returns an error for a missing file rather than throwing', async () => {
     const { fs } = fakeFs({});
     const read = await readDrop({ kind: 'file', name: 'gone.md', path: '/w/gone.md' }, fs);
@@ -199,6 +227,64 @@ describe('dropDesk', () => {
 
     desk.offer({ paths: ['/w/gone.md'] });
     await expect(desk.take()).rejects.toThrow('I couldn’t read gone.md.');
+  });
+
+  it('lets a held drop expire, unread, so a later ask cannot send it', async () => {
+    const { fs, reads } = fakeFs({ '/w/a.md': { size: 3, text: 'abc' } });
+    let now = 1_000;
+    const desk = dropDesk(fs, () => now);
+    desk.offer({ paths: ['/w/a.md'] });
+    now += DROP_HOLD_MS + 1;
+    await expect(desk.take()).rejects.toThrow(/drop it on me again/i);
+    expect(reads).toEqual([]);
+    // Expired is gone, not waiting: a second try finds nothing either.
+    await expect(desk.take()).rejects.toThrow(/nothing/i);
+  });
+
+  it('still sends a drop taken within the hold', async () => {
+    const { fs } = fakeFs({ '/w/a.md': { size: 3, text: 'abc' } });
+    let now = 1_000;
+    const desk = dropDesk(fs, () => now);
+    desk.offer({ paths: ['/w/a.md'] });
+    now += DROP_HOLD_MS - 1;
+    expect(await desk.take()).toMatchObject({ text: 'abc' });
+  });
+});
+
+describe('registerDropIpc', () => {
+  const avatarEvent = { sender: 'avatar' };
+  function setup() {
+    const ipc = fakeIpc();
+    const { fs } = fakeFs({ '/w/a.md': { size: 3, text: 'abc' } });
+    const desk = dropDesk(fs);
+    const shown: unknown[] = [];
+    registerDropIpc(ipc.handle, {
+      desk,
+      fromAvatar: (event) => event === avatarEvent,
+      show: (offer) => shown.push(offer),
+    });
+    return { ipc, desk, shown };
+  }
+
+  it('opens the card for a drop on the figure', async () => {
+    const { ipc, shown } = setup();
+    await ipc.invokeWith(avatarEvent, IPC.dropOnPet, { paths: ['/w/a.md'] });
+    expect(shown).toEqual([
+      { dropped: { kind: 'file', name: 'a.md', path: '/w/a.md' }, explain: true },
+    ]);
+  });
+
+  it('takes a drop only from the figure’s own window, holding nothing from elsewhere', async () => {
+    const { ipc, desk, shown } = setup();
+    await expect(ipc.invoke(IPC.dropOnPet, { paths: ['/w/a.md'] })).rejects.toThrow(/figure/i);
+    expect(shown).toEqual([]);
+    await expect(desk.take()).rejects.toThrow(/nothing/i);
+  });
+
+  it('shows nothing for an empty drop', async () => {
+    const { ipc, shown } = setup();
+    await ipc.invokeWith(avatarEvent, IPC.dropOnPet, { paths: [] });
+    expect(shown).toEqual([]);
   });
 });
 
