@@ -584,6 +584,14 @@ the keychain). `connector.confirm` brings up Scout's bubble, which shows `Connec
 change, the details Scout filled in, **Allow once** and **Cancel**, answered with `tool.approve`.
 The card goes away when it is answered or when its turn ends.
 
+**"What needs me?"** has no tool of its own, because each app's tools differ. The companion's
+instructions (`roles/companion.md`) tell Scout to call the read tools of every connected app with
+issues, reviews or pages (GitHub reviews requested and issues assigned, Linear open issues assigned,
+Notion mentions if its tools offer them, otherwise it says so), merge them into one list grouped by
+app, oldest first, at most 15 per app, and never call a write tool or send screen content for it.
+Home's **What needs me** routine template asks the same every weekday at 09:00; an engine test pins
+that a read on a routine turn emits no `connector.confirm` while a write on the same turn still does.
+
 Tests never reach a real app: `fakeMcpServer` (`connections/fake-server.ts`) is an SDK server in the
 same process over the SDK's in-memory transport, `FakeOAuthTransport` plays an app behind OAuth, and
 `EngineOptions.connectorTransport` and `claudeCodeConfigPath` point the engine at them.
@@ -710,7 +718,8 @@ question, answer }`, so a follow-up continues the routine's conversation. Home's
 (`routines.setEnabled`), last run (with **See in Activity**), next run, **Run now** and **Edit**, and
 follows `routines.changed`. **New routine** offers the templates, which live in the UI only: Morning
 papers (weekdays 08:00, with Topics and `handTo` set to the first Claude Code expert switched on),
-Today's calendar, Reviews waiting on GitHub, End-of-day summary, and Blank. The form has Name, When
+Today's calendar, Reviews waiting on GitHub, What needs me (weekdays 09:00, `uses` GitHub, Linear and
+Notion; it only reads, so a run never meets a confirm card), End-of-day summary, and Blank. The form has Name, When
 (every day, weekdays, chosen days with a time; or one of the four triggers, with the app or site to
 match), What, Topics, Result goes to, and May hand to.
 

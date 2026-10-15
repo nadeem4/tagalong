@@ -243,6 +243,12 @@ call or a full-screen window is in front, and while the pets are hidden). Your s
 small models (Silero VAD, Moonshine and Smart Turn) downloaded the first time (about 43 MB); the
 audio is never sent or kept.
 
+**What needs me?** Ask it and Scout reads your connected apps (GitHub reviews and assigned issues,
+Linear issues, Notion mentions when its tools offer them) and answers with one list grouped by app,
+oldest first, one line each with how long it has waited. It only reads, and sends no screen
+content. An app that isn't connected is named once at the end; a signed-out one asks you to sign in
+again.
+
 **Memory.** Tell Scout "I prefer short answers" and it remembers across restarts.
 
 Upgrading from an earlier build removes its other companions, Ink and Bolt; their conversations
@@ -280,7 +286,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   project folder: each task picks its project, and you confirm before anything is sent.
 - **Routines**: things Scout does for you on its own, such as new papers every weekday at 8.
   - **New routine** starts from a template (**Morning papers**, **Today's calendar**, **Reviews
-    waiting on GitHub**, **End-of-day summary**) or **Blank**. Pick **When** (every day, weekdays,
+    waiting on GitHub**, **What needs me** at 09:00 on weekdays, **End-of-day summary**) or **Blank**. Pick **When** (every day, weekdays,
     chosen days at a time, or when Tagalong opens, an app or site appears, an expert finishes, a
     watch fires), say **What** in your own words, and where the **Result goes**: Scout's bubble,
     read aloud, a Windows notification. Activity always keeps each run.

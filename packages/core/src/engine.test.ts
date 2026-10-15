@@ -1179,6 +1179,67 @@ describe('connections over rpc', () => {
       state: 'done',
     });
   });
+
+  it('on a routine turn reads without asking, and a change still asks', async () => {
+    // What the "What needs me" template relies on: its run never meets a card for a read.
+    let rounds = 0;
+    const readThenWrite: BrainProvider = {
+      id: 'fake',
+      capabilities: { vision: false, tools: true, streaming: true },
+      listModels: () => Promise.resolve(['fake-model']),
+      complete: async (_req, events) => {
+        if (rounds++ === 0) {
+          await events.onToolUse({ id: 'call-1', name: 'wiki__search', input: { q: 'me' } });
+          await events.onToolUse({
+            id: 'call-2',
+            name: 'wiki__create_page',
+            input: { title: 'X' },
+          });
+        }
+        events.onText('One review waiting.');
+        return {
+          text: 'One review waiting.',
+          stopReason: 'end',
+          usage: { inputTokens: 1, outputTokens: 1 },
+        };
+      },
+    };
+    const fake = server();
+    const e = await boot(readThenWrite, { connectorTransport: () => fake.transport() });
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('connections.add', {
+      name: 'Wiki',
+      transport: { type: 'http', url: 'https://wiki.example/mcp' },
+      auth: 'none',
+    });
+    const saved = (
+      await host.call('routines.save', {
+        routine: {
+          name: 'What needs me',
+          when: { type: 'schedule', days: [1, 2, 3, 4, 5], time: '09:00' },
+          what: 'List what is waiting on me across my connected apps.',
+          uses: ['Wiki'],
+        },
+      })
+    )['result'] as { routine: { id: string } };
+
+    await host.call('routines.runNow', { id: saved.routine.id });
+    await vi.waitFor(() => expect(host.methods()).toContain('connector.confirm'), {
+      timeout: 5000,
+    });
+    // The read already ran, with no card; the only card is for the change.
+    expect(fake.calls).toEqual([{ name: 'search', args: { q: 'me' } }]);
+    const confirms = host.notifications.filter((n) => n.method === 'connector.confirm');
+    expect(confirms.map((n) => n.params['tool'])).toEqual(['create_page']);
+
+    await host.call('tool.approve', {
+      approvalId: confirms[0]!.params['approvalId'],
+      decision: 'deny',
+    });
+    await vi.waitFor(() => expect(host.methods()).toContain('routine.result'), { timeout: 5000 });
+    expect(fake.calls).toEqual([{ name: 'search', args: { q: 'me' } }]);
+  });
 });
 
 describe('providers.check', () => {

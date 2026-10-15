@@ -98,12 +98,36 @@ describe('RoutinesPanel', () => {
     expect(bridge.routines[0]?.what).toMatch(/title and one line on why it matters/);
   });
 
+  it('starts What needs me from its template, across GitHub, Linear and Notion', async () => {
+    const bridge = createFakeHostBridge();
+    await renderPanel(bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'New routine' }));
+    fireEvent.click(screen.getByRole('button', { name: /What needs me/ }));
+    await flush();
+    expect(screen.getByLabelText('Name')).toHaveValue('What needs me');
+    expect(screen.getByLabelText('When')).toHaveValue('weekdays');
+    expect(screen.getByLabelText('At')).toHaveValue('09:00');
+    expect(screen.getByLabelText('What')).toHaveValue(
+      'List what is waiting on me across my connected apps: reviews requested, issues assigned ' +
+        'to me, mentions. One line each, oldest first.',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await flush();
+    expect(bridge.routines[0]).toMatchObject({
+      name: 'What needs me',
+      when: { type: 'schedule', days: [1, 2, 3, 4, 5], time: '09:00' },
+      uses: ['GitHub', 'Linear', 'Notion'],
+    });
+    expect(bridge.routines[0]?.handTo).toBeUndefined();
+  });
+
   it('offers the other templates and Blank', async () => {
     await renderPanel(createFakeHostBridge());
     fireEvent.click(screen.getByRole('button', { name: 'New routine' }));
     for (const name of [
       /Today’s calendar/,
       /Reviews waiting on GitHub/,
+      /What needs me/,
       /End-of-day summary/,
       /Blank/,
     ]) {
