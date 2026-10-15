@@ -70,6 +70,22 @@ export function connectedApps(configPath: string = join(homedir(), '.claude.json
   return [...claudeAi, ...servers];
 }
 
+/**
+ * The allow rules in the person's Claude Code user settings (`~/.claude/settings.json`),
+ * read-only. A catalog expert's run loads user settings, so an app tool allowed there would
+ * run without asking; the run denies each one its entry does not list.
+ */
+export function userAllowRules(
+  settingsPath: string = join(homedir(), '.claude', 'settings.json'),
+): string[] {
+  const settings = readJson(settingsPath);
+  const allow =
+    isRecord(settings) && isRecord(settings.permissions) ? settings.permissions.allow : undefined;
+  return Array.isArray(allow)
+    ? allow.filter((rule): rule is string => typeof rule === 'string')
+    : [];
+}
+
 export type InstallResult = { ok: true } | { ok: false; error: string };
 
 /**

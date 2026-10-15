@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ChildRun, SpawnFn } from './claude-code';
-import { connectedApps, installPlugin, installedPlugins } from './claude-setup';
+import { connectedApps, installPlugin, installedPlugins, userAllowRules } from './claude-setup';
 
 let root: string;
 beforeEach(() => {
@@ -62,6 +62,29 @@ describe('connectedApps', () => {
 
   it('is empty when the file is missing', () => {
     expect(connectedApps(join(root, 'none.json'))).toEqual([]);
+  });
+});
+
+describe('userAllowRules', () => {
+  it("lists the allow rules in the person's Claude Code user settings", () => {
+    const path = join(root, 'settings.json');
+    writeFileSync(
+      path,
+      JSON.stringify({
+        permissions: { allow: ['mcp__claude_ai_Gmail__send_message', 3, 'Read'], deny: ['Bash'] },
+      }),
+    );
+    expect(userAllowRules(path)).toEqual(['mcp__claude_ai_Gmail__send_message', 'Read']);
+  });
+
+  it('is empty when the file is missing, broken or has no allow list', () => {
+    expect(userAllowRules(join(root, 'none.json'))).toEqual([]);
+    const broken = join(root, 'broken.json');
+    writeFileSync(broken, '{');
+    expect(userAllowRules(broken)).toEqual([]);
+    const bare = join(root, 'bare.json');
+    writeFileSync(bare, JSON.stringify({ permissions: { allow: 'mcp__x__y' } }));
+    expect(userAllowRules(bare)).toEqual([]);
   });
 });
 

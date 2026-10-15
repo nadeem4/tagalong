@@ -8,10 +8,7 @@
     "canEdit": false,
     "canSearchWeb": true,
     "workspace": "own",
-    "plugins": [
-      { "id": "firecrawl@claude-plugins-official", "name": "Firecrawl" },
-      { "id": "notion@claude-plugins-official", "name": "Notion" }
-    ],
+    "plugins": [{ "id": "notion@claude-plugins-official", "name": "Notion" }],
     "apps": [
       {
         "name": "Notion",

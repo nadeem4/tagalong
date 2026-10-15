@@ -445,8 +445,9 @@ Two connectors exist so far:
   process that already exited is swallowed, since the exit code already reports the failure.
 - **The expert catalog** (`experts/catalog.json`, `experts/catalog.ts`) is a built-in list of
   ready-made experts, parsed by the protocol's `CatalogEntry` at load: **Researcher** (pins
-  `firecrawl@claude-plugins-official` and `notion@claude-plugins-official`, may call Notion
-  search and fetch), **Trip planner** (no plugins; Google Calendar list and search events, and
+  `notion@claude-plugins-official`, may call Notion search and fetch, and searches the web with
+  WebSearch and WebFetch; no Firecrawl pin, since that plugin only drives its CLI through Bash,
+  which no expert has), **Trip planner** (no plugins; Google Calendar list and search events, and
   Expedia, Booking.com and Kiwi.com search tools when set up) and **Social media manager** (pins the
   Notion plugin; Notion search and fetch, Canva design search when set up). No server, no fetching.
   An expert carries its bundle on `ClaudeCodeConnection`: `plugins` (`name@marketplace`),
@@ -454,18 +455,23 @@ Two connectors exist so far:
   (`project` or `own`), plus `Expert.catalogId`; old rows parse with `[]`, `[]` and `project`.
   `experts.upsert` passes every expert through `fromCatalog`: one without a `catalogId` is saved
   with no plugins and no app tools, whatever was sent, and one with a `catalogId` gets exactly its
-  entry's bundle (an unknown id is refused). `defaultConnectorFor` passes a bundle on only when a
-  `catalogId` is set. **Only these runs are unsealed**: `Skill` joins `--tools` and
+  entry's bundle (an unknown id is refused). At run time `defaultConnectorFor` reads the bundle
+  again from `catalog.json` by `catalogId` (`catalogBundle`), never from the saved row, so a row
+  edited by hand cannot add a plugin or an app tool, and an unknown `catalogId` stays sealed.
+  **Only these runs are unsealed**: `Skill` joins `--tools` and
   `--allowedTools`; `--strict-mcp-config` and the `mcp__*` deny go, and `--allowedTools` lists
   exactly `mcpTools`; the permission mode is always `dontAsk` (draft edits are on the allowed list),
-  so every tool not listed is refused; `--setting-sources user`, the secret-file denies and
+  so every tool not listed is refused. User settings still load, so an app tool the person allowed
+  there (`permissions.allow` in `~/.claude/settings.json`, read by `userAllowRules`) would run
+  without asking: every `mcp__` allow rule there that the entry does not list exactly goes on
+  `--disallowedTools`, and a deny wins. `--setting-sources user`, the secret-file denies and
   `disableAllHooks` stay, and the `--settings` override adds `enabledPlugins` with each pinned
   plugin `true` and every other installed plugin `false` (from
   `~/.claude/plugins/installed_plugins.json` plus claude.ai-synced plugins, `name@synced`, read by
   `installedPlugins` in `experts/claude-setup.ts`). The stream-json `system` init event lists the
   plugins Claude Code really loaded; when that list (less its own `@builtin` ones) is not exactly the
   pinned set, or no init event comes first, the run is stopped before it does anything and fails
-  with a plain reason ("Claude Code did not load firecrawl@claude-plugins-official, which this
+  with a plain reason ("Claude Code did not load notion@claude-plugins-official, which this
   expert needs…"). A routine's research run stays sealed whatever the bundle. Apps are the
   person's own Claude Code connectors (claude.ai connectors and user-scope servers, read from
   `~/.claude.json` by `connectedApps`); Tagalong stores no token and does no sign-in for them.

@@ -6,6 +6,7 @@ import WebSocket from 'ws';
 import { PROTOCOL_VERSION, RPC_ERROR_CODES, SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import { defaultConnectorFor, Engine, type EngineOptions } from './engine';
 import { ClaudeCodeConnector, FakeConnector } from './experts';
+import type { SpawnFn } from './experts/claude-code';
 import { SPOKEN_HEADING } from './conversation/prompt-assembler';
 import { fakeMcpServer } from './connections/fake-server';
 import { ActivityLog } from './memory/activity';
@@ -2000,7 +2001,6 @@ describe('the expert catalog', () => {
       'social-media-manager',
     ]);
     expect(entries[0]?.plugins).toEqual([
-      { id: 'firecrawl@claude-plugins-official', name: 'Firecrawl', installed: false },
       { id: 'notion@claude-plugins-official', name: 'Notion', installed: true },
     ]);
     expect(entries[1]?.apps.find((a) => a.name === 'Google Calendar')?.found).toBe(true);
@@ -2008,24 +2008,29 @@ describe('the expert catalog', () => {
 
   it('installs only the missing plugins, with claude plugin install', async () => {
     const spawned: string[][] = [];
-    const host = await connected({
-      env: {},
-      claudePluginsRoot: plugins(['notion@claude-plugins-official']),
-      claudeSpawn: (_command, args) => {
-        spawned.push(args);
-        return {
-          write: () => undefined,
-          end: () => undefined,
-          lines: (async function* () {})(),
-          exit: Promise.resolve(0),
-          stderr: () => '',
-          kill: () => undefined,
-        };
-      },
-    });
+    const spawn: SpawnFn = (_command, args) => {
+      spawned.push(args);
+      return {
+        write: () => undefined,
+        end: () => undefined,
+        lines: (async function* () {})(),
+        exit: Promise.resolve(0),
+        stderr: () => '',
+        kill: () => undefined,
+      };
+    };
+    const host = await connected({ env: {}, claudePluginsRoot: plugins([]), claudeSpawn: spawn });
     const result = (await host.call('experts.install', { catalogId: 'researcher' }))['result'];
-    expect(result).toEqual({ ok: true, installed: ['firecrawl@claude-plugins-official'] });
-    expect(spawned).toEqual([['plugin', 'install', 'firecrawl@claude-plugins-official']]);
+    expect(result).toEqual({ ok: true, installed: ['notion@claude-plugins-official'] });
+    // The arguments come from catalog.json, never from the caller.
+    expect(spawned).toEqual([['plugin', 'install', 'notion@claude-plugins-official']]);
+
+    // Already installed: nothing runs.
+    spawned.length = 0;
+    plugins(['notion@claude-plugins-official']);
+    const again = (await host.call('experts.install', { catalogId: 'researcher' }))['result'];
+    expect(again).toEqual({ ok: true, installed: [] });
+    expect(spawned).toEqual([]);
   });
 
   it('says why an install failed, in plain words', async () => {
@@ -2090,10 +2095,7 @@ describe('the expert catalog', () => {
         },
       })
     )['result'] as { expert: { connection: { plugins: string[]; workspace: string } } };
-    expect(catalog.expert.connection.plugins).toEqual([
-      'firecrawl@claude-plugins-official',
-      'notion@claude-plugins-official',
-    ]);
+    expect(catalog.expert.connection.plugins).toEqual(['notion@claude-plugins-official']);
     expect(catalog.expert.connection.workspace).toBe('own');
 
     const unknown = await host.call('experts.upsert', {
@@ -2129,9 +2131,13 @@ describe('defaultConnectorFor', () => {
   });
 
   it('gives a catalog expert its bundle and its own folder, and nothing to any other', () => {
+    // The Researcher's bundle in catalog.json.
     const bundle = {
       plugins: ['notion@claude-plugins-official'],
-      mcpTools: ['mcp__plugin_Notion_notion__notion-search'],
+      mcpTools: [
+        'mcp__plugin_Notion_notion__notion-search',
+        'mcp__plugin_Notion_notion__notion-fetch',
+      ],
       workspace: 'own' as const,
     };
     const catalog = defaultConnectorFor({})({
@@ -2146,6 +2152,35 @@ describe('defaultConnectorFor', () => {
       ownFolder: join(tmpdir(), 'tagalong-experts', 'researcher'),
     });
     expect(typeof catalog.options['installedPlugins']).toBe('function');
+    expect(typeof catalog.options['userAllowRules']).toBe('function');
+
+    // A stored row edited by hand: the bundle still comes from catalog.json alone.
+    const forged = defaultConnectorFor({})({
+      ...expert,
+      id: 'researcher',
+      catalogId: 'researcher',
+      connection: {
+        ...expert.connection,
+        plugins: ['superpowers@claude-plugins-official'],
+        mcpTools: ['mcp__claude_ai_Gmail__send_message'],
+        workspace: 'project',
+      },
+    }) as unknown as { options: Record<string, unknown> };
+    expect(forged.options['plugins']).toEqual(['notion@claude-plugins-official']);
+    expect(forged.options['mcpTools']).toEqual([
+      'mcp__plugin_Notion_notion__notion-search',
+      'mcp__plugin_Notion_notion__notion-fetch',
+    ]);
+    expect(forged.options['ownFolder']).toBe(join(tmpdir(), 'tagalong-experts', 'researcher'));
+
+    // A catalog id that is not in the catalog unseals nothing.
+    const unknown = defaultConnectorFor({})({
+      ...expert,
+      catalogId: 'gmail-sender',
+      connection: { ...expert.connection, ...bundle },
+    }) as unknown as { options: Record<string, unknown> };
+    expect(unknown.options['plugins']).toBeUndefined();
+    expect(unknown.options['mcpTools']).toBeUndefined();
 
     const handMade = defaultConnectorFor({})({
       ...expert,

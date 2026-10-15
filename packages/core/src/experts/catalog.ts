@@ -42,6 +42,28 @@ export function catalogStatus(
   return { entry, plugins, apps };
 }
 
+/** What a catalog expert runs with: its plugins, its app tools and where it works. */
+export interface CatalogBundle {
+  plugins: string[];
+  mcpTools: string[];
+  workspace: 'project' | 'own';
+}
+
+/**
+ * The bundle an expert runs with, read from the catalog by its `catalogId` and never from
+ * what its saved row holds, so a row edited by hand cannot add a plugin or an app tool.
+ * Undefined, so the run stays sealed, for every expert not installed from the catalog.
+ */
+export function catalogBundle(expert: Expert): CatalogBundle | undefined {
+  const entry = expert.catalogId === undefined ? undefined : catalogEntry(expert.catalogId);
+  if (entry === undefined) return undefined;
+  return {
+    plugins: entry.plugins.map((plugin) => plugin.id),
+    mcpTools: entry.apps.flatMap((app) => app.tools),
+    workspace: entry.workspace,
+  };
+}
+
 /**
  * The expert as it is saved: only one installed from the catalog keeps a bundle, and that
  * bundle is always its entry's, whatever was sent. Every other expert stays sealed.
@@ -50,17 +72,9 @@ export function fromCatalog(expert: Expert): Expert {
   if (expert.catalogId === undefined) {
     return { ...expert, connection: { ...expert.connection, plugins: [], mcpTools: [] } };
   }
-  const entry = catalogEntry(expert.catalogId);
-  if (entry === undefined) {
+  const bundle = catalogBundle(expert);
+  if (bundle === undefined) {
     throw new Error(`'${expert.catalogId}' is not in the expert catalog`);
   }
-  return {
-    ...expert,
-    connection: {
-      ...expert.connection,
-      plugins: entry.plugins.map((plugin) => plugin.id),
-      mcpTools: entry.apps.flatMap((app) => app.tools),
-      workspace: entry.workspace,
-    },
-  };
+  return { ...expert, connection: { ...expert.connection, ...bundle } };
 }

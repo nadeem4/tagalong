@@ -62,6 +62,11 @@ export interface ClaudeCodeOptions {
   mcpTools?: readonly string[];
   /** Every plugin Claude Code has, so a bundled run can turn off the ones it does not pin. */
   installedPlugins?: () => readonly string[];
+  /**
+   * The allow rules in the person's own Claude Code user settings. A bundled run denies each
+   * app tool rule there that it does not list, so dontAsk cannot run it. Read per run.
+   */
+  userAllowRules?: () => readonly string[];
   /** Set for an expert that works in its own folder: it runs here, never in a project. */
   ownFolder?: string;
 }
@@ -95,6 +100,8 @@ interface Bundle {
   plugins: readonly string[];
   mcpTools: readonly string[];
   installed: readonly string[];
+  /** App tool rules the person's own settings allow and the bundle does not list. */
+  denied: readonly string[];
 }
 
 /**
@@ -148,7 +155,14 @@ export class ClaudeCodeConnector implements Connector {
     const mcpTools = research ? [] : (this.options.mcpTools ?? []);
     const bundle: Bundle | undefined =
       plugins.length > 0 || mcpTools.length > 0
-        ? { plugins, mcpTools, installed: this.options.installedPlugins?.() ?? [] }
+        ? {
+            plugins,
+            mcpTools,
+            installed: this.options.installedPlugins?.() ?? [],
+            denied: (this.options.userAllowRules?.() ?? []).filter(
+              (rule) => rule.startsWith('mcp__') && !mcpTools.includes(rule),
+            ),
+          }
         : undefined;
     let folder: string | undefined;
     if (research) {
@@ -387,7 +401,10 @@ function bundledArgs(tools: readonly string[], bundle: Bundle): string[] {
     '--allowedTools',
     ...tools,
     ...bundle.mcpTools,
+    // A deny rule wins over an allow rule, so an app tool the person allowed for their own
+    // sessions stays refused here unless the entry lists it exactly.
     '--disallowedTools',
+    ...bundle.denied,
   ];
 }
 

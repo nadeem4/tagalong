@@ -109,7 +109,9 @@ The extension's public privacy policy, for the Chrome Web Store, is
   events), through the connectors you already set up and signed into in Claude Code. Tagalong
   holds no token and does no sign-in for them; it reads which ones exist from `~/.claude.json` and
   `~/.claude/plugins`, read-only. Every tool not on the list, including any that posts, sends,
-  books or changes something, is refused without asking. Only its pinned plugins load; if Claude
+  books or changes something, is refused without asking, even one you allowed for your own Claude
+  Code sessions in `~/.claude/settings.json` (it is denied for these runs). The tools come from
+  Tagalong's built-in catalog every run, never from the saved expert. Only its pinned plugins load; if Claude
   Code loads any other, the run stops before it starts. **Install** runs `claude plugin install`
   only after you pressed it on a card that names each plugin. These experts work in their own
   folder in your temp folder, never in your projects. Templates and experts you make stay sealed.

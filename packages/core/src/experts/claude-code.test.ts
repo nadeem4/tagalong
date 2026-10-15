@@ -2,7 +2,7 @@ import { SECRET_FILES } from '@tagalong/protocol';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClaudeCodeConnector, spawnChild, type ChildRun, type SpawnFn } from './claude-code';
 
 interface Spawned {
@@ -828,6 +828,29 @@ describe('ClaudeCodeConnector with a catalog bundle', () => {
     ]);
   });
 
+  it("denies every app tool the person's own settings allow but its entry does not list", async () => {
+    // A user allow rule would let dontAsk run that tool; a deny rule wins over it.
+    const { connector, calls } = bundled([init([FIRECRAWL, NOTION]), result('ok')], {
+      userAllowRules: () => [
+        'mcp__claude_ai_Gmail__send_message',
+        'mcp__plugin_Notion_notion',
+        SEARCH,
+        'Bash(npm test)',
+        'WebFetch(domain:example.com)',
+      ],
+    });
+    await connector.send({ ask: 'x' }, () => {});
+    const args = calls[0]?.args ?? [];
+    const denied = args.slice(args.indexOf('--disallowedTools') + 1);
+    expect(denied.slice(0, 2)).toEqual([
+      'mcp__claude_ai_Gmail__send_message',
+      'mcp__plugin_Notion_notion',
+    ]);
+    // Its own listed tool stays allowed; rules for tools the run does not have are left alone.
+    expect(denied).not.toContain(SEARCH);
+    expect(denied).not.toContain('Bash(npm test)');
+  });
+
   it('works in its own folder, made if needed, never in a project', async () => {
     const { connector, calls } = bundled([init([FIRECRAWL, NOTION]), result('ok')], {
       folder: 'C:\\projects\\site',
@@ -910,6 +933,15 @@ describe('ClaudeCodeConnector with a catalog bundle', () => {
     expect(args).toContain('--strict-mcp-config');
     expect(args).toContain('mcp__*');
     expect(args).not.toContain('Skill');
+  });
+
+  it('reads no user rules for a sealed run, which has no app tools to guard', async () => {
+    const userAllowRules = vi.fn(() => ['mcp__claude_ai_Gmail__send_message']);
+    const { spawn, calls } = fakeSpawn([result('ok')]);
+    const connector = new ClaudeCodeConnector({ spawn, folder: own, userAllowRules });
+    await connector.send({ ask: 'x' }, () => {});
+    expect(userAllowRules).not.toHaveBeenCalled();
+    expect(calls[0]?.args).toContain('mcp__*');
   });
 });
 

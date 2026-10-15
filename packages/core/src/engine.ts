@@ -70,17 +70,24 @@ import { recordBrain } from './providers/record-brain';
 import { recordExpertSends } from './experts/record-expert';
 import { CalendarFeed, httpsFetchText, type FetchText } from './meetings/calendar-feed';
 import { UsageLog, budgetSpent, meterBrain } from './usage';
-import { CATALOG, catalogEntry, catalogStatus, fromCatalog } from './experts/catalog';
+import {
+  CATALOG,
+  catalogBundle,
+  catalogEntry,
+  catalogStatus,
+  fromCatalog,
+} from './experts/catalog';
 import {
   claudePluginsRoot,
   connectedApps,
   installedPlugins,
   installMissing,
   installPlugin,
+  userAllowRules,
 } from './experts/claude-setup';
 import type { SpawnFn } from './experts/claude-code';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 /** Key the Anthropic API key is filed under in the host's SecretStore. */
 export const ANTHROPIC_KEY = SECRET_KEYS.anthropic!;
@@ -192,10 +199,13 @@ export function defaultConnectorFor(
         text: `${expert.name} (fake) read the brief and has nothing to change.`,
       });
     }
-    const { folder, canEdit, canSearchWeb, command, plugins, mcpTools, workspace } =
-      expert.connection;
-    // Only an expert installed from the catalog runs with plugins and apps.
-    const catalog = expert.catalogId !== undefined && (plugins.length > 0 || mcpTools.length > 0);
+    const { folder, canEdit, canSearchWeb, command } = expert.connection;
+    // Only an expert installed from the catalog runs with plugins and apps, and its bundle
+    // comes from catalog.json, never from the saved row.
+    const bundle = catalogBundle(expert);
+    const workspace = bundle?.workspace ?? expert.connection.workspace;
+    const unsealed =
+      bundle !== undefined && (bundle.plugins.length > 0 || bundle.mcpTools.length > 0);
     return new ClaudeCodeConnector({
       canEdit,
       canSearchWeb,
@@ -203,8 +213,13 @@ export function defaultConnectorFor(
       ...(folder !== undefined ? { folder } : {}),
       ...(command ? { command } : {}),
       ...(mode?.research === true ? { research: true } : {}),
-      ...(catalog
-        ? { plugins, mcpTools, installedPlugins: () => installedPlugins(pluginsRoot) }
+      ...(unsealed
+        ? {
+            plugins: bundle.plugins,
+            mcpTools: bundle.mcpTools,
+            installedPlugins: () => installedPlugins(pluginsRoot),
+            userAllowRules: () => userAllowRules(join(dirname(pluginsRoot), 'settings.json')),
+          }
         : {}),
       ...(workspace === 'own' ? { ownFolder: join(tmpdir(), 'tagalong-experts', expert.id) } : {}),
     });

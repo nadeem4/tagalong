@@ -1617,25 +1617,29 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
 
 ## Expert catalog _(real Claude Code)_
 
-1. **Setup:** Claude Code installed and signed in; the Notion plugin installed, Firecrawl not
-   (`claude plugin uninstall firecrawl@claude-plugins-official` if needed).
+1. **Setup:** Claude Code installed and signed in; the Notion plugin not installed
+   (`claude plugin uninstall notion@claude-plugins-official` if needed).
 2. **Action:** Home → Experts → **Add expert**. **Expected:** **From the catalog** lists
-   **Researcher**, **Trip planner** and **Social media manager**. Researcher's card shows Firecrawl
-   **Missing**, Notion **Installed**, Notion _found in Claude Code_, its **May do** line and the two
-   allowed Notion tools.
+   **Researcher**, **Trip planner** and **Social media manager**. Researcher's card shows Notion
+   **Missing** (no Firecrawl), its **May do** line and the two allowed Notion tools.
 3. **Action:** **Install** on Researcher. **Expected:** a card names
-   `firecrawl@claude-plugins-official` and nothing else; nothing has run yet. **Not now** goes back.
+   `notion@claude-plugins-official` and nothing else; nothing has run yet. **Not now** goes back.
 4. **Action:** **Install** again, then **Install and continue**. **Expected:** after a short wait the
    form opens filled in (Researcher, its instructions, web search On, "Works in its own folder");
-   `claude plugin list` now shows Firecrawl. **Save and test**.
+   `claude plugin list` now shows Notion. **Save and test**.
 5. **Action:** ask Scout to research a topic and pick Researcher. **Expected:** the hand-off card has
    no Project row ("Works in its own folder") and Send works with no folder. In a debug run, the
-   first stream-json line (`system`, `init`) lists exactly the Firecrawl and Notion plugins (plus
-   Claude Code's own `@builtin` ones), and the run's args have no `--strict-mcp-config`.
-6. **Action:** uninstall Firecrawl, then send Researcher another task. **Expected:** it fails at
-   once with "Claude Code did not load firecrawl@claude-plugins-official, which this expert
+   first stream-json line (`system`, `init`) lists exactly the Notion plugin (plus Claude Code's
+   own `@builtin` ones), and the run's args have no `--strict-mcp-config`. It searches the web with
+   WebSearch and WebFetch.
+6. **Action:** uninstall Notion, then send Researcher another task. **Expected:** it fails at
+   once with "Claude Code did not load notion@claude-plugins-official, which this expert
    needs…".
-7. **Action:** add **Trip planner** and ask it to plan a weekend. **Expected:** it reads the calendar
+7. **Action:** add `"mcp__plugin_Notion_notion__notion-create-pages"` to `permissions.allow` in
+   `~/.claude/settings.json`, reinstall Notion, and ask Researcher to add a page to Notion.
+   **Expected:** it is refused (the run's `--disallowedTools` lists that rule); remove the rule
+   afterwards.
+8. **Action:** add **Trip planner** and ask it to plan a weekend. **Expected:** it reads the calendar
    when Google Calendar is connected in Claude Code, writes its plan in its own folder, and never
    books anything. The tool names in `catalog.json` need this real-run check.
 
