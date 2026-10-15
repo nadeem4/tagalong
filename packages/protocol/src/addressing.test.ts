@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addressedToScout, isStopListening } from './addressing';
+import { addressedToScout, isStopListening, mightBeStop } from './addressing';
 
 describe('addressedToScout', () => {
   it.each([
@@ -44,5 +44,18 @@ describe('isStopListening', () => {
 
   it.each(['stop the build', 'what is stop'])('%j does not', (text) => {
     expect(isStopListening(text)).toBe(false);
+  });
+});
+
+describe('mightBeStop', () => {
+  it.each(['st', 'sto', 'stop', 'Stop list', 'stop listening.', 'S'])(
+    '%j may still become "stop listening"',
+    (text) => {
+      expect(mightBeStop(text)).toBe(true);
+    },
+  );
+
+  it.each(['sta', 'what', 'stop the', ''])('%j cannot', (text) => {
+    expect(mightBeStop(text)).toBe(false);
   });
 });

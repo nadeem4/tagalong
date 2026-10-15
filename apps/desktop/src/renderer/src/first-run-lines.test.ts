@@ -149,6 +149,9 @@ describe('listening lines', () => {
     expect(listenFailed('denied')).toBe(
       'I wasn’t allowed to use the microphone, so let’s type. You can allow it later in Windows settings.',
     );
+    expect(listenFailed('busy')).toBe(
+      'Another app is using the microphone, so let’s type. Tap or type your answers.',
+    );
     expect(listenFailed('model-failed')).toBe(
       'My listening model didn’t download, so let’s type for now.',
     );

@@ -1,4 +1,4 @@
-import { addressedToScout, isStopListening } from '@tagalong/protocol';
+import { addressedToScout, isStopListening, mightBeStop } from '@tagalong/protocol';
 import type { Ears, ListenMode, MicStream } from '@tagalong/protocol';
 
 /** The open microphone, as the controller needs it: its frames, and a way to close it. */
@@ -14,6 +14,8 @@ export interface ListenControllerOptions {
   onHeard(text: string): void;
   onNothingHeard(): void;
   onMicFailed(error: unknown): void;
+  /** The mic has actually opened and the ears are listening, not just asked to. */
+  onMicOpen?(mode: ListenMode): void;
   /** "Scout, stop" was heard while listening all the time. */
   onStopListening(): void;
   /**
@@ -23,7 +25,19 @@ export interface ListenControllerOptions {
   onDropped(): void;
   /** Always listening: false hands over every turn whole, no "Scout" needed and "stop" is just words. Default true. */
   needsName?: boolean;
+  /** The first wait before always listening retries after the ears failed; it doubles, up to five minutes. Default 30 s. */
+  retryMs?: number;
+  /** Runs `run` after `ms`; returns a cancel. Default setTimeout. */
+  setTimer?(run: () => void, ms: number): () => void;
 }
+
+const RETRY_MS = 30_000;
+const MAX_RETRY_MS = 5 * 60_000;
+
+const setTimer = (run: () => void, ms: number): (() => void) => {
+  const timer = setTimeout(run, ms);
+  return () => clearTimeout(timer);
+};
 
 interface Session {
   mode: ListenMode;
@@ -64,9 +78,13 @@ export class ListenController {
   #always = false;
   #paused = false;
   #deaf = false;
+  /** The wait before the next retry after the ears failed, and the cancel of one pending. */
+  #retryMs: number;
+  #cancelRetry: (() => void) | null = null;
 
   constructor(options: ListenControllerOptions) {
     this.#options = options;
+    this.#retryMs = options.retryMs ?? RETRY_MS;
   }
 
   get mode(): ListenMode | null {
@@ -111,20 +129,40 @@ export class ListenController {
   /**
    * The ears failed (the first download offline, models that would not start): every
    * question is dropped and the mic closes. Always listening stays switched on but does not
-   * retry at once, which would fail again; the next switch, call or system voice tries again
-   * (the voice process tries its download again). Returns what was listening.
+   * retry at once, which would fail again: it retries on its own after a wait (30 s, then
+   * doubling up to five minutes), or sooner on the next switch, call or system voice (the
+   * voice process tries its download again). Returns what was listening.
    */
   earsFailed(): ListenMode | null {
     const mode = this.mode;
     this.#dropReleased();
     this.#end();
+    if (mode === 'always') this.#scheduleRetry();
     return mode;
   }
 
-  /** Always listening, as the person switched it. */
+  /** Always listening, as the person switched it. Off cancels a pending retry. */
   setAlways(on: boolean): void {
     this.#always = on;
+    if (!on) this.#resetRetry();
     this.#sync();
+  }
+
+  #scheduleRetry(): void {
+    this.#cancelRetry?.();
+    const wait = this.#retryMs;
+    this.#retryMs = Math.min(wait * 2, MAX_RETRY_MS);
+    this.#cancelRetry = (this.#options.setTimer ?? setTimer)(() => {
+      this.#cancelRetry = null;
+      this.#sync();
+    }, wait);
+  }
+
+  /** A question heard, or the switch off: the next failure waits the first wait again. */
+  #resetRetry(): void {
+    this.#cancelRetry?.();
+    this.#cancelRetry = null;
+    this.#retryMs = this.#options.retryMs ?? RETRY_MS;
   }
 
   /** A call or a full-screen window, or the pets hidden: the mic closes until it is over. */
@@ -176,12 +214,15 @@ export class ListenController {
   /**
    * Always: words heard while a released question still waits are that question's, as the
    * voice process runs sessions in order; only talk addressed to Scout counts, and it cuts
-   * Scout off once per turn.
+   * Scout off once per turn. A partial that may still become "stop" ("Scout, st") is not
+   * addressed yet: it neither cuts Scout off nor shows.
    */
-  #addressed(session: Session, text: string): string | null {
+  #addressed(session: Session, text: string, partial = false): string | null {
     if (this.#taken || this.#released.size > 0) return null;
     const question =
       this.#options.needsName === false ? text.trim() || null : addressedToScout(text);
+    if (partial && this.#options.needsName !== false && question !== null && mightBeStop(question))
+      return null;
     if (question !== null && !session.barged) {
       session.barged = true;
       this.#options.onSpeechStart();
@@ -206,7 +247,7 @@ export class ListenController {
     });
     ears.on('partial', (text) => {
       if (!session.live || text === undefined || text === '') return;
-      if (mode === 'always' && this.#addressed(session, text) === null) return;
+      if (mode === 'always' && this.#addressed(session, text, true) === null) return;
       this.#options.onPartial(text, mode);
     });
     ears.on('turnEnd', (text = '') => {
@@ -220,9 +261,14 @@ export class ListenController {
           if (barged) this.#options.onDropped();
           return;
         }
-        if (this.#options.needsName !== false && isStopListening(question))
+        if (this.#options.needsName !== false && isStopListening(question)) {
           this.#options.onStopListening();
-        else this.#options.onHeard(question);
+          // A stop that cut Scout off is never asked: the bubble lets go.
+          if (barged) this.#options.onDropped();
+        } else {
+          this.#resetRetry();
+          this.#options.onHeard(question);
+        }
         return;
       }
       if (!session.released) return;
@@ -244,6 +290,7 @@ export class ListenController {
         }
         session.opened = true;
         ears.listen(mic);
+        this.#options.onMicOpen?.(mode);
         return mic;
       },
       (error: unknown) => {

@@ -143,6 +143,20 @@ describe('forwardEars', () => {
     expect(onSpoken).toHaveBeenCalledOnce();
   });
 
+  it('a partial "Scout, st" might still be "stop", so the bubble stays down', () => {
+    const listeners: ((m: FromWorker) => void)[] = [];
+    const onSpoken = vi.fn();
+    forwardEars(
+      { onMessage: (l) => (listeners.push(l), () => undefined), onExit: () => () => undefined },
+      () => undefined,
+      onSpoken,
+    );
+    listeners.forEach((l) => l({ kind: 'ears', event: 'partial', text: 'Scout, st' }));
+    expect(onSpoken).not.toHaveBeenCalled();
+    listeners.forEach((l) => l({ kind: 'ears', event: 'partial', text: 'Scout, sta' }));
+    expect(onSpoken).toHaveBeenCalledOnce();
+  });
+
   it('"Scout, stop" switches listening off without bringing the bubble up', () => {
     const listeners: ((m: FromWorker) => void)[] = [];
     const onSpoken = vi.fn();

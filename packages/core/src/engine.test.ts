@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 import { PROTOCOL_VERSION, RPC_ERROR_CODES } from '@tagalong/protocol';
-import { Engine, type EngineOptions } from './engine';
+import { defaultConnectorFor, Engine, type EngineOptions } from './engine';
+import { ClaudeCodeConnector, FakeConnector } from './experts';
 import { SPOKEN_HEADING } from './conversation/prompt-assembler';
 import { fakeMcpServer } from './connections/fake-server';
 import { ActivityLog } from './memory/activity';
@@ -1196,5 +1197,30 @@ describe('providers.check', () => {
       ok: false,
       message: expect.stringContaining('turned that key down'),
     });
+  });
+});
+
+describe('defaultConnectorFor', () => {
+  const expert = {
+    id: 'debugger',
+    name: 'Debugger',
+    goodAt: 'Finding why something breaks',
+    enabled: true,
+    instructions: 'Find the cause before you suggest a fix.',
+    connection: { type: 'claude-code' as const, canEdit: false, canSearchWeb: true },
+  };
+
+  it('passes the standing instructions and web search on to Claude Code', () => {
+    const connector = defaultConnectorFor({})(expert);
+    expect(connector).toBeInstanceOf(ClaudeCodeConnector);
+    expect(connector).toMatchObject({
+      options: { instructions: 'Find the cause before you suggest a fix.', canSearchWeb: true },
+    });
+  });
+
+  it('still hands back a fake connector in fake mode', () => {
+    expect(defaultConnectorFor({ TAGALONG_FAKE_PROVIDERS: '1' })(expert)).toBeInstanceOf(
+      FakeConnector,
+    );
   });
 });

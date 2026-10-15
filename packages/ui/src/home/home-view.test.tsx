@@ -21,7 +21,8 @@ const CLAUDE: Expert = {
   name: 'Claude Code',
   goodAt: 'Code',
   enabled: true,
-  connection: { type: 'claude-code', canEdit: false },
+  instructions: '',
+  connection: { type: 'claude-code', canEdit: false, canSearchWeb: false },
 };
 
 const HANDED: ActivityEntry = {

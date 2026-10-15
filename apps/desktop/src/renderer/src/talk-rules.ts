@@ -1,9 +1,19 @@
 import { addressedToScout } from '@tagalong/protocol';
 import type { ListenMode } from '@tagalong/protocol';
+import { micFailure } from './setup-ears';
 
 export const FIRST_TIME =
   'The first time, Tagalong downloads its speech models (about 43 MB). Speech is turned into text on this PC.';
 const EARS_FAILED = 'Listening stopped. Try again.';
+const MIC_BUSY =
+  'Another app is using the microphone. Close it and try again, or pick another in Settings.';
+const NO_MICROPHONE =
+  'The microphone could not be opened. Check that Windows lets apps use it, or pick another in Settings.';
+
+/** The note for a microphone that would not open: busy in another app, or not usable. */
+export function micNote(error: unknown): string {
+  return micFailure(error) === 'busy' ? MIC_BUSY : NO_MICROPHONE;
+}
 
 /**
  * A question is over: the bubble goes quiet unless a held question has already started. An

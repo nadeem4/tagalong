@@ -95,11 +95,13 @@ The extension's public privacy policy, for the Chrome Web Store, is
 - **Secret files, by your experts.** Claude Code reads files for itself, so it is started with deny
   rules for every secret file name above (`Read(**/.env)`, `Edit(**/.env)` and so on).
 - **Experts run sealed.** An expert run of Claude Code gets only the tools its mode allows (read and
-  search; plus edit when you allowed edits; web search and fetch for a routine's research), none of
+  search; plus edit when you allowed edits; web search and fetch when you switched on **Let it
+  search the web**, or for a routine's research), none of
   your MCP servers, none of the project folder's `.claude` settings (so a project cannot grant
   itself permissions or run hooks), and no hooks from your own settings either. Its answer, its
   error and its progress steps pass through `hideSecrets` before they are kept in Activity or shown,
-  so a key it read in a file is not repeated back.
+  so a key it read in a file is not repeated back. Its standing instructions pass through
+  `hideSecrets` too, into a temp file that is removed when the run ends.
 - **A monitor with an excluded window on it.** If a password manager is open and visible on your
   second screen, that whole screen is blanked in the full-view capture — not just when it is the
   window you are working in. The blanked screen is replaced with a flat panel reading BLOCKED, so

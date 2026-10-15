@@ -400,7 +400,14 @@ Two connectors exist so far:
 --verbose` in the expert's folder and writes the brief to stdin, so a long brief needs no quoting
   and hits no command-line limit. Read-only is the default: `--permission-mode dontAsk` with only
   `Read`, `Glob` and `Grep` allowed, so anything else is refused without a prompt. An expert that may
-  edit runs with `acceptEdits` and adds `Edit` and `Write`. Every run is sealed: `--tools` names
+  edit runs with `acceptEdits` and adds `Edit` and `Write`; one with `canSearchWeb` adds `WebSearch`
+  and `WebFetch` to the same lists. Standing instructions (`instructions`), when not empty, pass
+  through `hideSecrets` into a temp file (`%TEMP%\tagalong-instructions-*\instructions.md`) given
+  as `--append-system-prompt-file`, removed when the run ends (done, failed, could not start or
+  stopped); a file, not the inline flag, because the `claude.cmd` shim runs under cmd.exe, where a
+  multi-line argument does not survive. A routine's research run gets them too. If the temp file
+  cannot be written the run fails with "Could not write the standing instructions" and claude is
+  not started. Every run is sealed: `--tools` names
   exactly those built-in tools, so no other tool exists in the run; `--strict-mcp-config` with no
   `--mcp-config` loads none of the person's MCP servers, and `--disallowedTools mcp__*` backs it up;
   `--setting-sources user` skips the project's and folder's `.claude/settings.json` and
@@ -421,9 +428,11 @@ Each connector also has `check()`, which says whether the expert can be reached 
 anything: Claude Code's runs `claude --version`.
 
 **Storage.** `ExpertStore` (`experts/store.ts`) keeps one JSON row per expert in the `experts` table
-(migration 8), in the order they were added. An expert is `{ id, name, goodAt, enabled, connection }`
-(`packages/protocol/src/experts.ts`); the only connection so far is `{ type: 'claude-code', folder?,
-canEdit = false, command? }`. `folder` is no longer a setting: each hand-off names its own project
+(migration 8), in the order they were added. An expert is `{ id, name, goodAt, enabled,
+instructions = '', connection }` (`packages/protocol/src/experts.ts`; `instructions` holds at most
+4000 characters); the only connection so far is `{ type: 'claude-code', folder?, canEdit = false,
+canSearchWeb = false, command? }`. Both new fields have defaults, so rows saved before them still
+parse with no migration. `defaultConnectorFor` (`engine.ts`) passes them to the connector. `folder` is no longer a setting: each hand-off names its own project
 and the running hand-off carries it there. An old expert's saved folder still parses and is ignored. Nothing secret is stored: Claude Code signs itself in, and keys for
 later connectors go to the host's keychain.
 
@@ -1055,8 +1064,12 @@ on, the model list, `savePet`) and the settings form as a slot.
   [The Settings window](#the-settings-window).
 
 **Experts tab.** `ExpertsPanel` (`home/experts-panel.tsx`) lists the experts and adds or edits one:
-name, good at, two switches (`role="switch"`): may edit files by default, and on or off, and an
-optional command under Advanced. There is no default project folder. Each row shows **Reads only**
+name, good at, standing instructions, three switches (`role="switch"`): may edit files by default,
+may search the web, and on or off, and an optional command under Advanced. **Add expert** first
+shows a template picker (`TEMPLATES`: Coder, Debugger, Designer, Researcher, Blank, styled like New
+routine's), and each template is only a pre-filled form: Coder may edit, Researcher may search the
+web, the others read only, and every one's instructions show in full and can be changed. Editing
+an existing expert opens the form with no picker. There is no default project folder. Each row shows **Reads only**
 or **Can edit** and **On** or **Off** as labels, and says it asks which project for each task; Delete
 sits apart from Save. **Save and test** saves through `saveExpert` (`experts.upsert`) and then runs
 `testExpert` (`experts.test`), so a missing shows at once while the expert stays saved. A new expert's id is its name in
@@ -1456,7 +1469,8 @@ reached. The "Talk or type?" step (`answer`) is offered when the window has the 
   (`setAlways(true)`). `stop()` is `setAlways(false)`, which closes the mic; a download that ends
   after a stop is ignored. Every failure (`onMicFailed`, `ensureEars` rejecting, or an
   `IPC.earsStatusEvent` of `failed` while on) is `stop()` then `onFailure` with `no-mic`, `denied`
-  (`NotAllowedError` or `SecurityError`, `micFailure`) or `model-failed`. The Ears events used are
+  (`NotAllowedError` or `SecurityError`, `micFailure`), `busy` (`NotReadableError` or
+  `AbortError`: another app holds the microphone) or `model-failed`. The Ears events used are
   `partial` (barge-in only) and `turnEnd` (the answer), from `IPC.earsEvent`, which reaches every
   window; the controller ignores events outside its own session.
 - **When setup listens** is derived, never started on a tap: `listensNow(run, settings)`
@@ -1802,8 +1816,12 @@ flowchart LR
   question being held and every released one whose words have not come yet, so none of them is asked
   later, and leaves an always session running (or brings it back after the held one). `earsFailed`
   (models that failed to load, a voice process that died) drops every question too and ends the
-  always session without switching it off and without retrying at once; the next `setAlways`,
-  `setPaused` or `setDeaf` starts it again, and the voice process tries its download again. A mic that opens after the release is closed unused and is
+  always session without switching it off and without retrying at once. It retries on its own
+  after `retryMs` (30 s by default, doubling up to five minutes, through the injectable
+  `setTimer`); switching off cancels the retry and a question heard starts the wait over. The next
+  `setAlways`, `setPaused` or `setDeaf` starts it again sooner, and the voice process tries its
+  download again. `onMicOpen(mode)` is called once the mic has really opened and the ears listen,
+  never for a mic that fails or opens after a release. A mic that opens after the release is closed unused and is
   heard as nothing said; one that opens after a cancel is closed unused too. Every window hears the one stream of ears
   events and the voice process runs sessions one after another, so a held session takes a turnEnd only
   once it has been released: a released question's words that arrive after the next press began go to
@@ -1833,9 +1851,12 @@ flowchart LR
   mid-turn (a pause, the switch, the system voice, the talk key) after an addressed `partial` cut
   Scout off calls `onDropped`, so its words leave the bubble. Only talk addressed to Scout counts
   (`addressedToScout` from `@tagalong/protocol`): bare `speechStart` does nothing, the first addressed
-  `partial` of a turn cuts Scout off and each one shows, an unaddressed turn goes nowhere, and an
+  `partial` of a turn cuts Scout off and each one shows, except one that may still grow into "stop
+  listening" (`mightBeStop`: "Scout, st", "Scout, stop list"), which neither cuts Scout off nor
+  shows; an unaddressed turn goes nowhere, and an
   addressed turnEnd asks what follows the name, or, for "Scout, stop" (`isStopListening`), calls
-  `onStopListening`, which switches Always listening off through `setListening(false)`. A turn that
+  `onStopListening`, which switches Always listening off through `setListening(false)`, and
+  `onDropped`, so a stop that cut Scout off lets the bubble go. A turn that
   cut Scout off but ends unaddressed or empty calls `onDropped`, and the bubble clears its words. The system
   voice is not echo-cancelled, so `voice-player.ts` reports it speaking (`onSystemVoice`,
   `systemVoiceSpeaking`) for `setDeaf`: Scout never answers or cuts off its own words.
@@ -1844,7 +1865,12 @@ flowchart LR
   to `setPaused`; the panel window is created hidden at launch (`createPanelWindow` in
   `main/index.ts`), so with Always listening saved on, the microphone opens from the start. It
   passes `onSystemVoice` to `setDeaf`, and returns `talk.always` (`{ on, paused, onToggle }`,
-  `onToggle` calling `setListening(!on)`) for the bubble's switch. Closing the bubble cancels the
+  `onToggle` calling `setListening(!on)`) for the bubble's switch. The talk key cuts Scout off on
+  the press, but the state turns `listening` (the dot and "Listening…") only in `onMicOpen`, once
+  the mic is really open. A mic that will not open shows `micNote(error)`: "Another app is using
+  the microphone…" when it is busy (`NotReadableError`, `AbortError`), otherwise that it could not
+  be opened. Only `getUserMedia` itself can say busy: `openMic` rethrows an audio-graph failure
+  (a worklet that would not load rejects with an `AbortError`) as a plain error. Closing the bubble cancels the
   question being asked, never always listening. The decisions sit in `talk-rules.ts`, unit tested:
   `settles` (a heard question clears the words and the state unless a held question has started, so
   an always question and a held question heard after the always session resumed both settle),
@@ -1885,7 +1911,8 @@ flowchart LR
   `partial` or `turnEnd` whose words are addressed to Scout (`addressedToScout`, from
   `@tagalong/protocol`) brings the hidden bubble up beside a visible pet with `showPanelQuietly`,
   without taking the keyboard, as a remark or the launch line does; bare speech, talk that does
-  not start with the name, and "Scout, stop" never do.
+  not start with the name, "Scout, stop", and a partial that may still become it
+  (`mightBeStop`, such as "Scout, st") never do.
 - **The ears, in the voice process** (`main/voice/worker/ears-host.ts`, `main/voice/ears/`).
   `createEarsHost` opens an inbox for frames at each listen, so the first words are not lost while
   the models load, and runs one session at a time. Letting go of a held question only ends its
@@ -1992,7 +2019,8 @@ flowchart LR
   not echo-cancelled). `addressedToScout` (`@tagalong/protocol`) accepts a turn that starts with
   "Scout", after an optional "hey", "ok" or "okay", and returns the rest as the question; "Scout's"
   and "Scout-like" are not addressed. `isStopListening` matches "stop" or "stop listening" after
-  the name. An unaddressed turn goes nowhere.
+  the name; `mightBeStop` is true for words that may still grow into "stop listening" ("st",
+  "stop list"), so such a partial is not a question yet. An unaddressed turn goes nowhere.
 - **Hold-to-talk and the mic button need no name**, in every case. They are the `held` mode, not
   the `always` mode, and `addressedToScout` is never applied to them: pressed while an always
   session runs, it ends for the held question and comes back after it.
