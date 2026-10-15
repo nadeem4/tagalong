@@ -98,6 +98,10 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
         console.warn('[talk] the microphone could not be opened', error);
         done(micNote(error));
       },
+      // The dot shows only once the mic is really open, never while it is still opening.
+      onMicOpen: (mode) => {
+        if (mode === 'held' && listening.current) setState('listening');
+      },
       // "Scout, stop": switched off as the person would, so main saves it and tells every window.
       onStopListening: () =>
         void window.tagalongHost
@@ -128,7 +132,7 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
         earsNotes.clear();
         controller.bargeIn();
         listening.current = true;
-        setState('listening');
+        // 'listening' (the dot) waits for the mic to open: onMicOpen.
         setNote(null);
         setPartial(null);
         controller.made.hold();

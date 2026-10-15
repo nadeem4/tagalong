@@ -14,6 +14,8 @@ export interface ListenControllerOptions {
   onHeard(text: string): void;
   onNothingHeard(): void;
   onMicFailed(error: unknown): void;
+  /** The mic has actually opened and the ears are listening, not just asked to. */
+  onMicOpen?(mode: ListenMode): void;
   /** "Scout, stop" was heard while listening all the time. */
   onStopListening(): void;
   /**
@@ -249,6 +251,7 @@ export class ListenController {
         }
         session.opened = true;
         ears.listen(mic);
+        this.#options.onMicOpen?.(mode);
         return mic;
       },
       (error: unknown) => {

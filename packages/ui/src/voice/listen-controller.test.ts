@@ -144,6 +144,32 @@ describe('ListenController, held', () => {
     expect(controller.mode).toBeNull();
   });
 
+  it('says the mic is open only once it has opened', async () => {
+    let open!: (mic: ListenMic) => void;
+    const onMicOpen = vi.fn();
+    const { controller } = setup(
+      vi.fn(() => new Promise<ListenMic>((resolve) => (open = resolve))),
+      { onMicOpen },
+    );
+    controller.hold();
+    await tick();
+    expect(onMicOpen).not.toHaveBeenCalled();
+    open(fakeMic());
+    await tick();
+    expect(onMicOpen).toHaveBeenCalledExactlyOnceWith('held');
+  });
+
+  it('never says a mic that would not open is open', async () => {
+    const onMicOpen = vi.fn();
+    const { controller } = setup(
+      vi.fn(async () => Promise.reject(new Error('busy'))),
+      { onMicOpen },
+    );
+    controller.hold();
+    await tick();
+    expect(onMicOpen).not.toHaveBeenCalled();
+  });
+
   it('holds one session at a time, and release or cancel with none is nothing', async () => {
     const { controller, ears, calls } = setup();
     controller.release();
