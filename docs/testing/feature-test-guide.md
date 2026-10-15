@@ -1037,7 +1037,8 @@ monitor.
    (any SQLite tool), set `taken_at` in the `pick_up` row to seven hours ago. Start Tagalong.
    **Expected:** instead of the usual hello, one line beside Scout names the project, its branch
    and the file, and the unsent hand-off, with **Pick up** and **Not now**. An update or crash
-   line, or the "Fix it" line, would come first instead.
+   line, or the "Fix it" line, would come first instead; the pick-up line then follows once that
+   line has gone (for an update or crash, within about a minute), once only.
 3. **Action:** press **Pick up**. **Expected:** the bubble shows a card with one row per item.
    Nothing has opened yet.
 4. **Action:** press **Open in VS Code**. **Expected:** VS Code opens that folder with its own

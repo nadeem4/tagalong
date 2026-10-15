@@ -297,6 +297,20 @@ describe('PickUp', () => {
     expect(emitted).toHaveLength(1);
   });
 
+  it('keeps a ready snapshot while no host is connected, and offers it once one is', async () => {
+    const p = pickUp();
+    await p.tick();
+    await clock.sleep(BACK_AFTER_MS);
+    windows = null;
+    await p.tick();
+    // Nobody to show it to: it is not spent.
+    expect(emitted).toEqual([]);
+    expect(p.ready()).not.toBeNull();
+    windows = [];
+    await p.tick();
+    expect(emitted).toHaveLength(1);
+  });
+
   it('never fires an empty snapshot', async () => {
     windows = [];
     const p = pickUp();

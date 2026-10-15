@@ -95,7 +95,7 @@ import { registerExpertIpc } from './ipc/experts';
 import type { EngineCall, IpcHandle } from './ipc/handle';
 import { registerRoutineIpc } from './ipc/routines';
 import { registerPickUpIpc } from './ipc/pick-up';
-import { PickUpAllowlist } from './pick-up-open';
+import { PickUpAllowlist, PickUpWaiting } from './pick-up-open';
 import { registerSettingsIpc } from './ipc/settings';
 import { registerTurnIpc } from './ipc/turns';
 import { forwardEars, registerVoiceIpc } from './ipc/voice';
@@ -466,11 +466,14 @@ let pauseListening: (change: Partial<typeof listeningWhy>) => void = () => undef
 
 /** The projects the pick-up last shown named: the only ones its Open may reach. */
 const pickUpAllowlist = new PickUpAllowlist();
+/** A pick-up waiting for the open bubble to hide: one at most, the latest. */
+const pickUpWaiting = new PickUpWaiting();
 
 /**
  * Back after a long break, found on a tick rather than at launch (Always listening's line went
- * first, or the PC slept): the pick-up line beside Scout, like a remark. With the bubble open,
- * it waits until the bubble next hides.
+ * first, or the PC slept), or one the launch line could not carry (the Fix it line): the
+ * pick-up line beside Scout, like a remark. With the bubble open, it waits until the bubble
+ * next hides, and is dropped if pick-up was switched off meanwhile.
  */
 function showPickUp(params: unknown): void {
   const pickUp = params as PickUpReadyParams;
@@ -478,7 +481,12 @@ function showPickUp(params: unknown): void {
   const avatar = desktop?.avatar;
   if (panel == null || avatar == null || !avatar.isVisible()) return;
   if (panel.isVisible()) {
-    panel.once('hide', () => showPickUp(params));
+    if (pickUpWaiting.hold(pickUp)) {
+      panel.once('hide', () => {
+        const next = pickUpWaiting.release();
+        if (next !== null && desktop?.settings.pickUp !== false) showPickUp(next);
+      });
+    }
     return;
   }
   pickUpAllowlist.set(pickUp);
@@ -511,6 +519,9 @@ function showRemark(params: unknown): void {
 async function greetOnLaunch(host: EngineHost): Promise<void> {
   const current = desktop;
   if (current === null) return;
+  // The engine hands a pick-up out once, so one the line did not carry is shown after it.
+  let offered: PickUpReadyParams | undefined;
+  let carried = false;
   try {
     // With Always listening on, the first line says so and how to stop, greeting or not.
     const line = await launchLine(current.settings, async () => {
@@ -530,6 +541,7 @@ async function greetOnLaunch(host: EngineHost): Promise<void> {
         });
       })().catch(() => 'unknown' as const);
       const [brain, composed] = await Promise.all([readiness, composing]);
+      offered = composed.pickUp;
       return brainLine(brain, composed.text, settings.userName, composed.pickUp);
     });
     if (line !== null) {
@@ -541,11 +553,14 @@ async function greetOnLaunch(host: EngineHost): Promise<void> {
         if (line.pickUp !== undefined) pickUpAllowlist.set(line.pickUp);
         panel.webContents.send(IPC.greetLineEvent, line);
         showPanelQuietly(panel, avatar);
+        carried = line.pickUp !== undefined;
       }
     }
   } catch (error) {
     console.warn('[main] the greeting did not run:', error);
   }
+  // The Fix it line won, or the bubble was open: the pick-up follows once the bubble hides.
+  if (offered !== undefined && !carried) showPickUp(offered);
   try {
     const patch: SettingsPatch = { lastOpenedAt: new Date().toISOString() };
     current.settings = (await host.client.call('settings.set', { patch })).settings;

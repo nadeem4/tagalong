@@ -94,7 +94,7 @@ test('signed in: the next launch says the brain’s own line', async () => {
 test('back after a long break: the launch line offers to pick up, and the card opens on a click', async () => {
   await quit();
   // A snapshot from eight hours ago, as last night's session would leave it. Written by
-  // Electron's own Node, so better-sqlite3 loads for the ABI it was built for.
+  // Electron run as Node; better-sqlite3's prebuilt N-API binary loads there as in the app.
   const takenAt = new Date(Date.now() - 8 * 3_600_000).toISOString();
   const snapshot = JSON.stringify({
     projects: [{ name: 'ai_pet', path: dataDir, editor: 'other', branch: 'feat/pick-up' }],

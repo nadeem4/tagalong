@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { PickUpReadyParams } from '@tagalong/protocol';
-import { PickUpAllowlist, openFor } from './pick-up-open';
+import { PickUpAllowlist, PickUpWaiting, openFor } from './pick-up-open';
 
 const ready: PickUpReadyParams = {
   text: 'Yesterday you were in ai_pet.',
@@ -47,5 +47,25 @@ describe('PickUpAllowlist', () => {
     expect(allow.open('p3')).toEqual({ path: 'C:\\api' });
     allow.clear();
     expect(allow.open('p3')).toBeNull();
+  });
+});
+
+describe('PickUpWaiting', () => {
+  it('waits on one hide only, and shows the latest pick-up once', () => {
+    const waiting = new PickUpWaiting();
+    const later = { text: 'later', items: [ready.items[2]!] };
+    expect(waiting.hold(ready)).toBe(true);
+    // A second one while the bubble is still open replaces the first: no second listener.
+    expect(waiting.hold(later)).toBe(false);
+    expect(waiting.release()).toBe(later);
+    expect(waiting.release()).toBeNull();
+  });
+
+  it('shows nothing stale once dropped, as when pick-up is switched off', () => {
+    const waiting = new PickUpWaiting();
+    waiting.hold(ready);
+    waiting.drop();
+    expect(waiting.release()).toBeNull();
+    expect(waiting.hold(ready)).toBe(true);
   });
 });

@@ -2156,13 +2156,17 @@ and no keys or mouse are driven.
 - **Back**: `now - taken_at >= 6 h` (`BACK_AFTER_MS`) with anything to say. At that point the
   hand-offs also include `ActivityLog#expertsLeftSince(started_at)`: expert rows that ended
   `stopped` or `error`, interrupted ones included, ask only. The snapshot is offered once
-  (`take()`), and a new empty one starts.
+  (`take()`), and a new empty one starts. A tick with no host connected leaves a ready snapshot
+  unspent, since nobody could see it.
 - **At launch** `greeting.compose` asks `PickUp#ready()`. `launchScenario` puts them in this
   order: `update`, `crash`, `pickUp`, `away`, `normal`. For `pickUp` it returns `describePickUp`'s line with
   `source: 'fallback'` and `pickUp: { text, items }`, with no model call. The brain's Fix it line
-  still wins in `brainLine`. With Always listening on, `launchLine` composes nothing, so the
+  still wins in `brainLine`; the pick-up it displaced (already taken) follows through `showPickUp`
+  once that line's bubble hides. With Always listening on, `launchLine` composes nothing, so the
   snapshot stays ready and the first tick offers it as the `pickUp.ready` notification. Main
-  (`showPickUp`) shows that like a remark, and waits for the bubble to hide if it is open.
+  (`showPickUp`) shows that like a remark, and waits for the bubble to hide if it is open:
+  `PickUpWaiting` holds one at most (the latest, on one `hide` listener) and drops it if pick-up
+  was switched off meanwhile, so no stale or second card appears.
 - **The card** (`packages/ui/src/pick-up-card.tsx`, rendered by `CompanionBubble` from its
   `pickUp` prop): **Open in VS Code** / **Open in Cursor** / **Open folder** per project, **Brief
   again** per hand-off, **Not now**. Brief again calls `pickUp.rebrief { itemId }`, which calls

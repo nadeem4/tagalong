@@ -217,11 +217,6 @@ export class PickUp {
   async tick(): Promise<void> {
     const options = this.#options;
     if (!options.enabled()) return;
-    const ready = this.take();
-    if (ready !== null) {
-      options.emit(ready);
-      return;
-    }
     let windows: readonly WindowEntry[] | null;
     try {
       windows = await options.windows();
@@ -229,7 +224,13 @@ export class PickUp {
       options.log?.(`pick-up could not list windows: ${(error as Error).message}`);
       return;
     }
+    // No host connected: nobody to offer it to, so a ready snapshot is kept, not spent.
     if (windows === null || !options.enabled()) return;
+    const ready = this.take();
+    if (ready !== null) {
+      options.emit(ready);
+      return;
+    }
     const now = options.clock.now();
     options.store.save({
       startedAt: options.store.get()?.startedAt ?? now,

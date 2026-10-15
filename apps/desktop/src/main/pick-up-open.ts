@@ -36,3 +36,30 @@ export class PickUpAllowlist {
     return item === undefined ? null : openFor(item);
   }
 }
+
+/**
+ * A pick-up found while the bubble is open waits for the bubble to hide. Only one waits: a
+ * newer one replaces it, so one hide shows one card, and dropping it (pick-up switched off)
+ * leaves nothing stale to show.
+ */
+export class PickUpWaiting {
+  #waiting: PickUpReadyParams | null = null;
+
+  /** Holds this pick-up. True when nothing was waiting, so the caller listens for the hide. */
+  hold(pickUp: PickUpReadyParams): boolean {
+    const first = this.#waiting === null;
+    this.#waiting = pickUp;
+    return first;
+  }
+
+  /** The pick-up to show now the bubble has hidden, if one still waits. */
+  release(): PickUpReadyParams | null {
+    const pickUp = this.#waiting;
+    this.#waiting = null;
+    return pickUp;
+  }
+
+  drop(): void {
+    this.#waiting = null;
+  }
+}
