@@ -154,6 +154,10 @@ describe('ExpertsPanel', () => {
       expect(screen.getByRole('button', { name: new RegExp(`^${name}`) })).toBeInTheDocument();
     }
     expect(screen.queryByLabelText('Name')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to experts' }));
+    expect(screen.queryByRole('button', { name: /^Debugger/ })).toBeNull();
+    expect(screen.getByText(/No experts yet/)).toBeInTheDocument();
   });
 
   it('fills the form from the Debugger template: read-only, with its instructions shown', async () => {

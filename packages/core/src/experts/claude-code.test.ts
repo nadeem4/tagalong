@@ -163,6 +163,86 @@ describe('ClaudeCodeConnector', () => {
     expect(calls[0]?.stdin).toBe('Why does it crash?');
   });
 
+  it('removes the instructions file when the run fails, cannot start or is stopped', async () => {
+    const files: string[] = [];
+    const watching =
+      (base: SpawnFn): SpawnFn =>
+      (command, args, options) => {
+        files.push(args[args.indexOf('--append-system-prompt-file') + 1] ?? '');
+        return base(command, args, options);
+      };
+    const instructions = 'Find the cause first.';
+
+    const failed = await new ClaudeCodeConnector({
+      folder: 'C:\\r',
+      instructions,
+      spawn: watching(fakeSpawn([result('Boom.', true)]).spawn),
+    }).send({ ask: 'x' }, () => {});
+    expect(failed.ok).toBe(false);
+
+    const missing = await new ClaudeCodeConnector({
+      folder: 'C:\\r',
+      instructions,
+      spawn: watching(() => {
+        throw Object.assign(new Error('spawn claude ENOENT'), { code: 'ENOENT' });
+      }),
+    }).send({ ask: 'x' }, () => {});
+    expect(missing.ok).toBe(false);
+
+    const controller = new AbortController();
+    const pending = new ClaudeCodeConnector({
+      folder: 'C:\\r',
+      instructions,
+      spawn: watching(fakeSpawn([]).spawn),
+    }).send({ ask: 'x' }, () => {}, controller.signal);
+    controller.abort();
+    expect(await pending).toEqual({ ok: false, error: 'Cancelled.' });
+
+    expect(files).toHaveLength(3);
+    for (const file of files) expect(existsSync(file)).toBe(false);
+  });
+
+  it('keeps standing instructions in research mode, which stays web-only', async () => {
+    const { spawn, calls } = fakeSpawn([result('ok')]);
+    await new ClaudeCodeConnector({
+      research: true,
+      researchFolder: () => 'C:\\empty',
+      instructions: 'Link every source.',
+      canEdit: true,
+      canSearchWeb: true,
+      spawn,
+    }).send({ ask: 'x' }, () => {});
+    const args = calls[0]?.args ?? [];
+    expect(args).toContain('--append-system-prompt-file');
+    expect(args[args.indexOf('--tools') + 1]).toBe('WebSearch,WebFetch');
+  });
+
+  describe('when the temp folder cannot be written', () => {
+    const saved = { TMPDIR: process.env.TMPDIR, TMP: process.env.TMP, TEMP: process.env.TEMP };
+    afterEach(() => {
+      for (const [key, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    });
+
+    it('fails the run with a reason instead of throwing, and starts nothing', async () => {
+      const gone = join(tmpdir(), 'tagalong-no-such-folder', 'deeper');
+      process.env.TMPDIR = gone;
+      process.env.TMP = gone;
+      process.env.TEMP = gone;
+      const { spawn, calls } = fakeSpawn([result('ok')]);
+      const out = await new ClaudeCodeConnector({
+        folder: 'C:\\r',
+        instructions: 'Find the cause first.',
+        spawn,
+      }).send({ ask: 'x' }, () => {});
+      expect(out.ok).toBe(false);
+      expect(out.ok ? '' : out.error).toMatch(/^Could not write the standing instructions: /);
+      expect(calls).toHaveLength(0);
+    });
+  });
+
   it('adds no prompt file when there are no standing instructions', async () => {
     const { spawn, calls } = fakeSpawn([result('ok')]);
     await new ClaudeCodeConnector({ folder: 'C:\\r', instructions: '  ', spawn }).send(
@@ -383,7 +463,15 @@ describe('spawnChild', () => {
       );
       writeFileSync(join(dir, 'fake-claude.cmd'), '@node "%~dp0echo-args.js" %*\r\n');
       process.env.PATH = `${dir};${path ?? ''}`;
-      const args = ['--settings', '{"disableAllHooks":true}', 'Read(**/.env)', 'mcp__*', 'a b'];
+      const args = [
+        '--settings',
+        '{"disableAllHooks":true}',
+        'Read(**/.env)',
+        'mcp__*',
+        'a b',
+        '--append-system-prompt-file',
+        'C:\\Users\\Jo Doe\\AppData\\Local\\Temp\\tagalong-instructions-a1\\instructions.md',
+      ];
 
       const child = spawnChild('fake-claude', args, { cwd: dir });
       child.write('brief');

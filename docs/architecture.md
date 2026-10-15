@@ -403,8 +403,11 @@ Two connectors exist so far:
   edit runs with `acceptEdits` and adds `Edit` and `Write`; one with `canSearchWeb` adds `WebSearch`
   and `WebFetch` to the same lists. Standing instructions (`instructions`), when not empty, pass
   through `hideSecrets` into a temp file (`%TEMP%\tagalong-instructions-*\instructions.md`) given
-  as `--append-system-prompt-file`, removed when the run ends; a file, not the inline flag, because
-  the `claude.cmd` shim runs under cmd.exe, where a multi-line argument does not survive. Every run is sealed: `--tools` names
+  as `--append-system-prompt-file`, removed when the run ends (done, failed, could not start or
+  stopped); a file, not the inline flag, because the `claude.cmd` shim runs under cmd.exe, where a
+  multi-line argument does not survive. A routine's research run gets them too. If the temp file
+  cannot be written the run fails with "Could not write the standing instructions" and claude is
+  not started. Every run is sealed: `--tools` names
   exactly those built-in tools, so no other tool exists in the run; `--strict-mcp-config` with no
   `--mcp-config` loads none of the person's MCP servers, and `--disallowedTools mcp__*` backs it up;
   `--setting-sources user` skips the project's and folder's `.claude/settings.json` and

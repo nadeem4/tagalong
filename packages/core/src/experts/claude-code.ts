@@ -130,15 +130,27 @@ export class ClaudeCodeConnector implements Connector {
     ];
     // Standing instructions go in a file: the claude.cmd shim runs under cmd.exe, where a
     // multi-line argument does not survive. Removed once the run ends.
+    // send() never throws, so a temp folder that cannot be written fails the run instead.
     const instructions = this.options.instructions?.trim() ?? '';
-    const promptDir =
-      instructions === '' ? undefined : mkdtempSync(join(tmpdir(), 'tagalong-instructions-'));
-    const promptFile = promptDir && join(promptDir, 'instructions.md');
-    if (promptFile) writeFileSync(promptFile, hideSecrets(instructions), 'utf8');
+    let promptDir: string | undefined;
+    let promptFile: string | undefined;
+    if (instructions !== '') {
+      try {
+        promptDir = mkdtempSync(join(tmpdir(), 'tagalong-instructions-'));
+        promptFile = join(promptDir, 'instructions.md');
+        writeFileSync(promptFile, hideSecrets(instructions), 'utf8');
+      } catch (error) {
+        removeQuietly(promptDir);
+        return {
+          ok: false,
+          error: `Could not write the standing instructions: ${(error as Error).message}`,
+        };
+      }
+    }
     try {
       return await this.run(brief, onProgress, folder, canEdit, tools, promptFile, signal);
     } finally {
-      if (promptDir) rmSync(promptDir, { recursive: true, force: true });
+      removeQuietly(promptDir);
     }
   }
 
@@ -230,6 +242,16 @@ export class ClaudeCodeConnector implements Connector {
     } finally {
       signal?.removeEventListener('abort', onAbort);
     }
+  }
+}
+
+/** A file Windows still holds must not turn a finished run into a failure. */
+function removeQuietly(dir: string | undefined): void {
+  if (dir === undefined) return;
+  try {
+    rmSync(dir, { recursive: true, force: true });
+  } catch {
+    // Left in the temp folder; the OS clears it.
   }
 }
 
