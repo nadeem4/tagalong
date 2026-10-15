@@ -86,6 +86,24 @@ describe('SpokenStream', () => {
     expect(said).toEqual([ONLY_IN_BUBBLE]);
   });
 
+  it('never says a quoted line, even when the > arrives alone, and says the lines after it', () => {
+    const { said, stream: s } = stream();
+    s.push('It’s in the bubble.\n');
+    s.push('>');
+    s.push(' Bonjour. Ça va ?');
+    s.push(' Très bien.\n> Merci.\nThat’s');
+    s.push(' all of it.');
+    s.end();
+    expect(said).toEqual(['It’s in the bubble.', 'That’s all of it.']);
+  });
+
+  it('points at the bubble when the whole answer is a quote', () => {
+    const { said, stream: s } = stream();
+    s.push('> Bonjour.\n> Merci.');
+    s.end();
+    expect(said).toEqual([ONLY_IN_BUBBLE]);
+  });
+
   it('says nothing more after end', () => {
     const { said, stream: s } = stream();
     s.push('Done.');

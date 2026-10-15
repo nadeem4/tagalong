@@ -1,7 +1,7 @@
 /** Said after a line that was cut short, so the listener knows there is more to read. */
 export const REST_IN_BUBBLE = 'The rest is in the bubble.';
 
-/** Said when nothing in an answer can be read aloud: it was all code, a list or a table. */
+/** Said when nothing in an answer can be read aloud: all code, a list, a table or a quote. */
 export const ONLY_IN_BUBBLE = 'The answer is in the bubble.';
 
 /** How many sentences are spoken before the rest is left to the bubble. */
@@ -15,8 +15,9 @@ export const SHORT_LINE = 40;
 
 /**
  * Turns a bubble line into what Scout says aloud: markdown stripped, code blocks, lists,
- * tables and bare URLs left out, and only the first sentence or two. Anything cut ends
- * with "The rest is in the bubble.", so a listener who is not looking knows to look.
+ * tables, quoted (`>`) lines and bare URLs left out, and only the first sentence or two.
+ * Anything cut ends with "The rest is in the bubble.", so a listener who is not looking
+ * knows to look.
  *
  * `whole` is a piece of a spoken answer (Talk to Scout), said as it streams: shaped the
  * same way but never cut, and nothing at all when the piece has nothing to say.
@@ -30,12 +31,15 @@ export function toSpeakable(text: string, { whole = false }: { whole?: boolean }
     return '\n';
   });
   const lines = withoutCode.split('\n').filter((line) => {
+    // A quote is a translation into another language; the line before it already says
+    // "It's in the bubble", so leaving it out is not a cut.
+    if (/^\s*>/.test(line)) return false;
     const listOrTable = /^\s*(?:[-*+•]|\d+[.)])\s+/.test(line) || /^\s*\|/.test(line);
     if (listOrTable) cut = true;
     return !listOrTable;
   });
   const plain = lines
-    .map((line) => line.replace(/^\s*#{1,6}\s+/, '').replace(/^\s*>\s?/, ''))
+    .map((line) => line.replace(/^\s*#{1,6}\s+/, ''))
     .join(' ')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')

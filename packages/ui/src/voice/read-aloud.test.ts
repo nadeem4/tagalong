@@ -8,6 +8,9 @@ describe('wantsReadAloud', () => {
     'read it aloud',
     'Say that out loud',
     'can you READ the selection out loud?',
+    'translate this and read it to me',
+    'Scout, translate it and read it to me',
+    'translate this to English and then read it aloud',
   ])('matches "%s"', (text) => {
     expect(wantsReadAloud(text)).toBe(true);
   });
@@ -19,6 +22,9 @@ describe('wantsReadAloud', () => {
     'how do I read this file?',
     'read the logs and explain the error to me',
     'why did you say that to me?',
+    'translate this',
+    'translate this to me',
+    'translate the docs and explain the error to me',
   ])('does not match "%s"', (text) => {
     expect(wantsReadAloud(text)).toBe(false);
   });

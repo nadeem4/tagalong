@@ -1,7 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { REST_IN_BUBBLE, mergeShortLines, toSpeakable } from './speakable';
+import { ONLY_IN_BUBBLE, REST_IN_BUBBLE, mergeShortLines, toSpeakable } from './speakable';
 
 describe('toSpeakable', () => {
+  it('never reads a quoted line, such as a translation into another language', () => {
+    expect(toSpeakable('It’s in the bubble.\n> Bonjour.')).toBe('It’s in the bubble.');
+  });
+
+  it('points at the bubble when the answer is only a quote', () => {
+    expect(toSpeakable('> Bonjour.\n> Ça va ?')).toBe(ONLY_IN_BUBBLE);
+  });
+
+  it('leaves an answer with no quote as it is', () => {
+    expect(toSpeakable('It’s German. Here it is in English: good morning.')).toBe(
+      'It’s German. Here it is in English: good morning.',
+    );
+  });
+
+  it('never reads a quoted line in a whole spoken piece', () => {
+    expect(toSpeakable('> Bonjour.', { whole: true })).toBe('');
+  });
+
   it('speaks a short plain answer as it is', () => {
     expect(toSpeakable('The build is green.')).toBe('The build is green.');
   });

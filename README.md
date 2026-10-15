@@ -255,6 +255,13 @@ and the bars cut it off. Ask "what's in this chart?" (or about a photo, diagram 
 Scout gives the kind, the axes, the trend and the values that stand out, and says when it can't
 make one out. With ElevenLabs as the voice, the text read goes to ElevenLabs.
 
+**Translate this.** Ask "translate this" and Scout translates your selection, or the window in
+front, into the language you name, else one you asked it to remember ("always translate to
+Spanish"), else the language you asked in. It names the source language, keeps the layout, names,
+numbers and code, and warns when the words came from a picture. Scout's own model translates, with
+no translation service. "Translate it and read it to me" speaks an English translation in full; a
+translation into another language shows in the bubble only, because the voices speak English.
+
 **What needs me?** Ask it and Scout reads your connected apps (GitHub reviews and assigned issues,
 Linear issues, Notion mentions when its tools offer them) and answers with one list grouped by app,
 oldest first, one line each with how long it has waited. It only reads, and sends no screen

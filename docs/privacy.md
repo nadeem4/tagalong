@@ -251,7 +251,7 @@ every weekday at 8. Nothing becomes a routine until you press **Save**, on Scout
 
 Scout says its bubble lines aloud while **Scout talks** is on (Settings → Voice, on by default).
 What reaches a speech engine is only the line being spoken, after it is shortened in the panel:
-markdown stripped, code blocks, lists, tables and URLs left out. An ordinary answer is cut to its
+markdown stripped, code blocks, lists, tables, quoted lines and URLs left out. An ordinary answer is cut to its
 first sentence or two, and a long sentence is cut at a word (about 200 characters), ending with
 "The rest is in the bubble." An answer to a spoken question, or to a typed "read this to me", is
 said in full, sentence by sentence, still without code or lists. Never the screen, the window list,
@@ -263,6 +263,13 @@ time, asking "Shall I go on?" between parts. So the text of that window or selec
 chosen speech engine: it stays on this computer with Kokoro or the system voice, and is sent to
 ElevenLabs when ElevenLabs is the chosen voice. With **Scout talks** off, the reading is only shown
 in the bubble.
+
+**Translating.** Scout translates with its own model: there is no translation service, so the text
+it read goes only to Scout's model, like any question about your screen, and reads are logged as
+they are today. A translation into English that you asked to hear goes to the chosen speech engine
+like a reading (ElevenLabs when picked). A translation into any other language is shown in the
+bubble only and never spoken. A target language you ask Scout to remember is kept as a remembered
+preference, like anything else you ask it to remember.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%
