@@ -144,6 +144,7 @@ describe('brainLine', () => {
     expect(brainLine('no-key', pickUp.text, '', pickUp)).toEqual({
       text: 'I have no API key, so I can’t think yet.',
       fix: 'Fix it',
+      fixTarget: 'brain',
     });
   });
 });

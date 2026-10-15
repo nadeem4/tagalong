@@ -28,5 +28,5 @@ function normalise(text: string): string {
 
 export function wantsHealthCheck(text: string): boolean {
   const asked = normalise(text);
-  return asked !== '' && ASKS.some((pattern) => pattern.test(asked));
+  return ASKS.some((pattern) => pattern.test(asked));
 }

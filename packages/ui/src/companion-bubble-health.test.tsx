@@ -94,6 +94,25 @@ describe('CompanionBubble, the health check', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('I couldn’t run the health check.');
   });
 
+  it('drops a check that finishes after a newer question', async () => {
+    let finish: (facts: HealthFacts) => void = () => undefined;
+    const onSay = vi.fn();
+    setup(
+      { checkHealth: () => new Promise<HealthFacts>((resolve) => (finish = resolve)) },
+      { onSay },
+    );
+    ask('what’s wrong?');
+    await flush();
+    ask('explain this error');
+    await flush();
+    await act(async () => {
+      finish(FACTS);
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole('region', { name: 'Health check' })).toBeNull();
+    expect(onSay).not.toHaveBeenCalledWith('One thing needs you.');
+  });
+
   it('clears the card when the next question is asked', async () => {
     setup();
     ask('what’s wrong?');

@@ -45,7 +45,10 @@ describe('HealthCard', () => {
   it('lets an optional row be set up, without calling it a problem', () => {
     const onFix = vi.fn();
     render(<HealthCard rows={ROWS} onFix={onFix} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Set up Browser extension' }));
+    const setUp = screen.getByRole('button', { name: 'Set up Browser extension' });
+    expect(setUp).toHaveTextContent(/^Set up$/);
+    expect(screen.getByRole('button', { name: 'Fix Voice' })).toHaveTextContent(/^Fix it$/);
+    fireEvent.click(setUp);
     expect(onFix).toHaveBeenCalledWith('browser');
   });
 
