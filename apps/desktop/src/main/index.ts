@@ -8,6 +8,7 @@ import {
   Notification,
   Tray,
   app,
+  clipboard,
   dialog,
   ipcMain,
   powerMonitor,
@@ -89,6 +90,7 @@ import { createOfficeWindow } from './windows/office';
 import { createPointerOverlay } from './windows/pointer';
 import { createOnboardingWindow } from './windows/onboarding';
 import { createSettingsWindow } from './windows/settings';
+import { registerClipboardIpc } from './ipc/clipboard';
 import { registerConnectionIpc } from './ipc/connections';
 import { registerCrewIpc } from './ipc/crew';
 import { registerExpertIpc } from './ipc/experts';
@@ -1042,6 +1044,14 @@ function registerIpc(): void {
     noteActiveWindow: () => captureForPanel(required(), ['activeWindow']),
     listening: () => required().listening,
     on: (channel, listener) => ipcMain.on(channel, listener as never),
+  });
+  registerClipboardIpc(handle, {
+    writeText: (text) => clipboard.writeText(text),
+    fromPanel: (event) => {
+      const { panel } = required();
+      const sender = (event as Electron.IpcMainInvokeEvent).sender;
+      return panel !== null && !panel.isDestroyed() && sender === panel.webContents;
+    },
   });
 
   ipcMain.handle(IPC.pickFolder, async (event): Promise<string | null> => {

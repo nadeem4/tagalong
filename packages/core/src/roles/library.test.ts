@@ -100,6 +100,15 @@ describe('the role files', () => {
     expect(instructions).toContain('point, never claim you clicked');
   });
 
+  it('let the companion write short drafts itself, in a draft block, never claiming it sent them', () => {
+    const instructions = getRole('companion')?.instructions ?? '';
+    expect(instructions).toContain('the one piece of work you do yourself');
+    expect(instructions).toContain('about 400 words');
+    expect(instructions).toContain('fenced `draft` block');
+    expect(instructions).toContain('offer to hand it to an expert');
+    expect(instructions).toContain('Never say you sent, pasted or typed it.');
+  });
+
   it('tell the companion to leave itself out of what it sees, unless asked', () => {
     const instructions = getRole('companion')?.instructions ?? '';
     expect(instructions).toContain('Your own figure and bubble show up in screenshots.');

@@ -143,6 +143,16 @@ describe('assemblePrompt system prompt', () => {
     expect(unspoken).not.toContain(SPOKEN_HEADING);
   });
 
+  it('keeps a spoken draft whole in its draft block', () => {
+    const spoken = assemblePrompt({
+      pet,
+      history: [userMessage('reply yes but Friday')],
+      settings,
+      spoken: true,
+    }).system;
+    expect(spoken).toContain('A draft still goes whole in its draft block.');
+  });
+
   it("falls back to the companion's instructions for a role the library does not have", () => {
     // A crew-era role, still on a pet saved before the crew went.
     const { system } = assemblePrompt({

@@ -146,6 +146,11 @@ export interface HostBridge {
   deleteSightLog?(id: string): Promise<boolean>;
   /** Deletes the whole log; resolves to how many rows went. */
   clearSightLog?(): Promise<number>;
+  /**
+   * Draft it for me: puts a draft on the clipboard, on the person's Copy click only. It
+   * never reads the clipboard and never pastes. Optional: without it a draft has no Copy.
+   */
+  copyText?(text: string): Promise<void>;
 }
 
 export interface ConfirmHandoff {

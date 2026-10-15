@@ -388,6 +388,10 @@ text and look at your other monitor ("what's on my other screen?"). Blind spots 
 short label shows around it for a few seconds (`Esc` puts it away). Scout never moves the mouse,
 clicks or types.
 
+**Draft it for me.** Say "reply to this email, yes but Friday" or "write the PR description" and
+Scout reads what is in front of you and writes a short draft in the bubble with a **Copy** button.
+Copy puts the draft on your clipboard; you paste it. Scout never types or pastes into an app.
+
 ## Privacy
 
 - Nothing on screen is read until you press a hotkey or ask, except screen memory and watches, which

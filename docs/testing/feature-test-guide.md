@@ -21,6 +21,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Screen memory](#screen-memory)
 - [Point, don't click](#point-dont-click)
 - [What Scout saw](#what-scout-saw)
+- [Draft it for me](#draft-it-for-me)
 - [The Chrome extension](#the-chrome-extension)
 - [Installer](#installer)
 - [Not in this build](#not-in-this-build)
@@ -1090,6 +1091,26 @@ monitor.
 3. **Action:** Home → Settings → Privacy → **Keep the record of what Scout saw**: type 31 and Save.
    **Expected:** Settings refuses it and says 1 to 30 days. Type 3, Save, and reopen What Scout saw.
    **Expected:** "Kept 3 days."
+
+## Draft it for me
+
+### D.1. A reply drafted, copied and pasted by you _(real brain)_
+
+1. **Setup:** open an email (or a chat message) in the browser and select its text.
+2. **Action:** press `Ctrl+Shift+Space` and ask "reply to this, yes but Friday". **Expected:** the
+   bubble shows the draft in a framed block with **Copy**, and one line: "Here's a draft. Copy it
+   and paste it in." Scout does not say it sent, pasted or typed anything, and nothing appears in
+   the email app.
+3. **Action:** click somewhere else so the bubble loses focus, then press **Copy**. **Expected:**
+   the button says **Copied** for about 2 seconds. Paste into the reply box: exactly the draft
+   arrives, with no ``` marks and no extra line.
+4. **Action:** hold the talk key and say "write the PR description" on a GitHub PR page that shows
+   its commits. **Expected:** only the one line about Copy is spoken; the draft is shown, never
+   read aloud.
+5. **Action:** ask for a PR description where no commits or files are on screen. **Expected:**
+   Scout offers to hand it to an expert instead of guessing.
+6. **Action:** ask for something long ("write a 2,000-word design doc"). **Expected:** Scout offers
+   to hand it to an expert.
 
 ## The Chrome extension
 
