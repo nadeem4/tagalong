@@ -30,7 +30,7 @@ import {
   saveListening,
   startListeningGuard,
 } from './always-listening';
-import { watchPresence } from './presence';
+import { startWellbeingTick, watchPresence } from './presence';
 import { systemClock } from './awareness/clock';
 import { handoffNotice } from './handoff-notice';
 import {
@@ -200,6 +200,7 @@ app.on('before-quit', () => {
   stopListeningGuard();
   pointerOverlay?.dispose();
   stopPresence();
+  stopWellbeing();
   // Memory only, and gone on quit: nothing here was ever written anywhere to clean up.
   desktop?.rolling.dispose();
   desktop?.perceptionMemory.clear();
@@ -462,7 +463,20 @@ async function start(): Promise<void> {
       send: (windows) => host.client.call('keepAnEye.observe', { windows }),
     });
   }
+  // Gentle nudges: the idle time and titles once a minute, only while on and sight is not paused.
+  stopWellbeing = startWellbeingTick({
+    enabled: () => (desktop?.settings.wellbeing.enabled ?? false) && !sightPause.paused,
+    idleMs: () => powerMonitor.getSystemIdleTime() * 1000,
+    list: async () => {
+      const exclusions = desktop?.settings.captureExclusions ?? settings.captureExclusions;
+      return (await platform.listWindows(exclusions, { countText: false })).windows;
+    },
+    send: (params) => host.client.call('wellbeing.observe', params),
+  });
 }
+
+/** Stops the gentle nudges' tick on quit. */
+let stopWellbeing = (): void => undefined;
 
 /** Stops the keep-an-eye timer on quit. */
 let stopKeepAnEye = (): void => undefined;

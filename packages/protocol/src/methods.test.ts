@@ -68,6 +68,7 @@ const HOST_TO_CORE = [
   'calendar.check',
   'usage.summary',
   'hosts.status',
+  'wellbeing.observe',
 ] as const;
 
 const CORE_TO_HOST = ['perception.capture'] as const;
@@ -129,6 +130,12 @@ describe('pet.mood', () => {
     expect(
       notificationParamsSchemaFor('pet.mood').safeParse({ ...wince, mood: 'dozing' }).success,
     ).toBe(false);
+    for (const mood of ['tired', 'rested'] as const) {
+      expect(notificationParamsSchemaFor('pet.mood').parse({ ...wince, mood })).toEqual({
+        petId: 'scout',
+        mood,
+      });
+    }
     expect(notificationParamsSchemaFor('pet.mood').safeParse({ mood: 'wince' }).success).toBe(
       false,
     );
@@ -167,6 +174,29 @@ describe('keep an eye', () => {
     expect(resultSchemaFor('keepAnEye.accept').parse({ proposed: true })).toEqual({
       proposed: true,
     });
+  });
+});
+
+describe('wellbeing.observe', () => {
+  const window = {
+    id: 'w-1',
+    processName: 'Code.exe',
+    title: 'parser.ts',
+    state: 'foreground',
+    browser: false,
+  };
+
+  it('takes the idle time and the window titles from the host', () => {
+    const params = { idleMs: 1_000, windows: [window] };
+    expect(paramsSchemaFor('wellbeing.observe').parse(params)).toEqual(params);
+    expect(resultSchemaFor('wellbeing.observe').parse({})).toEqual({});
+  });
+
+  it('refuses a negative or missing idle time', () => {
+    expect(
+      paramsSchemaFor('wellbeing.observe').safeParse({ idleMs: -1, windows: [] }).success,
+    ).toBe(false);
+    expect(paramsSchemaFor('wellbeing.observe').safeParse({ windows: [] }).success).toBe(false);
   });
 });
 

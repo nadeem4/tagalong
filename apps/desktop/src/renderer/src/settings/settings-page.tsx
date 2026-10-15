@@ -223,6 +223,7 @@ export function SettingsPage({
         greeting: form.get('greeting') !== null,
         keepAnEye: form.get('keepAnEye') !== null,
         pickUp: form.get('pickUp') !== null,
+        wellbeing: form.get('wellbeing') !== null,
         userName: field('userName'),
         dailyBudget: field('dailyBudget'),
         rollingMemoryEnabled: form.get('rollingMemoryEnabled') !== null,

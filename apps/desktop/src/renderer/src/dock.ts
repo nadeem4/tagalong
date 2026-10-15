@@ -4,8 +4,9 @@ import type { DockMood } from '@tagalong/ui';
  * What the companion on the dock is doing, kept apart from its rendering so it is tested
  * in plain Node. Seeing wins while a capture is fresh; then working, while the companion
  * answers or an expert has a task; then Seeing again while something is held over the pet
- * to drop on it; then a wince or a cheer, for a few seconds; then done, until the person
- * clicks to look; then dozing, while the person is away.
+ * to drop on it; then a wince or a cheer, for a few seconds; then tired, from a gentle nudge
+ * until `rested`; then done, until the person clicks to look; then dozing, while the person
+ * is away.
  */
 export interface DockState {
   seeing: boolean;
@@ -18,6 +19,8 @@ export interface DockState {
   reaction: 'wince' | 'cheer' | null;
   /** A file, a link or text is held over the pet, not yet dropped. */
   dropHover: boolean;
+  /** A gentle nudge's `tired`, until `rested` clears it. */
+  tired: boolean;
 }
 
 export const IDLE_DOCK: DockState = {
@@ -28,6 +31,7 @@ export const IDLE_DOCK: DockState = {
   away: false,
   reaction: null,
   dropHover: false,
+  tired: false,
 };
 
 /** How long a wince or a cheer stays on the face. */
@@ -69,6 +73,8 @@ export function nextDock(state: DockState, event: DockEvent): DockState {
     case 'presence.back':
       return state.away ? { ...state, away: false } : state;
     case 'pet.mood':
+      if (event.mood === 'tired') return state.tired ? state : { ...state, tired: true };
+      if (event.mood === 'rested') return state.tired ? { ...state, tired: false } : state;
       return event.mood === 'wince' || event.mood === 'cheer'
         ? { ...state, reaction: event.mood }
         : state;
@@ -101,6 +107,7 @@ export function dockMood(state: DockState): DockMood {
   if (state.turns.size > 0 || state.handoffs.size > 0) return 'working';
   if (state.dropHover) return 'listening';
   if (state.reaction !== null) return state.reaction;
+  if (state.tired) return 'tired';
   if (state.done) return 'done';
   return state.away ? 'dozing' : 'idle';
 }

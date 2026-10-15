@@ -428,6 +428,22 @@ reads one number from the operating system every fifteen seconds, how long since
 mouse input, and hears the lock and unlock events. Nothing on screen is read, the number is never
 stored, and it never leaves this computer.
 
+### Gentle nudges: idle time and titles
+
+Off by default; switch it on under Settings → Privacy → **Gentle nudges**. While it is on, and sight
+is not paused, the desktop sends the engine on this computer two things once a minute: the idle time
+(how long since the last key or mouse input) and the window titles keeping an eye already lists (no
+picture, no window text). Nothing is stored and no model is called: the lines are fixed text.
+
+- After an hour and a half with no five-minute break, Scout looks tired and suggests a stretch,
+  once. After 23:00, once you have been active for half an hour, it says it is late, once a night.
+- Nothing appears during a call or over a full-screen app, and **Not now** quiets it for an hour.
+- **Nothing leaves this computer unless you take the offer.** With an expert switched on, the late
+  line offers **Hand it over**, which opens the hand-off card with "Write a short note of where I am
+  so I can pick up tomorrow" and the app and title of the window in front (never a blind spot's).
+  Nothing goes to the expert until you press Send there.
+- Nudges read nothing beyond the titles feed, so they add no rows to what Scout saw.
+
 ## Pick up where you left off
 
 On by default; switch it off under Settings → Privacy → **Pick up where you left off**. Off means no

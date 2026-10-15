@@ -136,7 +136,14 @@ describe('a living pet', () => {
     expect(screen.getByTestId('dock-body')).toHaveAttribute('data-motion', 'cheer');
   });
 
-  it.each(['dozing', 'wince', 'cheer'] as const)('never blinks while %s', (mood) => {
+  it('breathes slowly while tired, and says so with no tag', () => {
+    render(<DockPet pet={SCOUT} mood="tired" />);
+    expect(screen.getByTestId('dock-body')).toHaveAttribute('data-motion', 'doze');
+    expect(screen.queryByTestId('dock-tag')).toBeNull();
+    expect(screen.getByRole('img')).toHaveAccessibleName('Scout looks tired');
+  });
+
+  it.each(['dozing', 'wince', 'cheer', 'tired'] as const)('never blinks while %s', (mood) => {
     vi.useFakeTimers();
     render(<DockPet pet={SCOUT} mood={mood} blinkEveryMs={3000} />);
     act(() => vi.advanceTimersByTime(3000));

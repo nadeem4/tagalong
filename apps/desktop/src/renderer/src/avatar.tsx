@@ -75,7 +75,8 @@ function Avatar() {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const off = window.tagalong.onTurnEvent((event) => {
       send(event);
-      if (event.type !== 'pet.mood') return;
+      // Tired and rested are sticky: they never start or restart the reaction's time.
+      if (event.type !== 'pet.mood' || event.mood === 'tired' || event.mood === 'rested') return;
       clearTimeout(timer);
       timer = setTimeout(() => send({ type: 'reacted' }), REACTION_MS);
     });

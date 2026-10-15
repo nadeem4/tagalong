@@ -621,3 +621,19 @@ describe('Settings.budget', () => {
     expect(SettingsPatch.safeParse({ budget: { dailyUsd: 0 } }).success).toBe(false);
   });
 });
+
+describe('Settings.wellbeing', () => {
+  it('is off by default, and a settings file from before it parses as off', () => {
+    expect(Settings.parse({}).wellbeing).toEqual({ enabled: false });
+    expect(Settings.parse({ keepAnEye: true, welcome: { done: true } }).wellbeing).toEqual({
+      enabled: false,
+    });
+  });
+
+  it('rides in a patch alone, and refuses a non-boolean', () => {
+    expect(SettingsPatch.parse({ wellbeing: { enabled: true } })).toEqual({
+      wellbeing: { enabled: true },
+    });
+    expect(SettingsPatch.safeParse({ wellbeing: { enabled: 'yes' } }).success).toBe(false);
+  });
+});

@@ -2,9 +2,10 @@ import type { Sprite } from './sprite';
 
 /**
  * What the pet on the dock is doing, as its face and tag show it. `listening` is "Seeing"
- * (a capture); dozing, wince and cheer are moods with a face and no tag.
+ * (a capture); dozing, wince, cheer and tired are moods with a face and no tag.
  */
-export type DockMood = 'idle' | 'listening' | 'working' | 'done' | 'dozing' | 'wince' | 'cheer';
+export type DockMood =
+  'idle' | 'listening' | 'working' | 'done' | 'dozing' | 'wince' | 'cheer' | 'tired';
 
 /**
  * Rows 4 to 7 of the shared 16x16 body (brow, eyes, muzzle top) for each mood. Only the
@@ -23,6 +24,8 @@ const FACES: Readonly<Record<Exclude<DockMood, 'idle'>, readonly string[]>> = {
   wince: ['offeffffffffeffo', 'offfeffffffefffo', 'offeffffffffeffo', 'offllllllllllffo'],
   // A happy ^ ^ squint: the tests pass.
   cheer: ['offffffffffffffo', 'offfeffffffefffo', 'offefeffffefeffo', 'offllllllllllffo'],
+  // Half-lidded: a heavy lid over open eyes, after a long stretch or late at night.
+  tired: ['offffffffffffffo', 'offooffffffooffo', 'offeeffffffeeffo', 'offllllllllllffo'],
 };
 
 /** The sprite with the face for a mood; idle, or a sprite of another shape, is left as is. */
