@@ -66,6 +66,16 @@ describe('Brief', () => {
     expect(Brief.safeParse({ ask: '' }).success).toBe(false);
     expect(Brief.parse({ ask: 'Why?', files: ['a.ts'] })).toEqual({ ask: 'Why?', files: ['a.ts'] });
   });
+
+  it('still parses an old brief, and takes the end of a window as its own field', () => {
+    const old = { ask: 'Fix it', context: { app: 'Code', windowTitle: 'Build failed' } };
+    expect(Brief.parse(old)).toEqual(old);
+    const stuck = { ask: 'Fix it', context: { windowText: 'FAIL parser.test.ts' } };
+    expect(Brief.parse(stuck)).toEqual(stuck);
+    expect(
+      Brief.safeParse({ ask: 'Fix it', context: { windowText: 'x'.repeat(4001) } }).success,
+    ).toBe(false);
+  });
 });
 
 describe('hand-off wire', () => {

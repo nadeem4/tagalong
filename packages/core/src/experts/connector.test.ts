@@ -18,6 +18,15 @@ describe('renderBrief', () => {
     expect(text).toContain('The cause in one paragraph and the fix.');
   });
 
+  it('puts the end of the window it was read from after what the user was looking at', () => {
+    const text = renderBrief({
+      ask: 'Fix the error in Build failed',
+      context: { windowTitle: 'Build failed', windowText: 'FAIL parser.test.ts: no ./lexer' },
+    });
+    expect(text).toContain('The end of that window:\nFAIL parser.test.ts: no ./lexer');
+    expect(text.indexOf('Window: Build failed')).toBeLessThan(text.indexOf('FAIL parser'));
+  });
+
   it('leaves out the sections it has nothing for', () => {
     const text = renderBrief({ ask: 'Tidy this paragraph.' });
     expect(text).toBe('Tidy this paragraph.');

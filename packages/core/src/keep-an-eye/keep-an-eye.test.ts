@@ -6,6 +6,7 @@ import type { BrainProvider, BrainRequest } from '../providers';
 import type { PerceptionHost } from '../perception';
 import { KeepAnEye } from './keep-an-eye';
 import { COOLDOWN_MS, NOT_NOW_MS, SETTLE_MS } from './lookout';
+import { STUCK_MS } from './stuck';
 
 const scout: Pet = {
   id: 'scout',
@@ -28,12 +29,21 @@ function win(id: string, title: string, extra: Partial<WindowEntry> = {}): Windo
   return { id, processName: 'Code.exe', title, state: 'foreground', browser: false, ...extra };
 }
 
+const coder = Expert.parse({
+  id: 'coder',
+  name: 'Coder',
+  goodAt: 'Fixing code',
+  connection: { type: 'claude-code' },
+});
+
 function setup(
   options: {
     reply?: string;
     settings?: Partial<Settings>;
     experts?: Expert[];
     spentOut?: () => boolean;
+    text?: string;
+    readFails?: boolean;
   } = {},
 ) {
   const clock = { t: 0, now: () => clock.t };
@@ -42,16 +52,24 @@ function setup(
   const requests: BrainRequest[] = [];
   const remarks: PetRemarkParams[] = [];
   const moods: PetMoodParams[] = [];
-  const proposals: Array<{ expertId: string; petId: string; brief: Brief }> = [];
+  const proposals: Array<{
+    expertId: string;
+    petId: string;
+    brief: Brief;
+    projectHint?: string;
+  }> = [];
   const state = { blocked: false };
   const host: PerceptionHost = {
     capabilities: ['textLayer'],
     capture: () => Promise.resolve({}),
     readText: ({ windowId }) => {
       reads.push(windowId);
+      if (options.readFails === true) return Promise.reject(new Error('UIA timed out'));
       return Promise.resolve({
         windowId: windowId ?? 'w-?',
-        text: state.blocked ? '' : 'FAIL parser.test.ts: Cannot find module ./lexer',
+        text: state.blocked
+          ? ''
+          : (options.text ?? 'FAIL parser.test.ts: Cannot find module ./lexer'),
         truncated: false,
         source: 'uia',
         ...(state.blocked ? { blocked: { rule: 'processName', entry: 'x.exe' } } : {}),
@@ -203,8 +221,8 @@ describe('KeepAnEye', () => {
     expect(remarks[0]!.offer).toBe('Fix the import in parser.ts');
     expect(proposals).toEqual([]);
 
-    expect(eye.accept('00000000-0000-4000-8000-000000000000')).toBe(false);
-    expect(eye.accept(remarks[0]!.remarkId)).toBe(true);
+    expect(await eye.accept('00000000-0000-4000-8000-000000000000')).toBe(false);
+    expect(await eye.accept(remarks[0]!.remarkId)).toBe(true);
     expect(proposals).toEqual([
       {
         expertId: 'claude-code',
@@ -216,7 +234,7 @@ describe('KeepAnEye', () => {
       },
     ]);
     // Once only: the card is the person's now.
-    expect(eye.accept(remarks[0]!.remarkId)).toBe(false);
+    expect(await eye.accept(remarks[0]!.remarkId)).toBe(false);
   });
 
   it('skips a snapshot while a look is still being written', async () => {
@@ -226,5 +244,92 @@ describe('KeepAnEye', () => {
     await eye.observe([win('w-2', 'Tests failed')]);
     await first;
     expect(requests).toHaveLength(1);
+  });
+});
+
+describe('KeepAnEye: Stuck?', () => {
+  const failing = win('w-1', 'npm test - 2 failed', { processName: 'WindowsTerminal.exe' });
+  const editor = win('w-2', 'parser.ts - ai_pet - Visual Studio Code', { state: 'background' });
+
+  async function stuck(options: Parameters<typeof setup>[0] = {}) {
+    const run = setup({ experts: [claudeCode, coder], ...options });
+    await run.at(0, [
+      { ...editor, state: 'foreground' },
+      { ...failing, state: 'background' },
+    ]);
+    await run.at(1_000, [failing, editor]);
+    // The look at the error itself, the moment it showed: one read, one call, nothing to say.
+    const before = { reads: run.reads.length, requests: run.requests.length };
+    await run.at(STUCK_MS, [failing, editor]);
+    return { ...run, before };
+  }
+
+  it('offers, in its own words, to hand an error that stayed up to Coder, reading nothing', async () => {
+    const { remarks, reads, requests, before, proposals } = await stuck();
+    expect(remarks).toEqual([
+      {
+        remarkId: expect.any(String),
+        petId: 'scout',
+        text: 'That error’s still up. Want me to hand it to Coder?',
+        offer: 'Fix the error in npm test - 2 failed',
+      },
+    ]);
+    expect(reads).toHaveLength(before.reads);
+    expect(requests).toHaveLength(before.requests);
+    expect(proposals).toEqual([]);
+  });
+
+  it('says nothing with no expert switched on', async () => {
+    const { remarks } = await stuck({ experts: [{ ...coder, enabled: false }] });
+    expect(remarks).toEqual([]);
+  });
+
+  it('says nothing after Not now', async () => {
+    const run = setup({ experts: [coder] });
+    run.eye.notNow();
+    await run.at(0, [failing]);
+    await run.at(STUCK_MS, [failing]);
+    expect(run.remarks).toEqual([]);
+  });
+
+  it('reads the window once on Hand it over, hides secrets, and proposes to Coder with the hint', async () => {
+    const key = 'sk-ant-' + 'a'.repeat(40);
+    const { eye, remarks, reads, before, proposals } = await stuck({
+      text: `npm ERR! auth ${key}\nFAIL parser.test.ts`,
+    });
+    expect(await eye.accept(remarks[0]!.remarkId)).toBe(true);
+    expect(reads.slice(before.reads)).toEqual(['w-1']);
+    expect(proposals).toHaveLength(1);
+    const { expertId, brief, projectHint } = proposals[0]!;
+    expect(expertId).toBe('coder');
+    expect(projectHint).toBe(`npm test - 2 failed - ${editor.title}`);
+    expect(brief.ask).toBe('Fix the error in npm test - 2 failed');
+    expect(brief.context).toMatchObject({ app: 'WindowsTerminal', windowTitle: failing.title });
+    expect(brief.context?.windowText).toContain('FAIL parser.test.ts');
+    expect(brief.context?.windowText).not.toContain(key);
+    expect(await eye.accept(remarks[0]!.remarkId)).toBe(false);
+    expect(reads.slice(before.reads)).toEqual(['w-1']);
+  });
+
+  it('still opens the card, without the text, when the read fails or is refused', async () => {
+    const failed = await stuck({ readFails: true });
+    expect(await failed.eye.accept(failed.remarks[0]!.remarkId)).toBe(true);
+    expect(failed.proposals[0]!.brief.context?.windowText).toBeUndefined();
+
+    const refused = await stuck();
+    refused.state.blocked = true;
+    expect(await refused.eye.accept(refused.remarks[0]!.remarkId)).toBe(true);
+    expect(refused.proposals[0]!.brief.context?.windowText).toBeUndefined();
+  });
+
+  it('picks Coder by name, then by what it is good at, then the first one on', async () => {
+    const byGoodAt = Expert.parse({ ...coder, id: 'bolt', name: 'Bolt', goodAt: 'Code reviews' });
+    const run = await stuck({ experts: [claudeCode, byGoodAt] });
+    expect(run.remarks[0]!.text).toBe('That error’s still up. Want me to hand it to Bolt?');
+    await run.eye.accept(run.remarks[0]!.remarkId);
+    expect(run.proposals[0]!.expertId).toBe('bolt');
+
+    const first = await stuck({ experts: [claudeCode] });
+    expect(first.remarks[0]!.text).toContain('hand it to Claude Code?');
   });
 });

@@ -68,13 +68,24 @@ export class HandoffManager {
   constructor(private readonly options: HandoffManagerOptions) {}
 
   /** Shows the brief to the person, with the project guesses best first. Nothing runs yet. */
-  propose(params: { expertId: string; petId: string; brief: Brief }): { proposalId: string } {
+  propose(params: {
+    expertId: string;
+    petId: string;
+    brief: Brief;
+    /** Titles to guess the project from instead of the brief's window, such as the editor's. */
+    projectHint?: string;
+  }): { proposalId: string } {
     const expert = this.#expert(params.expertId);
     // Only the guesses: an old expert's default folder is ignored, and with no guess at all
     // the hand-off card opens the folder picker.
-    const projects = this.options.projects?.suggest(params.brief.context?.windowTitle) ?? [];
+    const projects =
+      this.options.projects?.suggest(params.projectHint ?? params.brief.context?.windowTitle) ?? [];
     const proposalId = randomUUID();
-    this.#proposals.set(proposalId, params);
+    this.#proposals.set(proposalId, {
+      expertId: params.expertId,
+      petId: params.petId,
+      brief: params.brief,
+    });
     this.options.emit({
       method: 'handoff.proposed',
       params: {
