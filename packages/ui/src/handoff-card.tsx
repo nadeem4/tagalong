@@ -169,7 +169,9 @@ export function ProposalCard({
   const [nextAsk, setNextAsk] = useState(proposal.then?.ask ?? '');
   const [problem, setProblem] = useState<string | null>(null);
   const { expertName } = proposal;
-  const project = folder === undefined ? undefined : nameOf(folder);
+  // An expert with its own folder never works in a project, so the card asks for none.
+  const own = proposal.ownFolder === true;
+  const project = own ? 'its own folder' : folder === undefined ? undefined : nameOf(folder);
   const then = chained ? proposal.then : undefined;
 
   const choose = (path: string): void => {
@@ -186,7 +188,7 @@ export function ProposalCard({
   };
 
   const send = async (): Promise<void> => {
-    if (folder === undefined || bridge.confirmHandoff === undefined) return;
+    if ((!own && folder === undefined) || bridge.confirmHandoff === undefined) return;
     const edited = ask.trim() !== '' && ask.trim() !== proposal.brief.ask;
     const nextEdited = then !== undefined && nextAsk.trim() !== '' && nextAsk.trim() !== then.ask;
     try {
@@ -195,14 +197,14 @@ export function ProposalCard({
         handoffId: null,
         expertId: proposal.expertId,
         expertName,
-        project: nameOf(folder),
+        project: project ?? '',
         steps: [],
         ...(then === undefined ? {} : { chain: { step: 1 as const, nextName: then.expertName } }),
       };
       onSent(working);
       const { handoffId } = await bridge.confirmHandoff({
         proposalId: proposal.proposalId,
-        folder,
+        ...(own || folder === undefined ? {} : { folder }),
         canEdit,
         ...(edited ? { brief: { ...proposal.brief, ask: ask.trim() } } : {}),
         ...(proposal.then === undefined
@@ -257,25 +259,32 @@ export function ProposalCard({
             <dd>{expertName}</dd>
           </div>
         )}
-        <div>
-          <dt>Project</dt>
-          <dd>
-            {folder === undefined ? (
-              <span>Choose the project to work in</span>
-            ) : (
-              <>
-                <strong>{project}</strong>
-                <small>{folder}</small>
-              </>
+        {own ? (
+          <div>
+            <dt>Works in</dt>
+            <dd>Works in its own folder</dd>
+          </div>
+        ) : (
+          <div>
+            <dt>Project</dt>
+            <dd>
+              {folder === undefined ? (
+                <span>Choose the project to work in</span>
+              ) : (
+                <>
+                  <strong>{project}</strong>
+                  <small>{folder}</small>
+                </>
+              )}
+            </dd>
+            {!picking && (
+              <button type="button" className="bubble-quiet" onClick={() => setPicking(true)}>
+                Change project
+              </button>
             )}
-          </dd>
-          {!picking && (
-            <button type="button" className="bubble-quiet" onClick={() => setPicking(true)}>
-              Change project
-            </button>
-          )}
-        </div>
-        {picking && (
+          </div>
+        )}
+        {!own && picking && (
           <div className="handoff-picker">
             {[...others, ...results.filter((r) => !others.some((o) => o.path === r.path))].map(
               (candidate) => (
@@ -336,7 +345,7 @@ export function ProposalCard({
         <button
           type="button"
           className="bubble-primary"
-          disabled={folder === undefined}
+          disabled={!own && folder === undefined}
           onClick={() => void send()}
         >
           Send

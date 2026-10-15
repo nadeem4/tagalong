@@ -16,9 +16,13 @@ import {
   ConnectorConfirmParams,
 } from './connections';
 import {
+  ExpertsCatalogParams,
+  ExpertsCatalogResult,
   ExpertsDeleteParams,
   ExpertsDeleteResult,
   ExpertsListParams,
+  ExpertsInstallParams,
+  ExpertsInstallResult,
   ExpertsListResult,
   ExpertsTestParams,
   ExpertsTestResult,
@@ -547,6 +551,9 @@ export const hostToCoreMethods = {
   'usage.summary': { params: UsageSummaryParams, result: UsageSummaryResult },
   'hosts.status': { params: HostsStatusParams, result: HostsStatusResult },
   'wellbeing.observe': { params: WellbeingObserveParams, result: WellbeingObserveResult },
+  // The expert catalog. Not in EXTENSION_METHODS: only the desktop's Home installs experts.
+  'experts.catalog': { params: ExpertsCatalogParams, result: ExpertsCatalogResult },
+  'experts.install': { params: ExpertsInstallParams, result: ExpertsInstallResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostMethods = {

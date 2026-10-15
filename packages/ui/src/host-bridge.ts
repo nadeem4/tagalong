@@ -9,6 +9,7 @@ import type {
   ConnectionsListResult,
   ContextSnapshot,
   CoreToHostNotification,
+  CatalogStatus,
   Expert,
   NotificationParamsOf,
   PerceptionTarget,
@@ -102,6 +103,10 @@ export interface HostBridge {
   deleteExpert?(expertId: string): Promise<boolean>;
   /** Whether the expert can be reached, at no cost: Claude Code's `--version`. */
   testExpert?(expertId: string): Promise<{ ok: boolean; error?: string }>;
+  /** The built-in expert catalog, with what this computer has for each entry. */
+  expertCatalog?(): Promise<CatalogStatus[]>;
+  /** Installs an entry's missing plugins with `claude plugin install`, on the person's press. */
+  installExpert?(catalogId: string): Promise<{ ok: boolean; installed: string[]; error?: string }>;
   /** The host's folder picker; null when the user cancelled. */
   pickFolder?(): Promise<string | null>;
   /** Sends a proposed hand-off, in the folder the person settled on. */
@@ -186,7 +191,8 @@ export interface HostBridge {
 
 export interface ConfirmHandoff {
   proposalId: string;
-  folder: string;
+  /** Left out for an expert that works in its own folder. */
+  folder?: string;
   canEdit: boolean;
   brief?: Brief;
   /** A two-step hand-off: step 2's access and edited ask, or null when it was removed. */

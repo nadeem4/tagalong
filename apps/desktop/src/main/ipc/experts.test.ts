@@ -14,6 +14,8 @@ function setup() {
     'experts.delete': { deleted: true },
     'experts.test': { ok: true },
     'handoffs.confirm': { handoffId: 'h1' },
+    'experts.catalog': { entries: [{ entry: { id: 'researcher' } }] },
+    'experts.install': { ok: true, installed: ['firecrawl@claude-plugins-official'] },
     'projects.search': { projects: ['C:\\code\\app'] },
     'usage.summary': { today: [], month: [] },
   });
@@ -49,6 +51,19 @@ describe('registerExpertIpc', () => {
       ['experts.upsert', { expert: EXPERT }],
       ['experts.delete', { expertId: 'claude-code' }],
       ['experts.test', { expertId: 'claude-code' }],
+    ]);
+  });
+
+  it('lists the expert catalog and installs an entry, unwrapping each answer', async () => {
+    const { invoke, calls } = setup();
+    expect(await invoke(IPC.expertCatalog)).toEqual([{ entry: { id: 'researcher' } }]);
+    expect(await invoke(IPC.installExpert, 'researcher')).toEqual({
+      ok: true,
+      installed: ['firecrawl@claude-plugins-official'],
+    });
+    expect(calls).toEqual([
+      ['experts.catalog', {}],
+      ['experts.install', { catalogId: 'researcher' }],
     ]);
   });
 

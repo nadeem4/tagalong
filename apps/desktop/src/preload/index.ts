@@ -3,6 +3,7 @@ import type { IpcRendererEvent } from 'electron';
 import type {
   ActivityListResult,
   CalendarCheckResult,
+  CatalogStatus,
   ConnectionState,
   ConnectionsAddParams,
   ConnectionsListResult,
@@ -129,6 +130,13 @@ const bridge: HostBridge = {
   usageSummary: () => ipcRenderer.invoke(IPC.usageSummary) as Promise<UsageSummaryResult>,
   applySettings: (patch: SettingsPatch) =>
     ipcRenderer.invoke(IPC.applySettings, patch) as Promise<void>,
+  expertCatalog: () => ipcRenderer.invoke(IPC.expertCatalog) as Promise<CatalogStatus[]>,
+  installExpert: (catalogId: string) =>
+    ipcRenderer.invoke(IPC.installExpert, catalogId) as Promise<{
+      ok: boolean;
+      installed: string[];
+      error?: string;
+    }>,
   onTurnEvent: (handler: (event: TurnEvent) => void) => {
     const listener = (_event: IpcRendererEvent, turnEvent: TurnEvent): void => handler(turnEvent);
     ipcRenderer.on(IPC.turnEvent, listener);

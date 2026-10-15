@@ -188,7 +188,14 @@ describe('welcomeExperts', () => {
         goodAt: 'Code: reading, explaining, debugging and changing code in a project.',
         enabled: true,
         instructions: '',
-        connection: { type: 'claude-code', canEdit: false, canSearchWeb: false },
+        connection: {
+          type: 'claude-code',
+          canEdit: false,
+          canSearchWeb: false,
+          plugins: [],
+          mcpTools: [],
+          workspace: 'project',
+        },
       },
     ]);
   });
@@ -203,7 +210,14 @@ describe('welcomeExperts', () => {
           goodAt: '',
           enabled: true,
           instructions: '',
-          connection: { type: 'claude-code', canEdit: true, canSearchWeb: false },
+          connection: {
+            type: 'claude-code',
+            canEdit: true,
+            canSearchWeb: false,
+            plugins: [],
+            mcpTools: [],
+            workspace: 'project' as const,
+          },
         },
       ]),
     ).toEqual([]);

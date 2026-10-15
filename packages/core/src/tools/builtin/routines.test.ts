@@ -10,7 +10,14 @@ const RESEARCHER: Expert = {
   goodAt: 'Web research',
   enabled: true,
   instructions: '',
-  connection: { type: 'claude-code', canEdit: false, canSearchWeb: false },
+  connection: {
+    type: 'claude-code',
+    canEdit: false,
+    canSearchWeb: false,
+    plugins: [],
+    mcpTools: [],
+    workspace: 'project' as const,
+  },
 };
 
 const SAVED: RoutineView = {

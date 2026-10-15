@@ -134,7 +134,14 @@ export function welcomeExperts(
       goodAt: 'Code: reading, explaining, debugging and changing code in a project.',
       enabled: true,
       instructions: '',
-      connection: { type: 'claude-code', canEdit: false, canSearchWeb: false },
+      connection: {
+        type: 'claude-code',
+        canEdit: false,
+        canSearchWeb: false,
+        plugins: [],
+        mcpTools: [],
+        workspace: 'project',
+      },
     },
   ];
 }

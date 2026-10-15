@@ -2,7 +2,7 @@ import { SECRET_FILES } from '@tagalong/protocol';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ClaudeCodeConnector, spawnChild, type ChildRun, type SpawnFn } from './claude-code';
 
 interface Spawned {
@@ -755,6 +755,193 @@ describe('ClaudeCodeConnector', () => {
     expect(taken).toBe(0);
     expect(calls[0]?.stdin).toBe(userLine('x'));
     expect(calls[0]?.ended).toBe(true);
+  });
+});
+
+describe('ClaudeCodeConnector with a catalog bundle', () => {
+  const FIRECRAWL = 'firecrawl@claude-plugins-official';
+  const NOTION = 'notion@claude-plugins-official';
+  const SEARCH = 'mcp__plugin_Notion_notion__notion-search';
+  const init = (plugins: string[]) => ({
+    type: 'system',
+    subtype: 'init',
+    plugins: plugins.map((source) => ({ name: source.split('@')[0], source })),
+  });
+  let own: string;
+  beforeEach(() => {
+    own = join(mkdtempSync(join(tmpdir(), 'tagalong-own-')), 'researcher');
+  });
+
+  function bundled(
+    lines: unknown[],
+    extra: Partial<ConstructorParameters<typeof ClaudeCodeConnector>[0]> = {},
+  ) {
+    const { spawn, calls } = fakeSpawn(lines);
+    const connector = new ClaudeCodeConnector({
+      spawn,
+      canSearchWeb: true,
+      plugins: [FIRECRAWL, NOTION],
+      mcpTools: [SEARCH],
+      installedPlugins: () => [FIRECRAWL, NOTION, 'superpowers@claude-plugins-official'],
+      ownFolder: own,
+      ...extra,
+    });
+    return { connector, calls };
+  }
+
+  it('pins its plugins, turns every other one off, and allows exactly its app tools', async () => {
+    const { connector, calls } = bundled([init([FIRECRAWL, NOTION]), result('Found it.')]);
+    const outcome = await connector.send({ ask: 'Find papers' }, () => {});
+    expect(outcome).toMatchObject({ ok: true, text: 'Found it.' });
+    expect(calls[0]?.args).toEqual([
+      '-p',
+      '--input-format',
+      'stream-json',
+      '--output-format',
+      'stream-json',
+      '--verbose',
+      '--permission-mode',
+      'dontAsk',
+      '--tools',
+      'Read,Glob,Grep,WebSearch,WebFetch,Skill',
+      '--setting-sources',
+      'user',
+      '--settings',
+      JSON.stringify({
+        disableAllHooks: true,
+        enabledPlugins: {
+          [FIRECRAWL]: true,
+          [NOTION]: true,
+          'superpowers@claude-plugins-official': false,
+        },
+      }),
+      '--allowedTools',
+      'Read',
+      'Glob',
+      'Grep',
+      'WebSearch',
+      'WebFetch',
+      'Skill',
+      SEARCH,
+      '--disallowedTools',
+      ...SECRET_FILES.flatMap((file) => [`Read(**/${file})`, `Edit(**/${file})`]),
+    ]);
+  });
+
+  it("denies every app tool the person's own settings allow but its entry does not list", async () => {
+    // A user allow rule would let dontAsk run that tool; a deny rule wins over it.
+    const { connector, calls } = bundled([init([FIRECRAWL, NOTION]), result('ok')], {
+      userAllowRules: () => [
+        'mcp__claude_ai_Gmail__send_message',
+        'mcp__plugin_Notion_notion',
+        SEARCH,
+        'Bash(npm test)',
+        'WebFetch(domain:example.com)',
+      ],
+    });
+    await connector.send({ ask: 'x' }, () => {});
+    const args = calls[0]?.args ?? [];
+    const denied = args.slice(args.indexOf('--disallowedTools') + 1);
+    expect(denied.slice(0, 2)).toEqual([
+      'mcp__claude_ai_Gmail__send_message',
+      'mcp__plugin_Notion_notion',
+    ]);
+    // Its own listed tool stays allowed; rules for tools the run does not have are left alone.
+    expect(denied).not.toContain(SEARCH);
+    expect(denied).not.toContain('Bash(npm test)');
+  });
+
+  it('works in its own folder, made if needed, never in a project', async () => {
+    const { connector, calls } = bundled([init([FIRECRAWL, NOTION]), result('ok')], {
+      folder: 'C:\\projects\\site',
+    });
+    await connector.send({ ask: 'x' }, () => {});
+    expect(calls[0]?.cwd).toBe(own);
+    expect(existsSync(own)).toBe(true);
+  });
+
+  it('writes drafts there without asking, but anything else unlisted is still refused', async () => {
+    const { connector, calls } = bundled([init([FIRECRAWL, NOTION]), result('ok')], {
+      canEdit: true,
+    });
+    await connector.send({ ask: 'x' }, () => {});
+    const args = calls[0]?.args ?? [];
+    expect(args[args.indexOf('--permission-mode') + 1]).toBe('dontAsk');
+    expect(args[args.indexOf('--tools') + 1]).toBe(
+      'Read,Glob,Grep,WebSearch,WebFetch,Edit,Write,Skill',
+    );
+  });
+
+  it('refuses to run when Claude Code did not load a pinned plugin', async () => {
+    const { connector, calls } = bundled([init([NOTION]), result('should not get here')]);
+    const outcome = await connector.send({ ask: 'x' }, () => {});
+    expect(outcome).toEqual({
+      ok: false,
+      error: `Claude Code did not load ${FIRECRAWL}, which this expert needs. Install it from Home, Experts, then try again.`,
+    });
+    expect(calls[0]?.killed).toBe(true);
+  });
+
+  it('refuses to run when Claude Code loaded a plugin it does not pin', async () => {
+    const { connector, calls } = bundled([
+      init([FIRECRAWL, NOTION, 'engineering@synced', 'cc-plugin-agents-md@builtin']),
+      result('should not get here'),
+    ]);
+    const outcome = await connector.send({ ask: 'x' }, () => {});
+    expect(outcome).toEqual({
+      ok: false,
+      error:
+        'Claude Code also loaded engineering@synced, which this expert does not use, so it did not start.',
+    });
+    expect(calls[0]?.killed).toBe(true);
+  });
+
+  it('refuses to run when Claude Code does not say which plugins it loaded', async () => {
+    const { connector } = bundled([result('ok')]);
+    expect(await connector.send({ ask: 'x' }, () => {})).toEqual({
+      ok: false,
+      error: 'Claude Code did not say which plugins it loaded, so this expert did not start.',
+    });
+  });
+
+  it("ignores Claude Code's own built-in plugins", async () => {
+    const { connector } = bundled([
+      init([FIRECRAWL, NOTION, 'cc-plugin-agents-md@builtin']),
+      result('ok'),
+    ]);
+    expect(await connector.send({ ask: 'x' }, () => {})).toMatchObject({ ok: true });
+  });
+
+  it('runs with app tools alone, no plugins, and still checks none were loaded', async () => {
+    const { connector, calls } = bundled([init([]), result('ok')], {
+      plugins: [],
+      mcpTools: ['mcp__claude_ai_Google_Calendar__list_events'],
+    });
+    expect(await connector.send({ ask: 'x' }, () => {})).toMatchObject({ ok: true });
+    const args = calls[0]?.args ?? [];
+    expect(args).not.toContain('--strict-mcp-config');
+    expect(args).toContain('mcp__claude_ai_Google_Calendar__list_events');
+  });
+
+  it('stays sealed for a routine’s research, whatever its bundle', async () => {
+    const { connector, calls } = bundled([result('ok')], {
+      research: true,
+      researchFolder: () => 'C:\\tmp\\research',
+    });
+    await connector.send({ ask: 'x' }, () => {});
+    const args = calls[0]?.args ?? [];
+    expect(args).toContain('--strict-mcp-config');
+    expect(args).toContain('mcp__*');
+    expect(args).not.toContain('Skill');
+  });
+
+  it('reads no user rules for a sealed run, which has no app tools to guard', async () => {
+    const userAllowRules = vi.fn(() => ['mcp__claude_ai_Gmail__send_message']);
+    const { spawn, calls } = fakeSpawn([result('ok')]);
+    const connector = new ClaudeCodeConnector({ spawn, folder: own, userAllowRules });
+    await connector.send({ ask: 'x' }, () => {});
+    expect(userAllowRules).not.toHaveBeenCalled();
+    expect(calls[0]?.args).toContain('mcp__*');
   });
 });
 

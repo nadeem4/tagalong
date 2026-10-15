@@ -140,6 +140,7 @@ export class HandoffManager {
         brief: params.brief,
         projects,
         canEdit: expert.connection.canEdit,
+        ...(expert.connection.workspace === 'own' ? { ownFolder: true } : {}),
         ...(next === undefined || params.then === undefined
           ? {}
           : {
@@ -158,7 +159,8 @@ export class HandoffManager {
   /** The person sent it: starts the hand-off in their folder and remembers the folder. */
   confirm(params: {
     proposalId: string;
-    folder: string;
+    /** Left out for an expert that works in its own folder. */
+    folder?: string | undefined;
     canEdit: boolean;
     brief?: Brief | undefined;
     /** Null: the person removed the follow-up step. Left out: it runs as proposed. */
@@ -189,7 +191,7 @@ export class HandoffManager {
       then,
     });
     this.#proposals.delete(params.proposalId);
-    this.options.projects?.remember(params.folder);
+    if (params.folder !== undefined) this.options.projects?.remember(params.folder);
     return started;
   }
 
@@ -214,6 +216,15 @@ export class HandoffManager {
   start(params: StartParams): { handoffId: string } {
     const stored = this.#expert(params.expertId);
     const folder = params.folder;
+    // An expert with its own folder never works in a project: its connector picks the folder.
+    if (stored.connection.workspace === 'own') {
+      const { folder: _folder, ...connection } = stored.connection;
+      const expert: Expert = {
+        ...stored,
+        connection: { ...connection, canEdit: params.canEdit ?? stored.connection.canEdit },
+      };
+      return this.#begin(expert, params.petId, params.brief, false, params.then);
+    }
     if (folder === undefined) {
       throw new RpcFailure(
         RPC_ERROR_CODES.invalidParams,
