@@ -95,7 +95,7 @@ test.describe('the hand-off card', () => {
         goodAt: 'Code',
         enabled: true,
         instructions: '',
-        connection: { type: 'claude-code', canEdit: false, canSearchWeb: false },
+        connection: { type: 'claude-code', canEdit: false, canSearchWeb: false, plugins: [], mcpTools: [], workspace: 'project' as const },
       }),
     );
     // The folder picker is a native dialog Playwright cannot click; it answers with a

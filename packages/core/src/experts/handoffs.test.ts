@@ -752,6 +752,45 @@ describe('proposals', () => {
     });
   });
 
+  describe('an expert that works in its own folder', () => {
+    function ownFolder(connector: Connector) {
+      const made = proposing(connector);
+      experts.upsert(
+        Expert.parse({
+          id: 'trip-planner',
+          name: 'Trip planner',
+          catalogId: 'trip-planner',
+          connection: { type: 'claude-code', workspace: 'own', canEdit: true },
+        }),
+      );
+      return made;
+    }
+
+    it('says so on the proposal, so the card asks for no project', () => {
+      const { handoffs } = ownFolder(new FakeConnector({ text: 'x' }));
+      handoffs.propose({ expertId: 'trip-planner', petId: 'scout', brief });
+      expect(events[0]?.params).toMatchObject({ expertId: 'trip-planner', ownFolder: true });
+    });
+
+    it('confirms without a folder, and remembers none', async () => {
+      projects.remember.mockClear();
+      const connector = new FakeConnector({ text: 'A plan.' });
+      const { handoffs, seen } = ownFolder(connector);
+      const { proposalId } = handoffs.propose({ expertId: 'trip-planner', petId: 'scout', brief });
+      handoffs.confirm({ proposalId, canEdit: true });
+      await vi.waitFor(() => expect(finished()).toBeDefined());
+      expect(finished()?.params).toMatchObject({ state: 'done', text: 'A plan.' });
+      expect(seen[0]?.connection.folder).toBeUndefined();
+      expect(projects.remember).not.toHaveBeenCalled();
+    });
+
+    it('still needs a folder for an expert that works in projects', () => {
+      const { handoffs } = proposing(new FakeConnector({ text: 'x' }));
+      const { proposalId } = handoffs.propose({ expertId: 'claude-code', petId: 'scout', brief });
+      expect(() => handoffs.confirm({ proposalId, canEdit: false })).toThrow(/project folder/);
+    });
+  });
+
   it('refuses to start with no folder, even when an old expert carries a default one', () => {
     const { handoffs } = proposing(new FakeConnector({ text: 'x' }), 'D:\\default');
     expect(() => handoffs.start({ expertId: 'claude-code', petId: 'scout', brief })).toThrow(

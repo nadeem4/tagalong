@@ -128,6 +128,8 @@ export const IPC = {
   hostsStatus: 'tagalong:hosts:status',
   // Change settings by talking: Apply on Scout's settings card, a click only.
   applySettings: 'tagalong:settings:apply',
+  expertCatalog: 'tagalong:experts:catalog',
+  installExpert: 'tagalong:experts:install',
 } as const;
 
 /** What the figure hands its preload on a drop: the files, and the drag's link and text. */

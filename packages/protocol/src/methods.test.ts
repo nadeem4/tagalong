@@ -69,6 +69,8 @@ const HOST_TO_CORE = [
   'usage.summary',
   'hosts.status',
   'wellbeing.observe',
+  'experts.catalog',
+  'experts.install',
 ] as const;
 
 const CORE_TO_HOST = ['perception.capture'] as const;

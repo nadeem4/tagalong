@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useState } from 'react';
-import type { Expert } from '@tagalong/protocol';
+import type { CatalogEntry, CatalogStatus, Expert } from '@tagalong/protocol';
 import { useHostBridge } from '../host-bridge';
 
 /** A kebab-case id from the expert's name, unique among the ids already taken. */
@@ -22,6 +22,11 @@ interface Draft {
   canSearchWeb: boolean;
   enabled: boolean;
   command: string;
+  /** Set only for an expert installed from the catalog, with its entry's bundle. */
+  catalogId?: string;
+  plugins: string[];
+  mcpTools: string[];
+  workspace: 'project' | 'own';
 }
 
 const NEW_DRAFT: Draft = {
@@ -32,7 +37,24 @@ const NEW_DRAFT: Draft = {
   canSearchWeb: false,
   enabled: true,
   command: '',
+  plugins: [],
+  mcpTools: [],
+  workspace: 'project',
 };
+
+/** The add form for a catalog entry: the same form as a template, with the entry's bundle. */
+const draftOfEntry = (entry: CatalogEntry): Draft => ({
+  ...NEW_DRAFT,
+  name: entry.name,
+  goodAt: entry.goodAt,
+  instructions: entry.instructions,
+  canEdit: entry.canEdit,
+  canSearchWeb: entry.canSearchWeb,
+  catalogId: entry.id,
+  plugins: entry.plugins.map((plugin) => plugin.id),
+  mcpTools: entry.apps.flatMap((app) => app.tools),
+  workspace: entry.workspace,
+});
 
 const draftOf = (expert: Expert): Draft => ({
   name: expert.name,
@@ -42,6 +64,10 @@ const draftOf = (expert: Expert): Draft => ({
   canSearchWeb: expert.connection.canSearchWeb,
   enabled: expert.enabled,
   command: expert.connection.command ?? '',
+  ...(expert.catalogId === undefined ? {} : { catalogId: expert.catalogId }),
+  plugins: expert.connection.plugins,
+  mcpTools: expert.connection.mcpTools,
+  workspace: expert.connection.workspace,
 });
 
 interface Template {
@@ -53,7 +79,8 @@ interface Template {
 
 /**
  * Add expert starts from one of these. Each is only a filled-in form: the person sees the
- * standing instructions in full and can change any of it before saving.
+ * standing instructions in full and can change any of it before saving. The Researcher
+ * comes from the catalog instead, with its plugins and apps.
  */
 const TEMPLATES: readonly Template[] = [
   {
@@ -100,21 +127,6 @@ const TEMPLATES: readonly Template[] = [
     },
   },
   {
-    id: 'researcher',
-    name: 'Researcher',
-    line: 'Looks things up on the web and sums up, with sources. Never edits.',
-    draft: {
-      ...NEW_DRAFT,
-      name: 'Researcher',
-      goodAt: 'Looking things up on the web and summarising with sources',
-      canSearchWeb: true,
-      instructions:
-        'You look things up on the web. Prefer primary and recent sources. Sum up what you ' +
-        'found in plain words, say where sources disagree, and link every source you used. ' +
-        'Do not change files.',
-    },
-  },
-  {
     id: 'reviewer',
     name: 'Reviewer',
     line: 'Checks a change for bugs, missing tests and unclear code. Reads only.',
@@ -152,16 +164,37 @@ export function ExpertsPanel() {
   // Add expert shows the templates first; the one picked fills the add form.
   const [picking, setPicking] = useState(false);
   const [start, setStart] = useState<Draft>(NEW_DRAFT);
+  const [catalog, setCatalog] = useState<CatalogStatus[]>([]);
+  // The catalog entry whose Install was pressed: its confirm card shows before anything runs.
+  const [installing, setInstalling] = useState<CatalogStatus | null>(null);
 
   const reload = useCallback(() => {
     void bridge.listExperts?.().then(setExperts);
   }, [bridge]);
   useEffect(reload, [reload]);
+  useEffect(() => {
+    if (picking) void bridge.expertCatalog?.().then(setCatalog);
+  }, [bridge, picking]);
 
   if (bridge.listExperts === undefined) {
     return <p className="home-note">Experts are set up in the Tagalong desktop app.</p>;
   }
   if (experts === null) return <p className="home-note">Loading experts…</p>;
+
+  if (installing !== null) {
+    return (
+      <InstallCard
+        status={installing}
+        onBack={() => setInstalling(null)}
+        onInstalled={() => {
+          setStart(draftOfEntry(installing.entry));
+          setInstalling(null);
+          setPicking(false);
+          setOpen('new');
+        }}
+      />
+    );
+  }
 
   if (picking) {
     return (
@@ -185,6 +218,22 @@ export function ExpertsPanel() {
             </button>
           ))}
         </div>
+        {catalog.length > 0 && (
+          <>
+            <h3>From the catalog</h3>
+            <p className="tg-note">
+              Ready-made experts that use the plugins and apps you already have in Claude Code.
+              Tagalong keeps no sign-in for them.
+            </p>
+            {catalog.map((status) => (
+              <CatalogCard
+                key={status.entry.id}
+                status={status}
+                onInstall={() => setInstalling(status)}
+              />
+            ))}
+          </>
+        )}
         <div className="tg-footer">
           <button type="button" className="tg-btn-quiet" onClick={() => setPicking(false)}>
             Back to experts
@@ -226,7 +275,11 @@ export function ExpertsPanel() {
               <button type="button" className="home-entry" onClick={() => setOpen(expert.id)}>
                 <span className="home-entry__body">
                   <span className="home-entry__title">{expert.name}</span>
-                  <span className="home-entry__preview">Asks which project for each task</span>
+                  <span className="home-entry__preview">
+                    {expert.connection.workspace === 'own'
+                      ? 'Works in its own folder'
+                      : 'Asks which project for each task'}
+                  </span>
                 </span>
                 <span className="tg-chip">
                   {expert.connection.canEdit ? 'Can edit' : 'Reads only'}
@@ -287,7 +340,12 @@ function ExpertForm({
         canEdit: draft.canEdit,
         canSearchWeb: draft.canSearchWeb,
         ...(draft.command.trim() ? { command: draft.command.trim() } : {}),
+        // The bundle is the catalog's; the engine checks it against the entry on save.
+        plugins: draft.plugins,
+        mcpTools: draft.mcpTools,
+        workspace: draft.workspace,
       },
+      ...(draft.catalogId === undefined ? {} : { catalogId: draft.catalogId }),
     };
     setBusy(true);
     setStatus(null);
@@ -353,13 +411,24 @@ function ExpertForm({
       <p className="tg-note">
         Sent with every task, on top of Claude Code&apos;s own instructions.
       </p>
-      <p className="tg-note">
-        Each task asks which project to work in, guessed from your screen. When your companion
-        can&apos;t tell, you pick it on the hand-off card.
-      </p>
+      {draft.workspace === 'own' ? (
+        <p className="tg-note">
+          Works in its own folder, one of Tagalong&apos;s, never in your projects. Edits there are
+          drafts for you to use.
+        </p>
+      ) : (
+        <p className="tg-note">
+          Each task asks which project to work in, guessed from your screen. When your companion
+          can&apos;t tell, you pick it on the hand-off card.
+        </p>
+      )}
       <Switch
         label="Let it edit files by default"
-        help="Off, it only reads and searches. You can still allow edits for one task when you send it."
+        help={
+          draft.workspace === 'own'
+            ? 'Off, it only reads and searches. On, it writes drafts in its own folder.'
+            : 'Off, it only reads and searches. You can still allow edits for one task when you send it.'
+        }
         checked={draft.canEdit}
         onChange={(canEdit) => set({ canEdit })}
       />
@@ -416,6 +485,157 @@ function ExpertForm({
             role={status.error ? 'alert' : 'status'}
           >
             {status.text}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * One catalog entry on the Add expert screen: what it is good at, the plugins it uses
+ * (installed or missing), the apps it may use (set up in Claude Code or not), what it may
+ * do in plain words, and the exact app tools it is allowed.
+ */
+function CatalogCard({ status, onInstall }: { status: CatalogStatus; onInstall: () => void }) {
+  const { entry } = status;
+  const tools = entry.apps.flatMap((app) => app.tools);
+  return (
+    <section className="home-catalog" aria-label={entry.name}>
+      <span className="home-template__name">{entry.name}</span>
+      <span className="home-template__line">{entry.line}</span>
+      {status.plugins.length > 0 && (
+        <>
+          <span className="home-catalog__label">Uses</span>
+          <ul aria-label="Uses" className="home-catalog__list">
+            {status.plugins.map((plugin) => (
+              <li key={plugin.id}>
+                <span>{plugin.name}</span>
+                <span className={plugin.installed ? 'tg-chip tg-chip--ok' : 'tg-chip'}>
+                  {plugin.installed ? 'Installed' : 'Missing'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {status.apps.length > 0 && (
+        <>
+          <span className="home-catalog__label">Apps</span>
+          <ul aria-label="Apps" className="home-catalog__list">
+            {status.apps.map((app) => (
+              <li key={app.name}>
+                {app.name}:{' '}
+                {app.found
+                  ? 'found in Claude Code'
+                  : app.optional
+                    ? 'not set up (optional)'
+                    : 'not set up'}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <span className="home-catalog__label">May do</span>
+      <p className="tg-note">{entry.mayDo}</p>
+      {tools.length > 0 && <AllowedTools tools={tools} />}
+      <div className="tg-footer">
+        <button
+          type="button"
+          className="tg-btn"
+          aria-label={`Install ${entry.name}`}
+          onClick={onInstall}
+        >
+          Install
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/** The exact app tools a catalog expert may call. Every other tool is refused. */
+function AllowedTools({ tools }: { tools: readonly string[] }) {
+  return (
+    <>
+      <span className="home-catalog__label">Allowed app tools (every other tool is refused)</span>
+      <ul aria-label="Allowed app tools" className="home-catalog__tools">
+        {tools.map((tool) => (
+          <li key={tool}>
+            <code>{tool}</code>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+/**
+ * The last look before Install runs anything: each plugin Claude Code will install, by its
+ * id, and the app tools the expert will be allowed. Nothing runs until the person presses.
+ */
+function InstallCard({
+  status,
+  onBack,
+  onInstalled,
+}: {
+  status: CatalogStatus;
+  onBack: () => void;
+  onInstalled: () => void;
+}) {
+  const bridge = useHostBridge();
+  const heading = useId();
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const { entry } = status;
+  const missing = status.plugins.filter((plugin) => !plugin.installed);
+  const tools = entry.apps.flatMap((app) => app.tools);
+
+  const install = async (): Promise<void> => {
+    if (missing.length === 0) return onInstalled();
+    setBusy(true);
+    setProblem(null);
+    try {
+      const result = await bridge.installExpert?.(entry.id);
+      if (result === undefined || result.ok) return onInstalled();
+      setProblem(result.error ?? 'The install did not finish.');
+    } catch (error) {
+      setProblem(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="tg-panel home-controls" aria-labelledby={heading}>
+      <h3 id={heading}>Install {entry.name}?</h3>
+      {missing.length > 0 ? (
+        <>
+          <p className="tg-note">
+            Tagalong runs Claude Code&apos;s own <code>claude plugin install</code> for:
+          </p>
+          <ul className="home-catalog__list">
+            {missing.map((plugin) => (
+              <li key={plugin.id}>
+                {plugin.name} <code>{plugin.id}</code>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className="tg-note">Nothing to install: Claude Code has every plugin it uses.</p>
+      )}
+      {tools.length > 0 && <AllowedTools tools={tools} />}
+      <p className="tg-note">{entry.mayDo}</p>
+      <div className="tg-footer home-controls__footer">
+        <button type="button" className="tg-btn" disabled={busy} onClick={() => void install()}>
+          {busy ? 'Installing…' : missing.length > 0 ? 'Install and continue' : 'Continue'}
+        </button>
+        <button type="button" className="tg-btn-quiet" onClick={onBack}>
+          Not now
+        </button>
+        {problem !== null && (
+          <p className="tg-error" role="alert">
+            {problem}
           </p>
         )}
       </div>

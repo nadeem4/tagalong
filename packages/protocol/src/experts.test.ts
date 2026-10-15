@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   Brief,
+  CatalogEntry,
   Expert,
   HandoffFinishedParams,
   HandoffProgressParams,
@@ -22,7 +23,14 @@ describe('Expert', () => {
       ...claudeCode,
       enabled: true,
       instructions: '',
-      connection: { ...claudeCode.connection, canEdit: false, canSearchWeb: false },
+      connection: {
+        ...claudeCode.connection,
+        canEdit: false,
+        canSearchWeb: false,
+        plugins: [],
+        mcpTools: [],
+        workspace: 'project',
+      },
     });
   });
 
@@ -123,7 +131,9 @@ describe('proposals', () => {
     expect(
       HandoffsConfirmParams.parse({ proposalId, folder: 'D:\\code\\site', canEdit: false }),
     ).toEqual({ proposalId, folder: 'D:\\code\\site', canEdit: false });
-    expect(HandoffsConfirmParams.safeParse({ proposalId, canEdit: false }).success).toBe(false);
+    expect(
+      HandoffsConfirmParams.safeParse({ proposalId, folder: '', canEdit: false }).success,
+    ).toBe(false);
   });
 
   it('carries one optional follow-up step, and old payloads still parse', () => {
@@ -172,5 +182,73 @@ describe('proposals', () => {
       expect(HandoffProgressParams.parse({ ...step, kind }).kind).toBe(kind);
     }
     expect(HandoffProgressParams.safeParse({ ...step, kind: 'shout' }).success).toBe(false);
+  });
+});
+
+describe('an expert from the catalog', () => {
+  const bundle = {
+    ...claudeCode,
+    catalogId: 'researcher',
+    connection: {
+      type: 'claude-code',
+      plugins: ['firecrawl@claude-plugins-official'],
+      mcpTools: ['mcp__plugin_Notion_notion__notion-search'],
+      workspace: 'own',
+    },
+  };
+
+  it('keeps its pinned plugins, its exact app tools, its own folder and where it came from', () => {
+    const expert = Expert.parse(bundle);
+    expect(expert.catalogId).toBe('researcher');
+    expect(expert.connection.plugins).toEqual(['firecrawl@claude-plugins-official']);
+    expect(expert.connection.mcpTools).toEqual(['mcp__plugin_Notion_notion__notion-search']);
+    expect(expert.connection.workspace).toBe('own');
+  });
+
+  it('refuses a plugin id without its marketplace', () => {
+    const bad = { ...bundle, connection: { ...bundle.connection, plugins: ['firecrawl'] } };
+    expect(Expert.safeParse(bad).success).toBe(false);
+  });
+
+  it('refuses an app rule that is not one exact tool, such as a wildcard', () => {
+    for (const rule of ['mcp__*', 'mcp__claude_ai_Gmail__*', 'Bash', 'mcp__notion']) {
+      const bad = { ...bundle, connection: { ...bundle.connection, mcpTools: [rule] } };
+      expect(Expert.safeParse(bad).success, rule).toBe(false);
+    }
+  });
+});
+
+describe('CatalogEntry', () => {
+  it('parses an entry with its plugins, apps and plain-words profile', () => {
+    const entry = CatalogEntry.parse({
+      id: 'researcher',
+      name: 'Researcher',
+      line: 'Looks things up and sums up, with sources.',
+      goodAt: 'Research',
+      instructions: 'Link every source.',
+      canSearchWeb: true,
+      workspace: 'own',
+      plugins: [{ id: 'firecrawl@claude-plugins-official', name: 'Firecrawl' }],
+      apps: [
+        {
+          name: 'Notion',
+          server: 'plugin:Notion:notion',
+          tools: ['mcp__plugin_Notion_notion__notion-search'],
+        },
+      ],
+      mayDo: 'Reads the web. Never posts anything.',
+    });
+    expect(entry.canEdit).toBe(false);
+    expect(entry.apps[0]?.optional).toBe(true);
+  });
+});
+
+describe('HandoffsConfirmParams without a folder', () => {
+  it('parses, for an expert that works in its own folder', () => {
+    const params = HandoffsConfirmParams.parse({
+      proposalId: '6f1c1a4e-8b7d-4c39-9c8a-0b1a2c3d4e5f',
+      canEdit: false,
+    });
+    expect(params.folder).toBeUndefined();
   });
 });

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -48,8 +48,9 @@ async function boot(provider?: BrainProvider, extra: Partial<EngineOptions> = {}
     // The project finder never scans this machine's real code folders in a test.
     projectRoots: () => [],
     ...(provider ? { provider } : {}),
-    // Never this machine's own Claude Code servers.
+    // Never this machine's own Claude Code servers or plugins.
     claudeCodeConfigPath: join(dir, 'no-claude.json'),
+    claudePluginsRoot: join(dir, 'no-plugins'),
     ...extra,
   });
   return engine;
@@ -1958,6 +1959,130 @@ describe('what Scout saw over rpc', () => {
   });
 });
 
+describe('the expert catalog', () => {
+  function plugins(ids: string[]): string {
+    const root = join(dir, 'plugins');
+    mkdirSync(root, { recursive: true });
+    writeFileSync(
+      join(root, 'installed_plugins.json'),
+      JSON.stringify({ version: 2, plugins: Object.fromEntries(ids.map((id) => [id, []])) }),
+    );
+    return root;
+  }
+
+  async function connected(extra: Partial<EngineOptions> = {}) {
+    const e = await boot(undefined, extra);
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    return host;
+  }
+
+  it('lists the entries with what this computer has: plugins installed, apps set up', async () => {
+    const claudeJson = join(dir, 'claude.json');
+    writeFileSync(claudeJson, JSON.stringify({ claudeAiMcpEverConnected: ['claude.ai Google Calendar'] }));
+    const host = await connected({
+      claudePluginsRoot: plugins(['notion@claude-plugins-official']),
+      claudeCodeConfigPath: claudeJson,
+    });
+    const { entries } = (await host.call('experts.catalog', {}))['result'] as {
+      entries: { entry: { id: string }; plugins: { id: string; installed: boolean }[]; apps: { name: string; found: boolean }[] }[];
+    };
+    expect(entries.map((e) => e.entry.id)).toEqual(['researcher', 'trip-planner', 'social-media-manager']);
+    expect(entries[0]?.plugins).toEqual([
+      { id: 'firecrawl@claude-plugins-official', name: 'Firecrawl', installed: false },
+      { id: 'notion@claude-plugins-official', name: 'Notion', installed: true },
+    ]);
+    expect(entries[1]?.apps.find((a) => a.name === 'Google Calendar')?.found).toBe(true);
+  });
+
+  it('installs only the missing plugins, with claude plugin install', async () => {
+    const spawned: string[][] = [];
+    const host = await connected({
+      env: {},
+      claudePluginsRoot: plugins(['notion@claude-plugins-official']),
+      claudeSpawn: (_command, args) => {
+        spawned.push(args);
+        return {
+          write: () => undefined,
+          end: () => undefined,
+          lines: (async function* () {})(),
+          exit: Promise.resolve(0),
+          stderr: () => '',
+          kill: () => undefined,
+        };
+      },
+    });
+    const result = (await host.call('experts.install', { catalogId: 'researcher' }))['result'];
+    expect(result).toEqual({ ok: true, installed: ['firecrawl@claude-plugins-official'] });
+    expect(spawned).toEqual([['plugin', 'install', 'firecrawl@claude-plugins-official']]);
+  });
+
+  it('says why an install failed, in plain words', async () => {
+    const host = await connected({
+      env: {},
+      claudeSpawn: () => ({
+        write: () => undefined,
+        end: () => undefined,
+        lines: (async function* () {})(),
+        exit: Promise.resolve(1),
+        stderr: () => 'marketplace not found',
+        kill: () => undefined,
+      }),
+    });
+    const result = (await host.call('experts.install', { catalogId: 'social-media-manager' }))['result'];
+    expect(result).toEqual({
+      ok: false,
+      installed: [],
+      error: 'Could not install notion@claude-plugins-official: marketplace not found',
+    });
+  });
+
+  it('never starts a real claude in fake mode', async () => {
+    const spawn = vi.fn();
+    const host = await connected({ claudeSpawn: spawn });
+    const result = (await host.call('experts.install', { catalogId: 'researcher' }))['result'];
+    expect(result).toEqual({ ok: true, installed: [] });
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it('refuses an entry that is not in the catalog', async () => {
+    const host = await connected();
+    const res = await host.call('experts.install', { catalogId: 'nope' });
+    expect(res['error']).toMatchObject({ code: RPC_ERROR_CODES.invalidParams });
+  });
+
+  it('saves a catalog expert with its entry’s bundle, and seals every other expert', async () => {
+    const host = await connected();
+    const forged = {
+      id: 'mine',
+      name: 'Mine',
+      connection: {
+        type: 'claude-code',
+        plugins: ['notion@claude-plugins-official'],
+        mcpTools: ['mcp__claude_ai_Gmail__send_message'],
+      },
+    };
+    const sealed = (await host.call('experts.upsert', { expert: forged }))['result'] as {
+      expert: { connection: { plugins: string[]; mcpTools: string[] } };
+    };
+    expect(sealed.expert.connection).toMatchObject({ plugins: [], mcpTools: [] });
+
+    const catalog = (await host.call('experts.upsert', {
+      expert: { id: 'researcher', name: 'Researcher', catalogId: 'researcher', connection: { type: 'claude-code' } },
+    }))['result'] as { expert: { connection: { plugins: string[]; workspace: string } } };
+    expect(catalog.expert.connection.plugins).toEqual([
+      'firecrawl@claude-plugins-official',
+      'notion@claude-plugins-official',
+    ]);
+    expect(catalog.expert.connection.workspace).toBe('own');
+
+    const unknown = await host.call('experts.upsert', {
+      expert: { id: 'x', name: 'X', catalogId: 'nope', connection: { type: 'claude-code' } },
+    });
+    expect(unknown['error']).toMatchObject({ code: RPC_ERROR_CODES.invalidParams });
+  });
+});
+
 describe('defaultConnectorFor', () => {
   const expert = {
     id: 'debugger',
@@ -1965,7 +2090,7 @@ describe('defaultConnectorFor', () => {
     goodAt: 'Finding why something breaks',
     enabled: true,
     instructions: 'Find the cause before you suggest a fix.',
-    connection: { type: 'claude-code' as const, canEdit: false, canSearchWeb: true },
+    connection: { type: 'claude-code' as const, canEdit: false, canSearchWeb: true, plugins: [], mcpTools: [], workspace: 'project' as const },
   };
 
   it('passes the standing instructions and web search on to Claude Code', () => {
@@ -1974,6 +2099,33 @@ describe('defaultConnectorFor', () => {
     expect(connector).toMatchObject({
       options: { instructions: 'Find the cause before you suggest a fix.', canSearchWeb: true },
     });
+  });
+
+  it('gives a catalog expert its bundle and its own folder, and nothing to any other', () => {
+    const bundle = {
+      plugins: ['notion@claude-plugins-official'],
+      mcpTools: ['mcp__plugin_Notion_notion__notion-search'],
+      workspace: 'own' as const,
+    };
+    const catalog = defaultConnectorFor({})({
+      ...expert,
+      id: 'researcher',
+      catalogId: 'researcher',
+      connection: { ...expert.connection, ...bundle },
+    }) as unknown as { options: Record<string, unknown> };
+    expect(catalog.options).toMatchObject({
+      plugins: bundle.plugins,
+      mcpTools: bundle.mcpTools,
+      ownFolder: join(tmpdir(), 'tagalong-experts', 'researcher'),
+    });
+    expect(typeof catalog.options['installedPlugins']).toBe('function');
+
+    const handMade = defaultConnectorFor({})({
+      ...expert,
+      connection: { ...expert.connection, ...bundle },
+    }) as unknown as { options: Record<string, unknown> };
+    expect(handMade.options['plugins']).toBeUndefined();
+    expect(handMade.options['mcpTools']).toBeUndefined();
   });
 
   it('still hands back a fake connector in fake mode', () => {

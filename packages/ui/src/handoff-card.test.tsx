@@ -57,6 +57,32 @@ describe('the hand-off card', () => {
     ]);
   });
 
+  it('has no Project row for an expert that works in its own folder, and sends with no folder', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    act(() =>
+      bridge.emit({
+        type: 'handoff.proposed',
+        proposalId: PROPOSAL,
+        petId: 'scout',
+        expertId: 'trip-planner',
+        expertName: 'Trip planner',
+        brief: BRIEF,
+        projects: [],
+        canEdit: true,
+        ownFolder: true,
+      }),
+    );
+    const own = screen.getByRole('region', { name: 'Hand to Trip planner' });
+    expect(own).toHaveTextContent('Works in its own folder');
+    expect(own).not.toHaveTextContent('Choose the project');
+    expect(within(own).queryByRole('button', { name: 'Change project' })).toBeNull();
+    expect(within(own).queryByLabelText('Search projects')).toBeNull();
+
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Send' })));
+    expect(bridge.confirmedHandoffs).toEqual([{ proposalId: PROPOSAL, canEdit: true }]);
+  });
+
   it('changes the project to another guess, a search result, or a picked folder', async () => {
     const bridge = createFakeHostBridge({
       searchProjects: () => [{ name: 'acme-api', path: 'D:\\acme-api', reason: 'found' }],

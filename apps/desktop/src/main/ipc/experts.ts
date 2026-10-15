@@ -38,6 +38,15 @@ export function registerExpertIpc(handle: IpcHandle, { engine }: ExpertIpcDeps):
     engine().call('experts.test', { expertId }),
   );
 
+  // Home's Add expert: the catalog, and Install after the person confirmed its card.
+  handle(IPC.expertCatalog, async () => {
+    const result = await engine().call('experts.catalog', {});
+    return result.entries;
+  });
+  handle(IPC.installExpert, async (_event, catalogId: string) =>
+    engine().call('experts.install', { catalogId }),
+  );
+
   // The hand-off card.
   handle(IPC.confirmHandoff, async (_event, params: ConfirmHandoff) =>
     engine().call('handoffs.confirm', params),

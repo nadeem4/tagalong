@@ -5,6 +5,7 @@ import type {
   ConnectionsAddParams,
   ConnectionsListResult,
   ContextSnapshot,
+  CatalogStatus,
   Expert,
   PerceptionTarget,
   Pet,
@@ -38,6 +39,8 @@ export interface FakeHostBridge extends HostBridge {
   experts: Expert[];
   /** Every expert id tested, in order. */
   readonly testedExperts: readonly string[];
+  /** Every catalog entry installed, in order. */
+  readonly installedCatalog: readonly string[];
   /** Every hand-off the person sent, dismissed or stopped, in order. */
   readonly confirmedHandoffs: readonly ConfirmHandoff[];
   readonly dismissedHandoffs: readonly string[];
@@ -76,6 +79,10 @@ export function createFakeHostBridge(
     experts?: Expert[];
     /** What testing an expert answers; absent answers ready. */
     testExpert?: (expertId: string) => { ok: boolean; error?: string };
+    /** The expert catalog; absent is empty. */
+    catalog?: CatalogStatus[];
+    /** What installing answers; absent answers installed. */
+    installExpert?: (catalogId: string) => { ok: boolean; installed: string[]; error?: string };
     /** What the folder picker answers; absent means the host has no picker. */
     pickFolder?: () => string | null;
     /** What a project search answers; absent answers nothing found. */
@@ -97,6 +104,7 @@ export function createFakeHostBridge(
   const captures: (readonly PerceptionTarget[])[] = [];
   let turnCount = 0;
   const testedExperts: string[] = [];
+  const installedCatalog: string[] = [];
   const confirmedHandoffs: ConfirmHandoff[] = [];
   const dismissedHandoffs: string[] = [];
   const cancelledHandoffs: string[] = [];
@@ -184,6 +192,7 @@ export function createFakeHostBridge(
     },
     experts: [...(options.experts ?? [])],
     testedExperts,
+    installedCatalog,
     listExperts() {
       return Promise.resolve([...fake.experts]);
     },
@@ -197,6 +206,13 @@ export function createFakeHostBridge(
       const before = fake.experts.length;
       fake.experts = fake.experts.filter((e) => e.id !== expertId);
       return Promise.resolve(fake.experts.length < before);
+    },
+    expertCatalog() {
+      return Promise.resolve([...(options.catalog ?? [])]);
+    },
+    installExpert(catalogId) {
+      installedCatalog.push(catalogId);
+      return Promise.resolve(options.installExpert?.(catalogId) ?? { ok: true, installed: [] });
     },
     testExpert(expertId) {
       testedExperts.push(expertId);

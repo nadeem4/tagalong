@@ -41,7 +41,7 @@ const RESEARCHER: Expert = {
   goodAt: 'Research on the web',
   enabled: true,
   instructions: '',
-  connection: { type: 'claude-code', canEdit: false, canSearchWeb: false },
+  connection: { type: 'claude-code', canEdit: false, canSearchWeb: false, plugins: [], mcpTools: [], workspace: 'project' as const },
 };
 
 const NO_EXCLUSIONS: CaptureExclusions = { processNames: [], titlePatterns: [] };

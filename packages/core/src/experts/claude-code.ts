@@ -54,6 +54,16 @@ export interface ClaudeCodeOptions {
   research?: boolean;
   /** The empty folder research runs in. Defaults to one in the temp folder. */
   researchFolder?: () => string;
+  /**
+   * A catalog expert's bundle: the plugins it pins and the exact app tools it may call.
+   * Either one non-empty unseals the run for them, and only for them; see `bundledArgs`.
+   */
+  plugins?: readonly string[];
+  mcpTools?: readonly string[];
+  /** Every plugin Claude Code has, so a bundled run can turn off the ones it does not pin. */
+  installedPlugins?: () => readonly string[];
+  /** Set for an expert that works in its own folder: it runs here, never in a project. */
+  ownFolder?: string;
 }
 
 /** An empty folder of Tagalong's own, so research has no project files to read. */
@@ -66,6 +76,8 @@ function defaultResearchFolder(): string {
 const NOT_INSTALLED = 'Claude Code is not installed, or "claude" is not on the PATH.';
 
 const READ_TOOLS = ['Read', 'Glob', 'Grep'];
+/** Lets a pinned plugin's skills load. A skill only adds instructions; tools stay as listed. */
+const SKILL_TOOL = 'Skill';
 const EDIT_TOOLS = ['Edit', 'Write'];
 const WEB_TOOLS = ['WebSearch', 'WebFetch'];
 
@@ -77,6 +89,13 @@ const SECRET_FILE_RULES = SECRET_FILES.flatMap((file) => [`Read(**/${file})`, `E
 
 /** `--settings` sits above user settings, so no hook from any settings file runs. */
 const SEALED_SETTINGS = JSON.stringify({ disableAllHooks: true });
+
+/** A catalog expert's run: its pinned plugins and the app tools it may call. */
+interface Bundle {
+  plugins: readonly string[];
+  mcpTools: readonly string[];
+  installed: readonly string[];
+}
 
 /**
  * Claude Code as an expert: runs `claude -p` headless in the expert's folder, feeds it the
@@ -124,9 +143,26 @@ export class ClaudeCodeConnector implements Connector {
   ): Promise<ConnectorResult> {
     if (signal?.aborted) return CANCELLED;
     const research = this.options.research === true;
-    const folder = research
-      ? (this.options.researchFolder ?? defaultResearchFolder)()
-      : this.options.folder;
+    // A routine's research stays sealed, whatever the expert's bundle.
+    const plugins = research ? [] : (this.options.plugins ?? []);
+    const mcpTools = research ? [] : (this.options.mcpTools ?? []);
+    const bundle: Bundle | undefined =
+      plugins.length > 0 || mcpTools.length > 0
+        ? { plugins, mcpTools, installed: this.options.installedPlugins?.() ?? [] }
+        : undefined;
+    let folder: string | undefined;
+    if (research) {
+      folder = (this.options.researchFolder ?? defaultResearchFolder)();
+    } else if (this.options.ownFolder !== undefined) {
+      folder = this.options.ownFolder;
+      try {
+        mkdirSync(folder, { recursive: true });
+      } catch (error) {
+        return { ok: false, error: `Could not make its folder: ${(error as Error).message}` };
+      }
+    } else {
+      folder = this.options.folder;
+    }
     if (folder === undefined) return { ok: false, error: 'No project folder was chosen.' };
     const canEdit = !research && this.options.canEdit === true;
     const web = !research && this.options.canSearchWeb === true;
@@ -134,6 +170,7 @@ export class ClaudeCodeConnector implements Connector {
       ...(research ? WEB_TOOLS : READ_TOOLS),
       ...(web ? WEB_TOOLS : []),
       ...(canEdit ? EDIT_TOOLS : []),
+      ...(bundle ? [SKILL_TOOL] : []),
     ];
     // Standing instructions go in a file: the claude.cmd shim runs under cmd.exe, where a
     // multi-line argument does not survive. Removed once the run ends.
@@ -155,7 +192,17 @@ export class ClaudeCodeConnector implements Connector {
       }
     }
     try {
-      return await this.run(brief, onProgress, folder, canEdit, tools, promptFile, signal, notes);
+      return await this.run(
+        brief,
+        onProgress,
+        folder,
+        canEdit,
+        tools,
+        bundle,
+        promptFile,
+        signal,
+        notes,
+      );
     } finally {
       removeQuietly(promptDir);
     }
@@ -167,6 +214,7 @@ export class ClaudeCodeConnector implements Connector {
     folder: string,
     canEdit: boolean,
     tools: readonly string[],
+    bundle: Bundle | undefined,
     promptFile: string | undefined,
     signal: AbortSignal | undefined,
     notes: NoteQueue | undefined,
@@ -180,24 +228,11 @@ export class ClaudeCodeConnector implements Connector {
       '--output-format',
       'stream-json',
       '--verbose',
+      // A bundled run always refuses what is not listed; its draft edits are on the list.
       '--permission-mode',
-      canEdit ? 'acceptEdits' : 'dontAsk',
+      canEdit && bundle === undefined ? 'acceptEdits' : 'dontAsk',
       ...(promptFile ? ['--append-system-prompt-file', promptFile] : []),
-      // Sealed: only these built-in tools exist in the run; no MCP servers (strict, and no
-      // --mcp-config); no project or local settings, so a folder's .claude/settings.json
-      // cannot add permissions or hooks; and no hooks at all, user ones included. Reusing the
-      // person's own MCP servers is for the Expert catalog feature, not this connector.
-      '--tools',
-      tools.join(','),
-      '--strict-mcp-config',
-      '--setting-sources',
-      'user',
-      '--settings',
-      SEALED_SETTINGS,
-      '--allowedTools',
-      ...tools,
-      '--disallowedTools',
-      'mcp__*',
+      ...(bundle === undefined ? sealedArgs(tools) : bundledArgs(tools, bundle)),
       ...SECRET_FILE_RULES,
     ];
 
@@ -233,13 +268,29 @@ export class ClaudeCodeConnector implements Connector {
       // A line it wrote is said only once a tool follows: the text before a `result` is the
       // answer, which Scout reads out when the run finishes.
       let toSay: string | undefined;
+      let checked = false;
 
       for await (const line of child.lines) {
         const event = parse(line);
         if (!event) continue;
-        if (event.type === 'system' && typeof event.model === 'string') {
-          model = event.model;
-        } else if (event.type === 'assistant') {
+        if (event.type === 'system' && typeof event.model === 'string') model = event.model;
+        if (bundle !== undefined && !checked) {
+          // The first event says which plugins Claude Code really loaded. Anything but the
+          // pinned set (and its own built-ins) and the run stops before it does anything.
+          checked = true;
+          const refused =
+            event.type === 'system' && event.subtype === 'init'
+              ? pluginMismatch(bundle, event.plugins)
+              : 'Claude Code did not say which plugins it loaded, so this expert did not start.';
+          if (refused !== undefined) {
+            child.end();
+            child.kill();
+            return { ok: false, error: refused };
+          }
+          continue;
+        }
+        if (event.type === 'system') continue;
+        if (event.type === 'assistant') {
           for (const block of event.message?.content ?? []) {
             if (block.type === 'text') {
               toSay = firstSentence(block.text) ?? toSay;
@@ -296,6 +347,68 @@ export class ClaudeCodeConnector implements Connector {
   }
 }
 
+/**
+ * Sealed: only these built-in tools exist in the run; no MCP servers (strict, and no
+ * --mcp-config); no project or local settings, so a folder's .claude/settings.json cannot
+ * add permissions or hooks; and no hooks at all, user ones included.
+ */
+function sealedArgs(tools: readonly string[]): string[] {
+  return [
+    '--tools',
+    tools.join(','),
+    '--strict-mcp-config',
+    '--setting-sources',
+    'user',
+    '--settings',
+    SEALED_SETTINGS,
+    '--allowedTools',
+    ...tools,
+    '--disallowedTools',
+    'mcp__*',
+  ];
+}
+
+/**
+ * A catalog expert: still no project settings and no hooks, but the person's own Claude Code
+ * apps are reachable and its pinned plugins load, every other installed plugin off. Only the
+ * listed app tools are allowed; dontAsk refuses every other one.
+ */
+function bundledArgs(tools: readonly string[], bundle: Bundle): string[] {
+  const enabledPlugins: Record<string, boolean> = {};
+  for (const id of bundle.plugins) enabledPlugins[id] = true;
+  for (const id of bundle.installed) if (!(id in enabledPlugins)) enabledPlugins[id] = false;
+  return [
+    '--tools',
+    tools.join(','),
+    '--setting-sources',
+    'user',
+    '--settings',
+    JSON.stringify({ disableAllHooks: true, enabledPlugins }),
+    '--allowedTools',
+    ...tools,
+    ...bundle.mcpTools,
+    '--disallowedTools',
+  ];
+}
+
+/** Why the plugins Claude Code loaded are not the pinned set; undefined when they are. */
+function pluginMismatch(bundle: Bundle, loaded: unknown): string | undefined {
+  const ids = Array.isArray(loaded)
+    ? loaded
+        .map((plugin: unknown) => (plugin as { source?: unknown } | null)?.source)
+        .filter((id): id is string => typeof id === 'string' && !id.endsWith('@builtin'))
+    : [];
+  const missing = bundle.plugins.find((id) => !ids.includes(id));
+  if (missing !== undefined) {
+    return `Claude Code did not load ${missing}, which this expert needs. Install it from Home, Experts, then try again.`;
+  }
+  const extra = ids.find((id) => !bundle.plugins.includes(id));
+  if (extra !== undefined) {
+    return `Claude Code also loaded ${extra}, which this expert does not use, so it did not start.`;
+  }
+  return undefined;
+}
+
 /** A file Windows still holds must not turn a finished run into a failure. */
 function removeQuietly(dir: string | undefined): void {
   if (dir === undefined) return;
@@ -330,6 +443,9 @@ interface ToolInput {
 
 interface StreamEvent {
   type?: string;
+  subtype?: string;
+  /** On the `system` init event: the plugins Claude Code loaded, each by `source` (name@marketplace). */
+  plugins?: unknown;
   is_error?: boolean;
   result?: string;
   /** On the `system` init event: the model the run uses. */

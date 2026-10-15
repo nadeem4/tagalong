@@ -70,6 +70,17 @@ import { recordBrain } from './providers/record-brain';
 import { recordExpertSends } from './experts/record-expert';
 import { CalendarFeed, httpsFetchText, type FetchText } from './meetings/calendar-feed';
 import { UsageLog, budgetSpent, meterBrain } from './usage';
+import { CATALOG, catalogEntry, catalogStatus, fromCatalog } from './experts/catalog';
+import {
+  claudePluginsRoot,
+  connectedApps,
+  installedPlugins,
+  installMissing,
+  installPlugin,
+} from './experts/claude-setup';
+import type { SpawnFn } from './experts/claude-code';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 /** Key the Anthropic API key is filed under in the host's SecretStore. */
 export const ANTHROPIC_KEY = SECRET_KEYS.anthropic!;
@@ -160,13 +171,20 @@ export interface EngineOptions {
   claudeCodeConfigPath?: string | undefined;
   /** How Meeting prep's .ics link is fetched. Tests pass a fake; never the network. */
   calendarFetch?: FetchText | undefined;
+  /** Claude Code's plugins folder, read-only. Defaults to `~/.claude/plugins`. */
+  claudePluginsRoot?: string | undefined;
+  /** Starts `claude plugin install`. Tests pass a fake; fake mode never starts one. */
+  claudeSpawn?: SpawnFn | undefined;
 }
 
 /**
  * The connector behind an expert. Fake mode never starts a real tool, the same rule the
  * brain providers follow, so a test or a demo cannot spend the user's Claude Code usage.
  */
-export function defaultConnectorFor(env: Record<string, string | undefined>) {
+export function defaultConnectorFor(
+  env: Record<string, string | undefined>,
+  pluginsRoot: string = claudePluginsRoot(),
+) {
   return (expert: Expert, mode?: { research: boolean }): Connector => {
     if (env.TAGALONG_FAKE_PROVIDERS === '1') {
       return new FakeConnector({
@@ -174,7 +192,10 @@ export function defaultConnectorFor(env: Record<string, string | undefined>) {
         text: `${expert.name} (fake) read the brief and has nothing to change.`,
       });
     }
-    const { folder, canEdit, canSearchWeb, command } = expert.connection;
+    const { folder, canEdit, canSearchWeb, command, plugins, mcpTools, workspace } =
+      expert.connection;
+    // Only an expert installed from the catalog runs with plugins and apps.
+    const catalog = expert.catalogId !== undefined && (plugins.length > 0 || mcpTools.length > 0);
     return new ClaudeCodeConnector({
       canEdit,
       canSearchWeb,
@@ -182,6 +203,8 @@ export function defaultConnectorFor(env: Record<string, string | undefined>) {
       ...(folder !== undefined ? { folder } : {}),
       ...(command ? { command } : {}),
       ...(mode?.research === true ? { research: true } : {}),
+      ...(catalog ? { plugins, mcpTools, installedPlugins: () => installedPlugins(pluginsRoot) } : {}),
+      ...(workspace === 'own' ? { ownFolder: join(tmpdir(), 'tagalong-experts', expert.id) } : {}),
     });
   };
 }
@@ -317,7 +340,8 @@ export class Engine {
     });
     const experts = new ExpertStore(db);
     const connectorFor = recordExpertSends(
-      options.connectorFor ?? defaultConnectorFor(options.env ?? process.env),
+      options.connectorFor ??
+        defaultConnectorFor(options.env ?? process.env, options.claudePluginsRoot),
       sightLog,
     );
     const projects = new ProjectFinder({
@@ -552,6 +576,9 @@ export class Engine {
       calendar,
       hostKinds: () => live.server?.sessions().map((session) => session.host) ?? [],
       claudeCodeConfigPath: options.claudeCodeConfigPath,
+      claudePluginsRoot: options.claudePluginsRoot,
+      claudeSpawn: options.claudeSpawn,
+      fake: (options.env ?? process.env).TAGALONG_FAKE_PROVIDERS === '1',
       sightLog,
       checkResolve: guarded,
       refreshProviders: async () => keyed?.refresh(),
@@ -659,6 +686,10 @@ function buildHandlers(parts: {
   /** Which hosts are connected now, for the health check's browser row. */
   hostKinds: () => readonly HostKind[];
   claudeCodeConfigPath: string | undefined;
+  claudePluginsRoot: string | undefined;
+  claudeSpawn: SpawnFn | undefined;
+  /** Fake mode: the catalog's Install starts no real claude. */
+  fake: boolean;
   /** Re-reads provider keys, so a key saved since the last ask is used by this one. */
   refreshProviders: () => Promise<void>;
   sightLog: SightLog;
@@ -746,7 +777,15 @@ function buildHandlers(parts: {
     'activity.list': (params) => activity.list(params),
 
     'experts.list': () => ({ experts: experts.list() }),
-    'experts.upsert': (params) => ({ expert: experts.upsert(params.expert) }),
+    'experts.upsert': (params) => {
+      if (params.expert.catalogId !== undefined && catalogEntry(params.expert.catalogId) === undefined) {
+        throw new RpcFailure(
+          RPC_ERROR_CODES.invalidParams,
+          `'${params.expert.catalogId}' is not in the expert catalog`,
+        );
+      }
+      return { expert: experts.upsert(fromCatalog(params.expert)) };
+    },
     'experts.delete': (params) => {
       routes.forgetExpert(params.expertId);
       return { deleted: experts.delete(params.expertId) };
@@ -895,6 +934,30 @@ function buildHandlers(parts: {
     // What Scout saw. Deleting removes the record, not what was already sent.
     'sightLog.list': (params) => ({ entries: sightLog.list(params.limit) }),
     'sightLog.delete': (params) => ({ deleted: sightLog.delete(params.id) }),
+    'experts.catalog': () => {
+      const have = {
+        plugins: installedPlugins(parts.claudePluginsRoot),
+        apps: connectedApps(parts.claudeCodeConfigPath),
+      };
+      return { entries: CATALOG.map((entry) => catalogStatus(entry, have)) };
+    },
+    // Runs only on the person's Install press, after the card named each plugin it adds.
+    'experts.install': async (params) => {
+      const entry = catalogEntry(params.catalogId);
+      if (entry === undefined) {
+        throw new RpcFailure(
+          RPC_ERROR_CODES.invalidParams,
+          `'${params.catalogId}' is not in the expert catalog`,
+        );
+      }
+      // Fake mode never starts a real claude, the rule every connector follows.
+      if (parts.fake) return { ok: true, installed: [] };
+      return installMissing(
+        entry.plugins.map((plugin) => plugin.id),
+        installedPlugins(parts.claudePluginsRoot),
+        (id) => installPlugin(id, parts.claudeSpawn ? { spawn: parts.claudeSpawn } : {}),
+      );
+    },
     'sightLog.clear': () => ({ deleted: sightLog.clear() }),
     // Meeting prep's link goes to the keychain, never to settings; the answer never holds it.
     'calendar.setLink': async (params) => {
