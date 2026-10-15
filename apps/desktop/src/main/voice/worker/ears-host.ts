@@ -104,6 +104,16 @@ export function createEarsHost(options: {
       parts = options.load();
     }
     const loading = parts;
+    /**
+     * The ears could not be built, or a model broke while always listening: nothing hears the
+     * mic, so the panel is told (and stops showing listening) and the next listen loads again.
+     */
+    const failed = (error: unknown): void => {
+      console.warn('[ears] listening stopped: a model failed', error);
+      if (parts === loading) parts = null;
+      current.finish();
+      options.post({ kind: 'ears.status', status: 'failed', message: EARS_START_FAILED });
+    };
     loading.then(
       (loaded) => {
         if (!current.superseded) options.post({ kind: 'ears.status', status: 'ready' });
@@ -115,12 +125,13 @@ export function createEarsHost(options: {
           // A session stopped before this point has an ended inbox: its buffered words still
           // play through, and the mic ending ends the turn.
           try {
-            current.ears = wire(new LocalEars(loaded, current.mode));
-            if (current.mode === 'held') current.ears.on('turnEnd', current.finish);
-            current.ears.listen(current.inbox);
+            const ears = wire(new LocalEars(loaded, current.mode, (error) => failed(error)));
+            if (current.mode === 'held') ears.on('turnEnd', current.finish);
+            ears.listen(current.inbox);
+            // Kept only once it listens: ears that never started are never stopped.
+            current.ears = ears;
           } catch (error) {
-            console.warn('[ears] could not start listening', error);
-            current.finish();
+            failed(error);
           }
         });
       },

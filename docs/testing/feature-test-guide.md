@@ -706,7 +706,10 @@ looking at?" and Chromium's fake microphone stands in for a real one.
     go back to the download note or repeat as Scout finishes lines. Connect and wait: within
     about 30 s (the wait doubles each failure, up to five minutes) it tries again on its own and
     listening works, with the switch untouched. Switching Always listening off and on retries
-    at once.
+    at once. The same happens if a speech model breaks while listening: the bubble stops showing
+    listening and says "I couldn’t start listening. Try again." once, then retries on its own.
+    **Edge:** with Always listening on, say a short word that starts softly, such as "Scout,
+    find...": the first syllable shows in the live words, not cut off.
 13. **Action:** with Always listening on, close the bubble with ×.
 14. **Expected:** the mark stays solid and listening goes on: say "Scout, what is this?" and the
     bubble comes back with the question.

@@ -1889,7 +1889,8 @@ flowchart LR
   open window; each `ListenController` ignores events outside its own session. If the voice process
   dies, or the models fail to load, the windows hear a `failed` status with a plain line ("Listening
   stopped unexpectedly. Try again." for a dead process; `ears-host.ts#EARS_DOWNLOAD_FAILED` when the
-  first-time download fails, `EARS_START_FAILED` when models already on disk cannot start; the raw
+  first-time download fails, `EARS_START_FAILED` when models already on disk cannot start, when
+  the ears cannot be built, or when a model fails at run time while always listening; the raw
   error goes to the voice process's log only); the panel then calls `earsFailed`, which drops the
   question being held and any released question still waiting for its words and ends an always
   session, and shows the message once. The
@@ -1921,7 +1922,14 @@ flowchart LR
   stopped at once. `LocalEars` (`local-ears.ts`) is the `Ears`
   implementation behind three seams that fakes test: `Vad` (speech or not, per 512-sample frame),
   `StreamingStt` (words so far for the current stretch) and `EndOfTurn` (how sure the person is done,
-  from the last 8 s). The real parts are loaded in the voice process only, never in tests, and each
+  from the last 8 s). Silero reacts a frame or three late, so `LocalEars` keeps the last
+  `PRE_ROLL_FRAMES` (8 frames, 256 ms) while no stretch of speech is open and feeds them to the
+  speech model (and the end-of-turn audio) just before the frame that starts one, at the turn's
+  start and between stretches of one turn alike, so the first syllable is not clipped. A frame
+  loop that fails while always listening calls `LocalEars`'s `onFailed`; `createEarsHost` uses it,
+  and its own catch when the ears cannot be built, to post `ears.status` `failed`
+  (`EARS_START_FAILED`) and forget the loaded models, so the panel stops showing listening, its
+  retry starts, and the next listen loads them again. The real parts are loaded in the voice process only, never in tests, and each
   loader is one screen: `ort-ears.ts` (Silero VAD v5 on `onnxruntime-node`, input the previous frame's
   last 64 samples plus the 512-sample frame, state carried between frames; Moonshine tiny through
   `@huggingface/transformers`, q8, CPU, its decodes chained so a second `text()` waits for the first),
