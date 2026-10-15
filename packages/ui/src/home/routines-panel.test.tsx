@@ -223,4 +223,73 @@ describe('RoutinesPanel', () => {
     act(() => bridge.emit({ type: 'routines.changed' }));
     await waitFor(() => expect(screen.getByText('Morning papers')).toBeInTheDocument());
   });
+
+  it('starts Meeting prep from its template and keeps the calendar link apart from the routine', async () => {
+    const bridge = createFakeHostBridge();
+    await renderPanel(bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'New routine' }));
+    fireEvent.click(screen.getByRole('button', { name: /Meeting prep/ }));
+    await flush();
+    expect(screen.getByLabelText('When')).toHaveValue('meeting');
+    expect(screen.getByLabelText('Minutes before')).toHaveValue('10');
+    expect(screen.queryByLabelText('At')).not.toBeInTheDocument();
+    expect(screen.getByText(/Secret address in iCal format/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await flush();
+    expect(screen.getByRole('alert')).toHaveTextContent(/calendar link/i);
+    expect(bridge.routines).toEqual([]);
+
+    const link = 'https://calendar.example.com/private-abc/basic.ics';
+    fireEvent.change(screen.getByLabelText('Calendar link (.ics)'), { target: { value: link } });
+    fireEvent.change(screen.getByLabelText('Minutes before'), { target: { value: '30' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await flush();
+    expect(bridge.calendarLinks).toEqual([link]);
+    expect(bridge.routines[0]).toMatchObject({
+      name: 'Meeting prep',
+      when: { type: 'meeting', minutesBefore: 30 },
+    });
+    expect(bridge.routines[0]?.what).toMatch(/agenda/i);
+    expect(JSON.stringify(bridge.routines[0])).not.toContain(link);
+  });
+
+  it('needs no new link once one is kept', async () => {
+    const bridge = createFakeHostBridge({ calendar: { linked: true, meetings: 2 } });
+    await renderPanel(bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'New routine' }));
+    fireEvent.click(screen.getByRole('button', { name: /Meeting prep/ }));
+    await flush();
+    expect(screen.getByText(/kept in your keychain/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await flush();
+    expect(bridge.calendarLinks).toEqual([]);
+    expect(bridge.routines).toHaveLength(1);
+  });
+
+  it('forgets the kept link on request', async () => {
+    const bridge = createFakeHostBridge({ calendar: { linked: true, meetings: 2 } });
+    await renderPanel(bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'New routine' }));
+    fireEvent.click(screen.getByRole('button', { name: /Meeting prep/ }));
+    await flush();
+    fireEvent.click(screen.getByRole('button', { name: 'Forget the link' }));
+    await flush();
+    expect(bridge.calendarLinks).toEqual([null]);
+    expect(screen.queryByRole('button', { name: 'Forget the link' })).not.toBeInTheDocument();
+  });
+
+  it('shows what is wrong with the calendar on the routine’s row', async () => {
+    const prep: RoutineView = {
+      ...PAPERS,
+      id: '50000000-0000-4000-8000-000000000002',
+      name: 'Meeting prep',
+      when: { type: 'meeting', minutesBefore: 10 },
+      problem: 'Could not read your calendar: the calendar host answered 404.',
+    };
+    await renderPanel(createFakeHostBridge({ routines: [prep] }));
+    const row = screen.getByRole('listitem');
+    expect(row).toHaveTextContent('10 min before each meeting');
+    expect(row).toHaveTextContent('the calendar host answered 404');
+  });
 });

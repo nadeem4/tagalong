@@ -1,6 +1,7 @@
 import { createContext, createElement, useContext } from 'react';
 import type { ReactNode } from 'react';
 import type {
+  CalendarCheckResult,
   ActivityListResult,
   Brief,
   ConnectionState,
@@ -151,6 +152,13 @@ export interface HostBridge {
    * never reads the clipboard and never pastes. Optional: without it a draft has no Copy.
    */
   copyText?(text: string): Promise<void>;
+  /**
+   * Meeting prep's .ics link, kept in the keychain by the engine (null forgets it). The
+   * answer says whether it reads, and never holds the link.
+   */
+  setCalendarLink?(link: string | null): Promise<CalendarCheckResult>;
+  /** Whether a calendar link is kept, without showing it. */
+  checkCalendar?(): Promise<CalendarCheckResult>;
 }
 
 export interface ConfirmHandoff {

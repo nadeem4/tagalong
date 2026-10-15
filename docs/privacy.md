@@ -206,7 +206,23 @@ every weekday at 8. Nothing becomes a routine until you press **Save**, on Scout
   conversation on this computer so you can ask about it later. Results wait while a full-screen app
   or a call is in front.
 - **Missed runs.** If the computer was asleep or Tagalong was closed, a routine runs once when it is
-  back, and says it ran late. Never more than once.
+  back, and says it ran late. Never more than once. A meeting prep never runs late: once a meeting
+  has started, its prep is skipped.
+- **Meeting prep's calendar link.** The secret .ics link you paste in the Meeting prep form is a key
+  to your calendar, so it is kept in the OS keychain through Electron safe storage
+  (`calendar.ics`), never in settings, the database, the repository, logs, an error message or
+  chat. Tagalong sends nothing with it: every 15 minutes at most it fetches that link from your
+  calendar host, over https only, and reads it on this computer. Only the meetings in the next 36
+  hours are kept, in memory. Ten (or thirty) minutes before a meeting, its title, time, attendees,
+  room or link and up to 600 characters of its description go to Scout's brain provider as part of
+  that routine's turn, fenced as invite text Scout must never follow, since anyone can send you an
+  invite. Scout may then use your connected apps' read tools to find the last thread and related
+  docs. A calendar fetch carries nothing from your screen, so it is not a row in Activity. Nothing
+  is fetched while no meeting routine is on, except one check when you open the Meeting prep form
+  with a link kept, and **Forget the link** in the form deletes it from
+  the keychain.
+- **During a call.** A prep that is still waiting when the meeting starts goes out as a Windows
+  notification only, never spoken aloud.
 - Routines are kept in the database on this computer (`routines` table). Delete one in Home, or ask
   Scout to, and it is gone.
 

@@ -1571,3 +1571,50 @@ describe('defaultConnectorFor', () => {
     );
   });
 });
+
+describe('the calendar link', () => {
+  it('keeps the link in the keychain, never in settings, and checks it with one fetch', async () => {
+    const secrets = new InMemorySecretStore();
+    const fetched: string[] = [];
+    const soon = new Date(Date.now() + 3_600_000).toISOString().replace(/[-:]|\.\d{3}/g, '');
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'BEGIN:VEVENT',
+      'UID:soon@tagalong.test',
+      `DTSTART:${soon}`,
+      'SUMMARY:Design review',
+      'DESCRIPTION:Agenda: onboarding.',
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+    const e = await boot(undefined, {
+      secretStore: secrets,
+      calendarFetch: (url) => {
+        fetched.push(url);
+        return Promise.resolve(ics);
+      },
+    });
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const link = 'https://calendar.example.com/private-abc/basic.ics';
+
+    const set = await host.call('calendar.setLink', { link });
+    expect(set['result']).toEqual({ linked: true, meetings: 1 });
+    expect(await secrets.get('calendar.ics')).toBe(link);
+    expect(fetched).toEqual([link]);
+    const settings = await host.call('settings.get', {});
+    expect(JSON.stringify(settings)).not.toContain('calendar.example.com');
+
+    const refused = await host.call('calendar.setLink', { link: 'http://calendar.example.com/a' });
+    expect(refused['error']).toBeDefined();
+    expect(await secrets.get('calendar.ics')).toBe(link);
+
+    await host.call('calendar.setLink', { link: null });
+    expect(await secrets.get('calendar.ics')).toBeNull();
+    expect((await host.call('calendar.check', {}))['result']).toEqual({
+      linked: false,
+      meetings: 0,
+    });
+  });
+});

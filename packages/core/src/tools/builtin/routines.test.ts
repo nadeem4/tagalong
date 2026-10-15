@@ -113,6 +113,28 @@ describe(CREATE_ROUTINE, () => {
     });
   });
 
+  it('takes a meeting trigger, minutes before each meeting, ten by default', async () => {
+    const d = deps();
+    const t = tools({ routines: d.value });
+    await t.run({
+      name: CREATE_ROUTINE,
+      input: { name: 'Prep', what: 'x', when: { type: 'meeting', minutes_before: 30 } },
+    });
+    await t.run({
+      name: CREATE_ROUTINE,
+      input: { name: 'Prep', what: 'x', when: { type: 'meeting' } },
+    });
+    expect(d.proposed.map((p) => p.routine.when)).toEqual([
+      { type: 'meeting', minutesBefore: 30 },
+      { type: 'meeting', minutesBefore: 10 },
+    ]);
+    const tooEarly = await t.run({
+      name: CREATE_ROUTINE,
+      input: { name: 'Prep', what: 'x', when: { type: 'meeting', minutes_before: 120 } },
+    });
+    expect(tooEarly).toMatchObject({ isError: true });
+  });
+
   it('refuses a bad time, an unknown expert, or a missing field, by name', async () => {
     const d = deps();
     const t = tools({ routines: d.value });

@@ -49,6 +49,8 @@ export const IPC = {
   listSightLog: 'tagalong:sight-log:list',
   deleteSightLog: 'tagalong:sight-log:delete',
   clearSightLog: 'tagalong:sight-log:clear',
+  setCalendarLink: 'tagalong:calendar:set-link',
+  checkCalendar: 'tagalong:calendar:check',
   routineEvent: 'tagalong:panel:routine',
   routineDraftEvent: 'tagalong:office:routine-draft',
   turnEvent: 'tagalong:turn-event',

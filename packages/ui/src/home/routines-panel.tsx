@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import {
   RoutineDraft,
   describeWhen,
+  type CalendarCheckResult,
   type Expert,
   type RoutineDraftInput,
   type RoutineProposedParams,
@@ -11,7 +12,7 @@ import {
 import { useHostBridge } from '../host-bridge';
 
 /** The "When" choices, in plain words. Days of the week and a time; no cron. */
-type WhenKind = 'daily' | 'weekdays' | 'days' | 'launch' | 'app' | 'expert' | 'watch';
+type WhenKind = 'daily' | 'weekdays' | 'days' | 'launch' | 'app' | 'expert' | 'watch' | 'meeting';
 
 const WHEN_KINDS: readonly { id: WhenKind; label: string }[] = [
   { id: 'daily', label: 'Every day' },
@@ -21,7 +22,11 @@ const WHEN_KINDS: readonly { id: WhenKind; label: string }[] = [
   { id: 'app', label: 'When an app or site appears' },
   { id: 'expert', label: 'When an expert finishes' },
   { id: 'watch', label: 'When a watch fires' },
+  { id: 'meeting', label: 'Before each meeting' },
 ];
+
+/** Meeting prep's lead times. A routine saved with another keeps its own. */
+const LEADS = [10, 30];
 
 /** Monday first, as a week reads; the numbers are `Date#getDay`'s. */
 const DAYS: readonly { day: number; label: string }[] = [
@@ -41,6 +46,9 @@ interface Form {
   time: string;
   days: number[];
   match: string;
+  minutesBefore: number;
+  /** A new calendar link to keep. Never part of the routine: it goes to the keychain. */
+  link: string;
   what: string;
   topics: string;
   showTopics: boolean;
@@ -58,6 +66,8 @@ const BLANK: Form = {
   time: '09:00',
   days: [],
   match: '',
+  minutesBefore: 10,
+  link: '',
   what: '',
   topics: '',
   showTopics: false,
@@ -162,6 +172,24 @@ const TEMPLATES: readonly Template[] = [
         'then suggest the first thing to pick up tomorrow.',
     }),
   },
+  {
+    id: 'meeting',
+    name: 'Meeting prep',
+    line: 'Before each meeting: the agenda, the last thread, docs and open questions.',
+    form: () => ({
+      ...BLANK,
+      name: 'Meeting prep',
+      kind: 'meeting',
+      minutesBefore: 10,
+      what:
+        'Prepare me for this meeting. Start with one line: the meeting, when, and the gist. ' +
+        'Then four short parts: the agenda, the last thread with these people, related docs, ' +
+        'and open questions. Use what you remember and the read tools of my connected apps ' +
+        '(Notion, GitHub, mail) for the last thread and the docs; if no app is connected, say ' +
+        'so in one line.',
+      uses: ['Calendar'],
+    }),
+  },
   { id: 'blank', name: 'Blank', line: 'Start from nothing.', form: () => ({ ...BLANK }) },
 ];
 
@@ -183,6 +211,8 @@ function formOf(routine: RoutineDraftInput & { id?: string }): Form {
     time: when.type === 'schedule' ? when.time : '09:00',
     days: when.type === 'schedule' ? [...when.days] : [],
     match: when.type === 'app' ? when.match : '',
+    minutesBefore: when.type === 'meeting' ? when.minutesBefore : 10,
+    link: '',
     what: draft.what,
     topics: draft.topics,
     showTopics: draft.topics.trim() !== '',
@@ -205,6 +235,8 @@ function whenOf(form: Form): RoutineWhen | string {
     case 'app':
       if (form.match.trim() === '') return 'Say which app or site, such as Outlook.';
       return { type: 'app', match: form.match.trim() };
+    case 'meeting':
+      return { type: 'meeting', minutesBefore: form.minutesBefore };
     default:
       return { type: form.kind };
   }
@@ -418,6 +450,7 @@ function RoutineRow({
           <span>Next: {shortTime(routine.nextRunAt)}</span>
         )}
       </p>
+      {routine.problem !== undefined && <p className="tg-error">{routine.problem}</p>}
       <div className="home-conn__actions">
         <button
           type="button"
@@ -459,7 +492,12 @@ function RoutineForm({
   const [form, setForm] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [calendar, setCalendar] = useState<CalendarCheckResult | null>(null);
   const heading = useId();
+  const meeting = form.kind === 'meeting';
+  useEffect(() => {
+    if (meeting) void bridge.checkCalendar?.().then(setCalendar);
+  }, [bridge, meeting]);
   const set = (patch: Partial<Form>) => setForm((current) => ({ ...current, ...patch }));
   const timed = form.kind === 'daily' || form.kind === 'weekdays' || form.kind === 'days';
   const switchedOn = experts.filter((e) => e.enabled);
@@ -468,8 +506,14 @@ function RoutineForm({
   const save = async (): Promise<void> => {
     const draft = draftOf(form);
     if (typeof draft === 'string') return setError(draft);
+    const link = form.link.trim();
+    if (meeting && link === '' && calendar?.linked !== true) {
+      return setError('Paste your calendar link (.ics) first.');
+    }
     setError(null);
     try {
+      // The link goes to the keychain on its own; the routine never holds it.
+      if (meeting && link !== '') await bridge.setCalendarLink?.(link);
       if (proposalId !== undefined) await bridge.confirmRoutine?.(proposalId, draft);
       else
         await bridge.saveRoutine?.({ ...draft, ...(form.id !== undefined ? { id: form.id } : {}) });
@@ -515,6 +559,21 @@ function RoutineForm({
             />
           </label>
         )}
+        {meeting && (
+          <label>
+            <span>Minutes before</span>
+            <select
+              value={String(form.minutesBefore)}
+              onChange={(event) => set({ minutesBefore: Number(event.target.value) })}
+            >
+              {[...new Set([...LEADS, form.minutesBefore])].map((minutes) => (
+                <option key={minutes} value={String(minutes)}>
+                  {minutes} minutes
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {form.kind === 'app' && (
           <label>
             <span>App or site</span>
@@ -546,6 +605,38 @@ function RoutineForm({
             </button>
           ))}
         </div>
+      )}
+      {meeting && (
+        <>
+          <label>
+            <span>Calendar link (.ics)</span>
+            <input
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              value={form.link}
+              placeholder={calendar?.linked === true ? 'Kept in your keychain' : 'https://…'}
+              onChange={(event) => set({ link: event.target.value })}
+            />
+          </label>
+          <p className="tg-note">
+            {calendar?.linked === true
+              ? 'A link is kept in your keychain. Paste a new one only to change it. '
+              : ''}
+            Google: calendar settings, then Secret address in iCal format. Outlook: Calendar, Shared
+            calendars, then Publish. The link is a key to your calendar: it stays in your keychain,
+            never in settings or chat.
+          </p>
+          {calendar?.linked === true && (
+            <button
+              type="button"
+              className="home-link home-routine__more"
+              onClick={() => void bridge.setCalendarLink?.(null).then(setCalendar)}
+            >
+              Forget the link
+            </button>
+          )}
+        </>
       )}
       {form.kind === 'app' && (
         <p className="tg-note">

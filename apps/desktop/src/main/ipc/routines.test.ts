@@ -21,6 +21,8 @@ function setup(window: RoutineWindow | null = null) {
     'routines.setEnabled': { routine: SAVED },
     'routines.runNow': { started: true },
     'routines.confirm': { routine: SAVED },
+    'calendar.setLink': { linked: true, meetings: 3 },
+    'calendar.check': { linked: false, meetings: 0 },
   });
   const openOffice = vi.fn();
   registerRoutineIpc(ipc.handle, {
@@ -45,6 +47,17 @@ function fakeWindow(loading: boolean) {
 }
 
 describe('registerRoutineIpc', () => {
+  it('hands the calendar link straight to the engine, which keeps it in the keychain', async () => {
+    const { invoke, calls } = setup();
+    const link = 'https://calendar.example.com/private-abc/basic.ics';
+    expect(await invoke(IPC.setCalendarLink, link)).toEqual({ linked: true, meetings: 3 });
+    expect(await invoke(IPC.checkCalendar)).toEqual({ linked: false, meetings: 0 });
+    expect(calls).toEqual([
+      ['calendar.setLink', { link }],
+      ['calendar.check', {}],
+    ]);
+  });
+
   it('saves a parsed draft, keeping the id of one being edited', async () => {
     const { invoke, calls } = setup();
     expect(await invoke(IPC.saveRoutine, DRAFT)).toEqual(SAVED);

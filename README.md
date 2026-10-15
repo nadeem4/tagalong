@@ -286,13 +286,19 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   project folder: each task picks its project, and you confirm before anything is sent.
 - **Routines**: things Scout does for you on its own, such as new papers every weekday at 8.
   - **New routine** starts from a template (**Morning papers**, **Today's calendar**, **Reviews
-    waiting on GitHub**, **What needs me** at 09:00 on weekdays, **End-of-day summary**) or
-    **Blank**. Pick **When** (every day, weekdays, chosen days at a time, or when Tagalong opens, an
-    app or site appears, an expert finishes, a watch fires), say **What** in your own words, and where the **Result goes**: Scout's bubble,
+    waiting on GitHub**, **What needs me** at 09:00 on weekdays, **End-of-day summary**, **Meeting
+    prep**) or **Blank**. Pick **When** (every day, weekdays, chosen days at a time, or when Tagalong
+    opens, an app or site appears, an expert finishes, a watch fires, or 10 or 30 minutes before each
+    meeting), say **What** in your own words, and where the **Result goes**: Scout's bubble,
     read aloud, a Windows notification. Activity always keeps each run.
   - **May hand to** lets each run hand work to one expert without asking, read-only, with web search
     and no project, so it never touches your files. Morning papers uses this to search the web with
     Claude Code, or a paper app such as arXiv when you have connected one.
+  - **Meeting prep** reads your calendar from its secret .ics link (Google: Secret address in iCal
+    format; Outlook: Publish), kept in your keychain. Before each meeting with someone, Scout's line
+    gives the gist, and the full prep has the agenda, the last thread, related docs and open
+    questions, from your connected apps. A prep still waiting when a call runs past the start comes
+    as a Windows notification.
   - Each routine shows its switch, its last run (with **See in Activity**) and its next run, with
     **Run now** and **Edit**.
   - You can also ask Scout: "every weekday at 8, give me new papers on AI agents and explain the best

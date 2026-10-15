@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron';
 import type {
   ActivityListResult,
+  CalendarCheckResult,
   ConnectionState,
   ConnectionsAddParams,
   ConnectionsListResult,
@@ -120,6 +121,9 @@ const bridge: HostBridge = {
   deleteSightLog: (id: string) => ipcRenderer.invoke(IPC.deleteSightLog, id) as Promise<boolean>,
   clearSightLog: () => ipcRenderer.invoke(IPC.clearSightLog) as Promise<number>,
   copyText: (text: string) => ipcRenderer.invoke(IPC.copyText, text) as Promise<void>,
+  setCalendarLink: (link: string | null) =>
+    ipcRenderer.invoke(IPC.setCalendarLink, link) as Promise<CalendarCheckResult>,
+  checkCalendar: () => ipcRenderer.invoke(IPC.checkCalendar) as Promise<CalendarCheckResult>,
   onTurnEvent: (handler: (event: TurnEvent) => void) => {
     const listener = (_event: IpcRendererEvent, turnEvent: TurnEvent): void => handler(turnEvent);
     ipcRenderer.on(IPC.turnEvent, listener);

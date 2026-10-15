@@ -1,5 +1,6 @@
 import type {
   ActivityEntry,
+  CalendarCheckResult,
   ConnectionState,
   ConnectionsAddParams,
   ConnectionsListResult,
@@ -55,6 +56,8 @@ export interface FakeHostBridge extends HostBridge {
   readonly editedRoutines: readonly RoutineProposedParams[];
   /** Every text put on the clipboard with Copy, in order. */
   readonly copied: readonly string[];
+  /** Every calendar link Home handed over, in order. */
+  readonly calendarLinks: readonly (string | null)[];
 }
 
 /**
@@ -80,6 +83,8 @@ export function createFakeHostBridge(
     routines?: RoutineView[];
     /** What Scout saw, newest first. */
     sightLog?: SightLogEntry[];
+    /** Whether a calendar link is kept; absent, none is. */
+    calendar?: CalendarCheckResult;
   } = {},
 ): FakeHostBridge {
   const handlers = new Set<(event: TurnEvent) => void>();
@@ -101,6 +106,8 @@ export function createFakeHostBridge(
   const dismissedRoutines: string[] = [];
   const editedRoutines: RoutineProposedParams[] = [];
   const copied: string[] = [];
+  const calendarLinks: (string | null)[] = [];
+  let calendar: CalendarCheckResult = options.calendar ?? { linked: false, meetings: 0 };
   let routineCount = 0;
   const toView = (draft: RoutineDraftInput & { id?: string }): RoutineView => {
     routineCount += 1;
@@ -324,6 +331,15 @@ export function createFakeHostBridge(
     copyText(text) {
       copied.push(text);
       return Promise.resolve();
+    },
+    calendarLinks,
+    setCalendarLink(link) {
+      calendarLinks.push(link);
+      calendar = link === null ? { linked: false, meetings: 0 } : { linked: true, meetings: 1 };
+      return Promise.resolve(calendar);
+    },
+    checkCalendar() {
+      return Promise.resolve(calendar);
     },
     emit(event) {
       // Copied first so a handler that unsubscribes mid-emit cannot skip its neighbours.

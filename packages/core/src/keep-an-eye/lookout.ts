@@ -41,8 +41,8 @@ export function isMeeting(window: WindowEntry): boolean {
 /**
  * The one call and full-screen rule: a call or a full-screen window in front, and Scout keeps
  * out of the way. It is the front window that counts, so a Teams window in front counts even
- * with no call, and a call behind another window does not. Keeping an eye, Always listening
- * and moods all follow this one check.
+ * with no call, and a call behind another window does not. Keeping an eye, Always listening,
+ * moods and routine delivery all follow this one check.
  */
 export function callOrFullScreenInFront(windows: readonly WindowEntry[]): boolean {
   const front = windows.find((window) => window.state === 'foreground');

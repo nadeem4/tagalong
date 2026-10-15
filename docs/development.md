@@ -45,6 +45,7 @@ tagalong/
       memory/                       # db.ts (numbered migrations), store.ts (ConversationStore)
       experts/                      # hand-offs, the Claude Code connector, the fake connector
       routines/                     # the scheduler, schedules and triggers, the routine store
+      meetings/                     # Meeting prep's calendar feed: the .ics link, parsed with ical.js
       greeting/, keep-an-eye/       # the launch line; the remark from watching window titles
       watch/, projects/, privacy/   # watches, the project finder, the blind spots
       pets/registry.ts              # PetRegistry, the default pet Scout
