@@ -1856,7 +1856,8 @@ flowchart LR
   the press, but the state turns `listening` (the dot and "Listening…") only in `onMicOpen`, once
   the mic is really open. A mic that will not open shows `micNote(error)`: "Another app is using
   the microphone…" when it is busy (`NotReadableError`, `AbortError`), otherwise that it could not
-  be opened. Closing the bubble cancels the
+  be opened. Only `getUserMedia` itself can say busy: `openMic` rethrows an audio-graph failure
+  (a worklet that would not load rejects with an `AbortError`) as a plain error. Closing the bubble cancels the
   question being asked, never always listening. The decisions sit in `talk-rules.ts`, unit tested:
   `settles` (a heard question clears the words and the state unless a held question has started, so
   an always question and a held question heard after the always session resumed both settle),

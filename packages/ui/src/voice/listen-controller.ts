@@ -263,8 +263,8 @@ export class ListenController {
         }
         if (this.#options.needsName !== false && isStopListening(question)) {
           this.#options.onStopListening();
-          // The stop cut Scout off, but is never asked: the bubble lets go.
-          this.#options.onDropped();
+          // A stop that cut Scout off is never asked: the bubble lets go.
+          if (barged) this.#options.onDropped();
         } else {
           this.#resetRetry();
           this.#options.onHeard(question);

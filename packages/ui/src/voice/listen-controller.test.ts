@@ -566,6 +566,8 @@ describe('ListenController, always', () => {
     ears.say('turnEnd', 'Scout, stop.');
     expect(calls.stop).toHaveBeenCalledOnce();
     expect(calls.heard).not.toHaveBeenCalled();
+    // Nothing was cut off, so there is nothing to let go.
+    expect(calls.dropped).not.toHaveBeenCalled();
   });
 
   it('a stop that had cut Scout off lets the bubble go', async () => {

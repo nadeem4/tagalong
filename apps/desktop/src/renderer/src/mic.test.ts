@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openMic } from './mic';
+import { micFailure } from './setup-ears';
 
 /** A microphone and an audio graph that fails at `failAt`, in plain Node. */
-function fakeAudio(failAt: 'context' | 'worklet' | 'node') {
+function fakeAudio(failAt: 'context' | 'worklet' | 'node' | 'worklet-abort') {
   const stop = vi.fn();
   const close = vi.fn(async () => undefined);
   vi.stubGlobal('navigator', {
@@ -14,6 +15,8 @@ function fakeAudio(failAt: 'context' | 'worklet' | 'node') {
       audioWorklet = {
         addModule: async () => {
           if (failAt === 'worklet') throw new Error('worklet blocked');
+          // A worklet that would not load rejects with an AbortError.
+          if (failAt === 'worklet-abort') throw new DOMException('worklet not fetched', 'AbortError');
         },
       };
       destination = {};
@@ -58,5 +61,11 @@ describe('openMic', () => {
     const { stop } = fakeAudio('context');
     await expect(openMic()).rejects.toThrow('no audio device');
     expect(stop).toHaveBeenCalledOnce();
+  });
+
+  it('a worklet that would not load is not read as a microphone another app holds', async () => {
+    fakeAudio('worklet-abort');
+    const error: unknown = await openMic().catch((e: unknown) => e);
+    expect(micFailure(error)).toBe('no-mic');
   });
 });
