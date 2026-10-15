@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EARS_FRAME } from '@tagalong/protocol';
-import { createEarsHost, EARS_DOWNLOAD_FAILED, EARS_START_FAILED } from './ears-host';
+import {
+  createEarsHost,
+  EARS_DOWNLOAD_FAILED,
+  EARS_MODEL_DAMAGED,
+  EARS_START_FAILED,
+} from './ears-host';
+import { ModelIntegrityError } from '../ears/model-files';
 import type { EarsParts } from '../ears/local-ears';
 import type { FromWorker } from './messages';
 
@@ -370,6 +376,25 @@ describe('createEarsHost', () => {
       message: EARS_DOWNLOAD_FAILED,
     });
     expect(JSON.stringify(posted)).not.toContain('fetch failed');
+    host({ kind: 'ears.listen', mode: 'always' });
+    await tick();
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  it('says the model was damaged when a download fails its checksum twice, and tries again next time', async () => {
+    const posted: FromWorker[] = [];
+    const load = vi
+      .fn()
+      .mockRejectedValueOnce(new ModelIntegrityError('ears/vad.onnx'))
+      .mockImplementation(partsOnce());
+    const host = createEarsHost({ fake: false, load, post: (m) => posted.push(m) });
+    host({ kind: 'ears.listen', mode: 'always' });
+    await tick();
+    expect(posted).toContainEqual({
+      kind: 'ears.status',
+      status: 'failed',
+      message: EARS_MODEL_DAMAGED,
+    });
     host({ kind: 'ears.listen', mode: 'always' });
     await tick();
     expect(load).toHaveBeenCalledTimes(2);

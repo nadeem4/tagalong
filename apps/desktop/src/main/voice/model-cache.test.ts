@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { isDownloaded, loadOrForget } from './model-cache';
+import { isDownloaded } from './model-cache';
 
 let cacheDir: string;
 
@@ -27,27 +27,5 @@ describe('isDownloaded', () => {
     partial('acme/model');
     expect(isDownloaded(cacheDir, 'acme/model', 'model.onnx')).toBe(true);
     expect(isDownloaded(cacheDir, 'acme/model', 'onnx/model_quantized.onnx')).toBe(false);
-  });
-});
-
-describe('loadOrForget', () => {
-  it('returns what the loader loaded and keeps the cache', async () => {
-    const dir = partial('acme/model');
-    await expect(loadOrForget(cacheDir, 'acme/model', async () => 'loaded')).resolves.toBe(
-      'loaded',
-    );
-    expect(existsSync(dir)).toBe(true);
-  });
-
-  it('deletes that model’s folder when loading fails, so the next try downloads again', async () => {
-    const dir = partial('acme/model');
-    const other = partial('acme/other');
-    await expect(
-      loadOrForget(cacheDir, 'acme/model', async () => {
-        throw new Error('Protobuf parsing failed');
-      }),
-    ).rejects.toThrow('Protobuf parsing failed');
-    expect(existsSync(dir)).toBe(false);
-    expect(existsSync(other)).toBe(true);
   });
 });

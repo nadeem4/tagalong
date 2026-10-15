@@ -14,6 +14,9 @@ export async function loadOrtParts(dir: string): Promise<{ vad: Vad; stt: Stream
   const ort = mod.default ?? mod;
   const { env, pipeline } = await import('@huggingface/transformers');
   env.cacheDir = dir;
+  env.localModelPath = dir;
+  // Only the files `ensureFiles` checked against their pinned hashes: never a fetch of its own.
+  env.allowRemoteModels = false;
   const silero = await ort.InferenceSession.create(join(dir, 'ears/silero-vad/model.onnx'), {
     intraOpNumThreads: 1,
     interOpNumThreads: 1,
