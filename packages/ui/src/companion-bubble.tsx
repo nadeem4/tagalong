@@ -22,6 +22,7 @@ import { HealthCard } from './health-card';
 import type { TurnEvent } from './host-bridge';
 import { officeTokens as t } from './office/tokens';
 import { SpokenStream } from './voice/spoken-stream';
+import { wantsReadAloud } from './voice/read-aloud';
 
 /**
  * Talk to Scout, as the bubble sees it: the host holds the microphone and turns speech into
@@ -508,7 +509,13 @@ export function CompanionBubble({
     const text = draft.trim();
     if (text === '' || reply.state === 'running') return;
     setDraft('');
-    submit(text, snapshot === undefined ? undefined : without(snapshot, removed));
+    // "Read this to me", or a reply to "Shall I go on?" after a reading, is spoken whole.
+    const continuing = spokenReply && reply.state === 'done' && /go on\?\s*$/i.test(reply.text);
+    submit(
+      text,
+      snapshot === undefined ? undefined : without(snapshot, removed),
+      wantsReadAloud(text) || continuing,
+    );
   };
 
   // A spoken question arrives from the host: ask it, once per new `seq`.

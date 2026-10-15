@@ -50,6 +50,7 @@ export { SpeechQueue } from './voice/speech-queue';
 export type { PreparedLine, SpeechQueueOptions } from './voice/speech-queue';
 export { QueueMouth } from './voice/mouth';
 export { toSpeakable } from './voice/speakable';
+export { wantsReadAloud } from './voice/read-aloud';
 /** Talk to Scout: telling a held key from a fresh press, and the bubble's side of it. */
 export { PushToTalk } from './voice/push-to-talk';
 export type { TalkAction } from './voice/push-to-talk';

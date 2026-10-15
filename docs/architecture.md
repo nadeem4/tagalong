@@ -1879,7 +1879,8 @@ flowchart LR
   (`GreetingLine`), remarks from keeping an eye on things (`remarkEvent`, sent by `showRemark`)
   and `watch.fired` messages.
   `SpeechQueue` shapes each line with `toSpeakable` (markdown stripped; code blocks, lists, tables
-  and URLs left out; at most two sentences or 200 characters, then "The rest is in the bubble."),
+  and URLs left out; at most two sentences or 200 characters, then "The rest is in the bubble.";
+  an answer to a spoken question or a read-aloud, see Talk to Scout, is said whole),
   merges short lines waiting together (`mergeShortLines`, because Kokoro says a lone "Done." badly),
   and plays one line at a time. While a line plays, the next one is already being synthesised
   (`prepare` starts `speak` at once and returns how to play the result; one line ahead, and not a
@@ -1989,6 +1990,19 @@ flowchart LR
   also interrupts that turn (`bridge.interrupt`), drops its `SpokenStream` and keeps what was shown so far, so no later
   sentence of the old answer is said. A spoken question sent while an answer still runs is a new
   ask for the same pet, which the runner already interrupts.
+- **Read aloud and describe** (`ui/voice/read-aloud.ts`, `companion.md`, `SPOKEN_MODE`). No tool of
+  its own: the companion reads with `get_selection`, then `read_window_text`, and describes a
+  picture with `look_at_window` or `look_closer`. `companion.md` says how: a reading is the text
+  itself, verbatim with no preamble, list items as sentences and code described rather than its
+  symbols, stopping at about 300 words with "Shall I go on?"; a description gives the kind, axes,
+  trend and notable values, quoting only labels it can read; text that came from OCR carries a
+  warning that a word may be misread. `SPOKEN_MODE` carries the one exception to keeping it short,
+  since it comes last in the system prompt and would otherwise cut the reading. A typed request is
+  spoken whole too: `CompanionBubble.send` asks with `spoken: true` when the pure
+  `wantsReadAloud(text)` matches (read or say, with aloud, to me or out loud), so the answer goes
+  through `SpokenStream` and `QueueMouth.speak` instead of `onSay`, whose `toSpeakable` would cut it
+  to two sentences. Every 300-word part stays well under `MAX_OUTPUT_TOKENS` (2,048). With Scout
+  talks off the mouth says nothing and the reading is only in the bubble.
 - **Settings on the fly.** Main sends `IPC.settingsChangedEvent` with the saved settings to every
   window after each save; the panel reads the ask and talk keys, the microphone and the user's name
   from it (`renderer/src/panel-settings.ts`), as it does at open, so none needs a restart.

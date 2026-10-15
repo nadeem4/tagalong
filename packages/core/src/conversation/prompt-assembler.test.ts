@@ -153,6 +153,12 @@ describe('assemblePrompt system prompt', () => {
     expect(spoken).toContain('A draft still goes whole in its draft block.');
   });
 
+  it('lets a spoken read-aloud run long: the one exception to keeping it short', () => {
+    expect(SPOKEN_MODE).toContain(
+      'When asked to read something aloud, give the text in full as plain sentences; that is the exception to keeping it short.',
+    );
+  });
+
   it("falls back to the companion's instructions for a role the library does not have", () => {
     // A crew-era role, still on a pet saved before the crew went.
     const { system } = assemblePrompt({
