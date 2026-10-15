@@ -1313,6 +1313,27 @@ Needs GitHub connected (Home → Connections → GitHub, with a token) and a rea
    instruction are filled in. **Save**, then **Run now**: the same list arrives as the routine's
    line, with no confirm card, and Activity shows only read rows for the apps.
 
+## Drop it on Scout _(real brain)_
+
+1. Drag a `.md` file from Explorer onto Scout. While you hold it over Scout, Scout shows its Seeing
+   face; let go, and the bubble opens on "report.md: want me to explain it, or hand it to an
+   expert?". Nothing opens in Tagalong's windows, and Scout does not move.
+2. Press **Explain**: the answer is about the file's contents. Type your own words first and the
+   answer follows them.
+3. Drop a PDF: only **Hand it to an expert** and **Cancel** show. Press **Hand it to an expert**:
+   the hand-off card appears with the brief naming the file's path, and nothing runs until **Send**.
+4. Drop a PNG with a brain that cannot see images: Scout says the image was not sent. With
+   **Screenshot retention** off, the stored conversation has no picture.
+5. Drop a `.env` file: "That looks like a secrets file, so I won’t read it or pass it on." and no
+   buttons.
+6. Drag a link from the browser: **Hand it to an expert** only. Drag selected text: **Explain**.
+7. **Cancel** sends nothing (Activity shows no new turn). With Always listening on and a card open,
+   say "Scout, explain it": Scout answers without the dropped item.
+8. Pause sight, then drop a file: the card still shows and works.
+9. Drag Scout itself to move it: no drop card opens.
+10. Drop a file, wait more than ten minutes, then press **Explain**: Scout says to drop it again,
+    and nothing is sent.
+
 ## Not in this build
 
 Do not test these here.

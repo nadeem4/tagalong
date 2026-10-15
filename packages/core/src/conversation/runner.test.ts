@@ -586,6 +586,16 @@ function shotSnapshot(): ContextSnapshot {
   };
 }
 
+/** An image dropped on Scout, with no screenshot beside it. */
+function dropSnapshot(): ContextSnapshot {
+  return {
+    id: randomUUID(),
+    capturedAt: new Date().toISOString(),
+    host: 'desktop',
+    dropped: { kind: 'image', name: 'chart.png', path: '/w/chart.png', image: { ...SCREENSHOT } },
+  };
+}
+
 /** Reads the raw column, because the point is what landed on disk, not what was returned. */
 function storedSnapshotJson(conversationId: string): string | null {
   return (
@@ -641,6 +651,27 @@ describe('ConversationRunner screenshot persistence', () => {
     expect(storedSnapshotJson(turn.conversationId)).toContain(SCREENSHOT.base64);
   });
 
+  it('keeps a dropped image out of the database by the same rule, but keeps its text', async () => {
+    const seen: BrainRequest[] = [];
+    const runner = makeRunner(recording(seen, 'ok'));
+    const turn = runner.run({ pet, text: 'Explain this.', snapshot: dropSnapshot() });
+    await turn.done;
+
+    const stored = storedSnapshotJson(turn.conversationId);
+    expect(stored).not.toContain(SCREENSHOT.base64);
+    expect(stored).toContain('chart.png');
+    expect(imageBlocks(seen[0])).toHaveLength(1);
+  });
+
+  it('keeps a dropped image once a retention window is set', async () => {
+    settings.set({ screenshotRetention: { mode: 'hours', hours: 24 } });
+    const runner = makeRunner(new FakeBrainProvider({ text: 'ok' }));
+    const turn = runner.run({ pet, text: 'Explain this.', snapshot: dropSnapshot() });
+    await turn.done;
+
+    expect(storedSnapshotJson(turn.conversationId)).toContain(SCREENSHOT.base64);
+  });
+
   it('stores a snapshot that never had a screenshot untouched', async () => {
     const runner = makeRunner(new FakeBrainProvider({ text: 'ok' }));
     const turn = runner.run({ pet, text: 'hi', snapshot });
@@ -673,6 +704,21 @@ describe('ConversationRunner vision capability', () => {
 
     expect(imageBlocks(seen[0])).toHaveLength(1);
     expect(methods()).not.toContain('turn.warning');
+  });
+
+  it('strips a dropped image from a blind brain and warns, keeping the rest of the drop', async () => {
+    const seen: BrainRequest[] = [];
+    const runner = makeRunner(blind(seen));
+    const turn = runner.run({ pet, text: 'Explain this.', snapshot: dropSnapshot() });
+    await turn.done;
+
+    expect(imageBlocks(seen[0])).toHaveLength(0);
+    expect(JSON.stringify(seen[0])).not.toContain(SCREENSHOT.base64);
+    expect(JSON.stringify(seen[0])).toContain('chart.png');
+    const warning = events.find((event) => event.method === 'turn.warning');
+    expect(warning?.params).toMatchObject({ turnId: turn.turnId, code: 'vision_unsupported' });
+    expect(JSON.stringify(warning?.params)).toContain('image');
+    expect(methods().at(-1)).toBe('turn.completed');
   });
 
   it('warns about nothing when a blind provider gets no screenshot', async () => {

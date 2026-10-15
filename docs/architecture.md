@@ -215,7 +215,7 @@ sequenceDiagram
   participant A as Claude
   participant T as Text to speech, in the host
   U->>H: highlight text, press hotkey
-  H->>H: build ContextSnapshot
+  H->>H: build ContextSnapshot, plus dropped from a drop card's button
   H->>C: ask(petId, input, snapshot)
   C->>C: assemble prompt: role + notes + memory + context
   C->>A: streaming request with tools
@@ -235,8 +235,8 @@ notifications.
    `ContextSnapshot`.
 2. `ConversationRunner.run` opens a conversation if none was named, stores the user message (with its
    snapshot) in SQLite, mints a `turnId`, emits `turn.started`, and **returns immediately**. The `ask`
-   result is `{ turnId }` and nothing else. The stored snapshot loses its screenshot unless
-   `screenshotRetention` allows keeping it, and the same call sweeps screenshots that have outlived
+   result is `{ turnId }` and nothing else. The stored snapshot loses its screenshot (and an image
+   dropped on Scout, `dropped.image`) unless `screenshotRetention` allows keeping it, and the same call sweeps screenshots that have outlived
    the setting — the turn is the only moment the engine reliably wakes up, and Phase 4 owns timers.
 3. If none of the pet's models can see (`modelForTurn` answers null — see
    [Brain providers](#brain-providers)) and the ask carried a screenshot, the
@@ -781,18 +781,36 @@ every window, and what makes the two hosts interchangeable.
 the settings or the voice live in `main/ipc/`, one module per area, each a `register…Ipc(handle, deps)`
 that takes `ipcMain.handle` and what it reads as arguments, so it is unit tested without Electron:
 
-| Module           | Channels                                                      |
-| ---------------- | ------------------------------------------------------------- |
-| `turns.ts`       | ask, stop a watch, interrupt, a remark's Not now and accept   |
-| `crew.ts`        | pets, save a pet, switch Scout, finish Welcome                |
-| `experts.ts`     | Activity, the Experts tab, the hand-off card, project search  |
-| `connections.ts` | connected apps and the answer to a change Scout asked to make |
-| `routines.ts`    | Home's Routines page and the routine card, including its Edit |
-| `sight-log.ts`   | Home's What Scout saw: list, delete one, delete all           |
-| `settings.ts`    | the settings view, saving settings and keys, model lists      |
-| `voice.ts`       | speak; listen, mic frames and stop, to the voice process      |
+| Module           | Channels                                                                                                  |
+| ---------------- | --------------------------------------------------------------------------------------------------------- |
+| `turns.ts`       | ask (with the dropped item when a drop card asks), stop a watch, interrupt, a remark's Not now and accept |
+| `crew.ts`        | pets, save a pet, switch Scout, finish Welcome                                                            |
+| `experts.ts`     | Activity, the Experts tab, the hand-off card, project search                                              |
+| `connections.ts` | connected apps and the answer to a change Scout asked to make                                             |
+| `routines.ts`    | Home's Routines page and the routine card, including its Edit                                             |
+| `sight-log.ts`   | Home's What Scout saw: list, delete one, delete all                                                       |
+| `settings.ts`    | the settings view, saving settings and keys, model lists                                                  |
+| `voice.ts`       | speak; listen, mic frames and stop, to the voice process                                                  |
 
 The handlers that move windows, open dialogs or read the screen stay in `index.ts`.
+
+**Drop it on Scout** (`main/drop.ts`). The figure (`renderer/src/pet-input.ts`) keeps HTML drag
+events apart from its pointer events: a press that moves drags the pet (`dragAvatar`, then
+`dropAvatar`), while a file, link or text dragged in from another app only ever sends
+`dropOnPet`. Both drag events call `preventDefault`, and the avatar and panel windows refuse
+`will-navigate` (`guardNavigation`), so Electron never opens a dropped file. The preload turns each
+`File` into its path with `webUtils.getPathForFile` (`File.path` is gone in Electron 44; `webUtils`
+is available to a sandboxed preload). In main, `dropDesk.offer` names the item without reading it:
+a file first, then a web link, then text; a secret file name (`SECRET_FILES`, through core's
+`secretFileRule`) becomes a refusal. `dropOnPet` is taken only from the figure's own window
+(`registerDropIpc`, `fromWindow`). Main opens the bubble (`openPanelNow`) and sends `dropEvent`
+with the card. A card's button asks with `drop: true`; only then does `dropDesk.take` read the item, once and
+within ten minutes of the drop (`DROP_HOLD_MS`; after that it is let go unread)
+(`readDrop`: a text file up to 1 MB, a PNG or JPEG up to 10 MB scaled by `nativeImage` to the
+screenshot long side, any other file by name, path and size) and `turns.ts` attaches it as
+`snapshot.dropped`. The prompt gets a "Dropped on you" section and, for an image, an image block;
+a blind brain has the image stripped with a warning, as for a screenshot. The dock shows Seeing
+while something is held over the pet (`dropHover`, `dropLeave`), below working.
 
 The preload exposes exactly two globals, and the split between them is deliberate:
 
@@ -1735,6 +1753,13 @@ the same component `expanded`: a header with the companion's name and **Back to 
 conversation (each question on the right, each answer below it, hand-off cards inline) and the chips
 above a **Message** box. It is the same component, so it is the same conversation. `ChatPanel` is only used by the Chrome extension's side panel.
 
+- **The drop card** (`drop-card.tsx`). After a drop the panel passes `drop` to the bubble, which
+  shows `DropCard`: "report.md: want me to explain it, or hand it to an expert?" with an optional
+  line for your own words. **Explain** asks `Explain this.` (or your words); **Hand it to an
+  expert** asks `Hand this to an expert: … (path)`, so Scout calls `hand_to_expert` with the file
+  and the usual hand-off card follows. A link, a PDF or a Word file offers the hand-off only.
+  **Cancel** asks nothing. A secrets file shows the refusal with no buttons. Both buttons ask with
+  `drop: true`; a spoken or typed ask never does.
 - **What it can see, as chips.** The hotkey's snapshot becomes chips: the app and window title,
   selected text, a screenshot. Removing a chip drops that part from the ask (`without`); a new
   capture brings them all back.

@@ -100,11 +100,19 @@ function matchSecretFile(title: string | undefined): CaptureBlock | null {
     .split(/\s+/)
     .map((word) => word.split(/[\\/]/).pop() ?? '')
     .filter((word) => word.length > 0);
-  for (const file of SECRET_FILES) {
-    const pattern = globToRegExp(file);
-    if (words.some((word) => pattern.test(word))) return { rule: 'titlePattern', entry: file };
+  for (const word of words) {
+    const entry = secretFileRule(word);
+    if (entry !== null) return { rule: 'titlePattern', entry };
   }
   return null;
+}
+
+/**
+ * The secret-file name (`.env`, `id_rsa`, `secrets.*`) a bare file name matches, or null.
+ * Shared by the title rule above and by a file dropped on Scout.
+ */
+export function secretFileRule(fileName: string): string | null {
+  return SECRET_FILES.find((file) => globToRegExp(file).test(fileName)) ?? null;
 }
 
 /**

@@ -77,6 +77,26 @@ describe('moods on the dock', () => {
   });
 });
 
+describe('something held over the pet', () => {
+  it('shows the Seeing face while hovering, until it leaves or is dropped', () => {
+    const hovering = nextDock(IDLE_DOCK, { type: 'dropHover' });
+    expect(dockMood(hovering)).toBe('listening');
+    // The drop itself ends the hover with the same event.
+    expect(dockMood(nextDock(hovering, { type: 'dropLeave' }))).toBe('idle');
+  });
+
+  it('returns the same state for a repeated hover or a leave with nothing held', () => {
+    const hovering = nextDock(IDLE_DOCK, { type: 'dropHover' });
+    expect(nextDock(hovering, { type: 'dropHover' })).toBe(hovering);
+    expect(nextDock(IDLE_DOCK, { type: 'dropLeave' })).toBe(IDLE_DOCK);
+  });
+
+  it('lets working win over a hover', () => {
+    const working = nextDock(IDLE_DOCK, { type: 'turn.started', turnId: T, petId: 'scout' });
+    expect(dockMood(nextDock(working, { type: 'dropHover' }))).toBe('working');
+  });
+});
+
 describe('dragging the pet', () => {
   it('stays a click until the pointer moves past the threshold', () => {
     const start = startDrag({ x: 100, y: 100 });

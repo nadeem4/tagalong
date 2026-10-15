@@ -398,6 +398,10 @@ clicks or types.
 Scout reads what is in front of you and writes a short draft in the bubble with a **Copy** button.
 Copy puts the draft on your clipboard; you paste it. Scout never types or pastes into an app.
 
+**Drop it on Scout.** Drag a file, an image, a link or selected text onto Scout and it asks whether
+to explain it or hand it to an expert. Nothing is read until you press a button, and secrets files
+such as `.env` are refused.
+
 ## Privacy
 
 - Nothing on screen is read until you press a hotkey or ask, except screen memory and watches, which

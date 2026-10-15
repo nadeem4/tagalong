@@ -13,6 +13,7 @@ import type {
   PickUpReadyParams,
   RoutineResultParams,
 } from '@tagalong/protocol';
+import type { DropOffer } from '@tagalong/ui';
 // Bundled, not fetched: the bubble's two typefaces ship inside the app, Latin subset only.
 import '@fontsource/onest/latin-400.css';
 import '@fontsource/onest/latin-600.css';
@@ -56,6 +57,8 @@ function Panel() {
     question: string;
     answer: string;
   } | null>(null);
+  // Something dropped on Scout: its card, until a button on it is pressed.
+  const [drop, setDrop] = useState<DropOffer | null>(null);
   // Which side of the pet this window sits on; the speech tail points the other way, at it.
   const [side, setSide] = useState<'left' | 'right'>('left');
   const root = useRef<HTMLDivElement>(null);
@@ -194,8 +197,24 @@ function Panel() {
       setRemark(null);
       setRoutine(null);
       setResume(null);
+      setDrop(null);
     });
   }, []);
+
+  // A drop on the figure: main opened the bubble and hands over the card for it.
+  useEffect(
+    () =>
+      window.tagalongHost.onDrop((offer) => {
+        setMode('bubble');
+        setGreeting(false);
+        setLine(null);
+        setRemark(null);
+        setRoutine(null);
+        setResume(null);
+        setDrop(offer);
+      }),
+    [],
+  );
 
   // A broken hotkey is invisible by nature: the user presses a key and nothing happens.
   // The panel is the surface they can still reach — through the tray — so it says which
@@ -366,6 +385,8 @@ function Panel() {
               {...(snapshot !== null ? { snapshot } : {})}
               {...(resume !== null ? { resume } : {})}
               {...(pickUp !== null ? { pickUp, onPickUpDone: () => setPickUp(null) } : {})}
+              {...(drop !== null ? { drop } : {})}
+              onDropDone={() => setDrop(null)}
             />
           )}
         </div>

@@ -13,6 +13,7 @@ import { HANDOFF_CSS, HandoffStatus, ProposalCard, type Handoff } from './handof
 import { ConnectorConfirmCard } from './connector-confirm';
 import { RoutineCard } from './routine-card';
 import { PickUpCard } from './pick-up-card';
+import { DropCard, type DropOffer } from './drop-card';
 import { useHostBridge } from './host-bridge';
 import type { TurnEvent } from './host-bridge';
 import { officeTokens as t } from './office/tokens';
@@ -85,6 +86,10 @@ export interface CompanionBubbleProps {
   pickUp?: PickUpReadyParams;
   /** The pick-up card is done: Not now, or Brief again handed it to the hand-off card. */
   onPickUpDone?: () => void;
+  /** Something dropped on Scout: the drop card, until one of its buttons is pressed. */
+  drop?: DropOffer;
+  /** The drop card was answered or cancelled. */
+  onDropDone?: () => void;
 }
 
 /** A question and how it was answered, once it is over. */
@@ -168,6 +173,8 @@ export function CompanionBubble({
   seeing,
   pickUp,
   onPickUpDone,
+  drop,
+  onDropDone,
 }: CompanionBubbleProps) {
   const bridge = useHostBridge();
   const [draft, setDraft] = useState('');
@@ -197,6 +204,14 @@ export function CompanionBubble({
   const [spokenReply, setSpokenReply] = useState(false);
   // The question was spoken: the bubble shows what it heard, so a mishearing is visible.
   const [askedAloud, setAskedAloud] = useState(false);
+
+  // A new drop opens its card again; a button or Cancel closes it.
+  const [openDrop, setOpenDrop] = useState(drop);
+  const [lastDrop, setLastDrop] = useState(drop);
+  if (drop !== lastDrop) {
+    setLastDrop(drop);
+    setOpenDrop(drop);
+  }
 
   // A new capture brings every chip back: removing is per question, not forever.
   const [lastSnapshot, setLastSnapshot] = useState(snapshot);
@@ -399,7 +414,12 @@ export function CompanionBubble({
    * Asks one question, with what the companion can see, and keeps the last answer above.
    * A spoken question may cut in on an answer still running: the engine stops that turn.
    */
-  const submit = (text: string, context: ContextSnapshot | undefined, asSpoken = false): void => {
+  const submit = (
+    text: string,
+    context: ContextSnapshot | undefined,
+    asSpoken = false,
+    withDrop = false,
+  ): void => {
     if (question !== null && (reply.state === 'done' || reply.state === 'failed')) {
       const answered = { question, answer: reply.text, failed: reply.state === 'failed' };
       setPast((current) => [...current, answered]);
@@ -422,6 +442,8 @@ export function CompanionBubble({
         text,
         ...(context !== undefined ? { snapshot: context } : {}),
         ...(asSpoken ? { spoken: true } : {}),
+        // Only a button on the drop card sends the dropped item, never a spoken ask.
+        ...(withDrop ? { drop: true } : {}),
       })
       .then(({ turnId }) => {
         mine.current ??= turnId;
@@ -536,9 +558,28 @@ export function CompanionBubble({
     void bridge.approveTool?.(confirm.approvalId, decision);
     setConfirm(null);
   };
+  const closeDrop = (): void => {
+    setOpenDrop(undefined);
+    onDropDone?.();
+  };
   const handoffCard = (
     <>
       {pickUp !== undefined && <PickUpCard pickUp={pickUp} onDone={() => onPickUpDone?.()} />}
+      {openDrop !== undefined && (
+        <DropCard
+          offer={openDrop}
+          onCancel={closeDrop}
+          onAsk={(text) => {
+            closeDrop();
+            submit(
+              text,
+              snapshot === undefined ? undefined : without(snapshot, removed),
+              false,
+              true,
+            );
+          }}
+        />
+      )}
       {confirm !== null && (
         <ConnectorConfirmCard key={confirm.approvalId} confirm={confirm} onAnswer={answerConfirm} />
       )}

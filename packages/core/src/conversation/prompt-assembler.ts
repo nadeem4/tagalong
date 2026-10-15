@@ -31,6 +31,7 @@ export const CONTEXT_LABELS = {
   screenshot: 'Screenshot',
   windows: 'Open windows',
   displays: 'Displays',
+  dropped: 'Dropped on you',
 } as const;
 
 /**
@@ -149,6 +150,8 @@ function imagesToAttach(snapshot: ContextSnapshot, settings: Settings): BrainCon
     images.push({ type: 'image', mime: image.mime, base64: image.base64 });
   };
 
+  // What the person handed over leads: it is what the question is about.
+  if (snapshot.dropped?.image) add(snapshot.dropped.image);
   if (snapshot.screenshot) add(snapshot.screenshot);
   // The composite leads the displays: it is the map, and a reader makes sense of one
   // screen faster having already seen where that screen sits.
@@ -225,9 +228,12 @@ function attachToLastUserMessage(
   messages.push({ role: 'user', content: [...leading, ...trailing] });
 }
 
-/** Selection, page, window, screenshot, then everything else that is open. */
+/** What was dropped on Scout, then selection, page, window, screenshot, then the rest. */
 function contextBlock(snapshot: ContextSnapshot, settings: Settings): string {
   const sections: string[] = [];
+
+  if (snapshot.dropped)
+    sections.push(section(CONTEXT_LABELS.dropped, droppedText(snapshot.dropped)));
 
   if (snapshot.selection) {
     sections.push(
@@ -265,6 +271,31 @@ function contextBlock(snapshot: ContextSnapshot, settings: Settings): string {
   }
 
   return sections.length > 0 ? ['--- Screen context ---', ...sections].join('\n\n') : '';
+}
+
+/**
+ * The one thing the person dropped on Scout, said for what it is. A file Tagalong did not
+ * read is named as unread, so Scout hands it on by its path rather than guessing at it.
+ */
+function droppedText(dropped: NonNullable<ContextSnapshot['dropped']>): string {
+  const text = dropped.text === undefined ? '' : truncate(dropped.text, MAX_SELECTION_CHARS);
+  const where = [dropped.name, dropped.path === undefined ? '' : `(${dropped.path})`]
+    .filter((part) => part !== undefined && part.length > 0)
+    .join(' ');
+  switch (dropped.kind) {
+    case 'text':
+      return `Text:\n${text}`;
+    case 'link':
+      return `A link: ${text}`;
+    case 'image':
+      return `An image: ${where}, attached alongside this message.`;
+    case 'file': {
+      const size = dropped.size === undefined ? '' : `, ${dropped.size} bytes`;
+      return dropped.text === undefined
+        ? `A file: ${where}${size}. Not read by Tagalong; an expert can open it at that path.`
+        : `A file: ${where}${size}. Its contents:\n${text}`;
+    }
+  }
 }
 
 /**

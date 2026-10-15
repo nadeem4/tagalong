@@ -3,8 +3,9 @@ import type { DockMood } from '@tagalong/ui';
 /**
  * What the companion on the dock is doing, kept apart from its rendering so it is tested
  * in plain Node. Seeing wins while a capture is fresh; then working, while the companion
- * answers or an expert has a task; then a wince or a cheer, for a few seconds; then done,
- * until the person clicks to look; then dozing, while the person is away.
+ * answers or an expert has a task; then Seeing again while something is held over the pet
+ * to drop on it; then a wince or a cheer, for a few seconds; then done, until the person
+ * clicks to look; then dozing, while the person is away.
  */
 export interface DockState {
   seeing: boolean;
@@ -15,6 +16,8 @@ export interface DockState {
   away: boolean;
   /** A short reaction from `pet.mood`, until `reacted` clears it. */
   reaction: 'wince' | 'cheer' | null;
+  /** A file, a link or text is held over the pet, not yet dropped. */
+  dropHover: boolean;
 }
 
 export const IDLE_DOCK: DockState = {
@@ -24,6 +27,7 @@ export const IDLE_DOCK: DockState = {
   done: false,
   away: false,
   reaction: null,
+  dropHover: false,
 };
 
 /** How long a wince or a cheer stays on the face. */
@@ -31,7 +35,7 @@ export const REACTION_MS = 4_000;
 
 /**
  * The slice of an event the dock reads: engine notifications, plus its own (seeing, seen,
- * looked, reacted) and main's presence.away and presence.back.
+ * looked, reacted, dropHover, dropLeave) and main's presence.away and presence.back.
  */
 export interface DockEvent {
   type: string;
@@ -55,6 +59,11 @@ export function nextDock(state: DockState, event: DockEvent): DockState {
       return { ...state, seeing: false };
     case 'looked':
       return { ...state, done: false };
+    // Something held over the pet; the drop itself ends it with dropLeave too.
+    case 'dropHover':
+      return state.dropHover ? state : { ...state, dropHover: true };
+    case 'dropLeave':
+      return state.dropHover ? { ...state, dropHover: false } : state;
     case 'presence.away':
       return state.away ? state : { ...state, away: true };
     case 'presence.back':
@@ -90,6 +99,7 @@ export function nextDock(state: DockState, event: DockEvent): DockState {
 export function dockMood(state: DockState): DockMood {
   if (state.seeing) return 'listening';
   if (state.turns.size > 0 || state.handoffs.size > 0) return 'working';
+  if (state.dropHover) return 'listening';
   if (state.reaction !== null) return state.reaction;
   if (state.done) return 'done';
   return state.away ? 'dozing' : 'idle';

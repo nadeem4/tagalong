@@ -24,6 +24,7 @@ export type { SightBarProps, SightProblem } from './sight-bar';
 
 export { ChatPanel } from './chat-panel';
 export { CompanionBubble, GreetingLine } from './companion-bubble';
+export type { DropOffer } from './drop-card';
 export { DockPet } from './dock-pet';
 export type { DockPetProps } from './dock-pet';
 export type { DockMood } from './office/sprites/expressions';
