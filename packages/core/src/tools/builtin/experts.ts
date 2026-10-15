@@ -26,7 +26,13 @@ export interface ExpertToolDeps {
    * Shows the brief to the person, who confirms it with a project folder; the answer then
    * comes back on its own, outside this turn.
    */
-  propose(params: { expertId: string; petId: string; brief: Brief }): { proposalId: string };
+  propose(params: {
+    expertId: string;
+    petId: string;
+    brief: Brief;
+    /** One follow-up step, on the same card, that runs after the first one finishes well. */
+    then?: { expertId: string; ask: string };
+  }): { proposalId: string };
   /**
    * Starts the expert at once, read-only, with web search and no project: only for the expert
    * a saved routine's card allowed, on that routine's own turn.
@@ -56,7 +62,11 @@ function definition(experts: readonly Expert[]): BrainTool {
       'its own, so do not wait for it or guess it.\n' +
       'task_kind is a short label for the kind of task, such as fix-code or summarise; the ' +
       'expert who took that kind before takes it again. Leave expert_id out to use that ' +
-      `expert, or name one to choose.\nExperts:\n${list}`,
+      'expert, or name one to choose.\n' +
+      'then is one optional follow-up step for a different expert, such as a reviewer ' +
+      'checking a change: it runs after the first one finishes, in the same project, with ' +
+      'its answer. Use it only when the user asks for the work to be checked or passed on.\n' +
+      `Experts:\n${list}`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -65,6 +75,16 @@ function definition(experts: readonly Expert[]): BrainTool {
         expert_id: { type: 'string', description: 'One of the ids above.' },
         files: { type: 'array', items: { type: 'string' } },
         good_answer: { type: 'string', description: 'What a good answer looks like.' },
+        then: {
+          type: 'object',
+          description: 'Optional follow-up step for a different expert.',
+          properties: {
+            expert_id: { type: 'string', description: 'One of the ids above.' },
+            ask: { type: 'string', description: 'What the second expert should do.' },
+          },
+          required: ['expert_id', 'ask'],
+          additionalProperties: false,
+        },
       },
       required: ['ask', 'task_kind'],
       additionalProperties: false,
@@ -78,6 +98,7 @@ interface Input {
   expert_id?: string;
   files?: string[];
   good_answer?: string;
+  then?: { expert_id: string; ask: string };
 }
 
 function parse(input: unknown): Input | string {
@@ -89,6 +110,14 @@ function parse(input: unknown): Input | string {
   const files = value['files'];
   if (files !== undefined && !(Array.isArray(files) && files.every((f) => typeof f === 'string'))) {
     return 'files must be a list of paths.';
+  }
+  const then = value['then'];
+  if (then !== undefined) {
+    const step = (typeof then === 'object' && then !== null ? then : {}) as Record<string, unknown>;
+    const ask = step['ask'];
+    if (typeof step['expert_id'] !== 'string' || typeof ask !== 'string' || ask.trim() === '') {
+      return 'then needs an expert_id and an ask.';
+    }
   }
   return value as unknown as Input;
 }
@@ -137,8 +166,29 @@ export function handToExpertTool(deps: ExpertToolDeps, experts: readonly Expert[
       });
     }
 
+    let then: { expert: Expert; ask: string } | undefined;
+    if (parsed.then !== undefined) {
+      const nextId = parsed.then.expert_id;
+      const next = available.find((e) => e.id === nextId);
+      if (next === undefined) {
+        return Promise.resolve({
+          content: `There is no expert '${nextId}' switched on for the next step. Choose one of: ${ids}.`,
+          isError: true,
+        });
+      }
+      if (next.id === expert.id) {
+        return Promise.resolve({
+          content: `The next step needs a different expert than ${expert.name}.`,
+          isError: true,
+        });
+      }
+      then = { expert: next, ask: parsed.then.ask };
+    }
+
     const routine = ctx.routine;
+    // A chain always shows the card: its second step is never pre-approved.
     if (
+      then === undefined &&
       routine?.expertId === expert.id &&
       deps.startReadOnly !== undefined &&
       !preApprovedUsed.has(routine)
@@ -172,7 +222,12 @@ export function handToExpertTool(deps: ExpertToolDeps, experts: readonly Expert[
 
     const brief = briefFrom(parsed, ctx);
     try {
-      deps.propose({ expertId: expert.id, petId: ctx.pet.id, brief });
+      deps.propose({
+        expertId: expert.id,
+        petId: ctx.pet.id,
+        brief,
+        ...(then === undefined ? {} : { then: { expertId: then.expert.id, ask: then.ask } }),
+      });
     } catch (error) {
       return Promise.resolve({
         content: `The brief for ${expert.name} could not be shown: ${(error as Error).message}`,
@@ -182,7 +237,8 @@ export function handToExpertTool(deps: ExpertToolDeps, experts: readonly Expert[
     deps.routes.remember(parsed.task_kind, expert.id, 'companion');
     return Promise.resolve({
       content:
-        `The brief for ${expert.name} is in front of the user to check, with the project to ` +
+        `The brief for ${expert.name}${then === undefined ? '' : `, then ${then.expert.name},`} ` +
+        'is in front of the user to check, with the project to ' +
         'work in. Tell them in one line to check it and press Send; the answer arrives on its own.',
     });
   });

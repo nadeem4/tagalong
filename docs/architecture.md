@@ -447,6 +447,14 @@ sends it: `handoffs.confirm { proposalId, folder, canEdit, brief? }` starts it i
 the brief as they edited it) and remembers the folder; `handoffs.dismiss` drops it. Proposals do not
 survive a restart.
 
+**Two steps (a second opinion).** A proposal may carry one follow-up step, `then: { expertId,
+expertName, ask, canEdit }`, such as a Reviewer checking what a Coder changed. Never more than two
+steps, and step 2 must be a different expert that is switched on (`propose` refuses one that is
+missing or off). Both steps go on the one card and start on the one Send:
+`handoffs.confirm` takes `then?: { canEdit, ask? } | null`, where `null` means the person removed
+step 2 and leaving it out runs it as proposed (with step 2's own access, read-only by default for a
+Reviewer). Nothing in step 2 is started by the model later: it is part of the confirmed proposal.
+
 **Projects.** `ProjectFinder` (`projects/finder.ts`) guesses which project a task is about, on this
 computer only, reading folder names and never file contents. `suggest(windowTitle)` puts a project
 named in the window title first (editors write `file - folder - App`), then the projects confirmed
@@ -467,6 +475,18 @@ after `HANDOFF_TIMEOUT_MS` (30 minutes) is aborted and ends as `error`, "Claude 
 `handoffs.cancel` aborts a running one; shutdown cancels all of them and waits until each has written how it ended, so nothing
 writes to a closed database. `experts.test` runs the connector's `check()`.
 
+A two-step hand-off runs its steps in order. When step 1 ends `done`, `HandoffManager` writes step
+2's own `expert` Activity row and starts it in the same folder, with the brief `ask` + "What
+<step 1's expert> did:" + step 1's answer, and `files` set to step 1's `changedFiles` (left out when
+it changed nothing; step 2 still runs). Step 1's `handoff.finished` carries `next: { handoffId,
+expertId, expertName }` so the bubble follows the chain; it is sent before step 2 reports anything.
+If step 1 fails, times out or is stopped, step 2 never runs and there is no `next`; if step 2's
+expert was switched off meanwhile, or shutdown has begun, step 1 finishes alone. Stopping step 2
+stops only it. The 30-minute limit applies to each step. There is no new column: the two rows are
+ordinary `expert` rows, and step 2's brief carries step 1's answer. Step 2's brief goes through the
+same `connectorFor` as any other, so the log of what Scout saw has a "Sent to expert" row for each
+step.
+
 In fake mode (`TAGALONG_FAKE_PROVIDERS=1`) every expert is a `FakeConnector`, so a test or a demo
 never starts a real Claude Code. `EngineOptions.connectorFor` overrides the choice for tests.
 
@@ -474,7 +494,9 @@ never starts a real Claude Code. `EngineOptions.connectorFor` overrides the choi
 (`tools/builtin/experts.ts`). It builds the brief from the model's `ask`, `files` and `good_answer`
 plus what the turn's snapshot says the user was looking at (app, window title, selection), proposes
 the hand-off through `HandoffManager`, and tells the model to ask the user to check it and press
-Send; the answer arrives on its own. The expert
+Send; the answer arrives on its own. Its optional `then: { expert_id, ask }` adds the follow-up step;
+an unknown, switched-off or same expert is an error the model can fix. A chain always shows the card,
+even on a routine's turn for the expert the routine allowed. The expert
 is chosen in this order: one the user chose for that `task_kind`, the one the model named, the one
 remembered for that kind, then the only expert switched on; otherwise the tool asks the model to name
 one. `RouteMemory` (`experts/routes.ts`, table `expert_routes`, migration 9) remembers task kind to
@@ -1166,9 +1188,11 @@ on, the model list, `savePet`) and the settings form as a slot.
 **Experts tab.** `ExpertsPanel` (`home/experts-panel.tsx`) lists the experts and adds or edits one:
 name, good at, standing instructions, three switches (`role="switch"`): may edit files by default,
 may search the web, and on or off, and an optional command under Advanced. **Add expert** first
-shows a template picker (`TEMPLATES`: Coder, Debugger, Designer, Researcher, Blank, styled like New
-routine's), and each template is only a pre-filled form: Coder may edit, Researcher may search the
-web, the others read only, and every one's instructions show in full and can be changed. Editing
+shows a template picker (`TEMPLATES`: Coder, Debugger, Designer, Researcher, Reviewer, Blank, styled
+like New routine's), and each template is only a pre-filled form: Coder may edit, Researcher may
+search the web, the others read only, and every one's instructions show in full and can be changed.
+Reviewer is the usual second step of a two-step hand-off: its instructions say to read the files the
+brief names and check the change for bugs, edge cases, weak tests and unclear code. Editing
 an existing expert opens the form with no picker. There is no default project folder. Each row shows **Reads only**
 or **Can edit** and **On** or **Off** as labels, and says it asks which project for each task; Delete
 sits apart from Save. **Save and test** saves through `saveExpert` (`experts.upsert`) and then runs
@@ -1899,6 +1923,14 @@ above a **Message** box. It is the same component, so it is the same conversatio
   bubble up with focus for a proposal, and without focus for a finished hand-off; only when the
   pets are hidden does a finished hand-off become a Windows notification instead. The folder dialog
   takes focus and hides the bubble, so main shows it again after the dialog closes.
+  A proposal with `then` shows both steps on the one card ("Hand to Coder, then Reviewer"): one
+  Project row, then **1. Coder** and **2. Reviewer**, each with its own Access and Edit brief, and
+  **Remove step 2** (Send then passes `then: null`). The working card reads "Coder is on it (1 of
+  2)"; step 1's `handoff.finished` with `next` keeps its answer and switches to "Reviewer is
+  checking (2 of 2)" without speaking; the last step's finish shows both answers ("Coder changed
+  `date.ts`" and its answer, then "Reviewer says" and its answer) and `onSay` speaks once. If step 1
+  fails or is stopped, the card says "Reviewer did not start." A step that hands on raises no
+  Windows notification (`handoffNotice` returns null for it); the last step's does.
 - **Attached to the pet.** `panelPosition` puts the window right against the pet (no gap) and
   reports which side it is on; main sends that as `panelSideEvent`, and the bubble draws a speech
   tail on the side facing the pet, so it reads as the pet speaking. It moves with the pet when the

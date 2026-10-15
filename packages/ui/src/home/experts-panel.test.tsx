@@ -150,7 +150,7 @@ describe('ExpertsPanel', () => {
   it('starts Add expert with a choice of templates', async () => {
     renderPanel(createFakeHostBridge());
     fireEvent.click(await screen.findByRole('button', { name: 'Add expert' }));
-    for (const name of ['Coder', 'Debugger', 'Designer', 'Researcher', 'Blank']) {
+    for (const name of ['Coder', 'Debugger', 'Designer', 'Researcher', 'Reviewer', 'Blank']) {
       expect(screen.getByRole('button', { name: new RegExp(`^${name}`) })).toBeInTheDocument();
     }
     expect(screen.queryByLabelText('Name')).toBeNull();
@@ -169,6 +169,26 @@ describe('ExpertsPanel', () => {
     );
     expect((screen.getByLabelText('Standing instructions') as HTMLTextAreaElement).value).toContain(
       'find the cause before suggesting anything',
+    );
+    expect(screen.getByRole('switch', { name: 'Let it edit files by default' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    expect(screen.getByRole('switch', { name: 'Let it search the web' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+  });
+
+  it('fills the form from the Reviewer template: reads only, told to review a diff', async () => {
+    renderPanel(createFakeHostBridge());
+    await startFrom('Reviewer');
+    expect(screen.getByLabelText('Name')).toHaveValue('Reviewer');
+    expect(screen.getByLabelText('Good at')).toHaveValue(
+      'Checking a change for bugs, missing tests and unclear code',
+    );
+    expect((screen.getByLabelText('Standing instructions') as HTMLTextAreaElement).value).toContain(
+      'the files the brief names',
     );
     expect(screen.getByRole('switch', { name: 'Let it edit files by default' })).toHaveAttribute(
       'aria-checked',

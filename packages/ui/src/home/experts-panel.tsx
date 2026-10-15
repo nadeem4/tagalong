@@ -115,6 +115,21 @@ const TEMPLATES: readonly Template[] = [
     },
   },
   {
+    id: 'reviewer',
+    name: 'Reviewer',
+    line: 'Checks a change for bugs, missing tests and unclear code. Reads only.',
+    draft: {
+      ...NEW_DRAFT,
+      name: 'Reviewer',
+      goodAt: 'Checking a change for bugs, missing tests and unclear code',
+      instructions:
+        'You review a change someone else just made. Read the files the brief names and what ' +
+        'it says was done, then check the change: bugs, edge cases, missing or weak tests, and ' +
+        'code that is hard to follow. Do not change files. Answer with what is wrong, most ' +
+        'important first, each with the file and line, or say plainly that it looks right.',
+    },
+  },
+  {
     id: 'blank',
     name: 'Blank',
     line: 'Claude Code with nothing filled in.',

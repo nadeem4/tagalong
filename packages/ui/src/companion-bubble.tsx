@@ -297,33 +297,58 @@ export function CompanionBubble({
             : current,
         );
         return;
-      case 'handoff.finished':
-        if (
-          handoff?.phase === 'working' &&
-          handoff.expertId === event.expertId &&
-          (handoff.handoffId === null || handoff.handoffId === event.handoffId)
-        ) {
-          onSay?.(
-            event.state === 'done'
-              ? `${handoff.expertName} has finished. ${event.text ?? ''}`.trim()
-              : `${handoff.expertName} stopped without finishing.`,
-          );
-        }
-        setHandoff((current) =>
+      case 'handoff.finished': {
+        const isThis = (
+          current: Handoff | null,
+        ): current is Extract<Handoff, { phase: 'working' }> =>
           current?.phase === 'working' &&
           current.expertId === event.expertId &&
-          (current.handoffId === null || current.handoffId === event.handoffId)
-            ? {
-                phase: 'finished',
-                expertName: current.expertName,
-                state: event.state,
-                text: event.text,
-                changedFiles: event.changedFiles,
-                error: event.error,
-              }
-            : current,
-        );
+          (current.handoffId === null || current.handoffId === event.handoffId);
+        // Step 1 of a chain hands on to step 2: no word yet, Scout speaks once at the end.
+        const next = event.state === 'done' ? event.next : undefined;
+        if (isThis(handoff) && next === undefined) {
+          const earlier = handoff.chain?.step === 2 ? handoff.chain.earlier : undefined;
+          onSay?.(
+            event.state !== 'done'
+              ? `${handoff.expertName} stopped without finishing.`
+              : earlier !== undefined
+                ? `${earlier.expertName} and ${handoff.expertName} have finished. ${event.text ?? ''}`.trim()
+                : `${handoff.expertName} has finished. ${event.text ?? ''}`.trim(),
+          );
+        }
+        setHandoff((current) => {
+          if (!isThis(current)) return current;
+          if (next !== undefined) {
+            return {
+              phase: 'working',
+              handoffId: next.handoffId,
+              expertId: next.expertId,
+              expertName: next.expertName,
+              project: current.project,
+              steps: [],
+              chain: {
+                step: 2,
+                earlier: {
+                  expertName: current.expertName,
+                  text: event.text,
+                  changedFiles: event.changedFiles,
+                },
+              },
+            };
+          }
+          return {
+            phase: 'finished',
+            expertName: current.expertName,
+            state: event.state,
+            text: event.text,
+            changedFiles: event.changedFiles,
+            error: event.error,
+            earlier: current.chain?.step === 2 ? current.chain.earlier : undefined,
+            skipped: current.chain?.step === 1 ? current.chain.nextName : undefined,
+          };
+        });
         return;
+      }
       default:
         return;
     }
@@ -662,9 +687,17 @@ export function CompanionBubble({
         <ProposalCard
           key={handoff.proposal.proposalId}
           proposal={handoff.proposal}
-          // A quick expert can finish before Send hears back its id: keep what it sent.
+          // A quick expert can finish before Send hears back its id: keep what it sent, or
+          // the chain's step 2 it already handed on to.
           onSent={(next) =>
-            setHandoff((current) => (current?.phase === 'finished' ? current : next))
+            setHandoff((current) =>
+              current?.phase === 'finished' ||
+              (current?.phase === 'working' &&
+                current.handoffId !== null &&
+                current.handoffId !== next.handoffId)
+                ? current
+                : next,
+            )
           }
           onCancelled={() => setHandoff(null)}
         />

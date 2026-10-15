@@ -103,6 +103,11 @@ The extension's public privacy policy, for the Chrome Web Store, is
   error and its progress steps pass through `hideSecrets` before they are kept in Activity or shown,
   so a key it read in a file is not repeated back. Its standing instructions pass through
   `hideSecrets` too, into a temp file that is removed when the run ends.
+- **Two-step hand-offs.** When one card names two steps (say a Coder, then a Reviewer), both are
+  confirmed by the one Send, with each step's access shown on the card; nothing starts later on its
+  own. Step 2 is briefed with step 1's answer (already scrubbed by `hideSecrets`) and the names of
+  the files it changed, works in the same project, and never runs if step 1 failed or was stopped.
+  Each step's brief is its own "Sent to expert" row in the log of what Scout saw.
 - **A monitor with an excluded window on it.** If a password manager is open and visible on your
   second screen, that whole screen is blanked in the full-view capture — not just when it is the
   window you are working in. The blanked screen is replaced with a flat panel reading BLOCKED, so

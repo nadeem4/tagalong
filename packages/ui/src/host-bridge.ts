@@ -182,6 +182,8 @@ export interface ConfirmHandoff {
   folder: string;
   canEdit: boolean;
   brief?: Brief;
+  /** A two-step hand-off: step 2's access and edited ask, or null when it was removed. */
+  then?: { canEdit: boolean; ask?: string } | null;
 }
 
 const HostBridgeContext = createContext<HostBridge | null>(null);
