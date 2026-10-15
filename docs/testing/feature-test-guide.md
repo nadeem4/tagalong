@@ -1070,6 +1070,8 @@ monitor.
    with its character count. No row shows the words you selected or the question.
 3. **Action:** ask Scout to hand a small task to an expert and press **Send** on the card.
    **Expected:** a **Sent to expert** row with the expert's name and the brief's size, not its text.
+4. **Action:** ask Scout "where's the Save button?" with Notepad in front. **Expected:** a **Read
+   element names** row naming `notepad` and its window title, without the word "Save".
 
 ### WS.3. Blind spots and pause write nothing revealing
 

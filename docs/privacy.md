@@ -438,13 +438,14 @@ Home has a page, **What Scout saw**, that lists each time Scout looked at your s
 something off this computer, newest first, grouped Today, Yesterday and Earlier. It is always on;
 there is no switch, because it holds no content and an off switch would weaken the audit.
 
-| Row                | Written when                                                                                                 | What the row keeps                                       |
-| ------------------ | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------- |
-| **Listed windows** | the window list is read (a tool, a routine, the hotkey's full view)                                          | how many windows                                         |
-| **Read text**      | one window's text is read (accessibility tree or OCR), or a hotkey ask arrives with a selection or page text | the app, the window title, how many characters           |
-| **Screenshot**     | a screenshot, a crop, a window picture, a frame from screen memory, or a watch's before-and-after crops      | the app and title when known, how many pictures          |
-| **Sent to AI**     | any call to Scout's provider: a turn, a summary, a watch check, keeping an eye on things, the launch line    | the provider and model, how many characters and pictures |
-| **Sent to expert** | a brief goes to an expert                                                                                    | the expert's name, how many characters                   |
+| Row                    | Written when                                                                                                 | What the row keeps                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| **Listed windows**     | the window list is read (a tool, a routine, the hotkey's full view)                                          | how many windows                                                 |
+| **Read text**          | one window's text is read (accessibility tree or OCR), or a hotkey ask arrives with a selection or page text | the app, the window title, how many characters                   |
+| **Screenshot**         | a screenshot, a crop, a window picture, a frame from screen memory, or a watch's before-and-after crops      | the app and title when known, how many pictures                  |
+| **Sent to AI**         | any call to Scout's provider: a turn, a summary, a watch check, keeping an eye on things, the launch line    | the provider and model, how many characters and pictures         |
+| **Sent to expert**     | a brief goes to an expert                                                                                    | the expert's name, how many characters                           |
+| **Read element names** | Scout points at a named button or field, so the window's element names are read to find it                   | the app and the window title; not the name asked or any it found |
 
 - **Metadata only.** The table behind it (`sight_log`) has no column for text, pixels or a brief, and
   a test checks that it never gains one. A window title passes through the same secret scrubber as

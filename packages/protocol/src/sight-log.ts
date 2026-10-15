@@ -16,6 +16,8 @@ export const SightKind = z.enum([
   'screenshot',
   'sent_to_ai',
   'sent_to_expert',
+  /** Pointing at something: the host read a window's element names to find the one asked. */
+  'read_element_names',
 ]);
 export type SightKind = z.infer<typeof SightKind>;
 

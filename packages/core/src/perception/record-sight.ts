@@ -97,6 +97,17 @@ export function recordSight<H extends PerceptionHost>(host: H, log: SightRecorde
       return result;
     };
   }
+  if (host.pointAt !== undefined) {
+    wrapped.pointAt = async (params) => {
+      const result = await host.pointAt!(params);
+      // Finding a named element reads the window's element names; a ring around a rectangle
+      // reads nothing. Only where it looked is kept, never the name asked or any it found.
+      if ('windowId' in params && result.blocked === undefined) {
+        record({ kind: 'read_element_names', ...named(params.windowId) });
+      }
+      return result;
+    };
+  }
   if (host.diff !== undefined) {
     wrapped.diff = async (params) => {
       const result = await host.diff!(params);

@@ -43,6 +43,7 @@ function fakeHost(overrides: Partial<PerceptionHost> = {}): PerceptionHost {
         windows: [],
         focusedWindow: { processName: 'Code.exe', title: 'main.ts - repo' },
       }),
+    pointAt: () => Promise.resolve({ shown: true, screen: 2 }),
     diff: () =>
       Promise.resolve({
         changeRatio: 0.2,
@@ -130,6 +131,32 @@ describe('recordSight', () => {
       ['screenshot', 'Code.exe', 1],
       ['listed_windows', undefined, undefined],
     ]);
+  });
+
+  it('logs pointing at a named element as reading element names, with the app and title only', async () => {
+    const host = recordSight(fakeHost(), sight);
+    await host.listWindows!();
+    const shown = await host.pointAt!({ windowId: 'w1', name: 'Export', label: 'here' });
+    expect(shown).toEqual({ shown: true, screen: 2 });
+    expect(rows()[0]).toMatchObject({
+      kind: 'read_element_names',
+      app: 'Code.exe',
+      title: 'main.ts - repo',
+    });
+    const stored = JSON.stringify(db.prepare('SELECT * FROM sight_log').all());
+    expect(stored).not.toContain('Export');
+    expect(stored).not.toContain('here');
+  });
+
+  it('logs no element read for a refused window or a ring around a rectangle', async () => {
+    const host = recordSight(
+      fakeHost({ pointAt: () => Promise.resolve({ shown: false, blocked: BLOCK }) }),
+      sight,
+    );
+    await host.pointAt!({ windowId: 'w1', name: 'Export' });
+    const rect = recordSight(fakeHost(), sight);
+    await rect.pointAt!({ displayId: 1, rect: { x: 0, y: 0, width: 5, height: 5 } });
+    expect(rows()).toEqual([]);
   });
 
   it('logs text a capture read, by its length', async () => {

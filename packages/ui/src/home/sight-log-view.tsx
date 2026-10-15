@@ -16,6 +16,10 @@ const KINDS: Record<SightKind, { label: string; icon: string }> = {
   },
   sent_to_ai: { label: 'Sent to AI', icon: 'M8 13V3M4 7l4-4 4 4' },
   sent_to_expert: { label: 'Sent to expert', icon: 'M2.5 8h10M9 4.5L12.5 8 9 11.5' },
+  read_element_names: {
+    label: 'Read element names',
+    icon: 'M2.5 2.5h11v11h-11zM5 5.5h6M5 8h6M5 10.5h3',
+  },
 };
 
 /** After these the log may have new rows. */
