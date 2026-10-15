@@ -6,7 +6,12 @@ import { migrate } from '../memory/db';
 import { ConversationStore } from '../memory/store';
 import type { Brief, Connector, ConnectorResult } from './connector';
 import { FakeConnector } from './fake';
-import { HANDOFF_TIMEOUT_MS, HandoffManager, type HandoffEvent } from './handoffs';
+import {
+  FOLLOW_UP_ANSWER_CHARS,
+  HANDOFF_TIMEOUT_MS,
+  HandoffManager,
+  type HandoffEvent,
+} from './handoffs';
 import { ExpertStore } from './store';
 
 let db: Database.Database;
@@ -640,6 +645,69 @@ describe('proposals', () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
       expect(finishes()).toEqual([{ handoffId, expertId: 'claude-code', state: 'stopped' }]);
       expect(checker.sent).toEqual([]);
+    });
+
+    it('never starts step 2 when step 1 runs past the time limit', async () => {
+      vi.useFakeTimers();
+      try {
+        const hanging: Connector = {
+          check: () => Promise.resolve({ ok: true }),
+          send: (_b, _p, signal) =>
+            new Promise((resolve) =>
+              signal?.addEventListener('abort', () => resolve({ ok: false, error: 'Cancelled.' })),
+            ),
+        };
+        const checker = new FakeConnector({ text: 'ok' });
+        const { handoffs } = chaining(hanging, checker);
+        const { proposalId } = handoffs.propose({
+          expertId: 'claude-code',
+          petId: 'scout',
+          brief,
+          then: { expertId: 'reviewer', ask: 'Check it' },
+        });
+        handoffs.confirm({ proposalId, folder: 'C:\\r', canEdit: true });
+        await vi.advanceTimersByTimeAsync(HANDOFF_TIMEOUT_MS);
+        await vi.advanceTimersByTimeAsync(HANDOFF_TIMEOUT_MS);
+        expect(finishes()).toEqual([expect.objectContaining({ state: 'error' })]);
+        expect(finishes()[0]?.next).toBeUndefined();
+        expect(checker.sent).toEqual([]);
+        expect(activity.list({}).entries).toHaveLength(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps step 2’s brief bounded: a long answer from step 1 is cut', async () => {
+      const long = 'x'.repeat(FOLLOW_UP_ANSWER_CHARS * 3);
+      const checker = new FakeConnector({ text: 'ok' });
+      const { handoffs } = chaining(new FakeConnector({ text: long }), checker);
+      const { proposalId } = handoffs.propose({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief,
+        then: { expertId: 'reviewer', ask: 'Check it' },
+      });
+      handoffs.confirm({ proposalId, folder: 'C:\\r', canEdit: true });
+      await vi.waitFor(() => expect(finishes()).toHaveLength(2));
+      const ask = checker.sent[0]?.ask ?? '';
+      expect(ask.startsWith('Check it\n\nWhat Claude Code did:\nxxx')).toBe(true);
+      expect(ask.length).toBeLessThan(FOLLOW_UP_ANSWER_CHARS + 100);
+      expect(ask.endsWith('…')).toBe(true);
+    });
+
+    it('hides a key in step 1’s answer before it reaches step 2', async () => {
+      const key = `sk-ant-${'a'.repeat(40)}`;
+      const checker = new FakeConnector({ text: 'ok' });
+      const { handoffs } = chaining(new FakeConnector({ text: `Used ${key}` }), checker);
+      const { proposalId } = handoffs.propose({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief,
+        then: { expertId: 'reviewer', ask: 'Check it' },
+      });
+      handoffs.confirm({ proposalId, folder: 'C:\\r', canEdit: true });
+      await vi.waitFor(() => expect(finishes()).toHaveLength(2));
+      expect(checker.sent[0]?.ask).not.toContain(key);
     });
 
     it('finishes step 1 alone when step 2’s expert was switched off meanwhile', async () => {

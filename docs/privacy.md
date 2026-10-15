@@ -105,8 +105,9 @@ The extension's public privacy policy, for the Chrome Web Store, is
   `hideSecrets` too, into a temp file that is removed when the run ends.
 - **Two-step hand-offs.** When one card names two steps (say a Coder, then a Reviewer), both are
   confirmed by the one Send, with each step's access shown on the card; nothing starts later on its
-  own. Step 2 is briefed with step 1's answer (already scrubbed by `hideSecrets`) and the names of
-  the files it changed, works in the same project, and never runs if step 1 failed or was stopped.
+  own. Step 2 is briefed with step 1's answer (already scrubbed by `hideSecrets`, and cut at 8,000
+  characters) and the names of the files it changed, works in the same project with its own access,
+  and never runs if step 1 failed, timed out or was stopped, or once Tagalong is closing.
   Each step's brief is its own "Sent to expert" row in the log of what Scout saw.
 - **A monitor with an excluded window on it.** If a password manager is open and visible on your
   second screen, that whole screen is blanked in the full-view capture — not just when it is the

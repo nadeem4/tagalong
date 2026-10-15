@@ -392,6 +392,55 @@ describe('a two-step hand-off', () => {
     );
   });
 
+  it('shows step 2 as stopped, with step 1’s answer kept, when Stop ends step 2', async () => {
+    const bridge = createFakeHostBridge();
+    const onSay = vi.fn();
+    render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" onSay={onSay} />
+      </HostBridgeProvider>,
+    );
+    proposeChain(bridge);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Send' })));
+    finishStep1(bridge);
+    act(() =>
+      bridge.emit({
+        type: 'handoff.finished',
+        handoffId: STEP2,
+        expertId: 'reviewer',
+        state: 'stopped',
+      }),
+    );
+    const stopped = screen.getByRole('region', { name: 'Reviewer was stopped' });
+    expect(stopped).toHaveTextContent('Coder changed date.ts');
+    expect(stopped).toHaveTextContent('The month was off by one.');
+    expect(stopped).not.toHaveTextContent('Reviewer says');
+    expect(onSay).toHaveBeenCalledExactlyOnceWith('Reviewer stopped without finishing.');
+  });
+
+  it('ignores step 1’s late Send id after step 2 has already finished', async () => {
+    const bridge = createFakeHostBridge();
+    let answer: (value: { handoffId: string }) => void = () => undefined;
+    bridge.confirmHandoff = () => new Promise((resolve) => (answer = resolve));
+    renderBubble(bridge);
+    proposeChain(bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    finishStep1(bridge);
+    act(() =>
+      bridge.emit({
+        type: 'handoff.finished',
+        handoffId: STEP2,
+        expertId: 'reviewer',
+        state: 'done',
+        text: 'The fix is right.',
+      }),
+    );
+    await act(async () => answer({ handoffId: 'handoff-1' }));
+    expect(screen.getByRole('region', { name: 'Reviewer finished' })).toHaveTextContent(
+      'The fix is right.',
+    );
+  });
+
   it('says step 2 never ran when step 1 failed', async () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge);

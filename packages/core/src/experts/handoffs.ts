@@ -16,6 +16,15 @@ import type { UsageEntry } from '../usage/usage-log';
 /** How long a hand-off may run before it is stopped and marked failed. */
 export const HANDOFF_TIMEOUT_MS = 30 * 60 * 1000;
 
+/** How much of step 1's answer goes into step 2's brief, so a long answer cannot flood it. */
+export const FOLLOW_UP_ANSWER_CHARS = 8_000;
+
+function clip(text: string): string {
+  return text.length <= FOLLOW_UP_ANSWER_CHARS
+    ? text
+    : `${text.slice(0, FOLLOW_UP_ANSWER_CHARS - 1)}…`;
+}
+
 export type HandoffEvent =
   | { method: 'handoff.proposed'; params: HandoffProposedParams }
   | { method: 'handoff.progress'; params: { handoffId: string; expertId: string; step: string } }
@@ -272,7 +281,7 @@ export class HandoffManager {
       connection: { ...stored.connection, folder: first.connection.folder, canEdit: then.canEdit },
     };
     const brief: Brief = {
-      ask: `${then.ask}\n\nWhat ${first.name} did:\n${result.text}`,
+      ask: `${then.ask}\n\nWhat ${first.name} did:\n${clip(result.text)}`,
       ...(result.changedFiles.length > 0 ? { files: result.changedFiles } : {}),
     };
     const { handoffId, launch } = this.#prepare(expert, petId, brief, false);

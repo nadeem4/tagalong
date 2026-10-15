@@ -477,7 +477,7 @@ writes to a closed database. `experts.test` runs the connector's `check()`.
 
 A two-step hand-off runs its steps in order. When step 1 ends `done`, `HandoffManager` writes step
 2's own `expert` Activity row and starts it in the same folder, with the brief `ask` + "What
-<step 1's expert> did:" + step 1's answer, and `files` set to step 1's `changedFiles` (left out when
+<step 1's expert> did:" + step 1's answer (cut at `FOLLOW_UP_ANSWER_CHARS`, 8,000 characters), and `files` set to step 1's `changedFiles` (left out when
 it changed nothing; step 2 still runs). Step 1's `handoff.finished` carries `next: { handoffId,
 expertId, expertName }` so the bubble follows the chain; it is sent before step 2 reports anything.
 If step 1 fails, times out or is stopped, step 2 never runs and there is no `next`; if step 2's
