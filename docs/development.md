@@ -206,7 +206,8 @@ jobs:
 
 - **`changes`** (Linux, seconds). Asks `dorny/paths-filter` whether anything outside `docs/` that is
   not Markdown changed. The role files in `packages/core/roles/*.md` count as code, because they
-  compile into core. When nothing counts, the other two jobs are skipped.
+  compile into core. When nothing counts, the other two jobs are skipped. If `changes` itself
+  fails, `build` runs anyway rather than skipping.
 - **`build`** (Linux). Install, lint, format check, typecheck (`tsc -b` and the test project), and
   the unit tests with coverage and the floors below.
 - **`e2e`** (Windows). Starts only after `build` passes. Runs the unit tests that skip themselves off
@@ -220,7 +221,8 @@ here: the workflow would never start, the required checks would never report, an
 would wait forever. Docs-only changes also skip the format check, so run `pnpm format:check` locally
 before pushing Markdown.
 
-A newer push to a pull request cancels the run still going for the older one. Runs on `main` finish.
+A newer push to a pull request cancels the run still going for the older one. Every push to `main`
+runs in its own concurrency group, so none is cancelled or dropped from the queue.
 
 A unit test that only works on Windows uses `it.runIf(process.platform === 'win32')` (or
 `describe.skipIf`), and its file joins the "Windows-only unit tests" step in `ci.yml`, so it still
