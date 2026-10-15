@@ -14,6 +14,8 @@ export const ClaudeCodeConnection = z.object({
   folder: z.string().min(1).optional(),
   /** False keeps it to reading and searching. */
   canEdit: z.boolean().default(false),
+  /** True also lets it search and fetch the web. Off unless the person turns it on. */
+  canSearchWeb: z.boolean().default(false),
   /** Defaults to `claude` on the PATH. */
   command: z.string().min(1).optional(),
 });
@@ -27,6 +29,8 @@ export const Expert = z.object({
   /** What the companion reads when it picks an expert for a task. */
   goodAt: z.string().max(500).default(''),
   enabled: z.boolean().default(true),
+  /** Standing instructions: what the expert is told on every task, added to its own prompt. */
+  instructions: z.string().max(4000).default(''),
   connection: ExpertConnection,
 });
 export type Expert = z.infer<typeof Expert>;

@@ -400,7 +400,11 @@ Two connectors exist so far:
 --verbose` in the expert's folder and writes the brief to stdin, so a long brief needs no quoting
   and hits no command-line limit. Read-only is the default: `--permission-mode dontAsk` with only
   `Read`, `Glob` and `Grep` allowed, so anything else is refused without a prompt. An expert that may
-  edit runs with `acceptEdits` and adds `Edit` and `Write`. Every run is sealed: `--tools` names
+  edit runs with `acceptEdits` and adds `Edit` and `Write`; one with `canSearchWeb` adds `WebSearch`
+  and `WebFetch` to the same lists. Standing instructions (`instructions`), when not empty, pass
+  through `hideSecrets` into a temp file (`%TEMP%\tagalong-instructions-*\instructions.md`) given
+  as `--append-system-prompt-file`, removed when the run ends; a file, not the inline flag, because
+  the `claude.cmd` shim runs under cmd.exe, where a multi-line argument does not survive. Every run is sealed: `--tools` names
   exactly those built-in tools, so no other tool exists in the run; `--strict-mcp-config` with no
   `--mcp-config` loads none of the person's MCP servers, and `--disallowedTools mcp__*` backs it up;
   `--setting-sources user` skips the project's and folder's `.claude/settings.json` and
@@ -421,9 +425,11 @@ Each connector also has `check()`, which says whether the expert can be reached 
 anything: Claude Code's runs `claude --version`.
 
 **Storage.** `ExpertStore` (`experts/store.ts`) keeps one JSON row per expert in the `experts` table
-(migration 8), in the order they were added. An expert is `{ id, name, goodAt, enabled, connection }`
-(`packages/protocol/src/experts.ts`); the only connection so far is `{ type: 'claude-code', folder?,
-canEdit = false, command? }`. `folder` is no longer a setting: each hand-off names its own project
+(migration 8), in the order they were added. An expert is `{ id, name, goodAt, enabled,
+instructions = '', connection }` (`packages/protocol/src/experts.ts`; `instructions` holds at most
+4000 characters); the only connection so far is `{ type: 'claude-code', folder?, canEdit = false,
+canSearchWeb = false, command? }`. Both new fields have defaults, so rows saved before them still
+parse with no migration. `defaultConnectorFor` (`engine.ts`) passes them to the connector. `folder` is no longer a setting: each hand-off names its own project
 and the running hand-off carries it there. An old expert's saved folder still parses and is ignored. Nothing secret is stored: Claude Code signs itself in, and keys for
 later connectors go to the host's keychain.
 
@@ -1055,8 +1061,12 @@ on, the model list, `savePet`) and the settings form as a slot.
   [The Settings window](#the-settings-window).
 
 **Experts tab.** `ExpertsPanel` (`home/experts-panel.tsx`) lists the experts and adds or edits one:
-name, good at, two switches (`role="switch"`): may edit files by default, and on or off, and an
-optional command under Advanced. There is no default project folder. Each row shows **Reads only**
+name, good at, standing instructions, three switches (`role="switch"`): may edit files by default,
+may search the web, and on or off, and an optional command under Advanced. **Add expert** first
+shows a template picker (`TEMPLATES`: Coder, Debugger, Designer, Researcher, Blank, styled like New
+routine's), and each template is only a pre-filled form: Coder may edit, Researcher may search the
+web, the others read only, and every one's instructions show in full and can be changed. Editing
+an existing expert opens the form with no picker. There is no default project folder. Each row shows **Reads only**
 or **Can edit** and **On** or **Off** as labels, and says it asks which project for each task; Delete
 sits apart from Save. **Save and test** saves through `saveExpert` (`experts.upsert`) and then runs
 `testExpert` (`experts.test`), so a missing shows at once while the expert stays saved. A new expert's id is its name in

@@ -9,7 +9,8 @@ const expert = (id: string, name: string, goodAt = '', enabled = true): Expert =
   name,
   goodAt,
   enabled,
-  connection: { type: 'claude-code', folder: 'C:\\r', canEdit: false },
+  instructions: '',
+  connection: { type: 'claude-code', folder: 'C:\\r', canEdit: false, canSearchWeb: false },
 });
 
 const CLAUDE = expert('claude-code', 'Claude Code', 'Code changes in this repo');

@@ -269,12 +269,15 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 - **Overview**: whether Scout is ready and what it thinks with, your experts, and the latest
   activity.
 - **Scout**: how Scout thinks, a provider and a model. **Save** applies from the next question.
-- **Experts**: the tools Scout hands work to. Choose **Add expert**, give it a name and say what it
-  is good at. Claude Code is the first kind; it must be installed and signed in on this computer,
-  and Welcome adds it for you when it is. It only reads and searches unless you switch on **Let it
-  edit files by default** or allow edits when you send a task. **Save and test** checks that Claude
-  Code starts, which costs nothing. There is no default project folder: each task picks its
-  project, and you confirm before anything is sent.
+- **Experts**: the tools Scout hands work to. **Add expert** starts from a template (**Coder**,
+  **Debugger**, **Designer**, **Researcher**) or **Blank**, which fills in the name, what it is good
+  at, its **Standing instructions** (what it is told on every task, shown in full) and its switches;
+  change any of it before you save. Claude Code is the first kind; it must be installed and signed
+  in on this computer, and Welcome adds it for you when it is. It only reads and searches unless you
+  switch on **Let it edit files by default** (Coder starts with it on) or allow edits when you send
+  a task, and it searches the web only when **Let it search the web** is on (Researcher starts with
+  it on). **Save and test** checks that Claude Code starts, which costs nothing. There is no default
+  project folder: each task picks its project, and you confirm before anything is sent.
 - **Routines**: things Scout does for you on its own, such as new papers every weekday at 8.
   - **New routine** starts from a template (**Morning papers**, **Today's calendar**, **Reviews
     waiting on GitHub**, **End-of-day summary**) or **Blank**. Pick **When** (every day, weekdays,

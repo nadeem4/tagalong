@@ -266,6 +266,23 @@ _Not the default configuration._
 _Fake provider:_ the same flow runs with a scripted expert that "read the brief and has nothing to
 change".
 
+### E.2. Add a Debugger from its template
+
+1. **Setup:** Claude Code installed and signed in.
+2. **Action:** Home → Experts → **Add expert**. **Expected:** a picker with **Coder**, **Debugger**,
+   **Designer**, **Researcher** and **Blank**, each with one line saying what it does.
+3. **Action:** pick **Debugger**. **Expected:** the form is filled in: Name **Debugger**, Good at
+   "Finding why something breaks, reading logs and stack traces", **Standing instructions** shown in
+   full (find the cause before suggesting anything, do not change files), **Let it edit files by
+   default** Off and **Let it search the web** Off. Every field can be changed.
+4. **Action:** **Save and test**. **Expected:** "Saved. Debugger is ready." and the list shows
+   Debugger, **Reads only**, **On**. Opening it again shows the form with its instructions and no
+   picker.
+5. **Action:** ask Scout why a failing test breaks and **Send** the hand-off to Debugger.
+   **Expected:** the answer names the cause and the evidence (file and line) and no file changes.
+6. **Action:** add a **Researcher** the same way. **Expected:** **Let it search the web** starts On;
+   a hand-off to it can search the web, and still edits nothing.
+
 ## Settings
 
 ### S.1. How Scout thinks shows the real brain and sign-in

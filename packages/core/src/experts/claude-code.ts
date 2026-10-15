@@ -1,10 +1,11 @@
 import { SECRET_FILES } from '@tagalong/protocol';
 import { spawn as nodeSpawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import crossSpawn from 'cross-spawn';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
+import { hideSecrets } from '../privacy/secrets';
 import {
   CANCELLED,
   renderBrief,
@@ -33,6 +34,10 @@ export interface ClaudeCodeOptions {
   folder?: string;
   /** False (the default) keeps it to reading and searching; true also lets it edit files there. */
   canEdit?: boolean;
+  /** True also lets it search and fetch the web. Still sealed: no MCP, no hooks. */
+  canSearchWeb?: boolean;
+  /** Standing instructions, appended to Claude Code's own system prompt on every run. */
+  instructions?: string;
   command?: string;
   spawn?: SpawnFn;
   folderExists?: (folder: string) => boolean;
@@ -117,7 +122,35 @@ export class ClaudeCodeConnector implements Connector {
       : this.options.folder;
     if (folder === undefined) return { ok: false, error: 'No project folder was chosen.' };
     const canEdit = !research && this.options.canEdit === true;
-    const tools = [...(research ? WEB_TOOLS : READ_TOOLS), ...(canEdit ? EDIT_TOOLS : [])];
+    const web = !research && this.options.canSearchWeb === true;
+    const tools = [
+      ...(research ? WEB_TOOLS : READ_TOOLS),
+      ...(web ? WEB_TOOLS : []),
+      ...(canEdit ? EDIT_TOOLS : []),
+    ];
+    // Standing instructions go in a file: the claude.cmd shim runs under cmd.exe, where a
+    // multi-line argument does not survive. Removed once the run ends.
+    const instructions = this.options.instructions?.trim() ?? '';
+    const promptDir =
+      instructions === '' ? undefined : mkdtempSync(join(tmpdir(), 'tagalong-instructions-'));
+    const promptFile = promptDir && join(promptDir, 'instructions.md');
+    if (promptFile) writeFileSync(promptFile, hideSecrets(instructions), 'utf8');
+    try {
+      return await this.run(brief, onProgress, folder, canEdit, tools, promptFile, signal);
+    } finally {
+      if (promptDir) rmSync(promptDir, { recursive: true, force: true });
+    }
+  }
+
+  private async run(
+    brief: Brief,
+    onProgress: (step: string) => void,
+    folder: string,
+    canEdit: boolean,
+    tools: readonly string[],
+    promptFile: string | undefined,
+    signal: AbortSignal | undefined,
+  ): Promise<ConnectorResult> {
     const args = [
       '-p',
       '--output-format',
@@ -125,6 +158,7 @@ export class ClaudeCodeConnector implements Connector {
       '--verbose',
       '--permission-mode',
       canEdit ? 'acceptEdits' : 'dontAsk',
+      ...(promptFile ? ['--append-system-prompt-file', promptFile] : []),
       // Sealed: only these built-in tools exist in the run; no MCP servers (strict, and no
       // --mcp-config); no project or local settings, so a folder's .claude/settings.json
       // cannot add permissions or hooks; and no hooks at all, user ones included. Reusing the

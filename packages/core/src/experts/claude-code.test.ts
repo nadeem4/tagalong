@@ -1,5 +1,5 @@
 import { SECRET_FILES } from '@tagalong/protocol';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -139,6 +139,53 @@ describe('ClaudeCodeConnector', () => {
     expect(args).toContain('Edit');
     expect(args).toContain('Write');
     expect(args[args.indexOf('--tools') + 1]).toBe('Read,Glob,Grep,Edit,Write');
+  });
+
+  it('hands standing instructions over as a file, with secrets hidden, and removes it after', async () => {
+    const seen: { path: string; text: string }[] = [];
+    const { spawn: base, calls } = fakeSpawn([result('ok')]);
+    const spawn: SpawnFn = (command, args, options) => {
+      const path = args[args.indexOf('--append-system-prompt-file') + 1] ?? '';
+      seen.push({ path, text: readFileSync(path, 'utf8') });
+      return base(command, args, options);
+    };
+    const key = 'sk-ant-abcdefghijklmnopqrstuvwxyz0123';
+    await new ClaudeCodeConnector({
+      folder: 'C:\\r',
+      instructions: `Find the cause first.\nNever paste ${key}.`,
+      spawn,
+    }).send({ ask: 'Why does it crash?' }, () => {});
+
+    const args = calls[0]?.args ?? [];
+    expect(args).toContain('--append-system-prompt-file');
+    expect(seen[0]?.text).toBe('Find the cause first.\nNever paste [hidden: API key].');
+    expect(existsSync(seen[0]?.path ?? '')).toBe(false);
+    expect(calls[0]?.stdin).toBe('Why does it crash?');
+  });
+
+  it('adds no prompt file when there are no standing instructions', async () => {
+    const { spawn, calls } = fakeSpawn([result('ok')]);
+    await new ClaudeCodeConnector({ folder: 'C:\\r', instructions: '  ', spawn }).send(
+      { ask: 'x' },
+      () => {},
+    );
+    expect(calls[0]?.args).not.toContain('--append-system-prompt-file');
+  });
+
+  it('may search and fetch the web when the expert is allowed to, still sealed', async () => {
+    const { spawn, calls } = fakeSpawn([result('ok')]);
+    await new ClaudeCodeConnector({ folder: 'C:\\r', canSearchWeb: true, spawn }).send(
+      { ask: 'x' },
+      () => {},
+    );
+    const args = calls[0]?.args ?? [];
+    expect(args[args.indexOf('--tools') + 1]).toBe('Read,Glob,Grep,WebSearch,WebFetch');
+    expect(
+      args.slice(args.indexOf('--allowedTools') + 1, args.indexOf('--disallowedTools')),
+    ).toEqual(['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch']);
+    expect(args).toContain('--strict-mcp-config');
+    expect(args).toContain('Read(**/.env)');
+    expect(args[args.indexOf('--permission-mode') + 1]).toBe('dontAsk');
   });
 
   it('uses the command it was given', async () => {
