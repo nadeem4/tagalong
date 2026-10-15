@@ -270,7 +270,7 @@ change works at once.
 ## Home: one window for everything
 
 Right-click the tray icon and choose **Open Tagalong**. The tray has only four items: **Open
-Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in seven pages:
+Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in eight pages:
 
 - **Overview**: whether Scout is ready and what it thinks with, your experts, and the latest
   activity.
@@ -318,13 +318,15 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
     **Cancel**.
 - **Activity**: every answer, every hand-off, every call to an app and every routine run, newest
   first. Click one to read it.
+- **What Scout saw**: every time Scout looked at your screen or sent something to an AI or an
+  expert, as metadata only, grouped by day. Delete a row, or **Delete all**.
 - **Settings**, in seven sections. Press ⓘ beside a setting for the longer story.
   - **How Scout thinks**: Scout's real brain, and whether your Claude Code sign-in works (checked
     locally with `claude auth status`). Without Claude Code you pick a service and paste its key,
     and saving moves Scout to it.
   - **You**: what Scout calls you. Empty means no name.
-  - **Privacy**: the hello when Tagalong opens, keeping an eye on things, screen memory, and what
-    Scout never looks at.
+  - **Privacy**: the hello when Tagalong opens, keeping an eye on things, screen memory, how many
+    days the record of what Scout saw is kept, and what Scout never looks at.
   - **Voice**: **Scout talks** (on by default), the voice (George or Fable) with **▶ Preview**, the
     speed, the **Talk to Scout** key and the microphone it listens on.
   - **Shortcuts**: the ask, pause and stop-speaking keys.
@@ -411,6 +413,9 @@ clicks or types.
   leaves your computer, and Claude Code is told not to open secret files.
 - Screenshots are not written to disk. Screen memory and watches live in memory only and are thrown
   away when you pause sight or quit.
+- **Home → What Scout saw** lists every look (windows listed, text read, screenshots) and every send
+  to an AI or an expert: the app and window, where it went and how much, never the content. Kept 7
+  days (1 to 30 in Settings → Privacy); delete one row or all.
 - What you ask goes only to the provider Scout runs on. There is no Tagalong server.
 - Scout's voice is made on your computer. With an ElevenLabs key and voice, only the words Scout
   says are sent to ElevenLabs, never your screen or your questions.

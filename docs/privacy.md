@@ -432,6 +432,37 @@ and sent to the pet's small check model — or, for a text-only model, the last 
 window you were watching. Every watch shows a **Watching** chip with **Stop**, and ends on its own
 after its timeout or its check limit.
 
+## What Scout saw: the log of its own looking
+
+Home has a page, **What Scout saw**, that lists each time Scout looked at your screen or sent
+something off this computer, newest first, grouped Today, Yesterday and Earlier. It is always on;
+there is no switch, because it holds no content and an off switch would weaken the audit.
+
+| Row                    | Written when                                                                                                 | What the row keeps                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| **Listed windows**     | the window list is read (a tool, a routine, the hotkey's full view)                                          | how many windows                                                 |
+| **Read text**          | one window's text is read (accessibility tree or OCR), or a hotkey ask arrives with a selection or page text | the app, the window title, how many characters                   |
+| **Screenshot**         | a screenshot, a crop, a window picture, a frame from screen memory, or a watch's before-and-after crops      | the app and title when known, how many pictures                  |
+| **Sent to AI**         | any call to Scout's provider: a turn, a summary, a watch check, keeping an eye on things, the launch line    | the provider and model, how many characters and pictures         |
+| **Sent to expert**     | a brief goes to an expert                                                                                    | the expert's name, how many characters                           |
+| **Read element names** | Scout points at a named button or field, so the window's element names are read to find it                   | the app and the window title; not the name asked or any it found |
+
+- **Metadata only.** The table behind it (`sight_log`) has no column for text, pixels or a brief, and
+  a test checks that it never gains one. A window title passes through the same secret scrubber as
+  everything sent; the title of a blind spot or a window on your exclusion list is not kept at all,
+  only its app.
+- **What makes no row.** A read the blind spots or your exclusions refused, and anything while sight is
+  paused, because nothing was read. A watch comparing frames on this computer with no picture sent. The
+  window titles keeping an eye on things follows every five seconds. The key check in Welcome, which
+  sends no screen. Voice: audio never leaves the computer and is never stored, so there is no "heard"
+  row; what you say to Scout becomes a question, and its text reaching the provider is a **Sent to
+  AI** row.
+- **Kept 7 days** by default, 1 to 30 in **Settings → Privacy → Keep the record of what Scout saw**.
+  Older rows are deleted as new ones are written and when Tagalong starts.
+- **Deleting.** Each row has a delete button; **Delete all** asks first. Deleting removes the record,
+  not what was already sent, and does not touch your conversations.
+- The Chrome extension cannot read or delete the log.
+
 ## Pausing sight
 
 `Ctrl+Shift+Alt+P` turns every kind of looking off, and pressing it again turns it back on. The

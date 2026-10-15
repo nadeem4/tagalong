@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
-import { BLIND_SPOTS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
+import {
+  BLIND_SPOTS,
+  MAX_SIGHT_LOG_DAYS,
+  MIN_SIGHT_LOG_DAYS,
+  SETTINGS_DEFAULTS,
+} from '@tagalong/protocol';
 import type { Settings } from '@tagalong/protocol';
 import { keyCaps } from '../settings-form';
-import { Info, Section, Tip } from './section';
+import { Info, Section, Tip, useInvalid } from './section';
 
 /**
  * Seeing and Always listening act at once, through main, so they are no form fields: each
@@ -80,6 +85,45 @@ function LiveSwitches() {
         </button>
       </div>
       <hr className="tg-divider" />
+    </>
+  );
+}
+
+/**
+ * How long Home's What Scout saw keeps its rows. Always on, so there is no switch: the log
+ * holds no pixels and no text, only what was looked at and where it went.
+ */
+function SightLogDays({ days }: { days: number }) {
+  const invalid = useInvalid('sightLogDays');
+  return (
+    <>
+      <div className="tg-setting">
+        <div className="tg-setting__text">
+          <div className="tg-titlerow">
+            <h3 className="tg-sub">Keep the record of what Scout saw</h3>
+            <Info tip="sightLog" label="About the record of what Scout saw" />
+          </div>
+          <p className="tg-help">Days, from 1 to 30. Home shows it under What Scout saw.</p>
+          {invalid.message}
+        </div>
+        <input
+          name="sightLogDays"
+          type="number"
+          min={MIN_SIGHT_LOG_DAYS}
+          max={MAX_SIGHT_LOG_DAYS}
+          defaultValue={days}
+          aria-label="Days to keep the record of what Scout saw"
+          style={{ width: 72 }}
+          {...invalid.props}
+        />
+      </div>
+      <Tip tip="sightLog">
+        Each time Scout lists your windows, reads text, takes a screenshot, or sends something to an
+        AI or an expert, Home notes the kind, the app and window, where it went and how much. Never
+        the picture, the text or the brief. Blind spots and your exclusions are noted by app only.
+        Older entries are deleted, and deleting one does not take back what was already sent. Always
+        on. Kept 7 days by default.
+      </Tip>
     </>
   );
 }
@@ -223,6 +267,8 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
         away, blind spots are never recorded, and a red dot shows on Scout while it records. Off by
         default.
       </Tip>
+      <hr className="tg-divider" />
+      <SightLogDays days={settings.sightLog.days} />
       <hr className="tg-divider" />
       <div className="tg-titlerow">
         <h3 className="tg-sub">Scout never looks at</h3>

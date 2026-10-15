@@ -751,6 +751,7 @@ that takes `ipcMain.handle` and what it reads as arguments, so it is unit tested
 | `experts.ts`     | Activity, the Experts tab, the hand-off card, project search  |
 | `connections.ts` | connected apps and the answer to a change Scout asked to make |
 | `routines.ts`    | Home's Routines page and the routine card, including its Edit |
+| `sight-log.ts`   | Home's What Scout saw: list, delete one, delete all           |
 | `settings.ts`    | the settings view, saving settings and keys, model lists      |
 | `voice.ts`       | speak; listen, mic frames and stop, to the voice process      |
 
@@ -1064,7 +1065,7 @@ The renderer entry wraps `HomeView` (`packages/ui/src/home/home-view.tsx`)
 in the preload's `HostBridge` and hands it a `HomeHost` (the companion's id, the providers it can think
 on, the model list, `savePet`) and the settings form as a slot.
 
-`HomeView` is a navy side menu, with the companion's pixel character and name, and seven pages:
+`HomeView` is a navy side menu, with the companion's pixel character and name, and eight pages:
 
 - **Overview**: the companion (its state, the provider and model it thinks with), the experts (on or
   off, read-only or allowed to edit) and the three most recent activity entries, each with a button
@@ -1082,6 +1083,8 @@ on, the model list, `savePet`) and the settings form as a slot.
   and a card already saved is not opened again on the way back.
 - **Connections**: `ConnectionsPanel`; see [Connected apps](#connected-apps-mcp).
 - **Activity**: `ActivityView`; see [Activity](#activity).
+- **What Scout saw**: `SightLogView`; see [What Scout saw](#what-scout-saw). The days it keeps come
+  from `HomeHost.setup().sightLogDays`.
 - **Settings**: the host's settings form (`SettingsPage embedded`), described under
   [The Settings window](#the-settings-window).
 
@@ -1113,9 +1116,11 @@ flowchart LR
     Routines
     Connections
     Activity
+    Saw["What Scout saw"]
     Settings
   end
   Engine[(Engine)] -- "pets.list, experts.list, activity.list" --> Home
+  Saw -- "sightLog.list, sightLog.delete, sightLog.clear" --> Engine
   Scout -- "pets.upsert" --> Engine
   Experts -- "experts.upsert, experts.delete, experts.test" --> Engine
   Routines -- "routines.save, routines.setEnabled, routines.runNow" --> Engine
@@ -1148,6 +1153,37 @@ first; `next` is the id to pass as `before` for the page after. An `expert` row 
 `HandoffManager` through `expertStarted` and `expertFinished`, not from a notification: it keeps the
 expert's name at the time, the brief as text, the answer and the files changed. Meetings are not recorded: they do not
 exist yet.
+
+### What Scout saw
+
+`memory/sight-log.ts` keeps Home's record of Scout's own looking in `sight_log(id, kind, at, app,
+title, provider_id, model, expert_name, windows, chars, images, source)` (migration 15). Metadata
+only: there is no column for text, pixels or a brief. `kind` is `listed_windows`, `read_text`,
+`screenshot`, `sent_to_ai`, `sent_to_expert` or `read_element_names` (`SightKind` in `protocol/src/sight-log.ts`); the
+column has no CHECK, so a new kind is one enum entry and no migration. `SightLog.record` hides secrets
+in a title with `hideSecrets` and drops the title of a window `findCaptureBlock` refuses (blind spots
+plus the person's exclusions), keeping the app. It prunes rows older than `sightLog.days` (default 7,
+1 to 30) on every insert, and the engine prunes once at boot.
+
+Nothing records at a call site. Three wrappers in `engine.ts`, the same pattern as `guardBrain`, cover
+every read path by construction:
+
+| Wrapper                                                       | Wraps                                                                          | Writes                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sightedHosts` / `recordSight` (`perception/record-sight.ts`) | each host `hosts()` returns, once per session (a `WeakMap`, so identity holds) | `listWindows` (count), `readText` (chars, `uia`/`ocr`), `capture` (pictures, else text read, else window count; an identity check writes nothing), `captureWindow`, `captureRegion`, `recall`, `diff` with pictures, `pointAt` at a named element (`read_element_names`: app and title only, never the name asked; a rectangle writes nothing). A `blocked` or empty result writes nothing. The last window list maps a `windowId` to its app and title. |
+| `recordBrain` (`providers/record-brain.ts`)                   | each provider, inside `resolve`, outside `guardBrain`                          | one `sent_to_ai` row per `complete`, when it ends (failed or not): provider, model, characters and pictures sent, tool results handed back mid-call included                                                                                                                                                                                                                                                                                             |
+| `recordExpertSends` (`experts/record-expert.ts`)              | `connectorFor`                                                                 | one `sent_to_expert` row per `send`: the expert's name and `renderBrief(brief).length`; `check` writes nothing                                                                                                                                                                                                                                                                                                                                           |
+
+The hotkey ask is the one read no host method sees: `ask` calls `recordSnapshot` on the snapshot it
+arrives with, before the browser host fills it in (that fill is a `capture` and logs itself). The
+watch and screen-memory tools reach `diff`, `recall`, `captureRegion` and `capture`, so they are
+covered with no code of their own. `providers.check` resolves through the guarded but unrecorded
+resolver, so a key check writes no row. A failed write is logged to the console and never fails the
+read. `sightLog.list { limit = 200 }` answers `{ entries }` newest first; `sightLog.delete { id }`
+answers `{ deleted }`; `sightLog.clear` answers `{ deleted: count }`. None is in `EXTENSION_METHODS`.
+Home's `SightLogView` (`packages/ui/src/home/sight-log-view.tsx`) reads them through the optional
+bridge methods `listSightLog`, `deleteSightLog` and `clearSightLog`, which the desktop wires in
+`main/ipc/sight-log.ts`.
 
 ### The Settings window
 

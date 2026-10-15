@@ -23,7 +23,10 @@ function tableNames(db: Database.Database): string[] {
     .sort();
 }
 
-describe('openDatabase', () => {
+// These open a real file in a fresh temp dir: the first loads the SQLite native addon and every
+// one runs all migrations with an fsync each. That takes ~30ms locally but has passed 5s on a
+// loaded Windows runner with on-access scanning, so the bounded work gets an explicit allowance.
+describe('openDatabase', { timeout: 20_000 }, () => {
   it('creates the database file inside the data dir', () => {
     const db = openDatabase(dataDir);
     try {
@@ -195,6 +198,25 @@ describe('migrate', () => {
       expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
 
       expect(tableNames(db)).not.toContain('notices');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('adds the log of what Scout saw in migration 15, and rerunning it changes nothing', () => {
+    const db = new Database(':memory:');
+    try {
+      migrate(db);
+      expect(LATEST_SCHEMA_VERSION).toBeGreaterThanOrEqual(15);
+      expect(tableNames(db)).toContain('sight_log');
+      db.prepare("INSERT INTO sight_log (id, kind, at) VALUES ('r1', 'screenshot', 'x')").run();
+
+      // Rolled back past 15, as a database restored from before it would be.
+      db.prepare('DELETE FROM schema_version WHERE version >= 15').run();
+      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+
+      const rows = db.prepare<[], { n: number }>('SELECT COUNT(*) AS n FROM sight_log').get();
+      expect(rows?.n).toBe(1);
     } finally {
       db.close();
     }

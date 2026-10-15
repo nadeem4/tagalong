@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './limits';
 import { EARS_IDS, MOUTH_IDS } from './voice';
+import { MAX_SIGHT_LOG_DAYS, MIN_SIGHT_LOG_DAYS, SIGHT_LOG_DEFAULT_DAYS } from './sight-log';
 
 /**
  * Engine settings that cross the wire. Secrets are deliberately absent: they live in
@@ -155,6 +156,11 @@ export const SETTINGS_DEFAULTS = {
    * without a click. Off means no snapshot at all, and switching it off deletes the one kept.
    */
   pickUp: true,
+  /**
+   * How many days the log of what Scout saw keeps its rows. Always on: it is metadata only,
+   * and an off switch would weaken the audit. Talk may only lower it.
+   */
+  sightLog: { days: SIGHT_LOG_DEFAULT_DAYS },
 } as const;
 
 /** The local voices Scout can speak in: two British male voices of the Kokoro model. */
@@ -359,6 +365,10 @@ const settingsFields = {
   listening: z.object({ always: z.boolean() }),
   /** Whether Scout keeps a snapshot of what you were in the middle of, to offer when you are back. */
   pickUp: z.boolean(),
+  /** How long the log of what Scout saw keeps its rows, in whole days. */
+  sightLog: z.object({
+    days: z.number().int().min(MIN_SIGHT_LOG_DAYS).max(MAX_SIGHT_LOG_DAYS),
+  }),
 };
 
 export const Settings = z.object({
@@ -397,6 +407,7 @@ export const Settings = z.object({
   userNameDeclined: settingsFields.userNameDeclined.default(SETTINGS_DEFAULTS.userNameDeclined),
   listening: settingsFields.listening.prefault({ ...SETTINGS_DEFAULTS.listening }),
   pickUp: settingsFields.pickUp.default(SETTINGS_DEFAULTS.pickUp),
+  sightLog: settingsFields.sightLog.prefault({ ...SETTINGS_DEFAULTS.sightLog }),
 });
 export type Settings = z.infer<typeof Settings>;
 

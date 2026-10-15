@@ -20,6 +20,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Memory](#memory)
 - [Screen memory](#screen-memory)
 - [Point, don't click](#point-dont-click)
+- [What Scout saw](#what-scout-saw)
 - [The Chrome extension](#the-chrome-extension)
 - [Installer](#installer)
 - [Not in this build](#not-in-this-build)
@@ -1049,6 +1050,46 @@ monitor.
    The pick-up is offered once.
 7. **Action:** switch the setting Off and save. **Expected:** the `pick_up` row is gone and no
    pick-up is ever offered. A password manager or `.env` window in front is never named.
+
+## What Scout saw
+
+### WS.1. The page, empty
+
+1. **Setup:** a fresh install (or **Delete all** first).
+2. **Action:** open Home. **Expected:** **What Scout saw** sits between **Activity** and
+   **Settings**. Open it: "Scout hasn't looked at anything yet." and "Kept 7 days. Deleting removes
+   this record, not what was already sent." No **Delete all** button.
+
+### WS.2. A look and a send are recorded, without their content
+
+1. **Action:** put Notepad with some text in front, press the ask hotkey, select a few words and ask
+   "what does this say?". Then ask "what's on my screen?".
+2. **Expected:** under **Today**, newest first: a **Screenshot** row naming `notepad` and its window
+   title with "1 picture", **Sent to AI** rows naming Scout's brain (for example "Your Claude
+   sign-in · Haiku") with character and picture counts, and a **Read text** row for the selection
+   with its character count. No row shows the words you selected or the question.
+3. **Action:** ask Scout to hand a small task to an expert and press **Send** on the card.
+   **Expected:** a **Sent to expert** row with the expert's name and the brief's size, not its text.
+4. **Action:** ask Scout "where's the Save button?" with Notepad in front. **Expected:** a **Read
+   element names** row naming `notepad` and its window title, without the word "Save".
+
+### WS.3. Blind spots and pause write nothing revealing
+
+1. **Action:** open a password manager (or add `*Payroll*` under exclusions and open a file with
+   that name), put it in front and ask Scout about it. **Expected:** any row for it shows the app
+   only, never the window title.
+2. **Action:** press `Ctrl+Shift+Alt+P` and ask "what's on my screen?". **Expected:** no new
+   **Screenshot** or **Read text** row while paused.
+
+### WS.4. Delete one, delete all, and the days kept
+
+1. **Action:** press × on one row. **Expected:** only that row goes.
+2. **Action:** press **Delete all**, then **Keep them**. **Expected:** nothing goes. Press **Delete
+   all**, then **Delete all for good**. **Expected:** the empty state; your conversations and
+   Activity are untouched.
+3. **Action:** Home → Settings → Privacy → **Keep the record of what Scout saw**: type 31 and Save.
+   **Expected:** Settings refuses it and says 1 to 30 days. Type 3, Save, and reopen What Scout saw.
+   **Expected:** "Kept 3 days."
 
 ## The Chrome extension
 

@@ -1,5 +1,7 @@
 import {
   MAX_ROLLING_MEMORY_MINUTES,
+  MAX_SIGHT_LOG_DAYS,
+  MIN_SIGHT_LOG_DAYS,
   MAX_USER_NAME_CHARS,
   MAX_VOICE_SPEED,
   MAX_WINDOW_TEXT_CHARS,
@@ -52,6 +54,8 @@ export interface SettingsFormValues {
   microphoneId?: string;
   mouth?: string;
   ears?: string;
+  /** How many days What Scout saw keeps. Absent leaves the setting alone. */
+  sightLogDays?: string;
 }
 
 /**
@@ -129,6 +133,19 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
     ...(values.keepAnEye !== undefined ? { keepAnEye: values.keepAnEye } : {}),
     ...(values.pickUp !== undefined ? { pickUp: values.pickUp } : {}),
     ...(values.userName !== undefined ? { userName: cleanUserName(values.userName) } : {}),
+    ...(values.sightLogDays !== undefined
+      ? {
+          sightLog: {
+            days: wholeNumber(
+              'sightLogDays',
+              values.sightLogDays,
+              MIN_SIGHT_LOG_DAYS,
+              MAX_SIGHT_LOG_DAYS,
+              `What Scout saw keeps between ${MIN_SIGHT_LOG_DAYS} and ${MAX_SIGHT_LOG_DAYS} days.`,
+            ),
+          },
+        }
+      : {}),
     ...(values.rollingMemoryMinutes !== undefined
       ? {
           rollingMemory: {

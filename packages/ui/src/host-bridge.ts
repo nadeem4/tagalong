@@ -16,6 +16,7 @@ import type {
   RoutineDraftInput,
   RoutineProposedParams,
   RoutineView,
+  SightLogEntry,
 } from '@tagalong/protocol';
 
 /**
@@ -137,6 +138,14 @@ export interface HostBridge {
   openPickUp?(itemId: string): Promise<void>;
   rebriefPickUp?(itemId: string): Promise<void>;
   dismissPickUp?(): Promise<void>;
+  /**
+   * Home's What Scout saw: each look and each send, newest first, as metadata. All
+   * optional: a host without Home never shows the page.
+   */
+  listSightLog?(): Promise<SightLogEntry[]>;
+  deleteSightLog?(id: string): Promise<boolean>;
+  /** Deletes the whole log; resolves to how many rows went. */
+  clearSightLog?(): Promise<number>;
 }
 
 export interface ConfirmHandoff {

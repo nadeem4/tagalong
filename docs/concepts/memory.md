@@ -87,3 +87,8 @@ Built in the desktop host (`apps/desktop/src/main/awareness/`), off by default (
 - A red dot shows on Scout while it records.
 - Scout reads it back with `recall_screen` and `what_changed` when you ask about something seen
   earlier or what changed.
+
+Screen memory is not the same as Home's **What Scout saw**. That is a record on disk (the
+`sight_log` table) of each look and each send, holding only the kind, the app and window, where it
+went and how much, never a picture or any text. Screen memory holds pictures, in RAM only. Deleting
+the record does not touch screen memory, and clearing screen memory does not delete the record.

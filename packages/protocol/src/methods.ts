@@ -84,6 +84,14 @@ import {
 } from './pick-up';
 import { Pet } from './pet';
 import { CaptureBlock, Settings, SettingsPatch } from './settings';
+import {
+  SightLogClearParams,
+  SightLogClearResult,
+  SightLogDeleteParams,
+  SightLogDeleteResult,
+  SightLogListParams,
+  SightLogListResult,
+} from './sight-log';
 
 /** What a host tells the engine it is able to perceive or play. */
 export const HostCapability = z.enum([
@@ -498,6 +506,10 @@ export const hostToCoreMethods = {
   'routines.dismiss': { params: RoutinesDismissParams, result: RoutinesDismissResult },
   'pickUp.rebrief': { params: PickUpRebriefParams, result: PickUpRebriefResult },
   'pickUp.dismiss': { params: PickUpDismissParams, result: PickUpDismissResult },
+  // What Scout saw. Not in EXTENSION_METHODS: only the desktop's Home reads or deletes it.
+  'sightLog.list': { params: SightLogListParams, result: SightLogListResult },
+  'sightLog.delete': { params: SightLogDeleteParams, result: SightLogDeleteResult },
+  'sightLog.clear': { params: SightLogClearParams, result: SightLogClearResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostMethods = {

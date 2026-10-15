@@ -11,6 +11,7 @@ import type {
   RoutineDraftInput,
   RoutineProposedParams,
   RoutineView,
+  SightLogEntry,
 } from '@tagalong/protocol';
 import type { AskInput, ConfirmHandoff, HostBridge, TurnEvent } from '../host-bridge';
 
@@ -27,6 +28,8 @@ export interface FakeHostBridge extends HostBridge {
   nextCapture: ContextSnapshot | null;
   /** Home's activity, newest first; a test pushes or edits entries, then emits an event. */
   activity: ActivityEntry[];
+  /** What Scout saw, newest first; delete and clear edit it. */
+  sightLog: SightLogEntry[];
   /** How many times the activity was listed. */
   activityReads: number;
   /** Home's experts, as saved; a test reads them back after a save. */
@@ -73,6 +76,8 @@ export function createFakeHostBridge(
     /** What adding answers; absent answers a connected connection with no tools. */
     addConnection?: (params: ConnectionsAddParams) => ConnectionState;
     routines?: RoutineView[];
+    /** What Scout saw, newest first. */
+    sightLog?: SightLogEntry[];
   } = {},
 ): FakeHostBridge {
   const handlers = new Set<(event: TurnEvent) => void>();
@@ -297,6 +302,20 @@ export function createFakeHostBridge(
     editRoutine(proposal) {
       editedRoutines.push(proposal);
       return Promise.resolve();
+    },
+    sightLog: [...(options.sightLog ?? [])],
+    listSightLog() {
+      return Promise.resolve([...fake.sightLog]);
+    },
+    deleteSightLog(id) {
+      const before = fake.sightLog.length;
+      fake.sightLog = fake.sightLog.filter((entry) => entry.id !== id);
+      return Promise.resolve(fake.sightLog.length < before);
+    },
+    clearSightLog() {
+      const deleted = fake.sightLog.length;
+      fake.sightLog = [];
+      return Promise.resolve(deleted);
     },
     emit(event) {
       // Copied first so a handler that unsubscribes mid-emit cannot skip its neighbours.
