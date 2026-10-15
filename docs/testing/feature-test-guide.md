@@ -657,7 +657,9 @@ voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APP
    sentences and the code is described, not read symbol by symbol. After about 300 words (about two
    minutes) it asks "Shall I go on?", and "go on" carries on from where it stopped. The spoken
    request reads only the selected paragraph. The stop key, ×, and the bars cut the reading off at
-   once. A typed "what is this?" afterwards is still spoken only in its short form (V.2). With
+   once. Typing a different question (not "go on", "yes", "continue" or "keep going") in reply to
+   "Shall I go on?" is answered as an ordinary typed question, in its short spoken form. A typed
+   "what is this?" afterwards is still spoken only in its short form (V.2). With
    Scout talks off, the reading shows in the bubble and nothing is spoken.
 
 ### V.8. Describe a chart

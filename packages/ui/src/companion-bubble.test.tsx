@@ -797,6 +797,33 @@ describe('CompanionBubble, talking to Scout', () => {
     expect(bridge.asks[1]).toMatchObject({ text: 'go on', spoken: true });
   });
 
+  it('keeps a typed question after "Shall I go on?" unspoken unless it says to go on', async () => {
+    const bridge = createFakeHostBridge();
+    const onSay = vi.fn();
+    const { mouth } = spokenMouth();
+    renderBubble(bridge, { onSay, mouth });
+    await act(async () => ask('read it aloud'));
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'turn-1',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      });
+      bridge.emit(done('turn-1', 'The first part. Shall I go on?'));
+    });
+    await act(async () => ask('what is my bank password field called?'));
+    expect(bridge.asks[1]).not.toHaveProperty('spoken');
+  });
+
+  it('does not show a typed read-aloud as something it heard', async () => {
+    const bridge = createFakeHostBridge();
+    const { mouth } = spokenMouth();
+    renderBubble(bridge, { mouth });
+    await act(async () => ask('read this to me'));
+    expect(screen.queryByText('You said:')).toBeNull();
+  });
+
   it('leaves a typed question unspoken, with no reply hint', async () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge, { talk: talk() });

@@ -1999,9 +1999,12 @@ flowchart LR
   warning that a word may be misread. `SPOKEN_MODE` carries the one exception to keeping it short,
   since it comes last in the system prompt and would otherwise cut the reading. A typed request is
   spoken whole too: `CompanionBubble.send` asks with `spoken: true` when the pure
-  `wantsReadAloud(text)` matches (read or say, with aloud, to me or out loud), so the answer goes
-  through `SpokenStream` and `QueueMouth.speak` instead of `onSay`, whose `toSpeakable` would cut it
-  to two sentences. Every 300-word part stays well under `MAX_OUTPUT_TOKENS` (2,048). With Scout
+  `wantsReadAloud(text)` matches (a request that starts with read or say and ends a few words later
+  in aloud, to me or out loud, so "read the logs and explain the error to me" does not), so the
+  answer goes through `SpokenStream` and `QueueMouth.speak` instead of `onSay`, whose `toSpeakable`
+  would cut it to two sentences. After a spoken answer ending "Shall I go on?", a typed reply is
+  spoken too only when `goesOn(text)` matches a bare "go on", "yes", "continue" or "keep going";
+  any other typed question is asked as typed. Every 300-word part stays well under `MAX_OUTPUT_TOKENS` (2,048). With Scout
   talks off the mouth says nothing and the reading is only in the bubble.
 - **Settings on the fly.** Main sends `IPC.settingsChangedEvent` with the saved settings to every
   window after each save; the panel reads the ask and talk keys, the microphone and the user's name
