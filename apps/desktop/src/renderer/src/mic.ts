@@ -44,7 +44,9 @@ export async function openMic(deviceId?: string): Promise<OpenMic> {
   } catch (error) {
     stream.getTracks().forEach((track) => track.stop());
     void context?.close();
-    throw error;
+    // The device itself opened: an audio failure (a worklet that would not load rejects with
+    // an AbortError) must never read as a microphone another app holds.
+    throw new Error(error instanceof Error ? error.message : String(error), { cause: error });
   }
   const audio = context;
 

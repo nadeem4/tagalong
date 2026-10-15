@@ -264,4 +264,10 @@ describe('micFailure', () => {
     expect(micFailure({ name: 'NotFoundError' })).toBe('no-mic');
     expect(micFailure(new Error('x'))).toBe('no-mic');
   });
+
+  it('reads a microphone another app holds as busy, not missing', () => {
+    expect(micFailure({ name: 'NotReadableError' })).toBe('busy');
+    expect(micFailure({ name: 'AbortError' })).toBe('busy');
+    expect(micFailure({ name: 'OverconstrainedError' })).toBe('no-mic');
+  });
 });
