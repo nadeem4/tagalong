@@ -481,10 +481,19 @@ describe('routines over rpc', () => {
     );
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
+    // The card carries the current voice, hotkeys and exclusions: the desktop's only.
+    const ext = await TestHost.connect(e.port);
+    await ext.call('hello', {
+      host: 'extension',
+      version: '0.0.0',
+      capabilities: ['selection', 'pageText', 'activeWindow'],
+      token: e.pairingToken,
+    });
     await host.call('ask', { petId: 'scout', input: { text: 'talk a bit slower' } });
     await vi.waitFor(() => expect(host.methods()).toContain('settings.proposed'), {
       timeout: 5000,
     });
+    expect(ext.methods()).not.toContain('settings.proposed');
     const card = host.notifications.find((n) => n.method === 'settings.proposed')?.params as {
       patch: { voice: { speed: number } };
     };

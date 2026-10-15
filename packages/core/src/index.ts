@@ -64,6 +64,7 @@ export {
   RECALL_SCREEN,
   WATCH_FOR,
   WHAT_CHANGED,
+  talkPatchProblem,
   ToolRegistry,
   toolsFor,
   type PerceptionToolsOptions,

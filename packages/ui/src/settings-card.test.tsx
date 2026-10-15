@@ -99,6 +99,17 @@ describe('the settings card', () => {
     expect(screen.getByRole('region', { name: 'Change these settings?' })).toBeInTheDocument();
   });
 
+  it('never claims it applied on a host that cannot apply a card', async () => {
+    const bridge = createFakeHostBridge();
+    Object.assign(bridge, { applySettings: undefined });
+    renderBubble(bridge);
+    act(() => bridge.emit(proposed()));
+    fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+    await flush();
+    expect(screen.getByRole('alert')).toHaveTextContent('Settings');
+    expect(screen.getByRole('region', { name: 'Change these settings?' })).toBeInTheDocument();
+  });
+
   it('ignores a card for another pet', () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge);

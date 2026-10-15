@@ -39,6 +39,7 @@ function setup({ engineUp = true, problem = null as string | null, folder = 'C:\
     configureRolling: vi.fn(),
     broadcast: vi.fn(),
     listeningOff: vi.fn(),
+    fromPanel: (event: unknown) => (event as { sender?: string }).sender === 'panel',
   };
   registerSettingsIpc(ipc.handle, deps);
   return { ...ipc, calls: engine.calls, secrets, settingsStore, deps };
@@ -106,34 +107,61 @@ describe('registerSettingsIpc: saveSettings', () => {
 });
 
 describe('registerSettingsIpc: applySettings', () => {
+  const PANEL = { sender: 'panel' };
+
+  it('refuses a card from any window but the bubble, and saves nothing', async () => {
+    const { invokeWith, calls, deps } = setup();
+    await expect(
+      invokeWith({ sender: 'office' }, IPC.applySettings, { userName: 'Sam' }),
+    ).rejects.toThrow('only from the bubble');
+    expect(calls).toEqual([]);
+    expect(deps.listeningOff).not.toHaveBeenCalled();
+  });
+
+  it('re-checks the patch against the settings now, never trusting the renderer', async () => {
+    const { invokeWith, calls } = setup();
+    await expect(
+      invokeWith(PANEL, IPC.applySettings, {
+        providerBaseUrls: { openrouter: 'https://evil.example' },
+      }),
+    ).rejects.toThrow();
+    expect(calls).toEqual([['settings.get', {}]]);
+  });
+
   it('saves a settings card through the engine, marked as by talk for the privacy log', async () => {
-    const { invoke, calls, deps } = setup();
+    const { invokeWith, calls, deps } = setup();
     const patch: SettingsPatch = { userName: 'Sam' };
-    await invoke(IPC.applySettings, patch);
-    expect(calls).toEqual([['settings.set', { patch, byTalk: true }]]);
+    await invokeWith(PANEL, IPC.applySettings, patch);
+    expect(calls).toEqual([
+      ['settings.get', {}],
+      ['settings.set', { patch, byTalk: true }],
+    ]);
     expect(deps.broadcast).toHaveBeenCalledWith(ENGINE_SETTINGS);
     expect(deps.listeningOff).not.toHaveBeenCalled();
   });
 
   it('switches Always listening off through its own path, and saves the rest', async () => {
-    const { invoke, calls, deps } = setup();
-    await invoke(IPC.applySettings, { listening: { always: false }, greeting: false });
+    const { invokeWith, calls, deps } = setup();
+    await invokeWith(PANEL, IPC.applySettings, { listening: { always: false }, greeting: false });
     expect(deps.listeningOff).toHaveBeenCalledTimes(1);
-    expect(calls).toEqual([['settings.set', { patch: { greeting: false }, byTalk: true }]]);
+    expect(calls).toEqual([
+      ['settings.get', {}],
+      ['settings.set', { patch: { greeting: false }, byTalk: true }],
+    ]);
   });
 
   it('never switches Always listening on', async () => {
-    const { invoke, calls, deps } = setup();
-    await expect(invoke(IPC.applySettings, { listening: { always: true } })).rejects.toThrow(
-      'Only you can switch Always listening on',
-    );
+    const { invokeWith, calls, deps } = setup();
+    await expect(
+      invokeWith(PANEL, IPC.applySettings, { listening: { always: true } }),
+    ).rejects.toThrow('Only you can switch Always listening on');
     expect(calls).toEqual([]);
     expect(deps.listeningOff).not.toHaveBeenCalled();
   });
 
   it('saves to the file with no engine', async () => {
-    const { invoke, settingsStore } = setup({ engineUp: false });
-    await invoke(IPC.applySettings, { userName: 'Sam' });
+    const { invokeWith, settingsStore } = setup({ engineUp: false });
+    await invokeWith(PANEL, IPC.applySettings, { userName: 'Sam' });
     expect(settingsStore.set).toHaveBeenCalledWith({ userName: 'Sam' });
   });
 });

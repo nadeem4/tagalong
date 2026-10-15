@@ -285,6 +285,65 @@ function refusal(setting: string): string {
   return `'${shown}' is not something I can change by talk. I can change: ${CHAT_SETTINGS.join(', ')}.`;
 }
 
+/** The settings `field` patches one key of; every other top-level setting goes `whole`. */
+const OBJECT_SETTINGS: ReadonlySet<string> = new Set([
+  'voice',
+  'hotkeys',
+  'listening',
+  'rollingMemory',
+  'sightLog',
+  'budget',
+  'wellbeing',
+]);
+
+const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+
+function changeProblem(name: string, value: unknown, settings: Settings): string | null {
+  const entry = Object.hasOwn(ALLOWED, name) ? ALLOWED[name] : undefined;
+  if (entry === undefined || name === 'captureExclusions.add') return refusal(name);
+  // The card holds the retention object; its shape is SettingsPatch's to check.
+  if (name === 'screenshotRetention') return null;
+  const parsed = entry.parse(value, settings);
+  if (typeof parsed !== 'string') return null;
+  return /^[a-z]/.test(parsed) ? `${entry.label} (${name}) ${parsed}` : parsed;
+}
+
+/**
+ * Why `patch` is not one a settings card could hold, or null when it is. The host runs it
+ * on Apply against the settings now, so a patch from the renderer can never reach a setting
+ * off the chat allowlist, change or wipe an object's other fields, remove a capture
+ * exclusion, raise the log's days or switch Always listening on. Loosening is allowed here:
+ * the person clicked Turn on.
+ */
+export function talkPatchProblem(settings: Settings, patch: SettingsPatch): string | null {
+  const now = settings as unknown as Record<string, unknown>;
+  for (const [top, value] of Object.entries(patch)) {
+    if (value === undefined || same(now[top], value)) continue;
+    if (top === 'captureExclusions') {
+      const next = value as Settings['captureExclusions'];
+      const { processNames, titlePatterns } = settings.captureExclusions;
+      const kept =
+        processNames.every((name) => next.processNames.includes(name)) &&
+        titlePatterns.every((pattern) => next.titlePatterns.includes(pattern));
+      if (!kept) return refusal('captureExclusions');
+      continue;
+    }
+    if (!OBJECT_SETTINGS.has(top)) {
+      const problem = changeProblem(top, value, settings);
+      if (problem !== null) return problem;
+      continue;
+    }
+    const before = now[top] as Record<string, unknown>;
+    const after = value as Record<string, unknown>;
+    for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+      if (same(before[key], after[key])) continue;
+      const problem = changeProblem(`${top}.${key}`, after[key], settings);
+      if (problem !== null) return problem;
+    }
+  }
+  return null;
+}
+
 const LOOSENING_ON_ROUTINE =
   "A routine can't ask to let me see, keep or spend more. Ask the person to change it " +
   'themselves, by talking to me or in Settings.';

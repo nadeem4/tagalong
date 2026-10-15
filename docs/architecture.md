@@ -1008,9 +1008,14 @@ keep or spend more (keep an eye on, screen memory on or longer, screenshots kept
 such a change is refused. Its description lists the current values, secrets scrubbed, so Scout can
 say "your voice speed is 0.95" without a read tool.
 
-Main brings the bubble up on `settings.proposed`. **Apply** on the card calls
+The engine sends `settings.proposed` to the desktop only, never the extension: the patch carries the
+current voice, hotkeys and exclusions. Main brings the bubble up on it. **Apply** on the card calls
 `HostBridge.applySettings(patch)`, which desktop maps to `IPC.applySettings`
-(`main/ipc/apply-settings.ts`): `listening` is taken out of the patch and switched off through
+(`main/ipc/apply-settings.ts`). Main accepts it only from the bubble's window, and never trusts the
+renderer's patch: `talkPatchProblem` (exported by core, beside the allowlist) checks it again
+against the settings now, and refuses it whole if it reaches a setting off the allowlist, changes or
+wipes another field of `voice` or `hotkeys`, removes an exclusion, raises the log's days or switches
+listening on. Then `listening` is taken out of the patch and switched off through
 `AlwaysListening.set(false)`, the same path as the bubble's switch, because saving the file alone
 would leave the microphone open; the rest goes through the `saveSettings` handler (rebinding hotkeys,
 reconfiguring rolling memory, broadcasting to open windows) with `settings.set { byTalk: true }`,

@@ -7,7 +7,13 @@ import { applySettings } from './apply-settings';
 function setup(on = true) {
   const listening = new AlwaysListening(on);
   const saved: SettingsPatch[] = [];
+  const now = {
+    ...SETTINGS_DEFAULTS,
+    listening: { always: on },
+    captureExclusions: { processNames: ['Signal.exe'], titlePatterns: [] },
+  } as Settings;
   const deps = {
+    current: () => Promise.resolve(now),
     listeningOff: vi.fn(() => listening.set(false)),
     save: vi.fn((patch: SettingsPatch) => {
       saved.push(patch);
@@ -47,6 +53,32 @@ describe('applySettings', () => {
       applySettings({ listening: { always: true }, userName: 'Sam' }, deps),
     ).rejects.toThrow('Only you can switch Always listening on');
     expect(listening.state.on).toBe(false);
+    expect(saved).toEqual([]);
+  });
+
+  it('re-checks the renderer’s patch: nothing off the chat allowlist is saved', async () => {
+    const refused: unknown[] = [
+      { providerBaseUrls: { openrouter: 'https://evil.example' }, userName: 'Sam' },
+      { captureExclusions: { processNames: [], titlePatterns: [] } },
+      { voice: { ...SETTINGS_DEFAULTS.voice, microphoneId: 'other-mic' } },
+      { sightLog: { days: SETTINGS_DEFAULTS.sightLog.days + 10 } },
+      { closedCleanly: false },
+    ];
+    for (const patch of refused) {
+      const { listening, saved, deps } = setup();
+      await expect(applySettings(patch, deps)).rejects.toThrow();
+      expect(saved).toEqual([]);
+      expect(deps.listeningOff).not.toHaveBeenCalled();
+      expect(listening.state.on).toBe(true);
+    }
+  });
+
+  it('does not switch listening off when the rest of the patch is refused', async () => {
+    const { listening, saved, deps } = setup();
+    await expect(
+      applySettings({ listening: { always: false }, enginePort: 1 }, deps),
+    ).rejects.toThrow();
+    expect(listening.state.on).toBe(true);
     expect(saved).toEqual([]);
   });
 

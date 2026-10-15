@@ -423,7 +423,13 @@ export class Engine {
       // Change settings by talking: the card only. The host saves it on Apply (settings.set).
       changeSettings: {
         get: () => settings.get(),
-        emit: (params) => live.server?.broadcast('settings.proposed', params),
+        // The desktop only: the patch carries the current voice, hotkeys and exclusions,
+        // and only the desktop bubble can apply a card.
+        emit: (params) => {
+          for (const session of live.server?.sessions() ?? []) {
+            if (session.host === 'desktop') session.notify('settings.proposed', params);
+          }
+        },
       },
       connections: {
         tools: () => connections.tools(),

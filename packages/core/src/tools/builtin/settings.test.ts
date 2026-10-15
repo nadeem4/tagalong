@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { SETTINGS_DEFAULTS, Settings, SettingsProposedParams } from '@tagalong/protocol';
+import {
+  SETTINGS_DEFAULTS,
+  Settings,
+  SettingsProposedParams,
+  type SettingsPatch,
+} from '@tagalong/protocol';
 import { FAKE_TURN_PET, fakeTurnTools } from '../fake-turn';
 import type { TurnRequest } from '../registry';
-import { CHANGE_SETTINGS, type SettingsToolDeps } from './settings';
+import { CHANGE_SETTINGS, talkPatchProblem, type SettingsToolDeps } from './settings';
 
 function deps(overrides: Partial<Settings> = {}) {
   const current = Settings.parse({ ...SETTINGS_DEFAULTS, ...overrides });
@@ -253,5 +258,83 @@ describe(CHANGE_SETTINGS, () => {
     expect(outcome.isError).toBeUndefined();
     expect(outcome.content).toContain('already');
     expect(d.emitted).toEqual([]);
+  });
+});
+
+describe('talkPatchProblem: main re-checks an applied card, never trusting the renderer', () => {
+  const current = Settings.parse({
+    ...SETTINGS_DEFAULTS,
+    voice: { ...SETTINGS_DEFAULTS.voice, microphoneId: 'mic-1', mouth: 'kokoro' },
+    captureExclusions: { processNames: ['Signal.exe'], titlePatterns: ['*bank*'] },
+    listening: { always: true },
+    sightLog: { days: 7 },
+  });
+
+  it('passes every card the tool itself builds', async () => {
+    const d = deps({
+      voice: current.voice,
+      captureExclusions: current.captureExclusions,
+      listening: current.listening,
+      sightLog: current.sightLog,
+    });
+    await change(d, [
+      { setting: 'voice.speed', value: 0.85 },
+      { setting: 'hotkeys.talk', value: 'CommandOrControl+Shift+T' },
+      { setting: 'listening.always', value: false },
+      { setting: 'captureExclusions.add', value: 'Teams.exe' },
+      { setting: 'sightLog.days', value: 3 },
+      { setting: 'keepAnEye', value: true },
+      { setting: 'screenshotRetention', value: 24 },
+      { setting: 'budget.dailyUsd', value: null },
+    ]);
+    expect(talkPatchProblem(current, d.emitted[0]!.patch)).toBeNull();
+  });
+
+  it('refuses settings off the allowlist, whatever the renderer sends', () => {
+    const refused: SettingsPatch[] = [
+      { providerBaseUrls: { ...current.providerBaseUrls, openrouter: 'https://evil.example' } },
+      { summarizer: { providerId: 'openrouter', model: 'x' } },
+      { enginePort: 1234 },
+      { defaultPetId: 'other' },
+      { closedCleanly: !current.closedCleanly },
+      { lastVersion: '9.9.9' },
+      { userNameDeclined: !current.userNameDeclined },
+      { onboarding: { done: !current.onboarding.done } },
+      { hiddenPets: ['scout'] },
+      { watch: { ...current.watch, maxChecks: 500 } },
+      { pageTextBudget: current.pageTextBudget + 1 },
+    ];
+    for (const patch of refused) {
+      expect(talkPatchProblem(current, patch), JSON.stringify(patch)).not.toBeNull();
+    }
+  });
+
+  it('refuses a voice object that changes or wipes a field off the allowlist', () => {
+    const { microphoneId: _mic, ...wiped } = current.voice;
+    expect(talkPatchProblem(current, { voice: wiped })).not.toBeNull();
+    expect(
+      talkPatchProblem(current, { voice: { ...current.voice, microphoneId: 'mic-2' } }),
+    ).not.toBeNull();
+    const { mouth: _mouth, ...noMouth } = current.voice;
+    expect(talkPatchProblem(current, { voice: noMouth })).not.toBeNull();
+    expect(talkPatchProblem(current, { voice: { ...current.voice, speed: 0.8 } })).toBeNull();
+  });
+
+  it('refuses removing a capture exclusion, raising the log, or switching listening on', () => {
+    expect(
+      talkPatchProblem(current, {
+        captureExclusions: { processNames: [], titlePatterns: ['*bank*'] },
+      }),
+    ).toContain('Settings');
+    expect(talkPatchProblem(current, { sightLog: { days: 30 } })).not.toBeNull();
+    const off = Settings.parse({ ...current, listening: { always: false } });
+    expect(talkPatchProblem(off, { listening: { always: true } })).toContain('Only you');
+  });
+
+  it('lets through a patch that changes nothing', () => {
+    expect(talkPatchProblem(current, {})).toBeNull();
+    expect(
+      talkPatchProblem(current, { voice: current.voice, enginePort: current.enginePort }),
+    ).toBeNull();
   });
 });

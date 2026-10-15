@@ -20,8 +20,12 @@ export function SettingsCard({
   const loosens = proposal.rows.some((row) => row.loosens);
 
   const apply = async (): Promise<void> => {
+    if (bridge.applySettings === undefined) {
+      setError('This window can’t apply settings. Change them in Settings instead.');
+      return;
+    }
     try {
-      await bridge.applySettings?.(proposal.patch);
+      await bridge.applySettings(proposal.patch);
       onDone();
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure));

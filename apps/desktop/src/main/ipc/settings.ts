@@ -31,6 +31,8 @@ export interface SettingsIpcDeps {
   broadcast: (settings: Settings) => void;
   /** Always listening's off path, the same as the bubble's switch (`IPC.setListening`). */
   listeningOff: () => void;
+  /** Whether the call came from the bubble's window: the only one with a settings card. */
+  fromPanel: (event: unknown) => boolean;
 }
 
 /** Settings, the keys, and the model lists. */
@@ -92,12 +94,17 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
   handle(IPC.saveSettings, (_event, patch: SettingsPatch) => save(patch, false));
 
   // Apply on Scout's settings card: a click only. Always listening goes its own off path.
-  handle(IPC.applySettings, (_event, patch: unknown) =>
-    applySettings(patch, {
+  // The patch is the renderer's, so it is checked again against the settings now.
+  handle(IPC.applySettings, (event, patch: unknown) => {
+    if (!deps.fromPanel(event)) {
+      return Promise.reject(new Error('A settings card is applied only from the bubble.'));
+    }
+    return applySettings(patch, {
+      current: readSettings,
       listeningOff: () => deps.listeningOff(),
       save: (rest) => save(rest, true),
-    }),
-  );
+    });
+  });
 
   handle(IPC.saveApiKey, async (_event, providerId: string, apiKey: string) => {
     const secrets = deps.secrets();

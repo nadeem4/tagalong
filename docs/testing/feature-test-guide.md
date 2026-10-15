@@ -1613,6 +1613,8 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    Ask for 3 days: a card.
 7. Ask "use ElevenLabs to speak" with no ElevenLabs key: the row says it needs a key in Settings.
 8. Ask "what's my voice speed?": Scout answers without a card.
+9. With the browser extension connected, ask for a change from the desktop bubble: the card shows
+   only in the desktop bubble, never in the extension's side panel.
 
 ## Not in this build
 

@@ -1064,6 +1064,7 @@ function registerIpc(): void {
     listeningOff: () => {
       required().listening.set(false);
     },
+    fromPanel: fromWindow(() => required().panel),
   });
   registerVoiceIpc(handle, {
     voice: () => required().voice,

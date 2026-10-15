@@ -147,7 +147,9 @@ it.
 - **What chat can never change.** API keys, logins, provider URLs, the model, the calendar link
   (it lives in the keychain), removing a capture exclusion, raising the log's days, and the app's
   own bookkeeping. Scout says these are changed only in Settings, never shows a card for them and
-  never repeats a key or a link. The tool has no way to read the keychain.
+  never repeats a key or a link. The tool has no way to read the keychain. On Apply the app checks
+  the card's changes again against this list, so a tampered card cannot reach anything else, and
+  only the bubble can apply one. The card goes to the desktop only, never the browser extension.
 - **Always listening.** Scout can switch it off through the card, never on: "Only you can switch
   that on". The Seeing switch and the pause key are not settings; Scout points you to them.
 - **Loosening always shows a marked card.** A change that lets Scout see, keep or spend more (keep
