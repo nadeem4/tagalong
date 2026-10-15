@@ -26,6 +26,7 @@ describe('ui package surface', () => {
         'SpeechQueue',
         'QueueMouth',
         'toSpeakable',
+        'wantsReadAloud',
         'PushToTalk',
         'ListenController',
       ].sort(),

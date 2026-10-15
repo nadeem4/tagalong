@@ -645,6 +645,35 @@ voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APP
    words). With the key removed, or a wrong voice ID, Scout speaks with the local voice again.
    With the network cut while ElevenLabs is set, the local voice takes over within 15 seconds.
 
+### V.7. Read aloud
+
+1. **Setup:** a real brain (not `TAGALONG_FAKE_PROVIDERS`), Scout talks on. Open a long article or
+   document (well over 300 words) in front, with a bulleted list and a code sample in it.
+2. **Action:** type "read this to me" in the bubble. When Scout asks "Shall I go on?", type "go on".
+   Then select one paragraph and hold the talk key to say "read this to me". Press
+   `Ctrl+Shift+Alt+M` partway through one reading.
+3. **Expected:** Scout says the text itself with no preamble ("Sure, here it is" is not said), in
+   full sentences, not the first two and "The rest is in the bubble." List items come out as
+   sentences and the code is described, not read symbol by symbol. After about 300 words (about two
+   minutes) it asks "Shall I go on?", and "go on" carries on from where it stopped. The spoken
+   request reads only the selected paragraph. The stop key, ×, and the bars cut the reading off at
+   once. Typing a different question (not "go on", "yes", "continue" or "keep going") in reply to
+   "Shall I go on?" is answered as an ordinary typed question, in its short spoken form. A typed
+   "what is this?" afterwards is still spoken only in its short form (V.2). With
+   Scout talks off, the reading shows in the bubble and nothing is spoken.
+
+### V.8. Describe a chart
+
+1. **Setup:** a real vision brain. Open a line or bar chart (a spreadsheet chart or an image of one)
+   in front.
+2. **Action:** ask "what's in this chart?". Then ask the same about a photo, and about a chart too
+   small or blurred to read.
+3. **Expected:** Scout names the kind of chart, its axes, the trend and the values that stand out,
+   quoting only labels it can read. For the photo it says what is in it. For the unreadable one it
+   says it can't make it out, rather than guessing. With a brain that cannot see pictures, Scout says
+   so and offers to read the window's text instead. When the words came from reading the screen's
+   picture (OCR), Scout warns that a word may be misread.
+
 ## Talk to Scout
 
 Run from source **without** `TAGALONG_FAKE_STT` and `TAGALONG_FAKE_TTS`, with a microphone and

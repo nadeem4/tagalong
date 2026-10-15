@@ -239,9 +239,18 @@ every weekday at 8. Nothing becomes a routine until you press **Save**, on Scout
 
 Scout says its bubble lines aloud while **Scout talks** is on (Settings → Voice, on by default).
 What reaches a speech engine is only the line being spoken, after it is shortened in the panel:
-markdown stripped, code blocks, lists, tables and URLs left out, and at most two sentences (an
-answer to a spoken question is said in full, sentence by sentence, still without code or lists).
-Never the screen, the window list, the question or the conversation.
+markdown stripped, code blocks, lists, tables and URLs left out. An ordinary answer is cut to its
+first sentence or two, and a long sentence is cut at a word (about 200 characters), ending with
+"The rest is in the bubble." An answer to a spoken question, or to a typed "read this to me", is
+said in full, sentence by sentence, still without code or lists. Never the screen, the window list,
+the question or the conversation.
+
+**Reading aloud.** When you ask Scout to read something to you, it reads your selection or the
+window in front (as for any question about your screen) and says that text, about 300 words at a
+time, asking "Shall I go on?" between parts. So the text of that window or selection goes to the
+chosen speech engine: it stays on this computer with Kokoro or the system voice, and is sent to
+ElevenLabs when ElevenLabs is the chosen voice. With **Scout talks** off, the reading is only shown
+in the bubble.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%
@@ -264,7 +273,7 @@ flowchart LR
   the operating system's own voice (a British male voice such as Microsoft George when installed).
 - **ElevenLabs (optional).** Used when picked under Settings → Voice → **Who speaks**, or when an older install already had a voice ID, and only with your own key and a voice ID you picked from your ElevenLabs
   library, both under Settings → Advanced. Each spoken line is sent to ElevenLabs' Flash model and
-  billed to your account. The key is encrypted with the OS keychain like the others. If ElevenLabs
+  billed to your account, including every line of a reading aloud. The key is encrypted with the OS keychain like the others. If ElevenLabs
   fails, Scout uses Kokoro.
 - Nothing spoken is recorded or stored. Closing the bubble or `Ctrl+Shift+Alt+M` stops speech at
   once.

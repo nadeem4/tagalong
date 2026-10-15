@@ -244,6 +244,13 @@ call or a full-screen window is in front, and while the pets are hidden). Your s
 small models (Silero VAD, Moonshine and Smart Turn) downloaded the first time (about 43 MB); the
 audio is never sent or kept.
 
+**Read it to me.** Type or say "read this to me" and Scout reads your selection, or the window in
+front, aloud in full: the text itself, lists as sentences, code described rather than spelled out.
+After about 300 words it asks "Shall I go on?"; say or type "go on" for more. The stop key, ×
+and the bars cut it off. Ask "what's in this chart?" (or about a photo, diagram or screenshot) and
+Scout gives the kind, the axes, the trend and the values that stand out, and says when it can't
+make one out. With ElevenLabs as the voice, the text read goes to ElevenLabs.
+
 **What needs me?** Ask it and Scout reads your connected apps (GitHub reviews and assigned issues,
 Linear issues, Notion mentions when its tools offer them) and answers with one list grouped by app,
 oldest first, one line each with how long it has waited. It only reads, and sends no screen

@@ -70,6 +70,7 @@ export const SPOKEN_MODE = [
   SPOKEN_HEADING,
   'The person asked this out loud, and your answer is read aloud as you write it. Answer like a person talking, not a document:',
   '- Short sentences and contractions. Two or three sentences is usually plenty.',
+  '- When asked to read something aloud, give the text in full as plain sentences; that is the exception to keeping it short.',
   '- No markdown, headings, links or lists in what you say. When exact detail helps (code, steps, a list), say so in a sentence and put the detail after it as a list or code block: that shows in the bubble and is not read aloud.',
   '- A draft still goes whole in its draft block.',
   '- Ask at most one question back, and only when you need the answer.',

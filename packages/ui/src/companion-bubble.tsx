@@ -22,6 +22,7 @@ import { HealthCard } from './health-card';
 import type { TurnEvent } from './host-bridge';
 import { officeTokens as t } from './office/tokens';
 import { SpokenStream } from './voice/spoken-stream';
+import { goesOn, wantsReadAloud } from './voice/read-aloud';
 
 /**
  * Talk to Scout, as the bubble sees it: the host holds the microphone and turns speech into
@@ -426,6 +427,7 @@ export function CompanionBubble({
     text: string,
     context: ContextSnapshot | undefined,
     asSpoken = false,
+    heard = asSpoken,
     withDrop = false,
   ): void => {
     if (question !== null && (reply.state === 'done' || reply.state === 'failed')) {
@@ -441,7 +443,7 @@ export function CompanionBubble({
     setQuestion(text);
     setReply({ state: 'running', turnId: null, text: '' });
     setSpokenReply(false);
-    setAskedAloud(asSpoken);
+    setAskedAloud(heard);
     mine.current = null;
     spoken.current?.lines.end();
     if (asSpoken && mouth !== undefined) {
@@ -508,7 +510,16 @@ export function CompanionBubble({
     const text = draft.trim();
     if (text === '' || reply.state === 'running') return;
     setDraft('');
-    submit(text, snapshot === undefined ? undefined : without(snapshot, removed));
+    // "Read this to me", or a "go on" in reply to "Shall I go on?" after a reading, is spoken
+    // whole. It was typed, so the bubble does not show it as heard.
+    const continuing =
+      spokenReply && reply.state === 'done' && /go on\?\s*$/i.test(reply.text) && goesOn(text);
+    submit(
+      text,
+      snapshot === undefined ? undefined : without(snapshot, removed),
+      wantsReadAloud(text) || continuing,
+      false,
+    );
   };
 
   // A spoken question arrives from the host: ask it, once per new `seq`.
@@ -634,6 +645,7 @@ export function CompanionBubble({
             submit(
               text,
               snapshot === undefined ? undefined : without(snapshot, removed),
+              false,
               false,
               true,
             );
