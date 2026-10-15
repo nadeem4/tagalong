@@ -109,6 +109,17 @@ The extension's public privacy policy, for the Chrome Web Store, is
   characters) and the names of the files it changed, works in the same project with its own access,
   and never runs if step 1 failed, timed out or was stopped, or once Tagalong is closing.
   Each step's brief is its own "Sent to expert" row in the log of what Scout saw.
+- **Notes to a working expert.** What you ask Scout to tell a working expert ("use dayjs, not
+  moment") leaves the machine to that expert like the brief did: your words, passed through
+  `hideSecrets`, written into the same live Claude Code session when its current step ends. It
+  cannot change what the expert may do: same folder, same tools, still sealed. Each note delivered
+  is its own "Sent to expert" row (its size, never its words), and it is added to the hand-off's
+  Activity row under "What Coder was told". A note still waiting when the run ends is never sent,
+  and the card says so; after Stop nothing more is passed on. At most 5 notes wait at a time, each
+  at most 2,000 characters. What the expert writes between its tools may be said aloud by Scout
+  (first sentence, at most 120 characters, keys hidden), at most once every 20 seconds, only while
+  Scout talks is on. What its tools read or return is never said aloud, and neither is its final
+  answer before the finish line.
 - **A monitor with an excluded window on it.** If a password manager is open and visible on your
   second screen, that whole screen is blanked in the full-view capture — not just when it is the
   window you are working in. The blanked screen is replaced with a flat panel reading BLOCKED, so
@@ -546,7 +557,7 @@ there is no switch, because it holds no content and an off switch would weaken t
 | **Read text**          | one window's text is read (accessibility tree or OCR), or a hotkey ask arrives with a selection or page text | the app, the window title, how many characters                   |
 | **Screenshot**         | a screenshot, a crop, a window picture, a frame from screen memory, or a watch's before-and-after crops      | the app and title when known, how many pictures                  |
 | **Sent to AI**         | any call to Scout's provider: a turn, a summary, a watch check, keeping an eye on things, the launch line    | the provider and model, how many characters and pictures         |
-| **Sent to expert**     | a brief goes to an expert                                                                                    | the expert's name, how many characters                           |
+| **Sent to expert**     | a brief goes to an expert, or a note from you reaches a working one                                          | the expert's name, how many characters                           |
 | **Read element names** | Scout points at a named button or field, so the window's element names are read to find it                   | the app and the window title; not the name asked or any it found |
 
 - **Metadata only.** The table behind it (`sight_log`) has no column for text, pixels or a brief, and

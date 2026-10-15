@@ -3,6 +3,7 @@ import {
   RPC_ERROR_CODES,
   type Expert,
   type HandoffFinishedParams,
+  type HandoffProgressParams,
   type HandoffProposedParams,
   type ProjectCandidate,
 } from '@tagalong/protocol';
@@ -19,15 +20,22 @@ export const HANDOFF_TIMEOUT_MS = 30 * 60 * 1000;
 /** How much of step 1's answer goes into step 2's brief, so a long answer cannot flood it. */
 export const FOLLOW_UP_ANSWER_CHARS = 8_000;
 
-function clip(text: string): string {
-  return text.length <= FOLLOW_UP_ANSWER_CHARS
-    ? text
-    : `${text.slice(0, FOLLOW_UP_ANSWER_CHARS - 1)}…`;
+/** The most notes that may wait for one run's turn to end; more are refused until it takes them. */
+export const MAX_WAITING_NOTES = 5;
+
+/** The most one note may be: a long dictation is cut, so a note cannot flood the session. */
+export const NOTE_CHARS = 2_000;
+
+/** How much of a running hand-off's ask names it to the companion: only its first line. */
+export const RUNNING_ASK_CHARS = 100;
+
+function clip(text: string, max = FOLLOW_UP_ANSWER_CHARS): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 }
 
 export type HandoffEvent =
   | { method: 'handoff.proposed'; params: HandoffProposedParams }
-  | { method: 'handoff.progress'; params: { handoffId: string; expertId: string; step: string } }
+  | { method: 'handoff.progress'; params: HandoffProgressParams }
   | { method: 'handoff.finished'; params: HandoffFinishedParams };
 
 export interface HandoffManagerOptions {
@@ -63,6 +71,16 @@ export interface FollowUp {
   canEdit: boolean;
 }
 
+/** A hand-off that has started and not finished: who, what it was told, notes waiting. */
+interface Live {
+  expert: Expert;
+  ask: string;
+  /** What the Activity row says it was told: the brief, then each note passed on. */
+  told: string;
+  delivered: number;
+  waiting: string[];
+}
+
 /** A brief waiting for the person to confirm it. */
 interface Proposal {
   expertId: string;
@@ -81,6 +99,8 @@ interface Proposal {
 export class HandoffManager {
   readonly #proposals = new Map<string, Proposal>();
   readonly #running = new Map<string, AbortController>();
+  /** Every hand-off from its Activity row until it finishes, stopped ones included. */
+  readonly #live = new Map<string, Live>();
   /** Every unfinished run, so shutdown can wait for its last write before the database closes. */
   readonly #runs = new Set<Promise<void>>();
   /** Set by `stopAll`: no follow-up step starts once shutdown has begun. */
@@ -245,14 +265,16 @@ export class HandoffManager {
     research: boolean,
     then?: FollowUp,
   ): { handoffId: string; launch: () => void } {
+    const told = renderBrief(brief);
     const handoffId = this.options.activity.expertStarted({
       petId,
       expertId: expert.id,
       expertName: expert.name,
-      text: renderBrief(brief),
+      text: told,
     });
     const controller = new AbortController();
     this.#running.set(handoffId, controller);
+    this.#live.set(handoffId, { expert, ask: brief.ask, told, delivered: 0, waiting: [] });
     const launch = (): void => {
       const run = this.#run(
         { handoffId, expert, petId, brief, research, then },
@@ -286,6 +308,86 @@ export class HandoffManager {
     };
     const { handoffId, launch } = this.#prepare(expert, petId, brief, false);
     return { next: { handoffId, expertId: expert.id, expertName: expert.name }, launch };
+  }
+
+  /**
+   * The hand-offs running now, for Scout to name when the person wants to tell one something.
+   * Only the first line of the ask, kept short: a chain's second ask carries the first
+   * expert's answer, which must not reach the companion's tool list.
+   */
+  running(): { handoffId: string; expertId: string; expertName: string; ask: string }[] {
+    return [...this.#live.entries()]
+      .filter(([handoffId]) => this.#isLive(handoffId))
+      .map(([handoffId, live]) => ({
+        handoffId,
+        expertId: live.expert.id,
+        expertName: live.expert.name,
+        ask: clip(live.ask.split('\n')[0]?.trim() ?? '', RUNNING_ASK_CHARS),
+      }));
+  }
+
+  /**
+   * Queues the person's words for a running expert. They go to it when its current turn
+   * ends, in the same session; the run keeps its folder and its tools. A note still waiting
+   * when the run ends is dropped, and the card says so.
+   */
+  steer(handoffId: string, text: string): { ok: true } | { ok: false; error: string } {
+    const note = clip(hideSecrets(text.trim()), NOTE_CHARS);
+    if (note === '') return { ok: false, error: 'There is nothing to pass on.' };
+    const live = this.#live.get(handoffId);
+    // Finished, stopped or never started: there is no session left to tell.
+    if (live === undefined || !this.#isLive(handoffId)) {
+      return { ok: false, error: 'That hand-off is not running, so there is no one to tell.' };
+    }
+    if (live.waiting.length >= MAX_WAITING_NOTES) {
+      return {
+        ok: false,
+        error: `${live.expert.name} already has ${MAX_WAITING_NOTES} notes waiting; it gets them when its current step ends.`,
+      };
+    }
+    live.waiting.push(note);
+    this.options.emit({
+      method: 'handoff.progress',
+      params: { handoffId, expertId: live.expert.id, step: note, kind: 'note' },
+    });
+    return { ok: true };
+  }
+
+  /** The notes waiting for a run, taken once each: delivered on the card and in Activity. */
+  #take(handoffId: string): string[] {
+    const live = this.#live.get(handoffId);
+    // Stopped or timed out: the notes stay waiting and are dropped as the run ends.
+    if (live === undefined || live.waiting.length === 0 || !this.#isLive(handoffId)) return [];
+    const notes = live.waiting.splice(0);
+    for (const note of notes) {
+      live.told +=
+        live.delivered === 0 ? `\n\nPassed on while it worked:\n- ${note}` : `\n- ${note}`;
+      live.delivered += 1;
+      this.options.emit({
+        method: 'handoff.progress',
+        params: { handoffId, expertId: live.expert.id, step: note, kind: 'delivered' },
+      });
+    }
+    this.options.activity.expertBriefed(handoffId, live.told);
+    return notes;
+  }
+
+  /** The run is over: notes it never took are dropped, and the card says so. */
+  #dropNotes(handoffId: string): void {
+    const live = this.#live.get(handoffId);
+    this.#live.delete(handoffId);
+    for (const note of live?.waiting ?? []) {
+      this.options.emit({
+        method: 'handoff.progress',
+        params: { handoffId, expertId: live!.expert.id, step: note, kind: 'dropped' },
+      });
+    }
+  }
+
+  /** Running and neither stopped nor past its time limit (a timeout aborts but stays listed). */
+  #isLive(handoffId: string): boolean {
+    const controller = this.#running.get(handoffId);
+    return controller !== undefined && !controller.signal.aborted;
   }
 
   /** True when a running hand-off was stopped. */
@@ -341,12 +443,13 @@ export class HandoffManager {
         .connectorFor(expert, research ? { research: true } : undefined)
         .send(
           brief,
-          (step) =>
+          (step, kind) =>
             emit({
               method: 'handoff.progress',
-              params: { handoffId, expertId, step: hideSecrets(step) },
+              params: { handoffId, expertId, step: hideSecrets(step), ...(kind ? { kind } : {}) },
             }),
           signal,
+          { take: () => this.#take(handoffId) },
         );
     } catch (error) {
       sent = { ok: false, error: `${expert.name} could not run: ${(error as Error).message}` };
@@ -379,6 +482,7 @@ export class HandoffManager {
       ? { ...sent, text: hideSecrets(sent.text) }
       : { ...sent, error: hideSecrets(sent.error) };
     this.#running.delete(handoffId);
+    this.#dropNotes(handoffId);
 
     if (signal.aborted && !timedOut) {
       activity.expertFinished(handoffId, result, 'stopped');

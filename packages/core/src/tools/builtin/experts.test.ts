@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Brief, ContextSnapshot, Expert } from '@tagalong/protocol';
 import { FAKE_TURN_PET, fakeTurnTools as fakeTools } from '../fake-turn';
 import type { ToolRegistryOptions, TurnRequest } from '../registry';
-import { HAND_TO_EXPERT, type ExpertToolDeps } from './experts';
+import { HAND_TO_EXPERT, TELL_EXPERT, type ExpertToolDeps } from './experts';
 
 const expert = (id: string, name: string, goodAt = '', enabled = true): Expert => ({
   id,
@@ -325,5 +325,121 @@ describe(HAND_TO_EXPERT, () => {
       expect(d.research).toEqual([]);
       expect(d.started.map((s) => s.expertId)).toEqual(['gemini', 'claude-code']);
     });
+  });
+});
+
+describe(TELL_EXPERT, () => {
+  const CODER_RUN = {
+    handoffId: '0b6f0c4e-1111-4222-8333-444455556666',
+    expertId: 'claude-code',
+    expertName: 'Claude Code',
+    ask: 'Fix the date bug',
+  };
+  const WRITER_RUN = {
+    handoffId: '0b6f0c4e-9999-4222-8333-444455556666',
+    expertId: 'gemini',
+    expertName: 'Gemini',
+    ask: 'Summarise the spec',
+  };
+
+  function steering(running: (typeof CODER_RUN)[], refuse?: string) {
+    const d = deps([CLAUDE, GEMINI]);
+    const told: { handoffId: string; text: string }[] = [];
+    const value: ExpertToolDeps = {
+      ...d.value,
+      running: () => running,
+      steer: (handoffId, text) => {
+        told.push({ handoffId, text });
+        return refuse === undefined ? { ok: true } : { ok: false, error: refuse };
+      },
+    };
+    return { value, told };
+  }
+
+  const names = (options: ToolRegistryOptions, overrides: Partial<TurnRequest> = {}) =>
+    fakeTurnTools(options, overrides).definitions.map((d) => d.name);
+
+  it('is offered only while an expert is working, and never on a routine’s own turn', () => {
+    expect(names({ experts: steering([]).value })).not.toContain(TELL_EXPERT);
+    expect(names({ experts: deps([CLAUDE]).value })).not.toContain(TELL_EXPERT);
+    expect(names({ experts: steering([CODER_RUN]).value })).toContain(TELL_EXPERT);
+    expect(
+      names(
+        { experts: steering([CODER_RUN]).value },
+        { routine: { routineId: 'r1', handedOff: () => undefined } },
+      ),
+    ).not.toContain(TELL_EXPERT);
+  });
+
+  it('lists what is running in its description, and is a write', () => {
+    const tools = fakeTurnTools({ experts: steering([CODER_RUN, WRITER_RUN]).value });
+    const description = tools.definitions.find((d) => d.name === TELL_EXPERT)?.description;
+    expect(description).toContain(`${CODER_RUN.handoffId} (Claude Code): Fix the date bug`);
+    expect(description).toContain(`${WRITER_RUN.handoffId} (Gemini): Summarise the spec`);
+    expect(tools.tools.find((t) => t.id === TELL_EXPERT)?.kind).toBe('write');
+  });
+
+  it('passes the words to the one running expert when no id is given', async () => {
+    const s = steering([CODER_RUN]);
+    const outcome = await fakeTurnTools({ experts: s.value }).run({
+      name: TELL_EXPERT,
+      input: { message: 'use dayjs, not moment' },
+    });
+    expect(outcome.isError).toBeUndefined();
+    expect(outcome.content).toContain('Claude Code');
+    expect(s.told).toEqual([{ handoffId: CODER_RUN.handoffId, text: 'use dayjs, not moment' }]);
+  });
+
+  it('asks which one when two are running and no id is given', async () => {
+    const s = steering([CODER_RUN, WRITER_RUN]);
+    const outcome = await fakeTurnTools({ experts: s.value }).run({
+      name: TELL_EXPERT,
+      input: { message: 'hurry up' },
+    });
+    expect(outcome.isError).toBe(true);
+    expect(outcome.content).toContain(CODER_RUN.handoffId);
+    expect(s.told).toEqual([]);
+  });
+
+  it('names the one asked for, and refuses an id that is not running', async () => {
+    const s = steering([CODER_RUN, WRITER_RUN]);
+    const tools = fakeTurnTools({ experts: s.value });
+    await tools.run({
+      name: TELL_EXPERT,
+      input: { message: 'shorter', handoff_id: WRITER_RUN.handoffId },
+    });
+    expect(s.told).toEqual([{ handoffId: WRITER_RUN.handoffId, text: 'shorter' }]);
+    const wrong = await tools.run({
+      name: TELL_EXPERT,
+      input: { message: 'x', handoff_id: 'nope' },
+    });
+    expect(wrong.isError).toBe(true);
+    expect(s.told).toHaveLength(1);
+  });
+
+  it('says so when nothing is running any more, or the hand-off refuses the note', async () => {
+    let running = [CODER_RUN];
+    const s = steering([], 'That hand-off is not running, so there is no one to tell.');
+    const value: ExpertToolDeps = { ...s.value, running: () => running };
+    const tools = fakeTurnTools({ experts: value });
+    const refused = await tools.run({ name: TELL_EXPERT, input: { message: 'x' } });
+    expect(refused).toEqual({
+      content: 'That hand-off is not running, so there is no one to tell.',
+      isError: true,
+    });
+    running = [];
+    const none = await tools.run({ name: TELL_EXPERT, input: { message: 'x' } });
+    expect(none.isError).toBe(true);
+    expect(none.content).toMatch(/No expert is working/);
+  });
+
+  it('refuses an empty message', async () => {
+    const s = steering([CODER_RUN]);
+    const outcome = await fakeTurnTools({ experts: s.value }).run({
+      name: TELL_EXPERT,
+      input: { message: ' ' },
+    });
+    expect(outcome.isError).toBe(true);
+    expect(s.told).toEqual([]);
   });
 });

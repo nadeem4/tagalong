@@ -20,8 +20,9 @@ the person sees it in full on the confirm card first; it never guesses a repo. I
 the person's connected apps (`connections`), whose changes always ask first, `create_routine`
 and `change_routine`, which show a routine card the person saves, `point_at`, which draws a ring
 around something on screen and never clicks, `recall_day`, which reads back what Scout looked at
-and was asked today or yesterday, and `search_history`, which searches the window titles it looked
-at and the person's asks by words; it has nothing that writes files or runs code. Its own figure and bubble show up in its screenshots, so its instructions tell it to look
+and was asked today or yesterday, `search_history`, which searches the window titles it looked
+at and the person's asks by words, and `tell_expert`, which passes the person's words to an expert
+already working; it has nothing that writes files or runs code. Its own figure and bubble show up in its screenshots, so its instructions tell it to look
 past them and never mention itself or Tagalong unless asked.
 
 ### The role file
@@ -51,6 +52,7 @@ tools:
   - point_at
   - recall_day
   - search_history
+  - tell_expert
 model:
   tier: fast # fast | balanced | deep
   needs_vision: false
@@ -136,7 +138,7 @@ packages/core/src/tools/
                    look_closer, list_windows, read_window_text, look_at_window
     awareness.ts   recall_screen, what_changed, watch_for
     memory.ts      remember
-    experts.ts     hand_to_expert
+    experts.ts     hand_to_expert, tell_expert
     connections.ts <connection>__<tool>: every tool of the person's connected apps
     routines.ts    create_routine, change_routine
     pointing.ts    point_at
@@ -145,11 +147,11 @@ packages/core/src/tools/
 ```
 
 The companion's role lists every one of them; `point_at` comes after `change_routine`, and
-then `recall_day` and `search_history` last.
+then `recall_day`, `search_history` and `tell_expert` last.
 
 - **Kind.** A tool is `write` when it leaves stored state behind after the turn: `remember` files a
   memory, `watch_for` starts a watch, `hand_to_expert` starts a hand-off and remembers which expert
-  took that kind of task, and `create_routine` and `change_routine` lead to a saved routine once the
+  took that kind of task, `tell_expert` queues a note in a running hand-off and its Activity row, and `create_routine` and `change_routine` lead to a saved routine once the
   person presses Save. The rest are `read`.
 - **Context.** Every tool runs with the turn's pet, turn id, abort signal, snapshot, whether the
   pet's brain can see, and, on a routine's turn, the routine (`ToolContext.routine`): the expert its
@@ -158,7 +160,8 @@ then `recall_day` and `search_history` last.
   and returns none when the pet's provider cannot call tools. `hand_to_expert` is built only when an
   expert is switched on, and lists every such expert and what it is good at in its description. The
   routine tools are left off a routine's own turn, and `change_routine` is built only when a routine
-  is saved. An unknown name is refused by name.
+  is saved. `tell_expert` is built only while a hand-off is running, never on a routine's own turn,
+  and lists the running hand-offs (id, expert, ask) in its description. An unknown name is refused by name.
 - **`toolsFor(pet, tools)`** is the single place a turn's tools are narrowed: the tools the pet's
   role lists, minus any its grants turn off (see [What the role decides](#what-the-role-decides)).
   A role can list a group instead of single tools: `connections` gives it every tool of the

@@ -10,6 +10,21 @@ describe('FakeConnector', () => {
     expect(result).toEqual({ ok: true, text: 'Done.', changedFiles: [] });
   });
 
+  it('says its scripted lines after its steps, then takes the notes waiting once', async () => {
+    const connector = new FakeConnector({ steps: ['Reading'], says: ['Found it.'], text: 'Done.' });
+    const progress: [string, string | undefined][] = [];
+    const queue = [['use dayjs']];
+    await connector.send({ ask: 'Help' }, (step, kind) => progress.push([step, kind]), undefined, {
+      take: () => queue.shift() ?? [],
+    });
+    expect(progress).toEqual([
+      ['Reading', undefined],
+      ['Found it.', 'say'],
+    ]);
+    expect(connector.notes).toEqual(['use dayjs']);
+    expect(queue).toEqual([]);
+  });
+
   it('remembers the briefs it was sent', async () => {
     const connector = new FakeConnector({ text: 'ok' });
     await connector.send({ ask: 'first' }, () => {});

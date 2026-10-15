@@ -15,6 +15,20 @@ import {
  */
 export const HAND_TO_EXPERT = 'hand_to_expert';
 
+/**
+ * Passes the person's words to an expert already working. `write`: the note waits in the
+ * hand-off and is kept in its Activity row.
+ */
+export const TELL_EXPERT = 'tell_expert';
+
+/** A hand-off that is running now, as `tell_expert` names it. */
+export interface RunningHandoff {
+  handoffId: string;
+  expertId: string;
+  expertName: string;
+  ask: string;
+}
+
 export interface ExpertToolDeps {
   /** Read per turn: experts are added and switched off while the app runs. */
   experts: () => readonly Expert[];
@@ -38,6 +52,10 @@ export interface ExpertToolDeps {
    * a saved routine's card allowed, on that routine's own turn.
    */
   startReadOnly?(params: { expertId: string; petId: string; brief: Brief }): { handoffId: string };
+  /** The hand-offs running now, read per turn and per call. */
+  running?(): RunningHandoff[];
+  /** Queues a note for a running hand-off; it reaches the expert when its current step ends. */
+  steer?(handoffId: string, text: string): { ok: true } | { ok: false; error: string };
 }
 
 /** Routine runs that already used their one pre-approved hand-off. */
@@ -240,6 +258,71 @@ export function handToExpertTool(deps: ExpertToolDeps, experts: readonly Expert[
         `The brief for ${expert.name}${then === undefined ? '' : `, then ${then.expert.name},`} ` +
         'is in front of the user to check, with the project to ' +
         'work in. Tell them in one line to check it and press Send; the answer arrives on its own.',
+    });
+  });
+}
+
+function tellDefinition(running: readonly RunningHandoff[]): BrainTool {
+  const list = running.map((r) => `- ${r.handoffId} (${r.expertName}): ${r.ask}`).join('\n');
+  return {
+    name: TELL_EXPERT,
+    description:
+      'Pass something the person says to an expert who is already working on their request, ' +
+      'such as "use dayjs, not moment". Use it only when they want the expert told something: ' +
+      'not to change a setting, and not for new work (that is hand_to_expert). Pass their own ' +
+      'words, not yours. It reaches the expert when it finishes its current step, in the same ' +
+      'session with the same access, so say "I’ll pass that to <expert>" in one line.\n' +
+      'With one hand-off running, leave handoff_id out.\n' +
+      `Running now:\n${list}`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', description: 'What the person wants the expert told.' },
+        handoff_id: { type: 'string', description: 'One of the ids above.' },
+      },
+      required: ['message'],
+      additionalProperties: false,
+    },
+  };
+}
+
+/** `tell_expert`, describing the hand-offs running when the turn starts. */
+export function tellExpertTool(deps: ExpertToolDeps, running: readonly RunningHandoff[]): Tool {
+  return defineTool(tellDefinition(running), 'write', (input): Promise<ToolOutcome> => {
+    const fail = (content: string) => Promise.resolve({ content, isError: true });
+    const value = (input ?? {}) as Record<string, unknown>;
+    const message = value['message'];
+    const wanted = value['handoff_id'];
+    if (typeof message !== 'string' || message.trim() === '') return fail('message is required.');
+    if (wanted !== undefined && typeof wanted !== 'string') return fail('handoff_id is an id.');
+    // Read again: a hand-off may have finished since the turn started.
+    const now = deps.running?.() ?? [];
+    if (now.length === 0) {
+      return fail('No expert is working on anything now, so there is no one to tell.');
+    }
+    const ids = now.map((r) => `${r.handoffId} (${r.expertName})`).join(', ');
+    const target =
+      wanted !== undefined
+        ? now.find((r) => r.handoffId === wanted)
+        : now.length === 1
+          ? now[0]
+          : undefined;
+    if (target === undefined) {
+      return fail(
+        wanted === undefined
+          ? `More than one expert is working. Name one with handoff_id: ${ids}.`
+          : `No hand-off '${wanted}' is running. Choose one of: ${ids}.`,
+      );
+    }
+    const steered = deps.steer?.(target.handoffId, message) ?? {
+      ok: false as const,
+      error: 'Notes cannot be passed on here.',
+    };
+    if (!steered.ok) return fail(steered.error);
+    return Promise.resolve({
+      content:
+        `Passed to ${target.expertName}: it gets it when it finishes its current step. ` +
+        `Say “I’ll pass that to ${target.expertName}” in one line.`,
     });
   });
 }

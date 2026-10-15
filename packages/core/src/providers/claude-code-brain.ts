@@ -140,12 +140,15 @@ export class ClaudeCodeBrain implements BrainProvider {
     let stopped = false;
     const onAbort = () => {
       stopped = true;
+      child.end();
       child.kill();
     };
     signal.addEventListener('abort', onAbort, { once: true });
     try {
       const line = { type: 'user', message: { role: 'user', content: render(req, messages) } };
       child.write(`${JSON.stringify(line)}\n`);
+      // One message per run: closing stdin lets the stream-json session end after its reply.
+      child.end();
       let final:
         { text: string; isError: boolean; inputTokens: number; outputTokens: number } | undefined;
       for await (const raw of child.lines) {

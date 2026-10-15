@@ -411,6 +411,9 @@ export class Engine {
         propose: (params) => handoffs.propose(params),
         // Only reached on a routine's turn, for the expert its saved card allowed.
         startReadOnly: (params) => handoffs.startReadOnly(params),
+        // tell_expert: the person's words for an expert already working.
+        running: () => handoffs.running(),
+        steer: (handoffId, text) => handoffs.steer(handoffId, text),
       },
       routines: {
         list: () => live.routines?.list() ?? [],

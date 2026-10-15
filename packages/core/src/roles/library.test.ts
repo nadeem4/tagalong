@@ -33,6 +33,7 @@ const BUILT_IN_TOOLS = [
   'point_at',
   'recall_day',
   'search_history',
+  'tell_expert',
   // A group: every tool of the person's connected apps.
   'connections',
 ];

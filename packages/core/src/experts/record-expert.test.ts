@@ -35,6 +35,31 @@ describe('recordExpertSends', () => {
     expect(JSON.stringify(rows)).not.toContain('secret-sauce');
   });
 
+  it('writes one row per note passed on to the expert, with its size, never its words', async () => {
+    const rows: SightRow[] = [];
+    const batches = [['use dayjs, not moment', 'keep it short'], []];
+    const taken: string[][] = [];
+    const connectorFor = recordExpertSends(
+      () => ({
+        check: () => Promise.resolve({ ok: true }),
+        send: (_brief, _progress, _signal, notes) => {
+          taken.push(notes?.take() ?? [], notes?.take() ?? []);
+          return Promise.resolve({ ok: true, text: '', changedFiles: [] });
+        },
+      }),
+      { record: (row) => void rows.push(row) },
+    );
+    await connectorFor(EXPERT).send({ ask: 'x' }, () => {}, undefined, {
+      take: () => batches.shift() ?? [],
+    });
+    expect(taken).toEqual([['use dayjs, not moment', 'keep it short'], []]);
+    expect(rows.slice(1)).toEqual([
+      { kind: 'sent_to_expert', expertName: 'Coder', chars: 'use dayjs, not moment'.length },
+      { kind: 'sent_to_expert', expertName: 'Coder', chars: 'keep it short'.length },
+    ]);
+    expect(JSON.stringify(rows)).not.toContain('dayjs');
+  });
+
   it('writes nothing for a check, which sends no brief', async () => {
     const rows: SightRow[] = [];
     const connectorFor = recordExpertSends(() => new FakeConnector({ steps: [], text: '' }), {

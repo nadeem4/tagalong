@@ -471,3 +471,90 @@ describe('a two-step hand-off', () => {
     expect(screen.getByRole('region', { name: 'Reviewer is checking (2 of 2)' })).toBeVisible();
   });
 });
+
+describe('steering a working expert', () => {
+  const step = (text: string, kind?: 'tool' | 'say' | 'note' | 'delivered' | 'dropped') =>
+    act(() =>
+      bridge.emit({
+        type: 'handoff.progress',
+        handoffId: 'handoff-1',
+        expertId: 'claude-code',
+        step: text,
+        ...(kind === undefined ? {} : { kind }),
+      }),
+    );
+  let bridge: FakeHostBridge;
+
+  async function working(onSay?: (text: string) => void) {
+    bridge = createFakeHostBridge();
+    render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble
+          petId="scout"
+          petName="Scout"
+          {...(onSay === undefined ? {} : { onSay })}
+        />
+      </HostBridgeProvider>,
+    );
+    propose(bridge);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Send' })));
+    return screen.getByRole('region', { name: 'Claude Code is on it' });
+  }
+
+  it('shows a note as waiting, then delivered', async () => {
+    const card = await working();
+    step('use dayjs, not moment', 'note');
+    expect(card).toHaveTextContent('Passed on: use dayjs, not moment');
+    expect(card).toHaveTextContent('waiting for Claude Code to finish this step');
+    step('use dayjs, not moment', 'delivered');
+    expect(card).toHaveTextContent('Passed on: use dayjs, not moment');
+    expect(card).toHaveTextContent('delivered');
+    expect(card).not.toHaveTextContent('waiting for');
+    // A note is not a step of the expert's own.
+    expect(within(card).queryByRole('listitem')).toBeNull();
+  });
+
+  it('says when a note could not be passed on, and keeps saying it on the answer', async () => {
+    const onSay = vi.fn();
+    const card = await working(onSay);
+    step('one more thing', 'note');
+    step('one more thing', 'dropped');
+    expect(card).toHaveTextContent('not passed on: Claude Code finished first');
+    act(() =>
+      bridge.emit({
+        type: 'handoff.finished',
+        handoffId: 'handoff-1',
+        expertId: 'claude-code',
+        state: 'done',
+        text: 'Done.',
+      }),
+    );
+    const done = screen.getByRole('region', { name: 'Claude Code finished' });
+    expect(done).toHaveTextContent('Not passed on: one more thing');
+    expect(onSay).toHaveBeenCalledExactlyOnceWith(
+      'Claude Code has finished. Done. Claude Code finished before I could pass on your note.',
+    );
+  });
+
+  it('speaks what the expert says at most once every 20 seconds; tool steps stay silent', async () => {
+    vi.useFakeTimers();
+    try {
+      const onSay = vi.fn();
+      const card = await working(onSay);
+      step('Reading src/date.ts', 'tool');
+      step('Found the bug in date.ts.', 'say');
+      step('Fixing it now.', 'say');
+      expect(card).toHaveTextContent('Found the bug in date.ts.');
+      expect(card).toHaveTextContent('Fixing it now.');
+      expect(onSay.mock.calls).toEqual([['Found the bug in date.ts.']]);
+      act(() => vi.advanceTimersByTime(20_000));
+      step('Tests still failing in two places.', 'say');
+      expect(onSay.mock.calls).toEqual([
+        ['Found the bug in date.ts.'],
+        ['Tests still failing in two places.'],
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

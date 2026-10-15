@@ -6,7 +6,7 @@
  * a tool server) and brings back a `ConnectorResult`. Each kind of expert is one adapter.
  */
 import { hideSecrets } from '../privacy/secrets';
-import type { Brief } from '@tagalong/protocol';
+import type { Brief, HandoffStepKind } from '@tagalong/protocol';
 
 export type { Brief };
 
@@ -26,6 +26,18 @@ export type ConnectorResult =
 
 export type CheckResult = { ok: true } | { ok: false; error: string };
 
+/**
+ * What a progress step is: a tool the expert used ("Reading src/main.ts"), a short line it
+ * wrote between tools, which Scout may say aloud, or a note from the person, as it moves
+ * from waiting to delivered (or dropped, when the run ended first).
+ */
+export type StepKind = HandoffStepKind;
+
+/** Notes from the person for the running expert, taken once each when a turn ends. */
+export interface NoteQueue {
+  take(): string[];
+}
+
 export interface Connector {
   /** Whether the expert can be reached, without spending anything. */
   check(): Promise<CheckResult>;
@@ -34,11 +46,14 @@ export interface Connector {
    * Sends one brief and resolves with the expert's answer. `onProgress` gets short
    * human-readable steps ("Reading src/main.ts") while the expert works. Never throws:
    * every failure comes back as `{ ok: false }` so the companion can say what happened.
+   * A connector that can carry on in the same session takes `notes` each time a turn ends
+   * and passes them on; one that cannot ignores them, and the hand-off says they were dropped.
    */
   send(
     brief: Brief,
-    onProgress: (step: string) => void,
+    onProgress: (step: string, kind?: StepKind) => void,
     signal?: AbortSignal,
+    notes?: NoteQueue,
   ): Promise<ConnectorResult>;
 }
 

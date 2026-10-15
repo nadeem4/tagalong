@@ -9,7 +9,14 @@ import type {
   RoutineProposedParams,
 } from '@tagalong/protocol';
 import { ANSWER_CSS, Answer } from './answer';
-import { HANDOFF_CSS, HandoffStatus, ProposalCard, type Handoff } from './handoff-card';
+import {
+  HANDOFF_CSS,
+  HandoffStatus,
+  ProposalCard,
+  undelivered,
+  withProgress,
+  type Handoff,
+} from './handoff-card';
 import { ConnectorConfirmCard } from './connector-confirm';
 import { RoutineCard } from './routine-card';
 import { PickUpCard } from './pick-up-card';
@@ -144,6 +151,9 @@ function without(snapshot: ContextSnapshot, removed: ReadonlySet<Chip['id']>): C
 /** What Try it now asks, from the hello: a first look at the screen. */
 const TRY_IT = 'What am I working on, and what could you hand to an expert?';
 
+/** The least time between two lines of an expert's narration said aloud. */
+const SAY_GAP_MS = 20_000;
+
 type Reply =
   | { state: 'idle' }
   | { state: 'running'; turnId: string | null; text: string }
@@ -188,6 +198,8 @@ export function CompanionBubble({
     resume === undefined ? { state: 'idle' } : { state: 'done', text: resume.answer },
   );
   const [handoff, setHandoff] = useState<Handoff | null>(null);
+  // When the expert's narration was last said aloud, for the 20-second gap.
+  const lastSaid = useRef(Number.NEGATIVE_INFINITY);
   // A change Scout wants to make in a connected app, waiting for Allow once or Cancel.
   const [confirm, setConfirm] = useState<ConnectorConfirmParams | null>(null);
   // A routine Scout wrote or changed, waiting for Save.
@@ -288,15 +300,26 @@ export function CompanionBubble({
       case 'handoff.proposed':
         if (event.petId === petId) setHandoff({ phase: 'proposed', proposal: event });
         return;
-      case 'handoff.progress':
-        setHandoff((current) =>
+      case 'handoff.progress': {
+        const isThis = (
+          current: Handoff | null,
+        ): current is Extract<Handoff, { phase: 'working' }> =>
           current?.phase === 'working' &&
           current.expertId === event.expertId &&
-          (current.handoffId === null || current.handoffId === event.handoffId)
-            ? { ...current, steps: [...current.steps, event.step] }
-            : current,
-        );
+          (current.handoffId === null || current.handoffId === event.handoffId);
+        // What the expert writes between tools is said aloud, at most one line every 20
+        // seconds; tool steps and notes stay on the card.
+        if (event.kind === 'say' && isThis(handoff)) {
+          const now = Date.now();
+          if (now - lastSaid.current >= SAY_GAP_MS) {
+            lastSaid.current = now;
+            onSay?.(event.step);
+          }
+        }
+        const { type: _type, ...params } = event;
+        setHandoff((current) => (isThis(current) ? withProgress(current, params) : current));
         return;
+      }
       case 'handoff.finished': {
         const isThis = (
           current: Handoff | null,
@@ -308,12 +331,16 @@ export function CompanionBubble({
         const next = event.state === 'done' ? event.next : undefined;
         if (isThis(handoff) && next === undefined) {
           const earlier = handoff.chain?.step === 2 ? handoff.chain.earlier : undefined;
+          const missed =
+            undelivered(handoff).length > 0
+              ? ` ${handoff.expertName} finished before I could pass on your note.`
+              : '';
           onSay?.(
-            event.state !== 'done'
+            (event.state !== 'done'
               ? `${handoff.expertName} stopped without finishing.`
               : earlier !== undefined
                 ? `${earlier.expertName} and ${handoff.expertName} have finished. ${event.text ?? ''}`.trim()
-                : `${handoff.expertName} has finished. ${event.text ?? ''}`.trim(),
+                : `${handoff.expertName} has finished. ${event.text ?? ''}`.trim()) + missed,
           );
         }
         setHandoff((current) => {
@@ -326,6 +353,7 @@ export function CompanionBubble({
               expertName: next.expertName,
               project: current.project,
               steps: [],
+              notes: current.notes,
               chain: {
                 step: 2,
                 earlier: {
@@ -345,6 +373,7 @@ export function CompanionBubble({
             error: event.error,
             earlier: current.chain?.step === 2 ? current.chain.earlier : undefined,
             skipped: current.chain?.step === 1 ? current.chain.nextName : undefined,
+            dropped: undelivered(current).length > 0 ? undelivered(current) : undefined,
           };
         });
         return;

@@ -3,6 +3,7 @@ import {
   Brief,
   Expert,
   HandoffFinishedParams,
+  HandoffProgressParams,
   HandoffProposedParams,
   HandoffsConfirmParams,
   ProjectsSearchResult,
@@ -162,5 +163,14 @@ describe('proposals', () => {
 
   it('answers a project search with candidates', () => {
     expect(ProjectsSearchResult.parse({ projects: [project] }).projects).toHaveLength(1);
+  });
+
+  it('marks what a progress step is, and old steps with no kind still parse', () => {
+    const step = { handoffId: '11111111-1111-4111-8111-111111111111', expertId: 'c', step: 'x' };
+    expect(HandoffProgressParams.parse(step).kind).toBeUndefined();
+    for (const kind of ['tool', 'say', 'note', 'delivered', 'dropped']) {
+      expect(HandoffProgressParams.parse({ ...step, kind }).kind).toBe(kind);
+    }
+    expect(HandoffProgressParams.safeParse({ ...step, kind: 'shout' }).success).toBe(false);
   });
 });

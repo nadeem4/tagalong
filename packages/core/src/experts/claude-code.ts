@@ -14,11 +14,16 @@ import {
   type Connector,
   type ConnectorResult,
   type ConnectorUsage,
+  type NoteQueue,
+  type StepKind,
 } from './connector';
 
 /** The slice of a child process the connector needs, so tests never start a real claude. */
 export interface ChildRun {
+  /** Writes to stdin, which stays open: a stream-json session reads one message per line. */
   write(text: string): void;
+  /** Closes stdin: Claude Code finishes its last turn and exits. */
+  end(): void;
   /** stdout, one line at a time. */
   lines: AsyncIterable<string>;
   /** Resolves with the exit code, or null when the process was killed. */
@@ -101,7 +106,7 @@ export class ClaudeCodeConnector implements Connector {
         return { ok: false, error: NOT_INSTALLED };
       return { ok: false, error: `Claude Code did not start: ${(error as Error).message}` };
     }
-    child.write('');
+    child.end();
     for await (const line of child.lines) void line;
     const code = await child.exit;
     if (code === 0) return { ok: true };
@@ -113,8 +118,9 @@ export class ClaudeCodeConnector implements Connector {
 
   async send(
     brief: Brief,
-    onProgress: (step: string) => void,
+    onProgress: (step: string, kind?: StepKind) => void,
     signal?: AbortSignal,
+    notes?: NoteQueue,
   ): Promise<ConnectorResult> {
     if (signal?.aborted) return CANCELLED;
     const research = this.options.research === true;
@@ -149,7 +155,7 @@ export class ClaudeCodeConnector implements Connector {
       }
     }
     try {
-      return await this.run(brief, onProgress, folder, canEdit, tools, promptFile, signal);
+      return await this.run(brief, onProgress, folder, canEdit, tools, promptFile, signal, notes);
     } finally {
       removeQuietly(promptDir);
     }
@@ -157,15 +163,20 @@ export class ClaudeCodeConnector implements Connector {
 
   private async run(
     brief: Brief,
-    onProgress: (step: string) => void,
+    onProgress: (step: string, kind?: StepKind) => void,
     folder: string,
     canEdit: boolean,
     tools: readonly string[],
     promptFile: string | undefined,
     signal: AbortSignal | undefined,
+    notes: NoteQueue | undefined,
   ): Promise<ConnectorResult> {
     const args = [
       '-p',
+      // Messages in as JSON lines too: the session stays alive between turns until stdin
+      // closes, so a note from the person can follow in the same session.
+      '--input-format',
+      'stream-json',
       '--output-format',
       'stream-json',
       '--verbose',
@@ -206,15 +217,22 @@ export class ClaudeCodeConnector implements Connector {
     let cancelled = false;
     const onAbort = () => {
       cancelled = true;
+      child.end();
       child.kill();
     };
     signal?.addEventListener('abort', onAbort, { once: true });
 
     try {
-      child.write(renderBrief(brief));
+      child.write(userMessage(renderBrief(brief)));
       const changed = new Set<string>();
       let final: ConnectorResult | undefined;
       let model = '';
+      // Every `result` reports its own turn's tokens, so a session that took notes adds up.
+      let spent: ConnectorUsage | undefined;
+
+      // A line it wrote is said only once a tool follows: the text before a `result` is the
+      // answer, which Scout reads out when the run finishes.
+      let toSay: string | undefined;
 
       for await (const line of child.lines) {
         const event = parse(line);
@@ -223,19 +241,44 @@ export class ClaudeCodeConnector implements Connector {
           model = event.model;
         } else if (event.type === 'assistant') {
           for (const block of event.message?.content ?? []) {
+            if (block.type === 'text') {
+              toSay = firstSentence(block.text) ?? toSay;
+              continue;
+            }
             if (block.type !== 'tool_use') continue;
+            if (toSay) onProgress(toSay, 'say');
+            toSay = undefined;
             const step = describeTool(block.name, block.input);
-            if (step) onProgress(step);
+            if (step) onProgress(step, 'tool');
             if (EDIT_TOOLS.includes(block.name) && typeof block.input?.file_path === 'string') {
               changed.add(block.input.file_path);
             }
           }
         } else if (event.type === 'result') {
+          toSay = undefined;
           const text = event.result ?? '';
-          const usage = usageOf(event, model);
+          const turn = usageOf(event, model);
+          if (turn) {
+            spent = {
+              model,
+              inputTokens: (spent?.inputTokens ?? 0) + turn.inputTokens,
+              outputTokens: (spent?.outputTokens ?? 0) + turn.outputTokens,
+            };
+          }
+          const usage = spent ? { usage: spent } : {};
           final = event.is_error
             ? { ok: false, error: text, ...usage }
             : { ok: true, text, changedFiles: [...changed], ...usage };
+          // The turn is over. Notes waiting from the person go in as the next message, in
+          // the same session; with none, stdin closes and this result is the answer. Once
+          // stopped, nothing more is taken or written: a note is never passed on after Stop.
+          const waiting = event.is_error || cancelled ? [] : (notes?.take() ?? []);
+          if (waiting.length > 0) {
+            const list = waiting.map((note) => `- ${note}`).join('\n');
+            child.write(userMessage(hideSecrets(`From the person, while you worked:\n${list}`)));
+          } else {
+            child.end();
+          }
         }
       }
 
@@ -246,6 +289,9 @@ export class ClaudeCodeConnector implements Connector {
       return { ok: false, error: `Claude Code stopped: ${said || `exit code ${code}`}` };
     } finally {
       signal?.removeEventListener('abort', onAbort);
+      // Every way out closes stdin (closing it twice is harmless), so a session that is
+      // still alive between turns never waits on a message that will not come.
+      child.end();
     }
   }
 }
@@ -258,6 +304,23 @@ function removeQuietly(dir: string | undefined): void {
   } catch {
     // Left in the temp folder; the OS clears it.
   }
+}
+
+/** One user message as `--input-format stream-json` reads it: a JSON object on one line. */
+function userMessage(text: string): string {
+  return `${JSON.stringify({ type: 'user', message: { role: 'user', content: text } })}\n`;
+}
+
+/** The most a spoken line from the expert's narration may be. */
+const SAY_CHARS = 120;
+
+/** The first sentence of what the expert wrote, secrets hidden, short enough to say aloud. */
+function firstSentence(text: unknown): string | undefined {
+  if (typeof text !== 'string') return undefined;
+  const plain = hideSecrets(text).replace(/\s+/g, ' ').trim();
+  if (plain === '') return undefined;
+  const sentence = /^(.+?[.!?])(\s|$)/.exec(plain)?.[1] ?? plain;
+  return sentence.length <= SAY_CHARS ? sentence : `${sentence.slice(0, SAY_CHARS - 1)}…`;
 }
 
 interface ToolInput {
@@ -277,28 +340,27 @@ interface StreamEvent {
     cache_creation_input_tokens?: number;
     cache_read_input_tokens?: number;
   };
-  message?: { content?: { type: string; name: string; input?: ToolInput }[] };
+  message?: { content?: { type: string; name: string; text?: unknown; input?: ToolInput }[] };
 }
 
 /**
- * The run's tokens from its `result` event, for the cost meter. Cache reads and writes
- * count as input: on a cached run `input_tokens` alone is a handful. Tokens only, never
- * `total_cost_usd`: on the person's plan that number is not money they pay.
+ * One turn's tokens from its `result` event, for the cost meter: in a live session each
+ * `result` counts only its own turn. Cache reads and writes count as input: on a cached run
+ * `input_tokens` alone is a handful. Tokens only, never `total_cost_usd`: on the person's
+ * plan that number is not money they pay.
  */
-function usageOf(event: StreamEvent, model: string): { usage?: ConnectorUsage } {
+function usageOf(event: StreamEvent, model: string): ConnectorUsage | undefined {
   const usage = event.usage;
   // The stream is untrusted JSON: a null or non-object usage is no usage, never a crash.
-  if (typeof usage !== 'object' || usage === null) return {};
+  if (typeof usage !== 'object' || usage === null) return undefined;
   const count = (n: number | undefined) => (typeof n === 'number' && n > 0 ? Math.round(n) : 0);
   return {
-    usage: {
-      model,
-      inputTokens:
-        count(usage.input_tokens) +
-        count(usage.cache_creation_input_tokens) +
-        count(usage.cache_read_input_tokens),
-      outputTokens: count(usage.output_tokens),
-    },
+    model,
+    inputTokens:
+      count(usage.input_tokens) +
+      count(usage.cache_creation_input_tokens) +
+      count(usage.cache_read_input_tokens),
+    outputTokens: count(usage.output_tokens),
   };
 }
 
@@ -356,7 +418,10 @@ export function spawnChild(command: string, args: string[], { cwd }: { cwd: stri
   });
   return {
     write: (text) => {
-      child.stdin.end(text);
+      child.stdin.write(text);
+    },
+    end: () => {
+      child.stdin.end();
     },
     lines: createInterface({ input: child.stdout }),
     exit,

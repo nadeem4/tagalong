@@ -9,30 +9,42 @@ interface Spawned {
   args: string[];
   cwd: string;
   stdin: string;
+  ended: boolean;
 }
 
-/** One scripted claude run per call: each run replays its stream-json lines, then exits. */
+/**
+ * One scripted claude run per call: each run replays its stream-json lines, then, as a real
+ * `--input-format stream-json` session does, stays alive until stdin ends (or it is killed).
+ */
 function fakeSpawn(runs: unknown[][]): { spawn: SpawnFn; calls: Spawned[] } {
   const calls: Spawned[] = [];
   const spawn: SpawnFn = (command, args, { cwd }) => {
-    const call: Spawned = { command, args, cwd, stdin: '' };
+    const call: Spawned = { command, args, cwd, stdin: '', ended: false };
     const lines = runs[calls.length] ?? [];
     calls.push(call);
     let killed = false;
+    let close: () => void = () => {};
+    const closed = new Promise<void>((resolve) => (close = resolve));
     const run: ChildRun = {
       write: (text) => {
         call.stdin += text;
+      },
+      end: () => {
+        call.ended = true;
+        close();
       },
       lines: (async function* () {
         for (const line of lines) {
           if (killed) return;
           yield JSON.stringify(line);
         }
+        await closed;
       })(),
       exit: Promise.resolve(0),
       stderr: () => '',
       kill: () => {
         killed = true;
+        close();
       },
     };
     return run;
@@ -95,6 +107,8 @@ describe('ClaudeCodeBrain', () => {
     expect(calls[0]?.args.join(' ')).toContain('--permission-mode dontAsk');
     expect(calls[0]?.args).toEqual(expect.arrayContaining(['--tools', '', '--strict-mcp-config']));
     expect(sent(calls[0]!).type).toBe('user');
+    // One message, then stdin closes: the session ends and no claude is left running.
+    expect(calls[0]?.ended).toBe(true);
     expect(textOf(calls[0]!)).toContain('You are Scout.');
     expect(textOf(calls[0]!)).toContain('Why does this test fail?');
   });

@@ -221,7 +221,12 @@ bubble when it is done. Ask for a second opinion ("fix the date bug and have som
 the one card lists two steps, such as **1. Coder** then **2. Reviewer**, each with its own access
 and brief, under one project and one **Send**; **Remove step 2** keeps it to one. The Reviewer
 starts once the Coder has finished, with the Coder's answer and changed files, and the bubble shows
-both answers. If the first step fails or is stopped, the second never runs.
+both answers. If the first step fails or is stopped, the second never runs. While an expert works
+you can tell Scout something for it ("tell Coder to use dayjs, not moment"): Scout says "I'll pass
+that to Coder", the card shows **Passed on:** with _waiting for Coder to finish this step_, then
+_delivered_, and the expert carries on in the same session with your note (or the card says it
+finished first). Scout also says the expert's key moments aloud, such as "Found the bug in
+`date.ts`", at most one line every 20 seconds.
 
 **Keeping an eye on things.** Now and then Scout says one short line on its own, beside itself and
 without taking the keyboard: a build that failed and why, say. It follows window titles only, reads

@@ -135,6 +135,13 @@ export class ActivityLog {
     return id;
   }
 
+  /** What the expert was told, again: the brief with the notes passed on while it worked. */
+  expertBriefed(id: string, text: string): void {
+    this.db
+      .prepare(`UPDATE activity SET text = ? WHERE id = ? AND kind = 'expert'`)
+      .run(clip(text), id);
+  }
+
   /** The expert's answer, or why there was none. A cancel is `stopped` and keeps no error. */
   expertFinished(id: string, result: ConnectorResult, state?: 'stopped'): void {
     const done = state ?? (result.ok ? 'done' : 'error');
