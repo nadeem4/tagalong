@@ -1352,6 +1352,22 @@ monitor.
 4. **Action:** turn pick-up off in Settings and ask again. **Expected:** no project or branch from
    pick-up; a brief waiting for Send is still named.
 
+## Searching your history
+
+### SH.1. Find an article by its title _(real brain)_
+
+1. **Setup:** open a page whose title has "Vector databases" in it, ask Scout "what's on my
+   screen?" so it looks, then switch to another window.
+2. **Action:** ask "what was that article about vector databases I read today?". **Expected:**
+   Scout names the title, the day, time and browser, and says it only knows window titles, not page
+   text.
+3. **Action:** open **Home → What Scout saw**, delete that row, and ask again. **Expected:** Scout
+   says nothing on record matches.
+4. **Action:** ask Scout to search for `"vector* OR (db` (quotes and symbols included).
+   **Expected:** a normal answer or "nothing matches"; no error.
+5. **Action:** look at a window in a blind spot (a password manager), then search for words in its
+   title. **Expected:** not found; searching the app's name finds it with "no title kept".
+
 ## The Chrome extension
 
 **Before you start:** Chrome 116 or newer, the desktop app running, and a long article open in a

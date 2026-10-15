@@ -1065,6 +1065,27 @@ question is turned into an FTS query by quoting each distinct word and OR-ing th
 quotes, `*`, `NEAR(` and friends in a user's text are plain words rather than syntax errors, and BM25
 ranks the closest memory first.
 
+### Searchable work memory
+
+The memory layer is `tagalong.db`. Migration 18 adds two external-content FTS5 indexes (porter
+unicode61), kept in step by insert, delete and update triggers in the same pattern as
+`memories_fts`, and backfilled with `'rebuild'` when the migration runs: `sight_log_fts` over
+`sight_log.title` and `app`, and `activity_fts` over `activity.text` (questions, expert briefs,
+routine names; never answers). A row deleted from Home, cleared, or pruned by the privacy log's
+retention leaves the index through its trigger.
+
+`search_history({ query, since? })` (`tools/builtin/history.ts`, kind `read`, appended after
+`recall_day`) answers "what was that article about vector databases I read Tuesday?" through
+`HistorySearch` (`memory/history-search.ts`). The query is made safe by `historyQuery`: every
+distinct word is quoted and the words are AND-ed, so a quote, `*`, `NEAR(`, `OR` or `column:` in
+the person's text is a plain word, never FTS5 syntax. It returns at most 20 hits, newest first,
+across both indexes: a title seen many times counts once (its latest look); a blind spot's title
+was never stored, so it is found by its app alone; a brief shows only its ask; the asking turn's
+own question is left out. Nothing older than `settings.sightLog.days` is returned from either
+record, and an earlier `since` is raised to that cutoff. Every returned line goes through
+`hideSecrets` and is clipped to 160 characters. No protocol method reaches the index, so the
+Chrome extension cannot query it. No vector search, no embeddings.
+
 ### Recall
 
 Every turn recalls before it assembles (`memory/recall.ts`): the pet's five newest visible memories,

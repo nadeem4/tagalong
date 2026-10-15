@@ -565,6 +565,19 @@ like any tool result, with any key, token or password in them hidden first. Answ
 or window a brief carried. Nothing new is recorded for it, and the hours are an estimate from the
 first to the last look: Scout only knows what it looked at or was asked.
 
+## Searching your history
+
+Ask "what was that article about vector databases I read Tuesday?" and Scout searches a local
+full-text index in `tagalong.db` of the window titles and apps in the log of what Scout saw and of
+your questions, expert asks and routine names. It stores no new content: the index holds the same
+words as those rows and is kept in step with them, so deleting a row, **Delete all**, or the
+retention dropping old rows removes them from search too. Nothing older than the days the log
+keeps is found. A blind spot or excluded window was only ever kept as its app name, so its title
+cannot be found. Up to 20 matching lines (day, time, app and the title or ask, with any key, token
+or password hidden) go to **Scout's own model** as a tool result. No page text, answers or
+selections are searched or sent, nothing leaves the machine except that tool result, and the
+Chrome extension cannot query the index.
+
 ## Pausing sight
 
 `Ctrl+Shift+Alt+P` turns every kind of looking off, and pressing it again turns it back on. The

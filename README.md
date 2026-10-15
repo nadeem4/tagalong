@@ -265,6 +265,11 @@ again.
 from what it looked at and was asked: about how many hours (an estimate), the apps and projects,
 what experts did and what is still open. It only knows what it saw; nothing extra is tracked.
 
+**What was that article I read?** Ask "what was that article about vector databases I read
+Tuesday?" and Scout searches the window titles it looked at and what you asked it, and answers
+with the day, time and app. It only knows titles, never page text, and only as far back as the
+record of what Scout saw keeps.
+
 **Memory.** Tell Scout "I prefer short answers" and it remembers across restarts.
 
 **"Scout, what's wrong?"** Ask that (or "are you OK?", or "health check"), typed or spoken, and the

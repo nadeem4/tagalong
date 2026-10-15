@@ -36,6 +36,7 @@ export { HAND_TO_EXPERT, type ExpertToolDeps } from './builtin/experts';
 export { CHANGE_ROUTINE, CREATE_ROUTINE, type RoutineToolDeps } from './builtin/routines';
 export { POINT_AT } from './builtin/pointing';
 export { RECALL_DAY, estimateSpan, type DayToolDeps } from './builtin/day';
+export { SEARCH_HISTORY, type HistoryToolDeps } from './builtin/history';
 export {
   CONNECTIONS_GROUP,
   CONNECTOR_SEPARATOR,

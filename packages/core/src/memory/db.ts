@@ -144,6 +144,40 @@ const MIGRATIONS: readonly Migration[] = [
      cost_usd REAL
    );
    CREATE INDEX IF NOT EXISTS usage_at ON usage (at);`,
+  // Migration 18. Searchable work memory: external-content FTS5 indexes over the window
+  // titles (and apps) Scout looked at and the activity text (asks, briefs, routine names),
+  // kept in step by triggers like memories_fts, so a deleted or pruned row leaves the index.
+  // 'rebuild' backfills the rows already on disk; rerunning it is harmless.
+  `CREATE VIRTUAL TABLE IF NOT EXISTS sight_log_fts USING fts5(
+     title, app, content = 'sight_log', content_rowid = 'rowid', tokenize = 'porter unicode61'
+   );
+   CREATE TRIGGER IF NOT EXISTS sight_log_ai AFTER INSERT ON sight_log BEGIN
+     INSERT INTO sight_log_fts (rowid, title, app) VALUES (new.rowid, new.title, new.app);
+   END;
+   CREATE TRIGGER IF NOT EXISTS sight_log_ad AFTER DELETE ON sight_log BEGIN
+     INSERT INTO sight_log_fts (sight_log_fts, rowid, title, app)
+       VALUES ('delete', old.rowid, old.title, old.app);
+   END;
+   CREATE TRIGGER IF NOT EXISTS sight_log_au AFTER UPDATE OF title, app ON sight_log BEGIN
+     INSERT INTO sight_log_fts (sight_log_fts, rowid, title, app)
+       VALUES ('delete', old.rowid, old.title, old.app);
+     INSERT INTO sight_log_fts (rowid, title, app) VALUES (new.rowid, new.title, new.app);
+   END;
+   INSERT INTO sight_log_fts (sight_log_fts) VALUES ('rebuild');
+   CREATE VIRTUAL TABLE IF NOT EXISTS activity_fts USING fts5(
+     text, content = 'activity', content_rowid = 'rowid', tokenize = 'porter unicode61'
+   );
+   CREATE TRIGGER IF NOT EXISTS activity_ai AFTER INSERT ON activity BEGIN
+     INSERT INTO activity_fts (rowid, text) VALUES (new.rowid, new.text);
+   END;
+   CREATE TRIGGER IF NOT EXISTS activity_ad AFTER DELETE ON activity BEGIN
+     INSERT INTO activity_fts (activity_fts, rowid, text) VALUES ('delete', old.rowid, old.text);
+   END;
+   CREATE TRIGGER IF NOT EXISTS activity_au AFTER UPDATE OF text ON activity BEGIN
+     INSERT INTO activity_fts (activity_fts, rowid, text) VALUES ('delete', old.rowid, old.text);
+     INSERT INTO activity_fts (rowid, text) VALUES (new.rowid, new.text);
+   END;
+   INSERT INTO activity_fts (activity_fts) VALUES ('rebuild');`,
 ];
 
 /** The columns migration 7 gave `activity`, in order. */

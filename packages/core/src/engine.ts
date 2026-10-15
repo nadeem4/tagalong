@@ -63,6 +63,7 @@ import { readOrCreatePairingToken } from './server/pairing';
 import { RoutineStore, Routines } from './routines';
 import { PickUp, readBranch } from './pick-up/pick-up';
 import { PickUpStore } from './pick-up/store';
+import { HistorySearch } from './memory/history-search';
 import { SightLog } from './memory/sight-log';
 import { recordSnapshot, sightedHosts } from './perception/record-sight';
 import { recordBrain } from './providers/record-brain';
@@ -430,6 +431,11 @@ export class Engine {
         pickUp: { get: () => (settings.get().pickUp ? pickUpStore.get() : null) },
         handoffs,
         now: () => new Date(),
+      },
+      // "What was that article I read Tuesday?": the FTS index over the same records,
+      // limited to the days the privacy log keeps.
+      history: {
+        history: new HistorySearch(db, { days: () => settings.get().sightLog.days }),
       },
       // Both lookups are lazy: hosts connect and drop between turns, and the exclusion
       // list is edited while the app runs, so neither can be captured at boot.
