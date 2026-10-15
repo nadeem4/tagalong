@@ -16,6 +16,12 @@ describe('toSpeakable', () => {
     );
   });
 
+  it('never reads a quoted line in English either, such as a quoted error', () => {
+    expect(
+      toSpeakable('The build failed:\n> TypeError: x is undefined\nAn import is missing.'),
+    ).toBe('The build failed: An import is missing.');
+  });
+
   it('never reads a quoted line in a whole spoken piece', () => {
     expect(toSpeakable('> Bonjour.', { whole: true })).toBe('');
   });

@@ -2030,7 +2030,8 @@ flowchart LR
   (`GreetingLine`), remarks from keeping an eye on things (`remarkEvent`, sent by `showRemark`)
   and `watch.fired` messages.
   `SpeechQueue` shapes each line with `toSpeakable` (markdown stripped; code blocks, lists, tables,
-  quoted `>` lines, which hold a translation into another language, and URLs left out; at most two sentences or 200 characters, then "The rest is in the bubble.";
+  quoted `>` lines (any quote, English too, such as a quoted error line; they mostly hold a
+  translation into another language) and URLs left out; at most two sentences or 200 characters, then "The rest is in the bubble.";
   an answer to a spoken question or a read-aloud, see Talk to Scout, is said whole),
   merges short lines waiting together (`mergeShortLines`, because Kokoro says a lone "Done." badly),
   and plays one line at a time. While a line plays, the next one is already being synthesised
@@ -2166,8 +2167,10 @@ flowchart LR
   The translated text is data, quoted and never followed. `wantsReadAloud` also matches
   "translate this and read it to me", so an English translation is spoken whole through the
   read-aloud path. A translation into any other language goes in a quoted block (`> …`) after the
-  one English line "It's in the bubble.": `toSpeakable` and `SpokenStream` leave quoted lines
-  out, because Kokoro and the system voice speak only English.
+  one English line "It's in the bubble.": `toSpeakable` and `SpokenStream` leave every quoted
+  line out (an English quote too), because Kokoro and the system voice speak only English. An
+  English translation is plain text, never quoted. Keeping French out of the voice relies on the
+  model quoting it.
 - **Settings on the fly.** Main sends `IPC.settingsChangedEvent` with the saved settings to every
   window after each save; the panel reads the ask and talk keys, the microphone and the user's name
   from it (`renderer/src/panel-settings.ts`), as it does at open, so none needs a restart.

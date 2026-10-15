@@ -31,8 +31,8 @@ export function toSpeakable(text: string, { whole = false }: { whole?: boolean }
     return '\n';
   });
   const lines = withoutCode.split('\n').filter((line) => {
-    // A quote is a translation into another language; the line before it already says
-    // "It's in the bubble", so leaving it out is not a cut.
+    // A quote, English or not, is never spoken. It mostly holds a translation into another
+    // language, after a line that already says "It's in the bubble", so it is not a cut.
     if (/^\s*>/.test(line)) return false;
     const listOrTable = /^\s*(?:[-*+•]|\d+[.)])\s+/.test(line) || /^\s*\|/.test(line);
     if (listOrTable) cut = true;

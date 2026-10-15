@@ -97,6 +97,13 @@ describe('SpokenStream', () => {
     expect(said).toEqual(['It’s in the bubble.', 'That’s all of it.']);
   });
 
+  it('never says a quoted English line either, such as a quoted error', () => {
+    const { said, stream: s } = stream();
+    s.push('The build failed.\n> TypeError: x is undefined\nAn import is missing.');
+    s.end();
+    expect(said).toEqual(['The build failed.', 'An import is missing.']);
+  });
+
   it('points at the bubble when the whole answer is a quote', () => {
     const { said, stream: s } = stream();
     s.push('> Bonjour.\n> Merci.');

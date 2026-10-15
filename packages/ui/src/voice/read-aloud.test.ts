@@ -25,6 +25,9 @@ describe('wantsReadAloud', () => {
     'translate this',
     'translate this to me',
     'translate the docs and explain the error to me',
+    'translate this file to TypeScript',
+    'how do I translate strings in React?',
+    'translate the error and fix it',
   ])('does not match "%s"', (text) => {
     expect(wantsReadAloud(text)).toBe(false);
   });
