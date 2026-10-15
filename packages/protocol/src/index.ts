@@ -37,3 +37,4 @@ export * from './connections';
 export * from './routines';
 export * from './pick-up';
 export * from './sight-log';
+export * from './usage';

@@ -131,6 +131,19 @@ const MIGRATIONS: readonly Migration[] = [
      taken_at TEXT NOT NULL,
      json TEXT NOT NULL
    )`,
+  // Migration 17. The cost meter: counts only, never what was said. Priced once, when
+  // written; null for an unknown model or the Claude sign-in.
+  `CREATE TABLE IF NOT EXISTS usage (
+     id INTEGER PRIMARY KEY,
+     at TEXT NOT NULL,
+     source TEXT NOT NULL CHECK (source IN ('scout', 'expert')),
+     provider_id TEXT NOT NULL,
+     model TEXT NOT NULL,
+     input_tokens INTEGER NOT NULL,
+     output_tokens INTEGER NOT NULL,
+     cost_usd REAL
+   );
+   CREATE INDEX IF NOT EXISTS usage_at ON usage (at);`,
 ];
 
 /** The columns migration 7 gave `activity`, in order. */

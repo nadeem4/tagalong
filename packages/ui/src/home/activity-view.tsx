@@ -11,7 +11,8 @@ import { officeTokens as t } from '../office/tokens';
 const PAGE = 30;
 
 /** The engine notifications after which the record has changed. */
-function changesActivity(event: TurnEvent): boolean {
+/** The events after which Activity (and the Spend card) read again. */
+export function changesActivity(event: TurnEvent): boolean {
   switch (event.type) {
     case 'turn.started':
     case 'turn.completed':

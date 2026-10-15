@@ -97,6 +97,8 @@ export interface RoutinesOptions {
     /** Why the calendar cannot be read, or null. */
     problem(): string | null;
   };
+  /** The daily budget gate (`budgetSpent`): true means today's cap is reached. */
+  spentOut?: () => boolean;
 }
 
 interface RunContext {
@@ -105,12 +107,17 @@ interface RunContext {
   detail?: string | undefined;
   /** A meeting prep's meeting start: once it passes, the prep is no use beside Scout. */
   meetingStart?: number | undefined;
+  /** Run now: the person asked, so the daily budget never stops it. */
+  manual?: boolean | undefined;
 }
 
 interface Pending {
   params: RoutineResultParams;
   meetingStart?: number | undefined;
 }
+
+/** What Activity says about a routine run the daily budget stopped. */
+export const BUDGET_SKIPPED = 'Skipped: today’s budget is spent.';
 
 interface Waiting {
   stored: StoredRoutine;
@@ -249,12 +256,14 @@ export class Routines {
   async runNow(id: string): Promise<boolean> {
     const stored = this.#options.store.get(id);
     if (stored === null) return false;
-    if (stored.routine.when.type !== 'meeting') return this.#run(stored, { late: false });
+    if (stored.routine.when.type !== 'meeting')
+      return this.#run(stored, { late: false, manual: true });
     // A test run preps for the next meeting there is.
     const now = this.#options.clock.now();
     const next = (await this.#upcoming()).find((meeting) => meeting.start > now);
     return this.#run(stored, {
       late: false,
+      manual: true,
       detail:
         next === undefined
           ? 'No meeting is coming up in the next 36 hours: say so in one line.'
@@ -524,6 +533,11 @@ export class Routines {
     if (this.#running.has(routine.id)) return false;
     const pet = this.#options.pet();
     if (pet === null) return false;
+    // Run now is the person's own ask; every other start is proactive and waits for the budget.
+    if (context.manual !== true && this.#options.spentOut?.() === true) {
+      this.#skip(stored, pet.id);
+      return false;
+    }
     this.#running.add(routine.id);
     const activityId = this.#options.activity.routineStarted({
       routineId: routine.id,
@@ -575,6 +589,20 @@ export class Routines {
     }
     await this.#deliver().catch(() => undefined);
     return true;
+  }
+
+  /** Recorded in Activity and on the routine, and never said: the Spend card says why. */
+  #skip(stored: StoredRoutine, petId: string): void {
+    const { routine } = stored;
+    const activityId = this.#options.activity.routineStarted({
+      routineId: routine.id,
+      petId,
+      name: routine.name,
+    });
+    this.#options.activity.routineFinished(activityId, { state: 'error', error: BUDGET_SKIPPED });
+    this.#options.store.runStarted(routine.id, this.#options.clock.now(), activityId);
+    this.#options.store.runFinished(routine.id, 'error');
+    this.#changed();
   }
 
   #finish(

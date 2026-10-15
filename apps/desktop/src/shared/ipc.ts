@@ -51,6 +51,7 @@ export const IPC = {
   clearSightLog: 'tagalong:sight-log:clear',
   setCalendarLink: 'tagalong:calendar:set-link',
   checkCalendar: 'tagalong:calendar:check',
+  usageSummary: 'tagalong:usage:summary',
   routineEvent: 'tagalong:panel:routine',
   routineDraftEvent: 'tagalong:office:routine-draft',
   turnEvent: 'tagalong:turn-event',

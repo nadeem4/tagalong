@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ActivityListParams, ActivityListResult } from './activity';
+import { UsageSummaryParams, UsageSummaryResult } from './usage';
 import {
   ConnectionsAddParams,
   ConnectionsAddResult,
@@ -516,6 +517,7 @@ export const hostToCoreMethods = {
   'sightLog.clear': { params: SightLogClearParams, result: SightLogClearResult },
   'calendar.setLink': { params: CalendarSetLinkParams, result: CalendarSetLinkResult },
   'calendar.check': { params: CalendarCheckParams, result: CalendarCheckResult },
+  'usage.summary': { params: UsageSummaryParams, result: UsageSummaryResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostMethods = {

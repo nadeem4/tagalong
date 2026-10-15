@@ -59,6 +59,7 @@ describe('openDatabase', { timeout: 20_000 }, () => {
         'routines',
         'schema_version',
         'sight_log',
+        'usage',
       ]);
       const row = db
         .prepare<[], { version: number }>('SELECT MAX(version) AS version FROM schema_version')

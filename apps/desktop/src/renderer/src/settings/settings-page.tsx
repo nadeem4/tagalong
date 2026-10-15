@@ -12,6 +12,7 @@ import {
 import { AdvancedSection } from './advanced-section';
 import { scoutBrain } from './brain';
 import { BrainSection } from './brain-section';
+import { BudgetSection } from './budget-section';
 import { BrowserSection } from './browser-section';
 import { ElevenLabsSection } from './elevenlabs-section';
 import { KeysSection } from './keys-section';
@@ -223,6 +224,7 @@ export function SettingsPage({
         keepAnEye: form.get('keepAnEye') !== null,
         pickUp: form.get('pickUp') !== null,
         userName: field('userName'),
+        dailyBudget: field('dailyBudget'),
         rollingMemoryEnabled: form.get('rollingMemoryEnabled') !== null,
         rollingMemoryMinutes: field('rollingMemoryMinutes'),
         watchMaxChecks: field('watchMaxChecks'),
@@ -322,6 +324,7 @@ export function SettingsPage({
           />
           <YouSection settings={settings} />
           <PrivacySection settings={settings} platform={view.platform} />
+          <BudgetSection settings={settings} />
           <VoiceSection settings={settings} hotkeyError={view.hotkeyError} />
           <ShortcutsSection settings={settings} hotkeyError={view.hotkeyError} />
           <BrowserSection token={view.pairingToken} />

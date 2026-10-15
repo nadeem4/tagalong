@@ -28,7 +28,14 @@ function win(id: string, title: string, extra: Partial<WindowEntry> = {}): Windo
   return { id, processName: 'Code.exe', title, state: 'foreground', browser: false, ...extra };
 }
 
-function setup(options: { reply?: string; settings?: Partial<Settings>; experts?: Expert[] } = {}) {
+function setup(
+  options: {
+    reply?: string;
+    settings?: Partial<Settings>;
+    experts?: Expert[];
+    spentOut?: () => boolean;
+  } = {},
+) {
   const clock = { t: 0, now: () => clock.t };
   const settings = Settings.parse({ ...options.settings });
   const reads: Array<string | undefined> = [];
@@ -80,6 +87,7 @@ function setup(options: { reply?: string; settings?: Partial<Settings>; experts?
       if (event.method === 'pet.remark') remarks.push(event.params);
       else moods.push(event.params);
     },
+    ...(options.spentOut !== undefined ? { spentOut: options.spentOut } : {}),
   });
   const at = async (ms: number, windows: WindowEntry[]) => {
     clock.t = ms;
@@ -138,6 +146,25 @@ describe('KeepAnEye', () => {
     await at(SETTLE_MS, [win('w-1', 'Build failed')]);
     expect(reads).toEqual([]);
     expect(requests).toEqual([]);
+  });
+
+  it('reads nothing and asks nothing once today’s budget is spent, and resumes after', async () => {
+    const budget = { spent: true };
+    const { at, reads, requests, remarks } = setup({
+      reply: 'Something.',
+      spentOut: () => budget.spent,
+    });
+    const code = win('w-1', 'Build failed');
+    await at(0, [code]);
+    await at(SETTLE_MS, [code]);
+    expect(reads).toEqual([]);
+    expect(requests).toEqual([]);
+    expect(remarks).toEqual([]);
+
+    budget.spent = false;
+    await at(SETTLE_MS * 2, [code]);
+    await at(SETTLE_MS * 3, [code]);
+    expect(requests).toHaveLength(1);
   });
 
   it('asks nothing when the host refuses the window as a blind spot', async () => {

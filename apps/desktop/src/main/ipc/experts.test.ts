@@ -15,6 +15,7 @@ function setup() {
     'experts.test': { ok: true },
     'handoffs.confirm': { handoffId: 'h1' },
     'projects.search': { projects: ['C:\\code\\app'] },
+    'usage.summary': { today: [], month: [] },
   });
   registerExpertIpc(ipc.handle, { engine: () => engine.client });
   return { ...ipc, calls: engine.calls };
@@ -29,6 +30,12 @@ describe('registerExpertIpc', () => {
       ['activity.list', { limit: 30 }],
       ['activity.list', { limit: 5, before: 'a9' }],
     ]);
+  });
+
+  it("reads Home's Spend card from the engine as it is", async () => {
+    const { invoke, calls } = setup();
+    expect(await invoke(IPC.usageSummary)).toEqual({ today: [], month: [] });
+    expect(calls).toEqual([['usage.summary', {}]]);
   });
 
   it('lists, saves, deletes and tests experts, unwrapping each answer', async () => {

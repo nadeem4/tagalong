@@ -346,6 +346,26 @@ describe('ask', () => {
     }
   });
 
+  it('meters the turn: usage.summary shows one Scout row, and the cap is off', async () => {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('ask', { petId: 'scout', input: { text: 'what does this cost?' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+
+    const res = await host.call('usage.summary', {});
+    const result = res['result'] as {
+      today: { source: string; inputTokens: number }[];
+      month: unknown[];
+      budget: { dailyUsd: number | null; spentOut: boolean };
+    };
+    expect(result.today).toHaveLength(1);
+    expect(result.today[0]?.source).toBe('scout');
+    expect(result.today[0]?.inputTokens).toBeGreaterThan(0);
+    expect(result.month).toHaveLength(1);
+    expect(result.budget).toEqual({ dailyUsd: null, spentOut: false });
+  });
+
   it('persists the exchange so a restart still has the conversation', async () => {
     const e = await boot();
     const host = await TestHost.connect(e.port);

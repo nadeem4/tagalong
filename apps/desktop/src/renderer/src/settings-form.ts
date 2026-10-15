@@ -1,4 +1,5 @@
 import {
+  MAX_DAILY_BUDGET_USD,
   MAX_ROLLING_MEMORY_MINUTES,
   MAX_SIGHT_LOG_DAYS,
   MIN_SIGHT_LOG_DAYS,
@@ -56,6 +57,8 @@ export interface SettingsFormValues {
   ears?: string;
   /** How many days What Scout saw keeps. Absent leaves the setting alone. */
   sightLogDays?: string;
+  /** The daily budget in dollars. Blank is no cap; absent leaves the setting alone. */
+  dailyBudget?: string;
 }
 
 /**
@@ -146,6 +149,9 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
           },
         }
       : {}),
+    ...(values.dailyBudget !== undefined
+      ? { budget: { dailyUsd: parseDailyBudget(values.dailyBudget) } }
+      : {}),
     ...(values.rollingMemoryMinutes !== undefined
       ? {
           rollingMemory: {
@@ -228,6 +234,20 @@ function refuseSharedHotkeys(values: SettingsFormValues): void {
 /** A name as typed, trimmed and cut to the cap: a long name is shortened, never refused. */
 export function cleanUserName(raw: string): string {
   return raw.trim().slice(0, MAX_USER_NAME_CHARS).trim();
+}
+
+/** Blank is no cap; otherwise dollars above zero, up to the typo guard. */
+function parseDailyBudget(raw: string): number | null {
+  const typed = raw.trim().replace(/^\$/, '');
+  if (typed === '') return null;
+  const usd = Number(typed);
+  if (!Number.isFinite(usd) || usd <= 0 || usd > MAX_DAILY_BUDGET_USD) {
+    throw new SettingsFieldError(
+      'dailyBudget',
+      `The daily budget must be an amount in dollars above 0 and at most $${MAX_DAILY_BUDGET_USD}, or blank for no cap.`,
+    );
+  }
+  return usd;
 }
 
 /** The speaking speed, within what still sounds like speech. */

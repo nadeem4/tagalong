@@ -154,7 +154,8 @@ app's own client is `apps/desktop/src/main/engine-client.ts`. Read
 | Scout thinks through your Claude Code sign-in, or OpenRouter, Nebius Token Factory, Anthropic or an OpenAI-compatible service          | An "always allow" for changes in connected apps                     |
 | Connections: Scout uses your apps over MCP (Notion, GitHub, Linear, Claude Code's servers); every change asks first                    |                                                                     |
 | Routines: Scout does things on its own, on a schedule or when something happens, and tells you in the bubble, aloud or by notification |                                                                     |
-| Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                                      | A cost dashboard                                                    |
+| Spend: Home shows what Scout and the experts used, and an optional daily budget pauses proactive comments and routines                 |                                                                     |
+| Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                                      | ElevenLabs voice cost on the Spend card                             |
 | Vision routing in the engine: a text-only model hands pictures to a vision model it names (Home sets none yet)                         | Data export and delete-all in Settings                              |
 | Memory across restarts, rolling screen memory Scout recalls from (opt-in), and watches Scout starts                                    | Code signing (the installer is unsigned) and an app icon of its own |
 | The Chrome extension: Scout in Chrome's side panel, reading the page you are on                                                        |                                                                     |
@@ -272,8 +273,12 @@ change works at once.
 Right-click the tray icon and choose **Open Tagalong**. The tray has only four items: **Open
 Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in eight pages:
 
-- **Overview**: whether Scout is ready and what it thinks with, your experts, and the latest
-  activity.
+- **Overview**: whether Scout is ready and what it thinks with, your experts, what was spent today
+  and this month (**Spend**), and the latest activity. Spend shows dollars for models with a known
+  price, tokens and "price unknown" for the rest, and tokens "(your plan)" for the Claude sign-in.
+  **Settings → Daily budget** (off by default) pauses keep-an-eye comments and scheduled routines
+  until midnight once that day's priced spend reaches it; asking Scout, Run now, watches and
+  hand-offs always go through.
 - **Scout**: how Scout thinks, a provider and a model. **Save** applies from the next question.
 - **Experts**: the tools Scout hands work to. **Add expert** starts from a template (**Coder**,
   **Debugger**, **Designer**, **Researcher**) or **Blank**, which fills in the name, what it is good

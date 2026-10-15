@@ -122,7 +122,10 @@ its result.
 - Connections: Scout uses the person's apps over MCP (Notion, GitHub, Linear, the servers already
   in Claude Code, or any MCP server). It reads on its own; every change shows a confirm card and
   runs only on Allow once. Tokens live in the OS keychain.
-- Not built yet: speech to text through ElevenLabs, expert templates, cost dashboard, macOS and
+- Spend: Home's Overview shows what Scout and the experts used today and this month (dollars for
+  priced models, tokens for the Claude sign-in and unknown models). An optional daily budget pauses
+  keep-an-eye comments and scheduled routines once it is spent; asking Scout always works.
+- Not built yet: speech to text through ElevenLabs, expert templates, macOS and
   Linux. Google Calendar and Gmail are not in Popular: their official MCP servers are a developer
   preview that needs your own Google Cloud project. The roadmap lives in Notion.
 

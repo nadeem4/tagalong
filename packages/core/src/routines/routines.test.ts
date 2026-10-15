@@ -81,6 +81,7 @@ function setup(
     db?: Database.Database;
     meetings?: () => Meeting[];
     problem?: () => string | null;
+    spentOut?: () => boolean;
   } = {},
 ) {
   const db =
@@ -141,6 +142,7 @@ function setup(
           },
         }
       : {}),
+    ...(options.spentOut !== undefined ? { spentOut: options.spentOut } : {}),
   });
   const results = () =>
     events.filter((e) => e.method === 'routine.result').map((e) => e.params as RoutineResultParams);
@@ -242,6 +244,35 @@ describe('Routines, on a schedule', () => {
     t.routines.stop();
   });
 
+  it('skips its time once today’s budget is spent, records why, and says nothing', async () => {
+    const t = setup({ spentOut: () => true });
+    const saved = t.store.save(PAPERS, MONDAY_759 - MINUTE);
+    t.routines.start();
+    await t.clock.advance(2 * MINUTE);
+    expect(t.asks).toHaveLength(0);
+    expect(t.activity).toEqual([
+      expect.objectContaining({
+        name: 'Morning papers',
+        state: 'error',
+        error: 'Skipped: today’s budget is spent.',
+      }),
+    ]);
+    expect(t.results()).toEqual([]);
+    expect(t.store.get(saved.id)?.lastState).toBe('error');
+    // The slot is used up, so the skip is not retried on every tick.
+    await t.clock.advance(30 * MINUTE);
+    expect(t.activity).toHaveLength(1);
+    t.routines.stop();
+  });
+
+  it('still runs on Run now when today’s budget is spent', async () => {
+    const t = setup({ spentOut: () => true });
+    const saved = t.store.save(PAPERS, MONDAY_759 - MINUTE);
+    expect(await t.routines.runNow(saved.id)).toBe(true);
+    expect(t.asks).toHaveLength(1);
+    expect(t.activity[0]).toMatchObject({ state: 'done' });
+  });
+
   it('says when it runs next, for Home', () => {
     const t = setup();
     t.store.save(PAPERS, MONDAY_759 - MINUTE);
@@ -250,6 +281,19 @@ describe('Routines, on a schedule', () => {
 });
 
 describe('Routines, on a trigger', () => {
+  it('skips launch, watch and expert triggers once today’s budget is spent', async () => {
+    const t = setup({ spentOut: () => true });
+    t.store.save({ ...PAPERS, name: 'Hello', when: { type: 'launch' } }, MONDAY_759);
+    t.store.save({ ...PAPERS, name: 'On watch', when: { type: 'watch' } }, MONDAY_759);
+    t.routines.start();
+    await t.clock.advance(0);
+    t.routines.watchFired('The build finished.');
+    await t.clock.advance(0);
+    expect(t.asks).toHaveLength(0);
+    expect(t.activity.map((row) => row.name).sort()).toEqual(['Hello', 'On watch']);
+    t.routines.stop();
+  });
+
   it('runs a "Tagalong opens" routine at start', async () => {
     const t = setup();
     t.store.save({ ...PAPERS, name: 'Hello', when: { type: 'launch' } }, MONDAY_759);

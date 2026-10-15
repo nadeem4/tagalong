@@ -13,6 +13,7 @@ import {
   type CheckResult,
   type Connector,
   type ConnectorResult,
+  type ConnectorUsage,
 } from './connector';
 
 /** The slice of a child process the connector needs, so tests never start a real claude. */
@@ -213,11 +214,14 @@ export class ClaudeCodeConnector implements Connector {
       child.write(renderBrief(brief));
       const changed = new Set<string>();
       let final: ConnectorResult | undefined;
+      let model = '';
 
       for await (const line of child.lines) {
         const event = parse(line);
         if (!event) continue;
-        if (event.type === 'assistant') {
+        if (event.type === 'system' && typeof event.model === 'string') {
+          model = event.model;
+        } else if (event.type === 'assistant') {
           for (const block of event.message?.content ?? []) {
             if (block.type !== 'tool_use') continue;
             const step = describeTool(block.name, block.input);
@@ -228,9 +232,10 @@ export class ClaudeCodeConnector implements Connector {
           }
         } else if (event.type === 'result') {
           const text = event.result ?? '';
+          const usage = usageOf(event, model);
           final = event.is_error
-            ? { ok: false, error: text }
-            : { ok: true, text, changedFiles: [...changed] };
+            ? { ok: false, error: text, ...usage }
+            : { ok: true, text, changedFiles: [...changed], ...usage };
         }
       }
 
@@ -264,7 +269,36 @@ interface StreamEvent {
   type?: string;
   is_error?: boolean;
   result?: string;
+  /** On the `system` init event: the model the run uses. */
+  model?: unknown;
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_creation_input_tokens?: number;
+    cache_read_input_tokens?: number;
+  };
   message?: { content?: { type: string; name: string; input?: ToolInput }[] };
+}
+
+/**
+ * The run's tokens from its `result` event, for the cost meter. Cache reads and writes
+ * count as input: on a cached run `input_tokens` alone is a handful. Tokens only, never
+ * `total_cost_usd`: on the person's plan that number is not money they pay.
+ */
+function usageOf(event: StreamEvent, model: string): { usage?: ConnectorUsage } {
+  const usage = event.usage;
+  if (usage === undefined) return {};
+  const count = (n: number | undefined) => (typeof n === 'number' && n > 0 ? Math.round(n) : 0);
+  return {
+    usage: {
+      model,
+      inputTokens:
+        count(usage.input_tokens) +
+        count(usage.cache_creation_input_tokens) +
+        count(usage.cache_read_input_tokens),
+      outputTokens: count(usage.output_tokens),
+    },
+  };
 }
 
 function parse(line: string): StreamEvent | undefined {

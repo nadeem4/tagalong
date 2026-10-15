@@ -31,6 +31,8 @@ export interface KeepAnEyeOptions {
       | { method: 'pet.remark'; params: PetRemarkParams }
       | { method: 'pet.mood'; params: PetMoodParams },
   ) => void;
+  /** The daily budget gate (`budgetSpent`): true means today's cap is reached. */
+  spentOut?: () => boolean;
   log?: (message: string) => void;
   timeoutMs?: number;
 }
@@ -66,6 +68,9 @@ export class KeepAnEye {
       this.#options.emit({ method: 'pet.mood', params: { petId: moodPet.id, mood } });
     }
     if (this.#busy) return;
+    // Proactive, so it waits once today's budget is spent: nothing is read or asked.
+    // Moods above call no model, so they carry on.
+    if (this.#options.spentOut?.() === true) return;
     const glance = this.#lookout.observe(windows, settings.captureExclusions);
     if (glance === null) return;
     const pet = this.#options.pet();

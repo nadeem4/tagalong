@@ -147,6 +147,33 @@ describe('buildSettingsPatch', () => {
   });
 });
 
+describe('buildSettingsPatch daily budget', () => {
+  it('leaves the budget alone when the form does not carry it', () => {
+    expect(buildSettingsPatch(values).budget).toBeUndefined();
+  });
+
+  it('sends no cap for an empty box, and dollars for a number', () => {
+    expect(buildSettingsPatch({ ...values, dailyBudget: '' }).budget).toEqual({ dailyUsd: null });
+    expect(buildSettingsPatch({ ...values, dailyBudget: ' 1 ' }).budget).toEqual({ dailyUsd: 1 });
+    expect(buildSettingsPatch({ ...values, dailyBudget: '2.50' }).budget).toEqual({
+      dailyUsd: 2.5,
+    });
+  });
+
+  it('refuses a cap that is not a positive amount, naming the field', () => {
+    for (const typed of ['-1', '0', 'a dollar', '5000']) {
+      let thrown: unknown;
+      try {
+        buildSettingsPatch({ ...values, dailyBudget: typed });
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).toBeInstanceOf(SettingsFieldError);
+      expect((thrown as SettingsFieldError).field).toBe('dailyBudget');
+    }
+  });
+});
+
 describe('what a rejected save tells the user', () => {
   it('names the field, not just that something was wrong', () => {
     // A save that refuses with "invalid input" is the same lie as one that silently keeps

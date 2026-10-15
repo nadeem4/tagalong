@@ -1128,7 +1128,9 @@ on, the model list, `savePet`) and the settings form as a slot.
   Settings does (`settings/brain.ts#scoutBrain`, the Claude sign-in or a stored key) and the sight
   pause, and `overviewStatus` says "Ready" only when Scout can think and see; otherwise "Signed out of
   Claude Code", "No API key", "Claude Code is not installed", "Couldn’t check its sign-in", "Not
-  running" or "Ready, sight paused", with an amber dot.
+  running" or "Ready, sight paused", with an amber dot. Below them the **Spend** card
+  (`home/spend-card.tsx`, `HostBridge.usageSummary` → `usage.summary`) lists today and this month;
+  see [Usage and budget](#usage-and-budget).
 - **Scout** (the companion's name): how it thinks, a provider and a model, saved with `savePet`.
   Changing provider drops the vision and watch models, which named the old provider's models. Its
   role is always the Companion.
@@ -2328,3 +2330,53 @@ flowchart LR
   C -- "Open" --> A["allowlist, then openExternal / openPath"]
   C -- "Brief again" --> H["HandoffManager.propose"]
 ```
+
+## Usage and budget
+
+The cost meter records what each model call and expert run used, as counts only, and the daily
+budget pauses proactive work once a day's priced spend reaches it. The code is in
+`packages/core/src/usage/`.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%
+flowchart LR
+  R["resolve: meterBrain(guardBrain(provider))"] -->|"scout row"| U[("usage table")]
+  H["HandoffManager: ConnectorResult.usage"] -->|"expert row"| U
+  U --> S["usage.summary: Home's Spend card"]
+  U --> G["budgetSpent: the one gate"]
+  G --> K["KeepAnEye.observe"]
+  G --> RT["Routines: schedule, launch, app, watch, expert"]
+```
+
+- **Two capture points.** Scout's: `meterBrain` wraps the single `resolve` in `engine.ts`, outside
+  `guardBrain`, so turns, keep-an-eye, routines, watches, the greeting, summaries and every later
+  feature that calls `resolve` are metered with nothing to add. After each `complete` it records
+  `provider.id`, `request.model` and `result.usage`, aborted calls included; a call that throws
+  records nothing, and a record that fails never fails the call. The experts': `ClaudeCodeConnector`
+  reads `usage` from the stream-json `result` event (cache reads and writes count as input) and the
+  model from the `system` init event into the optional `ConnectorResult.usage`, and
+  `HandoffManager` records it as an `expert` row. Every expert run goes through `HandoffManager`; a
+  new connector should fill `usage` when its tool reports tokens.
+- **Prices.** `usage/prices.ts` is a small table keyed `providerId/model`, dollars per million input
+  and output tokens, with the date it was last checked. It covers Anthropic's `claude-opus-5`,
+  `claude-sonnet-5` and `claude-haiku-4-5` and OpenRouter's two Anthropic fallbacks. Anything else,
+  Token Factory's Nemotron models included, has no price (`null`): the card says "price unknown" and
+  never guesses. `claude-code`, as Scout's brain or as an expert, is always `null`: it is the
+  person's plan, shown as tokens, never dollars (Claude Code's `total_cost_usd` is ignored). The
+  cost is worked out once, when the row is written.
+- **Storage.** `usage(id, at, source CHECK IN ('scout','expert'), provider_id, model, input_tokens,
+output_tokens, cost_usd REAL NULL)` with an index on `at`. `UsageLog.summary()` groups today and
+  this month by source and provider in the person's time zone (local midnight, not UTC);
+  `todayUsd()` sums priced rows only.
+- **The cap.** `budget.dailyUsd` in settings, `null` (off) by default. `budgetSpent(usage, cap)` is
+  the one gate, built once in `engine.ts` and passed as `spentOut` to `KeepAnEye` and `Routines`.
+  It is read only when something starts, never in the middle. Stopped: `KeepAnEye.observe` (no
+  read, no call) and `Routines.#run` for every trigger except Run now; a skipped run is recorded in
+  Activity as "Skipped: today's budget is spent." and is never said. Never stopped: asks,
+  `routines.runNow`, watches the person started, confirmed hand-offs and summaries. Any later
+  proactive feature (nudges, meeting prep, a daily briefing) must call the same gate. Only priced
+  dollars count, so on the Claude sign-in alone the cap never trips.
+- **Home.** `usage.summary` answers `{ today, month, todayUsd, budget: { dailyUsd, spentOut } }`;
+  the Spend card re-reads it on the same notifications that refresh Activity, and shows "Proactive
+  comments paused: today's $N is spent." while `spentOut` is true. Settings → **Daily budget** sets
+  the cap.

@@ -224,6 +224,8 @@ every weekday at 8. Nothing becomes a routine until you press **Save**, on Scout
   the keychain.
 - **During a call.** A prep that is still waiting when the meeting starts goes out as a Windows
   notification only, never spoken aloud.
+- **The daily budget.** With a cap set, a routine that comes due after that day's priced spend
+  reached it does not run; Activity records it as skipped. **Run now** always runs.
 - Routines are kept in the database on this computer (`routines` table). Delete one in Home, or ask
   Scout to, and it is gone.
 
@@ -400,6 +402,9 @@ tracking at all: the window list is not even taken.
   and no model called, at most once a minute, and never for a blind spot, a call or full screen.
   A finished hand-off can make Scout wince or cheer too, from the expert's own reply, which is
   already on this computer.
+- **The daily budget stops it too.** With a cap set under Settings → **Daily budget**, once that
+  day's priced spend reaches it no window is looked at and no call is made until midnight. Moods
+  carry on, since they call no model.
 
 ### Dozing: your idle time
 
@@ -426,6 +431,17 @@ snapshot at all, and switching it off deletes the one kept.
   starts. Nothing opens until you press a button on the card. **Open** opens only a folder that
   pick-up named, through VS Code's or Cursor's own link or Explorer; **Brief again** only fills in
   the hand-off card, which waits for Send. No keys are typed and the mouse is never moved.
+
+## Spend: what the cost meter keeps
+
+Every model call Scout makes and every expert run is counted in the local database, for Home's
+**Spend** card and the daily budget.
+
+- **Counts only:** when, Scout or an expert, the provider, the model, input and output tokens, and
+  the dollar cost when the model has a known price. Never what was asked, said, read or seen.
+- **Stays on this computer.** Nothing about it is sent anywhere; prices come from a table built into
+  the app, so working out a cost makes no network call.
+- **The Claude sign-in is shown as tokens only,** as your plan, never as money.
 
 ## Rolling memory: what the buffer holds
 

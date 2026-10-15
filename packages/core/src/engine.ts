@@ -67,6 +67,7 @@ import { recordSnapshot, sightedHosts } from './perception/record-sight';
 import { recordBrain } from './providers/record-brain';
 import { recordExpertSends } from './experts/record-expert';
 import { CalendarFeed, httpsFetchText, type FetchText } from './meetings/calendar-feed';
+import { UsageLog, budgetSpent, meterBrain } from './usage';
 
 /** Key the Anthropic API key is filed under in the host's SecretStore. */
 export const ANTHROPIC_KEY = SECRET_KEYS.anthropic!;
@@ -258,11 +259,21 @@ export class Engine {
       exclusions: () => settings.get().captureExclusions,
     });
     sightLog.prune();
+    // The cost meter: counts only, in the person's zone. One gate for all proactive work.
+    const usage = new UsageLog(db, {
+      now: () => Date.now(),
+      timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+    });
+    const spentOut = budgetSpent(usage, () => settings.get().budget.dailyUsd);
     // Every brain is guarded: no key, token or password in anything sent reaches a model.
     const guarded: ProviderResolver = (pet) =>
       guardBrain(typeof provider === 'function' ? provider(pet) : provider);
-    // And recorded: each call writes one "Sent to AI" row.
-    const resolve: ProviderResolver = (pet) => recordBrain(guarded(pet), sightLog);
+    // And recorded: each call writes one "Sent to AI" row. Metered outermost: every call
+    // through here is counted, so nothing new can skip it.
+    const resolve: ProviderResolver = (pet) =>
+      meterBrain(recordBrain(guarded(pet), sightLog), (call) =>
+        usage.record({ source: 'scout', ...call }),
+      );
     const summarizer = new Summarizer({
       store,
       memories: memory,
@@ -328,6 +339,7 @@ export class Engine {
         }
       },
       projects,
+      usage,
     });
     const routes = new RouteMemory(db);
     /** What is open, titles only: null with no host connected, empty when none can list. */
@@ -356,6 +368,7 @@ export class Engine {
       propose: (params) => handoffs.propose(params),
       emit: (event) => live.server?.broadcast(event.method, event.params),
       log: (message) => console.warn(`[engine] ${message}`),
+      spentOut,
     });
     // The person's apps over MCP. Each connects on its own; one that fails never stops boot.
     const connections = new ConnectionManager({
@@ -455,6 +468,7 @@ export class Engine {
       emit: (event) => live.server?.broadcast(event.method, event.params),
       log: (message) => console.warn(`[engine] ${message}`),
       meetings: calendar,
+      spentOut,
     });
     live.routines = routines;
 
@@ -501,6 +515,12 @@ export class Engine {
       refreshProviders: async () => keyed?.refresh(),
       models: (providerId) =>
         listModels(providerId, options.secretStore, settings, options.env ?? process.env),
+    });
+    // Home's Spend card.
+    handlers['usage.summary'] = () => ({
+      ...usage.summary(),
+      todayUsd: usage.todayUsd(),
+      budget: { dailyUsd: settings.get().budget.dailyUsd, spentOut: spentOut() },
     });
 
     const server = await EngineServer.start({
