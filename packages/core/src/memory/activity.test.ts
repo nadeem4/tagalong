@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type Database from 'better-sqlite3';
-import { ActivityLog } from './activity';
+import { ACTIVITY_TEXT_CHARS, ActivityLog } from './activity';
 import { openDatabase } from './db';
 import { ConversationStore } from './store';
 
@@ -152,6 +152,19 @@ describe('ActivityLog.list', () => {
 });
 
 describe('expert hand-offs', () => {
+  it('rewrites what the expert was told when a note is passed on, clipped like any text', () => {
+    const id = log.expertStarted({
+      petId: 'scout',
+      expertId: 'claude-code',
+      expertName: 'Claude Code',
+      text: 'Fix it',
+    });
+    log.expertBriefed(id, 'Fix it\n\nPassed on while it worked:\n- use dayjs');
+    expect(log.list({}).entries[0]?.text).toBe('Fix it\n\nPassed on while it worked:\n- use dayjs');
+    log.expertBriefed(id, 'x'.repeat(ACTIVITY_TEXT_CHARS + 10));
+    expect(log.list({}).entries[0]?.text).toHaveLength(ACTIVITY_TEXT_CHARS);
+  });
+
   it('records the brief, then the answer and the files changed', () => {
     const id = log.expertStarted({
       petId: 'scout',

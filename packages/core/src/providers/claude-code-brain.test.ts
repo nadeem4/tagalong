@@ -23,6 +23,7 @@ function fakeSpawn(runs: unknown[][]): { spawn: SpawnFn; calls: Spawned[] } {
       write: (text) => {
         call.stdin += text;
       },
+      end: () => {},
       lines: (async function* () {
         for (const line of lines) {
           if (killed) return;

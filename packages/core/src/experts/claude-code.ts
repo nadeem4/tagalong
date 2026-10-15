@@ -14,11 +14,16 @@ import {
   type Connector,
   type ConnectorResult,
   type ConnectorUsage,
+  type NoteQueue,
+  type StepKind,
 } from './connector';
 
 /** The slice of a child process the connector needs, so tests never start a real claude. */
 export interface ChildRun {
+  /** Writes to stdin, which stays open: a stream-json session reads one message per line. */
   write(text: string): void;
+  /** Closes stdin: Claude Code finishes its last turn and exits. */
+  end(): void;
   /** stdout, one line at a time. */
   lines: AsyncIterable<string>;
   /** Resolves with the exit code, or null when the process was killed. */
@@ -101,7 +106,7 @@ export class ClaudeCodeConnector implements Connector {
         return { ok: false, error: NOT_INSTALLED };
       return { ok: false, error: `Claude Code did not start: ${(error as Error).message}` };
     }
-    child.write('');
+    child.end();
     for await (const line of child.lines) void line;
     const code = await child.exit;
     if (code === 0) return { ok: true };
@@ -113,8 +118,9 @@ export class ClaudeCodeConnector implements Connector {
 
   async send(
     brief: Brief,
-    onProgress: (step: string) => void,
+    onProgress: (step: string, kind?: StepKind) => void,
     signal?: AbortSignal,
+    notes?: NoteQueue,
   ): Promise<ConnectorResult> {
     if (signal?.aborted) return CANCELLED;
     const research = this.options.research === true;
@@ -149,7 +155,7 @@ export class ClaudeCodeConnector implements Connector {
       }
     }
     try {
-      return await this.run(brief, onProgress, folder, canEdit, tools, promptFile, signal);
+      return await this.run(brief, onProgress, folder, canEdit, tools, promptFile, signal, notes);
     } finally {
       removeQuietly(promptDir);
     }
@@ -157,15 +163,20 @@ export class ClaudeCodeConnector implements Connector {
 
   private async run(
     brief: Brief,
-    onProgress: (step: string) => void,
+    onProgress: (step: string, kind?: StepKind) => void,
     folder: string,
     canEdit: boolean,
     tools: readonly string[],
     promptFile: string | undefined,
     signal: AbortSignal | undefined,
+    notes: NoteQueue | undefined,
   ): Promise<ConnectorResult> {
     const args = [
       '-p',
+      // Messages in as JSON lines too: the session stays alive between turns until stdin
+      // closes, so a note from the person can follow in the same session.
+      '--input-format',
+      'stream-json',
       '--output-format',
       'stream-json',
       '--verbose',
@@ -211,7 +222,7 @@ export class ClaudeCodeConnector implements Connector {
     signal?.addEventListener('abort', onAbort, { once: true });
 
     try {
-      child.write(renderBrief(brief));
+      child.write(userMessage(renderBrief(brief)));
       const changed = new Set<string>();
       let final: ConnectorResult | undefined;
       let model = '';
@@ -223,9 +234,14 @@ export class ClaudeCodeConnector implements Connector {
           model = event.model;
         } else if (event.type === 'assistant') {
           for (const block of event.message?.content ?? []) {
+            if (block.type === 'text') {
+              const said = firstSentence(block.text);
+              if (said) onProgress(said, 'say');
+              continue;
+            }
             if (block.type !== 'tool_use') continue;
             const step = describeTool(block.name, block.input);
-            if (step) onProgress(step);
+            if (step) onProgress(step, 'tool');
             if (EDIT_TOOLS.includes(block.name) && typeof block.input?.file_path === 'string') {
               changed.add(block.input.file_path);
             }
@@ -236,6 +252,15 @@ export class ClaudeCodeConnector implements Connector {
           final = event.is_error
             ? { ok: false, error: text, ...usage }
             : { ok: true, text, changedFiles: [...changed], ...usage };
+          // The turn is over. Notes waiting from the person go in as the next message, in
+          // the same session; with none, stdin closes and this result is the answer.
+          const waiting = event.is_error ? [] : (notes?.take() ?? []);
+          if (waiting.length > 0) {
+            const list = waiting.map((note) => `- ${note}`).join('\n');
+            child.write(userMessage(hideSecrets(`From the person, while you worked:\n${list}`)));
+          } else {
+            child.end();
+          }
         }
       }
 
@@ -260,6 +285,23 @@ function removeQuietly(dir: string | undefined): void {
   }
 }
 
+/** One user message as `--input-format stream-json` reads it: a JSON object on one line. */
+function userMessage(text: string): string {
+  return `${JSON.stringify({ type: 'user', message: { role: 'user', content: text } })}\n`;
+}
+
+/** The most a spoken line from the expert's narration may be. */
+const SAY_CHARS = 120;
+
+/** The first sentence of what the expert wrote, secrets hidden, short enough to say aloud. */
+function firstSentence(text: unknown): string | undefined {
+  if (typeof text !== 'string') return undefined;
+  const plain = hideSecrets(text).replace(/\s+/g, ' ').trim();
+  if (plain === '') return undefined;
+  const sentence = /^(.+?[.!?])(\s|$)/.exec(plain)?.[1] ?? plain;
+  return sentence.length <= SAY_CHARS ? sentence : `${sentence.slice(0, SAY_CHARS - 1)}…`;
+}
+
 interface ToolInput {
   file_path?: unknown;
   pattern?: unknown;
@@ -277,7 +319,7 @@ interface StreamEvent {
     cache_creation_input_tokens?: number;
     cache_read_input_tokens?: number;
   };
-  message?: { content?: { type: string; name: string; input?: ToolInput }[] };
+  message?: { content?: { type: string; name: string; text?: unknown; input?: ToolInput }[] };
 }
 
 /**
@@ -356,7 +398,10 @@ export function spawnChild(command: string, args: string[], { cwd }: { cwd: stri
   });
   return {
     write: (text) => {
-      child.stdin.end(text);
+      child.stdin.write(text);
+    },
+    end: () => {
+      child.stdin.end();
     },
     lines: createInterface({ input: child.stdout }),
     exit,

@@ -1,6 +1,10 @@
 import { Answer } from './answer';
 import { useState } from 'react';
-import type { HandoffProposedParams, ProjectCandidate } from '@tagalong/protocol';
+import type {
+  HandoffProgressParams,
+  HandoffProposedParams,
+  ProjectCandidate,
+} from '@tagalong/protocol';
 import { useHostBridge } from './host-bridge';
 
 /** What one finished step of a two-step hand-off sent back, kept while step 2 works. */
@@ -8,6 +12,12 @@ export interface StepResult {
   expertName: string;
   text?: string | undefined;
   changedFiles?: string[] | undefined;
+}
+
+/** Something the person told Scout to pass on to the working expert, and where it got to. */
+export interface PassedNote {
+  text: string;
+  state: 'waiting' | 'delivered' | 'dropped';
 }
 
 /** A hand-off as the bubble shows it: proposed, running, or come back. */
@@ -21,6 +31,8 @@ export type Handoff =
       expertName: string;
       project: string;
       steps: string[];
+      /** Notes the person passed on while it works, in the order they were given. */
+      notes?: PassedNote[] | undefined;
       /** A two-step hand-off: who comes next, or what step 1 already sent back. */
       chain?: { step: 1; nextName: string } | { step: 2; earlier: StepResult } | undefined;
     }
@@ -35,7 +47,39 @@ export type Handoff =
       earlier?: StepResult | undefined;
       /** Step 2's expert, when step 1 failed or was stopped so step 2 never ran. */
       skipped?: string | undefined;
+      /** Notes that never reached the expert: it finished first. */
+      dropped?: string[] | undefined;
     };
+
+type Working = Extract<Handoff, { phase: 'working' }>;
+
+/**
+ * One progress event on the working card: a note queued, delivered or dropped, or one more
+ * step (a tool, or a line the expert wrote).
+ */
+export function withProgress(current: Working, event: HandoffProgressParams): Working {
+  const notes = current.notes ?? [];
+  if (event.kind === 'note') {
+    return { ...current, notes: [...notes, { text: event.step, state: 'waiting' }] };
+  }
+  if (event.kind === 'delivered' || event.kind === 'dropped') {
+    const state = event.kind;
+    const index = notes.findIndex((note) => note.state === 'waiting' && note.text === event.step);
+    return {
+      ...current,
+      notes:
+        index === -1
+          ? [...notes, { text: event.step, state }]
+          : notes.map((note, i) => (i === index ? { ...note, state } : note)),
+    };
+  }
+  return { ...current, steps: [...current.steps, event.step] };
+}
+
+/** The notes that never reached the expert, once it has finished: still waiting, or dropped. */
+export function undelivered(current: Working): string[] {
+  return (current.notes ?? []).filter((note) => note.state !== 'delivered').map((n) => n.text);
+}
 
 function nameOf(path: string): string {
   return (
@@ -332,6 +376,22 @@ export function HandoffStatus({
             <li key={index}>{step}</li>
           ))}
         </ul>
+        {handoff.notes !== undefined && handoff.notes.length > 0 && (
+          <div className="handoff-notes" aria-live="polite">
+            {handoff.notes.map((note, index) => (
+              <p key={index}>
+                <strong>Passed on: {note.text}</strong>{' '}
+                <em>
+                  {note.state === 'waiting'
+                    ? `waiting for ${handoff.expertName} to finish this step`
+                    : note.state === 'delivered'
+                      ? 'delivered'
+                      : `not passed on: ${handoff.expertName} finished first`}
+                </em>
+              </p>
+            ))}
+          </div>
+        )}
         <div className="bubble-row bubble-hints">
           <span>{handoff.project} · keep working, I’ll tell you</span>
           <button type="button" className="bubble-quiet" onClick={onStop}>
@@ -384,6 +444,11 @@ export function HandoffStatus({
       {handoff.skipped !== undefined && (
         <p className="bubble-hints">{handoff.skipped} did not start.</p>
       )}
+      {handoff.dropped?.map((note, index) => (
+        <p key={index} className="bubble-hints">
+          Not passed on: {note}
+        </p>
+      ))}
       <div className="bubble-row">
         <button type="button" className="bubble-quiet" onClick={onDismiss}>
           Dismiss
@@ -415,6 +480,10 @@ export const HANDOFF_CSS = `
   font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; font-size: 12px; color: #A3AAC4;
 }
 .handoff-steps li:last-child { color: #E9ECF5; }
+.handoff-notes { display: flex; flex-direction: column; gap: 4px; }
+.handoff-notes p { margin: 0; font-size: 12px; line-height: 1.5; color: #E9ECF5; }
+.handoff-notes strong { font-weight: 600; }
+.handoff-notes em { font-style: italic; color: #A3AAC4; }
 .connector-details { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 160px; overflow-y: auto; }
 .routine-card .handoff-rows dt { width: 72px; }
 .handoff-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #F2C14E; }

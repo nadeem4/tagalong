@@ -1576,6 +1576,24 @@ Needs GitHub connected (Home → Connections → GitHub, with a token) and a rea
 10. Drop a file, wait more than ten minutes, then press **Explain**: Scout says to drop it again,
     and nothing is sent.
 
+## Steer an expert mid-task _(real Claude Code)_
+
+Needs Claude Code installed and signed in, and an expert that may edit a small test project.
+
+1. Ask Scout to fix something in the project and press **Send**. While "Coder is on it", Scout says
+   a line now and then from what Claude Code writes ("Found the bug in `date.ts`"), never more than
+   one every 20 seconds, and only while Scout talks is on. Tool steps ("Reading ...") stay silent.
+2. Tell Scout "tell Coder to use dayjs, not moment". Scout answers "I'll pass that to Coder". The
+   card shows **Passed on: use dayjs, not moment**, _waiting for Coder to finish this step_, then
+   _delivered_; the final answer reflects the note.
+3. Home → Activity: the expert row's "What Coder was told" ends with "Passed on while it worked:"
+   and the note. Home → What Scout saw: a "Sent to expert" row for the brief and one for the note.
+4. Start another hand-off and press **Stop** while it works: it stops at once. Tell Scout something
+   for it afterwards: Scout says no expert is working.
+5. With two hand-offs running, "tell it to hurry" makes Scout ask which one.
+6. A note given just as the expert finishes: the card shows _not passed on: Coder finished first_,
+   and Scout's finish line says it could not pass the note on.
+
 ## Not in this build
 
 Do not test these here.

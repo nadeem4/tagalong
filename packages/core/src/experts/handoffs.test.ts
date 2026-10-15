@@ -756,3 +756,121 @@ describe('proposals', () => {
     );
   });
 });
+
+describe('steering a running hand-off', () => {
+  /** An expert that works one turn, then takes the notes waiting, as Claude Code does. */
+  function turnConnector() {
+    let endTurn: () => void = () => {};
+    const turnEnded = new Promise<void>((resolve) => (endTurn = resolve));
+    const received: string[][] = [];
+    const connector: Connector = {
+      check: () => Promise.resolve({ ok: true }),
+      send: async (_brief, onProgress, signal, notes) => {
+        onProgress('Found the bug in date.ts.', 'say');
+        await Promise.race([
+          turnEnded,
+          new Promise((resolve) => signal?.addEventListener('abort', resolve)),
+        ]);
+        if (signal?.aborted) return { ok: false, error: 'Cancelled.' };
+        received.push(notes?.take() ?? []);
+        return { ok: true, text: 'Used dayjs.', changedFiles: [] };
+      },
+    };
+    return { connector, endTurn, received };
+  }
+
+  const start = (handoffs: HandoffManager) =>
+    handoffs.start({
+      expertId: 'claude-code',
+      petId: 'scout',
+      brief: { ask: 'Fix the dates' },
+      folder: 'C:\\r',
+    }).handoffId;
+
+  const progress = () => events.flatMap((e) => (e.method === 'handoff.progress' ? [e.params] : []));
+
+  it('lists what is running, by expert and ask', () => {
+    const { connector } = turnConnector();
+    const handoffs = manager(connector);
+    const handoffId = start(handoffs);
+    expect(handoffs.running()).toEqual([
+      { handoffId, expertId: 'claude-code', expertName: 'Claude Code', ask: 'Fix the dates' },
+    ]);
+  });
+
+  it('queues a note, delivers it when the turn ends, and keeps it in the activity text', async () => {
+    const { connector, endTurn, received } = turnConnector();
+    const handoffs = manager(connector);
+    const handoffId = start(handoffs);
+
+    expect(handoffs.steer(handoffId, '  use dayjs, not moment ')).toEqual({ ok: true });
+    endTurn();
+    await vi.waitFor(() => expect(finished()).toBeDefined());
+
+    expect(received).toEqual([['use dayjs, not moment']]);
+    expect(progress()).toEqual([
+      { handoffId, expertId: 'claude-code', step: 'Found the bug in date.ts.', kind: 'say' },
+      { handoffId, expertId: 'claude-code', step: 'use dayjs, not moment', kind: 'note' },
+      { handoffId, expertId: 'claude-code', step: 'use dayjs, not moment', kind: 'delivered' },
+    ]);
+    expect(activity.list({}).entries[0]?.text).toBe(
+      'Fix the dates\n\nPassed on while it worked:\n- use dayjs, not moment',
+    );
+  });
+
+  it('hides secrets in a note before it is queued, shown or kept', async () => {
+    const { connector, endTurn, received } = turnConnector();
+    const handoffs = manager(connector);
+    const handoffId = start(handoffs);
+    handoffs.steer(handoffId, 'the key is sk-ant-abcdefghijklmnopqrstuvwxyz0123');
+    endTurn();
+    await vi.waitFor(() => expect(finished()).toBeDefined());
+    expect(JSON.stringify([received, events, activity.list({})])).not.toContain('sk-ant-');
+  });
+
+  it('refuses an unknown or finished hand-off, and an empty note', async () => {
+    const { connector, endTurn } = turnConnector();
+    const handoffs = manager(connector);
+    const handoffId = start(handoffs);
+    expect(handoffs.steer(handoffId, '   ')).toMatchObject({ ok: false });
+    expect(handoffs.steer('no-such-id', 'hi')).toMatchObject({ ok: false });
+    endTurn();
+    await vi.waitFor(() => expect(finished()).toBeDefined());
+    expect(handoffs.steer(handoffId, 'too late')).toEqual({
+      ok: false,
+      error: 'That hand-off is not running, so there is no one to tell.',
+    });
+    expect(handoffs.running()).toEqual([]);
+  });
+
+  it('drops a note queued during the last turn, before the finish, saying so', async () => {
+    let handoffId = '';
+    const late: Connector = {
+      check: () => Promise.resolve({ ok: true }),
+      send: async () => {
+        await Promise.resolve();
+        handoffs.steer(handoffId, 'one more thing');
+        return { ok: true, text: 'Done.', changedFiles: [] };
+      },
+    };
+    const handoffs = manager(late);
+    handoffId = start(handoffs);
+    await vi.waitFor(() => expect(finished()).toBeDefined());
+    const kinds = events.map((e) =>
+      e.method === 'handoff.progress' ? `${e.params.kind}:${e.params.step}` : e.method,
+    );
+    expect(kinds).toEqual(['note:one more thing', 'dropped:one more thing', 'handoff.finished']);
+    expect(activity.list({}).entries[0]?.text).toBe('Fix the dates');
+  });
+
+  it('drops waiting notes when the hand-off is stopped', async () => {
+    const { connector } = turnConnector();
+    const handoffs = manager(connector);
+    const handoffId = start(handoffs);
+    handoffs.steer(handoffId, 'use dayjs');
+    handoffs.cancel(handoffId);
+    await vi.waitFor(() => expect(finished()).toBeDefined());
+    expect(progress().map((p) => p.kind)).toEqual(['say', 'note', 'dropped']);
+    expect(handoffs.steer(handoffId, 'again')).toMatchObject({ ok: false });
+  });
+});

@@ -75,10 +75,19 @@ export const HandoffsCancelParams = z.object({ handoffId: z.uuid() });
 export const HandoffsCancelResult = z.object({ cancelled: z.boolean() });
 
 /** A short step while the expert works, such as "Reading src/main.ts". */
+/**
+ * What a progress step is: a tool the expert used, a line it wrote that Scout may say aloud,
+ * or a note from the person, queued (`note`), passed on (`delivered`), or not passed on
+ * because the run ended first (`dropped`). Left out on older steps: a tool step.
+ */
+export const HandoffStepKind = z.enum(['tool', 'say', 'note', 'delivered', 'dropped']);
+export type HandoffStepKind = z.infer<typeof HandoffStepKind>;
+
 export const HandoffProgressParams = z.object({
   handoffId: z.uuid(),
   expertId: z.string().min(1),
   step: z.string().min(1),
+  kind: HandoffStepKind.optional(),
 });
 
 export const HandoffFinishedParams = z.object({
@@ -94,6 +103,7 @@ export const HandoffFinishedParams = z.object({
     .optional(),
 });
 export type HandoffFinishedParams = z.infer<typeof HandoffFinishedParams>;
+export type HandoffProgressParams = z.infer<typeof HandoffProgressParams>;
 
 /** A folder that may be the project a task is about, and why it was suggested. */
 export const ProjectCandidate = z.object({

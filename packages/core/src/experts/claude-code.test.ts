@@ -11,6 +11,7 @@ interface Spawned {
   cwd: string;
   stdin: string;
   killed: boolean;
+  ended: boolean;
 }
 
 /** A stand-in for the claude process: replays stream-json lines, then exits. */
@@ -21,13 +22,16 @@ function fakeSpawn(
 ): { spawn: SpawnFn; calls: Spawned[] } {
   const calls: Spawned[] = [];
   const spawn: SpawnFn = (command, args, { cwd }) => {
-    const call: Spawned = { command, args, cwd, stdin: '', killed: false };
+    const call: Spawned = { command, args, cwd, stdin: '', killed: false, ended: false };
     calls.push(call);
     let release: () => void = () => {};
     const killed = new Promise<void>((resolve) => (release = resolve));
     const run: ChildRun = {
       write: (text) => {
         call.stdin += text;
+      },
+      end: () => {
+        call.ended = true;
       },
       lines: (async function* () {
         for (const line of lines) {
@@ -51,6 +55,50 @@ function fakeSpawn(
   return { spawn, calls };
 }
 
+/** The brief or a note as Claude Code's stream-json input reads it: one user message per line. */
+const userLine = (text: string) =>
+  `${JSON.stringify({ type: 'user', message: { role: 'user', content: text } })}\n`;
+
+/**
+ * A claude that stays alive between turns, as `--input-format stream-json` does: it replays
+ * one turn's lines, then waits for the next user message (the next turn) or for stdin to end.
+ */
+function turnSpawn(turns: unknown[][]): { spawn: SpawnFn; calls: Spawned[] } {
+  const calls: Spawned[] = [];
+  const spawn: SpawnFn = (command, args, { cwd }) => {
+    const call: Spawned = { command, args, cwd, stdin: '', killed: false, ended: false };
+    calls.push(call);
+    let wake: () => void = () => {};
+    const wait = () => new Promise<void>((resolve) => (wake = resolve));
+    let messages = 0;
+    return {
+      write: (text) => {
+        call.stdin += text;
+        messages += 1;
+        wake();
+      },
+      end: () => {
+        call.ended = true;
+        wake();
+      },
+      lines: (async function* () {
+        for (let turn = 0; turn < turns.length; turn += 1) {
+          while (messages <= turn && !call.ended && !call.killed) await wait();
+          if (call.ended || call.killed) return;
+          for (const line of turns[turn] ?? []) yield JSON.stringify(line);
+        }
+      })(),
+      exit: Promise.resolve(0),
+      stderr: () => '',
+      kill: () => {
+        call.killed = true;
+        wake();
+      },
+    };
+  };
+  return { spawn, calls };
+}
+
 const assistant = (content: unknown[]) => ({ type: 'assistant', message: { content } });
 const result = (text: string, isError = false) => ({
   type: 'result',
@@ -70,6 +118,8 @@ describe('ClaudeCodeConnector', () => {
     expect(call?.cwd).toBe('C:\\work\\repo');
     expect(call?.args).toEqual([
       '-p',
+      '--input-format',
+      'stream-json',
       '--output-format',
       'stream-json',
       '--verbose',
@@ -90,7 +140,8 @@ describe('ClaudeCodeConnector', () => {
       'mcp__*',
       ...SECRET_FILES.flatMap((file) => [`Read(**/${file})`, `Edit(**/${file})`]),
     ]);
-    expect(call?.stdin).toBe('Explain main.ts');
+    expect(call?.stdin).toBe(userLine('Explain main.ts'));
+    expect(call?.ended).toBe(true);
   });
 
   it('researches with no project: web search and fetch only, in an empty folder, never edits', async () => {
@@ -107,6 +158,8 @@ describe('ClaudeCodeConnector', () => {
     expect(call?.cwd).toBe('C:\\tmp\\tagalong-research');
     expect(call?.args).toEqual([
       '-p',
+      '--input-format',
+      'stream-json',
       '--output-format',
       'stream-json',
       '--verbose',
@@ -160,7 +213,7 @@ describe('ClaudeCodeConnector', () => {
     expect(args).toContain('--append-system-prompt-file');
     expect(seen[0]?.text).toBe('Find the cause first.\nNever paste [hidden: API key].');
     expect(existsSync(seen[0]?.path ?? '')).toBe(false);
-    expect(calls[0]?.stdin).toBe('Why does it crash?');
+    expect(calls[0]?.stdin).toBe(userLine('Why does it crash?'));
   });
 
   it('removes the instructions file when the run fails, cannot start or is stopped', async () => {
@@ -285,11 +338,16 @@ describe('ClaudeCodeConnector', () => {
       assistant([{ type: 'text', text: 'Looking good.' }]),
       result('main.ts boots the engine.'),
     ]);
-    const progress: string[] = [];
-    const out = await new ClaudeCodeConnector({ folder: 'C:\\r', spawn }).send({ ask: 'x' }, (s) =>
-      progress.push(s),
+    const progress: [string, string | undefined][] = [];
+    const out = await new ClaudeCodeConnector({ folder: 'C:\\r', spawn }).send(
+      { ask: 'x' },
+      (s, kind) => progress.push([s, kind]),
     );
-    expect(progress).toEqual(['Reading src/main.ts', 'Searching for boot']);
+    expect(progress).toEqual([
+      ['Reading src/main.ts', 'tool'],
+      ['Searching for boot', 'tool'],
+      ['Looking good.', 'say'],
+    ]);
     expect(out).toEqual({ ok: true, text: 'main.ts boots the engine.', changedFiles: [] });
   });
 
@@ -414,6 +472,129 @@ describe('ClaudeCodeConnector', () => {
     });
   });
 
+  describe('notes from the person, in the same live session', () => {
+    const queue = (batches: string[][]) => {
+      const taken: number[] = [];
+      return {
+        taken,
+        notes: {
+          take: () => {
+            taken.push(1);
+            return batches.shift() ?? [];
+          },
+        },
+      };
+    };
+
+    it('writes waiting notes after the turn ends and reads on to the next result', async () => {
+      const { spawn, calls } = turnSpawn([
+        [
+          assistant([{ type: 'tool_use', name: 'Edit', input: { file_path: 'a.ts' } }]),
+          result('Used moment.'),
+        ],
+        [
+          assistant([{ type: 'tool_use', name: 'Edit', input: { file_path: 'b.ts' } }]),
+          result('Switched to dayjs.'),
+        ],
+      ]);
+      const { notes } = queue([['use dayjs, not moment']]);
+      const out = await new ClaudeCodeConnector({ folder: 'C:\\r', spawn, canEdit: true }).send(
+        { ask: 'Fix the dates' },
+        () => {},
+        undefined,
+        notes,
+      );
+
+      expect(out).toEqual({ ok: true, text: 'Switched to dayjs.', changedFiles: ['a.ts', 'b.ts'] });
+      expect(calls[0]?.stdin).toBe(
+        userLine('Fix the dates') +
+          userLine('From the person, while you worked:\n- use dayjs, not moment'),
+      );
+      expect(calls[0]?.ended).toBe(true);
+    });
+
+    it('ends stdin after the first result when no note is waiting', async () => {
+      const { spawn, calls } = turnSpawn([[result('Done.')], [result('never')]]);
+      const { notes, taken } = queue([]);
+      const out = await new ClaudeCodeConnector({ folder: 'C:\\r', spawn }).send(
+        { ask: 'x' },
+        () => {},
+        undefined,
+        notes,
+      );
+      expect(out).toMatchObject({ ok: true, text: 'Done.' });
+      expect(taken).toHaveLength(1);
+      expect(calls[0]?.ended).toBe(true);
+      expect(calls[0]?.stdin).toBe(userLine('x'));
+    });
+
+    it('takes no notes after an error result: the run ends with it', async () => {
+      const { spawn, calls } = turnSpawn([[result('Ran out of turns.', true)]]);
+      const { notes, taken } = queue([['too late']]);
+      const out = await new ClaudeCodeConnector({ folder: 'C:\\r', spawn }).send(
+        { ask: 'x' },
+        () => {},
+        undefined,
+        notes,
+      );
+      expect(out).toEqual({ ok: false, error: 'Ran out of turns.' });
+      expect(taken).toHaveLength(0);
+      expect(calls[0]?.ended).toBe(true);
+    });
+
+    it('hides secrets in a note before it is written', async () => {
+      const { spawn, calls } = turnSpawn([[result('one')], [result('two')]]);
+      const { notes } = queue([['the key is sk-ant-abcdefghijklmnopqrstuvwxyz0123']]);
+      await new ClaudeCodeConnector({ folder: 'C:\\r', spawn }).send(
+        { ask: 'x' },
+        () => {},
+        undefined,
+        notes,
+      );
+      expect(calls[0]?.stdin).not.toContain('sk-ant-');
+      expect(calls[0]?.stdin).toContain('[hidden: API key]');
+    });
+
+    it('kills the session when stopped while it waits between turns', async () => {
+      // The first turn never ends: the session sits waiting until Stop.
+      const { spawn, calls } = turnSpawn([
+        [assistant([{ type: 'text', text: 'Looking.' }])],
+        [result('never')],
+      ]);
+      const controller = new AbortController();
+      const pending = new ClaudeCodeConnector({ folder: 'C:\\r', spawn }).send(
+        { ask: 'x' },
+        () => {},
+        controller.signal,
+        queue([]).notes,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      controller.abort();
+      expect(await pending).toEqual({ ok: false, error: 'Cancelled.' });
+      expect(calls[0]?.killed).toBe(true);
+    });
+  });
+
+  it('says the first sentence of what Claude Code writes, clipped, with secrets hidden', async () => {
+    const long = `Found the bug in ${'very '.repeat(40)}long names. Then more.`;
+    const { spawn } = fakeSpawn([
+      assistant([{ type: 'text', text: 'Found the bug in `date.ts`. Fixing it next.' }]),
+      assistant([{ type: 'text', text: '  \n ' }]),
+      assistant([{ type: 'text', text: 'Key: sk-ant-abcdefghijklmnopqrstuvwxyz0123 is in .env.' }]),
+      assistant([{ type: 'text', text: long }]),
+      result('ok'),
+    ]);
+    const says: string[] = [];
+    await new ClaudeCodeConnector({ folder: 'C:\\r', spawn }).send({ ask: 'x' }, (s, kind) => {
+      if (kind === 'say') says.push(s);
+    });
+    expect(says[0]).toBe('Found the bug in `date.ts`.');
+    expect(says[1]).toBe('Key: [hidden: API key] is in .env.');
+    expect(says[2]?.length).toBeLessThanOrEqual(120);
+    expect(says[2]?.endsWith('…')).toBe(true);
+    expect(says).toHaveLength(3);
+  });
+
   it('kills the process when the hand-off is cancelled', async () => {
     const { spawn, calls } = fakeSpawn([]);
     const controller = new AbortController();
@@ -490,6 +671,7 @@ describe('spawnChild', () => {
   it('reports a missing command as a failed run, even after writing the brief', async () => {
     const child = spawnChild('tagalong-no-such-command', ['-p'], { cwd: dir });
     child.write('x'.repeat(1 << 20));
+    child.end();
     for await (const line of child.lines) void line;
     expect(await child.exit).toBe(-1);
     expect(child.stderr()).toMatch(/not found on the PATH/);
@@ -534,6 +716,7 @@ describe('spawnChild', () => {
 
       const child = spawnChild('fake-claude', args, { cwd: dir });
       child.write('brief');
+      child.end();
       const lines: string[] = [];
       for await (const line of child.lines) lines.push(line);
 

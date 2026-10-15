@@ -7,7 +7,12 @@ import { connectorTools, type ConnectorToolDeps } from './builtin/connections';
 import { recallDayTool, type DayToolDeps } from './builtin/day';
 import { searchHistoryTool, type HistoryToolDeps } from './builtin/history';
 import { rememberTool } from './builtin/memory';
-import { enabledExperts, handToExpertTool, type ExpertToolDeps } from './builtin/experts';
+import {
+  enabledExperts,
+  handToExpertTool,
+  tellExpertTool,
+  type ExpertToolDeps,
+} from './builtin/experts';
 import { perceptionTools, type PerceptionToolsOptions } from './builtin/perception';
 import { pointAtTool } from './builtin/pointing';
 import { changeRoutineTool, createRoutineTool, type RoutineToolDeps } from './builtin/routines';
@@ -132,6 +137,11 @@ export class ToolRegistry {
     if (perception) tools.push(pointAtTool(perception));
     if (day) tools.push(recallDayTool(day));
     if (history) tools.push(searchHistoryTool(history));
+    // Only while an expert works, and never on a routine's own turn: nobody is there to say it.
+    const running = experts?.running?.() ?? [];
+    if (experts?.steer && running.length > 0 && turn.routine === undefined) {
+      tools.push(tellExpertTool(experts, running));
+    }
     return tools;
   }
 }

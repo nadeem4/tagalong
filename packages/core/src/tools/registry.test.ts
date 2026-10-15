@@ -164,6 +164,27 @@ describe('ToolRegistry.forTurn', () => {
     }
   });
 
+  it('appends tell_expert last, and only while a hand-off is running', () => {
+    const base = {
+      experts: () => [],
+      routes: { get: () => null, remember: () => undefined },
+      propose: () => ({ proposalId: '7c9e6679-7425-40de-944b-e07fc1f90ae7' }),
+      steer: () => ({ ok: true as const }),
+    };
+    const run = {
+      handoffId: '0b6f0c4e-1111-4222-8333-444455556666',
+      expertId: 'claude-code',
+      expertName: 'Claude Code',
+      ask: 'x',
+    };
+    const ids = (running: (typeof run)[]) =>
+      new ToolRegistry(everything({ experts: { ...base, running: () => running } }))
+        .forTurn(fakeTurn())
+        .tools.map((tool) => tool.id);
+    expect(ids([])).toEqual(ALL_TOOLS);
+    expect(ids([run])).toEqual([...ALL_TOOLS, 'tell_expert']);
+  });
+
   it('builds only what is wired: no perception options, no perception tools', () => {
     const turn = new ToolRegistry({ memory: fakeMemory() }).forTurn(fakeTurn());
     expect(turn.tools.map((tool) => tool.id)).toEqual(['remember']);

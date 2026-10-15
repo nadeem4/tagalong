@@ -383,15 +383,18 @@ parsing path is the production one and nothing reaches the network.
 
 The companion on screen never does the work. It writes a `Brief` and hands it to an expert's
 `Connector` (`experts/connector.ts`), which carries it to the real tool and brings back a
-`ConnectorResult`. `send(brief, onProgress, signal)` never throws: a failure, a cancel or a missing
-tool all come back as `{ ok: false, error }`. `renderBrief` turns a brief into plain text: the ask
+`ConnectorResult`. `send(brief, onProgress, signal, notes?)` never throws: a failure, a cancel or a
+missing tool all come back as `{ ok: false, error }`. `onProgress(step, kind?)` marks each step `tool`
+(a tool call) or `say` (a line the expert wrote between tools); `notes` is a `NoteQueue` whose
+`take()` returns the person's notes waiting for the expert, taken once each when a turn ends. A
+connector that cannot carry on in the same session ignores `notes`, and the hand-off drops them. `renderBrief` turns a brief into plain text: the ask
 first, then the app and window, the selection, the files that matter, and what a good answer is.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#ffffff', 'primaryTextColor': '#000000', 'primaryBorderColor': '#000000', 'lineColor': '#000000'}}}%%
 flowchart LR
   C[Companion] -- Brief --> K[Connector]
-  K -- stdin --> P["claude -p (expert folder)"]
+  K -- "stream-json on stdin: brief, then notes" --> P["claude -p (expert folder)"]
   P -- stream-json --> K
   K -- progress steps --> C
   K -- ConnectorResult --> C
@@ -399,9 +402,16 @@ flowchart LR
 
 Two connectors exist so far:
 
-- **`ClaudeCodeConnector`** (`experts/claude-code.ts`) runs `claude -p --output-format stream-json
---verbose` in the expert's folder and writes the brief to stdin, so a long brief needs no quoting
-  and hits no command-line limit. Read-only is the default: `--permission-mode dontAsk` with only
+- **`ClaudeCodeConnector`** (`experts/claude-code.ts`) runs `claude -p --input-format stream-json
+--output-format stream-json --verbose` in the expert's folder and writes the brief to stdin as one
+  user message (`{"type":"user","message":{"role":"user","content":"<brief>"}}` on one line), so a
+  long brief needs no quoting and hits no command-line limit. Stdin stays open: on each `result`
+  event the connector takes the notes waiting; if there are any it writes them as the next user
+  message ("From the person, while you worked:" and one line per note, secrets hidden) and reads on
+  to the next `result` in the same live session; if there are none, or the result is an error, it
+  closes stdin and that result is the answer. Changed files add up across turns. There is no second
+  process and no `--resume`. A message written while a turn runs is not relied on to reach the model
+  mid-turn, so notes always wait for the turn to end. Read-only is the default: `--permission-mode dontAsk` with only
   `Read`, `Glob` and `Grep` allowed, so anything else is refused without a prompt. An expert that may
   edit runs with `acceptEdits` and adds `Edit` and `Write`; one with `canSearchWeb` adds `WebSearch`
   and `WebFetch` to the same lists. Standing instructions (`instructions`), when not empty, pass
@@ -418,13 +428,16 @@ Two connectors exist so far:
   `--settings '{"disableAllHooks":true}'` turns off hooks from user settings too (only managed,
   organisation-wide hooks are beyond it). User settings stay so sign-in such as `apiKeyHelper`
   keeps working. Letting an expert reuse the person's MCP servers is left to the Expert catalog
-  feature. Tool calls become progress steps
-  ("Reading src/main.ts"), edited paths become `changedFiles`, and the `result` event is the answer.
+  feature. Tool calls become `tool` progress steps
+  ("Reading src/main.ts"); each `text` block Claude Code writes between them becomes a `say` step
+  (its first sentence, at most 120 characters, secrets hidden), with no extra model call. Edited
+  paths become `changedFiles`, and the last `result` event is the answer.
   A run that ends without a result reports what claude printed on stderr. Aborting kills the process
   (on Windows the whole tree, with `taskkill /T`). `spawnChild` starts claude through `cross-spawn`,
   which finds npm's `claude.cmd` shim on Windows and quotes every argument for it; a write to a
   process that already exited is swallowed, since the exit code already reports the failure.
-- **`FakeConnector`** (`experts/fake.ts`) replays scripted steps and an answer or an error. Tests use
+- **`FakeConnector`** (`experts/fake.ts`) replays scripted steps, then scripted `says` lines as
+  `say` steps, takes the notes waiting once (kept in `notes`), and gives an answer or an error. Tests use
   it, and the claude tests inject a fake `spawn`, so no test starts a real claude.
 
 Each connector also has `check()`, which says whether the expert can be reached without spending
@@ -469,11 +482,24 @@ directly: every hand-off is a `handoff.proposed` card the person confirms with `
 or a routine's one pre-approved research run. `HandoffManager.start` refuses a hand-off with no folder at all, and an unknown or switched-off expert with `-32602`, writes an `expert` row to the
 activity log, and returns `{ handoffId }` at once (the row's id). The expert's steps arrive as
 `handoff.progress { handoffId, expertId, step }` and the end as `handoff.finished { handoffId,
-expertId, state: done | error | stopped, text?, changedFiles?, error? }`. A hand-off still running
+expertId, state: done | error | stopped, text?, changedFiles?, error? }`. A progress step may carry
+`kind`: `tool`, `say`, `note`, `delivered` or `dropped` (left out on a plain tool step). A hand-off still running
 after `HANDOFF_TIMEOUT_MS` (30 minutes) is aborted and ends as `error`, "Claude Code took longer than
 30 minutes, so it was stopped."; a connector that throws ends as `error` too, never as a crash.
 `handoffs.cancel` aborts a running one; shutdown cancels all of them and waits until each has written how it ended, so nothing
 writes to a closed database. `experts.test` runs the connector's `check()`.
+
+**Steering a running hand-off.** `HandoffManager.steer(handoffId, text)` queues the person's words
+for a hand-off that is running (secrets hidden, trimmed); an empty note, or a hand-off that is
+unknown, finished or stopped, is refused with a reason. Each note is announced as `handoff.progress`
+with `kind: 'note'`; when the connector takes it at the end of a turn it is announced again with
+`kind: 'delivered'`, and the expert row's Activity text (Home's "What Coder was told") gains
+"Passed on while it worked:" and the note. A note still waiting when the run ends (it finished, failed,
+timed out or was stopped first) is announced with `kind: 'dropped'` before `handoff.finished`, and is
+never sent. `running()` lists the hand-offs running now (`handoffId`, expert, ask). A note never
+changes the run: same folder, same tools, same seal. In a chain a note goes to the step that is
+running. The privacy log wrapper (`record-expert.ts`) writes one "Sent to expert" row per note
+delivered, with its size, never its words.
 
 A two-step hand-off runs its steps in order. When step 1 ends `done`, `HandoffManager` writes step
 2's own `expert` Activity row and starts it in the same folder, with the brief `ask` + "What
@@ -499,7 +525,12 @@ an unknown, switched-off or same expert is an error the model can fix. A chain a
 even on a routine's turn for the expert the routine allowed. The expert
 is chosen in this order: one the user chose for that `task_kind`, the one the model named, the one
 remembered for that kind, then the only expert switched on; otherwise the tool asks the model to name
-one. `RouteMemory` (`experts/routes.ts`, table `expert_routes`, migration 9) remembers task kind to
+one. While a hand-off runs, the Companion also gets `tell_expert { message, handoff_id? }` (appended
+after `point_at`, never on a routine's own turn), whose description lists the hand-offs running at the
+start of the turn. It passes the person's words, not the model's, to `HandoffManager.steer`
+directly (no RPC); with one hand-off running `handoff_id` may be left out, with two it asks which,
+and with none left it says so. It is a `write` tool: the note waits in the hand-off and stays in
+its Activity row. `RouteMemory` (`experts/routes.ts`, table `expert_routes`, migration 9) remembers task kind to
 expert; the companion's own picks never overwrite the user's, and deleting an expert forgets its
 routes.
 
@@ -1943,7 +1974,13 @@ above a **Message** box. It is the same component, so it is the same conversatio
   waits for a project. **Allow edits** lets this one task change files; **Edit brief** edits the ask.
   **Send** calls `confirmHandoff` and the card becomes `HandoffStatus`: the expert's steps as
   `handoff.progress` arrives, with **Stop** (`cancelHandoff`), then on `handoff.finished` its answer,
-  the files it changed, or what went wrong. **Cancel** calls `dismissHandoff`. Main brings the
+  the files it changed, or what went wrong. **Cancel** calls `dismissHandoff`. A note the person
+  passed on through Scout shows under the steps as **Passed on: use dayjs, not moment**, _waiting
+  for Coder to finish this step_, then _delivered_, or _not passed on: Coder finished first_; the
+  finished card lists any note that never arrived ("Not passed on: ..."), and the spoken finish line
+  adds "Coder finished before I could pass on your note.". A `say` step shows in the steps and is
+  passed to `onSay`, at most one line every 20 seconds (`SAY_GAP_MS`); tool steps stay silent. There
+  is no text box on the card: notes go through Scout. Main brings the
   bubble up with focus for a proposal, and without focus for a finished hand-off; only when the
   pets are hidden does a finished hand-off become a Windows notification instead. The folder dialog
   takes focus and hides the bubble, so main shows it again after the dialog closes.
@@ -2026,7 +2063,8 @@ flowchart LR
 
 - **What is said** (`@tagalong/ui`). `CompanionBubble` calls `onSay` with each finished answer
   (`turn.completed` for its own turn), each intro beat once as it appears, and `handoff.finished` for the
-  hand-off it is showing ("Claude Code has finished. …"). The panel adds the launch line
+  hand-off it is showing ("Claude Code has finished. …"), plus a working expert's own narration
+  (`say` steps such as "Found the bug in `date.ts`."), at most one line every 20 seconds. The panel adds the launch line
   (`GreetingLine`), remarks from keeping an eye on things (`remarkEvent`, sent by `showRemark`)
   and `watch.fired` messages.
   `SpeechQueue` shapes each line with `toSpeakable` (markdown stripped; code blocks, lists, tables,
