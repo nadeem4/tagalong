@@ -242,6 +242,8 @@ export function listenFailed(why: ListenFailure): string {
   switch (why) {
     case 'no-mic':
       return 'I can’t find a microphone, so let’s type. Tap or type your answers.';
+    case 'busy':
+      return 'Another app is using the microphone, so let’s type. Tap or type your answers.';
     case 'denied':
       return 'I wasn’t allowed to use the microphone, so let’s type. You can allow it later in Windows settings.';
     case 'model-failed':

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EarsNotes, FIRST_TIME, FailureStreak, settles, shownPartial } from './talk-rules';
+import { EarsNotes, FIRST_TIME, FailureStreak, micNote, settles, shownPartial } from './talk-rules';
 
 describe('settles', () => {
   it('lets the bubble go quiet when no held question is being asked', () => {
@@ -97,5 +97,20 @@ describe('EarsNotes', () => {
     notes.clear();
     expect(notes.status(null, 'loading')).toBe(FIRST_TIME);
     expect(notes.failed(FIRST_TIME, OFFLINE)).toBe(OFFLINE);
+  });
+});
+
+describe('micNote', () => {
+  it('says another app has the microphone when it is busy', () => {
+    expect(micNote({ name: 'NotReadableError' })).toBe(
+      'Another app is using the microphone. Close it and try again, or pick another in Settings.',
+    );
+  });
+
+  it('says the microphone could not be opened otherwise', () => {
+    expect(micNote({ name: 'NotFoundError' })).toBe(
+      'The microphone could not be opened. Check that Windows lets apps use it, or pick another in Settings.',
+    );
+    expect(micNote(new Error('x'))).toMatch(/could not be opened/);
   });
 });

@@ -3,15 +3,13 @@ import { ListenController, PushToTalk } from '@tagalong/ui';
 import type { BubbleTalk, TalkAction } from '@tagalong/ui';
 import { openMic } from './mic';
 import { RemoteEars } from './remote-ears';
-import { EarsNotes, FailureStreak, settles, shownPartial } from './talk-rules';
+import { EarsNotes, FailureStreak, micNote, settles, shownPartial } from './talk-rules';
 import { onSystemVoice } from './voice-player';
 
 /** A question is never longer than this: the microphone closes on its own after it. */
 const MAX_LISTEN_MS = 30_000;
 
 const NOTHING_HEARD = 'I didn’t catch that. Hold the key and try again.';
-const NO_MICROPHONE =
-  'The microphone could not be opened. Check that Windows lets apps use it, or pick another in Settings.';
 
 export interface TalkOptions {
   /** The talk key as a person reads it. */
@@ -98,7 +96,11 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
         clearTimeout(timer.current);
         if (!micFailures.fail()) return;
         console.warn('[talk] the microphone could not be opened', error);
-        done(NO_MICROPHONE);
+        done(micNote(error));
+      },
+      // The dot shows only once the mic is really open, never while it is still opening.
+      onMicOpen: (mode) => {
+        if (mode === 'held' && listening.current) setState('listening');
       },
       // "Scout, stop": switched off as the person would, so main saves it and tells every window.
       onStopListening: () =>
@@ -130,7 +132,7 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
         earsNotes.clear();
         controller.bargeIn();
         listening.current = true;
-        setState('listening');
+        // 'listening' (the dot) waits for the mic to open: onMicOpen.
         setNote(null);
         setPartial(null);
         controller.made.hold();
@@ -158,7 +160,8 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
   });
 
   // The ears' models: the first time they download. A failure ends the question being asked,
-  // and the always session until the next switch, call or system voice tries again.
+  // and the always session until it retries on its own (30 s, doubling up to five minutes)
+  // or the next switch, call or system voice tries again.
   useEffect(
     () =>
       window.tagalongHost.onEarsStatus(({ status, message }) => {

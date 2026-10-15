@@ -3,18 +3,23 @@ import type { ListenMic } from '@tagalong/ui';
 import type { Ears, ListenMode } from '@tagalong/protocol';
 import type { EarsStatus } from '../../shared/ipc';
 
-export type ListenFailure = 'no-mic' | 'denied' | 'model-failed';
+export type ListenFailure = 'no-mic' | 'denied' | 'busy' | 'model-failed';
 
 /** 'off'; a fraction while the speech model downloads (mic still closed); null while the mic is open. */
 export type SetupListening = 'off' | number | null;
 
-/** A refused permission reads as denied; anything else as no microphone. */
-export function micFailure(error: unknown): 'denied' | 'no-mic' {
+/**
+ * A refused permission reads as denied; a microphone another app holds as busy; anything
+ * else as no microphone.
+ */
+export function micFailure(error: unknown): 'denied' | 'busy' | 'no-mic' {
   const name =
     typeof error === 'object' && error !== null && 'name' in error
       ? String((error as { name: unknown }).name)
       : '';
-  return name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'no-mic';
+  if (name === 'NotAllowedError' || name === 'SecurityError') return 'denied';
+  if (name === 'NotReadableError' || name === 'AbortError') return 'busy';
+  return 'no-mic';
 }
 
 export interface SetupEarsDeps {

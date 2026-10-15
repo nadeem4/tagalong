@@ -33,3 +33,14 @@ export function addressedToScout(text: string): string | null {
 export function isStopListening(question: string): boolean {
   return STOP.test(question.trim());
 }
+
+const TRAILING_PUNCTUATION = new RegExp(`[${PUNCTUATION}]+$`, 'u');
+
+/**
+ * Words heard so far that could still grow into "stop listening" ("st", "stop list"): a
+ * partial like this is not a question yet, so it must not bring the bubble up or cut Scout off.
+ */
+export function mightBeStop(question: string): boolean {
+  const words = question.trim().replace(TRAILING_PUNCTUATION, '').replace(/\s+/gu, ' ');
+  return words !== '' && 'stop listening'.startsWith(words.toLowerCase());
+}
