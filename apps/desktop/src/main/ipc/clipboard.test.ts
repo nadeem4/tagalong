@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { IPC } from '../../shared/ipc';
 import { fakeIpc } from './fake-ipc';
-import { MAX_COPY_CHARS, registerClipboardIpc } from './clipboard';
+import { MAX_COPY_CHARS, fromWindow, registerClipboardIpc } from './clipboard';
 
 const PANEL = { sender: 'panel' };
 const OTHER = { sender: 'home' };
@@ -56,5 +56,26 @@ describe('registerClipboardIpc', () => {
     await invokeFrom(PANEL, 'hi');
     await invokeFrom(OTHER, 'hi').catch(() => undefined);
     expect(clipboard.readText).not.toHaveBeenCalled();
+  });
+});
+
+describe('fromWindow', () => {
+  const contents = {};
+  const live = { isDestroyed: () => false, webContents: contents };
+
+  it("accepts a call from the window's own page", () => {
+    expect(fromWindow(() => live)({ sender: contents })).toBe(true);
+  });
+
+  it("refuses another window's page, however alike it looks", () => {
+    expect(fromWindow(() => live)({ sender: { ...contents } })).toBe(false);
+    expect(fromWindow(() => live)({})).toBe(false);
+    expect(fromWindow(() => live)(null)).toBe(false);
+  });
+
+  it('refuses when the window is not there or has closed', () => {
+    expect(fromWindow(() => null)({ sender: contents })).toBe(false);
+    const closed = { isDestroyed: () => true, webContents: contents };
+    expect(fromWindow(() => closed)({ sender: contents })).toBe(false);
   });
 });

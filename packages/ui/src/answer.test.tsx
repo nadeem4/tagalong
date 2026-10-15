@@ -74,8 +74,20 @@ describe('Answer, a draft', () => {
     expect(container.querySelector('.answer-draft')).toHaveTextContent('Yes, Friday works.');
   });
 
-  it('gives a code block no Copy button', () => {
-    render(<Answer text={'```ts\nawait engine.stop();\n```'} onCopy={vi.fn()} />);
+  it('gives a code block no Copy button and keeps it a code block', () => {
+    const { container } = render(
+      <Answer text={'```ts\nawait engine.stop();\n```'} onCopy={vi.fn()} />,
+    );
+    expect(screen.queryByRole('button')).toBeNull();
+    expect(container.querySelector('pre > code.language-ts')).toHaveTextContent(
+      'await engine.stop();',
+    );
+    expect(container.querySelector('.answer-draft')).toBeNull();
+  });
+
+  it('keeps a fenced block with no language a code block', () => {
+    const { container } = render(<Answer text={'```\nnpm test\n```'} onCopy={vi.fn()} />);
+    expect(container.querySelector('pre > code')).toHaveTextContent('npm test');
     expect(screen.queryByRole('button')).toBeNull();
   });
 

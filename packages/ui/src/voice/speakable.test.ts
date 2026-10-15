@@ -18,6 +18,14 @@ describe('toSpeakable', () => {
     );
   });
 
+  it('never reads a draft block', () => {
+    const spoken = toSpeakable(
+      "Here's a draft. Copy it and paste it in.\n\n```draft\nHi Sam,\n\nYes, Friday works.\n```",
+    );
+    expect(spoken).not.toContain('Friday');
+    expect(spoken).toContain("Here's a draft.");
+  });
+
   it('never reads a list, and says where the rest is', () => {
     expect(toSpeakable('Three things:\n- one\n- two\n- three')).toBe(
       `Three things: ${REST_IN_BUBBLE}`,

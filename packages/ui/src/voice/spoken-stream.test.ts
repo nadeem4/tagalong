@@ -37,6 +37,16 @@ describe('SpokenStream', () => {
     expect(said).toEqual(['Here’s the fix.', 'That should do it.']);
   });
 
+  it('never says a draft, only the line about Copy, even when it arrives in pieces', () => {
+    const { said, stream: s } = stream();
+    s.push("Here's a draft. Copy it and paste it in.\n``");
+    s.push('`draft\nHi Sam. Yes, Friday works.\n');
+    s.push('Thanks!\n``');
+    s.push('`');
+    s.end();
+    expect(said).toEqual(["Here's a draft.", 'Copy it and paste it in.']);
+  });
+
   it('skips list lines and strips markdown', () => {
     const { said, stream: s } = stream();
     s.push('Two steps, they’re in the bubble.\n- run **pnpm** install\n- run the tests\n');

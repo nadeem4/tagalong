@@ -11,6 +11,25 @@ export interface ClipboardIpcDeps {
   fromPanel: (event: unknown) => boolean;
 }
 
+/** The part of a BrowserWindow the sender check needs. */
+interface SenderWindow {
+  isDestroyed(): boolean;
+  webContents: unknown;
+}
+
+/**
+ * Whether an IPC call came from `window`'s own page. Electron sets `event.sender` in main,
+ * so another window's page (or the extension, which has no IPC at all) cannot pass as it.
+ */
+export function fromWindow(window: () => SenderWindow | null): (event: unknown) => boolean {
+  return (event) => {
+    const current = window();
+    if (current === null || current.isDestroyed()) return false;
+    const sender = (event as { sender?: unknown } | null)?.sender;
+    return sender !== undefined && sender === current.webContents;
+  };
+}
+
 /**
  * Draft it for me: a draft's Copy. Main writes the clipboard because the renderer's
  * navigator.clipboard fails while the bubble is not focused. It only writes, only text,
