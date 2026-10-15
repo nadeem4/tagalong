@@ -4,13 +4,14 @@ const PREVIEW_CHARS = 160;
 
 /**
  * The system notification for a finished hand-off, so the answer reaches the user even with
- * Home closed. Null for one the user stopped: they already know.
+ * Home closed. Null for one the user stopped: they already know. Null for step 1 of a chain
+ * that handed on: the last step's notice is the one that tells.
  */
 export function handoffNotice(
   params: HandoffFinishedParams,
 ): { title: string; body: string } | null {
   const who = params.expertId;
-  if (params.state === 'stopped') return null;
+  if (params.state === 'stopped' || params.next !== undefined) return null;
   if (params.state === 'error') {
     return { title: `${who} could not finish`, body: params.error ?? 'No reason given.' };
   }

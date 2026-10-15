@@ -1048,6 +1048,75 @@ describe('a companion handing work to an expert', () => {
     expect(sent).toMatchObject({ expertName: 'Claude Code', chars: expect.any(Number) });
     expect(JSON.stringify(sent)).not.toContain('Why does the build fail?');
   });
+
+  it('runs a chained second step after one Send, and logs both sends', async () => {
+    const provider = new FakeBrainProvider({
+      text: 'Coder has it, then Reviewer.',
+      toolCall: {
+        id: 'call-1',
+        name: 'hand_to_expert',
+        input: {
+          ask: 'Fix the date bug',
+          task_kind: 'fix-code',
+          expert_id: 'coder',
+          then: { expert_id: 'reviewer', ask: 'Check what Coder changed' },
+        },
+      },
+    });
+    const e = await boot(provider, {
+      connectorFor: (expert) =>
+        new FakeConnector({
+          steps: [],
+          text: expert.id === 'coder' ? 'Fixed date.ts.' : 'Looks right.',
+          changedFiles: expert.id === 'coder' ? ['date.ts'] : [],
+        }),
+    });
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    for (const [id, name] of [
+      ['coder', 'Coder'],
+      ['reviewer', 'Reviewer'],
+    ] as const) {
+      await host.call('experts.upsert', {
+        expert: { id, name, connection: { type: 'claude-code' } },
+      });
+    }
+    const listed = await host.call('pets.list', {});
+    const scout = (listed['result'] as { pets: Record<string, unknown>[] }).pets.find(
+      (pet) => pet['id'] === 'scout',
+    );
+    await host.call('pets.upsert', { pet: { ...scout, roleId: 'companion' } });
+    await host.call('ask', { petId: 'scout', input: { text: 'Fix it and have it checked' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('handoff.proposed'), {
+      timeout: 5000,
+    });
+    const proposed = host.notifications.find((n) => n.method === 'handoff.proposed')!;
+    expect(proposed.params['then']).toMatchObject({ expertName: 'Reviewer', canEdit: false });
+
+    await host.call('handoffs.confirm', {
+      proposalId: proposed.params['proposalId'],
+      folder: 'C:\\projects\\ai_pet',
+      canEdit: true,
+    });
+    const finishes = () => host.notifications.filter((n) => n.method === 'handoff.finished');
+    await vi.waitFor(() => expect(finishes()).toHaveLength(2));
+    expect(finishes()[0]?.params['next']).toMatchObject({ expertName: 'Reviewer' });
+
+    const res = await host.call('activity.list', {});
+    const rows = (res['result'] as { entries: Record<string, unknown>[] }).entries.filter(
+      (entry) => entry['kind'] === 'expert',
+    );
+    expect(rows.map((row) => row['expertName']).sort()).toEqual(['Coder', 'Reviewer']);
+    const reviewer = rows.find((row) => row['expertName'] === 'Reviewer');
+    expect(String(reviewer?.['text'])).toContain('Fixed date.ts.');
+
+    // Step 2's generated brief is a send too: the log of what Scout saw has both.
+    const seen = await host.call('sightLog.list', {});
+    const sent = (seen['result'] as { entries: Record<string, unknown>[] }).entries.filter(
+      (row) => row['kind'] === 'sent_to_expert',
+    );
+    expect(sent.map((row) => row['expertName']).sort()).toEqual(['Coder', 'Reviewer']);
+  });
 });
 
 describe('the daily budget over rpc', () => {

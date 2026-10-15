@@ -148,6 +148,78 @@ describe(HAND_TO_EXPERT, () => {
     expect(d.started).toEqual([]);
   });
 
+  describe('with a follow-up step', () => {
+    const REVIEWER = expert('reviewer', 'Reviewer', 'Checking a change');
+
+    it('proposes both steps on one card', async () => {
+      const d = deps([CLAUDE, REVIEWER]);
+      const outcome = await fakeTurnTools({ experts: d.value }).run({
+        name: HAND_TO_EXPERT,
+        input: {
+          expert_id: 'claude-code',
+          task_kind: 'fix-code',
+          ask: 'Fix the date bug',
+          then: { expert_id: 'reviewer', ask: 'Check what Claude Code changed' },
+        },
+      });
+      expect(outcome.isError).toBeUndefined();
+      expect(outcome.content).toContain('Reviewer');
+      expect(d.started).toEqual([
+        {
+          expertId: 'claude-code',
+          petId: 'scout',
+          brief: { ask: 'Fix the date bug' },
+          then: { expertId: 'reviewer', ask: 'Check what Claude Code changed' },
+        },
+      ]);
+    });
+
+    it('refuses an unknown, switched-off or same expert, or a bad step', async () => {
+      const d = deps([CLAUDE, { ...REVIEWER, enabled: false }]);
+      const tools = fakeTurnTools({ experts: d.value });
+      const run = (then: unknown) =>
+        tools.run({
+          name: HAND_TO_EXPERT,
+          input: { expert_id: 'claude-code', task_kind: 'fix-code', ask: 'Fix it', then },
+        });
+      const unknown = await run({ expert_id: 'nobody', ask: 'Check' });
+      expect(unknown.isError).toBe(true);
+      expect(unknown.content).toContain('nobody');
+      const off = await run({ expert_id: 'reviewer', ask: 'Check' });
+      expect(off.isError).toBe(true);
+      const same = await run({ expert_id: 'claude-code', ask: 'Check' });
+      expect(same.isError).toBe(true);
+      expect(same.content).toMatch(/different expert/);
+      const bad = await run({ expert_id: 'reviewer' });
+      expect(bad.isError).toBe(true);
+      expect(d.started).toEqual([]);
+    });
+
+    it('always shows the card in a routine, even for the expert it allowed', async () => {
+      const d = deps([CLAUDE, REVIEWER]);
+      const research: unknown[] = [];
+      d.value.startReadOnly = (params) => {
+        research.push(params);
+        return { handoffId: 'a3bb189e-8bf9-4888-9912-ace4e6543002' };
+      };
+      const tools = fakeTurnTools(
+        { experts: d.value },
+        { routine: { routineId: 'r1', expertId: 'claude-code', handedOff: () => undefined } },
+      );
+      await tools.run({
+        name: HAND_TO_EXPERT,
+        input: {
+          task_kind: 'fix-code',
+          ask: 'Fix it',
+          expert_id: 'claude-code',
+          then: { expert_id: 'reviewer', ask: 'Check it' },
+        },
+      });
+      expect(research).toEqual([]);
+      expect(d.started).toHaveLength(1);
+    });
+  });
+
   it('reports a hand-off that could not be proposed', async () => {
     const d = deps([CLAUDE]);
     d.value.propose = () => {

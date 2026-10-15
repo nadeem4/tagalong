@@ -125,6 +125,41 @@ describe('proposals', () => {
     expect(HandoffsConfirmParams.safeParse({ proposalId, canEdit: false }).success).toBe(false);
   });
 
+  it('carries one optional follow-up step, and old payloads still parse', () => {
+    const base = {
+      proposalId,
+      petId: 'scout',
+      expertId: 'coder',
+      expertName: 'Coder',
+      brief: { ask: 'Fix the date bug' },
+      projects: [project],
+      canEdit: true,
+    };
+    expect(HandoffProposedParams.parse(base).then).toBeUndefined();
+    const then = { expertId: 'reviewer', expertName: 'Reviewer', ask: 'Check it', canEdit: false };
+    expect(HandoffProposedParams.parse({ ...base, then }).then).toEqual(then);
+    expect(HandoffProposedParams.safeParse({ ...base, then: { expertId: 'r' } }).success).toBe(
+      false,
+    );
+
+    const confirm = { proposalId, folder: 'C:\\r', canEdit: true };
+    expect(HandoffsConfirmParams.parse(confirm).then).toBeUndefined();
+    expect(HandoffsConfirmParams.parse({ ...confirm, then: null }).then).toBeNull();
+    expect(
+      HandoffsConfirmParams.parse({ ...confirm, then: { canEdit: false, ask: 'Look again' } }).then,
+    ).toEqual({ canEdit: false, ask: 'Look again' });
+  });
+
+  it('names the next step when a finished step hands on', () => {
+    const finished = { handoffId: proposalId, expertId: 'coder', state: 'done' as const };
+    expect(HandoffFinishedParams.parse(finished).next).toBeUndefined();
+    const next = { handoffId: proposalId, expertId: 'reviewer', expertName: 'Reviewer' };
+    expect(HandoffFinishedParams.parse({ ...finished, next }).next).toEqual(next);
+    expect(HandoffFinishedParams.safeParse({ ...finished, next: { handoffId: 'x' } }).success).toBe(
+      false,
+    );
+  });
+
   it('answers a project search with candidates', () => {
     expect(ProjectsSearchResult.parse({ projects: [project] }).projects).toHaveLength(1);
   });

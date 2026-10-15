@@ -6,7 +6,12 @@ import { migrate } from '../memory/db';
 import { ConversationStore } from '../memory/store';
 import type { Brief, Connector, ConnectorResult } from './connector';
 import { FakeConnector } from './fake';
-import { HANDOFF_TIMEOUT_MS, HandoffManager, type HandoffEvent } from './handoffs';
+import {
+  FOLLOW_UP_ANSWER_CHARS,
+  HANDOFF_TIMEOUT_MS,
+  HandoffManager,
+  type HandoffEvent,
+} from './handoffs';
 import { ExpertStore } from './store';
 
 let db: Database.Database;
@@ -443,6 +448,305 @@ describe('proposals', () => {
     expect(JSON.stringify(handoffs.pending())).not.toContain('token');
     handoffs.confirm({ proposalId: kept.proposalId, folder: 'C:\\r', canEdit: false });
     expect(handoffs.pending()).toEqual([]);
+  });
+
+  describe('with a follow-up step', () => {
+    const reviewer = Expert.parse({
+      id: 'reviewer',
+      name: 'Reviewer',
+      connection: { type: 'claude-code' },
+    });
+
+    function chaining(first: Connector, second: Connector) {
+      experts.upsert(reviewer);
+      const seen: Expert[] = [];
+      const handoffs = new HandoffManager({
+        experts,
+        activity,
+        connectorFor: (expert) => {
+          seen.push(expert);
+          return expert.id === 'reviewer' ? second : first;
+        },
+        emit: (event) => events.push(event),
+        projects,
+      });
+      return { handoffs, seen };
+    }
+
+    const finishes = () =>
+      events.flatMap((e) => (e.method === 'handoff.finished' ? [e.params] : []));
+
+    it('shows the follow-up on the proposal, with the second expert’s access', () => {
+      const { handoffs } = chaining(new FakeConnector({}), new FakeConnector({}));
+      handoffs.propose({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief,
+        then: { expertId: 'reviewer', ask: 'Check what changed' },
+      });
+      const proposed = events[0];
+      expect(proposed?.method === 'handoff.proposed' && proposed.params.then).toEqual({
+        expertId: 'reviewer',
+        expertName: 'Reviewer',
+        ask: 'Check what changed',
+        canEdit: false,
+      });
+    });
+
+    it('refuses a follow-up expert that is missing or switched off', () => {
+      const { handoffs } = chaining(new FakeConnector({}), new FakeConnector({}));
+      expect(() =>
+        handoffs.propose({
+          expertId: 'claude-code',
+          petId: 'scout',
+          brief,
+          then: { expertId: 'nobody', ask: 'x' },
+        }),
+      ).toThrow(/no expert/);
+      experts.upsert({ ...reviewer, enabled: false });
+      expect(() =>
+        handoffs.propose({
+          expertId: 'claude-code',
+          petId: 'scout',
+          brief,
+          then: { expertId: 'reviewer', ask: 'x' },
+        }),
+      ).toThrow(/switched off/);
+    });
+
+    it('runs step 2 after step 1, in the same folder, briefed with step 1’s answer and files', async () => {
+      const coder = new FakeConnector({ text: 'Fixed the off-by-one.', changedFiles: ['date.ts'] });
+      const checker = new FakeConnector({ text: 'Looks right.' });
+      const { handoffs, seen } = chaining(coder, checker);
+      const { proposalId } = handoffs.propose({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief,
+        then: { expertId: 'reviewer', ask: 'Check what changed' },
+      });
+      const { handoffId } = handoffs.confirm({
+        proposalId,
+        folder: 'C:\\projects\\ai_pet',
+        canEdit: true,
+        then: { canEdit: false },
+      });
+
+      await vi.waitFor(() => expect(finishes()).toHaveLength(2));
+      const [first, second] = finishes();
+      expect(first).toMatchObject({
+        handoffId,
+        state: 'done',
+        next: { expertId: 'reviewer', expertName: 'Reviewer' },
+      });
+      expect(second).toMatchObject({
+        handoffId: first?.next?.handoffId,
+        expertId: 'reviewer',
+        state: 'done',
+        text: 'Looks right.',
+      });
+      expect(second?.next).toBeUndefined();
+      expect(seen.map((e) => e.connection)).toEqual([
+        expect.objectContaining({ folder: 'C:\\projects\\ai_pet', canEdit: true }),
+        expect.objectContaining({ folder: 'C:\\projects\\ai_pet', canEdit: false }),
+      ]);
+      expect(checker.sent).toEqual([
+        {
+          ask: 'Check what changed\n\nWhat Claude Code did:\nFixed the off-by-one.',
+          files: ['date.ts'],
+        },
+      ]);
+      // Two ordinary Activity rows; step 2's brief carries step 1's answer.
+      const rows = activity.list({}).entries;
+      expect(rows).toHaveLength(2);
+      expect(rows.map((r) => r.state)).toEqual(['done', 'done']);
+    });
+
+    it('runs step 2 with the access and ask the person left on the card', async () => {
+      const checker = new FakeConnector({ text: 'ok' });
+      const { handoffs, seen } = chaining(
+        new FakeConnector({ text: 'Nothing to change.' }),
+        checker,
+      );
+      const { proposalId } = handoffs.propose({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief,
+        then: { expertId: 'reviewer', ask: 'Check it' },
+      });
+      handoffs.confirm({
+        proposalId,
+        folder: 'C:\\r',
+        canEdit: false,
+        then: { canEdit: true, ask: 'Check it twice' },
+      });
+      await vi.waitFor(() => expect(finishes()).toHaveLength(2));
+      expect(seen[1]?.connection.canEdit).toBe(true);
+      // A first step that changed nothing still gets checked: no files in the brief.
+      expect(checker.sent).toEqual([
+        { ask: 'Check it twice\n\nWhat Claude Code did:\nNothing to change.' },
+      ]);
+    });
+
+    it('runs only step 1 when the person removed step 2', async () => {
+      const checker = new FakeConnector({ text: 'ok' });
+      const { handoffs } = chaining(new FakeConnector({ text: 'Fixed.' }), checker);
+      const { proposalId } = handoffs.propose({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief,
+        then: { expertId: 'reviewer', ask: 'Check it' },
+      });
+      handoffs.confirm({ proposalId, folder: 'C:\\r', canEdit: true, then: null });
+      await vi.waitFor(() => expect(finishes()).toHaveLength(1));
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(finishes()).toHaveLength(1);
+      expect(finishes()[0]?.next).toBeUndefined();
+      expect(checker.sent).toEqual([]);
+    });
+
+    it('never starts step 2 when step 1 fails', async () => {
+      const checker = new FakeConnector({ text: 'ok' });
+      const { handoffs } = chaining(new FakeConnector({ error: 'Not signed in.' }), checker);
+      const { proposalId } = handoffs.propose({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief,
+        then: { expertId: 'reviewer', ask: 'Check it' },
+      });
+      handoffs.confirm({ proposalId, folder: 'C:\\r', canEdit: true });
+      await vi.waitFor(() => expect(finishes()).toHaveLength(1));
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(finishes()).toEqual([
+        expect.objectContaining({ state: 'error', error: 'Not signed in.' }),
+      ]);
+      expect(finishes()[0]?.next).toBeUndefined();
+      expect(checker.sent).toEqual([]);
+    });
+
+    it('never starts step 2 when step 1 is stopped', async () => {
+      const slow: Connector = {
+        check: () => Promise.resolve({ ok: true }),
+        send: (_brief, _progress, signal) =>
+          new Promise((resolve) =>
+            signal?.addEventListener('abort', () => resolve({ ok: false, error: 'Cancelled.' })),
+          ),
+      };
+      const checker = new FakeConnector({ text: 'ok' });
+      const { handoffs } = chaining(slow, checker);
+      const { proposalId } = handoffs.propose({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief,
+        then: { expertId: 'reviewer', ask: 'Check it' },
+      });
+      const { handoffId } = handoffs.confirm({ proposalId, folder: 'C:\\r', canEdit: true });
+      handoffs.cancel(handoffId);
+      await vi.waitFor(() => expect(finishes()).toHaveLength(1));
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(finishes()).toEqual([{ handoffId, expertId: 'claude-code', state: 'stopped' }]);
+      expect(checker.sent).toEqual([]);
+    });
+
+    it('never starts step 2 when step 1 runs past the time limit', async () => {
+      vi.useFakeTimers();
+      try {
+        const hanging: Connector = {
+          check: () => Promise.resolve({ ok: true }),
+          send: (_b, _p, signal) =>
+            new Promise((resolve) =>
+              signal?.addEventListener('abort', () => resolve({ ok: false, error: 'Cancelled.' })),
+            ),
+        };
+        const checker = new FakeConnector({ text: 'ok' });
+        const { handoffs } = chaining(hanging, checker);
+        const { proposalId } = handoffs.propose({
+          expertId: 'claude-code',
+          petId: 'scout',
+          brief,
+          then: { expertId: 'reviewer', ask: 'Check it' },
+        });
+        handoffs.confirm({ proposalId, folder: 'C:\\r', canEdit: true });
+        await vi.advanceTimersByTimeAsync(HANDOFF_TIMEOUT_MS);
+        await vi.advanceTimersByTimeAsync(HANDOFF_TIMEOUT_MS);
+        expect(finishes()).toEqual([expect.objectContaining({ state: 'error' })]);
+        expect(finishes()[0]?.next).toBeUndefined();
+        expect(checker.sent).toEqual([]);
+        expect(activity.list({}).entries).toHaveLength(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('keeps step 2’s brief bounded: a long answer from step 1 is cut', async () => {
+      const long = 'x'.repeat(FOLLOW_UP_ANSWER_CHARS * 3);
+      const checker = new FakeConnector({ text: 'ok' });
+      const { handoffs } = chaining(new FakeConnector({ text: long }), checker);
+      const { proposalId } = handoffs.propose({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief,
+        then: { expertId: 'reviewer', ask: 'Check it' },
+      });
+      handoffs.confirm({ proposalId, folder: 'C:\\r', canEdit: true });
+      await vi.waitFor(() => expect(finishes()).toHaveLength(2));
+      const ask = checker.sent[0]?.ask ?? '';
+      expect(ask.startsWith('Check it\n\nWhat Claude Code did:\nxxx')).toBe(true);
+      expect(ask.length).toBeLessThan(FOLLOW_UP_ANSWER_CHARS + 100);
+      expect(ask.endsWith('…')).toBe(true);
+    });
+
+    it('hides a key in step 1’s answer before it reaches step 2', async () => {
+      const key = `sk-ant-${'a'.repeat(40)}`;
+      const checker = new FakeConnector({ text: 'ok' });
+      const { handoffs } = chaining(new FakeConnector({ text: `Used ${key}` }), checker);
+      const { proposalId } = handoffs.propose({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief,
+        then: { expertId: 'reviewer', ask: 'Check it' },
+      });
+      handoffs.confirm({ proposalId, folder: 'C:\\r', canEdit: true });
+      await vi.waitFor(() => expect(finishes()).toHaveLength(2));
+      expect(checker.sent[0]?.ask).not.toContain(key);
+    });
+
+    it('finishes step 1 alone when step 2’s expert was switched off meanwhile', async () => {
+      const checker = new FakeConnector({ text: 'ok' });
+      const { handoffs } = chaining(new FakeConnector({ text: 'Fixed.' }), checker);
+      const { proposalId } = handoffs.propose({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief,
+        then: { expertId: 'reviewer', ask: 'Check it' },
+      });
+      experts.upsert({ ...reviewer, enabled: false });
+      handoffs.confirm({ proposalId, folder: 'C:\\r', canEdit: true });
+      await vi.waitFor(() => expect(finishes()).toHaveLength(1));
+      expect(finishes()[0]).toMatchObject({ state: 'done', text: 'Fixed.' });
+      expect(finishes()[0]?.next).toBeUndefined();
+      expect(checker.sent).toEqual([]);
+    });
+
+    it('starts no step 2 once the app is shutting down', async () => {
+      let release: (result: ConnectorResult) => void = () => {};
+      const first: Connector = {
+        check: () => Promise.resolve({ ok: true }),
+        send: () => new Promise((resolve) => (release = resolve)),
+      };
+      const checker = new FakeConnector({ text: 'ok' });
+      const { handoffs } = chaining(first, checker);
+      const { proposalId } = handoffs.propose({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief,
+        then: { expertId: 'reviewer', ask: 'Check it' },
+      });
+      handoffs.confirm({ proposalId, folder: 'C:\\r', canEdit: true });
+      // The answer lands as shutdown begins: the follow-up must not outlive the database.
+      release({ ok: true, text: 'Fixed.', changedFiles: [] });
+      await handoffs.stopAll();
+      expect(checker.sent).toEqual([]);
+    });
   });
 
   it('refuses to start with no folder, even when an old expert carries a default one', () => {

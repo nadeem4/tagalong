@@ -217,7 +217,11 @@ project it guessed (from your window, or the projects you used before), whether 
 files, and the brief. **Change project** picks another guess, searches your code folders or browses
 for a folder; **Allow edits** lets this one task change files; **Send** (or **Cancel**) decides.
 While the expert works the bubble lists its steps with **Stop**, and its answer comes back to the
-bubble when it is done.
+bubble when it is done. Ask for a second opinion ("fix the date bug and have someone check it") and
+the one card lists two steps, such as **1. Coder** then **2. Reviewer**, each with its own access
+and brief, under one project and one **Send**; **Remove step 2** keeps it to one. The Reviewer
+starts once the Coder has finished, with the Coder's answer and changed files, and the bubble shows
+both answers. If the first step fails or is stopped, the second never runs.
 
 **Keeping an eye on things.** Now and then Scout says one short line on its own, beside itself and
 without taking the keyboard: a build that failed and why, say. It follows window titles only, reads
@@ -298,7 +302,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   hand-offs always go through.
 - **Scout**: how Scout thinks, a provider and a model. **Save** applies from the next question.
 - **Experts**: the tools Scout hands work to. **Add expert** starts from a template (**Coder**,
-  **Debugger**, **Designer**, **Researcher**) or **Blank**, which fills in the name, what it is good
+  **Debugger**, **Designer**, **Researcher**, **Reviewer**) or **Blank**, which fills in the name, what it is good
   at, its **Standing instructions** (what it is told on every task, shown in full) and its switches;
   change any of it before you save. Claude Code is the first kind; it must be installed and signed
   in on this computer, and Welcome adds it for you when it is. It only reads and searches unless you

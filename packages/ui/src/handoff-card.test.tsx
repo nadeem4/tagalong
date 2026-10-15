@@ -259,3 +259,215 @@ describe('the hand-off card', () => {
     );
   });
 });
+
+describe('a two-step hand-off', () => {
+  const STEP2 = 'a3bb189e-8bf9-4888-9912-ace4e6543002';
+
+  function proposeChain(bridge: FakeHostBridge) {
+    act(() =>
+      bridge.emit({
+        type: 'handoff.proposed',
+        proposalId: PROPOSAL,
+        petId: 'scout',
+        expertId: 'coder',
+        expertName: 'Coder',
+        brief: { ask: 'Fix the date bug.' },
+        projects: [AI_PET],
+        canEdit: true,
+        then: {
+          expertId: 'reviewer',
+          expertName: 'Reviewer',
+          ask: 'Check what Coder changed.',
+          canEdit: false,
+        },
+      }),
+    );
+  }
+
+  const chainCard = () => screen.getByRole('region', { name: 'Hand to Coder, then Reviewer' });
+
+  function finishStep1(bridge: FakeHostBridge) {
+    act(() =>
+      bridge.emit({
+        type: 'handoff.finished',
+        handoffId: 'handoff-1',
+        expertId: 'coder',
+        state: 'done',
+        text: 'The month was off by one.',
+        changedFiles: ['date.ts'],
+        next: { handoffId: STEP2, expertId: 'reviewer', expertName: 'Reviewer' },
+      }),
+    );
+  }
+
+  it('lists both steps with one project and their own access, and sends them on one Send', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    proposeChain(bridge);
+
+    const step1 = within(chainCard()).getByRole('group', { name: 'Step 1: Coder' });
+    const step2 = within(chainCard()).getByRole('group', { name: 'Step 2: Reviewer' });
+    expect(step1).toHaveTextContent('Can change files');
+    expect(step1).toHaveTextContent('Fix the date bug.');
+    expect(step2).toHaveTextContent('Reads only');
+    expect(step2).toHaveTextContent('Check what Coder changed.');
+    expect(within(chainCard()).getAllByText('ai_pet')).toHaveLength(1);
+
+    fireEvent.click(within(step2).getByRole('button', { name: 'Allow edits' }));
+    expect(step2).toHaveTextContent('Can change files');
+    fireEvent.click(within(step2).getByRole('button', { name: 'Edit brief' }));
+    fireEvent.change(within(step2).getByLabelText('Brief'), {
+      target: { value: 'Check it and run the tests.' },
+    });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Send' })));
+    expect(bridge.confirmedHandoffs).toEqual([
+      {
+        proposalId: PROPOSAL,
+        folder: 'C:\\projects\\ai_pet',
+        canEdit: true,
+        then: { canEdit: true, ask: 'Check it and run the tests.' },
+      },
+    ]);
+  });
+
+  it('sends then: null when step 2 is removed', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    proposeChain(bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove step 2' }));
+    expect(screen.queryByRole('group', { name: 'Step 2: Reviewer' })).toBeNull();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Send' })));
+    expect(bridge.confirmedHandoffs[0]).toEqual({
+      proposalId: PROPOSAL,
+      folder: 'C:\\projects\\ai_pet',
+      canEdit: true,
+      then: null,
+    });
+    expect(screen.getByRole('region', { name: 'Coder is on it' })).toBeVisible();
+  });
+
+  it('follows the chain: 1 of 2, then 2 of 2, then both answers, spoken once', async () => {
+    const bridge = createFakeHostBridge();
+    const onSay = vi.fn();
+    render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" onSay={onSay} />
+      </HostBridgeProvider>,
+    );
+    proposeChain(bridge);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Send' })));
+    expect(screen.getByRole('region', { name: 'Coder is on it (1 of 2)' })).toBeVisible();
+
+    finishStep1(bridge);
+    expect(onSay).not.toHaveBeenCalled();
+    const checking = screen.getByRole('region', { name: 'Reviewer is checking (2 of 2)' });
+    act(() =>
+      bridge.emit({
+        type: 'handoff.progress',
+        handoffId: STEP2,
+        expertId: 'reviewer',
+        step: 'Reading date.ts',
+      }),
+    );
+    expect(checking).toHaveTextContent('Reading date.ts');
+    await act(async () => fireEvent.click(within(checking).getByRole('button', { name: 'Stop' })));
+    expect(bridge.cancelledHandoffs).toEqual([STEP2]);
+
+    act(() =>
+      bridge.emit({
+        type: 'handoff.finished',
+        handoffId: STEP2,
+        expertId: 'reviewer',
+        state: 'done',
+        text: 'The fix is right.',
+      }),
+    );
+    const done = screen.getByRole('region', { name: 'Reviewer finished' });
+    expect(done).toHaveTextContent('Coder changed date.ts');
+    expect(done).toHaveTextContent('The month was off by one.');
+    expect(done).toHaveTextContent('Reviewer says');
+    expect(done).toHaveTextContent('The fix is right.');
+    expect(onSay).toHaveBeenCalledExactlyOnceWith(
+      'Coder and Reviewer have finished. The fix is right.',
+    );
+  });
+
+  it('shows step 2 as stopped, with step 1’s answer kept, when Stop ends step 2', async () => {
+    const bridge = createFakeHostBridge();
+    const onSay = vi.fn();
+    render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" onSay={onSay} />
+      </HostBridgeProvider>,
+    );
+    proposeChain(bridge);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Send' })));
+    finishStep1(bridge);
+    act(() =>
+      bridge.emit({
+        type: 'handoff.finished',
+        handoffId: STEP2,
+        expertId: 'reviewer',
+        state: 'stopped',
+      }),
+    );
+    const stopped = screen.getByRole('region', { name: 'Reviewer was stopped' });
+    expect(stopped).toHaveTextContent('Coder changed date.ts');
+    expect(stopped).toHaveTextContent('The month was off by one.');
+    expect(stopped).not.toHaveTextContent('Reviewer says');
+    expect(onSay).toHaveBeenCalledExactlyOnceWith('Reviewer stopped without finishing.');
+  });
+
+  it('ignores step 1’s late Send id after step 2 has already finished', async () => {
+    const bridge = createFakeHostBridge();
+    let answer: (value: { handoffId: string }) => void = () => undefined;
+    bridge.confirmHandoff = () => new Promise((resolve) => (answer = resolve));
+    renderBubble(bridge);
+    proposeChain(bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    finishStep1(bridge);
+    act(() =>
+      bridge.emit({
+        type: 'handoff.finished',
+        handoffId: STEP2,
+        expertId: 'reviewer',
+        state: 'done',
+        text: 'The fix is right.',
+      }),
+    );
+    await act(async () => answer({ handoffId: 'handoff-1' }));
+    expect(screen.getByRole('region', { name: 'Reviewer finished' })).toHaveTextContent(
+      'The fix is right.',
+    );
+  });
+
+  it('says step 2 never ran when step 1 failed', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    proposeChain(bridge);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Send' })));
+    act(() =>
+      bridge.emit({
+        type: 'handoff.finished',
+        handoffId: 'handoff-1',
+        expertId: 'coder',
+        state: 'error',
+        error: 'Coder is not signed in.',
+      }),
+    );
+    const failed = screen.getByRole('region', { name: 'Coder could not finish' });
+    expect(failed).toHaveTextContent('Reviewer did not start.');
+  });
+
+  it('keeps step 2 when step 1 finished before Send heard back', async () => {
+    const bridge = createFakeHostBridge();
+    let answer: (value: { handoffId: string }) => void = () => undefined;
+    bridge.confirmHandoff = () => new Promise((resolve) => (answer = resolve));
+    renderBubble(bridge);
+    proposeChain(bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+    finishStep1(bridge);
+    await act(async () => answer({ handoffId: 'handoff-1' }));
+    expect(screen.getByRole('region', { name: 'Reviewer is checking (2 of 2)' })).toBeVisible();
+  });
+});

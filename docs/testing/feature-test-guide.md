@@ -300,7 +300,7 @@ change".
 
 1. **Setup:** Claude Code installed and signed in.
 2. **Action:** Home → Experts → **Add expert**. **Expected:** a picker with **Coder**, **Debugger**,
-   **Designer**, **Researcher** and **Blank**, each with one line saying what it does.
+   **Designer**, **Researcher**, **Reviewer** and **Blank**, each with one line saying what it does.
 3. **Action:** pick **Debugger**. **Expected:** the form is filled in: Name **Debugger**, Good at
    "Finding why something breaks, reading logs and stack traces", **Standing instructions** shown in
    full (find the cause before suggesting anything, do not change files), **Let it edit files by
@@ -312,6 +312,24 @@ change".
    **Expected:** the answer names the cause and the evidence (file and line) and no file changes.
 6. **Action:** add a **Researcher** the same way. **Expected:** **Let it search the web** starts On;
    a hand-off to it can search the web, and still edits nothing.
+
+### E.3. Change then review (two steps, one Send)
+
+1. **Setup:** Claude Code installed and signed in; add a **Coder** and a **Reviewer** from their
+   templates. A project with a small bug you know of.
+2. **Action:** ask Scout "Fix the date bug and have someone check it". **Expected:** one card,
+   "Hand to Coder, then Reviewer": one Project row, **1. Coder** (Can change files) and
+   **2. Reviewer** (Reads only), each with **Edit brief**, and **Remove step 2**.
+3. **Action:** **Send**. **Expected:** "Coder is on it (1 of 2)" with its steps, then "Reviewer is
+   checking (2 of 2)". Scout says nothing in between and one line at the end. The finished card
+   shows "Coder changed …" with Coder's answer, then "Reviewer says" with Reviewer's answer.
+4. **Action:** Home → Activity. **Expected:** two expert rows; Reviewer's "What Reviewer was told"
+   holds Coder's answer and changed files. What Scout saw has two "Sent to expert" rows.
+5. **Action:** repeat, and press **Stop** while Coder works. **Expected:** "Coder was stopped" and
+   "Reviewer did not start."; Activity has only Coder's row.
+6. **Action:** repeat, press **Remove step 2**, then **Send**. **Expected:** only Coder runs.
+
+_Fake provider:_ with `TAGALONG_FAKE_PROVIDERS=1` both steps are scripted experts.
 
 ## Settings
 

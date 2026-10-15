@@ -3,6 +3,13 @@ import { useState } from 'react';
 import type { HandoffProposedParams, ProjectCandidate } from '@tagalong/protocol';
 import { useHostBridge } from './host-bridge';
 
+/** What one finished step of a two-step hand-off sent back, kept while step 2 works. */
+export interface StepResult {
+  expertName: string;
+  text?: string | undefined;
+  changedFiles?: string[] | undefined;
+}
+
 /** A hand-off as the bubble shows it: proposed, running, or come back. */
 export type Handoff =
   | { phase: 'proposed'; proposal: HandoffProposedParams }
@@ -14,6 +21,8 @@ export type Handoff =
       expertName: string;
       project: string;
       steps: string[];
+      /** A two-step hand-off: who comes next, or what step 1 already sent back. */
+      chain?: { step: 1; nextName: string } | { step: 2; earlier: StepResult } | undefined;
     }
   | {
       phase: 'finished';
@@ -22,6 +31,10 @@ export type Handoff =
       text?: string | undefined;
       changedFiles?: string[] | undefined;
       error?: string | undefined;
+      /** Step 1's answer, when this was step 2 of a chain. */
+      earlier?: StepResult | undefined;
+      /** Step 2's expert, when step 1 failed or was stopped so step 2 never ran. */
+      skipped?: string | undefined;
     };
 
 function nameOf(path: string): string {
@@ -34,9 +47,63 @@ function nameOf(path: string): string {
 }
 
 /**
+ * One step's Access and Brief rows: edits allowed for this task, and the brief to edit.
+ * `carriesWindowEnd` notes that the brief takes the end of the error window along.
+ */
+function StepRows({
+  canEdit,
+  onToggle,
+  ask,
+  onAsk,
+  project,
+  carriesWindowEnd = false,
+}: {
+  canEdit: boolean;
+  onToggle: () => void;
+  ask: string;
+  onAsk: (ask: string) => void;
+  project: string | undefined;
+  carriesWindowEnd?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  return (
+    <>
+      <div>
+        <dt>Access</dt>
+        <dd>{canEdit ? `Can change files in ${project ?? 'the project'}` : 'Reads only'}</dd>
+        <button type="button" className="bubble-quiet" onClick={onToggle}>
+          {canEdit ? 'Reads only' : 'Allow edits'}
+        </button>
+      </div>
+      <div>
+        <dt>Brief</dt>
+        <dd>
+          {editing ? (
+            <label className="bubble-field">
+              <span>Brief</span>
+              <textarea rows={4} value={ask} onChange={(event) => onAsk(event.target.value)} />
+            </label>
+          ) : (
+            <span className="handoff-brief">{ask}</span>
+          )}
+          {carriesWindowEnd && <small>Includes the end of the error window</small>}
+        </dd>
+        {!editing && (
+          <button type="button" className="bubble-quiet" onClick={() => setEditing(true)}>
+            Edit brief
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+/**
  * Mockup screen 4: the brief a companion wrote, shown before anything runs. The project is
  * the best guess, changed to another guess, a search result or a picked folder; edits can
  * be allowed for this one task; the brief can be edited. Send confirms, Cancel drops it.
+ * With a follow-up step, both steps share the one project and the one Send; each has its own
+ * access and brief, and step 2 can be removed.
  */
 export function ProposalCard({
   proposal,
@@ -52,11 +119,14 @@ export function ProposalCard({
   const [picking, setPicking] = useState(proposal.projects.length === 0);
   const [results, setResults] = useState<ProjectCandidate[]>([]);
   const [canEdit, setCanEdit] = useState(proposal.canEdit);
-  const [editing, setEditing] = useState(false);
   const [ask, setAsk] = useState(proposal.brief.ask);
+  const [chained, setChained] = useState(proposal.then !== undefined);
+  const [nextCanEdit, setNextCanEdit] = useState(proposal.then?.canEdit ?? false);
+  const [nextAsk, setNextAsk] = useState(proposal.then?.ask ?? '');
   const [problem, setProblem] = useState<string | null>(null);
   const { expertName } = proposal;
   const project = folder === undefined ? undefined : nameOf(folder);
+  const then = chained ? proposal.then : undefined;
 
   const choose = (path: string): void => {
     setFolder(path);
@@ -74,6 +144,7 @@ export function ProposalCard({
   const send = async (): Promise<void> => {
     if (folder === undefined || bridge.confirmHandoff === undefined) return;
     const edited = ask.trim() !== '' && ask.trim() !== proposal.brief.ask;
+    const nextEdited = then !== undefined && nextAsk.trim() !== '' && nextAsk.trim() !== then.ask;
     try {
       const working = {
         phase: 'working' as const,
@@ -82,6 +153,7 @@ export function ProposalCard({
         expertName,
         project: nameOf(folder),
         steps: [],
+        ...(then === undefined ? {} : { chain: { step: 1 as const, nextName: then.expertName } }),
       };
       onSent(working);
       const { handoffId } = await bridge.confirmHandoff({
@@ -89,6 +161,14 @@ export function ProposalCard({
         folder,
         canEdit,
         ...(edited ? { brief: { ...proposal.brief, ask: ask.trim() } } : {}),
+        ...(proposal.then === undefined
+          ? {}
+          : {
+              then:
+                then === undefined
+                  ? null
+                  : { canEdit: nextCanEdit, ...(nextEdited ? { ask: nextAsk.trim() } : {}) },
+            }),
       });
       onSent({ ...working, handoffId });
     } catch (error) {
@@ -102,14 +182,37 @@ export function ProposalCard({
   };
 
   const others = proposal.projects.filter((p) => p.path !== folder);
+  const firstRows = (
+    <StepRows
+      canEdit={canEdit}
+      onToggle={() => setCanEdit(!canEdit)}
+      ask={ask}
+      onAsk={setAsk}
+      project={project}
+      carriesWindowEnd={proposal.brief.context?.windowText !== undefined}
+    />
+  );
   return (
-    <section className="handoff" aria-label={`Hand to ${expertName}`}>
-      <p className="bubble-text">I’ll ask {expertName} to look into it. Is this right?</p>
+    <section
+      className="handoff"
+      aria-label={
+        then === undefined
+          ? `Hand to ${expertName}`
+          : `Hand to ${expertName}, then ${then.expertName}`
+      }
+    >
+      <p className="bubble-text">
+        {then === undefined
+          ? `I’ll ask ${expertName} to look into it. Is this right?`
+          : `I’ll ask ${expertName} first, then ${then.expertName}. Is this right?`}
+      </p>
       <dl className="handoff-rows">
-        <div>
-          <dt>Agent</dt>
-          <dd>{expertName}</dd>
-        </div>
+        {then === undefined && (
+          <div>
+            <dt>Agent</dt>
+            <dd>{expertName}</dd>
+          </div>
+        )}
         <div>
           <dt>Project</dt>
           <dd>
@@ -153,35 +256,33 @@ export function ProposalCard({
             )}
           </div>
         )}
-        <div>
-          <dt>Access</dt>
-          <dd>{canEdit ? `Can change files in ${project ?? 'the project'}` : 'Reads only'}</dd>
-          <button type="button" className="bubble-quiet" onClick={() => setCanEdit(!canEdit)}>
-            {canEdit ? 'Reads only' : 'Allow edits'}
-          </button>
-        </div>
-        <div>
-          <dt>Brief</dt>
-          <dd>
-            {editing ? (
-              <label className="bubble-field">
-                <span>Brief</span>
-                <textarea rows={4} value={ask} onChange={(event) => setAsk(event.target.value)} />
-              </label>
-            ) : (
-              <span className="handoff-brief">{ask}</span>
-            )}
-            {proposal.brief.context?.windowText !== undefined && (
-              <small>Includes the end of the error window</small>
-            )}
-          </dd>
-          {!editing && (
-            <button type="button" className="bubble-quiet" onClick={() => setEditing(true)}>
-              Edit brief
-            </button>
-          )}
-        </div>
+        {then === undefined && firstRows}
       </dl>
+      {then !== undefined && (
+        <>
+          <div role="group" aria-label={`Step 1: ${expertName}`} className="handoff-step">
+            <p className="handoff-step-title">1. {expertName}</p>
+            <dl className="handoff-rows">{firstRows}</dl>
+          </div>
+          <div role="group" aria-label={`Step 2: ${then.expertName}`} className="handoff-step">
+            <p className="handoff-step-title">
+              2. {then.expertName}
+              <button type="button" className="bubble-quiet" onClick={() => setChained(false)}>
+                Remove step 2
+              </button>
+            </p>
+            <dl className="handoff-rows">
+              <StepRows
+                canEdit={nextCanEdit}
+                onToggle={() => setNextCanEdit(!nextCanEdit)}
+                ask={nextAsk}
+                onAsk={setNextAsk}
+                project={project}
+              />
+            </dl>
+          </div>
+        </>
+      )}
       {problem !== null && (
         <p role="alert" className="bubble-error">
           {problem}
@@ -215,10 +316,16 @@ export function HandoffStatus({
   onDismiss: () => void;
 }) {
   if (handoff.phase === 'working') {
+    const label =
+      handoff.chain === undefined
+        ? `${handoff.expertName} is on it`
+        : handoff.chain.step === 1
+          ? `${handoff.expertName} is on it (1 of 2)`
+          : `${handoff.expertName} is checking (2 of 2)`;
     return (
-      <section className="handoff" aria-label={`${handoff.expertName} is on it`}>
+      <section className="handoff" aria-label={label}>
         <p className="bubble-text">
-          <span className="handoff-dot" aria-hidden="true" /> {handoff.expertName} is on it
+          <span className="handoff-dot" aria-hidden="true" /> {label}
         </p>
         <ul className="handoff-steps" aria-live="polite">
           {handoff.steps.map((step, index) => (
@@ -241,9 +348,26 @@ export function HandoffStatus({
       : ok
         ? `${handoff.expertName} finished`
         : `${handoff.expertName} could not finish`;
+  const { earlier } = handoff;
   return (
     <section className="handoff" aria-label={title}>
-      <p className="bubble-hints">{title}</p>
+      {earlier !== undefined && (
+        <>
+          <p className="bubble-hints">
+            {earlier.changedFiles !== undefined && earlier.changedFiles.length > 0
+              ? `${earlier.expertName} changed ${earlier.changedFiles.join(', ')}`
+              : `${earlier.expertName} finished`}
+          </p>
+          {earlier.text !== undefined && (
+            <div className="bubble-answer">
+              <Answer text={earlier.text} />
+            </div>
+          )}
+        </>
+      )}
+      <p className="bubble-hints">
+        {earlier !== undefined && ok ? `${handoff.expertName} says` : title}
+      </p>
       {handoff.text !== undefined && (
         <div className="bubble-answer">
           <Answer text={handoff.text} />
@@ -256,6 +380,9 @@ export function HandoffStatus({
       )}
       {handoff.changedFiles !== undefined && handoff.changedFiles.length > 0 && (
         <p className="bubble-hints">Changed {handoff.changedFiles.join(', ')}</p>
+      )}
+      {handoff.skipped !== undefined && (
+        <p className="bubble-hints">{handoff.skipped} did not start.</p>
       )}
       <div className="bubble-row">
         <button type="button" className="bubble-quiet" onClick={onDismiss}>
@@ -291,4 +418,9 @@ export const HANDOFF_CSS = `
 .connector-details { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 160px; overflow-y: auto; }
 .routine-card .handoff-rows dt { width: 72px; }
 .handoff-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #F2C14E; }
+.handoff-step { display: flex; flex-direction: column; gap: 4px; }
+.handoff-step-title {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0;
+  font-size: 12px; font-weight: 600; color: #E9ECF5;
+}
 `;

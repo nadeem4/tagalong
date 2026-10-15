@@ -88,6 +88,10 @@ export const HandoffFinishedParams = z.object({
   text: z.string().optional(),
   changedFiles: z.array(z.string()).optional(),
   error: z.string().optional(),
+  /** A chained hand-off: the follow-up step that started after this one, so the bubble follows it. */
+  next: z
+    .object({ handoffId: z.uuid(), expertId: z.string().min(1), expertName: z.string().min(1) })
+    .optional(),
 });
 export type HandoffFinishedParams = z.infer<typeof HandoffFinishedParams>;
 
@@ -112,6 +116,18 @@ export const HandoffProposedParams = z.object({
   brief: Brief,
   projects: z.array(ProjectCandidate),
   canEdit: z.boolean(),
+  /**
+   * One follow-up step, such as a Reviewer checking what a Coder changed. It runs after the
+   * first step finishes well, in the same folder, with the first step's answer in its brief.
+   */
+  then: z
+    .object({
+      expertId: z.string().min(1),
+      expertName: z.string().min(1),
+      ask: z.string().min(1),
+      canEdit: z.boolean(),
+    })
+    .optional(),
 });
 export type HandoffProposedParams = z.infer<typeof HandoffProposedParams>;
 
@@ -122,6 +138,14 @@ export const HandoffsConfirmParams = z.object({
   canEdit: z.boolean(),
   /** The brief as the person edited it, if they did. */
   brief: Brief.optional(),
+  /**
+   * The follow-up step as the person left it: its access and edited ask. Null when they removed
+   * it; left out, it runs as proposed.
+   */
+  then: z
+    .object({ canEdit: z.boolean(), ask: z.string().min(1).optional() })
+    .nullable()
+    .optional(),
 });
 export const HandoffsConfirmResult = z.object({ handoffId: z.uuid() });
 

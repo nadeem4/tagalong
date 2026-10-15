@@ -16,6 +16,15 @@ import type { UsageEntry } from '../usage/usage-log';
 /** How long a hand-off may run before it is stopped and marked failed. */
 export const HANDOFF_TIMEOUT_MS = 30 * 60 * 1000;
 
+/** How much of step 1's answer goes into step 2's brief, so a long answer cannot flood it. */
+export const FOLLOW_UP_ANSWER_CHARS = 8_000;
+
+function clip(text: string): string {
+  return text.length <= FOLLOW_UP_ANSWER_CHARS
+    ? text
+    : `${text.slice(0, FOLLOW_UP_ANSWER_CHARS - 1)}…`;
+}
+
 export type HandoffEvent =
   | { method: 'handoff.proposed'; params: HandoffProposedParams }
   | { method: 'handoff.progress'; params: { handoffId: string; expertId: string; step: string } }
@@ -43,6 +52,15 @@ export interface StartParams {
   /** The project to work in. Required: an old expert's default folder is ignored. */
   folder?: string | undefined;
   canEdit?: boolean | undefined;
+  /** A follow-up step that starts in the same folder once this one finishes well. */
+  then?: FollowUp | undefined;
+}
+
+/** The second step of a chain, such as a Reviewer checking what a Coder changed. */
+export interface FollowUp {
+  expertId: string;
+  ask: string;
+  canEdit: boolean;
 }
 
 /** A brief waiting for the person to confirm it. */
@@ -50,6 +68,7 @@ interface Proposal {
   expertId: string;
   petId: string;
   brief: Brief;
+  then?: { expertId: string; ask: string } | undefined;
 }
 
 /**
@@ -64,6 +83,8 @@ export class HandoffManager {
   readonly #running = new Map<string, AbortController>();
   /** Every unfinished run, so shutdown can wait for its last write before the database closes. */
   readonly #runs = new Set<Promise<void>>();
+  /** Set by `stopAll`: no follow-up step starts once shutdown has begun. */
+  #closed = false;
 
   constructor(private readonly options: HandoffManagerOptions) {}
 
@@ -74,8 +95,10 @@ export class HandoffManager {
     brief: Brief;
     /** Titles to guess the project from instead of the brief's window, such as the editor's. */
     projectHint?: string;
+    then?: { expertId: string; ask: string } | undefined;
   }): { proposalId: string } {
     const expert = this.#expert(params.expertId);
+    const next = params.then === undefined ? undefined : this.#expert(params.then.expertId);
     // Only the guesses: an old expert's default folder is ignored, and with no guess at all
     // the hand-off card opens the folder picker.
     const projects =
@@ -85,6 +108,7 @@ export class HandoffManager {
       expertId: params.expertId,
       petId: params.petId,
       brief: params.brief,
+      then: params.then,
     });
     this.options.emit({
       method: 'handoff.proposed',
@@ -96,6 +120,16 @@ export class HandoffManager {
         brief: params.brief,
         projects,
         canEdit: expert.connection.canEdit,
+        ...(next === undefined || params.then === undefined
+          ? {}
+          : {
+              then: {
+                expertId: next.id,
+                expertName: next.name,
+                ask: params.then.ask,
+                canEdit: next.connection.canEdit,
+              },
+            }),
       },
     });
     return { proposalId };
@@ -107,16 +141,32 @@ export class HandoffManager {
     folder: string;
     canEdit: boolean;
     brief?: Brief | undefined;
+    /** Null: the person removed the follow-up step. Left out: it runs as proposed. */
+    then?: { canEdit: boolean; ask?: string | undefined } | null | undefined;
   }): { handoffId: string } {
     const proposal = this.#proposals.get(params.proposalId);
     if (proposal === undefined) {
       throw new RpcFailure(RPC_ERROR_CODES.invalidParams, 'that hand-off is no longer waiting');
     }
+    const proposed = proposal.then;
+    const then: FollowUp | undefined =
+      proposed === undefined || params.then === null
+        ? undefined
+        : {
+            expertId: proposed.expertId,
+            ask: params.then?.ask ?? proposed.ask,
+            canEdit:
+              params.then?.canEdit ??
+              this.options.experts.get(proposed.expertId)?.connection.canEdit ??
+              false,
+          };
     const started = this.start({
-      ...proposal,
+      expertId: proposal.expertId,
+      petId: proposal.petId,
       brief: params.brief ?? proposal.brief,
       folder: params.folder,
       canEdit: params.canEdit,
+      then,
     });
     this.#proposals.delete(params.proposalId);
     this.options.projects?.remember(params.folder);
@@ -158,7 +208,7 @@ export class HandoffManager {
         canEdit: params.canEdit ?? stored.connection.canEdit,
       },
     };
-    return this.#begin(expert, params.petId, params.brief, false);
+    return this.#begin(expert, params.petId, params.brief, false, params.then);
   }
 
   /**
@@ -172,7 +222,29 @@ export class HandoffManager {
     return this.#begin(expert, params.petId, params.brief, true);
   }
 
-  #begin(expert: Expert, petId: string, brief: Brief, research: boolean): { handoffId: string } {
+  #begin(
+    expert: Expert,
+    petId: string,
+    brief: Brief,
+    research: boolean,
+    then?: FollowUp,
+  ): { handoffId: string } {
+    const { handoffId, launch } = this.#prepare(expert, petId, brief, research, then);
+    launch();
+    return { handoffId };
+  }
+
+  /**
+   * Writes the Activity row and holds the run until `launch`, so a chain can name the next
+   * step's id before that step reports anything.
+   */
+  #prepare(
+    expert: Expert,
+    petId: string,
+    brief: Brief,
+    research: boolean,
+    then?: FollowUp,
+  ): { handoffId: string; launch: () => void } {
     const handoffId = this.options.activity.expertStarted({
       petId,
       expertId: expert.id,
@@ -181,11 +253,39 @@ export class HandoffManager {
     });
     const controller = new AbortController();
     this.#running.set(handoffId, controller);
-    const run = this.#run(handoffId, expert, brief, research, controller.signal).finally(() =>
-      this.#runs.delete(run),
-    );
-    this.#runs.add(run);
-    return { handoffId };
+    const launch = (): void => {
+      const run = this.#run(
+        { handoffId, expert, petId, brief, research, then },
+        controller.signal,
+      ).finally(() => this.#runs.delete(run));
+      this.#runs.add(run);
+    };
+    return { handoffId, launch };
+  }
+
+  /**
+   * After a step that finished well: sets up its follow-up in the same folder, briefed with
+   * what the first expert said and changed. Null when there is none, or it cannot start.
+   */
+  #followUp(
+    first: Expert,
+    petId: string,
+    then: FollowUp | undefined,
+    result: { text: string; changedFiles: string[] },
+  ): { next: NonNullable<HandoffFinishedParams['next']>; launch: () => void } | null {
+    if (then === undefined || this.#closed) return null;
+    const stored = this.options.experts.get(then.expertId);
+    if (stored === null || !stored.enabled) return null;
+    const expert: Expert = {
+      ...stored,
+      connection: { ...stored.connection, folder: first.connection.folder, canEdit: then.canEdit },
+    };
+    const brief: Brief = {
+      ask: `${then.ask}\n\nWhat ${first.name} did:\n${clip(result.text)}`,
+      ...(result.changedFiles.length > 0 ? { files: result.changedFiles } : {}),
+    };
+    const { handoffId, launch } = this.#prepare(expert, petId, brief, false);
+    return { next: { handoffId, expertId: expert.id, expertName: expert.name }, launch };
   }
 
   /** True when a running hand-off was stopped. */
@@ -199,6 +299,7 @@ export class HandoffManager {
 
   /** Cancels every running hand-off and resolves once each has recorded how it ended. */
   async stopAll(): Promise<void> {
+    this.#closed = true;
     for (const handoffId of [...this.#running.keys()]) this.cancel(handoffId);
     await Promise.all([...this.#runs]);
   }
@@ -215,12 +316,17 @@ export class HandoffManager {
   }
 
   async #run(
-    handoffId: string,
-    expert: Expert,
-    brief: Brief,
-    research: boolean,
+    step: {
+      handoffId: string;
+      expert: Expert;
+      petId: string;
+      brief: Brief;
+      research: boolean;
+      then?: FollowUp | undefined;
+    },
     signal: AbortSignal,
   ): Promise<void> {
+    const { handoffId, expert, brief, research } = step;
     const { activity, emit } = this.options;
     const expertId = expert.id;
     // Past the limit the run is cancelled like a stop, but recorded as a failure.
@@ -280,6 +386,8 @@ export class HandoffManager {
       return;
     }
     activity.expertFinished(handoffId, result);
+    // Only a step that finished well hands on; a failed or stopped one ends the chain.
+    const followUp = result.ok ? this.#followUp(expert, step.petId, step.then, result) : null;
     emit({
       method: 'handoff.finished',
       params: result.ok
@@ -289,8 +397,10 @@ export class HandoffManager {
             state: 'done',
             text: result.text,
             changedFiles: result.changedFiles,
+            ...(followUp === null ? {} : { next: followUp.next }),
           }
         : { handoffId, expertId, state: 'error', error: result.error },
     });
+    followUp?.launch();
   }
 }

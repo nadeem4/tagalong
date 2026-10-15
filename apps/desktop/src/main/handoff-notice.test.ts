@@ -39,6 +39,18 @@ describe('handoffNotice', () => {
     ).toEqual({ title: 'x could not finish', body: 'not signed in' });
   });
 
+  it('stays quiet for a step that hands on: the chain’s last step tells', () => {
+    expect(
+      handoffNotice({
+        handoffId: id,
+        expertId: 'coder',
+        state: 'done',
+        text: 'Fixed.',
+        next: { handoffId: id, expertId: 'reviewer', expertName: 'Reviewer' },
+      }),
+    ).toBeNull();
+  });
+
   it('stays quiet for a hand-off the user stopped', () => {
     expect(handoffNotice({ handoffId: id, expertId: 'x', state: 'stopped' })).toBeNull();
   });
