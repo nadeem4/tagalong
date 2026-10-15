@@ -63,6 +63,8 @@ export class Wellbeing {
   #activeSince: number | null = null;
   /** Whether this stretch has had its line. */
   #stretchSaid = false;
+  /** When the last tick came; a long gap since is a break. */
+  #lastTickAt = Number.NEGATIVE_INFINITY;
   #lateSaidAt = Number.NEGATIVE_INFINITY;
   #quietUntil = Number.NEGATIVE_INFINITY;
   /** Whether the host was last told Scout looks tired. */
@@ -82,12 +84,15 @@ export class Wellbeing {
       return;
     }
     const now = this.#options.clock.now();
-    if (params.idleMs >= BREAK_MS) {
+    const sinceLastTick = now - this.#lastTickAt;
+    this.#lastTickAt = now;
+    // No ticks for a break's length (the computer slept, the setting was off, sight was paused)
+    // or a clock set back counts as a break, so waking up never finds an old stretch due.
+    if (params.idleMs >= BREAK_MS || sinceLastTick >= BREAK_MS || sinceLastTick < 0) {
       this.#activeSince = null;
       this.#stretchSaid = false;
-    } else {
-      this.#activeSince ??= now;
     }
+    if (params.idleMs < BREAK_MS) this.#activeSince ??= now;
     const active = this.#activeSince === null ? 0 : now - this.#activeSince;
     const hour = this.#hourOf(now);
     const lateHour = hour >= LATE_FROM_HOUR || hour < LATE_UNTIL_HOUR;

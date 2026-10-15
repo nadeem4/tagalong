@@ -559,11 +559,19 @@ describe('gentle nudges over rpc', () => {
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
     await host.call('settings.set', { patch: { wellbeing: { enabled: true } } });
-    const at = async (minutes: number) => {
-      vi.setSystemTime(start + minutes * MINUTE);
+    let minute = 0;
+    const observe = async () => {
+      vi.setSystemTime(start + minute * MINUTE);
       await host.call('wellbeing.observe', { idleMs: 0, windows: [editor] });
     };
-    await at(0);
+    /** One tick a minute up to `minutes`, as the host sends them: a longer gap is a break. */
+    const at = async (minutes: number) => {
+      while (minute < minutes) {
+        minute += 1;
+        await observe();
+      }
+    };
+    await observe();
     return { host, at };
   }
 

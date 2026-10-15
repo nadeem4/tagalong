@@ -286,3 +286,114 @@ describe('Wellbeing: Not now, off, and the offer', () => {
     expect(remarks).toEqual([]);
   });
 });
+
+describe('Wellbeing: the clock across midnight, sleep and jumps', () => {
+  const HOUR = 60 * MINUTE;
+  /** A fake clock whose local hour follows it: t = 0 is midnight of day one. */
+  function nightSetup(startHour: number, minute = 0) {
+    const clock = { t: startHour * HOUR + minute * MINUTE, now: () => clock.t };
+    const remarks: PetRemarkParams[] = [];
+    const moods: PetMoodParams['mood'][] = [];
+    const hourShift = { value: 0 };
+    const wellbeing = new Wellbeing({
+      clock,
+      hourOf: (now) => (Math.floor(now / HOUR) + hourShift.value) % 24,
+      settings: () => Settings.parse({ wellbeing: { enabled: true } }),
+      pet: () => scout,
+      experts: () => [],
+      propose: () => undefined,
+      emit: (event) => {
+        if (event.method === 'pet.remark') remarks.push(event.params);
+        else moods.push(event.params.mood);
+      },
+    });
+    const tick = (idleMs = 0): void => {
+      clock.t += MINUTE;
+      wellbeing.observe({ idleMs, windows: editor });
+    };
+    const ticks = (count: number, idleMs = 0): void => {
+      for (let i = 0; i < count; i += 1) tick(idleMs);
+    };
+    return { clock, remarks, moods, wellbeing, tick, ticks, hourShift };
+  }
+
+  it('keeps one late line for the night across midnight, and says it again the next night', () => {
+    const { clock, remarks, moods, wellbeing, tick, ticks } = nightSetup(23, 20);
+    wellbeing.observe({ idleMs: 0, windows: editor });
+    ticks(30); // 23:50
+    expect(remarks.map((remark) => remark.text)).toEqual([LATE_LINE]);
+    ticks(30); // 00:20, past midnight
+    tick(BREAK_MS); // a break
+    expect(moods).toEqual(['tired', 'rested']);
+    ticks(40); // 01:01, half an hour active again, still late
+    expect(moods).toEqual(['tired', 'rested', 'tired']);
+    expect(remarks).toHaveLength(1);
+    // Asleep until the next night at 23:00: the gap counts as a break.
+    clock.t = (24 + 23) * HOUR;
+    wellbeing.observe({ idleMs: 0, windows: editor });
+    expect(moods.at(-1)).toBe('rested');
+    ticks(29);
+    expect(remarks).toHaveLength(1);
+    ticks(1); // 23:30 the next night
+    expect(remarks.map((remark) => remark.text)).toEqual([LATE_LINE, LATE_LINE]);
+  });
+
+  it('a daylight-saving change moves the hour, not the stretch: one late line, the face kept', () => {
+    const { remarks, moods, wellbeing, ticks, hourShift } = nightSetup(1);
+    wellbeing.observe({ idleMs: 0, windows: editor });
+    ticks(30);
+    expect(remarks).toHaveLength(1);
+    hourShift.value = 1; // clocks go forward
+    ticks(10);
+    hourShift.value = 0; // and back
+    ticks(10);
+    expect(remarks).toHaveLength(1);
+    expect(moods).toEqual(['tired']);
+  });
+
+  it('waking from sleep is a break: no stretch line on resume, and the stretch starts over', () => {
+    const { clock, remarks, moods, wellbeing, ticks } = nightSetup(14);
+    wellbeing.observe({ idleMs: 0, windows: editor });
+    ticks(80);
+    // The laptop sleeps for two hours; on wake a key press makes the idle time small.
+    clock.t += 2 * HOUR;
+    wellbeing.observe({ idleMs: 2_000, windows: editor });
+    expect(remarks).toEqual([]);
+    expect(moods).toEqual([]);
+    ticks(STRETCH_MS / MINUTE - 1);
+    expect(remarks).toEqual([]);
+    ticks(1);
+    expect(remarks.map((remark) => remark.text)).toEqual([STRETCH_LINE]);
+  });
+
+  it('waking while tired looks rested', () => {
+    const { clock, moods, wellbeing, ticks } = nightSetup(14);
+    wellbeing.observe({ idleMs: 0, windows: editor });
+    ticks(90);
+    expect(moods).toEqual(['tired']);
+    clock.t += 2 * HOUR;
+    wellbeing.observe({ idleMs: 0, windows: editor });
+    expect(moods).toEqual(['tired', 'rested']);
+  });
+
+  it('a clock set back starts the stretch over', () => {
+    const { clock, remarks, wellbeing, ticks } = nightSetup(14);
+    wellbeing.observe({ idleMs: 0, windows: editor });
+    ticks(80);
+    clock.t -= 2 * HOUR;
+    wellbeing.observe({ idleMs: 0, windows: editor });
+    ticks(STRETCH_MS / MINUTE - 1);
+    expect(remarks).toEqual([]);
+    ticks(1);
+    expect(remarks).toHaveLength(1);
+  });
+
+  it('no ticks for a while (switched off, or sight paused) and an old stretch does not count', () => {
+    const { clock, remarks, wellbeing, ticks } = nightSetup(14);
+    wellbeing.observe({ idleMs: 0, windows: editor });
+    ticks(80);
+    clock.t += 20 * MINUTE;
+    ticks(15);
+    expect(remarks).toEqual([]);
+  });
+});

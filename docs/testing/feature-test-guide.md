@@ -595,6 +595,8 @@ hour. By hand, check the switch, the hold during calls and the late-night offer.
    an hour and a half. Stretch?", with **Not now**. No second line in the same stretch.
 3. **Action:** step away for five minutes, then come back.
 4. **Expected:** the tired face clears.
+5. **Action:** an hour into a new stretch, put the computer to sleep for ten minutes, then wake it.
+6. **Expected:** no line on waking; the stretch starts over.
 
 ### N.3. Calls and full screen
 

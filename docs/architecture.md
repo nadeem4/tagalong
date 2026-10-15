@@ -1499,11 +1499,15 @@ flowchart LR
 false })`, the same titles-only list keeping an eye uses. Nothing is listed or sent while the
   setting is off or sight is paused.
 - **The decision.** An `idleMs` of `BREAK_MS` (5 min) or more is a break: the stretch starts over
-  and, if Scout looked tired, `pet.mood rested`. `STRETCH_MS` (90 min) of unbroken activity is
+  and, if Scout looked tired, `pet.mood rested`. So is a gap of `BREAK_MS` between ticks (the
+  computer slept, the setting was off, sight was paused) or a clock set back, so waking up never
+  finds an old stretch due. `STRETCH_MS` (90 min) of unbroken activity is
   tired, with `STRETCH_LINE` ("You've been at it for an hour and a half. Stretch?") once per
   stretch. From 23:00 to 05:00, `LATE_ACTIVE_MS` (30 min) active is tired, with `LATE_LINE` ("It's
   late. Want me to write up where you are?") once a night; the line also counts for the stretch, so
-  one line at a time. The tired face clears after a break or at 05:00. **Not now** keeps the lines
+  one line at a time. The tired face clears after a break, or at 05:00 unless the stretch is also
+  due. "Once a night" is no second late line within 12 h, so midnight and a daylight-saving change
+  need no date math: the hour comes from the local clock each tick. **Not now** keeps the lines
   quiet for `NOT_NOW_MS` (1 h). All of these are constants.
 - **Calls and full screen.** `callOrFullScreenInFront(windows)`, the one rule keeping an eye, moods
   and Always listening use: with a call or a full-screen window in front, no line and no face
