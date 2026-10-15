@@ -420,6 +420,14 @@ Copy puts the draft on your clipboard; you paste it. Scout never types or pastes
 to explain it or hand it to an expert. Nothing is read until you press a button, and secrets files
 such as `.env` are refused.
 
+**File this as a bug.** With an error on screen, say "file this as a bug" or "make a Linear ticket
+for this". Scout reads the window with the error and writes the issue: a short title, then what
+happened (the error, quoted), where (the app, the window title and the project), the steps it saw
+and what was expected. The connected app's confirm card shows the whole issue; **Allow once** files
+it ("Filed as #123"), **Cancel** files nothing. Scout never guesses a GitHub repo: it uses the one on
+screen or the one you name, or asks. With both GitHub and Linear connected, it asks which. No
+screenshot is attached.
+
 ## Privacy
 
 - Nothing on screen is read until you press a hotkey or ask, except screen memory and watches, which
