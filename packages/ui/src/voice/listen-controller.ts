@@ -1,4 +1,4 @@
-import { addressedToScout, isStopListening } from '@tagalong/protocol';
+import { addressedToScout, isStopListening, mightBeStop } from '@tagalong/protocol';
 import type { Ears, ListenMode, MicStream } from '@tagalong/protocol';
 
 /** The open microphone, as the controller needs it: its frames, and a way to close it. */
@@ -176,12 +176,15 @@ export class ListenController {
   /**
    * Always: words heard while a released question still waits are that question's, as the
    * voice process runs sessions in order; only talk addressed to Scout counts, and it cuts
-   * Scout off once per turn.
+   * Scout off once per turn. A partial that may still become "stop" ("Scout, st") is not
+   * addressed yet: it neither cuts Scout off nor shows.
    */
-  #addressed(session: Session, text: string): string | null {
+  #addressed(session: Session, text: string, partial = false): string | null {
     if (this.#taken || this.#released.size > 0) return null;
     const question =
       this.#options.needsName === false ? text.trim() || null : addressedToScout(text);
+    if (partial && this.#options.needsName !== false && question !== null && mightBeStop(question))
+      return null;
     if (question !== null && !session.barged) {
       session.barged = true;
       this.#options.onSpeechStart();
@@ -206,7 +209,7 @@ export class ListenController {
     });
     ears.on('partial', (text) => {
       if (!session.live || text === undefined || text === '') return;
-      if (mode === 'always' && this.#addressed(session, text) === null) return;
+      if (mode === 'always' && this.#addressed(session, text, true) === null) return;
       this.#options.onPartial(text, mode);
     });
     ears.on('turnEnd', (text = '') => {
@@ -220,9 +223,11 @@ export class ListenController {
           if (barged) this.#options.onDropped();
           return;
         }
-        if (this.#options.needsName !== false && isStopListening(question))
+        if (this.#options.needsName !== false && isStopListening(question)) {
           this.#options.onStopListening();
-        else this.#options.onHeard(question);
+          // The stop cut Scout off, but is never asked: the bubble lets go.
+          this.#options.onDropped();
+        } else this.#options.onHeard(question);
         return;
       }
       if (!session.released) return;

@@ -462,6 +462,30 @@ describe('ListenController, always', () => {
     expect(calls.heard).not.toHaveBeenCalled();
   });
 
+  it('a partial "Scout, st" might still be "stop": it neither cuts Scout off nor shows', async () => {
+    const { controller, ears, calls } = setup();
+    controller.setAlways(true);
+    await tick();
+    ears.say('partial', 'Scout, st');
+    ears.say('partial', 'Scout, stop list');
+    expect(calls.speechStart).not.toHaveBeenCalled();
+    expect(calls.partial).not.toHaveBeenCalled();
+    ears.say('turnEnd', 'Scout, stop.');
+    expect(calls.stop).toHaveBeenCalledOnce();
+    expect(calls.heard).not.toHaveBeenCalled();
+  });
+
+  it('a stop that had cut Scout off lets the bubble go', async () => {
+    const { controller, ears, calls } = setup();
+    controller.setAlways(true);
+    await tick();
+    ears.say('partial', 'Scout, wait');
+    expect(calls.speechStart).toHaveBeenCalledOnce();
+    ears.say('turnEnd', 'Scout, stop.');
+    expect(calls.stop).toHaveBeenCalledOnce();
+    expect(calls.dropped).toHaveBeenCalledOnce();
+  });
+
   it('a held question needs no name', async () => {
     const { controller, ears, calls } = setup();
     controller.hold();
