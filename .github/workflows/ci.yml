@@ -95,13 +95,16 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # Compiles the workspace packages (their package.json entries point at dist), which the
+      # tests below import, and the desktop app the Playwright suites start. On Linux the
+      # Typecheck step's `tsc -b` does the same job before the tests.
+      - name: Build
+        run: pnpm build
+
       # The unit tests that skip themselves off Windows: the real PowerShell transport and
       # recogniser, and the npm .cmd shims claude is started through.
       - name: Windows-only unit tests
         run: pnpm exec vitest run integration.test claude-sign-in.test claude-code.test
-
-      - name: Build
-        run: pnpm build
 
       # The runner is windows-latest, which has an interactive desktop session, so Electron
       # opens real windows and needs no xvfb-style wrapper. The step is capped because

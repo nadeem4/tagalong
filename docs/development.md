@@ -210,10 +210,11 @@ jobs:
   fails, `build` runs anyway rather than skipping.
 - **`build`** (Linux). Install, lint, format check, typecheck (`tsc -b` and the test project), and
   the unit tests with coverage and the floors below.
-- **`e2e`** (Windows). Starts only after `build` passes. Runs the unit tests that skip themselves off
-  Windows (`*.integration.test.ts` against a real PowerShell, and the npm `.cmd` shim cases in
-  `claude-sign-in.test.ts` and `claude-code.test.ts`), then `pnpm build` and the Electron
-  end-to-end suites.
+- **`e2e`** (Windows). Starts only after `build` passes. Runs `pnpm build` first, because the tests
+  import the workspace packages from their compiled `dist` (on Linux the typecheck's `tsc -b` does
+  this). Then the unit tests that skip themselves off Windows (`*.integration.test.ts` against a
+  real PowerShell, and the npm `.cmd` shim cases in `claude-sign-in.test.ts` and
+  `claude-code.test.ts`), and the Electron end-to-end suites.
 
 Branch protection on `main` requires `build` and `e2e`. A docs-only pull request skips both, and a
 skipped required check counts as passed, so it can merge. A `paths-ignore` trigger would not work
