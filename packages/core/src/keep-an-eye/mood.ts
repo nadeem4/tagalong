@@ -20,12 +20,19 @@ const PASSING = /\b(passed|passing|succeeded|success)\b|✓|✔/i;
 const TESTS_PASS = /\b(\d+ )?tests? pass(ed|ing)?\b|\b\d+ passed\b/i;
 /** A failure counted in an expert's last words. */
 const FAILED = /\bfail/i;
+/** A zero count says nothing either way: "0 failed" is no failure, "0 passed" no pass. */
+const ZERO_COUNT = /\b(0|no) (tests? )?\w+/gi;
+
+function withoutZeroCounts(text: string): string {
+  return text.replace(ZERO_COUNT, '');
+}
 
 type TitleState = 'trouble' | 'passing' | 'plain';
 
 function stateOf(title: string): TitleState {
-  if (looksLikeTrouble(title)) return 'trouble';
-  return PASSING.test(title) ? 'passing' : 'plain';
+  const counted = withoutZeroCounts(title);
+  if (looksLikeTrouble(counted)) return 'trouble';
+  return PASSING.test(counted) ? 'passing' : 'plain';
 }
 
 export class MoodWatch {
@@ -40,6 +47,9 @@ export class MoodWatch {
 
   /** The reaction the front window's title earns now, or null. */
   observe(windows: readonly WindowEntry[], exclusions: CaptureExclusions): Reaction | null {
+    // Only windows still open are remembered, so the map cannot grow all day.
+    const open = new Set(windows.map((window) => window.id));
+    for (const id of this.#seen.keys()) if (!open.has(id)) this.#seen.delete(id);
     if (callOrFullScreenInFront(windows)) return null;
     const front = windows.find((window) => window.state === 'foreground');
     if (front === undefined || blind(front, exclusions)) return null;
@@ -63,6 +73,7 @@ export class MoodWatch {
 export function moodForHandoff(params: HandoffFinishedParams): Reaction | null {
   if (params.state === 'error') return 'wince';
   if (params.state !== 'done' || params.text === undefined) return null;
-  if (FAILED.test(params.text)) return /\b\d+ failed\b/i.test(params.text) ? 'wince' : null;
-  return TESTS_PASS.test(params.text) ? 'cheer' : null;
+  const text = withoutZeroCounts(params.text);
+  if (FAILED.test(text)) return /\b\d+ failed\b/i.test(text) ? 'wince' : null;
+  return TESTS_PASS.test(text) ? 'cheer' : null;
 }

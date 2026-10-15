@@ -495,7 +495,7 @@ export class Engine {
     this.#watches.stopAll();
     await this.#handoffs.stopAll();
     await this.#connections.closeAll();
-    this.#runner.interruptAll();
+    await this.#runner.stopAll();
     await this.#server.close();
     this.#db.close();
   }

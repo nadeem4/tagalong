@@ -46,6 +46,21 @@ describe('MoodWatch', () => {
     expect(at(MOOD_COOLDOWN_MS * 3, [win('w-2', 'Deploy ✓')])).toBe('cheer');
   });
 
+  it('reads a zero count in a title as nothing', () => {
+    const { at } = setup();
+    expect(at(0, [win('w-1', 'vitest - 12 passed, 0 failed')])).toBe('cheer');
+    expect(at(MOOD_COOLDOWN_MS, [win('w-2', 'vitest - 0 passed, 3 failed')])).toBe('wince');
+    expect(at(MOOD_COOLDOWN_MS * 2, [win('w-3', 'vitest - 0 passed')])).toBeNull();
+  });
+
+  it('forgets windows that are gone', () => {
+    const { at } = setup();
+    expect(at(0, [win('w-1', 'Build failed')])).toBe('wince');
+    expect(at(1, [win('w-2', 'notes.txt')])).toBeNull();
+    // w-1 closed and its id came back as a new window: a new failure, so a new wince.
+    expect(at(MOOD_COOLDOWN_MS * 2, [win('w-1', 'Build failed')])).toBe('wince');
+  });
+
   it('reacts to nothing in a blind spot, a full-screen window or a call', () => {
     const { at } = setup();
     expect(
@@ -87,6 +102,14 @@ describe('moodForHandoff', () => {
 
   it('winces when the text counts failures', () => {
     expect(moodForHandoff({ ...base, text: '3 failed, 9 passed' })).toBe('wince');
+  });
+
+  it('reads a zero count as nothing: no wince at 0 failed, no cheer at 0 passed', () => {
+    expect(moodForHandoff({ ...base, text: '0 passed, 5 failed' })).toBe('wince');
+    expect(moodForHandoff({ ...base, text: '12 passed, 0 failed' })).toBe('cheer');
+    expect(moodForHandoff({ ...base, text: 'Tests: 0 failed' })).toBeNull();
+    expect(moodForHandoff({ ...base, text: '0 passed' })).toBeNull();
+    expect(moodForHandoff({ ...base, text: '0 tests passed' })).toBeNull();
   });
 
   it('leaves a plain finish to the done face', () => {

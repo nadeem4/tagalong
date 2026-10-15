@@ -259,8 +259,8 @@ Notifications are broadcast to every connected host session, so a second window 
 one: two streams into one panel read as nonsense. A second `ask` for the same pet is therefore an
 interruption, not a queue. Explicit `interrupt(turnId)` aborts through the same `AbortController` and
 answers `{ aborted: false }` when the turn had already finished. `Engine.shutdown` interrupts everything
-still running before closing the database, because a stream left in flight would keep writing to a
-database that is about to close.
+still running and waits until each turn has settled (`runner.stopAll()`) before closing the database,
+because an aborted stream still writes its last row and event.
 
 Tool calls are part of the contract already: the provider's `onToolUse` is awaited before the dependent
 text streams. Phase 2 fills it with two built-ins, now in `packages/core/src/tools/builtin/perception.ts` —
@@ -1342,7 +1342,9 @@ flowchart LR
   spots and a call or full screen in front get nothing, and there is at most one reaction a minute
   (`MOOD_COOLDOWN_MS`). The engine also calls `moodForHandoff` when a hand-off finishes: an error is
   a wince, "tests pass" or "N passed" with no failure is a cheer, "N failed" is a wince, anything
-  else is left to the done face. Both send `pet.mood { petId, mood: 'wince' | 'cheer' }`, which
+  else is left to the done face. A zero count says nothing either way, in a title or an expert's
+  words: "12 passed, 0 failed" cheers, "0 passed" alone does not. Only windows still in the list are
+  remembered. Both send `pet.mood { petId, mood: 'wince' | 'cheer' }`, which
   main forwards to every window like every notification. Title moods run only while keeping an eye
   is on and sight is not paused, so there is no second tracker.
 - **The call** (`remark.ts#composeRemark`). Reads the last 4,000 characters of that window through

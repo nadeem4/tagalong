@@ -117,6 +117,8 @@ interface ActiveTurn {
   petId: string;
   controller: AbortController;
   background: boolean;
+  /** Set once the stream starts; settles when the turn is over. */
+  done?: Promise<TurnOutcome>;
 }
 
 /**
@@ -235,6 +237,8 @@ export class ConversationRunner {
         this.#active.delete(turnId);
       },
     );
+    const active = this.#active.get(turnId);
+    if (active !== undefined) active.done = done;
 
     return { turnId, conversationId, done };
   }
@@ -257,6 +261,18 @@ export class ConversationRunner {
       if (this.interrupt(turnId)) stopped += 1;
     }
     return stopped;
+  }
+
+  /**
+   * Aborts every running turn and waits until each has settled. An aborted stream still
+   * writes its last row and event, so shutdown waits here before closing the database.
+   */
+  async stopAll(): Promise<void> {
+    const running = [...this.#active.values()].flatMap((active) =>
+      active.done === undefined ? [] : [active.done],
+    );
+    this.interruptAll();
+    await Promise.allSettled(running);
   }
 
   #interruptPet(petId: string): void {

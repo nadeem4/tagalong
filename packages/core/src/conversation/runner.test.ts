@@ -548,6 +548,20 @@ describe('interruptAll', () => {
     expect((await second.done).stopReason).toBe('aborted');
   });
 
+  it('settles every running turn before stopAll resolves, so nothing writes after it', async () => {
+    const runner = makeRunner(
+      new FakeBrainProvider({ text: 'one two three four five', delayMs: 20 }),
+    );
+    const settled: string[] = [];
+    void runner.run({ pet, text: 'a' }).done.then(() => settled.push('a'));
+    void runner.run({ pet: { ...pet, id: 'other' }, text: 'b' }).done.then(() => settled.push('b'));
+    await firstDelta();
+
+    await runner.stopAll();
+
+    expect(settled.sort()).toEqual(['a', 'b']);
+  });
+
   it('reports zero when nothing is running', () => {
     const runner = makeRunner(new FakeBrainProvider({ text: 'idle' }));
 
