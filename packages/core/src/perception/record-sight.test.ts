@@ -79,6 +79,21 @@ describe('recordSight', () => {
     expect(rows()[0]).not.toHaveProperty('title');
   });
 
+  it('forgets a window the latest list no longer has, so the map never grows past one list', async () => {
+    let listed = WINDOWS;
+    const host = recordSight(
+      fakeHost({ listWindows: () => Promise.resolve({ windows: listed }) }),
+      sight,
+    );
+    await host.listWindows!();
+    listed = [window('w9', 'notepad.exe', 'todo.txt')];
+    await host.listWindows!();
+    await host.readText!({ windowId: 'w1', maxChars: 100 });
+    expect(rows()[0]).toMatchObject({ kind: 'read_text', chars: 12 });
+    expect(rows()[0]).not.toHaveProperty('app');
+    expect(rows()[0]).not.toHaveProperty('title');
+  });
+
   it('names a read window from the last list, with the character count and source', async () => {
     const host = recordSight(fakeHost(), sight);
     await host.listWindows!();

@@ -46,6 +46,32 @@ describe('recordBrain', () => {
     expect(rows[0]).toMatchObject({ chars: 35 + 11, images: 2 });
   });
 
+  it('counts the tool results already in the history it sends', async () => {
+    const { rows, log } = recorder();
+    const provider = recordBrain(new FakeBrainProvider({ text: 'ok' }), log);
+    const history: BrainRequest = {
+      ...REQUEST,
+      messages: [
+        ...REQUEST.messages,
+        { role: 'assistant', content: [{ type: 'tool_use', id: 't1', name: 'look', input: {} }] },
+        {
+          role: 'user',
+          content: [
+            { type: 'tool_result', toolUseId: 't1', content: 'four' },
+            {
+              type: 'tool_result',
+              toolUseId: 't2',
+              content: [{ type: 'text', text: 'ab' }, IMAGE],
+            },
+          ],
+        },
+      ],
+    };
+    await provider.complete(history, EVENTS, new AbortController().signal);
+    // 35 from the request, 4 and 2 from the two results, and the result's picture.
+    expect(rows[0]).toMatchObject({ chars: 35 + 4 + 2, images: 2 });
+  });
+
   it('never keeps the text or the pictures themselves', async () => {
     const { rows, log } = recorder();
     await recordBrain(new FakeBrainProvider({ text: 'ok' }), log).complete(

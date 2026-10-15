@@ -16,8 +16,12 @@ import type { PerceptionHost } from './host';
  */
 export function recordSight<H extends PerceptionHost>(host: H, log: SightRecorder): H {
   const windows = new Map<string, WindowEntry>();
+  // Only the latest list: a long session opens thousands of windows, and a closed one's
+  // title has no business outliving it here.
   const remember = (list: readonly WindowEntry[] | undefined): void => {
-    for (const window of list ?? []) windows.set(window.id, window);
+    if (list === undefined) return;
+    windows.clear();
+    for (const window of list) windows.set(window.id, window);
   };
   const named = (windowId: string): Pick<SightRow, 'app' | 'title'> => {
     const window = windows.get(windowId);
