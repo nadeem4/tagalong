@@ -106,6 +106,39 @@ describe('the hand-off card', () => {
     });
   });
 
+  it('says when the brief carries the end of the error window, and keeps it when edited', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    const brief = {
+      ask: 'Fix the error in npm test - 2 failed',
+      context: { windowTitle: 'npm test - 2 failed', windowText: 'FAIL parser.test.ts' },
+    };
+    act(() =>
+      bridge.emit({
+        type: 'handoff.proposed',
+        proposalId: PROPOSAL,
+        petId: 'scout',
+        expertId: 'claude-code',
+        expertName: 'Claude Code',
+        brief,
+        projects: [AI_PET],
+        canEdit: false,
+      }),
+    );
+    expect(card()).toHaveTextContent('Includes the end of the error window');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit brief' }));
+    fireEvent.change(screen.getByLabelText('Brief'), { target: { value: 'Fix the lexer.' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Send' })));
+    expect(bridge.confirmedHandoffs[0]?.brief).toEqual({ ...brief, ask: 'Fix the lexer.' });
+  });
+
+  it('says nothing about window text for a brief without it', () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    propose(bridge);
+    expect(card()).not.toHaveTextContent('Includes the end');
+  });
+
   it('drops the proposal on Cancel', async () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge);

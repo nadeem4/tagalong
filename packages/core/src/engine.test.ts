@@ -535,6 +535,12 @@ describe('keep an eye over rpc', () => {
     const quiet = await host.call('keepAnEye.notNow', {});
     const until = Date.parse((quiet['result'] as { quietUntil: string }).quietUntil);
     expect(until - Date.now()).toBeGreaterThan(59 * 60_000);
+
+    // accept is async now: the answer is still a plain boolean on the wire.
+    const accepted = await host.call('keepAnEye.accept', {
+      remarkId: '00000000-0000-4000-8000-000000000000',
+    });
+    expect(accepted['result']).toEqual({ proposed: false });
   });
 });
 

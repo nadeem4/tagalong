@@ -547,7 +547,8 @@ On by default. Not active under `TAGALONG_FAKE_PROVIDERS=1` unless `TAGALONG_KEE
    like trouble (K.1), **What Scout saw** shows no new read of the terminal before the click.
 4. **Action:** press **Hand it over**.
 5. **Expected:** the hand-off card opens to Coder with "Fix the error in npm test - 2 failed" and
-   the editor's project already picked; **What Scout saw** now shows one more read of the terminal.
+   the editor's project already picked and "Includes the end of the error window" under the brief;
+   **What Scout saw** now shows one more read of the terminal.
    Nothing runs until **Send**; after Send, Coder's brief ends with the terminal's last lines, any
    key in them hidden.
 6. **Action:** leave a second error up for three minutes within half an hour, and separately press

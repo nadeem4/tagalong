@@ -171,6 +171,9 @@ export function ProposalCard({
             ) : (
               <span className="handoff-brief">{ask}</span>
             )}
+            {proposal.brief.context?.windowText !== undefined && (
+              <small>Includes the end of the error window</small>
+            )}
           </dd>
           {!editing && (
             <button type="button" className="bubble-quiet" onClick={() => setEditing(true)}>

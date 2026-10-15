@@ -284,6 +284,24 @@ describe('KeepAnEye: Stuck?', () => {
     expect(remarks).toEqual([]);
   });
 
+  it('still offers an error once an expert is switched on, as it was never offered', async () => {
+    const experts: Expert[] = [];
+    const run = setup({ experts });
+    await run.at(0, [failing]);
+    await run.at(STUCK_MS, [failing]);
+    expect(run.remarks).toEqual([]);
+    experts.push(coder);
+    await run.at(STUCK_MS + 5_000, [failing]);
+    expect(run.remarks.map((remark) => remark.text)).toEqual([
+      'That error’s still up. Want me to hand it to Coder?',
+    ]);
+  });
+
+  it('says nothing while Keep an eye on things is off', async () => {
+    const { remarks } = await stuck({ settings: { keepAnEye: false } });
+    expect(remarks).toEqual([]);
+  });
+
   it('says nothing after Not now', async () => {
     const run = setup({ experts: [coder] });
     run.eye.notNow();

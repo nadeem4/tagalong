@@ -90,6 +90,15 @@ describe('StuckWatch', () => {
     expect(other.at(STUCK_MS, [failing], listed)).toBeNull();
   });
 
+  it('keeps count but offers nothing, and uses nothing up, while not ready', () => {
+    const { watch, clock } = setup();
+    clock.t = 0;
+    watch.observe([failing], none, false);
+    clock.t = STUCK_MS;
+    expect(watch.observe([failing], none, false)).toBeNull();
+    expect(watch.observe([failing], none)).toEqual({ window: failing, projectHint: failing.title });
+  });
+
   it('stays quiet until Not now ends', () => {
     const { at, watch } = setup();
     watch.quietUntil(STUCK_MS * 4);

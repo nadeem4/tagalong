@@ -1469,14 +1469,15 @@ flowchart LR
   true, and never for a blind spot (`blind`). It returns the window and a `projectHint`: the trouble
   title, plus the last window in front without trouble (usually the editor). `KeepAnEye` then sends
   a handwritten `pet.remark` ("That error’s still up. Want me to hand it to Coder?") with the offer
-  "Fix the error in <title>", but only with an expert switched on. `pickCoder` chooses the enabled
+  "Fix the error in <title>", but only with an expert switched on (until then it keeps counting and
+  uses up neither the error nor the 30 minutes). `pickCoder` chooses the enabled
   expert named Coder, else one whose `goodAt` mentions code, else the first enabled one.
   `keepAnEye.accept` is async: for a stuck offer it reads the window only then, through the same
   recorded hosts (`readText`, last `REMARK_TEXT_CHARS`; a `blocked` or failed read just leaves the
   text out), passes it through `hideSecrets`, and puts it in the brief's own `context.windowText`
   (max 4,000; `renderBrief` adds it as "The end of that window"). `HandoffManager.propose` takes the
-  optional `projectHint` for `projects.suggest`, so the card arrives with the project picked; nothing
-  runs until **Send**.
+  optional `projectHint` for `projects.suggest`, so the card arrives with the project picked and, under the brief, "Includes the end of the error
+  window"; nothing runs until **Send**.
 - **The call** (`remark.ts#composeRemark`). Reads the last 4,000 characters of that window through
   the host's `readText` (a `blocked` read ends it), then one call to `settings.summarizer`, else the
   pet's own provider and model, text only, like `Summarizer`: 80 tokens, tools refused, a 15 s

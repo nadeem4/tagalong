@@ -39,8 +39,15 @@ export class StuckWatch {
     this.#clock = clock;
   }
 
-  /** The error to offer help with now, or null. Each error is offered once. */
-  observe(windows: readonly WindowEntry[], exclusions: CaptureExclusions): Stuck | null {
+  /**
+   * The error to offer help with now, or null. Each error is offered once. With `ready`
+   * false (no pet or no expert on) it keeps count but offers nothing, so nothing is used up.
+   */
+  observe(
+    windows: readonly WindowEntry[],
+    exclusions: CaptureExclusions,
+    ready = true,
+  ): Stuck | null {
     const now = this.#clock.now();
     const open = new Set<string>();
     for (const window of windows) {
@@ -61,7 +68,8 @@ export class StuckWatch {
       return null;
     }
 
-    if (now < this.#quietUntil || now - this.#lastOfferedAt < STUCK_COOLDOWN_MS) return null;
+    if (!ready || now < this.#quietUntil || now - this.#lastOfferedAt < STUCK_COOLDOWN_MS)
+      return null;
     if (callOrFullScreenInFront(windows)) return null;
     const key = keyOf(front);
     const since = this.#since.get(key);

@@ -163,11 +163,11 @@ export class KeepAnEye {
 
   /** An error that stayed up: one handwritten line and an offer, from titles alone. */
   #stuckOffer(windows: readonly WindowEntry[], settings: Settings): void {
-    const stuck = this.#stuck.observe(windows, settings.captureExclusions);
-    if (stuck === null) return;
     const pet = this.#options.pet();
     const expert = pickCoder(this.#options.experts());
-    if (pet === null || expert === undefined) return;
+    const ready = pet !== null && expert !== undefined;
+    const stuck = this.#stuck.observe(windows, settings.captureExclusions, ready);
+    if (stuck === null || !ready) return;
     const remarkId = randomUUID();
     const ask = `Fix the error in ${stuck.window.title}`;
     this.#offer = {
