@@ -18,6 +18,7 @@ import type {
   RoutineProposedParams,
   RoutineView,
   SightLogEntry,
+  UsageSummaryResult,
 } from '@tagalong/protocol';
 
 /**
@@ -164,6 +165,8 @@ export interface HostBridge {
   setCalendarLink?(link: string | null): Promise<CalendarCheckResult>;
   /** Whether a calendar link is kept, without showing it. */
   checkCalendar?(): Promise<CalendarCheckResult>;
+  /** Home's Spend card: today's and this month's usage, and the daily budget. */
+  usageSummary?(): Promise<UsageSummaryResult>;
 }
 
 export interface ConfirmHandoff {

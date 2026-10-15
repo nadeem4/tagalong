@@ -22,6 +22,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Point, don't click](#point-dont-click)
 - [What Scout saw](#what-scout-saw)
 - [Draft it for me](#draft-it-for-me)
+- [Spend and the daily budget](#spend-and-the-daily-budget)
 - [The Chrome extension](#the-chrome-extension)
 - [Installer](#installer)
 - [Not in this build](#not-in-this-build)
@@ -1155,6 +1156,38 @@ monitor.
 6. **Action:** ask for something long ("write a 2,000-word design doc"). **Expected:** Scout offers
    to hand it to an expert.
 
+## Spend and the daily budget
+
+### SP.1. Home shows what Scout and the experts used
+
+1. **Setup:** Scout thinks with OpenRouter on `anthropic/claude-haiku-4.5`, with a key stored.
+2. **Action:** ask Scout two questions, then open **Home → Overview**. **Expected:** the **Spend**
+   card lists **Today** and **This month** with a row `Scout · OpenRouter` and a dollar amount (or
+   "under $0.01"). It updates when a turn finishes, without reopening Home.
+3. **Action:** switch Scout to a model not in the price table (any other OpenRouter model) and ask
+   again. **Expected:** the row shows tokens and "price unknown". No dollar figure is guessed.
+4. **Action:** switch Scout to the Claude sign-in and ask again; then send a task to Claude Code.
+   **Expected:** `Scout · Claude sign-in` and `Experts · Claude Code` show tokens and "(your plan)",
+   never dollars.
+
+### SP.2. The cap pauses proactive work only
+
+1. **Setup:** OpenRouter on a priced model, as above. Keep an eye on things on, and a routine
+   scheduled a few minutes from now.
+2. **Action:** in **Settings → Daily budget** type `0.01` and save, then ask Scout questions until
+   today's spend passes $0.01. **Expected:** the Spend card says "Proactive comments paused: today's
+   $0.01 is spent."
+3. **Action:** wait for the routine's time. **Expected:** it does not run; **Activity** shows it
+   with "Skipped: today's budget is spent." Scout says nothing about it.
+4. **Action:** open a window whose title reads like trouble ("Build failed") and stay on it.
+   **Expected:** no keep-an-eye comment.
+5. **Action:** ask Scout a question, press **Run now** on the routine, start a watch and send a
+   hand-off. **Expected:** all of them run.
+6. **Action:** type `-1` or `abc` in the budget and save. **Expected:** the field says what it needs;
+   nothing is saved. Clear the box and save: the cap is off and the paused line goes.
+7. **Action:** with only the Claude sign-in in use, set the cap to `0.01`. **Expected:** the cap
+   never trips, because the sign-in has no price.
+
 ## The Chrome extension
 
 **Before you start:** Chrome 116 or newer, the desktop app running, and a long article open in a
@@ -1344,4 +1377,4 @@ Do not test these here.
   computer only.
 - **"Always allow" for connected apps.** Every change asks.
 - **macOS and Linux.** The app stops at launch on both; their installer configs are unverified.
-- **Cost dashboard.** The side panel estimates image tokens, but there is no usage view.
+- **Voice cost.** ElevenLabs characters are not counted on the Spend card.

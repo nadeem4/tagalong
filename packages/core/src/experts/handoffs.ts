@@ -11,6 +11,7 @@ import { hideSecrets } from '../privacy/secrets';
 import { RpcFailure } from '../server/ws-server';
 import { renderBrief, type Brief, type Connector, type ConnectorResult } from './connector';
 import type { ExpertStore } from './store';
+import type { UsageEntry } from '../usage/usage-log';
 
 /** How long a hand-off may run before it is stopped and marked failed. */
 export const HANDOFF_TIMEOUT_MS = 30 * 60 * 1000;
@@ -31,6 +32,8 @@ export interface HandoffManagerOptions {
     suggest(windowTitle: string | undefined): ProjectCandidate[];
     remember(path: string): void;
   };
+  /** The cost meter: every expert run that reports tokens is recorded here, and only here. */
+  usage?: { record(entry: UsageEntry): void };
 }
 
 export interface StartParams {
@@ -232,6 +235,19 @@ export class HandoffManager {
       sent = { ok: false, error: `${expert.name} could not run: ${(error as Error).message}` };
     } finally {
       clearTimeout(timer);
+    }
+    if (sent.usage !== undefined) {
+      try {
+        this.options.usage?.record({
+          source: 'expert',
+          providerId: expert.connection.type,
+          model: sent.usage.model,
+          inputTokens: sent.usage.inputTokens,
+          outputTokens: sent.usage.outputTokens,
+        });
+      } catch {
+        // A meter that cannot write never changes how the hand-off ends.
+      }
     }
     if (timedOut) {
       const minutes = Math.round(HANDOFF_TIMEOUT_MS / 60_000);

@@ -346,6 +346,26 @@ describe('ask', () => {
     }
   });
 
+  it('meters the turn: usage.summary shows one Scout row, and the cap is off', async () => {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('ask', { petId: 'scout', input: { text: 'what does this cost?' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+
+    const res = await host.call('usage.summary', {});
+    const result = res['result'] as {
+      today: { source: string; inputTokens: number }[];
+      month: unknown[];
+      budget: { dailyUsd: number | null; spentOut: boolean };
+    };
+    expect(result.today).toHaveLength(1);
+    expect(result.today[0]?.source).toBe('scout');
+    expect(result.today[0]?.inputTokens).toBeGreaterThan(0);
+    expect(result.month).toHaveLength(1);
+    expect(result.budget).toEqual({ dailyUsd: null, spentOut: false });
+  });
+
   it('persists the exchange so a restart still has the conversation', async () => {
     const e = await boot();
     const host = await TestHost.connect(e.port);
@@ -940,6 +960,95 @@ describe('a companion handing work to an expert', () => {
     );
     expect(sent).toMatchObject({ expertName: 'Claude Code', chars: expect.any(Number) });
     expect(JSON.stringify(sent)).not.toContain('Why does the build fail?');
+  });
+});
+
+describe('the daily budget over rpc', () => {
+  it('once spent, stops keep-an-eye only: an ask, Run now and a confirmed hand-off still go', async () => {
+    // A dollar already spent today, against a one-cent cap.
+    const db = openDatabase(dir);
+    db.prepare(
+      `INSERT INTO usage (at, source, provider_id, model, input_tokens, output_tokens, cost_usd)
+       VALUES (?, 'scout', 'anthropic', 'claude-opus-5-5', 1000, 1000, 1)`,
+    ).run(new Date().toISOString());
+    db.close();
+    const provider = new FakeBrainProvider({
+      text: 'Claude Code has it.',
+      toolCall: {
+        id: 'call-1',
+        name: 'hand_to_expert',
+        input: { ask: 'Why does the build fail?', task_kind: 'fix-code' },
+      },
+    });
+    const e = await boot(provider);
+    const host = await TestHost.connect(e.port);
+    const reads: unknown[] = [];
+    host.onRequest = (_method, params) => {
+      reads.push(params);
+      return { windowId: 'w-7', text: 'error TS2307', truncated: false, source: 'uia' };
+    };
+    await host.call('hello', {
+      ...helloParams(e.pairingToken),
+      capabilities: ['textLayer'] as const,
+    });
+    await host.call('settings.set', { patch: { budget: { dailyUsd: 0.01 } } });
+    const summary = (await host.call('usage.summary', {}))['result'] as {
+      budget: { dailyUsd: number | null; spentOut: boolean };
+    };
+    expect(summary.budget).toEqual({ dailyUsd: 0.01, spentOut: true });
+
+    // Keep-an-eye is proactive: nothing is read and nothing is said.
+    const window = {
+      id: 'w-7',
+      processName: 'Code.exe',
+      title: 'Build failed',
+      state: 'foreground',
+      browser: false,
+    };
+    await host.call('keepAnEye.observe', { windows: [window] });
+    expect(reads).toEqual([]);
+
+    // A direct ask still runs, and its confirmed hand-off still finishes.
+    await host.call('experts.upsert', {
+      expert: {
+        id: 'claude-code',
+        name: 'Claude Code',
+        connection: { type: 'claude-code', folder: 'C:\\projects\\ai_pet' },
+      },
+    });
+    const listed = await host.call('pets.list', {});
+    const scout = (listed['result'] as { pets: Record<string, unknown>[] }).pets.find(
+      (pet) => pet['id'] === 'scout',
+    );
+    await host.call('pets.upsert', { pet: { ...scout, roleId: 'companion' } });
+    await host.call('ask', { petId: 'scout', input: { text: 'Why does the build fail?' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('handoff.proposed'), {
+      timeout: 5000,
+    });
+    expect(host.methods()).not.toContain('turn.error');
+    const proposed = host.notifications.find((n) => n.method === 'handoff.proposed')!;
+    await host.call('handoffs.confirm', {
+      proposalId: proposed.params['proposalId'],
+      folder: 'C:\\projects\\ai_pet',
+      canEdit: false,
+    });
+    await vi.waitFor(() => expect(host.methods()).toContain('handoff.finished'), {
+      timeout: 5000,
+    });
+
+    // Run now is the person's own ask too.
+    const saved = (
+      await host.call('routines.save', {
+        routine: {
+          name: 'Morning papers',
+          when: { type: 'schedule', days: [1, 2, 3, 4, 5], time: '08:00' },
+          what: 'Find new papers on my topics.',
+        },
+      })
+    )['result'] as { routine: { id: string } };
+    const run = await host.call('routines.runNow', { id: saved.routine.id });
+    expect(run['result']).toEqual({ started: true });
+    await vi.waitFor(() => expect(host.methods()).toContain('routine.result'), { timeout: 5000 });
   });
 });
 

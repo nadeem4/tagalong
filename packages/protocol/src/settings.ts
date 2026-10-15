@@ -25,6 +25,9 @@ export const MAX_ROLLING_MEMORY_MINUTES = 30;
 /** Ceiling on the name Scout calls the person: a first name, not a paragraph. */
 export const MAX_USER_NAME_CHARS = 40;
 
+/** The highest daily budget Settings accepts, in dollars. A typo guard, not a judgement. */
+export const MAX_DAILY_BUDGET_USD = 1000;
+
 /** The guided first run, in order. `answer` is offered only when setup can listen. */
 export const WELCOME_STEPS = ['answer', 'name', 'think', 'voice', 'keys', 'try'] as const;
 export type WelcomeStep = (typeof WELCOME_STEPS)[number];
@@ -161,6 +164,13 @@ export const SETTINGS_DEFAULTS = {
    * and an off switch would weaken the audit. Talk may only lower it.
    */
   sightLog: { days: SIGHT_LOG_DEFAULT_DAYS },
+  /**
+   * A daily cap on priced spend. Off by default. Once today's priced dollars reach it,
+   * keep-an-eye comments and scheduled routines wait until local midnight; a direct ask,
+   * Run now, a watch, a confirmed hand-off and a summary always go through. Talk to change
+   * settings may set it ("cap me at a dollar a day").
+   */
+  budget: { dailyUsd: null as number | null },
 } as const;
 
 /** The local voices Scout can speak in: two British male voices of the Kokoro model. */
@@ -369,6 +379,8 @@ const settingsFields = {
   sightLog: z.object({
     days: z.number().int().min(MIN_SIGHT_LOG_DAYS).max(MAX_SIGHT_LOG_DAYS),
   }),
+  /** Dollars of priced spend a day before proactive work pauses; null for no cap. */
+  budget: z.object({ dailyUsd: z.number().positive().max(MAX_DAILY_BUDGET_USD).nullable() }),
 };
 
 export const Settings = z.object({
@@ -408,6 +420,7 @@ export const Settings = z.object({
   listening: settingsFields.listening.prefault({ ...SETTINGS_DEFAULTS.listening }),
   pickUp: settingsFields.pickUp.default(SETTINGS_DEFAULTS.pickUp),
   sightLog: settingsFields.sightLog.prefault({ ...SETTINGS_DEFAULTS.sightLog }),
+  budget: settingsFields.budget.prefault({ ...SETTINGS_DEFAULTS.budget }),
 });
 export type Settings = z.infer<typeof Settings>;
 

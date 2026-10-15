@@ -59,6 +59,7 @@ describe('openDatabase', { timeout: 20_000 }, () => {
         'routines',
         'schema_version',
         'sight_log',
+        'usage',
       ]);
       const row = db
         .prepare<[], { version: number }>('SELECT MAX(version) AS version FROM schema_version')
@@ -244,6 +245,39 @@ describe('migrate', () => {
       expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
       const rows = db.prepare<[], { n: number }>('SELECT COUNT(*) AS n FROM pick_up').get();
       expect(rows?.n).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('adds the usage table in migration 17: counts only, no column for anything said', () => {
+    const db = new Database(':memory:');
+    try {
+      migrate(db);
+      expect(LATEST_SCHEMA_VERSION).toBeGreaterThanOrEqual(17);
+      const columns = db
+        .prepare<[], { name: string }>('PRAGMA table_info(usage)')
+        .all()
+        .map((c) => c.name);
+      expect(columns).toEqual([
+        'id',
+        'at',
+        'source',
+        'provider_id',
+        'model',
+        'input_tokens',
+        'output_tokens',
+        'cost_usd',
+      ]);
+      // Only Scout or an expert spends.
+      expect(() =>
+        db
+          .prepare(
+            `INSERT INTO usage (at, source, provider_id, model, input_tokens, output_tokens)
+             VALUES ('a', 'someone', 'p', 'm', 1, 1)`,
+          )
+          .run(),
+      ).toThrow();
     } finally {
       db.close();
     }

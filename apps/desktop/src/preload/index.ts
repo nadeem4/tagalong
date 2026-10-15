@@ -18,6 +18,7 @@ import type {
   RoutineProposedParams,
   RoutineResultParams,
   RoutineView,
+  UsageSummaryResult,
   Settings,
   SettingsPatch,
   SightLogEntry,
@@ -124,6 +125,7 @@ const bridge: HostBridge = {
   setCalendarLink: (link: string | null) =>
     ipcRenderer.invoke(IPC.setCalendarLink, link) as Promise<CalendarCheckResult>,
   checkCalendar: () => ipcRenderer.invoke(IPC.checkCalendar) as Promise<CalendarCheckResult>,
+  usageSummary: () => ipcRenderer.invoke(IPC.usageSummary) as Promise<UsageSummaryResult>,
   onTurnEvent: (handler: (event: TurnEvent) => void) => {
     const listener = (_event: IpcRendererEvent, turnEvent: TurnEvent): void => handler(turnEvent);
     ipcRenderer.on(IPC.turnEvent, listener);

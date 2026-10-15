@@ -603,3 +603,21 @@ describe('Settings.sightLog', () => {
     expect(SettingsPatch.parse({ sightLog: { days: 3 } })).toEqual({ sightLog: { days: 3 } });
   });
 });
+
+describe('Settings.budget', () => {
+  it('is off by default, and a settings file from before it still parses', () => {
+    expect(Settings.parse({}).budget).toEqual({ dailyUsd: null });
+    expect(Settings.parse({ welcome: { done: true } }).budget).toEqual({ dailyUsd: null });
+  });
+
+  it('takes a cap in dollars in a patch alone, and can be cleared', () => {
+    expect(SettingsPatch.parse({ budget: { dailyUsd: 1 } })).toEqual({ budget: { dailyUsd: 1 } });
+    expect(SettingsPatch.parse({ budget: { dailyUsd: 0.5 } }).budget?.dailyUsd).toBe(0.5);
+    expect(SettingsPatch.parse({ budget: { dailyUsd: null } }).budget?.dailyUsd).toBeNull();
+  });
+
+  it('refuses a negative or zero cap', () => {
+    expect(SettingsPatch.safeParse({ budget: { dailyUsd: -1 } }).success).toBe(false);
+    expect(SettingsPatch.safeParse({ budget: { dailyUsd: 0 } }).success).toBe(false);
+  });
+});

@@ -18,6 +18,9 @@ export function registerExpertIpc(handle: IpcHandle, { engine }: ExpertIpcDeps):
     }),
   );
 
+  // Home's Spend card.
+  handle(IPC.usageSummary, async () => engine().call('usage.summary', {}));
+
   // Home's Experts tab.
   handle(IPC.listExperts, async (): Promise<Expert[]> => {
     const result = await engine().call('experts.list', {});

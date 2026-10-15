@@ -10,8 +10,19 @@ import type { Brief } from '@tagalong/protocol';
 
 export type { Brief };
 
+/**
+ * What one run used, for the cost meter. Optional: a connector fills it when its tool
+ * reports tokens (Claude Code's `result` event does). `model` is empty when unknown.
+ */
+export interface ConnectorUsage {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export type ConnectorResult =
-  { ok: true; text: string; changedFiles: string[] } | { ok: false; error: string };
+  | { ok: true; text: string; changedFiles: string[]; usage?: ConnectorUsage }
+  | { ok: false; error: string; usage?: ConnectorUsage };
 
 export type CheckResult = { ok: true } | { ok: false; error: string };
 

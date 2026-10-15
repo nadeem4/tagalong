@@ -69,6 +69,49 @@ describe('HandoffManager', () => {
     expect(finished()?.params).toMatchObject({ handoffId, state: 'done', text: 'Three papers.' });
   });
 
+  it('meters a finished run as an expert row, and a run with no usage not at all', async () => {
+    const recorded: unknown[] = [];
+    const usage = { model: 'claude-sonnet-5', inputTokens: 3210, outputTokens: 150 };
+    const withUsage: Connector = {
+      check: async () => ({ ok: true }),
+      send: async () => ({ ok: true, text: 'Done.', changedFiles: [], usage }),
+    };
+    const make = (connector: Connector) =>
+      new HandoffManager({
+        experts,
+        activity,
+        connectorFor: () => connector,
+        emit: (event) => events.push(event),
+        usage: { record: (entry) => recorded.push(entry) },
+      });
+    make(withUsage).start({
+      expertId: 'claude-code',
+      petId: 'scout',
+      brief: { ask: 'x' },
+      folder: 'C:\\r',
+    });
+    await vi.waitFor(() => expect(finished()).toBeDefined());
+    expect(recorded).toEqual([
+      {
+        source: 'expert',
+        providerId: 'claude-code',
+        model: 'claude-sonnet-5',
+        inputTokens: 3210,
+        outputTokens: 150,
+      },
+    ]);
+
+    events = [];
+    make(new FakeConnector({ text: 'ok' })).start({
+      expertId: 'claude-code',
+      petId: 'scout',
+      brief: { ask: 'y' },
+      folder: 'C:\\r',
+    });
+    await vi.waitFor(() => expect(finished()).toBeDefined());
+    expect(recorded).toHaveLength(1);
+  });
+
   it('sends the brief, reports progress, then the result, and logs it', async () => {
     const connector = new FakeConnector({
       steps: ['Reading a.ts'],

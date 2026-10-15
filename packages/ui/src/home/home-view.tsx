@@ -12,6 +12,7 @@ import { ExpertsPanel } from './experts-panel';
 import { HOME_CSS } from './home-styles';
 import { RoutinesPanel } from './routines-panel';
 import { SightLogView } from './sight-log-view';
+import { SpendCard } from './spend-card';
 
 export type HomePage =
   | 'overview'
@@ -258,6 +259,7 @@ function Overview({
           </button>
         </section>
       </div>
+      <SpendCard />
       <section className="home-card" aria-label="Recent">
         <h2 className="home-card__label">RECENT</h2>
         {recent.length === 0 && <p>Nothing yet. Press the key and ask {name} something.</p>}

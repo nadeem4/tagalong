@@ -293,6 +293,65 @@ describe('ClaudeCodeConnector', () => {
     expect(out).toEqual({ ok: true, text: 'main.ts boots the engine.', changedFiles: [] });
   });
 
+  it('reads the tokens from the result event, cache reads counted as input', async () => {
+    const { spawn } = fakeSpawn([
+      { type: 'system', subtype: 'init', model: 'claude-sonnet-5' },
+      {
+        ...result('Done.'),
+        total_cost_usd: 0.42,
+        usage: {
+          input_tokens: 10,
+          cache_creation_input_tokens: 200,
+          cache_read_input_tokens: 3000,
+          output_tokens: 150,
+        },
+      },
+    ]);
+    const out = await new ClaudeCodeConnector({ folder: 'C:\\r', spawn }).send(
+      { ask: 'x' },
+      () => {},
+    );
+    expect(out).toEqual({
+      ok: true,
+      text: 'Done.',
+      changedFiles: [],
+      usage: { model: 'claude-sonnet-5', inputTokens: 3210, outputTokens: 150 },
+    });
+  });
+
+  it('reads a result whose usage is missing, null or malformed without failing the run', async () => {
+    const send = async (usage: unknown) => {
+      const { spawn } = fakeSpawn([{ ...result('Done.'), usage }]);
+      return new ClaudeCodeConnector({ folder: 'C:\\r', spawn }).send({ ask: 'x' }, () => {});
+    };
+    const done = { ok: true, text: 'Done.', changedFiles: [] };
+    expect(await send(null)).toEqual(done);
+    expect(await send('lots')).toEqual(done);
+    expect(await send({ input_tokens: '12', output_tokens: -3 })).toEqual({
+      ...done,
+      usage: { model: '', inputTokens: 0, outputTokens: 0 },
+    });
+    expect(await send({ output_tokens: 9 })).toEqual({
+      ...done,
+      usage: { model: '', inputTokens: 0, outputTokens: 9 },
+    });
+  });
+
+  it('keeps the tokens of a run that ended in an error', async () => {
+    const { spawn } = fakeSpawn([
+      { ...result('Ran out of turns.', true), usage: { input_tokens: 5, output_tokens: 7 } },
+    ]);
+    const out = await new ClaudeCodeConnector({ folder: 'C:\\r', spawn }).send(
+      { ask: 'x' },
+      () => {},
+    );
+    expect(out).toEqual({
+      ok: false,
+      error: 'Ran out of turns.',
+      usage: { model: '', inputTokens: 5, outputTokens: 7 },
+    });
+  });
+
   it('lists the files it changed, once each', async () => {
     const { spawn } = fakeSpawn([
       assistant([{ type: 'tool_use', name: 'Edit', input: { file_path: 'a.ts' } }]),
