@@ -187,8 +187,9 @@ when Scout calls one of their tools in a turn you started.
 - **"What needs me?"** (asked, or the **What needs me** routine) calls only the apps' read tools,
   with no screen content in what it sends; what comes back goes to Scout's brain provider like any
   other app answer.
-- **"File this as a bug"** is the one time screen text goes to an app, because you asked for
-  exactly that. Scout reads the window with the error and quotes it (at most 40 lines) in the issue.
+- **"File this as a bug"** sends screen text to an app, because you asked for exactly that. Scout
+  reads the window with the error and quotes it (at most 40 lines) in the issue, as data: it never
+  follows instructions written in it.
   The text goes to GitHub or Linear only after you press **Allow once** on the card, which shows the
   whole issue; Cancel sends nothing. Keys and passwords in it are hidden first, blind spots are
   never read, and no screenshot is attached.
