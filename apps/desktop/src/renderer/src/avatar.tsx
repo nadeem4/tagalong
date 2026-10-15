@@ -8,7 +8,7 @@ import '@fontsource/onest/latin-600.css';
 import './app.css';
 import '../../shared/ipc';
 import { visibleCrew } from './crew';
-import { IDLE_DOCK, dockMood, moveDrag, nextDock, startDrag } from './dock';
+import { IDLE_DOCK, REACTION_MS, dockMood, moveDrag, nextDock, startDrag } from './dock';
 import type { DragState } from './dock';
 
 /** How long "Seeing" shows after a capture. */
@@ -68,7 +68,21 @@ function Avatar() {
     return window.tagalongHost.onListening(setListening);
   }, []);
 
-  useEffect(() => window.tagalong.onTurnEvent((event) => send(event)), []);
+  // Engine events, and main's presence.away and presence.back on the same channel. A wince
+  // or a cheer clears after a few seconds; a new one starts the time again.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const off = window.tagalong.onTurnEvent((event) => {
+      send(event);
+      if (event.type !== 'pet.mood') return;
+      clearTimeout(timer);
+      timer = setTimeout(() => send({ type: 'reacted' }), REACTION_MS);
+    });
+    return () => {
+      clearTimeout(timer);
+      off();
+    };
+  }, []);
 
   // Every capture is announced: the pet looks up and says "Seeing" for a moment.
   useEffect(() => {

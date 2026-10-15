@@ -38,6 +38,17 @@ export function isMeeting(window: WindowEntry): boolean {
   );
 }
 
+/**
+ * The one call and full-screen rule: a call or a full-screen window in front, and Scout keeps
+ * out of the way. It is the front window that counts, so a Teams window in front counts even
+ * with no call, and a call behind another window does not. Keeping an eye, Always listening
+ * and moods all follow this one check.
+ */
+export function callOrFullScreenInFront(windows: readonly WindowEntry[]): boolean {
+  const front = windows.find((window) => window.state === 'foreground');
+  return front !== undefined && (front.fullScreen === true || isMeeting(front));
+}
+
 /** A window that has earned one look, and why. */
 export interface Glance {
   window: WindowEntry;
@@ -72,7 +83,7 @@ export class Lookout {
     }
 
     if (now < this.#quietUntil || now - this.#lastSpokeAt < COOLDOWN_MS) return null;
-    if (front !== undefined && (front.fullScreen === true || isMeeting(front))) return null;
+    if (callOrFullScreenInFront(windows)) return null;
 
     const open = windows.filter(
       (window) =>
@@ -118,7 +129,7 @@ export class Lookout {
 }
 
 /** A blind spot, by the host's own mark or by the lists: never considered, titles included. */
-function blind(window: WindowEntry, exclusions: CaptureExclusions): boolean {
+export function blind(window: WindowEntry, exclusions: CaptureExclusions): boolean {
   return (
     window.blocked !== undefined ||
     findCaptureBlock({ processName: window.processName, title: window.title }, exclusions) !== null

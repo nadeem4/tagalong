@@ -259,8 +259,8 @@ Notifications are broadcast to every connected host session, so a second window 
 one: two streams into one panel read as nonsense. A second `ask` for the same pet is therefore an
 interruption, not a queue. Explicit `interrupt(turnId)` aborts through the same `AbortController` and
 answers `{ aborted: false }` when the turn had already finished. `Engine.shutdown` interrupts everything
-still running before closing the database, because a stream left in flight would keep writing to a
-database that is about to close.
+still running and waits until each turn has settled (`runner.stopAll()`) before closing the database,
+because an aborted stream still writes its last row and event.
 
 Tool calls are part of the contract already: the provider's `onToolUse` is awaited before the dependent
 text streams. Phase 2 fills it with two built-ins, now in `packages/core/src/tools/builtin/perception.ts` —
@@ -1006,15 +1006,26 @@ The desktop avatar window holds the companion alone: `DockPet` (`@tagalong/ui`) 
 character (`characterFor`) at 4x, with a face and a tag per mood (`withMood`,
 `office/sprites/expressions.ts`): idle; **Seeing** for 2.5 s after a capture, eyes up; **Working**
 while the companion answers or an expert has a task, eyes down; **Done** when a hand-off finishes, a
-happy squint, until the pet is clicked. The mood comes from `dockMood(nextDock(...))`
-(`renderer/src/dock.ts`), a pure reducer over turn and hand-off notifications and capture notices.
+happy squint, until the pet is clicked. Three moods have a face and no tag: **dozing** while the
+person is away (eyes closed to a line, slow breathing), **wince** for 4 s at a failing build or an
+expert's error (eyes squeezed shut, `> <`, one small shake) and **cheer** for 4 s when tests pass (a
+happy squint and two hops). The mood comes from `dockMood(nextDock(...))`
+(`renderer/src/dock.ts`), a pure reducer over turn and hand-off notifications, capture notices,
+`pet.mood`, and main's `presence.away`/`presence.back`, in this order: seeing > working >
+wince/cheer > done > dozing > idle. `pet.mood` sets the reaction and the avatar clears it after
+`REACTION_MS` (4 s) with its own `reacted` event. Presence comes from
+`main/presence.ts#watchPresence`: `powerMonitor.getSystemIdleTime()` every 15 s (away at 5 min,
+`AWAY_AFTER_MS`, a constant) and the `lock-screen`/`unlock-screen` events, sent to the avatar on
+the `turnEvent` channel. The aria-label follows the mood ("Scout is dozing").
 The sight-paused mark and the recording dot stay, and so does the listening mark: while Always
 listening is on, `DockPet`'s `listening` prop draws a small green dot (`dock-pet__listening`), solid
 while on and an outline while paused, and the pet's name reads "…, listening" or "…, listening
 paused". The avatar reads `getListening` on mount and follows `onListening`, so the mark shows
 from the first second. The pet is alive: it blinks every three to six
 seconds (`withBlink`) in moods with open eyes, breathes with a 1 px rise when idle or seeing, bobs
-faster while working and hops three times when done; `prefers-reduced-motion` stops all of it.
+faster while working and hops three times when done; dozing, wince and cheer never blink.
+`prefers-reduced-motion` stops all of it: faces still change, nothing moves. The listening mark
+shows in every mood, dozing included.
 
 The pet is dragged by hand, since a drag region would swallow its clicks: a press that moves past
 4 px (`startDrag`, `moveDrag` in `renderer/src/dock.ts`) sends each step to main (`dragAvatar`),
@@ -1321,7 +1332,21 @@ flowchart LR
   within `NOT_NOW_MS` (1 h) of **Not now**, or while the window in front is `fullScreen` or a call
   (`isMeeting`: Teams or Zoom by process, Google Meet or a Zoom meeting by title). A window the host
   marked `blocked`, or that `findCaptureBlock` refuses (blind spots and the person's exclusions), is
-  never considered, its title included.
+  never considered, its title included. The call and full-screen check is one function,
+  `callOrFullScreenInFront(windows)` (exported from `@tagalong/core`): the `Lookout`, moods and
+  Always listening all use it.
+- **Moods** (`mood.ts`). Before the `Lookout`, every `observe` passes the same titles to
+  `MoodWatch`, with no read and no model call: the front window's title newly matching
+  `looksLikeTrouble` is a wince; newly matching passing words (`passed`, `passing`, `succeeded`,
+  `success`, `✓`, `✔`), or the same window id no longer reading like trouble, is a cheer. Blind
+  spots and a call or full screen in front get nothing, and there is at most one reaction a minute
+  (`MOOD_COOLDOWN_MS`). The engine also calls `moodForHandoff` when a hand-off finishes: an error is
+  a wince, "tests pass" or "N passed" with no failure is a cheer, "N failed" is a wince, anything
+  else is left to the done face. A zero count says nothing either way, in a title or an expert's
+  words: "12 passed, 0 failed" cheers, "0 passed" alone does not. Only windows still in the list are
+  remembered. Both send `pet.mood { petId, mood: 'wince' | 'cheer' }`, which
+  main forwards to every window like every notification. Title moods run only while keeping an eye
+  is on and sight is not paused, so there is no second tracker.
 - **The call** (`remark.ts#composeRemark`). Reads the last 4,000 characters of that window through
   the host's `readText` (a `blocked` read ends it), then one call to `settings.summarizer`, else the
   pet's own provider and model, text only, like `Summarizer`: 80 tokens, tools refused, a 15 s
@@ -2008,8 +2033,9 @@ flowchart LR
   open.
 - **The guard.** `startListeningGuard` lists the windows every 2 s (`LISTENING_GUARD_MS`) while
   listening is on, and at once when it comes on (switched on, or on at launch), and
-  `listeningBlocked` is true when the front window is a call app (`isMeeting`, from
-  `@tagalong/core`; a Teams window in front counts even with no call) or fills the screen. Only
+  `listeningBlocked` is true when the front window is a call app or fills the screen: it is
+  `callOrFullScreenInFront` from `@tagalong/core` (`isMeeting` for the call; a Teams window in front
+  counts even with no call), the same rule keeping an eye and moods use. Only
   titles and positions are read, never window text. A failed listing keeps the last answer;
   switched off, the guard forgets it.
 - **The pets hidden.** The tray's Hide pets (or Welcome, before Scout arrives) hides the avatar,

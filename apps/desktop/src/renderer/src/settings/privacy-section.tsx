@@ -156,7 +156,9 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
         summaries model, in one short call, whether there is one useful thing to say. At most one
         line every ten minutes, never twice about the same window, and nothing while a full-screen
         app or a call is in front. Not now on the line quiets it for an hour. Blind spots are never
-        considered, titles included. Off means no tracking at all. On by default.
+        considered, titles included. The same titles make Scout wince when a build fails and cheer
+        when tests pass, with no read and no model call. Off means no tracking at all. On by
+        default.
       </Tip>
       <hr className="tg-divider" />
       <div className="tg-setting">

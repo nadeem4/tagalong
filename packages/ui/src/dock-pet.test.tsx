@@ -126,4 +126,56 @@ describe('a living pet', () => {
     rerender(<DockPet pet={SCOUT} mood="done" />);
     expect(screen.getByTestId('dock-body')).toHaveAttribute('data-motion', 'hop');
   });
+
+  it('breathes slowly while dozing, shakes once at a wince, and hops twice to cheer', () => {
+    const { rerender } = render(<DockPet pet={SCOUT} mood="dozing" />);
+    expect(screen.getByTestId('dock-body')).toHaveAttribute('data-motion', 'doze');
+    rerender(<DockPet pet={SCOUT} mood="wince" />);
+    expect(screen.getByTestId('dock-body')).toHaveAttribute('data-motion', 'shake');
+    rerender(<DockPet pet={SCOUT} mood="cheer" />);
+    expect(screen.getByTestId('dock-body')).toHaveAttribute('data-motion', 'cheer');
+  });
+
+  it.each(['dozing', 'wince', 'cheer'] as const)('never blinks while %s', (mood) => {
+    vi.useFakeTimers();
+    render(<DockPet pet={SCOUT} mood={mood} blinkEveryMs={3000} />);
+    act(() => vi.advanceTimersByTime(3000));
+    expect(screen.getByRole('img')).toHaveAttribute('data-blink', 'false');
+  });
+});
+
+describe('moods', () => {
+  it('react without a tag, and say the mood in the label', () => {
+    const { rerender } = render(<DockPet pet={SCOUT} mood="dozing" />);
+    expect(screen.queryByTestId('dock-tag')).toBeNull();
+    expect(screen.getByRole('img')).toHaveAccessibleName('Scout is dozing');
+    rerender(<DockPet pet={SCOUT} mood="wince" />);
+    expect(screen.queryByTestId('dock-tag')).toBeNull();
+    expect(screen.getByRole('img')).toHaveAccessibleName('Scout winces');
+    rerender(<DockPet pet={SCOUT} mood="cheer" />);
+    expect(screen.queryByTestId('dock-tag')).toBeNull();
+    expect(screen.getByRole('img')).toHaveAccessibleName('Scout is cheering');
+  });
+
+  it.each(['dozing', 'wince', 'cheer'] as const)(
+    'keeps the listening mark and its words while %s',
+    (mood) => {
+      const { rerender } = render(<DockPet pet={SCOUT} mood={mood} listening="on" />);
+      expect(screen.getByTestId('listening-mark')).toHaveAttribute('data-state', 'on');
+      expect(screen.getByRole('img').getAttribute('aria-label')).toMatch(/, listening$/);
+      rerender(<DockPet pet={SCOUT} mood={mood} listening="paused" />);
+      expect(screen.getByTestId('listening-mark')).toHaveAttribute('data-state', 'paused');
+      expect(screen.getByRole('img').getAttribute('aria-label')).toMatch(/, listening paused$/);
+    },
+  );
+
+  it('stops every motion under reduced motion, the new ones included', () => {
+    render(<DockPet pet={SCOUT} mood="cheer" />);
+    const css = document.querySelector('style')?.textContent ?? '';
+    expect(css).toMatch(/prefers-reduced-motion: reduce\)\s*\{\s*\.dock-body\b/);
+    // The new motions are all on .dock-body, so the one rule stops them too.
+    for (const motion of ['doze', 'shake', 'cheer']) {
+      expect(css).toContain(`.dock-body[data-motion='${motion}']`);
+    }
+  });
 });

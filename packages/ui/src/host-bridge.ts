@@ -33,7 +33,8 @@ type TurnNotification =
   | 'routine.proposed'
   | 'routine.result'
   | 'routines.changed'
-  | 'connections.changed';
+  | 'connections.changed'
+  | 'pet.mood';
 
 /**
  * Derived from the protocol catalog rather than restated, so a new turn.* notification

@@ -3,6 +3,7 @@ import type {
   Brief,
   Expert,
   Pet,
+  PetMoodParams,
   PetRemarkParams,
   Settings,
   WindowEntry,
@@ -10,6 +11,7 @@ import type {
 import type { BrainProvider } from '../providers';
 import type { PerceptionHost } from '../perception';
 import { Lookout } from './lookout';
+import { MoodWatch } from './mood';
 import { REMARK_TEXT_CHARS, composeRemark } from './remark';
 
 export interface KeepAnEyeOptions {
@@ -24,7 +26,11 @@ export interface KeepAnEyeOptions {
   experts: () => readonly Expert[];
   /** `HandoffManager.propose`: the brief goes to the card, and nothing runs until Send. */
   propose: (params: { expertId: string; petId: string; brief: Brief }) => unknown;
-  emit: (event: { method: 'pet.remark'; params: PetRemarkParams }) => void;
+  emit: (
+    event:
+      | { method: 'pet.remark'; params: PetRemarkParams }
+      | { method: 'pet.mood'; params: PetMoodParams },
+  ) => void;
   log?: (message: string) => void;
   timeoutMs?: number;
 }
@@ -32,11 +38,14 @@ export interface KeepAnEyeOptions {
 /**
  * Keep an eye on things: the host sends the window list every few seconds, the `Lookout`
  * picks the rare window worth a look, and one cheap model call decides whether there is
- * anything to say. A line, when there is one, goes to the host as `pet.remark`.
+ * anything to say. A line, when there is one, goes to the host as `pet.remark`. Before that,
+ * the `MoodWatch` reads the same titles for a wince or a cheer (`pet.mood`), with no read and
+ * no model call.
  */
 export class KeepAnEye {
   readonly #options: KeepAnEyeOptions;
   readonly #lookout: Lookout;
+  readonly #moods: MoodWatch;
   #busy = false;
   /** The latest remark's offer, until it is taken or another remark replaces it. */
   #offer: { remarkId: string; petId: string; brief: Brief } | null = null;
@@ -44,12 +53,19 @@ export class KeepAnEye {
   constructor(options: KeepAnEyeOptions) {
     this.#options = options;
     this.#lookout = new Lookout(options.clock);
+    this.#moods = new MoodWatch(options.clock);
   }
 
   /** Resolves once this snapshot is fully handled, which tests wait on and the engine does not. */
   async observe(windows: readonly WindowEntry[]): Promise<void> {
     const settings = this.#options.settings();
-    if (!settings.keepAnEye || this.#busy) return;
+    if (!settings.keepAnEye) return;
+    const mood = this.#moods.observe(windows, settings.captureExclusions);
+    const moodPet = mood === null ? null : this.#options.pet();
+    if (mood !== null && moodPet !== null) {
+      this.#options.emit({ method: 'pet.mood', params: { petId: moodPet.id, mood } });
+    }
+    if (this.#busy) return;
     const glance = this.#lookout.observe(windows, settings.captureExclusions);
     if (glance === null) return;
     const pet = this.#options.pet();
