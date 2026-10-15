@@ -138,6 +138,7 @@ export interface HostBridge {
   openPickUp?(itemId: string): Promise<void>;
   rebriefPickUp?(itemId: string): Promise<void>;
   dismissPickUp?(): Promise<void>;
+  /**
    * Home's What Scout saw: each look and each send, newest first, as metadata. All
    * optional: a host without Home never shows the page.
    */

@@ -23,7 +23,10 @@ function tableNames(db: Database.Database): string[] {
     .sort();
 }
 
-describe('openDatabase', () => {
+// These open a real file in a fresh temp dir: the first loads the SQLite native addon and every
+// one runs all migrations with an fsync each. That takes ~30ms locally but has passed 5s on a
+// loaded Windows runner with on-access scanning, so the bounded work gets an explicit allowance.
+describe('openDatabase', { timeout: 20_000 }, () => {
   it('creates the database file inside the data dir', () => {
     const db = openDatabase(dataDir);
     try {

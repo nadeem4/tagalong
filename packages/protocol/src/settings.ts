@@ -156,6 +156,7 @@ export const SETTINGS_DEFAULTS = {
    * without a click. Off means no snapshot at all, and switching it off deletes the one kept.
    */
   pickUp: true,
+  /**
    * How many days the log of what Scout saw keeps its rows. Always on: it is metadata only,
    * and an off switch would weaken the audit. Talk may only lower it.
    */
