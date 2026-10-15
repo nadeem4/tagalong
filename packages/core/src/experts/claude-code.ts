@@ -217,6 +217,7 @@ export class ClaudeCodeConnector implements Connector {
     let cancelled = false;
     const onAbort = () => {
       cancelled = true;
+      child.end();
       child.kill();
     };
     signal?.addEventListener('abort', onAbort, { once: true });
@@ -227,6 +228,10 @@ export class ClaudeCodeConnector implements Connector {
       let final: ConnectorResult | undefined;
       let model = '';
 
+      // A line it wrote is said only once a tool follows: the text before a `result` is the
+      // answer, which Scout reads out when the run finishes.
+      let toSay: string | undefined;
+
       for await (const line of child.lines) {
         const event = parse(line);
         if (!event) continue;
@@ -235,11 +240,12 @@ export class ClaudeCodeConnector implements Connector {
         } else if (event.type === 'assistant') {
           for (const block of event.message?.content ?? []) {
             if (block.type === 'text') {
-              const said = firstSentence(block.text);
-              if (said) onProgress(said, 'say');
+              toSay = firstSentence(block.text) ?? toSay;
               continue;
             }
             if (block.type !== 'tool_use') continue;
+            if (toSay) onProgress(toSay, 'say');
+            toSay = undefined;
             const step = describeTool(block.name, block.input);
             if (step) onProgress(step, 'tool');
             if (EDIT_TOOLS.includes(block.name) && typeof block.input?.file_path === 'string') {
@@ -247,14 +253,16 @@ export class ClaudeCodeConnector implements Connector {
             }
           }
         } else if (event.type === 'result') {
+          toSay = undefined;
           const text = event.result ?? '';
           const usage = usageOf(event, model);
           final = event.is_error
             ? { ok: false, error: text, ...usage }
             : { ok: true, text, changedFiles: [...changed], ...usage };
           // The turn is over. Notes waiting from the person go in as the next message, in
-          // the same session; with none, stdin closes and this result is the answer.
-          const waiting = event.is_error ? [] : (notes?.take() ?? []);
+          // the same session; with none, stdin closes and this result is the answer. Once
+          // stopped, nothing more is taken or written: a note is never passed on after Stop.
+          const waiting = event.is_error || cancelled ? [] : (notes?.take() ?? []);
           if (waiting.length > 0) {
             const list = waiting.map((note) => `- ${note}`).join('\n');
             child.write(userMessage(hideSecrets(`From the person, while you worked:\n${list}`)));
@@ -271,6 +279,9 @@ export class ClaudeCodeConnector implements Connector {
       return { ok: false, error: `Claude Code stopped: ${said || `exit code ${code}`}` };
     } finally {
       signal?.removeEventListener('abort', onAbort);
+      // Every way out closes stdin (closing it twice is harmless), so a session that is
+      // still alive between turns never waits on a message that will not come.
+      child.end();
     }
   }
 }

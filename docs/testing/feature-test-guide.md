@@ -1588,8 +1588,9 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    _delivered_; the final answer reflects the note.
 3. Home → Activity: the expert row's "What Coder was told" ends with "Passed on while it worked:"
    and the note. Home → What Scout saw: a "Sent to expert" row for the brief and one for the note.
-4. Start another hand-off and press **Stop** while it works: it stops at once. Tell Scout something
-   for it afterwards: Scout says no expert is working.
+4. Start another hand-off and press **Stop** while it works: it stops at once, and Task Manager
+   shows no `claude` / `node` process left from it. Tell Scout something for it afterwards: Scout
+   says no expert is working. Also after a normal finish, no `claude` process stays behind.
 5. With two hand-offs running, "tell it to hurry" makes Scout ask which one.
 6. A note given just as the expert finishes: the card shows _not passed on: Coder finished first_,
    and Scout's finish line says it could not pass the note on.

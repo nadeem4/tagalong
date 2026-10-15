@@ -346,7 +346,7 @@ describe('ClaudeCodeConnector', () => {
     expect(progress).toEqual([
       ['Reading src/main.ts', 'tool'],
       ['Searching for boot', 'tool'],
-      ['Looking good.', 'say'],
+      // The last text before the result is the answer: it is not narrated.
     ]);
     expect(out).toEqual({ ok: true, text: 'main.ts boots the engine.', changedFiles: [] });
   });
@@ -572,16 +572,19 @@ describe('ClaudeCodeConnector', () => {
       controller.abort();
       expect(await pending).toEqual({ ok: false, error: 'Cancelled.' });
       expect(calls[0]?.killed).toBe(true);
+      expect(calls[0]?.ended).toBe(true);
     });
   });
 
   it('says the first sentence of what Claude Code writes, clipped, with secrets hidden', async () => {
     const long = `Found the bug in ${'very '.repeat(40)}long names. Then more.`;
+    const read = { type: 'tool_use', name: 'Read', input: { file_path: 'a.ts' } };
     const { spawn } = fakeSpawn([
-      assistant([{ type: 'text', text: 'Found the bug in `date.ts`. Fixing it next.' }]),
-      assistant([{ type: 'text', text: '  \n ' }]),
+      assistant([{ type: 'text', text: 'Found the bug in `date.ts`. Fixing it next.' }, read]),
+      assistant([{ type: 'text', text: '  \n ' }, read]),
       assistant([{ type: 'text', text: 'Key: sk-ant-abcdefghijklmnopqrstuvwxyz0123 is in .env.' }]),
-      assistant([{ type: 'text', text: long }]),
+      assistant([read]),
+      assistant([{ type: 'text', text: long }, read]),
       result('ok'),
     ]);
     const says: string[] = [];
@@ -595,7 +598,21 @@ describe('ClaudeCodeConnector', () => {
     expect(says).toHaveLength(3);
   });
 
-  it('kills the process when the hand-off is cancelled', async () => {
+  it('never says the final answer: only what it writes between tools', async () => {
+    const { spawn } = fakeSpawn([
+      assistant([{ type: 'text', text: 'Looking at the dates.' }]),
+      assistant([{ type: 'tool_use', name: 'Read', input: { file_path: 'date.ts' } }]),
+      assistant([{ type: 'text', text: 'The bug is an off-by-one. Here is the fix.' }]),
+      result('The bug is an off-by-one. Here is the fix.'),
+    ]);
+    const steps: string[] = [];
+    await new ClaudeCodeConnector({ folder: 'C:\\r', spawn }).send({ ask: 'x' }, (s, kind) =>
+      steps.push(`${kind}:${s}`),
+    );
+    expect(steps).toEqual(['say:Looking at the dates.', 'tool:Reading date.ts']);
+  });
+
+  it('kills the process when the hand-off is cancelled, and closes its stdin', async () => {
     const { spawn, calls } = fakeSpawn([]);
     const controller = new AbortController();
     const pending = new ClaudeCodeConnector({ folder: 'C:\\r', spawn }).send(
@@ -606,6 +623,83 @@ describe('ClaudeCodeConnector', () => {
     controller.abort();
     expect(await pending).toEqual({ ok: false, error: 'Cancelled.' });
     expect(calls[0]?.killed).toBe(true);
+    expect(calls[0]?.ended).toBe(true);
+  });
+
+  it('closes stdin when claude exits with no result', async () => {
+    const { spawn, calls } = fakeSpawn([assistant([{ type: 'text', text: 'Hm.' }])], 1, 'boom');
+    const out = await new ClaudeCodeConnector({ folder: 'C:\\r', spawn }).send(
+      { ask: 'x' },
+      () => {},
+      undefined,
+      { take: () => ['never'] },
+    );
+    expect(out).toEqual({ ok: false, error: 'Claude Code stopped: boom' });
+    expect(calls[0]?.ended).toBe(true);
+  });
+
+  it('closes stdin when reading its output fails', async () => {
+    let ended = false;
+    const spawn: SpawnFn = () => ({
+      write: () => {},
+      end: () => {
+        ended = true;
+      },
+      lines: (async function* () {
+        yield JSON.stringify(assistant([]));
+        throw new Error('stream broke');
+      })(),
+      exit: Promise.resolve(1),
+      stderr: () => '',
+      kill: () => {},
+    });
+    await expect(
+      new ClaudeCodeConnector({ folder: 'C:\\r', spawn }).send({ ask: 'x' }, () => {}),
+    ).rejects.toThrow('stream broke');
+    expect(ended).toBe(true);
+  });
+
+  it('takes no notes and writes nothing once stopped, even when a result is still on its way', async () => {
+    const controller = new AbortController();
+    const calls: Spawned[] = [];
+    const spawn: SpawnFn = (command, args, { cwd }) => {
+      const call: Spawned = { command, args, cwd, stdin: '', killed: false, ended: false };
+      calls.push(call);
+      return {
+        write: (text) => {
+          call.stdin += text;
+        },
+        end: () => {
+          call.ended = true;
+        },
+        // The result was already read from the pipe when Stop came.
+        lines: (async function* () {
+          controller.abort();
+          yield JSON.stringify(result('Done.'));
+        })(),
+        exit: Promise.resolve(null),
+        stderr: () => '',
+        kill: () => {
+          call.killed = true;
+        },
+      };
+    };
+    let taken = 0;
+    const out = await new ClaudeCodeConnector({ folder: 'C:\\r', spawn }).send(
+      { ask: 'x' },
+      () => {},
+      controller.signal,
+      {
+        take: () => {
+          taken += 1;
+          return ['use dayjs'];
+        },
+      },
+    );
+    expect(out).toEqual({ ok: false, error: 'Cancelled.' });
+    expect(taken).toBe(0);
+    expect(calls[0]?.stdin).toBe(userLine('x'));
+    expect(calls[0]?.ended).toBe(true);
   });
 });
 
@@ -724,6 +818,63 @@ describe('spawnChild', () => {
       expect(JSON.parse(lines.join(''))).toEqual(args);
     },
     30_000,
+  );
+
+  /** A stand-in claude: one `result` per user line, alive between turns until stdin ends. */
+  const SESSION_JS = [
+    'const rl = require("readline").createInterface({ input: process.stdin });',
+    'let turn = 0;',
+    'rl.on("line", (line) => {',
+    '  turn += 1;',
+    '  const text = JSON.parse(line).message.content;',
+    '  console.log(JSON.stringify({ type: "result", is_error: false, result: `turn ${turn}: ${text}` }));',
+    '});',
+    'rl.on("close", () => process.exit(0));',
+  ].join('\n');
+
+  it.runIf(process.platform === 'win32')(
+    'carries a note into the same live session under a .cmd shim, and exits once stdin ends',
+    async () => {
+      writeFileSync(join(dir, 'session.js'), SESSION_JS);
+      writeFileSync(join(dir, 'session-claude.cmd'), '@node "%~dp0session.js" %*\r\n');
+      process.env.PATH = `${dir};${path ?? ''}`;
+      const batches = [['use dayjs']];
+
+      const out = await new ClaudeCodeConnector({ folder: dir, command: 'session-claude' }).send(
+        { ask: 'Fix it' },
+        () => {},
+        undefined,
+        { take: () => batches.shift() ?? [] },
+      );
+
+      expect(out).toEqual({
+        ok: true,
+        text: 'turn 2: From the person, while you worked:\n- use dayjs',
+        changedFiles: [],
+      });
+    },
+  );
+
+  it.runIf(process.platform === 'win32')(
+    'kills the whole session tree under a .cmd shim when stopped between turns',
+    async () => {
+      // Never ends a turn: it only waits, as a session does while the model works.
+      writeFileSync(join(dir, 'idle.js'), 'process.stdin.resume(); setInterval(() => {}, 1000);');
+      writeFileSync(join(dir, 'idle-claude.cmd'), '@node "%~dp0idle.js" %*\r\n');
+      process.env.PATH = `${dir};${path ?? ''}`;
+      const controller = new AbortController();
+      const pending = new ClaudeCodeConnector({ folder: dir, command: 'idle-claude' }).send(
+        { ask: 'x' },
+        () => {},
+        controller.signal,
+        { take: () => [] },
+      );
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      controller.abort();
+      // Resolving at all means stdout closed: the node grandchild holding it is gone too.
+      expect(await pending).toEqual({ ok: false, error: 'Cancelled.' });
+    },
+    20_000,
   );
 
   it.runIf(process.platform === 'win32')(

@@ -409,9 +409,17 @@ Two connectors exist so far:
   event the connector takes the notes waiting; if there are any it writes them as the next user
   message ("From the person, while you worked:" and one line per note, secrets hidden) and reads on
   to the next `result` in the same live session; if there are none, or the result is an error, it
-  closes stdin and that result is the answer. Changed files add up across turns. There is no second
+  closes stdin and that result is the answer. Every other way out closes stdin too (stopped, timed
+  out, claude exiting with no result, its output failing), so a session left alive between turns
+  never waits on a message that will not come; Stop and the time limit also kill the process tree
+  (`taskkill /T` under the `claude.cmd` shim). Once stopped, no note is taken or written, even if a
+  `result` was already on its way. Changed files add up across turns. There is no second
   process and no `--resume`. A message written while a turn runs is not relied on to reach the model
-  mid-turn, so notes always wait for the turn to end. Read-only is the default: `--permission-mode dontAsk` with only
+  mid-turn, so notes always wait for the turn to end. A `text` block becomes a `say` step only when a
+  tool call follows it: the text before a `result` is the answer, which is read out at the finish,
+  not narrated. Tool inputs and results are never narrated. The Claude Code brain
+  (`providers/claude-code-brain.ts`) uses the same `ChildRun` and closes stdin right after its one
+  message. Read-only is the default: `--permission-mode dontAsk` with only
   `Read`, `Glob` and `Grep` allowed, so anything else is refused without a prompt. An expert that may
   edit runs with `acceptEdits` and adds `Edit` and `Write`; one with `canSearchWeb` adds `WebSearch`
   and `WebFetch` to the same lists. Standing instructions (`instructions`), when not empty, pass
@@ -490,13 +498,17 @@ after `HANDOFF_TIMEOUT_MS` (30 minutes) is aborted and ends as `error`, "Claude 
 writes to a closed database. `experts.test` runs the connector's `check()`.
 
 **Steering a running hand-off.** `HandoffManager.steer(handoffId, text)` queues the person's words
-for a hand-off that is running (secrets hidden, trimmed); an empty note, or a hand-off that is
-unknown, finished or stopped, is refused with a reason. Each note is announced as `handoff.progress`
+for a hand-off that is running (secrets hidden, trimmed, cut at `NOTE_CHARS` = 2,000 characters); an
+empty note, a hand-off that is unknown, finished, stopped or past its time limit, or one that already
+has `MAX_WAITING_NOTES` (5) notes waiting, is refused with a reason. Each note is announced as `handoff.progress`
 with `kind: 'note'`; when the connector takes it at the end of a turn it is announced again with
 `kind: 'delivered'`, and the expert row's Activity text (Home's "What Coder was told") gains
 "Passed on while it worked:" and the note. A note still waiting when the run ends (it finished, failed,
 timed out or was stopped first) is announced with `kind: 'dropped'` before `handoff.finished`, and is
-never sent. `running()` lists the hand-offs running now (`handoffId`, expert, ask). A note never
+never sent; once a run is stopped or times out its queue gives the connector nothing more.
+`running()` lists the hand-offs running now (`handoffId`, expert, and only the first line of the ask,
+at most 100 characters: a chain's second ask carries the first expert's answer, which stays out of
+the Companion's tool list). A note never
 changes the run: same folder, same tools, same seal. In a chain a note goes to the step that is
 running. The privacy log wrapper (`record-expert.ts`) writes one "Sent to expert" row per note
 delivered, with its size, never its words.

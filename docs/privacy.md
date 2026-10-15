@@ -115,9 +115,11 @@ The extension's public privacy policy, for the Chrome Web Store, is
   cannot change what the expert may do: same folder, same tools, still sealed. Each note delivered
   is its own "Sent to expert" row (its size, never its words), and it is added to the hand-off's
   Activity row under "What Coder was told". A note still waiting when the run ends is never sent,
-  and the card says so. What the expert writes between its tools may be said aloud by Scout (first
-  sentence, at most 120 characters, keys hidden), at most once every 20 seconds, only while Scout
-  talks is on.
+  and the card says so; after Stop nothing more is passed on. At most 5 notes wait at a time, each
+  at most 2,000 characters. What the expert writes between its tools may be said aloud by Scout
+  (first sentence, at most 120 characters, keys hidden), at most once every 20 seconds, only while
+  Scout talks is on. What its tools read or return is never said aloud, and neither is its final
+  answer before the finish line.
 - **A monitor with an excluded window on it.** If a password manager is open and visible on your
   second screen, that whole screen is blanked in the full-view capture — not just when it is the
   window you are working in. The blanked screen is replaced with a flat panel reading BLOCKED, so

@@ -20,10 +20,17 @@ export const HANDOFF_TIMEOUT_MS = 30 * 60 * 1000;
 /** How much of step 1's answer goes into step 2's brief, so a long answer cannot flood it. */
 export const FOLLOW_UP_ANSWER_CHARS = 8_000;
 
-function clip(text: string): string {
-  return text.length <= FOLLOW_UP_ANSWER_CHARS
-    ? text
-    : `${text.slice(0, FOLLOW_UP_ANSWER_CHARS - 1)}…`;
+/** The most notes that may wait for one run's turn to end; more are refused until it takes them. */
+export const MAX_WAITING_NOTES = 5;
+
+/** The most one note may be: a long dictation is cut, so a note cannot flood the session. */
+export const NOTE_CHARS = 2_000;
+
+/** How much of a running hand-off's ask names it to the companion: only its first line. */
+export const RUNNING_ASK_CHARS = 100;
+
+function clip(text: string, max = FOLLOW_UP_ANSWER_CHARS): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 }
 
 export type HandoffEvent =
@@ -303,15 +310,19 @@ export class HandoffManager {
     return { next: { handoffId, expertId: expert.id, expertName: expert.name }, launch };
   }
 
-  /** The hand-offs running now, for Scout to name when the person wants to tell one something. */
+  /**
+   * The hand-offs running now, for Scout to name when the person wants to tell one something.
+   * Only the first line of the ask, kept short: a chain's second ask carries the first
+   * expert's answer, which must not reach the companion's tool list.
+   */
   running(): { handoffId: string; expertId: string; expertName: string; ask: string }[] {
     return [...this.#live.entries()]
-      .filter(([handoffId]) => this.#running.has(handoffId))
+      .filter(([handoffId]) => this.#isLive(handoffId))
       .map(([handoffId, live]) => ({
         handoffId,
         expertId: live.expert.id,
         expertName: live.expert.name,
-        ask: live.ask,
+        ask: clip(live.ask.split('\n')[0]?.trim() ?? '', RUNNING_ASK_CHARS),
       }));
   }
 
@@ -321,12 +332,18 @@ export class HandoffManager {
    * when the run ends is dropped, and the card says so.
    */
   steer(handoffId: string, text: string): { ok: true } | { ok: false; error: string } {
-    const note = hideSecrets(text.trim());
+    const note = clip(hideSecrets(text.trim()), NOTE_CHARS);
     if (note === '') return { ok: false, error: 'There is nothing to pass on.' };
     const live = this.#live.get(handoffId);
     // Finished, stopped or never started: there is no session left to tell.
-    if (live === undefined || !this.#running.has(handoffId)) {
+    if (live === undefined || !this.#isLive(handoffId)) {
       return { ok: false, error: 'That hand-off is not running, so there is no one to tell.' };
+    }
+    if (live.waiting.length >= MAX_WAITING_NOTES) {
+      return {
+        ok: false,
+        error: `${live.expert.name} already has ${MAX_WAITING_NOTES} notes waiting; it gets them when its current step ends.`,
+      };
     }
     live.waiting.push(note);
     this.options.emit({
@@ -339,7 +356,8 @@ export class HandoffManager {
   /** The notes waiting for a run, taken once each: delivered on the card and in Activity. */
   #take(handoffId: string): string[] {
     const live = this.#live.get(handoffId);
-    if (live === undefined || live.waiting.length === 0) return [];
+    // Stopped or timed out: the notes stay waiting and are dropped as the run ends.
+    if (live === undefined || live.waiting.length === 0 || !this.#isLive(handoffId)) return [];
     const notes = live.waiting.splice(0);
     for (const note of notes) {
       live.told +=
@@ -364,6 +382,12 @@ export class HandoffManager {
         params: { handoffId, expertId: live!.expert.id, step: note, kind: 'dropped' },
       });
     }
+  }
+
+  /** Running and neither stopped nor past its time limit (a timeout aborts but stays listed). */
+  #isLive(handoffId: string): boolean {
+    const controller = this.#running.get(handoffId);
+    return controller !== undefined && !controller.signal.aborted;
   }
 
   /** True when a running hand-off was stopped. */
