@@ -6,14 +6,50 @@ on:
   pull_request:
     branches: [main]
 
+# A newer push to a pull request cancels its older run. Every push to main gets its own group, so
+# none is cancelled or dropped from the queue: each compares against the push before it, and a
+# dropped run would leave that push's code changes untested.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  pull-requests: read # dorny/paths-filter lists a pull request's files through the API
 
 jobs:
+  # Docs-only changes skip the real jobs. This is a job, not a `paths-ignore` trigger: a
+  # workflow that never starts never reports `build` or `e2e`, and a required check that never
+  # reports keeps a pull request waiting forever. A job skipped by its `if:` reports as
+  # skipped, which branch protection accepts.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code == 'true' || steps.filter.outputs.roles == 'true' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        with:
+          predicate-quantifier: every
+          # `code`: any file outside docs/ that is not Markdown. `roles`: the role files are
+          # Markdown but compile into core, and a test fails when the compiled file is stale.
+          filters: |
+            code:
+              - '**'
+              - '!docs/**'
+              - '!**/*.md'
+            roles:
+              - 'packages/core/roles/**'
+
+  # Everything that runs anywhere runs here, on Linux: a Linux minute bills at half a Windows one.
+  # It also runs when `changes` itself failed: a skipped required check counts as passed, so
+  # skipping here would let a broken filter wave a code change through.
   build:
-    # Windows is the primary development target. macOS and Linux join in Phase 7.
-    runs-on: windows-latest
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true') }}
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v7
@@ -40,14 +76,40 @@ jobs:
       - name: Test (with coverage)
         run: pnpm test:coverage
 
+  # Only what needs Windows, and only once the Linux job is green.
+  e2e:
+    needs: build
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Compiles the workspace packages (their package.json entries point at dist), which the
+      # tests below import, and the desktop app the Playwright suites start. On Linux the
+      # Typecheck step's `tsc -b` does the same job before the tests.
       - name: Build
         run: pnpm build
 
+      # The unit tests that skip themselves off Windows: the real PowerShell transport and
+      # recogniser, and the npm .cmd shims claude is started through.
+      - name: Windows-only unit tests
+        run: pnpm exec vitest run integration.test claude-sign-in.test claude-code.test
+
       # The runner is windows-latest, which has an interactive desktop session, so Electron
-      # opens real windows and needs no xvfb-style wrapper (that would only be needed if
-      # this job ever moved to a Linux runner). The step is capped because Electron answers
-      # an uncaught main-process exception with a *modal* dialog, which blocks the event
-      # loop: without a cap such a failure hangs the job instead of failing it.
+      # opens real windows and needs no xvfb-style wrapper. The step is capped because
+      # Electron answers an uncaught main-process exception with a *modal* dialog, which
+      # blocks the event loop: without a cap such a failure hangs the job instead of failing it.
       - name: Smoke test (Electron end-to-end)
         run: pnpm --filter @tagalong/desktop test:e2e
         timeout-minutes: 10
