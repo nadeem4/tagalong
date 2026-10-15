@@ -66,6 +66,31 @@ describe('parseMeetings', () => {
     expect(meeting?.description?.length).toBe(600);
   });
 
+  it('reads a TZID the feed does not define as that IANA zone, and a floating time as the person’s', () => {
+    const ics = (start: string) =>
+      [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'BEGIN:VEVENT',
+        'UID:zone@tagalong.test',
+        `DTSTART${start}`,
+        'SUMMARY:Sync',
+        'DESCRIPTION:Notes',
+        'END:VEVENT',
+        'END:VCALENDAR',
+      ].join('\r\n');
+    const now = Date.parse('2026-10-14T00:00:00Z');
+    const startOf = (start: string) => parseMeetings(ics(start), now, 'Europe/London')[0]?.start;
+    expect(startOf(';TZID=America/New_York:20261014T090000')).toBe(
+      Date.parse('2026-10-14T13:00:00Z'),
+    );
+    expect(startOf(':20261014T090000')).toBe(Date.parse('2026-10-14T08:00:00Z'));
+    // A Windows zone name is no IANA zone: the person's zone stands in.
+    expect(startOf(';TZID=W. Europe Standard Time:20261014T090000')).toBe(
+      Date.parse('2026-10-14T08:00:00Z'),
+    );
+  });
+
   it('returns nothing for text that is not a calendar', () => {
     expect(() => parseMeetings('<html>Sign in</html>', MON_12, 'Europe/London')).toThrow();
   });
@@ -128,6 +153,29 @@ describe('CalendarFeed', () => {
     t.advance(FEED_REFRESH_MS);
     expect(await t.feed.upcoming()).toHaveLength(1);
     expect(t.feed.problem()).toMatch(/did not answer in 10 seconds/);
+  });
+
+  it('never repeats the link from an error the fetch threw, and check() never returns it', async () => {
+    const t = feedWith(() => Promise.reject(new TypeError(`fetch failed for ${LINK}`)));
+    await t.secrets.set(CALENDAR_SECRET, LINK);
+    const checked = await t.feed.check();
+    expect(checked).toEqual({
+      linked: true,
+      meetings: 0,
+      error: 'Could not read your calendar: the calendar host could not be reached.',
+    });
+    expect(JSON.stringify(checked)).not.toContain('private-abc123');
+    await t.feed.setLink(null);
+    expect(await t.feed.check()).toEqual({ linked: false, meetings: 0 });
+  });
+
+  it('says a page that is not a calendar is not one', async () => {
+    const t = feedWith(() => Promise.resolve('BEGIN:VCALENDAR\r\nnot a line\r\n'));
+    await t.secrets.set(CALENDAR_SECRET, LINK);
+    await t.feed.upcoming();
+    expect(t.feed.problem()).toBe(
+      'Could not read your calendar: that link did not return a calendar.',
+    );
   });
 
   it('passes a time limit to the fetch', async () => {
@@ -198,6 +246,12 @@ describe('httpsFetchText', () => {
       /https/,
     );
     await expect(ok(LINK, { signal, maxBytes: 10 })).rejects.toThrow(/over 2 MB/);
+    const downgraded = httpsFetchText(() =>
+      Promise.resolve(
+        Object.defineProperty(new Response('x'), 'url', { value: 'http://a.example/x' }),
+      ),
+    );
+    await expect(downgraded(LINK, { signal, maxBytes: 1_000 })).rejects.toThrow(/plain http/);
     const missing = httpsFetchText(() => Promise.resolve(new Response('gone', { status: 404 })));
     await expect(missing(LINK, { signal, maxBytes: 1_000 })).rejects.toThrow(
       'the calendar host answered 404',

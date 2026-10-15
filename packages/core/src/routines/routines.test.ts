@@ -535,6 +535,25 @@ describe('Routines, before a meeting', () => {
     t.routines.stop();
   });
 
+  it('skips the meeting check when the calendar cannot be read, and keeps ticking', async () => {
+    let broken = true;
+    const t = setup({
+      meetings: () => {
+        if (broken) throw new Error('the keychain is locked');
+        return [REVIEW];
+      },
+      start: AT_10 - 10 * MINUTE,
+    });
+    t.store.save(PREP, AT_10 - 30 * MINUTE);
+    t.routines.start();
+    await t.clock.advance(0);
+    expect(t.asks).toHaveLength(0);
+    broken = false;
+    await t.clock.advance(ROUTINE_TICK_MS);
+    expect(t.asks).toHaveLength(1);
+    t.routines.stop();
+  });
+
   it('does not run for a meeting that has already started', async () => {
     const t = setup({ meetings: () => [REVIEW], start: AT_10 + MINUTE });
     t.store.save(PREP, AT_10 - 30 * MINUTE);
