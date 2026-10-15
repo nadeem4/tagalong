@@ -210,7 +210,14 @@ describe('welcomeExperts', () => {
           goodAt: '',
           enabled: true,
           instructions: '',
-          connection: { type: 'claude-code', canEdit: true, canSearchWeb: false, plugins: [], mcpTools: [], workspace: 'project' as const },
+          connection: {
+            type: 'claude-code',
+            canEdit: true,
+            canSearchWeb: false,
+            plugins: [],
+            mcpTools: [],
+            workspace: 'project' as const,
+          },
         },
       ]),
     ).toEqual([]);

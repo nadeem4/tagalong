@@ -203,7 +203,9 @@ export function defaultConnectorFor(
       ...(folder !== undefined ? { folder } : {}),
       ...(command ? { command } : {}),
       ...(mode?.research === true ? { research: true } : {}),
-      ...(catalog ? { plugins, mcpTools, installedPlugins: () => installedPlugins(pluginsRoot) } : {}),
+      ...(catalog
+        ? { plugins, mcpTools, installedPlugins: () => installedPlugins(pluginsRoot) }
+        : {}),
       ...(workspace === 'own' ? { ownFolder: join(tmpdir(), 'tagalong-experts', expert.id) } : {}),
     });
   };
@@ -778,7 +780,10 @@ function buildHandlers(parts: {
 
     'experts.list': () => ({ experts: experts.list() }),
     'experts.upsert': (params) => {
-      if (params.expert.catalogId !== undefined && catalogEntry(params.expert.catalogId) === undefined) {
+      if (
+        params.expert.catalogId !== undefined &&
+        catalogEntry(params.expert.catalogId) === undefined
+      ) {
         throw new RpcFailure(
           RPC_ERROR_CODES.invalidParams,
           `'${params.expert.catalogId}' is not in the expert catalog`,

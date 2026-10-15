@@ -22,7 +22,14 @@ const CLAUDE: Expert = {
   goodAt: 'Code',
   enabled: true,
   instructions: '',
-  connection: { type: 'claude-code', canEdit: false, canSearchWeb: false, plugins: [], mcpTools: [], workspace: 'project' as const },
+  connection: {
+    type: 'claude-code',
+    canEdit: false,
+    canSearchWeb: false,
+    plugins: [],
+    mcpTools: [],
+    workspace: 'project' as const,
+  },
 };
 
 const HANDED: ActivityEntry = {

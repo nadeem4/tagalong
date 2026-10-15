@@ -265,24 +265,24 @@ export function ProposalCard({
             <dd>Works in its own folder</dd>
           </div>
         ) : (
-        <div>
-          <dt>Project</dt>
-          <dd>
-            {folder === undefined ? (
-              <span>Choose the project to work in</span>
-            ) : (
-              <>
-                <strong>{project}</strong>
-                <small>{folder}</small>
-              </>
+          <div>
+            <dt>Project</dt>
+            <dd>
+              {folder === undefined ? (
+                <span>Choose the project to work in</span>
+              ) : (
+                <>
+                  <strong>{project}</strong>
+                  <small>{folder}</small>
+                </>
+              )}
+            </dd>
+            {!picking && (
+              <button type="button" className="bubble-quiet" onClick={() => setPicking(true)}>
+                Change project
+              </button>
             )}
-          </dd>
-          {!picking && (
-            <button type="button" className="bubble-quiet" onClick={() => setPicking(true)}>
-              Change project
-            </button>
-          )}
-        </div>
+          </div>
         )}
         {!own && picking && (
           <div className="handoff-picker">

@@ -772,7 +772,10 @@ describe('ClaudeCodeConnector with a catalog bundle', () => {
     own = join(mkdtempSync(join(tmpdir(), 'tagalong-own-')), 'researcher');
   });
 
-  function bundled(lines: unknown[], extra: Partial<ConstructorParameters<typeof ClaudeCodeConnector>[0]> = {}) {
+  function bundled(
+    lines: unknown[],
+    extra: Partial<ConstructorParameters<typeof ClaudeCodeConnector>[0]> = {},
+  ) {
     const { spawn, calls } = fakeSpawn(lines);
     const connector = new ClaudeCodeConnector({
       spawn,
@@ -827,7 +830,7 @@ describe('ClaudeCodeConnector with a catalog bundle', () => {
 
   it('works in its own folder, made if needed, never in a project', async () => {
     const { connector, calls } = bundled([init([FIRECRAWL, NOTION]), result('ok')], {
-      folder: 'C:\projects\site',
+      folder: 'C:\\projects\\site',
     });
     await connector.send({ ask: 'x' }, () => {});
     expect(calls[0]?.cwd).toBe(own);
@@ -841,7 +844,9 @@ describe('ClaudeCodeConnector with a catalog bundle', () => {
     await connector.send({ ask: 'x' }, () => {});
     const args = calls[0]?.args ?? [];
     expect(args[args.indexOf('--permission-mode') + 1]).toBe('dontAsk');
-    expect(args[args.indexOf('--tools') + 1]).toBe('Read,Glob,Grep,WebSearch,WebFetch,Edit,Write,Skill');
+    expect(args[args.indexOf('--tools') + 1]).toBe(
+      'Read,Glob,Grep,WebSearch,WebFetch,Edit,Write,Skill',
+    );
   });
 
   it('refuses to run when Claude Code did not load a pinned plugin', async () => {
@@ -862,7 +867,8 @@ describe('ClaudeCodeConnector with a catalog bundle', () => {
     const outcome = await connector.send({ ask: 'x' }, () => {});
     expect(outcome).toEqual({
       ok: false,
-      error: 'Claude Code also loaded engineering@synced, which this expert does not use, so it did not start.',
+      error:
+        'Claude Code also loaded engineering@synced, which this expert does not use, so it did not start.',
     });
     expect(calls[0]?.killed).toBe(true);
   });
@@ -897,7 +903,7 @@ describe('ClaudeCodeConnector with a catalog bundle', () => {
   it('stays sealed for a routine’s research, whatever its bundle', async () => {
     const { connector, calls } = bundled([result('ok')], {
       research: true,
-      researchFolder: () => 'C:\tmp\r',
+      researchFolder: () => 'C:\\tmp\\research',
     });
     await connector.send({ ask: 'x' }, () => {});
     const args = calls[0]?.args ?? [];

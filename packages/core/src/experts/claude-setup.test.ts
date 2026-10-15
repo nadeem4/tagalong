@@ -110,7 +110,8 @@ describe('installPlugin', () => {
     const { spawn } = fakeSpawn(1, 'Plugin "nope" not found in marketplace\n');
     await expect(installPlugin('nope@claude-plugins-official', { spawn })).resolves.toEqual({
       ok: false,
-      error: 'Could not install nope@claude-plugins-official: Plugin "nope" not found in marketplace',
+      error:
+        'Could not install nope@claude-plugins-official: Plugin "nope" not found in marketplace',
     });
   });
 

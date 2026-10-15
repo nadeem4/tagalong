@@ -106,9 +106,7 @@ export interface HostBridge {
   /** The built-in expert catalog, with what this computer has for each entry. */
   expertCatalog?(): Promise<CatalogStatus[]>;
   /** Installs an entry's missing plugins with `claude plugin install`, on the person's press. */
-  installExpert?(
-    catalogId: string,
-  ): Promise<{ ok: boolean; installed: string[]; error?: string }>;
+  installExpert?(catalogId: string): Promise<{ ok: boolean; installed: string[]; error?: string }>;
   /** The host's folder picker; null when the user cancelled. */
   pickFolder?(): Promise<string | null>;
   /** Sends a proposed hand-off, in the folder the person settled on. */

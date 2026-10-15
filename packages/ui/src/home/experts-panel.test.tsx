@@ -310,7 +310,11 @@ describe('ExpertsPanel', () => {
       expect(within(card).getByText('Reads the web. Never posts anything.')).toBeInTheDocument();
       // The exact tools it is allowed, and nothing else.
       const tools = within(card).getByRole('list', { name: 'Allowed app tools' });
-      expect(within(tools).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      expect(
+        within(tools)
+          .getAllByRole('listitem')
+          .map((item) => item.textContent),
+      ).toEqual([
         'mcp__plugin_Notion_notion__notion-search',
         'mcp__claude_ai_Google_Calendar__list_events',
       ]);

@@ -103,6 +103,16 @@ The extension's public privacy policy, for the Chrome Web Store, is
   error and its progress steps pass through `hideSecrets` before they are kept in Activity or shown,
   so a key it read in a file is not repeated back. Its standing instructions pass through
   `hideSecrets` too, into a temp file that is removed when the run ends.
+- **Catalog experts use your Claude Code apps.** An expert installed from the catalog (Researcher,
+  Trip planner, Social media manager) is the one exception to the seal: it may call exactly the app
+  tools its card lists (for example Notion search and fetch, or Google Calendar list and search
+  events), through the connectors you already set up and signed into in Claude Code. Tagalong
+  holds no token and does no sign-in for them; it reads which ones exist from `~/.claude.json` and
+  `~/.claude/plugins`, read-only. Every tool not on the list, including any that posts, sends,
+  books or changes something, is refused without asking. Only its pinned plugins load; if Claude
+  Code loads any other, the run stops before it starts. **Install** runs `claude plugin install`
+  only after you pressed it on a card that names each plugin. These experts work in their own
+  folder in your temp folder, never in your projects. Templates and experts you make stay sealed.
 - **Two-step hand-offs.** When one card names two steps (say a Coder, then a Reviewer), both are
   confirmed by the one Send, with each step's access shown on the card; nothing starts later on its
   own. Step 2 is briefed with step 1's answer (already scrubbed by `hideSecrets`, and cut at 8,000

@@ -1979,15 +1979,26 @@ describe('the expert catalog', () => {
 
   it('lists the entries with what this computer has: plugins installed, apps set up', async () => {
     const claudeJson = join(dir, 'claude.json');
-    writeFileSync(claudeJson, JSON.stringify({ claudeAiMcpEverConnected: ['claude.ai Google Calendar'] }));
+    writeFileSync(
+      claudeJson,
+      JSON.stringify({ claudeAiMcpEverConnected: ['claude.ai Google Calendar'] }),
+    );
     const host = await connected({
       claudePluginsRoot: plugins(['notion@claude-plugins-official']),
       claudeCodeConfigPath: claudeJson,
     });
     const { entries } = (await host.call('experts.catalog', {}))['result'] as {
-      entries: { entry: { id: string }; plugins: { id: string; installed: boolean }[]; apps: { name: string; found: boolean }[] }[];
+      entries: {
+        entry: { id: string };
+        plugins: { id: string; installed: boolean }[];
+        apps: { name: string; found: boolean }[];
+      }[];
     };
-    expect(entries.map((e) => e.entry.id)).toEqual(['researcher', 'trip-planner', 'social-media-manager']);
+    expect(entries.map((e) => e.entry.id)).toEqual([
+      'researcher',
+      'trip-planner',
+      'social-media-manager',
+    ]);
     expect(entries[0]?.plugins).toEqual([
       { id: 'firecrawl@claude-plugins-official', name: 'Firecrawl', installed: false },
       { id: 'notion@claude-plugins-official', name: 'Notion', installed: true },
@@ -2029,7 +2040,9 @@ describe('the expert catalog', () => {
         kill: () => undefined,
       }),
     });
-    const result = (await host.call('experts.install', { catalogId: 'social-media-manager' }))['result'];
+    const result = (await host.call('experts.install', { catalogId: 'social-media-manager' }))[
+      'result'
+    ];
     expect(result).toEqual({
       ok: false,
       installed: [],
@@ -2067,9 +2080,16 @@ describe('the expert catalog', () => {
     };
     expect(sealed.expert.connection).toMatchObject({ plugins: [], mcpTools: [] });
 
-    const catalog = (await host.call('experts.upsert', {
-      expert: { id: 'researcher', name: 'Researcher', catalogId: 'researcher', connection: { type: 'claude-code' } },
-    }))['result'] as { expert: { connection: { plugins: string[]; workspace: string } } };
+    const catalog = (
+      await host.call('experts.upsert', {
+        expert: {
+          id: 'researcher',
+          name: 'Researcher',
+          catalogId: 'researcher',
+          connection: { type: 'claude-code' },
+        },
+      })
+    )['result'] as { expert: { connection: { plugins: string[]; workspace: string } } };
     expect(catalog.expert.connection.plugins).toEqual([
       'firecrawl@claude-plugins-official',
       'notion@claude-plugins-official',
@@ -2090,7 +2110,14 @@ describe('defaultConnectorFor', () => {
     goodAt: 'Finding why something breaks',
     enabled: true,
     instructions: 'Find the cause before you suggest a fix.',
-    connection: { type: 'claude-code' as const, canEdit: false, canSearchWeb: true, plugins: [], mcpTools: [], workspace: 'project' as const },
+    connection: {
+      type: 'claude-code' as const,
+      canEdit: false,
+      canSearchWeb: true,
+      plugins: [],
+      mcpTools: [],
+      workspace: 'project' as const,
+    },
   };
 
   it('passes the standing instructions and web search on to Claude Code', () => {

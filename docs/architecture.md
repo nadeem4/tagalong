@@ -435,8 +435,7 @@ Two connectors exist so far:
   `settings.local.json`, so a project cannot add permissions or hooks; and
   `--settings '{"disableAllHooks":true}'` turns off hooks from user settings too (only managed,
   organisation-wide hooks are beyond it). User settings stay so sign-in such as `apiKeyHelper`
-  keeps working. Letting an expert reuse the person's MCP servers is left to the Expert catalog
-  feature. Tool calls become `tool` progress steps
+  keeps working. The one exception is an expert installed from the catalog (below). Tool calls become `tool` progress steps
   ("Reading src/main.ts"); each `text` block Claude Code writes between them becomes a `say` step
   (its first sentence, at most 120 characters, secrets hidden), with no extra model call. Edited
   paths become `changedFiles`, and the last `result` event is the answer.
@@ -444,6 +443,38 @@ Two connectors exist so far:
   (on Windows the whole tree, with `taskkill /T`). `spawnChild` starts claude through `cross-spawn`,
   which finds npm's `claude.cmd` shim on Windows and quotes every argument for it; a write to a
   process that already exited is swallowed, since the exit code already reports the failure.
+- **The expert catalog** (`experts/catalog.json`, `experts/catalog.ts`) is a built-in list of
+  ready-made experts, parsed by the protocol's `CatalogEntry` at load: **Researcher** (pins
+  `firecrawl@claude-plugins-official` and `notion@claude-plugins-official`, may call Notion
+  search and fetch), **Trip planner** (no plugins; Google Calendar list and search events, and
+  Expedia, Booking.com and Kiwi.com search tools when set up) and **Social media manager** (pins the
+  Notion plugin; Notion search and fetch, Canva design search when set up). No server, no fetching.
+  An expert carries its bundle on `ClaudeCodeConnection`: `plugins` (`name@marketplace`),
+  `mcpTools` (exact `mcp__<server>__<tool>` rules, never a wildcard) and `workspace`
+  (`project` or `own`), plus `Expert.catalogId`; old rows parse with `[]`, `[]` and `project`.
+  `experts.upsert` passes every expert through `fromCatalog`: one without a `catalogId` is saved
+  with no plugins and no app tools, whatever was sent, and one with a `catalogId` gets exactly its
+  entry's bundle (an unknown id is refused). `defaultConnectorFor` passes a bundle on only when a
+  `catalogId` is set. **Only these runs are unsealed**: `Skill` joins `--tools` and
+  `--allowedTools`; `--strict-mcp-config` and the `mcp__*` deny go, and `--allowedTools` lists
+  exactly `mcpTools`; the permission mode is always `dontAsk` (draft edits are on the allowed list),
+  so every tool not listed is refused; `--setting-sources user`, the secret-file denies and
+  `disableAllHooks` stay, and the `--settings` override adds `enabledPlugins` with each pinned
+  plugin `true` and every other installed plugin `false` (from
+  `~/.claude/plugins/installed_plugins.json` plus claude.ai-synced plugins, `name@synced`, read by
+  `installedPlugins` in `experts/claude-setup.ts`). The stream-json `system` init event lists the
+  plugins Claude Code really loaded; when that list (less its own `@builtin` ones) is not exactly the
+  pinned set, or no init event comes first, the run is stopped before it does anything and fails
+  with a plain reason ("Claude Code did not load firecrawl@claude-plugins-official, which this
+  expert needs…"). A routine's research run stays sealed whatever the bundle. Apps are the
+  person's own Claude Code connectors (claude.ai connectors and user-scope servers, read from
+  `~/.claude.json` by `connectedApps`); Tagalong stores no token and does no sign-in for them.
+  `experts.catalog` returns each entry with its plugins installed or missing and its apps found or
+  not; `experts.install` runs Claude Code's own `claude plugin install <id>` (`installPlugin`) for
+  each missing pinned plugin, one at a time, stopping at the first failure, and starts nothing in
+  fake mode. A `workspace: 'own'` expert runs in `<temp>/tagalong-experts/<id>`, made if needed,
+  never in a project: `HandoffManager.start` needs no folder for it, `handoff.proposed` carries
+  `ownFolder: true`, and `handoffs.confirm` takes no `folder`.
 - **`FakeConnector`** (`experts/fake.ts`) replays scripted steps, then scripted `says` lines as
   `say` steps, takes the notes waiting once (kept in `notes`), and gives an answer or an error. Tests use
   it, and the claude tests inject a fake `spawn`, so no test starts a real claude.
@@ -1289,9 +1320,17 @@ on, the model list, `savePet`) and the settings form as a slot.
 **Experts tab.** `ExpertsPanel` (`home/experts-panel.tsx`) lists the experts and adds or edits one:
 name, good at, standing instructions, three switches (`role="switch"`): may edit files by default,
 may search the web, and on or off, and an optional command under Advanced. **Add expert** first
-shows a template picker (`TEMPLATES`: Coder, Debugger, Designer, Researcher, Reviewer, Blank, styled
-like New routine's), and each template is only a pre-filled form: Coder may edit, Researcher may
-search the web, the others read only, and every one's instructions show in full and can be changed.
+shows a template picker (`TEMPLATES`: Coder, Debugger, Designer, Reviewer, Blank, styled
+like New routine's), and each template is only a pre-filled form: Coder may edit, the others read
+only, and every one's instructions show in full and can be changed. Below them, **From the catalog**
+(`bridge.expertCatalog`, `experts.catalog`) shows a `CatalogCard` per entry: its line, **Uses** (each
+plugin **Installed** or **Missing**), **Apps** (each _found in Claude Code_ or _not set up
+(optional)_), **May do** in plain words, and the exact allowed app tools. **Install** opens
+`InstallCard`, which names each plugin `claude plugin install` will add (or says there is nothing to
+install) and the allowed tools; only its **Install and continue** calls `installExpert`
+(`experts.install`), and on success the same form opens filled from the entry, carrying its
+`catalogId` and bundle (the bundle itself cannot be edited in v1). An own-folder expert's row and
+form say "Works in its own folder", and its hand-off card has no Project row.
 Reviewer is the usual second step of a two-step hand-off: its instructions say to read the files the
 brief names and check the change for bugs, edge cases, weak tests and unclear code. Editing
 an existing expert opens the form with no picker. There is no default project folder. Each row shows **Reads only**

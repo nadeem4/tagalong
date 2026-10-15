@@ -35,7 +35,9 @@ export function installedPlugins(root: string = claudePluginsRoot()): string[] {
   const synced: string[] = [];
   for (const group of list(join(root, 'synced'))) {
     for (const folder of list(join(root, 'synced', group))) {
-      const manifest = readJson(join(root, 'synced', group, folder, '.claude-plugin', 'plugin.json'));
+      const manifest = readJson(
+        join(root, 'synced', group, folder, '.claude-plugin', 'plugin.json'),
+      );
       if (isRecord(manifest) && typeof manifest.name === 'string') {
         synced.push(`${manifest.name}@synced`);
       }

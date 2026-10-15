@@ -10,7 +10,15 @@ const expert = (id: string, name: string, goodAt = '', enabled = true): Expert =
   goodAt,
   enabled,
   instructions: '',
-  connection: { type: 'claude-code', folder: 'C:\\r', canEdit: false, canSearchWeb: false, plugins: [], mcpTools: [], workspace: 'project' as const },
+  connection: {
+    type: 'claude-code',
+    folder: 'C:\\r',
+    canEdit: false,
+    canSearchWeb: false,
+    plugins: [],
+    mcpTools: [],
+    workspace: 'project' as const,
+  },
 });
 
 const CLAUDE = expert('claude-code', 'Claude Code', 'Code changes in this repo');
