@@ -257,6 +257,10 @@ oldest first, one line each with how long it has waited. It only reads, and send
 content. An app that isn't connected is named once at the end; a signed-out one asks you to sign in
 again.
 
+**What did we do today?** Ask it (or "how much did I work yesterday?") and Scout sums up the day
+from what it looked at and was asked: about how many hours (an estimate), the apps and projects,
+what experts did and what is still open. It only knows what it saw; nothing extra is tracked.
+
 **Memory.** Tell Scout "I prefer short answers" and it remembers across restarts.
 
 **"Scout, what's wrong?"** Ask that (or "are you OK?", or "health check"), typed or spoken, and the

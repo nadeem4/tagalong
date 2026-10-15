@@ -18,8 +18,9 @@ to about 400 words), which it writes alone in a fenced `draft` block that the bu
 the person sees it in full on the confirm card first; it never guesses a repo. Its tools are only the ones that look (screen, selection, windows), `remember`,
 `hand_to_expert`, which writes a brief and hands it to an expert such as Claude Code, the tools of
 the person's connected apps (`connections`), whose changes always ask first, `create_routine`
-and `change_routine`, which show a routine card the person saves, and `point_at`, which draws a ring
-around something on screen and never clicks; it has nothing that writes files or runs code. Its own figure and bubble show up in its screenshots, so its instructions tell it to look
+and `change_routine`, which show a routine card the person saves, `point_at`, which draws a ring
+around something on screen and never clicks, and `recall_day`, which reads back what Scout looked at
+and was asked today or yesterday; it has nothing that writes files or runs code. Its own figure and bubble show up in its screenshots, so its instructions tell it to look
 past them and never mention itself or Tagalong unless asked.
 
 ### The role file
@@ -47,6 +48,7 @@ tools:
   - create_routine
   - change_routine
   - point_at
+  - recall_day
 model:
   tier: fast # fast | balanced | deep
   needs_vision: false
@@ -136,9 +138,11 @@ packages/core/src/tools/
     connections.ts <connection>__<tool>: every tool of the person's connected apps
     routines.ts    create_routine, change_routine
     pointing.ts    point_at
+    day.ts         recall_day
 ```
 
-The companion's role lists every one of them; `point_at` comes last, after `change_routine`.
+The companion's role lists every one of them; `point_at` comes after `change_routine`, and
+`recall_day` last.
 
 - **Kind.** A tool is `write` when it leaves stored state behind after the turn: `remember` files a
   memory, `watch_for` starts a watch, `hand_to_expert` starts a hand-off and remembers which expert

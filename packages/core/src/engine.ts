@@ -343,6 +343,7 @@ export class Engine {
       usage,
     });
     const routes = new RouteMemory(db);
+    const pickUpStore = new PickUpStore(db);
     /** What is open, titles only: null with no host connected, empty when none can list. */
     const listHostWindows = async () => {
       const connected = hosts();
@@ -421,6 +422,15 @@ export class Engine {
         confirm: (params, signal) => approvals.ask(params, signal),
         record: (entry) => activity.connectorCalled(entry),
       },
+      // "What did we do today?": reads the records already kept, nothing new is tracked.
+      day: {
+        activity,
+        sightLog,
+        // Pick-up off: its snapshot is not read.
+        pickUp: { get: () => (settings.get().pickUp ? pickUpStore.get() : null) },
+        handoffs,
+        now: () => new Date(),
+      },
       // Both lookups are lazy: hosts connect and drop between turns, and the exclusion
       // list is edited while the app runs, so neither can be captured at boot.
       perception: {
@@ -484,7 +494,7 @@ export class Engine {
 
     // Pick up where you left off: one snapshot every ten minutes, offered once when you are back.
     const pickUp = new PickUp({
-      store: new PickUpStore(db),
+      store: pickUpStore,
       clock: systemWatchClock,
       enabled: () => settings.get().pickUp,
       windows: listHostWindows,

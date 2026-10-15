@@ -359,3 +359,42 @@ describe('after a crash', () => {
     expect(byId(routine)).toMatchObject({ state: 'done', answer: 'None today.' });
   });
 });
+
+describe('ActivityLog.since, for the daily briefing', () => {
+  /** Moves a row's start, since the log stamps rows with the real clock. */
+  function at(id: string, startedAt: string): void {
+    db.prepare('UPDATE activity SET started_at = ? WHERE id = ?').run(startedAt, id);
+  }
+
+  it('lists the shown kinds that started at or after the time, oldest first', () => {
+    const before = log.expertStarted({ petId: 'scout', expertId: 'x', expertName: 'X', text: 'a' });
+    const second = log.expertStarted({ petId: 'scout', expertId: 'x', expertName: 'X', text: 'b' });
+    const first = log.routineStarted({ routineId: randomUUID(), petId: 'scout', name: 'Papers' });
+    at(before, '2026-10-14T23:59:59.000Z');
+    at(second, '2026-10-15T10:00:00.000Z');
+    at(first, '2026-10-15T00:00:00.000Z');
+    db.prepare(
+      `INSERT INTO activity (id, kind, state, pet_id, started_at)
+       VALUES ('old', 'consult', 'done', 'scout', '2026-10-15T11:00:00.000Z')`,
+    ).run();
+
+    expect(log.since('2026-10-15T00:00:00.000Z').map((entry) => entry.id)).toEqual([first, second]);
+  });
+
+  it('stops at the limit, keeping the oldest', () => {
+    const ids = [0, 1, 2].map((n) => {
+      const id = log.expertStarted({
+        petId: 'scout',
+        expertId: 'x',
+        expertName: 'X',
+        text: `${n}`,
+      });
+      at(id, `2026-10-15T0${n}:00:00.000Z`);
+      return id;
+    });
+
+    expect(log.since('2026-10-15T00:00:00.000Z', 2).map((entry) => entry.id)).toEqual(
+      ids.slice(0, 2),
+    );
+  });
+});

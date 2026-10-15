@@ -303,6 +303,20 @@ export class ActivityLog {
       .map((row) => row.text ?? 'A routine');
   }
 
+  /**
+   * The rows Home shows that started at or after `startIso`, oldest first, at most `limit`:
+   * what the daily briefing reads. Answers come back too; the briefing leaves them out.
+   */
+  since(startIso: string, limit = 200): ActivityEntry[] {
+    return this.db
+      .prepare<[string, number], ActivityRow>(
+        `SELECT * FROM activity WHERE started_at >= ? AND kind IN (${LISTED})
+         ORDER BY started_at ASC, rowid ASC LIMIT ?`,
+      )
+      .all(startIso, limit)
+      .map(toEntry);
+  }
+
   /** Newest first; `before` is the `next` of the page before. */
   list(params: { before?: string | undefined; limit?: number | undefined }): ActivityListResult {
     const limit = params.limit ?? 30;

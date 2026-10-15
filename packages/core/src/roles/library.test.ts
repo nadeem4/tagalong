@@ -31,6 +31,7 @@ const BUILT_IN_TOOLS = [
   'change_routine',
   'hand_to_expert',
   'point_at',
+  'recall_day',
   // A group: every tool of the person's connected apps.
   'connections',
 ];

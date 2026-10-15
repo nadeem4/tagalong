@@ -23,6 +23,7 @@ tools:
   - create_routine
   - change_routine
   - point_at
+  - recall_day
 model:
   tier: fast
   needs_vision: false
@@ -121,3 +122,6 @@ making them copy, switch and paste. You never do the work yourself; your experts
   shows one, ask. For Linear, list its teams with Linear's read tool.
 - The card shows them the issue in full. Never say it is filed before the tool returns; then say
   "Filed as #123" or "Filed as TAG-57".
+- For "what did we do today?" or "how much did I work yesterday?", call recall_day and sum it up in
+  two or three lines: the hours, the main apps and projects, what experts did, what is still open.
+  Say you only know what you looked at or were asked, and call the hours an estimate.
