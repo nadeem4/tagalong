@@ -1585,8 +1585,11 @@ reached. The "Talk or type?" step (`answer`) is offered when the window has the 
   opens Settings (the same offer button the bubble uses for a hand-off). The engine's
   `greeting/scenario.ts#launchScenario` picks one scenario from the recorded facts: an update (`lastVersion` differs from the
   running version; first, because an installer ends a running tray app by force, so that launch
-  also reads as a crash), else a crash, else away (a day or more since
-  `awaySince`), else normal. The handwritten line for each: "I closed unexpectedly last time…"
+  also reads as a crash), else a crash, else a pick-up (a snapshot is ready: see
+  [Pick up where you left off](#pick-up-where-you-left-off)), else away (a day or more since
+  `awaySince`), else normal. A pick-up line is handwritten (`describePickUp`, `source: 'fallback'`,
+  no model call) and `GreetingComposeResult.pickUp` carries its items; `brainLine` passes them on
+  as `GreetLine.pickUp` unless the Fix it line wins. The handwritten line for each: "I closed unexpectedly last time…"
   (saying how many tasks stopped), "Morning. I’ve been updated to x.y.z." (the time of day first) plus `WHATS_NEW`
   (`apps/desktop/src/main/whats-new.ts`, edited by hand in each release), "Back after a day.", with
   the routines that ran while away named. With Always listening on, `launchLine` answers
@@ -1606,7 +1609,7 @@ flowchart LR
   L -- "no" --> P1["brainReadiness (1 s sign-in race)"]
   L -- "no" --> P2["greeting.compose with launch facts"]
   P2 --> SC{"launchScenario"}
-  SC --> C1["crash / update / away / normal"]
+  SC --> C1["update / crash / pickUp / away / normal"]
   P1 --> BL["brainLine"]
   C1 --> BL
   BL -- "can't think" --> FX["plain line with Fix it"]
@@ -2129,3 +2132,61 @@ clock), on `Esc` (a `globalShortcut` registered only while a ring shows), or whe
 starts. A removed or rescaled display loses its window. The ring is `renderer/src/pointer.tsx`;
 `prefers-reduced-motion` drops its pulse and fade. Nothing here moves the mouse, clicks or types.
 `findElement` is a `sight` method of `Platform`, so pausing sight refuses it.
+
+## Pick up where you left off
+
+Back after a long break (next morning, after a weekend, a launch after a quit), Scout says one
+quiet line instead of the launch line: "Yesterday you were in ai_pet on feat/x, with engine.ts
+open, and Claude Code’s “fix the e2e tests” stopped halfway." with **Pick up** and **Not now**.
+Pick up opens the bubble on a card with one button per item. Nothing opens without a click there,
+and no keys or mouse are driven.
+
+- **Snapshot** (`packages/core/src/pick-up/pick-up.ts#PickUp`, on `systemWatchClock`): the first
+  look a minute after boot, then every ten minutes. `takeSnapshot` reads the host's window list
+  (`perception.listWindows`, titles only), drops blocked windows and `findCaptureBlock` matches, and
+  keeps editor windows (VS Code, Cursor, JetBrains IDEs, Visual Studio, by process name). The title
+  goes through `ProjectFinder.suggest`; only a project named on screen counts. The file name in the
+  title is kept as a name only. The branch comes from `<project>/.git/HEAD` (`readBranch`, which
+  follows a worktree's `gitdir:` file; a detached HEAD names no branch; no git process). Unsent
+  briefs come from `HandoffManager.pending()` (expert and ask only, never the selection). At most
+  three projects and three hand-offs. With no host connected nothing is overwritten.
+- **Store** (`pick-up/store.ts#PickUpStore`, migration 16, table `pick_up`): one row
+  (`id = 1`), `started_at` (when this snapshot began), `taken_at` (the latest overwrite) and the
+  JSON body.
+- **Back**: `now - taken_at >= 6 h` (`BACK_AFTER_MS`) with anything to say. At that point the
+  hand-offs also include `ActivityLog#expertsLeftSince(started_at)`: expert rows that ended
+  `stopped` or `error`, interrupted ones included, ask only. The snapshot is offered once
+  (`take()`), and a new empty one starts.
+- **At launch** `greeting.compose` asks `PickUp#ready()`. `launchScenario` puts them in this
+  order: `update`, `crash`, `pickUp`, `away`, `normal`. For `pickUp` it returns `describePickUp`'s line with
+  `source: 'fallback'` and `pickUp: { text, items }`, with no model call. The brain's Fix it line
+  still wins in `brainLine`. With Always listening on, `launchLine` composes nothing, so the
+  snapshot stays ready and the first tick offers it as the `pickUp.ready` notification. Main
+  (`showPickUp`) shows that like a remark, and waits for the bubble to hide if it is open.
+- **The card** (`packages/ui/src/pick-up-card.tsx`, rendered by `CompanionBubble` from its
+  `pickUp` prop): **Open in VS Code** / **Open in Cursor** / **Open folder** per project, **Brief
+  again** per hand-off, **Not now**. Brief again calls `pickUp.rebrief { itemId }`, which calls
+  `HandoffManager.propose` with the saved ask: the normal hand-off card, nothing runs until Send.
+  Not now, the close and the fade call `pickUp.dismiss`.
+- **Reopen** (`apps/desktop/src/main/pick-up-open.ts`, `ipc/pick-up.ts`): the renderer names an
+  item id, never a path. Main looks it up in `PickUpAllowlist`, which holds only the items of the
+  pick-up it last showed, and refuses anything else. VS Code and Cursor open through
+  `shell.openExternal('vscode://file/<path>')` / `cursor://file/...`, which restores the editor's
+  own open files. Any other editor opens the folder with `shell.openPath`.
+- **Setting**: `settings.pickUp`, on by default. Off means no snapshot at all; switching it off
+  (`settings.set`) deletes the row.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%
+flowchart LR
+  T["tick (10 min)"] --> R{"6 h since taken_at?"}
+  R -- "no" --> S["overwrite the snapshot"]
+  R -- "yes, items" --> O["pickUp.ready, new snapshot"]
+  L["greeting.compose"] --> SC{"launchScenario"}
+  SC -- "pickUp" --> D["describePickUp line, no model"]
+  O --> M["main: line beside Scout"]
+  D --> M
+  M -- "Pick up" --> C["card"]
+  C -- "Open" --> A["allowlist, then openExternal / openPath"]
+  C -- "Brief again" --> H["HandoffManager.propose"]
+```

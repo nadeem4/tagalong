@@ -380,6 +380,25 @@ reads one number from the operating system every fifteen seconds, how long since
 mouse input, and hears the lock and unlock events. Nothing on screen is read, the number is never
 stored, and it never leaves this computer.
 
+## Pick up where you left off
+
+On by default; switch it off under Settings → Privacy → **Pick up where you left off**. Off means no
+snapshot at all, and switching it off deletes the one kept.
+
+- **What it holds:** one row in `tagalong.db` (table `pick_up`), on this computer, overwritten
+  every ten minutes while the app runs. From window titles only: up to three projects open in an
+  editor (the project's name and folder, the branch read from its `.git/HEAD`, and the file name
+  in the title, which is never opened or read), and up to three hand-offs left half done (the
+  expert's name and the ask; never the selected text or window a brief carried).
+- **Nothing is sent.** No picture, no window text and no model call. The line is written from
+  these facts on this computer.
+- **Blind spots apply:** a window on the built-in list or your exclusion list is never noted, its
+  title included.
+- **When you are back** after six hours or more, the snapshot is offered once and a new one
+  starts. Nothing opens until you press a button on the card. **Open** opens only a folder that
+  pick-up named, through VS Code's or Cursor's own link or Explorer; **Brief again** only fills in
+  the hand-off card, which waits for Send. No keys are typed and the mouse is never moved.
+
 ## Rolling memory: what the buffer holds
 
 Off until you switch on **Remember the last few minutes of the screen** in Settings → Privacy. While
