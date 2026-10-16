@@ -12,7 +12,6 @@ import { changesActivity } from './activity-view';
 const PROVIDER_LABELS: Readonly<Record<string, string>> = {
   anthropic: 'Anthropic',
   openrouter: 'OpenRouter',
-  nebius: 'Token Factory',
   fake: 'Fake',
 };
 

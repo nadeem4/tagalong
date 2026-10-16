@@ -230,7 +230,7 @@ const settingsFields = {
   defaultPetId: z.string().min(1),
   /**
    * Base URL overrides for the OpenAI-compatible presets, keyed by provider id
-   * (`nebius`, `openrouter`). An absent entry means the preset's own URL. This is what
+   * (`openrouter`). An absent entry means the preset's own URL. This is what
    * makes "any OpenAI-format service" a settings change: a URL here, a key in the
    * keychain, a model id on the pet.
    */
@@ -356,12 +356,27 @@ const settingsFields = {
   wellbeing: z.object({ enabled: z.boolean() }),
 };
 
+/** Providers Tagalong no longer has; an older file naming one still parses, without it. */
+const RETIRED_PROVIDERS: readonly string[] = ['nebius'];
+
+function withoutRetiredBaseUrls(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value).filter(([id]) => !RETIRED_PROVIDERS.includes(id)),
+  );
+}
+
+function withoutRetiredSummarizer(value: unknown): unknown {
+  const providerId = (value as { providerId?: unknown } | null | undefined)?.providerId;
+  return typeof providerId === 'string' && RETIRED_PROVIDERS.includes(providerId) ? null : value;
+}
+
 export const Settings = z.object({
   enginePort: settingsFields.enginePort.default(SETTINGS_DEFAULTS.enginePort),
   defaultPetId: settingsFields.defaultPetId.default(SETTINGS_DEFAULTS.defaultPetId),
-  providerBaseUrls: settingsFields.providerBaseUrls.prefault({
-    ...SETTINGS_DEFAULTS.providerBaseUrls,
-  }),
+  providerBaseUrls: z
+    .preprocess(withoutRetiredBaseUrls, settingsFields.providerBaseUrls)
+    .prefault({ ...SETTINGS_DEFAULTS.providerBaseUrls }),
   pageTextBudget: settingsFields.pageTextBudget.default(SETTINGS_DEFAULTS.pageTextBudget),
   historyMessages: settingsFields.historyMessages.default(SETTINGS_DEFAULTS.historyMessages),
   hotkeys: settingsFields.hotkeys.prefault({ ...SETTINGS_DEFAULTS.hotkeys }),
@@ -375,7 +390,9 @@ export const Settings = z.object({
   }),
   sightDetail: settingsFields.sightDetail.default(SETTINGS_DEFAULTS.sightDetail),
   windowTextBudget: settingsFields.windowTextBudget.default(SETTINGS_DEFAULTS.windowTextBudget),
-  summarizer: settingsFields.summarizer.default(SETTINGS_DEFAULTS.summarizer),
+  summarizer: z
+    .preprocess(withoutRetiredSummarizer, settingsFields.summarizer)
+    .default(SETTINGS_DEFAULTS.summarizer),
   hiddenPets: settingsFields.hiddenPets.prefault([...SETTINGS_DEFAULTS.hiddenPets]),
   rollingMemory: settingsFields.rollingMemory.prefault({ ...SETTINGS_DEFAULTS.rollingMemory }),
   watch: settingsFields.watch.prefault({ ...SETTINGS_DEFAULTS.watch }),

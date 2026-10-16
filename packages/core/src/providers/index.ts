@@ -1,7 +1,7 @@
 /**
  * The brain layer's public surface: the contract types, each provider, `createProvider`,
  * the key resolver, presets and model ids. Most code outside this folder imports from here;
- * the engine (guard, record, key check), roles (presets, Nebius ids) and usage (the brain
+ * the engine (guard, record, key check), roles (presets) and usage (the brain
  * types) import a file directly.
  */
 export type {
@@ -20,15 +20,8 @@ export { BrainError, type BrainErrorCode } from './errors';
 export { ANTHROPIC_MODELS, AnthropicProvider } from './anthropic';
 export { CLAUDE_CODE_MODELS, ClaudeCodeBrain } from './claude-code-brain';
 export { FAKE_MODELS, FakeBrainProvider, type FakeScript } from './fake';
-export { NEBIUS_BASE_URL, OpenAiCompatibleProvider } from './openai-compatible';
-export {
-  NEBIUS_FALLBACK_MODELS,
-  NEBIUS_VISION_MODELS,
-  NEMOTRON_TEXT_MODEL,
-  NEMOTRON_VISION_MODEL,
-} from './nebius-models';
+export { OpenAiCompatibleProvider } from './openai-compatible';
 export { createProvider, type ProviderConfig } from './registry';
 export { KeyedProviderResolver } from './key-resolver';
-export { carriesImage, modelForTurn } from './vision-routing';
 export { OPENAI_COMPATIBLE_PRESETS, SECRET_KEYS, openAiPreset, type OpenAiPreset } from './presets';
-export { NEMOTRON_NANO_MODEL, WATCH_MODEL_DEFAULTS, watchModelsFor } from './watch-models';
+export { WATCH_MODEL_DEFAULTS, watchModelsFor } from './watch-models';

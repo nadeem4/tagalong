@@ -1,13 +1,14 @@
 /**
  * The brains Settings and Welcome offer, built from core's presets, and where each key lives in the
- * keychain. Contains providerChoices, storedKeys, secretKeyFor and ELEVENLABS_SECRET_KEY.
+ * keychain. Contains providerChoices, storedKeys, secretKeyFor, forgetRetiredKeys and
+ * ELEVENLABS_SECRET_KEY.
  */
 
-import { OPENAI_COMPATIBLE_PRESETS, SECRET_KEYS } from '@tagalong/core';
+import { OPENAI_COMPATIBLE_PRESETS, SECRET_KEYS, type SecretStore } from '@tagalong/core';
 import type { ProviderChoice } from '../shared/ipc';
 
-/** Presets in the order a person meets them: OpenRouter to try things, Token Factory to ship. */
-const PRESET_ORDER = ['openrouter', 'nebius'] as const;
+/** Presets in the order a person meets them. */
+const PRESET_ORDER = ['openrouter'] as const;
 
 /**
  * The providers the settings window offers, built from core's presets so the form can
@@ -63,6 +64,20 @@ export async function storedKeys(secrets: {
  * rather than in core's SECRET_KEYS: the engine never reads it.
  */
 export const ELEVENLABS_SECRET_KEY = 'elevenlabs.apiKey';
+
+/** Keys for providers Tagalong no longer has. Deleted at boot so none lingers on disk. */
+const RETIRED_SECRET_KEYS = ['nebius.apiKey'] as const;
+
+/**
+ * Deletes the keys of retired providers. It writes only when one is there: a delete rewrites
+ * the whole store, so doing it on every boot would put every stored key at risk for nothing.
+ * A key the store cannot read stays; nothing reads it either.
+ */
+export async function forgetRetiredKeys(secrets: SecretStore): Promise<void> {
+  for (const key of RETIRED_SECRET_KEYS) {
+    if ((await secrets.get(key).catch(() => null)) !== null) await secrets.delete(key);
+  }
+}
 
 /** Whether a provider id has a keychain entry at all, so a renderer cannot invent one. */
 export function secretKeyFor(providerId: string): string | undefined {

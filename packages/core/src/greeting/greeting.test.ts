@@ -12,7 +12,6 @@ const scout: Pet = {
   avatar: '🔎',
   notes: 'You are Scout.',
   model: 'sonnet',
-  visionModel: 'sonnet-vision',
   providerId: 'claude-code',
   roleId: 'companion',
   toolGrants: {},
@@ -25,7 +24,7 @@ const at = (day: number, hour: number, minute = 0) => new Date(2026, 9, day, hou
 const morning: GreetingContext = { now: at(13, 9, 14), awaySince: at(13, 8), handoffs: [] };
 
 function brain(reply: string | Error) {
-  const asked: { providerId: string; model: string; visionModel?: string }[] = [];
+  const asked: { providerId: string; model: string }[] = [];
   const requests: BrainRequest[] = [];
   const fake = new FakeBrainProvider({ text: typeof reply === 'string' ? reply : '' });
   const provider: BrainProvider = {
@@ -41,11 +40,7 @@ function brain(reply: string | Error) {
     asked,
     requests,
     resolve: (pet: Pet) => {
-      asked.push({
-        providerId: pet.providerId,
-        model: pet.model,
-        ...(pet.visionModel === undefined ? {} : { visionModel: pet.visionModel }),
-      });
+      asked.push({ providerId: pet.providerId, model: pet.model });
       return provider;
     },
   };

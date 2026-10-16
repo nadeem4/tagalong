@@ -44,7 +44,7 @@ export function readableKey(accelerator: string): string {
 function thinkLine(ctx: LineContext): string {
   if (ctx.picking) {
     return ctx.keyLabel === null
-      ? 'Which service is the key for? Anthropic, OpenRouter or Token Factory.'
+      ? 'Which service is the key for? Anthropic or OpenRouter.'
       : `Paste your ${ctx.keyLabel} key below. I’ll test it once. Keys are typed or pasted, never spoken.`;
   }
   switch (ctx.signIn) {
@@ -106,7 +106,7 @@ const BACK_OPTION: StepOption = {
 const KEY_OPTION: StepOption = {
   id: 'key',
   label: 'An API key',
-  note: 'Anthropic, OpenRouter or Token Factory',
+  note: 'Anthropic or OpenRouter',
 };
 
 export function optionsFor(

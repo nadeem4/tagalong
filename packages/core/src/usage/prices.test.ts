@@ -38,7 +38,6 @@ describe('priceFor', () => {
 
   it('has no price for a model it does not know: it never guesses', () => {
     expect(priceFor('openrouter', 'some/new-model')).toBeNull();
-    expect(priceFor('nebius', 'nvidia/nemotron-3-super-120b-a12b')).toBeNull();
     // A made-up id that only looks like a real one.
     expect(priceFor('anthropic', 'claude-opus-5-5-20260401')).toBeNull();
   });

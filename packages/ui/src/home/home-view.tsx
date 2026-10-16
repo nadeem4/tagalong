@@ -300,7 +300,7 @@ const STATE_WORDS: Record<ActivityEntry['state'], string> = {
 
 /**
  * Scout's page: the provider and model it thinks with. A provider change drops the pet's
- * vision and watch models.
+ * watch model.
  */
 function ScoutPanel({
   pet,
@@ -346,7 +346,7 @@ function ScoutPanel({
 
   const save = async (): Promise<void> => {
     try {
-      const { visionModel: _vision, watchModel: _watch, ...rest } = pet;
+      const { watchModel: _watch, ...rest } = pet;
       const changed = providerId !== pet.providerId;
       const saved = await host.savePet({
         ...(changed ? rest : pet),

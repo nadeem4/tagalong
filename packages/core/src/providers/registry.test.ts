@@ -5,7 +5,6 @@ import { FakeBrainProvider } from './fake';
 import { AnthropicProvider } from './anthropic';
 import { ClaudeCodeBrain } from './claude-code-brain';
 import { OpenAiCompatibleProvider } from './openai-compatible';
-import { NEMOTRON_TEXT_MODEL, NEMOTRON_VISION_MODEL } from './nebius-models';
 import { createProvider } from './registry';
 import type { BrainProvider } from './brain';
 
@@ -49,23 +48,22 @@ describe('createProvider', () => {
     expect(provider.id).toBe('claude-code');
   });
 
-  it('builds the Token Factory provider as nebius', () => {
-    const provider = createProvider({ providerId: 'nebius', apiKey: 'k', env: {} });
-    expect(provider).toBeInstanceOf(OpenAiCompatibleProvider);
-    expect(provider.id).toBe('nebius');
-  });
-
-  it('tells the runner that only the Nemotron VL model sees on Token Factory', () => {
-    const provider = createProvider({ providerId: 'nebius', apiKey: 'k', env: {} });
-    expect(provider.canSee?.(NEMOTRON_VISION_MODEL)).toBe(true);
-    expect(provider.canSee?.(NEMOTRON_TEXT_MODEL)).toBe(false);
-  });
-
-  it('builds the OpenRouter provider, whose models all see', () => {
+  it('builds the OpenRouter provider, which sees', () => {
     const provider = createProvider({ providerId: 'openrouter', apiKey: 'k', env: {} });
     expect(provider).toBeInstanceOf(OpenAiCompatibleProvider);
     expect(provider.id).toBe('openrouter');
-    expect(provider.canSee?.('anthropic/claude-sonnet-5')).toBe(true);
+    expect(provider.capabilities.vision).toBe(true);
+  });
+
+  it('treats the retired nebius provider as unknown', () => {
+    try {
+      createProvider({ providerId: 'nebius', apiKey: 'k', env: {} });
+      expect.unreachable('expected a BrainError');
+    } catch (error) {
+      expect(error).toBeInstanceOf(BrainError);
+      expect((error as BrainError).code).toBe('config');
+      expect((error as BrainError).message).not.toContain("'nebius',");
+    }
   });
 
   it('sends OpenRouter requests to the OpenRouter URL', async () => {
@@ -78,7 +76,7 @@ describe('createProvider', () => {
   it('uses a base URL from settings over the preset one', async () => {
     const url = await firstRequestUrl(() =>
       createProvider({
-        providerId: 'nebius',
+        providerId: 'openrouter',
         apiKey: 'k',
         baseURL: 'http://127.0.0.1:8000/v1/',
         env: {},
@@ -91,23 +89,14 @@ describe('createProvider', () => {
     expect(() => createProvider({ providerId: 'openrouter', env: {} })).toThrow('OpenRouter');
   });
 
-  it('refuses to build the Token Factory provider without an API key', () => {
+  it('says which service has no key, as an auth error', () => {
     try {
-      createProvider({ providerId: 'nebius', env: {} });
+      createProvider({ providerId: 'openrouter', env: {} });
       expect.unreachable('expected a BrainError');
     } catch (error) {
       expect((error as BrainError).code).toBe('auth');
-      expect((error as BrainError).message).toContain('Token Factory');
+      expect((error as BrainError).message).toContain('OpenRouter');
     }
-  });
-
-  it('forces the fake provider over nebius when TAGALONG_FAKE_PROVIDERS is set', () => {
-    const provider = createProvider({
-      providerId: 'nebius',
-      apiKey: 'k',
-      env: { TAGALONG_FAKE_PROVIDERS: '1' },
-    });
-    expect(provider).toBeInstanceOf(FakeBrainProvider);
   });
 
   it('builds the fake provider', () => {

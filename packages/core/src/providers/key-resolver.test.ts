@@ -32,20 +32,20 @@ describe('KeyedProviderResolver', () => {
   it('refuses a provider with no key, naming where to add one', async () => {
     const resolver = resolverWith(new InMemorySecretStore());
     await resolver.refresh();
-    expect(() => resolver.resolve(pet('nebius'))).toThrow(BrainError);
+    expect(() => resolver.resolve(pet('openrouter'))).toThrow(BrainError);
   });
 
   it('picks up a key saved after boot on the next refresh, without a restart', async () => {
     const secrets = new InMemorySecretStore();
     const resolver = resolverWith(secrets);
     await resolver.refresh();
-    expect(() => resolver.resolve(pet('nebius'))).toThrow(BrainError);
+    expect(() => resolver.resolve(pet('openrouter'))).toThrow(BrainError);
 
     // What Welcome and Settings do: the key lands in the keychain while the app runs.
-    await secrets.set(SECRET_KEYS.nebius!, 'nb-test');
+    await secrets.set(SECRET_KEYS.openrouter!, 'or-test');
     await resolver.refresh();
 
-    expect(resolver.resolve(pet('nebius'))).toBeInstanceOf(OpenAiCompatibleProvider);
+    expect(resolver.resolve(pet('openrouter'))).toBeInstanceOf(OpenAiCompatibleProvider);
   });
 
   it('reuses one provider while its key and base URL are unchanged', async () => {

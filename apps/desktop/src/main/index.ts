@@ -56,7 +56,12 @@ import { captureAskSnapshot, capturePatch } from './context';
 import { startEngineHost } from './engine-host';
 import { keepAnEyeAllowed, startKeepAnEye } from './keep-an-eye';
 import { isAllowedLink } from './links';
-import { ELEVENLABS_SECRET_KEY, providerChoices, storedKeys } from './provider-choices';
+import {
+  ELEVENLABS_SECRET_KEY,
+  forgetRetiredKeys,
+  providerChoices,
+  storedKeys,
+} from './provider-choices';
 import { WHATS_NEW } from './whats-new';
 import { elevenLabsTts } from './voice/elevenlabs';
 import { kokoroDownloaded } from './voice/kokoro';
@@ -223,6 +228,7 @@ async function start(): Promise<void> {
   const platform = gateSight(createPlatform(), () => sightPause.paused);
   const dataDir = app.getPath('userData');
   const secrets = new SafeStorageSecretStore(dataDir);
+  void forgetRetiredKeys(secrets).catch(() => {});
   const settingsStore = new SettingsStore(dataDir);
 
   // Before anything else reads or writes settings: what the last launch left, then this one.

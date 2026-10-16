@@ -17,7 +17,7 @@ import {
   BrainError,
   CLAUDE_CODE_MODELS,
   FakeBrainProvider,
-  NEBIUS_FALLBACK_MODELS,
+  OPENAI_COMPATIBLE_PRESETS,
   SECRET_KEYS,
 } from './providers';
 import type { BrainProvider } from './providers';
@@ -193,13 +193,13 @@ describe('per-pet providers', () => {
     return { e: engine, host };
   }
 
-  it('boots without any key, and a Nemotron pet with no key fails its turn readably', async () => {
+  it('boots without any key, and an OpenRouter pet with no key fails its turn readably', async () => {
     const { host } = await bootWithoutFakes();
     // Never Scout's own Claude Code sign-in: a test must not start a real claude.
     const listed = await host.call('pets.list', {});
     const [scout] = (listed['result'] as { pets: Record<string, unknown>[] }).pets;
     await host.call('pets.upsert', {
-      pet: { ...scout, providerId: 'nebius', model: 'nvidia/nemotron-3-super-120b-a12b' },
+      pet: { ...scout, providerId: 'openrouter', model: 'anthropic/claude-haiku-4.5' },
     });
 
     await host.call('ask', { petId: 'scout', input: { text: 'hi' } });
@@ -207,7 +207,7 @@ describe('per-pet providers', () => {
 
     const error = host.notifications.find((n) => n.method === 'turn.error');
     expect(error?.params['code']).toBe('auth');
-    expect(String(error?.params['message'])).toContain('Token Factory');
+    expect(String(error?.params['message'])).toContain('OpenRouter');
   });
 
   it('builds an OpenRouter pet from its stored key and reaches the turn', async () => {
@@ -273,11 +273,11 @@ describe('models.list', () => {
     return host;
   }
 
-  it('offers the built-in Nemotron list when no Token Factory key is stored', async () => {
+  it('offers the built-in OpenRouter list when no OpenRouter key is stored', async () => {
     const host = await connected({});
-    const res = await host.call('models.list', { providerId: 'nebius' });
+    const res = await host.call('models.list', { providerId: 'openrouter' });
     expect(res['result']).toEqual({
-      models: [...NEBIUS_FALLBACK_MODELS],
+      models: [...(OPENAI_COMPATIBLE_PRESETS.openrouter?.fallbackModels ?? [])],
       source: 'fallback',
     });
   });

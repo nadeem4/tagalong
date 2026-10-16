@@ -14,7 +14,6 @@ import { Section } from './section';
 const KEYED = [
   { id: 'anthropic', hint: 'Claude through an API key' },
   { id: 'openrouter', hint: 'Hundreds of models, one key' },
-  { id: 'nebius', hint: 'Open models, low cost' },
 ] as const;
 
 export function BrainSection({

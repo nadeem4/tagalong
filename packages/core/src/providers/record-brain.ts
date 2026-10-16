@@ -50,9 +50,6 @@ export function recordBrain(provider: BrainProvider, log: SightRecorder): BrainP
       }
     },
   };
-  if (provider.canSee !== undefined) {
-    recorded.canSee = (model) => provider.canSee?.(model) ?? false;
-  }
   return recorded;
 }
 

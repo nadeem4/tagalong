@@ -4,8 +4,8 @@
  * A small table on purpose: a model not in it has no price, and the Spend card then says
  * "price unknown" rather than guessing. The Claude sign-in (`claude-code`, as Scout's brain
  * or as an expert) is never priced: it is the person's plan, so it shows tokens only.
- * Token Factory's Nemotron models are left out because their prices could not be checked,
- * and so are OpenRouter ids for the 5.5 family, whose exact spelling could not be checked.
+ * OpenRouter ids for the 5.5 family are left out, because their exact spelling could not be
+ * checked.
  *
  * Prices last checked: 2026-10-15, against Anthropic's published first-party API rates.
  * OpenRouter passes Anthropic's rates through unchanged. Prompt-cache reads and writes are

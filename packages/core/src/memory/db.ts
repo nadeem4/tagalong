@@ -197,6 +197,16 @@ const MIGRATIONS: readonly Migration[] = [
    END;
    DELETE FROM activity_fts;
    INSERT INTO activity_fts (rowid, text) SELECT rowid, ${activityAsk('')} FROM activity;`,
+  // Migration 19. Nebius Token Factory was removed: any pet thinking on it moves to the
+  // default brain, the Claude sign-in on its fast model (Scout's own), frozen here so a later
+  // change to Scout does not rewrite history. Its vision and watch models named Nemotron ids,
+  // so they go. Usage, activity and sight-log rows keep their 'nebius' provider id: history.
+  `UPDATE pets
+     SET json = json_remove(
+           json_set(json, '$.providerId', 'claude-code', '$.model', 'haiku'),
+           '$.visionModel', '$.watchModel'),
+         updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+   WHERE json_extract(json, '$.providerId') = 'nebius'`,
 ];
 
 /** The columns migration 7 gave `activity`, in order. */

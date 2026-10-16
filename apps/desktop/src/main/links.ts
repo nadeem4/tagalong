@@ -10,7 +10,6 @@
  */
 const ALLOWED_LINK_ORIGINS: ReadonlySet<string> = new Set([
   'https://openrouter.ai',
-  'https://tokenfactory.nebius.com',
   'https://console.anthropic.com',
 ]);
 

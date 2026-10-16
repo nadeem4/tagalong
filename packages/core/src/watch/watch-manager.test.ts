@@ -70,12 +70,11 @@ function screenHost(clock: FakeClock, changedRatio = 0.08) {
 }
 
 /** A check model that answers from a queue and records every request. */
-function checker(answers: string[], options: { canSee?: (model: string) => boolean } = {}) {
+function checker(answers: string[], options: { vision?: boolean } = {}) {
   const requests: BrainRequest[] = [];
   const provider: BrainProvider = {
     id: 'checker',
-    capabilities: { vision: true, tools: true },
-    ...(options.canSee === undefined ? {} : { canSee: options.canSee }),
+    capabilities: { vision: options.vision ?? true, tools: true },
     complete: (req): Promise<BrainResult> => {
       requests.push(req);
       const text = answers.shift() ?? '{"answer":"no","reason":"Nothing yet."}';
@@ -93,14 +92,14 @@ function setup(
   options: {
     answers?: string[];
     limits?: Partial<Settings['watch']>;
-    canSee?: (model: string) => boolean;
+    vision?: boolean;
     changedRatio?: number;
   } = {},
 ) {
   const clock = new FakeClock(Date.parse('2026-10-04T10:00:00.000Z'));
   const screen = screenHost(clock, options.changedRatio);
   const check = checker(options.answers ?? [], {
-    ...(options.canSee ? { canSee: options.canSee } : {}),
+    ...(options.vision === undefined ? {} : { vision: options.vision }),
   });
   const events: WatchEvent[] = [];
   const manager = new WatchManager({
@@ -334,30 +333,27 @@ describe('WatchManager', () => {
   it('reads the watched window text when the check model cannot see', async () => {
     const { clock, screen, check, manager } = setup({
       answers: ['{"answer":"yes","reason":"The log says done."}'],
-      canSee: () => false,
+      vision: false,
     });
-    await started(manager, { windowId: 'w1', pet: { ...pet, providerId: 'nebius' } });
+    await started(manager, { windowId: 'w1', pet: { ...pet, providerId: 'openrouter' } });
     screen.state.text = 'compiling...\nDone in 42s';
     screen.state.version = 1;
     await clock.advance(WATCH_POLL_MS * 3);
 
     const request = check.requests[0]!;
-    expect(request.model).toBe('nvidia/nemotron-3-nano-30b-a3b');
+    expect(request.model).toBe('anthropic/claude-haiku-4.5');
     expect(JSON.stringify(request.messages)).toContain('Done in 42s');
     expect(JSON.stringify(request.messages)).not.toContain(CROP.base64);
   });
 
-  it('routes the crop to the vision model when the check model is blind and there is no text', async () => {
-    const { clock, screen, check, manager } = setup({
-      canSee: (model) => model.includes('VL') || model.includes('V2'),
-    });
-    await started(manager, { pet: { ...pet, providerId: 'nebius' } });
+  it('ends the watch with an error when the check model is blind and there is no text', async () => {
+    const { clock, screen, check, manager, statuses } = setup({ vision: false });
+    await started(manager, { pet: { ...pet, providerId: 'openrouter' } });
     screen.state.version = 1;
     await clock.advance(WATCH_POLL_MS * 3);
 
-    const request = check.requests[0]!;
-    expect(request.visionModel).toBe('nvidia/Nemotron-Nano-V2-12b');
-    expect(JSON.stringify(request.messages)).toContain(CROP.base64);
+    expect(check.requests).toHaveLength(0);
+    expect(statuses()).toEqual(['watching', 'error']);
   });
 
   it('reads a plain yes even when the model ignores the JSON format', async () => {

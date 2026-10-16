@@ -77,13 +77,12 @@ export class Summarizer {
 
     const chosen = this.#options.settings.get().summarizer;
     const brainPet: Pet = chosen === null ? pet : { ...pet, ...chosen };
-    const { visionModel: _unused, ...textOnly } = brainPet;
 
     try {
-      const provider = this.#options.provider(textOnly);
+      const provider = this.#options.provider(brainPet);
       const result = await provider.complete(
         {
-          model: textOnly.model,
+          model: brainPet.model,
           system: SUMMARY_INSTRUCTIONS,
           messages: [{ role: 'user', content: [{ type: 'text', text: transcript(folding, pet) }] }],
           maxTokens: SUMMARY_MAX_TOKENS,

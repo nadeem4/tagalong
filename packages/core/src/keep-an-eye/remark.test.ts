@@ -10,7 +10,6 @@ const scout: Pet = {
   name: 'Scout',
   avatar: '🔎',
   model: 'claude-opus-5',
-  visionModel: 'claude-opus-5',
   providerId: 'anthropic',
   roleId: 'companion',
   toolGrants: {},
@@ -104,17 +103,16 @@ describe('composeRemark', () => {
     expect(requests[0]!.tools ?? []).toHaveLength(0);
   });
 
-  it('runs on the summaries model when one is chosen, text only', async () => {
+  it('runs on the summaries model when one is chosen', async () => {
     const { asked, resolve } = brain('NOTHING');
     await composeRemark({
       pet: scout,
-      summarizer: { providerId: 'nebius', model: 'small' },
+      summarizer: { providerId: 'openrouter', model: 'small' },
       provider: resolve,
       window,
       text: 'ok',
     });
-    expect(asked[0]).toMatchObject({ providerId: 'nebius', model: 'small' });
-    expect(asked[0]!.visionModel).toBeUndefined();
+    expect(asked[0]).toMatchObject({ providerId: 'openrouter', model: 'small' });
   });
 
   it('falls back to the pet’s own brain', async () => {

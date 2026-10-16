@@ -57,11 +57,6 @@ export interface BrainTool {
 
 export interface BrainRequest {
   model: string;
-  /**
-   * The model to switch to when the turn carries an image and `model` cannot see.
-   * Providers that route by model read it; the rest ignore it. See `modelForTurn`.
-   */
-  visionModel?: string | undefined;
   system: string;
   messages: BrainMessage[];
   tools?: BrainTool[];
@@ -87,11 +82,5 @@ export interface BrainResult {
 export interface BrainProvider {
   id: string;
   capabilities: BrainCapabilities;
-  /**
-   * Whether one model of this provider accepts images. Absent means every model does,
-   * as long as `capabilities.vision` is set. Only a provider whose models differ — a
-   * chat-completions server with text-only and vision models side by side — needs it.
-   */
-  canSee?(model: string): boolean;
   complete(req: BrainRequest, events: BrainEvents, signal: AbortSignal): Promise<BrainResult>;
 }

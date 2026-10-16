@@ -64,8 +64,7 @@ export async function composeRemark(options: {
   timeoutMs?: number;
 }): Promise<Remark | null> {
   const { pet, summarizer, window } = options;
-  const { visionModel: _unused, ...textOnly } =
-    summarizer === null ? pet : { ...pet, ...summarizer };
+  const brainPet = summarizer === null ? pet : { ...pet, ...summarizer };
   const body = [
     `App: ${window.processName.replace(/\.exe$/i, '')}`,
     `Title: ${window.title}`,
@@ -73,9 +72,9 @@ export async function composeRemark(options: {
     options.text.slice(-REMARK_TEXT_CHARS),
   ].join('\n');
   try {
-    const result = await options.provider(textOnly).complete(
+    const result = await options.provider(brainPet).complete(
       {
-        model: textOnly.model,
+        model: brainPet.model,
         system: REMARK_INSTRUCTIONS,
         messages: [{ role: 'user', content: [{ type: 'text', text: body }] }],
         maxTokens: REMARK_MAX_TOKENS,

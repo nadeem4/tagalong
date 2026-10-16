@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import Database from 'better-sqlite3';
+import { Pet } from '@tagalong/protocol';
 import { DB_FILENAME, LATEST_SCHEMA_VERSION, migrate, openDatabase } from './db';
 
 let dataDir: string;
@@ -348,6 +349,85 @@ describe('migrate', () => {
       expect(count('SELECT COUNT(*) AS n FROM activity_fts_docsize')).toBe(2);
       db.exec("INSERT INTO sight_log_fts (sight_log_fts) VALUES ('integrity-check')");
       db.exec("INSERT INTO activity_fts (activity_fts) VALUES ('integrity-check')");
+    } finally {
+      db.close();
+    }
+  });
+
+  it('moves every pet off the retired nebius provider in migration 19', () => {
+    const db = new Database(':memory:');
+    const petJson = (id: string) =>
+      db.prepare<[string], { json: string }>('SELECT json FROM pets WHERE id = ?').get(id)?.json;
+    try {
+      migrate(db);
+      expect(LATEST_SCHEMA_VERSION).toBe(19);
+      // A database from before 19: a pet still thinking on Nebius, one on OpenRouter.
+      db.prepare('DELETE FROM schema_version WHERE version >= 19').run();
+      const insert = db.prepare('INSERT INTO pets (id, json, updated_at) VALUES (?, ?, ?)');
+      insert.run(
+        'scout',
+        JSON.stringify({
+          id: 'scout',
+          name: 'Scout',
+          avatar: 'fox',
+          roleId: 'companion',
+          notes: 'keep me',
+          providerId: 'nebius',
+          model: 'nvidia/nemotron-3-super-120b-a12b',
+          visionModel: 'nvidia/Nemotron-Nano-V2-12b',
+          watchModel: 'nvidia/nemotron-3-nano-30b-a3b',
+          toolGrants: { notify: 'allowed' },
+        }),
+        'old',
+      );
+      const other = JSON.stringify({
+        id: 'sage',
+        name: 'Sage',
+        avatar: 'owl',
+        roleId: 'companion',
+        providerId: 'openrouter',
+        model: 'anthropic/claude-haiku-4.5',
+        visionModel: 'some/vision-model',
+      });
+      insert.run('sage', other, 'old');
+      db.prepare(
+        `INSERT INTO usage (at, source, provider_id, model, input_tokens, output_tokens)
+         VALUES ('2026-10-01T00:00:00.000Z', 'scout', 'nebius', 'nvidia/x', 10, 5)`,
+      ).run();
+
+      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+
+      const moved = JSON.parse(petJson('scout') ?? '{}') as Record<string, unknown>;
+      expect(moved).toMatchObject({
+        providerId: 'claude-code',
+        model: 'haiku',
+        notes: 'keep me',
+        roleId: 'companion',
+        toolGrants: { notify: 'allowed' },
+      });
+      expect(moved).not.toHaveProperty('visionModel');
+      expect(moved).not.toHaveProperty('watchModel');
+      expect(Pet.safeParse(moved).success).toBe(true);
+      const stamp = db
+        .prepare<[], { updated_at: string }>("SELECT updated_at FROM pets WHERE id = 'scout'")
+        .get()?.updated_at;
+      expect(stamp).not.toBe('old');
+      // Any other pet is left exactly as it was.
+      expect(petJson('sage')).toBe(other);
+      // History stays: the old usage row is still there.
+      expect(
+        db
+          .prepare<[], { n: number }>(
+            "SELECT COUNT(*) AS n FROM usage WHERE provider_id = 'nebius'",
+          )
+          .get()?.n,
+      ).toBe(1);
+
+      // Rerunning it changes nothing more.
+      db.prepare('DELETE FROM schema_version WHERE version >= 19').run();
+      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+      expect(JSON.parse(petJson('scout') ?? '{}')).toEqual(moved);
+      expect(petJson('sage')).toBe(other);
     } finally {
       db.close();
     }

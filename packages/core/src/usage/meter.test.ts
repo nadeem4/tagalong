@@ -81,13 +81,10 @@ describe('meterBrain', () => {
       text: 'one two',
       toolCall: { id: 't1', name: 'read_window_text', input: {} },
     });
-    const seeing: BrainProvider = Object.assign(inner, { canSee: (m: string) => m === 'v' });
     const calls: MeteredCall[] = [];
-    const metered = meterBrain(seeing, (c) => calls.push(c));
+    const metered = meterBrain(inner, (c) => calls.push(c));
     expect(metered.id).toBe('fake');
     expect(metered.capabilities).toEqual(inner.capabilities);
-    expect(metered.canSee?.('v')).toBe(true);
-    expect(metered.canSee?.('t')).toBe(false);
     const result = await metered.complete(
       request,
       events(texts, tools),

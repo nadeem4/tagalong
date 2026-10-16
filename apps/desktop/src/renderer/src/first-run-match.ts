@@ -75,7 +75,6 @@ const KEY: Choice = { id: 'key', says: ['key', 'api', 'api key', 'a key'] };
 const SERVICE_WORDS: Readonly<Record<string, readonly string[]>> = {
   anthropic: ['anthropic'],
   openrouter: ['openrouter', 'open router'],
-  nebius: ['nebius', 'token factory'],
 };
 
 export function choicesFor(

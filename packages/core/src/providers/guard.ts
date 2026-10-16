@@ -31,7 +31,6 @@ export function guardBrain(provider: BrainProvider): BrainProvider {
         signal,
       ),
   };
-  if (provider.canSee !== undefined) guarded.canSee = (model) => provider.canSee?.(model) ?? false;
   return guarded;
 }
 

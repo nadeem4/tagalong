@@ -1,11 +1,8 @@
 /**
- * The OpenAI-compatible services the app knows by name (Nebius Token Factory, OpenRouter).
+ * The OpenAI-compatible services the app knows by name (OpenRouter).
  * Contains `OPENAI_COMPATIBLE_PRESETS`, `openAiPreset` and `SECRET_KEYS` (where each
  * provider's key is filed in the SecretStore).
  */
-import { NEBIUS_FALLBACK_MODELS, NEBIUS_VISION_MODELS } from './nebius-models';
-import { NEBIUS_BASE_URL } from './openai-compatible';
-
 /**
  * One OpenAI-format service the app knows by name.
  *
@@ -23,8 +20,6 @@ export interface OpenAiPreset {
   envVar: string;
   /** Offered in the model picker when the live list cannot be fetched. */
   fallbackModels: readonly string[];
-  /** The models that accept images. Absent means every model does. */
-  visionModels?: readonly string[] | undefined;
 }
 
 /**
@@ -35,28 +30,15 @@ export interface OpenAiPreset {
 const OPENROUTER_FALLBACK_MODELS: readonly string[] = [
   'anthropic/claude-sonnet-5',
   'anthropic/claude-haiku-4.5',
-  'nvidia/nemotron-3-super-120b-a12b',
 ];
 
 export const OPENAI_COMPATIBLE_PRESETS: Readonly<Record<string, OpenAiPreset>> = {
-  nebius: {
-    id: 'nebius',
-    label: 'Token Factory',
-    baseURL: NEBIUS_BASE_URL,
-    envVar: 'NEBIUS_API_KEY',
-    fallbackModels: NEBIUS_FALLBACK_MODELS,
-    // Token Factory serves text-only and vision models side by side, so a turn that
-    // carries an image is routed to the pet's vision model.
-    visionModels: NEBIUS_VISION_MODELS,
-  },
   openrouter: {
     id: 'openrouter',
     label: 'OpenRouter',
     baseURL: 'https://openrouter.ai/api/v1',
     envVar: 'OPENROUTER_API_KEY',
     fallbackModels: OPENROUTER_FALLBACK_MODELS,
-    // No vision list: OpenRouter fronts hundreds of models and most a person would pick
-    // for this see. With Claude, the one model answers text and pictures alike.
   },
 };
 
@@ -70,6 +52,5 @@ export function openAiPreset(providerId: string): OpenAiPreset | undefined {
 /** Where each provider's API key is filed in the host's SecretStore. */
 export const SECRET_KEYS: Readonly<Record<string, string>> = {
   anthropic: 'anthropic.apiKey',
-  nebius: 'nebius.apiKey',
   openrouter: 'openrouter.apiKey',
 };

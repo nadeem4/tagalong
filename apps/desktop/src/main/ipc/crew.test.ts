@@ -66,17 +66,19 @@ describe('registerCrewIpc', () => {
 
   it('moves Scout, as the Companion, to the chosen service', async () => {
     const { invoke, calls, deps } = setup();
-    expect(await invoke(IPC.switchScout, 'nebius')).toEqual(SCOUT);
+    expect(await invoke(IPC.switchScout, 'openrouter')).toEqual(SCOUT);
     expect(calls[1]).toEqual([
       'pets.upsert',
-      { pet: companionOn(SCOUT, 'nebius', getRole('companion')!) },
+      { pet: companionOn(SCOUT, 'openrouter', getRole('companion')!) },
     ]);
     expect(deps.refreshStrip).toHaveBeenCalledOnce();
   });
 
   it('refuses to switch a desktop pet that does not exist', async () => {
     const { invoke } = setup({ 'pets.list': { pets: [pet('sage')] } });
-    await expect(invoke(IPC.switchScout, 'nebius')).rejects.toThrow('There is no scout to switch.');
+    await expect(invoke(IPC.switchScout, 'openrouter')).rejects.toThrow(
+      'There is no scout to switch.',
+    );
   });
 
   it('finishes Welcome: keeps the setup record and marks it done, Scout docks alone, then hello', async () => {
