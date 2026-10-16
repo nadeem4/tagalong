@@ -48,7 +48,7 @@ test.beforeAll(async () => {
       TAGALONG_FAKE_TOOL: 'list_windows',
       // Welcome would open on a fresh profile and change the window count the first test
       // asserts. Its own test below opens it on purpose.
-      TAGALONG_SKIP_ONBOARDING: '1',
+      TAGALONG_SKIP_WELCOME: '1',
     },
   });
 });
@@ -474,8 +474,8 @@ test('sight detail and the window text budget save and read back', async () => {
 
 test('Setup opens on request: the steps are listed and an answer box waits', async () => {
   const panel = await windowFor('panel');
-  await panel.evaluate(() => window.tagalongHost.openOnboarding());
-  const setup = await windowFor('onboarding');
+  await panel.evaluate(() => window.tagalongHost.openWelcome());
+  const setup = await windowFor('welcome');
 
   await expect(setup).toHaveTitle('Set up Tagalong');
   await expect(setup.getByRole('navigation', { name: 'Setup steps' })).toBeVisible();
@@ -485,7 +485,7 @@ test('Setup opens on request: the steps are listed and an answer box waits', asy
   // Nothing is answered: finishing would change Scout and its settings for the rest of the suite.
   await app.evaluate(({ BrowserWindow }) => {
     for (const w of BrowserWindow.getAllWindows()) {
-      if (w.webContents.getURL().includes('onboarding.html')) w.close();
+      if (w.webContents.getURL().includes('welcome.html')) w.close();
     }
   });
 });
@@ -494,8 +494,8 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
   const panel = await windowFor('panel');
   // The tray's Open Tagalong item calls the same main-process function as this host call;
   // a tray menu cannot be clicked from Playwright.
-  await panel.evaluate(() => window.tagalongHost.openOffice());
-  const home = await windowFor('office');
+  await panel.evaluate(() => window.tagalongHost.openHome());
+  const home = await windowFor('home');
   await expect(home).toHaveTitle('Home');
 
   // One companion and eight pages.

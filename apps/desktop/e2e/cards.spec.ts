@@ -30,7 +30,7 @@ async function launch(
       ...process.env,
       TAGALONG_FAKE_PROVIDERS: '1',
       TAGALONG_FAKE_TTS: '1',
-      TAGALONG_SKIP_ONBOARDING: '1',
+      TAGALONG_SKIP_WELCOME: '1',
       TAGALONG_FAKE_TOOL: tool,
       TAGALONG_FAKE_TOOL_INPUT: JSON.stringify(input),
     },
@@ -66,8 +66,8 @@ async function ask(app: ElectronApplication, text: string): Promise<Page> {
 /** Home's Activity page, from the engine's own record. */
 async function activity(app: ElectronApplication): Promise<Page> {
   const avatar = await windowFor(app, 'avatar');
-  await avatar.evaluate(() => window.tagalongHost.openOffice());
-  const home = await windowFor(app, 'office');
+  await avatar.evaluate(() => window.tagalongHost.openHome());
+  const home = await windowFor(app, 'home');
   const nav = home.getByRole('navigation', { name: 'Tagalong' });
   await nav.getByRole('button', { name: 'Activity' }).click({ timeout: 15_000 });
   return home;
@@ -279,8 +279,8 @@ test.describe('the routine card', () => {
     expect(await routines(panel)).toEqual(['Morning papers']);
 
     const avatar = await windowFor(app, 'avatar');
-    await avatar.evaluate(() => window.tagalongHost.openOffice());
-    const home = await windowFor(app, 'office');
+    await avatar.evaluate(() => window.tagalongHost.openHome());
+    const home = await windowFor(app, 'home');
     await home
       .getByRole('navigation', { name: 'Tagalong' })
       .getByRole('button', { name: 'Routines' })

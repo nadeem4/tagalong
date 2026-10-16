@@ -6,7 +6,7 @@ import type { MenuItemConstructorOptions } from 'electron';
 export interface TrayActions {
   togglePets: () => void;
   toggleSightPause: () => void;
-  openOffice: () => void;
+  openHome: () => void;
   quit: () => void;
 }
 
@@ -19,7 +19,7 @@ export function trayMenuTemplate(
   state: { sightPaused: boolean },
 ): MenuItemConstructorOptions[] {
   return [
-    { label: 'Open Tagalong', click: () => actions.openOffice() },
+    { label: 'Open Tagalong', click: () => actions.openHome() },
     {
       label: 'Pause sight',
       type: 'checkbox',

@@ -1,5 +1,5 @@
 /**
- * The Welcome window's page (built as `onboarding.html`): Scout asks each setup question
+ * The Welcome window's page (built as `welcome.html`): Scout asks each setup question
  * aloud and in its bubble, suggests an answer when it can, and setup moves on once you answer
  * by voice, typing or a tap. Every answer is saved as given, so a closed window resumes at the
  * same step next launch. The step rules are in first-run.ts, the matching in

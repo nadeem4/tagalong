@@ -4,7 +4,7 @@
  * menu, off-white panels for the sections you read and edit, gold only for what is
  * selected, focused or primary.
  */
-import { officeTokens as t } from '../office/tokens';
+import { themeTokens as t } from '../theme/tokens';
 
 export const SETTINGS_CSS = `
 .tg-settings {

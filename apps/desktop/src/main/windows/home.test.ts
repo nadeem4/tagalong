@@ -1,7 +1,7 @@
 /** Tests for Home's minimum width. */
 
 import { describe, expect, it } from 'vitest';
-import { HOME_MIN_WIDTH } from './office';
+import { HOME_MIN_WIDTH } from './home';
 
 describe('Home window', () => {
   it('fits a small laptop screen and still shows the overview two cards across', () => {

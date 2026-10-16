@@ -43,14 +43,14 @@ export function isOnPath(command: string): Promise<boolean> {
 }
 
 /**
- * Opens until Welcome is finished. `TAGALONG_SKIP_ONBOARDING=1` keeps it shut for the
+ * Opens until Welcome is finished. `TAGALONG_SKIP_WELCOME=1` keeps it shut for the
  * end-to-end suites, which drive the panel, not Welcome.
  */
 export function shouldOpenWelcome(
   settings: Settings,
   env: Record<string, string | undefined>,
 ): boolean {
-  if (env.TAGALONG_SKIP_ONBOARDING === '1') return false;
+  if (env.TAGALONG_SKIP_WELCOME === '1') return false;
   return !settings.welcome.done;
 }
 

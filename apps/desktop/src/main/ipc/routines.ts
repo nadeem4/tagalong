@@ -21,9 +21,9 @@ export interface RoutineIpcDeps {
   /** Throws when the engine is not running. */
   engine: () => EngineCall;
   /** Opens Home on a page. */
-  openOffice: (page: string) => void;
+  openHome: (page: string) => void;
   /** Home's window, once it is open. */
-  officeWindow: () => RoutineWindow | null;
+  homeWindow: () => RoutineWindow | null;
 }
 
 export function registerRoutineIpc(handle: IpcHandle, deps: RoutineIpcDeps): void {
@@ -67,8 +67,8 @@ export function registerRoutineIpc(handle: IpcHandle, deps: RoutineIpcDeps): voi
   handle(IPC.checkCalendar, () => engine().call('calendar.check', {}));
   // The card's Edit: Home opens on Routines with the card's routine in the form.
   handle(IPC.editRoutine, (_event, proposal: RoutineProposedParams) => {
-    deps.openOffice('routines');
-    const window = deps.officeWindow();
+    deps.openHome('routines');
+    const window = deps.homeWindow();
     if (window === null) return;
     if (window.webContents.isLoading()) {
       window.webContents.once('did-finish-load', () =>

@@ -1,6 +1,6 @@
 /**
  * Turns the page name main sends Home (`settings#voice` and the like) into a page and a
- * Settings section, and scrolls to that section. Used by office.tsx.
+ * Settings section, and scrolls to that section. Used by home.tsx.
  */
 import type { HomePage } from '@tagalong/ui';
 

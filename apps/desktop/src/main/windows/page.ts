@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import type { BrowserWindow } from 'electron';
 
 /** One HTML entry per window, all built by the renderer half of electron-vite. */
-export type RendererPage = 'avatar' | 'panel' | 'settings' | 'onboarding' | 'office' | 'pointer';
+export type RendererPage = 'avatar' | 'panel' | 'settings' | 'welcome' | 'home' | 'pointer';
 
 /**
  * The compiled preload. It is a .cjs because a sandboxed preload can only be CommonJS,

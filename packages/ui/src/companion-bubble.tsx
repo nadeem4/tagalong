@@ -36,7 +36,7 @@ import { healthHeadline, healthRows } from './health';
 import type { FixTarget, HealthRow } from './health';
 import { HealthCard } from './health-card';
 import type { TurnEvent } from './host-bridge';
-import { officeTokens as t } from './office/tokens';
+import { themeTokens as t } from './theme/tokens';
 import { SpokenStream } from './voice/spoken-stream';
 import { goesOn, wantsReadAloud } from './voice/read-aloud';
 

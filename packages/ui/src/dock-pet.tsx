@@ -6,10 +6,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { Pet } from '@tagalong/protocol';
-import { PixelSprite } from './office/pixel-sprite';
-import { SCOUT_SPRITE } from './office/sprites/characters';
-import { withBlink, withMood, type DockMood } from './office/sprites/expressions';
-import { officeTokens as t } from './office/tokens';
+import { PixelSprite } from './theme/pixel-sprite';
+import { SCOUT_SPRITE } from './theme/sprites/characters';
+import { withBlink, withMood, type DockMood } from './theme/sprites/expressions';
+import { themeTokens as t } from './theme/tokens';
 
 export interface DockPetProps {
   pet: Pet;

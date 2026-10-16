@@ -1,7 +1,7 @@
 /** Tests for SETTINGS_CSS: focus ring, minimum font size, colours from the tokens. */
 
 import { describe, expect, it } from 'vitest';
-import { officeTokens as t } from '../office/tokens';
+import { themeTokens as t } from '../theme/tokens';
 import { SETTINGS_CSS } from './settings-styles';
 
 describe('SETTINGS_CSS', () => {

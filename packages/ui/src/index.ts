@@ -13,7 +13,7 @@ export { CompanionBubble, GreetingLine } from './companion-bubble';
 export type { DropOffer } from './drop-card';
 export { DockPet } from './dock-pet';
 export type { DockPetProps } from './dock-pet';
-export type { DockMood } from './office/sprites/expressions';
+export type { DockMood } from './theme/sprites/expressions';
 export type { BubbleTalk, CompanionBubbleProps, GreetingLineProps } from './companion-bubble';
 export type { ChatPanelProps } from './chat-panel';
 
@@ -24,9 +24,9 @@ export { createFakeHostBridge } from './test-support/fake-host-bridge';
 export { HomeView } from './home/home-view';
 export type { HomeHost, HomePage, HomeViewProps } from './home/home-view';
 export { brainLabel } from './home/brain-label';
-export { PixelSprite } from './office/pixel-sprite';
-export { SCOUT_SPRITE } from './office/sprites/characters';
-export type { PixelSpriteProps } from './office/pixel-sprite';
+export { PixelSprite } from './theme/pixel-sprite';
+export { SCOUT_SPRITE } from './theme/sprites/characters';
+export type { PixelSpriteProps } from './theme/pixel-sprite';
 
 export { SETTINGS_CSS } from './settings/settings-styles';
 

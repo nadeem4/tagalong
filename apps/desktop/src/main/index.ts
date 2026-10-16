@@ -100,9 +100,9 @@ import {
   showPanelQuietly,
 } from './windows/panel';
 import { moveWindow } from './windows/move';
-import { createOfficeWindow } from './windows/office';
+import { createHomeWindow } from './windows/home';
 import { createPointerOverlay } from './windows/pointer';
-import { createOnboardingWindow } from './windows/onboarding';
+import { createWelcomeWindow } from './windows/welcome';
 import { createSettingsWindow } from './windows/settings';
 import { fromWindow, registerClipboardIpc } from './ipc/clipboard';
 import { registerConnectionIpc } from './ipc/connections';
@@ -140,11 +140,11 @@ interface Desktop {
   tray: Tray;
   settingsWindow: BrowserWindow | null;
   /** The Welcome window, while it is open. */
-  onboardingWindow: BrowserWindow | null;
+  welcomeWindow: BrowserWindow | null;
   /** Scout is hidden until the first Welcome is done. */
   scoutWaits: boolean;
   /** Home, while it is open. */
-  officeWindow: BrowserWindow | null;
+  homeWindow: BrowserWindow | null;
   /** The snapshot the last hotkey captured, handed to the panel and sent with the ask. */
   pendingSnapshot: ContextSnapshot | null;
   /** Turn ids in flight: the panel must not vanish on focus loss mid-answer. */
@@ -303,9 +303,9 @@ async function start(): Promise<void> {
     panel: null,
     tray: createTray(),
     settingsWindow: null,
-    onboardingWindow: null,
+    welcomeWindow: null,
     scoutWaits: false,
-    officeWindow: null,
+    homeWindow: null,
     pendingSnapshot: null,
     activeTurns: new Set(),
     hotkeys: new HotkeyManager({
@@ -461,7 +461,7 @@ async function start(): Promise<void> {
 
   // A fresh install starts in Welcome: the agents found here, how Scout thinks, one key.
   // Finishing it is remembered in settings; Home opens it again.
-  if (welcoming) openOnboarding();
+  if (welcoming) openWelcome();
   else void greetOnLaunch(host);
 
   // Keep an eye on things: window titles go to the engine every five seconds, never a
@@ -642,8 +642,8 @@ function applyHotkeys(settings: Settings): string | null {
  */
 function talkPressed(): void {
   if (desktop === null) return;
-  if (desktop.onboardingWindow !== null && !desktop.onboardingWindow.isDestroyed()) {
-    desktop.onboardingWindow.focus();
+  if (desktop.welcomeWindow !== null && !desktop.welcomeWindow.isDestroyed()) {
+    desktop.welcomeWindow.focus();
     return;
   }
   if (desktop.panel === null || desktop.avatar === null) return;
@@ -820,7 +820,7 @@ function buildTrayMenu(): Menu {
           }
         },
         toggleSightPause: () => void toggleSightPause(),
-        openOffice: () => openOffice(),
+        openHome: () => openHome(),
         quit: () => app.quit(),
       },
       { sightPaused: desktop?.sightPause.paused ?? false },
@@ -853,24 +853,24 @@ function openSettings(): void {
  * Opens Home, or brings the open one forward, on `page` when one is named (Settings, say).
  * A fresh window is told its page once it has loaded.
  */
-function openOffice(page?: string): void {
+function openHome(page?: string): void {
   if (desktop === null) return;
-  const open = desktop.officeWindow;
+  const open = desktop.homeWindow;
   if (open !== null && !open.isDestroyed()) {
     if (page !== undefined) open.webContents.send(IPC.homePageEvent, page);
     open.focus();
     return;
   }
-  const window = createOfficeWindow();
+  const window = createHomeWindow();
   window.on('closed', () => {
-    if (desktop !== null) desktop.officeWindow = null;
+    if (desktop !== null) desktop.homeWindow = null;
   });
   if (page !== undefined) {
     window.webContents.once('did-finish-load', () =>
       window.webContents.send(IPC.homePageEvent, page),
     );
   }
-  desktop.officeWindow = window;
+  desktop.homeWindow = window;
 }
 
 /**
@@ -880,30 +880,30 @@ function openOffice(page?: string): void {
 function openSettingsPage(target?: unknown): void {
   const page = fixPage(target);
   if (desktop?.host === null) openSettings();
-  else openOffice(page);
+  else openHome(page);
 }
 
 /** Opens Welcome, or brings the open one forward. */
-function openOnboarding(): void {
+function openWelcome(): void {
   if (desktop === null) return;
-  if (desktop.onboardingWindow !== null && !desktop.onboardingWindow.isDestroyed()) {
-    desktop.onboardingWindow.focus();
+  if (desktop.welcomeWindow !== null && !desktop.welcomeWindow.isDestroyed()) {
+    desktop.welcomeWindow.focus();
     return;
   }
-  const window = createOnboardingWindow();
+  const window = createWelcomeWindow();
   // Always listening waits while Welcome is open, so the two never share the voice process.
   pauseListening({ setupOpen: true });
   window.on('closed', () => {
     pauseListening({ setupOpen: false });
     if (desktop === null) return;
-    desktop.onboardingWindow = null;
+    desktop.welcomeWindow = null;
     // Closed without Start, Scout still arrives: an install never ends with nothing on screen.
     // Only the first Welcome hides it, so this never undoes the tray's Hide Scout. Not while
     // quitting: the close is the app going away, and showing a window then can stall the exit.
     if (desktop.scoutWaits && !quitting) desktop.avatar?.show();
     desktop.scoutWaits = false;
   });
-  desktop.onboardingWindow = window;
+  desktop.welcomeWindow = window;
 }
 
 /**
@@ -1020,7 +1020,7 @@ function registerIpc(): void {
     findAgents: () => findAgents(),
     welcomed: () => {
       const current = required();
-      current.onboardingWindow?.close();
+      current.welcomeWindow?.close();
       if (current.panel !== null && current.avatar !== null) {
         current.avatar.show();
         current.panel.webContents.send(IPC.greetEvent);
@@ -1039,8 +1039,8 @@ function registerIpc(): void {
   registerSightLogIpc(handle, { engine });
   registerRoutineIpc(handle, {
     engine,
-    openOffice: (page) => openOffice(page),
-    officeWindow: () => required().officeWindow,
+    openHome: (page) => openHome(page),
+    homeWindow: () => required().homeWindow,
   });
   registerSettingsIpc(handle, {
     host: () => required().host,
@@ -1119,8 +1119,8 @@ function registerIpc(): void {
 
   // A Fix it names its target; fixPage refuses anything off the list.
   ipcMain.handle(IPC.openSettings, (_event, target: unknown) => openSettingsPage(target));
-  ipcMain.handle(IPC.openOnboarding, () => openOnboarding());
-  ipcMain.handle(IPC.openOffice, () => openOffice());
+  ipcMain.handle(IPC.openWelcome, () => openWelcome());
+  ipcMain.handle(IPC.openHome, () => openHome());
 
   ipcMain.handle(IPC.checkClaudeSignIn, () => signInFor(process.env));
   ipcMain.handle(IPC.openClaudeSignIn, () => openClaudeSignIn());

@@ -1,9 +1,9 @@
 /**
  * Design tokens shared by Home, Settings, the bubble and the dock: colours, fonts, sizes,
- * spacing and radii. Contains officeTokens. Sprite palettes are character art and live in
+ * spacing and radii. Contains themeTokens. Sprite palettes are character art and live in
  * `sprites/characters.ts`.
  */
-export const officeTokens = {
+export const themeTokens = {
   color: {
     // The dark chrome: top bars, side menus and the bubble.
     page: '#12162B',

@@ -8,7 +8,7 @@ import type { SightKind, SightLogEntry } from '@tagalong/protocol';
 import { SIGHT_LOG_DEFAULT_DAYS } from '@tagalong/protocol';
 import { useHostBridge } from '../host-bridge';
 import type { TurnEvent } from '../host-bridge';
-import { officeTokens as t } from '../office/tokens';
+import { themeTokens as t } from '../theme/tokens';
 import { brainLabel } from './brain-label';
 
 /** Each kind's name and icon. A new kind of looking adds one entry here. */

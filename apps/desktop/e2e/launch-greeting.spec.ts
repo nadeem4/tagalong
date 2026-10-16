@@ -76,7 +76,7 @@ test('signed out: the launch line says so plainly, and Fix it opens Settings', a
     timeout: 30_000,
   });
   await panel.getByRole('button', { name: 'Fix it' }).click();
-  await windowFor('office');
+  await windowFor('home');
 });
 
 test('a clean quit records the close and this version', async () => {

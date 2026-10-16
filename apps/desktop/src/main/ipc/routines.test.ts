@@ -26,13 +26,13 @@ function setup(window: RoutineWindow | null = null) {
     'calendar.setLink': { linked: true, meetings: 3 },
     'calendar.check': { linked: false, meetings: 0 },
   });
-  const openOffice = vi.fn();
+  const openHome = vi.fn();
   registerRoutineIpc(ipc.handle, {
     engine: () => engine.client,
-    openOffice,
-    officeWindow: () => window,
+    openHome,
+    homeWindow: () => window,
   });
-  return { ...ipc, calls: engine.calls, openOffice };
+  return { ...ipc, calls: engine.calls, openHome };
 }
 
 function fakeWindow(loading: boolean) {
@@ -101,7 +101,7 @@ describe('registerRoutineIpc', () => {
     const ready = fakeWindow(false);
     const open = setup(ready.window);
     await open.invoke(IPC.editRoutine, proposal);
-    expect(open.openOffice).toHaveBeenCalledWith('routines');
+    expect(open.openHome).toHaveBeenCalledWith('routines');
     expect(ready.sent).toEqual([[IPC.routineDraftEvent, proposal]]);
 
     const loading = fakeWindow(true);
@@ -112,8 +112,8 @@ describe('registerRoutineIpc', () => {
   });
 
   it('does nothing more when Home did not open', async () => {
-    const { invoke, openOffice } = setup(null);
+    const { invoke, openHome } = setup(null);
     await invoke(IPC.editRoutine, { proposalId: 'p1', routine: DRAFT });
-    expect(openOffice).toHaveBeenCalledWith('routines');
+    expect(openHome).toHaveBeenCalledWith('routines');
   });
 });

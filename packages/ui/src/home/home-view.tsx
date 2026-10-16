@@ -2,15 +2,15 @@
  * Home: the one window for the companion, its experts and the app. Scout in the corner and
  * eight pages (overview, Scout, experts, routines, connections, activity, what Scout saw,
  * settings). Contains HomeView, HomeHost, HomeProvider, HomePage and the Scout page.
- * Rendered by the desktop `office` page.
+ * Rendered by the desktop `home` page.
  */
 
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ActivityEntry, Expert, Pet, RoutineProposedParams } from '@tagalong/protocol';
 import { useHostBridge } from '../host-bridge';
-import { PixelSprite } from '../office/pixel-sprite';
-import { SCOUT_SPRITE } from '../office/sprites/characters';
+import { PixelSprite } from '../theme/pixel-sprite';
+import { SCOUT_SPRITE } from '../theme/sprites/characters';
 import { SETTINGS_CSS } from '../settings/settings-styles';
 import { ActivityView } from './activity-view';
 import { brainLabel, modelLabel } from './brain-label';
