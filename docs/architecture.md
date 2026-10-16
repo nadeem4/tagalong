@@ -1170,7 +1170,8 @@ overwritten and a default the user deleted stays deleted. Migration 5 gives ever
 and keeps an edited persona as the pet's notes. Migration 11 deletes Ink and Bolt, the crew's other
 two defaults from before the one-companion design; their conversations stay, and `pet_seeds` keeps
 them from being seeded again. Migration 20 keeps only Scout: other pets go with their
-conversations, messages, memories and activity; shared memories become Scout's; and Scout's stored
+conversations, messages, memories and activity; shared memories become Scout's (one Scout already
+holds is not copied twice); and Scout's stored
 record loses `toolGrants`, `replyStyle`, `notes` and `color` (if Scout itself is missing, its seed
 record goes too, so it is seeded again on the same boot). Migration 6 recorded a one-time roles notice; it now does nothing, and
 migration 14 drops the `notices` table. Each pet carries an optional `color` (`#rrggbb`) for its

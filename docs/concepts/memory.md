@@ -74,7 +74,8 @@ Built in `packages/core/src/memory/recall.ts`:
 - The total is capped at **2,000 characters**. Whole memories are dropped from the end rather than
   cut mid-sentence.
 - Visibility is decided in SQL on every read: `pet_id = <Scout>`. Older installs kept some
-  memories in a shared crew notebook; migration 20 moved those to Scout, so none were lost.
+  memories in a shared crew notebook; migration 20 moved those to Scout, so none were lost (one
+  Scout already held is not copied twice).
 
 Scout files a memory with the `remember` tool (`{ text, kind: fact | preference }`), so "I prefer
 short answers" is kept across restarts.

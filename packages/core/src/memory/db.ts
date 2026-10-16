@@ -209,14 +209,17 @@ const MIGRATIONS: readonly Migration[] = [
    WHERE json_extract(json, '$.providerId') = 'nebius'`,
   // Migration 20. One companion: every pet but Scout goes, with
   // its conversations, messages, private memories and activity rows. The crew notebook's
-  // shared memories become Scout's own, and Scout's stored pet loses the crew-era grants,
-  // reply style, notes and colour. If Scout is missing, its seed record goes too, so
-  // seedDefaults brings it back on this boot. 'scout' is a frozen literal, like migration 5's
-  // constants.
+  // shared memories become Scout's own (one Scout already holds is not copied twice), and
+  // Scout's stored pet loses the crew-era grants, reply style, notes and colour. If Scout is
+  // missing, its seed record goes too, so seedDefaults brings it back on this boot. 'scout'
+  // is a frozen literal, like migration 5's constants.
   `DELETE FROM messages
      WHERE conversation_id IN (SELECT id FROM conversations WHERE pet_id <> 'scout');
    DELETE FROM conversations WHERE pet_id <> 'scout';
    DELETE FROM memories WHERE scope = 'pet' AND pet_id <> 'scout';
+   DELETE FROM memories
+    WHERE scope = 'crew'
+      AND text IN (SELECT text FROM memories WHERE scope = 'pet' AND pet_id = 'scout');
    UPDATE memories SET scope = 'pet', pet_id = 'scout' WHERE scope = 'crew';
    DELETE FROM activity WHERE pet_id <> 'scout';
    DELETE FROM pets WHERE id <> 'scout';

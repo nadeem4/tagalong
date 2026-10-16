@@ -547,6 +547,29 @@ describe('migrate', () => {
     }
   });
 
+  it('does not give Scout the same memory twice when a crew row repeats one of its own', () => {
+    const db = new Database(':memory:');
+    try {
+      migrate(db, ONE_COMPANION - 1);
+      db.exec(`INSERT INTO memories (id, scope, pet_id, kind, text, created_at)
+          VALUES ('mem-scout', 'pet', 'scout', 'preference', 'prefers short answers', 'x'),
+                 ('mem-crew', 'crew', NULL, 'preference', 'prefers short answers', 'x'),
+                 ('mem-other', 'crew', NULL, 'fact', 'uses pnpm', 'x');`);
+
+      migrate(db);
+
+      expect(
+        db
+          .prepare<[], { id: string }>('SELECT id FROM memories ORDER BY id')
+          .all()
+          .map((row) => row.id),
+      ).toEqual(['mem-other', 'mem-scout']);
+      db.exec("INSERT INTO memories_fts (memories_fts) VALUES ('integrity-check')");
+    } finally {
+      db.close();
+    }
+  });
+
   it('brings Scout back on the same boot when migration 20 finds only another pet', () => {
     const db = new Database(':memory:');
     try {
