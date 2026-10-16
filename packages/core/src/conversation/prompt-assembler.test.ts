@@ -6,7 +6,6 @@ import { MAX_SELECTION_CHARS, Settings as SettingsSchema } from '@tagalong/proto
 import {
   CONTEXT_LABELS,
   MEMORY_HEADING,
-  NOTES_HEADING,
   SPOKEN_HEADING,
   SPOKEN_MODE,
   TRUNCATION_MARKER,
@@ -18,12 +17,9 @@ const pet: Pet = {
   id: 'scout',
   name: 'Scout',
   avatar: '🐾',
-  notes: 'You are Scout, a terse field guide.',
   model: 'claude-opus-5',
   providerId: 'anthropic',
   roleId: 'companion',
-  toolGrants: {},
-  replyStyle: 'text',
 };
 
 const settings: Settings = SettingsSchema.parse({});
@@ -65,7 +61,7 @@ function lastText(request: ReturnType<typeof assemblePrompt>): string {
 }
 
 describe('assemblePrompt system prompt', () => {
-  it('states the base rules, the role, the name, the notes, and the reply style', () => {
+  it('states the base rules, the role and the name', () => {
     const { system } = assemblePrompt({ pet, history: [userMessage('hi')], settings });
 
     expect(system).toContain('screen');
@@ -74,10 +70,9 @@ describe('assemblePrompt system prompt', () => {
     expect(system).toMatch(/clicked|typed/i);
     expect(system).toContain(getRole('companion')!.instructions);
     expect(system).toContain('Your name is Scout.');
-    expect(system).toContain(`${NOTES_HEADING}\n${pet.notes}`);
   });
 
-  it('orders the role instructions, then the name, then the notes, then the reply style', () => {
+  it('orders the role instructions, then the name, then the screen-reply rule', () => {
     const { system } = assemblePrompt({
       pet,
       history: [userMessage('hi')],
@@ -86,21 +81,18 @@ describe('assemblePrompt system prompt', () => {
 
     const role = system.indexOf(getRole('companion')!.instructions);
     const name = system.indexOf('Your name is Scout.');
-    const notes = system.indexOf(NOTES_HEADING);
     const style = system.indexOf('Your reply is read on screen.');
     expect(system.indexOf('You are a Tagalong companion')).toBe(0);
     expect(role).toBeGreaterThan(0);
     expect(name).toBeGreaterThan(role);
-    expect(notes).toBeGreaterThan(name);
-    expect(style).toBeGreaterThan(notes);
+    expect(style).toBeGreaterThan(name);
   });
 
-  it('leaves the notes section out when the pet has none or they are blank', () => {
-    const { notes: _notes, ...plain } = pet;
-    for (const subject of [plain, { ...pet, notes: '  ' }]) {
-      const { system } = assemblePrompt({ pet: subject, history: [userMessage('hi')], settings });
-      expect(system).not.toContain(NOTES_HEADING);
-    }
+  it('says the reply is read on screen', () => {
+    const { system } = assemblePrompt({ pet, history: [userMessage('hi')], settings });
+    expect(system).toContain(
+      'Your reply is read on screen. Short paragraphs, lists, and code fences are fine.',
+    );
   });
 
   it('tells the pet the person’s name, to use rarely, only when one is set', () => {
@@ -168,24 +160,11 @@ describe('assemblePrompt system prompt', () => {
     });
     expect(system).toContain(getRole('companion')!.instructions);
   });
-
-  it('swaps in the reply-style rule the pet asked for', () => {
-    const spoken = assemblePrompt({
-      pet: { ...pet, replyStyle: 'voice-full' },
-      history: [userMessage('hi')],
-      settings,
-    });
-    expect(spoken.system).toMatch(/spoken|aloud/i);
-    expect(spoken.system).not.toBe(
-      assemblePrompt({ pet, history: [userMessage('hi')], settings }).system,
-    );
-  });
 });
 
 describe('assemblePrompt memory section', () => {
   const memory = (text: string, overrides: Record<string, unknown> = {}) => ({
     id: randomUUID(),
-    scope: 'pet' as const,
     petId: 'scout',
     kind: 'preference' as const,
     text,
@@ -193,23 +172,20 @@ describe('assemblePrompt memory section', () => {
     ...overrides,
   });
 
-  it('adds what the pet remembers to the system prompt, labelled by kind and scope', () => {
+  it('adds what the pet remembers to the system prompt, labelled by kind', () => {
     const request = assemblePrompt({
       pet,
       history: [userMessage('hi')],
       settings,
-      memories: [
-        memory('Prefers short answers'),
-        memory('The repo uses pnpm', { scope: 'crew', petId: null, kind: 'fact' }),
-      ],
+      memories: [memory('Prefers short answers'), memory('The repo uses pnpm', { kind: 'fact' })],
     });
 
     expect(request.system).toContain(MEMORY_HEADING);
     expect(request.system).toContain('- (preference) Prefers short answers');
-    expect(request.system).toContain('- (fact, shared by the crew) The repo uses pnpm');
+    expect(request.system).toContain('- (fact) The repo uses pnpm');
     // Remembered preferences outrank the generic style rule, so they come after it.
     expect(request.system.indexOf(MEMORY_HEADING)).toBeGreaterThan(
-      request.system.indexOf('You are Scout'),
+      request.system.indexOf('Your reply is read on screen.'),
     );
   });
 

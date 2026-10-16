@@ -1,6 +1,6 @@
 /**
  * Builds a turn's tools and dispatches them. Contains `ToolRegistry`, `toolsFor` (the
- * role's tools minus any switched off) and the turn types. The runner builds one registry
+ * role's tools) and the turn types. The runner builds one registry
  * and calls `forTurn` per turn.
  */
 import type { Pet } from '@tagalong/protocol';
@@ -32,18 +32,14 @@ export type ToolFilter = (pet: Pet, tools: readonly Tool[]) => readonly Tool[];
 
 /**
  * The default filter: exactly the tools the pet's role lists (the companion's for a role
- * the library does not have), minus any the pet's grants turn off. A grant cannot add a
- * tool the role does not list. A role may list a group (`connections`) for all its tools,
- * and a grant can switch the group off. Registry order is kept.
+ * the library does not have). A role may list a group (`connections`) for all its tools.
+ * Registry order is kept.
  */
 export const toolsFor: ToolFilter = (pet, tools) => {
   const listed = roleFor(pet.roleId).tools;
-  return tools.filter((tool) => {
-    if (tool.group !== undefined && listed.includes(tool.group)) {
-      return pet.toolGrants[tool.group] !== 'off' && pet.toolGrants[tool.id] !== 'off';
-    }
-    return listed.includes(tool.id) && pet.toolGrants[tool.id] !== 'off';
-  });
+  return tools.filter((tool) =>
+    tool.group !== undefined && listed.includes(tool.group) ? true : listed.includes(tool.id),
+  );
 };
 
 export interface ToolRegistryOptions {
@@ -68,7 +64,7 @@ export interface ToolRegistryOptions {
    * offered on a routine's turn too, but refuses there anything that loosens privacy.
    */
   changeSettings?: SettingsToolDeps | undefined;
-  /** Defaults to `toolsFor`: the tools its role lists, minus any its grants switch off. */
+  /** Defaults to `toolsFor`: the tools its role lists. */
   toolsFor?: ToolFilter | undefined;
 }
 

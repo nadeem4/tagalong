@@ -20,12 +20,9 @@ const scout: Pet = {
   id: 'scout',
   name: 'Scout',
   avatar: '🔎',
-  notes: 'You are Scout.',
   model: 'fake-model',
   providerId: 'fake',
   roleId: 'companion',
-  toolGrants: {},
-  replyStyle: 'text',
 };
 
 let dir: string;
@@ -70,12 +67,11 @@ function runner(provider: BrainProvider): ConversationRunner {
 describe('recall in a turn', () => {
   it('sends what the pet remembers, matched against the question and the selection', async () => {
     memories.add({
-      scope: 'pet',
       petId: 'scout',
       kind: 'preference',
       text: 'Prefers short answers',
     });
-    memories.add({ scope: 'pet', petId: 'ink', kind: 'fact', text: 'Ink only knows this' });
+    memories.add({ petId: 'ink', kind: 'fact', text: 'Ink only knows this' });
     const requests: BrainRequest[] = [];
 
     await runner(recordingFake({ text: 'ok' }, requests)).run({ pet: scout, text: 'hello' }).done;
@@ -93,7 +89,7 @@ describe('recall in a turn', () => {
         toolCall: {
           id: 'mem-1',
           name: REMEMBER,
-          input: { text: 'Works in TypeScript', kind: 'fact', shared: true },
+          input: { text: 'Works in TypeScript', kind: 'fact' },
         },
       },
       requests,
@@ -102,7 +98,7 @@ describe('recall in a turn', () => {
     await runner(provider).run({ pet: scout, text: 'I write TypeScript all day' }).done;
 
     expect(requests[0]?.tools?.map((tool) => tool.name)).toContain(REMEMBER);
-    expect(memories.recent('ink', 5).map((m) => m.text)).toEqual(['Works in TypeScript']);
+    expect(memories.recent('scout', 5).map((m) => m.text)).toEqual(['Works in TypeScript']);
     const result = events.find((event) => event.method === 'turn.toolResult');
     expect(result?.params).toMatchObject({ tool: REMEMBER, ok: true });
   });

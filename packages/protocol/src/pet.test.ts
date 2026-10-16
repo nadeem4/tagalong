@@ -1,6 +1,6 @@
-/** Tests for the Pet schema, including its defaults and watchModel. */
+/** Tests for the Pet schema, including the keys it drops, SCOUT_ID and watchModel. */
 import { describe, expect, it } from 'vitest';
-import { Pet } from './pet';
+import { Pet, SCOUT_ID } from './pet';
 
 const valid = {
   id: 'scout',
@@ -12,27 +12,24 @@ const valid = {
 };
 
 describe('Pet', () => {
-  it('parses a minimal pet and fills defaults', () => {
-    const parsed = Pet.parse(valid);
-    expect(parsed.toolGrants).toEqual({});
-    expect(parsed.replyStyle).toBe('text');
-    expect(parsed.notes).toBeUndefined();
+  it('parses a minimal pet as it is', () => {
+    expect(Pet.parse(valid)).toEqual(valid);
   });
 
-  it('keeps an explicit reply style, grants and notes', () => {
+  it('still parses a crew-era pet, dropping its grants, reply style and notes', () => {
     const parsed = Pet.parse({
       ...valid,
-      replyStyle: 'voice-summary',
-      toolGrants: { watch_for: 'off', remember: 'allowed' },
-      notes: 'Answer in haiku.',
+      toolGrants: { remember: 'off' },
+      replyStyle: 'voice-full',
+      notes: 'x',
     });
-    expect(parsed.replyStyle).toBe('voice-summary');
-    expect(parsed.toolGrants).toEqual({ watch_for: 'off', remember: 'allowed' });
-    expect(parsed.notes).toBe('Answer in haiku.');
+    expect(parsed).not.toHaveProperty('toolGrants');
+    expect(parsed).not.toHaveProperty('replyStyle');
+    expect(parsed).not.toHaveProperty('notes');
   });
 
-  it('rejects a grant other than off or allowed', () => {
-    expect(Pet.safeParse({ ...valid, toolGrants: { watch_for: 'ask' } }).success).toBe(false);
+  it("names Scout's id", () => {
+    expect(SCOUT_ID).toBe('scout');
   });
 
   it('carries a role', () => {
@@ -52,10 +49,6 @@ describe('Pet', () => {
     const parsed = Pet.parse({ ...valid, roleVersion: 2, voiceId: 'fox' });
     expect(parsed).not.toHaveProperty('roleVersion');
     expect(parsed).not.toHaveProperty('voiceId');
-  });
-
-  it('rejects an unknown reply style', () => {
-    expect(Pet.safeParse({ ...valid, replyStyle: 'interpretive-dance' }).success).toBe(false);
   });
 
   it('rejects an empty name', () => {

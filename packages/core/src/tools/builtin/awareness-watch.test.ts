@@ -14,8 +14,6 @@ const pet: Pet = {
   model: 'claude-opus-5',
   providerId: 'anthropic',
   roleId: 'companion',
-  toolGrants: {},
-  replyStyle: 'text',
 };
 
 function host(): PerceptionHost {

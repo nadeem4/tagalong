@@ -20,12 +20,9 @@ const pet: Pet = {
   id: 'scout',
   name: 'Scout',
   avatar: '🐾',
-  notes: 'You are Scout.',
   model: 'fake-model',
   providerId: 'fake',
   roleId: 'companion',
-  toolGrants: {},
-  replyStyle: 'text',
 };
 
 const NOW = Date.parse('2026-10-04T10:10:00.000Z');

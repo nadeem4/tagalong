@@ -19,8 +19,6 @@ const pet: Pet = {
   model: 'claude-opus-5',
   providerId: 'anthropic',
   roleId: 'generalist',
-  toolGrants: {},
-  replyStyle: 'text',
 };
 
 const LIMITS: Settings['watch'] = { maxChecks: 60, maxConcurrent: 3, defaultTimeoutMinutes: 30 };

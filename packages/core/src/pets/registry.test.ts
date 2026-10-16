@@ -34,9 +34,7 @@ describe('PetRegistry seeding', () => {
       roleId: 'companion',
       providerId: 'claude-code',
       model: 'haiku',
-      toolGrants: {},
     });
-    expect(SCOUT.notes).toBeUndefined();
   });
 
   it('does not bring back a default pet that was removed', () => {
@@ -60,11 +58,11 @@ describe('PetRegistry seeding', () => {
   it('does not overwrite a pet the user edited', () => {
     const registry = new PetRegistry(db);
     registry.seedDefaults();
-    registry.upsert({ ...SCOUT, notes: 'Answer only in haiku.' });
+    registry.upsert({ ...SCOUT, model: 'sonnet' });
 
     registry.seedDefaults();
 
-    expect(registry.get('scout')?.notes).toBe('Answer only in haiku.');
+    expect(registry.get('scout')?.model).toBe('sonnet');
   });
 });
 
@@ -75,12 +73,9 @@ describe('PetRegistry CRUD', () => {
       id: 'bolt',
       name: 'Bolt',
       avatar: '⚡',
-      notes: 'You read code.',
       model: 'claude-opus-5',
       providerId: 'anthropic',
       roleId: 'companion',
-      toolGrants: {},
-      replyStyle: 'text' as const,
     };
 
     const saved = registry.upsert(bolt);
@@ -122,8 +117,6 @@ describe('PetRegistry CRUD', () => {
       model: 'claude-opus-5',
       providerId: 'anthropic',
       roleId: 'companion',
-      toolGrants: {},
-      replyStyle: 'text' as const,
     };
     registry.upsert({ ...base, id: 'zed', name: 'Zed' });
     registry.upsert({ ...base, id: 'abe', name: 'Abe' });

@@ -15,8 +15,6 @@ const SCOUT: Pet = {
   roleId: 'companion',
   model: 'haiku',
   providerId: 'claude-code',
-  toolGrants: {},
-  replyStyle: 'text',
 };
 
 describe('withMood', () => {

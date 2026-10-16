@@ -12,8 +12,6 @@ function pet(overrides: Partial<Pet>): Pet {
     roleId: 'generalist',
     model: 'fake',
     providerId: 'fake',
-    toolGrants: {},
-    replyStyle: 'text',
     ...overrides,
   };
 }

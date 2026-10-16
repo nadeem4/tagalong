@@ -15,8 +15,6 @@ const SCOUT: Pet = {
   model: 'claude-sonnet-5',
   providerId: 'anthropic',
   roleId: 'companion',
-  toolGrants: {},
-  replyStyle: 'text',
 };
 
 let server: EngineServer | undefined;

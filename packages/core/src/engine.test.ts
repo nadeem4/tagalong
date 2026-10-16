@@ -243,16 +243,16 @@ describe('per-pet providers', () => {
     expect(String(error?.params['message'])).toContain('OpenRouter');
   });
 
-  it('answers each pet from the provider it names', async () => {
+  it('answers Scout from the provider it names', async () => {
     const { host } = await bootWithoutFakes();
     const scout = (
       (await host.call('pets.list'))['result'] as { pets: Record<string, unknown>[] }
     ).pets.find((pet) => pet['id'] === 'scout');
     await host.call('pets.upsert', {
-      pet: { ...scout, id: 'ink', name: 'Ink', providerId: 'fake', model: 'fake-model' },
+      pet: { ...scout, providerId: 'fake', model: 'fake-model' },
     });
 
-    await host.call('ask', { petId: 'ink', input: { text: 'hi' } });
+    await host.call('ask', { petId: 'scout', input: { text: 'hi' } });
     await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
 
     expect(host.methods()).not.toContain('turn.error');
@@ -770,21 +770,18 @@ describe('pets and settings over rpc', () => {
     const e = await boot();
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
-    const pip = {
-      id: 'pip',
-      name: 'Pip',
-      avatar: '🐣',
-      notes: 'You are Pip.',
-      model: 'fake-model',
+    const scout = {
+      id: 'scout',
+      name: 'Scout',
+      avatar: '🦊',
+      model: 'other-fake-model',
       providerId: 'fake',
-      color: '#22c55e',
+      color: '#E8873A',
       roleId: 'companion',
-      toolGrants: {},
-      replyStyle: 'text',
     };
 
-    const saved = await host.call('pets.upsert', { pet: pip });
-    expect((saved['result'] as { pet: unknown }).pet).toEqual(pip);
+    const saved = await host.call('pets.upsert', { pet: scout });
+    expect((saved['result'] as { pet: unknown }).pet).toEqual(scout);
 
     await e.shutdown();
     engine = undefined;
@@ -792,8 +789,32 @@ describe('pets and settings over rpc', () => {
     const reconnected = await TestHost.connect(again.port);
     await reconnected.call('hello', helloParams(again.pairingToken));
     const listed = await reconnected.call('pets.list', {});
+    const pets = (listed['result'] as { pets: { id: string; model: string }[] }).pets;
+    expect(pets.map((pet) => [pet.id, pet.model])).toEqual([['scout', 'other-fake-model']]);
+  });
+
+  it('refuses to save a pet other than Scout, and saves nothing', async () => {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+
+    const res = await host.call('pets.upsert', {
+      pet: {
+        id: 'pip',
+        name: 'Pip',
+        avatar: '🐣',
+        model: 'fake-model',
+        providerId: 'fake',
+        roleId: 'companion',
+      },
+    });
+
+    const error = res['error'] as Record<string, unknown>;
+    expect(error['code']).toBe(RPC_ERROR_CODES.invalidParams);
+    expect(String(error['message'])).toContain('only Scout');
+    const listed = await host.call('pets.list', {});
     const ids = (listed['result'] as { pets: { id: string }[] }).pets.map((pet) => pet.id);
-    expect(ids).toEqual(['pip', 'scout']);
+    expect(ids).toEqual(['scout']);
   });
 
   it('round-trips a settings patch', async () => {
@@ -823,14 +844,12 @@ describe('roles over rpc', () => {
   }
 
   const draft = (overrides: Record<string, unknown> = {}) => ({
-    id: 'pip',
-    name: 'Pip',
-    avatar: '🐣',
+    id: 'scout',
+    name: 'Scout',
+    avatar: '🦊',
     model: 'fake-model',
     providerId: 'fake',
     roleId: 'companion',
-    toolGrants: {},
-    replyStyle: 'text',
     ...overrides,
   });
 
@@ -841,8 +860,8 @@ describe('roles over rpc', () => {
     expect(error['code']).toBe(RPC_ERROR_CODES.invalidParams);
     expect(String(error['message'])).toContain('wizard');
     const listed = await host.call('pets.list', {});
-    const pets = (listed['result'] as { pets: { id: string }[] }).pets;
-    expect(pets.map((pet) => pet.id)).not.toContain('pip');
+    const pets = (listed['result'] as { pets: { roleId: string }[] }).pets;
+    expect(pets.map((pet) => pet.roleId)).toEqual(['companion']);
   });
 
   it('refuses the crew-era methods: they are gone', async () => {

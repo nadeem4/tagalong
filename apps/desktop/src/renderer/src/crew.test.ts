@@ -10,8 +10,6 @@ const pet = (id: string): Pet => ({
   model: 'm',
   providerId: 'fake',
   roleId: 'companion',
-  toolGrants: {},
-  replyStyle: 'text',
 });
 const crew = [pet('bolt'), pet('ink'), pet('scout')];
 

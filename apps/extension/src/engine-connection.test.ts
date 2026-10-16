@@ -13,12 +13,9 @@ const PET: Pet = {
   id: 'pip',
   name: 'Pip',
   avatar: '🐣',
-  notes: 'A cheerful helper.',
   providerId: 'fake',
   model: 'fake-1',
   roleId: 'companion',
-  toolGrants: {},
-  replyStyle: 'text',
 };
 
 function harness(overrides: Partial<EngineConnectionOptions> = {}) {

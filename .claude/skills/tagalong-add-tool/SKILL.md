@@ -53,7 +53,7 @@ export function lookAtThingTool(deps: Deps): Tool {
 
 `write` when running it leaves stored state behind after the turn (a memory filed, a watch started).
 Everything else is `read`, even when it costs a model call. Decide by the state, not by how risky it
-feels: Phase 8 grants lean on this.
+feels.
 
 ## Test it first, with fakes
 

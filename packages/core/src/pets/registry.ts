@@ -3,7 +3,7 @@
  * upsert).
  */
 import type { Database } from 'better-sqlite3';
-import { Pet } from '@tagalong/protocol';
+import { Pet, SCOUT_ID } from '@tagalong/protocol';
 
 /**
  * The companion, and the only pet a fresh install has. Scout sees what you are doing,
@@ -13,15 +13,13 @@ import { Pet } from '@tagalong/protocol';
  * that already exists.
  */
 export const SCOUT: Pet = {
-  id: 'scout',
+  id: SCOUT_ID,
   name: 'Scout',
   avatar: '🦊',
   color: '#E8873A',
   roleId: 'companion',
   model: 'haiku',
   providerId: 'claude-code',
-  toolGrants: {},
-  replyStyle: 'text',
 };
 
 /** What a fresh install starts with: one companion. */

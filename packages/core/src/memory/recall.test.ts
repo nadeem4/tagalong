@@ -26,10 +26,10 @@ afterEach(() => {
 describe('recall', () => {
   it('returns the five most recent memories, then up to five matches not already listed', () => {
     for (let i = 0; i < 6; i += 1) {
-      memories.add({ scope: 'pet', petId: 'scout', kind: 'fact', text: `old giraffe ${i}` });
+      memories.add({ petId: 'scout', kind: 'fact', text: `old giraffe ${i}` });
     }
     for (let i = 0; i < 5; i += 1) {
-      memories.add({ scope: 'pet', petId: 'scout', kind: 'fact', text: `recent note ${i}` });
+      memories.add({ petId: 'scout', kind: 'fact', text: `recent note ${i}` });
     }
 
     const recalled = recall(memories, 'scout', 'tell me about giraffe').map((m) => m.text);
@@ -46,21 +46,21 @@ describe('recall', () => {
   });
 
   it('does not list a recent memory twice when it also matches', () => {
-    memories.add({ scope: 'pet', petId: 'scout', kind: 'preference', text: 'Short answers' });
+    memories.add({ petId: 'scout', kind: 'preference', text: 'Short answers' });
 
     expect(recall(memories, 'scout', 'short answers please')).toHaveLength(1);
   });
 
   it('only recalls what the pet may see', () => {
-    memories.add({ scope: 'pet', petId: 'ink', kind: 'fact', text: 'Ink private otter' });
-    memories.add({ scope: 'crew', kind: 'fact', text: 'Shared otter' });
+    memories.add({ petId: 'ink', kind: 'fact', text: 'Ink private otter' });
+    memories.add({ petId: 'scout', kind: 'fact', text: 'Scout otter' });
 
-    expect(recall(memories, 'scout', 'otter').map((m) => m.text)).toEqual(['Shared otter']);
+    expect(recall(memories, 'scout', 'otter').map((m) => m.text)).toEqual(['Scout otter']);
   });
 
   it('stays under the character budget, keeping the earliest-ranked memories', () => {
     for (let i = 0; i < 10; i += 1) {
-      memories.add({ scope: 'pet', petId: 'scout', kind: 'fact', text: `${i} ${'x'.repeat(380)}` });
+      memories.add({ petId: 'scout', kind: 'fact', text: `${i} ${'x'.repeat(380)}` });
     }
 
     const recalled = recall(memories, 'scout', 'x');

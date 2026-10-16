@@ -58,7 +58,7 @@ Every turn is assembled from scratch by the prompt assembler
 
 A turn contains, in order:
 
-1. The base instructions, the role's instructions, Scout's name and your notes for it (see
+1. The base instructions, the role's instructions and Scout's name (see
    [roles-and-tools.md](roles-and-tools.md)).
 2. Recalled memories, within a budget (below).
 3. The thread: the last `historyMessages` messages of this conversation.
@@ -73,8 +73,9 @@ Built in `packages/core/src/memory/recall.ts`:
   and OR-ed, so punctuation in a question can never break the query.
 - The total is capped at **2,000 characters**. Whole memories are dropped from the end rather than
   cut mid-sentence.
-- Visibility is decided in SQL on every read: `scope = 'crew' OR pet_id = <this pet>`. The `crew`
-  scope value is a leftover name for a shared memory; with one companion it changes nothing.
+- Visibility is decided in SQL on every read: `pet_id = <Scout>`. Older installs kept some
+  memories in a shared crew notebook; migration 20 moved those to Scout, so none were lost (one
+  Scout already held is not copied twice).
 
 Scout files a memory with the `remember` tool (`{ text, kind: fact | preference }`), so "I prefer
 short answers" is kept across restarts.

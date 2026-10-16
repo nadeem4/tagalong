@@ -79,15 +79,10 @@ describe('connector tools', () => {
     expect(search?.inputSchema).toEqual(schema);
   });
 
-  it('only for a role that lists connections, and not when its grant is off', () => {
+  it('only for a role that lists connections', () => {
     expect(getRole('companion')?.tools).toContain('connections');
     const listed = fakeTurnTools({ connections: deps().value, toolsFor }, { pet: companion });
     expect(listed.definitions.some((d) => d.name.startsWith('notion__'))).toBe(true);
-    const off = fakeTurnTools(
-      { connections: deps().value, toolsFor },
-      { pet: { ...companion, toolGrants: { connections: 'off' } } },
-    );
-    expect(off.definitions.some((d) => d.name.startsWith('notion__'))).toBe(false);
   });
 
   it('with many tools, drops the descriptions inside the schemas to keep the prompt small', () => {
