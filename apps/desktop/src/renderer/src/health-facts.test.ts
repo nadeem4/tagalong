@@ -24,7 +24,6 @@ function view(patch: Partial<HostView> = {}, settings: Record<string, unknown> =
     pets: [scout],
     providers: [],
     engineVersion: '0.0.0',
-    watchModelDefaults: {},
     platform: 'win32',
     elevenLabsKeyStored: false,
     ...patch,

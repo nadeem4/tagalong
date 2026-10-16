@@ -21,19 +21,23 @@ describe('providerChoices', () => {
     ]);
   });
 
-  it('carries each preset default base URL and key variable for the form', () => {
+  it('carries each preset default base URL for the form', () => {
     const [, openrouter, nebius] = providerChoices(new Set());
     expect(openrouter).toMatchObject({
       label: 'OpenRouter',
       defaultBaseUrl: 'https://openrouter.ai/api/v1',
-      envVar: 'OPENROUTER_API_KEY',
       needsKey: true,
     });
     expect(nebius).toMatchObject({
       label: 'Token Factory',
       defaultBaseUrl: 'https://api.tokenfactory.nebius.com/v1/',
-      envVar: 'NEBIUS_API_KEY',
     });
+  });
+
+  it('does not send the environment variable name, which no window reads', () => {
+    for (const choice of providerChoices(new Set())) {
+      expect(choice).not.toHaveProperty('envVar');
+    }
   });
 
   it('says which keys are stored, never what they are', () => {

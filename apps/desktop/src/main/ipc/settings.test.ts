@@ -1,7 +1,7 @@
 /** Tests for the host view, saving settings, Apply, keys and models. */
 
 import { describe, expect, it, vi } from 'vitest';
-import { InMemorySecretStore, WATCH_MODEL_DEFAULTS } from '@tagalong/core';
+import { InMemorySecretStore } from '@tagalong/core';
 import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import type { Settings, SettingsPatch } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
@@ -14,7 +14,7 @@ const ENGINE_SETTINGS: Settings = { ...SETTINGS_DEFAULTS, userName: 'Ada' } as S
 const STORED_SETTINGS: Settings = { ...SETTINGS_DEFAULTS };
 const PET = { id: 'scout' };
 
-function setup({ engineUp = true, problem = null as string | null, folder = 'C:\\ext' } = {}) {
+function setup({ engineUp = true, problem = null as string | null } = {}) {
   const ipc = fakeIpc();
   const engine = fakeEngine({
     'settings.get': { settings: ENGINE_SETTINGS },
@@ -33,7 +33,6 @@ function setup({ engineUp = true, problem = null as string | null, folder = 'C:\
     settingsStore: () => settingsStore,
     secrets: () => secrets,
     problem: () => problem,
-    extensionFolder: () => (folder.length > 0 ? folder : undefined),
     version: () => '1.2.3',
     setSettings: vi.fn(),
     applyHotkeys: vi.fn(),
@@ -59,22 +58,19 @@ describe('registerSettingsIpc: hostView', () => {
       pets: [PET],
       providers: providerChoices(new Set(['openrouter'])),
       engineVersion: '1.2.3',
-      watchModelDefaults: { ...WATCH_MODEL_DEFAULTS },
       platform: process.platform,
-      extensionFolder: 'C:\\ext',
       pairingToken: 'tok',
     });
   });
 
   it('still opens with no engine: stored settings, no pets, no token, and the problem', async () => {
-    const { invoke } = setup({ engineUp: false, problem: 'the engine is down', folder: '' });
+    const { invoke } = setup({ engineUp: false, problem: 'the engine is down' });
     const view = (await invoke(IPC.hostView)) as HostView;
     expect(view.settings).toBe(STORED_SETTINGS);
     expect(view.pets).toEqual([]);
     expect(view.elevenLabsKeyStored).toBe(false);
     expect(view.hotkeyError).toBe('the engine is down');
     expect(view).not.toHaveProperty('pairingToken');
-    expect(view).not.toHaveProperty('extensionFolder');
   });
 });
 

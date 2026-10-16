@@ -59,7 +59,7 @@ describe('findAgents', () => {
 });
 
 describe('shouldOpenWelcome', () => {
-  it('opens until Welcome is finished, even after the old wizard was', () => {
+  it('opens until Welcome is finished, even if an old onboarding flag is set', () => {
     expect(shouldOpenWelcome(Settings.parse({ onboarding: { done: true } }), {})).toBe(true);
     expect(shouldOpenWelcome(Settings.parse({ welcome: { done: true } }), {})).toBe(false);
   });

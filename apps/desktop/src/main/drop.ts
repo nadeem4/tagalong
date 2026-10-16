@@ -15,13 +15,6 @@ import { MAX_SCREENSHOT_LONG_SIDE } from './context';
 import type { IpcHandle } from './ipc/handle';
 import { IPC } from '../shared/ipc';
 
-/** What the figure's preload hands main: file paths, and the drag's link and text. */
-export interface DropItem {
-  paths: string[];
-  uri?: string;
-  text?: string;
-}
-
 /** A text file past this is named with its size, not read. */
 export const MAX_TEXT_FILE_BYTES = 1024 * 1024;
 /** An image past this is named with its size, not decoded. */

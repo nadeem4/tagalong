@@ -40,7 +40,7 @@ describe('resolveAvatarPosition', () => {
   });
 });
 
-describe('the crew strip', () => {
+describe("the pet window's width", () => {
   it('is one avatar wide per visible pet, and never narrower than one', () => {
     expect(stripWidth(3)).toBe(3 * AVATAR_SIZE);
     expect(stripWidth(0)).toBe(AVATAR_SIZE);

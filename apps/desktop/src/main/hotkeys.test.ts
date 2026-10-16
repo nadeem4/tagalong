@@ -1,8 +1,8 @@
 /** Tests for binding, rebinding and reporting the global shortcuts. */
 
 import { describe, expect, it, vi } from 'vitest';
+import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import {
-  DEFAULT_ASK_HOTKEY,
   DEFAULT_PAUSE_SIGHT_HOTKEY,
   DEFAULT_STOP_VOICE_HOTKEY,
   DEFAULT_TALK_HOTKEY,
@@ -11,6 +11,9 @@ import {
   registerHotkey,
 } from './hotkeys';
 import type { HotkeyRegistrar } from './hotkeys';
+
+/** The ask key a fresh install starts with. */
+const ASK_HOTKEY = SETTINGS_DEFAULTS.hotkeys.ask;
 
 vi.mock('electron', () => ({ globalShortcut: undefined }));
 
@@ -46,14 +49,14 @@ describe('registerHotkey', () => {
     const register = vi.fn(() => true);
 
     const outcome = registerHotkey({
-      accelerator: DEFAULT_ASK_HOTKEY,
+      accelerator: ASK_HOTKEY,
       action: 'ask',
       registrar: registrar(register),
       onTrigger: () => {},
     });
 
-    expect(outcome).toEqual({ accelerator: DEFAULT_ASK_HOTKEY, action: 'ask', registered: true });
-    expect(register).toHaveBeenCalledWith(DEFAULT_ASK_HOTKEY, expect.any(Function));
+    expect(outcome).toEqual({ accelerator: ASK_HOTKEY, action: 'ask', registered: true });
+    expect(register).toHaveBeenCalledWith(ASK_HOTKEY, expect.any(Function));
   });
 
   it('runs the trigger when the shortcut fires', () => {
@@ -102,7 +105,7 @@ describe('registerHotkey', () => {
 });
 
 const BOTH = {
-  ask: DEFAULT_ASK_HOTKEY,
+  ask: ASK_HOTKEY,
   pauseSight: DEFAULT_PAUSE_SIGHT_HOTKEY,
   stopVoice: DEFAULT_STOP_VOICE_HOTKEY,
   talk: DEFAULT_TALK_HOTKEY,
@@ -130,13 +133,13 @@ describe('HotkeyManager', () => {
     // Each outcome carries its action, so a refusal can name the thing the user lost
     // rather than only the combination that failed.
     expect(outcomes).toEqual([
-      { accelerator: DEFAULT_ASK_HOTKEY, action: 'ask', registered: true },
+      { accelerator: ASK_HOTKEY, action: 'ask', registered: true },
       { accelerator: DEFAULT_PAUSE_SIGHT_HOTKEY, action: 'pauseSight', registered: true },
       { accelerator: DEFAULT_STOP_VOICE_HOTKEY, action: 'stopVoice', registered: true },
       { accelerator: DEFAULT_TALK_HOTKEY, action: 'talk', registered: true },
     ]);
     expect([...reg.bound.keys()]).toEqual([
-      DEFAULT_ASK_HOTKEY,
+      ASK_HOTKEY,
       DEFAULT_PAUSE_SIGHT_HOTKEY,
       DEFAULT_STOP_VOICE_HOTKEY,
       DEFAULT_TALK_HOTKEY,
@@ -145,7 +148,7 @@ describe('HotkeyManager', () => {
 
   it('has defaults that do not collide', () => {
     // A duplicate accelerator does not error, it silently steals the other action.
-    expect(DEFAULT_ASK_HOTKEY).not.toBe(DEFAULT_PAUSE_SIGHT_HOTKEY);
+    expect(ASK_HOTKEY).not.toBe(DEFAULT_PAUSE_SIGHT_HOTKEY);
   });
 
   it('routes each accelerator to its own action', () => {
@@ -157,7 +160,7 @@ describe('HotkeyManager', () => {
     }).apply(BOTH);
 
     reg.bound.get(DEFAULT_PAUSE_SIGHT_HOTKEY)?.();
-    reg.bound.get(DEFAULT_ASK_HOTKEY)?.();
+    reg.bound.get(ASK_HOTKEY)?.();
 
     expect(fired).toEqual(['pauseSight', 'ask']);
   });
@@ -171,7 +174,7 @@ describe('HotkeyManager', () => {
     held.apply({ ...BOTH, ask: 'Alt+Space' });
 
     // Only the key that changed is touched: the other is never briefly dead.
-    expect(reg.unregistered).toEqual([DEFAULT_ASK_HOTKEY]);
+    expect(reg.unregistered).toEqual([ASK_HOTKEY]);
     expect(registerAfter).toHaveBeenCalledExactlyOnceWith('Alt+Space', expect.any(Function));
     expect([...reg.bound.keys()].sort()).toEqual(
       [
@@ -192,11 +195,11 @@ describe('HotkeyManager', () => {
 
     expect(outcomes[1]?.registered).toBe(false);
     expect(outcomes[1]?.error).toMatch(/CommandOrControl\+Shift\+Alt\+P/);
-    expect(reg.bound.has(DEFAULT_ASK_HOTKEY)).toBe(true);
+    expect(reg.bound.has(ASK_HOTKEY)).toBe(true);
   });
 
   it('retries an accelerator that was refused the first time', () => {
-    const reg = recordingRegistrar([DEFAULT_ASK_HOTKEY]);
+    const reg = recordingRegistrar([ASK_HOTKEY]);
     const held = manager(reg);
     held.apply(BOTH);
 
@@ -244,7 +247,7 @@ describe('the stop voice hotkey', () => {
 describe('the talk hotkey', () => {
   it('defaults to Ctrl+Shift+Alt+Space, apart from the ask key, and fires on every press', () => {
     expect(DEFAULT_TALK_HOTKEY).toBe('CommandOrControl+Shift+Alt+Space');
-    expect(DEFAULT_TALK_HOTKEY).not.toBe(DEFAULT_ASK_HOTKEY);
+    expect(DEFAULT_TALK_HOTKEY).not.toBe(ASK_HOTKEY);
     const reg = recordingRegistrar();
     const onTalk = vi.fn();
     new HotkeyManager({

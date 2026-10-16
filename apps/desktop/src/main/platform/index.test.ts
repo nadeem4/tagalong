@@ -18,12 +18,12 @@ describe('createPlatform', () => {
     expect(typeof platform.readClipboard).toBe('function');
   });
 
-  it('says which phase brings the other platforms rather than returning a stub', () => {
+  it('names the platform it cannot run on rather than returning a stub', () => {
     expect(() => createPlatform('darwin')).toThrow(/darwin/);
-    expect(() => createPlatform('linux')).toThrow(/Phase 7/);
+    expect(() => createPlatform('linux')).toThrow(/Windows only/);
   });
 
-  it('exposes window capture now that Phase 2 has landed', () => {
+  it('exposes window capture', () => {
     // What capture actually does is covered in capture.test.ts against injected fakes;
     // calling it here would reach Electron's real capturer and need a display.
     expect(typeof createPlatform('win32').captureActiveWindowImage).toBe('function');

@@ -41,21 +41,7 @@ export const DESKTOP_CAPABILITIES = [
  */
 export const MAX_SCREENSHOT_LONG_SIDE = 1568;
 
-/** What a capture produced, and the rule that refused it if one did. */
-export interface CaptureOptions {
-  /** Screenshots are opt-in per capture: they cost ~1,500 extra input tokens each. */
-  screenshot: boolean;
-  /**
-   * Every display, the composite, and the window inventory.
-   *
-   * Opt-in per capture for the same reason as the screenshot, and more so. Enumerating
-   * windows costs seconds of walking accessibility trees, and doing it on the cheap ask
-   * is what would make the fast path stop feeling fast.
-   */
-  fullView?: boolean;
-  exclusions: CaptureExclusions;
-}
-
+/** What the ask's capture produced, and the rule that refused it if one did. */
 export interface AskCapture {
   snapshot: ContextSnapshot;
   blocked: CaptureBlock | null;
@@ -255,21 +241,18 @@ function toSnapshotDisplays(capture: DisplaysCapture): ContextSnapshot['displays
 }
 
 /**
- * The full-view half of a capture: every display plus everything that is open.
+ * Every display and the composite, for the displays target.
  *
- * Both reads are best effort, like every other perception. A capturer that throws must
- * not cost the user the selection they highlighted before pressing the key.
+ * Best effort, like every other perception: a capturer that throws must not cost the
+ * engine the other targets it asked for.
  */
 async function captureFullView(
   platform: Platform,
   exclusions: CaptureExclusions,
-  options: { windows?: boolean } = {},
 ): Promise<{ patch: ContextSnapshotPatch; blocked: CaptureBlock | null }> {
-  const wantsWindows = options.windows ?? true;
-  const [capture, inventory] = await Promise.all([
-    attempt('the displays', () => platform.captureDisplays(MAX_SCREENSHOT_LONG_SIDE, exclusions)),
-    wantsWindows ? attempt('the open windows', () => platform.listWindows(exclusions)) : null,
-  ]);
+  const capture = await attempt('the displays', () =>
+    platform.captureDisplays(MAX_SCREENSHOT_LONG_SIDE, exclusions),
+  );
 
   const patch: ContextSnapshotPatch = {};
   if (capture !== null) {
@@ -283,12 +266,6 @@ async function captureFullView(
       };
     }
   }
-  // An empty or failed enumeration stays out of the snapshot: a pet told the desktop has
-  // no windows on it reasons from that as though it had been observed.
-  if (inventory !== null && inventory.failure === undefined && inventory.windows.length > 0) {
-    patch.windows = inventory.windows;
-  }
-
   // The notice says why the pet cannot see, and the screen the user is on is the one
   // whose refusal they will notice. A blanked display elsewhere is already named in the
   // context text and in the composite.
@@ -296,13 +273,16 @@ async function captureFullView(
   return { patch, blocked: focusedRefusal };
 }
 
-/** Everything this host can see, packaged as the snapshot that rides along with an ask. */
+/**
+ * The snapshot that rides along with an ask: the selection and the window in focus. No
+ * picture, no displays and no window list: those cost tokens and seconds, and Scout takes
+ * them itself, through a tool, when a question needs them.
+ */
 export async function captureAskSnapshot(
   platform: Platform,
-  options: CaptureOptions,
+  options: { exclusions: CaptureExclusions },
 ): Promise<AskCapture> {
-  // Every screen read sits behind one pause check, so a paused capture is one fact about
-  // the attempt rather than a flag each target sets for itself.
+  // The window read sits behind the pause check: a paused capture names no app.
   const focused = await unlessPaused(() =>
     attempt('the active window', () => platform.getActiveWindow()),
   );
@@ -317,19 +297,6 @@ export async function captureAskSnapshot(
     selectionBlock === null
       ? await attempt('the selection', () => platform.captureSelection())
       : null;
-  const seen = focused.paused
-    ? { value: null, paused: true }
-    : await unlessPaused(async () => {
-        const shot = options.screenshot
-          ? await captureScreenshot(platform, options.exclusions, window)
-          : { blocked: null };
-
-        const full = options.fullView
-          ? await captureFullView(platform, options.exclusions)
-          : { patch: {}, blocked: null };
-
-        return { window, shot, full };
-      });
 
   return {
     snapshot: ContextSnapshot.parse({
@@ -337,16 +304,10 @@ export async function captureAskSnapshot(
       capturedAt: new Date().toISOString(),
       host: 'desktop',
       ...(selection !== null && selection.length > 0 ? { selection } : {}),
-      ...appOf(seen.value?.window ?? null, options.exclusions),
-      ...(seen.value?.shot && 'screenshot' in seen.value.shot && seen.value.shot.screenshot
-        ? { screenshot: seen.value.shot.screenshot }
-        : {}),
-      ...(seen.value?.full.patch ?? {}),
+      ...appOf(window, options.exclusions),
     }),
-    blocked:
-      selectionBlock ??
-      (seen.value === null ? null : (seen.value.shot.blocked ?? seen.value.full.blocked)),
-    paused: seen.paused,
+    blocked: selectionBlock,
+    paused: focused.paused,
   };
 }
 
@@ -400,7 +361,7 @@ export async function capturePatch(
     }
 
     if (what.includes('displays')) {
-      const full = await captureFullView(platform, options.exclusions, { windows: false });
+      const full = await captureFullView(platform, options.exclusions);
       if (full.patch.displays === undefined) {
         // The host advertises the `displays` capability, so a silent nothing here is the
         // engine calling a method it was told would work and getting an empty answer.

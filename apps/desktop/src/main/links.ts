@@ -1,9 +1,7 @@
 /**
  * The links main will open for a renderer or the engine: provider key pages, Welcome's install
- * pages and https sign-in pages. Contains isAllowedLink, isSignInPage and extensionFolder.
+ * pages and https sign-in pages. Contains isAllowedLink and isSignInPage.
  */
-
-import { join, resolve } from 'node:path';
 
 /**
  * The only pages a renderer may ask main to open in the browser: where each provider's
@@ -36,28 +34,4 @@ export function isAllowedLink(url: string): boolean {
  */
 export function isSignInPage(url: string): boolean {
   return URL.canParse(url) && new URL(url).protocol === 'https:';
-}
-
-export interface ExtensionFolderOptions {
-  packaged: boolean;
-  /** `process.resourcesPath`: the installer copies the extension next to app.asar. */
-  resourcesPath: string;
-  /** `app.getAppPath()`: apps/desktop in a source checkout. */
-  appPath: string;
-  exists: (path: string) => boolean;
-}
-
-/**
- * Where the unpacked Chrome extension lives on this machine, for "Load unpacked".
- *
- * The installer ships it under resources/extension so someone with no checkout can still
- * load it; a source checkout points at the extension's own build. Undefined when it was
- * never built, rather than naming a folder that is not there. Main fills HostView.extensionFolder
- * with it, but no window reads that today.
- */
-export function extensionFolder(options: ExtensionFolderOptions): string | undefined {
-  const folder = options.packaged
-    ? join(options.resourcesPath, 'extension')
-    : resolve(options.appPath, '..', 'extension', 'dist');
-  return options.exists(folder) ? folder : undefined;
 }

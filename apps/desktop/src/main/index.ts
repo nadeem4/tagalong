@@ -6,7 +6,6 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -56,7 +55,7 @@ import { captureNotice, captureTooltip } from './capture-notice';
 import { captureAskSnapshot, capturePatch } from './context';
 import { startEngineHost } from './engine-host';
 import { keepAnEyeAllowed, startKeepAnEye } from './keep-an-eye';
-import { extensionFolder, isAllowedLink } from './links';
+import { isAllowedLink } from './links';
 import { ELEVENLABS_SECRET_KEY, providerChoices, storedKeys } from './provider-choices';
 import { WHATS_NEW } from './whats-new';
 import { elevenLabsTts } from './voice/elevenlabs';
@@ -898,16 +897,6 @@ function openOnboarding(): void {
   desktop.onboardingWindow = window;
 }
 
-/** Where the unpacked Chrome extension is on this machine, if anywhere. */
-function localExtensionFolder(): string | undefined {
-  return extensionFolder({
-    packaged: app.isPackaged,
-    resourcesPath: process.resourcesPath,
-    appPath: app.getAppPath(),
-    exists: existsSync,
-  });
-}
-
 /**
  * Tells everyone that a capture just happened.
  *
@@ -930,7 +919,6 @@ async function openPanelWithContext(): Promise<void> {
   if (desktop === null || desktop.panel === null || desktop.avatar === null) return;
 
   const { snapshot, blocked, paused } = await captureAskSnapshot(desktop.platform, {
-    screenshot: false,
     exclusions: desktop.settings.captureExclusions,
   });
   desktop.pendingSnapshot = snapshot;
@@ -1053,7 +1041,6 @@ function registerIpc(): void {
       const current = required();
       return current.hotkeyError ?? current.bootError;
     },
-    extensionFolder: localExtensionFolder,
     version: () => app.getVersion(),
     setSettings: (settings) => {
       required().settings = settings;
@@ -1138,7 +1125,6 @@ function registerIpc(): void {
   ipcMain.handle(IPC.openOnboarding, () => openOnboarding());
   ipcMain.handle(IPC.openOffice, () => openOffice());
 
-  ipcMain.handle(IPC.findAgents, () => findAgents());
   ipcMain.handle(IPC.checkClaudeSignIn, () => signInFor(process.env));
   ipcMain.handle(IPC.openClaudeSignIn, () => openClaudeSignIn());
 
@@ -1182,12 +1168,6 @@ function registerIpc(): void {
     await shell.openExternal(url);
   });
 
-  ipcMain.handle(IPC.showExtensionFolder, async () => {
-    const folder = localExtensionFolder();
-    if (folder === undefined) throw new Error('The Chrome extension has not been built here.');
-    const problem = await shell.openPath(folder);
-    if (problem.length > 0) throw new Error(problem);
-  });
   ipcMain.handle(IPC.hidePanel, () => required().panel?.hide());
   ipcMain.handle(IPC.togglePanel, () => {
     const current = required();
