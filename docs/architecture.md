@@ -243,7 +243,7 @@ notifications.
    result is `{ turnId }` and nothing else. The stored snapshot loses its screenshot (and an image
    dropped on Scout, `dropped.image`) unless `screenshotRetention` allows keeping it, and the same call sweeps screenshots that have outlived
    the setting — the turn is the only moment the engine reliably wakes up, and Phase 4 owns timers.
-3. If none of the pet's models can see (`modelForTurn` answers null — see
+3. If the pet's brain cannot see (`capabilities.vision` is false — see
    [Brain providers](#brain-providers)) and the ask carried a screenshot, the
    image is dropped before the request is assembled and a `turn.warning` with code
    `vision_unsupported` goes out. The turn continues without the picture.
@@ -301,13 +301,12 @@ the model through the snapshot attached to an ask.
 
 ## Brain providers
 
-`BrainProvider` (`providers/brain.ts`) is the only thing the runner talks to. Five ids are
+`BrainProvider` (`providers/brain.ts`) is the only thing the runner talks to. Four ids are
 registered in `providers/registry.ts`:
 
 | id            | Class                      | Wire format                                                                          |
 | ------------- | -------------------------- | ------------------------------------------------------------------------------------ |
 | `openrouter`  | `OpenAiCompatibleProvider` | OpenAI chat completions through the `openai` SDK, preset base URL OpenRouter         |
-| `nebius`      | `OpenAiCompatibleProvider` | The same, preset base URL Nebius Token Factory                                       |
 | `anthropic`   | `AnthropicProvider`        | Anthropic Messages API through `@anthropic-ai/sdk`                                   |
 | `claude-code` | `ClaudeCodeBrain`          | `claude -p` with stream-json in and out, on the person's Claude Code sign-in: no key |
 | `fake`        | `FakeBrainProvider`        | None: scripted words, for tests and demos; forced by `TAGALONG_FAKE_PROVIDERS=1`     |
@@ -321,27 +320,29 @@ through `onToolUse` and starts the next step with the result, up to 8 steps. It 
 API (a process per step) and is the default for a fresh install where Claude Code is signed in.
 Other sign-ins (Gemini CLI, Codex) are meant to follow the same shape under their own ids.
 
-**Each pet picks its own.** `Pet.providerId`, `Pet.model` and the optional `Pet.visionModel` decide
-the brain; settings carry no provider or model of their own (an older file's `providerId` and
+**Each pet picks its own.** `Pet.providerId` and `Pet.model` decide the brain; settings carry no provider or model of their own (an older file's `providerId` and
 `defaultModel` are dropped on load). The engine resolves a pet's
 provider on its first turn and caches it per id. Keys come from the SecretStore entries in
-`SECRET_KEYS` (`anthropic.apiKey`, `nebius.apiKey`, `openrouter.apiKey`), read at boot; base URLs come
+`SECRET_KEYS` (`anthropic.apiKey`, `openrouter.apiKey`), read at boot; base URLs come
 from `Settings.providerBaseUrls`, falling back to the preset's. A provider that cannot be built — no
 key, an unknown id — fails only that turn, as a `turn.error`, and boot never depends on a key.
 
-The two OpenAI-compatible ids are presets in `providers/presets.ts`: a label, a base URL, a fallback
-model list, and a vision list. Any other chat-completions server is configuration only — a base URL
+The OpenAI-compatible id, `openrouter`, is a preset in `providers/presets.ts`: a label, a base
+URL and a fallback model list. Any other chat-completions server is configuration only — a base URL
 override, a key, a model id.
 
-**Vision routing** (`providers/vision-routing.ts`). `modelForTurn` returns the pet's model for a
-turn without an image; with one, the model if the provider says it can see (`canSee`, or every model
-when a provider has no `canSee`), else the vision model, else null. The runner uses it to decide
-whether to drop a screenshot (with the `vision_unsupported` warning) and passes the answer to the
-perception tools with every call, so a blind pet's `look_at_screen` answers in words. The
-OpenAI-compatible provider re-routes every request round, so an image a tool returns mid-turn moves the
-rest of the turn to the vision model, and as a last resort replaces images it may not send with a note
-saying one was attached. Token Factory lists only Nemotron Nano 2 VL as seeing; OpenRouter lists none,
-meaning all.
+**Sight.** Whether a pet sees is the provider's `capabilities.vision`, the same for every model on
+it. The runner uses it to decide whether to drop a screenshot (with the `vision_unsupported` warning)
+and passes it to the perception tools with every call, so a blind pet's `look_at_screen` answers in
+words. Every built-in provider sees.
+
+**Nebius removed (migration 19).** Nebius Token Factory and its Nemotron models were a provider
+until October 2026. Migration 19 moves any pet still on `nebius` to the Claude sign-in on `haiku`
+and drops its `visionModel` and `watchModel`; `nebius` is now an unknown id with a `config` error.
+`Settings` drops a `summarizer` on `nebius` (back to each pet's own brain) and a `nebius` base URL
+when an older file loads, and the desktop deletes a stored `nebius.apiKey` at boot
+(`forgetRetiredKeys`). Usage, activity and sight-log rows keep `nebius` as history. An older pet's
+`visionModel` is dropped when it parses: no provider routes pictures to a second model any more.
 
 **Model lists.** `models.list` answers with `GET /models` from the service when a key is stored and
 the app is not in fake mode, sorted; anything else — no key, fake mode, a refused key, a wrong URL —
@@ -1183,7 +1184,8 @@ ranks the closest memory first.
 
 ### Searchable work memory
 
-The memory layer is `tagalong.db`. Migration 18 adds two FTS5 indexes (porter unicode61), kept in
+The memory layer is `tagalong.db`. Migration 19 moves pets off the removed `nebius` provider (see
+[Brain providers](#brain-providers)). Migration 18 adds two FTS5 indexes (porter unicode61), kept in
 step by insert, delete and update triggers and backfilled when the migration runs.
 `sight_log_fts` is an external-content index over `sight_log.title` and `app`, in the same pattern
 as `memories_fts`, rebuilt with `'rebuild'`. `activity_fts` is contentless
@@ -1573,11 +1575,10 @@ flowchart LR
   holds still, so it costs nothing until the build stops; a finished command is checked 2 to 7 s
   after its last line. After a no, the baseline moves to now: one check per change.
 - **Which model.** `watchModelsFor(pet)`: the pet's `watchModel`, else its provider's default —
-  Nemotron 3 Nano on Token Factory, `anthropic/claude-haiku-4.5` on OpenRouter, `claude-haiku-4-5` on
-  Anthropic. If that model can see, it gets the native-resolution after crop and the condition. If it
-  cannot, it gets the last 4,000 characters of the watched window's text instead, which is how Nano
-  reads a terminal; with no text it gets the crop routed to the pet's vision model (Nemotron Nano 2
-  VL on Token Factory). The answer is JSON `{answer, reason}`; a plain "Yes, ..." also counts.
+  `anthropic/claude-haiku-4.5` on OpenRouter, `claude-haiku-4-5` on Anthropic. If the provider can
+  see, the model gets the native-resolution after crop and the condition. If it cannot, it gets the
+  last 4,000 characters of the watched window's text instead; with no text the watch ends with an
+  error. The answer is JSON `{answer, reason}`; a plain "Yes, ..." also counts.
 - **Caps.** From `settings.watch`: at most `maxChecks` (60) checks a watch, then `capped`; at most
   `maxConcurrent` (3) watches, and a fourth is refused with a sentence the pet repeats; the timeout
   (`defaultTimeoutMinutes`, 30, unless the pet names one, at most 240) ends it with `timeout`.
@@ -2002,7 +2003,7 @@ me.", "Nothing waiting for you." or the hand-off that finished.
   `ask` and rebuilds a provider only when its key or base URL changed, so a key pasted in Welcome is
   used without a restart.
 - **Links leave through an allowlist.** Main opens only the provider key pages
-  (`https://openrouter.ai`, `https://tokenfactory.nebius.com`, `https://console.anthropic.com`) and
+  (`https://openrouter.ai`, `https://console.anthropic.com`) and
   Welcome's three install pages, exactly (`isAllowedLink`), so a renderer cannot make it open anything
   else.
 - **Where the pet appears.** A pet never moved docks on the screen under the cursor, and a moved pet
@@ -2721,7 +2722,7 @@ flowchart LR
   tokens), the models Settings offers there (`claude-opus-5`, `claude-sonnet-5`,
   `claude-haiku-4-5`), and OpenRouter's Anthropic fallbacks and role tiers
   (`anthropic/claude-opus-5`, `anthropic/claude-sonnet-5`, `anthropic/claude-haiku-4.5`). Anything
-  else, Token Factory's Nemotron models included, has no price (`null`): the card says "price
+  else has no price (`null`), including old rows on the removed `nebius` provider: the card says "price
   unknown" and never guesses. Prompt-cache reads and writes are not priced apart: Scout's Anthropic
   provider reports uncached input tokens only, so its dollars can run a little low on cached turns. `claude-code`, as Scout's brain or as an expert, is always `null`: it is the
   person's plan, shown as tokens, never dollars (Claude Code's `total_cost_usd` is ignored). The

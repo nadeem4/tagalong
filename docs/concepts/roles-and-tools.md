@@ -98,24 +98,23 @@ The model is a pet setting, not a role setting. The role only recommends: it nam
 balanced, deep) and whether it needs pictures, and a table in `packages/core/src/roles/tiers.ts` maps
 tiers to models for each provider, read by `recommendedModel(role, providerId)`:
 
-| Provider    | Fast                             | Balanced                            | Deep                                |
-| ----------- | -------------------------------- | ----------------------------------- | ----------------------------------- |
-| OpenRouter  | `anthropic/claude-haiku-4.5`     | `anthropic/claude-sonnet-5`         | `anthropic/claude-opus-5`           |
-| Anthropic   | `claude-haiku-4-5`               | `claude-sonnet-5`                   | `claude-opus-5`                     |
-| Claude Code | `haiku`                          | `sonnet`                            | `opus`                              |
-| Nebius      | `nvidia/nemotron-3-nano-30b-a3b` | `nvidia/nemotron-3-super-120b-a12b` | `nvidia/nemotron-3-super-120b-a12b` |
+| Provider    | Fast                         | Balanced                    | Deep                      |
+| ----------- | ---------------------------- | --------------------------- | ------------------------- |
+| OpenRouter  | `anthropic/claude-haiku-4.5` | `anthropic/claude-sonnet-5` | `anthropic/claude-opus-5` |
+| Anthropic   | `claude-haiku-4-5`           | `claude-sonnet-5`           | `claude-opus-5`           |
+| Claude Code | `haiku`                      | `sonnet`                    | `opus`                    |
 
-On Nebius, a role that needs pictures also gets `nvidia/Nemotron-Nano-V2-12b` as its vision model,
-because the tier model cannot see.
+Every model in the table sees, so a role that needs pictures gets the same model.
 
 ## What a pet stores
 
 The pet is stored as JSON in the `pets` table of `tagalong.db`, validated by the `Pet` schema in
 `packages/protocol/src/pet.ts`: `id`, `name`, `avatar`, `color`, `roleId`, `notes`, `providerId`,
-`model`, `visionModel`, `watchModel`, `toolGrants` (tool id → `off` or `allowed`; the default `{}`
+`model`, `watchModel`, `toolGrants` (tool id → `off` or `allowed`; the default `{}`
 allows every tool the role lists) and `replyStyle`. The schema drops keys it does not know, so a pet
-stored by an older version still parses: `persona` and `toolAllowlist` from before roles, and
-`roleVersion` and `voiceId` from the crew.
+stored by an older version still parses: `persona` and `toolAllowlist` from before roles,
+`roleVersion` and `voiceId` from the crew, and `visionModel` from when a provider routed pictures to
+a second model.
 
 A fresh install has one pet, Scout, as the Companion, with no notes. Database migration 5
 (`packages/core/src/pets/roles-upgrade.ts`) gave pets stored before roles a role id and moved an
