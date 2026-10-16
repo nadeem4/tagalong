@@ -776,7 +776,6 @@ describe('pets and settings over rpc', () => {
       avatar: '🦊',
       model: 'other-fake-model',
       providerId: 'fake',
-      color: '#E8873A',
       roleId: 'companion',
     };
 
@@ -831,7 +830,7 @@ describe('pets and settings over rpc', () => {
 
     expect(settings['userName']).toBe('Ada');
     // A patch must not reset the fields it left out.
-    expect(settings['defaultPetId']).toBe('scout');
+    expect(settings['historyMessages']).toBe(SETTINGS_DEFAULTS.historyMessages);
   });
 });
 

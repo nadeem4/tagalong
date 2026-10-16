@@ -46,7 +46,8 @@ describe('SettingsStore.get', () => {
     );
     const settings = new SettingsStore(dataDir).get();
     expect(settings.enginePort).toBe(50000);
-    expect(settings.hiddenPets).toEqual(['ink', 'bolt']);
+    expect(settings).not.toHaveProperty('defaultPetId');
+    expect(settings).not.toHaveProperty('hiddenPets');
     expect(settings).not.toHaveProperty('providerId');
     expect(settings).not.toHaveProperty('defaultModel');
   });

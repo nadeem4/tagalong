@@ -27,7 +27,6 @@ const SCOUT: Pet = {
   id: 'scout',
   name: 'Scout',
   avatar: 'fox',
-  color: '#3b82f6',
   providerId: 'fake',
   model: 'fake-model',
   roleId: 'companion',
