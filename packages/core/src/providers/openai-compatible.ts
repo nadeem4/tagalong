@@ -271,11 +271,6 @@ export class OpenAiCompatibleProvider implements BrainProvider {
     });
   }
 
-  /** Where requests go. */
-  get baseURL(): string {
-    return this.#baseURL;
-  }
-
   /** The built-in list. Never touches the network. */
   listModels(): Promise<string[]> {
     return Promise.resolve([...this.#models]);

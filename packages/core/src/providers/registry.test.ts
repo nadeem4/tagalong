@@ -7,6 +7,7 @@ import { ClaudeCodeBrain } from './claude-code-brain';
 import { OpenAiCompatibleProvider } from './openai-compatible';
 import { NEMOTRON_TEXT_MODEL, NEMOTRON_VISION_MODEL } from './nebius-models';
 import { createProvider } from './registry';
+import type { BrainProvider } from './brain';
 
 vi.mock('@anthropic-ai/sdk', () => ({
   default: class Anthropic {},
@@ -16,6 +17,24 @@ vi.mock('@anthropic-ai/sdk', () => ({
   APIConnectionError: class APIConnectionError extends Error {},
   APIUserAbortError: class APIUserAbortError extends Error {},
 }));
+
+/** The URL the built provider's first request goes to. The stubbed network refuses it. */
+async function firstRequestUrl(build: () => BrainProvider): Promise<string> {
+  const urls: string[] = [];
+  vi.stubGlobal('fetch', (input: string | URL | Request) => {
+    urls.push(input instanceof Request ? input.url : String(input));
+    return Promise.resolve(new Response('{}', { status: 401 }));
+  });
+  try {
+    const provider = build();
+    const events = { onText: () => {}, onToolUse: () => Promise.resolve({ content: '' }) };
+    const request = { model: 'm', system: '', messages: [], maxTokens: 1 };
+    await provider.complete(request, events, new AbortController().signal).catch(() => {});
+  } finally {
+    vi.unstubAllGlobals();
+  }
+  return urls[0] ?? '';
+}
 
 describe('createProvider', () => {
   it('builds the Anthropic provider from settings', () => {
@@ -46,18 +65,26 @@ describe('createProvider', () => {
     const provider = createProvider({ providerId: 'openrouter', apiKey: 'k', env: {} });
     expect(provider).toBeInstanceOf(OpenAiCompatibleProvider);
     expect(provider.id).toBe('openrouter');
-    expect((provider as OpenAiCompatibleProvider).baseURL).toBe('https://openrouter.ai/api/v1');
     expect(provider.canSee?.('anthropic/claude-sonnet-5')).toBe(true);
   });
 
-  it('uses a base URL from settings over the preset one', () => {
-    const provider = createProvider({
-      providerId: 'nebius',
-      apiKey: 'k',
-      baseURL: 'http://127.0.0.1:8000/v1/',
-      env: {},
-    });
-    expect((provider as OpenAiCompatibleProvider).baseURL).toBe('http://127.0.0.1:8000/v1/');
+  it('sends OpenRouter requests to the OpenRouter URL', async () => {
+    const url = await firstRequestUrl(() =>
+      createProvider({ providerId: 'openrouter', apiKey: 'k', env: {} }),
+    );
+    expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
+  });
+
+  it('uses a base URL from settings over the preset one', async () => {
+    const url = await firstRequestUrl(() =>
+      createProvider({
+        providerId: 'nebius',
+        apiKey: 'k',
+        baseURL: 'http://127.0.0.1:8000/v1/',
+        env: {},
+      }),
+    );
+    expect(url).toBe('http://127.0.0.1:8000/v1/chat/completions');
   });
 
   it('refuses to build the OpenRouter provider without an API key', () => {

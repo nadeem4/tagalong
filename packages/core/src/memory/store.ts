@@ -72,7 +72,6 @@ export class ConversationStore {
     return toConversation(row);
   }
 
-
   appendMessage(input: NewMessage): Message {
     const message = Message.parse({
       id: randomUUID(),

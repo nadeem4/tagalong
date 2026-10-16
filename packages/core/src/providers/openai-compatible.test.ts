@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { BrainEvents, BrainRequest } from './brain';
 import { BrainError } from './errors';
 import { NEBIUS_BASE_URL, OpenAiCompatibleProvider } from './openai-compatible';
-import { REFUSAL_MESSAGE } from './anthropic';
+import { REFUSAL_MESSAGE } from './brain';
 
 /**
  * Every test talks to a fake `fetch` that answers with canned server-sent events, so the

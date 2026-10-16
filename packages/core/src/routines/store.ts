@@ -53,11 +53,6 @@ export class RoutineStore {
     return row === undefined ? null : toStored(row);
   }
 
-  findByName(name: string): StoredRoutine | null {
-    const wanted = name.trim().toLowerCase();
-    return this.list().find((stored) => stored.routine.name.toLowerCase() === wanted) ?? null;
-  }
-
   /**
    * Saves a new routine, or an edit when `id` is given. The schedule starts from `now`, so a
    * slot earlier today does not run the moment it is saved; an edit keeps its place unless

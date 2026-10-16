@@ -2,7 +2,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BrainEvents, BrainRequest } from './brain';
 import { BrainError } from './errors';
-import { AnthropicProvider, REFUSAL_MESSAGE } from './anthropic';
+import { AnthropicProvider } from './anthropic';
+import { REFUSAL_MESSAGE } from './brain';
 
 /**
  * The SDK is mocked wholesale: these tests must never open a socket, and the error

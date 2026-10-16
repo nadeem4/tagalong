@@ -30,8 +30,6 @@ import type {
 import { REFUSAL_MESSAGE } from './brain';
 import { BrainError } from './errors';
 
-export { REFUSAL_MESSAGE };
-
 /**
  * Models this provider is known to serve. Kept as a list rather than a `models.list`
  * call so settings UI and tests never depend on the network.
@@ -44,8 +42,6 @@ export const ANTHROPIC_MODELS: readonly string[] = [
 
 export interface AnthropicProviderOptions {
   apiKey: string;
-  /** Overridable for proxies and gateways; omitted means the SDK default. */
-  baseURL?: string;
 }
 
 /**
@@ -135,10 +131,7 @@ export class AnthropicProvider implements BrainProvider {
   private readonly client: Anthropic;
 
   constructor(options: AnthropicProviderOptions) {
-    this.client = new Anthropic({
-      apiKey: options.apiKey,
-      ...(options.baseURL === undefined ? {} : { baseURL: options.baseURL }),
-    });
+    this.client = new Anthropic({ apiKey: options.apiKey });
   }
 
   listModels(): Promise<string[]> {

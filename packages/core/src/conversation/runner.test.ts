@@ -209,20 +209,12 @@ describe('ConversationRunner perception tools', () => {
 
   const NO_EXCLUSIONS = { processNames: [] as string[], titlePatterns: [] as string[] };
 
-  /**
-   * `vision` is explicit because the toolset defaults to *no* vision, and a test that
-   * leaves it out is testing the blind path whatever its name claims.
-   */
+  /** Whether a look returns pixels is the turn's call: the provider's sight. */
   function toolsFor(
     hosts: readonly PerceptionHost[],
     exclusions = NO_EXCLUSIONS,
-    vision = false,
   ): PerceptionToolsOptions {
-    return {
-      hosts: () => hosts,
-      exclusions: () => exclusions,
-      vision: () => vision,
-    };
+    return { hosts: () => hosts, exclusions: () => exclusions };
   }
 
   it('offers the built-in tools to a provider that supports them', async () => {
@@ -271,7 +263,11 @@ describe('ConversationRunner perception tools', () => {
       text: 'I cannot look at it',
       toolCall: { id: 'call-1', name: LOOK_AT_SCREEN, input: {} },
     });
-    const runner = makeRunner(observed.provider, toolsFor([host]));
+    const blind: BrainProvider = {
+      ...observed.provider,
+      capabilities: { ...observed.provider.capabilities, vision: false },
+    };
+    const runner = makeRunner(blind, toolsFor([host]));
     const outcome = await runner.run({ pet, text: 'what is this?' }).done;
 
     expect(observed.toolResults).toHaveLength(1);
@@ -287,7 +283,7 @@ describe('ConversationRunner perception tools', () => {
       text: 'I can see it',
       toolCall: { id: 'call-1b', name: LOOK_AT_SCREEN, input: {} },
     });
-    const runner = makeRunner(observed.provider, toolsFor([host], NO_EXCLUSIONS, true));
+    const runner = makeRunner(observed.provider, toolsFor([host]));
     const outcome = await runner.run({ pet, text: 'what is this?' }).done;
 
     const content = observed.toolResults[0]?.content;

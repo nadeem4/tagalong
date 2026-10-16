@@ -37,16 +37,6 @@ export interface PerceptionToolsOptions {
   /** Called per tool use too, so editing the exclusion list takes effect immediately. */
   exclusions: () => CaptureExclusions;
   /**
-   * A ceiling on sight. Called per tool use because the user can switch providers
-   * mid-conversation. The turn's own `vision` can lower it but never raise it; with this
-   * absent, the turn alone decides.
-   *
-   * Absent with no turn vision either means *no* vision: handing base64 to a model that
-   * cannot decode it burns the user's tokens and teaches it nothing, so the safe default
-   * is words.
-   */
-  vision?: () => boolean;
-  /**
    * The user's default character cap for one window text read.
    *
    * A function, and called per tool use, for the same reason `exclusions` is: this is
@@ -63,14 +53,12 @@ export interface PerceptionToolsOptions {
 }
 
 /**
- * Whether this call may return pixels: the turn's sight, under the options' ceiling.
- * Pets pick their own provider and model, so only the turn knows whether the brain asking
- * can decode an image; the options' `vision` stays a ceiling a turn can lower but never raise.
+ * Whether this call may return pixels. Pets pick their own provider and model, so only the
+ * turn knows whether the brain asking can decode an image. Unknown means words: base64 sent
+ * to a model that cannot decode it burns tokens and teaches it nothing.
  */
-export function canSee(options: PerceptionToolsOptions, ctx: ToolContext): boolean {
-  const ceiling = options.vision?.();
-  if (ceiling === undefined) return ctx.vision ?? false;
-  return ceiling && (ctx.vision ?? true);
+export function canSee(ctx: ToolContext): boolean {
+  return ctx.vision ?? false;
 }
 
 /** Neither focused-window tool takes arguments: "look at the screen" has nothing to vary. */
@@ -221,12 +209,9 @@ const LOOK_AT_WINDOW_DEFINITION: BrainTool = {
  * text itself, which is the part a model can reason about.
  */
 export function perceptionTools(options: PerceptionToolsOptions): Tool[] {
-  const fullView = (ctx: ToolContext): FullViewContext =>
-    fullViewContext(options, canSee(options, ctx));
+  const fullView = (ctx: ToolContext): FullViewContext => fullViewContext(options, canSee(ctx));
   return [
-    defineTool(LOOK_AT_SCREEN_DEFINITION, 'read', (_input, ctx) =>
-      capture(options, canSee(options, ctx)),
-    ),
+    defineTool(LOOK_AT_SCREEN_DEFINITION, 'read', (_input, ctx) => capture(options, canSee(ctx))),
     defineTool(GET_SELECTION_DEFINITION, 'read', () => selection(options)),
     defineTool(LIST_DISPLAYS_DEFINITION, 'read', (_input, ctx) => runListDisplays(fullView(ctx))),
     defineTool(LOOK_AT_DISPLAY_DEFINITION, 'read', (input, ctx) =>

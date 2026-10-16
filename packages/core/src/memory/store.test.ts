@@ -45,7 +45,6 @@ describe('ConversationStore.createConversation', () => {
       'Debugging',
     );
   });
-
 });
 
 describe('ConversationStore.appendMessage', () => {

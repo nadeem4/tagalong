@@ -376,9 +376,13 @@ describe('ask', () => {
     await host.call('ask', { petId: 'scout', input: { text: 'remember me' } });
     await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
 
-    const conversations = e.conversationCount();
+    const db = openDatabase(dir);
+    const { count } = db.prepare('SELECT COUNT(*) AS count FROM conversations').get() as {
+      count: number;
+    };
+    db.close();
 
-    expect(conversations).toBe(1);
+    expect(count).toBe(1);
   });
 
   it('answers an ask for a pet that does not exist with an error', async () => {
@@ -787,7 +791,10 @@ describe('pets and settings over rpc', () => {
     await e.shutdown();
     engine = undefined;
     const again = await boot();
-    const ids = again.pets.map((pet) => pet.id);
+    const reconnected = await TestHost.connect(again.port);
+    await reconnected.call('hello', helloParams(again.pairingToken));
+    const listed = await reconnected.call('pets.list', {});
+    const ids = (listed['result'] as { pets: { id: string }[] }).pets.map((pet) => pet.id);
     expect(ids).toEqual(['pip', 'scout']);
   });
 
@@ -830,12 +837,14 @@ describe('roles over rpc', () => {
   });
 
   it('refuses a pet whose role is not in the library, and saves nothing', async () => {
-    const { e, host } = await connected();
+    const { host } = await connected();
     const res = await host.call('pets.upsert', { pet: draft({ roleId: 'wizard' }) });
     const error = res['error'] as Record<string, unknown>;
     expect(error['code']).toBe(RPC_ERROR_CODES.invalidParams);
     expect(String(error['message'])).toContain('wizard');
-    expect(e.pets.map((pet) => pet.id)).not.toContain('pip');
+    const listed = await host.call('pets.list', {});
+    const pets = (listed['result'] as { pets: { id: string }[] }).pets;
+    expect(pets.map((pet) => pet.id)).not.toContain('pip');
   });
 
   it('refuses the crew-era methods: they are gone', async () => {

@@ -1,16 +1,13 @@
 /**
  * The role library and its helpers. Contains `getRole`, `roleFor` (falls back to the
- * companion), `recommendedModel` (a role's tier mapped to a model on one provider) and
- * re-exports `ROLE_LIBRARY` and `MODEL_TIERS`. Used by the prompt assembler, the tool
- * registry, the key check, the engine and the desktop's Welcome.
+ * companion) and `recommendedModel` (a role's tier mapped to a model on one provider).
+ * Used by the prompt assembler, the tool registry, the key check, the engine and the
+ * desktop's Welcome.
  */
 import type { Role } from '@tagalong/protocol';
 import { openAiPreset } from '../providers/presets';
 import { ROLE_LIBRARY } from './library.generated';
 import { MODEL_TIERS } from './tiers';
-
-export { ROLE_LIBRARY };
-export { MODEL_TIERS, type ProviderTiers } from './tiers';
 
 /** The role with this id, or undefined when there is none. */
 export function getRole(id: string): Role | undefined {
@@ -18,7 +15,7 @@ export function getRole(id: string): Role | undefined {
 }
 
 /** The role every pet falls back to when its own is missing from the library. */
-export const FALLBACK_ROLE_ID = 'companion';
+const FALLBACK_ROLE_ID = 'companion';
 
 /**
  * The role a pet with this role id works as: its own, or the companion when the library

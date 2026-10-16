@@ -126,14 +126,16 @@ function toolset(
   vision = true,
   windowTextBudget?: () => number,
 ): TurnTools {
-  return fakeTurnTools({
-    perception: {
-      hosts: () => hosts,
-      exclusions: () => NO_EXCLUSIONS,
-      vision: () => vision,
-      ...(windowTextBudget === undefined ? {} : { windowTextBudget }),
+  return fakeTurnTools(
+    {
+      perception: {
+        hosts: () => hosts,
+        exclusions: () => NO_EXCLUSIONS,
+        ...(windowTextBudget === undefined ? {} : { windowTextBudget }),
+      },
     },
-  });
+    { vision },
+  );
 }
 
 describe('the full-view toolset', () => {

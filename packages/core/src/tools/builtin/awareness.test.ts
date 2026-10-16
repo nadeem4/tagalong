@@ -51,14 +51,10 @@ function recallHost(
 }
 
 function toolset(hosts: readonly PerceptionHost[], vision = true) {
-  return fakeTurnTools({
-    perception: {
-      hosts: () => hosts,
-      exclusions: () => NO_EXCLUSIONS,
-      vision: () => vision,
-      now: () => NOW,
-    },
-  });
+  return fakeTurnTools(
+    { perception: { hosts: () => hosts, exclusions: () => NO_EXCLUSIONS, now: () => NOW } },
+    { vision },
+  );
 }
 
 const FIVE_MINUTES_AGO = '2026-10-04T10:05:00.000Z';

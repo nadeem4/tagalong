@@ -145,10 +145,10 @@ export function recallTools(options: PerceptionToolsOptions): Tool[] {
   });
   return [
     defineTool(RECALL_SCREEN_DEFINITION, 'read', (input, ctx) =>
-      runRecallScreen(context(canSee(options, ctx)), input),
+      runRecallScreen(context(canSee(ctx)), input),
     ),
     defineTool(WHAT_CHANGED_DEFINITION, 'read', (input, ctx) =>
-      runWhatChanged(context(canSee(options, ctx)), input),
+      runWhatChanged(context(canSee(ctx)), input),
     ),
   ];
 }
