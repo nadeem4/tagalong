@@ -293,7 +293,7 @@ components:
 
 Tagalong is one companion, Scout, a 16x16 pixel-art figure (orange fur, pointed ears, a green shirt with a gold badge) that sits on the desktop and opens a speech bubble beside itself. The figure is the only game-like thing in the product; everything around it is calm, modern product chrome: a deep ink-navy for Scout's own surfaces (the dock tags, the bubble, Welcome, Home's nav), a cool off-white for reading (Home's pages and Settings), clean Onest type and one warm gold.
 
-Tokens live in `packages/ui/src/office/tokens.ts` (`officeTokens`; the `office/` folder name is historical). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav and Welcome hard-code several hex values, recorded below as hard-coded. Sprites are plain data (rows and a palette) drawn by `PixelSprite` as a CSS `box-shadow` on one 1px element, scaled by a whole number. No images, no canvas.
+Tokens live in `packages/ui/src/theme/tokens.ts` (`themeTokens`). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav and Welcome hard-code several hex values, recorded below as hard-coded. Sprites are plain data (rows and a palette) drawn by `PixelSprite` as a CSS `box-shadow` on one 1px element, scaled by a whole number. No images, no canvas.
 
 Scout's state is always a face plus a word: the eyes change per mood, a small tag says Seeing, Working or Done, and the accessible name says it in full. Motion is small and soft (a breath, a bob, a hop) and stops for reduced motion.
 
@@ -407,7 +407,7 @@ Gently rounded chrome, square pixels. The bubble, Home cards and Welcome's tile 
 
 ### Scout on the dock (signature)
 
-`DockPet` draws Scout's sprite at scale 4 with `role="img"` and a full label ("Scout is looking at your screen, sight paused"). Scout's palette (in `office/sprites/characters.ts`): outline and nose `#2A1B14`, fur `#E8873A`, inner ear `#F6B8A0`, muzzle `#FFF1E0`, eyes `#1B1B2A`, shirt `#3E8E5A` and `#2E6B44`, badge Gold. Moods change only the eye rows: idle, listening (eyes up), working (eyes down), done (a happy squint). A tag sits top right: **Seeing** on Sky, **Working** on Gold, **Done** on Done Green, all in Gold Ink, Onest 600 11px. **Paused** is a Paused Grey pill top left; the Recording Red dot sits bottom left while rolling memory is on and sight is not paused.
+`DockPet` draws Scout's sprite at scale 4 with `role="img"` and a full label ("Scout is looking at your screen, sight paused"). Scout's palette (in `theme/sprites/characters.ts`): outline and nose `#2A1B14`, fur `#E8873A`, inner ear `#F6B8A0`, muzzle `#FFF1E0`, eyes `#1B1B2A`, shirt `#3E8E5A` and `#2E6B44`, badge Gold. Moods change only the eye rows: idle, listening (eyes up), working (eyes down), done (a happy squint). A tag sits top right: **Seeing** on Sky, **Working** on Gold, **Done** on Done Green, all in Gold Ink, Onest 600 11px. **Paused** is a Paused Grey pill top left; the Recording Red dot sits bottom left while rolling memory is on and sight is not paused.
 
 ### The bubble
 
@@ -459,7 +459,7 @@ Under `prefers-reduced-motion: reduce`: the dock body stops and Scout does not b
 
 ### Do:
 
-- **Do** take colours, sizes, spacing and radii from `officeTokens`; add a token before adding another hard-coded value.
+- **Do** take colours, sizes, spacing and radii from `themeTokens`; add a token before adding another hard-coded value.
 - **Do** draw Scout as sprite data through `PixelSprite`, at a whole-number scale.
 - **Do** keep gold for the one primary action, an on or pressed control, and Scout's active marks.
 - **Do** pair every status with a word (and an icon where there is room).
