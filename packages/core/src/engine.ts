@@ -7,7 +7,7 @@
 import { guardBrain } from './providers/guard';
 import { checkKey } from './providers/check-key';
 import type { Database } from 'better-sqlite3';
-import { DEFAULT_ENGINE_PORT, RPC_ERROR_CODES, Settings } from '@tagalong/protocol';
+import { DEFAULT_ENGINE_PORT, RPC_ERROR_CODES } from '@tagalong/protocol';
 import type { Expert, HostKind, Pet } from '@tagalong/protocol';
 import { openDatabase } from './memory/db';
 import { ActivityLog } from './memory/activity';
