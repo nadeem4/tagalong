@@ -59,7 +59,7 @@ function fakeBridge(capture: ContextSnapshot | null = PAGE) {
 const CONNECTED: ConnectionStatus = {
   state: 'connected',
   engineVersion: '1.2.3',
-  pets: [pet('scout', 'Scout'), pet('fern', 'Fern')],
+  pets: [pet('scout', 'Scout')],
 };
 
 function send(text: string): void {

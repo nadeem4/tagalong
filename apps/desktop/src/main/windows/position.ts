@@ -1,7 +1,6 @@
 /**
  * Where Scout's window and the bubble go: docking, a remembered position and display scale. Pure,
- * so it is tested without a screen. Contains resolveAvatarPosition, panelPosition, crossesScale and
- * stripWidth.
+ * so it is tested without a screen. Contains resolveAvatarPosition, panelPosition and crossesScale.
  */
 
 /** Edge length of the square avatar window, in device-independent pixels. */
@@ -20,11 +19,6 @@ export interface Rect {
 export interface Point {
   x: number;
   y: number;
-}
-
-/** Scout's window is one avatar wide per visible pet, and never narrower than one. */
-export function stripWidth(visiblePets: number): number {
-  return Math.max(1, visiblePets) * AVATAR_SIZE;
 }
 
 /** What settings remembers: null on either axis means "dock to the default edge". */

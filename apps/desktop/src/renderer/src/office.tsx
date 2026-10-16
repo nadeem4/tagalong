@@ -28,7 +28,6 @@ const homeHost: HomeHost = {
   setup: async () => {
     const view = await window.tagalongHost.getHostView();
     return {
-      companionId: view.settings.defaultPetId,
       // The fake provider is for tests and demos, never offered.
       providers: view.providers
         .filter((choice) => choice.id !== 'fake')
@@ -41,7 +40,7 @@ const homeHost: HomeHost = {
   // The overview's line: Ready only when Scout can think (signed in, or a key) and see.
   status: async () => {
     const view = await window.tagalongHost.getHostView();
-    const scout = view.pets.find((pet) => pet.id === view.settings.defaultPetId) ?? view.pets[0];
+    const scout = view.pets[0];
     const signIn =
       scout?.providerId === 'claude-code'
         ? await window.tagalongHost.checkClaudeSignIn().catch(() => 'unknown' as const)

@@ -36,7 +36,6 @@ function setup({ engineUp = true, problem = null as string | null } = {}) {
     version: () => '1.2.3',
     setSettings: vi.fn(),
     applyHotkeys: vi.fn(),
-    refreshStrip: vi.fn(),
     configureRolling: vi.fn(),
     broadcast: vi.fn(),
     listeningOff: vi.fn(),
@@ -83,23 +82,19 @@ describe('registerSettingsIpc: saveSettings', () => {
     expect(deps.setSettings).toHaveBeenCalledWith(ENGINE_SETTINGS);
     expect(deps.broadcast).toHaveBeenCalledWith(ENGINE_SETTINGS);
     expect(deps.applyHotkeys).not.toHaveBeenCalled();
-    expect(deps.refreshStrip).not.toHaveBeenCalled();
     expect(deps.configureRolling).not.toHaveBeenCalled();
   });
 
-  it('saves to the file with no engine, and applies hotkeys, the strip and rolling memory now', async () => {
+  it('saves to the file with no engine, and applies hotkeys and rolling memory now', async () => {
     const { invoke, calls, deps, settingsStore } = setup({ engineUp: false });
-    const patch = {
+    const patch: SettingsPatch = {
       hotkeys: SETTINGS_DEFAULTS.hotkeys,
-      hiddenPets: [],
-      defaultPetId: 'scout',
       rollingMemory: SETTINGS_DEFAULTS.rollingMemory,
-    } as SettingsPatch;
+    };
     const saved = (await invoke(IPC.saveSettings, patch)) as Settings;
     expect(settingsStore.set).toHaveBeenCalledWith(patch);
     expect(calls).toEqual([]);
     expect(deps.applyHotkeys).toHaveBeenCalledWith(saved);
-    expect(deps.refreshStrip).toHaveBeenCalledTimes(2);
     expect(deps.configureRolling).toHaveBeenCalledWith(saved.rollingMemory);
   });
 });

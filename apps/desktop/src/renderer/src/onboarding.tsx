@@ -9,7 +9,7 @@ import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import type { Settings, SettingsPatch, WelcomeStep } from '@tagalong/protocol';
-import { PixelSprite, SpeechQueue, characterFor } from '@tagalong/ui';
+import { PixelSprite, SCOUT_SPRITE, SpeechQueue } from '@tagalong/ui';
 // Bundled, not fetched: setup's two typefaces ship inside the app, Latin subset only.
 import '@fontsource/onest/latin-400.css';
 import '@fontsource/onest/latin-600.css';
@@ -223,7 +223,7 @@ function FirstRunWindow() {
   }
 
   const providers = view?.providers ?? [];
-  const scout = view?.pets.find((pet) => pet.id === view.settings.defaultPetId);
+  const scout = view?.pets[0];
   const context: LineContext | null =
     run === null || settings === null
       ? null
@@ -448,7 +448,7 @@ function FirstRunWindow() {
           {scout !== undefined && (
             <PixelSprite
               className="first-run__sprite"
-              sprite={characterFor(scout).sprite}
+              sprite={SCOUT_SPRITE}
               scale={6}
             />
           )}

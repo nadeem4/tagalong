@@ -201,7 +201,6 @@ describe('what a rejected save tells the user', () => {
 describe('buildSettingsPatch optional settings', () => {
   it('leaves optional settings out when the form does not carry them', () => {
     const patch = buildSettingsPatch(values);
-    expect(patch).not.toHaveProperty('hiddenPets');
     expect(patch).not.toHaveProperty('summarizer');
   });
 

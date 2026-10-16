@@ -12,7 +12,6 @@ import type { ListeningState } from '../../shared/ipc';
 import '@fontsource/onest/latin-600.css';
 import './app.css';
 import '../../shared/ipc';
-import { visibleCrew } from './crew';
 import { IDLE_DOCK, REACTION_MS, dockMood, nextDock } from './dock';
 import { petInput } from './pet-input';
 
@@ -36,12 +35,9 @@ function Avatar() {
   const [input] = useState(() => petInput(window.tagalongHost, send));
 
   useEffect(() => {
-    Promise.all([window.tagalong.listPets(), window.tagalongHost.getHostView()])
-      .then(([all, view]) => {
-        const companion = visibleCrew(all, view.settings.hiddenPets, view.settings.defaultPetId)[0];
-        setPet(companion ?? null);
-        void window.tagalongHost.resizeStrip(1);
-      })
+    window.tagalong
+      .listPets()
+      .then((all) => setPet(all[0] ?? null))
       .catch((error: unknown) => console.error('could not list pets', error));
   }, []);
 
@@ -141,7 +137,7 @@ function Avatar() {
           // The click that ends a drag is not a click on the pet.
           if (!input.takeClick()) return;
           send({ type: 'looked' });
-          void window.tagalongHost.selectPet(pet.id);
+          void window.tagalongHost.openBubble();
         }}
       >
         <DockPet

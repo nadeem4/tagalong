@@ -49,7 +49,7 @@ async function brainOf(
   deps: HealthDeps,
 ): Promise<HealthFacts['brain']> {
   if (view === 'unknown') return 'unknown';
-  const scout = view.pets.find((pet) => pet.id === view.settings.defaultPetId) ?? view.pets[0];
+  const scout = view.pets[0];
   const signIn =
     scout?.providerId === 'claude-code'
       ? await within(() => deps.checkClaudeSignIn(), deps.testBudgetMs, 'unknown' as const)
