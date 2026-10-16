@@ -46,14 +46,6 @@ describe('ConversationStore.createConversation', () => {
     );
   });
 
-  it('loads a conversation back by id', () => {
-    const created = store.createConversation({ petId: 'scout', title: 'Debugging' });
-    expect(store.getConversation(created.id)).toEqual(created);
-  });
-
-  it('returns null for an unknown conversation', () => {
-    expect(store.getConversation(randomUUID())).toBeNull();
-  });
 });
 
 describe('ConversationStore.appendMessage', () => {

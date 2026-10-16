@@ -2,10 +2,9 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import type { ContextSnapshot, Message, Pet, Settings } from '@tagalong/protocol';
-import { Settings as SettingsSchema } from '@tagalong/protocol';
+import { MAX_SELECTION_CHARS, Settings as SettingsSchema } from '@tagalong/protocol';
 import {
   CONTEXT_LABELS,
-  MAX_SELECTION_CHARS,
   MEMORY_HEADING,
   NOTES_HEADING,
   SPOKEN_HEADING,

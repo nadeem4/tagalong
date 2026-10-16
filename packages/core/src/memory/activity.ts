@@ -27,10 +27,8 @@ interface ActivityRow {
   kind: string;
   state: string;
   pet_id: string;
-  to_pet_id: string | null;
   turn_id: string | null;
   conversation_id: string | null;
-  run_id: string | null;
   provider_id: string | null;
   model: string | null;
   text: string | null;

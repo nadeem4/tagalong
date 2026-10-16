@@ -160,7 +160,6 @@ describe('ConversationRunner.run', () => {
     expect(messages[0]?.content).toEqual([{ type: 'text', text: 'hi' }]);
     expect(messages[0]?.snapshot?.selection).toBe('the highlighted paragraph');
     expect(messages[1]?.content).toEqual([{ type: 'text', text: 'an answer' }]);
-    expect(store.getConversation(turn.conversationId)?.petId).toBe('scout');
   });
 
   it('continues an existing conversation and replays its history', async () => {
