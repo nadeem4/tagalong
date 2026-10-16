@@ -1,10 +1,11 @@
+/**
+ * Settings' Browser extension section: the token the Chrome extension needs, once. Read-only
+ * and selectable, with a copy button, because the alternative is asking someone to find a file
+ * in their profile folder.
+ */
 import { useState } from 'react';
 import { Section, Tip } from './section';
 
-/**
- * The token the Chrome extension needs, once. Read-only and selectable, with a copy button,
- * because the alternative is asking someone to find a file in their profile folder.
- */
 export function BrowserSection({ token }: { token: string | undefined }) {
   const [copied, setCopied] = useState(false);
   return (

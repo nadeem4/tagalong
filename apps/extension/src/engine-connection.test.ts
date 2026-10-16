@@ -1,3 +1,4 @@
+/** Tests for EngineConnection: hello, heartbeat, reconnect and a rejected token. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RPC_ERROR_CODES } from '@tagalong/protocol';
 import type { Pet } from '@tagalong/protocol';

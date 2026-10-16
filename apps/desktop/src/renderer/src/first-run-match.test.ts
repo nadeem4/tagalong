@@ -1,3 +1,4 @@
+/** Tests for matching typed or heard answers to Welcome's choices, and reading a name. */
 import { describe, expect, it } from 'vitest';
 import type { ProviderChoice } from '../../shared/ipc';
 import { choicesFor, matchChoice, nameFrom } from './first-run-match';

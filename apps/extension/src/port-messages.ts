@@ -1,3 +1,7 @@
+/**
+ * The messages between extension pages and the service worker over their one port, and the
+ * slice of chrome.runtime.Port both ends use.
+ */
 import type {
   ContextSnapshot,
   CoreToHostNotification,

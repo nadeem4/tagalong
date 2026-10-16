@@ -1,3 +1,4 @@
+/** Vitest config for the extension. */
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({

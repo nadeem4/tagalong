@@ -1,3 +1,4 @@
+/** Tests for the manifest's permissions, pages, shortcut, description and socket policy. */
 import { describe, expect, it } from 'vitest';
 import { COMMAND_OPEN_PANEL, manifest } from './manifest';
 

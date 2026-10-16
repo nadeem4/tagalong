@@ -1,10 +1,16 @@
+/**
+ * Welcome's step machine (the first-run setup window, onboarding.tsx), kept apart from React
+ * so it is tested in plain Node: where setup opens or resumes, how an answer moves it on, and
+ * what each answer saves. Contains FirstRun, stepsFor, startFirstRun, answered, goTo, chipState,
+ * listensNow, oneAtATime and answerPatch. Answers are matched in first-run-match.ts and worded
+ * in first-run-lines.ts; no AI steers any of it.
+ */
 import { WELCOME_STEPS } from '@tagalong/protocol';
 import type { Settings, SettingsPatch, WelcomeStep } from '@tagalong/protocol';
 
 /**
- * The guided first run as a pure state machine: which steps this computer offers, the one
- * on screen, and the furthest one reached (saved, so setup resumes there). No AI steers it:
- * every answer is a fixed choice, matched in `first-run-match.ts`.
+ * Where setup is: the steps, the one on screen, and the furthest one reached (saved, so setup
+ * resumes there).
  */
 export interface FirstRun {
   steps: readonly WelcomeStep[];

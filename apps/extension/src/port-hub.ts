@@ -1,3 +1,9 @@
+/**
+ * The service worker's side of every open extension page.
+ *
+ * Pages never open their own socket: the token stays in the worker, and there is one
+ * connection to the engine however many side panels are open.
+ */
 import type { ContextSnapshot, HostToCoreMethod, PerceptionTarget } from '@tagalong/protocol';
 import type { ConnectionStatus } from './engine-connection';
 import type { PageMessage, PortLike, WorkerMessage } from './port-messages';
@@ -8,12 +14,6 @@ export interface PortHubOptions {
   capture: (targets: readonly PerceptionTarget[]) => Promise<ContextSnapshot | null>;
 }
 
-/**
- * The service worker's side of every open extension page.
- *
- * Pages never open their own socket: the token stays in the worker, and there is one
- * connection to the engine however many side panels are open.
- */
 export class PortHub {
   readonly #ports = new Set<PortLike>();
   readonly #options: PortHubOptions;

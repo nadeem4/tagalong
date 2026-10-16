@@ -1,11 +1,12 @@
+/**
+ * Settings' Summaries group, under Advanced: which brain folds long conversations into a short
+ * memory note, "Same as Scout" or one model from a service that can be used now. Controlled,
+ * because the lists arrive after the page does and an uncontrolled select would lose the saved
+ * choice.
+ */
 import type { SummarizerGroup } from '../settings-form';
 import { Info, Tip, useInvalid } from './section';
 
-/**
- * Which brain folds long conversations into a short memory note: "Same as Scout", or one
- * model from a service that can be used now. Controlled, because the lists arrive after
- * the page does and an uncontrolled select would lose the saved choice.
- */
 export function SummariesSection({
   groups,
   value,

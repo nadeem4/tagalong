@@ -1,11 +1,12 @@
+/**
+ * Settings' ElevenLabs group, under Advanced. ElevenLabs is the optional premium voice: the
+ * person's own key and a voice from their own library. Both are needed; with either missing
+ * Scout keeps its local voice. The key is stored like the others and never read back into the
+ * form.
+ */
 import type { Settings } from '@tagalong/protocol';
 import { Info, Tip, useInvalid } from './section';
 
-/**
- * ElevenLabs, the optional premium voice: the person's own key and a voice from their own
- * library. Both are needed; with either missing Scout keeps its local voice. The key is
- * stored like the others and never read back into the form.
- */
 export function ElevenLabsSection({
   settings,
   keyStored,

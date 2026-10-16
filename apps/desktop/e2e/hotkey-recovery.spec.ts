@@ -1,3 +1,9 @@
+/**
+ * End-to-end: an accelerator Windows refuses, saved in settings, must not stop the app before a
+ * window appears. The app names the binding that broke, the panel shows it, and the other
+ * hotkeys and capture still work. No unit test can see this: every hotkey test injects a fake
+ * registrar.
+ */
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -8,23 +14,6 @@ import type {} from '../src/shared/ipc';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-/**
- * The lockout this file exists to prevent.
- *
- * Until the settings window could rebind the full-view and pause keys, an accelerator
- * that Windows refuses could not be stored at all. Now it can — a user types it, it saves,
- * and it is read back on the next launch. If that made the app stop on a modal error box
- * before any window appeared, the only surface for fixing it would be the settings file,
- * and the app that refused to start would be the one holding the settings window.
- *
- * It is not a hypothetical. It happened to this suite: a mutation run left
- * `Ctrl+Shift+Nonsense` in the real data directory and every later Playwright run failed
- * with "no avatar window appeared" — a broken app, and a symptom pointing nowhere near
- * the cause.
- *
- * No unit test can see this. Every hotkey test injects a fake registrar, so a refusal is
- * whatever the fake says it is and the app is never started at all.
- */
 let app: ElectronApplication;
 let dataDir: string;
 
@@ -81,7 +70,7 @@ async function windowFor(name: string): Promise<Page> {
 
 test('the app still starts with an unregisterable accelerator stored', async () => {
   // The assertion is the whole point: reaching a window at all means no modal stopped
-  // boot. Before this change the launch hung here with an empty window list.
+  // boot.
   const avatar = await windowFor('avatar');
   await expect(avatar.locator('body')).toBeVisible();
   await windowFor('panel');

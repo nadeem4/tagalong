@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+/** Tests for readPage: article text, fallback and the selection. */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MAX_PAGE_TEXT_CHARS, MAX_SELECTION_CHARS } from '@tagalong/protocol';
 import { readPage } from './read-page';

@@ -1,3 +1,4 @@
+/** Tests for gatherHealth: each row, budgets and calls that fail or hang. */
 import { describe, expect, it, vi } from 'vitest';
 import { Settings } from '@tagalong/protocol';
 import type { Expert, Pet } from '@tagalong/protocol';

@@ -1,10 +1,13 @@
+/**
+ * Settings' Sight detail group, under Advanced: the two controls over what looking costs. Both
+ * are read per capture.
+ */
 import { MAX_WINDOW_TEXT_CHARS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import type { Settings } from '@tagalong/protocol';
 import { Info, Tip, useInvalid } from './section';
 
 const DEFAULT_BUDGET = SETTINGS_DEFAULTS.windowTextBudget;
 
-/** The two controls over what looking costs. Both are read per capture. */
 export function SightSection({ settings }: { settings: Settings }) {
   const budget = useInvalid('windowTextBudget');
   return (

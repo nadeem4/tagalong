@@ -1,3 +1,7 @@
+/**
+ * SidePanelApp: the side panel's UI, the connection line and the shared chat panel for Scout,
+ * with the page it opened beside attached.
+ */
 import { useEffect, useState } from 'react';
 import type { ContextSnapshot, Pet } from '@tagalong/protocol';
 import { ChatPanel, HostBridgeProvider } from '@tagalong/ui';

@@ -1,3 +1,8 @@
+/**
+ * EngineConnection: the extension's one WebSocket to the desktop engine, owned by the service
+ * worker: pairing token hello, heartbeat, reconnect with backoff, and answering perception
+ * requests.
+ */
 import {
   HelloResult,
   RPC_ERROR_CODES,

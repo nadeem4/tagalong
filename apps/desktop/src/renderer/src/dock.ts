@@ -1,5 +1,3 @@
-import type { DockMood } from '@tagalong/ui';
-
 /**
  * What the companion on the dock is doing, kept apart from its rendering so it is tested
  * in plain Node. Seeing wins while a capture is fresh; then working, while the companion
@@ -7,7 +5,11 @@ import type { DockMood } from '@tagalong/ui';
  * to drop on it; then a wince or a cheer, for a few seconds; then tired, from a gentle nudge
  * until `rested`; then done, until the person clicks to look; then dozing, while the person
  * is away.
+ * Contains nextDock and dockMood (the mood reducer) and startDrag/moveDrag (when a press
+ * becomes a drag).
  */
+import type { DockMood } from '@tagalong/ui';
+
 export interface DockState {
   seeing: boolean;
   turns: ReadonlySet<string>;

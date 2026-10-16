@@ -1,3 +1,4 @@
+/** Tests for PointerRingView: the ring, its label and reduced motion. */
 import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';

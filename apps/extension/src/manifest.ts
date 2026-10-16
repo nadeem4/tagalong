@@ -1,8 +1,6 @@
 /**
- * The extension's manifest, as data, so a test can hold it to the phase's permission list.
- *
- * The build writes this object to `dist/manifest.json`. Nothing here is computed at runtime:
- * Chrome reads the file once, at load.
+ * The extension's manifest as data, so a test can hold it to its permission list. The build
+ * writes it to `dist/manifest.json`; Chrome reads that file once, at load.
  */
 
 /** The command id the service worker listens for. */
@@ -25,13 +23,12 @@ export const manifest = {
    * `<all_urls>` grant would let a pet read any tab at any moment, which is not what the
    * user agreed to by installing a side panel.
    *
-   * `alarms` is the one addition to the phase's list. Chrome stops an idle service worker
-   * after thirty seconds, and with it the reconnect timer; an alarm wakes the worker so it
-   * notices the desktop app coming back even with no panel open. It shows the user no
-   * permission prompt.
+   * `alarms`: Chrome stops an idle service worker after thirty seconds, and with it the
+   * reconnect timer; an alarm wakes the worker so it notices the desktop app coming back even
+   * with no panel open. It shows the user no permission prompt.
    */
   permissions: ['activeTab', 'alarms', 'scripting', 'sidePanel', 'storage'],
-  /** Requested only if a later feature needs it; nothing in Phase 6 reads the clipboard. */
+  /** Declared but never requested; nothing reads the clipboard. */
   optional_permissions: ['clipboardRead'],
   /**
    * Off until the user turns it on from the options page. `activeTab` covers the tab the
@@ -51,10 +48,10 @@ export const manifest = {
   commands: {
     [COMMAND_OPEN_PANEL]: {
       /**
-       * Not Ctrl+Shift+Space, which the phase page names: that is the desktop app's global
-       * ask hotkey, and a global shortcut is taken before Chrome ever sees the key. The
-       * extension cannot run without the desktop app, so the phase's key would never
-       * reach it. The user can rebind it at chrome://extensions/shortcuts.
+       * Not Ctrl+Shift+Space: that is the desktop app's global ask key, and a global shortcut
+       * is taken before Chrome ever sees the key. The extension cannot run without the desktop
+       * app, so that key would never reach it. The user can rebind this one at
+       * chrome://extensions/shortcuts.
        */
       suggested_key: { default: 'Alt+Shift+Space' },
       description: 'Open Tagalong with the selection attached',

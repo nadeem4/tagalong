@@ -1,3 +1,8 @@
+/**
+ * Scout's voice in a renderer window: prepareLine and playLine play what main synthesised
+ * (Kokoro or ElevenLabs) or fall back to the system voice, and onSystemVoice tells the ears
+ * when the un-cancellable system voice speaks.
+ */
 import type { SpeakPreview } from '../../shared/ipc';
 
 /** Names of British male system voices, after George, the one Windows ships. */

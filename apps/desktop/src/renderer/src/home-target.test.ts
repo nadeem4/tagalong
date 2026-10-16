@@ -1,3 +1,4 @@
+/** Tests for reading Home's page target and scrolling to a Settings section. */
 import { describe, expect, it, vi } from 'vitest';
 import { homeTarget, scrollToSection } from './home-target';
 

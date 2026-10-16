@@ -1,8 +1,11 @@
+/**
+ * Settings' You section: what Scout calls you. Optional: an emptied box clears it, and Scout
+ * then uses no name.
+ */
 import { MAX_USER_NAME_CHARS } from '@tagalong/protocol';
 import type { Settings } from '@tagalong/protocol';
 import { Info, Section, Tip } from './section';
 
-/** What Scout calls you. Optional: an emptied box clears it, and Scout then uses no name. */
 export function YouSection({ settings }: { settings: Settings }) {
   return (
     <Section id="you">

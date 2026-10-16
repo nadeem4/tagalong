@@ -1,3 +1,8 @@
+/**
+ * Settings' Voice section: Scout's voice on or off, who speaks and who listens, which voice, how
+ * fast. Preview plays the form's choice before it is saved. ElevenLabs' key and voice are under
+ * Advanced. Then Talk to Scout: the key you hold to speak, and which microphone listens.
+ */
 import { useEffect, useState } from 'react';
 import {
   MAX_VOICE_SPEED,
@@ -24,11 +29,6 @@ const VOICES: readonly { id: VoiceId; label: string }[] = [
   { id: 'bm_fable', label: 'Fable: warmer, a storyteller' },
 ];
 
-/**
- * Scout talks: on or off, which voice, how fast. Preview plays the form's choice before it
- * is saved. ElevenLabs, the bring-your-own-key voice, is under Advanced. Then Talk to
- * Scout: the key you hold to speak, and which microphone listens.
- */
 export function VoiceSection({
   settings,
   hotkeyError,

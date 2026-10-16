@@ -1,9 +1,14 @@
+/**
+ * RemoteEars: the Ears interface for a renderer window. The ears run in the voice process;
+ * mic frames go out and heard words come back over IPC. Used by talk.ts, voice-seam.ts and
+ * onboarding.tsx.
+ */
 import type { Ears, EarsEvent, ListenMode, MicStream } from '@tagalong/protocol';
 import type { TagalongHostApi } from '../../shared/ipc';
 
 type EarsHost = Pick<TagalongHostApi, 'earsListen' | 'micFrame' | 'earsStop' | 'onEarsEvent'>;
 
-/** The ears as the panel sees them: they run in the voice process; frames and events cross IPC. */
+/** The ears as a window sees them. */
 export class RemoteEars implements Ears {
   readonly #host: EarsHost;
   readonly #mode: ListenMode;

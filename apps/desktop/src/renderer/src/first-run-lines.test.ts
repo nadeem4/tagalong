@@ -1,3 +1,4 @@
+/** Tests for Welcome's lines, options, echoes, chips and listening hints. */
 import { describe, expect, it } from 'vitest';
 import { Settings } from '@tagalong/protocol';
 import type { ProviderChoice } from '../../shared/ipc';

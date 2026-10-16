@@ -1,3 +1,4 @@
+/** Tests for pairing input and storage. */
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ENGINE_PORT } from '@tagalong/protocol';
 import { clearPairing, parsePairingInput, readPairing, savePairing } from './pairing';

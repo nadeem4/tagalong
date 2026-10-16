@@ -1,3 +1,7 @@
+/**
+ * Tests for Welcome's step machine: start and resume, answers, chips, what is saved, when it
+ * listens.
+ */
 import { describe, expect, it } from 'vitest';
 import { SETTINGS_DEFAULTS, Settings } from '@tagalong/protocol';
 import {

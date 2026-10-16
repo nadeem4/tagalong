@@ -1,3 +1,8 @@
+/**
+ * Settings: the form, one section per file in this folder, saved as one patch through
+ * settings-form.ts. Home embeds it as its Settings page; the standalone window shows it only
+ * when the engine failed to start.
+ */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { Pet } from '@tagalong/protocol';
@@ -28,16 +33,14 @@ import { YouSection } from './you-section';
 import type { ClaudeSignIn, HostView } from '../../../shared/ipc';
 
 /**
- * App-level settings, one section per file under `settings/`, in the order the design
- * gives them: how Scout thinks, privacy, voice, shortcuts, the browser extension, then
- * Advanced (summaries, keys, the ElevenLabs voice, sight detail, screen memory and
- * watches), closed by default. It is
- * Home's Settings page (`embedded`, no header or side menu of its own); the standalone
- * window only opens when the engine failed to start, since Home needs the engine.
+ * Sections in page order: how Scout thinks, You, Privacy, Daily budget, Voice, Shortcuts, the
+ * browser extension, then Advanced (summaries, keys, the ElevenLabs voice, sight detail, screen
+ * memory and watches), closed by default. Embedded in Home it has no header or side menu of its
+ * own.
  *
  * Keys are re-read by the engine before every ask and a provider is rebuilt when its key or
- * base URL changed, so those apply on the next ask. Hotkeys are re-registered by main on
- * save, and the sight settings are read per capture.
+ * base URL changes, so they apply on the next ask. Main re-registers hotkeys on save, and the
+ * sight settings are read per capture.
  */
 export function SettingsPage({
   embedded = false,

@@ -1,3 +1,4 @@
+/** Tests for captureTab and captureSnapshot. */
 import { describe, expect, it, vi } from 'vitest';
 import { ContextSnapshot, ContextSnapshotPatch, MAX_PAGE_TEXT_CHARS } from '@tagalong/protocol';
 import type { PageReading } from './content/read-page';

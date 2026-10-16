@@ -1,6 +1,13 @@
+/**
+ * Picks the pet the avatar window shows: the default pet first, any pet in `settings.hiddenPets`
+ * left out. Used by avatar.tsx.
+ */
 import type { Pet } from '@tagalong/protocol';
 
-/** The pets that may sit on the dock: the default one first, the hidden ones left out. */
+/**
+ * The pets that may be shown, the default one first and the hidden ones left out. The avatar
+ * shows the first.
+ */
 export function visibleCrew(
   pets: readonly Pet[],
   hiddenPets: readonly string[],

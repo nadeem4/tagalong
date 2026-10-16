@@ -1,11 +1,12 @@
-import { DEFAULT_ENGINE_PORT } from '@tagalong/protocol';
-
 /**
  * Where the pairing lives: `chrome.storage.local`, behind the slice of its API used here.
  *
  * Local rather than sync: the token opens the user's engine on this machine, and a copy
  * synced to every other Chrome they sign into would be a secret travelling for no reason.
+ * Contains parsePairingInput and read/save/clearPairing.
  */
+import { DEFAULT_ENGINE_PORT } from '@tagalong/protocol';
+
 export interface StorageArea {
   get(key: string): Promise<Record<string, unknown>>;
   set(items: Record<string, unknown>): Promise<void>;

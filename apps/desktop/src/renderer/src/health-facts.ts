@@ -1,3 +1,8 @@
+/**
+ * "Scout, what's wrong?": gatherHealth reads the health card's rows (brain and sign-in,
+ * experts, connections, voice, microphone, browser extension) from host calls that already
+ * exist, each within a time budget, with no model call. Used by the bubble (panel.tsx).
+ */
 import { chosenMouth } from '@tagalong/protocol';
 import type { ConnectionsListResult, Expert } from '@tagalong/protocol';
 import type { HealthFacts } from '@tagalong/ui';
@@ -72,10 +77,7 @@ async function expertsOf(deps: HealthDeps): Promise<HealthFacts['experts']> {
   );
 }
 
-/**
- * "Scout, what's wrong?": reads each check from calls the host already makes, at once, with
- * no model call. Never throws. Never reads a key: only whether one is stored.
- */
+/** Reads every row at once. Never throws. Never reads a key: only whether one is stored. */
 export async function gatherHealth(deps: HealthDeps): Promise<HealthFacts> {
   // Every call gets the budget: one that hangs is `unknown` for its own row, never the card.
   const attempt = <T>(work: () => Promise<T>) =>

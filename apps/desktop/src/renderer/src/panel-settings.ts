@@ -1,3 +1,7 @@
+/**
+ * The few settings the bubble shows (the ask and talk keys as a person reads them, the
+ * microphone, the user's name), read at open and on every save. Used by panel.tsx.
+ */
 import type { Settings } from '@tagalong/protocol';
 
 /** The talk key until settings say otherwise. Matches main's DEFAULT_TALK_HOTKEY. */

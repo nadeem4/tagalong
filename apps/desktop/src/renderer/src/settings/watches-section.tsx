@@ -1,8 +1,11 @@
+/**
+ * Settings' Screen memory and watches group, under Advanced: how much screen memory keeps, and
+ * the limits on watches. Rolling memory's switch is in Privacy.
+ */
 import { MAX_ROLLING_MEMORY_MINUTES } from '@tagalong/protocol';
 import type { Settings } from '@tagalong/protocol';
 import { Info, Tip, useInvalid } from './section';
 
-/** How much screen memory keeps, and the limits on watches. Rolling memory's switch is in Privacy. */
 export function WatchesSection({ settings }: { settings: Settings }) {
   return (
     <div className="tg-group">

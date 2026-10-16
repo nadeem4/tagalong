@@ -1,3 +1,7 @@
+/**
+ * Puts `window.tagalongVoice` (ears, microphone, ears' models) on a window. The bubble and
+ * Welcome both install it before they render.
+ */
 import type { Ears } from '@tagalong/protocol';
 import '../../shared/ipc';
 import { openMic } from './mic';
@@ -17,7 +21,7 @@ declare global {
   }
 }
 
-/** Puts `window.tagalongVoice` on a window; the first-run window will call it too. */
+/** Installs the voice seam on a window. */
 export function installVoiceSeam(target: Window = window): void {
   // A RemoteEars lets go of its handlers after a held question's turnEnd, so this long-lived
   // ears subscribes for good itself and hands only listen and stop to one RemoteEars.

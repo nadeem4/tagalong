@@ -1,3 +1,4 @@
+/** Tests for RemoteEars: frames out, words back, and when handlers are let go. */
 import { describe, expect, it, vi } from 'vitest';
 import { Pushable } from '@tagalong/protocol';
 import type { EarsEvent } from '@tagalong/protocol';

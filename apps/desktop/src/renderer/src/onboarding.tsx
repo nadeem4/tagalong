@@ -1,3 +1,10 @@
+/**
+ * The Welcome window's page (built as `onboarding.html`): Scout asks each setup question
+ * aloud and in its bubble, suggests an answer when it can, and setup moves on once you answer
+ * by voice, typing or a tap. Every answer is saved as given, so a closed window resumes at the
+ * same step next launch. The step rules are in first-run.ts, the matching in
+ * first-run-match.ts, the wording in first-run-lines.ts.
+ */
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
@@ -49,12 +56,7 @@ const SIGN_IN_POLL_MS = 3_000;
 const messageOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
-/**
- * Setup, driven by Scout: it asks each question aloud and in its bubble, suggests an answer
- * when it can, and moves on by itself once you answer by voice, typing or a tap. No Next
- * button; the step chips are the way back. Every answer is saved as it is given, so closing
- * the window resumes at the same step next launch. It listens only after "Talk to me".
- */
+/** Welcome. No Next button: the step chips are the way back. It listens only after "Talk to me". */
 function FirstRunWindow() {
   const [view, setView] = useState<HostView | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);

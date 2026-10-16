@@ -1,3 +1,7 @@
+/**
+ * End-to-end: Scout's launch line across launches on one profile (signed out, clean quit,
+ * signed in, back after a long break).
+ */
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';

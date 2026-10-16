@@ -1,3 +1,8 @@
+/**
+ * Every line Welcome shows or says: Scout's line and title per step, the answer buttons,
+ * the echo of an answer, the asks-again lines, the step chips and the listening hint. Pure
+ * functions of the step and a LineContext, so onboarding.tsx only renders them.
+ */
 import type { Settings, WelcomeStep } from '@tagalong/protocol';
 import type { ClaudeSignIn, ProviderChoice } from '../../shared/ipc';
 import type { FirstRunAnswer } from './first-run';

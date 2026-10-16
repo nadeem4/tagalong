@@ -1,3 +1,4 @@
+/** Tests for the system-voice pick, prepareLine and onSystemVoice. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { onSystemVoice, pickSystemVoice, prepareLine, systemVoiceSpeaking } from './voice-player';
 

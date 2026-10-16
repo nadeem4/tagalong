@@ -1,3 +1,8 @@
+/**
+ * Settings' How Scout thinks section: Scout's real brain (its own provider and model) with a
+ * status chip. When Claude Code is not here, or is signed out and the person asks for it, a
+ * service is picked and its key pasted; Save stores the key and moves Scout to that service.
+ */
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Pet } from '@tagalong/protocol';
@@ -12,11 +17,6 @@ const KEYED = [
   { id: 'nebius', hint: 'Open models, low cost' },
 ] as const;
 
-/**
- * How Scout thinks: its real brain (Scout's own provider and model) with a status chip.
- * When Claude Code is not here, or is signed out and the person asks for it, a service is
- * picked and its key pasted; Save stores the key and moves Scout to that service.
- */
 export function BrainSection({
   brain,
   providers,

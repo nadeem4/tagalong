@@ -1,3 +1,4 @@
+/** Tests for petInput: click versus drag, and files, links or text dropped on the pet. */
 import { describe, expect, it } from 'vitest';
 import type { DockEvent } from './dock';
 import { petInput } from './pet-input';
