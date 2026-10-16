@@ -1,8 +1,8 @@
 /**
  * The desktop app's main process: boots the engine, makes the windows (Scout, its bubble,
  * Home, Welcome, the pointer overlay), the tray and the hotkeys, and wires every IPC channel.
- * Handlers that need only the engine or settings live in `ipc/`; the ones here move windows
- * or read the screen.
+ * Handlers that need only the engine, settings or voice live in `ipc/`; the ones here need
+ * Electron itself: they move windows, read the screen or open things through the shell.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -986,7 +986,8 @@ async function captureForPanel(
 /**
  * Wires every IPC channel. The handlers that only need the engine, the settings or the
  * voice live in `ipc/`, which takes what it needs as arguments so it is tested without
- * Electron; the ones left here move windows or read the screen.
+ * Electron; the ones left here need Electron itself: they move windows, read the screen
+ * or open things through the shell.
  */
 function registerIpc(): void {
   const required = (): Desktop => {

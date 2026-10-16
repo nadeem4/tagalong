@@ -54,7 +54,8 @@ export function registerCrewIpc(handle: IpcHandle, deps: CrewIpcDeps): void {
   });
 
   // Scout becomes the Companion on the chosen brain and is the only pet shown; any other is
-  // hidden, not deleted. Then Welcome closes and Scout says hello in its bubble, without taking focus.
+  // hidden, not deleted. Then Welcome closes and Scout says hello in its bubble, without
+  // taking focus.
   handle(IPC.finishWelcome, async (_event, providerId: string) => {
     const client = engine();
     const companion = getRole('companion');

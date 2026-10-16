@@ -1,6 +1,6 @@
 /**
- * The Windows adapter: the Platform built from Electron, PowerShell and get-windows. Contains
- * Win32Platform.
+ * The Windows adapter: the Platform built from Electron, PowerShell, get-windows and nut-js (the
+ * one Ctrl+C keystroke). Contains Win32Platform.
  */
 
 import { setTimeout as delay } from 'node:timers/promises';

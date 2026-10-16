@@ -344,7 +344,10 @@ export interface TagalongHostApi {
   openOffice(): Promise<void>;
   /** Main names the Home page to show, when the tray or the bubble opens a particular one. */
   onHomePage(handler: (page: string) => void): () => void;
-  /** The coding agents on this computer. No window calls it: finishing Welcome finds them in main. */
+  /**
+   * The coding agents on this computer. No window calls it: finishing Welcome finds them in
+   * main.
+   */
   findAgents(): Promise<FoundAgent[]>;
   /**
    * Finishes Welcome: Scout becomes the Companion thinking on `providerId` and docks alone,
@@ -358,7 +361,10 @@ export interface TagalongHostApi {
    * model. Settings calls it after storing a key when no Claude sign-in was found.
    */
   switchScout(providerId: string): Promise<Pet>;
-  /** Opens a provider's key page in the browser. Main refuses any other URL. */
+  /**
+   * Opens a provider's key page, or one of Welcome's install pages, in the browser. Main
+   * refuses any other URL.
+   */
   openLink(url: string): Promise<void>;
   /** Shows the unpacked extension's folder in the file manager. No window calls it. */
   showExtensionFolder(): Promise<void>;
