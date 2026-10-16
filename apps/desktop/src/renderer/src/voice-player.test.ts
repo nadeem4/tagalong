@@ -69,15 +69,7 @@ describe('prepareLine', () => {
 describe('onSystemVoice', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it('starts quiet and lets a listener go', () => {
-    const heard: boolean[] = [];
-    const off = onSystemVoice((speaking) => heard.push(speaking));
-    expect(heard).toEqual([]);
-    expect(typeof off).toBe('function');
-    off();
-  });
-
-  it('says when the system voice starts and stops speaking', async () => {
+  it('says when the system voice starts and stops speaking, and a listener let go hears nothing', async () => {
     vi.stubGlobal('window', {
       tagalongHost: { speak: () => Promise.resolve({ kind: 'fallback' }) },
     });
@@ -95,13 +87,17 @@ describe('onSystemVoice', () => {
       getVoices: () => [],
     });
     const heard: boolean[] = [];
+    const gone: boolean[] = [];
     const off = onSystemVoice((speaking) => heard.push(speaking));
+    onSystemVoice((speaking) => gone.push(speaking))();
+    expect(heard).toEqual([]);
     const playing = prepareLine('Hello there.')(new AbortController().signal);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(heard).toEqual([true]);
     spoken.onend();
     await playing;
     expect(heard).toEqual([true, false]);
+    expect(gone).toEqual([]);
     off();
   });
 });
