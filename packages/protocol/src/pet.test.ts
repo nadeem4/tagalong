@@ -1,3 +1,4 @@
+/** Tests for the Pet schema, including its defaults and watchModel. */
 import { describe, expect, it } from 'vitest';
 import { Pet } from './pet';
 

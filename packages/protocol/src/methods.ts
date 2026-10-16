@@ -1,3 +1,11 @@
+/**
+ * The JSON-RPC method catalog: every request and notification between the engine and a
+ * host, with its params and result schemas. Contains the remaining message schemas,
+ * HostCapability, the three catalog objects (hostToCoreMethods, coreToHostMethods,
+ * coreToHostNotifications) and typed lookups. After `hello`, the extension may call only
+ * `ask`, `interrupt` and `pets.list` (core's EXTENSION_METHODS); every other host-to-core
+ * method is desktop-only.
+ */
 import { z } from 'zod';
 import { ActivityListParams, ActivityListResult } from './activity';
 import { UsageSummaryParams, UsageSummaryResult } from './usage';
@@ -111,11 +119,11 @@ export const HostCapability = z.enum([
   'pageText',
   'audioIn',
   'audioOut',
-  /** Phase 2B: can enumerate and photograph every display, not only the focused one. */
+  /** Can enumerate and photograph every display, not only the focused one. */
   'displays',
-  /** Phase 2B: can read a window's text without photographing it. */
+  /** Can read a window's text without photographing it. */
   'textLayer',
-  /** Phase 3B: answers perception.recall and perception.diff from its in-memory frames. */
+  /** Answers perception.recall and perception.diff from its in-memory frames. */
   'recall',
   /** Draws a ring around one thing on screen (screen.pointAt). Never moves the mouse. */
   'pointer',
@@ -125,10 +133,6 @@ export type HostCapability = z.infer<typeof HostCapability>;
 const Empty = z.object({});
 
 export { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './limits';
-
-// ---------------------------------------------------------------------------
-// Host to core
-// ---------------------------------------------------------------------------
 
 export const HelloParams = z.object({
   host: HostKind,
@@ -147,7 +151,7 @@ export const HelloResult = z.object({
 export const AskInput = z
   .object({
     text: z.string().optional(),
-    /** Phase 3: push-to-talk audio, transcribed by the engine. */
+    /** Audio instead of text. The engine ignores it: speech becomes text before an ask is sent. */
     audio: z.object({ mime: z.string().min(1), base64: z.string().min(1) }).optional(),
   })
   .refine((i) => i.text !== undefined || i.audio !== undefined, {
@@ -215,16 +219,12 @@ export const ToolApproveParams = z.object({
 });
 export const ToolApproveResult = z.object({ accepted: z.boolean() });
 
-// ---------------------------------------------------------------------------
-// Core to host
-// ---------------------------------------------------------------------------
-
 /** Lets a pet look on demand mid-turn. */
 export const PerceptionCaptureParams = z.object({ what: z.array(PerceptionTarget).min(1) });
 export const PerceptionCaptureResult = z.object({ snapshot: ContextSnapshotPatch });
 
 /**
- * Phase 2B. A native-resolution crop of one display, for when the composite is too coarse.
+ * A native-resolution crop of one display, for when the composite is too coarse.
  *
  * The composite gives each monitor a few hundred pixels — enough to see that a terminal is
  * red, not enough to read it. This is the lean-in: the pet names a rectangle and gets it at
@@ -254,7 +254,7 @@ export const PerceptionCaptureWindowResult = z.object({
   notes: z.array(z.string()).optional(),
 });
 
-/** Phase 2B. Every top-level window: what and where, never what is inside. */
+/** Every top-level window: what and where, never what is inside. */
 export const PerceptionListWindowsParams = Empty;
 export const PerceptionListWindowsResult = z.object({
   windows: z.array(WindowEntry),
@@ -263,12 +263,9 @@ export const PerceptionListWindowsResult = z.object({
 });
 
 /**
- * Phase 2B. The text of exactly one window.
- *
- * There is deliberately no scope that reads everything. Measured on a twelve-window
- * desktop, the whole text layer is 46,491 characters — roughly 11,600 tokens — in a single
- * call, and one background browser window supplied 34,588 of them. The pet reads the
- * inventory, which is about 200 tokens, picks a window, and pays for that one.
+ * The text of exactly one window. There is no scope that reads everything: on a
+ * twelve-window desktop that was about 11,600 tokens in one call, while the inventory
+ * costs about 200.
  */
 export const PerceptionReadTextParams = z.object({
   /** Omit for the foreground window. A window behind another or minimized reads fine. */
@@ -291,18 +288,9 @@ export const PerceptionReadTextResult = z.object({
   /** Present when an exclusion refused this window. `text` is then empty. */
   blocked: CaptureBlock.optional(),
   /**
-   * What the text does not say, in plain sentences the pet can repeat.
-   *
-   * An accessibility tree carries what an application chooses to publish. Editors,
-   * terminals and canvas apps draw their own glyphs and publish only menus and tab
-   * titles, so a read of one returns a few hundred characters that look like a complete
-   * answer and are not. Measured on a live desktop: a minimized editor returned 456
-   * characters, all of it window chrome, none of it the open file.
-   *
-   * A separate field rather than a prefix on `text`, so a pet cannot quote a caveat back
-   * as though it were something on the user's screen. Attached where the read happens
-   * rather than left to whatever surfaces the result later: a qualification that depends
-   * on a later consumer remembering it is a qualification that goes missing.
+   * What the text does not say, in sentences the pet can repeat: editors, terminals and
+   * canvas apps publish little to the accessibility tree, so a short read can look complete
+   * when it is not. A separate field, so the pet never quotes a caveat as screen content.
    */
   notes: z.array(z.string().min(1)).optional(),
 });
@@ -347,10 +335,6 @@ export type ScreenPointAtResult = z.infer<typeof ScreenPointAtResult>;
 export type PerceptionCaptureWindowParams = z.infer<typeof PerceptionCaptureWindowParams>;
 export type PerceptionCaptureWindowResult = z.infer<typeof PerceptionCaptureWindowResult>;
 
-// ---------------------------------------------------------------------------
-// Core to host notifications (no result; the host must not answer)
-// ---------------------------------------------------------------------------
-
 export const TurnStartedParams = z.object({
   turnId: z.uuid(),
   petId: z.string().min(1),
@@ -362,7 +346,7 @@ export const TurnStartedParams = z.object({
   routineId: z.uuid().optional(),
 });
 export const TurnDeltaParams = z.object({ turnId: z.uuid(), text: z.string() });
-/** Phase 5. */
+/** A pet's tool call is starting; `turn.toolResult` follows when it ends. */
 export const TurnToolRequestParams = z.object({
   turnId: z.uuid(),
   approvalId: z.uuid(),
@@ -400,7 +384,7 @@ export const TurnErrorParams = z.object({
  */
 export const TurnWarningParams = z.object({
   turnId: z.uuid(),
-  /** Machine-readable so a host can decide what to show; `vision_unsupported` is the first. */
+  /** Machine-readable, such as `vision_unsupported`, so a host can decide what to show. */
   code: z.string().min(1),
   message: z.string(),
 });
@@ -488,10 +472,6 @@ export const WellbeingObserveParams = z.object({
 });
 export const WellbeingObserveResult = Empty;
 
-// ---------------------------------------------------------------------------
-// The catalog
-// ---------------------------------------------------------------------------
-
 interface MethodSpec {
   readonly params: z.ZodType;
   readonly result: z.ZodType;
@@ -542,7 +522,6 @@ export const hostToCoreMethods = {
   'routines.dismiss': { params: RoutinesDismissParams, result: RoutinesDismissResult },
   'pickUp.rebrief': { params: PickUpRebriefParams, result: PickUpRebriefResult },
   'pickUp.dismiss': { params: PickUpDismissParams, result: PickUpDismissResult },
-  // What Scout saw. Not in EXTENSION_METHODS: only the desktop's Home reads or deletes it.
   'sightLog.list': { params: SightLogListParams, result: SightLogListResult },
   'sightLog.delete': { params: SightLogDeleteParams, result: SightLogDeleteResult },
   'sightLog.clear': { params: SightLogClearParams, result: SightLogClearResult },
@@ -551,7 +530,6 @@ export const hostToCoreMethods = {
   'usage.summary': { params: UsageSummaryParams, result: UsageSummaryResult },
   'hosts.status': { params: HostsStatusParams, result: HostsStatusResult },
   'wellbeing.observe': { params: WellbeingObserveParams, result: WellbeingObserveResult },
-  // The expert catalog. Not in EXTENSION_METHODS: only the desktop's Home installs experts.
   'experts.catalog': { params: ExpertsCatalogParams, result: ExpertsCatalogResult },
   'experts.install': { params: ExpertsInstallParams, result: ExpertsInstallResult },
 } as const satisfies Record<string, MethodSpec>;

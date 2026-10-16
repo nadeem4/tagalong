@@ -1,3 +1,4 @@
+/** Tests for the built-in blind spots and the secret file list. */
 import { describe, expect, it } from 'vitest';
 import { BLIND_SPOTS, BUILT_IN_EXCLUSIONS, SECRET_FILES } from './blind-spots';
 

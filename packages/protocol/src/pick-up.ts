@@ -1,10 +1,10 @@
-import { z } from 'zod';
-
 /**
  * Pick up where you left off. Scout keeps one snapshot of what you were in the middle of,
  * from window titles only, and offers it once when you come back after a long break.
  * Nothing opens or runs without a click on the card.
+ * Contains the pick-up items and the `pickUp.*` messages.
  */
+import { z } from 'zod';
 
 /** The editors a project reopens in: VS Code and Cursor by their own links, others as a folder. */
 export const PickUpEditor = z.enum(['vscode', 'cursor', 'other']);

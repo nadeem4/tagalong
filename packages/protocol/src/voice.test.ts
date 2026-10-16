@@ -1,3 +1,4 @@
+/** Tests for the voice adapter facts, mouth order, chosenMouth and Pushable. */
 import { describe, expect, it } from 'vitest';
 import {
   LOCAL_MOUTH,

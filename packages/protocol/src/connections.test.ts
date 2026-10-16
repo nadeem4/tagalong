@@ -1,3 +1,4 @@
+/** Tests for connection schemas, connectionIdFrom and the connection methods. */
 import { describe, expect, it } from 'vitest';
 import {
   Connection,

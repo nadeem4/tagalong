@@ -1,3 +1,8 @@
+/**
+ * Roles: the job a pet does, compiled from `packages/core/roles/*.md` by core's gen-roles
+ * script. Contains Role and ModelTier. Also published as `@tagalong/protocol/roles` so the
+ * script can validate role files without loading the whole package.
+ */
 import { z } from 'zod';
 
 /** How much brain a role wants. Each provider maps a tier to one of its models. */

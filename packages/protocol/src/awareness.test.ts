@@ -1,3 +1,4 @@
+/** Tests for perception.recall, perception.diff and the watch notifications. */
 import { describe, expect, it } from 'vitest';
 import {
   PerceptionDiffParams,

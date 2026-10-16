@@ -3,6 +3,7 @@
  *
  * This package depends on zod and nothing else. It must never import node, electron,
  * react, or DOM APIs, because both the Electron host and the Chrome host load it.
+ * Re-exports every module below; `./limits` and `./roles` are also published as subpaths.
  */
 
 /** Bumped whenever the JSON-RPC method catalog changes shape. */

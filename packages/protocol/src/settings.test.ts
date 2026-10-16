@@ -1,3 +1,4 @@
+/** Tests for the Settings schema, its defaults, SettingsPatch and the change-by-talk card. */
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './methods';
 import {
@@ -173,10 +174,6 @@ describe('SettingsPatch', () => {
     expect(SettingsPatch.safeParse({ screenshotRetention: { mode: 'weeks' } }).success).toBe(false);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Phase 2B: full view
-// ---------------------------------------------------------------------------
 
 describe('Settings.sightDetail', () => {
   it('defaults to focused, so a full-view capture stays one image plus one screen', () => {

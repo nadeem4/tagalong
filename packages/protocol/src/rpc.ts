@@ -1,6 +1,10 @@
+/**
+ * JSON-RPC 2.0 envelopes for the WebSocket between the engine and its hosts: request,
+ * notification, response and error, plus the error codes. Both sides validate every message.
+ */
 import { z } from 'zod';
 
-/** JSON-RPC 2.0 over WebSocket. Every message is validated on both sides. */
+/** A request id: a string or a number. */
 export const RpcId = z.union([z.string(), z.number()]);
 export type RpcId = z.infer<typeof RpcId>;
 

@@ -1,9 +1,11 @@
-import { z } from 'zod';
-
 /**
  * The cost meter: what Scout and the experts spent, as counts only. A row never holds
  * what was said, only who spent it, on which model, and how many tokens.
+ * Contains UsageRow and the `usage.summary` params and result.
  */
+import { z } from 'zod';
+
+/** Who spent it: Scout or an expert. */
 export const UsageSource = z.enum(['scout', 'expert']);
 export type UsageSource = z.infer<typeof UsageSource>;
 

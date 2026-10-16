@@ -7,6 +7,7 @@
  * Matching is by the focused window's process name or title, so a rule only works when the
  * app or the title says what it is. Secrets that slip past (an editor shows `.env` in its
  * title only while that tab is open) are still hidden on the way out by the engine.
+ * Contains BLIND_SPOTS, SECRET_FILES and BUILT_IN_EXCLUSIONS; shared by core and the desktop.
  */
 export interface BlindSpot {
   label: string;

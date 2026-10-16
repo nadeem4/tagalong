@@ -1,8 +1,13 @@
+/**
+ * The Activity log: what Scout did, as Home's Activity view lists it. One entry per turn,
+ * per brief handed to an expert, per call to a connected app and per routine run.
+ * Contains ActivityEntry and the `activity.list` params and result.
+ */
 import { z } from 'zod';
 
 /**
- * What Scout did, as Home's activity view lists it: each turn, each brief handed to an
- * expert, each call to a connected app (`connector`), and each routine run (`routine`).
+ * What an entry records: a turn, a hand-off to an expert, a connected-app call (`connector`)
+ * or a routine run.
  */
 export const ActivityKind = z.enum(['turn', 'expert', 'connector', 'routine']);
 export type ActivityKind = z.infer<typeof ActivityKind>;

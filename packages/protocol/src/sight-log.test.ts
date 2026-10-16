@@ -1,3 +1,4 @@
+/** Tests for the sight log entry and the sightLog methods. */
 import { describe, expect, it } from 'vitest';
 import {
   SightKind,

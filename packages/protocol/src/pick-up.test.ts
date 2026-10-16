@@ -1,3 +1,4 @@
+/** Tests for pick-up items and the pickUp messages. */
 import { describe, expect, it } from 'vitest';
 import {
   coreToHostNotifications,

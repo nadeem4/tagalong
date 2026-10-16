@@ -1,3 +1,4 @@
+/** Tests for spotting a turn addressed to Scout and the "stop listening" phrases. */
 import { describe, expect, it } from 'vitest';
 import { addressedToScout, isStopListening, mightBeStop } from './addressing';
 

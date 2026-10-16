@@ -1,13 +1,15 @@
+/**
+ * Stored conversations: Message, its content blocks (text, image, tool use, tool result)
+ * and Conversation. The block shape is provider-neutral, so the store and every brain
+ * provider read and write the same thing.
+ */
 import { z } from 'zod';
 import { ContextSnapshot } from './context';
 
 export const MessageRole = z.enum(['user', 'assistant']);
 export type MessageRole = z.infer<typeof MessageRole>;
 
-/**
- * One block inside a message. Mirrors the provider-neutral content shape so the
- * conversation store and the BrainProvider speak the same language.
- */
+/** One block inside a message. */
 export const MessageContent = z.discriminatedUnion('type', [
   z.object({ type: z.literal('text'), text: z.string() }),
   z.object({
