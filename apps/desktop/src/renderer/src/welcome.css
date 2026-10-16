@@ -1,4 +1,7 @@
-/* The Welcome window's sheet: Scout's navy shell (DESIGN.md), gold only for the suggestion and the step you are on. */
+/*
+ * The Welcome window's sheet: Scout's navy shell (DESIGN.md), gold only for the suggestion and
+ * the step you are on.
+ */
 
 body:has(.first-run) {
   background: #12162b;

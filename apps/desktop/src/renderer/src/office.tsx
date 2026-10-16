@@ -51,7 +51,10 @@ const homeHost: HomeHost = {
   },
 };
 
-/** The Home window. Main names a page when the tray or the bubble opens a particular one, such as Settings. */
+/**
+ * The Home window. Main names a page when the tray or the bubble opens a particular one, such
+ * as Settings.
+ */
 function Home() {
   const [page, setPage] = useState<HomePage | undefined>(undefined);
   // Scout's routine card, opened here by its Edit button.

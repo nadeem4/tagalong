@@ -1,6 +1,7 @@
 /**
- * End-to-end: Welcome on a fresh profile, answered by typing, signed in to Claude and without
- * Claude Code.
+ * End-to-end: Welcome on a fresh profile, answered by typing, in two runs. Signed in to Claude:
+ * setup resumes after a close, goes back by a chip, asks again and saves every answer. Without
+ * Claude Code: setup offers the install or a key, and a checked key moves it on.
  */
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

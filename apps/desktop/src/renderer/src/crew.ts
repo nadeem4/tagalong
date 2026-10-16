@@ -4,7 +4,10 @@
  */
 import type { Pet } from '@tagalong/protocol';
 
-/** The pets that may be shown, the default one first and the hidden ones left out. The avatar shows the first. */
+/**
+ * The pets that may be shown, the default one first and the hidden ones left out. The avatar
+ * shows the first.
+ */
 export function visibleCrew(
   pets: readonly Pet[],
   hiddenPets: readonly string[],

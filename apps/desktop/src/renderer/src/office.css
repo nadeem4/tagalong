@@ -1,4 +1,7 @@
-/* The Home page's sheet: Home draws itself from @tagalong/ui's styles, so this only gives it the whole window. */
+/*
+ * The Home page's sheet: Home draws itself from @tagalong/ui's styles, so this only gives it the
+ * whole window.
+ */
 html,
 body,
 #root {

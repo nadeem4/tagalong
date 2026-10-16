@@ -1,6 +1,6 @@
 /**
- * End-to-end smoke test: one app on a fake brain, through the avatar, bubble, talk, capture,
- * sight pause, hotkeys, Welcome and Home.
+ * End-to-end smoke test: one app on a fake brain, through the avatar, bubble, talk, capture, a
+ * tool call over the real socket, the sight pause, hotkeys and sight settings, Welcome and Home.
  */
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,7 +28,8 @@ test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
   app = await electron.launch({
-    // A fresh profile every run, so a developer's own pets and settings never change what this suite sees.
+    // A fresh profile every run, so a developer's own pets and settings never change what this
+    // suite sees.
     args: ['.', `--user-data-dir=${mkdtempSync(join(tmpdir(), 'tagalong-smoke-'))}`],
     cwd: appDir,
     // Fake providers keep the smoke test offline and deterministic: no API key, no

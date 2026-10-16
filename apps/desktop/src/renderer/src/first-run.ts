@@ -8,7 +8,10 @@
 import { WELCOME_STEPS } from '@tagalong/protocol';
 import type { Settings, SettingsPatch, WelcomeStep } from '@tagalong/protocol';
 
-/** Where setup is: the steps, the one on screen, and the furthest one reached (saved, so setup resumes there). */
+/**
+ * Where setup is: the steps, the one on screen, and the furthest one reached (saved, so setup
+ * resumes there).
+ */
 export interface FirstRun {
   steps: readonly WelcomeStep[];
   current: WelcomeStep;

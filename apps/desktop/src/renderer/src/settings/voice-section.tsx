@@ -1,6 +1,6 @@
 /**
- * Settings' Voice section: Scout's voice on or off, which voice, how fast. Preview plays the
- * form's choice before it is saved. ElevenLabs, the bring-your-own-key voice, is under
+ * Settings' Voice section: Scout's voice on or off, who speaks and who listens, which voice, how
+ * fast. Preview plays the form's choice before it is saved. ElevenLabs' key and voice are under
  * Advanced. Then Talk to Scout: the key you hold to speak, and which microphone listens.
  */
 import { useEffect, useState } from 'react';
