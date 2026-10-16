@@ -2,7 +2,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BrainEvents, BrainRequest } from './brain';
 import { BrainError } from './errors';
-import { AnthropicProvider, REFUSAL_MESSAGE } from './anthropic';
+import { AnthropicProvider } from './anthropic';
+import { REFUSAL_MESSAGE } from './brain';
 
 /**
  * The SDK is mocked wholesale: these tests must never open a socket, and the error
@@ -114,11 +115,10 @@ beforeEach(() => {
 });
 
 describe('AnthropicProvider', () => {
-  it('advertises itself and its models without touching the network', async () => {
+  it('advertises itself without touching the network', () => {
     const p = provider();
     expect(p.id).toBe('anthropic');
-    expect(p.capabilities).toEqual({ vision: true, tools: true, streaming: true });
-    expect(await p.listModels()).toContain('claude-opus-5');
+    expect(p.capabilities).toEqual({ vision: true, tools: true });
     expect(sdk.stream).not.toHaveBeenCalled();
   });
 

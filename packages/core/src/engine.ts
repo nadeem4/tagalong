@@ -7,7 +7,7 @@
 import { guardBrain } from './providers/guard';
 import { checkKey } from './providers/check-key';
 import type { Database } from 'better-sqlite3';
-import { DEFAULT_ENGINE_PORT, RPC_ERROR_CODES, Settings } from '@tagalong/protocol';
+import { DEFAULT_ENGINE_PORT, RPC_ERROR_CODES } from '@tagalong/protocol';
 import type { Expert, HostKind, Pet } from '@tagalong/protocol';
 import { openDatabase } from './memory/db';
 import { ActivityLog } from './memory/activity';
@@ -94,9 +94,6 @@ import {
 import type { SpawnFn } from './experts/claude-code';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-
-/** Key the Anthropic API key is filed under in the host's SecretStore. */
-export const ANTHROPIC_KEY = SECRET_KEYS.anthropic!;
 
 async function readKey(secrets: SecretStore, providerId: string): Promise<string | undefined> {
   const secretKey = SECRET_KEYS[providerId];
@@ -242,8 +239,6 @@ export class Engine {
   readonly #db: Database;
   readonly #server: EngineServer;
   readonly #runner: ConversationRunner;
-  readonly #pets: PetRegistry;
-  readonly #settings: SettingsStore;
   readonly #token: string;
   readonly #watches: WatchManager;
   readonly #handoffs: HandoffManager;
@@ -255,8 +250,6 @@ export class Engine {
     db: Database;
     server: EngineServer;
     runner: ConversationRunner;
-    pets: PetRegistry;
-    settings: SettingsStore;
     token: string;
     watches: WatchManager;
     handoffs: HandoffManager;
@@ -272,8 +265,6 @@ export class Engine {
     this.#db = parts.db;
     this.#server = parts.server;
     this.#runner = parts.runner;
-    this.#pets = parts.pets;
-    this.#settings = parts.settings;
     this.#token = parts.token;
   }
 
@@ -505,8 +496,8 @@ export class Engine {
         // Lazy for the same reason: the cap is a cost control the user edits in Settings,
         // and reading it at boot would make saving it do nothing until the next launch.
         windowTextBudget: () => settings.get().windowTextBudget,
-        // No `vision` here: whether a look returns pixels depends on the pet asking, so
-        // the runner passes it with every tool call.
+        // Whether a look returns pixels depends on the pet asking, so the runner passes
+        // `vision` with every tool call.
       },
     });
 
@@ -630,8 +621,6 @@ export class Engine {
       db,
       server,
       runner,
-      pets,
-      settings,
       token: readOrCreatePairingToken(options.dataDir),
       watches,
       handoffs,
@@ -651,14 +640,6 @@ export class Engine {
     return this.#token;
   }
 
-  /** How many conversations are stored. Only tests read it. */
-  conversationCount(): number {
-    const row = this.#db
-      .prepare<[], { count: number }>('SELECT COUNT(*) AS count FROM conversations')
-      .get();
-    return row?.count ?? 0;
-  }
-
   async shutdown(): Promise<void> {
     this.#routines.stop();
     this.#pickUp.stop();
@@ -668,15 +649,6 @@ export class Engine {
     await this.#runner.stopAll();
     await this.#server.close();
     this.#db.close();
-  }
-
-  /** The settings now. Hosts read them over RPC (`settings.get`) instead. */
-  get settings(): Settings {
-    return this.#settings.get();
-  }
-
-  get pets(): Pet[] {
-    return this.#pets.list();
   }
 }
 

@@ -81,7 +81,6 @@ function setup(
   const provider: BrainProvider = {
     id: 'fake',
     capabilities: fake.capabilities,
-    listModels: () => fake.listModels(),
     complete: (request) => {
       requests.push(request);
       return Promise.resolve({

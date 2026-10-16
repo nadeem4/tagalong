@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { BrainEvents, BrainRequest } from './brain';
 import { BrainError } from './errors';
 import { NEBIUS_BASE_URL, OpenAiCompatibleProvider } from './openai-compatible';
-import { REFUSAL_MESSAGE } from './anthropic';
+import { REFUSAL_MESSAGE } from './brain';
 
 /**
  * Every test talks to a fake `fetch` that answers with canned server-sent events, so the
@@ -152,7 +152,7 @@ describe('OpenAiCompatibleProvider', () => {
   it('advertises itself and its capabilities', () => {
     const { provider: p } = provider([]);
     expect(p.id).toBe('nebius');
-    expect(p.capabilities).toEqual({ vision: true, tools: true, streaming: true });
+    expect(p.capabilities).toEqual({ vision: true, tools: true });
   });
 
   it('streams text deltas and reports usage', async () => {
@@ -678,16 +678,9 @@ describe('OpenAiCompatibleProvider models', () => {
       baseURL: 'https://openrouter.ai/api/v1',
       fetch: fake.fetch,
       maxRetries: 0,
-      models: ['fallback-model'],
     });
     return { provider: p, calls: fake.calls };
   }
-
-  it('lists its fallback models without touching the network', async () => {
-    const { provider: p, calls } = models([]);
-    expect(await p.listModels()).toEqual(['fallback-model']);
-    expect(calls).toHaveLength(0);
-  });
 
   it('fetches the live list from GET /models', async () => {
     const { provider: p, calls } = models([

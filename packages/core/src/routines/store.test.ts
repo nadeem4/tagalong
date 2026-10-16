@@ -59,13 +59,6 @@ describe('RoutineStore', () => {
     expect(routines.get(saved.id)?.lastDueAt).toBe(T0 + 99_000);
   });
 
-  it('finds one by name, whatever the case', () => {
-    const { routines } = store();
-    const saved = routines.save(PAPERS, T0);
-    expect(routines.findByName('morning PAPERS')?.routine.id).toBe(saved.id);
-    expect(routines.findByName('evening')).toBeNull();
-  });
-
   it('records how the last run went', () => {
     const { routines } = store();
     const saved = routines.save(PAPERS, T0);

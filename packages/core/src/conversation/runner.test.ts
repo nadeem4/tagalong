@@ -160,7 +160,6 @@ describe('ConversationRunner.run', () => {
     expect(messages[0]?.content).toEqual([{ type: 'text', text: 'hi' }]);
     expect(messages[0]?.snapshot?.selection).toBe('the highlighted paragraph');
     expect(messages[1]?.content).toEqual([{ type: 'text', text: 'an answer' }]);
-    expect(store.getConversation(turn.conversationId)?.petId).toBe('scout');
   });
 
   it('continues an existing conversation and replays its history', async () => {
@@ -210,20 +209,12 @@ describe('ConversationRunner perception tools', () => {
 
   const NO_EXCLUSIONS = { processNames: [] as string[], titlePatterns: [] as string[] };
 
-  /**
-   * `vision` is explicit because the toolset defaults to *no* vision, and a test that
-   * leaves it out is testing the blind path whatever its name claims.
-   */
+  /** Whether a look returns pixels is the turn's call: the provider's sight. */
   function toolsFor(
     hosts: readonly PerceptionHost[],
     exclusions = NO_EXCLUSIONS,
-    vision = false,
   ): PerceptionToolsOptions {
-    return {
-      hosts: () => hosts,
-      exclusions: () => exclusions,
-      vision: () => vision,
-    };
+    return { hosts: () => hosts, exclusions: () => exclusions };
   }
 
   it('offers the built-in tools to a provider that supports them', async () => {
@@ -272,7 +263,11 @@ describe('ConversationRunner perception tools', () => {
       text: 'I cannot look at it',
       toolCall: { id: 'call-1', name: LOOK_AT_SCREEN, input: {} },
     });
-    const runner = makeRunner(observed.provider, toolsFor([host]));
+    const blind: BrainProvider = {
+      ...observed.provider,
+      capabilities: { ...observed.provider.capabilities, vision: false },
+    };
+    const runner = makeRunner(blind, toolsFor([host]));
     const outcome = await runner.run({ pet, text: 'what is this?' }).done;
 
     expect(observed.toolResults).toHaveLength(1);
@@ -288,7 +283,7 @@ describe('ConversationRunner perception tools', () => {
       text: 'I can see it',
       toolCall: { id: 'call-1b', name: LOOK_AT_SCREEN, input: {} },
     });
-    const runner = makeRunner(observed.provider, toolsFor([host], NO_EXCLUSIONS, true));
+    const runner = makeRunner(observed.provider, toolsFor([host]));
     const outcome = await runner.run({ pet, text: 'what is this?' }).done;
 
     const content = observed.toolResults[0]?.content;
@@ -463,7 +458,6 @@ function recording(into: BrainRequest[], reply: string): BrainProvider {
   return {
     id: 'recording',
     capabilities: fake.capabilities,
-    listModels: () => fake.listModels(),
     complete: (req: BrainRequest, events_: BrainEvents, signal: AbortSignal) => {
       into.push(req);
       return fake.complete(req, events_, signal);
@@ -490,7 +484,6 @@ function observing(script: FakeScript): {
     provider: {
       id: 'observing',
       capabilities: fake.capabilities,
-      listModels: () => fake.listModels(),
       complete: (req, events_, signal) => {
         requests.push(req);
         return fake.complete(
@@ -515,8 +508,7 @@ function toolless(into: BrainRequest[]): BrainProvider {
   const fake = new FakeBrainProvider({ text: 'no tools here' });
   return {
     id: 'toolless',
-    capabilities: { vision: false, tools: false, streaming: true },
-    listModels: () => fake.listModels(),
+    capabilities: { vision: false, tools: false },
     complete: (req, events_, signal) => {
       into.push(req);
       return fake.complete(req, events_, signal);
@@ -527,8 +519,7 @@ function toolless(into: BrainRequest[]): BrainProvider {
 function failing(error: unknown): BrainProvider {
   return {
     id: 'failing',
-    capabilities: { vision: false, tools: false, streaming: false },
-    listModels: () => Promise.resolve([]),
+    capabilities: { vision: false, tools: false },
     complete: (): Promise<BrainResult> => Promise.reject(error),
   };
 }
@@ -613,8 +604,7 @@ function blind(into: BrainRequest[]): BrainProvider {
   const fake = new FakeBrainProvider({ text: 'I cannot see images' });
   return {
     id: 'blind',
-    capabilities: { vision: false, tools: true, streaming: true },
-    listModels: () => fake.listModels(),
+    capabilities: { vision: false, tools: true },
     complete: (req, events_, signal) => {
       into.push(req);
       return fake.complete(req, events_, signal);
@@ -813,8 +803,7 @@ describe('ConversationRunner per-pet providers', () => {
     const fake = new FakeBrainProvider({ text: `answered by ${id}` });
     return {
       id,
-      capabilities: { vision: true, tools: true, streaming: true },
-      listModels: () => Promise.resolve([]),
+      capabilities: { vision: true, tools: true },
       canSee: (model) => sees.includes(model),
       complete: (req, events_, signal) => {
         into.push(req);
@@ -904,7 +893,6 @@ describe('ConversationRunner per-pet providers', () => {
       ...fake,
       id: 'nebius',
       capabilities: fake.capabilities,
-      listModels: () => fake.listModels(),
       complete: (req, ev, sig) => fake.complete(req, ev, sig),
       canSee: (model) => models.includes(model),
     });

@@ -72,13 +72,6 @@ export class ConversationStore {
     return toConversation(row);
   }
 
-  getConversation(id: string): Conversation | null {
-    const row = this.db
-      .prepare<[string], ConversationRow>('SELECT * FROM conversations WHERE id = ?')
-      .get(id);
-    return row ? toConversation(row) : null;
-  }
-
   appendMessage(input: NewMessage): Message {
     const message = Message.parse({
       id: randomUUID(),

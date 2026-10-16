@@ -65,13 +65,9 @@ function sleep(ms: number): Promise<void> {
  */
 export class FakeBrainProvider implements BrainProvider {
   readonly id = 'fake';
-  readonly capabilities: BrainCapabilities = { vision: true, tools: true, streaming: true };
+  readonly capabilities: BrainCapabilities = { vision: true, tools: true };
 
   constructor(private readonly script: FakeScript) {}
-
-  listModels(): Promise<string[]> {
-    return Promise.resolve([...FAKE_MODELS]);
-  }
 
   async complete(
     req: BrainRequest,

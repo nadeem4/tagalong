@@ -17,8 +17,6 @@ import type { Memory } from '../memory/memories';
 import { renderInventory } from '../perception/inventory';
 import { roleFor } from '../roles';
 
-export { MAX_SELECTION_CHARS };
-
 /**
  * Ceiling on a single answer. Generous enough for an explanation with a code block,
  * small enough that a runaway reply cannot burn a whole rate limit window.
@@ -90,7 +88,7 @@ export const NOTES_HEADING = "## The user's notes for you";
 export const MEMORY_HEADING = '## What you remember';
 
 /** The memory section never grows past this, heading included. */
-export const MAX_MEMORY_SECTION_CHARS = 2000;
+const MAX_MEMORY_SECTION_CHARS = 2000;
 
 const MEMORY_PREAMBLE =
   'Notes kept from earlier conversations. Follow remembered preferences; treat facts as ' +

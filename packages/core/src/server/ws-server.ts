@@ -84,32 +84,20 @@ export interface HostSession {
    * tokens on an ordinary twelve-window session, which is why the pet reads the ~300
    * token inventory first and names the window it actually wants.
    */
-  readText(params: ReadTextParams): Promise<ReadTextReading>;
+  readText(params: PerceptionReadTextParams): Promise<PerceptionReadTextResultType>;
   /** Asks the host for the window inventory: what each window is and where, never its text. */
   listWindows(): Promise<PerceptionListWindowsResultType>;
   /** Asks the host for a native-resolution crop of one display, for leaning in. */
-  captureRegion(params: CaptureRegionParams): Promise<PerceptionCaptureRegionResultType>;
+  captureRegion(params: PerceptionCaptureRegionParams): Promise<PerceptionCaptureRegionResultType>;
   /** Asks the host for a screenshot of one listed window, in front or not. */
   captureWindow(params: PerceptionCaptureWindowParams): Promise<PerceptionCaptureWindowResult>;
   /** The buffered frame nearest a moment ago, from the host's rolling memory. */
-  recall(params: RecallParams): Promise<RecallResult>;
+  recall(params: PerceptionRecallParamsType): Promise<PerceptionRecallResultType>;
   /** How a display, or a region of it, changed since a moment ago. */
-  diff(params: DiffParams): Promise<DiffResult>;
+  diff(params: PerceptionDiffParamsType): Promise<PerceptionDiffResultType>;
   /** Asks the host to draw a ring around one thing on screen. It only draws. */
   pointAt(params: ScreenPointAtParams): Promise<ScreenPointAtResultType>;
 }
-
-export type RecallParams = PerceptionRecallParamsType;
-export type RecallResult = PerceptionRecallResultType;
-export type DiffParams = PerceptionDiffParamsType;
-export type DiffResult = PerceptionDiffResultType;
-
-/** What the engine asks for when a pet wants a closer look. */
-export type CaptureRegionParams = PerceptionCaptureRegionParams;
-
-/** What the engine asks for. `windowId` absent means the foreground window. */
-export type ReadTextParams = PerceptionReadTextParams;
-export type ReadTextReading = PerceptionReadTextResultType;
 
 /** Everything a host may call, minus hello, which the server answers itself. */
 export type MethodHandlers = {
@@ -176,7 +164,7 @@ class SessionImpl implements HostSession {
     return ContextSnapshotPatch.parse(result.snapshot ?? {});
   }
 
-  async readText(params: ReadTextParams): Promise<ReadTextReading> {
+  async readText(params: PerceptionReadTextParams): Promise<PerceptionReadTextResultType> {
     const id = `readText-${this.#nextRequestId++}`;
     const raw = await this.#request(id, 'perception.readText', params);
     // Parsed rather than trusted: this crosses a socket, and a malformed reading that
@@ -198,19 +186,21 @@ class SessionImpl implements HostSession {
     return PerceptionListWindowsResult.parse(raw);
   }
 
-  async captureRegion(params: CaptureRegionParams): Promise<PerceptionCaptureRegionResultType> {
+  async captureRegion(
+    params: PerceptionCaptureRegionParams,
+  ): Promise<PerceptionCaptureRegionResultType> {
     const id = `captureRegion-${this.#nextRequestId++}`;
     const raw = await this.#request(id, 'perception.captureRegion', params);
     return PerceptionCaptureRegionResult.parse(raw);
   }
 
-  async recall(params: RecallParams): Promise<RecallResult> {
+  async recall(params: PerceptionRecallParamsType): Promise<PerceptionRecallResultType> {
     const id = `recall-${this.#nextRequestId++}`;
     const raw = await this.#request(id, 'perception.recall', PerceptionRecallParams.parse(params));
     return PerceptionRecallResult.parse(raw);
   }
 
-  async diff(params: DiffParams): Promise<DiffResult> {
+  async diff(params: PerceptionDiffParamsType): Promise<PerceptionDiffResultType> {
     const id = `diff-${this.#nextRequestId++}`;
     // Parsed on the way out too, so `includeImages` reaches the host with its default.
     const raw = await this.#request(id, 'perception.diff', PerceptionDiffParams.parse(params));

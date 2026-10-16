@@ -32,7 +32,6 @@ function brain(reply: string | Error, stopReason: BrainResult['stopReason'] = 'e
   const provider: BrainProvider = {
     id: 'fake',
     capabilities: fake.capabilities,
-    listModels: () => fake.listModels(),
     complete: (request) => {
       requests.push(request);
       if (reply instanceof Error) return Promise.reject(reply);

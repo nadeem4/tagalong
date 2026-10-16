@@ -4,12 +4,7 @@ export {
   WATCH_POLL_MS,
   WATCH_SETTLE_MS,
   WatchManager,
-  parseVerdict,
   systemWatchClock,
-  type StartOutcome,
-  type StartWatch,
-  type WatchClock,
   type WatchEvent,
   type WatchInfo,
-  type WatchManagerOptions,
 } from './watch-manager';

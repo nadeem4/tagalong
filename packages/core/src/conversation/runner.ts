@@ -144,7 +144,7 @@ interface ActiveTurn {
 const NO_TOOLS_YET = 'No tools are available yet. Answer from the context you already have.';
 
 /** Code on the warning a host shows when the pet's brain cannot read the picture it was given. */
-export const VISION_UNSUPPORTED = 'vision_unsupported';
+const VISION_UNSUPPORTED = 'vision_unsupported';
 
 /**
  * Drives one turn: store the question, assemble the prompt, stream the answer, store it.

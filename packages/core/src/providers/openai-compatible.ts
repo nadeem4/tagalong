@@ -43,8 +43,6 @@ export interface OpenAiCompatibleProviderOptions {
   baseURL?: string | undefined;
   /** Shown in error messages, so a person knows which service failed. */
   label?: string | undefined;
-  /** Models offered when nothing better is known. */
-  models?: readonly string[] | undefined;
   /**
    * The models that accept images. Absent means all of them do. Token Factory serves
    * text-only and vision models side by side, so the registry always passes this.
@@ -249,18 +247,16 @@ interface PendingCall {
  */
 export class OpenAiCompatibleProvider implements BrainProvider {
   readonly id: string;
-  readonly capabilities: BrainCapabilities = { vision: true, tools: true, streaming: true };
+  readonly capabilities: BrainCapabilities = { vision: true, tools: true };
 
   readonly #client: OpenAI;
   readonly #label: string;
-  readonly #models: readonly string[];
   readonly #visionModels: readonly string[] | undefined;
   readonly #baseURL: string;
 
   constructor(options: OpenAiCompatibleProviderOptions) {
     this.id = options.id;
     this.#label = options.label ?? 'Token Factory';
-    this.#models = options.models ?? [];
     this.#visionModels = options.visionModels;
     this.#baseURL = options.baseURL ?? NEBIUS_BASE_URL;
     this.#client = new OpenAI({
@@ -269,16 +265,6 @@ export class OpenAiCompatibleProvider implements BrainProvider {
       ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
       ...(options.maxRetries === undefined ? {} : { maxRetries: options.maxRetries }),
     });
-  }
-
-  /** Where requests go. */
-  get baseURL(): string {
-    return this.#baseURL;
-  }
-
-  /** The built-in list. Never touches the network. */
-  listModels(): Promise<string[]> {
-    return Promise.resolve([...this.#models]);
   }
 
   /**

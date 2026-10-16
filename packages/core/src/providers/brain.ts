@@ -11,7 +11,6 @@ export const REFUSAL_MESSAGE =
 export interface BrainCapabilities {
   vision: boolean;
   tools: boolean;
-  streaming: boolean;
 }
 
 /**
@@ -88,7 +87,6 @@ export interface BrainResult {
 export interface BrainProvider {
   id: string;
   capabilities: BrainCapabilities;
-  listModels(): Promise<string[]>;
   /**
    * Whether one model of this provider accepts images. Absent means every model does,
    * as long as `capabilities.vision` is set. Only a provider whose models differ — a

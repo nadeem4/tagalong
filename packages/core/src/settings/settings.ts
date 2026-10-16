@@ -63,11 +63,6 @@ export class SettingsStore {
     this.#file = join(dataDir, SETTINGS_FILENAME);
   }
 
-  /** Absolute path of the file this store reads and writes. */
-  get file(): string {
-    return this.#file;
-  }
-
   /** Current settings, with every absent field filled in from the defaults. */
   get(): Settings {
     const main = this.#load(this.#file);

@@ -15,24 +15,12 @@ export type {
   BrainResult,
   BrainTool,
 } from './brain';
+export { REFUSAL_MESSAGE } from './brain';
 export { BrainError, type BrainErrorCode } from './errors';
-export {
-  ANTHROPIC_MODELS,
-  AnthropicProvider,
-  REFUSAL_MESSAGE,
-  type AnthropicProviderOptions,
-} from './anthropic';
-export {
-  CLAUDE_CODE_MODELS,
-  ClaudeCodeBrain,
-  type ClaudeCodeBrainOptions,
-} from './claude-code-brain';
+export { ANTHROPIC_MODELS, AnthropicProvider } from './anthropic';
+export { CLAUDE_CODE_MODELS, ClaudeCodeBrain } from './claude-code-brain';
 export { FAKE_MODELS, FakeBrainProvider, type FakeScript } from './fake';
-export {
-  NEBIUS_BASE_URL,
-  OpenAiCompatibleProvider,
-  type OpenAiCompatibleProviderOptions,
-} from './openai-compatible';
+export { NEBIUS_BASE_URL, OpenAiCompatibleProvider } from './openai-compatible';
 export {
   NEBIUS_FALLBACK_MODELS,
   NEBIUS_VISION_MODELS,
@@ -40,12 +28,7 @@ export {
   NEMOTRON_VISION_MODEL,
 } from './nebius-models';
 export { createProvider, type ProviderConfig } from './registry';
-export { KeyedProviderResolver, type KeyedProviderResolverOptions } from './key-resolver';
+export { KeyedProviderResolver } from './key-resolver';
 export { carriesImage, modelForTurn } from './vision-routing';
 export { OPENAI_COMPATIBLE_PRESETS, SECRET_KEYS, openAiPreset, type OpenAiPreset } from './presets';
-export {
-  NEMOTRON_NANO_MODEL,
-  WATCH_MODEL_DEFAULTS,
-  watchModelsFor,
-  type WatchModels,
-} from './watch-models';
+export { NEMOTRON_NANO_MODEL, WATCH_MODEL_DEFAULTS, watchModelsFor } from './watch-models';

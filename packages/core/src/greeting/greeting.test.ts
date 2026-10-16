@@ -31,7 +31,6 @@ function brain(reply: string | Error) {
   const provider: BrainProvider = {
     id: 'fake',
     capabilities: fake.capabilities,
-    listModels: () => fake.listModels(),
     complete: (req, events, signal) => {
       requests.push(req);
       if (reply instanceof Error) return Promise.reject(reply);
@@ -254,8 +253,7 @@ describe('composeGreeting', () => {
   it('falls back when the brain takes too long', async () => {
     const slow: BrainProvider = {
       id: 'slow',
-      capabilities: { vision: false, tools: false, streaming: true },
-      listModels: () => Promise.resolve([]),
+      capabilities: { vision: false, tools: false },
       complete: (_req, _events, signal) =>
         new Promise((resolve) => {
           signal.addEventListener('abort', () =>
@@ -285,8 +283,7 @@ describe('composeGreeting', () => {
     // A cold `claude -p` may not answer the abort at once; the greeting must not wait on it.
     const deaf: BrainProvider = {
       id: 'deaf',
-      capabilities: { vision: false, tools: false, streaming: true },
-      listModels: () => Promise.resolve([]),
+      capabilities: { vision: false, tools: false },
       complete: () => new Promise(() => undefined),
     };
     const result = await composeGreeting({

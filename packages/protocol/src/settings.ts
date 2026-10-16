@@ -85,12 +85,7 @@ export const SETTINGS_DEFAULTS = {
   rollingMemory: { enabled: false, minutes: 10 },
   /** 60 model checks a watch, 3 watches at once, 30 minutes unless the pet names a timeout. */
   watch: { maxChecks: 60, maxConcurrent: 3, defaultTimeoutMinutes: 30 },
-  /** Unused: nothing reads or writes it. */
-  onboarding: { done: false },
-  /**
-   * Whether the Welcome window has been finished. Separate from `onboarding`, so every
-   * install sees Welcome once.
-   */
+  /** Whether the Welcome window has been finished. Every install sees Welcome once. */
   welcome: { done: false },
   /**
    * Whether Scout says one short line when Tagalong opens, after the first time. On by
@@ -303,8 +298,6 @@ const settingsFields = {
       .min(1)
       .max(24 * 60),
   }),
-  /** Unused; see SETTINGS_DEFAULTS.onboarding. */
-  onboarding: z.object({ done: z.boolean() }),
   /**
    * The guided first run: whether it is finished, the furthest step reached (where it
    * resumes), how the person answers, and the brain picked. A patch replaces the whole
@@ -386,7 +379,6 @@ export const Settings = z.object({
   hiddenPets: settingsFields.hiddenPets.prefault([...SETTINGS_DEFAULTS.hiddenPets]),
   rollingMemory: settingsFields.rollingMemory.prefault({ ...SETTINGS_DEFAULTS.rollingMemory }),
   watch: settingsFields.watch.prefault({ ...SETTINGS_DEFAULTS.watch }),
-  onboarding: settingsFields.onboarding.prefault({ ...SETTINGS_DEFAULTS.onboarding }),
   welcome: settingsFields.welcome.prefault({ ...SETTINGS_DEFAULTS.welcome }),
   greeting: settingsFields.greeting.default(SETTINGS_DEFAULTS.greeting),
   lastOpenedAt: settingsFields.lastOpenedAt.default(SETTINGS_DEFAULTS.lastOpenedAt),

@@ -283,12 +283,9 @@ describe('ask input', () => {
     expect(parsed.petId).toBe('scout');
   });
 
-  it('accepts an audio-only ask', () => {
+  it('rejects an ask without text, audio included', () => {
     const params = { petId: 'scout', input: { audio: { mime: 'audio/webm', base64: 'aGk=' } } };
-    expect(paramsSchemaFor('ask').safeParse(params).success).toBe(true);
-  });
-
-  it('rejects an ask with neither text nor audio', () => {
+    expect(paramsSchemaFor('ask').safeParse(params).success).toBe(false);
     expect(paramsSchemaFor('ask').safeParse({ petId: 'scout', input: {} }).success).toBe(false);
   });
 
@@ -443,15 +440,20 @@ describe('HostCapability, full view', () => {
     expect(HostCapability.safeParse('textLayer').success).toBe(true);
   });
 
-  it('still knows every capability a Phase 1 host advertises', () => {
+  it('still knows the original perception capabilities', () => {
     for (const capability of ['selection', 'screenshot', 'activeWindow', 'clipboard', 'pageText']) {
       expect(HostCapability.safeParse(capability).success, capability).toBe(true);
     }
   });
+
+  it('has no audio capabilities: speech becomes text on the host', () => {
+    expect(HostCapability.safeParse('audioIn').success).toBe(false);
+    expect(HostCapability.safeParse('audioOut').success).toBe(false);
+  });
 });
 
-describe('the core-to-host catalog after 3B', () => {
-  it('carries the 2B perception methods plus recall and diff', () => {
+describe('the core-to-host catalog', () => {
+  it('carries the perception methods, recall, diff and the pointer', () => {
     expect(Object.keys(coreToHostMethods).sort()).toEqual([
       'perception.capture',
       'perception.captureRegion',

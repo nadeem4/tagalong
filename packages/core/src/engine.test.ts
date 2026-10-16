@@ -376,9 +376,13 @@ describe('ask', () => {
     await host.call('ask', { petId: 'scout', input: { text: 'remember me' } });
     await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
 
-    const conversations = e.conversationCount();
+    const db = openDatabase(dir);
+    const { count } = db.prepare('SELECT COUNT(*) AS count FROM conversations').get() as {
+      count: number;
+    };
+    db.close();
 
-    expect(conversations).toBe(1);
+    expect(count).toBe(1);
   });
 
   it('answers an ask for a pet that does not exist with an error', async () => {
@@ -671,7 +675,6 @@ describe('a spoken ask over rpc', () => {
     const recording: BrainProvider = {
       id: 'fake',
       capabilities: fake.capabilities,
-      listModels: () => fake.listModels(),
       complete: (req, handlers, signal) => {
         systems.push(req.system);
         return fake.complete(req, handlers, signal);
@@ -727,7 +730,6 @@ describe('memory across a restart', () => {
     const recording: BrainProvider = {
       id: 'fake',
       capabilities: fake.capabilities,
-      listModels: () => fake.listModels(),
       complete: (req, handlers, signal) => {
         systems.push(req.system);
         return fake.complete(req, handlers, signal);
@@ -787,7 +789,10 @@ describe('pets and settings over rpc', () => {
     await e.shutdown();
     engine = undefined;
     const again = await boot();
-    const ids = again.pets.map((pet) => pet.id);
+    const reconnected = await TestHost.connect(again.port);
+    await reconnected.call('hello', helloParams(again.pairingToken));
+    const listed = await reconnected.call('pets.list', {});
+    const ids = (listed['result'] as { pets: { id: string }[] }).pets.map((pet) => pet.id);
     expect(ids).toEqual(['pip', 'scout']);
   });
 
@@ -830,12 +835,14 @@ describe('roles over rpc', () => {
   });
 
   it('refuses a pet whose role is not in the library, and saves nothing', async () => {
-    const { e, host } = await connected();
+    const { host } = await connected();
     const res = await host.call('pets.upsert', { pet: draft({ roleId: 'wizard' }) });
     const error = res['error'] as Record<string, unknown>;
     expect(error['code']).toBe(RPC_ERROR_CODES.invalidParams);
     expect(String(error['message'])).toContain('wizard');
-    expect(e.pets.map((pet) => pet.id)).not.toContain('pip');
+    const listed = await host.call('pets.list', {});
+    const pets = (listed['result'] as { pets: { id: string }[] }).pets;
+    expect(pets.map((pet) => pet.id)).not.toContain('pip');
   });
 
   it('refuses the crew-era methods: they are gone', async () => {
@@ -857,7 +864,6 @@ describe('the browser host', () => {
     const provider: BrainProvider = {
       id: inner.id,
       capabilities: inner.capabilities,
-      listModels: () => inner.listModels(),
       complete: (req, events, signal) => {
         prompts.push(JSON.stringify(req));
         return inner.complete(req, events, signal);
@@ -1296,7 +1302,6 @@ describe('the built-in blind spots', () => {
     const e = await boot({
       id: inner.id,
       capabilities: inner.capabilities,
-      listModels: () => inner.listModels(),
       complete: (req, events, signal) => {
         prompts.push(JSON.stringify(req));
         return inner.complete(req, events, signal);
@@ -1326,8 +1331,7 @@ describe('greeting.compose', () => {
   it('greets by the name in settings when the brain cannot', async () => {
     const failing: BrainProvider = {
       id: 'fake',
-      capabilities: { vision: false, tools: false, streaming: true },
-      listModels: () => Promise.resolve([]),
+      capabilities: { vision: false, tools: false },
       complete: () => Promise.reject(new Error('offline')),
     };
     const e = await boot(failing);
@@ -1341,8 +1345,7 @@ describe('greeting.compose', () => {
   it('counts the time away from when Tagalong was last closed, not last launched', async () => {
     const failing: BrainProvider = {
       id: 'fake',
-      capabilities: { vision: false, tools: false, streaming: true },
-      listModels: () => Promise.resolve([]),
+      capabilities: { vision: false, tools: false },
       complete: () => Promise.reject(new Error('offline')),
     };
     const e = await boot(failing);
@@ -1375,8 +1378,7 @@ describe('greeting.compose', () => {
   it('says it closed unexpectedly when main says the last launch crashed', async () => {
     const failing: BrainProvider = {
       id: 'fake',
-      capabilities: { vision: false, tools: false, streaming: true },
-      listModels: () => Promise.resolve([]),
+      capabilities: { vision: false, tools: false },
       complete: () => Promise.reject(new Error('offline')),
     };
     // A hand-off still running when the last launch died: boot closes it as interrupted.
@@ -1402,8 +1404,7 @@ describe('greeting.compose', () => {
   it('says what is new when the version changed', async () => {
     const failing: BrainProvider = {
       id: 'fake',
-      capabilities: { vision: false, tools: false, streaming: true },
-      listModels: () => Promise.resolve([]),
+      capabilities: { vision: false, tools: false },
       complete: () => Promise.reject(new Error('offline')),
     };
     const e = await boot(failing);
@@ -1449,8 +1450,7 @@ describe('pick up where you left off', () => {
     let calls = 0;
     const provider: BrainProvider = {
       id: 'fake',
-      capabilities: { vision: false, tools: false, streaming: true },
-      listModels: () => Promise.resolve([]),
+      capabilities: { vision: false, tools: false },
       complete: () => {
         calls += 1;
         return Promise.resolve({
@@ -1651,8 +1651,7 @@ describe('connections over rpc', () => {
     let rounds = 0;
     const readThenWrite: BrainProvider = {
       id: 'fake',
-      capabilities: { vision: false, tools: true, streaming: true },
-      listModels: () => Promise.resolve(['fake-model']),
+      capabilities: { vision: false, tools: true },
       complete: async (_req, events) => {
         if (rounds++ === 0) {
           await events.onToolUse({ id: 'call-1', name: 'wiki__search', input: { q: 'me' } });
@@ -1722,8 +1721,7 @@ describe('file this as a bug over rpc', () => {
     let rounds = 0;
     return {
       id: 'fake',
-      capabilities: { vision: false, tools: true, streaming: true },
-      listModels: () => Promise.resolve(['fake-model']),
+      capabilities: { vision: false, tools: true },
       complete: async (req, events) => {
         systems.push(req.system);
         if (rounds++ === 0) {
@@ -1806,8 +1804,7 @@ describe('providers.check', () => {
   it('tests the key once and says plainly when it fails', async () => {
     const refusing: BrainProvider = {
       id: 'fake',
-      capabilities: { vision: false, tools: false, streaming: true },
-      listModels: () => Promise.resolve([]),
+      capabilities: { vision: false, tools: false },
       complete: () => Promise.reject(new BrainError('auth', 'rejected')),
     };
     const e = await boot(refusing);

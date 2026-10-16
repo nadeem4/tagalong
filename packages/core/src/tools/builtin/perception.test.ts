@@ -48,17 +48,10 @@ function toolset(
   hosts: readonly PerceptionHost[],
   exclusions: CaptureExclusions = NO_EXCLUSIONS,
   vision = true,
-  turnVision?: boolean,
 ): TurnTools {
   return fakeTurnTools(
-    {
-      perception: {
-        hosts: () => hosts,
-        exclusions: () => exclusions,
-        vision: () => vision,
-      },
-    },
-    turnVision === undefined ? {} : { vision: turnVision },
+    { perception: { hosts: () => hosts, exclusions: () => exclusions } },
+    { vision },
   );
 }
 
@@ -246,26 +239,23 @@ describe('unknown tools', () => {
 });
 
 describe('per-turn vision', () => {
-  it('sends pixels when the turn says its brain can see and the host sets no ceiling', async () => {
-    const tools = fakeTurnTools(
-      { perception: { hosts: () => [screenshotHost()], exclusions: () => NO_EXCLUSIONS } },
-      { vision: true },
-    );
-    const outcome = await tools.run({ name: LOOK_AT_SCREEN });
+  it('sends pixels when the turn says its brain can see', async () => {
+    const outcome = await toolset([screenshotHost()]).run({ name: LOOK_AT_SCREEN });
     expect(Array.isArray(outcome.content)).toBe(true);
   });
 
-  it('answers in words when this turn cannot see, even though the toolset could', async () => {
-    const outcome = await toolset([screenshotHost()], NO_EXCLUSIONS, true, false).run({
+  it('answers in words when this turn cannot see', async () => {
+    const outcome = await toolset([screenshotHost()], NO_EXCLUSIONS, false).run({
       name: LOOK_AT_SCREEN,
     });
     expect(typeof outcome.content).toBe('string');
   });
 
-  it('never lets a turn widen a toolset that was built blind', async () => {
-    const outcome = await toolset([screenshotHost()], NO_EXCLUSIONS, false, true).run({
-      name: LOOK_AT_SCREEN,
+  it('answers in words when the turn does not say whether it can see', async () => {
+    const tools = fakeTurnTools({
+      perception: { hosts: () => [screenshotHost()], exclusions: () => NO_EXCLUSIONS },
     });
+    const outcome = await tools.run({ name: LOOK_AT_SCREEN });
     expect(typeof outcome.content).toBe('string');
   });
 });

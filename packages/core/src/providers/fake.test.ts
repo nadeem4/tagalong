@@ -34,11 +34,10 @@ function recorder(toolResult = { content: 'tool ran' }): {
 }
 
 describe('FakeBrainProvider', () => {
-  it('identifies itself as the fake provider with full capabilities', async () => {
+  it('identifies itself as the fake provider with full capabilities', () => {
     const provider = new FakeBrainProvider({ text: 'hi' });
     expect(provider.id).toBe('fake');
-    expect(provider.capabilities).toEqual({ vision: true, tools: true, streaming: true });
-    expect(await provider.listModels()).toContain('fake-model');
+    expect(provider.capabilities).toEqual({ vision: true, tools: true });
   });
 
   it('streams the scripted text word by word', async () => {

@@ -105,13 +105,15 @@ async function engineWithHost(
 
 /** The toolset, bound to the real sessions of a real server. */
 function toolsetOver(sessions: () => readonly HostSession[]): TurnTools {
-  return fakeTurnTools({
-    perception: {
-      hosts: () => sessions() as unknown as readonly PerceptionHost[],
-      exclusions: () => ({ processNames: [], titlePatterns: [] }),
-      vision: () => true,
+  return fakeTurnTools(
+    {
+      perception: {
+        hosts: () => sessions() as unknown as readonly PerceptionHost[],
+        exclusions: () => ({ processNames: [], titlePatterns: [] }),
+      },
     },
-  });
+    { vision: true },
+  );
 }
 
 const WINDOW = {

@@ -53,8 +53,7 @@ describe('meterBrain', () => {
     const calls: MeteredCall[] = [];
     const failing: BrainProvider = {
       id: 'broken',
-      capabilities: { vision: false, tools: true, streaming: true },
-      listModels: async () => [],
+      capabilities: { vision: false, tools: true },
       complete: () => Promise.reject(new Error('offline')),
     };
     await expect(

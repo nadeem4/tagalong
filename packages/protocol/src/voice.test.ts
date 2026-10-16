@@ -26,7 +26,8 @@ describe('voice adapters', () => {
     expect(adaptersFor('ears')).toEqual([expect.objectContaining({ id: 'local', offline: true })]);
   });
 
-  it('has a Live slot but no Live adapter yet', () => {
+  it('has only the ears and mouth slots', () => {
+    // @ts-expect-error 'live' is not a slot.
     expect(adaptersFor('live')).toEqual([]);
   });
 });

@@ -49,7 +49,7 @@ const SHELL_PROMPT =
  */
 export class ClaudeCodeBrain implements BrainProvider {
   readonly id = 'claude-code';
-  readonly capabilities: BrainCapabilities = { vision: true, tools: true, streaming: false };
+  readonly capabilities: BrainCapabilities = { vision: true, tools: true };
   readonly #spawn: SpawnFn;
   readonly #command: string;
   readonly #cwd: string;
@@ -58,10 +58,6 @@ export class ClaudeCodeBrain implements BrainProvider {
     this.#spawn = options.spawn ?? spawnChild;
     this.#command = options.command ?? 'claude';
     this.#cwd = options.cwd ?? tmpdir();
-  }
-
-  async listModels(): Promise<string[]> {
-    return [...CLAUDE_CODE_MODELS];
   }
 
   async complete(

@@ -74,8 +74,7 @@ function checker(answers: string[], options: { canSee?: (model: string) => boole
   const requests: BrainRequest[] = [];
   const provider: BrainProvider = {
     id: 'checker',
-    capabilities: { vision: true, tools: true, streaming: true },
-    listModels: () => Promise.resolve([]),
+    capabilities: { vision: true, tools: true },
     ...(options.canSee === undefined ? {} : { canSee: options.canSee }),
     complete: (req): Promise<BrainResult> => {
       requests.push(req);
