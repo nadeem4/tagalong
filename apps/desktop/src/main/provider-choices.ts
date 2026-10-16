@@ -25,7 +25,6 @@ export function providerChoices(stored: ReadonlySet<string>): ProviderChoice[] {
         id,
         label: preset.label,
         defaultBaseUrl: preset.baseURL,
-        envVar: preset.envVar,
         needsKey: true,
         hasKey: stored.has(id),
       },

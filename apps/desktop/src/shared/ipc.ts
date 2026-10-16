@@ -97,10 +97,8 @@ export const IPC = {
   openOnboarding: 'tagalong:onboarding:open',
   openOffice: 'tagalong:office:open',
   homePageEvent: 'tagalong:office:page',
-  findAgents: 'tagalong:welcome:agents',
   finishWelcome: 'tagalong:welcome:finish',
   openLink: 'tagalong:link:open',
-  showExtensionFolder: 'tagalong:extension:show',
   checkClaudeSignIn: 'tagalong:claude:sign-in',
   openClaudeSignIn: 'tagalong:claude:open-sign-in',
   switchScout: 'tagalong:pets:switch-scout',
@@ -209,8 +207,6 @@ export interface ProviderChoice {
   label: string;
   /** Present for OpenAI-compatible presets: the URL used when settings name none. */
   defaultBaseUrl?: string;
-  /** The environment variable for this key, as `.env.example` lists it. Nothing reads it today. */
-  envVar?: string;
   needsKey: boolean;
   /** Whether a key is stored. The key itself never comes back out. */
   hasKey: boolean;
@@ -274,12 +270,8 @@ export interface HostView {
   pairingToken?: string;
   /** Set when the global hotkey could not be registered, so settings can say why. */
   hotkeyError?: string;
-  /** The check model a watch uses on each provider when a pet names none. No window reads it. */
-  watchModelDefaults: Record<string, string>;
   /** `process.platform`, so a hotkey reads Ctrl on Windows and Cmd on a Mac. */
   platform: string;
-  /** The unpacked Chrome extension's folder, when it is on this machine. No window reads it. */
-  extensionFolder?: string;
   /** Whether an ElevenLabs key is stored. The key itself never comes back out. */
   elevenLabsKeyStored: boolean;
 }
@@ -345,11 +337,6 @@ export interface TagalongHostApi {
   /** Main names the Home page to show, when the tray or the bubble opens a particular one. */
   onHomePage(handler: (page: string) => void): () => void;
   /**
-   * The coding agents on this computer. No window calls it: finishing Welcome finds them in
-   * main.
-   */
-  findAgents(): Promise<FoundAgent[]>;
-  /**
    * Finishes Welcome: Scout becomes the Companion thinking on `providerId` and docks alone,
    * Welcome closes and the panel opens beside Scout.
    */
@@ -366,8 +353,6 @@ export interface TagalongHostApi {
    * refuses any other URL.
    */
   openLink(url: string): Promise<void>;
-  /** Shows the unpacked extension's folder in the file manager. No window calls it. */
-  showExtensionFolder(): Promise<void>;
   hidePanel(): Promise<void>;
   /** The panel measured its content; main resizes it, keeping it level with the pet. */
   fitPanel(height: number): Promise<void>;

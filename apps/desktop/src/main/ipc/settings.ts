@@ -3,7 +3,6 @@
  * lists. Works with no engine, from the settings file. Contains registerSettingsIpc.
  */
 
-import { WATCH_MODEL_DEFAULTS } from '@tagalong/core';
 import type { SecretStore } from '@tagalong/core';
 import type { ProvidersCheckResult, Settings, SettingsPatch } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
@@ -25,8 +24,6 @@ export interface SettingsIpcDeps {
   secrets: () => SecretStore;
   /** Why a hotkey or the engine failed, for Settings to say. */
   problem: () => string | null;
-  /** The unpacked Chrome extension's folder, when it is on this machine. */
-  extensionFolder: () => string | undefined;
   version: () => string;
   setSettings: (settings: Settings) => void;
   applyHotkeys: (settings: Settings) => void;
@@ -58,7 +55,6 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
     const host = deps.host();
     const pets = host === null ? [] : (await host.client.call('pets.list', {})).pets;
     const problem = deps.problem();
-    const folder = deps.extensionFolder();
     const elevenLabsKey = await secrets.get(ELEVENLABS_SECRET_KEY).catch(() => null);
     return {
       elevenLabsKeyStored: elevenLabsKey !== null && elevenLabsKey.length > 0,
@@ -66,9 +62,7 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
       pets,
       providers: providerChoices(stored),
       engineVersion: deps.version(),
-      watchModelDefaults: { ...WATCH_MODEL_DEFAULTS },
       platform: process.platform,
-      ...(folder !== undefined ? { extensionFolder: folder } : {}),
       ...(host !== null ? { pairingToken: host.engine.pairingToken } : {}),
       ...(problem !== null ? { hotkeyError: problem } : {}),
     };

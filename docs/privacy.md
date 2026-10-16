@@ -593,7 +593,7 @@ there is no switch, because it holds no content and an off switch would weaken t
 
 | Row                    | Written when                                                                                                 | What the row keeps                                               |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| **Listed windows**     | the window list is read (a tool, a routine, the hotkey's full view)                                          | how many windows                                                 |
+| **Listed windows**     | the window list is read (a tool or a routine)                                                                | how many windows                                                 |
 | **Read text**          | one window's text is read (accessibility tree or OCR), or a hotkey ask arrives with a selection or page text | the app, the window title, how many characters                   |
 | **Screenshot**         | a screenshot, a crop, a window picture, a frame from screen memory, or a watch's before-and-after crops      | the app and title when known, how many pictures                  |
 | **Sent to AI**         | any call to Scout's provider: a turn, a summary, a watch check, keeping an eye on things, the launch line    | the provider and model, how many characters and pictures         |

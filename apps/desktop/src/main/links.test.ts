@@ -1,8 +1,7 @@
-/** Tests for the link allowlists and the extension folder. */
+/** Tests for the link allowlists. */
 
-import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { extensionFolder, isAllowedLink, isSignInPage } from './links';
+import { isAllowedLink, isSignInPage } from './links';
 
 describe('isAllowedLink', () => {
   it('opens the pages where provider keys are made', () => {
@@ -24,44 +23,6 @@ describe('isAllowedLink', () => {
     expect(isAllowedLink('file:///C:/Windows/System32/calc.exe')).toBe(false);
     expect(isAllowedLink('https://openrouter.ai.evil.example.com/')).toBe(false);
     expect(isAllowedLink('not a url')).toBe(false);
-  });
-});
-
-describe('extensionFolder', () => {
-  const exists = (paths: string[]) => (path: string) => paths.includes(path);
-
-  it('points a packaged app at the extension shipped in its resources', () => {
-    expect(
-      extensionFolder({
-        packaged: true,
-        resourcesPath: '/opt/Tagalong/resources',
-        appPath: '/opt/Tagalong/resources/app.asar',
-        exists: exists([join('/opt/Tagalong/resources', 'extension')]),
-      }),
-    ).toBe(join('/opt/Tagalong/resources', 'extension'));
-  });
-
-  // Built with node:path so the expectations hold on the Windows CI runner too.
-  it('points a source checkout at the extension build', () => {
-    expect(
-      extensionFolder({
-        packaged: false,
-        resourcesPath: '/irrelevant',
-        appPath: '/repo/apps/desktop',
-        exists: exists([resolve('/repo/apps/extension/dist')]),
-      }),
-    ).toBe(resolve('/repo/apps/extension/dist'));
-  });
-
-  it('says nothing when the extension was never built', () => {
-    expect(
-      extensionFolder({
-        packaged: false,
-        resourcesPath: '/irrelevant',
-        appPath: '/repo/apps/desktop',
-        exists: exists([]),
-      }),
-    ).toBeUndefined();
   });
 });
 

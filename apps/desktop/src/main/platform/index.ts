@@ -114,7 +114,7 @@ export interface Platform {
  */
 export function createPlatform(platform: NodeJS.Platform = process.platform): Platform {
   if (platform === 'win32') return new Win32Platform();
-  throw new Error(`Tagalong has no platform adapter for '${platform}' until Phase 7`);
+  throw new Error(`Tagalong has no platform adapter for '${platform}'. It runs on Windows only.`);
 }
 
 export type { Win32Platform };

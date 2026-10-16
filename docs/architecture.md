@@ -1065,7 +1065,7 @@ Scout saw. The card never switches Always listening on. Core holds no proposal; 
 
 Everything OS-specific sits behind `Platform` in `src/main/platform/`. `createPlatform` throws on any
 OS with no adapter rather than returning a stub, because a host that silently perceives nothing looks
-like a broken engine instead of a missing port. Windows is the only implementation until Phase 7.
+like a broken engine instead of a missing port. Windows is the only implementation.
 
 `TextLayerProvider` is the second interface here, and it exists for the same stated reason: Phase 7
 names the macOS implementation, which answers the same two questions through the Accessibility API.
@@ -2570,9 +2570,7 @@ matters for the hackathon, and carries best-effort, unverified dmg, AppImage and
   prebuilt Windows binary. `scripts/fetch-native.mjs` runs that download (never a compile) before
   `package:win`; without it the active-window lookup answers "no window" and a look captures the whole
   screen.
-- `extraResources` copies `apps/extension/dist` to `resources/extension`, and `HostView.extensionFolder`
-  points Settings at it (`main/links.ts#extensionFolder`: the resources folder when packaged, the
-  extension's build in a checkout).
+- `extraResources` copies `apps/extension/dist` to `resources/extension`.
 - `publish: null`: there is no auto-update channel, and electron-builder otherwise crashes writing
   update metadata for one.
 
