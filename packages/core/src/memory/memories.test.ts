@@ -24,9 +24,17 @@ afterEach(() => {
 
 describe('MemoryStore', () => {
   it('stores a memory under the pet it belongs to', () => {
-    const mine = memories.add({ petId: 'scout', kind: 'preference', text: 'Prefers short answers' });
+    const mine = memories.add({
+      petId: 'scout',
+      kind: 'preference',
+      text: 'Prefers short answers',
+    });
 
-    expect(mine).toMatchObject({ petId: 'scout', kind: 'preference', text: 'Prefers short answers' });
+    expect(mine).toMatchObject({
+      petId: 'scout',
+      kind: 'preference',
+      text: 'Prefers short answers',
+    });
     expect(mine).not.toHaveProperty('scope');
     expect(memories.recent('scout', 10).map((m) => m.text)).toEqual(['Prefers short answers']);
   });

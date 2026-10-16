@@ -177,10 +177,7 @@ describe('assemblePrompt memory section', () => {
       pet,
       history: [userMessage('hi')],
       settings,
-      memories: [
-        memory('Prefers short answers'),
-        memory('The repo uses pnpm', { kind: 'fact' }),
-      ],
+      memories: [memory('Prefers short answers'), memory('The repo uses pnpm', { kind: 'fact' })],
     });
 
     expect(request.system).toContain(MEMORY_HEADING);

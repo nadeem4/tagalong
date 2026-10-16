@@ -3,13 +3,7 @@
  * the screen-reply rule, memories), history, and the screen context attached to the question.
  * Contains assemblePrompt and the headings and limits it uses. Pure: no IO.
  */
-import type {
-  ContextSnapshot,
-  Message,
-  MessageContent,
-  Pet,
-  Settings,
-} from '@tagalong/protocol';
+import type { ContextSnapshot, Message, MessageContent, Pet, Settings } from '@tagalong/protocol';
 import { MAX_SELECTION_CHARS } from '@tagalong/protocol';
 import type { BrainContent, BrainMessage, BrainRequest } from '../providers';
 import type { Memory } from '../memory/memories';
@@ -54,7 +48,8 @@ const BASE_INSTRUCTIONS = [
 ].join('\n');
 
 /** How Scout's answer is shown: read on screen. A spoken turn adds SPOKEN_MODE on top. */
-const SCREEN_REPLY = 'Your reply is read on screen. Short paragraphs, lists, and code fences are fine.';
+const SCREEN_REPLY =
+  'Your reply is read on screen. Short paragraphs, lists, and code fences are fine.';
 
 /** Heads the spoken-mode block, which only a question asked out loud gets. */
 export const SPOKEN_HEADING = '## This turn is spoken';
