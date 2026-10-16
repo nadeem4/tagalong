@@ -105,12 +105,16 @@ describe('the role files', () => {
     expect(instructions).toContain('point, never claim you clicked');
   });
 
-  it('give the companion change_settings, after tell_expert, and tell it Apply is a click', () => {
+  it('give the companion change_settings, after tell_expert, and tell it Apply or Turn on is a click', () => {
     const tools = getRole('companion')?.tools ?? [];
     expect(tools.indexOf('change_settings')).toBe(tools.indexOf('tell_expert') + 1);
     const instructions = getRole('companion')?.instructions ?? '';
     expect(instructions).toContain('change_settings');
-    expect(instructions).toContain('until they click Apply');
+    // The card's button reads Turn on, not Apply, for a change that loosens a setting.
+    expect(instructions).toContain('nothing changes until they click');
+    expect(instructions).toContain(
+      'Apply (Turn on, for a change marked as letting you see or keep more)',
+    );
     expect(instructions).toContain('only in Settings');
   });
 
@@ -136,6 +140,12 @@ describe('the role files', () => {
     ]) {
       expect(lines).toContain(heading);
     }
+  });
+
+  it('tell the companion a meeting routine is a `when` of type meeting, not a string', () => {
+    const instructions = getRole('companion')?.instructions ?? '';
+    expect(instructions).toContain('give `when` the type `meeting`');
+    expect(instructions).not.toContain('set `when` to `meeting`');
   });
 
   it("tell the companion to name a routine's expert in uses, so the card shows it", () => {
