@@ -1,8 +1,8 @@
 /**
  * The brain layer's public surface: the contract types, each provider, `createProvider`,
- * the key resolver, presets and model ids. Code outside this folder imports from here
- * rather than from a provider file; the engine reaches the guard, record and key-check
- * wrappers by file.
+ * the key resolver, presets and model ids. Most code outside this folder imports from here;
+ * the engine (guard, record, key check), roles (presets, Nebius ids) and usage (the brain
+ * types) import a file directly.
  */
 export type {
   BrainCapabilities,

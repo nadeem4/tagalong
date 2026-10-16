@@ -236,8 +236,7 @@ export function defaultConnectorFor(
  * Everything the engine owns, wired together and listening.
  *
  * The facade exists so a host has exactly one thing to start and stop. Hosts never
- * touch the store, the runner, or the provider directly — they speak the protocol,
- * which is what keeps the Electron host and the Chrome host interchangeable.
+ * touch the store, the runner, or the provider directly: they speak the protocol.
  */
 export class Engine {
   readonly #db: Database;
