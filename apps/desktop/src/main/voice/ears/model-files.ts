@@ -1,3 +1,8 @@
+/**
+ * The pinned model files for the ears and Kokoro, and the checked download that fetches them.
+ * Contains EARS_FILES, KOKORO_FILES, ensureFiles and sharedEnsureFiles.
+ */
+
 import { createHash } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
 import { mkdir, open, rename, rm } from 'node:fs/promises';

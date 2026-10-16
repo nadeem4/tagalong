@@ -1,3 +1,5 @@
+/** Tests for the voice service, the lazy local voice, ElevenLabs and the fake. */
+
 import { describe, expect, it, vi } from 'vitest';
 import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import type { MouthId } from '@tagalong/protocol';

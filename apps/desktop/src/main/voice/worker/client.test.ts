@@ -1,3 +1,5 @@
+/** Tests for VoiceWorker. */
+
 import { describe, expect, it, vi } from 'vitest';
 import { VoiceWorker } from './client';
 import type { FromWorker, ToWorker, WorkerProcess } from './messages';

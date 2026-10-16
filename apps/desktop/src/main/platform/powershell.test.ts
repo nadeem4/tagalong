@@ -1,3 +1,5 @@
+/** Tests that PowerShell is started in one place, with the expected arguments. */
+
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 

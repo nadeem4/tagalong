@@ -1,3 +1,5 @@
+/** Tests for reading one window's text, with OCR when the text layer is thin. */
+
 import type { WindowEntry } from '@tagalong/protocol';
 import { describe, expect, it, vi } from 'vitest';
 

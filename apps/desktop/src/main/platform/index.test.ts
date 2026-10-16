@@ -1,3 +1,5 @@
+/** Tests for createPlatform. */
+
 import { describe, expect, it, vi } from 'vitest';
 import { createPlatform } from './index';
 

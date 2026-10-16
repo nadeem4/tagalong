@@ -5,13 +5,14 @@
  * makes the inventory cheap enough to attach to every capture. This is the other half:
  * the deliberate, per-window read the pet spends a tool call on once it knows which
  * window it wants.
+ * Contains the read and count scripts and parseWindowText.
  */
 
 /**
  * How long the walk of one window may run before it returns what it has.
  *
- * Under the three seconds the phase page allows for the whole call, leaving room for
- * PowerShell to start and for the JSON to come back. Measured on a real desktop, the
+ * Under three seconds for the whole call, leaving room for PowerShell to start and for
+ * the JSON to come back. Measured on a real desktop, the
  * heaviest single window — a background browser holding 34,588 characters — took 829ms,
  * so this is roughly triple the worst real case.
  */

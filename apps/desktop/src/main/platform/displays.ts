@@ -1,3 +1,8 @@
+/**
+ * Captures every display at once, blanking any display that shows an excluded window, and draws the
+ * composite. Contains captureDisplaysWith and displayRefusals.
+ */
+
 import { findCaptureBlock } from '@tagalong/core';
 import type { CaptureBlock } from '@tagalong/core';
 import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
@@ -26,7 +31,7 @@ export interface DisplayImagePort {
   isEmpty(): boolean;
   getSize(): PixelSize;
   resize(size: PixelSize): DisplayImagePort;
-  /** Phase 2B: the native-resolution crop behind look_closer. */
+  /** The native-resolution crop behind look_closer. */
   crop(rect: { x: number; y: number; width: number; height: number }): DisplayImagePort;
   toPNG(): Buffer;
   toBitmap(): Buffer;
@@ -188,14 +193,13 @@ export async function displayRefusals(deps: DisplayRefusalDeps): Promise<Display
  * three full enumerations.
  *
  * A display is blanked when **any window on it that the user can see** is excluded, not
- * only when the foreground window is. Phase 2 checked the foreground window alone, which
- * was sufficient while a capture only ever framed that window; capturing every display at
- * once puts unfocused windows in frame, and a password manager open on a second monitor
- * was going to the model in full.
+ * only when the foreground window is. Checking only the foreground window is not enough:
+ * every display puts unfocused windows in frame, such as a password manager on a second
+ * monitor.
  *
- * The foreground check stays as a floor beneath the inventory. If the enumeration fails —
- * PowerShell missing, blocked by policy, an accessibility tree that will not answer — the
- * protection Phase 2 already shipped must not quietly disappear with it.
+ * The foreground check stays as a floor beneath the inventory: if the enumeration fails
+ * (PowerShell missing, blocked by policy, an accessibility tree that will not answer), the
+ * focused window is still refused.
  */
 export async function captureDisplaysWith(
   deps: DisplaysCaptureDeps,

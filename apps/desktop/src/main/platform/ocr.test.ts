@@ -1,3 +1,5 @@
+/** Tests for the OCR script, its parser and recognizeText. */
+
 import { describe, expect, it, vi } from 'vitest';
 import { NO_RECOGNISER, OCR_SCRIPT, parseOcr, recognizeText } from './ocr';
 

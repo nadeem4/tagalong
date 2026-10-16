@@ -1,3 +1,5 @@
+/** Tests for the pinned model lists and the checked download. */
+
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

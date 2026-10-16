@@ -1,3 +1,5 @@
+/** Tests for diffBitmaps and cropBitmap. */
+
 import { describe, expect, it } from 'vitest';
 import { createCanvas } from '../platform/canvas';
 import type { Bitmap } from '../platform/canvas';

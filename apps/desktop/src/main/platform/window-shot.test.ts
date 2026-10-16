@@ -1,3 +1,5 @@
+/** Tests for the screenshot of one listed window. */
+
 import { describe, expect, it, vi } from 'vitest';
 import type { WindowEntry } from '@tagalong/protocol';
 import { lookAtWindowWith } from './window-shot';

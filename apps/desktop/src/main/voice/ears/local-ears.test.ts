@@ -1,3 +1,5 @@
+/** Tests for LocalEars, held and always listening. */
+
 import { describe, expect, it, vi } from 'vitest';
 import { EARS_FRAME, Pushable } from '@tagalong/protocol';
 import {

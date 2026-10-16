@@ -1,3 +1,5 @@
+/** Tests for the display crop behind look_closer. */
+
 import { describe, expect, it } from 'vitest';
 
 import { captureRegionWith } from './region';

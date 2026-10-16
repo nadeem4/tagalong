@@ -1,4 +1,8 @@
-/** Time, injected so the ring and its timer run under a fake clock in tests. */
+/**
+ * Time as an injectable Clock, so rolling memory and the pointer run under a fake clock in tests.
+ * Contains Clock and systemClock.
+ */
+
 export interface Clock {
   now(): number;
   setTimeout(run: () => void, ms: number): unknown;

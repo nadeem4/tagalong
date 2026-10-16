@@ -1,3 +1,8 @@
+/**
+ * The messages between main and the voice process. Contains ToWorker, FromWorker, WorkerCall and
+ * WorkerProcess.
+ */
+
 import type { EarsEvent, ListenMode, VoiceId } from '@tagalong/protocol';
 
 /** What main sends the voice process. */

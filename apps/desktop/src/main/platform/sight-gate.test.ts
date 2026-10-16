@@ -1,3 +1,5 @@
+/** Tests for the sight gate while running and paused. */
+
 import { describe, expect, it } from 'vitest';
 
 import { SIGHT_POLICY, SightPausedError, gateSight, isSightPaused } from './sight-gate';

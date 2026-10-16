@@ -1,3 +1,5 @@
+/** Tests for the frame ring's window and eviction. */
+
 import { describe, expect, it } from 'vitest';
 import { FrameRing } from './frame-ring';
 import type { Moment } from './frame-ring';

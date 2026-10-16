@@ -1,3 +1,8 @@
+/**
+ * The voice process's call handler: Kokoro, the ears' download and ears messages. Contains
+ * createWorkerHandler.
+ */
+
 import type { LazyLocalVoice } from '../voice';
 import type { EarsMessage } from './ears-host';
 import type { FromWorker, ToWorker } from './messages';

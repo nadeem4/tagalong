@@ -1,3 +1,8 @@
+/**
+ * Kokoro, the local voice: whether it is downloaded, and loading it in the voice process. Contains
+ * kokoroDownloaded and loadKokoro.
+ */
+
 import { isDownloaded } from './model-cache';
 import type { LocalSynth } from './voice';
 

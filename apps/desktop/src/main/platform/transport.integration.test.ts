@@ -1,17 +1,8 @@
-import { describe, expect, it } from 'vitest';
-
-import { runPowerShellScript } from './powershell';
-import { LIST_WINDOWS_SCRIPT } from './window-helper';
-import { parseWindowList } from './window-list';
-
 /**
- * The test that would have caught it.
+ * Runs the real window list through the app's PowerShell runner.
  *
- * Every other test in this directory passed while the window enumeration was completely
- * non-functional, because every other test feeds the parser fixture output. The parsers
- * were never wrong. The transport carrying the script to PowerShell was, and no amount of
- * fixture testing can see that — which is how a broken enumeration shipped through a
- * task, a review and a green CI run.
+ * Every other test in this directory feeds the parser fixture output, so none of them can
+ * see whether the transport carrying the script to PowerShell works.
  *
  * So this one starts a real PowerShell, the same way the app does, and checks that a
  * script comes back having actually run. It is slower than the rest of the suite by an
@@ -22,11 +13,17 @@ import { parseWindowList } from './window-list';
  * nothing to do with the bug it guards.
  *
  * Timeouts are generous because these start real processes on a machine that may be doing
- * it for the first time. An earlier version asserted `Add-Type -TypeDefinition` on its own
- * and timed out on CI at five seconds while the C# compiler warmed up. That check was
- * redundant anyway: the enumeration script itself defines a type, so the end-to-end case
- * below covers it through the code that actually ships.
+ * it for the first time; the C# compiler alone can take more than five seconds to warm up
+ * on CI. There is no separate `Add-Type -TypeDefinition` check: the enumeration script
+ * defines a type, so the end-to-end case below covers it through the code that ships.
  */
+
+import { describe, expect, it } from 'vitest';
+
+import { runPowerShellScript } from './powershell';
+import { LIST_WINDOWS_SCRIPT } from './window-helper';
+import { parseWindowList } from './window-list';
+
 const onWindows = process.platform === 'win32';
 
 /**

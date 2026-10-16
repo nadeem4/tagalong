@@ -1,3 +1,8 @@
+/**
+ * The one place the host starts PowerShell. Contains powerShellArgs, spawnPowerShell and
+ * runPowerShellScript.
+ */
+
 import { spawn } from 'node:child_process';
 
 import { runWindowHelper } from './window-helper';

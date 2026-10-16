@@ -1,3 +1,8 @@
+/**
+ * Reads the highlighted text with the clipboard trick (Ctrl+C, read, restore). Contains
+ * captureSelectionWith and COPY_SETTLE_MS.
+ */
+
 import { MAX_SELECTION_CHARS } from '@tagalong/protocol';
 
 /**
@@ -13,8 +18,8 @@ export interface ClipboardPort {
  * How long to wait after Ctrl+C before reading the clipboard.
  *
  * The foreground app owns the copy, so there is no event to await — only a guess at how
- * long it takes. 150 ms is the phase page's starting point; the timing log below is what
- * makes tuning it a measurement instead of a guess.
+ * long it takes. 150 ms is a starting point; the timing log below is what makes tuning it
+ * a measurement instead of a guess.
  */
 export const COPY_SETTLE_MS = 150;
 

@@ -1,3 +1,5 @@
+/** Tests for WorkerLocalVoice. */
+
 import { describe, expect, it, vi } from 'vitest';
 import type { FromWorker } from './messages';
 import { WorkerLocalVoice } from './worker-local-voice';

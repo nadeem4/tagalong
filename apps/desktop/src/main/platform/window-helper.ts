@@ -1,17 +1,11 @@
 /**
- * The window enumeration helper, and the wrapper that runs it.
+ * The window enumeration script (LIST_WINDOWS_SCRIPT) and runWindowHelper, which runs a
+ * PowerShell script with a timeout and returns what it printed.
  *
- * The C# for the P/Invokes is one single-quoted line rather than a here-string. PowerShell
- * reading commands from stdin silently swallows an `Add-Type @"..."@` block and everything
- * after it: the process exits 0, prints nothing, and reports no error. That failure is
- * invisible from the outside, which is exactly why the script is shaped to avoid it and
- * why a test asserts the here-string never comes back.
- *
- * The script is a string here rather than a file on disk. A bundled `.ps1` has to survive
- * electron-vite's build, the asar archive and the installer, and each of those is a way
- * for the inventory to work in development and be missing in the packaged app. A string
- * cannot go missing. It is fed to PowerShell over stdin, which also sidesteps every
- * quoting question a long `-Command` argument would raise.
+ * The script is a string, not a .ps1 file: a bundled file has to survive the build, the asar
+ * archive and the installer, and a string cannot go missing. The C# for the P/Invokes is one
+ * single-quoted line, never a here-string: PowerShell reading a script over stdin silently
+ * swallows an `Add-Type @"..."@` block and everything after it. A test keeps it that way.
  */
 
 /**

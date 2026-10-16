@@ -1,3 +1,8 @@
+/**
+ * The voice process's entry point, an Electron utility process: the voice models load and run here
+ * so they never stall a window.
+ */
+
 import { loadEars } from '../ears/load-ears';
 import { EARS_FILES, filesPresent, KOKORO_FILES, sharedEnsureFiles } from '../ears/model-files';
 import { loadKokoro } from '../kokoro';
@@ -6,7 +11,6 @@ import { createEarsHost } from './ears-host';
 import { createWorkerHandler } from './handler';
 import type { ToWorker } from './messages';
 
-// An Electron utility process: the voice models load and run here, so they never stall a window.
 const dir = process.env.TAGALONG_VOICE_DIR ?? '.';
 const port = process.parentPort;
 const fake = process.env.TAGALONG_FAKE_STT === '1';

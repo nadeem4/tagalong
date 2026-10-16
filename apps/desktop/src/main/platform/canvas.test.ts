@@ -1,3 +1,5 @@
+/** Tests for the canvas: creating and blitting bitmaps. */
+
 import { describe, expect, it } from 'vitest';
 
 import { blit, createCanvas, pixelAt } from './canvas';

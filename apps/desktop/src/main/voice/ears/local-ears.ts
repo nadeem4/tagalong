@@ -1,3 +1,9 @@
+/**
+ * LocalEars: turns microphone frames into words with a VAD, streaming speech-to-text and an
+ * end-of-turn model, held or always listening. Contains LocalEars, its model interfaces and the
+ * frame thresholds.
+ */
+
 import { EARS_SAMPLE_RATE } from '@tagalong/protocol';
 import type { Ears, EarsEvent, ListenMode, MicStream } from '@tagalong/protocol';
 

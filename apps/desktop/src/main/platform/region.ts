@@ -1,3 +1,8 @@
+/**
+ * Answers perception.captureRegion (look_closer): a native-resolution crop of one display, after
+ * the same per-display refusal as a full capture. Contains captureRegionWith.
+ */
+
 import type { DisplayBounds } from '@tagalong/protocol';
 
 import { displayRefusals } from './displays';

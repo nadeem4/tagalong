@@ -1,3 +1,5 @@
+/** FakeEars, for TAGALONG_FAKE_STT=1: fixed words, no model. Used by the end-to-end suites. */
+
 import type { Ears, EarsEvent, ListenMode, MicStream } from '@tagalong/protocol';
 
 /** What the fake hears when held, whatever was said. The end-to-end suite asks this question. */

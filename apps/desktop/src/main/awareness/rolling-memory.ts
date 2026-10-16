@@ -1,3 +1,9 @@
+/**
+ * Rolling memory: one small frame of every display, and the window list, every five seconds while
+ * it is on. Opt-in, memory only, gone on quit. Contains RollingMemory, ROLLING_TICK_MS and
+ * FRAME_LONG_SIDE.
+ */
+
 import { findCaptureBlock } from '@tagalong/core';
 import type { CaptureExclusions } from '@tagalong/protocol';
 import type { Platform } from '../platform/index';
@@ -6,7 +12,7 @@ import type { Clock } from './clock';
 import { FrameRing } from './frame-ring';
 import type { StoredFrame } from './frame-ring';
 
-/** One moment every five seconds: the phase plan's cadence. */
+/** One moment every five seconds. */
 export const ROLLING_TICK_MS = 5_000;
 
 /**

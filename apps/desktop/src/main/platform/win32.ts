@@ -1,3 +1,8 @@
+/**
+ * The Windows adapter: the Platform built from Electron, PowerShell and get-windows. Contains
+ * Win32Platform.
+ */
+
 import { setTimeout as delay } from 'node:timers/promises';
 import { clipboard, desktopCapturer, nativeImage, screen } from 'electron';
 import { buildInventory } from '@tagalong/core';
@@ -45,9 +50,8 @@ async function sendCopy(): Promise<void> {
 /**
  * How long the window enumeration may take before partial output is used instead.
  *
- * The phase page asks for three seconds. Measured on a live twelve-window desktop the
- * whole enumeration finished well inside it, and this read sits in front of a capture the
- * user is waiting on.
+ * Measured on a live twelve-window desktop the whole enumeration finished well inside
+ * three seconds, and this read sits in front of a capture the user is waiting on.
  */
 const WINDOW_HELPER_TIMEOUT_MS = 3_000;
 
