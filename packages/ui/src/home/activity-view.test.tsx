@@ -2,20 +2,11 @@
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { ActivityEntry, Pet } from '@tagalong/protocol';
+import type { ActivityEntry } from '@tagalong/protocol';
 import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
 import { ActivityView } from './activity-view';
 
-const pet = (id: string, name: string): Pet => ({
-  id,
-  name,
-  avatar: '🐾',
-  roleId: 'companion',
-  model: 'fake',
-  providerId: 'fake',
-});
-const PETS = [pet('scout', 'Scout'), pet('ink', 'Ink')];
 const T1 = '10000000-0000-4000-8000-000000000001';
 const T2 = '10000000-0000-4000-8000-000000000002';
 const AT = '2026-10-07T10:00:00.000Z';
@@ -43,7 +34,7 @@ const HANDED = entry({
 async function renderActivity(bridge: FakeHostBridge) {
   render(
     <HostBridgeProvider bridge={bridge}>
-      <ActivityView pets={PETS} />
+      <ActivityView name="Scout" />
     </HostBridgeProvider>,
   );
   return screen.findByRole('list', { name: 'Activity' }).catch(() => null);
@@ -132,23 +123,23 @@ describe('ActivityView', () => {
       createFakeHostBridge({
         activity: [
           entry({ id: 'r', kind: 'turn', state: 'running' }),
-          entry({ id: 'f', kind: 'turn', petId: 'ink', state: 'error', error: 'No key.' }),
+          entry({ id: 'f', kind: 'turn', state: 'error', error: 'No key.' }),
         ],
       }),
     );
     expect(row(/Scout is answering/)).toHaveTextContent('Working');
-    expect(row(/Ink could not answer/)).toHaveTextContent('Failed');
+    expect(row(/Scout could not answer/)).toHaveTextContent('Failed');
   });
 
   it('updates live when the engine reports a turn', async () => {
     const bridge = createFakeHostBridge({ activity: [TURN] });
     await renderActivity(bridge);
-    bridge.activity.unshift(entry({ id: 'new', kind: 'turn', petId: 'ink', state: 'running' }));
+    bridge.activity.unshift(entry({ id: 'new', kind: 'turn', state: 'running' }));
     await act(async () => {
-      bridge.emit({ type: 'turn.started', turnId: T2, petId: 'ink', conversationId: T2 });
+      bridge.emit({ type: 'turn.started', turnId: T2, petId: 'scout', conversationId: T2 });
       await Promise.resolve();
     });
-    expect(await screen.findByRole('button', { name: /Ink is answering/ })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Scout is answering/ })).toBeInTheDocument();
     expect(row(/Scout answered/)).toBeInTheDocument();
   });
 
@@ -192,7 +183,7 @@ describe('ActivityView', () => {
   it('says so when nothing has happened yet', async () => {
     render(
       <HostBridgeProvider bridge={createFakeHostBridge()}>
-        <ActivityView pets={PETS} />
+        <ActivityView name="Scout" />
       </HostBridgeProvider>,
     );
     expect(await screen.findByText(/Nothing yet/)).toBeInTheDocument();
@@ -203,7 +194,7 @@ describe('ActivityView', () => {
     delete (bridge as { listActivity?: unknown }).listActivity;
     render(
       <HostBridgeProvider bridge={bridge}>
-        <ActivityView pets={PETS} />
+        <ActivityView name="Scout" />
       </HostBridgeProvider>,
     );
     expect(screen.getByText(/not available here/)).toBeInTheDocument();

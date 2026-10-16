@@ -8,13 +8,13 @@ describe('createFakeHostBridge', () => {
   it('records every ask and answers with a fresh turn id', async () => {
     const bridge = createFakeHostBridge();
 
-    const first = await bridge.ask({ petId: 'sage', text: 'hello' });
-    const second = await bridge.ask({ petId: 'sage', text: 'again' });
+    const first = await bridge.ask({ petId: 'scout', text: 'hello' });
+    const second = await bridge.ask({ petId: 'scout', text: 'again' });
 
     expect(first.turnId).not.toBe(second.turnId);
     expect(bridge.asks).toEqual([
-      { petId: 'sage', text: 'hello' },
-      { petId: 'sage', text: 'again' },
+      { petId: 'scout', text: 'hello' },
+      { petId: 'scout', text: 'again' },
     ]);
   });
 
@@ -34,8 +34,8 @@ describe('createFakeHostBridge', () => {
     const bridge = createFakeHostBridge({
       pets: [
         {
-          id: 'sage',
-          name: 'Sage',
+          id: 'scout',
+          name: 'Scout',
           avatar: '🦊',
           model: 'claude-opus-5',
           providerId: 'anthropic',

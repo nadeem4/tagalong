@@ -9,12 +9,12 @@ import { createFakeHostBridge, type FakeHostBridge } from './test-support/fake-h
 const APPROVAL = '20000000-0000-4000-8000-000000000001';
 const TURN = '20000000-0000-4000-8000-000000000002';
 
-const confirm = (petId = 'scout') =>
+const confirm = () =>
   ({
     type: 'connector.confirm',
     approvalId: APPROVAL,
     turnId: TURN,
-    petId,
+    petId: 'scout',
     app: 'Notion',
     tool: 'create-pages',
     summary: 'Create a page.\ntitle: Launch plan',
@@ -56,12 +56,11 @@ describe('the connector confirm card', () => {
     expect(bridge.approvals).toEqual([{ approvalId: APPROVAL, decision: 'deny' }]);
   });
 
-  it('ignores another pet’s card, and goes away when the turn ends', () => {
+  it('goes away when the turn ends', () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge);
-    act(() => bridge.emit(confirm('ink')));
-    expect(screen.queryByRole('button', { name: 'Allow once' })).toBeNull();
     act(() => bridge.emit(confirm()));
+    expect(screen.getByRole('button', { name: 'Allow once' })).toBeInTheDocument();
     act(() =>
       bridge.emit({ type: 'turn.error', turnId: TURN, code: 'aborted', message: 'Stopped.' }),
     );

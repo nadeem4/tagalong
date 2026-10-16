@@ -3,8 +3,7 @@
  * the answer still streaming. Contains MessageList and ChatMessage. Used by ChatPanel.
  */
 
-import type { MessageRole, Pet } from '@tagalong/protocol';
-import { DEFAULT_PET_COLOR } from './office/sprites/characters';
+import type { MessageRole } from '@tagalong/protocol';
 
 /**
  * A message as the panel shows it: the stored content blocks flattened to text, with who
@@ -14,8 +13,6 @@ export interface ChatMessage {
   id: string;
   role: MessageRole;
   text: string;
-  /** The pet that answered, for an assistant message. */
-  petId?: string;
   /** "Scout · haiku": who said it, on what. */
   speaker?: string;
   kind?: 'note' | 'watch';
@@ -29,9 +26,12 @@ export interface MessageListProps {
   streamingText: string;
   /** Labels the streaming bubble with the pet and model answering. */
   streamingSpeaker?: string;
-  /** The pets, for names and colours. */
-  pets?: readonly Pet[];
+  /** The companion's name, for the fired-watch line. */
+  petName: string;
 }
+
+/** One colour for every speaker label and fired-watch border. */
+const SPEAKER_COLOR = '#64748b';
 
 const BUBBLE_BY_ROLE: Record<MessageRole, string> = {
   user: 'bg-sky-600 text-white',
@@ -42,14 +42,6 @@ const COLUMN_BY_ROLE: Record<MessageRole, string> = {
   user: 'self-end items-end',
   assistant: 'self-start items-start',
 };
-
-function nameOf(pets: readonly Pet[], id: string | undefined): string {
-  return pets.find((pet) => pet.id === id)?.name ?? id ?? 'A pet';
-}
-
-function colorOf(pets: readonly Pet[], id: string | undefined): string {
-  return pets.find((pet) => pet.id === id)?.color ?? DEFAULT_PET_COLOR;
-}
 
 function Speaker({ text, color }: { text: string; color: string }) {
   return (
@@ -63,7 +55,7 @@ export function MessageList({
   messages,
   streamingText,
   streamingSpeaker,
-  pets = [],
+  petName,
 }: MessageListProps) {
   return (
     <div
@@ -79,13 +71,10 @@ export function MessageList({
               data-testid="watch-fired"
               role="note"
               className="self-start max-w-[90%] rounded-lg border-2 px-3 py-2 text-sm"
-              style={{ borderColor: colorOf(pets, message.petId) }}
+              style={{ borderColor: SPEAKER_COLOR }}
             >
-              <p
-                className="text-[11px] font-medium"
-                style={{ color: colorOf(pets, message.petId) }}
-              >
-                ⏰ {nameOf(pets, message.petId)}
+              <p className="text-[11px] font-medium" style={{ color: SPEAKER_COLOR }}>
+                ⏰ {petName}
                 {message.condition === undefined ? '' : ` — watching for “${message.condition}”`}
               </p>
               <p className="mt-1 whitespace-pre-wrap">{message.text}</p>
@@ -111,7 +100,7 @@ export function MessageList({
             className={`flex max-w-[85%] flex-col gap-0.5 ${COLUMN_BY_ROLE[message.role]}`}
           >
             {message.speaker !== undefined && (
-              <Speaker text={message.speaker} color={colorOf(pets, message.petId)} />
+              <Speaker text={message.speaker} color={SPEAKER_COLOR} />
             )}
             <div
               data-role={message.role}
@@ -125,7 +114,7 @@ export function MessageList({
       {streamingText !== '' && (
         <div className={`flex max-w-[85%] flex-col gap-0.5 ${COLUMN_BY_ROLE.assistant}`}>
           {streamingSpeaker !== undefined && (
-            <Speaker text={streamingSpeaker} color={DEFAULT_PET_COLOR} />
+            <Speaker text={streamingSpeaker} color={SPEAKER_COLOR} />
           )}
           <div
             data-testid="streaming-message"

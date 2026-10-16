@@ -240,21 +240,6 @@ describe('CompanionBubble', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Please run /login');
   });
 
-  it('ignores turns of other pets', async () => {
-    const bridge = createFakeHostBridge();
-    renderBubble(bridge);
-    act(() => {
-      bridge.emit({
-        type: 'turn.started',
-        turnId: 'x',
-        petId: 'other',
-        conversationId: CONVERSATION,
-      });
-      bridge.emit(done('x', 'Another pet talking.'));
-    });
-    expect(screen.queryByText('Another pet talking.')).toBeNull();
-  });
-
   it('opens the full chat on request', () => {
     const onOpenChat = vi.fn();
     renderBubble(createFakeHostBridge(), { onOpenChat });
@@ -475,7 +460,7 @@ describe('CompanionBubble voice', () => {
     expect(onSay).toHaveBeenCalledExactlyOnceWith('Because the database closed first.');
   });
 
-  it('does not speak another pet’s answer', () => {
+  it('does not speak the answer to a turn it did not start', () => {
     const bridge = createFakeHostBridge();
     const onSay = vi.fn();
     renderBubble(bridge, { onSay });

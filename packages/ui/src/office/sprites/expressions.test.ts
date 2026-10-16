@@ -1,10 +1,10 @@
 /** Tests for the dock faces: each mood changes only the face rows. */
 
 import { describe, expect, it } from 'vitest';
-import { CHARACTERS } from './characters';
+import { SCOUT_SPRITE } from './characters';
 import { withMood, type DockMood } from './expressions';
 
-const base = CHARACTERS['scout']!.sprite;
+const base = SCOUT_SPRITE;
 const MOODS: readonly DockMood[] = [
   'listening',
   'working',

@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Pet } from '@tagalong/protocol';
 import { PixelSprite } from './office/pixel-sprite';
-import { characterFor } from './office/sprites/characters';
+import { SCOUT_SPRITE } from './office/sprites/characters';
 import { withBlink, withMood, type DockMood } from './office/sprites/expressions';
 import { officeTokens as t } from './office/tokens';
 
@@ -108,9 +108,9 @@ export function DockPet({
   }, [canBlink, blinkEveryMs]);
 
   const sprite = useMemo(() => {
-    const faced = withMood(characterFor(pet).sprite, mood);
+    const faced = withMood(SCOUT_SPRITE, mood);
     return blinking && canBlink ? withBlink(faced) : faced;
-  }, [pet, mood, blinking, canBlink]);
+  }, [mood, blinking, canBlink]);
   const tag = isTagged(mood) ? TAGS[mood] : undefined;
   const label = `${pet.name} ${WORDS[mood]}${sightPaused ? ', sight paused' : ''}${
     recording && !sightPaused ? ', recording the screen' : ''

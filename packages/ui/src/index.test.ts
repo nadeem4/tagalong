@@ -15,7 +15,7 @@ describe('ui package surface', () => {
         'HomeView',
         'brainLabel',
         'PixelSprite',
-        'characterFor',
+        'SCOUT_SPRITE',
         'SETTINGS_CSS',
         'createFakeHostBridge',
         'SpeechQueue',

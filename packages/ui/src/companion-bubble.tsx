@@ -261,28 +261,23 @@ export function CompanionBubble({
     }
     switch (event.type) {
       case 'connector.confirm': {
-        if (event.petId !== petId) return;
         const { type: _type, ...params } = event;
         setConfirm(params);
         return;
       }
       case 'routine.proposed': {
-        if (event.petId !== petId) return;
         const { type: _type, ...params } = event;
         setRoutine(params);
         return;
       }
       case 'settings.proposed': {
-        if (event.petId !== petId) return;
         const { type: _type, ...params } = event;
         setSettingsCard(params);
         return;
       }
       case 'turn.started':
         // A routine's turn runs on its own; its result arrives as routine.result.
-        if (event.petId !== petId || reply.state !== 'running' || event.routineId !== undefined) {
-          return;
-        }
+        if (reply.state !== 'running' || event.routineId !== undefined) return;
         mine.current = event.turnId;
         conversation.current = event.conversationId;
         setReply({ state: 'running', turnId: event.turnId, text: '' });
@@ -315,7 +310,7 @@ export function CompanionBubble({
         setReply({ state: 'failed', text: event.message });
         return;
       case 'handoff.proposed':
-        if (event.petId === petId) setHandoff({ phase: 'proposed', proposal: event });
+        setHandoff({ phase: 'proposed', proposal: event });
         return;
       case 'handoff.progress': {
         const isThis = (

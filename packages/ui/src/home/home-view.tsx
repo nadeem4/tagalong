@@ -10,7 +10,7 @@ import type { ReactNode } from 'react';
 import type { ActivityEntry, Expert, Pet, RoutineProposedParams } from '@tagalong/protocol';
 import { useHostBridge } from '../host-bridge';
 import { PixelSprite } from '../office/pixel-sprite';
-import { characterFor } from '../office/sprites/characters';
+import { SCOUT_SPRITE } from '../office/sprites/characters';
 import { SETTINGS_CSS } from '../settings/settings-styles';
 import { ActivityView } from './activity-view';
 import { brainLabel, modelLabel } from './brain-label';
@@ -51,7 +51,6 @@ export interface HomeProvider {
 /** What Home needs from its host beyond the bridge: the companion and how it can think. */
 export interface HomeHost {
   setup(): Promise<{
-    companionId: string;
     /** `needsKey` marks a service that thinks on an API key, so the picker can say so. */
     providers: readonly HomeProvider[];
     /** How many days What Scout saw keeps its rows, as set. Absent: the default. */
@@ -103,8 +102,7 @@ export function HomeView({ host, settings, page: asked, onPage, routineDraft }: 
     });
   }, [bridge, host]);
 
-  const companion =
-    pets.find((pet) => pet.id === setup?.companionId) ?? pets[0] ?? (undefined as Pet | undefined);
+  const companion = pets[0] as Pet | undefined;
   const name = companion?.name ?? 'Scout';
   const go = (next: HomePage): void => {
     setPage(next);
@@ -119,7 +117,7 @@ export function HomeView({ host, settings, page: asked, onPage, routineDraft }: 
         <div className="home-nav__who">
           <span className="home-nav__tile">
             {companion !== undefined && (
-              <PixelSprite sprite={characterFor(companion).sprite} scale={3} />
+              <PixelSprite sprite={SCOUT_SPRITE} scale={3} />
             )}
           </span>
           <span>
@@ -164,7 +162,7 @@ export function HomeView({ host, settings, page: asked, onPage, routineDraft }: 
           </div>
         )}
         {page === 'connections' && <ConnectionsPanel />}
-        {page === 'activity' && <ActivityView pets={pets} />}
+        {page === 'activity' && <ActivityView name={name} />}
         {page === 'sightLog' && (
           <SightLogView
             name={name}

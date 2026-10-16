@@ -20,16 +20,12 @@ function renderBubble(bridge: FakeHostBridge) {
   );
 }
 
-function propose(
-  bridge: FakeHostBridge,
-  projects: ProjectCandidate[] = [AI_PET, SITE],
-  petId = 'scout',
-) {
+function propose(bridge: FakeHostBridge, projects: ProjectCandidate[] = [AI_PET, SITE]) {
   act(() =>
     bridge.emit({
       type: 'handoff.proposed',
       proposalId: PROPOSAL,
-      petId,
+      petId: 'scout',
       expertId: 'claude-code',
       expertName: 'Claude Code',
       brief: BRIEF,
@@ -173,13 +169,6 @@ describe('the hand-off card', () => {
     propose(bridge);
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Cancel' })));
     expect(bridge.dismissedHandoffs).toEqual([PROPOSAL]);
-    expect(screen.queryByRole('region', { name: 'Hand to Claude Code' })).toBeNull();
-  });
-
-  it('ignores a proposal from another pet', () => {
-    const bridge = createFakeHostBridge();
-    renderBubble(bridge);
-    propose(bridge, [AI_PET], 'ink');
     expect(screen.queryByRole('region', { name: 'Hand to Claude Code' })).toBeNull();
   });
 
