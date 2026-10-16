@@ -293,7 +293,7 @@ components:
 
 Tagalong is one companion, Scout, a 16x16 pixel-art figure (orange fur, pointed ears, a green shirt with a gold badge) that sits on the desktop and opens a speech bubble beside itself. The figure is the only game-like thing in the product; everything around it is calm, modern product chrome: a deep ink-navy for Scout's own surfaces (the dock tags, the bubble, Welcome, Home's nav), a cool off-white for reading (Home's pages and Settings), clean Onest type and one warm gold.
 
-Tokens live in `packages/ui/src/office/tokens.ts` (`officeTokens`; the `office/` folder name is historical). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav and Welcome hard-code several hex values, recorded below as hard-coded. Sprites are plain data (rows, a palette, optional overlay pixels) drawn by `PixelSprite` as a CSS `box-shadow` on one 1px element, scaled by a whole number. No images, no canvas.
+Tokens live in `packages/ui/src/office/tokens.ts` (`officeTokens`; the `office/` folder name is historical). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav and Welcome hard-code several hex values, recorded below as hard-coded. Sprites are plain data (rows and a palette) drawn by `PixelSprite` as a CSS `box-shadow` on one 1px element, scaled by a whole number. No images, no canvas.
 
 Scout's state is always a face plus a word: the eyes change per mood, a small tag says Seeing, Working or Done, and the accessible name says it in full. Motion is small and soft (a breath, a bob, a hop) and stops for reduced motion.
 
@@ -382,7 +382,7 @@ Every window bundles its faces from `@fontsource` (Latin subset), nothing fetche
 - **Bubble:** a 420px-wide window (`PANEL_WIDTH`) that sizes its own height (80 to 520px; the full chat takes 520px). It has 10px of padding on the side the tail points to.
 - **Home:** a 1440x800 window (min 880x600). A fixed 232px nav (20px by 12px padding) and a fluid main column (24px by 32px padding, 20px between blocks). Overview cards sit in an auto-fit grid (min 260px, 16px gap); routine templates in an auto-fill grid (min 220px, 8px gap). Embedded Settings sits in the main column, max 820px.
 - **Welcome:** a 900x620 window in two columns. A header of step chips (18px by 32px padding, 8px apart), then a 300px left column for Scout and its words and a right column for the question, 40px apart, 40px by 48px padding. The answer pill is pinned to the bottom of the right column.
-- **Standalone Settings:** 1080x760, opened only when Tagalong starts without its engine; a 64px bar over a 280px nav (`size.headerHeight`, `size.partyWidth`).
+- **Standalone Settings:** 1080x760, opened only when Tagalong starts without its engine; a 64px bar over a 280px nav (`size.headerHeight`, `size.navWidth`).
 
 Spacing runs on the token scale (2, 3, 4, 6, 8, 12, 16, 20, 24). The bubble and cards also use 14px, 28px and 32px, hard-coded. Controls are 40px tall in Home and Settings, 36px for the bubble's primary button, 44px for the bubble field and Welcome's key field and Check key, 46px for Welcome's answer pill, 28px for quiet bubble controls.
 

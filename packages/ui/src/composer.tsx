@@ -12,9 +12,6 @@ export interface ComposerProps {
   disabled: boolean;
   /** True when something is attached. The placeholder must not promise sight there isn't. */
   seeing?: boolean;
-  /** Controlled text. Leave both unset and the composer keeps its own text. */
-  value?: string;
-  onValueChange?: (text: string) => void;
 }
 
 /** The placeholder is a promise, so it only offers sight when sight is attached. */
@@ -23,19 +20,8 @@ const PLACEHOLDER = {
   blind: 'Ask anything — or attach what you are looking at',
 };
 
-export function Composer({
-  onSend,
-  disabled,
-  seeing = false,
-  value,
-  onValueChange,
-}: ComposerProps) {
-  const [ownText, setOwnText] = useState('');
-  const text = value ?? ownText;
-  const setText = (next: string): void => {
-    if (value === undefined) setOwnText(next);
-    onValueChange?.(next);
-  };
+export function Composer({ onSend, disabled, seeing = false }: ComposerProps) {
+  const [text, setText] = useState('');
   const trimmed = text.trim();
 
   function send(): void {

@@ -5,23 +5,8 @@
  * fake bridge for host tests. Never imports electron or opens a socket: hosts hand it a
  * HostBridge.
  */
-export { HostBridgeProvider, useHostBridge } from './host-bridge';
-export type {
-  AskInput,
-  ConfirmHandoff,
-  HostBridge,
-  HostBridgeProviderProps,
-  TurnEvent,
-} from './host-bridge';
-
-export { MessageList } from './message-list';
-export type { ChatMessage, MessageListProps } from './message-list';
-
-export { Composer } from './composer';
-export type { ComposerProps } from './composer';
-
-export { SightBar, estimateImageTokens } from './sight-bar';
-export type { SightBarProps, SightProblem } from './sight-bar';
+export { HostBridgeProvider } from './host-bridge';
+export type { AskInput, ConfirmHandoff, HostBridge, TurnEvent } from './host-bridge';
 
 export { ChatPanel } from './chat-panel';
 export { CompanionBubble, GreetingLine } from './companion-bubble';
@@ -34,30 +19,25 @@ export type { ChatPanelProps } from './chat-panel';
 
 /** Exported so hosts can test their renderer wiring without booting an engine. */
 export { createFakeHostBridge } from './test-support/fake-host-bridge';
-export type { FakeHostBridge } from './test-support/fake-host-bridge';
 
 /** Home: the one window for the companion, its experts, activity and settings. */
 export { HomeView } from './home/home-view';
-export type { HomeHost, HomePage, HomeProvider, HomeViewProps } from './home/home-view';
-export { brainLabel, modelLabel } from './home/brain-label';
+export type { HomeHost, HomePage, HomeViewProps } from './home/home-view';
+export { brainLabel } from './home/brain-label';
 export { PixelSprite } from './office/pixel-sprite';
 export { characterFor } from './office/sprites/characters';
 export type { PixelSpriteProps } from './office/pixel-sprite';
 
 export { SETTINGS_CSS } from './settings/settings-styles';
 
-/** Scout talks: what a bubble line sounds like, and the queue that says one at a time. */
+/** Scout talks: the queue that says one line at a time, and the mouth that plays it. */
 export { SpeechQueue } from './voice/speech-queue';
-export type { PreparedLine, SpeechQueueOptions } from './voice/speech-queue';
 export { QueueMouth } from './voice/mouth';
-export { toSpeakable } from './voice/speakable';
-export { wantsReadAloud } from './voice/read-aloud';
 /** Talk to Scout: telling a held key from a fresh press, and the bubble's side of it. */
 export { PushToTalk } from './voice/push-to-talk';
 export type { TalkAction } from './voice/push-to-talk';
 export { ListenController } from './voice/listen-controller';
-export type { ListenControllerOptions, ListenMic } from './voice/listen-controller';
-export { officeTokens } from './office/tokens';
+export type { ListenMic } from './voice/listen-controller';
 
 /** "Scout, what's wrong?": what a host reads for the health card, and where Fix it lands. */
-export type { FixTarget, HealthCheckId, HealthFacts, HealthRow } from './health';
+export type { FixTarget, HealthFacts } from './health';

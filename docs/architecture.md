@@ -76,7 +76,7 @@ landed in Phase 6, which ran fifth; see "The browser host" below.
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
 | packages/protocol | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC envelopes, plus the method and notification catalog                                                                                                                                                            | anything except zod                              |
 | packages/core     | Engine facade, conversation runner, prompt assembler, SQLite memory, pet registry, settings and SecretStore, pairing, websocket server, brain providers                                                                                                                                  | electron, react, DOM globals                     |
-| packages/ui       | React components — `DockPet`, `CompanionBubble`, `HomeView`, `MessageList`, `Composer`, `SightBar`, `ChatPanel` — plus the `HostBridge` contract and its context, and a fake bridge for host tests                                                                                       | electron, sockets, node APIs                     |
+| packages/ui       | React components — `DockPet`, `CompanionBubble`, `HomeView`, `ChatPanel` (with its internal `MessageList`, `Composer` and `SightBar`) — plus the `HostBridge` contract and its context, and a fake bridge for host tests                                                                 | electron, sockets, node APIs                     |
 | apps/desktop      | Electron host. Runs the engine in the main process, dials it over the loopback socket, owns avatar, panel and settings windows, the tray, the two global hotkeys (ask and pause sight), perception with exclusions and capture announcements, and safeStorage secrets, one folder per OS | nothing from core internals, only its public API |
 | apps/extension    | Chrome MV3 host. Connects to the running engine from its service worker, supplies the exact selection and page text on demand, renders Scout in the side panel, pairs from its options page                                                                                              | core at all; it speaks the protocol only         |
 
@@ -1476,16 +1476,6 @@ A save the form refuses throws `SettingsFieldError` with the field's name
 `aria-invalid` and the message under it. With no engine (no Scout to read), the brain card says the
 engine did not start and that sign-in status, model lists and the pairing token come back once it
 runs.
-
-The role-shaped part of a pet is pure components in `packages/ui/src/settings/`, which take the role
-library and the recommended model as props and are now composed in Home: `RolePicker` (one role, its
-summary and good-at, and a warning that a role change replaces instructions and tools while name,
-look, notes and memories stay), `BrainPicker` (provider and model, a **Recommended** or **Your
-choice** chip and **Use recommended**), `ToolToggles` (one switch per tool the role lists, stored as
-`toolGrants`), and `DirectoryCard` (the card teammates read: name, role, summary, good at, not for,
-the tools it can reach, and its brain tier or custom). `PetSettings` composes them with the name and
-notes. Role labels take their colour from `officeTokens.roleInk` by role id, through `jobFor`, so a
-role reads the same everywhere.
 
 ## Awareness (Phase 3B)
 

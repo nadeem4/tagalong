@@ -2,7 +2,7 @@
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { ContextSnapshot } from '@tagalong/protocol';
+import type { ContextSnapshot, Pet } from '@tagalong/protocol';
 import { ChatPanel } from './chat-panel';
 import { HostBridgeProvider } from './host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from './test-support/fake-host-bridge';
@@ -23,10 +23,14 @@ const screenshot: ContextSnapshot = {
   screenshot: { mime: 'image/png', base64: 'iVBORw0KGgo=', width: 1280, height: 800 },
 };
 
-function renderPanel(bridge: FakeHostBridge, attached: ContextSnapshot | null = snapshot) {
+function renderPanel(
+  bridge: FakeHostBridge,
+  attached: ContextSnapshot | null = snapshot,
+  pets: readonly Pet[] = [],
+) {
   return render(
     <HostBridgeProvider bridge={bridge}>
-      <ChatPanel petId="sage" {...(attached === null ? {} : { snapshot: attached })} />
+      <ChatPanel petId="sage" pets={pets} {...(attached === null ? {} : { snapshot: attached })} />
     </HostBridgeProvider>,
   );
 }
@@ -89,6 +93,7 @@ describe('ChatPanel', () => {
       <HostBridgeProvider bridge={bridge}>
         <ChatPanel
           petId="sage"
+          pets={[]}
           lookTargets={['selection', 'pageText', 'activeWindow']}
           lookLabel="Read this page"
         />
@@ -168,6 +173,40 @@ describe('ChatPanel', () => {
 
     expect(screen.queryByTestId('streaming-message')).not.toBeInTheDocument();
     expect(screen.getByText('A fox is a small canid.')).toHaveAttribute('data-role', 'assistant');
+  });
+
+  it('names the speaker from the pets the host passes, with the model', () => {
+    const sage = { id: 'sage', name: 'Sage' } as Pet;
+    const bridge = createFakeHostBridge();
+    renderPanel(bridge, snapshot, [sage]);
+    send('Explain this');
+
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 't1',
+        petId: 'sage',
+        conversationId: 'c1',
+        model: 'm-1',
+      });
+      bridge.emit({
+        type: 'turn.completed',
+        turnId: 't1',
+        text: 'Done.',
+        stopReason: 'end',
+        usage: { inputTokens: 1, outputTokens: 1 },
+      });
+    });
+
+    expect(screen.getByTestId('speaker')).toHaveTextContent('Sage · m-1');
+  });
+
+  it('empties the box once the question is sent', () => {
+    renderPanel(createFakeHostBridge());
+
+    send('Explain this');
+
+    expect(screen.getByRole('textbox')).toHaveValue('');
   });
 
   it('locks the composer while a turn streams and frees it when the turn completes', () => {

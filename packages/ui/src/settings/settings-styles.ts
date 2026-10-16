@@ -8,7 +8,7 @@ import { officeTokens as t } from '../office/tokens';
 
 export const SETTINGS_CSS = `
 .tg-settings {
-  display: grid; grid-template-columns: ${t.size.partyWidth}px 1fr;
+  display: grid; grid-template-columns: ${t.size.navWidth}px 1fr;
   grid-template-rows: ${t.size.headerHeight}px 1fr;
   height: 100vh; margin: 0; background: ${t.color.page}; color: ${t.color.text};
   font-family: ${t.font.ui}; font-size: ${t.fontSize.body}px;
@@ -51,12 +51,12 @@ export const SETTINGS_CSS = `
   padding: ${t.space.xxl}px; margin: 0; border: 0; min-width: 0;
 }
 .tg-panel__heading {
-  font-size: ${t.fontSize.partyHeading}px; font-weight: ${t.fontWeight.semibold};
+  font-size: ${t.fontSize.panelHeading}px; font-weight: ${t.fontWeight.semibold};
   text-transform: uppercase; margin: 0 0 ${t.space.lg}px; padding: 0;
 }
 .tg-panel h3 {
   font-family: ${t.font.pixel}; letter-spacing: ${t.letterSpacing.pixel}px;
-  font-size: ${t.fontSize.roomName}px; font-weight: ${t.fontWeight.bold}; text-transform: uppercase;
+  font-size: ${t.fontSize.groupHeading}px; font-weight: ${t.fontWeight.bold}; text-transform: uppercase;
   margin: ${t.space.xxl}px 0 ${t.space.md}px;
 }
 .tg-panel h3:first-child { margin-top: 0; }

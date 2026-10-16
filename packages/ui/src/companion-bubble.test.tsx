@@ -247,12 +247,12 @@ describe('CompanionBubble', () => {
       bridge.emit({
         type: 'turn.started',
         turnId: 'x',
-        petId: 'ink',
+        petId: 'other',
         conversationId: CONVERSATION,
       });
-      bridge.emit(done('x', 'Ink talking.'));
+      bridge.emit(done('x', 'Another pet talking.'));
     });
-    expect(screen.queryByText('Ink talking.')).toBeNull();
+    expect(screen.queryByText('Another pet talking.')).toBeNull();
   });
 
   it('opens the full chat on request', () => {

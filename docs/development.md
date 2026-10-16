@@ -99,7 +99,7 @@ tagalong/
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/protocol` | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC, plus the method catalog. Depends only on zod.                                                                                    |
 | `packages/core`     | The Tagalong Engine: Scout, conversation runner, prompt assembly, SQLite memory, experts and hand-offs, connected apps (MCP client), routines, host protocol server, pairing, provider adapters. Pure Node. |
-| `packages/ui`       | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, `MessageList`, `Composer`, `SightBar`, `ChatPanel`, Home's `HomeView`, and the `HostBridge` context.                          |
+| `packages/ui`       | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, `ChatPanel` (with its internal `MessageList`, `Composer` and `SightBar`), Home's `HomeView`, and the `HostBridge` context.    |
 | `apps/desktop`      | Electron host. Runs the engine in the main process, dials it over the loopback socket, and owns Scout's window, the bubble, Home, Welcome, the tray, hotkeys, secret storage, and Scout's voice and ears.   |
 | `apps/extension`    | Chrome MV3 host. Connects to the running engine and speaks the protocol only. Side panel, pairing page, on-demand page reader, and the open-panel shortcut.                                                 |
 
@@ -591,8 +591,8 @@ docs to update. The design is in [concepts/roles-and-tools.md](concepts/roles-an
 
 What is still standing, recorded here so nobody rediscovers it.
 
-- **No Tailwind build in the desktop renderer.** `@tagalong/ui`'s chat components (`ChatPanel`,
-  `MessageList`, `Composer`, `SightBar`) are written against Tailwind utility classes, but the
+- **No Tailwind build in the desktop renderer.** `@tagalong/ui`'s chat panel (`ChatPanel`, with its
+  internal `MessageList`, `Composer` and `SightBar`) is written against Tailwind utility classes, but the
   desktop renderer has no Tailwind toolchain, so those class names resolve to nothing.
   `apps/desktop/src/renderer/src/app.css` hand-writes the structural rules the utilities would have
   supplied — enough for a usable panel, but the components are unstyled beyond that until the build
