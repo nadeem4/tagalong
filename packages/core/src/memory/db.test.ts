@@ -7,6 +7,11 @@ import Database from 'better-sqlite3';
 import { Pet } from '@tagalong/protocol';
 import { UsageLog } from '../usage/usage-log';
 import { DB_FILENAME, LATEST_SCHEMA_VERSION, migrate, openDatabase } from './db';
+import { MemoryStore } from './memories';
+import { PetRegistry } from '../pets/registry';
+
+/** Migration 20, which keeps only Scout. */
+const ONE_COMPANION = 20;
 
 let dataDir: string;
 
@@ -134,7 +139,7 @@ describe('migrate', () => {
         '2026-09-11T00:00:00.000Z',
       );
 
-      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+      expect(migrate(db, 5)).toBe(5);
 
       const row = db.prepare<[], { json: string }>("SELECT json FROM pets WHERE id = 'pip'").get();
       expect(JSON.parse(row?.json ?? '{}')).toMatchObject({
@@ -159,7 +164,7 @@ describe('migrate', () => {
         "INSERT INTO conversations (id, pet_id, created_at) VALUES ('c1', 'ink', 'x')",
       ).run();
 
-      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+      expect(migrate(db, 11)).toBe(11);
 
       const ids = db
         .prepare<[], { id: string }>('SELECT id FROM pets ORDER BY id')
@@ -361,7 +366,7 @@ describe('migrate', () => {
       db.prepare<[string], { json: string }>('SELECT json FROM pets WHERE id = ?').get(id)?.json;
     try {
       migrate(db);
-      expect(LATEST_SCHEMA_VERSION).toBe(19);
+      expect(LATEST_SCHEMA_VERSION).toBe(20);
       // A database from before 19: a pet still thinking on Nebius, one on OpenRouter.
       db.prepare('DELETE FROM schema_version WHERE version >= 19').run();
       const insert = db.prepare('INSERT INTO pets (id, json, updated_at) VALUES (?, ?, ?)');
@@ -396,7 +401,7 @@ describe('migrate', () => {
          VALUES ('2026-10-01T00:00:00.000Z', 'scout', 'nebius', 'nvidia/x', 10, 5)`,
       ).run();
 
-      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+      expect(migrate(db, 19)).toBe(19);
 
       const moved = JSON.parse(petJson('scout') ?? '{}') as Record<string, unknown>;
       expect(moved).toMatchObject({
@@ -439,9 +444,124 @@ describe('migrate', () => {
 
       // Rerunning it changes nothing more.
       db.prepare('DELETE FROM schema_version WHERE version >= 19').run();
-      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+      expect(migrate(db, 19)).toBe(19);
       expect(JSON.parse(petJson('scout') ?? '{}')).toEqual(moved);
       expect(petJson('sage')).toBe(other);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('migrate stops at upTo', () => {
+    const db = new Database(':memory:');
+    try {
+      expect(migrate(db, 3)).toBe(3);
+      expect(tableNames(db)).toContain('memories');
+      expect(tableNames(db)).not.toContain('activity');
+      expect(migrate(db, 2)).toBe(3);
+      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("keeps only Scout in migration 20, with the crew's memories moved to Scout and the others' data gone", () => {
+    const db = new Database(':memory:');
+    const ids = (sql: string) =>
+      db
+        .prepare<[], { id: string }>(sql)
+        .all()
+        .map((row) => row.id);
+    try {
+      migrate(db);
+      db.prepare('DELETE FROM schema_version WHERE version >= ?').run(ONE_COMPANION);
+      const pet = db.prepare('INSERT INTO pets (id, json, updated_at) VALUES (?, ?, ?)');
+      pet.run(
+        'scout',
+        JSON.stringify({
+          id: 'scout',
+          name: 'Scout',
+          roleId: 'companion',
+          toolGrants: { remember: 'off' },
+          replyStyle: 'voice-full',
+          notes: 'Be terse.',
+          color: '#E8873A',
+        }),
+        'x',
+      );
+      pet.run('pip', JSON.stringify({ id: 'pip', name: 'Pip' }), 'x');
+      db.exec(`INSERT INTO conversations (id, pet_id, created_at)
+          VALUES ('c-scout', 'scout', 'x'), ('c-pip', 'pip', 'x');
+        INSERT INTO messages (id, conversation_id, role, content_json, created_at)
+          VALUES ('m-scout', 'c-scout', 'user', '[]', 'x'), ('m-pip', 'c-pip', 'user', '[]', 'x');
+        INSERT INTO memories (id, scope, pet_id, kind, text, created_at)
+          VALUES ('mem-scout', 'pet', 'scout', 'fact', 'likes tea', 'x'),
+                 ('mem-pip', 'pet', 'pip', 'fact', 'likes coffee', 'x'),
+                 ('mem-crew', 'crew', NULL, 'preference', 'prefers marmalade', 'x');
+        INSERT INTO activity (id, kind, state, pet_id, text, started_at)
+          VALUES ('a-scout', 'turn', 'done', 'scout', 'compare qdrant', 'x'),
+                 ('a-pip', 'turn', 'done', 'pip', 'compare pinecone', 'x');`);
+
+      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+
+      expect(ids('SELECT id FROM pets')).toEqual(['scout']);
+      const scout = JSON.parse(
+        db.prepare<[], { json: string }>("SELECT json FROM pets WHERE id = 'scout'").get()?.json ??
+          '{}',
+      ) as Record<string, unknown>;
+      for (const key of ['toolGrants', 'replyStyle', 'notes', 'color']) {
+        expect(scout).not.toHaveProperty(key);
+      }
+      expect(scout).toMatchObject({ name: 'Scout', roleId: 'companion' });
+      expect(ids('SELECT id FROM conversations')).toEqual(['c-scout']);
+      expect(ids('SELECT id FROM messages')).toEqual(['m-scout']);
+      expect(
+        db
+          .prepare<[], { id: string; scope: string; pet_id: string }>(
+            'SELECT id, scope, pet_id FROM memories ORDER BY id',
+          )
+          .all(),
+      ).toEqual([
+        { id: 'mem-crew', scope: 'pet', pet_id: 'scout' },
+        { id: 'mem-scout', scope: 'pet', pet_id: 'scout' },
+      ]);
+      // The moved row is still in the index, so Scout can find it.
+      expect(new MemoryStore(db).search('scout', 'marmalade', 5).map((m) => m.id)).toEqual([
+        'mem-crew',
+      ]);
+      expect(ids('SELECT id FROM activity')).toEqual(['a-scout']);
+      expect(
+        db
+          .prepare<[], { n: number }>(
+            "SELECT COUNT(*) AS n FROM activity_fts WHERE activity_fts MATCH 'pinecone'",
+          )
+          .get()?.n,
+      ).toBe(0);
+      db.exec("INSERT INTO memories_fts (memories_fts) VALUES ('integrity-check')");
+      db.exec("INSERT INTO activity_fts (activity_fts) VALUES ('integrity-check')");
+
+      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+      expect(ids('SELECT id FROM pets')).toEqual(['scout']);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('brings Scout back on the same boot when migration 20 finds only another pet', () => {
+    const db = new Database(':memory:');
+    try {
+      migrate(db, ONE_COMPANION - 1);
+      db.prepare('INSERT INTO pets (id, json, updated_at) VALUES (?, ?, ?)').run(
+        'pip',
+        JSON.stringify({ id: 'pip', name: 'Pip' }),
+        'x',
+      );
+      db.prepare("INSERT OR IGNORE INTO pet_seeds (id, seeded_at) VALUES ('scout', 'x')").run();
+
+      migrate(db);
+      new PetRegistry(db).seedDefaults();
+
+      expect(new PetRegistry(db).list().map((p) => p.id)).toEqual(['scout']);
     } finally {
       db.close();
     }

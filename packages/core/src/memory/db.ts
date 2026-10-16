@@ -207,6 +207,24 @@ const MIGRATIONS: readonly Migration[] = [
            '$.visionModel', '$.watchModel'),
          updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
    WHERE json_extract(json, '$.providerId') = 'nebius'`,
+  // Migration 20. One companion: every pet but Scout goes, with
+  // its conversations, messages, private memories and activity rows. The crew notebook's
+  // shared memories become Scout's own, and Scout's stored pet loses the crew-era grants,
+  // reply style, notes and colour. If Scout is missing, its seed record goes too, so
+  // seedDefaults brings it back on this boot. 'scout' is a frozen literal, like migration 5's
+  // constants.
+  `DELETE FROM messages
+     WHERE conversation_id IN (SELECT id FROM conversations WHERE pet_id <> 'scout');
+   DELETE FROM conversations WHERE pet_id <> 'scout';
+   DELETE FROM memories WHERE scope = 'pet' AND pet_id <> 'scout';
+   UPDATE memories SET scope = 'pet', pet_id = 'scout' WHERE scope = 'crew';
+   DELETE FROM activity WHERE pet_id <> 'scout';
+   DELETE FROM pets WHERE id <> 'scout';
+   UPDATE pets
+      SET json = json_remove(json, '$.toolGrants', '$.replyStyle', '$.notes', '$.color')
+    WHERE id = 'scout';
+   DELETE FROM pet_seeds
+    WHERE id = 'scout' AND NOT EXISTS (SELECT 1 FROM pets WHERE id = 'scout');`,
 ];
 
 /** The columns migration 7 gave `activity`, in order. */
@@ -362,10 +380,11 @@ function addRoutines(db: Database.Database): void {
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.length;
 
 /**
- * Brings a database up to the latest schema and returns the version it now sits at.
- * Applied versions are recorded row by row, so rerunning this is a no-op.
+ * Brings a database up to version `upTo` (the latest by default) and returns the version it
+ * now sits at. Applied versions are recorded row by row, so rerunning this is a no-op. Only
+ * tests pass `upTo`, to check an older migration on its own.
  */
-export function migrate(db: Database.Database): number {
+export function migrate(db: Database.Database, upTo: number = MIGRATIONS.length): number {
   db.exec(
     'CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)',
   );
@@ -375,7 +394,8 @@ export function migrate(db: Database.Database): number {
       .get()?.version ?? 0;
 
   const record = db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (?, ?)');
-  for (let version = current + 1; version <= MIGRATIONS.length; version += 1) {
+  const target = Math.min(upTo, MIGRATIONS.length);
+  for (let version = current + 1; version <= target; version += 1) {
     const migration = MIGRATIONS[version - 1];
     if (migration === undefined) continue;
     // One transaction per migration so a failure leaves the previous version intact.
@@ -386,7 +406,7 @@ export function migrate(db: Database.Database): number {
     })();
   }
 
-  return LATEST_SCHEMA_VERSION;
+  return Math.max(current, target);
 }
 
 /** Opens (creating if needed) the migrated database for a host's data dir. */
