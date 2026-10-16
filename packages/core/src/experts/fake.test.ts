@@ -1,3 +1,4 @@
+/** Tests for FakeConnector: scripted steps, errors and check. */
 import { describe, expect, it } from 'vitest';
 import { FakeConnector } from './fake';
 

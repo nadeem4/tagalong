@@ -1,3 +1,4 @@
+/** Tests for HandoffManager: proposals, runs, steering, chains, timeouts and shutdown. */
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Expert } from '@tagalong/protocol';

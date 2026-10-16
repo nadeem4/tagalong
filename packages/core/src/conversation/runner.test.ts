@@ -1,3 +1,4 @@
+/** Tests for ConversationRunner: storing, streaming, tools, interrupts and failures. */
 import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -230,10 +231,10 @@ describe('ConversationRunner perception tools', () => {
     const runner = makeRunner(observed.provider, toolsFor([host]));
     await runner.run({ pet, text: 'hi' }).done;
 
-    // Asserted as a prefix since Phase 2B added the five full-view tools. What this test
-    // is for is that the runner hands the toolset's definitions to the provider at all —
-    // which tools exist is the toolset's own test, and pinning the whole list here would
-    // make every future tool a two-file change for no extra coverage.
+    // Asserted as a prefix. What this test is for is that the runner hands the toolset's
+    // definitions to the provider at all. Which tools exist is the toolset's own test, and
+    // pinning the whole list here would make every future tool a two-file change for no
+    // extra coverage.
     const offered = observed.requests[0]?.tools?.map((tool) => tool.name) ?? [];
     expect(offered.slice(0, 2)).toEqual([LOOK_AT_SCREEN, GET_SELECTION]);
     expect(offered).toContain('read_window_text');
@@ -751,8 +752,7 @@ describe('tool notifications', () => {
    *
    * The user watching the panel needs to tell a pet that is working from one that is
    * hung. And without a notification there is no way to observe end to end that a tool
-   * call reached the host at all — which is the seam that shipped dead twice in this
-   * phase, once on the PowerShell transport and once on the displays capture path.
+   * call reached the host at all.
    */
   function toolset(outcome: ToolOutcome): ToolFilter {
     return only(

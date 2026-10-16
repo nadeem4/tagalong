@@ -1,3 +1,8 @@
+/**
+ * Read-only looks at the person's Claude Code setup (installed plugins, connected apps, user
+ * allow rules) and the plugin install the catalog's Install button runs. Used by the engine
+ * for the expert catalog.
+ */
 import { PluginId } from '@tagalong/protocol';
 import { readdirSync, readFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';

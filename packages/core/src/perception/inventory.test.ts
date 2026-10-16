@@ -1,3 +1,4 @@
+/** Tests for the window inventory: browsers, blocked windows, text counts and the prompt lines. */
 import { describe, expect, it } from 'vitest';
 import type { CaptureExclusions } from '@tagalong/protocol';
 

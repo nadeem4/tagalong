@@ -1,3 +1,4 @@
+/** Tests for RouteMemory: the user's pick wins and deleted experts are forgotten. */
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from '../memory/db';

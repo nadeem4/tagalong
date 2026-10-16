@@ -1,3 +1,4 @@
+/** Tests for PetRegistry: seeding once, CRUD, older rows and schema errors. */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

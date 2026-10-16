@@ -1,10 +1,13 @@
+/**
+ * Saves the experts the person set up in SQLite (ExpertStore, table experts). Nothing
+ * secret is stored.
+ */
 import type { Database } from 'better-sqlite3';
 import { Expert } from '@tagalong/protocol';
 
 /**
  * The experts the user has set up, one JSON row each in the `experts` table (migration 8).
- * Nothing secret is stored: a Claude Code expert is a folder and a command, and keys for
- * later connectors go to the host's keychain.
+ * Nothing secret is stored: a Claude Code expert is a folder and a command.
  */
 export class ExpertStore {
   constructor(private readonly db: Database) {}

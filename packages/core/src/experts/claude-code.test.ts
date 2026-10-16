@@ -1,3 +1,4 @@
+/** Tests for ClaudeCodeConnector: arguments, sealing, bundles, stream parsing, notes, spawnChild. */
 import { SECRET_FILES } from '@tagalong/protocol';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -1,3 +1,7 @@
+/**
+ * Searchable work memory: full-text search over the window titles Scout looked at and the
+ * activity asks (HistorySearch, historyQuery). Used by the search_history tool.
+ */
 import type Database from 'better-sqlite3';
 import { hideSecrets } from '../privacy/secrets';
 

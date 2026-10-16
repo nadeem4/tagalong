@@ -1,3 +1,4 @@
+/** Tests for SightLog: titles kept or hidden, pruning, listing and clearing. */
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CaptureExclusions } from '@tagalong/protocol';

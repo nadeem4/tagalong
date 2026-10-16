@@ -1,14 +1,14 @@
-import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
-import { findCaptureBlock, normalizeProcessName } from '../perception/exclusions';
-
 /**
  * Decides, from window titles alone, when one window is worth a closer look.
  *
  * Nothing here reads a screen or calls a model. The host sends the window list every few
  * seconds and almost every snapshot ends in this file with "not now". A look happens when
  * the person has settled on a window for half a minute, or when a title reads like
- * something broke, and never twice on the same window.
+ * something broke, and never twice on the same window. Also holds the shared call and
+ * full-screen rule (callOrFullScreenInFront) and the blind-spot check (blind).
  */
+import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
+import { findCaptureBlock, normalizeProcessName } from '../perception/exclusions';
 
 /** How long the person stays on a window before it is worth a look. */
 export const SETTLE_MS = 30_000;

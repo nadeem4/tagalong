@@ -1,3 +1,4 @@
+/** Tests for mayPersistScreenshot. */
 import { describe, expect, it } from 'vitest';
 import { Settings, type ScreenshotRetention } from '@tagalong/protocol';
 import { mayPersistScreenshot } from './retention';

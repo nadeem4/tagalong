@@ -1,3 +1,4 @@
+/** Tests for ExpertStore and migration 8 on older databases. */
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Expert } from '@tagalong/protocol';

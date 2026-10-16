@@ -1,3 +1,4 @@
+/** Tests for the calendar feed: recurrences, refresh, errors that never name the link, the fetch. */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';

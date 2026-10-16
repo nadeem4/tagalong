@@ -1,3 +1,4 @@
+/** Tests for the expert catalog: entries parse, status, bundle and fromCatalog. */
 import type { Expert } from '@tagalong/protocol';
 import { describe, expect, it } from 'vitest';
 import raw from './catalog.json' with { type: 'json' };

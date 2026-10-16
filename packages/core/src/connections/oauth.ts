@@ -1,3 +1,8 @@
+/**
+ * OAuth sign-in for a connection: SecretOAuthProvider keeps the client and tokens in the
+ * host's secret store, and startLoopback runs the one-time 127.0.0.1 callback server the
+ * browser returns to.
+ */
 import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';

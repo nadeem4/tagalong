@@ -1,3 +1,7 @@
+/**
+ * Home's "What Scout saw": the privacy log of every look and send, metadata only (SightLog,
+ * table sight_log).
+ */
 import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { SightLogEntry } from '@tagalong/protocol';

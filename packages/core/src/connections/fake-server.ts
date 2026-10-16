@@ -1,3 +1,7 @@
+/**
+ * Test helper, never used by the app: an in-process MCP server (fakeMcpServer) and a
+ * transport that acts like a server behind OAuth (FakeOAuthTransport).
+ */
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
@@ -12,10 +16,7 @@ import {
   type Tool as McpTool,
 } from '@modelcontextprotocol/sdk/types.js';
 
-/**
- * An MCP server in this process, for tests: no network, no real app. Each tool answers
- * from a function; `calls` records what the client sent.
- */
+/** One tool the fake server offers: its name, its annotations and the function that answers. */
 export interface FakeTool {
   name: string;
   description?: string;
@@ -29,6 +30,10 @@ export interface FakeMcpServer {
   calls: { name: string; args: Record<string, unknown> }[];
 }
 
+/**
+ * An MCP server in this process, for tests: no network, no real app. Each tool answers
+ * from a function; `calls` records what the client sent.
+ */
 export function fakeMcpServer(tools: FakeTool[]): FakeMcpServer {
   const calls: FakeMcpServer['calls'] = [];
   return {

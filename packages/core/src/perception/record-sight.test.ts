@@ -1,3 +1,4 @@
+/** Tests for the sight-log wrappers: what each read writes, and what writes nothing. */
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CapturedImage, WindowEntry } from '@tagalong/protocol';

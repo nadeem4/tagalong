@@ -1,3 +1,4 @@
+/** Tests for PickUpStore: save, overwrite, clear and unreadable rows. */
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from '../memory/db';

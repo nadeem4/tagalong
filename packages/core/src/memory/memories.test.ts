@@ -1,3 +1,4 @@
+/** Tests for MemoryStore: add, visibility, search, dedupe and delete. */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

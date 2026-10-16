@@ -1,3 +1,8 @@
+/**
+ * Small rules shared by the connection code: whether an MCP tool reads or writes (accessOf),
+ * and how Claude Code style ${VAR} references are expanded (expandEnv) and recognised
+ * (isEnvReference).
+ */
 import type { ToolAccess } from '@tagalong/protocol';
 
 /** The MCP tool annotations the classification reads. Both are hints from the server. */

@@ -1,3 +1,4 @@
+/** Tests for Approvals: allow, deny, stop and timeout of a waiting write. */
 import { describe, expect, it } from 'vitest';
 import type { ConnectorConfirmParams } from '@tagalong/protocol';
 import { Approvals } from './approvals';

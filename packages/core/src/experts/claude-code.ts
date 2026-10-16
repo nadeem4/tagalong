@@ -1,3 +1,8 @@
+/**
+ * Claude Code as an expert: runs claude -p headless in the expert's folder, sealed or with a
+ * catalog bundle, and turns its stream-json into progress steps and an answer. Also exports
+ * spawnChild, the process starter the Claude Code brain shares.
+ */
 import { SECRET_FILES } from '@tagalong/protocol';
 import { spawn as nodeSpawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import crossSpawn from 'cross-spawn';

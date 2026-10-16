@@ -1,3 +1,4 @@
+/** Works out what happened since the last launch (launchScenario) from recorded facts. */
 /**
  * What happened since Tagalong last ran, worked out from recorded facts alone, so the
  * launch line never guesses. One scenario per launch: an update matters most (an installer

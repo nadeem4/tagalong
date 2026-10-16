@@ -1,3 +1,8 @@
+/**
+ * Runs the person's app connections: one MCP client per switched-on connection, sign-in,
+ * tool calls with time limits, and the state Home shows. Contains ConnectionManager and the
+ * transport types it is built from.
+ */
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import {
   UnauthorizedError,

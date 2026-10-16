@@ -1,3 +1,4 @@
+/** Tests for assemblePrompt: system prompt, memories, context block and the image attach policy. */
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import type { ContextSnapshot, Message, Pet, Settings } from '@tagalong/protocol';
@@ -160,7 +161,7 @@ describe('assemblePrompt system prompt', () => {
   });
 
   it("falls back to the companion's instructions for a role the library does not have", () => {
-    // A crew-era role, still on a pet saved before the crew went.
+    // A saved pet may name a role the library does not have.
     const { system } = assemblePrompt({
       pet: { ...pet, roleId: 'writer' },
       history: [userMessage('hi')],
@@ -529,10 +530,6 @@ describe('assemblePrompt window inventory', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Phase 2B: the full-view attach policy
-// ---------------------------------------------------------------------------
-
 const PNG = { mime: 'image/png', base64: 'aGk=', width: 1568, height: 882 } as const;
 
 function display(
@@ -588,8 +585,8 @@ function textOf(request: ReturnType<typeof assemblePrompt>): string {
 
 describe('the full-view attach policy', () => {
   it('attaches the composite and the focused display, and nothing else', () => {
-    // The whole cost argument of this phase: three monitors must not mean three images
-    // on every ask. The composite is the map; the focused display is where the user is.
+    // The cost rule: three monitors must not mean three images on every ask. The
+    // composite is the map; the focused display is where the user is.
     const request = assemblePrompt({
       pet,
       history: [userMessage('what is on my screens')],
@@ -707,7 +704,7 @@ describe('the full-view attach policy', () => {
   });
 
   it('leaves a Phase 2 single-screenshot snapshot exactly as it was', () => {
-    // Phase 2's Ctrl+Shift+S path must not change shape because Phase 2B exists.
+    // A single-screenshot snapshot keeps its shape when full-view capture exists.
     const request = assemblePrompt({
       pet,
       history: [userMessage('what is wrong here')],

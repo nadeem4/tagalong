@@ -1,3 +1,7 @@
+/**
+ * The window inventory: applies exclusions to the host's window list (buildInventory) and
+ * renders it for the prompt (renderInventory). Shared by core and the desktop host.
+ */
 import type { CaptureExclusions, ScreenInfo, WindowEntry } from '@tagalong/protocol';
 
 import { findCaptureBlock, normalizeProcessName } from './exclusions';

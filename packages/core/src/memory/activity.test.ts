@@ -1,3 +1,4 @@
+/** Tests for ActivityLog: every row kind, older kinds, paging and the greeting and briefing reads. */
 import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

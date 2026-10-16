@@ -1,3 +1,4 @@
+/** Tests for memory in a turn: recall into the prompt, stated preferences and the summary job. */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

@@ -1,3 +1,4 @@
+/** Tests for pick-up: the snapshot, branch reading, the line, and the offer cycle. */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

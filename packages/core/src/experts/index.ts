@@ -1,3 +1,7 @@
+/**
+ * Experts: the back-office agents Scout hands work to. Re-exports the connector contract,
+ * the Claude Code connector, the fake, HandoffManager, ExpertStore and RouteMemory.
+ */
 export {
   CANCELLED,
   renderBrief,

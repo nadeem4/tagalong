@@ -1,3 +1,7 @@
+/**
+ * Keep an eye on things: turns the host's window lists into moods, remarks and Stuck?
+ * offers. Contains KeepAnEye and pickCoder.
+ */
 import { randomUUID } from 'node:crypto';
 import type {
   Brief,

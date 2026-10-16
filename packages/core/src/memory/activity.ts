@@ -1,3 +1,7 @@
+/**
+ * The Activity log behind Home: turns, hand-offs, app calls and routine runs in the activity
+ * table, plus the queries the greeting, pick-up and daily briefing read. Contains ActivityLog.
+ */
 import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { ActivityEntry, ActivityKind } from '@tagalong/protocol';
@@ -13,8 +17,8 @@ export const ACTIVITY_TEXT_CHARS = 4_000;
 const INTERRUPTED = 'Interrupted: Tagalong closed before this finished.';
 
 /**
- * The kinds the list shows. A crew-era install also holds consults, handoffs and
- * roundtables; they stay on disk and out of the list.
+ * The kinds the list shows. Older databases also hold consult, handoff and roundtable
+ * rows; they stay on disk and out of the list.
  */
 const LISTED = ActivityKind.options.map((kind) => `'${kind}'`).join(', ');
 

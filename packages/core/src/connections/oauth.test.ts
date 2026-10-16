@@ -1,3 +1,4 @@
+/** Tests for the sign-in loopback: state check, error redirects and timeout. */
 import { afterEach, describe, expect, it } from 'vitest';
 import { startLoopback, type Loopback } from './oauth';
 

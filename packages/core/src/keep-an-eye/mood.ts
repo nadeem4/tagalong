@@ -1,11 +1,11 @@
-import type { CaptureExclusions, HandoffFinishedParams, WindowEntry } from '@tagalong/protocol';
-import { blind, callOrFullScreenInFront, looksLikeTrouble } from './lookout';
-
 /**
  * Scout's face reacts to what the front window's title says: a wince when a build or a test
  * newly fails, a cheer when it passes. Titles only, from the window list keeping an eye
- * already gets: no text is read and no model is asked.
+ * already gets: no text is read and no model is asked. Contains MoodWatch and
+ * moodForHandoff.
  */
+import type { CaptureExclusions, HandoffFinishedParams, WindowEntry } from '@tagalong/protocol';
+import { blind, callOrFullScreenInFront, looksLikeTrouble } from './lookout';
 
 /** A reaction on the pet's face. */
 export type Reaction = 'wince' | 'cheer';

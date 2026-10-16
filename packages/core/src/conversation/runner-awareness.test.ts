@@ -1,3 +1,4 @@
+/** Tests for recall_screen, what_changed and watch_for inside a real turn. */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

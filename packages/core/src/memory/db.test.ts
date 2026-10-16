@@ -1,3 +1,4 @@
+/** Tests for openDatabase and every migration, including upgrades of older databases. */
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

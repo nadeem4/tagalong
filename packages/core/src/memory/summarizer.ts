@@ -1,3 +1,7 @@
+/**
+ * Folds long conversations into summary memories after a turn, off the request path
+ * (Summarizer).
+ */
 import type { Message, Pet } from '@tagalong/protocol';
 import type { BrainProvider } from '../providers';
 import type { SettingsStore } from '../settings/settings';
