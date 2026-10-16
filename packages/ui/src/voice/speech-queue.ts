@@ -1,3 +1,8 @@
+/**
+ * Scout's lines spoken one at a time, the next one prepared while the current one plays.
+ * Contains SpeechQueue, PreparedLine and SpeechQueueOptions.
+ */
+
 import { SHORT_LINE, mergeShortLines, toSpeakable } from './speakable';
 
 /** One line's audio, being got ready: playing it resolves when it is said or the signal aborts it. */

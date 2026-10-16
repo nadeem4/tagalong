@@ -1,3 +1,8 @@
+/**
+ * The drop card: something dropped on Scout, with Explain, Hand it to an expert and Cancel,
+ * or the refusal for a secrets file. Contains DropCard and DropOffer. Used by the bubble.
+ */
+
 import { useState } from 'react';
 import type { Dropped } from '@tagalong/protocol';
 

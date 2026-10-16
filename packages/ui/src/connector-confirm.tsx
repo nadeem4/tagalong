@@ -1,3 +1,8 @@
+/**
+ * The connector confirm card: Scout wants to change something in a connected app, and
+ * nothing runs until Allow once. Contains ConnectorConfirmCard. Used by the bubble.
+ */
+
 import type { ConnectorConfirmParams } from '@tagalong/protocol';
 
 /**

@@ -1,3 +1,5 @@
+/** Tests for SightBar: what is attached, full view and the image token estimate. */
+
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ContextSnapshot } from '@tagalong/protocol';
@@ -114,10 +116,6 @@ describe('SightBar', () => {
     expect(screen.getByTestId('sight-bar')).toHaveTextContent('Capture did not work');
   });
 });
-
-// ---------------------------------------------------------------------------
-// Phase 2B: the full-view chip
-// ---------------------------------------------------------------------------
 
 const PNG = { mime: 'image/png', base64: 'iVBORw0KGgo=', width: 1568, height: 882 } as const;
 

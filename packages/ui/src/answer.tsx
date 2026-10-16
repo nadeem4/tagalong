@@ -1,3 +1,8 @@
+/**
+ * How an answer reads in the bubble: Markdown rendered safely, links kept as text, and a
+ * fenced `draft` block shown as a draft with Copy. Contains Answer and ANSWER_CSS.
+ */
+
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Markdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';

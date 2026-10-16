@@ -1,3 +1,8 @@
+/**
+ * The settings card: settings Scout would change by talking, shown now and after, applied
+ * only by a click. Contains SettingsCard. Used by the bubble.
+ */
+
 import { useState } from 'react';
 import type { SettingsProposedParams } from '@tagalong/protocol';
 import { useHostBridge } from './host-bridge';

@@ -1,3 +1,5 @@
+/** Tests for RoutinesPanel: list, templates, form and Scout's card. */
+
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { Expert, RoutineProposedParams, RoutineView } from '@tagalong/protocol';

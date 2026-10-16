@@ -1,3 +1,9 @@
+/**
+ * Turns a bubble line into what Scout says aloud: Markdown stripped, code, lists, tables,
+ * quotes and URLs left out, and long answers cut to their first sentences. Contains
+ * toSpeakable, mergeShortLines, SHORT_LINE and the spoken fallback lines.
+ */
+
 /** Said after a line that was cut short, so the listener knows there is more to read. */
 export const REST_IN_BUBBLE = 'The rest is in the bubble.';
 

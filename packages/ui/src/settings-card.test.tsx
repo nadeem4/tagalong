@@ -1,3 +1,5 @@
+/** Tests for SettingsCard: Apply, Turn on and Cancel. */
+
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { SETTINGS_DEFAULTS, type SettingsProposedParams } from '@tagalong/protocol';

@@ -1,3 +1,8 @@
+/**
+ * The health card in the bubble: a headline, then one row per check with a dot, a plain
+ * line and Fix it or Set up. Contains HealthCard.
+ */
+
 import { healthHeadline } from './health';
 import type { FixTarget, HealthRow } from './health';
 import { officeTokens as t } from './office/tokens';

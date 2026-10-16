@@ -1,3 +1,9 @@
+/**
+ * Home's Experts page: the Claude Code experts Scout hands work to, the add form with its
+ * templates, and the expert catalog with its install confirm. Contains ExpertsPanel and
+ * expertIdFor.
+ */
+
 import { useCallback, useEffect, useId, useState } from 'react';
 import type { CatalogEntry, CatalogStatus, Expert } from '@tagalong/protocol';
 import { useHostBridge } from '../host-bridge';
@@ -152,9 +158,9 @@ const TEMPLATES: readonly Template[] = [
 type Status = { text: string; error: boolean } | null;
 
 /**
- * Home's Experts tab: the tools the companion hands work to. Claude Code is the only kind so
- * far. Saving also tests the connection, which costs nothing (`claude --version`), so the user
- * learns straight away whether the command is right.
+ * Home's Experts page: the tools the companion hands work to. Every expert is a Claude Code
+ * connection. Saving also tests the connection, which costs nothing (`claude --version`), so
+ * the user learns straight away whether the command is right.
  */
 export function ExpertsPanel() {
   const bridge = useHostBridge();
@@ -334,7 +340,7 @@ function ExpertForm({
       goodAt: draft.goodAt.trim(),
       enabled: draft.enabled,
       instructions: draft.instructions.trim(),
-      // An old expert's default folder is dropped: each task picks its project.
+      // A default folder in a saved expert is not written back: each task picks its project.
       connection: {
         type: 'claude-code',
         canEdit: draft.canEdit,

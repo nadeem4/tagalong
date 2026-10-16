@@ -1,3 +1,8 @@
+/**
+ * A spoken answer said sentence by sentence while it streams, leaving code, lists and
+ * quotes to the bubble. Contains SpokenStream.
+ */
+
 import { ONLY_IN_BUBBLE, toSpeakable } from './speakable';
 
 const FENCE = '```';
@@ -17,8 +22,8 @@ const MAYBE_LIST = /^[ \t]*(?:[-*+•]|\d+[.)]?)?$/;
 /**
  * A spoken answer, said sentence by sentence while it streams: the first complete sentence
  * goes to the voice at once rather than after the whole reply. Code blocks, list lines and
- * quoted (`>`) lines are left to the bubble, whole: a list item is judged by how its line starts, so none of
- * its sentences is read. Markdown is stripped from the rest.
+ * quoted (`>`) lines are left to the bubble, whole: a list item is judged by how its line
+ * starts, so none of its sentences is read. Markdown is stripped from the rest.
  */
 export class SpokenStream {
   readonly #say: (line: string) => void;

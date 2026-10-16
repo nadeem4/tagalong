@@ -1,10 +1,9 @@
+/**
+ * Home's stylesheet: the frame, the side nav, the pages, the activity list and the forms,
+ * built from the design tokens and scoped under `.home`. Contains HOME_CSS.
+ */
 import { officeTokens as t } from '../office/tokens';
 
-/**
- * Home's chrome: the frame, the top bar, the right panel's tabs, the activity list and the
- * agent controls, built from the office tokens and scoped under `.home`. Nothing here
- * belongs to a theme; a theme's scene brings its own look.
- */
 export const HOME_CSS = `
 .home {
   height: 100%; display: flex; overflow: hidden;

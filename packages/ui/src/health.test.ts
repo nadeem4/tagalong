@@ -1,3 +1,5 @@
+/** Tests for healthRows and healthHeadline. */
+
 import { describe, expect, it } from 'vitest';
 import { healthHeadline, healthRows } from './health';
 import type { HealthFacts, HealthRow } from './health';

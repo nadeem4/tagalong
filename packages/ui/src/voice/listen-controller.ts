@@ -1,3 +1,9 @@
+/**
+ * When the microphone is open and what happens to what it hears: hold-to-talk, always
+ * listening with "Scout" and "stop", pauses, and retry after the ears fail. Contains
+ * ListenController and ListenMic. Used by the desktop renderer's talk wiring.
+ */
+
 import { addressedToScout, isStopListening, mightBeStop } from '@tagalong/protocol';
 import type { Ears, ListenMode, MicStream } from '@tagalong/protocol';
 
@@ -23,9 +29,15 @@ export interface ListenControllerOptions {
    * (a call, the switch, the system voice, the talk key).
    */
   onDropped(): void;
-  /** Always listening: false hands over every turn whole, no "Scout" needed and "stop" is just words. Default true. */
+  /**
+   * Always listening: false hands over every turn whole, no "Scout" needed and "stop" is
+   * just words. Default true.
+   */
   needsName?: boolean;
-  /** The first wait before always listening retries after the ears failed; it doubles, up to five minutes. Default 30 s. */
+  /**
+   * The first wait before always listening retries after the ears failed; it doubles, up to
+   * five minutes. Default 30 s.
+   */
   retryMs?: number;
   /** Runs `run` after `ms`; returns a cancel. Default setTimeout. */
   setTimer?(run: () => void, ms: number): () => void;

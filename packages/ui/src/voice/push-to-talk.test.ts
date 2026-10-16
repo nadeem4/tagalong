@@ -1,3 +1,5 @@
+/** Tests for PushToTalk: held key, fresh press, mic button. */
+
 import { describe, expect, it } from 'vitest';
 import { FRESH_PRESS_MS, PushToTalk } from './push-to-talk';
 

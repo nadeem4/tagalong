@@ -1,3 +1,8 @@
+/**
+ * The "pick up where you left off" card: each project and half-done hand-off with its own
+ * Open or Brief again button. Contains PickUpCard. Used by the bubble.
+ */
+
 import { useState } from 'react';
 import type { PickUpItem, PickUpProject, PickUpReadyParams } from '@tagalong/protocol';
 import { useHostBridge } from './host-bridge';

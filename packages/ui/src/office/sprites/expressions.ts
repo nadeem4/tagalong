@@ -1,3 +1,8 @@
+/**
+ * The dock pet's faces: the moods it can show and the rows of the body each one swaps in,
+ * plus the blink. Contains DockMood, withMood and withBlink.
+ */
+
 import type { Sprite } from './sprite';
 
 /**

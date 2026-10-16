@@ -1,3 +1,5 @@
+/** Tests for MessageList: order, roles and the streaming bubble. */
+
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { MessageList, type ChatMessage } from './message-list';

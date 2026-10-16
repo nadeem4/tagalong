@@ -1,3 +1,5 @@
+/** Tests for the hand-off cards: proposal, two-step chains and steering a working expert. */
+
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ProjectCandidate } from '@tagalong/protocol';

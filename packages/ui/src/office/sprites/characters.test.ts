@@ -1,3 +1,5 @@
+/** Tests for characterFor and shade. */
+
 import { describe, expect, it } from 'vitest';
 import type { Pet } from '@tagalong/protocol';
 import { BODY, CHARACTERS, characterFor, shade } from './characters';

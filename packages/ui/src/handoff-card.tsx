@@ -1,3 +1,10 @@
+/**
+ * The hand-off cards in the bubble: the proposal (project, access, brief, Send), the expert
+ * at work with notes passed on, and what it sent back, including two-step hand-offs.
+ * Contains ProposalCard, HandoffStatus, the Handoff state type, withProgress, undelivered
+ * and HANDOFF_CSS.
+ */
+
 import { Answer } from './answer';
 import { useState } from 'react';
 import type {
@@ -143,7 +150,7 @@ function StepRows({
 }
 
 /**
- * Mockup screen 4: the brief a companion wrote, shown before anything runs. The project is
+ * The proposal card: the brief a companion wrote, shown before anything runs. The project is
  * the best guess, changed to another guess, a search result or a picked folder; edits can
  * be allowed for this one task; the brief can be edited. Send confirms, Cancel drops it.
  * With a follow-up step, both steps share the one project and the one Send; each has its own
@@ -358,7 +365,7 @@ export function ProposalCard({
   );
 }
 
-/** Mockup screens 5 and 6: the expert at work, then what it sent back. */
+/** The running card, then the finished card: the expert at work, then what it sent back. */
 export function HandoffStatus({
   handoff,
   onStop,

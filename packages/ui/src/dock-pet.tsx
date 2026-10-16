@@ -1,3 +1,9 @@
+/**
+ * Scout on the dock: the pixel character with a face per mood, a small tag (Seeing,
+ * Working, Done), blinking, and the sight-paused, recording and listening marks.
+ * Contains DockPet. Used by the desktop avatar window.
+ */
+
 import { useEffect, useMemo, useState } from 'react';
 import type { Pet } from '@tagalong/protocol';
 import { PixelSprite } from './office/pixel-sprite';
@@ -72,8 +78,8 @@ export function DockPet({
 }: DockPetProps) {
   const [blinking, setBlinking] = useState(false);
   // Blinks in moods with open eyes; working looks down at the task, done and cheer squint,
-  // dozing and wince have their eyes shut, tired half shut. A blink is motion too, so it stops with the rest
-  // when the system asks for less.
+  // dozing and wince have their eyes shut, tired half shut. A blink is motion too, so it
+  // stops with the rest when the system asks for less.
   const [still] = useState(reducedMotion);
   const canBlink = !still && (mood === 'idle' || mood === 'listening');
 

@@ -1,3 +1,5 @@
+/** Tests for the fake bridge and useHostBridge's missing-provider error. */
+
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ContextSnapshot } from '@tagalong/protocol';

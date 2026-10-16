@@ -1,3 +1,5 @@
+/** Tests for QueueMouth. */
+
 import { describe, expect, it, vi } from 'vitest';
 import { Pushable } from '@tagalong/protocol';
 import { QueueMouth } from './mouth';

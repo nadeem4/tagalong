@@ -1,3 +1,5 @@
+/** Tests for SpeechQueue: order, merging, prefetch and stop. */
+
 import { describe, expect, it, vi } from 'vitest';
 import { SpeechQueue } from './speech-queue';
 

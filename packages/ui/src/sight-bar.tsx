@@ -1,3 +1,9 @@
+/**
+ * The chat panel's sight bar: what is attached to the next ask (window, page, screens,
+ * selection), a rough token estimate for its images, and Look and Clear. Contains SightBar,
+ * SightProblem and estimateImageTokens. Used by ChatPanel.
+ */
+
 import type { ContextSnapshot } from '@tagalong/protocol';
 
 /** Why the pet cannot see, when the reason is worth saying out loud. */
@@ -19,9 +25,8 @@ export interface SightBarProps {
 }
 
 /**
- * Sight is a state, so it is always on screen. A pet that can see and a pet that
- * cannot used to look identical — an empty chip rendered nothing — and the only way
- * to find out was to ask and be told no. This bar never renders nothing.
+ * Sight is a state, so the bar is always on screen and never renders nothing: a pet that
+ * cannot see must look different from one that can, before anyone asks.
  */
 export function SightBar({
   snapshot,

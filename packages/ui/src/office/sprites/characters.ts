@@ -1,3 +1,8 @@
+/**
+ * How a pet looks: the shared 16x16 body, Scout's own palette, and any other pet recoloured
+ * from its saved colour. Contains characterFor, CHARACTERS, BODY, shade and DEFAULT_PET_COLOR.
+ */
+
 import type { Pet } from '@tagalong/protocol';
 import { officeTokens } from '../tokens';
 import type { Sprite } from './sprite';
@@ -66,8 +71,8 @@ export function shade(hex: string, amount: number): string {
 }
 
 /**
- * The one place a pet becomes a character: Scout by id, anyone else as the
- * base body recoloured from the pet's own colour.
+ * The one place a pet becomes a character: Scout by id; any other saved pet as the base
+ * body recoloured from its own colour.
  */
 export function characterFor(pet: Pet): Character {
   const known = Object.hasOwn(CHARACTERS, pet.id) ? CHARACTERS[pet.id] : undefined;

@@ -1,3 +1,8 @@
+/**
+ * Home's Connections page: the person's apps over MCP. Popular apps, servers found in
+ * Claude Code, and Add a connector. Contains ConnectionsPanel and splitCommand.
+ */
+
 import { useCallback, useEffect, useId, useState } from 'react';
 import type {
   ConnectionState,

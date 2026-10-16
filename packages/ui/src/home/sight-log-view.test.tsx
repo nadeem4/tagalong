@@ -1,3 +1,5 @@
+/** Tests for SightLogView: grouping, rows and delete. */
+
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { SightLogEntry } from '@tagalong/protocol';

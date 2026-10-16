@@ -1,11 +1,11 @@
 /**
- * Every visual value Home, the bubble and the dock use, in one place. Components read only from here,
- * so the look can change without touching component logic. Sprite palettes are character
- * art and live with the sprites instead.
+ * Design tokens shared by Home, Settings, the bubble and the dock: colours, fonts, sizes,
+ * spacing and radii. Contains officeTokens. Sprite palettes are character art and live in
+ * `sprites/characters.ts`.
  */
 export const officeTokens = {
   color: {
-    // The dark chrome: top bar and party list.
+    // The dark chrome: top bars, side menus and the bubble.
     page: '#12162B',
     text: '#E9ECF5',
     textMuted: '#A3AAC4',

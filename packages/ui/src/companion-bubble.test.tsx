@@ -1,3 +1,5 @@
+/** Tests for CompanionBubble and GreetingLine: asking, chips, full chat, talk and voice. */
+
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ContextSnapshot } from '@tagalong/protocol';

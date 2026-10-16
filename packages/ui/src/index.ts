@@ -1,8 +1,9 @@
 /**
- * React components shared by the desktop renderer and the extension side panel.
- *
- * This package must never import electron or reach for a socket. Hosts hand it a
- * HostBridge and the components talk to nothing else.
+ * The public surface of @tagalong/ui: React components and helpers shared by the desktop
+ * renderer and the extension side panel. Contains the HostBridge contract and its provider,
+ * the bubble, dock pet, chat panel, Home, the Settings sheet, Scout's voice helpers and the
+ * fake bridge for host tests. Never imports electron or opens a socket: hosts hand it a
+ * HostBridge.
  */
 export { HostBridgeProvider, useHostBridge } from './host-bridge';
 export type {
