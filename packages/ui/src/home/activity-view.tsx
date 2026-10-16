@@ -6,11 +6,11 @@
 
 import { useCallback, useEffect, useId, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { ActivityEntry, ActivityState, Pet } from '@tagalong/protocol';
+import type { ActivityEntry, ActivityState } from '@tagalong/protocol';
 import { useHostBridge } from '../host-bridge';
 import type { TurnEvent } from '../host-bridge';
 import { PixelSprite } from '../office/pixel-sprite';
-import { characterFor } from '../office/sprites/characters';
+import { SCOUT_SPRITE } from '../office/sprites/characters';
 import { officeTokens as t } from '../office/tokens';
 
 /** How many entries one page holds. */
@@ -37,8 +37,7 @@ const WORDS: Record<ActivityState, string> = {
   stopped: 'Stopped',
 };
 
-function headline(entry: ActivityEntry, name: (petId: string) => string): string {
-  const who = name(entry.petId);
+function headline(entry: ActivityEntry, who: string): string {
   switch (entry.kind) {
     case 'expert':
       return `${who} handed off to ${entry.expertName ?? 'an expert'}`;
@@ -95,7 +94,7 @@ function time(iso: string): string {
  * on click. Read from the engine's record with `listActivity`, re-read whenever a turn, a
  * hand-off or a routine run is reported.
  */
-export function ActivityView({ pets }: { pets: readonly Pet[] }) {
+export function ActivityView({ name }: { name: string }) {
   const bridge = useHostBridge();
   const [page, setPage] = useState<{ entries: ActivityEntry[]; next?: string | undefined } | null>(
     null,
@@ -150,8 +149,6 @@ export function ActivityView({ pets }: { pets: readonly Pet[] }) {
       .catch((error: unknown) => console.error('could not list older activity', error));
   };
 
-  const name = (petId: string): string => pets.find((pet) => pet.id === petId)?.name ?? petId;
-
   if (!supported) {
     return <Note>Activity is not available here.</Note>;
   }
@@ -175,7 +172,6 @@ export function ActivityView({ pets }: { pets: readonly Pet[] }) {
           <Entry
             key={entry.id}
             entry={entry}
-            pets={pets}
             name={name}
             open={open === entry.id}
             onToggle={() => setOpen(open === entry.id ? null : entry.id)}
@@ -215,20 +211,17 @@ function Note({ children }: { children: ReactNode }) {
 
 function Entry({
   entry,
-  pets,
   name,
   open,
   onToggle,
 }: {
   entry: ActivityEntry;
-  pets: readonly Pet[];
-  name: (petId: string) => string;
+  name: string;
   open: boolean;
   onToggle: () => void;
 }) {
   const threadId = useId();
   const title = headline(entry, name);
-  const pet = pets.find((candidate) => candidate.id === entry.petId);
   const meta = [
     entry.tool,
     entry.model,
@@ -247,9 +240,7 @@ function Entry({
         onClick={onToggle}
       >
         <span className="home-entry__tile">
-          {pet !== undefined && (
-            <PixelSprite sprite={characterFor(pet).sprite} scale={t.spriteScale.tile} />
-          )}
+          <PixelSprite sprite={SCOUT_SPRITE} scale={t.spriteScale.tile} />
         </span>
         <span className="home-entry__body">
           <span className="home-entry__title">{title}</span>
@@ -278,8 +269,7 @@ function Said({ who, text }: { who: string; text: string }) {
   );
 }
 
-function Thread({ entry, name }: { entry: ActivityEntry; name: (petId: string) => string }) {
-  const who = name(entry.petId);
+function Thread({ entry, name: who }: { entry: ActivityEntry; name: string }) {
   const failure =
     entry.error === undefined ? null : <Said who="What went wrong" text={entry.error} />;
   switch (entry.kind) {

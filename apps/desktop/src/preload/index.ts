@@ -188,12 +188,7 @@ const host: TagalongHostApi = {
     ipcRenderer.invoke(IPC.checkKey, providerId) as Promise<ProvidersCheckResult>,
   openClaudeSignIn: () => ipcRenderer.invoke(IPC.openClaudeSignIn) as Promise<void>,
   savePet: (pet: Pet) => ipcRenderer.invoke(IPC.savePet, pet) as Promise<Pet>,
-  selectPet: (petId: string) => ipcRenderer.invoke(IPC.selectPet, petId) as Promise<void>,
-  onActivePet: (handler) => {
-    const listener = (_event: IpcRendererEvent, petId: string): void => handler(petId);
-    ipcRenderer.on(IPC.activePetEvent, listener);
-    return () => void ipcRenderer.off(IPC.activePetEvent, listener);
-  },
+  openBubble: () => ipcRenderer.invoke(IPC.openBubble) as Promise<void>,
   fitPanel: (height: number) => ipcRenderer.invoke(IPC.fitPanel, height) as Promise<void>,
   onPanelSide: (handler) => {
     const listener = (_event: IpcRendererEvent, side: 'left' | 'right'): void => handler(side);
@@ -228,8 +223,6 @@ const host: TagalongHostApi = {
   remarkNotNow: () => ipcRenderer.invoke(IPC.remarkNotNow) as Promise<void>,
   remarkAccept: (remarkId: string) =>
     ipcRenderer.invoke(IPC.remarkAccept, remarkId) as Promise<void>,
-  resizeStrip: (visiblePets: number) =>
-    ipcRenderer.invoke(IPC.resizeStrip, visiblePets) as Promise<void>,
   listModels: (providerId: string) =>
     ipcRenderer.invoke(IPC.listModels, providerId) as Promise<ModelList>,
   openSettings: (target) => ipcRenderer.invoke(IPC.openSettings, target) as Promise<void>,

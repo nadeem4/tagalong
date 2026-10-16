@@ -111,13 +111,4 @@ describe('the settings card', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Settings');
     expect(screen.getByRole('region', { name: 'Change these settings?' })).toBeInTheDocument();
   });
-
-  it('ignores a card for another pet', () => {
-    const bridge = createFakeHostBridge();
-    renderBubble(bridge);
-    act(() => bridge.emit(proposed({ petId: 'other' })));
-    expect(
-      screen.queryByRole('region', { name: 'Change these settings?' }),
-    ).not.toBeInTheDocument();
-  });
 });

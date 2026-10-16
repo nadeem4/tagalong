@@ -73,8 +73,7 @@ export function SidePanelApp({ bridge, openOptions }: SidePanelAppProps) {
         </header>
         {activePet !== undefined && (
           <ChatPanel
-            petId={activePet.id}
-            pets={pets}
+            pet={activePet}
             {...(snapshot !== undefined ? { snapshot } : {})}
             lookTargets={PAGE_TARGETS}
             lookLabel="Read this page"

@@ -12,7 +12,6 @@ import {
   launchLine,
   shouldGreetOnLaunch,
   shouldOpenWelcome,
-  welcomeCrew,
   welcomeExperts,
 } from './welcome';
 
@@ -131,10 +130,9 @@ describe('launchLine', () => {
   });
 });
 
-describe('welcomeCrew', () => {
-  it('makes Scout the Companion on the chosen brain, and docks Scout alone', () => {
-    const crew = [pet('scout', { watchModel: 'x' }), pet('ink'), pet('bolt')];
-    const { scout, hiddenPets } = welcomeCrew(crew, 'scout', 'claude-code', COMPANION);
+describe('companionOn', () => {
+  it('makes Scout the Companion on the chosen brain, dropping its watch model', () => {
+    const scout = companionOn(pet('scout', { watchModel: 'x' }), 'claude-code', COMPANION);
     expect(scout).toMatchObject({
       id: 'scout',
       roleId: 'companion',
@@ -142,20 +140,13 @@ describe('welcomeCrew', () => {
       model: 'haiku',
     });
     expect(scout.watchModel).toBeUndefined();
-    expect(hiddenPets).toEqual(['ink', 'bolt']);
   });
 
   it('picks the role tier’s model on a keyed provider', () => {
-    const { scout } = welcomeCrew([pet('scout')], 'scout', 'anthropic', COMPANION);
+    const scout = companionOn(pet('scout'), 'anthropic', COMPANION);
     expect(scout).toMatchObject({ providerId: 'anthropic', model: 'claude-haiku-4-5' });
   });
 
-  it('refuses a crew without the default pet', () => {
-    expect(() => welcomeCrew([pet('ink')], 'scout', 'claude-code', COMPANION)).toThrow(/no scout/);
-  });
-});
-
-describe('companionOn', () => {
   it('moves Scout to a keyed service on its recommended model, dropping old vision and watch models', () => {
     const scout = companionOn(
       pet('scout', {

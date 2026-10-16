@@ -80,24 +80,6 @@ export async function launchLine(
 }
 
 /**
- * What finishing Welcome does to the pets: the default pet becomes the Companion on the
- * chosen brain, on the model its role's tier recommends there, and is the only one shown.
- * Any other pet is hidden, not deleted. Vision and watch models are dropped: they named
- * the old provider's models.
- */
-export function welcomeCrew(
-  pets: readonly Pet[],
-  defaultPetId: string,
-  providerId: string,
-  companion: Role,
-): { scout: Pet; hiddenPets: string[] } {
-  const current = pets.find((pet) => pet.id === defaultPetId);
-  if (current === undefined) throw new Error(`The crew has no ${defaultPetId} to welcome.`);
-  const scout = companionOn(current, providerId, companion);
-  return { scout, hiddenPets: pets.filter((pet) => pet.id !== defaultPetId).map((pet) => pet.id) };
-}
-
-/**
  * The pet as the Companion thinking on `providerId`, on the model its role's tier recommends
  * there. The watch model is dropped: it named the old provider's model. Used by
  * Welcome and by Settings when a key is saved because no Claude sign-in was found.

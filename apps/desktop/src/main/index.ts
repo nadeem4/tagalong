@@ -18,11 +18,15 @@ import {
   dialog,
   ipcMain,
   powerMonitor,
-  screen,
   shell,
   utilityProcess,
 } from 'electron';
-import { ContextSnapshot, HandoffFinishedParams, RoutineResultParams } from '@tagalong/protocol';
+import {
+  ContextSnapshot,
+  HandoffFinishedParams,
+  RoutineResultParams,
+  SCOUT_ID,
+} from '@tagalong/protocol';
 import type {
   PerceptionTarget,
   PickUpReadyParams,
@@ -95,7 +99,6 @@ import {
   showPanelBeside,
   showPanelQuietly,
 } from './windows/panel';
-import { AVATAR_SIZE, resolveAvatarPosition, stripWidth } from './windows/position';
 import { moveWindow } from './windows/move';
 import { createOfficeWindow } from './windows/office';
 import { createPointerOverlay } from './windows/pointer';
@@ -103,7 +106,7 @@ import { createOnboardingWindow } from './windows/onboarding';
 import { createSettingsWindow } from './windows/settings';
 import { fromWindow, registerClipboardIpc } from './ipc/clipboard';
 import { registerConnectionIpc } from './ipc/connections';
-import { registerCrewIpc } from './ipc/crew';
+import { registerScoutIpc } from './ipc/scout';
 import { registerExpertIpc } from './ipc/experts';
 import type { EngineCall, IpcHandle } from './ipc/handle';
 import { registerRoutineIpc } from './ipc/routines';
@@ -562,13 +565,13 @@ async function greetOnLaunch(host: EngineHost): Promise<void> {
       const { settings, previousLaunch } = current;
       // Compose first, then check the brain beside it, so a slow check never delays the line.
       const composing = host.client.call('greeting.compose', {
-        petId: settings.defaultPetId,
+        petId: SCOUT_ID,
         launch: { ...previousLaunch, version: app.getVersion(), whatsNew: WHATS_NEW },
       });
       const readiness = (async () => {
         const { pets } = await host.client.call('pets.list', {});
         return brainReadiness({
-          pet: pets.find((pet) => pet.id === settings.defaultPetId),
+          pet: pets.find((pet) => pet.id === SCOUT_ID),
           providers: providerChoices(await storedKeys(current.secrets)),
           signIn: () => signInCheck ?? signInFor(process.env),
           budgetMs: SIGN_IN_BUDGET_MS,
@@ -659,8 +662,8 @@ function stopVoice(): void {
   }
 }
 
-/** Reloads Scout's window after its pet, or which pet it shows, changed. */
-function refreshStrip(): void {
+/** Reloads Scout's window after Scout's record changed. */
+function reloadAvatar(): void {
   const avatar = desktop?.avatar;
   if (avatar !== null && avatar !== undefined && !avatar.isDestroyed()) avatar.webContents.reload();
 }
@@ -1007,13 +1010,13 @@ function registerIpc(): void {
     pendingSnapshot: () => required().pendingSnapshot,
     takeDrop: () => drops.take(),
   });
-  registerCrewIpc(handle, {
+  registerScoutIpc(handle, {
     engine,
     settings: () => required().settings,
     setSettings: (settings) => {
       required().settings = settings;
     },
-    refreshStrip,
+    reloadAvatar,
     findAgents: () => findAgents(),
     welcomed: () => {
       const current = required();
@@ -1054,7 +1057,6 @@ function registerIpc(): void {
     applyHotkeys: (settings) => {
       applyHotkeys(settings);
     },
-    refreshStrip,
     configureRolling: (rollingMemory) => required().rolling.configure(rollingMemory),
     broadcast: (settings) => {
       for (const window of BrowserWindow.getAllWindows()) {
@@ -1107,23 +1109,12 @@ function registerIpc(): void {
     captureForPanel(required(), targets),
   );
 
-  ipcMain.handle(IPC.selectPet, (_event, petId: string) => {
+  ipcMain.handle(IPC.openBubble, () => {
     const current = required();
     // A click on the pet opens its bubble, or keeps the open one and gives it the keyboard
     // back (the click focused the pet's window). It never closes it.
     if (current.panel?.isVisible() !== true) openPanelNow(current);
     else if (current.avatar !== null) showPanelBeside(current.panel, current.avatar);
-    current.panel?.webContents.send(IPC.activePetEvent, petId);
-  });
-
-  ipcMain.handle(IPC.resizeStrip, (_event, visiblePets: number) => {
-    const avatar = required().avatar;
-    if (avatar === null || avatar.isDestroyed()) return;
-    const width = stripWidth(visiblePets);
-    const [x, y] = avatar.getPosition();
-    const area = screen.getDisplayMatching(avatar.getBounds()).workArea;
-    const at = resolveAvatarPosition({ x: x ?? null, y: y ?? null }, area, width);
-    avatar.setBounds({ x: at.x, y: at.y, width, height: AVATAR_SIZE });
   });
 
   // A Fix it names its target; fixPage refuses anything off the list.

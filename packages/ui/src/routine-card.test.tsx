@@ -97,13 +97,6 @@ describe('the routine card', () => {
     act(() => bridge.emit(proposed({ action: 'pause', routineId: SAVED_ID })));
     expect(screen.getByRole('region', { name: 'Pause Morning papers?' })).toBeInTheDocument();
   });
-
-  it('ignores a card for another pet', () => {
-    const bridge = createFakeHostBridge();
-    renderBubble(bridge);
-    act(() => bridge.emit(proposed({ petId: 'ink' })));
-    expect(screen.queryByRole('region', { name: /Morning papers/ })).not.toBeInTheDocument();
-  });
 });
 
 describe('the bubble and routine turns', () => {

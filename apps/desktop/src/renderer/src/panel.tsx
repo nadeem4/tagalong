@@ -263,11 +263,11 @@ function Panel() {
     return window.tagalongHost.onHotkeyProblem(setHotkeyProblem);
   }, []);
 
-  // Opens on the default pet, Scout on a fresh install.
+  // Opens on Scout.
   useEffect(() => {
     Promise.all([window.tagalong.listPets(), window.tagalongHost.getHostView()])
       .then(([pets, view]) => {
-        const preferred = pets.find((pet) => pet.id === view.settings.defaultPetId) ?? pets[0];
+        const preferred = pets[0];
         setPetId(preferred?.id ?? null);
         if (preferred !== undefined) setPetName(preferred.name);
         platform.current = view.platform;
@@ -284,9 +284,6 @@ function Panel() {
       ),
     [],
   );
-
-  // A click on the pet on the desktop names the pet this panel talks to.
-  useEffect(() => window.tagalongHost.onActivePet(setPetId), []);
 
   if (petId === null) return <p className="settings__note">Waking Scout…</p>;
 

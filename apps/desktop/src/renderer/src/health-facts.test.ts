@@ -20,7 +20,7 @@ const expert = (id: string, enabled = true): Expert =>
 
 function view(patch: Partial<HostView> = {}, settings: Record<string, unknown> = {}): HostView {
   return {
-    settings: Settings.parse({ defaultPetId: 'scout', ...settings }),
+    settings: Settings.parse(settings),
     pets: [scout],
     providers: [],
     engineVersion: '0.0.0',

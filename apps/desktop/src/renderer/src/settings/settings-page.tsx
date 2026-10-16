@@ -149,7 +149,7 @@ export function SettingsPage({
 
   const { settings } = view;
   const presets = view.providers.filter((choice) => choice.defaultBaseUrl !== undefined);
-  const scout = view.pets.find((pet) => pet.id === settings.defaultPetId);
+  const scout = view.pets[0];
   const brain = scoutBrain(scout, view.providers, signIn);
 
   const markProviders = (providerId: string, hasKey: boolean): void =>

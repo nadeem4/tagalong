@@ -25,7 +25,7 @@ export { HomeView } from './home/home-view';
 export type { HomeHost, HomePage, HomeViewProps } from './home/home-view';
 export { brainLabel } from './home/brain-label';
 export { PixelSprite } from './office/pixel-sprite';
-export { characterFor } from './office/sprites/characters';
+export { SCOUT_SPRITE } from './office/sprites/characters';
 export type { PixelSpriteProps } from './office/pixel-sprite';
 
 export { SETTINGS_CSS } from './settings/settings-styles';

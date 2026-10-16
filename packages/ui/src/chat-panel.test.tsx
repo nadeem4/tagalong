@@ -15,6 +15,15 @@ const snapshot: ContextSnapshot = {
   selection: 'x'.repeat(42),
 };
 
+const SCOUT: Pet = {
+  id: 'scout',
+  name: 'Scout',
+  avatar: '🦊',
+  roleId: 'companion',
+  model: 'haiku',
+  providerId: 'fake',
+};
+
 const screenshot: ContextSnapshot = {
   id: '22222222-2222-4222-8222-222222222222',
   capturedAt: '2026-09-11T10:05:00.000Z',
@@ -23,14 +32,10 @@ const screenshot: ContextSnapshot = {
   screenshot: { mime: 'image/png', base64: 'iVBORw0KGgo=', width: 1280, height: 800 },
 };
 
-function renderPanel(
-  bridge: FakeHostBridge,
-  attached: ContextSnapshot | null = snapshot,
-  pets: readonly Pet[] = [],
-) {
+function renderPanel(bridge: FakeHostBridge, attached: ContextSnapshot | null = snapshot) {
   return render(
     <HostBridgeProvider bridge={bridge}>
-      <ChatPanel petId="sage" pets={pets} {...(attached === null ? {} : { snapshot: attached })} />
+      <ChatPanel pet={SCOUT} {...(attached === null ? {} : { snapshot: attached })} />
     </HostBridgeProvider>,
   );
 }
@@ -77,7 +82,7 @@ describe('ChatPanel', () => {
     send('What is wrong here?');
 
     expect(bridge.asks).toEqual([
-      { petId: 'sage', text: 'What is wrong here?', snapshot: screenshot },
+      { petId: 'scout', text: 'What is wrong here?', snapshot: screenshot },
     ]);
   });
 
@@ -92,8 +97,7 @@ describe('ChatPanel', () => {
     render(
       <HostBridgeProvider bridge={bridge}>
         <ChatPanel
-          petId="sage"
-          pets={[]}
+          pet={SCOUT}
           lookTargets={['selection', 'pageText', 'activeWindow']}
           lookLabel="Read this page"
         />
@@ -129,7 +133,7 @@ describe('ChatPanel', () => {
 
     send('Explain this');
 
-    expect(bridge.asks).toEqual([{ petId: 'sage', text: 'Explain this' }]);
+    expect(bridge.asks).toEqual([{ petId: 'scout', text: 'Explain this' }]);
   });
 
   it('asks through the bridge with the pet, text and snapshot, and echoes the question', () => {
@@ -138,7 +142,7 @@ describe('ChatPanel', () => {
 
     send('Explain this');
 
-    expect(bridge.asks).toEqual([{ petId: 'sage', text: 'Explain this', snapshot }]);
+    expect(bridge.asks).toEqual([{ petId: 'scout', text: 'Explain this', snapshot }]);
     expect(screen.getByText('Explain this')).toHaveAttribute('data-role', 'user');
   });
 
@@ -148,7 +152,7 @@ describe('ChatPanel', () => {
     send('Explain this');
 
     act(() => {
-      bridge.emit({ type: 'turn.started', turnId: 't1', petId: 'sage', conversationId: 'c1' });
+      bridge.emit({ type: 'turn.started', turnId: 't1', petId: 'scout', conversationId: 'c1' });
     });
     expect(screen.queryByTestId('streaming-message')).not.toBeInTheDocument();
 
@@ -175,17 +179,16 @@ describe('ChatPanel', () => {
     expect(screen.getByText('A fox is a small canid.')).toHaveAttribute('data-role', 'assistant');
   });
 
-  it('names the speaker from the pets the host passes, with the model', () => {
-    const sage = { id: 'sage', name: 'Sage' } as Pet;
+  it('names the speaker from the pet the host passes, with the model', () => {
     const bridge = createFakeHostBridge();
-    renderPanel(bridge, snapshot, [sage]);
+    renderPanel(bridge);
     send('Explain this');
 
     act(() => {
       bridge.emit({
         type: 'turn.started',
         turnId: 't1',
-        petId: 'sage',
+        petId: 'scout',
         conversationId: 'c1',
         model: 'm-1',
       });
@@ -198,7 +201,30 @@ describe('ChatPanel', () => {
       });
     });
 
-    expect(screen.getByTestId('speaker')).toHaveTextContent('Sage · m-1');
+    expect(screen.getByTestId('speaker')).toHaveTextContent('Scout · m-1');
+  });
+
+  it('continues the conversation the last answer came from', () => {
+    const bridge = createFakeHostBridge();
+    renderPanel(bridge, null);
+    send('First');
+
+    act(() => {
+      bridge.emit({ type: 'turn.started', turnId: 't1', petId: 'scout', conversationId: 'c1' });
+      bridge.emit({
+        type: 'turn.completed',
+        turnId: 't1',
+        text: 'Done.',
+        stopReason: 'end',
+        usage: { inputTokens: 1, outputTokens: 1 },
+      });
+    });
+    send('And then?');
+
+    expect(bridge.asks).toEqual([
+      { petId: 'scout', text: 'First' },
+      { petId: 'scout', conversationId: 'c1', text: 'And then?' },
+    ]);
   });
 
   it('empties the box once the question is sent', () => {
@@ -216,7 +242,7 @@ describe('ChatPanel', () => {
 
     rerender(
       <HostBridgeProvider bridge={bridge}>
-        <ChatPanel petId="sage" pets={[]} snapshot={screenshot} />
+        <ChatPanel pet={SCOUT} snapshot={screenshot} />
       </HostBridgeProvider>,
     );
 
@@ -229,7 +255,7 @@ describe('ChatPanel', () => {
     send('Explain this');
 
     act(() => {
-      bridge.emit({ type: 'turn.started', turnId: 't1', petId: 'sage', conversationId: 'c1' });
+      bridge.emit({ type: 'turn.started', turnId: 't1', petId: 'scout', conversationId: 'c1' });
     });
     expect(screen.getByRole('textbox')).toBeDisabled();
 
@@ -251,7 +277,7 @@ describe('ChatPanel', () => {
     send('Explain this');
 
     act(() => {
-      bridge.emit({ type: 'turn.started', turnId: 't1', petId: 'sage', conversationId: 'c1' });
+      bridge.emit({ type: 'turn.started', turnId: 't1', petId: 'scout', conversationId: 'c1' });
       bridge.emit({ type: 'turn.delta', turnId: 't1', text: 'partial' });
       bridge.emit({
         type: 'turn.error',

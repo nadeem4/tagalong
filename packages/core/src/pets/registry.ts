@@ -16,7 +16,6 @@ export const SCOUT: Pet = {
   id: SCOUT_ID,
   name: 'Scout',
   avatar: '🦊',
-  color: '#E8873A',
   roleId: 'companion',
   model: 'haiku',
   providerId: 'claude-code',

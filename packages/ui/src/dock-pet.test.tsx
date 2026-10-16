@@ -5,7 +5,7 @@ import { act } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Pet } from '@tagalong/protocol';
 import { DockPet } from './dock-pet';
-import { CHARACTERS } from './office/sprites/characters';
+import { SCOUT_SPRITE } from './office/sprites/characters';
 import { withBlink, withMood } from './office/sprites/expressions';
 
 const SCOUT: Pet = {
@@ -18,7 +18,7 @@ const SCOUT: Pet = {
 };
 
 describe('withMood', () => {
-  const base = CHARACTERS['scout']!.sprite;
+  const base = SCOUT_SPRITE;
 
   it('keeps the face as drawn when idle', () => {
     expect(withMood(base, 'idle')).toBe(base);
@@ -84,7 +84,7 @@ describe('a living pet', () => {
   afterEach(() => vi.useRealTimers());
 
   it('closes its eyes for a blink, and changes nothing else', () => {
-    const base = CHARACTERS['scout']!.sprite;
+    const base = SCOUT_SPRITE;
     const blink = withBlink(base);
     expect(blink.rows).not.toEqual(base.rows);
     expect(blink.rows.slice(0, 5)).toEqual(base.rows.slice(0, 5));

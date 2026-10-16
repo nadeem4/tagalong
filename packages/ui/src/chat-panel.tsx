@@ -14,10 +14,8 @@ import { useHostBridge, type TurnEvent } from './host-bridge';
 const LOOK_TARGETS = ['screenshot', 'activeWindow'] as const;
 
 export interface ChatPanelProps {
-  /** The pet the next ask goes to. */
-  petId: string;
-  /** The pets, for the speaker's name and the watcher's. */
-  pets: readonly Pet[];
+  /** The companion: who the next ask goes to, and the name on its answers and watches. */
+  pet: Pet;
   /** What the host captured for this ask: named in the sight bar and sent with the turn. */
   snapshot?: ContextSnapshot;
   /** What Look captures in this host. Defaults to a screenshot of the active window. */
@@ -29,22 +27,14 @@ export interface ChatPanelProps {
 /** A watch in progress, from its latest `watch.status`. */
 interface RunningWatch {
   watchId: string;
-  petId: string;
   condition: string;
   checks: number;
   maxChecks: number;
   checkModel?: string;
 }
 
-/** Who is answering a turn, from its `turn.started`. */
-interface TurnInfo {
-  petId: string;
-  speaker: string;
-}
-
 export function ChatPanel({
-  petId,
-  pets,
+  pet,
   snapshot,
   lookTargets = LOOK_TARGETS,
   lookLabel,
@@ -60,11 +50,12 @@ export function ChatPanel({
   // Model calls in the last turn: tool round trips multiply them, so the footer shows the
   // count whenever a turn made more than the one call an ask costs.
   const [modelCalls, setModelCalls] = useState<number | null>(null);
-  // Which conversation each pet is in, so a follow-up continues the thread it answered in.
-  const [conversations, setConversations] = useState<Record<string, string>>({});
+  // The conversation the last answer came from, so a follow-up continues that thread.
+  const [conversationId, setConversationId] = useState<string | null>(null);
   // Watches running now, shown as chips with a Stop button each.
   const [watches, setWatches] = useState<readonly RunningWatch[]>([]);
-  const turns = useRef(new Map<string, TurnInfo>());
+  // Who answered each turn, "Scout · haiku", from its `turn.started`.
+  const speakers = useRef(new Map<string, string>());
 
   // React's documented way to reset state when a prop changes: a fresh host capture
   // replaces whatever the panel was holding, without an effect and an extra paint.
@@ -108,17 +99,13 @@ export function ChatPanel({
   }
 
   // An effect event, so the subscription below is made once per bridge yet always sees the
-  // current pets and the host's latest callback.
+  // current pet and the watches running now.
   const onTurnEvent = useEffectEvent((event: TurnEvent) => {
     switch (event.type) {
       case 'turn.started': {
-        const name = pets.find((pet) => pet.id === event.petId)?.name;
-        const speaker = [name ?? (pets.length > 0 ? event.petId : undefined)]
-          .concat(event.model)
-          .filter((part): part is string => part !== undefined)
-          .join(' · ');
-        turns.current.set(event.turnId, { petId: event.petId, speaker });
-        setConversations((current) => ({ ...current, [event.petId]: event.conversationId }));
+        const speaker = [pet.name].concat(event.model ?? []).join(' · ');
+        speakers.current.set(event.turnId, speaker);
+        setConversationId(event.conversationId);
         setActiveTurnId(event.turnId);
         setStreamingSpeaker(speaker);
         setStreamingText('');
@@ -129,7 +116,7 @@ export function ChatPanel({
         break;
       case 'turn.completed': {
         // The completed text is authoritative; deltas may have been dropped.
-        const info = turns.current.get(event.turnId);
+        const speaker = speakers.current.get(event.turnId);
         if (event.modelCalls !== undefined && event.modelCalls > 1) {
           setModelCalls(event.modelCalls);
         }
@@ -137,8 +124,7 @@ export function ChatPanel({
           id: event.turnId,
           role: 'assistant',
           text: event.text,
-          ...(info !== undefined ? { petId: info.petId } : {}),
-          ...(info !== undefined && info.speaker !== '' ? { speaker: info.speaker } : {}),
+          ...(speaker !== undefined ? { speaker } : {}),
         });
         break;
       }
@@ -149,7 +135,6 @@ export function ChatPanel({
         if (event.state === 'watching') {
           const running: RunningWatch = {
             watchId: event.watchId,
-            petId: event.petId,
             condition: event.condition,
             checks: event.checks,
             maxChecks: event.maxChecks,
@@ -177,7 +162,6 @@ export function ChatPanel({
             role: 'assistant',
             kind: 'watch',
             text: event.message,
-            petId: event.petId,
             ...(condition === undefined ? {} : { condition }),
           },
         ]);
@@ -195,11 +179,10 @@ export function ChatPanel({
   function handleSend(text: string): void {
     setModelCalls(null);
     setMessages((current) => [...current, { id: `ask:${current.length}`, role: 'user', text }]);
-    const conversationId = conversations[petId];
     bridge
       .ask({
-        petId,
-        ...(conversationId !== undefined ? { conversationId } : {}),
+        petId: pet.id,
+        ...(conversationId !== null ? { conversationId } : {}),
         text,
         ...(attached !== null ? { snapshot: attached } : {}),
       })
@@ -229,42 +212,39 @@ export function ChatPanel({
         onClear={handleClear}
         {...(lookLabel !== undefined ? { lookLabel } : {})}
       />
-      {watches.map((watch) => {
-        const watcher = pets.find((pet) => pet.id === watch.petId);
-        return (
-          <div
-            key={watch.watchId}
-            data-testid="watching"
-            className="flex items-center gap-2 border-b border-sky-200 bg-sky-50 px-3 py-1 text-xs text-sky-900"
+      {watches.map((watch) => (
+        <div
+          key={watch.watchId}
+          data-testid="watching"
+          className="flex items-center gap-2 border-b border-sky-200 bg-sky-50 px-3 py-1 text-xs text-sky-900"
+        >
+          <span aria-hidden="true">⏱</span>
+          <span className="font-semibold">Watching</span>
+          <span className="truncate">
+            {pet.name}: “{watch.condition}”
+          </span>
+          <span
+            className="ml-auto shrink-0 text-sky-700"
+            title="Model checks spent, and the small model answering them"
           >
-            <span aria-hidden="true">⏱</span>
-            <span className="font-semibold">Watching</span>
-            <span className="truncate">
-              {watcher === undefined ? '' : `${watcher.name}: `}“{watch.condition}”
-            </span>
-            <span
-              className="ml-auto shrink-0 text-sky-700"
-              title="Model checks spent, and the small model answering them"
+            {watch.checks}/{watch.maxChecks} checks
+            {watch.checkModel === undefined ? '' : ` · ${watch.checkModel}`}
+          </span>
+          {bridge.stopWatch !== undefined && (
+            <button
+              type="button"
+              onClick={() => void bridge.stopWatch?.(watch.watchId)}
+              className="shrink-0 rounded-md border border-sky-300 bg-white px-2 py-0.5 font-medium"
             >
-              {watch.checks}/{watch.maxChecks} checks
-              {watch.checkModel === undefined ? '' : ` · ${watch.checkModel}`}
-            </span>
-            {bridge.stopWatch !== undefined && (
-              <button
-                type="button"
-                onClick={() => void bridge.stopWatch?.(watch.watchId)}
-                className="shrink-0 rounded-md border border-sky-300 bg-white px-2 py-0.5 font-medium"
-              >
-                Stop
-              </button>
-            )}
-          </div>
-        );
-      })}
+              Stop
+            </button>
+          )}
+        </div>
+      ))}
       <MessageList
         messages={messages}
         streamingText={streamingText}
-        pets={pets}
+        petName={pet.name}
         {...(streamingSpeaker !== '' ? { streamingSpeaker } : {})}
       />
       {busy && (

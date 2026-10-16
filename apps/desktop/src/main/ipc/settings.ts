@@ -27,7 +27,6 @@ export interface SettingsIpcDeps {
   version: () => string;
   setSettings: (settings: Settings) => void;
   applyHotkeys: (settings: Settings) => void;
-  refreshStrip: () => void;
   configureRolling: (rollingMemory: Settings['rollingMemory']) => void;
   /** Sends the saved settings to every open window. */
   broadcast: (settings: Settings) => void;
@@ -80,9 +79,6 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
     // not after a restart.
     deps.setSettings(saved);
     if (patch.hotkeys !== undefined) deps.applyHotkeys(saved);
-    if (patch.hiddenPets !== undefined) deps.refreshStrip();
-    // A new default pet: the desktop redraws on the pet it now shows.
-    if (patch.defaultPetId !== undefined) deps.refreshStrip();
     // Rolling memory starts, stops or trims the moment the user saves, not after a restart.
     if (patch.rollingMemory !== undefined) deps.configureRolling(saved.rollingMemory);
     // An open panel reads its keys, microphone and the user's name from here, not a restart.

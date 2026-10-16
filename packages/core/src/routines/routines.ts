@@ -19,7 +19,7 @@ import {
   type RoutineView,
   type WindowEntry,
 } from '@tagalong/protocol';
-import { RoutineDraft } from '@tagalong/protocol';
+import { RoutineDraft, SCOUT_ID } from '@tagalong/protocol';
 import { callOrFullScreenInFront } from '../keep-an-eye/lookout';
 import type { Meeting } from '../meetings/calendar-feed';
 import { findCaptureBlock } from '../perception/exclusions';
@@ -637,7 +637,7 @@ export class Routines {
       params: {
         routineId: routine.id,
         name: routine.name,
-        petId: this.#options.pet()?.id ?? 'scout',
+        petId: this.#options.pet()?.id ?? SCOUT_ID,
         ...(outcome.conversationId !== undefined ? { conversationId: outcome.conversationId } : {}),
         state: outcome.state,
         line,

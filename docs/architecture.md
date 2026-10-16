@@ -189,7 +189,8 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   `roles.recommendModel`, `notices.rolesUpgrade` and `notices.dismiss` are gone. Protocol 0.14.0:
   `ask` takes text only (the unread `input.audio` is gone, since speech becomes text on the host),
   and the never-advertised `audioIn` and `audioOut` capabilities are gone. Protocol 0.15.0: `Pet`
-  drops `toolGrants`, `replyStyle` and `notes`. `hosts.status`
+  drops `toolGrants`, `replyStyle` and `notes`. Protocol 0.16.0: `Settings` drops `defaultPetId`
+  and `hiddenPets` (an older file still parses, without them), and `Pet` drops `color`. `hosts.status`
   → `{ extension }` says whether the browser extension is connected, for the health check (see
   [The companion's bubble](#the-companions-bubble)); the extension may not call it.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
@@ -906,7 +907,7 @@ that takes `ipcMain.handle` and what it reads as arguments, so it is unit tested
 | Module           | Channels                                                                                                  |
 | ---------------- | --------------------------------------------------------------------------------------------------------- |
 | `turns.ts`       | ask (with the dropped item when a drop card asks), stop a watch, interrupt, a remark's Not now and accept |
-| `crew.ts`        | pets, save a pet, switch Scout, finish Welcome                                                            |
+| `scout.ts`       | pets, save Scout, switch Scout, finish Welcome                                                            |
 | `experts.ts`     | Activity, the Experts tab, the hand-off card, project search                                              |
 | `connections.ts` | connected apps and the answer to a change Scout asked to make                                             |
 | `routines.ts`    | Home's Routines page and the routine card, including its Edit                                             |
@@ -1160,7 +1161,7 @@ lives in `packages/core`; hosts only render what the engine broadcasts.
 `pets.list` and `pets.upsert`. `pets.upsert` refuses any id but `scout` (`SCOUT_ID`), and a
 `roleId` the role library does not have, with RPC error `-32602`. The library holds one role, `companion`; a pet still naming a crew-era role
 (`generalist`, `writer` and the rest) works as the companion (`roleFor`). Parsing drops unknown keys,
-so a pet stored with the crew-era `roleVersion`, `voiceId`, `toolGrants`, `replyStyle` or `notes`
+so a pet stored with the crew-era `roleVersion`, `voiceId`, `toolGrants`, `replyStyle`, `notes` or `color`
 still loads. A fresh install is seeded with one pet: Scout, the Companion, on
 `claude-code` with the `haiku` model, so it thinks through the person's Claude Code sign-in and needs
 no key (Welcome moves it to a keyed provider when Claude Code is missing).
@@ -1174,8 +1175,7 @@ conversations, messages, memories and activity; shared memories become Scout's (
 holds is not copied twice); and Scout's stored
 record loses `toolGrants`, `replyStyle`, `notes` and `color` (if Scout itself is missing, its seed
 record goes too, so it is seeded again on the same boot). Migration 6 recorded a one-time roles notice; it now does nothing, and
-migration 14 drops the `notices` table. Each pet carries an optional `color` (`#rrggbb`) for its
-sprite.
+migration 14 drops the `notices` table.
 
 ### Memory
 
@@ -1250,13 +1250,13 @@ and on what.
 ### The companion in the hosts
 
 `ChatPanel` in `packages/ui` is the Chrome side panel's chat with Scout. It names the speaker from
-the pets the host passes, continues the conversation `turn.started` reported,
+the `pet` the host passes (Scout, the first in `pets.list`), continues the one conversation `turn.started` reported,
 labels each answer `Name · model`, shows Watching chips and fired watches, and **Stop** interrupts the
 turn in flight. The footer shows a turn's `modelCalls` when it was more than one. The extension's port
 bridge forwards only `turn.*` notifications to it.
 
 The desktop avatar window holds the companion alone: `DockPet` (`@tagalong/ui`) draws its pixel
-character (`characterFor`) at 4x, with a face and a tag per mood (`withMood`,
+character (`SCOUT_SPRITE`) at 4x, with a face and a tag per mood (`withMood`,
 `office/sprites/expressions.ts`): idle; **Seeing** for 2.5 s after a capture, eyes up; **Working**
 while the companion answers or an expert has a task, eyes down; **Done** when a hand-off finishes, a
 happy squint, until the pet is clicked. Three moods have a face and no tag: **dozing** while the
@@ -1285,7 +1285,7 @@ shows in every mood, dozing included.
 The pet is dragged by hand, since a drag region would swallow its clicks: a press that moves past
 4 px (`startDrag`, `moveDrag` in `renderer/src/dock.ts`) sends each step to main (`dragAvatar`),
 which moves the window and the open bubble with it; `dropAvatar` saves the position to the `avatar`
-setting. A press that does not move is a click: `selectPet` opens the bubble at once (`openPanelNow`),
+setting. A press that does not move is a click: `openBubble` opens the bubble at once (`openPanelNow`),
 or keeps an open one and gives it the keyboard back; it never closes it. A click captures nothing:
 it has just put the pet's own window in front, so a selection copy or a window read would wait on
 the keyboard and the clipboard only to find Tagalong itself. The ask hotkey still captures the selection and the active window; screenshots, the window list and other monitors are the pet's own tools, taken only when a question needs them. The bubble hides when it loses focus, except
@@ -1468,7 +1468,7 @@ is one file under `apps/desktop/src/renderer/src/settings/`:
 | `watches-section.tsx`    | Minutes of screen to remember and the watch limits                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `section.tsx`            | The section list, the panel, the ⓘ button and its inline note (one open at a time), and `useInvalid` for a refused field                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
-**How Scout thinks** reads the companion pet (`settings.defaultPetId`), never `settings.providerId`,
+**How Scout thinks** reads Scout (`SCOUT_ID`), never `settings.providerId`,
 which the engine ignores. Whether the Claude sign-in works comes from `main/claude-sign-in.ts`:
 `checkClaudeSignIn` runs `claude auth status --json` (local, no model call, five-second timeout)
 through cross-spawn with no shell, as the experts start claude, so an npm install's `claude.cmd`
@@ -1908,9 +1908,9 @@ seam before it renders, so it can always listen.
   "OpenRouter turned that key down…"). Only a passing test moves setup on; a failing one stays
   on the step and the message shows in Scout's bubble alone. A window error (a failed save,
   sign-in or finish) shows in a red alert instead.
-- **Finish.** Reaching **Try it** calls `finishWelcome(providerId)`, which makes the default pet
-  the Companion on that provider, on the model its role's tier recommends there (`welcomeCrew`,
-  using `recommendedModel`), hides every other pet (they stay in Home), adds Claude Code as an
+- **Finish.** Reaching **Try it** calls `finishWelcome(providerId)`, which makes Scout
+  the Companion on that provider, on the model its role's tier recommends there (`companionOn`,
+  using `recommendedModel`), adds Claude Code as an
   expert when it is installed and none exists (`welcomeExperts`, via `main/welcome.ts#findAgents`,
   which looks for `claude`, `gemini` and `codex` on the PATH with `where` or `which`; nothing is run
   and nothing is sent), keeps the whole `welcome` record and sets `done`, closes setup, and sends
@@ -1930,7 +1930,7 @@ seam before it renders, so it can always listen.
   `LISTENING_LINE` ("I’m listening. Say “Scout, stop”, or switch off Always listening in my
   bubble."), even when the greeting is switched off, and nothing is composed. Otherwise, when
   Welcome is done and `settings.greeting` is on (`welcome.ts#shouldGreetOnLaunch`, default on),
-  main calls `greeting.compose` for the default pet. Either way main sends the text as
+  main calls `greeting.compose` for Scout (`SCOUT_ID`). Either way main sends the text as
   `greetLineEvent` (the preload keeps one that arrives before the panel subscribes)
   and shows the panel with `showPanelQuietly`. The panel renders `GreetingLine`: `role="status"`,
   fades after about seven seconds unless pointed at or focused, opens the ask bubble on a click.
@@ -1946,7 +1946,7 @@ seam before it renders, so it can always listen.
   `greetOnLaunch` passes `launchLine` a compose closure that runs two things in parallel:
   `greeting.compose { petId, launch? }` (`launch` is `{ crashed, lastVersion, version, whatsNew }`
   plus the interrupted tasks counted at boot and the names of routines that ran) and
-  `brainReadiness` (the default pet's provider needs a key and has none, Claude Code is not
+  `brainReadiness` (Scout's provider needs a key and has none, Claude Code is not
   found, or the Claude sign-in check says signed out; the sign-in check gets
   `SIGN_IN_BUDGET_MS`, 1 s, and a slow or failing check reads as `unknown`, never as a problem).
   `brainLine(brain, composed, userName)` then returns the composed line, or a plain one ("I’m

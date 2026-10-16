@@ -6,9 +6,9 @@ import { Pet } from '@tagalong/protocol';
 import type { HostToCoreMethod, Settings } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
 import type { FoundAgent } from '../../shared/ipc';
-import { companionOn, welcomeCrew } from '../welcome';
+import { companionOn } from '../welcome';
 import { fakeEngine, fakeIpc } from './fake-ipc';
-import { registerCrewIpc } from './crew';
+import { registerScoutIpc } from './scout';
 
 const pet = (id: string): Pet =>
   Pet.parse({
@@ -22,7 +22,6 @@ const pet = (id: string): Pet =>
 
 const SCOUT = pet('scout');
 const SETTINGS = {
-  defaultPetId: 'scout',
   welcome: { done: false, step: 'keys', answerBy: 'type', brain: 'claude-code' },
 } as Settings;
 const FINISHED = { done: true, step: 'try', answerBy: 'type', brain: 'claude-code' } as const;
@@ -31,7 +30,7 @@ const CLAUDE: FoundAgent = { id: 'claude-code', label: 'Claude Code', found: tru
 function setup(answers: Partial<Record<HostToCoreMethod, unknown>> = {}) {
   const ipc = fakeIpc();
   const engine = fakeEngine({
-    'pets.list': { pets: [SCOUT, pet('sage')] },
+    'pets.list': { pets: [SCOUT] },
     'pets.upsert': { pet: SCOUT },
     'experts.list': { experts: [] },
     'settings.set': { settings: { ...SETTINGS, welcome: FINISHED } },
@@ -42,26 +41,26 @@ function setup(answers: Partial<Record<HostToCoreMethod, unknown>> = {}) {
     engine: () => engine.client,
     settings: () => SETTINGS,
     setSettings: vi.fn(() => void order.push('setSettings')),
-    refreshStrip: vi.fn(() => void order.push('refreshStrip')),
+    reloadAvatar: vi.fn(() => void order.push('reloadAvatar')),
     findAgents: vi.fn(() => Promise.resolve([CLAUDE])),
     welcomed: vi.fn(() => void order.push('welcomed')),
   };
-  registerCrewIpc(ipc.handle, deps);
+  registerScoutIpc(ipc.handle, deps);
   return { ...ipc, calls: engine.calls, deps, order };
 }
 
-describe('registerCrewIpc', () => {
+describe('registerScoutIpc', () => {
   it('lists pets', async () => {
     const { invoke, calls } = setup();
-    expect(await invoke(IPC.listPets)).toEqual([SCOUT, pet('sage')]);
+    expect(await invoke(IPC.listPets)).toEqual([SCOUT]);
     expect(calls).toEqual([['pets.list', {}]]);
   });
 
-  it('saves a pet, redrawing the strip after', async () => {
+  it('saves Scout, reloading its window after', async () => {
     const { invoke, calls, deps } = setup();
     expect(await invoke(IPC.savePet, SCOUT)).toEqual(SCOUT);
     expect(calls).toEqual([['pets.upsert', { pet: SCOUT }]]);
-    expect(deps.refreshStrip).toHaveBeenCalledOnce();
+    expect(deps.reloadAvatar).toHaveBeenCalledOnce();
   });
 
   it('moves Scout, as the Companion, to the chosen service', async () => {
@@ -71,34 +70,36 @@ describe('registerCrewIpc', () => {
       'pets.upsert',
       { pet: companionOn(SCOUT, 'openrouter', getRole('companion')!) },
     ]);
-    expect(deps.refreshStrip).toHaveBeenCalledOnce();
+    expect(deps.reloadAvatar).toHaveBeenCalledOnce();
   });
 
-  it('refuses to switch a desktop pet that does not exist', async () => {
-    const { invoke } = setup({ 'pets.list': { pets: [pet('sage')] } });
+  it('refuses to switch when there is no Scout', async () => {
+    const { invoke } = setup({ 'pets.list': { pets: [] } });
     await expect(invoke(IPC.switchScout, 'openrouter')).rejects.toThrow(
-      'There is no scout to switch.',
+      'There is no Scout to switch.',
     );
   });
 
-  it('finishes Welcome: keeps the setup record and marks it done, Scout docks alone, then hello', async () => {
+  it('refuses to finish Welcome when there is no Scout', async () => {
+    const { invoke, deps } = setup({ 'pets.list': { pets: [] } });
+    await expect(invoke(IPC.finishWelcome, 'claude-code')).rejects.toThrow(
+      'There is no Scout to welcome.',
+    );
+    expect(deps.welcomed).not.toHaveBeenCalled();
+  });
+
+  it('finishes Welcome: Scout on the chosen brain, the setup record marked done, then hello', async () => {
     const { invoke, calls, deps, order } = setup();
     await invoke(IPC.finishWelcome, 'claude-code');
-    const companion = getRole('companion')!;
-    const { scout, hiddenPets } = welcomeCrew(
-      [SCOUT, pet('sage')],
-      'scout',
-      'claude-code',
-      companion,
-    );
+    const scout = companionOn(SCOUT, 'claude-code', getRole('companion')!);
     expect(calls).toEqual([
       ['pets.list', {}],
       ['pets.upsert', { pet: scout }],
       ['experts.list', {}],
       ['experts.upsert', { expert: expect.objectContaining({ id: 'claude-code' }) }],
-      ['settings.set', { patch: { hiddenPets, welcome: FINISHED } }],
+      ['settings.set', { patch: { welcome: FINISHED } }],
     ]);
     expect(deps.setSettings).toHaveBeenCalledWith({ ...SETTINGS, welcome: FINISHED });
-    expect(order).toEqual(['setSettings', 'refreshStrip', 'welcomed']);
+    expect(order).toEqual(['setSettings', 'reloadAvatar', 'welcomed']);
   });
 });

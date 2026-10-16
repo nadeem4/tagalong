@@ -296,11 +296,9 @@ describe('talkPatchProblem: main re-checks an applied card, never trusting the r
       { providerBaseUrls: { ...current.providerBaseUrls, openrouter: 'https://evil.example' } },
       { summarizer: { providerId: 'openrouter', model: 'x' } },
       { enginePort: 1234 },
-      { defaultPetId: 'other' },
       { closedCleanly: !current.closedCleanly },
       { lastVersion: '9.9.9' },
       { userNameDeclined: !current.userNameDeclined },
-      { hiddenPets: ['scout'] },
       { watch: { ...current.watch, maxChecks: 500 } },
       { pageTextBudget: current.pageTextBudget + 1 },
     ];

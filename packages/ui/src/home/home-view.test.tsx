@@ -47,7 +47,6 @@ function host(saved: Pet[] = []): HomeHost {
   return {
     setup: () =>
       Promise.resolve({
-        companionId: 'scout',
         providers: [
           { id: 'claude-code', label: 'Your Claude sign-in', needsKey: false },
           { id: 'anthropic', label: 'Anthropic', needsKey: true },

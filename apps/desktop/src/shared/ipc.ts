@@ -88,9 +88,7 @@ export const IPC = {
   toggleSightPause: 'tagalong:toggle-sight-pause',
   hotkeyProblemEvent: 'tagalong:hotkey-problem-event',
   settingsChangedEvent: 'tagalong:settings-changed-event',
-  selectPet: 'tagalong:pets:select',
-  activePetEvent: 'tagalong:active-pet-event',
-  resizeStrip: 'tagalong:avatar:resize-strip',
+  openBubble: 'tagalong:bubble:open',
   recordingEvent: 'tagalong:recording-event',
   getRecording: 'tagalong:get-recording',
   stopWatch: 'tagalong:watch:stop',
@@ -321,12 +319,8 @@ export interface TagalongHostApi {
   /** Opens a terminal that signs in to Claude Code; Welcome waits and checks again. */
   openClaudeSignIn(): Promise<void>;
   savePet(pet: Pet): Promise<Pet>;
-  /** A click on Scout: opens its bubble on that pet, or gives the open bubble the keyboard back. */
-  selectPet(petId: string): Promise<void>;
-  /** Fires in the bubble when a click on the pet chose it. */
-  onActivePet(handler: (petId: string) => void): () => void;
-  /** Sizes Scout's window to hold this many pets side by side. The avatar always asks for one. */
-  resizeStrip(visiblePets: number): Promise<void>;
+  /** A click on Scout: opens its bubble, or gives the open bubble the keyboard back. */
+  openBubble(): Promise<void>;
   listModels(providerId: string): Promise<ModelList>;
   /** Opens Settings, or the section or Home page a Fix it names. Main checks the target. */
   openSettings(target?: FixTarget): Promise<void>;

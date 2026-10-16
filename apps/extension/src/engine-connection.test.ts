@@ -243,11 +243,13 @@ describe('EngineConnection', () => {
     h.latest().receive({
       jsonrpc: '2.0',
       id: ping.id,
-      result: { pets: [PET, { ...PET, id: 'fern', name: 'Fern' }] },
+      result: { pets: [{ ...PET, model: 'newer-model' }] },
     });
     await flush();
     expect(h.lastStatus()).toMatchObject({ state: 'connected' });
-    expect((h.lastStatus() as { pets: Pet[] }).pets.map((p) => p.id)).toEqual(['pip', 'fern']);
+    expect((h.lastStatus() as { pets: Pet[] }).pets.map((p) => [p.id, p.model])).toEqual([
+      ['pip', 'newer-model'],
+    ]);
   });
 
   it('drops a socket whose heartbeat goes unanswered, so a wedged engine reads as down', async () => {

@@ -23,7 +23,7 @@ function renderPanel(): FakeHostBridge {
   const bridge = createFakeHostBridge({ pets: [scout] });
   render(
     <HostBridgeProvider bridge={bridge}>
-      <ChatPanel petId="scout" pets={[scout]} />
+      <ChatPanel pet={scout} />
     </HostBridgeProvider>,
   );
   return bridge;

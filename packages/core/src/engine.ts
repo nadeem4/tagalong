@@ -380,7 +380,7 @@ export class Engine {
         // A wince at an error, a cheer when tests pass; a plain finish keeps the done face.
         const mood = moodForHandoff(event.params);
         if (mood !== null) {
-          live.server?.broadcast('pet.mood', { petId: settings.get().defaultPetId, mood });
+          live.server?.broadcast('pet.mood', { petId: SCOUT_ID, mood });
         }
       },
       projects,
@@ -407,7 +407,7 @@ export class Engine {
     const keepAnEye = new KeepAnEye({
       clock: { now: () => Date.now() },
       settings: () => settings.get(),
-      pet: () => pets.get(settings.get().defaultPetId),
+      pet: () => pets.get(SCOUT_ID),
       hosts,
       provider: resolve,
       experts: () => experts.list(),
@@ -420,7 +420,7 @@ export class Engine {
     const wellbeing = new Wellbeing({
       clock: { now: () => Date.now() },
       settings: () => settings.get(),
-      pet: () => pets.get(settings.get().defaultPetId),
+      pet: () => pets.get(SCOUT_ID),
       experts: () => experts.list(),
       propose: (params) => handoffs.propose(params),
       emit: (event) => live.server?.broadcast(event.method, event.params),
@@ -520,7 +520,7 @@ export class Engine {
       store: routineStore,
       clock: systemWatchClock,
       timeZone,
-      pet: () => pets.get(settings.get().defaultPetId),
+      pet: () => pets.get(SCOUT_ID),
       experts: () => experts.list(),
       exclusions: () => settings.get().captureExclusions,
       run: (ask) => {
@@ -567,7 +567,7 @@ export class Engine {
       pending: () => handoffs.pending(),
       stoppedSince: (since) => activity.expertsLeftSince(since),
       propose: ({ expertId, ask }) =>
-        void handoffs.propose({ expertId, petId: settings.get().defaultPetId, brief: { ask } }),
+        void handoffs.propose({ expertId, petId: SCOUT_ID, brief: { ask } }),
       emit: (params) => live.server?.broadcast('pickUp.ready', params),
       log: (message) => console.warn(`[engine] ${message}`),
     });
@@ -763,7 +763,7 @@ function buildHandlers(parts: {
     // Setup's one test of a pasted key, on Scout as it would think with that provider.
     'providers.check': async (params) => {
       await refreshProviders();
-      const base = pets.get(settings.get().defaultPetId);
+      const base = pets.get(SCOUT_ID);
       if (base === null) {
         throw new RpcFailure(RPC_ERROR_CODES.invalidParams, 'there is no Scout to test a key with');
       }
