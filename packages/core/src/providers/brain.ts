@@ -87,7 +87,6 @@ export interface BrainResult {
 export interface BrainProvider {
   id: string;
   capabilities: BrainCapabilities;
-  listModels(): Promise<string[]>;
   /**
    * Whether one model of this provider accepts images. Absent means every model does,
    * as long as `capabilities.vision` is set. Only a provider whose models differ — a

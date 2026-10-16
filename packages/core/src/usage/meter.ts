@@ -27,7 +27,6 @@ export function meterBrain(
   const metered: BrainProvider = {
     id: provider.id,
     capabilities: provider.capabilities,
-    listModels: () => provider.listModels(),
     complete: async (request, events, signal) => {
       const result = await provider.complete(request, events, signal);
       try {

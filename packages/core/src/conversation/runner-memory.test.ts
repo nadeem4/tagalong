@@ -50,7 +50,6 @@ function recordingFake(script: FakeScript, into: BrainRequest[]): BrainProvider 
   return {
     id: 'recording',
     capabilities: fake.capabilities,
-    listModels: () => fake.listModels(),
     complete: (req, handlers, signal) => {
       into.push(req);
       return fake.complete(req, handlers, signal);

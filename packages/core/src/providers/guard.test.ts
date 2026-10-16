@@ -11,7 +11,6 @@ function recording() {
   const provider: BrainProvider = {
     id: 'recording',
     capabilities: { vision: true, tools: true },
-    listModels: async () => ['m'],
     complete: async (request, events) => {
       seen.request = request;
       seen.toolResult = await events.onToolUse({ id: 't1', name: 'read_window_text', input: {} });

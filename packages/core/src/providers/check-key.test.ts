@@ -25,7 +25,6 @@ function provider(fail?: Error) {
     resolve: (pet: Pet): BrainProvider => ({
       id: 'fake',
       capabilities: fake.capabilities,
-      listModels: () => fake.listModels(),
       complete: (req, events, signal) => {
         asked.push({ pet, req });
         return fail === undefined ? fake.complete(req, events, signal) : Promise.reject(fail);
@@ -77,7 +76,6 @@ describe('checkKey', () => {
       resolve: (): BrainProvider => ({
         id: 'deaf',
         capabilities: { vision: false, tools: false },
-        listModels: () => Promise.resolve([]),
         complete: (_req, _events, signal) =>
           new Promise((_resolve, reject) =>
             signal.addEventListener('abort', () => reject(new Error('aborted'))),

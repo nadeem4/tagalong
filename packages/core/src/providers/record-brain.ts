@@ -20,7 +20,6 @@ export function recordBrain(provider: BrainProvider, log: SightRecorder): BrainP
   const recorded: BrainProvider = {
     id: provider.id,
     capabilities: provider.capabilities,
-    listModels: () => provider.listModels(),
     complete: async (request, events, signal) => {
       const sent = measureRequest(request);
       try {

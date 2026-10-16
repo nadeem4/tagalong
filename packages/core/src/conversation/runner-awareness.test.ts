@@ -94,7 +94,6 @@ function observing(script: FakeScript): { provider: BrainProvider; results: Tool
     provider: {
       id: 'observing',
       capabilities: fake.capabilities,
-      listModels: () => fake.listModels(),
       complete: (req, handlers, signal) =>
         fake.complete(
           req,

@@ -675,7 +675,6 @@ describe('a spoken ask over rpc', () => {
     const recording: BrainProvider = {
       id: 'fake',
       capabilities: fake.capabilities,
-      listModels: () => fake.listModels(),
       complete: (req, handlers, signal) => {
         systems.push(req.system);
         return fake.complete(req, handlers, signal);
@@ -731,7 +730,6 @@ describe('memory across a restart', () => {
     const recording: BrainProvider = {
       id: 'fake',
       capabilities: fake.capabilities,
-      listModels: () => fake.listModels(),
       complete: (req, handlers, signal) => {
         systems.push(req.system);
         return fake.complete(req, handlers, signal);
@@ -866,7 +864,6 @@ describe('the browser host', () => {
     const provider: BrainProvider = {
       id: inner.id,
       capabilities: inner.capabilities,
-      listModels: () => inner.listModels(),
       complete: (req, events, signal) => {
         prompts.push(JSON.stringify(req));
         return inner.complete(req, events, signal);
@@ -1305,7 +1302,6 @@ describe('the built-in blind spots', () => {
     const e = await boot({
       id: inner.id,
       capabilities: inner.capabilities,
-      listModels: () => inner.listModels(),
       complete: (req, events, signal) => {
         prompts.push(JSON.stringify(req));
         return inner.complete(req, events, signal);
@@ -1336,7 +1332,6 @@ describe('greeting.compose', () => {
     const failing: BrainProvider = {
       id: 'fake',
       capabilities: { vision: false, tools: false },
-      listModels: () => Promise.resolve([]),
       complete: () => Promise.reject(new Error('offline')),
     };
     const e = await boot(failing);
@@ -1351,7 +1346,6 @@ describe('greeting.compose', () => {
     const failing: BrainProvider = {
       id: 'fake',
       capabilities: { vision: false, tools: false },
-      listModels: () => Promise.resolve([]),
       complete: () => Promise.reject(new Error('offline')),
     };
     const e = await boot(failing);
@@ -1385,7 +1379,6 @@ describe('greeting.compose', () => {
     const failing: BrainProvider = {
       id: 'fake',
       capabilities: { vision: false, tools: false },
-      listModels: () => Promise.resolve([]),
       complete: () => Promise.reject(new Error('offline')),
     };
     // A hand-off still running when the last launch died: boot closes it as interrupted.
@@ -1412,7 +1405,6 @@ describe('greeting.compose', () => {
     const failing: BrainProvider = {
       id: 'fake',
       capabilities: { vision: false, tools: false },
-      listModels: () => Promise.resolve([]),
       complete: () => Promise.reject(new Error('offline')),
     };
     const e = await boot(failing);
@@ -1459,7 +1451,6 @@ describe('pick up where you left off', () => {
     const provider: BrainProvider = {
       id: 'fake',
       capabilities: { vision: false, tools: false },
-      listModels: () => Promise.resolve([]),
       complete: () => {
         calls += 1;
         return Promise.resolve({
@@ -1661,7 +1652,6 @@ describe('connections over rpc', () => {
     const readThenWrite: BrainProvider = {
       id: 'fake',
       capabilities: { vision: false, tools: true },
-      listModels: () => Promise.resolve(['fake-model']),
       complete: async (_req, events) => {
         if (rounds++ === 0) {
           await events.onToolUse({ id: 'call-1', name: 'wiki__search', input: { q: 'me' } });
@@ -1732,7 +1722,6 @@ describe('file this as a bug over rpc', () => {
     return {
       id: 'fake',
       capabilities: { vision: false, tools: true },
-      listModels: () => Promise.resolve(['fake-model']),
       complete: async (req, events) => {
         systems.push(req.system);
         if (rounds++ === 0) {
@@ -1816,7 +1805,6 @@ describe('providers.check', () => {
     const refusing: BrainProvider = {
       id: 'fake',
       capabilities: { vision: false, tools: false },
-      listModels: () => Promise.resolve([]),
       complete: () => Promise.reject(new BrainError('auth', 'rejected')),
     };
     const e = await boot(refusing);

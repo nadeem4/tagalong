@@ -183,9 +183,4 @@ describe('ClaudeCodeBrain', () => {
     const answer = await brain.complete(request(), events().events, controller.signal);
     expect(answer.stopReason).toBe('aborted');
   });
-
-  it('offers the Claude model aliases', async () => {
-    const brain = new ClaudeCodeBrain({ spawn: fakeSpawn([]).spawn, cwd: 'C:\\tmp' });
-    expect(await brain.listModels()).toEqual(['haiku', 'sonnet', 'opus']);
-  });
 });

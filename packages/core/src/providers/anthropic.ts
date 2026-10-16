@@ -134,10 +134,6 @@ export class AnthropicProvider implements BrainProvider {
     this.client = new Anthropic({ apiKey: options.apiKey });
   }
 
-  listModels(): Promise<string[]> {
-    return Promise.resolve([...ANTHROPIC_MODELS]);
-  }
-
   async complete(
     req: BrainRequest,
     events: BrainEvents,

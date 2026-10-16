@@ -678,16 +678,9 @@ describe('OpenAiCompatibleProvider models', () => {
       baseURL: 'https://openrouter.ai/api/v1',
       fetch: fake.fetch,
       maxRetries: 0,
-      models: ['fallback-model'],
     });
     return { provider: p, calls: fake.calls };
   }
-
-  it('lists its fallback models without touching the network', async () => {
-    const { provider: p, calls } = models([]);
-    expect(await p.listModels()).toEqual(['fallback-model']);
-    expect(calls).toHaveLength(0);
-  });
 
   it('fetches the live list from GET /models', async () => {
     const { provider: p, calls } = models([

@@ -115,11 +115,10 @@ beforeEach(() => {
 });
 
 describe('AnthropicProvider', () => {
-  it('advertises itself and its models without touching the network', async () => {
+  it('advertises itself without touching the network', () => {
     const p = provider();
     expect(p.id).toBe('anthropic');
     expect(p.capabilities).toEqual({ vision: true, tools: true });
-    expect(await p.listModels()).toContain('claude-opus-5');
     expect(sdk.stream).not.toHaveBeenCalled();
   });
 

@@ -69,10 +69,6 @@ export class FakeBrainProvider implements BrainProvider {
 
   constructor(private readonly script: FakeScript) {}
 
-  listModels(): Promise<string[]> {
-    return Promise.resolve([...FAKE_MODELS]);
-  }
-
   async complete(
     req: BrainRequest,
     events: BrainEvents,

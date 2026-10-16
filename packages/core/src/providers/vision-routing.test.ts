@@ -7,7 +7,6 @@ function provider(vision: boolean, canSee?: (model: string) => boolean): BrainPr
   return {
     id: 'p',
     capabilities: { vision, tools: true },
-    listModels: () => Promise.resolve([]),
     complete: () => Promise.reject(new Error('unused')),
     ...(canSee ? { canSee } : {}),
   };

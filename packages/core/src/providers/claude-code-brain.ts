@@ -60,10 +60,6 @@ export class ClaudeCodeBrain implements BrainProvider {
     this.#cwd = options.cwd ?? tmpdir();
   }
 
-  async listModels(): Promise<string[]> {
-    return [...CLAUDE_CODE_MODELS];
-  }
-
   async complete(
     req: BrainRequest,
     events: BrainEvents,

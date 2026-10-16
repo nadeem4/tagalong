@@ -64,7 +64,6 @@ function brains(reply = 'The user asked about DNS; Scout explained resolvers.') 
   const provider: BrainProvider = {
     id: 'fake',
     capabilities: fake.capabilities,
-    listModels: () => fake.listModels(),
     complete: (req, handlers, signal) => {
       requests.push(req);
       return fake.complete(req, handlers, signal);
@@ -137,7 +136,6 @@ describe('Summarizer', () => {
       ...new FakeBrainProvider({ text: '' }),
       id: 'fake',
       capabilities: { vision: false, tools: false },
-      listModels: () => Promise.resolve([]),
       complete: () => Promise.reject(new BrainError('auth', 'No key.')),
     };
     const summarizer = new Summarizer({

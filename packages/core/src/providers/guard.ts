@@ -18,7 +18,6 @@ export function guardBrain(provider: BrainProvider): BrainProvider {
   const guarded: BrainProvider = {
     id: provider.id,
     capabilities: provider.capabilities,
-    listModels: () => provider.listModels(),
     complete: (request, events, signal) =>
       provider.complete(
         guardRequest(request),

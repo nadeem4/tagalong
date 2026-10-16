@@ -54,7 +54,6 @@ describe('meterBrain', () => {
     const failing: BrainProvider = {
       id: 'broken',
       capabilities: { vision: false, tools: true },
-      listModels: async () => [],
       complete: () => Promise.reject(new Error('offline')),
     };
     await expect(

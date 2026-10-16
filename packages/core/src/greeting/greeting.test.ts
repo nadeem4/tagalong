@@ -31,7 +31,6 @@ function brain(reply: string | Error) {
   const provider: BrainProvider = {
     id: 'fake',
     capabilities: fake.capabilities,
-    listModels: () => fake.listModels(),
     complete: (req, events, signal) => {
       requests.push(req);
       if (reply instanceof Error) return Promise.reject(reply);
@@ -255,7 +254,6 @@ describe('composeGreeting', () => {
     const slow: BrainProvider = {
       id: 'slow',
       capabilities: { vision: false, tools: false },
-      listModels: () => Promise.resolve([]),
       complete: (_req, _events, signal) =>
         new Promise((resolve) => {
           signal.addEventListener('abort', () =>
@@ -286,7 +284,6 @@ describe('composeGreeting', () => {
     const deaf: BrainProvider = {
       id: 'deaf',
       capabilities: { vision: false, tools: false },
-      listModels: () => Promise.resolve([]),
       complete: () => new Promise(() => undefined),
     };
     const result = await composeGreeting({

@@ -72,7 +72,6 @@ export function createProvider(config: ProviderConfig): BrainProvider {
       apiKey: config.apiKey,
       baseURL: config.baseURL ?? preset.baseURL,
       label: preset.label,
-      models: preset.fallbackModels,
       visionModels: preset.visionModels,
     });
   }

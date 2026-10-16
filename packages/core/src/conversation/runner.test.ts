@@ -458,7 +458,6 @@ function recording(into: BrainRequest[], reply: string): BrainProvider {
   return {
     id: 'recording',
     capabilities: fake.capabilities,
-    listModels: () => fake.listModels(),
     complete: (req: BrainRequest, events_: BrainEvents, signal: AbortSignal) => {
       into.push(req);
       return fake.complete(req, events_, signal);
@@ -485,7 +484,6 @@ function observing(script: FakeScript): {
     provider: {
       id: 'observing',
       capabilities: fake.capabilities,
-      listModels: () => fake.listModels(),
       complete: (req, events_, signal) => {
         requests.push(req);
         return fake.complete(
@@ -511,7 +509,6 @@ function toolless(into: BrainRequest[]): BrainProvider {
   return {
     id: 'toolless',
     capabilities: { vision: false, tools: false },
-    listModels: () => fake.listModels(),
     complete: (req, events_, signal) => {
       into.push(req);
       return fake.complete(req, events_, signal);
@@ -523,7 +520,6 @@ function failing(error: unknown): BrainProvider {
   return {
     id: 'failing',
     capabilities: { vision: false, tools: false },
-    listModels: () => Promise.resolve([]),
     complete: (): Promise<BrainResult> => Promise.reject(error),
   };
 }
@@ -609,7 +605,6 @@ function blind(into: BrainRequest[]): BrainProvider {
   return {
     id: 'blind',
     capabilities: { vision: false, tools: true },
-    listModels: () => fake.listModels(),
     complete: (req, events_, signal) => {
       into.push(req);
       return fake.complete(req, events_, signal);
@@ -809,7 +804,6 @@ describe('ConversationRunner per-pet providers', () => {
     return {
       id,
       capabilities: { vision: true, tools: true },
-      listModels: () => Promise.resolve([]),
       canSee: (model) => sees.includes(model),
       complete: (req, events_, signal) => {
         into.push(req);
@@ -899,7 +893,6 @@ describe('ConversationRunner per-pet providers', () => {
       ...fake,
       id: 'nebius',
       capabilities: fake.capabilities,
-      listModels: () => fake.listModels(),
       complete: (req, ev, sig) => fake.complete(req, ev, sig),
       canSee: (model) => models.includes(model),
     });
