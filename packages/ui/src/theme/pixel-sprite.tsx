@@ -1,6 +1,6 @@
 /**
  * Draws a Sprite as crisp pixel art: one box-shadow per pixel on a 1px element, scaled up.
- * Contains PixelSprite. Used by the dock pet, Home and the onboarding window.
+ * Contains PixelSprite. Used by the dock pet, Home and the Welcome window.
  */
 
 import { useMemo } from 'react';

@@ -105,7 +105,7 @@ describe('registerSettingsIpc: applySettings', () => {
   it('refuses a card from any window but the bubble, and saves nothing', async () => {
     const { invokeWith, calls, deps } = setup();
     await expect(
-      invokeWith({ sender: 'office' }, IPC.applySettings, { userName: 'Sam' }),
+      invokeWith({ sender: 'home' }, IPC.applySettings, { userName: 'Sam' }),
     ).rejects.toThrow('only from the bubble');
     expect(calls).toEqual([]);
     expect(deps.listeningOff).not.toHaveBeenCalled();

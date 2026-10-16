@@ -57,7 +57,7 @@ export function AdvancedSection({
           <button
             type="button"
             className="tg-btn-quiet"
-            onClick={() => void window.tagalongHost.openOnboarding()}
+            onClick={() => void window.tagalongHost.openWelcome()}
           >
             Open Welcome again
           </button>

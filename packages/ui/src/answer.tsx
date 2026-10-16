@@ -6,7 +6,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Markdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { officeTokens as t } from './office/tokens';
+import { themeTokens as t } from './theme/tokens';
 
 /**
  * A link stays text with its address on hover: a click inside the bubble's window would

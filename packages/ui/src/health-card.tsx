@@ -5,7 +5,7 @@
 
 import { healthHeadline } from './health';
 import type { FixTarget, HealthRow } from './health';
-import { officeTokens as t } from './office/tokens';
+import { themeTokens as t } from './theme/tokens';
 
 /** The words beside each dot, so a state never rests on colour alone. */
 const STATE_WORDS: Record<HealthRow['state'], string> = {

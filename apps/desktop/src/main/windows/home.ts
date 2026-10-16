@@ -1,6 +1,6 @@
 /**
- * Home's window: a framed, centred window with the nav on the left and one page beside it. The file
- * and its page keep the name "office". Contains createOfficeWindow and HOME_MIN_WIDTH.
+ * Home's window: a framed, centred window with the nav on the left and one page beside it.
+ * Contains createHomeWindow and HOME_MIN_WIDTH.
  */
 
 import { BrowserWindow } from 'electron';
@@ -13,7 +13,7 @@ import { PRELOAD_PATH, loadPage } from './page';
 export const HOME_MIN_WIDTH = 880;
 
 /** Opens Home. */
-export function createOfficeWindow(): BrowserWindow {
+export function createHomeWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1440,
     height: 800,
@@ -38,6 +38,6 @@ export function createOfficeWindow(): BrowserWindow {
   });
   window.setMenuBarVisibility(false);
   window.once('ready-to-show', () => window.show());
-  loadPage(window, 'office');
+  loadPage(window, 'home');
   return window;
 }

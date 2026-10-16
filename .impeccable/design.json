@@ -8,7 +8,7 @@
         "role": "neutral",
         "displayName": "Ink Navy",
         "canonical": "#12162B",
-        "source": "officeTokens.color.page",
+        "source": "themeTokens.color.page",
         "tonalRamp": [
           "oklch(15% 0.042 274.0)",
           "oklch(26% 0.042 274.0)",
@@ -24,7 +24,7 @@
         "role": "neutral",
         "displayName": "Frost Text",
         "canonical": "#E9ECF5",
-        "source": "officeTokens.color.text",
+        "source": "themeTokens.color.text",
         "tonalRamp": [
           "oklch(15% 0.013 271.3)",
           "oklch(26% 0.013 271.3)",
@@ -40,7 +40,7 @@
         "role": "neutral",
         "displayName": "Shell Muted",
         "canonical": "#A3AAC4",
-        "source": "officeTokens.color.textMuted",
+        "source": "themeTokens.color.textMuted",
         "tonalRamp": [
           "oklch(15% 0.038 273.5)",
           "oklch(26% 0.038 273.5)",
@@ -56,7 +56,7 @@
         "role": "neutral",
         "displayName": "Shell Line",
         "canonical": "#262C4A",
-        "source": "officeTokens.color.line",
+        "source": "themeTokens.color.line",
         "tonalRamp": [
           "oklch(15% 0.055 274.1)",
           "oklch(26% 0.055 274.1)",
@@ -72,7 +72,7 @@
         "role": "neutral",
         "displayName": "Sidebar Navy",
         "canonical": "#171C33",
-        "source": "officeTokens.color.sidebar",
+        "source": "themeTokens.color.sidebar",
         "tonalRamp": [
           "oklch(15% 0.045 273.2)",
           "oklch(26% 0.045 273.2)",
@@ -88,7 +88,7 @@
         "role": "neutral",
         "displayName": "Active Row Navy",
         "canonical": "#1E2442",
-        "source": "officeTokens.color.rowActive",
+        "source": "themeTokens.color.rowActive",
         "tonalRamp": [
           "oklch(15% 0.056 273.5)",
           "oklch(26% 0.056 273.5)",
@@ -120,7 +120,7 @@
         "role": "neutral",
         "displayName": "Field Navy",
         "canonical": "#1A1F3A",
-        "source": "officeTokens.color.field",
+        "source": "themeTokens.color.field",
         "tonalRamp": [
           "oklch(15% 0.052 274.1)",
           "oklch(26% 0.052 274.1)",
@@ -136,7 +136,7 @@
         "role": "neutral",
         "displayName": "Field Line",
         "canonical": "#2E3558",
-        "source": "officeTokens.color.fieldLine",
+        "source": "themeTokens.color.fieldLine",
         "tonalRamp": [
           "oklch(15% 0.062 274.1)",
           "oklch(26% 0.062 274.1)",
@@ -152,7 +152,7 @@
         "role": "primary",
         "displayName": "Gold",
         "canonical": "#F2C14E",
-        "source": "officeTokens.color.gold",
+        "source": "themeTokens.color.gold",
         "tonalRamp": [
           "oklch(15% 0.141 85.4)",
           "oklch(26% 0.141 85.4)",
@@ -168,7 +168,7 @@
         "role": "primary",
         "displayName": "Gold Ink",
         "canonical": "#12162B",
-        "source": "officeTokens.color.goldInk",
+        "source": "themeTokens.color.goldInk",
         "tonalRamp": [
           "oklch(15% 0.042 274.0)",
           "oklch(26% 0.042 274.0)",
@@ -328,7 +328,7 @@
         "role": "neutral",
         "displayName": "Panel White",
         "canonical": "#F6F7FB",
-        "source": "officeTokens.color.panel",
+        "source": "themeTokens.color.panel",
         "tonalRamp": [
           "oklch(15% 0.005 275.0)",
           "oklch(26% 0.005 275.0)",
@@ -360,7 +360,7 @@
         "role": "neutral",
         "displayName": "Panel Text",
         "canonical": "#12162B",
-        "source": "officeTokens.color.panelText",
+        "source": "themeTokens.color.panelText",
         "tonalRamp": [
           "oklch(15% 0.042 274.0)",
           "oklch(26% 0.042 274.0)",
@@ -376,7 +376,7 @@
         "role": "neutral",
         "displayName": "Panel Muted",
         "canonical": "#5A6178",
-        "source": "officeTokens.color.panelMuted",
+        "source": "themeTokens.color.panelMuted",
         "tonalRamp": [
           "oklch(15% 0.038 271.7)",
           "oklch(26% 0.038 271.7)",
@@ -392,7 +392,7 @@
         "role": "neutral",
         "displayName": "Panel Line",
         "canonical": "#E0E3EC",
-        "source": "officeTokens.color.panelLine",
+        "source": "themeTokens.color.panelLine",
         "tonalRamp": [
           "oklch(15% 0.013 271.3)",
           "oklch(26% 0.013 271.3)",
@@ -408,7 +408,7 @@
         "role": "neutral",
         "displayName": "Panel Tile",
         "canonical": "#E6E9F2",
-        "source": "officeTokens.color.panelTile",
+        "source": "themeTokens.color.panelTile",
         "tonalRamp": [
           "oklch(15% 0.013 271.3)",
           "oklch(26% 0.013 271.3)",
@@ -424,7 +424,7 @@
         "role": "neutral",
         "displayName": "Neutral Chip",
         "canonical": "#E6E9F2",
-        "source": "officeTokens.color.chipFree",
+        "source": "themeTokens.color.chipFree",
         "tonalRamp": [
           "oklch(15% 0.013 271.3)",
           "oklch(26% 0.013 271.3)",
@@ -440,7 +440,7 @@
         "role": "neutral",
         "displayName": "Neutral Chip Ink",
         "canonical": "#4A5168",
-        "source": "officeTokens.color.chipFreeInk",
+        "source": "themeTokens.color.chipFreeInk",
         "tonalRamp": [
           "oklch(15% 0.039 271.5)",
           "oklch(26% 0.039 271.5)",
@@ -456,7 +456,7 @@
         "role": "neutral",
         "displayName": "Link",
         "canonical": "#3D4A8A",
-        "source": "officeTokens.color.link",
+        "source": "themeTokens.color.link",
         "tonalRamp": [
           "oklch(15% 0.106 272.6)",
           "oklch(26% 0.106 272.6)",
@@ -472,7 +472,7 @@
         "role": "neutral",
         "displayName": "OK Fill",
         "canonical": "#E3F1E6",
-        "source": "officeTokens.color.okFill",
+        "source": "themeTokens.color.okFill",
         "tonalRamp": [
           "oklch(15% 0.021 152.2)",
           "oklch(26% 0.021 152.2)",
@@ -488,7 +488,7 @@
         "role": "neutral",
         "displayName": "OK Ink",
         "canonical": "#1F5A2E",
-        "source": "officeTokens.color.okInk",
+        "source": "themeTokens.color.okInk",
         "tonalRamp": [
           "oklch(15% 0.094 149.0)",
           "oklch(26% 0.094 149.0)",
@@ -504,7 +504,7 @@
         "role": "neutral",
         "displayName": "Warn Fill",
         "canonical": "#FFF4D6",
-        "source": "officeTokens.color.warnFill",
+        "source": "themeTokens.color.warnFill",
         "tonalRamp": [
           "oklch(15% 0.041 90.2)",
           "oklch(26% 0.041 90.2)",
@@ -520,7 +520,7 @@
         "role": "neutral",
         "displayName": "Warn Ink",
         "canonical": "#5C4600",
-        "source": "officeTokens.color.warnInk",
+        "source": "themeTokens.color.warnInk",
         "tonalRamp": [
           "oklch(15% 0.083 88.1)",
           "oklch(26% 0.083 88.1)",
@@ -536,7 +536,7 @@
         "role": "neutral",
         "displayName": "Error Fill",
         "canonical": "#FDE7E5",
-        "source": "officeTokens.color.errFill",
+        "source": "themeTokens.color.errFill",
         "tonalRamp": [
           "oklch(15% 0.024 23.8)",
           "oklch(26% 0.024 23.8)",
@@ -552,7 +552,7 @@
         "role": "neutral",
         "displayName": "Error Ink",
         "canonical": "#8A1C12",
-        "source": "officeTokens.color.errInk",
+        "source": "themeTokens.color.errInk",
         "tonalRamp": [
           "oklch(15% 0.147 29.8)",
           "oklch(26% 0.147 29.8)",
@@ -584,7 +584,7 @@
         "role": "neutral",
         "displayName": "Scrollbar Thumb",
         "canonical": "#CDD2DE",
-        "source": "officeTokens.color.scrollbarThumb",
+        "source": "themeTokens.color.scrollbarThumb",
         "tonalRamp": [
           "oklch(15% 0.017 267.8)",
           "oklch(26% 0.017 267.8)",
@@ -745,7 +745,7 @@
       "emptyTextWidth": "300px",
       "scrollbar": "8px"
     },
-    "source": "packages/ui/src/office/tokens.ts"
+    "source": "packages/ui/src/theme/tokens.ts"
   },
   "components": [
     {
@@ -839,7 +839,7 @@
   ],
   "narrative": {
     "northStar": "A Pixel Friend in Modern Chrome",
-    "overview": "Tagalong is one companion, Scout, a 16x16 pixel-art figure (orange fur, pointed ears, a green shirt with a gold badge) that sits on the desktop and opens a speech bubble beside itself. The figure is the only game-like thing in the product; everything around it is calm, modern product chrome: a deep ink-navy for Scout's own surfaces (the dock tags, the bubble, Welcome, Home's nav), a cool off-white for reading (Home's pages and Settings), clean Onest type and one warm gold.\n\nTokens live in `packages/ui/src/office/tokens.ts` (`officeTokens`; the `office/` folder name is historical). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav and Welcome hard-code several hex values, recorded below as hard-coded. Sprites are plain data (rows and a palette) drawn by `PixelSprite` as a CSS `box-shadow` on one 1px element, scaled by a whole number. No images, no canvas.\n\nScout's state is always a face plus a word: the eyes change per mood, a small tag says Seeing, Working or Done, and the accessible name says it in full. Motion is small and soft (a breath, a bob, a hop) and stops for reduced motion.",
+    "overview": "Tagalong is one companion, Scout, a 16x16 pixel-art figure (orange fur, pointed ears, a green shirt with a gold badge) that sits on the desktop and opens a speech bubble beside itself. The figure is the only game-like thing in the product; everything around it is calm, modern product chrome: a deep ink-navy for Scout's own surfaces (the dock tags, the bubble, Welcome, Home's nav), a cool off-white for reading (Home's pages and Settings), clean Onest type and one warm gold.\n\nTokens live in `packages/ui/src/theme/tokens.ts` (`themeTokens`). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav and Welcome hard-code several hex values, recorded below as hard-coded. Sprites are plain data (rows and a palette) drawn by `PixelSprite` as a CSS `box-shadow` on one 1px element, scaled by a whole number. No images, no canvas.\n\nScout's state is always a face plus a word: the eyes change per mood, a small tag says Seeing, Working or Done, and the accessible name says it in full. Motion is small and soft (a breath, a bob, a hop) and stops for reduced motion.",
     "keyCharacteristics": [
       "One pixel figure; modern chrome around it.",
       "Navy for Scout's surfaces, off-white for reading.",
@@ -881,7 +881,7 @@
       }
     ],
     "dos": [
-      "**Do** take colours, sizes, spacing and radii from `officeTokens`; add a token before adding another hard-coded value.",
+      "**Do** take colours, sizes, spacing and radii from `themeTokens`; add a token before adding another hard-coded value.",
       "**Do** draw Scout as sprite data through `PixelSprite`, at a whole-number scale.",
       "**Do** keep gold for the one primary action, an on or pressed control, and Scout's active marks.",
       "**Do** pair every status with a word (and an icon where there is room).",

@@ -947,7 +947,7 @@ The preload exposes exactly two globals, and the split between them is deliberat
 Keeping them apart means a shared UI component can never grow a dependency on something the Chrome host
 will not have: if it compiles against `HostBridge`, it runs in both hosts.
 
-Every window — avatar, panel, settings, onboarding, office — is created with `contextIsolation: true`,
+Every window — avatar, panel, settings, welcome, home — is created with `contextIsolation: true`,
 `nodeIntegration: false`, and `sandbox: true`. Nothing from node or electron crosses the preload
 boundary; only plain data over the IPC channels named in `src/shared/ipc.ts`. Because a sandboxed
 preload can only be CommonJS while the package is ESM, the preload is built to `dist/preload/index.cjs`.
@@ -1257,7 +1257,7 @@ bridge forwards only `turn.*` notifications to it.
 
 The desktop avatar window holds the companion alone: `DockPet` (`@tagalong/ui`) draws its pixel
 character (`SCOUT_SPRITE`) at 4x, with a face and a tag per mood (`withMood`,
-`office/sprites/expressions.ts`): idle; **Seeing** for 2.5 s after a capture, eyes up; **Working**
+`theme/sprites/expressions.ts`): idle; **Seeing** for 2.5 s after a capture, eyes up; **Working**
 while the companion answers or an expert has a task, eyes down; **Done** when a hand-off finishes, a
 happy squint, until the pet is clicked. Three moods have a face and no tag: **dozing** while the
 person is away (eyes closed to a line, slow breathing), **wince** for 4 s at a failing build or an
@@ -1298,9 +1298,9 @@ Home is the one window for everything: the companion, its experts, what happened
 settings. There is no crew and no office scene any more; the tray's **Open Tagalong** opens it, and
 anything that used to open Settings opens Home on its Settings page.
 
-It is a framed desktop window (`windows/office.ts`, the `office` renderer page; both keep their old
-names, the window and the page are titled **Home**) opened with `tagalongHost.openOffice()`. Main
-names a page by sending `homePageEvent` (`openOffice('settings')`), to an open window at once and to
+It is a framed desktop window (`windows/home.ts`, the `home` renderer page; the window and the page
+are titled **Home**) opened with `tagalongHost.openHome()`. Main
+names a page by sending `homePageEvent` (`openHome('settings')`), to an open window at once and to
 a new one once it has loaded; the preload keeps a page or a routine card that arrives before the
 page subscribes (`preload/held.ts`) and hands it over when it does. The window is at least
 `HOME_MIN_WIDTH` (880 px) wide: the nav and a page that still shows the overview two cards across.
@@ -1363,7 +1363,7 @@ main process shows a system notification for a finished or failed hand-off (`han
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%
 flowchart LR
   Tray["Tray: Open Tagalong"] --> Home
-  Bubble["Bubble: Open Settings"] -- "openOffice('settings')" --> Home
+  Bubble["Bubble: Open Settings"] -- "openHome('settings')" --> Home
   subgraph Home["Home (one window)"]
     Overview
     Scout["Scout: how it thinks"]
@@ -1447,7 +1447,7 @@ The settings form (`settings/settings-page.tsx`, `SettingsPage`) holds app-level
 Home's Settings page (`embedded`: no bar or side menu of its own). The standalone Settings window
 (`windows/settings.ts`, the `settings` page) only opens when the engine failed to start, since Home
 needs the engine; it adds a navy top bar with Save and a nav with links to each section. Its sheet is `SETTINGS_CSS` in `@tagalong/ui` (`packages/ui/src/settings/settings-styles.ts`),
-built from `officeTokens`, so Settings has no palette of its own.
+built from `themeTokens`, so Settings has no palette of its own.
 
 `SettingsPage` holds the form state and the save. The sections come in the design's order, and each
 is one file under `apps/desktop/src/renderer/src/settings/`:
@@ -1790,10 +1790,10 @@ installer, and listing the workspace packages there would ship their whole trees
 
 ## Welcome (first run)
 
-A fresh install opens setup, a renderer page (`onboarding.html`, titled "Set up Tagalong") in an
+A fresh install opens setup, a renderer page (`welcome.html`, titled "Set up Tagalong") in an
 ordinary framed window centred on the screen under the cursor. Main opens it from `start` when
 `shouldOpenWelcome(settings, env)` says so: the protocol setting `welcome.done` is false and
-`TAGALONG_SKIP_ONBOARDING` is not `1`. It replaced an older setup wizard, whose saved `onboarding`
+`TAGALONG_SKIP_WELCOME` is not `1`. It replaced an older setup wizard, whose saved `onboarding`
 key is dropped when settings load, so an install that finished the wizard still sees Welcome once.
 **Open Welcome again** on Home's Settings page opens it again, from the top.
 
@@ -1847,7 +1847,7 @@ seam before it renders, so it can always listen.
   step (`scoutSays`), the option cards (`optionsFor`), the echo of the last answer, the chip
   labels. A line never carries a key. Each line is also spoken while Scout talks; the voice
   step's line is the sample of how Scout sounds, so it is spoken either way.
-- **`heard(text)`** in `onboarding.tsx` is the one way an answer comes in: typed text, and the
+- **`heard(text)`** in `welcome.tsx` is the one way an answer comes in: typed text, and the
   words setup's ears hear. A heard turn is dropped while the window is busy saving. Matching
   (above) also reads `cannot`, `haven't`, `hasn't` and `didn't` as negations, so "I haven't
   installed it" is asked about again. `installVoiceSeam()` runs in the setup window so voice
@@ -1872,7 +1872,7 @@ seam before it renders, so it can always listen.
   (`first-run.ts`) is true once "Talk to me" was saved as `welcome.answerBy` and the step
   reached is past `answer`. An unfinished setup closed part way therefore resumes listening at the
   next launch (red dot, "Talking" chip); a re-run of a finished setup starts with the mic closed.
-  It is also off on the Try it step. One effect on that value is the only place `onboarding.tsx` starts or stops
+  It is also off on the Try it step. One effect on that value is the only place `welcome.tsx` starts or stops
   the ears, so "Talk to me", "I'll type", a resume, the chips and Try it all go through it;
   `finish` also stops them before `finishWelcome`. The ears are disposed on unmount and on the
   page's `pagehide` (React runs no cleanup when a window closes), which closes the mic. The
@@ -1890,7 +1890,7 @@ seam before it renders, so it can always listen.
   `saveSettings`, and it is disabled until main's state is known.
 - **Main's two setup guards** (`main/index.ts`). While the setup window is open, the talk key
   (`talkPressed`) focuses setup and returns, so the bubble never opens a second mic over setup's.
-  And `openOnboarding` calls `pauseListening({ setupOpen: true })`, and `{ setupOpen: false }`
+  And `openWelcome` calls `pauseListening({ setupOpen: true })`, and `{ setupOpen: false }`
   when the window closes: `listeningPaused` is `blocked || !petsShown || setupOpen`, so Always
   listening (on a re-run of setup) never shares the voice process, which hears one session at a
   time, with setup. On a re-run with Scout shown, an answer that starts with "Scout, …" can still
@@ -2127,7 +2127,7 @@ above a **Message** box. It is the same component, so it is the same conversatio
 - **Fix it targets.** `openSettings(target?)` takes a `FixTarget` (`brain`, `voice`, `browser`,
   `privacy`, `experts`, `connections`). Main checks it against an allowlist (`main/fix-target.ts#fixPage`,
   anything else is refused) and opens Home on `settings#<section>` or the Experts or Connections
-  page; Home (`office.tsx`, `home-target.ts`) scrolls to the Settings `Section` with that id once it
+  page; Home (`home.tsx`, `home-target.ts`) scrolls to the Settings `Section` with that id once it
   is drawn. With no target it opens Settings, as before.
 
 ## Scout talks

@@ -8,7 +8,7 @@ function actions(): TrayActions {
   return {
     togglePets: vi.fn(),
     toggleSightPause: vi.fn(),
-    openOffice: vi.fn(),
+    openHome: vi.fn(),
     quit: vi.fn(),
   };
 }
@@ -47,7 +47,7 @@ describe('trayMenuTemplate', () => {
     click(template, 'Pause sight');
     click(template, 'Show or hide Scout');
     click(template, 'Quit');
-    expect(handlers.openOffice).toHaveBeenCalledOnce();
+    expect(handlers.openHome).toHaveBeenCalledOnce();
     expect(handlers.toggleSightPause).toHaveBeenCalledOnce();
     expect(handlers.togglePets).toHaveBeenCalledOnce();
     expect(handlers.quit).toHaveBeenCalledOnce();

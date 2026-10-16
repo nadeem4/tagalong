@@ -1,7 +1,7 @@
 /** Tests for the design tokens: text and status colours meet 4.5:1 contrast. */
 
 import { describe, expect, it } from 'vitest';
-import { officeTokens } from './tokens';
+import { themeTokens } from './tokens';
 
 /** WCAG relative luminance of a `#rrggbb` colour. */
 function luminance(hex: string): number {
@@ -18,7 +18,7 @@ function contrast(a: string, b: string): number {
 }
 
 describe('design tokens', () => {
-  const { color } = officeTokens;
+  const { color } = themeTokens;
 
   it('keeps status chips, links and errors readable on the light page', () => {
     expect(contrast(color.okInk, color.okFill)).toBeGreaterThanOrEqual(4.5);

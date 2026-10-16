@@ -2,7 +2,7 @@
  * Home's stylesheet: the frame, the side nav, the pages, the activity list and the forms,
  * built from the design tokens and scoped under `.home`. Contains HOME_CSS.
  */
-import { officeTokens as t } from '../office/tokens';
+import { themeTokens as t } from '../theme/tokens';
 
 export const HOME_CSS = `
 .home {

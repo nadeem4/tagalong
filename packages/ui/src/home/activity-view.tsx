@@ -9,9 +9,9 @@ import type { ReactNode } from 'react';
 import type { ActivityEntry, ActivityState } from '@tagalong/protocol';
 import { useHostBridge } from '../host-bridge';
 import type { TurnEvent } from '../host-bridge';
-import { PixelSprite } from '../office/pixel-sprite';
-import { SCOUT_SPRITE } from '../office/sprites/characters';
-import { officeTokens as t } from '../office/tokens';
+import { PixelSprite } from '../theme/pixel-sprite';
+import { SCOUT_SPRITE } from '../theme/sprites/characters';
+import { themeTokens as t } from '../theme/tokens';
 
 /** How many entries one page holds. */
 const PAGE = 30;

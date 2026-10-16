@@ -64,7 +64,7 @@ describe('shouldOpenWelcome', () => {
   });
 
   it('stays shut for the end-to-end smoke test', () => {
-    expect(shouldOpenWelcome(Settings.parse({}), { TAGALONG_SKIP_ONBOARDING: '1' })).toBe(false);
+    expect(shouldOpenWelcome(Settings.parse({}), { TAGALONG_SKIP_WELCOME: '1' })).toBe(false);
   });
 });
 

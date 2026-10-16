@@ -59,7 +59,7 @@ export const IPC = {
   checkCalendar: 'tagalong:calendar:check',
   usageSummary: 'tagalong:usage:summary',
   routineEvent: 'tagalong:panel:routine',
-  routineDraftEvent: 'tagalong:office:routine-draft',
+  routineDraftEvent: 'tagalong:home:routine-draft',
   turnEvent: 'tagalong:turn-event',
   getContext: 'tagalong:context:get',
   capture: 'tagalong:capture',
@@ -92,9 +92,9 @@ export const IPC = {
   recordingEvent: 'tagalong:recording-event',
   getRecording: 'tagalong:get-recording',
   stopWatch: 'tagalong:watch:stop',
-  openOnboarding: 'tagalong:onboarding:open',
-  openOffice: 'tagalong:office:open',
-  homePageEvent: 'tagalong:office:page',
+  openWelcome: 'tagalong:welcome:open',
+  openHome: 'tagalong:home:open',
+  homePageEvent: 'tagalong:home:page',
   finishWelcome: 'tagalong:welcome:finish',
   openLink: 'tagalong:link:open',
   checkClaudeSignIn: 'tagalong:claude:sign-in',
@@ -325,9 +325,9 @@ export interface TagalongHostApi {
   /** Opens Settings, or the section or Home page a Fix it names. Main checks the target. */
   openSettings(target?: FixTarget): Promise<void>;
   /** Opens the Welcome window, from Settings › Advanced. */
-  openOnboarding(): Promise<void>;
+  openWelcome(): Promise<void>;
   /** Opens Home, or focuses it. The tray's Open Tagalong is the shipped way in. */
-  openOffice(): Promise<void>;
+  openHome(): Promise<void>;
   /** Main names the Home page to show, when the tray or the bubble opens a particular one. */
   onHomePage(handler: (page: string) => void): () => void;
   /**

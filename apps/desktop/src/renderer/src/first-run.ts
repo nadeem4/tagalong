@@ -1,5 +1,5 @@
 /**
- * Welcome's step machine (the first-run setup window, onboarding.tsx), kept apart from React
+ * Welcome's step machine (the first-run setup window, welcome.tsx), kept apart from React
  * so it is tested in plain Node: where setup opens or resumes, how an answer moves it on, and
  * what each answer saves. Contains FirstRun, startFirstRun, answered, goTo, chipState,
  * listensNow, oneAtATime and answerPatch. Answers are matched in first-run-match.ts and worded

@@ -5,8 +5,8 @@ import { act } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Pet } from '@tagalong/protocol';
 import { DockPet } from './dock-pet';
-import { SCOUT_SPRITE } from './office/sprites/characters';
-import { withBlink, withMood } from './office/sprites/expressions';
+import { SCOUT_SPRITE } from './theme/sprites/characters';
+import { withBlink, withMood } from './theme/sprites/expressions';
 
 const SCOUT: Pet = {
   id: 'scout',

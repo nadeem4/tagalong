@@ -1,6 +1,5 @@
 /**
- * The Welcome window, centred on the screen the person is using. The file and its page keep the
- * name "onboarding". Contains createOnboardingWindow.
+ * The Welcome window, centred on the screen the person is using. Contains createWelcomeWindow.
  */
 
 import { BrowserWindow, screen } from 'electron';
@@ -14,7 +13,7 @@ const HEIGHT = 620;
  * user sees, so it must not open on a screen they are not looking at. The page is 900 by
  * 620, the size it was designed at.
  */
-export function createOnboardingWindow(): BrowserWindow {
+export function createWelcomeWindow(): BrowserWindow {
   const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   const window = new BrowserWindow({
     width: WIDTH,
@@ -38,6 +37,6 @@ export function createOnboardingWindow(): BrowserWindow {
   });
   window.setMenuBarVisibility(false);
   window.once('ready-to-show', () => window.show());
-  loadPage(window, 'onboarding');
+  loadPage(window, 'welcome');
   return window;
 }

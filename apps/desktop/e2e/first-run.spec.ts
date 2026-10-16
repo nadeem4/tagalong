@@ -89,7 +89,7 @@ test.describe('setup by typing, signed in to Claude', () => {
   });
 
   test('a new install opens setup alone, asks talk or type, and a typed name moves it on', async () => {
-    const setup = await windowFor(app, 'onboarding');
+    const setup = await windowFor(app, 'welcome');
     await chooseTyping(setup);
     await expect(heading(setup, 'What should I call you?')).toBeVisible(ENGINE);
     await windowFor(app, 'avatar');
@@ -103,20 +103,20 @@ test.describe('setup by typing, signed in to Claude', () => {
   test('closed, Scout still arrives, and the next launch resumes at the same step', async () => {
     await app.evaluate(({ BrowserWindow }) => {
       for (const w of BrowserWindow.getAllWindows()) {
-        if (w.webContents.getURL().includes('onboarding.html')) w.close();
+        if (w.webContents.getURL().includes('welcome.html')) w.close();
       }
     });
     await expect.poll(() => visible(app, 'avatar'), ENGINE).toBe(true);
     await quit(app);
     app = await launch(dataDir, 'signed-in');
-    const setup = await windowFor(app, 'onboarding');
+    const setup = await windowFor(app, 'welcome');
     await expect(heading(setup, 'How should I think?')).toBeVisible(ENGINE);
     await expect(setup.getByRole('button', { name: 'Typing' })).toBeVisible();
     await expect(setup.getByRole('button', { name: 'You: Alex' })).toBeVisible();
   });
 
   test('a step chip goes back, and Rather not returns to where you were', async () => {
-    const setup = await windowFor(app, 'onboarding');
+    const setup = await windowFor(app, 'welcome');
     await setup.getByRole('button', { name: 'You: Alex' }).click();
     await expect(heading(setup, 'What should I call you?')).toBeVisible();
     await setup.getByRole('button', { name: 'Rather not' }).click();
@@ -125,7 +125,7 @@ test.describe('setup by typing, signed in to Claude', () => {
   });
 
   test('an unclear answer is asked again, then typing finishes setup and Scout invites a question', async () => {
-    const setup = await windowFor(app, 'onboarding');
+    const setup = await windowFor(app, 'welcome');
     await answer(setup, 'banana');
     await expect(setup.getByRole('status')).toHaveText(/didn’t catch that/);
     await answer(setup, 'claude');
@@ -133,7 +133,7 @@ test.describe('setup by typing, signed in to Claude', () => {
     await setup.getByRole('button', { name: 'Text only' }).click();
     await expect(heading(setup, 'One key to remember')).toBeVisible();
     await answer(setup, 'got it');
-    await expect.poll(() => visible(app, 'onboarding'), ENGINE).toBe(false);
+    await expect.poll(() => visible(app, 'welcome'), ENGINE).toBe(false);
     await expect.poll(() => visible(app, 'avatar'), ENGINE).toBe(true);
     const panel = await windowFor(app, 'panel');
     await expect(panel.getByRole('button', { name: 'Try it now' })).toBeVisible(ENGINE);
@@ -153,7 +153,7 @@ test.describe('setup by typing, signed in to Claude', () => {
     expect(saved.voice.enabled).toBe(false);
     app = await launch(dataDir, 'signed-in');
     await expect.poll(() => visible(app, 'avatar'), ENGINE).toBe(true);
-    expect(await visible(app, 'onboarding')).toBe(false);
+    expect(await visible(app, 'welcome')).toBe(false);
   });
 });
 
@@ -173,7 +173,7 @@ test.describe('setup by typing, without Claude Code', () => {
   });
 
   test('offers install or a key, and a key tested once moves setup on', async () => {
-    const setup = await windowFor(app, 'onboarding');
+    const setup = await windowFor(app, 'welcome');
     await chooseTyping(setup);
     await expect(heading(setup, 'What should I call you?')).toBeVisible(ENGINE);
     await answer(setup, 'rather not');

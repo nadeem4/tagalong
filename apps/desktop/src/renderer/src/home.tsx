@@ -1,5 +1,5 @@
 /**
- * The Home window's page (built as `office.html`): HomeView from @tagalong/ui with the
+ * The Home window's page (built as `home.html`): HomeView from @tagalong/ui with the
  * desktop's host calls, Settings embedded as one of its pages, and the routing main asks
  * for (a page, a Settings section, a routine draft to edit).
  */
@@ -14,7 +14,7 @@ import '@fontsource/onest/latin-600.css';
 import '@fontsource/pixelify-sans/latin-400.css';
 import '@fontsource/pixelify-sans/latin-600.css';
 import '@fontsource/pixelify-sans/latin-700.css';
-import './office.css';
+import './home.css';
 import '../../shared/ipc';
 import { overviewStatus, scoutBrain } from './settings/brain';
 import { SettingsPage } from './settings/settings-page';
