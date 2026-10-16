@@ -183,7 +183,7 @@ describe('SightBar, full view', () => {
     expect(screen.getByTestId('sight-thumbnail')).toBeInTheDocument();
   });
 
-  it('leaves a Phase 2 snapshot reading exactly as it did', () => {
+  it('reads a single-screenshot snapshot as one screen', () => {
     render(<SightBar snapshot={withScreenshot} problem={null} onLook={noop} onClear={noop} />);
 
     const bar = screen.getByTestId('sight-bar');

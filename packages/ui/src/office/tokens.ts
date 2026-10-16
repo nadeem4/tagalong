@@ -12,7 +12,6 @@ export const officeTokens = {
     line: '#262C4A',
     sidebar: '#171C33',
     rowActive: '#1E2442',
-    avatarTile: '#222845',
     field: '#1A1F3A',
     fieldLine: '#2E3558',
     gold: '#F2C14E',
@@ -46,17 +45,16 @@ export const officeTokens = {
     small: 12,
     body: 13,
     field: 14,
-    roomName: 13,
-    partyHeading: 15,
-    petName: 17,
+    groupHeading: 13,
+    panelHeading: 15,
     title: 20,
   },
-  fontWeight: { regular: 400, medium: 500, semibold: 600, bold: 700 },
+  fontWeight: { semibold: 600, bold: 700 },
   space: { hair: 3, xxs: 2, xs: 4, sm: 6, md: 8, lg: 12, xl: 16, xxl: 20, xxxl: 24 },
   radius: { field: 8, row: 10, tile: 10, chip: 10, small: 8 },
   size: {
     headerHeight: 64,
-    partyWidth: 280,
+    navWidth: 280,
     fieldHeight: 40,
     focusRing: 2,
     focusOffset: 2,
@@ -66,5 +64,3 @@ export const officeTokens = {
   /** Integer multipliers for sprites: a 16px pet drawn at 2 is 32px on screen. */
   spriteScale: { tile: 2 },
 } as const;
-
-export type OfficeTokens = typeof officeTokens;

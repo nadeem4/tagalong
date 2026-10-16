@@ -16,8 +16,8 @@ const LOOK_TARGETS = ['screenshot', 'activeWindow'] as const;
 export interface ChatPanelProps {
   /** The pet the next ask goes to. */
   petId: string;
-  /** The pets, for the speaker's name. Omitted, the panel asks the bridge for them. */
-  pets?: readonly Pet[];
+  /** The pets, for the speaker's name and the watcher's. */
+  pets: readonly Pet[];
   /** What the host captured for this ask: named in the sight bar and sent with the turn. */
   snapshot?: ContextSnapshot;
   /** What Look captures in this host. Defaults to a screenshot of the active window. */
@@ -44,7 +44,7 @@ interface TurnInfo {
 
 export function ChatPanel({
   petId,
-  pets: givenPets,
+  pets,
   snapshot,
   lookTargets = LOOK_TARGETS,
   lookLabel,
@@ -56,8 +56,6 @@ export function ChatPanel({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamingText, setStreamingText] = useState('');
   const [activeTurnId, setActiveTurnId] = useState<string | null>(null);
-  const [fetchedPets, setFetchedPets] = useState<readonly Pet[]>([]);
-  const [draft, setDraft] = useState('');
   const [streamingSpeaker, setStreamingSpeaker] = useState('');
   // Model calls in the last turn: tool round trips multiply them, so the footer shows the
   // count whenever a turn made more than the one call an ask costs.
@@ -67,7 +65,6 @@ export function ChatPanel({
   // Watches running now, shown as chips with a Stop button each.
   const [watches, setWatches] = useState<readonly RunningWatch[]>([]);
   const turns = useRef(new Map<string, TurnInfo>());
-  const pets = givenPets ?? fetchedPets;
 
   // React's documented way to reset state when a prop changes: a fresh host capture
   // replaces whatever the panel was holding, without an effect and an extra paint.
@@ -77,20 +74,6 @@ export function ChatPanel({
     setAttached(snapshot ?? null);
     setProblem(null);
   }
-  useEffect(() => {
-    if (givenPets !== undefined) return;
-    let live = true;
-    bridge
-      .listPets()
-      .then((list) => {
-        if (live) setFetchedPets(list);
-      })
-      // Pets that cannot be listed leave the panel unnamed, which still works.
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, [bridge, givenPets]);
 
   function settle(message: ChatMessage): void {
     // An interrupted turn can end with nothing said; an empty bubble says nothing either.
@@ -210,7 +193,6 @@ export function ChatPanel({
   useEffect(() => bridge.onTurnEvent(onTurnEvent), [bridge]);
 
   function handleSend(text: string): void {
-    setDraft('');
     setModelCalls(null);
     setMessages((current) => [...current, { id: `ask:${current.length}`, role: 'user', text }]);
     const conversationId = conversations[petId];
@@ -296,13 +278,7 @@ export function ChatPanel({
           </button>
         </div>
       )}
-      <Composer
-        onSend={handleSend}
-        disabled={busy}
-        seeing={attached !== null}
-        value={draft}
-        onValueChange={setDraft}
-      />
+      <Composer onSend={handleSend} disabled={busy} seeing={attached !== null} />
       {modelCalls !== null && (
         <p
           data-testid="model-calls"
