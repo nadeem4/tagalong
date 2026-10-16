@@ -105,18 +105,59 @@ describe('the role files', () => {
     expect(instructions).toContain('point, never claim you clicked');
   });
 
-  it('give the companion change_settings, after tell_expert, and tell it Apply is a click', () => {
+  it('give the companion change_settings, after tell_expert, and tell it Apply or Turn on is a click', () => {
     const tools = getRole('companion')?.tools ?? [];
     expect(tools.indexOf('change_settings')).toBe(tools.indexOf('tell_expert') + 1);
     const instructions = getRole('companion')?.instructions ?? '';
     expect(instructions).toContain('change_settings');
-    expect(instructions).toContain('until they click Apply');
+    // The card's button reads Turn on, not Apply, for a change that loosens a setting.
+    expect(instructions).toContain('nothing changes until they click');
+    expect(instructions).toContain(
+      'Apply (Turn on, for a change marked as letting you see or keep more)',
+    );
     expect(instructions).toContain('only in Settings');
+  });
+
+  it("group the companion's instructions under headings, small jobs as sub-headings", () => {
+    const lines = lf(getRole('companion')?.instructions ?? '').split('\n');
+    for (const heading of [
+      '## Who you are',
+      '## Looking at the screen',
+      '## Handing work to experts',
+      '## Connected apps',
+      '## What needs me',
+      '## Routines and watches',
+      '## Pointing',
+      '## Changing settings',
+      '## Small jobs you do yourself',
+      '### Drafts',
+      '### Reading aloud',
+      '### Describing a picture',
+      '### Translating',
+      '### Filing a bug',
+      '## Your day and history',
+      '## Privacy and safety',
+    ]) {
+      expect(lines).toContain(heading);
+    }
+  });
+
+  it('tell the companion a meeting routine is a `when` of type meeting, not a string', () => {
+    const instructions = getRole('companion')?.instructions ?? '';
+    expect(instructions).toContain('give `when` the type `meeting`');
+    expect(instructions).not.toContain('set `when` to `meeting`');
+  });
+
+  it("tell the companion to name a routine's expert in uses, so the card shows it", () => {
+    const instructions = getRole('companion')?.instructions ?? '';
+    expect(instructions).toContain('list that expert in `uses` so the card shows it');
+    expect(instructions).not.toContain('say so on the card through uses');
   });
 
   it('let the companion write short drafts itself, in a draft block, never claiming it sent them', () => {
     const instructions = getRole('companion')?.instructions ?? '';
-    expect(instructions).toContain('the one piece of work you do yourself');
+    expect(instructions).toContain('Write short drafts yourself');
+    expect(instructions).not.toContain('the one piece of work you do yourself');
     expect(instructions).toContain('about 400 words');
     expect(instructions).toContain('fenced `draft` block');
     expect(instructions).toContain('offer to hand it to an expert');

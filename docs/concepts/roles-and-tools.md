@@ -29,7 +29,12 @@ past them and never mention itself or Tagalong unless asked.
 ### The role file
 
 One Markdown file per role in `packages/core/roles/` (today only `companion.md`). The YAML header is
-data; the body is the role's instructions.
+data; the body is the role's instructions. The companion's body is grouped under `##` headings
+(Who you are, Looking at the screen, Handing work to experts, Connected apps, What needs me,
+Routines and watches, Pointing, Changing settings, Small jobs you do yourself, Your day and
+history, Privacy and safety), with each small job (drafts, reading aloud, describing a picture,
+translating, filing a bug) under its own `###` heading. The generator keeps the body as written,
+headings included, and the rest of the system prompt already uses `##` headings.
 
 ```markdown
 ---

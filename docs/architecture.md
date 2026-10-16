@@ -1955,7 +1955,9 @@ seam before it renders, so it can always listen.
   no model call) and `GreetingComposeResult.pickUp` carries its items; `brainLine` passes them on
   as `GreetLine.pickUp` unless the Fix it line wins. The handwritten line for each: "I closed unexpectedly last time…"
   (saying how many tasks stopped), "Morning. I’ve been updated to x.y.z." (the time of day first) plus `WHATS_NEW`
-  (`apps/desktop/src/main/whats-new.ts`, edited by hand in each release), "Back after a day.", with
+  (`apps/desktop/src/main/whats-new.ts`, edited by hand in each release together with a bump of the
+  version in `apps/desktop/package.json`, which is what makes the launch an update; the line plays
+  once, because the next launch records the same version), "Back after a day.", with
   the routines that ran while away named. With Always listening on, `launchLine` answers
   `LISTENING_LINE` first and none of the scenario lines show.
   The Claude sign-in check starts at the top of `start()` (the promise is kept in `signInCheck`), so
@@ -2039,9 +2041,9 @@ above a **Message** box. It is the same component, so it is the same conversatio
   the bubble, the full chat and an expert's result, with `react-markdown` and `remark-gfm`: bold,
   lists, headings, code, tables. HTML in an answer is skipped, and a link shows as text with its
   address on hover, because a click would navigate the bubble's own window.
-- **Draft it for me.** Short drafts (an email reply, a message, a PR description, up to about 400
-  words) are the one piece of work Scout does itself (`companion.md`); anything longer goes to an
-  expert. Scout puts the draft alone in a fenced `draft` block and adds one line about Copy. `Answer`
+- **Draft it for me.** Scout writes short drafts itself (an email reply, a message, a PR
+  description, up to about 400 words; `companion.md`, under Small jobs you do yourself); anything
+  longer goes to an expert. Scout puts the draft alone in a fenced `draft` block and adds one line about Copy. `Answer`
   renders that block as a framed `DraftBlock` with **Copy**, which shows "Copied" for 2 s (or
   "Couldn't copy"). `Answer` takes an optional `onCopy`; without it, as in the extension, there is no
   button. The bubble passes `HostBridge.copyText`, which on desktop is `IPC.copyText`, handled in
