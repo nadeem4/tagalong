@@ -101,8 +101,8 @@ export interface HostBridge {
    */
   listActivity?(params?: { before?: string; limit?: number }): Promise<ActivityListResult>;
   /**
-   * Home's Experts tab: the tools a companion hands work to. All optional: a host without
-   * Home, such as the browser extension, never shows the tab.
+   * Home's Experts page: the tools a companion hands work to. All optional: a host without
+   * Home, such as the browser extension, never shows the page.
    */
   listExperts?(): Promise<Expert[]>;
   saveExpert?(expert: Expert): Promise<Expert>;

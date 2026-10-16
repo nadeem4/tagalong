@@ -201,8 +201,8 @@ export function ChatPanel({
         break;
       }
       default:
-        // Every other notification (tool calls, hand-offs, connector confirms, routines,
-        // moods, settings) is not shown in this panel.
+        // Every other notification (tool calls, warnings, hand-offs, connector confirms,
+        // routines, connections, moods, settings) is not shown in this panel.
         break;
     }
   });

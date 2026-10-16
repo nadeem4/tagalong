@@ -41,7 +41,7 @@ const CONFIRM: Record<RoutineAction, string> = {
 /**
  * Scout wrote or changed a routine: the card says what would be saved, built like the
  * hand-off card. Save is the person's consent; Edit opens it in Home's form; Cancel drops it.
- * After a new routine is saved, the card offers one test run.
+ * After a new or changed routine is saved, the card offers one test run.
  */
 export function RoutineCard({
   proposal,
