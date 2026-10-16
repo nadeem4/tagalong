@@ -24,7 +24,7 @@ tagalong/
       index.ts                      # PROTOCOL_VERSION, ENGINE_HOST, DEFAULT_ENGINE_PORT, engineUrl
       context.ts                    # ContextSnapshot, CapturedImage, DisplaySnapshot, WindowEntry,
                                     # ContextSnapshotPatch, PerceptionTarget
-      pet.ts                        # Pet, ReplyStyle
+      pet.ts                        # Pet, SCOUT_ID
       message.ts                    # Conversation, Message, MessageContent
       rpc.ts                        # JSON-RPC envelopes and error codes
       settings.ts                   # Settings, SettingsPatch, SETTINGS_DEFAULTS

@@ -290,8 +290,8 @@ microphone and the browser extension, each with a plain line, starting "Two thin
 "Everything's working." **Fix it** on a row opens the place that fixes it. It calls no model and
 reads no screen, so it works even when Scout cannot think.
 
-Upgrading from an earlier build removes its other companions, Ink and Bolt; their conversations
-stay on disk.
+Upgrading from an earlier build keeps only Scout; any other companion, with its conversations, is
+removed.
 
 ## Hotkeys
 

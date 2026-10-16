@@ -188,7 +188,8 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   [Gentle nudges](#gentle-nudges)). Protocol 0.13.0: the crew's `pets.delete`, `roles.list`,
   `roles.recommendModel`, `notices.rolesUpgrade` and `notices.dismiss` are gone. Protocol 0.14.0:
   `ask` takes text only (the unread `input.audio` is gone, since speech becomes text on the host),
-  and the never-advertised `audioIn` and `audioOut` capabilities are gone. `hosts.status`
+  and the never-advertised `audioIn` and `audioOut` capabilities are gone. Protocol 0.15.0: `Pet`
+  drops `toolGrants`, `replyStyle` and `notes`. `hosts.status`
   → `{ extension }` says whether the browser extension is connected, for the health check (see
   [The companion's bubble](#the-companions-bubble)); the extension may not call it.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
@@ -249,7 +250,7 @@ notifications.
    `vision_unsupported` goes out. The turn continues without the picture.
 4. The runner reads back the last `settings.historyMessages` messages — after the question was stored,
    so the prompt ends on what was asked — and `assemblePrompt` builds the provider-neutral request:
-   the base instructions, the pet's role instructions and the user's notes for it, the reply-style rule, the history, and a screen-context
+   the base instructions, the pet's role instructions, the screen-reply rule, the history, and a screen-context
    block appended to the last user message rather than sent as its own turn.
 5. The provider streams. Every text delta becomes a `turn.delta` notification.
 6. The turn ends with exactly one of `turn.completed` — carrying the full text, a stop reason of `end`,
@@ -642,7 +643,7 @@ finish". Adding an `oauth` app signs in straight away.
 **Scout's side.** `connectorTools` (`tools/builtin/connections.ts`) turns every tool of every
 connected, switched-on app into one Scout tool named `<connection>__<tool>`, such as
 `notion__search`. Each carries the group `connections`; `toolsFor` gives the whole group to a role
-that lists `connections` (the Companion does), and a pet's grant can switch the group off. The
+that lists `connections` (the Companion does). The
 description is one line: the app, the tool's first line, and whether it only reads. Past 30 app
 tools, the descriptions inside the input schemas are dropped to keep the prompt small. A read runs at
 once. A write first asks `Approvals`, which emits `connector.confirm { approvalId, turnId, petId, app,
@@ -1156,10 +1157,11 @@ lives in `packages/core`; hosts only render what the engine broadcasts.
 ### The registry and the companion
 
 `pets/registry.ts` keeps each pet as a validated JSON blob in the `pets` table and exposes it through
-`pets.list` and `pets.upsert`. `pets.upsert` refuses a `roleId` the role library does not have with
-RPC error `-32602`. The library holds one role, `companion`; a pet still naming a crew-era role
+`pets.list` and `pets.upsert`. `pets.upsert` refuses any id but `scout` (`SCOUT_ID`), and a
+`roleId` the role library does not have, with RPC error `-32602`. The library holds one role, `companion`; a pet still naming a crew-era role
 (`generalist`, `writer` and the rest) works as the companion (`roleFor`). Parsing drops unknown keys,
-so a pet stored with the crew-era `roleVersion` or `voiceId` still loads. A fresh install is seeded with one pet: Scout, the Companion, on
+so a pet stored with the crew-era `roleVersion`, `voiceId`, `toolGrants`, `replyStyle` or `notes`
+still loads. A fresh install is seeded with one pet: Scout, the Companion, on
 `claude-code` with the `haiku` model, so it thinks through the person's Claude Code sign-in and needs
 no key (Welcome moves it to a keyed provider when Claude Code is missing).
 
@@ -1167,17 +1169,20 @@ Seeding is remembered per pet in `pet_seeds` (migration 2), so a pet the user ed
 overwritten and a default the user deleted stays deleted. Migration 5 gives every stored pet a role
 and keeps an edited persona as the pet's notes. Migration 11 deletes Ink and Bolt, the crew's other
 two defaults from before the one-companion design; their conversations stay, and `pet_seeds` keeps
-them from being seeded again. Migration 6 recorded a one-time roles notice; it now does nothing, and
+them from being seeded again. Migration 20 keeps only Scout: other pets go with their
+conversations, messages, memories and activity; shared memories become Scout's; and Scout's stored
+record loses `toolGrants`, `replyStyle`, `notes` and `color` (if Scout itself is missing, its seed
+record goes too, so it is seeded again on the same boot). Migration 6 recorded a one-time roles notice; it now does nothing, and
 migration 14 drops the `notices` table. Each pet carries an optional `color` (`#rrggbb`) for its
 sprite.
 
 ### Memory
 
-`memory/memories.ts` is the pet's memory: `memories(id, scope, pet_id, kind, text, created_at)` with
+`memory/memories.ts` is Scout's memory: `memories(id, scope, pet_id, kind, text, created_at)` with
 an external-content FTS5 index (`memories_fts`, porter stemming) kept in step by triggers (migration 3).
-`scope` is `pet` (private, `pet_id` set) or `crew` (the shared notebook, `pet_id` null); `kind` is
-`fact`, `preference` or `summary`. Every read — `recent(petId)` and `search(petId, text)` — filters on
-`scope = 'crew' OR pet_id = ?` in SQL, so no code path can load another pet's private memories. A
+Every memory belongs to Scout (`pet_id`); `scope` is always `pet` now, and the older shared
+(`crew`) rows were moved to Scout by migration 20. `kind` is `fact`, `preference` or `summary`.
+Every read — `recent(petId)` and `search(petId, text)` — filters on `pet_id = ?` in SQL. A
 question is turned into an FTS query by quoting each distinct word and OR-ing them (`ftsQuery`), so
 quotes, `*`, `NEAR(` and friends in a user's text are plain words rather than syntax errors, and BM25
 ranks the closest memory first.
@@ -1212,13 +1217,13 @@ Chrome extension cannot query it. No vector search, no embeddings.
 Every turn recalls before it assembles (`memory/recall.ts`): the pet's five newest visible memories,
 then up to five FTS matches against the question plus the selection that are not already listed,
 dropping whole memories past a 2,000-character budget. `assemblePrompt` renders them last in the system
-prompt under `## What you remember`, labelled `(preference)`, `(fact)` or `(fact, shared by the
-crew)`, and caps the whole section — heading included — at 2,000 characters. Last, so a remembered
-"short answers" reads as overriding the generic reply-style rule above it.
+prompt under `## What you remember`, labelled `(preference)`, `(fact)` or `(summary)`, and caps the
+whole section — heading included — at 2,000 characters. Last, so a remembered "short answers" reads
+as overriding the screen-reply rule above it.
 
 Memories are written two ways. The `remember` tool (`tools/builtin/memory.ts`) is offered to every
-pet whose role lists it and whose provider supports tools: `{ text, kind: fact | preference, shared? }`, filed under the
-calling pet or, with `shared: true`, in the crew notebook. Under it sits a deterministic safety net:
+pet whose role lists it and whose provider supports tools: `{ text, kind: fact | preference }`, filed under the
+calling pet. Under it sits a deterministic safety net:
 when the user's own message states a lasting preference — "I prefer…", "from now on…", "remember
 that…", "always answer…" — the runner files that sentence as a private `preference` before the turn
 runs, so "Scout keeps answers short after a restart" does not hinge on a model choosing to call a tool.

@@ -1,7 +1,7 @@
 # Roles and tools
 
 **Status: built.** The role file, the generated role library, the tier table and its lookup
-helpers, giving a pet a role, filtering a turn's tools by role and grants, and
+helpers, giving a pet a role, filtering a turn's tools by role, and
 [the tools module](#the-tools-module).
 
 The crew-era roles (Generalist, Backend engineer, Frontend engineer, Writer, Researcher), the
@@ -83,17 +83,16 @@ body becomes `instructions`.
 `roleFor(id)` (the companion for an unknown id, such as a crew-era `writer`) and
 `recommendedModel(role, providerId)`. `getRole` and `recommendedModel` are exported from
 `@tagalong/core` for hosts; Welcome uses them to move Scout to a provider on the right model.
-`pets.upsert` refuses a pet whose `roleId` is not in the library with RPC error `-32602`.
+`pets.upsert` refuses a pet other than Scout, or one whose `roleId` is not in the library, with RPC
+error `-32602`.
 
 ### What the role decides
 
 A pet's role sets two things on every turn:
 
 - **Its instructions.** The system prompt is the base rules, then the role's `instructions`, then
-  `Your name is <name>.`, then the pet's `notes` under the heading "The user's notes for you" when
-  there are any, then the reply-style rule and the recalled memories.
-- **Its tools.** `toolsFor` gives the pet exactly the tools its role lists, minus any its
-  `toolGrants` set to `off`. A grant cannot add a tool the role does not list.
+  `Your name is <name>.`, then the screen-reply rule and the recalled memories.
+- **Its tools.** `toolsFor` gives the pet exactly the tools its role lists.
 
 A pet whose `roleId` is not in the library works as the companion, for both.
 
@@ -114,17 +113,17 @@ Every model in the table sees, so a role that needs pictures gets the same model
 ## What a pet stores
 
 The pet is stored as JSON in the `pets` table of `tagalong.db`, validated by the `Pet` schema in
-`packages/protocol/src/pet.ts`: `id`, `name`, `avatar`, `color`, `roleId`, `notes`, `providerId`,
-`model`, `watchModel`, `toolGrants` (tool id → `off` or `allowed`; the default `{}`
-allows every tool the role lists) and `replyStyle`. The schema drops keys it does not know, so a pet
+`packages/protocol/src/pet.ts`: `id` (always `SCOUT_ID`, `scout`), `name`, `avatar`, `color`,
+`roleId`, `providerId`, `model` and `watchModel`. The schema drops keys it does not know, so a pet
 stored by an older version still parses: `persona` and `toolAllowlist` from before roles,
-`roleVersion` and `voiceId` from the crew, and `visionModel` from when a provider routed pictures to
-a second model.
+`roleVersion`, `voiceId`, `toolGrants`, `replyStyle` and `notes` from the crew, and `visionModel`
+from when a provider routed pictures to a second model.
 
-A fresh install has one pet, Scout, as the Companion, with no notes. Database migration 5
+A fresh install has one pet, Scout, as the Companion. Database migration 5
 (`packages/core/src/pets/roles-upgrade.ts`) gave pets stored before roles a role id and moved an
 edited `persona` to `notes`; migration 11 removed Ink and Bolt; migration 14 drops the roles notice's
-table.
+table; migration 20 keeps only Scout, deleting any other pet with its conversations, and takes
+`toolGrants`, `replyStyle`, `notes` and `color` off Scout's stored record.
 
 Logins and API keys stay encrypted in `secrets.json`, never in the pet.
 
@@ -173,7 +172,7 @@ The companion's role lists every one of them; `point_at` comes after `change_rou
   offered on a routine's turn too, but refuses there any change that lets Scout see, keep or spend
   more. An unknown name is refused by name.
 - **`toolsFor(pet, tools)`** is the single place a turn's tools are narrowed: the tools the pet's
-  role lists, minus any its grants turn off (see [What the role decides](#what-the-role-decides)).
+  role lists (see [What the role decides](#what-the-role-decides)).
   A role can list a group instead of single tools: `connections` gives it every tool of the
   person's connected apps, whose names are only known once they connect.
 - **Connected apps.** An app tool is `read` when its server marks it read-only and `write`
