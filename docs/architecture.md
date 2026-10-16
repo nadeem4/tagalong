@@ -1930,7 +1930,7 @@ seam before it renders, so it can always listen.
   `LISTENING_LINE` ("I’m listening. Say “Scout, stop”, or switch off Always listening in my
   bubble."), even when the greeting is switched off, and nothing is composed. Otherwise, when
   Welcome is done and `settings.greeting` is on (`welcome.ts#shouldGreetOnLaunch`, default on),
-  main calls `greeting.compose` for the default pet. Either way main sends the text as
+  main calls `greeting.compose` for Scout (`SCOUT_ID`). Either way main sends the text as
   `greetLineEvent` (the preload keeps one that arrives before the panel subscribes)
   and shows the panel with `showPanelQuietly`. The panel renders `GreetingLine`: `role="status"`,
   fades after about seven seconds unless pointed at or focused, opens the ask bubble on a click.
@@ -1946,7 +1946,7 @@ seam before it renders, so it can always listen.
   `greetOnLaunch` passes `launchLine` a compose closure that runs two things in parallel:
   `greeting.compose { petId, launch? }` (`launch` is `{ crashed, lastVersion, version, whatsNew }`
   plus the interrupted tasks counted at boot and the names of routines that ran) and
-  `brainReadiness` (the default pet's provider needs a key and has none, Claude Code is not
+  `brainReadiness` (Scout's provider needs a key and has none, Claude Code is not
   found, or the Claude sign-in check says signed out; the sign-in check gets
   `SIGN_IN_BUDGET_MS`, 1 s, and a slow or failing check reads as `unknown`, never as a problem).
   `brainLine(brain, composed, userName)` then returns the composed line, or a plain one ("I’m
