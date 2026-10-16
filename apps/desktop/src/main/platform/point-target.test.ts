@@ -1,3 +1,5 @@
+/** Tests for mapping point_at's target onto a display. */
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { answerPointAt, displayRectToTarget, screenRectToTarget } from './point-target';

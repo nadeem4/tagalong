@@ -1,3 +1,5 @@
+/** Moving a window across displays with different scale factors. Contains moveWindow. */
+
 import { screen } from 'electron';
 import type { BrowserWindow } from 'electron';
 import { crossesScale } from './position';

@@ -1,3 +1,8 @@
+/**
+ * Apply on Scout's settings card: checks the patch again and saves it, with Always listening taken
+ * out and switched off on its own path. Contains applySettings.
+ */
+
 import { talkPatchProblem } from '@tagalong/core';
 import { SettingsPatch } from '@tagalong/protocol';
 import type { Settings } from '@tagalong/protocol';

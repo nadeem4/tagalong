@@ -1,3 +1,5 @@
+/** Shrinks a size to fit a long side, never upscaling. Contains PixelSize and fitWithin. */
+
 /** A pixel size, used both for what the OS handed back and for what we ask it to become. */
 export interface PixelSize {
   width: number;

@@ -1,3 +1,5 @@
+/** Tests for the window list script and runWindowHelper. */
+
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -65,10 +67,8 @@ describe('runWindowHelper', () => {
   });
 
   it('hands the script over as one encoded argument, not over stdin', async () => {
-    // Changed deliberately from the stdin transport this file used to assert. Feeding a
-    // script to `powershell -Command -` parses it line by line: any block spanning lines
-    // produces nothing at all, with exit 0 and no error. Measured on a desktop with
-    // twelve windows open, the enumeration returned an empty list.
+    // One encoded argument, never stdin: `powershell -Command -` parses a script line by
+    // line, so any block spanning lines produces nothing, with exit 0 and no error.
     const child = new FakeChild();
     let encoded = '';
     const run = runWindowHelper(
@@ -111,8 +111,8 @@ describe('runWindowHelper', () => {
   });
 
   it('returns partial output and kills the helper when it overruns', async () => {
-    // The phase page asks for a three second timeout with partial output rather than an
-    // error. A slow window must not hold up the ask behind it.
+    // Three seconds at most, returning partial output rather than an error: a slow window
+    // must not hold up the ask behind it.
     const child = new FakeChild();
     const run = runWindowHelper(() => child, 'x', 3000);
 

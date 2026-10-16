@@ -1,10 +1,14 @@
+/**
+ * The sight pause, enforced at the source: gateSight wraps the platform so every read checks the
+ * pause first. Contains gateSight, SIGHT_POLICY, SightPausedError and isSightPaused.
+ */
+
 import type { Platform } from './index';
 
 /**
  * Thrown instead of returning nothing, because nothing is what a failure looks like.
  *
- * Four separate times in this phase a broken read returned an empty answer that was
- * indistinguishable from a quiet desktop, and each one shipped. A pause that returned an
+ * An empty answer looks exactly like a quiet desktop. A pause that returned an
  * empty capture would be the same mistake with worse consequences: the user would be told
  * the pet cannot see, while every caller that treats emptiness as "nothing to report"
  * carried on as though sight were merely unproductive.

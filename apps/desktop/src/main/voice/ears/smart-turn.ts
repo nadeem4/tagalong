@@ -1,3 +1,5 @@
+/** Smart Turn, the end-of-turn model. Voice process only. Contains loadSmartTurn. */
+
 import type { EndOfTurn } from './local-ears';
 
 const SAMPLES = 8 * 16_000;

@@ -1,3 +1,8 @@
+/**
+ * A 3x5 bitmap font for the composite's display numbers and the word BLOCKED. Contains labelSize
+ * and drawLabel.
+ */
+
 import { createCanvas, blit } from './canvas';
 import type { Bitmap, Colour } from './canvas';
 
@@ -5,9 +10,9 @@ import type { Bitmap, Colour } from './canvas';
  * A 3x5 bitmap font, digits only.
  *
  * The composite needs each display's number written in its corner so the pet can name the
- * one it wants when it calls `look_at_display`. That is the entire text requirement of
- * this phase, and it does not justify a font stack or an offscreen browser window: ten
- * glyphs of fifteen bits each cover it.
+ * one it wants when it calls `look_at_display`. That is all the text the composite needs,
+ * and it does not justify a font stack or an offscreen browser window: ten glyphs of
+ * fifteen bits each cover it.
  *
  * Rows run top to bottom, each string one row, `#` for an inked pixel.
  */
@@ -28,7 +33,7 @@ const GLYPHS: Record<string, string[]> = {
   '7': ['###', '..#', '..#', '..#', '..#'],
   '8': ['###', '#.#', '###', '#.#', '###'],
   '9': ['###', '#.#', '###', '..#', '###'],
-  // Just the letters of BLOCKED, which is the only word this phase draws. Uppercase
+  // Just the letters of BLOCKED, the only word the composite draws. Uppercase
   // because lowercase descenders do not survive a five-pixel cell. Extend deliberately
   // rather than reaching for a font: every glyph added here is a glyph to keep legible.
   B: ['##.', '#.#', '##.', '#.#', '##.'],

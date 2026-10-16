@@ -1,3 +1,8 @@
+/**
+ * Kokoro as main sees it: a LocalVoice whose model runs in the voice process. Contains
+ * WorkerLocalVoice.
+ */
+
 import type { LocalVoice, SpeakOptions, SpokenAudio } from '../voice';
 import type { VoiceWorker } from './client';
 

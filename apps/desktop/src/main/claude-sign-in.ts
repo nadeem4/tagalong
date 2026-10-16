@@ -1,3 +1,9 @@
+/**
+ * Whether Claude Code is signed in on this computer (`claude auth status`, no model call), and the
+ * terminal that signs it in. Contains checkClaudeSignIn, signInFor, fakeSignIn and
+ * openClaudeSignIn.
+ */
+
 import { spawn } from 'node:child_process';
 import crossSpawn from 'cross-spawn';
 import type { ClaudeSignIn } from '../shared/ipc';

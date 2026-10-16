@@ -1,3 +1,5 @@
+/** Tests for finding an element by name for point_at. */
+
 import type { WindowEntry } from '@tagalong/protocol';
 import { describe, expect, it, vi } from 'vitest';
 

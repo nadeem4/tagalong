@@ -1,3 +1,8 @@
+/**
+ * electron-vite build for the desktop app: main and the voice worker, the sandboxed preload, and
+ * one renderer page per window.
+ */
+
 import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
@@ -17,9 +22,9 @@ const reactDomDir = dirname(fromUi.resolve('react-dom/package.json'));
  * They compile with `moduleResolution: bundler`, so their emitted relative imports carry
  * no file extension and Node's ESM loader cannot resolve them at runtime. Letting Rollup
  * inline them resolves those imports at build time, which is what an Electron app wants
- * anyway. Only their genuinely native dependencies stay external — better-sqlite3 and
- * get-windows ship .node binaries Rollup cannot inline — and because those are then
- * resolved at runtime from this app, they are declared as its dependencies. Pure
+ * anyway. Only their genuinely native dependencies stay external (better-sqlite3,
+ * get-windows and onnxruntime-node ship .node binaries Rollup cannot inline), and because
+ * those are then resolved at runtime from this app, they are declared as its dependencies. Pure
  * JavaScript deps such as ws and the Anthropic SDK are inlined with everything else.
  */
 const WORKSPACE_PACKAGES = ['@tagalong/core', '@tagalong/protocol', '@tagalong/ui'];
@@ -67,7 +72,7 @@ export default defineConfig({
     root: 'src/renderer',
     // @vitejs/plugin-react 6.1.1 imports `vite/internal`, which only exists in Vite 8,
     // and this app is pinned to Vite 7. Vite's own esbuild transform covers the JSX; the
-    // only thing lost is Fast Refresh during dev, which Phase 1 does not need.
+    // only thing lost is Fast Refresh during dev.
     esbuild: { jsx: 'automatic' },
     resolve: { alias: { react: reactDir, 'react-dom': reactDomDir } },
     build: {

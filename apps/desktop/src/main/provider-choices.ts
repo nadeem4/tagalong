@@ -1,3 +1,8 @@
+/**
+ * The brains Settings and Welcome offer, built from core's presets, and where each key lives in the
+ * keychain. Contains providerChoices, storedKeys, secretKeyFor and ELEVENLABS_SECRET_KEY.
+ */
+
 import { OPENAI_COMPATIBLE_PRESETS, SECRET_KEYS } from '@tagalong/core';
 import type { ProviderChoice } from '../shared/ipc';
 

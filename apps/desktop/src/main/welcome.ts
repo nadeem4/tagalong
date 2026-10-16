@@ -1,3 +1,9 @@
+/**
+ * The Welcome window's main-process half: which coding agents are on this computer, when
+ * Welcome opens, Scout's launch line, and what finishing Welcome sets up (Scout's brain, the
+ * first expert). Pure but for `isOnPath`, so it is tested without Electron.
+ */
+
 import { execFile } from 'node:child_process';
 import { recommendedModel } from '@tagalong/core';
 import { Pet } from '@tagalong/protocol';
@@ -5,15 +11,9 @@ import type { Expert, Role, Settings } from '@tagalong/protocol';
 import type { FoundAgent, GreetLine } from '../shared/ipc';
 
 /**
- * The Welcome window's main-process half: which coding agents are on this computer, when
- * Welcome opens, and how finishing it sets up the crew. Pure but for `isOnPath`, so it is
- * tested without Electron.
- */
-
-/**
  * The coding agents Welcome looks for, in the order it lists them. `brain` names the
  * provider through which the companion itself can think on that agent's sign-in; only
- * Claude Code has one so far. Gemini CLI and Codex get theirs the same way later.
+ * Claude Code has one.
  */
 const AGENTS = [
   { id: 'claude-code', label: 'Claude Code', command: 'claude', brain: 'claude-code' },
@@ -43,9 +43,8 @@ export function isOnPath(command: string): Promise<boolean> {
 }
 
 /**
- * Opens until Welcome is finished. It replaced the setup wizard, so an install that
- * finished the wizard still sees it once. `TAGALONG_SKIP_ONBOARDING=1` keeps it shut for
- * the end-to-end smoke test, which drives the panel, not Welcome.
+ * Opens until Welcome is finished. `TAGALONG_SKIP_ONBOARDING=1` keeps it shut for the
+ * end-to-end suites, which drive the panel, not Welcome.
  */
 export function shouldOpenWelcome(
   settings: Settings,
@@ -81,10 +80,10 @@ export async function launchLine(
 }
 
 /**
- * What finishing Welcome does to the crew: the default pet becomes the Companion on the
- * chosen brain, on the model its role's tier recommends there, and docks alone. The other
- * pets are hidden, not deleted, so Home can bring them back. Vision and watch models are
- * dropped: they named the old provider's models.
+ * What finishing Welcome does to the pets: the default pet becomes the Companion on the
+ * chosen brain, on the model its role's tier recommends there, and is the only one shown.
+ * Any other pet is hidden, not deleted. Vision and watch models are dropped: they named
+ * the old provider's models.
  */
 export function welcomeCrew(
   pets: readonly Pet[],

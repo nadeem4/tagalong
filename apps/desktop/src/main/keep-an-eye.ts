@@ -1,10 +1,11 @@
-import type { WindowEntry } from '@tagalong/protocol';
-
 /**
  * The desktop's half of keeping an eye on things: every few seconds, the window titles go
  * to the engine, which decides everything else. No picture is taken and no window is read
  * here; while the setting is off, nothing is listed at all.
+ * Contains keepAnEyeAllowed and startKeepAnEye.
  */
+
+import type { WindowEntry } from '@tagalong/protocol';
 
 /** How often the window titles go to the engine. */
 export const KEEP_AN_EYE_INTERVAL_MS = 5_000;

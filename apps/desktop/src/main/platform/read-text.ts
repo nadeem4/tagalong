@@ -1,3 +1,8 @@
+/**
+ * Answers perception.readText: one window's text, through the text layer and OCR when the text
+ * layer is thin. Checked against the classified inventory first. Contains readWindowTextWith.
+ */
+
 import { THIN_TEXT_CHARS, textLayerNotes } from '@tagalong/core';
 import type { WindowEntry } from '@tagalong/protocol';
 

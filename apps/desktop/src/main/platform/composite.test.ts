@@ -1,3 +1,5 @@
+/** Tests for the composite layout. */
+
 import { describe, expect, it } from 'vitest';
 
 import { layoutComposite } from './composite';

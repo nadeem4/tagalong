@@ -1,3 +1,8 @@
+/**
+ * Silero VAD and Moonshine speech-to-text on one ONNX runtime. Voice process only. Contains
+ * loadOrtParts.
+ */
+
 import { join } from 'node:path';
 import type { StreamingStt, Vad } from './local-ears';
 

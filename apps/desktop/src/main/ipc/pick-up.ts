@@ -1,3 +1,8 @@
+/**
+ * IPC for the pick-up card: Open (by item id, checked against the allowlist), Brief again and Not
+ * now. Contains registerPickUpIpc.
+ */
+
 import { IPC } from '../../shared/ipc';
 import type { PickUpAllowlist } from '../pick-up-open';
 import type { EngineCall, IpcHandle } from './handle';
@@ -12,7 +17,6 @@ export interface PickUpIpcDeps {
   openPath: (path: string) => Promise<string>;
 }
 
-/** The pick-up card: Open (by item id, checked against the allowlist), Brief again, Not now. */
 export function registerPickUpIpc(handle: IpcHandle, deps: PickUpIpcDeps): void {
   const { engine, allowlist } = deps;
 

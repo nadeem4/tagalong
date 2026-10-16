@@ -1,3 +1,5 @@
+/** Tests for parsing the window list and placing windows on displays. */
+
 import { describe, expect, it } from 'vitest';
 
 import type { ObservedWindow } from '@tagalong/core';

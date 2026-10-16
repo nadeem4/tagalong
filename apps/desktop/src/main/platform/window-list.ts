@@ -1,3 +1,8 @@
+/**
+ * Parses the window enumeration, places each window on its display and attaches text counts.
+ * Contains parseWindowList, placeOnDisplays, attachTextCounts and handleOf.
+ */
+
 import { findCaptureBlock } from '@tagalong/core';
 import type { ObservedWindow } from '@tagalong/core';
 import type { CaptureExclusions, ScreenInfo } from '@tagalong/protocol';

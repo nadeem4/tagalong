@@ -1,3 +1,8 @@
+/**
+ * The links main will open for a renderer or the engine: provider key pages, Welcome's install
+ * pages and https sign-in pages. Contains isAllowedLink, isSignInPage and extensionFolder.
+ */
+
 import { join, resolve } from 'node:path';
 
 /**
@@ -45,10 +50,10 @@ export interface ExtensionFolderOptions {
 /**
  * Where the unpacked Chrome extension lives on this machine, for "Load unpacked".
  *
- * The installer ships it under resources/extension so a judge with no checkout can still
+ * The installer ships it under resources/extension so someone with no checkout can still
  * load it; a source checkout points at the extension's own build. Undefined when it was
- * never built, so the wizard says how to build it instead of naming a folder that is not
- * there.
+ * never built, rather than naming a folder that is not there. Main fills HostView.extensionFolder
+ * with it, but no window reads that today.
  */
 export function extensionFolder(options: ExtensionFolderOptions): string | undefined {
   const folder = options.packaged

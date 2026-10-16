@@ -1,3 +1,5 @@
+/** FakeClock: a Clock tests drive by hand. Used only by tests. */
+
 import type { Clock } from './clock';
 
 interface Timer {

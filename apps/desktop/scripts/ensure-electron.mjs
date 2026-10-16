@@ -6,7 +6,7 @@
  * electron@44 publishes no npm install script, so `pnpm install` unpacks the package
  * without ever downloading the platform binary — and the first `dev` run then dies with
  * a message that reads like a broken machine rather than a missing download. Running the
- * package's own install.js is exactly what the install script used to do.
+ * package's own install.js does the download its install script would.
  *
  * The package is resolved rather than guessed at, so this keeps working across pnpm store
  * layouts and Electron upgrades.

@@ -1,3 +1,9 @@
+/**
+ * The bubble's window (the companion's bubble and the full chat behind it) and how it is placed
+ * beside Scout. Contains createPanelWindow, placePanel, showPanelBeside, showPanelQuietly and
+ * fitPanel.
+ */
+
 import { BrowserWindow, screen } from 'electron';
 import { guardNavigation } from '../drop';
 import { PRELOAD_PATH, loadPage } from './page';

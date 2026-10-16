@@ -1,3 +1,10 @@
+/**
+ * The renderer's entire view of the outside world: `window.tagalong` (the HostBridge that
+ * @tagalong/ui consumes) and `window.tagalongHost` (this host's own calls). Nothing from node
+ * or electron crosses this boundary, only plain data over IPC, so a compromised page can reach
+ * exactly the calls listed here and nothing else.
+ */
+
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { IpcRendererEvent } from 'electron';
 import type {
@@ -43,12 +50,6 @@ import type {
   VoiceModels,
 } from '../shared/ipc';
 
-/**
- * The renderer's entire view of the outside world.
- *
- * Nothing from node or electron crosses this boundary — only plain data over IPC — so a
- * compromised page can reach exactly the calls listed here and nothing else.
- */
 /** A launch greeting that arrived before the panel subscribed, kept until it does. */
 const greetLine = heldUntilHeard<GreetLine>();
 ipcRenderer.on(IPC.greetLineEvent, (_event: IpcRendererEvent, line: GreetLine) =>

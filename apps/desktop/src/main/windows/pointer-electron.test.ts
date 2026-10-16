@@ -1,3 +1,5 @@
+/** Tests for the pointer overlay's Electron windows. */
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /** The real overlay wiring against a fake Electron: window options, the global Esc, displays. */

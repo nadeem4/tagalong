@@ -1,10 +1,15 @@
+/**
+ * Scout's global shortcuts: the four default accelerators and HotkeyManager, which binds each one
+ * on its own and reports any it could not take.
+ */
+
 import { globalShortcut } from 'electron';
 
 /**
  * The ask: opens the bubble with what you are on, the selected text and the window, read
  * before the bubble takes the focus. It is the only way to hand Scout a selection, since a
  * click on the pet puts the pet's own window in front first. Screenshots and the window
- * list are not keys any more: Scout takes them itself, when a question needs them.
+ * list have no key: Scout takes them itself, when a question needs them.
  */
 export const DEFAULT_ASK_HOTKEY = 'CommandOrControl+Shift+Space';
 

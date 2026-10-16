@@ -1,3 +1,8 @@
+/**
+ * Test doubles for the ipc handlers: fakeIpc stands in for ipcMain, fakeEngine for the engine
+ * connection. Used only by tests.
+ */
+
 import type { HostToCoreMethod } from '@tagalong/protocol';
 import type { EngineCall, IpcHandle, IpcListener, IpcOn } from './handle';
 

@@ -1,3 +1,5 @@
+/** Tests for the routines IPC and the card's Edit. */
+
 import { describe, expect, it, vi } from 'vitest';
 import { RoutineDraft } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';

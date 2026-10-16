@@ -1,3 +1,5 @@
+/** Tests that Kokoro loads from checked files with fetching off. */
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Stand-ins for transformers.js and kokoro-js: the real ones would load a 92 MB model.

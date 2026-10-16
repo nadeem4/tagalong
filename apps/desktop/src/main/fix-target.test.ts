@@ -1,3 +1,5 @@
+/** Tests for fixPage's allowlist. */
+
 import { describe, expect, it } from 'vitest';
 import { fixPage } from './fix-target';
 

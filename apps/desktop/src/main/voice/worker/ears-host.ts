@@ -1,3 +1,8 @@
+/**
+ * The voice process's ears: one listening session at a time, buffering frames while the models
+ * load. Contains createEarsHost and the failure lines the bubble shows.
+ */
+
 import { Pushable } from '@tagalong/protocol';
 import type { Ears, EarsEvent, ListenMode } from '@tagalong/protocol';
 import { FakeEars } from '../ears/fake-ears';

@@ -1,3 +1,5 @@
+/** Speech from ElevenLabs with the person's own key. Contains elevenLabsTts. */
+
 import type { Tts } from './voice';
 
 /** ElevenLabs' low-latency model, made for real-time speech. */

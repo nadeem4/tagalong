@@ -1,3 +1,5 @@
+/** Tests for the installer config and the desktop's runtime dependencies. */
+
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -5,8 +7,8 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * The installer config is data, so it is checked like data. A packaging mistake only shows
- * on the machine that runs the installer — a judge's, for the hackathon — which is the
- * worst place to learn that the SQLite binary stayed inside app.asar.
+ * on the machine that runs the installer, which is the worst place to learn that the SQLite
+ * binary stayed inside app.asar.
  */
 const read = (path: string): unknown =>
   JSON.parse(readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8'));

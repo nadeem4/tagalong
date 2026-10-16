@@ -4,6 +4,7 @@
  * For the apps that draw their own text and publish little to the text layer: terminals,
  * editors, viewers. Nothing is installed and nothing leaves the machine; the picture goes to
  * PowerShell on stdin as base64, so it is never written to disk.
+ * Contains recognizeText, OCR_SCRIPT and parseOcr.
  */
 
 /** Printed instead of text when this Windows has no recogniser for the user's languages. */

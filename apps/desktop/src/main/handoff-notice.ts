@@ -1,3 +1,5 @@
+/** The system notification for a finished hand-off. Contains handoffNotice. */
+
 import type { HandoffFinishedParams } from '@tagalong/protocol';
 
 const PREVIEW_CHARS = 160;

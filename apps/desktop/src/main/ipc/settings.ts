@@ -1,3 +1,8 @@
+/**
+ * IPC for Settings: the host view every window reads, saving settings, the keys and the model
+ * lists. Works with no engine, from the settings file. Contains registerSettingsIpc.
+ */
+
 import { WATCH_MODEL_DEFAULTS } from '@tagalong/core';
 import type { SecretStore } from '@tagalong/core';
 import type { ProvidersCheckResult, Settings, SettingsPatch } from '@tagalong/protocol';
@@ -82,7 +87,7 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
     deps.setSettings(saved);
     if (patch.hotkeys !== undefined) deps.applyHotkeys(saved);
     if (patch.hiddenPets !== undefined) deps.refreshStrip();
-    // Home's Desktop pet control: the desktop redraws on the pet it now shows.
+    // A new default pet: the desktop redraws on the pet it now shows.
     if (patch.defaultPetId !== undefined) deps.refreshStrip();
     // Rolling memory starts, stops or trims the moment the user saves, not after a restart.
     if (patch.rollingMemory !== undefined) deps.configureRolling(saved.rollingMemory);

@@ -1,3 +1,5 @@
+/** Tests for the window and focused-window screenshots and their screen fallback. */
+
 import { describe, expect, it } from 'vitest';
 import { captureActiveWindowImageWith, captureWindowImageWith } from './capture';
 import type { CaptureImagePort, CaptureSource, WindowCaptureDeps } from './capture';

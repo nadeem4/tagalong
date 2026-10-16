@@ -1,3 +1,5 @@
+/** Tests for the finished hand-off notification. */
+
 import { describe, expect, it } from 'vitest';
 import { handoffNotice } from './handoff-notice';
 

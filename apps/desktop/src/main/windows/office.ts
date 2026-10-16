@@ -1,3 +1,8 @@
+/**
+ * Home's window: a framed, centred window with the nav on the left and one page beside it. The file
+ * and its page keep the name "office". Contains createOfficeWindow and HOME_MIN_WIDTH.
+ */
+
 import { BrowserWindow } from 'electron';
 import { PRELOAD_PATH, loadPage } from './page';
 
@@ -7,10 +12,7 @@ import { PRELOAD_PATH, loadPage } from './page';
  */
 export const HOME_MIN_WIDTH = 880;
 
-/**
- * Home (the module keeps its old office name). A framed, centred window like Settings:
- * the nav on the left and one page beside it.
- */
+/** Opens Home. */
 export function createOfficeWindow(): BrowserWindow {
   const window = new BrowserWindow({
     width: 1440,

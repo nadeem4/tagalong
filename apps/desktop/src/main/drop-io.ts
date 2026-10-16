@@ -1,11 +1,13 @@
+/**
+ * The disk for a drop: Node reads the file, Electron's nativeImage decodes a picture and
+ * scales it to a PNG. Only called once the person has pressed a button on the drop card.
+ * Contains nodeDropFs, the DropFs main passes to dropDesk.
+ */
+
 import { readFile, stat } from 'node:fs/promises';
 import { nativeImage } from 'electron';
 import type { DropFs } from './drop';
 
-/**
- * The disk for a drop: Node reads the file, Electron's nativeImage decodes a picture and
- * scales it to a PNG. Only called once the person has pressed a button on the drop card.
- */
 export const nodeDropFs: DropFs = {
   async size(path) {
     const info = await stat(path);

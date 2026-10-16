@@ -1,3 +1,5 @@
+/** Tests for the fake ears. */
+
 import { describe, expect, it } from 'vitest';
 import { EARS_FRAME, Pushable } from '@tagalong/protocol';
 import { FAKE_ALWAYS_TRANSCRIPT, FAKE_TRANSCRIPT, FAKE_TURN_FRAMES, FakeEars } from './fake-ears';

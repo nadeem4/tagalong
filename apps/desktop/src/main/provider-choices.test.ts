@@ -1,3 +1,5 @@
+/** Tests for the brain list, key names and stored keys. */
+
 import { InMemorySecretStore } from '@tagalong/core';
 import { describe, expect, it } from 'vitest';
 import {

@@ -6,6 +6,7 @@
  * for it, the pixels are handled directly: `nativeImage.toBitmap()` hands over a BGRA
  * buffer and `nativeImage.createFromBitmap()` takes one back, so everything in between is
  * ordinary buffer arithmetic that tests can drive with no display attached.
+ * Contains Bitmap, createCanvas, blit and pixelAt (pixelAt is for tests).
  */
 export interface Bitmap {
   /** BGRA, four bytes per pixel, rows top to bottom. Electron's own layout. */

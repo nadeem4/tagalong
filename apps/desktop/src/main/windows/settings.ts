@@ -1,3 +1,8 @@
+/**
+ * The standalone Settings window, opened only when the engine failed to start (Home needs the
+ * engine). Contains createSettingsWindow.
+ */
+
 import { BrowserWindow } from 'electron';
 import { PRELOAD_PATH, loadPage } from './page';
 
@@ -7,7 +12,7 @@ import { PRELOAD_PATH, loadPage } from './page';
  */
 export function createSettingsWindow(): BrowserWindow {
   const window = new BrowserWindow({
-    // Room for the crew nav, a pet's editor and its directory card side by side.
+    // Room for the Settings nav and one section beside it.
     width: 1080,
     height: 760,
     minWidth: 860,

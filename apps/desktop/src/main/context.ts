@@ -1,3 +1,9 @@
+/**
+ * What the desktop can see, packaged for the engine: the ask's snapshot (selection and the window
+ * in focus) and the answer to perception.capture. Contains DESKTOP_CAPABILITIES,
+ * captureAskSnapshot, capturePatch and answerCapture.
+ */
+
 import { randomUUID } from 'node:crypto';
 import { basename } from 'node:path';
 import { findCaptureBlock, normalizeProcessName } from '@tagalong/core';
@@ -13,14 +19,13 @@ export const DESKTOP_CAPABILITIES = [
   'activeWindow',
   'clipboard',
   'screenshot',
-  // Phase 2B.
   'displays',
   // The text layer reads any window by id, including ones behind others and minimized
   // ones. Advertised only now that `perception.readText` is answered: a capability the
   // host cannot honour makes the engine call a method that fails, which reads to the user
   // as a broken pet rather than a missing feature.
   'textLayer',
-  // Phase 3B. Advertised whether or not rolling memory is on: recall then answers that it
+  // Advertised whether or not rolling memory is on: recall then answers that it
   // is not recording, which the pet can repeat, and diff works regardless for watches.
   'recall',
   // Point, don't click: screen.pointAt draws a ring. Nothing is clicked or typed.
@@ -41,7 +46,7 @@ export interface CaptureOptions {
   /** Screenshots are opt-in per capture: they cost ~1,500 extra input tokens each. */
   screenshot: boolean;
   /**
-   * Phase 2B: every display, the composite, and the window inventory.
+   * Every display, the composite, and the window inventory.
    *
    * Opt-in per capture for the same reason as the screenshot, and more so. Enumerating
    * windows costs seconds of walking accessibility trees, and doing it on the cheap ask
@@ -100,8 +105,8 @@ async function attempt<T>(what: string, read: () => Promise<T>): Promise<T | nul
   } catch (error) {
     // A pause is a decision the user made, not a failure, and it is the one thing here
     // that must not be swallowed. Treating it as best effort would turn "you turned sight
-    // off" into an empty capture indistinguishable from a quiet screen — the exact shape
-    // that let four broken reads ship earlier in this phase.
+    // off" into an empty capture indistinguishable from a quiet screen, the exact shape a
+    // broken read takes.
     if (isSightPaused(error)) throw error;
     console.warn(`[context] could not read ${what}:`, error);
     return null;
@@ -380,10 +385,9 @@ export async function capturePatch(
       const inventory = await attempt('the open windows', () =>
         platform.listWindows(options.exclusions),
       );
-      // The inventory is still omitted from the snapshot when it is empty — a pet told the
-      // desktop has no windows on it will reason from that. What changed is that the
-      // omission is no longer silent: an empty list is a failure, and staying quiet about
-      // it is what let a completely broken enumeration ship unnoticed.
+      // An empty inventory still stays out of the snapshot: a pet told the desktop has no
+      // windows will reason from that. It is reported as a failure instead, so a broken
+      // enumeration is never silent.
       if (inventory === null) {
         warnings.push('the window list could not be read at all');
       } else if (inventory.failure !== undefined) {

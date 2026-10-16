@@ -1,3 +1,5 @@
+/** Tests for presence (away and back) and the wellbeing tick. */
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WindowEntry } from '@tagalong/protocol';
 import {

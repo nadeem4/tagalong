@@ -1,3 +1,8 @@
+/**
+ * What a launch remembers and says: the clean-close marker, whether Scout can think right now, and
+ * the launch line's Fix it. Contains recordLaunch, recordCleanClose, brainReadiness and brainLine.
+ */
+
 import type { Pet, PickUpReadyParams, Settings, SettingsPatch } from '@tagalong/protocol';
 import type { ClaudeSignIn, GreetLine, ProviderChoice } from '../shared/ipc';
 

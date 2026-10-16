@@ -1,3 +1,5 @@
+/** Tests for the link allowlists and the extension folder. */
+
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { extensionFolder, isAllowedLink, isSignInPage } from './links';

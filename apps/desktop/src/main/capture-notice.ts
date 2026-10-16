@@ -1,3 +1,8 @@
+/**
+ * The sentence and tray tooltip that announce every look at the screen, or its refusal. Contains
+ * captureNotice and captureTooltip.
+ */
+
 import type { CaptureBlock } from '@tagalong/core';
 import type { CaptureNotice } from '../shared/ipc';
 

@@ -1,3 +1,5 @@
+/** Tests for the tray menu. */
+
 import { describe, expect, it, vi } from 'vitest';
 import { trayMenuTemplate } from './tray-menu';
 import type { TrayActions } from './tray-menu';

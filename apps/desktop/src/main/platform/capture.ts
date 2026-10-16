@@ -1,3 +1,9 @@
+/**
+ * Screenshots of the window in focus or of one listed window, through Electron's desktopCapturer,
+ * with a whole-screen fallback the per-display refusal allows. Contains
+ * captureActiveWindowImageWith and captureWindowImageWith.
+ */
+
 import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
 
 import { displayRefusals } from './displays';

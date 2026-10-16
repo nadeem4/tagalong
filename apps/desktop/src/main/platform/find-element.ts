@@ -1,17 +1,18 @@
-import type { WindowEntry } from '@tagalong/protocol';
-
-import type { WindowBounds } from './index';
-import type { RunScript } from './text-layer';
-import { handleOf } from './window-list';
-import { WALK_PRELUDE, WINDOW_TEXT_WALK_MS } from './window-text';
-
 /**
  * Finding one element by its accessibility name inside one window, for point_at.
  *
  * Reads element names and one rectangle, nothing else. The search starts from the window's
  * handle, never from the desktop root, and the exclusion check runs before it, exactly as
  * a window text read does.
+ * Contains findElementWith, findElementScript and parseFoundElement.
  */
+
+import type { WindowEntry } from '@tagalong/protocol';
+
+import type { WindowBounds } from './index';
+import type { RunScript } from './text-layer';
+import { handleOf } from './window-list';
+import { WALK_PRELUDE, WINDOW_TEXT_WALK_MS } from './window-text';
 
 /** Guards the handle, the one number interpolated into the script. */
 function safeHandle(handle: number): number {

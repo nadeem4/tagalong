@@ -1,3 +1,9 @@
+/**
+ * The Platform interface: everything the engine can ask this machine to perceive. Contains
+ * Platform, its shapes (WindowBounds, ActiveWindowInfo, CapturedImage, WindowInventory) and
+ * createPlatform. Windows is the only adapter.
+ */
+
 import type { CaptureExclusions, ScreenInfo, WindowEntry } from '@tagalong/protocol';
 
 import type { DisplaysCapture } from './displays';
@@ -28,17 +34,11 @@ export interface CapturedImage {
   height: number;
 }
 
-/**
- * Everything the engine can ask this machine to perceive.
- *
- * Phase 1 implements Windows only; darwin and linux arrive in Phase 7. The interface
- * exists now because the plan names those second and third implementations.
- */
+/** Everything the engine can ask this machine to perceive. */
 export interface Platform {
   getActiveWindow(): Promise<ActiveWindowInfo | null>;
   captureSelection(): Promise<string | null>;
   readClipboard(): Promise<string>;
-  /** Phase 2. */
   /**
    * Takes the exclusion list for its screen fallback: when no window matches, a whole screen
    * is used only if the per-display refusal allows it.
@@ -48,16 +48,16 @@ export interface Platform {
     exclusions: CaptureExclusions,
   ): Promise<CapturedImage | null>;
   /**
-   * Phase 2B: every display at once, plus a composite showing how they are arranged.
+   * Every display at once, plus a composite showing how they are arranged.
    *
    * Takes the exclusion list. `captureActiveWindowImage` uses it only for its screen
-   * fallback; its caller checks the focused window first. Here one display can be refused while the others
-   * are returned, and the composite has to show the refusal in that display's slot, so
-   * the decision has to be made inside the capture rather than above it.
+   * fallback; its caller checks the focused window first. Here one display can be refused
+   * while the others are returned, and the composite has to show the refusal in that
+   * display's slot, so the decision has to be made inside the capture rather than above it.
    */
   captureDisplays(maxLongSide: number, exclusions: CaptureExclusions): Promise<DisplaysCapture>;
   /**
-   * Phase 2B: every top-level window, with no window text in it.
+   * Every top-level window, with no window text in it.
    *
    * Takes the exclusion list for the same reason `captureDisplays` does — one window is
    * refused while the rest are returned, so the decision belongs inside the enumeration.
@@ -69,7 +69,7 @@ export interface Platform {
     options?: { countText?: boolean },
   ): Promise<WindowInventory>;
   /**
-   * Phase 2B: a native-resolution crop of one display, for leaning in.
+   * A native-resolution crop of one display, for leaning in.
    *
    * Takes the exclusion list like its neighbours: the model can name any display id, so a
    * crop runs the same per-display refusal as `captureDisplays` and returns null for a
@@ -80,7 +80,7 @@ export interface Platform {
     exclusions: CaptureExclusions,
   ): Promise<CapturedImage | null>;
   /**
-   * Phase 2B: the text of one window, named by id or defaulting to the foreground one.
+   * The text of one window, named by id or defaulting to the foreground one.
    *
    * Takes the exclusion list because the refusal has to happen before the read, not after
    * it: a read that runs and is then discarded has already pulled the window's contents

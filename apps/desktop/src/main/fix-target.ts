@@ -1,3 +1,8 @@
+/**
+ * Where a Fix it button lands: the allowlist from FixTarget to a Home page or Settings section.
+ * Contains fixPage.
+ */
+
 import type { FixTarget } from '@tagalong/ui';
 
 /**

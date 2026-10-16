@@ -1,3 +1,8 @@
+/**
+ * Answers perception.captureWindow: a screenshot of one listed window, checked against the
+ * classified inventory before any pixel is read. Contains lookAtWindowWith.
+ */
+
 import type { CaptureBlock, WindowEntry } from '@tagalong/protocol';
 import { handleOf } from './window-list';
 import type { CapturedImage } from './index';

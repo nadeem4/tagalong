@@ -1,3 +1,8 @@
+/**
+ * Tests for rolling memory's ticks, exclusions and pause, and that awareness writes nothing to
+ * disk.
+ */
+
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';

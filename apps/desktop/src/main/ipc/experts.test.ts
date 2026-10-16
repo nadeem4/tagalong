@@ -1,3 +1,5 @@
+/** Tests for the Home and hand-off IPC. */
+
 import { describe, expect, it } from 'vitest';
 import { IPC } from '../../shared/ipc';
 import { fakeEngine, fakeIpc } from './fake-ipc';

@@ -1,3 +1,5 @@
+/** Tests for the voice process's call handler. */
+
 import { describe, expect, it, vi } from 'vitest';
 import { createWorkerHandler } from './handler';
 import type { FromWorker } from './messages';

@@ -1,3 +1,5 @@
+/** Tests for binding, rebinding and reporting the global shortcuts. */
+
 import { describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_ASK_HOTKEY,

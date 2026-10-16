@@ -2,6 +2,7 @@
  * Whether the bubble hides when it loses focus. It is easy to dismiss by clicking anywhere
  * else, but never by touching the pet it speaks from (a click or a drag on the pet focuses
  * the pet's window), and never while an answer is still streaming in.
+ * Contains hidesOnBlur.
  */
 export function hidesOnBlur(state: {
   streaming: boolean;

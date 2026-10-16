@@ -1,3 +1,5 @@
+/** Tests for the bitmap font. */
+
 import { describe, expect, it } from 'vitest';
 
 import { createCanvas, pixelAt } from './canvas';

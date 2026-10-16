@@ -1,3 +1,12 @@
+/**
+ * Whether Scout listens all the time, and whether that is paused for a call or full screen,
+ * or while the pets are hidden. It starts from the saved setting and main saves it on each
+ * change; the class itself stays pure, with no I/O. Only the person switches it on, and it
+ * never switches itself on. Every window that shows it follows this one state.
+ * Contains AlwaysListening, listeningPaused and listeningBlocked, startListeningGuard and
+ * saveListening.
+ */
+
 import { callOrFullScreenInFront } from '@tagalong/core';
 import type { Settings, SettingsPatch, WindowEntry } from '@tagalong/protocol';
 import type { ListeningState } from '../shared/ipc';
@@ -5,12 +14,6 @@ import type { EngineCall } from './ipc/handle';
 
 export type { ListeningState };
 
-/**
- * Whether Scout listens all the time, and whether that is paused for a call or full
- * screen, or while the pets are hidden. It starts from the saved setting and main saves it on each change; the class
- * itself stays pure, with no I/O. Only the person switches it on, and it never switches
- * itself on. Every window that shows it follows this one state.
- */
 export class AlwaysListening {
   #state: ListeningState;
   readonly #listeners = new Set<(state: ListeningState) => void>();
@@ -61,8 +64,8 @@ export function listeningBlocked(windows: readonly WindowEntry[]): boolean {
 /**
  * Listening waits for a call or a full-screen window, and while the pets are hidden (the
  * tray's Hide pets): the mark on Scout is then never out of sight while the mic is open. It
- * also waits while setup is open, as setup may be listening for its answers and the voice
- * process hears one window at a time.
+ * also waits while Welcome is open, as Welcome may be listening for its answers and the
+ * voice process hears one window at a time.
  */
 export function listeningPaused(why: {
   blocked: boolean;

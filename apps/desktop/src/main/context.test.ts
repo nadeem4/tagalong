@@ -1,3 +1,5 @@
+/** Tests for the ask's snapshot, perception.capture and the desktop's capabilities. */
+
 import { describe, expect, it, vi } from 'vitest';
 import { basename } from 'node:path';
 import { ContextSnapshot } from '@tagalong/protocol';
@@ -22,14 +24,14 @@ function fakePlatform(overrides: Partial<Platform> = {}): Platform {
     captureSelection: async () => 'the highlighted paragraph',
     readClipboard: async () => 'clipboard contents',
     captureActiveWindowImage: async () => ({ base64: 'cG5n', width: 1568, height: 882 }),
-    // Phase 2B. Nothing in this file asks for displays yet; the stub exists so the fake
+    // Nothing in this file asks for displays yet; the stub exists so the fake
     // still satisfies Platform, and returns an empty capture so a test that reaches it by
     // accident fails on missing displays rather than on a missing method.
     captureDisplays: async () => ({ displays: [], composite: null }),
-    // Phase 2B. Nothing in this file crops; the stub returns null so a test reaching it
+    // Nothing in this file crops; the stub returns null so a test reaching it
     // by accident fails on a missing crop rather than on a missing method.
     captureRegion: async () => null,
-    // Phase 2B. Nothing in this file reads window text; the stub keeps the fake a valid
+    // Nothing in this file reads window text; the stub keeps the fake a valid
     // Platform and answers with an empty read, so a test that reaches it by accident
     // fails on missing text rather than on a missing method.
     readWindowText: async () => ({
@@ -38,7 +40,7 @@ function fakePlatform(overrides: Partial<Platform> = {}): Platform {
       truncated: false,
       source: 'uia' as const,
     }),
-    // Phase 2B. Empty by default so a test that reaches the enumeration without meaning
+    // Empty by default so a test that reaches the enumeration without meaning
     // to fails on a missing inventory rather than on invented windows.
     listWindows: async () => ({ windows: [] }),
     lookAtWindow: async () => ({ windowId: '' }),
@@ -433,9 +435,8 @@ describe('a failed window enumeration', () => {
   });
 
   it('keeps omitting the inventory from the snapshot, so the pet is not told a lie', async () => {
-    // The judgement call from task 3 stands: an empty list must not reach the prompt as
-    // "no windows are open". What changes is that the omission now comes with a
-    // complaint instead of silence.
+    // An empty list must not reach the prompt as "no windows are open". The omission
+    // comes with a complaint instead of silence.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const platform = fakePlatform({
       listWindows: async () => ({ windows: [], failure: 'no-windows' as const }),
@@ -470,10 +471,6 @@ describe('a failed window enumeration', () => {
     expect(warnings).toEqual([]);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Phase 2B: the see-everything capture
-// ---------------------------------------------------------------------------
 
 const PNG = { base64: 'aGk=', width: 1568, height: 882 };
 
@@ -711,10 +708,6 @@ describe('capturePatch, displays', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Phase 2B task 8: sight paused
-// ---------------------------------------------------------------------------
-
 /** A platform gated by a pause that is already on, exactly as the host builds it. */
 function pausedPlatform(overrides: Partial<Platform> = {}): Platform {
   return gateSight(fakePlatform(overrides), () => true);
@@ -722,8 +715,8 @@ function pausedPlatform(overrides: Partial<Platform> = {}): Platform {
 
 describe('captureAskSnapshot while sight is paused', () => {
   it('reports the capture as paused rather than as merely empty', async () => {
-    // The distinction is the whole point. Four reads in this phase failed by returning
-    // nothing, and nothing is what an unproductive capture also looks like.
+    // The distinction is the whole point: a failed read returns nothing, and nothing is
+    // what an unproductive capture also looks like.
     const capture = await captureAskSnapshot(pausedPlatform(), {
       screenshot: true,
       exclusions: NOTHING_EXCLUDED,

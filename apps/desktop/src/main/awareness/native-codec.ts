@@ -1,12 +1,14 @@
-import { nativeImage } from 'electron';
-import type { ImageCodec } from './perception-memory';
-
 /**
  * PNG decoding and encoding through Electron, the one part of awareness that needs it.
  *
  * `toBitmap` hands back BGRA, the layout `pixel-diff` reads; `createFromBitmap` takes the
  * same layout back.
+ * Contains nativeCodec, the ImageCodec main hands PerceptionMemory.
  */
+
+import { nativeImage } from 'electron';
+import type { ImageCodec } from './perception-memory';
+
 export const nativeCodec: ImageCodec = {
   decode(png) {
     const image = nativeImage.createFromBuffer(png);

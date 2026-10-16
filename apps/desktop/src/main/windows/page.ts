@@ -1,3 +1,8 @@
+/**
+ * Loading a renderer page into a window, from the dev server or off disk. Contains RendererPage,
+ * PRELOAD_PATH and loadPage.
+ */
+
 import { fileURLToPath } from 'node:url';
 import type { BrowserWindow } from 'electron';
 

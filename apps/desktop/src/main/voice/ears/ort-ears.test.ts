@@ -1,3 +1,5 @@
+/** Tests that the ONNX ears load from the voice folder with fetching off. */
+
 import { describe, expect, it, vi } from 'vitest';
 
 // Stand-ins for onnxruntime-node and transformers.js: the real ones would load the models.

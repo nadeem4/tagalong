@@ -1,3 +1,5 @@
+/** Tests for capturing every display and blanking excluded ones. */
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { createCanvas, pixelAt } from './canvas';
@@ -358,7 +360,7 @@ describe('captureDisplaysWith, exclusions beyond the focused window', () => {
 
   it('still blanks the focused display when the enumeration comes back empty', async () => {
     // The fail-safe. PowerShell missing or blocked by policy must not silently remove the
-    // protection Phase 2 already shipped, so the foreground check stays as a floor.
+    // foreground check, so it stays as a floor.
     const { deps } = harness({
       displays: THREE_ACROSS,
       sources: THREE_SOURCES,

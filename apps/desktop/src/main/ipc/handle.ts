@@ -1,3 +1,8 @@
+/**
+ * The small types every ipc module takes, so handlers are tested without Electron: IpcHandle,
+ * IpcOn, IpcListener and EngineCall.
+ */
+
 import type { EngineClient } from '../engine-client';
 
 /** One IPC handler, as ipcMain.handle takes it. The event is unused by these modules. */

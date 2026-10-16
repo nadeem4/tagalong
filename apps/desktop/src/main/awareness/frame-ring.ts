@@ -1,3 +1,8 @@
+/**
+ * Rolling memory's buffer: the frames and window lists of the last few minutes, oldest dropped
+ * first. Contains StoredFrame, Moment and FrameRing.
+ */
+
 import type { WindowEntry } from '@tagalong/protocol';
 
 /**

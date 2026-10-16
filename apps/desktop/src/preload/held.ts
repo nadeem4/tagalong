@@ -2,6 +2,8 @@
  * An event main may send before React has subscribed: a fresh Home window is told its page
  * and Scout's card on `did-finish-load`, which can beat the page's first effects. The last
  * value that arrived with no one listening is kept and handed to the first listener.
+ * Contains heldUntilHeard; used by the preload for the greeting, Home's page and Scout's
+ * routine card.
  */
 export function heldUntilHeard<T>(): {
   arrived: (value: T) => void;

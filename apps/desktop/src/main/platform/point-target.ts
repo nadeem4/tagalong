@@ -1,3 +1,8 @@
+/**
+ * Where point_at's ring goes: an element's or a rectangle's screen pixels mapped to one display's
+ * local DIP. Contains answerPointAt and the two mapping helpers.
+ */
+
 import type { ScreenPointAtParams, ScreenPointAtResult } from '@tagalong/protocol';
 
 import type { FindElementAnswer } from './find-element';

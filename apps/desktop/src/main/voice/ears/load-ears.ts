@@ -1,9 +1,14 @@
+/** Loads the ears' three models in the voice process. Contains loadEars. */
+
 import { join } from 'node:path';
 import type { EarsParts } from './local-ears';
 import { loadOrtParts } from './ort-ears';
 import { loadSmartTurn } from './smart-turn';
 
-/** Downloads what is missing (through `ensure`, shared with the prefetch), then loads all three parts. Voice process only. */
+/**
+ * Downloads what is missing (through `ensure`, shared with the prefetch), then loads all
+ * three parts. Voice process only.
+ */
 export async function loadEars(dir: string, ensure: () => Promise<void>): Promise<EarsParts> {
   await ensure();
   const [heard, turn] = await Promise.all([

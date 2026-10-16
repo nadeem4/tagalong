@@ -1,3 +1,5 @@
+/** Tests for the clipboard trick. */
+
 import { describe, expect, it, vi } from 'vitest';
 import { MAX_SELECTION_CHARS } from '@tagalong/protocol';
 import { COPY_SETTLE_MS, captureSelectionWith } from './selection';

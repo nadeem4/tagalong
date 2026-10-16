@@ -1,3 +1,5 @@
+/** Tests for perception.recall and perception.diff from rolling memory. */
+
 import { describe, expect, it, vi } from 'vitest';
 import type { CaptureExclusions } from '@tagalong/protocol';
 import { createCanvas } from '../platform/canvas';

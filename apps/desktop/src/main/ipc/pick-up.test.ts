@@ -1,3 +1,5 @@
+/** Tests for the pick-up card's IPC. */
+
 import { describe, expect, it, vi } from 'vitest';
 import { IPC } from '../../shared/ipc';
 import { PickUpAllowlist } from '../pick-up-open';

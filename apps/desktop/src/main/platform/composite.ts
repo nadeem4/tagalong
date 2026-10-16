@@ -1,3 +1,7 @@
+/**
+ * Lays every display out by monitor geometry into one composite picture. Contains layoutComposite.
+ */
+
 import { fitWithin } from './downscale';
 import type { WindowBounds } from './index';
 
@@ -46,9 +50,8 @@ export interface CompositeLayout {
  * between monitors that touch, or push the rightmost slot past the canvas; deriving width
  * from `right - left` makes both impossible.
  *
- * The phase page asks for a composite "at most 1568 wide". This bounds the long side
- * instead, reusing `fitWithin`: a vertical monitor stack is tall rather than wide, and
- * bounding only the width would let it grow without limit.
+ * This bounds the long side, not the width, reusing `fitWithin`: a vertical monitor stack
+ * is tall rather than wide, and bounding only the width would let it grow without limit.
  */
 export function layoutComposite(displays: DisplayGeometry[], maxLongSide: number): CompositeLayout {
   // A locked or headless session really has no displays. The caller turns this into

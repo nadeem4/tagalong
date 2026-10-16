@@ -1,3 +1,11 @@
+/**
+ * Drop it on Scout: a file, an image, a link or selected text dropped on the figure.
+ *
+ * The drop only names the item. Nothing is read from disk until the person presses a
+ * button on the card, and then only that one item: `dropDesk` holds it until `take`.
+ * Contains offerFor, readDrop, dropDesk, registerDropIpc and guardNavigation.
+ */
+
 import { posix, win32 } from 'node:path';
 import { secretFileRule } from '@tagalong/core';
 import { MAX_SELECTION_CHARS } from '@tagalong/protocol';
@@ -6,13 +14,6 @@ import type { DropOffer } from '@tagalong/ui';
 import { MAX_SCREENSHOT_LONG_SIDE } from './context';
 import type { IpcHandle } from './ipc/handle';
 import { IPC } from '../shared/ipc';
-
-/**
- * Drop it on Scout: a file, an image, a link or selected text dropped on the figure.
- *
- * The drop only names the item. Nothing is read from disk until the person presses a
- * button on the card, and then only that one item: `dropDesk` holds it until `take`.
- */
 
 /** What the figure's preload hands main: file paths, and the drag's link and text. */
 export interface DropItem {

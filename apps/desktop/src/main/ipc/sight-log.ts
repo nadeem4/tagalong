@@ -1,7 +1,11 @@
+/**
+ * IPC for Home's What Scout saw: list it, delete one row, delete all. Contains
+ * registerSightLogIpc.
+ */
+
 import { IPC } from '../../shared/ipc';
 import type { EngineCall, IpcHandle } from './handle';
 
-/** Home's What Scout saw: list it, delete one row, delete all. */
 export function registerSightLogIpc(
   handle: IpcHandle,
   deps: { /** Throws when the engine is not running. */ engine: () => EngineCall },

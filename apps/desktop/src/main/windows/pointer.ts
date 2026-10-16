@@ -1,3 +1,8 @@
+/**
+ * The pointer overlay: one click-through window per display that draws point_at's ring, for six
+ * seconds or until Escape. Contains createPointerOverlay and PointerOverlay.
+ */
+
 import { BrowserWindow, globalShortcut, screen } from 'electron';
 
 import type { Clock } from '../awareness/clock';

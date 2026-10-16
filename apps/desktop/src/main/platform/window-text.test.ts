@@ -1,3 +1,5 @@
+/** Tests for the window text scripts and their parser. */
+
 import { describe, expect, it } from 'vitest';
 
 import { countWindowTextScript, parseWindowText, readWindowTextScript } from './window-text';

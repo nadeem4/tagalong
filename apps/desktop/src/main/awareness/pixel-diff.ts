@@ -1,3 +1,8 @@
+/**
+ * Pixel comparison for watches: how much of a region changed between two frames, and where.
+ * Contains diffBitmaps and cropBitmap.
+ */
+
 import type { Bitmap } from '../platform/canvas';
 
 /** A rectangle in one bitmap's pixels. */

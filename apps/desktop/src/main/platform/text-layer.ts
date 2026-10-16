@@ -1,3 +1,8 @@
+/**
+ * Reading window text out of the accessibility tree, behind TextLayerProvider. Contains
+ * createUiaTextLayer and parseWindowCounts.
+ */
+
 import {
   WINDOW_TEXT_WALK_MS,
   countWindowTextScript,
@@ -9,9 +14,8 @@ import type { WindowTextReading } from './window-text';
 /**
  * Reading text out of windows, behind an interface.
  *
- * The interface exists because Phase 7 names the second implementation: macOS supplies
- * the same two answers through the Accessibility API. Nothing above this line knows which
- * operating system it is talking to, or that PowerShell is involved at all.
+ * Nothing above this interface knows which operating system it is talking to, or that
+ * PowerShell is involved at all.
  */
 export interface TextLayerProvider {
   /** The text of one window, capped. Never rejects; an unreadable window reads as empty. */

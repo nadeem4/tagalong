@@ -1,3 +1,5 @@
+/** Tests for the turn IPC: ask, interrupt, watches and remarks. */
+
 import { describe, expect, it } from 'vitest';
 import type { ContextSnapshot } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';

@@ -1,3 +1,8 @@
+/**
+ * The desktop's WebSocket client to the engine: typed calls, notifications, and the answers to the
+ * engine's perception requests. Contains EngineClient.
+ */
+
 import {
   DEFAULT_WINDOW_TEXT_CHARS,
   PerceptionDiffParams,
@@ -43,9 +48,9 @@ export interface EngineClientOptions {
   }) => Promise<unknown>;
   /** Answers perception.captureWindow: a screenshot of one listed window. */
   captureWindow: (params: { windowId: string; maxLongSide: number }) => Promise<unknown>;
-  /** Phase 3B. Answers perception.recall from rolling memory. */
+  /** Answers perception.recall from rolling memory. */
   recall?: (params: PerceptionRecallParams) => Promise<unknown>;
-  /** Phase 3B. Answers perception.diff: now against a frame from before. */
+  /** Answers perception.diff: now against a frame from before. */
   diff?: (params: PerceptionDiffParams) => Promise<unknown>;
   /** Answers screen.pointAt: draws a ring around one thing. Never moves, clicks or types. */
   pointAt?: (params: ScreenPointAtParams) => Promise<unknown>;

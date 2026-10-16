@@ -1,3 +1,8 @@
+/**
+ * Answers perception.recall and perception.diff from rolling memory's frames, cropping and diffing
+ * in this process. Contains PerceptionMemory and ImageCodec.
+ */
+
 import { findCaptureBlock } from '@tagalong/core';
 import type {
   CaptureExclusions,

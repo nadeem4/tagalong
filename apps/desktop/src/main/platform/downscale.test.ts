@@ -1,3 +1,5 @@
+/** Tests for fitWithin. */
+
 import { describe, expect, it } from 'vitest';
 import { fitWithin } from './downscale';
 

@@ -1,3 +1,5 @@
+/** Tests for the pet IPC: switching Scout's brain and finishing Welcome. */
+
 import { describe, expect, it, vi } from 'vitest';
 import { getRole } from '@tagalong/core';
 import { Pet } from '@tagalong/protocol';

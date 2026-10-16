@@ -1,3 +1,9 @@
+/**
+ * Scout's mouth in main: picks who says a line (ElevenLabs or Kokoro), falls through on failure,
+ * and returns audio for the bubble to play, or tells the bubble to use the window's own system
+ * voice. Contains createVoiceService, LazyLocalVoice, the mouths and fakeTts.
+ */
+
 import { chosenMouth, mouthOrder } from '@tagalong/protocol';
 import type { MouthId, Settings, VoiceId } from '@tagalong/protocol';
 import type { SpeakResult } from '../../shared/ipc';

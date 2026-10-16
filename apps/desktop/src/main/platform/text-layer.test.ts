@@ -1,3 +1,5 @@
+/** Tests for the text layer and its count parser. */
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { createUiaTextLayer, parseWindowCounts } from './text-layer';

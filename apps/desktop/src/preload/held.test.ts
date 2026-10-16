@@ -1,3 +1,5 @@
+/** Tests for heldUntilHeard. */
+
 import { describe, expect, it } from 'vitest';
 import { heldUntilHeard } from './held';
 
