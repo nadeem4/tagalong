@@ -12,12 +12,9 @@ const pet = (providerId: string): Pet => ({
   id: 'scout',
   name: 'Scout',
   avatar: '🔎',
-  notes: 'p',
   model: 'm',
   providerId,
   roleId: 'companion',
-  toolGrants: {},
-  replyStyle: 'text',
 });
 
 function resolverWith(

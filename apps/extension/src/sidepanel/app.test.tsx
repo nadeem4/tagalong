@@ -18,8 +18,6 @@ const pet = (id: string, name: string): Pet => ({
   providerId: 'fake',
   model: 'fake-model',
   roleId: 'companion',
-  toolGrants: {},
-  replyStyle: 'text',
 });
 
 const PAGE: ContextSnapshot = {

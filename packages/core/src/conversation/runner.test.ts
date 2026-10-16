@@ -29,12 +29,9 @@ const pet: Pet = {
   id: 'scout',
   name: 'Scout',
   avatar: '🐾',
-  notes: 'You are Scout.',
   model: 'fake-model',
   providerId: 'fake',
   roleId: 'companion',
-  toolGrants: {},
-  replyStyle: 'text',
 };
 
 const snapshot: ContextSnapshot = {

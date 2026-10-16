@@ -213,7 +213,7 @@ describe('ToolRegistry.forTurn', () => {
 
     expect(outcome).toEqual({ content: 'Saved to your memory.' });
     expect(memory.saved).toEqual([
-      { scope: 'pet', petId: FAKE_TURN_PET.id, kind: 'fact', text: 'Likes tea.' },
+      { petId: FAKE_TURN_PET.id, kind: 'fact', text: 'Likes tea.' },
     ]);
   });
 
@@ -279,22 +279,8 @@ describe('toolsFor', () => {
     expect(turn.definitions.map((definition) => definition.name)).not.toContain('watch_for');
   });
 
-  it("takes away a role's tool the pet's grants turn off", () => {
-    const granted = ids({
-      ...FAKE_TURN_PET,
-      roleId: 'companion',
-      toolGrants: { remember: 'off', look_at_screen: 'allowed' },
-    });
-    expect(granted).not.toContain('remember');
-    expect(granted).toContain('look_at_screen');
-  });
-
-  it('cannot grant a tool the role does not list', () => {
-    const pet: Pet = {
-      ...FAKE_TURN_PET,
-      roleId: 'companion',
-      toolGrants: { write_file: 'allowed' },
-    };
+  it('gives no tool the role does not list', () => {
+    const pet: Pet = { ...FAKE_TURN_PET, roleId: 'companion' };
     const tools = new ToolRegistry(everything()).forTurn(fakeTurn({ pet })).tools;
     const outside = { ...tools[0]!, id: 'write_file' };
     expect(toolsFor(pet, [...tools, outside]).map((tool) => tool.id)).not.toContain('write_file');

@@ -37,12 +37,9 @@ describe('createFakeHostBridge', () => {
           id: 'sage',
           name: 'Sage',
           avatar: '🦊',
-          notes: 'a calm explainer',
           model: 'claude-opus-5',
           providerId: 'anthropic',
           roleId: 'generalist',
-          toolGrants: {},
-          replyStyle: 'text',
         },
       ],
     });

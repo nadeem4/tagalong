@@ -14,8 +14,6 @@ const scout: Pet = {
   model: 'anthropic/claude-sonnet-5',
   providerId: 'openrouter',
   roleId: 'generalist',
-  toolGrants: {},
-  replyStyle: 'text',
 };
 
 const W1 = '30000000-0000-4000-8000-000000000001';

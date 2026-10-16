@@ -9,12 +9,9 @@ const base: Pet = {
   id: 'scout',
   name: 'Scout',
   avatar: '🔎',
-  notes: '',
   model: 'haiku',
   providerId: 'claude-code',
   roleId: 'companion',
-  toolGrants: {},
-  replyStyle: 'text',
 };
 
 function provider(fail?: Error) {

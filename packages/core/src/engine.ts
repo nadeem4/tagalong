@@ -7,7 +7,7 @@
 import { guardBrain } from './providers/guard';
 import { checkKey } from './providers/check-key';
 import type { Database } from 'better-sqlite3';
-import { DEFAULT_ENGINE_PORT, RPC_ERROR_CODES } from '@tagalong/protocol';
+import { DEFAULT_ENGINE_PORT, RPC_ERROR_CODES, SCOUT_ID } from '@tagalong/protocol';
 import type { Expert, HostKind, Pet } from '@tagalong/protocol';
 import { openDatabase } from './memory/db';
 import { ActivityLog } from './memory/activity';
@@ -147,8 +147,14 @@ function routinesOf(live: { routines?: Routines }): Routines {
   return live.routines;
 }
 
-/** A pet about to be saved, with its role checked: an unknown role is an invalidParams refusal. */
-function withRole(pet: Pet): Pet {
+/**
+ * A pet about to be saved, checked: it must be Scout, the one pet there is, and its role
+ * must be in the library. Either refusal is invalidParams.
+ */
+function checkedPet(pet: Pet): Pet {
+  if (pet.id !== SCOUT_ID) {
+    throw new RpcFailure(RPC_ERROR_CODES.invalidParams, 'there is only Scout');
+  }
   if (getRole(pet.roleId) === undefined) {
     throw new RpcFailure(
       RPC_ERROR_CODES.invalidParams,
@@ -735,7 +741,7 @@ function buildHandlers(parts: {
     interrupt: (params) => ({ aborted: runner.interrupt(params.turnId) }),
 
     'pets.list': () => ({ pets: pets.list() }),
-    'pets.upsert': (params) => ({ pet: pets.upsert(withRole(params.pet)) }),
+    'pets.upsert': (params) => ({ pet: pets.upsert(checkedPet(params.pet)) }),
 
     'settings.get': () => ({ settings: settings.get() }),
     'settings.set': (params) => {

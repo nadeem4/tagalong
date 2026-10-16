@@ -1,6 +1,6 @@
 /**
  * Builds the provider-neutral request for one turn: system prompt (base rules, role, name,
- * notes, reply style, memories), history, and the screen context attached to the question.
+ * the screen-reply rule, memories), history, and the screen context attached to the question.
  * Contains assemblePrompt and the headings and limits it uses. Pure: no IO.
  */
 import type {
@@ -8,7 +8,6 @@ import type {
   Message,
   MessageContent,
   Pet,
-  ReplyStyle,
   Settings,
 } from '@tagalong/protocol';
 import { MAX_SELECTION_CHARS } from '@tagalong/protocol';
@@ -54,13 +53,8 @@ const BASE_INSTRUCTIONS = [
   'You can only look and talk. You never click, type, or change anything on the machine, and you must never claim to have clicked or typed anything.',
 ].join('\n');
 
-const REPLY_STYLE_RULES: Record<ReplyStyle, string> = {
-  text: 'Your reply is read on screen. Short paragraphs, lists, and code fences are fine.',
-  'voice-summary':
-    'Your reply is spoken aloud as a summary. Open with one or two sentences that stand on their own without any formatting.',
-  'voice-full':
-    'Your reply is spoken aloud in full. Write plain sentences: no markdown, no lists, no code fences.',
-};
+/** How Scout's answer is shown: read on screen. A spoken turn adds SPOKEN_MODE on top. */
+const SCREEN_REPLY = 'Your reply is read on screen. Short paragraphs, lists, and code fences are fine.';
 
 /** Heads the spoken-mode block, which only a question asked out loud gets. */
 export const SPOKEN_HEADING = '## This turn is spoken';
@@ -80,9 +74,6 @@ export const SPOKEN_MODE = [
   '- Your tools work as usual. When a change waits for the person to confirm it on a card, say "check the card" rather than reading it out.',
   '- The words came from speech recognition, so a word may be misheard: go with the likely meaning.',
 ].join('\n');
-
-/** Heads the user's own notes for the pet in the system prompt. */
-export const NOTES_HEADING = "## The user's notes for you";
 
 /** Heads the remembered notes in the system prompt. */
 export const MEMORY_HEADING = '## What you remember';
@@ -168,12 +159,11 @@ function imagesToAttach(snapshot: ContextSnapshot, settings: Settings): BrainCon
 }
 
 /**
- * Base rules, then who the pet is: its role's instructions, its name, and the user's notes
- * for it when there are any. Then the reply style and the memories.
- * The person's name, when they gave one, follows the pet's, with a nudge to use it rarely.
+ * Base rules, then who the pet is: its role's instructions and its name. Then the
+ * screen-reply rule and the memories. The person's name, when they gave one, follows the
+ * pet's, with a nudge to use it rarely.
  */
 function systemPrompt(pet: Pet, memories: readonly Memory[], userName: string): string {
-  const notes = pet.notes?.trim() ?? '';
   const name = userName.trim();
   return [
     BASE_INSTRUCTIONS,
@@ -182,8 +172,7 @@ function systemPrompt(pet: Pet, memories: readonly Memory[], userName: string): 
     name.length > 0
       ? `The person’s name is ${name}. Use it rarely: a greeting or a moment that warrants it, never every reply.`
       : '',
-    notes.length > 0 ? `${NOTES_HEADING}\n${notes}` : '',
-    REPLY_STYLE_RULES[pet.replyStyle],
+    SCREEN_REPLY,
     memorySection(memories),
   ]
     .filter((part) => part.length > 0)
@@ -200,8 +189,7 @@ function memorySection(memories: readonly Memory[]): string {
   const lines = [MEMORY_HEADING, MEMORY_PREAMBLE];
   let length = lines.join('\n').length;
   for (const memory of memories) {
-    const label = memory.scope === 'crew' ? `${memory.kind}, shared by the crew` : memory.kind;
-    const line = `- (${label}) ${memory.text}`;
+    const line = `- (${memory.kind}) ${memory.text}`;
     if (length + 1 + line.length > MAX_MEMORY_SECTION_CHARS) continue;
     lines.push(line);
     length += 1 + line.length;

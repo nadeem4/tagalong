@@ -17,12 +17,9 @@ const scout: Pet = {
   id: 'scout',
   name: 'Scout',
   avatar: '🔎',
-  notes: 'You are Scout.',
   model: 'anthropic/claude-haiku-4.5',
   providerId: 'openrouter',
   roleId: 'companion',
-  toolGrants: {},
-  replyStyle: 'text',
 };
 
 let dir: string;
@@ -97,7 +94,7 @@ describe('Summarizer', () => {
     expect(await summarizer.schedule(id, scout)).toBe(true);
 
     const [summary] = memories.recent('scout', 5);
-    expect(summary).toMatchObject({ kind: 'summary', scope: 'pet', petId: 'scout' });
+    expect(summary).toMatchObject({ kind: 'summary', petId: 'scout' });
     expect(summary?.text).toContain('DNS');
     expect(store.lastMessages(id, 100)).toHaveLength(SUMMARY_KEEP_RECENT);
     expect(store.listMessages(id)).toHaveLength(SUMMARY_THRESHOLD);

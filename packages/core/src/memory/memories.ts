@@ -5,40 +5,34 @@
 import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
 
-/** Private to one pet, or shared (`crew`, the stored value for a shared memory). */
-export type MemoryScope = 'pet' | 'crew';
-
 /** What a memory is: something true, something the user likes, or a digest of a thread. */
 export type MemoryKind = 'fact' | 'preference' | 'summary';
 
 export interface Memory {
   id: string;
-  scope: MemoryScope;
-  /** Set exactly when `scope` is `'pet'`. */
-  petId: string | null;
+  /** The pet the memory belongs to: Scout. */
+  petId: string;
   kind: MemoryKind;
   text: string;
   createdAt: string;
 }
 
 export interface NewMemory {
-  scope: MemoryScope;
-  petId?: string | undefined;
+  petId: string;
   kind: MemoryKind;
   text: string;
 }
 
 interface MemoryRow {
   id: string;
-  scope: MemoryScope;
-  pet_id: string | null;
+  pet_id: string;
   kind: MemoryKind;
   text: string;
   created_at: string;
 }
 
-/** The rows one pet may see: its own memories and every shared one. */
-const VISIBLE = "(m.scope = 'crew' OR m.pet_id = ?)";
+/** The rows one pet may see: its own. */
+const VISIBLE = 'm.pet_id = ?';
 
 /** More words than this in one question add noise to the match, not recall. */
 const MAX_QUERY_WORDS = 16;
@@ -63,10 +57,8 @@ export function ftsQuery(text: string): string | null {
 }
 
 /**
- * Memories: private notes per pet plus shared ones, with full-text search.
- *
- * Visibility is enforced in SQL on every read rather than filtered afterwards, so there is
- * no code path that loads another pet's private memories and forgets to drop them.
+ * Scout's memories, with full-text search. Each row is filed under its pet, and every read
+ * filters on that pet in SQL. The `scope` column from migration 3 is always `'pet'` now.
  */
 export class MemoryStore {
   constructor(private readonly db: Database.Database) {}
@@ -74,41 +66,33 @@ export class MemoryStore {
   add(input: NewMemory): Memory {
     const text = input.text.trim();
     if (text.length === 0) throw new Error('a memory needs some text');
-    if (input.scope === 'pet' && input.petId === undefined) {
-      throw new Error('a private memory needs the pet it belongs to');
-    }
-    if (input.scope === 'crew' && input.petId !== undefined) {
-      throw new Error('a shared memory belongs to the crew, not to one pet');
-    }
     const row: MemoryRow = {
       id: randomUUID(),
-      scope: input.scope,
-      pet_id: input.scope === 'pet' ? (input.petId ?? null) : null,
+      pet_id: input.petId,
       kind: input.kind,
       text,
       created_at: new Date().toISOString(),
     };
     this.db
       .prepare(
-        'INSERT INTO memories (id, scope, pet_id, kind, text, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+        "INSERT INTO memories (id, scope, pet_id, kind, text, created_at) VALUES (?, 'pet', ?, ?, ?, ?)",
       )
-      .run(row.id, row.scope, row.pet_id, row.kind, row.text, row.created_at);
+      .run(row.id, row.pet_id, row.kind, row.text, row.created_at);
     return toMemory(row);
   }
 
   /**
-   * Adds a memory unless an identical one already sits in the same place, and returns
+   * Adds a memory unless the pet already holds an identical one, and returns
    * whichever is stored. Saying "I prefer short answers" every morning should not fill
    * five recall slots with the same sentence.
    */
   addOnce(input: NewMemory): Memory {
     const text = input.text.trim();
     const existing = this.db
-      .prepare<[string, string, string | null, string | null], MemoryRow>(
-        `SELECT * FROM memories WHERE text = ? AND scope = ? AND (pet_id = ? OR (pet_id IS NULL AND ? IS NULL))
-         LIMIT 1`,
+      .prepare<[string, string], MemoryRow>(
+        'SELECT * FROM memories WHERE text = ? AND pet_id = ? LIMIT 1',
       )
-      .get(text, input.scope, input.petId ?? null, input.petId ?? null);
+      .get(text, input.petId);
     return existing === undefined ? this.add(input) : toMemory(existing);
   }
 
@@ -144,7 +128,6 @@ export class MemoryStore {
 function toMemory(row: MemoryRow): Memory {
   return {
     id: row.id,
-    scope: row.scope,
     petId: row.pet_id,
     kind: row.kind,
     text: row.text,

@@ -212,7 +212,6 @@ export class ConversationRunner {
     const preference = this.#options.memory ? statedPreference(ask.text) : null;
     if (preference !== null) {
       this.#options.memory?.addOnce({
-        scope: 'pet',
         petId: ask.pet.id,
         kind: 'preference',
         text: preference,

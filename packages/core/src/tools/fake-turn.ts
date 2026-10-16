@@ -14,14 +14,11 @@ import {
 export const FAKE_TURN_PET: Pet = {
   id: 'scout',
   name: 'Scout',
-  notes: 'You are Scout.',
   avatar: 'fox',
   color: '#3b82f6',
   providerId: 'fake',
   model: 'fake-model',
   roleId: 'companion',
-  toolGrants: {},
-  replyStyle: 'text',
 };
 
 /**

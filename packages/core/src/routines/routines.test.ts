@@ -26,14 +26,11 @@ vi.mock('../keep-an-eye/lookout', async (importOriginal) => {
 const SCOUT: Pet = {
   id: 'scout',
   name: 'Scout',
-  notes: '',
   avatar: 'fox',
   color: '#3b82f6',
   providerId: 'fake',
   model: 'fake-model',
   roleId: 'companion',
-  toolGrants: {},
-  replyStyle: 'text',
 };
 
 const RESEARCHER: Expert = {

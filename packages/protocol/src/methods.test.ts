@@ -370,7 +370,7 @@ describe('notification schemas', () => {
   it('carries who said what and on which model in turn.started', () => {
     const parsed = notificationParamsSchemaFor('turn.started').parse({
       turnId,
-      petId: 'ink',
+      petId: 'scout',
       conversationId: turnId,
       providerId: 'openrouter',
       model: 'anthropic/claude-sonnet-5',

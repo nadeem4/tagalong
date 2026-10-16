@@ -10,12 +10,9 @@ const scout: Pet = {
   id: 'scout',
   name: 'Scout',
   avatar: '🔎',
-  notes: 'You are Scout.',
   model: 'sonnet',
   providerId: 'claude-code',
   roleId: 'companion',
-  toolGrants: {},
-  replyStyle: 'text',
 };
 
 /** Local times, so the time of day reads the same wherever the test runs. */

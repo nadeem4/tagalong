@@ -97,7 +97,7 @@ export class Summarizer {
       if (text.length === 0 || result.stopReason !== 'end') {
         throw new Error(`the summary came back ${result.stopReason} with ${text.length} chars`);
       }
-      this.#options.memories.add({ scope: 'pet', petId: pet.id, kind: 'summary', text });
+      this.#options.memories.add({ petId: pet.id, kind: 'summary', text });
       this.#options.store.markSummarized(folding.map((message) => message.id));
       return true;
     } catch (error) {
