@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import Database from 'better-sqlite3';
 import { Pet } from '@tagalong/protocol';
+import { UsageLog } from '../usage/usage-log';
 import { DB_FILENAME, LATEST_SCHEMA_VERSION, migrate, openDatabase } from './db';
 
 let dataDir: string;
@@ -422,6 +423,19 @@ describe('migrate', () => {
           )
           .get()?.n,
       ).toBe(1);
+      // And the Spend card still sums it, under its old provider id.
+      const usage = new UsageLog(db, {
+        now: () => Date.parse('2026-10-01T12:00:00.000Z'),
+        timeZone: () => 'UTC',
+      });
+      expect(usage.summary().month).toEqual([
+        expect.objectContaining({
+          source: 'scout',
+          providerId: 'nebius',
+          inputTokens: 10,
+          outputTokens: 5,
+        }),
+      ]);
 
       // Rerunning it changes nothing more.
       db.prepare('DELETE FROM schema_version WHERE version >= 19').run();
