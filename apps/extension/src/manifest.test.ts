@@ -8,11 +8,11 @@ describe('manifest', () => {
     expect(manifest.background).toEqual({ service_worker: 'service-worker.js', type: 'module' });
   });
 
-  it('asks for the permissions the phase names plus alarms, with clipboard optional', () => {
+  it('asks for exactly these permissions, with no optional ones', () => {
     expect([...manifest.permissions].sort()).toEqual(
       ['activeTab', 'alarms', 'scripting', 'sidePanel', 'storage'].sort(),
     );
-    expect(manifest.optional_permissions).toEqual(['clipboardRead']);
+    expect('optional_permissions' in manifest).toBe(false);
   });
 
   it('carries no standing host permission: pages are reached through activeTab only', () => {

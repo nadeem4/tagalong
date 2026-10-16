@@ -28,8 +28,6 @@ export const manifest = {
    * with no panel open. It shows the user no permission prompt.
    */
   permissions: ['activeTab', 'alarms', 'scripting', 'sidePanel', 'storage'],
-  /** Declared but never requested; nothing reads the clipboard. */
-  optional_permissions: ['clipboardRead'],
   /**
    * Off until the user turns it on from the options page. `activeTab` covers the tab the
    * panel or shortcut was used on; this covers the rest — a tab switched to with the panel

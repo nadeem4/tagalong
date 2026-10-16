@@ -1825,11 +1825,11 @@ stateDiagram-v2
 ```
 
 A chip goes back to any step already reached; answering there returns setup to the step it had
-reached. The "Talk or type?" step (`answer`) is offered when the window has the voice seam
-(`startFirstRun(settings, 'tagalongVoice' in window)`), which setup always installs.
+reached. The "Talk or type?" step (`answer`) is always the first step: setup installs the voice
+seam before it renders, so it can always listen.
 
-- **The step machine** (`renderer/src/first-run.ts`) is pure: which steps this computer offers
-  (`stepsFor`), the step on screen and the furthest one reached. `startFirstRun` opens at the step
+- **The step machine** (`renderer/src/first-run.ts`) is pure: the steps (`WELCOME_STEPS`), the
+  step on screen and the furthest one reached. `startFirstRun` opens at the step
   reached last time (a finished setup, or a new one, starts at the top). `answered` moves on, or
   back to where you had got to; `goTo` serves the chips; `answerPatch` is what one answer saves.
   Each answer is saved at once through `saveSettings`, so closing the window mid-setup resumes at
@@ -2357,8 +2357,8 @@ flowchart LR
   `onStopListening`, which switches Always listening off through `setListening(false)`, and
   `onDropped`, so a stop that cut Scout off lets the bubble go. A turn that
   cut Scout off but ends unaddressed or empty calls `onDropped`, and the bubble clears its words. The system
-  voice is not echo-cancelled, so `voice-player.ts` reports it speaking (`onSystemVoice`,
-  `systemVoiceSpeaking`) for `setDeaf`: Scout never answers or cuts off its own words.
+  voice is not echo-cancelled, so `voice-player.ts` reports it speaking (`onSystemVoice`)
+  for `setDeaf`: Scout never answers or cuts off its own words.
 - **Always listening, wired** (`renderer/src/talk.ts`, `renderer/src/talk-rules.ts`). `useTalk`
   reads `getListening` at mount and follows `onListening`, passing `on` to `setAlways` and `paused`
   to `setPaused`; the panel window is created hidden at launch (`createPanelWindow` in

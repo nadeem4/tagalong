@@ -1,6 +1,6 @@
 /** Tests for the system-voice pick, prepareLine and onSystemVoice. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { onSystemVoice, pickSystemVoice, prepareLine, systemVoiceSpeaking } from './voice-player';
+import { onSystemVoice, pickSystemVoice, prepareLine } from './voice-player';
 
 const voice = (name: string, lang: string) => ({ name, lang });
 
@@ -70,8 +70,9 @@ describe('onSystemVoice', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it('starts quiet and lets a listener go', () => {
-    expect(systemVoiceSpeaking()).toBe(false);
-    const off = onSystemVoice(() => undefined);
+    const heard: boolean[] = [];
+    const off = onSystemVoice((speaking) => heard.push(speaking));
+    expect(heard).toEqual([]);
     expect(typeof off).toBe('function');
     off();
   });
@@ -97,11 +98,9 @@ describe('onSystemVoice', () => {
     const off = onSystemVoice((speaking) => heard.push(speaking));
     const playing = prepareLine('Hello there.')(new AbortController().signal);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(systemVoiceSpeaking()).toBe(true);
     expect(heard).toEqual([true]);
     spoken.onend();
     await playing;
-    expect(systemVoiceSpeaking()).toBe(false);
     expect(heard).toEqual([true, false]);
     off();
   });

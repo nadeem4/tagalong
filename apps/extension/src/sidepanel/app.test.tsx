@@ -6,7 +6,8 @@ import type { ContextSnapshot, Pet } from '@tagalong/protocol';
 import { createFakeHostBridge } from '@tagalong/ui';
 import type { ConnectionStatus } from '../engine-connection';
 import type { PortBridge } from '../port-bridge';
-import { PAGE_TARGETS, SidePanelApp } from './app';
+import { PAGE_TARGETS } from '../page-targets';
+import { SidePanelApp } from './app';
 
 afterEach(cleanup);
 

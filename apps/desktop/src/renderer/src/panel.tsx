@@ -288,7 +288,7 @@ function Panel() {
   // A click on the pet on the desktop names the pet this panel talks to.
   useEffect(() => window.tagalongHost.onActivePet(setPetId), []);
 
-  if (petId === null) return <p className="settings__note">Waking the crew…</p>;
+  if (petId === null) return <p className="settings__note">Waking Scout…</p>;
 
   return (
     <HostBridgeProvider bridge={bridge}>

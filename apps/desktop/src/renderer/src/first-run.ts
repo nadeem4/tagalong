@@ -1,7 +1,7 @@
 /**
  * Welcome's step machine (the first-run setup window, onboarding.tsx), kept apart from React
  * so it is tested in plain Node: where setup opens or resumes, how an answer moves it on, and
- * what each answer saves. Contains FirstRun, stepsFor, startFirstRun, answered, goTo, chipState,
+ * what each answer saves. Contains FirstRun, startFirstRun, answered, goTo, chipState,
  * listensNow, oneAtATime and answerPatch. Answers are matched in first-run-match.ts and worded
  * in first-run-lines.ts; no AI steers any of it.
  */
@@ -25,11 +25,6 @@ export type FirstRunAnswer =
   | { step: 'voice'; talk: boolean }
   | { step: 'keys' };
 
-/** How to answer is asked only when setup can listen; otherwise typing and taps are the way. */
-export function stepsFor(canListen: boolean): WelcomeStep[] {
-  return WELCOME_STEPS.filter((step) => canListen || step !== 'answer');
-}
-
 const indexOf = (run: FirstRun, step: WelcomeStep): number => run.steps.indexOf(step);
 const later = (run: FirstRun, a: WelcomeStep, b: WelcomeStep): WelcomeStep =>
   indexOf(run, a) >= indexOf(run, b) ? a : b;
@@ -42,13 +37,13 @@ function pastDeclinedName(run: FirstRun, declined: boolean): FirstRun {
 }
 
 /** Where setup opens: the step reached last time, or the top for a new or finished setup. */
-export function startFirstRun(settings: Settings, canListen: boolean): FirstRun {
-  const steps = stepsFor(canListen);
-  const first = steps[0] ?? 'name';
+export function startFirstRun(settings: Settings): FirstRun {
   const saved = settings.welcome.step;
-  const start =
-    !settings.welcome.done && saved !== undefined && steps.includes(saved) ? saved : first;
-  return pastDeclinedName({ steps, current: start, reached: start }, settings.userNameDeclined);
+  const start = !settings.welcome.done && saved !== undefined ? saved : WELCOME_STEPS[0];
+  return pastDeclinedName(
+    { steps: WELCOME_STEPS, current: start, reached: start },
+    settings.userNameDeclined,
+  );
 }
 
 /** An answer moves setup on by itself: to the next step, or back to where you had got to. */
@@ -70,7 +65,6 @@ export function answered(run: FirstRun, nameDeclined: boolean): FirstRun {
  */
 export function listensNow(run: FirstRun, settings: Settings): boolean {
   return (
-    run.steps.includes('answer') &&
     settings.welcome.answerBy === 'talk' &&
     indexOf(run, run.reached) > indexOf(run, 'answer') &&
     run.current !== 'try'

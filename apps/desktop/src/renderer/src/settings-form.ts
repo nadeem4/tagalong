@@ -27,8 +27,6 @@ export interface SettingsFormValues {
   talkHotkey: string;
   sightDetail: string;
   windowTextBudget: string;
-  /** Pet ids to hide from the desktop. Absent leaves the setting alone. */
-  hiddenPets?: readonly string[];
   /** The summarizer list's value: blank for "Same as Scout", else `summarizerValue(…)`. */
   summarizer?: string;
   /** Whether Scout greets you on a later launch. Absent leaves the setting alone. */
@@ -131,7 +129,6 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
       : {}),
     sightDetail: values.sightDetail,
     windowTextBudget: parseBudget(values.windowTextBudget),
-    ...(values.hiddenPets !== undefined ? { hiddenPets: [...values.hiddenPets] } : {}),
     ...(values.summarizer !== undefined ? { summarizer: parseSummarizer(values.summarizer) } : {}),
     ...(values.greeting !== undefined ? { greeting: values.greeting } : {}),
     ...(values.keepAnEye !== undefined ? { keepAnEye: values.keepAnEye } : {}),

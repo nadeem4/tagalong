@@ -10,8 +10,6 @@ import type { PortBridge } from '../port-bridge';
 import { PAGE_TARGETS } from '../page-targets';
 import { describeStatus } from '../status-text';
 
-export { PAGE_TARGETS };
-
 export interface SidePanelAppProps {
   bridge: PortBridge;
   openOptions: () => void;

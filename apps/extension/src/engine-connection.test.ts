@@ -111,7 +111,7 @@ describe('EngineConnection', () => {
     });
   });
 
-  it('reports connected, with the crew, once hello succeeds', async () => {
+  it('reports connected, with the pets, once hello succeeds', async () => {
     const h = harness();
     await h.connection.start();
     await acceptHello(h);
@@ -237,7 +237,7 @@ describe('EngineConnection', () => {
     expect(h.notifications).toEqual([{ method: 'turn.delta', params: { turnId: 'x', text: 'a' } }]);
   });
 
-  it('heartbeats with pets.list, which keeps the service worker alive and the crew fresh', async () => {
+  it('heartbeats with pets.list, which keeps the service worker alive and the pets fresh', async () => {
     const h = harness();
     await h.connection.start();
     await acceptHello(h);
