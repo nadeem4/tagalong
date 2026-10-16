@@ -664,7 +664,7 @@ describe('models.list', () => {
     );
     expect(paramsSchemaFor('models.list').safeParse({ providerId: '' }).success).toBe(false);
     const result = resultSchemaFor('models.list').parse({
-      models: ['nvidia/nemotron-3-super-120b-a12b'],
+      models: ['anthropic/claude-haiku-4.5'],
       source: 'fallback',
     });
     expect(result.source).toBe('fallback');

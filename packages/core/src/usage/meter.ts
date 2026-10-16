@@ -42,6 +42,5 @@ export function meterBrain(
       return result;
     },
   };
-  if (provider.canSee !== undefined) metered.canSee = (model) => provider.canSee?.(model) ?? false;
   return metered;
 }

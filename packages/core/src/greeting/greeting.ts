@@ -181,17 +181,16 @@ export async function composeGreeting(options: {
 }): Promise<GreetingComposeResult> {
   const { pet, summarizer, context } = options;
   const fallback: GreetingComposeResult = { text: fallbackGreeting(context), source: 'fallback' };
-  const { visionModel: _unused, ...textOnly } =
-    summarizer === null ? pet : { ...pet, ...summarizer };
+  const brainPet = summarizer === null ? pet : { ...pet, ...summarizer };
   const signal = AbortSignal.timeout(options.timeoutMs ?? GREETING_TIMEOUT_MS);
   // The budget holds even for a brain slow to notice the abort: the fallback goes out then.
   const outOfTime = new Promise<null>((resolve) =>
     signal.addEventListener('abort', () => resolve(null), { once: true }),
   );
   try {
-    const asked = options.provider(textOnly).complete(
+    const asked = options.provider(brainPet).complete(
       {
-        model: textOnly.model,
+        model: brainPet.model,
         system: GREETING_INSTRUCTIONS,
         messages: [{ role: 'user', content: [{ type: 'text', text: facts(context) }] }],
         maxTokens: GREETING_MAX_TOKENS,

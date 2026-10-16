@@ -38,7 +38,7 @@ export async function checkKey(options: {
   const model =
     (companion === undefined ? undefined : recommendedModel(companion, providerId)?.model) ??
     base.model;
-  const { visionModel: _vision, watchModel: _watch, ...rest } = base;
+  const { watchModel: _watch, ...rest } = base;
   const pet: Pet = { ...rest, providerId, model };
   try {
     const result = await options.resolve(pet).complete(

@@ -6,8 +6,11 @@ import { isAllowedLink, isSignInPage } from './links';
 describe('isAllowedLink', () => {
   it('opens the pages where provider keys are made', () => {
     expect(isAllowedLink('https://openrouter.ai/keys')).toBe(true);
-    expect(isAllowedLink('https://tokenfactory.nebius.com/')).toBe(true);
     expect(isAllowedLink('https://console.anthropic.com/settings/keys')).toBe(true);
+  });
+
+  it('no longer opens the key page of the retired nebius provider', () => {
+    expect(isAllowedLink('https://tokenfactory.nebius.com/')).toBe(false);
   });
 
   it('opens the exact pages Welcome links to for installing a coding agent, and no others there', () => {

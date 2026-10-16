@@ -122,7 +122,6 @@ export function assemblePrompt(input: AssembleInput): BrainRequest {
 
   return {
     model: pet.model,
-    ...(pet.visionModel === undefined ? {} : { visionModel: pet.visionModel }),
     system: [
       systemPrompt(pet, input.memories ?? [], settings.userName),
       input.spoken === true ? SPOKEN_MODE : '',

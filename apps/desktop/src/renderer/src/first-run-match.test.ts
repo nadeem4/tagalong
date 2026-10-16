@@ -6,7 +6,6 @@ import { choicesFor, matchChoice, nameFrom } from './first-run-match';
 const providers: ProviderChoice[] = [
   { id: 'claude-code', label: 'Your Claude sign-in', needsKey: false, hasKey: false },
   { id: 'openrouter', label: 'OpenRouter', needsKey: true, hasKey: false },
-  { id: 'nebius', label: 'Nebius Token Factory', needsKey: true, hasKey: false },
   { id: 'anthropic', label: 'Anthropic', needsKey: true, hasKey: false },
 ];
 const step = (name: 'answer' | 'voice' | 'keys') => choicesFor(name, null, false, providers);
@@ -53,7 +52,8 @@ describe('choicesFor think', () => {
   it('names the keyed services once a key is chosen, never the sign-in', () => {
     const picking = choicesFor('think', 'signed-in', true, providers);
     expect(matchChoice('open router', picking)).toBe('openrouter');
-    expect(matchChoice('token factory', picking)).toBe('nebius');
+    expect(matchChoice('nebius', picking)).toBeNull();
+    expect(matchChoice('token factory', picking)).toBeNull();
     expect(matchChoice('Anthropic', picking)).toBe('anthropic');
     expect(picking.map((choice) => choice.id)).not.toContain('claude-code');
   });

@@ -25,12 +25,23 @@ describe('Settings providerBaseUrls', () => {
   });
 
   it('rejects a base URL that is not a URL', () => {
-    expect(Settings.safeParse({ providerBaseUrls: { nebius: 'not a url' } }).success).toBe(false);
+    expect(Settings.safeParse({ providerBaseUrls: { openrouter: 'not a url' } }).success).toBe(
+      false,
+    );
   });
 
   it('can be patched on its own', () => {
-    const patch = SettingsPatch.parse({ providerBaseUrls: { nebius: 'https://example.com/v1/' } });
-    expect(patch).toEqual({ providerBaseUrls: { nebius: 'https://example.com/v1/' } });
+    const patch = SettingsPatch.parse({
+      providerBaseUrls: { openrouter: 'https://example.com/v1/' },
+    });
+    expect(patch).toEqual({ providerBaseUrls: { openrouter: 'https://example.com/v1/' } });
+  });
+
+  it('drops the base URL of the retired nebius provider from an older settings file', () => {
+    const s = Settings.parse({
+      providerBaseUrls: { nebius: 'https://a.example/v1/', openrouter: 'https://b.example/v1/' },
+    });
+    expect(s.providerBaseUrls).toEqual({ openrouter: 'https://b.example/v1/' });
   });
 });
 
@@ -278,9 +289,15 @@ describe('Settings.summarizer', () => {
   });
 
   it('rejects a summarizer with no model', () => {
-    expect(Settings.safeParse({ summarizer: { providerId: 'nebius', model: '' } }).success).toBe(
-      false,
-    );
+    expect(
+      Settings.safeParse({ summarizer: { providerId: 'openrouter', model: '' } }).success,
+    ).toBe(false);
+  });
+
+  it('drops a summarizer on the retired nebius provider, so each pet summarises itself', () => {
+    expect(
+      Settings.parse({ summarizer: { providerId: 'nebius', model: 'x' } }).summarizer,
+    ).toBeNull();
   });
 });
 

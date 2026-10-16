@@ -13,7 +13,7 @@ import type {
   WatchState,
 } from '@tagalong/protocol';
 import type { BrainContentBlock, BrainProvider } from '../providers';
-import { modelForTurn, watchModelsFor } from '../providers';
+import { watchModelsFor } from '../providers';
 import type { PerceptionHost } from '../perception';
 
 /** How often a watch compares the region, in ms. */
@@ -121,8 +121,8 @@ type Verdict = { yes: boolean; reason: string };
  * check per change: after a "no", the frame it was asked about becomes the new baseline.
  *
  * The check runs on the pet's own provider with a small model (`watchModelsFor`). When that
- * model cannot see, it reads the watched window's text instead; when there is no text, the
- * crop goes to the pet's vision model. A yes emits `watch.fired` and ends the watch.
+ * provider cannot see, it reads the watched window's text instead, and with no text it cannot
+ * check. Otherwise the crop is sent. A yes emits `watch.fired` and ends the watch.
  */
 export class WatchManager {
   readonly #options: WatchManagerOptions;
@@ -360,20 +360,16 @@ export class WatchManager {
   async #ask(host: PerceptionHost, watch: Watch, now: number): Promise<Verdict> {
     const provider = this.#options.provider(watch.pet);
     const models = watchModelsFor(watch.pet);
-    const seesDirectly =
-      provider.capabilities.vision &&
-      (provider.canSee === undefined || provider.canSee(models.model));
+    const sees = provider.capabilities.vision;
 
     let content: BrainContentBlock[] | null = null;
-    let visionModel: string | undefined;
-    if (!seesDirectly) content = await this.#textEvidence(host, watch);
+    if (!sees) content = await this.#textEvidence(host, watch);
     if (content === null) {
-      if (modelForTurn(provider, models, true) === null) {
+      if (!sees) {
         throw new CannotCheck(
           `${models.model} cannot see images and the watched window gave no text to read.`,
         );
       }
-      visionModel = models.visionModel;
       const diff = await this.#diff(host, watch, now - watch.baselineAt, true);
       const crop = diff.after;
       if (crop === undefined) return { yes: false, reason: '' };
@@ -384,7 +380,6 @@ export class WatchManager {
     const result = await provider.complete(
       {
         model: models.model,
-        ...(visionModel === undefined ? {} : { visionModel }),
         system: CHECK_SYSTEM,
         messages: [{ role: 'user', content }],
         maxTokens: 120,

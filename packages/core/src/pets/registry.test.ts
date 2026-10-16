@@ -36,7 +36,6 @@ describe('PetRegistry seeding', () => {
       model: 'haiku',
       toolGrants: {},
     });
-    expect(SCOUT.visionModel).toBeUndefined();
     expect(SCOUT.notes).toBeUndefined();
   });
 

@@ -67,16 +67,8 @@ describe('Pet', () => {
     expect(Pet.safeParse(withoutModel).success).toBe(false);
   });
 
-  it('leaves the vision model out when none is named', () => {
-    expect(Pet.parse(valid).visionModel).toBeUndefined();
-  });
-
-  it('keeps a vision model', () => {
-    expect(Pet.parse({ ...valid, visionModel: 'vl' }).visionModel).toBe('vl');
-  });
-
-  it('rejects an empty vision model', () => {
-    expect(Pet.safeParse({ ...valid, visionModel: '' }).success).toBe(false);
+  it('drops the retired vision model an older pet still carries', () => {
+    expect(Pet.parse({ ...valid, visionModel: 'vl' })).not.toHaveProperty('visionModel');
   });
 
   it('keeps a colour the crew strip can paint', () => {
@@ -94,8 +86,8 @@ describe('Pet.watchModel', () => {
     name: 'Scout',
     avatar: 'S',
     roleId: 'generalist',
-    model: 'nvidia/nemotron-3-super-120b-a12b',
-    providerId: 'nebius',
+    model: 'anthropic/claude-sonnet-5',
+    providerId: 'openrouter',
   };
 
   it('is optional: absent means the provider default check model', () => {

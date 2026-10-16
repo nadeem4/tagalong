@@ -85,8 +85,8 @@ describe('checkKey', () => {
     const result = await checkKey({
       resolve: deaf.resolve,
       base,
-      providerId: 'nebius',
-      label: 'Token Factory',
+      providerId: 'openrouter',
+      label: 'OpenRouter',
       timeoutMs: 10,
     });
     expect(result.ok).toBe(false);

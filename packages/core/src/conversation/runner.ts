@@ -6,7 +6,7 @@
 import { randomUUID } from 'node:crypto';
 import type { ContextSnapshot, NotificationParamsOf, Pet, Settings } from '@tagalong/protocol';
 import type { BrainContentBlock, BrainProvider, BrainResult } from '../providers';
-import { BrainError, modelForTurn } from '../providers';
+import { BrainError } from '../providers';
 import type { ConversationStore } from '../memory/store';
 import type { MemoryStore } from '../memory/memories';
 import { recall, statedPreference } from '../memory/recall';
@@ -305,11 +305,11 @@ export class ConversationRunner {
       return this.#fail(turnId, conversationId, error);
     }
 
-    // Whether any model this pet may use can decode an image. Sending pixels to one that
-    // cannot costs the user tokens and buys a confident answer about an image nobody read.
-    // Dropping it silently would be worse still, so the warning goes out — as a warning,
-    // because the turn still answers.
-    const canSee = modelForTurn(provider, ask.pet, true) !== null;
+    // Whether this pet's brain can decode an image. Sending pixels to one that cannot costs
+    // the user tokens and buys a confident answer about an image nobody read. Dropping it
+    // silently would be worse still, so the warning goes out — as a warning, because the
+    // turn still answers.
+    const canSee = provider.capabilities.vision;
 
     let snapshot = ask.snapshot;
     if (snapshot !== undefined && hasPixels(snapshot) && !canSee) {

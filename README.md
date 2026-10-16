@@ -58,8 +58,7 @@ desktop app and the Chrome extension run on it. It holds:
 - the companion, Scout, and the role it works as;
 - the conversation runner, which assembles each prompt, calls the model and runs tools;
 - memory: conversations, long-term memories and summaries, in SQLite;
-- providers: Claude Code sign-in, Anthropic, OpenRouter, Nebius Token Factory and any
-  OpenAI-compatible service;
+- providers: Claude Code sign-in, Anthropic, OpenRouter and any OpenAI-compatible service;
 - experts and hand-offs: briefs sent to Claude Code, with the project and edit permission you
   confirm;
 - connected apps over MCP (Notion, GitHub, Linear, or any MCP server): reads run at once, every
@@ -151,13 +150,13 @@ app's own client is `apps/desktop/src/main/engine-client.ts`. Read
 | One companion, Scout, that hands work to experts (Claude Code) and brings the answer back                                              | Speech to text through ElevenLabs                                   |
 | Scout talks: answers read aloud in a calm British voice, made on this computer, or through ElevenLabs with your own key                |                                                                     |
 | Talk to Scout: hold a key, ask out loud, hear a short spoken answer; speech is turned into text on this computer                       |                                                                     |
-| Scout thinks through your Claude Code sign-in, or OpenRouter, Nebius Token Factory, Anthropic or an OpenAI-compatible service          | An "always allow" for changes in connected apps                     |
+| Scout thinks through your Claude Code sign-in, or OpenRouter, Anthropic or an OpenAI-compatible service                                | An "always allow" for changes in connected apps                     |
 | Connections: Scout uses your apps over MCP (Notion, GitHub, Linear, Claude Code's servers); every change asks first                    |                                                                     |
 | Routines: Scout does things on its own, on a schedule or when something happens, and tells you in the bubble, aloud or by notification |                                                                     |
 | Spend: Home shows what Scout and the experts used, and an optional daily budget pauses proactive comments and routines                 |                                                                     |
 | Change settings by talking: "talk a bit slower" shows a card, and nothing changes until you click Apply                                |                                                                     |
 | Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                                      | ElevenLabs voice cost on the Spend card                             |
-| Vision routing in the engine: a text-only model hands pictures to a vision model it names (Home sets none yet)                         | Data export and delete-all in Settings                              |
+|                                                                                                                                        | Data export and delete-all in Settings                              |
 | Memory across restarts, rolling screen memory Scout recalls from (opt-in), and watches Scout starts                                    | Code signing (the installer is unsigned) and an app icon of its own |
 | The Chrome extension: Scout in Chrome's side panel, reading the page you are on                                                        |                                                                     |
 
@@ -177,7 +176,7 @@ picks up at the same step, and Scout arrives on your screen either way.
 2. **How should I think?** Scout checks your real Claude sign-in. If Claude Code is installed and
    signed in, it suggests that and needs no key. Signed out, **Sign in to Claude** opens a terminal
    and Scout then suggests Claude once you are in. Not installed, install Claude Code or use **An API key**:
-   pick OpenRouter, Nebius Token Factory or Anthropic and paste a key. It goes into the operating
+   pick OpenRouter or Anthropic and paste a key. It goes into the operating
    system's keychain and is tested once with one tiny request; if the service turns it down, Scout
    says so and you stay on the step.
 3. **Should I talk?** Scout speaks a sample line so you hear how it sounds; choose **Yes, talk** or
@@ -397,22 +396,17 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 Scout runs on one provider and one model. Keys are entered in Welcome or in **Settings → Advanced →
 API keys**, encrypted with the OS keychain, and only ever sent to the provider they belong to.
 
-| Setup                               | Where to get the key                                                                                                       | Model ids                                                                                                                                                                                                                                                                                                                     |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Claude Code sign-in**             | Nothing: install [Claude Code](https://claude.com/claude-code) and sign in. Scout thinks through `claude -p`.              | `haiku`, `sonnet`, `opus`.                                                                                                                                                                                                                                                                                                    |
-| **OpenRouter + Claude**             | [openrouter.ai/keys](https://openrouter.ai/keys)                                                                           | OpenRouter's catalog at [openrouter.ai/models](https://openrouter.ai/models), for example `anthropic/claude-sonnet-5` or `anthropic/claude-haiku-4.5`. Settings lists them live.                                                                                                                                              |
-| **Nebius Token Factory + Nemotron** | [tokenfactory.nebius.com](https://tokenfactory.nebius.com/), under API keys                                                | Token Factory's model list (`GET https://api.tokenfactory.nebius.com/v1/models`, shown live once the key is stored): `nvidia/nemotron-3-super-120b-a12b` (Nemotron 3 Super, text), `nvidia/Nemotron-Nano-V2-12b` (Nemotron Nano 2 VL, sees pictures), `nvidia/nemotron-3-nano-30b-a3b` (Nemotron 3 Nano, cheap watch checks). |
-| **Anthropic**                       | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) (an API key, not a Claude subscription) | `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5`.                                                                                                                                                                                                                                                                       |
+| Setup                   | Where to get the key                                                                                                       | Model ids                                                                                                                                                                        |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Claude Code sign-in** | Nothing: install [Claude Code](https://claude.com/claude-code) and sign in. Scout thinks through `claude -p`.              | `haiku`, `sonnet`, `opus`.                                                                                                                                                       |
+| **OpenRouter + Claude** | [openrouter.ai/keys](https://openrouter.ai/keys)                                                                           | OpenRouter's catalog at [openrouter.ai/models](https://openrouter.ai/models), for example `anthropic/claude-sonnet-5` or `anthropic/claude-haiku-4.5`. Settings lists them live. |
+| **Anthropic**           | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) (an API key, not a Claude subscription) | `claude-opus-5`, `claude-sonnet-5`, `claude-haiku-4-5`.                                                                                                                          |
 
 If Scout answers "model not found", open Settings and pick the id from the live list next to the
 model box: it is the authority.
 
-**Pictures on a text-only model.** Nemotron 3 Super and Nano cannot see, and Home sets no vision
-model, so on them a screenshot is dropped with a warning and Scout answers from text. Claude sees on
-its own.
-
 Any other OpenAI-compatible service also works: in **Settings → Advanced → API keys**, put its base
-URL in one of the base URL boxes, store its key there, and pick its model on the Scout page.
+URL in the base URL box, store its key there, and pick its model on the Scout page.
 
 ## The Chrome extension
 

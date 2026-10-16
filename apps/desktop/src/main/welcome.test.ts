@@ -133,11 +133,7 @@ describe('launchLine', () => {
 
 describe('welcomeCrew', () => {
   it('makes Scout the Companion on the chosen brain, and docks Scout alone', () => {
-    const crew = [
-      pet('scout', { visionModel: 'nvidia/Nemotron-Nano-V2-12b', watchModel: 'x' }),
-      pet('ink'),
-      pet('bolt'),
-    ];
+    const crew = [pet('scout', { watchModel: 'x' }), pet('ink'), pet('bolt')];
     const { scout, hiddenPets } = welcomeCrew(crew, 'scout', 'claude-code', COMPANION);
     expect(scout).toMatchObject({
       id: 'scout',
@@ -145,7 +141,6 @@ describe('welcomeCrew', () => {
       providerId: 'claude-code',
       model: 'haiku',
     });
-    expect(scout.visionModel).toBeUndefined();
     expect(scout.watchModel).toBeUndefined();
     expect(hiddenPets).toEqual(['ink', 'bolt']);
   });

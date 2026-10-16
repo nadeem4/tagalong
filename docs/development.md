@@ -51,8 +51,7 @@ tagalong/
       pets/registry.ts              # PetRegistry, the default pet Scout
       roles/                        # library.generated.ts, getRole, roleFor, recommendedModel, tiers.ts
       providers/                    # brain.ts, claude-code-brain.ts, anthropic.ts, openai-compatible.ts,
-                                    # presets.ts, nebius-models.ts, vision-routing.ts, watch-models.ts,
-                                    # fake.ts, registry.ts, errors.ts
+                                    # presets.ts, watch-models.ts, fake.ts, registry.ts, errors.ts
       server/                       # ws-server.ts (EngineServer), pairing.ts
       settings/settings.ts          # SettingsStore, SecretStore, InMemorySecretStore
     ui/src/
@@ -305,32 +304,28 @@ key, a base URL box for each OpenAI-compatible preset, and **Remove key**. Setti
 thinks** card shows the brain Scout really uses and whether the Claude Code sign-in works
 (`claude auth status --json`, run locally with no model call).
 
-| Provider      | Base URL (overridable)                    | Key                  | Models                                                  |
-| ------------- | ----------------------------------------- | -------------------- | ------------------------------------------------------- |
-| `claude-code` | none: runs the `claude` CLI               | your Claude sign-in  | `haiku`, `sonnet`, `opus`                               |
-| `openrouter`  | `https://openrouter.ai/api/v1`            | `OPENROUTER_API_KEY` | anything OpenRouter serves, e.g. a Claude model         |
-| `nebius`      | `https://api.tokenfactory.nebius.com/v1/` | `NEBIUS_API_KEY`     | Nemotron 3 Super for text, Nemotron Nano 2 VL for sight |
-| `anthropic`   | the Anthropic API                         | Anthropic key        | Claude, directly                                        |
-| `fake`        | none                                      | none                 | scripted, offline                                       |
+| Provider      | Base URL (overridable)         | Key                  | Models                                          |
+| ------------- | ------------------------------ | -------------------- | ----------------------------------------------- |
+| `claude-code` | none: runs the `claude` CLI    | your Claude sign-in  | `haiku`, `sonnet`, `opus`                       |
+| `openrouter`  | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | anything OpenRouter serves, e.g. a Claude model |
+| `anthropic`   | the Anthropic API              | Anthropic key        | Claude, directly                                |
+| `fake`        | none                           | none                 | scripted, offline                               |
 
-Both presets go through one `OpenAiCompatibleProvider`, so any other OpenAI-format service is a
-settings change: put its URL in one of the base URL boxes, store its key, and type its model id. The
+The OpenRouter preset goes through `OpenAiCompatibleProvider`, so any other OpenAI-format service is
+a settings change: put its URL in the base URL box, store its key, and type its model id. The
 model box suggests ids from the service's own `GET /models` once a key is stored, and says when it is
 showing the built-in list instead.
 
-**Vision routing.** A turn that carries a picture — a screenshot, or an image a tool such as
-`look_closer` returns — goes to Scout's model if that model can see, and otherwise to its vision
-model (`Pet.visionModel`). On Token Factory only Nemotron Nano 2 VL sees; Home sets no vision model,
-so Scout on a Nemotron text model drops pictures with a warning. On OpenRouter every model is
-treated as seeing, so Claude answers everything on the one model. With no model that can see, pixels
-are never sent: the screenshot is dropped with a warning.
+**Pictures.** A turn that carries a picture — a screenshot, or an image a tool such as
+`look_closer` returns — goes to Scout's own model. Every built-in provider sees; on a provider that
+cannot (`capabilities.vision` false), pixels are never sent: the screenshot is dropped with a
+warning.
 
 Scout's provider and model apply on its next ask, and so does a new key or base URL: the engine
 re-reads the keychain before every ask, so no restart is needed.
 
-The Nemotron Nano 2 VL id (`nvidia/Nemotron-Nano-V2-12b`) and the OpenRouter fallback ids could not be
-checked when they were written; they live in `packages/core/src/providers/nebius-models.ts` and
-`presets.ts`. The live list in Settings is the authority.
+The OpenRouter fallback ids could not be checked when they were written; they live in
+`packages/core/src/providers/presets.ts`. The live list in Settings is the authority.
 
 Once running: Scout sits on screen as a small always-on-top window, `Ctrl+Shift+Space` captures the
 selection and the active window and opens the bubble beside it, Escape or focus loss hides the
@@ -515,7 +510,6 @@ shell you launch from**, as shown above.
 | `TAGALONG_FAKE_STT=1`        | **Read** (`voice/worker/main.ts`, `main/index.ts`). The voice process uses the fake ears: a held question is heard as "What am I looking at?" every time, and in always mode (`FAKE_TURN_FRAMES` frames of the fake microphone end one turn) as "Scout, what am I looking at?", with no speech model download; Chromium's fake microphone stands in for a real one. The smoke and listening suites set it. |
 | `ANTHROPIC_API_KEY`          | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment.                                                                                                                                                                                                                                                    |
 | `OPENROUTER_API_KEY`         | **Not read.** The key for the `openrouter` provider, entered in Settings and stored like the Anthropic key.                                                                                                                                                                                                                                                                                                |
-| `NEBIUS_API_KEY`             | **Not read.** The key for the `nebius` provider (Token Factory), entered in Settings and stored like the Anthropic key.                                                                                                                                                                                                                                                                                    |
 | `ELEVENLABS_API_KEY`         | **Not read.** The optional ElevenLabs voice's key is entered in Settings → Advanced and stored like the others (`elevenlabs.apiKey`).                                                                                                                                                                                                                                                                      |
 
 Secrets never enter git. In the app they live in the OS keychain through Electron `safeStorage`, written
@@ -546,8 +540,8 @@ Providers are the swappable edges of the engine. Each one is an interface in `pa
 than one planned implementation.
 
 - **BrainProvider** for the AI engine. Existing: `claude-code` (the Claude sign-in, through the
-  `claude` CLI), `openrouter` and `nebius` (two presets of the OpenAI-compatible
-  `OpenAiCompatibleProvider`), `anthropic`, and `fake` (tests and demos). Another OpenAI-format
+  `claude` CLI), `openrouter` (a preset of the OpenAI-compatible `OpenAiCompatibleProvider`),
+  `anthropic`, and `fake` (tests and demos). Another OpenAI-format
   service needs no code — see [Choosing Scout's brain](#choosing-scouts-brain); a new named preset
   is one entry in `packages/core/src/providers/presets.ts`.
 - **Text to speech** lives in the desktop host, not in core: `Tts` in

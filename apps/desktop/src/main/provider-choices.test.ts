@@ -4,6 +4,7 @@ import { InMemorySecretStore } from '@tagalong/core';
 import { describe, expect, it } from 'vitest';
 import {
   ELEVENLABS_SECRET_KEY,
+  forgetRetiredKeys,
   providerChoices,
   secretKeyFor,
   storedKeys,
@@ -15,22 +16,17 @@ describe('providerChoices', () => {
     expect(choices.map((choice) => choice.id)).toEqual([
       'claude-code',
       'openrouter',
-      'nebius',
       'anthropic',
       'fake',
     ]);
   });
 
   it('carries each preset default base URL for the form', () => {
-    const [, openrouter, nebius] = providerChoices(new Set());
+    const [, openrouter] = providerChoices(new Set());
     expect(openrouter).toMatchObject({
       label: 'OpenRouter',
       defaultBaseUrl: 'https://openrouter.ai/api/v1',
       needsKey: true,
-    });
-    expect(nebius).toMatchObject({
-      label: 'Token Factory',
-      defaultBaseUrl: 'https://api.tokenfactory.nebius.com/v1/',
     });
   });
 
@@ -41,9 +37,9 @@ describe('providerChoices', () => {
   });
 
   it('says which keys are stored, never what they are', () => {
-    const choices = providerChoices(new Set(['nebius']));
-    expect(choices.find((c) => c.id === 'nebius')?.hasKey).toBe(true);
-    expect(choices.find((c) => c.id === 'openrouter')?.hasKey).toBe(false);
+    const choices = providerChoices(new Set(['openrouter']));
+    expect(choices.find((c) => c.id === 'openrouter')?.hasKey).toBe(true);
+    expect(choices.find((c) => c.id === 'anthropic')?.hasKey).toBe(false);
     expect(JSON.stringify(choices)).not.toContain('apiKey');
   });
 
@@ -78,6 +74,10 @@ describe('secretKeyFor', () => {
   it('refuses a provider that takes no key', () => {
     expect(secretKeyFor('fake')).toBeUndefined();
   });
+
+  it('has no key for the retired nebius provider', () => {
+    expect(secretKeyFor('nebius')).toBeUndefined();
+  });
 });
 
 describe('storedKeys', () => {
@@ -86,5 +86,40 @@ describe('storedKeys', () => {
     await secrets.set(secretKeyFor('openrouter')!, 'sk-or');
     await secrets.set(secretKeyFor('anthropic')!, '');
     expect(await storedKeys(secrets)).toEqual(new Set(['openrouter']));
+  });
+});
+
+describe('forgetRetiredKeys', () => {
+  it('deletes the retired nebius key and keeps every other key', async () => {
+    const secrets = new InMemorySecretStore();
+    await secrets.set('nebius.apiKey', 'sk-nb');
+    await secrets.set('openrouter.apiKey', 'sk-or');
+    await forgetRetiredKeys(secrets);
+    expect(await secrets.get('nebius.apiKey')).toBeNull();
+    expect(await secrets.get('openrouter.apiKey')).toBe('sk-or');
+  });
+
+  it('never rewrites the store when no retired key is there', async () => {
+    const secrets = new InMemorySecretStore();
+    await secrets.set('openrouter.apiKey', 'sk-or');
+    const deleted: string[] = [];
+    const del = secrets.delete.bind(secrets);
+    secrets.delete = async (key) => {
+      deleted.push(key);
+      await del(key);
+    };
+    await forgetRetiredKeys(secrets);
+    expect(deleted).toEqual([]);
+  });
+
+  it('leaves the entry when the store cannot read it', async () => {
+    const secrets = new InMemorySecretStore();
+    const deleted: string[] = [];
+    secrets.get = () => Promise.reject(new Error('no backend'));
+    secrets.delete = async (key) => {
+      deleted.push(key);
+    };
+    await expect(forgetRetiredKeys(secrets)).resolves.toBeUndefined();
+    expect(deleted).toEqual([]);
   });
 });

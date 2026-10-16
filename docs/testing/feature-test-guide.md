@@ -42,10 +42,6 @@ in (`claude auth status` says `"loggedIn": true`). On a fresh install Scout thin
 Advanced → API keys → OpenRouter, then on Home's **Scout** page set **Thinks with** to OpenRouter
 and **Model** to a Claude id (for example `anthropic/claude-sonnet-5`). Save.
 
-**Nebius Token Factory + Nemotron.** Get a key at <https://tokenfactory.nebius.com/> (API keys),
-store it the same way, and pick Token Factory on the Scout page. Its text models cannot see, and
-Home sets no vision model, so screenshots are dropped with a warning (H5).
-
 **Fake provider (no key).** Steps marked _fake provider_ need no key: launch from source with
 `TAGALONG_FAKE_PROVIDERS=1` (PowerShell: `$env:TAGALONG_FAKE_PROVIDERS = '1'`). Scout streams a
 scripted answer, hand-offs go to a scripted expert, and nothing leaves the machine. Keeping an eye
@@ -243,15 +239,16 @@ by tapping a card, or, after **Talk to me**, by saying it (W.9). W.1 to W.8 type
 4. **Action:** ask "can you read the task in Chrome?".
 5. **Expected:** Scout reads that one window's text and answers from it.
 
-### H5. Token Factory + Nemotron
+### H5. An install that used the removed Nebius provider
 
-_Not the default configuration._
+_Only on a data folder from a build before Nebius was removed._
 
-1. **Setup:** a Token Factory key stored; Scout on Token Factory with
-   `nvidia/nemotron-3-super-120b-a12b`.
-2. **Action:** (a) `Ctrl+Shift+Space` with a question; (b) "what is on my screen?".
-3. **Expected:** (a) answered by Nemotron 3 Super; (b) Scout says it cannot see images and answers
-   from the window list and text. Nothing breaks.
+1. **Setup:** a `tagalong.db`, `settings.json` and `secrets.json` from a build where Scout thought
+   on Token Factory (`providerId: 'nebius'`), with summaries on it too and some spend recorded.
+2. **Action:** launch this build, open Home, then ask Scout a question.
+3. **Expected:** Scout thinks with **Your Claude sign-in** on Haiku and answers. Settings shows
+   summaries on each pet's own brain. The Spend card still lists the old rows, as "Scout · nebius".
+   `secrets.json` has no `nebius.apiKey` entry after the launch.
 
 ### H6. Edge cases
 
@@ -353,16 +350,16 @@ _Fake provider:_ with `TAGALONG_FAKE_PROVIDERS=1` both steps are scripted expert
 
 1. **Setup:** a machine (or PATH) without `claude`. Scout on the Claude sign-in.
 2. **Action:** open Settings, pick **OpenRouter**, paste a key, click **Save**.
-3. **Expected:** before saving, "Scout needs a brain to think with" and three services. After Save
+3. **Expected:** before saving, "Scout needs a brain to think with" and two services. After Save
    the card reads **OpenRouter · anthropic/claude-haiku-4.5** (the recommended model) with **Key
    stored**, and Scout answers the next question on OpenRouter.
 
 ### S.4. API keys: add, replace, remove
 
 1. **Setup:** Settings → **Advanced** (closed until you open it).
-2. **Action:** **Add key** on Token Factory, paste a key, Save. Then **Remove key** on it.
+2. **Action:** **Add key** on OpenRouter, paste a key, Save. Then **Remove key** on it.
 3. **Expected:** after Save the row says **Key stored** and offers **Replace key**. **Remove key**
-   says "Token Factory key removed." and the row goes back to **No key**. There is no row for the
+   says "OpenRouter key removed." and the row goes back to **No key**. There is no row for the
    Claude sign-in.
 
 ### S.5. A refused value inside Advanced opens Advanced
@@ -1651,8 +1648,6 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
 
 Do not test these here.
 
-- **A vision model for a text-only brain.** Home has no vision model field; Nemotron text models
-  drop pictures with a warning.
 - **Cloud speech to text and a microphone step in Welcome.** Speech is turned into text on this
   computer only.
 - **"Always allow" for connected apps.** Every change asks.

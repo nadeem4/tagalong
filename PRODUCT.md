@@ -89,8 +89,8 @@ its result.
 
 ## Capabilities and Constraints
 
-- Scout thinks with the Claude sign-in when available, or an API key for Anthropic, OpenRouter or
-  Nebius Token Factory. A cheaper model can be set for summaries, greetings and remarks.
+- Scout thinks with the Claude sign-in when available, or an API key for Anthropic or OpenRouter.
+  A cheaper model can be set for summaries, greetings and remarks.
 - Experts are added from Home; Claude Code is the first kind. Add expert starts from a template
   (Coder, Debugger, Designer, Researcher, or Blank) with standing instructions you can read and
   change. Each task asks which project to work in, guessed from the screen.

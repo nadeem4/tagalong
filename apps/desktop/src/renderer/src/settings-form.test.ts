@@ -14,10 +14,7 @@ import {
 import type { SettingsFormValues } from './settings-form';
 
 const values: SettingsFormValues = {
-  baseUrls: [
-    { providerId: 'nebius', label: 'Token Factory', value: '' },
-    { providerId: 'openrouter', label: 'OpenRouter', value: '' },
-  ],
+  baseUrls: [{ providerId: 'openrouter', label: 'OpenRouter', value: '' }],
   askHotkey: 'CommandOrControl+Shift+Space',
   pauseSightHotkey: 'CommandOrControl+Shift+Alt+P',
   stopVoiceHotkey: 'CommandOrControl+Shift+Alt+M',
@@ -35,7 +32,6 @@ describe('buildSettingsPatch base URLs', () => {
     const patch = buildSettingsPatch({
       ...values,
       baseUrls: [
-        { providerId: 'nebius', label: 'Token Factory', value: '' },
         { providerId: 'openrouter', label: 'OpenRouter', value: ' http://127.0.0.1:8080/v1 ' },
       ],
     });
@@ -235,9 +231,9 @@ describe('summarizerGroups', () => {
   const providers = [
     { id: 'claude-code', label: 'Your Claude sign-in', needsKey: false, hasKey: false },
     { id: 'openrouter', label: 'OpenRouter', needsKey: true, hasKey: true },
-    { id: 'nebius', label: 'Token Factory', needsKey: true, hasKey: false },
+    { id: 'anthropic', label: 'Anthropic', needsKey: true, hasKey: false },
   ];
-  const models = { openrouter: ['anthropic/claude-haiku-4.5', 'nvidia/nemotron'] };
+  const models = { openrouter: ['anthropic/claude-haiku-4.5', 'anthropic/claude-sonnet-5'] };
 
   it('offers Haiku and Sonnet on the Claude sign-in, then each keyed service that has a key', () => {
     expect(summarizerGroups({ providers, signIn: 'signed-in', models, current: null })).toEqual([
@@ -255,7 +251,10 @@ describe('summarizerGroups', () => {
             value: summarizerValue('openrouter', 'anthropic/claude-haiku-4.5'),
             label: 'anthropic/claude-haiku-4.5',
           },
-          { value: summarizerValue('openrouter', 'nvidia/nemotron'), label: 'nvidia/nemotron' },
+          {
+            value: summarizerValue('openrouter', 'anthropic/claude-sonnet-5'),
+            label: 'anthropic/claude-sonnet-5',
+          },
         ],
       },
     ]);
@@ -271,11 +270,13 @@ describe('summarizerGroups', () => {
       providers,
       signIn: 'not-installed',
       models: {},
-      current: { providerId: 'nebius', model: 'meta/llama' },
+      current: { providerId: 'anthropic', model: 'claude-haiku-4-5' },
     });
     expect(groups).toContainEqual({
-      label: 'Token Factory',
-      options: [{ value: summarizerValue('nebius', 'meta/llama'), label: 'meta/llama' }],
+      label: 'Anthropic',
+      options: [
+        { value: summarizerValue('anthropic', 'claude-haiku-4-5'), label: 'claude-haiku-4-5' },
+      ],
     });
   });
 });

@@ -1,8 +1,7 @@
 /**
- * A provider over the OpenAI chat-completions wire format, used for Nebius Token Factory
- * and OpenRouter. Contains `OpenAiCompatibleProvider` and `NEBIUS_BASE_URL`. Handles
- * routing pictures to a vision model, tool calls, refusals, and the live model list
- * (`fetchModels`).
+ * A provider over the OpenAI chat-completions wire format, used for OpenRouter and any other
+ * chat-completions server. Contains `OpenAiCompatibleProvider`. Handles pictures, tool calls,
+ * refusals, and the live model list (`fetchModels`).
  */
 import OpenAI, {
   APIConnectionError,
@@ -30,24 +29,15 @@ import type {
   BrainTool,
 } from './brain';
 import { BrainError } from './errors';
-import { modelForTurn } from './vision-routing';
-
-/** Nebius Token Factory's OpenAI-compatible endpoint. */
-export const NEBIUS_BASE_URL = 'https://api.tokenfactory.nebius.com/v1/';
 
 export interface OpenAiCompatibleProviderOptions {
-  /** The registry id this instance answers to, e.g. 'nebius'. */
+  /** The registry id this instance answers to, e.g. 'openrouter'. */
   id: string;
   apiKey: string;
-  /** Omitted means Token Factory. Any chat-completions server works. */
-  baseURL?: string | undefined;
+  /** Any chat-completions server works. */
+  baseURL: string;
   /** Shown in error messages, so a person knows which service failed. */
-  label?: string | undefined;
-  /**
-   * The models that accept images. Absent means all of them do. Token Factory serves
-   * text-only and vision models side by side, so the registry always passes this.
-   */
-  visionModels?: readonly string[] | undefined;
+  label: string;
   /** Injected by tests, which answer with a canned event stream instead of the network. */
   fetch?: typeof fetch | undefined;
   /** Tests pass 0 so an error case does not sit through the SDK's back-off. */
@@ -203,36 +193,6 @@ function parseArguments(raw: string): unknown {
   }
 }
 
-function hasImages(messages: readonly ChatCompletionMessageParam[]): boolean {
-  return messages.some(
-    (m) => Array.isArray(m.content) && m.content.some((part) => part.type === 'image_url'),
-  );
-}
-
-/**
- * The same conversation with every picture replaced by a line saying one was there.
- *
- * The last line of defence for a model that cannot see: the runner already drops a
- * screenshot such a pet would be sent, but a tool can still hand back an image mid-turn.
- * The note keeps the model from answering as if the look had come back empty.
- */
-function withoutImages(
-  messages: readonly ChatCompletionMessageParam[],
-  model: string,
-): ChatCompletionMessageParam[] {
-  return messages.map((m) => {
-    if (m.role !== 'user' || !Array.isArray(m.content)) return m;
-    const images = m.content.filter((part) => part.type === 'image_url').length;
-    if (images === 0) return m;
-    const note =
-      images === 1
-        ? `[An image was attached, but ${model} cannot see images.]`
-        : `[${images} images were attached, but ${model} cannot see images.]`;
-    const texts = m.content.flatMap((part) => (part.type === 'text' ? [part.text] : []));
-    return { role: 'user', content: [note, ...texts].join('\n') };
-  });
-}
-
 interface PendingCall {
   id: string;
   name: string;
@@ -242,8 +202,8 @@ interface PendingCall {
 /**
  * A BrainProvider over the OpenAI chat-completions wire format.
  *
- * Built for Nebius Token Factory, but nothing in it is Nebius-specific beyond the default
- * base URL, so a local vLLM or any other compatible server is one option away.
+ * Used for OpenRouter, but nothing in it is OpenRouter-specific beyond the base URL, so a
+ * local vLLM or any other compatible server is one option away.
  */
 export class OpenAiCompatibleProvider implements BrainProvider {
   readonly id: string;
@@ -251,14 +211,12 @@ export class OpenAiCompatibleProvider implements BrainProvider {
 
   readonly #client: OpenAI;
   readonly #label: string;
-  readonly #visionModels: readonly string[] | undefined;
   readonly #baseURL: string;
 
   constructor(options: OpenAiCompatibleProviderOptions) {
     this.id = options.id;
-    this.#label = options.label ?? 'Token Factory';
-    this.#visionModels = options.visionModels;
-    this.#baseURL = options.baseURL ?? NEBIUS_BASE_URL;
+    this.#label = options.label;
+    this.#baseURL = options.baseURL;
     this.#client = new OpenAI({
       apiKey: options.apiKey,
       baseURL: this.#baseURL,
@@ -280,10 +238,6 @@ export class OpenAiCompatibleProvider implements BrainProvider {
     } catch (error) {
       throw this.#toBrainError(error);
     }
-  }
-
-  canSee(model: string): boolean {
-    return this.#visionModels === undefined || this.#visionModels.includes(model);
   }
 
   async complete(
@@ -311,16 +265,11 @@ export class OpenAiCompatibleProvider implements BrainProvider {
       let finishReason: string | null = null;
       const pending = new Map<number, PendingCall>();
 
-      // Routed every round, not once per turn: an image a tool returns mid-turn moves
-      // the rest of the turn onto the vision model.
-      const routed = modelForTurn(this, req, hasImages(messages));
-      const model = routed ?? req.model;
-
       try {
         const stream = await this.#client.chat.completions.create(
           {
-            model,
-            messages: routed === null ? withoutImages(messages, model) : messages,
+            model: req.model,
+            messages,
             max_tokens: req.maxTokens,
             stream: true,
             stream_options: { include_usage: true },
@@ -354,7 +303,7 @@ export class OpenAiCompatibleProvider implements BrainProvider {
         }
       } catch (error) {
         if (error instanceof APIUserAbortError || signal.aborted) return finish('aborted');
-        throw this.#toBrainError(error, model);
+        throw this.#toBrainError(error, req.model);
       }
 
       // The SDK ends the iteration quietly when the signal fires mid-stream.

@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BrainEvents, BrainRequest } from './brain';
 import { BrainError } from './errors';
-import { NEBIUS_BASE_URL, OpenAiCompatibleProvider } from './openai-compatible';
+import { OpenAiCompatibleProvider } from './openai-compatible';
 import { REFUSAL_MESSAGE } from './brain';
 
 /**
@@ -85,7 +85,7 @@ function textReply(parts: string[], finishReason = 'stop', usage: [number, numbe
 }
 
 const request: BrainRequest = {
-  model: 'nvidia/nemotron-3-super-120b-a12b',
+  model: 'anthropic/claude-sonnet-5',
   system: 'You are Scout.',
   messages: [{ role: 'user', content: [{ type: 'text', text: 'what is this?' }] }],
   maxTokens: 2048,
@@ -112,8 +112,10 @@ function recorder(): { events: BrainEvents; deltas: string[]; calls: unknown[] }
 function provider(replies: Reply[]) {
   const fake = fakeFetch(replies);
   const p = new OpenAiCompatibleProvider({
-    id: 'nebius',
+    id: 'openrouter',
     apiKey: 'test-key',
+    baseURL: 'https://openrouter.ai/api/v1',
+    label: 'OpenRouter',
     fetch: fake.fetch,
     maxRetries: 0,
   });
@@ -123,13 +125,12 @@ function provider(replies: Reply[]) {
 const signal = () => new AbortController().signal;
 
 describe('OpenAiCompatibleProvider', () => {
-  it('defaults to the Token Factory base URL and sends the key as a bearer token', async () => {
+  it('posts to the base URL it was given and sends the key as a bearer token', async () => {
     const { provider: p, calls } = provider([textReply(['ok'])]);
 
     await p.complete(request, recorder().events, signal());
 
-    expect(NEBIUS_BASE_URL).toBe('https://api.tokenfactory.nebius.com/v1/');
-    expect(calls[0]?.url).toBe('https://api.tokenfactory.nebius.com/v1/chat/completions');
+    expect(calls[0]?.url).toBe('https://openrouter.ai/api/v1/chat/completions');
     expect(calls[0]?.method).toBe('POST');
     expect(calls[0]?.headers.get('authorization')).toBe('Bearer test-key');
   });
@@ -137,9 +138,10 @@ describe('OpenAiCompatibleProvider', () => {
   it('honours a configured base URL', async () => {
     const fake = fakeFetch([textReply(['ok'])]);
     const p = new OpenAiCompatibleProvider({
-      id: 'nebius',
+      id: 'openrouter',
       apiKey: 'k',
       baseURL: 'http://127.0.0.1:9999/v1/',
+      label: 'Local',
       fetch: fake.fetch,
       maxRetries: 0,
     });
@@ -151,7 +153,7 @@ describe('OpenAiCompatibleProvider', () => {
 
   it('advertises itself and its capabilities', () => {
     const { provider: p } = provider([]);
-    expect(p.id).toBe('nebius');
+    expect(p.id).toBe('openrouter');
     expect(p.capabilities).toEqual({ vision: true, tools: true });
   });
 
@@ -168,7 +170,7 @@ describe('OpenAiCompatibleProvider', () => {
       usage: { inputTokens: 11, outputTokens: 7 },
     });
     expect(calls[0]?.body).toMatchObject({
-      model: 'nvidia/nemotron-3-super-120b-a12b',
+      model: 'anthropic/claude-sonnet-5',
       max_tokens: 2048,
       stream: true,
       stream_options: { include_usage: true },
@@ -514,14 +516,14 @@ describe('OpenAiCompatibleProvider', () => {
     await expect(failure).rejects.toBeInstanceOf(BrainError);
     await failure.catch((error: BrainError) => {
       expect(error.code).toBe(code);
-      expect(error.message).toContain('Token Factory');
+      expect(error.message).toContain('OpenRouter');
     });
   });
 
   it('names the model when the server does not know it', async () => {
     const { provider: p } = provider([jsonError(404, 'model not found')]);
     await expect(p.complete(request, recorder().events, signal())).rejects.toThrow(
-      'nvidia/nemotron-3-super-120b-a12b',
+      'anthropic/claude-sonnet-5',
     );
   });
 
@@ -576,99 +578,6 @@ describe('OpenAiCompatibleProvider', () => {
   });
 });
 
-describe('OpenAiCompatibleProvider vision routing', () => {
-  function routed(replies: Reply[]) {
-    const fake = fakeFetch(replies);
-    const p = new OpenAiCompatibleProvider({
-      id: 'nebius',
-      apiKey: 'k',
-      fetch: fake.fetch,
-      maxRetries: 0,
-      visionModels: ['vl'],
-    });
-    return { provider: p, calls: fake.calls };
-  }
-
-  const withScreenshot: BrainRequest = {
-    ...request,
-    model: 'super',
-    visionModel: 'vl',
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'image', mime: 'image/png', base64: 'AAA' },
-          { type: 'text', text: 'what is this?' },
-        ],
-      },
-    ],
-  };
-
-  it('reports which models can see', () => {
-    const { provider: p } = routed([]);
-    expect(p.canSee('vl')).toBe(true);
-    expect(p.canSee('super')).toBe(false);
-  });
-
-  it('answers a text-only turn on the text model', async () => {
-    const { provider: p, calls } = routed([textReply(['ok'])]);
-    await p.complete(
-      { ...request, model: 'super', visionModel: 'vl' },
-      recorder().events,
-      signal(),
-    );
-    expect(calls[0]?.body.model).toBe('super');
-  });
-
-  it('answers a turn that carries a screenshot on the vision model', async () => {
-    const { provider: p, calls } = routed([textReply(['ok'])]);
-    await p.complete(withScreenshot, recorder().events, signal());
-    expect(calls[0]?.body.model).toBe('vl');
-  });
-
-  it('switches to the vision model once a tool hands back an image', async () => {
-    const { provider: p, calls } = routed([
-      sse([
-        chunk({
-          tool_calls: [
-            {
-              index: 0,
-              id: 'c1',
-              type: 'function',
-              function: { name: 'look_closer', arguments: '{}' },
-            },
-          ],
-        }),
-        chunk({}, 'tool_calls'),
-      ]),
-      textReply(['a chart']),
-    ]);
-    const { events } = recorder();
-    events.onToolUse = () =>
-      Promise.resolve({
-        content: [{ type: 'image' as const, mime: 'image/png' as const, base64: 'C' }],
-      });
-
-    await p.complete({ ...request, model: 'super', visionModel: 'vl' }, events, signal());
-
-    expect(calls.map((call) => call.body.model)).toEqual(['super', 'vl']);
-  });
-
-  it('never sends pixels to a model that cannot see them', async () => {
-    const { provider: p, calls } = routed([textReply(['ok'])]);
-    const { visionModel: _none, ...noVision } = withScreenshot;
-
-    await p.complete(noVision, recorder().events, signal());
-
-    expect(calls[0]?.body.model).toBe('super');
-    expect(JSON.stringify(calls[0]?.body.messages)).not.toContain('image_url');
-    expect(calls[0]?.body.messages[1]).toEqual({
-      role: 'user',
-      content: '[An image was attached, but super cannot see images.]\nwhat is this?',
-    });
-  });
-});
-
 describe('OpenAiCompatibleProvider models', () => {
   function models(replies: Reply[]) {
     const fake = fakeFetch(replies);
@@ -676,6 +585,7 @@ describe('OpenAiCompatibleProvider models', () => {
       id: 'openrouter',
       apiKey: 'k',
       baseURL: 'https://openrouter.ai/api/v1',
+      label: 'OpenRouter',
       fetch: fake.fetch,
       maxRetries: 0,
     });

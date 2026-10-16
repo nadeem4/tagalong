@@ -1,6 +1,6 @@
 /**
- * `createProvider`: builds the provider a pet names ('claude-code', 'anthropic', 'nebius',
- * 'openrouter' or 'fake'). Fake mode (`TAGALONG_FAKE_PROVIDERS=1`) always wins, and
+ * `createProvider`: builds the provider a pet names ('claude-code', 'anthropic', 'openrouter'
+ * or 'fake'). Fake mode (`TAGALONG_FAKE_PROVIDERS=1`) always wins, and
  * `TAGALONG_FAKE_TOOL` scripts the fake to call one tool.
  */
 import type { BrainProvider } from './brain';
@@ -13,7 +13,7 @@ import { openAiPreset } from './presets';
 
 /** What the engine knows about the provider before it builds one. */
 export interface ProviderConfig {
-  /** Matches `Pet.providerId`: 'claude-code', 'anthropic', 'nebius', 'openrouter' or 'fake'. */
+  /** Matches `Pet.providerId`: 'claude-code', 'anthropic', 'openrouter' or 'fake'. */
   providerId: string;
   /** Read from the host's SecretStore; never stored in settings. */
   apiKey?: string | undefined;
@@ -72,7 +72,6 @@ export function createProvider(config: ProviderConfig): BrainProvider {
       apiKey: config.apiKey,
       baseURL: config.baseURL ?? preset.baseURL,
       label: preset.label,
-      visionModels: preset.visionModels,
     });
   }
 
@@ -90,7 +89,7 @@ export function createProvider(config: ProviderConfig): BrainProvider {
     default:
       throw new BrainError(
         'config',
-        `Unknown provider id '${config.providerId}'. Supported: 'claude-code', 'nebius', 'openrouter', 'anthropic' and 'fake'.`,
+        `Unknown provider id '${config.providerId}'. Supported: 'claude-code', 'openrouter', 'anthropic' and 'fake'.`,
       );
   }
 }

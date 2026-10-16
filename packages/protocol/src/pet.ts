@@ -39,17 +39,12 @@ export const Pet = z.object({
   /** The model that answers text turns. */
   model: z.string().min(1),
   /**
-   * The model a turn switches to when it carries an image and `model` cannot see.
-   * Optional: a pet on a model that sees, or a provider whose models all do, needs none.
-   */
-  visionModel: z.string().min(1).optional(),
-  /**
    * The small, cheap model that answers a watch's frequent yes-or-no check, on the pet's
-   * own provider. Absent means that provider's default: Nemotron 3 Nano on
-   * Token Factory, Claude Haiku on OpenRouter and Anthropic.
+   * own provider. Absent means that provider's default: Claude Haiku on OpenRouter and
+   * Anthropic.
    */
   watchModel: z.string().min(1).optional(),
-  /** BrainProvider id: 'claude-code', 'nebius', 'openrouter', 'anthropic' or 'fake'. */
+  /** BrainProvider id: 'claude-code', 'openrouter', 'anthropic' or 'fake'. */
   providerId: z.string().min(1),
   /**
    * Tool id to `off` or `allowed`. A tool the role lists and this map leaves out is

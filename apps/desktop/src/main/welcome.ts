@@ -99,18 +99,17 @@ export function welcomeCrew(
 
 /**
  * The pet as the Companion thinking on `providerId`, on the model its role's tier recommends
- * there. Vision and watch models are dropped: they named the old provider's models. Used by
+ * there. The watch model is dropped: it named the old provider's model. Used by
  * Welcome and by Settings when a key is saved because no Claude sign-in was found.
  */
 export function companionOn(current: Pet, providerId: string, companion: Role): Pet {
   const recommended = recommendedModel(companion, providerId);
-  const { visionModel: _vision, watchModel: _watch, ...rest } = current;
+  const { watchModel: _watch, ...rest } = current;
   return Pet.parse({
     ...rest,
     roleId: companion.id,
     providerId,
     model: recommended?.model ?? current.model,
-    ...(recommended?.visionModel === undefined ? {} : { visionModel: recommended.visionModel }),
   });
 }
 

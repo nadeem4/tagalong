@@ -18,8 +18,8 @@ const scout: Pet = {
   name: 'Scout',
   avatar: '🔎',
   notes: 'You are Scout.',
-  model: 'nvidia/nemotron-3-super-120b-a12b',
-  providerId: 'nebius',
+  model: 'anthropic/claude-haiku-4.5',
+  providerId: 'openrouter',
   roleId: 'companion',
   toolGrants: {},
   replyStyle: 'text',
@@ -114,7 +114,7 @@ describe('Summarizer', () => {
       scout,
     );
 
-    expect(fake.asked).toEqual([{ providerId: 'nebius', model: scout.model }]);
+    expect(fake.asked).toEqual([{ providerId: 'openrouter', model: scout.model }]);
     expect(fake.requests[0]?.model).toBe(scout.model);
   });
 
