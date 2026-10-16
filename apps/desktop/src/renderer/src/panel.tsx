@@ -1,3 +1,8 @@
+/**
+ * The panel window's page: Scout's bubble beside the pet and the full chat one click behind
+ * it, with talk-to-Scout (talk.ts), Scout's voice, the health check (health-facts.ts) and the
+ * cards Scout opens (keep-an-eye lines, routine results, pick-up, dropped items).
+ */
 import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
@@ -258,7 +263,7 @@ function Panel() {
     return window.tagalongHost.onHotkeyProblem(setHotkeyProblem);
   }, []);
 
-  // Opens on the default pet (Scout on a fresh install); the crew strip moves it from there.
+  // Opens on the default pet, Scout on a fresh install.
   useEffect(() => {
     Promise.all([window.tagalong.listPets(), window.tagalongHost.getHostView()])
       .then(([pets, view]) => {
@@ -280,7 +285,7 @@ function Panel() {
     [],
   );
 
-  // A click on the desktop crew strip picks the pet this panel talks to.
+  // A click on the pet on the desktop names the pet this panel talks to.
   useEffect(() => window.tagalongHost.onActivePet(setPetId), []);
 
   if (petId === null) return <p className="settings__note">Waking the crew…</p>;

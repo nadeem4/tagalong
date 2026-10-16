@@ -1,3 +1,7 @@
+/**
+ * The pointer window's page: the ring Scout draws round one thing on screen when it points
+ * (it never clicks). Contains PointerRingView; main sends each ring.
+ */
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fontsource/onest/latin-600.css';

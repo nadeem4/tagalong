@@ -1,3 +1,9 @@
+/**
+ * Settings' Privacy section: Seeing and Always listening (live switches), the launch hello,
+ * keeping an eye on things, gentle nudges, pick up where you left off, rolling memory on or off,
+ * how long What Scout saw keeps, and the built-in blind spots, listed from BLIND_SPOTS and never
+ * switchable. Rolling memory's minutes are under Advanced.
+ */
 import { useEffect, useState } from 'react';
 import {
   BLIND_SPOTS,
@@ -128,13 +134,6 @@ function SightLogDays({ days }: { days: number }) {
   );
 }
 
-/**
- * Seeing and Always listening (live), the hello on launch, keeping an eye on things, gentle nudges, rolling memory's on/off, and what Scout
- * never looks at. The blind
- * spots are built in and always on, so they are listed from `BLIND_SPOTS` and nothing here
- * can switch them off.
- * The minutes rolling memory keeps are under Advanced.
- */
 export function PrivacySection({ settings, platform }: { settings: Settings; platform: string }) {
   const [remember, setRemember] = useState(settings.rollingMemory.enabled);
   const [greet, setGreet] = useState(settings.greeting);

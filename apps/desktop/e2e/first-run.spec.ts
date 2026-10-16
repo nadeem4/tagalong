@@ -1,3 +1,7 @@
+/**
+ * End-to-end: Welcome on a fresh profile, answered by typing, signed in to Claude and without
+ * Claude Code.
+ */
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

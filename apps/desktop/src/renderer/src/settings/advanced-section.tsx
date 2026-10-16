@@ -1,9 +1,10 @@
+/**
+ * Settings' Advanced section: the tuning knobs, closed by default behind a real disclosure
+ * button. Closed only hides it: every field stays in the form, so saving never drops a value
+ * nobody opened.
+ */
 import type { ReactNode } from 'react';
 
-/**
- * Advanced: the tuning knobs, closed by default behind a real disclosure button. Closed only
- * hides it: every field stays in the form, so saving never drops a value nobody opened.
- */
 export function AdvancedSection({
   open,
   onToggle,

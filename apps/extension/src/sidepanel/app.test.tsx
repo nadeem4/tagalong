@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+/** Tests for the side panel UI across connection states. */
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ContextSnapshot, Pet } from '@tagalong/protocol';

@@ -1,11 +1,11 @@
-import type { SocketLike } from '../engine-connection';
-
-type Listener = (event: { data?: unknown }) => void;
-
 /**
  * A WebSocket double that does nothing on its own: the test opens it, feeds it frames,
  * and closes it, so every state the connection passes through is one the test chose.
  */
+import type { SocketLike } from '../engine-connection';
+
+type Listener = (event: { data?: unknown }) => void;
+
 export class FakeSocket implements SocketLike {
   static readonly OPEN = 1;
   readyState = 0;

@@ -1,3 +1,4 @@
+/** Tests for visibleCrew: the default pet first, hidden pets left out. */
 import { describe, expect, it } from 'vitest';
 import type { Pet } from '@tagalong/protocol';
 import { visibleCrew } from './crew';

@@ -1,3 +1,4 @@
+/** Tests for buildSettingsPatch and the Settings form helpers. */
 import { describe, expect, it } from 'vitest';
 import { MAX_USER_NAME_CHARS, MAX_WINDOW_TEXT_CHARS, SETTINGS_DEFAULTS } from '@tagalong/protocol';
 

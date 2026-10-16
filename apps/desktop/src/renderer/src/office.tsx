@@ -1,3 +1,8 @@
+/**
+ * The Home window's page (built as `office.html`): HomeView from @tagalong/ui with the
+ * desktop's host calls, Settings embedded as one of its pages, and the routing main asks
+ * for (a page, a Settings section, a routine draft to edit).
+ */
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HomeView, HostBridgeProvider } from '@tagalong/ui';
@@ -18,7 +23,7 @@ import { homeTarget, scrollToSection } from './home-target';
 /** How long Home waits, a tenth of a second at a time, for Settings to draw a section. */
 const SCROLL_TRIES = 30;
 
-/** How Home reads and changes the companion on the desktop: the same host calls as before. */
+/** How Home reads and changes the companion through the desktop's host calls. */
 const homeHost: HomeHost = {
   setup: async () => {
     const view = await window.tagalongHost.getHostView();
@@ -46,11 +51,7 @@ const homeHost: HomeHost = {
   },
 };
 
-/**
- * The Home window (the page keeps its old `office` name): the one window for the companion,
- * its experts, activity and settings. Main names a page when the tray or the bubble opens a
- * particular one, such as Settings.
- */
+/** The Home window. Main names a page when the tray or the bubble opens a particular one, such as Settings. */
 function Home() {
   const [page, setPage] = useState<HomePage | undefined>(undefined);
   // Scout's routine card, opened here by its Edit button.

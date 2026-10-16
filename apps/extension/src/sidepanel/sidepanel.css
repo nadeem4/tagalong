@@ -1,7 +1,6 @@
 /*
- * @tagalong/ui is written against Tailwind utility classes and this host does not ship the
- * Tailwind toolchain, the same as the desktop renderer. These rules supply the structure
- * those classes would have — enough for a usable panel.
+ * The side panel's sheet. @tagalong/ui is written against Tailwind utility classes and the
+ * extension does not ship Tailwind, so these rules give the structure those classes would.
  */
 :root {
   font:

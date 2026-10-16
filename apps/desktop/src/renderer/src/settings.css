@@ -1,7 +1,4 @@
-/*
- * Settings draws itself from @tagalong/ui's SETTINGS_CSS, built from the office tokens; the
- * page only has to give it the whole window.
- */
+/* The standalone Settings window's sheet: the page draws itself from @tagalong/ui's SETTINGS_CSS, so this only gives it the whole window. */
 html,
 body,
 #root {

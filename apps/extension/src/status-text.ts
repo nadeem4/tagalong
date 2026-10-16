@@ -1,6 +1,6 @@
+/** One sentence per connection state, shared by the options page and the side panel. */
 import type { ConnectionStatus } from './engine-connection';
 
-/** One sentence per connection state, shared by the options page and the side panel. */
 export function describeStatus(status: ConnectionStatus): string {
   switch (status.state) {
     case 'unpaired':

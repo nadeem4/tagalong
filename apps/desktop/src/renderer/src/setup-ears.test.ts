@@ -1,3 +1,4 @@
+/** Tests for Welcome's ears and micFailure. */
 import { describe, expect, it, vi } from 'vitest';
 import type { Ears, EarsEvent, ListenMode, MicStream } from '@tagalong/protocol';
 import type { ListenMic } from '@tagalong/ui';

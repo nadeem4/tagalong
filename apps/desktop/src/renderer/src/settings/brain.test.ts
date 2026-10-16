@@ -1,3 +1,4 @@
+/** Tests for scoutBrain and overviewStatus. */
 import { describe, expect, it } from 'vitest';
 import { Pet } from '@tagalong/protocol';
 import type { ProviderChoice } from '../../../shared/ipc';

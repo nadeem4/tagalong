@@ -1,3 +1,8 @@
+/**
+ * Turns the Settings form into a settings patch, kept apart from React so it is tested in plain
+ * Node. Contains SettingsFormValues, buildSettingsPatch and its field checks, SettingsFieldError,
+ * and helpers the sections share (summarizer list, key caps, voice facts, cleanUserName).
+ */
 import {
   MAX_DAILY_BUDGET_USD,
   MAX_ROLLING_MEMORY_MINUTES,
@@ -12,13 +17,7 @@ import {
 import type { SettingsPatch as SettingsPatchType, VoiceAdapterFacts } from '@tagalong/protocol';
 import type { ClaudeSignIn, ProviderChoice } from '../../shared/ipc';
 
-/**
- * The settings form's raw values, as `FormData` hands them over: every field a string.
- *
- * Separate from the component so the patch it builds can be tested. The desktop package
- * runs its tests in plain Node with no DOM, and the interesting part here was never the
- * rendering — it was which fields end up in the patch.
- */
+/** The settings form's raw values, as `FormData` hands them over: every field a string. */
 export interface SettingsFormValues {
   /** One box per OpenAI-compatible preset. Blank means the preset's own URL. */
   baseUrls: readonly { providerId: string; label: string; value: string }[];
@@ -28,7 +27,7 @@ export interface SettingsFormValues {
   talkHotkey: string;
   sightDetail: string;
   windowTextBudget: string;
-  /** Phase 4. The pets unticked under "Show on desktop". Absent leaves the setting alone. */
+  /** Pet ids to hide from the desktop. Absent leaves the setting alone. */
   hiddenPets?: readonly string[];
   /** The summarizer list's value: blank for "Same as Scout", else `summarizerValue(…)`. */
   summarizer?: string;
@@ -42,7 +41,7 @@ export interface SettingsFormValues {
   wellbeing?: boolean;
   /** What Scout calls you. Blank clears it; absent leaves the setting alone. */
   userName?: string;
-  /** Phase 3B. Present together when the form shows rolling memory and the watches. */
+  /** Present together when the form shows rolling memory and the watches. */
   rollingMemoryEnabled?: boolean;
   rollingMemoryMinutes?: string;
   watchMaxChecks?: string;

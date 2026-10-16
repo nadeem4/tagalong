@@ -1,3 +1,4 @@
+/** Tests for installVoiceSeam. */
 import { describe, expect, it, vi } from 'vitest';
 import { Pushable } from '@tagalong/protocol';
 import type { EarsEvent } from '@tagalong/protocol';

@@ -1,3 +1,4 @@
+/** Tests for the side panel's port bridge. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ContextSnapshot } from '@tagalong/protocol';
 import type { TurnEvent } from '@tagalong/ui';

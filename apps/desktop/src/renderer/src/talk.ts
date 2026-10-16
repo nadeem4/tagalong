@@ -1,3 +1,7 @@
+/**
+ * useTalk: Talk to Scout in the bubble (hold the talk key or the mic button) and Always
+ * listening. Used by panel.tsx; the rules it applies are in talk-rules.ts.
+ */
 import { useEffect, useRef, useState } from 'react';
 import { ListenController, PushToTalk } from '@tagalong/ui';
 import type { BubbleTalk, TalkAction } from '@tagalong/ui';
@@ -25,7 +29,7 @@ export interface TalkOptions {
  * its frames stream to the ears in the voice process, the words heard so far show as they
  * come, and letting go hands the question to the bubble. With Always listening switched on
  * (read at mount, so a launch with it on listens from the start) the microphone stays open
- * as well, closed during a call or full screen, with the pets hidden and while the system
+ * as well, closed during a call or full screen, while Scout is hidden and while the system
  * voice speaks, and only talk that starts with "Scout" is asked; the key and the mic button
  * still ask without the name. The microphone never opens otherwise.
  */

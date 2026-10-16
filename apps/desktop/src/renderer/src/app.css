@@ -1,7 +1,7 @@
 /*
- * @tagalong/ui is written against Tailwind utility classes. The desktop host cannot add
- * the Tailwind toolchain in this task, so this sheet covers the structural rules those
- * classes would have supplied — enough for a usable panel until the build gains Tailwind.
+ * Shared sheet for the avatar, bubble and Welcome windows. @tagalong/ui's chat parts are written
+ * against Tailwind utility classes and the desktop does not ship Tailwind, so these rules give the
+ * structure those classes would.
  */
 
 :root {
@@ -34,7 +34,10 @@ body {
   height: 100%;
 }
 
-/* The avatar window is transparent and the whole pet is the drag handle. */
+/*
+ * The avatar window is transparent. Its empty area is a drag region; the pet button opts out
+ * and pet-input.ts moves it, so its clicks still land.
+ */
 .avatar-body {
   background: transparent;
 }

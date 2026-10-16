@@ -1,15 +1,15 @@
+/**
+ * Settings' Keys group, under Advanced. One row per service that takes a key: whether one is
+ * stored, a box to add or replace it, its base URL, and Remove. A stored key is never read back
+ * into the form (`hasKey` is all main will say), so a saved secret cannot be recovered from a
+ * window someone left open. Every base URL box stays in the form even while its row is closed,
+ * since the overrides are sent whole and a missing box would read as "back to the default".
+ */
 import { useState } from 'react';
 import type { Settings } from '@tagalong/protocol';
 import type { ProviderChoice } from '../../../shared/ipc';
 import { Info, Tip, useInvalid } from './section';
 
-/**
- * One row per service that takes a key: whether one is stored, a box to add or replace it,
- * its base URL, and Remove. A stored key is never read back into the form (`hasKey` is all
- * main will say), so a saved secret cannot be recovered from a window someone left open.
- * Every base URL box stays in the form even while its row is closed, since the overrides
- * are sent whole and a missing box would read as "back to the default".
- */
 export function KeysSection({
   providers,
   settings,

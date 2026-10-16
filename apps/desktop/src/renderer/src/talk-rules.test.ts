@@ -1,3 +1,4 @@
+/** Tests for the talk rules: settling, partial words, and failures said once. */
 import { describe, expect, it } from 'vitest';
 import { EarsNotes, FIRST_TIME, FailureStreak, micNote, settles, shownPartial } from './talk-rules';
 

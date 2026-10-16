@@ -1,3 +1,4 @@
+/** Tests for openMic: the microphone and audio graph are closed on every failure. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { openMic } from './mic';
 import { micFailure } from './setup-ears';

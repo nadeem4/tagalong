@@ -1,3 +1,7 @@
+/**
+ * createPortBridge: the side panel's HostBridge, relayed over a chrome.runtime port to the
+ * service worker, plus the extension's status and capture extras.
+ */
 import { coreToHostNotifications } from '@tagalong/protocol';
 import type { ContextSnapshot, HostToCoreMethod, PerceptionTarget } from '@tagalong/protocol';
 import type { HostBridge, TurnEvent } from '@tagalong/ui';

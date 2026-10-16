@@ -1,12 +1,13 @@
-import { brainLabel } from '@tagalong/ui';
-import type { Pet } from '@tagalong/protocol';
-import type { ClaudeSignIn, ProviderChoice } from '../../../shared/ipc';
-
 /**
  * What the "How Scout thinks" card says, read from Scout itself (its provider and model),
  * never from `settings.providerId`, which the engine ignores. The chip always carries
  * words, so the state never rests on colour alone.
+ * Contains scoutBrain and overviewStatus (Home's overview line).
  */
+import { brainLabel } from '@tagalong/ui';
+import type { Pet } from '@tagalong/protocol';
+import type { ClaudeSignIn, ProviderChoice } from '../../../shared/ipc';
+
 export interface ScoutBrain {
   /**
    * `no-sign-in`: Scout is on the Claude sign-in and Claude Code is not on this computer,

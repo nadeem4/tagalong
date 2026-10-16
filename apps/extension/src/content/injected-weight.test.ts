@@ -1,10 +1,10 @@
-import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
-
 /**
  * The page reader is injected into the user's tab on every read, so what it imports ships
  * into that page each time. Zod alone would more than double it.
  */
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+
 describe('the injected page reader', () => {
   it('takes its budgets from the protocol limits module, which imports nothing', () => {
     const limits = readFileSync(

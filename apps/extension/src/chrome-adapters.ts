@@ -1,3 +1,7 @@
+/**
+ * The real Chrome APIs behind the tested modules' interfaces: chrome.storage.local for pairing,
+ * and the active tab for tab-capture.ts.
+ */
 import type { PageReading } from './content/read-page';
 import type { StorageArea } from './pairing';
 import type { TabAccess } from './tab-capture';

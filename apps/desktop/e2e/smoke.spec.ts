@@ -1,3 +1,7 @@
+/**
+ * End-to-end smoke test: one app on a fake brain, through the avatar, bubble, talk, capture,
+ * sight pause, hotkeys, Welcome and Home.
+ */
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -24,8 +28,7 @@ test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async () => {
   app = await electron.launch({
-    // A fresh profile every run, so a developer's own crew (and a pending roles notice that
-    // would open the office at launch) never changes what this suite sees.
+    // A fresh profile every run, so a developer's own pets and settings never change what this suite sees.
     args: ['.', `--user-data-dir=${mkdtempSync(join(tmpdir(), 'tagalong-smoke-'))}`],
     cwd: appDir,
     // Fake providers keep the smoke test offline and deterministic: no API key, no
@@ -40,7 +43,7 @@ test.beforeAll(async () => {
       // only way a tool call travels the real socket to the real host in this suite.
       // Every tool test feeds the toolset a fake host and every host test feeds the
       // parser fixture output, so the perception.* methods between them are covered by
-      // neither — and this phase has already shipped two dead paths through that gap.
+      // neither.
       TAGALONG_FAKE_TOOL: 'list_windows',
       // Welcome would open on a fresh profile and change the window count the first test
       // asserts. Its own test below opens it on purpose.
@@ -168,8 +171,8 @@ test('the bubble asks, shows the answer, and opens the full chat', async () => {
   await avatar.evaluate(() => window.tagalongHost.togglePanel());
 
   const panel = await windowFor('panel');
-  // The panel shows "Waking the crew…" until pets.list answers, so the bubble's field is
-  // not in the DOM the moment the window appears.
+  // The panel shows a waiting line until pets.list answers, so the bubble's field is not in
+  // the DOM the moment the window appears.
   const field = panel.getByLabel(/^Ask /);
   await field.waitFor({ state: 'visible', timeout: 30_000 });
 
@@ -248,13 +251,11 @@ test('capture takes a real, downscaled PNG of the screen', async () => {
 test('a full-view capture returns every real display and a composite', async () => {
   const avatar = await windowFor('avatar');
 
-  // The task 5 counterpart to the screenshot check above, and the only place the
-  // Phase 2B capture path runs for real. Every unit test in `displays.test.ts`,
-  // `composite.test.ts` and `context.test.ts` injects a fake capturer — they prove the
-  // layout maths and the policy, and all of them would pass with the Electron call
-  // wired to nothing. Task 4 shipped exactly that bug on the PowerShell transport, so
-  // this asserts the real `screen.getAllDisplays` and `desktopCapturer` ran and came
-  // back as the snapshot the engine would receive.
+  // The only place the full-view capture runs for real. The unit tests in
+  // `displays.test.ts`, `composite.test.ts` and `context.test.ts` inject a fake capturer:
+  // they prove the layout maths and the policy, and would all pass with the Electron call
+  // wired to nothing. So this asserts the real `screen.getAllDisplays` and `desktopCapturer`
+  // ran and came back as the snapshot the engine would receive.
   const full = await avatar.evaluate(async () => {
     const snapshot = await window.tagalong.capture(['displays']);
     const displays = snapshot?.displays;
@@ -305,12 +306,10 @@ test('a full-view capture returns every real display and a composite', async () 
 test('a tool call travels the real socket and the real host answers it', async () => {
   const avatar = await windowFor('avatar');
 
-  // The gap this closes. Every test in packages/core/src/perception hands the toolset a
-  // fake host, and every test in apps/desktop/src/main/platform feeds a parser fixture
-  // output, so a tool can be right and a host can be right while the perception.* method
-  // between them is unimplemented and the whole suite stays green. Phase 2B shipped that
-  // exact shape twice: a dead PowerShell transport in task 4, and a capture path that
-  // answered perception.capture(['displays']) with nothing in task 5.
+  // Every test in packages/core/src/perception hands the toolset a fake host, and every
+  // test in apps/desktop/src/main/platform feeds a parser fixture output, so a tool and a
+  // host can each be right while the perception.* method between them is missing and the
+  // whole suite stays green. This drives the real round trip.
   //
   // The fake pet is scripted to call list_windows before it answers, so asking anything
   // drives a real core-to-host request over the loopback socket into the real Electron
@@ -350,8 +349,7 @@ test('a tool call travels the real socket and the real host answers it', async (
  * The test that catches a pause that does not pause.
  *
  * Every unit test in this repo injects a fake platform, and the gate is applied to the
- * real one in `start()`. So the whole suite passes with the gating removed — verified by
- * deleting `gateSight` from `start()` and watching 761 tests stay green. A privacy
+ * real one in `start()`. So the whole suite passes with the gating removed. A privacy
  * control whose failure mode is silence needs a check that runs the real wiring.
  */
 test('pausing sight refuses a real capture, and resuming restores it', async () => {
@@ -389,9 +387,8 @@ test('pausing sight refuses a real capture, and resuming restores it', async () 
  *
  * Every unit test around hotkeys injects a fake registrar and applies the bindings
  * itself, which proves the manager rebinds and never that a *save* reaches it. Delete the
- * one line in the save handler that re-applies them and all 780 unit tests still pass
- * while a rebound hotkey quietly does nothing until the next launch — the same shape as
- * the transport, the capture path and the pause gate earlier in this phase.
+ * one line in the save handler that re-applies them and every unit test still passes
+ * while a rebound hotkey quietly does nothing until the next launch.
  *
  * An accelerator Electron cannot parse is the observable handle: it makes registration
  * fail, and a failed registration is reported through `hostView`. No keypress needed, and
@@ -484,8 +481,7 @@ test('Setup opens on request: the steps are listed and an answer box waits', asy
   await expect(setup.getByRole('heading', { level: 1 })).not.toBeEmpty();
   await expect(setup.getByLabel('Answer Scout')).toBeVisible();
 
-  // Nothing is answered: finishing would make Scout the Companion and hide the crew the
-  // rest of the suite talks to.
+  // Nothing is answered: finishing would change Scout and its settings for the rest of the suite.
   await app.evaluate(({ BrowserWindow }) => {
     for (const w of BrowserWindow.getAllWindows()) {
       if (w.webContents.getURL().includes('onboarding.html')) w.close();
@@ -501,7 +497,7 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
   const home = await windowFor('office');
   await expect(home).toHaveTitle('Home');
 
-  // One companion and eight pages; no crew and no office scene.
+  // One companion and eight pages.
   const nav = home.getByRole('navigation', { name: 'Tagalong' });
   await expect(nav.getByRole('button')).toHaveText(
     [
@@ -520,7 +516,7 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
   expect(pets.map((pet) => pet.id)).toEqual(['scout']);
   await expect(home.getByRole('region', { name: 'Scout' })).toContainText('Thinks with');
 
-  // Settings is a page of Home now: opening Settings anywhere lands here.
+  // Settings is a page of Home: opening Settings anywhere lands here.
   await panel.evaluate(() => window.tagalongHost.openSettings());
   for (const section of ['How Scout thinks', 'Privacy', 'Shortcuts', 'Advanced']) {
     await expect(home.getByRole('region', { name: section })).toBeVisible({ timeout: 15_000 });

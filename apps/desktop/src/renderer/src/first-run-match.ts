@@ -1,11 +1,12 @@
+/**
+ * Setup's answers are fixed choices, so typed text and local speech-to-text are matched
+ * here with no AI. A match needs exactly one choice; two or none and Scout asks again.
+ * Contains normalise, matchChoice, choicesFor and nameFrom; used by onboarding.tsx.
+ */
 import type { WelcomeStep } from '@tagalong/protocol';
 import type { ClaudeSignIn, ProviderChoice } from '../../shared/ipc';
 import { cleanUserName } from './settings-form';
 
-/**
- * Setup's answers are fixed choices, so typed text and local speech-to-text are matched
- * here with no AI. A match needs exactly one choice; two or none and Scout asks again.
- */
 export interface Choice {
   id: string;
   says: readonly string[];

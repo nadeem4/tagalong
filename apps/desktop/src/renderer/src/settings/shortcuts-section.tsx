@@ -1,13 +1,13 @@
+/**
+ * Settings' Shortcuts section: the ask key, which brings the selected text and the window you
+ * are on, the pause key and the key that stops Scout speaking (the talk key is under Voice).
+ * Every hotkey is sent on every save (see buildSettingsPatch); main re-registers them and
+ * reports one it could not take as `hotkeyError`, shown here on the field it names.
+ */
 import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import type { Settings } from '@tagalong/protocol';
 import { Info, Section, Tip } from './section';
 
-/**
- * The global hotkeys: the ask, which brings the selected text and the window you are on,
- * the pause, and the key that stops Scout speaking. All are sent on every save (see `buildSettingsPatch`), and main
- * re-registers them, reporting a key it could not take as `hotkeyError`, which is shown
- * here and marks the field whose combination it names.
- */
 export function ShortcutsSection({
   settings,
   hotkeyError,

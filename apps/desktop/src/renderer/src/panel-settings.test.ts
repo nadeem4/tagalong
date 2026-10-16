@@ -1,3 +1,4 @@
+/** Tests for panelSettings: the keys as read on each platform, the microphone and name. */
 import { describe, expect, it } from 'vitest';
 import { SETTINGS_DEFAULTS, Settings } from '@tagalong/protocol';
 import { panelSettings } from './panel-settings';

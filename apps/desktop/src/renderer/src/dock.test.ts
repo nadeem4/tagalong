@@ -1,3 +1,4 @@
+/** Tests for the dock's mood reducer and the press-to-drag threshold. */
 import { describe, expect, it } from 'vitest';
 import { IDLE_DOCK, dockMood, moveDrag, nextDock, startDrag } from './dock';
 

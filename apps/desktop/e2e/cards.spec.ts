@@ -1,3 +1,9 @@
+/**
+ * The three cards Scout shows before anything happens: the hand-off card, the connector
+ * confirm card and the routine card. Each needs the fake pet to reach for a different tool
+ * (TAGALONG_FAKE_TOOL is read once, at launch), so each block starts its own app on its own
+ * fresh profile, which also gives it its own single-instance lock.
+ */
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -7,13 +13,6 @@ import type { ElectronApplication, Page } from '@playwright/test';
 // Imported only for the `declare global` it carries, which types `window.tagalong` and
 // `window.tagalongHost` inside the page evaluates below.
 import type {} from '../src/shared/ipc';
-
-/**
- * The three cards Scout shows before anything happens: the hand-off card, the connector
- * confirm card and the routine card. Each needs the fake pet to reach for a different tool
- * (TAGALONG_FAKE_TOOL is read once, at launch), so each block starts its own app on its own
- * fresh profile, which also gives it its own single-instance lock.
- */
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 

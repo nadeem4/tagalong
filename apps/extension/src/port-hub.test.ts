@@ -1,3 +1,4 @@
+/** Tests for PortHub: relaying engine calls and delivering captures to panels. */
 import { describe, expect, it, vi } from 'vitest';
 import type { ContextSnapshot } from '@tagalong/protocol';
 import { PortHub } from './port-hub';

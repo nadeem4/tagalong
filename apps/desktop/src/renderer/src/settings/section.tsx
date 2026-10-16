@@ -1,3 +1,7 @@
+/**
+ * Building blocks every Settings section uses: SECTIONS (ids and titles, in page order),
+ * Section, the ⓘ Info button and its Tip, and the context that marks the field a save refused.
+ */
 import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
 

@@ -1,3 +1,8 @@
+/**
+ * Answers perception.capture from the active tab (selection, page text, tab identity) and
+ * builds the snapshot for a side-panel ask. Chrome is injected, so the mapping is tested
+ * without it.
+ */
 import type { ContextSnapshot, ContextSnapshotPatch, PerceptionTarget } from '@tagalong/protocol';
 import type { PageReading } from './content/read-page';
 

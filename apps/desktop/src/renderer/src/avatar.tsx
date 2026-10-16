@@ -1,3 +1,8 @@
+/**
+ * The avatar window's page: Scout's pixel figure on the desktop, with its mood and the
+ * sight-paused, recording and listening marks. Mood rules live in dock.ts and pointer and
+ * drop handling in pet-input.ts; this file only wires them to the host.
+ */
 import { StrictMode, useEffect, useReducer, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { DockPet } from '@tagalong/ui';

@@ -1,3 +1,4 @@
+/** Tests for describeStatus. */
 import { describe, expect, it } from 'vitest';
 import { describeStatus } from './status-text';
 

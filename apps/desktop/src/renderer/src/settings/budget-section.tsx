@@ -1,10 +1,11 @@
+/**
+ * Settings' Daily budget section: a daily cap on priced spend. Off (blank) by default. Once
+ * today's priced dollars reach it, keep-an-eye comments and scheduled routines wait until
+ * midnight; asking Scout never.
+ */
 import type { Settings } from '@tagalong/protocol';
 import { Info, Section, Tip, useInvalid } from './section';
 
-/**
- * A daily cap on priced spend. Off (blank) by default. Once today's priced dollars reach
- * it, keep-an-eye comments and scheduled routines wait until midnight; asking Scout never.
- */
 export function BudgetSection({ settings }: { settings: Settings }) {
   const invalid = useInvalid('dailyBudget');
   const value = settings.budget.dailyUsd;

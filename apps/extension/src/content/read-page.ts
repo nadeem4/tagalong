@@ -1,3 +1,7 @@
+/**
+ * readPage: the selection and the readable main text of the page it runs in, using Readability
+ * on a clone. Injected into the user's tab on demand only.
+ */
 import { Readability } from '@mozilla/readability';
 // The zod-free subpath: this file is injected into the user's page, and the schemas would
 // more than double what every read ships into the tab.
