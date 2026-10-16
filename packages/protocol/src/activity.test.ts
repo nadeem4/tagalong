@@ -1,3 +1,4 @@
+/** Tests for the Activity log schemas and the activity.list method. */
 import { describe, expect, it } from 'vitest';
 import { ActivityEntry, ActivityListParams, ActivityListResult } from './activity';
 import { hostToCoreMethods } from './methods';

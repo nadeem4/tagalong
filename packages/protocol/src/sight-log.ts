@@ -1,10 +1,10 @@
-import { z } from 'zod';
-
 /**
  * What Scout saw: Home's record of each time Scout looked at the screen or sent something
- * off this computer. Metadata only — kind, app, title, destination, counts and time. Never
+ * off this computer. Metadata only: kind, app, title, destination, counts and time. Never
  * the pixels, the text or the brief.
+ * Contains SightLogEntry, the retention bounds and the `sightLog.*` messages.
  */
+import { z } from 'zod';
 
 /**
  * Each kind of looking or sending. New kinds are appended (the database stores the kind as

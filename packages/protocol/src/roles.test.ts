@@ -1,3 +1,4 @@
+/** Tests for the Role schema. */
 import { describe, expect, it } from 'vitest';
 import { Role } from './roles';
 

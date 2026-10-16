@@ -1,3 +1,4 @@
+/** Tests for the engine address constants and engineUrl. */
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_ENGINE_PORT, ENGINE_HOST, PROTOCOL_VERSION, engineUrl } from './index';
 

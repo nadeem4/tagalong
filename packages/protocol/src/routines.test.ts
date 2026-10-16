@@ -1,3 +1,4 @@
+/** Tests for routines, describeWhen/describeDeliver, the calendar link and the routine methods. */
 import { describe, expect, it } from 'vitest';
 import { coreToHostNotifications, hostToCoreMethods } from './methods';
 import {

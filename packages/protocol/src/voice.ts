@@ -1,8 +1,9 @@
 /**
- * Scout's voice slots. Ears turn the microphone into words, a Mouth turns Scout's answer
- * into speech, and a Live voice (later) replaces both. Each vendor or model is one adapter
- * filling a slot, listed here with the plain facts Settings shows. No adapter runs here:
- * this file imports nothing, so main, the voice process and the windows all share it.
+ * Scout's voice slots: Ears turn the microphone into words and a Mouth turns an answer into
+ * speech. A Live voice would replace both; it is a slot only and none is built.
+ * Contains the slot interfaces, the adapter facts Settings shows, mouthOrder,
+ * chosenMouth and Pushable. Imports nothing, so desktop main, the voice process and the
+ * windows all share it.
  */
 
 /** The ears hear 16 kHz mono audio, in frames of this many samples (32 ms). */
@@ -42,7 +43,7 @@ export interface LiveSession {
   close(): void;
 }
 
-/** One hosted real-time service replacing Ears and Mouth. A slot only: none is built yet. */
+/** One hosted real-time service replacing Ears and Mouth. A slot only; nothing implements it. */
 export interface LiveVoice {
   connect(scout: ScoutTurn): LiveSession;
 }
@@ -118,8 +119,8 @@ export function mouthOrder(chosen: MouthId): MouthId[] {
 }
 
 /**
- * The mouth the person picked. A settings file from before the picker has no `mouth`: one
- * with an ElevenLabs voice set was speaking with ElevenLabs, and keeps doing so.
+ * The mouth the person picked. When `mouth` is unset, a set ElevenLabs voice id means
+ * ElevenLabs, otherwise the local voice.
  */
 export function chosenMouth(voice: {
   mouth?: MouthId | undefined;

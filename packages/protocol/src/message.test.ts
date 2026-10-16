@@ -1,3 +1,4 @@
+/** Tests for message content blocks and stored messages. */
 import { describe, expect, it } from 'vitest';
 import { Message, MessageContent } from './message';
 

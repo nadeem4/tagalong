@@ -581,6 +581,9 @@ docs to update. The design is in [concepts/roles-and-tools.md](concepts/roles-an
   `tools/registry` or the `tools` index, never from `tools/builtin/*`. ESLint enforces it too.
 - **Docs are part of done.** Update `README.md`, `docs/architecture.md`, and
   `docs/testing/feature-test-guide.md` with every change.
+- **Comments.** Every file opens with a 2-6 line header: what it is for, what it contains, who uses
+  it. Comments explain why, limits, units and parse-compat rules; phase numbers, PR references and
+  history belong in git. Test files get a one-line header.
 - **Commits** use Conventional Commits, for example `feat(core): add PromptAssembler`.
 - **Diagrams** are Mermaid with a black and white theme only.
 

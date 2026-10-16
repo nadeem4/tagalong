@@ -1,3 +1,4 @@
+/** Tests for the usage.summary method. */
 import { describe, expect, it } from 'vitest';
 import { hostToCoreMethods, paramsSchemaFor, resultSchemaFor } from './methods';
 import { UsageSummaryParams, UsageSummaryResult } from './usage';

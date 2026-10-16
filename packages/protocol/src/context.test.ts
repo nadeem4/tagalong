@@ -1,3 +1,4 @@
+/** Tests for the context snapshot and its displays, windows and dropped items. */
 import { describe, expect, it } from 'vitest';
 import {
   ContextSnapshot,
@@ -76,10 +77,6 @@ describe('ContextSnapshot', () => {
     expect(ContextSnapshot.safeParse({ ...valid, screenshot }).success).toBe(false);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Phase 2B: full view
-// ---------------------------------------------------------------------------
 
 const display = {
   id: 2528732444,

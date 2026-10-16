@@ -1,3 +1,4 @@
+/** Tests for the JSON-RPC request, notification and response envelopes. */
 import { describe, expect, it } from 'vitest';
 import { RpcNotification, RpcRequest, RpcResponse } from './rpc';
 

@@ -1,3 +1,9 @@
+/**
+ * Experts: the back-office workers a companion hands tasks to. Today an expert is a
+ * Claude Code connection; it holds no secrets, because Claude Code signs itself in.
+ * Contains Expert, the built-in catalog shapes, Brief, and the `experts.*`, `handoffs.*`,
+ * `handoff.*` and `projects.search` messages.
+ */
 import { z } from 'zod';
 
 /** A Claude Code plugin as `claude plugin install` names it: `name@marketplace`. */
@@ -13,16 +19,12 @@ export const McpToolRule = z
   .string()
   .regex(/^mcp__[A-Za-z0-9_.-]+__[A-Za-z0-9_.-]+$/, 'an app tool is mcp__<server>__<tool>');
 
-/**
- * Experts do the work a companion hands them. Each one is a connection to a tool the user
- * already has: Claude Code first, model APIs and tool servers later. The connection holds
- * no secrets; Claude Code signs itself in, and keys for later connectors go to the keychain.
- */
+/** How Tagalong reaches a Claude Code expert. */
 export const ClaudeCodeConnection = z.object({
   type: z.literal('claude-code'),
   /**
-   * The project a running hand-off works in, filled in when the person confirms it. No
-   * longer a saved setting: an old expert's default folder still parses but is ignored.
+   * The project a running hand-off works in, filled in when the person confirms it. Not
+   * saved with the expert: a saved value still parses but is ignored.
    */
   folder: z.string().min(1).optional(),
   /** False keeps it to reading and searching. */
@@ -152,15 +154,15 @@ export const ExpertsTestResult = z.object({
 export const HandoffsCancelParams = z.object({ handoffId: z.uuid() });
 export const HandoffsCancelResult = z.object({ cancelled: z.boolean() });
 
-/** A short step while the expert works, such as "Reading src/main.ts". */
 /**
  * What a progress step is: a tool the expert used, a line it wrote that Scout may say aloud,
  * or a note from the person, queued (`note`), passed on (`delivered`), or not passed on
- * because the run ended first (`dropped`). Left out on older steps: a tool step.
+ * because the run ended first (`dropped`). When `kind` is left out, the step is a tool step.
  */
 export const HandoffStepKind = z.enum(['tool', 'say', 'note', 'delivered', 'dropped']);
 export type HandoffStepKind = z.infer<typeof HandoffStepKind>;
 
+/** A short step while the expert works, such as "Reading src/main.ts". */
 export const HandoffProgressParams = z.object({
   handoffId: z.uuid(),
   expertId: z.string().min(1),

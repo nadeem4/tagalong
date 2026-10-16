@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 /**
  * Connections: the person's apps (Notion, GitHub, a local tool) reached over MCP, so Scout
  * can read them and, when the person allows it, change them.
@@ -7,7 +5,10 @@ import { z } from 'zod';
  * A connection is only its definition: no token, key or password is ever part of it. Those
  * live in the host's secret store under `connection.<id>.*`, and `secretNames` lists the
  * environment variables of a local command whose values are kept there.
+ * Contains the Connection schemas, the `connections.*` and `connector.confirm` messages,
+ * and connectionIdFrom.
  */
+import { z } from 'zod';
 
 /** Lower-case letters, digits and dashes: it prefixes the app's tool names, `notion__search`. */
 export const CONNECTION_ID = /^[a-z0-9][a-z0-9-]{0,23}$/;

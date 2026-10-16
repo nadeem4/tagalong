@@ -1,10 +1,11 @@
-import { z } from 'zod';
-
 /**
  * Routines: when + what + where the result goes. "Every weekday at 8, give me new papers on
  * AI agents." The engine runs each one as a Scout turn on a schedule or a trigger; the person
  * never writes cron, only picks days and a time, or one of five triggers.
+ * Contains Routine and its parts, describeWhen/describeDeliver, and the `routines.*`,
+ * `routine.*` and `calendar.*` messages.
  */
+import { z } from 'zod';
 
 /** Days of the week as `Date#getDay` numbers: 0 is Sunday. */
 export const Weekday = z.number().int().min(0).max(6);

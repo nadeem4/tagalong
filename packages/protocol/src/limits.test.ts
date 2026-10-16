@@ -1,3 +1,4 @@
+/** Tests that the limits module is published on its own subpath. */
 import { describe, expect, it } from 'vitest';
 import packageJson from '../package.json' with { type: 'json' };
 

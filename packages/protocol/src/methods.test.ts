@@ -1,3 +1,4 @@
+/** Tests for the method catalog and each method's params and result schemas. */
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_WINDOW_TEXT_CHARS,
@@ -21,7 +22,7 @@ import {
   resultSchemaFor,
 } from './methods';
 
-/** Every row of the Phase 1 method table, by direction. */
+/** The expected catalog, by direction. Host-to-core and notifications must match exactly. */
 const HOST_TO_CORE = [
   'hello',
   'ask',
@@ -436,10 +437,6 @@ describe('perception.capture', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Phase 2B: full view
-// ---------------------------------------------------------------------------
-
 describe('HostCapability, full view', () => {
   it('knows the two new capabilities', () => {
     expect(HostCapability.safeParse('displays').success).toBe(true);
@@ -571,8 +568,7 @@ describe('perception.readText', () => {
   });
 
   it('has no scope parameter, so there is no way to ask for every window at once', () => {
-    // The whole cost argument of this phase rests on this. Measured on a twelve-window
-    // desktop, reading everything is 46,491 characters, about 11,600 tokens, in one call.
+    // Reading every window at once was about 11,600 tokens on a twelve-window desktop.
     expect(Object.keys(PerceptionReadTextParams.shape).sort()).toEqual(['maxChars', 'windowId']);
   });
 

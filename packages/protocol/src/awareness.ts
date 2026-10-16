@@ -1,13 +1,12 @@
+/**
+ * Rolling memory and watches: what the desktop remembers and what changed on it.
+ * Contains the `perception.recall` and `perception.diff` schemas and the `watch.*` messages.
+ * Kept apart from methods.ts because only these shapes deal with time; every other
+ * perception method answers about now.
+ */
 import { z } from 'zod';
 
 import { CapturedImage, DisplayBounds, WindowEntry } from './context';
-
-/**
- * Phase 3B: what the desktop remembers, and what changed on it.
- *
- * Kept apart from `methods.ts` because these shapes share one idea the rest of the
- * catalog does not have — time. Every other perception method answers about now.
- */
 
 /** One display as it looked at a moment the host buffered. */
 export const RecalledFrame = z.object({

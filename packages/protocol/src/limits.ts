@@ -1,14 +1,8 @@
 /**
- * Character budgets, in the one module that imports nothing.
- *
- * They live here rather than beside the schemas that use them because both sides need
- * them: `settings.ts` bounds the configurable window budget, and `methods.ts` bounds the
- * per-call one. `methods.ts` already imports `settings.ts`, so a budget defined in either
- * would put the other in a cycle — and these are used at module-init time, inside schema
- * builders, which is exactly where a cycle stops being harmless and becomes a constant
- * that is still in its temporal dead zone.
- *
- * Their original modules re-export them, so no existing import had to change.
+ * Character budgets shared by settings, methods and context. This module imports nothing:
+ * the extension loads it as `@tagalong/protocol/limits` without zod, and keeping it apart
+ * avoids an import cycle between settings.ts and methods.ts (these constants are read
+ * while schemas are being built, so a cycle could reach them before they exist).
  */
 
 /** A selection is always kept whole up to this length; beyond it the host truncates. */

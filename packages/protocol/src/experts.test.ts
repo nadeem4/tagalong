@@ -1,3 +1,4 @@
+/** Tests for experts, the catalog, briefs and the hand-off messages. */
 import { describe, expect, it } from 'vitest';
 import {
   Brief,

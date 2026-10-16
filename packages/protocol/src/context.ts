@@ -1,3 +1,8 @@
+/**
+ * What a host saw when the person asked: the context snapshot and its parts (images,
+ * displays, the window inventory, something dropped on Scout). Contains ContextSnapshot,
+ * ContextSnapshotPatch, PerceptionTarget and the shapes they are built from.
+ */
 import { z } from 'zod';
 
 import { MAX_PAGE_TEXT_CHARS, MAX_SELECTION_CHARS } from './limits';
@@ -11,10 +16,7 @@ export { MAX_PAGE_TEXT_CHARS, MAX_SELECTION_CHARS } from './limits';
 
 /**
  * A picture a host captured. PNG only, so providers get one predictable image format.
- *
- * Shared by the single screenshot, each display, and the composite rather than repeated at
- * each: three inline copies of the same four fields drift, and a provider that has to
- * special-case one of them is a provider that will get it wrong.
+ * The one shape is shared by the screenshot, each display and the composite.
  */
 export const CapturedImage = z.object({
   mime: z.literal('image/png'),
@@ -83,9 +85,8 @@ export const WindowEntry = z.object({
   browser: z.boolean(),
   /**
    * How much text this window would yield, so the pet can judge a read before paying for
-   * it. Absent until the text layer lands, and absent for a blocked window: the count is
-   * itself a small leak, since knowing an excluded vault holds 4,000 characters says more
-   * than nothing at all.
+   * it. Absent when the host has no count, and always absent for a blocked window: the
+   * count is itself a small leak.
    */
   textChars: z.number().int().nonnegative().optional(),
   /** Present when an exclusion refuses this window. No text and no count are returned. */
@@ -146,23 +147,20 @@ export const ContextSnapshot = z.object({
       text: z.string().max(MAX_PAGE_TEXT_CHARS),
     })
     .optional(),
-  /** Phase 2. PNG only, so providers get one predictable image format. */
+  /** A single screenshot. `displays` and `composite` carry the full view. */
   screenshot: CapturedImage.optional(),
   /**
-   * Phase 2B. Every display, in the order the host enumerated them.
+   * Every display, in the order the host enumerated them.
    *
    * A display may arrive with no `image`: the capturer offers no source for a screen it
    * was not allowed to read, and an honest gap beats a stale or invented picture.
    */
   displays: z.array(DisplaySnapshot).optional(),
-  /** Phase 2B. Every display drawn into one picture, laid out by monitor geometry. */
+  /** Every display drawn into one picture, laid out by monitor geometry. */
   composite: CapturedImage.optional(),
   /**
-   * Phase 2B. Every top-level window, with no text in it.
-   *
-   * Deliberately cheap: this rides along with every full-view capture, so it carries what
-   * a window is and where it is, and the pet spends a tool call when it wants what is
-   * inside one.
+   * Every top-level window, with no text in it. It rides along with every full-view
+   * capture, so it stays cheap; the pet spends a tool call to read inside one.
    */
   windows: z.array(WindowEntry).optional(),
   /** What the person dropped on Scout and then chose to send, with a button. */
@@ -181,9 +179,9 @@ export const PerceptionTarget = z.enum([
   'activeWindow',
   'clipboard',
   'pageText',
-  /** Phase 2B: every display plus the composite. */
+  /** Every display plus the composite. */
   'displays',
-  /** Phase 2B: the window inventory, with no window text in it. */
+  /** The window inventory, with no window text in it. */
   'windows',
 ]);
 export type PerceptionTarget = z.infer<typeof PerceptionTarget>;

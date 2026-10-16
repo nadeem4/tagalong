@@ -1,3 +1,8 @@
+/**
+ * Engine settings as they cross the wire: the Settings schema, SETTINGS_DEFAULTS,
+ * SettingsPatch for `settings.set`, and the change-by-talk card. Secrets are never here:
+ * they live in the host's SecretStore.
+ */
 import { z } from 'zod';
 
 import { DEFAULT_WINDOW_TEXT_CHARS, MAX_WINDOW_TEXT_CHARS } from './limits';
@@ -5,20 +10,14 @@ import { EARS_IDS, MOUTH_IDS } from './voice';
 import { MAX_SIGHT_LOG_DAYS, MIN_SIGHT_LOG_DAYS, SIGHT_LOG_DEFAULT_DAYS } from './sight-log';
 
 /**
- * Engine settings that cross the wire. Secrets are deliberately absent: they live in
- * the host's SecretStore and never appear in settings.get or on disk in this shape.
- */
-
-/**
- * Ceiling on screenshot retention. The plan offers exactly one debugging window — 24
- * hours — so anything longer is a typo or a misunderstanding, not a supported choice.
- * Bounding it here means no host has to invent its own limit later.
+ * Ceiling on screenshot retention. Keeping screenshots is for debugging only, so a day is
+ * enough; more is treated as a typo.
  */
 export const MAX_SCREENSHOT_RETENTION_HOURS = 24;
 
 /**
- * Ceiling on rolling memory. Thirty minutes of 640-pixel frames of two displays is already
- * tens of megabytes of the user's screen in memory; the phase plan's default is ten.
+ * Ceiling on rolling memory. Thirty minutes of frames from two displays is already tens of
+ * megabytes of the screen in memory.
  */
 export const MAX_ROLLING_MEMORY_MINUTES = 30;
 
@@ -48,28 +47,13 @@ export const SETTINGS_DEFAULTS = {
   },
   avatar: { x: null, y: null },
   /**
-   * Why this set: every entry is a window where the pixels on screen are a credential.
-   * The four desktop password managers below cover the overwhelming majority of Windows
-   * installs; `CredentialUIBroker.exe` is the "Windows Security" prompt that asks for a
-   * PIN, a password or a passkey, and `LogonUI.exe` is the lock screen. `consent.exe`
-   * (UAC) is listed for completeness even though it runs on the secure desktop and is
-   * usually uncapturable anyway — cheap insurance if that ever stops being true.
-   *
-   * The title patterns exist because the same secrets are reached through a browser: the
-   * process is then `chrome.exe` or `msedge.exe`, which we must never block wholesale.
-   * They are deliberately few — a broad pattern like `*password*` would block an
-   * ordinary docs page about passwords and teach the user to switch the feature off.
-   */
-  /**
    * The person's own additions. Empty: password managers, secret files and the rest are
    * `BLIND_SPOTS`, built in, so clearing this list never takes them away.
    */
   captureExclusions: { processNames: [] as string[], titlePatterns: [] as string[] },
   /**
-   * Off by default. A screenshot is the most sensitive thing this app ever touches — it
-   * can hold a bank balance, a private message or a token that happened to be on screen —
-   * and the plan says screenshots are not persisted. Retention is therefore opt-in, for
-   * debugging, and bounded.
+   * Off by default. A screenshot can hold a bank balance, a private message or a token,
+   * so keeping one is opt-in, for debugging, and bounded.
    */
   screenshotRetention: { mode: 'off' },
   /**
@@ -95,20 +79,17 @@ export const SETTINGS_DEFAULTS = {
   summarizer: null,
   hiddenPets: [] as string[],
   /**
-   * Phase 3B. Off by default: remembering the screen is the most a pet ever holds about
+   * Off by default: remembering the screen is the most a pet ever holds about
    * the user, and it is the user's call to start it. Ten minutes when they do.
    */
   rollingMemory: { enabled: false, minutes: 10 },
-  /** Phase 3B. The phase plan's caps: 60 model checks a watch, 3 watches at once. */
+  /** 60 model checks a watch, 3 watches at once, 30 minutes unless the pet names a timeout. */
   watch: { maxChecks: 60, maxConcurrent: 3, defaultTimeoutMinutes: 30 },
-  /**
-   * Phase 7. Whether the first-run setup wizard has been finished or skipped. A settings
-   * file from before the wizard reads as not done, so an existing install sees it once.
-   */
+  /** Unused: nothing reads or writes it. */
   onboarding: { done: false },
   /**
-   * Whether the Welcome window has been finished. It replaced the setup wizard, so an
-   * install that finished the wizard still sees Welcome once.
+   * Whether the Welcome window has been finished. Separate from `onboarding`, so every
+   * install sees Welcome once.
    */
   welcome: { done: false },
   /**
@@ -122,8 +103,8 @@ export const SETTINGS_DEFAULTS = {
   lastClosedAt: null,
   /**
    * Whether the last launch closed cleanly. Main sets it false as each launch starts and
-   * true on a clean quit, so false at the next start means the last one crashed. True for a
-   * settings file from before it, so an upgrade is never read as a crash.
+   * true on a clean quit, so false at the next start means the last one crashed. It
+   * defaults to true, so a file without it is never read as a crash.
    */
   closedCleanly: true,
   /** The app version the last launch ran, so the greeting can say Tagalong was updated. */
@@ -263,20 +244,13 @@ const settingsFields = {
   pageTextBudget: z.number().int().positive(),
   /** How many past messages are replayed to the model. */
   historyMessages: z.number().int().positive(),
-  /**
-   * Two keys: the ask, and the pause. The look and see-everything keys of older settings
-   * files are dropped on parse: Scout takes screenshots and reads other windows itself now.
-   */
+  /** The global shortcuts. Unknown keys in older files (such as `look`) are dropped on parse. */
   hotkeys: z.object({
     ask: z.string().min(1),
     /**
-     * Turns all sight off and on again. Optional so a settings file written before it still
-     * parses, and because a patch replaces the whole `hotkeys` object, so a caller that only
-     * rebinds `ask` must not be forced to resend it. The host falls back to its default.
-     *
-     * The tray carries the same action, so a settings file that never names this key, or
-     * an accelerator another application already owns, still leaves the user a way to
-     * blind the pet.
+     * Turns all sight off and on again. Optional: a patch replaces the whole `hotkeys`
+     * object, so a caller that only rebinds `ask` need not resend it; the host falls back to
+     * its default. The tray has the same action, so sight can always be paused.
      */
     pauseSight: z.string().min(1).optional(),
     /** Stops Scout speaking at once. Optional for the same reasons as `pauseSight`. */
@@ -304,20 +278,19 @@ const settingsFields = {
    */
   windowTextBudget: z.number().int().positive().max(MAX_WINDOW_TEXT_CHARS),
   /**
-   * Phase 4. The brain that writes conversation summaries. Null means each pet summarises
-   * its own conversations with its own provider and model, so a crew on Token Factory and
-   * OpenRouter never needs a third key just for housekeeping.
+   * The brain that writes conversation summaries, the greeting and keep-an-eye lines. Null
+   * means each pet uses its own provider and model, so no extra key is needed.
    */
   summarizer: z.object({ providerId: z.string().min(1), model: z.string().min(1) }).nullable(),
-  /** Phase 4. Pets left off the desktop crew strip. They still answer in the panel. */
+  /** Pet ids left off the desktop strip. */
   hiddenPets: z.array(z.string().min(1)),
-  /** Phase 3B. Whether the desktop keeps its last few minutes in memory, and how many. */
+  /** Whether the desktop keeps its last few minutes in memory, and how many. */
   rollingMemory: z.object({
     enabled: z.boolean(),
     minutes: z.number().int().min(1).max(MAX_ROLLING_MEMORY_MINUTES),
   }),
   /**
-   * Phase 3B. What one watch may spend. `maxChecks` bounds the model calls a watch makes,
+   * What one watch may spend. `maxChecks` bounds the model calls a watch makes,
    * `maxConcurrent` how many run at once, and `defaultTimeoutMinutes` how long a watch
    * runs when the pet names no timeout of its own.
    */
@@ -330,7 +303,7 @@ const settingsFields = {
       .min(1)
       .max(24 * 60),
   }),
-  /** Phase 7. Set when the setup wizard is finished or skipped; Settings can rerun it. */
+  /** Unused; see SETTINGS_DEFAULTS.onboarding. */
   onboarding: z.object({ done: z.boolean() }),
   /**
    * The guided first run: whether it is finished, the furthest step reached (where it
@@ -365,11 +338,11 @@ const settingsFields = {
     /** The microphone Talk to Scout listens on. Absent: the system default microphone. */
     microphoneId: z.string().optional(),
     /**
-     * Who says Scout's lines. Absent in a file from before the picker: `chosenMouth`
-     * decides (ElevenLabs when a voice ID is set, otherwise Kokoro).
+     * Who says Scout's lines. When absent, `chosenMouth` decides: ElevenLabs when a voice
+     * id is set, otherwise Kokoro.
      */
     mouth: z.enum(MOUTH_IDS).optional(),
-    /** Who listens. Absent: the local ears, the only ones today. */
+    /** Who listens. Absent: the local ears. */
     ears: z.enum(EARS_IDS).optional(),
   }),
   /** What Scout calls the person; empty for no name. */
