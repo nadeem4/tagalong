@@ -16,14 +16,6 @@ export const Pet = z.object({
   name: z.string().min(1),
   /** Emoji or an asset key the host knows how to render. */
   avatar: z.string().min(1),
-  /**
-   * The pet's colour, as `#rrggbb`: its sprite's fur when it has no character of its own.
-   * Optional so a pet saved without one still parses; hosts pick a neutral one.
-   */
-  color: z
-    .string()
-    .regex(/^#[0-9a-fA-F]{6}$/, 'a colour is #rrggbb')
-    .optional(),
   /** The role this pet does: a role library id, `companion` for Scout. */
   roleId: z.string().min(1),
   /** The model that answers text turns. */

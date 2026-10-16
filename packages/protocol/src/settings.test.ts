@@ -49,7 +49,6 @@ describe('Settings', () => {
   it('fills every default from an empty object', () => {
     const s = Settings.parse({});
     expect(s.enginePort).toBe(47321);
-    expect(s.defaultPetId).toBe('scout');
     expect(s.pageTextBudget).toBe(40_000);
     expect(s.historyMessages).toBe(20);
     expect(s.hotkeys.ask).toBe('CommandOrControl+Shift+Space');
@@ -75,6 +74,14 @@ describe('Settings', () => {
     const s = Settings.parse({ providerId: 'anthropic', defaultModel: 'claude-opus-5' });
     expect(s).not.toHaveProperty('providerId');
     expect(s).not.toHaveProperty('defaultModel');
+  });
+
+  it('drops the crew-era defaultPetId and hiddenPets from an older settings file', () => {
+    const s = Settings.parse({ defaultPetId: 'ink', hiddenPets: ['bolt'] });
+    expect(s).not.toHaveProperty('defaultPetId');
+    expect(s).not.toHaveProperty('hiddenPets');
+    const patch = SettingsPatch.parse({ defaultPetId: 'ink', hiddenPets: ['bolt'] });
+    expect(patch).toEqual({});
   });
 
   it('keeps explicit values', () => {
@@ -298,16 +305,6 @@ describe('Settings.summarizer', () => {
     expect(
       Settings.parse({ summarizer: { providerId: 'nebius', model: 'x' } }).summarizer,
     ).toBeNull();
-  });
-});
-
-describe('Settings.hiddenPets', () => {
-  it('shows every pet on the desktop by default', () => {
-    expect(Settings.parse({}).hiddenPets).toEqual([]);
-  });
-
-  it('keeps the pets the user hid', () => {
-    expect(SettingsPatch.parse({ hiddenPets: ['bolt'] }).hiddenPets).toEqual(['bolt']);
   });
 });
 

@@ -34,7 +34,6 @@ export type WelcomeStep = (typeof WELCOME_STEPS)[number];
 /** Default value for every setting, in one place so the patch schema can stay defaults-free. */
 export const SETTINGS_DEFAULTS = {
   enginePort: 47321,
-  defaultPetId: 'scout',
   /** Every OpenAI-compatible preset on its own base URL until the user says otherwise. */
   providerBaseUrls: {} as Record<string, string>,
   pageTextBudget: 40_000,
@@ -77,7 +76,6 @@ export const SETTINGS_DEFAULTS = {
    */
   windowTextBudget: DEFAULT_WINDOW_TEXT_CHARS,
   summarizer: null,
-  hiddenPets: [] as string[],
   /**
    * Off by default: remembering the screen is the most a pet ever holds about
    * the user, and it is the user's call to start it. Ten minutes when they do.
@@ -226,8 +224,6 @@ export type ScreenshotRetention = z.infer<typeof ScreenshotRetention>;
 const settingsFields = {
   /** Loopback port for the host websocket. */
   enginePort: z.number().int().min(1024).max(65535),
-  /** Pet used when a host asks without naming one. */
-  defaultPetId: z.string().min(1),
   /**
    * Base URL overrides for the OpenAI-compatible presets, keyed by provider id
    * (`openrouter`). An absent entry means the preset's own URL. This is what
@@ -277,8 +273,6 @@ const settingsFields = {
    * means each pet uses its own provider and model, so no extra key is needed.
    */
   summarizer: z.object({ providerId: z.string().min(1), model: z.string().min(1) }).nullable(),
-  /** Pet ids left off the desktop strip. */
-  hiddenPets: z.array(z.string().min(1)),
   /** Whether the desktop keeps its last few minutes in memory, and how many. */
   rollingMemory: z.object({
     enabled: z.boolean(),
@@ -373,7 +367,6 @@ function withoutRetiredSummarizer(value: unknown): unknown {
 
 export const Settings = z.object({
   enginePort: settingsFields.enginePort.default(SETTINGS_DEFAULTS.enginePort),
-  defaultPetId: settingsFields.defaultPetId.default(SETTINGS_DEFAULTS.defaultPetId),
   providerBaseUrls: z
     .preprocess(withoutRetiredBaseUrls, settingsFields.providerBaseUrls)
     .prefault({ ...SETTINGS_DEFAULTS.providerBaseUrls }),
@@ -393,7 +386,6 @@ export const Settings = z.object({
   summarizer: z
     .preprocess(withoutRetiredSummarizer, settingsFields.summarizer)
     .default(SETTINGS_DEFAULTS.summarizer),
-  hiddenPets: settingsFields.hiddenPets.prefault([...SETTINGS_DEFAULTS.hiddenPets]),
   rollingMemory: settingsFields.rollingMemory.prefault({ ...SETTINGS_DEFAULTS.rollingMemory }),
   watch: settingsFields.watch.prefault({ ...SETTINGS_DEFAULTS.watch }),
   welcome: settingsFields.welcome.prefault({ ...SETTINGS_DEFAULTS.welcome }),

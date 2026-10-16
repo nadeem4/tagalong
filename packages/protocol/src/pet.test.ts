@@ -16,16 +16,18 @@ describe('Pet', () => {
     expect(Pet.parse(valid)).toEqual(valid);
   });
 
-  it('still parses a crew-era pet, dropping its grants, reply style and notes', () => {
+  it('still parses a crew-era pet, dropping its grants, reply style, notes and colour', () => {
     const parsed = Pet.parse({
       ...valid,
       toolGrants: { remember: 'off' },
       replyStyle: 'voice-full',
       notes: 'x',
+      color: '#0ea5e9',
     });
     expect(parsed).not.toHaveProperty('toolGrants');
     expect(parsed).not.toHaveProperty('replyStyle');
     expect(parsed).not.toHaveProperty('notes');
+    expect(parsed).not.toHaveProperty('color');
   });
 
   it("names Scout's id", () => {
@@ -62,14 +64,6 @@ describe('Pet', () => {
 
   it('drops the retired vision model an older pet still carries', () => {
     expect(Pet.parse({ ...valid, visionModel: 'vl' })).not.toHaveProperty('visionModel');
-  });
-
-  it('keeps a colour the crew strip can paint', () => {
-    expect(Pet.parse({ ...valid, color: '#0ea5e9' }).color).toBe('#0ea5e9');
-  });
-
-  it('rejects a colour that is not a six-digit hex', () => {
-    expect(Pet.safeParse({ ...valid, color: 'blue' }).success).toBe(false);
   });
 });
 
