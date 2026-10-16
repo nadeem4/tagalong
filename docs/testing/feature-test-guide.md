@@ -492,6 +492,10 @@ _Fake provider:_ with `TAGALONG_FAKE_PROVIDERS=1` both steps are scripted expert
 
 1. **Action:** install a newer build over the old one and start it.
 2. **Expected:** "Morning. I've been updated to x.y.z." (time of day first) plus the what's-new line.
+   From 0.0.0 to 0.1.0 the line is: "I can write short drafts, translate, read things aloud and
+   point at buttons now. Ask me “what needs me?” to see your reviews and issues in one list."
+3. **Action:** quit and start again.
+4. **Expected:** the update line does not play a second time.
 
 ### G.7. Days away with routines
 
@@ -1509,7 +1513,7 @@ Privacy, add the title pattern `*Bank*` to your exclusions (used in X.12; remove
 
 1. **Setup:** Windows with Node.js 22 and pnpm 10; a clean checkout; `pnpm install`.
 2. **Action:** `pnpm package:win` from the repository root.
-3. **Expected:** it ends without errors and `apps\desktop\release\Tagalong-Setup-0.0.0-x64.exe`
+3. **Expected:** it ends without errors and `apps\desktop\release\Tagalong-Setup-0.1.0-x64.exe`
    exists. In `apps\desktop\release\win-unpacked\resources` there are `app.asar`,
    `app.asar.unpacked` (holding `better-sqlite3`'s and `get-windows`' Windows binaries) and
    `extension`.
