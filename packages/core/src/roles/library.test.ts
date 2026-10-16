@@ -1,3 +1,4 @@
+/** Tests for the role files and library.generated.ts: valid, up to date, and the companion. */
 import { readFileSync, readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -277,7 +278,7 @@ describe('getRole', () => {
 describe('roleFor', () => {
   it("returns the pet's role, or the companion for an id the library does not have", () => {
     expect(roleFor('companion').id).toBe('companion');
-    // A crew-era role, still on a pet saved before the crew went.
+    // A role id the library no longer has, as an older saved pet may hold.
     expect(roleFor('writer').id).toBe('companion');
     expect(roleFor('astronaut').id).toBe('companion');
   });

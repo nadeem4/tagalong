@@ -1,3 +1,8 @@
+/**
+ * Builds a turn's tools and dispatches them. Contains `ToolRegistry`, `toolsFor` (the
+ * role's tools minus any switched off) and the turn types. The runner builds one registry
+ * and calls `forTurn` per turn.
+ */
 import type { Pet } from '@tagalong/protocol';
 import type { BrainTool } from '../providers';
 import type { MemoryStore } from '../memory/memories';

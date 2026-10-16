@@ -1,3 +1,4 @@
+/** Tests for MODEL_TIERS and recommendedModel: every provider covered, vision fallback. */
 import type { Role } from '@tagalong/protocol';
 import { describe, expect, it } from 'vitest';
 import { ANTHROPIC_MODELS } from '../providers/anthropic';

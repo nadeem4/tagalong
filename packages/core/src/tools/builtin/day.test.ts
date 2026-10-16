@@ -1,3 +1,4 @@
+/** Tests for the recall_day tool and estimateSpan: day bounds, grouping, what is left out. */
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ActivityEntry, SightLogEntry } from '@tagalong/protocol';
 import type { PickUpSnapshot } from '../../pick-up/store';

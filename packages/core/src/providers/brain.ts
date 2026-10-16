@@ -1,8 +1,7 @@
 /**
- * The provider-neutral brain contract.
- *
- * The runner talks to this interface and nothing else, so Ollama or an
- * OpenAI-compatible endpoint can be added later without touching conversation code.
+ * The provider-neutral brain contract every model provider implements. Contains
+ * `BrainProvider`, the request, message, content and result types, and `REFUSAL_MESSAGE`.
+ * The runner and every wrapper (guard, record, meter) speak only these types.
  */
 
 /** Shown instead of an empty bubble when the model declines to answer. Every provider uses it. */
@@ -32,9 +31,9 @@ export type BrainContentBlock =
  * be; forcing every one of them into a single-element array to serve the one tool that
  * returns pixels would churn every call site to buy nothing.
  *
- * The block array is deliberately provider-neutral: an Ollama or OpenAI-compatible
- * provider translates it into whatever that API wants, exactly as `AnthropicProvider`
- * translates it into SDK blocks. Nothing here mirrors Anthropic's wire format.
+ * The block array is provider-neutral: each provider translates it into its own wire
+ * format, as `AnthropicProvider` does into SDK blocks. Nothing here mirrors Anthropic's
+ * wire format.
  */
 export type BrainContent =
   | BrainContentBlock

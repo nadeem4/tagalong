@@ -1,3 +1,4 @@
+/** Tests for ToolRegistry.forTurn and toolsFor: which tools a turn gets, and dispatch. */
 import { describe, expect, it } from 'vitest';
 import type { Pet } from '@tagalong/protocol';
 import type { MemoryStore, NewMemory } from '../memory/memories';
@@ -300,7 +301,7 @@ describe('toolsFor', () => {
   });
 
   it("gives a pet with a role the library does not have the companion's tools", () => {
-    // A crew-era role, still on a pet saved before the crew went.
+    // A role id the library no longer has, as an older saved pet may hold.
     expect(ids({ ...FAKE_TURN_PET, roleId: 'writer' })).toEqual(
       ids({ ...FAKE_TURN_PET, roleId: 'companion' }),
     );

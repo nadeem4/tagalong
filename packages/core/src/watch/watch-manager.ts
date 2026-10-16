@@ -1,3 +1,8 @@
+/**
+ * `WatchManager`: runs the watches `watch_for` starts. Polls a region through the host and
+ * asks a small model only when it changed and held still. Also the `WATCH_*` timing
+ * constants, `systemWatchClock` and `parseVerdict`.
+ */
 import { randomUUID } from 'node:crypto';
 import type {
   DisplayBounds,
@@ -11,7 +16,7 @@ import type { BrainContentBlock, BrainProvider } from '../providers';
 import { modelForTurn, watchModelsFor } from '../providers';
 import type { PerceptionHost } from '../perception';
 
-/** How often a watch compares the region: the phase plan's five seconds. */
+/** How often a watch compares the region, in ms. */
 export const WATCH_POLL_MS = 5_000;
 
 /**

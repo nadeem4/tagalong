@@ -1,3 +1,4 @@
+/** Tests for FakeBrainProvider: streaming, the scripted tool call, stopping and usage. */
 import { describe, expect, it, vi } from 'vitest';
 import type { BrainEvents, BrainRequest } from './brain';
 import { FakeBrainProvider } from './fake';

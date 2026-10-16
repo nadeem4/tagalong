@@ -1,3 +1,4 @@
+/** Tests for priceFor and costUsd: the price table and the cost of a call. */
 import { describe, expect, it } from 'vitest';
 import { costUsd, priceFor } from './prices';
 

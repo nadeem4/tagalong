@@ -1,3 +1,6 @@
+/**
+ * Routines module entry: `Routines` (the scheduler), `RoutineStore` and the schedule math.
+ */
 export { dueSlot, latestDue, nextDue, wallTimeAt, zonedToEpoch } from './schedule';
 export { RoutineStore, type StoredRoutine } from './store';
 export {

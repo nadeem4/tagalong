@@ -1,3 +1,4 @@
+/** Tests for modelForTurn and carriesImage: which model answers a turn with a picture. */
 import { describe, expect, it } from 'vitest';
 import type { BrainMessage, BrainProvider } from './brain';
 import { carriesImage, modelForTurn } from './vision-routing';

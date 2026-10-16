@@ -1,3 +1,4 @@
+/** Tests for meterBrain: each finished call recorded, counts only. */
 import { describe, expect, it } from 'vitest';
 import type { BrainProvider, BrainRequest } from '../providers/brain';
 import { FakeBrainProvider } from '../providers/fake';

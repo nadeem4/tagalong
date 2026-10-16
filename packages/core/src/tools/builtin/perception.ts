@@ -1,3 +1,10 @@
+/**
+ * The perception tools: what is on screen now. Eight tools, all `read`.
+ * `look_at_screen` and `get_selection` share the capture path: ask what the focused window
+ * is, check the exclusion list, then capture. The display and window tools share a display
+ * id or a window id, from `list_displays` or `list_windows`, which the pet is told to call
+ * first. Also exports the helpers the awareness tools share: `canSee`, `noHost`, `hostFailure`.
+ */
 import { DEFAULT_WINDOW_TEXT_CHARS } from '@tagalong/protocol';
 import type {
   CaptureExclusions,
@@ -12,15 +19,6 @@ import { appCaptureBlock, type CaptureBlock } from '../../perception/exclusions'
 import type { PerceptionHost } from '../../perception/host';
 import { renderInventory } from '../../perception/inventory';
 import { defineTool, type Tool, type ToolContext, type ToolOutcome } from '../tool';
-
-/**
- * The perception tools: what is on screen now. Seven tools, all `read`.
- *
- * Two spines live here. The Phase 2 pair (`look_at_screen`, `get_selection`) share the
- * capture path: ask what the focused window is, check the exclusion list, then capture.
- * The Phase 2B five share a display id or a window id, fetched from a listing the pet is
- * told to call first.
- */
 
 /** Tool names, as the model sees them. */
 export const LOOK_AT_SCREEN = 'look_at_screen';
@@ -60,7 +58,7 @@ export interface PerceptionToolsOptions {
    * user.
    */
   windowTextBudget?: () => number;
-  /** Phase 3B. Milliseconds since the epoch; injected so recall wording is testable. */
+  /** Now, in epoch ms; injected so recall wording is testable. */
   now?: () => number;
 }
 
@@ -75,7 +73,7 @@ export function canSee(options: PerceptionToolsOptions, ctx: ToolContext): boole
   return ceiling && (ctx.vision ?? true);
 }
 
-/** Neither Phase 2 tool takes arguments: "look at the screen" has nothing to parameterise. */
+/** Neither focused-window tool takes arguments: "look at the screen" has nothing to vary. */
 const NO_INPUT: Record<string, unknown> = {
   type: 'object',
   properties: {},
@@ -245,8 +243,7 @@ export function perceptionTools(options: PerceptionToolsOptions): Tool[] {
   ];
 }
 
-// ---------------------------------------------------------------------------------------
-// The Phase 2 pair: look_at_screen and get_selection.
+// look_at_screen and get_selection.
 
 async function capture(options: PerceptionToolsOptions, vision: boolean): Promise<ToolOutcome> {
   const target = 'screenshot';
@@ -368,8 +365,7 @@ function windowLabel(app: SnapshotApp | undefined): string {
   return app.windowTitle ? `${app.name} — ${app.windowTitle}` : app.name;
 }
 
-// ---------------------------------------------------------------------------------------
-// The Phase 2B five: every display, and any window by name.
+// The display and window tools: every display, and any window by name.
 
 /** How large a `look_closer` crop may come back. The same ceiling as every other image. */
 const CROP_LONG_SIDE = 1568;
@@ -451,10 +447,10 @@ function fullViewContext(options: PerceptionToolsOptions, vision: boolean): Full
      * Requires both halves: the capability the host advertises, and the method it
      * actually implements.
      *
-     * A host claiming `displays` with no `listWindows` is a wiring mistake, and this
-     * phase has shipped that exact shape twice — an unanswered method reads to the user
-     * as a pet that ignored them. Checking the method here turns it into a refusal the
-     * pet can repeat instead of an exception that ends the turn.
+     * A host claiming `displays` with no `listWindows` is a wiring mistake, and an
+     * unanswered method reads to the user as a pet that ignored them. Checking the method
+     * here turns it into a refusal the pet can repeat instead of an exception that ends
+     * the turn.
      */
     host<K extends 'captureRegion' | 'listWindows' | 'readText' | 'captureWindow'>(
       capability: HostCapability,

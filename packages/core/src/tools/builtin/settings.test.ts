@@ -1,3 +1,4 @@
+/** Tests for the change_settings tool and talkPatchProblem: the card and the allowlist. */
 import { describe, expect, it } from 'vitest';
 import {
   SETTINGS_DEFAULTS,

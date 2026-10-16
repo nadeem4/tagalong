@@ -1,3 +1,8 @@
+/**
+ * The pairing token every host presents in hello. Contains `readOrCreatePairingToken`
+ * (stable across boots, file mode 0600) and `tokensMatch` (constant-time). Loopback is
+ * not a permission boundary; this token is.
+ */
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

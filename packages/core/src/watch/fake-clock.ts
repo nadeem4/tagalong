@@ -1,3 +1,7 @@
+/**
+ * `FakeClock`: a hand-moved clock for tests of watches, routines and pick-up. Imported
+ * only by tests.
+ */
 import type { WatchClock } from './watch-manager';
 
 interface Timer {
@@ -9,7 +13,7 @@ interface Timer {
 /**
  * A clock tests move by hand. `advance` fires every timer that falls due, in order, and
  * lets the promises each one starts settle before the next, so a watch tick that awaits a
- * diff and a model check finishes before the following tick fires — as it would in time.
+ * diff and a model check finishes before the following tick fires, as it would in time.
  */
 export class FakeClock implements WatchClock {
   #now: number;

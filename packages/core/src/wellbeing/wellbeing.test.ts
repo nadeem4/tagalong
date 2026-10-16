@@ -1,3 +1,4 @@
+/** Tests for Wellbeing: stretches, late nights, calls, Not now and clock jumps. */
 import { describe, expect, it } from 'vitest';
 import { Expert, Settings } from '@tagalong/protocol';
 import type { Brief, Pet, PetMoodParams, PetRemarkParams, WindowEntry } from '@tagalong/protocol';

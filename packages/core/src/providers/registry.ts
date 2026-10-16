@@ -1,3 +1,8 @@
+/**
+ * `createProvider`: builds the provider a pet names ('claude-code', 'anthropic', 'nebius',
+ * 'openrouter' or 'fake'). Fake mode (`TAGALONG_FAKE_PROVIDERS=1`) always wins, and
+ * `TAGALONG_FAKE_TOOL` scripts the fake to call one tool.
+ */
 import type { BrainProvider } from './brain';
 import { AnthropicProvider } from './anthropic';
 import { ClaudeCodeBrain } from './claude-code-brain';
@@ -24,11 +29,9 @@ const FAKE_SCRIPT = 'This is the fake pet. I stream scripted text so tests never
 /**
  * Lets a test script the fake pet to reach for one tool before it answers.
  *
- * It exists for the end-to-end smoke test. Tool tests hand the toolset a fake host and
- * host tests feed fixture output, so the `perception.*` methods on the socket between
- * them are covered by neither — and this phase has shipped two dead paths through that
- * gap. Driving a real tool call through a real host needs a provider that will call one,
- * and no test may spend the user's tokens on a real model to get it.
+ * The end-to-end smoke test uses it to drive a real tool call through a real host, the
+ * seam that tool tests and host tests each fake. No test may spend the user's tokens on a
+ * real model to get it.
  *
  * Malformed input degrades to no input rather than throwing: the variable is typed by
  * hand in a test script, and a typo should not take down the app under test.

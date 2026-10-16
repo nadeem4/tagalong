@@ -1,3 +1,8 @@
+/**
+ * The OpenAI-compatible services the app knows by name (Nebius Token Factory, OpenRouter).
+ * Contains `OPENAI_COMPATIBLE_PRESETS`, `openAiPreset` and `SECRET_KEYS` (where each
+ * provider's key is filed in the SecretStore).
+ */
 import { NEBIUS_FALLBACK_MODELS, NEBIUS_VISION_MODELS } from './nebius-models';
 import { NEBIUS_BASE_URL } from './openai-compatible';
 
@@ -23,9 +28,9 @@ export interface OpenAiPreset {
 }
 
 /**
- * OpenRouter model ids, unverified: openrouter.ai was unreachable from the machine that
- * wrote this. Check them against `GET https://openrouter.ai/api/v1/models`; the live list
- * replaces these in Settings as soon as a key is stored.
+ * OpenRouter fallback ids, not checked against the live list
+ * (`GET https://openrouter.ai/api/v1/models`), which replaces them in Settings once a key
+ * is stored.
  */
 const OPENROUTER_FALLBACK_MODELS: readonly string[] = [
   'anthropic/claude-sonnet-5',

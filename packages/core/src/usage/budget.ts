@@ -1,8 +1,8 @@
 /**
- * The one budget check for proactive work. Keep-an-eye comments and scheduled routines
- * call it before they start; anything else Scout starts on its own (nudges, meeting
- * prep, a daily briefing) must call this same gate. Direct asks, Run now, a watch the
- * person started, a confirmed hand-off and a summary never call it.
+ * `budgetSpent`: the one budget check for proactive work. Keep-an-eye remarks and
+ * scheduled routines (meeting prep included) call it before they start; any new proactive
+ * model work must too. Nudges make no model call. Direct asks, Run now, a watch the person
+ * started, a confirmed hand-off and a summary never call it.
  *
  * Checked only when something starts, never in the middle. Only priced dollars count,
  * so on the Claude sign-in alone the cap never trips.

@@ -1,3 +1,4 @@
+/** Tests for UsageLog: rows, and the daily and monthly sums in the person's time zone. */
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from '../memory/db';

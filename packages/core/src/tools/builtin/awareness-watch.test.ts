@@ -1,3 +1,4 @@
+/** Tests for the watch_for tool: its description, which display it watches, and its refusals. */
 import { describe, expect, it } from 'vitest';
 import type { Pet } from '@tagalong/protocol';
 import type { PerceptionHost } from '../../perception/host';

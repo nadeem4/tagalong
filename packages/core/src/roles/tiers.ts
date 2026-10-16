@@ -1,3 +1,7 @@
+/**
+ * `MODEL_TIERS`: the model each role tier (fast, balanced, deep) recommends on each
+ * provider, plus the vision model where a provider's models differ.
+ */
 import type { ModelTier } from '@tagalong/protocol';
 import {
   NEMOTRON_NANO_MODEL,

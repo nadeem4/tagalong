@@ -1,3 +1,4 @@
+/** Tests for the recall_screen and what_changed tools: input checks and host refusals. */
 import { describe, expect, it } from 'vitest';
 import type {
   CaptureExclusions,

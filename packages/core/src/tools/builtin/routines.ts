@@ -1,3 +1,9 @@
+/**
+ * Scout sets up routines for the person: `create_routine` writes one, `change_routine`
+ * pauses, resumes, changes or deletes one by name. Both only show the routine card; nothing
+ * is saved until the person presses Save. `write`, because a saved routine outlives the turn.
+ * Contains `createRoutineTool` and `changeRoutineTool`.
+ */
 import {
   RoutineDraft,
   describeWhen,
@@ -10,11 +16,6 @@ import {
 import type { BrainTool } from '../../providers';
 import { defineTool, type Tool, type ToolOutcome } from '../tool';
 
-/**
- * Scout sets up routines for the person: `create_routine` writes one, `change_routine`
- * pauses, resumes, changes or deletes one by name. Both only show the routine card; nothing
- * is saved until the person presses Save. `write`, because a saved routine outlives the turn.
- */
 export const CREATE_ROUTINE = 'create_routine';
 export const CHANGE_ROUTINE = 'change_routine';
 

@@ -1,3 +1,4 @@
+/** Tests for the connector tools: who gets them, reads, confirmed writes and the bug card. */
 import { describe, expect, it } from 'vitest';
 import type { Connection } from '@tagalong/protocol';
 import { getRole } from '../../roles';

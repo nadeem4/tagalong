@@ -1,17 +1,21 @@
+/**
+ * Picks the model that answers a turn when it carries a picture. Contains `modelForTurn`
+ * and `carriesImage`.
+ */
 import type { BrainMessage, BrainProvider } from './brain';
 
 /**
  * Which of a pet's models answers this turn, or null when none of them can see it.
  *
- * The rule the hackathon build runs on: Nemotron 3 Super for words, Nemotron Nano 2 VL
- * the moment a turn carries a picture — a screenshot with the question, or an image a
- * tool such as `look_closer` hands back mid-turn. The text model keeps the turn when it
- * can see on its own, so a pet on a vision model never pays for a switch it does not need.
+ * The pet's text model answers when it can see; otherwise a turn with a picture (a
+ * screenshot with the question, or an image a tool such as `look_closer` hands back
+ * mid-turn) moves to the pet's vision model. So a pet on a vision model never pays for a
+ * switch it does not need.
  *
  * Whether a model can see comes from the provider, never from the model's name: a
  * provider with `capabilities.vision === false` sees nothing, and one without `canSee`
  * sees with every model (Anthropic's all do). A vision model the pet names is trusted
- * even when the provider does not list it — the person chose it on purpose, and the live
+ * even when the provider does not list it: the person chose it on purpose, and the live
  * model list can know models this build does not.
  *
  * Null is the instruction to drop the pixels. Sending them anyway would buy a confident

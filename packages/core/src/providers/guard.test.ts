@@ -1,3 +1,4 @@
+/** Tests for guardBrain: secrets hidden in messages and tool results, everything else unchanged. */
 import { describe, expect, it } from 'vitest';
 import type { BrainEvents, BrainProvider, BrainRequest } from './brain';
 import { guardBrain } from './guard';

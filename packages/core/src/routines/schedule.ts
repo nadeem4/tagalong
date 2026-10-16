@@ -4,6 +4,9 @@
  *
  * A schedule is days of the week and a wall-clock time. A time the clocks skip in spring runs
  * that much later (01:30 becomes 02:30); a time they repeat in autumn runs once, the first time.
+ *
+ * Contains `latestDue`, `nextDue`, `dueSlot`, `zonedToEpoch`, `wallTimeAt`, and the meeting
+ * helpers `dueMeetings` and `nextMeetingRun`.
  */
 
 /** The schedule half of a routine's "when": days (0 is Sunday) and an HH:MM time. */

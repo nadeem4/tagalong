@@ -1,3 +1,4 @@
+/** Tests for the fake provider scripted by TAGALONG_FAKE_TOOL to call one tool before answering. */
 import { describe, expect, it } from 'vitest';
 import { createProvider } from './registry';
 import type { BrainContentBlock } from './brain';
@@ -6,11 +7,10 @@ import type { BrainContentBlock } from './brain';
  * The fake provider can be told to reach for one tool before it answers.
  *
  * It exists for the smoke test. Every tool test in `perception` hands the toolset a fake
- * host, and every host test feeds fixture output, so the socket between them — the
- * `perception.*` methods — is covered by neither. This phase has shipped two dead paths
- * through that gap already. Driving a real tool call through a real Electron host needs a
- * provider that will actually call one, and no test may spend the user's tokens on a real
- * model to get it.
+ * host, and every host test feeds fixture output, so the socket between them (the
+ * `perception.*` methods) is covered by neither. Driving a real tool call through a real
+ * host needs a provider that will actually call one, and no test may spend the user's
+ * tokens on a real model to get it.
  */
 async function runOnce(
   env: Record<string, string | undefined>,

@@ -1,3 +1,9 @@
+/**
+ * Gentle nudges. The host sends the idle time and the window titles once a minute; this
+ * class decides, from those and the clock alone, when Scout looks tired and says one fixed
+ * line. No screen is read and no model is asked, so a nudge costs nothing.
+ * Contains `Wellbeing` and the stretch and late-night constants and lines.
+ */
 import { randomUUID } from 'node:crypto';
 import type {
   Brief,
@@ -9,12 +15,6 @@ import type {
   WindowEntry,
 } from '@tagalong/protocol';
 import { blind, callOrFullScreenInFront } from '../keep-an-eye/lookout';
-
-/**
- * Gentle nudges. The host sends the idle time and the window titles once a minute; this
- * class decides, from those and the clock alone, when Scout looks tired and says one fixed
- * line. No screen is read and no model is asked, so a nudge costs nothing.
- */
 
 /** Unbroken activity this long, and Scout suggests a stretch. */
 export const STRETCH_MS = 90 * 60_000;

@@ -1,3 +1,7 @@
+/**
+ * `RoutineStore`: saved routines in the `routines` table, the definition as JSON and the
+ * run state beside it.
+ */
 import { randomUUID } from 'node:crypto';
 import type { Database } from 'better-sqlite3';
 import { Routine, RoutineDraft, type RoutineDraftInput } from '@tagalong/protocol';
@@ -36,7 +40,7 @@ function toStored(row: Row): StoredRoutine {
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
-/** Routines in the `routines` table (migration 13): the definition as JSON, the run state beside it. */
+/** Routines in the `routines` table: the definition as JSON, the run state beside it. */
 export class RoutineStore {
   constructor(private readonly db: Database) {}
 

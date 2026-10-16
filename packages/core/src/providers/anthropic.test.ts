@@ -1,3 +1,4 @@
+/** Tests for AnthropicProvider: streaming, caching, image order, the tool loop and refusals. */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BrainEvents, BrainRequest } from './brain';
 import { BrainError } from './errors';

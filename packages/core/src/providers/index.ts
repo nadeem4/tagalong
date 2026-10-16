@@ -1,6 +1,8 @@
 /**
- * The brain layer's public surface. The runner imports from here, never from a
- * concrete provider module, so adding Ollama later stays a one-file change.
+ * The brain layer's public surface: the contract types, each provider, `createProvider`,
+ * the key resolver, presets and model ids. Code outside this folder imports from here
+ * rather than from a provider file; the engine reaches the guard, record and key-check
+ * wrappers by file.
  */
 export type {
   BrainCapabilities,

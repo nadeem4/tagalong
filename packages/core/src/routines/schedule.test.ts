@@ -1,3 +1,4 @@
+/** Tests for the schedule math: zones, clock changes, missed slots and meetings. */
 import { describe, expect, it } from 'vitest';
 import { dueMeetings, dueSlot, latestDue, nextDue, nextMeetingRun, zonedToEpoch } from './schedule';
 

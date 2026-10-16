@@ -1,3 +1,4 @@
+/** Tests for WatchManager: thresholds, settling, checks, timeouts and stop. */
 import { describe, expect, it } from 'vitest';
 import type { PerceptionDiffParams, PerceptionDiffResult, Pet, Settings } from '@tagalong/protocol';
 import type { BrainProvider, BrainRequest, BrainResult } from '../providers';

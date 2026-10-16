@@ -1,3 +1,4 @@
+/** Tests for RoutineStore: save, edit, enable and run state. */
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import type { RoutineDraftInput } from '@tagalong/protocol';

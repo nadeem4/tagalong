@@ -1,3 +1,4 @@
+/** Tests for the create_routine and change_routine tools: the card, input checks, when offered. */
 import { describe, expect, it } from 'vitest';
 import type { Expert, RoutineAction, RoutineDraftInput, RoutineView } from '@tagalong/protocol';
 import { FAKE_TURN_PET, fakeTurnTools as fakeTools } from '../fake-turn';

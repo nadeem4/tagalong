@@ -1,3 +1,7 @@
+/**
+ * The cheap model a watch's yes-or-no check runs on, per provider. Contains
+ * `WATCH_MODEL_DEFAULTS` and `watchModelsFor`.
+ */
 import { NEMOTRON_NANO_MODEL, NEMOTRON_VISION_MODEL } from './nebius-models';
 
 export { NEMOTRON_NANO_MODEL };

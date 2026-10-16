@@ -1,3 +1,6 @@
+/**
+ * Types for gen-roles.mjs, so library.test.ts can import it.
+ */
 import type { Role } from '@tagalong/protocol';
 
 export const ROLES_DIR: string;

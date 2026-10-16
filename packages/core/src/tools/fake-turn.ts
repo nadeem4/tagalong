@@ -1,3 +1,7 @@
+/**
+ * Test helpers for tools: `FAKE_TURN_PET`, `fakeTurn` and `fakeTurnTools`. Imported only
+ * by tests.
+ */
 import type { Pet } from '@tagalong/protocol';
 import {
   ToolRegistry,

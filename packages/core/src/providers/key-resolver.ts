@@ -1,3 +1,8 @@
+/**
+ * `KeyedProviderResolver`: builds each pet's provider from the keychain the first time a
+ * turn needs it, and rebuilds it only when its key or base URL changes. The engine calls
+ * `refresh` before every ask.
+ */
 import type { Pet } from '@tagalong/protocol';
 import type { SecretStore } from '../settings/settings';
 import type { BrainProvider } from './brain';
@@ -21,13 +26,12 @@ interface Built {
 /**
  * Builds each pet's provider the first time a turn needs it, then reuses it.
  *
- * Keys are read by `refresh`, which the engine calls before every ask. That is what lets a
- * key pasted into the onboarding wizard answer the very next question: a fresh install
- * must reach its first answer without a restart, and a restart is a terminal-shaped step
- * for someone who never opened one. Reading three keychain entries per ask is cheap; the
- * provider itself is rebuilt only when its key or base URL actually changed.
+ * Keys are read by `refresh`, which the engine calls before every ask. That lets a key
+ * pasted in Welcome or Settings answer the very next question without a restart. Reading
+ * the keychain per ask is cheap; the provider is rebuilt only when its key or base URL
+ * changed.
  *
- * A provider that cannot be built — no key, an unknown id — is not cached, so the error is
+ * A provider that cannot be built (no key, an unknown id) is not cached, so the error is
  * raised on the turn that hit it and reported as that turn's `turn.error` rather than
  * failing boot for every pet.
  */

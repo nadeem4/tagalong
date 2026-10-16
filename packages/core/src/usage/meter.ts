@@ -1,3 +1,7 @@
+/**
+ * `meterBrain`: wraps a provider so every finished call is recorded (tokens only), in the
+ * engine's single resolver.
+ */
 import type { BrainProvider } from '../providers/brain';
 
 /** One finished model call, as the meter records it: counts only, never content. */
