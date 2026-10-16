@@ -27,7 +27,7 @@ export const MAX_USER_NAME_CHARS = 40;
 /** The highest daily budget Settings accepts, in dollars. A typo guard, not a judgement. */
 export const MAX_DAILY_BUDGET_USD = 1000;
 
-/** The guided first run, in order. `answer` is offered only when setup can listen. */
+/** The guided first run, in order. `answer` (talk or type) always comes first. */
 export const WELCOME_STEPS = ['answer', 'name', 'think', 'voice', 'keys', 'try'] as const;
 export type WelcomeStep = (typeof WELCOME_STEPS)[number];
 

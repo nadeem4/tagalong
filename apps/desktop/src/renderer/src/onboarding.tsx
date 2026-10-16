@@ -101,7 +101,7 @@ function FirstRunWindow() {
         setView(loaded);
         setSettings(loaded.settings);
         setSignIn(state);
-        setRun(startFirstRun(loaded.settings, 'tagalongVoice' in window));
+        setRun(startFirstRun(loaded.settings));
       })
       .catch((error: unknown) => setProblem(`Tagalong could not start setup: ${String(error)}`));
   }, []);

@@ -70,13 +70,9 @@ async function playAudio(bytes: Uint8Array, signal: AbortSignal): Promise<void> 
   });
 }
 
+/** Whether the system voice is speaking: the one voice echo cancellation cannot remove. */
 let systemSpeaking = false;
 const systemListeners = new Set<(speaking: boolean) => void>();
-
-/** Whether the system voice is speaking: the one voice echo cancellation cannot remove. */
-export function systemVoiceSpeaking(): boolean {
-  return systemSpeaking;
-}
 
 /** Hears each start and end of the system voice; the function returned stops listening. */
 export function onSystemVoice(listener: (speaking: boolean) => void): () => void {

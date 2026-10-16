@@ -72,11 +72,7 @@ One entry per permission in the manifest.
 | `scripting`                  | Injects the bundled page reader into the active tab only when the user asks, to read the selection and the page's main text. There is no standing content script.                                                                                                                       |
 | `sidePanel`                  | Shows the Tagalong chat in Chrome's side panel beside the page, and opens it from the toolbar button and the shortcut.                                                                                                                                                                  |
 | `storage`                    | Keeps the pairing token and port the user pastes on the options page, in `chrome.storage.local` only. Never synced.                                                                                                                                                                     |
-| `clipboardRead` (optional)   | Declared for a possible later feature. The current version never requests it and never reads the clipboard.                                                                                                                                                                             |
 | `<all_urls>` host (optional) | Off by default. The user turns it on from the options page with "Allow reading any tab when I ask". It lets the extension read the tab in front when the user asks from a tab it was never clicked on, for example with the desktop hotkey. It still reads nothing until the user asks. |
-
-Owner decision: `clipboardRead` is declared but unused. Reviewers sometimes question unused
-permissions. Removing it from `optional_permissions` before submission is the simpler path.
 
 ### Remote code
 
