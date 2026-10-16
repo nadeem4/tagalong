@@ -136,7 +136,7 @@ describe('Summarizer', () => {
     const failing: BrainProvider = {
       ...new FakeBrainProvider({ text: '' }),
       id: 'fake',
-      capabilities: { vision: false, tools: false, streaming: true },
+      capabilities: { vision: false, tools: false },
       listModels: () => Promise.resolve([]),
       complete: () => Promise.reject(new BrainError('auth', 'No key.')),
     };

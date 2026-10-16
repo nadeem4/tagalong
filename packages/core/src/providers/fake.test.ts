@@ -37,7 +37,7 @@ describe('FakeBrainProvider', () => {
   it('identifies itself as the fake provider with full capabilities', async () => {
     const provider = new FakeBrainProvider({ text: 'hi' });
     expect(provider.id).toBe('fake');
-    expect(provider.capabilities).toEqual({ vision: true, tools: true, streaming: true });
+    expect(provider.capabilities).toEqual({ vision: true, tools: true });
     expect(await provider.listModels()).toContain('fake-model');
   });
 

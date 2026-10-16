@@ -11,7 +11,6 @@ export const REFUSAL_MESSAGE =
 export interface BrainCapabilities {
   vision: boolean;
   tools: boolean;
-  streaming: boolean;
 }
 
 /**

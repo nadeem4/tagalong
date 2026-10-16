@@ -10,7 +10,7 @@ function recording() {
   const seen: { request?: BrainRequest; toolResult?: unknown } = {};
   const provider: BrainProvider = {
     id: 'recording',
-    capabilities: { vision: true, tools: true, streaming: true },
+    capabilities: { vision: true, tools: true },
     listModels: async () => ['m'],
     complete: async (request, events) => {
       seen.request = request;

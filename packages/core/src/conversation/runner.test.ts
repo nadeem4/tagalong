@@ -510,7 +510,7 @@ function toolless(into: BrainRequest[]): BrainProvider {
   const fake = new FakeBrainProvider({ text: 'no tools here' });
   return {
     id: 'toolless',
-    capabilities: { vision: false, tools: false, streaming: true },
+    capabilities: { vision: false, tools: false },
     listModels: () => fake.listModels(),
     complete: (req, events_, signal) => {
       into.push(req);
@@ -522,7 +522,7 @@ function toolless(into: BrainRequest[]): BrainProvider {
 function failing(error: unknown): BrainProvider {
   return {
     id: 'failing',
-    capabilities: { vision: false, tools: false, streaming: false },
+    capabilities: { vision: false, tools: false },
     listModels: () => Promise.resolve([]),
     complete: (): Promise<BrainResult> => Promise.reject(error),
   };
@@ -608,7 +608,7 @@ function blind(into: BrainRequest[]): BrainProvider {
   const fake = new FakeBrainProvider({ text: 'I cannot see images' });
   return {
     id: 'blind',
-    capabilities: { vision: false, tools: true, streaming: true },
+    capabilities: { vision: false, tools: true },
     listModels: () => fake.listModels(),
     complete: (req, events_, signal) => {
       into.push(req);
@@ -808,7 +808,7 @@ describe('ConversationRunner per-pet providers', () => {
     const fake = new FakeBrainProvider({ text: `answered by ${id}` });
     return {
       id,
-      capabilities: { vision: true, tools: true, streaming: true },
+      capabilities: { vision: true, tools: true },
       listModels: () => Promise.resolve([]),
       canSee: (model) => sees.includes(model),
       complete: (req, events_, signal) => {

@@ -152,7 +152,7 @@ describe('OpenAiCompatibleProvider', () => {
   it('advertises itself and its capabilities', () => {
     const { provider: p } = provider([]);
     expect(p.id).toBe('nebius');
-    expect(p.capabilities).toEqual({ vision: true, tools: true, streaming: true });
+    expect(p.capabilities).toEqual({ vision: true, tools: true });
   });
 
   it('streams text deltas and reports usage', async () => {

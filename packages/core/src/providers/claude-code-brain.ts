@@ -49,7 +49,7 @@ const SHELL_PROMPT =
  */
 export class ClaudeCodeBrain implements BrainProvider {
   readonly id = 'claude-code';
-  readonly capabilities: BrainCapabilities = { vision: true, tools: true, streaming: false };
+  readonly capabilities: BrainCapabilities = { vision: true, tools: true };
   readonly #spawn: SpawnFn;
   readonly #command: string;
   readonly #cwd: string;

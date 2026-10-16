@@ -249,7 +249,7 @@ interface PendingCall {
  */
 export class OpenAiCompatibleProvider implements BrainProvider {
   readonly id: string;
-  readonly capabilities: BrainCapabilities = { vision: true, tools: true, streaming: true };
+  readonly capabilities: BrainCapabilities = { vision: true, tools: true };
 
   readonly #client: OpenAI;
   readonly #label: string;

@@ -76,7 +76,7 @@ describe('checkKey', () => {
     const deaf = {
       resolve: (): BrainProvider => ({
         id: 'deaf',
-        capabilities: { vision: false, tools: false, streaming: true },
+        capabilities: { vision: false, tools: false },
         listModels: () => Promise.resolve([]),
         complete: (_req, _events, signal) =>
           new Promise((_resolve, reject) =>

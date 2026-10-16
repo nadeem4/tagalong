@@ -254,7 +254,7 @@ describe('composeGreeting', () => {
   it('falls back when the brain takes too long', async () => {
     const slow: BrainProvider = {
       id: 'slow',
-      capabilities: { vision: false, tools: false, streaming: true },
+      capabilities: { vision: false, tools: false },
       listModels: () => Promise.resolve([]),
       complete: (_req, _events, signal) =>
         new Promise((resolve) => {
@@ -285,7 +285,7 @@ describe('composeGreeting', () => {
     // A cold `claude -p` may not answer the abort at once; the greeting must not wait on it.
     const deaf: BrainProvider = {
       id: 'deaf',
-      capabilities: { vision: false, tools: false, streaming: true },
+      capabilities: { vision: false, tools: false },
       listModels: () => Promise.resolve([]),
       complete: () => new Promise(() => undefined),
     };

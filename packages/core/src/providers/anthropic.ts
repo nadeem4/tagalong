@@ -126,7 +126,7 @@ function toBrainError(error: unknown): BrainError {
 
 export class AnthropicProvider implements BrainProvider {
   readonly id = 'anthropic';
-  readonly capabilities: BrainCapabilities = { vision: true, tools: true, streaming: true };
+  readonly capabilities: BrainCapabilities = { vision: true, tools: true };
 
   private readonly client: Anthropic;
 

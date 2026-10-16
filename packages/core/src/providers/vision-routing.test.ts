@@ -6,7 +6,7 @@ import { carriesImage, modelForTurn } from './vision-routing';
 function provider(vision: boolean, canSee?: (model: string) => boolean): BrainProvider {
   return {
     id: 'p',
-    capabilities: { vision, tools: true, streaming: true },
+    capabilities: { vision, tools: true },
     listModels: () => Promise.resolve([]),
     complete: () => Promise.reject(new Error('unused')),
     ...(canSee ? { canSee } : {}),

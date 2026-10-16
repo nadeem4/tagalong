@@ -1335,7 +1335,7 @@ describe('greeting.compose', () => {
   it('greets by the name in settings when the brain cannot', async () => {
     const failing: BrainProvider = {
       id: 'fake',
-      capabilities: { vision: false, tools: false, streaming: true },
+      capabilities: { vision: false, tools: false },
       listModels: () => Promise.resolve([]),
       complete: () => Promise.reject(new Error('offline')),
     };
@@ -1350,7 +1350,7 @@ describe('greeting.compose', () => {
   it('counts the time away from when Tagalong was last closed, not last launched', async () => {
     const failing: BrainProvider = {
       id: 'fake',
-      capabilities: { vision: false, tools: false, streaming: true },
+      capabilities: { vision: false, tools: false },
       listModels: () => Promise.resolve([]),
       complete: () => Promise.reject(new Error('offline')),
     };
@@ -1384,7 +1384,7 @@ describe('greeting.compose', () => {
   it('says it closed unexpectedly when main says the last launch crashed', async () => {
     const failing: BrainProvider = {
       id: 'fake',
-      capabilities: { vision: false, tools: false, streaming: true },
+      capabilities: { vision: false, tools: false },
       listModels: () => Promise.resolve([]),
       complete: () => Promise.reject(new Error('offline')),
     };
@@ -1411,7 +1411,7 @@ describe('greeting.compose', () => {
   it('says what is new when the version changed', async () => {
     const failing: BrainProvider = {
       id: 'fake',
-      capabilities: { vision: false, tools: false, streaming: true },
+      capabilities: { vision: false, tools: false },
       listModels: () => Promise.resolve([]),
       complete: () => Promise.reject(new Error('offline')),
     };
@@ -1458,7 +1458,7 @@ describe('pick up where you left off', () => {
     let calls = 0;
     const provider: BrainProvider = {
       id: 'fake',
-      capabilities: { vision: false, tools: false, streaming: true },
+      capabilities: { vision: false, tools: false },
       listModels: () => Promise.resolve([]),
       complete: () => {
         calls += 1;
@@ -1660,7 +1660,7 @@ describe('connections over rpc', () => {
     let rounds = 0;
     const readThenWrite: BrainProvider = {
       id: 'fake',
-      capabilities: { vision: false, tools: true, streaming: true },
+      capabilities: { vision: false, tools: true },
       listModels: () => Promise.resolve(['fake-model']),
       complete: async (_req, events) => {
         if (rounds++ === 0) {
@@ -1731,7 +1731,7 @@ describe('file this as a bug over rpc', () => {
     let rounds = 0;
     return {
       id: 'fake',
-      capabilities: { vision: false, tools: true, streaming: true },
+      capabilities: { vision: false, tools: true },
       listModels: () => Promise.resolve(['fake-model']),
       complete: async (req, events) => {
         systems.push(req.system);
@@ -1815,7 +1815,7 @@ describe('providers.check', () => {
   it('tests the key once and says plainly when it fails', async () => {
     const refusing: BrainProvider = {
       id: 'fake',
-      capabilities: { vision: false, tools: false, streaming: true },
+      capabilities: { vision: false, tools: false },
       listModels: () => Promise.resolve([]),
       complete: () => Promise.reject(new BrainError('auth', 'rejected')),
     };

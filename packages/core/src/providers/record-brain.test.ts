@@ -90,7 +90,7 @@ describe('recordBrain', () => {
     const { rows, log } = recorder();
     const failing: BrainProvider = {
       id: 'anthropic',
-      capabilities: { vision: true, tools: true, streaming: true },
+      capabilities: { vision: true, tools: true },
       listModels: async () => [],
       complete: () => Promise.reject(new Error('overloaded')),
     };
