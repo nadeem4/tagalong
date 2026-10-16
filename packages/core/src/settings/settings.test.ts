@@ -51,6 +51,17 @@ describe('SettingsStore.get', () => {
     expect(settings).not.toHaveProperty('defaultModel');
   });
 
+  it('loads a file from the old setup wizard, and the next save drops its onboarding key', () => {
+    writeFileSync(file, JSON.stringify({ userName: 'Ada', onboarding: { done: true } }), 'utf8');
+    const store = new SettingsStore(dataDir);
+    expect(store.get().userName).toBe('Ada');
+    expect(store.get().welcome.done).toBe(false);
+    store.set({ enginePort: 50000 });
+    const onDisk = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
+    expect(onDisk).not.toHaveProperty('onboarding');
+    expect(onDisk['userName']).toBe('Ada');
+  });
+
   it('falls back to the last good copy when the file is malformed', () => {
     const store = new SettingsStore(dataDir);
     store.set({ userName: 'Ada' });

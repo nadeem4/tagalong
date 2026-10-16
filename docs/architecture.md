@@ -1797,8 +1797,8 @@ A fresh install opens setup, a renderer page (`onboarding.html`, titled "Set up 
 ordinary framed window centred on the screen under the cursor. Main opens it from `start` when
 `shouldOpenWelcome(settings, env)` says so: the protocol setting `welcome.done` is false and
 `TAGALONG_SKIP_ONBOARDING` is not `1`. It replaced an older setup wizard, whose saved `onboarding`
-key is dropped when settings load, so an install that finished the wizard still sees Welcome once. **Open Welcome again** on Home's
-Settings page opens it again, from the top.
+key is dropped when settings load, so an install that finished the wizard still sees Welcome once.
+**Open Welcome again** on Home's Settings page opens it again, from the top.
 
 Setup is alone on screen: the pet's window is created hidden (`createAvatarWindow({ hidden })`)
 and `scoutWaits` is set. Scout arrives when setup finishes, or when the window is closed without
