@@ -1,3 +1,5 @@
+/** Tests for HomeView: the nav, pages and Scout's page. */
+
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ActivityEntry, Expert, Pet } from '@tagalong/protocol';

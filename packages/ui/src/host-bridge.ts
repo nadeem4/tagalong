@@ -1,3 +1,9 @@
+/**
+ * The HostBridge contract: every call and notification a ui component may use, which each
+ * host (the Electron app, the browser extension) implements. Contains HostBridge, TurnEvent,
+ * AskInput, ConfirmHandoff, and the HostBridgeProvider / useHostBridge React context.
+ */
+
 import { createContext, createElement, useContext } from 'react';
 import type { ReactNode } from 'react';
 import type {
@@ -67,9 +73,9 @@ export interface AskInput {
 }
 
 /**
- * Everything this package is allowed to know about the outside world. Each host —
- * Electron today, the browser extension later — implements it; the components never
- * touch a socket, a preload bridge, or a node API themselves.
+ * Everything this package is allowed to know about the outside world. The desktop app and
+ * the browser extension each implement it; the components never touch a socket, a preload
+ * bridge or a node API themselves.
  */
 export interface HostBridge {
   ask(input: AskInput): Promise<{ turnId: string }>;
@@ -84,7 +90,7 @@ export interface HostBridge {
   onTurnEvent(handler: (event: TurnEvent) => void): () => void;
   listPets(): Promise<Pet[]>;
   /**
-   * Phase 3B. Ends a watch from its Watching chip. Optional: a host that cannot start
+   * Ends a watch from its Watching chip. Optional: a host that cannot start
    * watches never shows a chip to stop.
    */
   stopWatch?(watchId: string): Promise<void>;

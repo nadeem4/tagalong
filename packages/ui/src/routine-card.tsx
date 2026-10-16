@@ -1,3 +1,9 @@
+/**
+ * The routine card: a routine Scout wrote or changed, with its confirm button (Save, Pause,
+ * Turn on or Delete), Edit (in Home) and Cancel, and one test run once a new or changed
+ * routine is saved. Contains RoutineCard. Used by the bubble.
+ */
+
 import { useState } from 'react';
 import {
   RoutineDraft,

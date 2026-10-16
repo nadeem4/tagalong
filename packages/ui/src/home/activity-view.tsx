@@ -1,3 +1,9 @@
+/**
+ * Home's Activity page: what Scout did, newest first, each row opening its thread, paged
+ * from the engine's record. Contains ActivityView and changesActivity (also used by the
+ * Spend card to know when to read again).
+ */
+
 import { useCallback, useEffect, useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ActivityEntry, ActivityState, Pet } from '@tagalong/protocol';
@@ -10,7 +16,6 @@ import { officeTokens as t } from '../office/tokens';
 /** How many entries one page holds. */
 const PAGE = 30;
 
-/** The engine notifications after which the record has changed. */
 /** The events after which Activity (and the Spend card) read again. */
 export function changesActivity(event: TurnEvent): boolean {
   switch (event.type) {

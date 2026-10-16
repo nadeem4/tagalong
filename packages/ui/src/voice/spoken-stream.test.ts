@@ -1,3 +1,5 @@
+/** Tests for SpokenStream: sentence-by-sentence speech while streaming. */
+
 import { describe, expect, it } from 'vitest';
 import { ONLY_IN_BUBBLE } from './speakable';
 import { SpokenStream } from './spoken-stream';

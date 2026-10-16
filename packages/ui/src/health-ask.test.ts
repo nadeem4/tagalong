@@ -1,3 +1,5 @@
+/** Tests for wantsHealthCheck: which questions get the health card. */
+
 import { describe, expect, it } from 'vitest';
 import { wantsHealthCheck } from './health-ask';
 

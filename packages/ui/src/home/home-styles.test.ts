@@ -1,3 +1,5 @@
+/** Tests for HOME_CSS: the gold focus ring. */
+
 import { describe, expect, it } from 'vitest';
 import { officeTokens as t } from '../office/tokens';
 import { HOME_CSS } from './home-styles';

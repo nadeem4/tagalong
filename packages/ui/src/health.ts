@@ -1,3 +1,9 @@
+/**
+ * "Scout, what's wrong?": the health check as pure functions. Turns the facts a host read
+ * into one row per check and a headline. Contains HealthFacts, HealthRow, HealthCheckId,
+ * FixTarget, healthRows and healthHeadline.
+ */
+
 import type { ConnectionStatus, MouthId } from '@tagalong/protocol';
 
 /** Where a Fix it button lands: a Settings section, or a Home page. */

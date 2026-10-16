@@ -1,3 +1,5 @@
+/** Tests for the package's public exports. */
+
 import { describe, expect, it } from 'vitest';
 import * as ui from './index';
 

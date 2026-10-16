@@ -1,3 +1,8 @@
+/**
+ * The chat panel's text box and Send button: Enter sends, Shift+Enter is a newline.
+ * Contains Composer. Used by ChatPanel.
+ */
+
 import { useState } from 'react';
 import type { KeyboardEvent } from 'react';
 
@@ -7,10 +12,7 @@ export interface ComposerProps {
   disabled: boolean;
   /** True when something is attached. The placeholder must not promise sight there isn't. */
   seeing?: boolean;
-  /**
-   * Controlled text, for a panel that writes into the box — the Hand off menu fills in
-   * "@Ink ". Leave both unset and the composer keeps its own text.
-   */
+  /** Controlled text. Leave both unset and the composer keeps its own text. */
   value?: string;
   onValueChange?: (text: string) => void;
 }

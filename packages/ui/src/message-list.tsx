@@ -1,3 +1,8 @@
+/**
+ * The chat panel's message list: user and assistant bubbles, fired-watch cards, notes, and
+ * the answer still streaming. Contains MessageList and ChatMessage. Used by ChatPanel.
+ */
+
 import type { MessageRole, Pet } from '@tagalong/protocol';
 import { DEFAULT_PET_COLOR } from './office/sprites/characters';
 

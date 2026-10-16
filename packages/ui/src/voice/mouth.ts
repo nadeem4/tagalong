@@ -1,11 +1,12 @@
-import type { Mouth } from '@tagalong/protocol';
-import type { SpeechQueue } from './speech-queue';
-
 /**
  * Scout's mouth in a window. A spoken answer streams in and each piece goes to the speech
  * queue whole; a bubble line goes in shortened. `stop` cuts it off and drops whatever is
  * still streaming. Which engine says each line is main's choice (`mouthOrder`).
+ * Contains QueueMouth.
  */
+import type { Mouth } from '@tagalong/protocol';
+import type { SpeechQueue } from './speech-queue';
+
 export class QueueMouth implements Mouth {
   readonly #queue: Pick<SpeechQueue, 'say' | 'stop'>;
   #run = 0;

@@ -1,4 +1,9 @@
 /**
+ * Whether a typed request asks Scout to read aloud ("read this to me"), or only says to go
+ * on after "Shall I go on?". Contains wantsReadAloud and goesOn.
+ */
+
+/**
  * A request that starts with "read" or "say" (after "Scout,", "can you" or "please"), or with
  * "translate this and read", and ends within a few words in "aloud", "to me" or "out loud":
  * "read this to me" or "translate it and read it to me", not "read the logs and explain the

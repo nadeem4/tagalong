@@ -1,3 +1,5 @@
+/** Tests for Answer: Markdown rendering, links kept as text, and drafts with Copy. */
+
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Answer } from './answer';

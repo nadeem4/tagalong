@@ -1,3 +1,5 @@
+/** Tests for the drop card: Explain, hand to an expert, Cancel and the secrets refusal. */
+
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CompanionBubble } from './companion-bubble';

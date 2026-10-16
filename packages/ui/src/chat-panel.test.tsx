@@ -1,3 +1,5 @@
+/** Tests for ChatPanel: Look and Clear, asking, streaming, errors and follow-ups. */
+
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ContextSnapshot } from '@tagalong/protocol';

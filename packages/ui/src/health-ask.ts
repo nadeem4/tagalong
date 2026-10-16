@@ -1,8 +1,10 @@
 /**
- * "Scout, what's wrong?": the questions the bubble answers with a health check instead of a
- * turn, so the check works when Scout cannot think. Only the whole question counts: "what's
- * wrong with this code" is a real question for Scout. Words that also fit the person's work
- * ("what's broken?", "is anything broken?", "are you working?") stay with Scout.
+ * Which typed or spoken questions get the health card instead of a turn, so the check works
+ * when Scout cannot think. Contains wantsHealthCheck.
+ *
+ * Only the whole question counts: "what's wrong with this code" is a real question for
+ * Scout. Words that also fit the person's work ("what's broken?", "is anything broken?",
+ * "are you working?") stay with Scout.
  */
 const ASKS: readonly RegExp[] = [
   /^(what's|what is) (wrong|the matter)( with you)?$/,

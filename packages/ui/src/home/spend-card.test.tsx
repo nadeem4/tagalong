@@ -1,3 +1,5 @@
+/** Tests for SpendCard and formatSpend. */
+
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { UsageRow, UsageSummaryResult } from '@tagalong/protocol';

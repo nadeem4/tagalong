@@ -1,3 +1,9 @@
+/**
+ * Home's Routines page: what Scout does on its own, when, and where the result goes. The
+ * list, the templates and the form, which also edits a routine from Scout's card.
+ * Contains RoutinesPanel.
+ */
+
 import { useCallback, useEffect, useId, useState } from 'react';
 import {
   RoutineDraft,

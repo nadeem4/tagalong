@@ -1,3 +1,5 @@
+/** Tests for Composer: send, Enter vs Shift+Enter, whitespace, placeholder, disabled. */
+
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Composer } from './composer';

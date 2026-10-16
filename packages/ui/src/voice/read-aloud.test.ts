@@ -1,3 +1,5 @@
+/** Tests for wantsReadAloud and goesOn. */
+
 import { describe, expect, it } from 'vitest';
 import { goesOn, wantsReadAloud } from './read-aloud';
 

@@ -1,9 +1,7 @@
 /**
- * A pixel-art sprite as plain data: a map of rows, a palette, and optional overlay pixels.
- *
- * Each character in a row is one pixel; `.` is transparent, any other character is looked
- * up in the palette. Overlays paint over the base map (a headset, glasses) so characters
- * can share one body and differ only in a few pixels.
+ * A pixel-art sprite as plain data, and how to draw it. Each character in a row is one pixel:
+ * `.` is transparent, any other character is looked up in the palette. Contains Sprite,
+ * spriteSize and spriteShadow.
  */
 export interface Sprite {
   readonly rows: readonly string[];

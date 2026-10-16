@@ -1,3 +1,5 @@
+/** Tests for toSpeakable and mergeShortLines. */
+
 import { describe, expect, it } from 'vitest';
 import { ONLY_IN_BUBBLE, REST_IN_BUBBLE, mergeShortLines, toSpeakable } from './speakable';
 

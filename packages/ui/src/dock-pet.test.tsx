@@ -1,3 +1,5 @@
+/** Tests for DockPet: faces, tags, marks, blinking and reduced motion. */
+
 import { render, screen } from '@testing-library/react';
 import { act } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';

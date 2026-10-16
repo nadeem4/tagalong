@@ -1,3 +1,10 @@
+/**
+ * Home: the one window for the companion, its experts and the app. Scout in the corner and
+ * eight pages (overview, Scout, experts, routines, connections, activity, what Scout saw,
+ * settings). Contains HomeView, HomeHost, HomeProvider, HomePage and the Scout page.
+ * Rendered by the desktop `office` page.
+ */
+
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ActivityEntry, Expert, Pet, RoutineProposedParams } from '@tagalong/protocol';
@@ -291,7 +298,10 @@ const STATE_WORDS: Record<ActivityEntry['state'], string> = {
   stopped: 'Stopped',
 };
 
-/** How the companion thinks: the provider and the model. Its role is always the Companion. */
+/**
+ * Scout's page: the provider and model it thinks with. A provider change drops the pet's
+ * vision and watch models.
+ */
 function ScoutPanel({
   pet,
   providers,

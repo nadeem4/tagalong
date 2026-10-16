@@ -1,3 +1,9 @@
+/**
+ * Home's Spend card: today's and this month's usage by who spent it (Scout or the experts)
+ * and on which service, and whether the daily budget paused proactive comments. Contains
+ * SpendCard and formatSpend.
+ */
+
 import { useCallback, useEffect, useState } from 'react';
 import type { UsageRow, UsageSummaryResult } from '@tagalong/protocol';
 import { useHostBridge } from '../host-bridge';

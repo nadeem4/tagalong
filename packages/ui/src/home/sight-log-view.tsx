@@ -1,3 +1,8 @@
+/**
+ * Home's "What Scout saw" page: every look and every send, newest first, grouped by day,
+ * metadata only, with delete one and delete all. Contains SightLogView.
+ */
+
 import { useCallback, useEffect, useState } from 'react';
 import type { SightKind, SightLogEntry } from '@tagalong/protocol';
 import { SIGHT_LOG_DEFAULT_DAYS } from '@tagalong/protocol';

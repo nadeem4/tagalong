@@ -1,3 +1,5 @@
+/** Tests for RoutineCard and the bubble's routine turns. */
+
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { RoutineProposedParams } from '@tagalong/protocol';

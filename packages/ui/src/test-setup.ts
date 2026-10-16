@@ -1,3 +1,8 @@
+/**
+ * Vitest setup for the ui package: jest-dom matchers, cleanup after each test, a longer
+ * async timeout and a jsdom dialog shim.
+ */
+
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
 import { afterEach } from 'vitest';

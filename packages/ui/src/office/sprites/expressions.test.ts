@@ -1,3 +1,5 @@
+/** Tests for the dock faces: each mood changes only the face rows. */
+
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS } from './characters';
 import { withMood, type DockMood } from './expressions';

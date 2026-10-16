@@ -1,3 +1,5 @@
+/** Tests for the design tokens: text and status colours meet 4.5:1 contrast. */
+
 import { describe, expect, it } from 'vitest';
 import { officeTokens } from './tokens';
 

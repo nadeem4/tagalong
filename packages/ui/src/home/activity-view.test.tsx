@@ -1,3 +1,5 @@
+/** Tests for ActivityView: entries, threads, paging and refresh. */
+
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ActivityEntry, Pet } from '@tagalong/protocol';

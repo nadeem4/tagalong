@@ -1,3 +1,8 @@
+/**
+ * An in-memory HostBridge for tests, with `emit` to push engine events and arrays that
+ * record what the components asked for. Contains createFakeHostBridge and FakeHostBridge.
+ */
+
 import type {
   ActivityEntry,
   CalendarCheckResult,
@@ -67,8 +72,8 @@ export interface FakeHostBridge extends HostBridge {
 }
 
 /**
- * Shipped from the package rather than kept in test files: the desktop host needs the
- * same bridge double to test its renderer without booting an engine.
+ * Shipped from the package rather than kept in test files: the extension's side-panel tests
+ * use the same bridge double without booting an engine.
  */
 export function createFakeHostBridge(
   options: {

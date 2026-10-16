@@ -1,3 +1,5 @@
+/** Tests for the connector confirm card: Allow once and Cancel. */
+
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { CompanionBubble } from './companion-bubble';

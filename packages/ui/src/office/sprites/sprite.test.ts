@@ -1,3 +1,5 @@
+/** Tests for spriteShadow. */
+
 import { describe, expect, it } from 'vitest';
 import { spriteShadow } from './sprite';
 

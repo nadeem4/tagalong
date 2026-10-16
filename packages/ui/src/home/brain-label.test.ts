@@ -1,3 +1,5 @@
+/** Tests for modelLabel and brainLabel. */
+
 import { describe, expect, it } from 'vitest';
 import { brainLabel, modelLabel } from './brain-label';
 

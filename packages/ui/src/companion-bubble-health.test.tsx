@@ -1,3 +1,5 @@
+/** Tests for the bubble's health check: "what's wrong?" answered by the health card. */
+
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CompanionBubble } from './companion-bubble';

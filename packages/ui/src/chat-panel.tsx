@@ -1,3 +1,8 @@
+/**
+ * The full chat panel used by the browser extension's side panel: sight bar, watch chips,
+ * messages, Stop and the composer, driven by the HostBridge turn events. Contains ChatPanel.
+ */
+
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { ContextSnapshot, PerceptionTarget, Pet } from '@tagalong/protocol';
 import { Composer } from './composer';
@@ -59,7 +64,7 @@ export function ChatPanel({
   const [modelCalls, setModelCalls] = useState<number | null>(null);
   // Which conversation each pet is in, so a follow-up continues the thread it answered in.
   const [conversations, setConversations] = useState<Record<string, string>>({});
-  // Phase 3B. Watches running now, shown as chips with a Stop button each.
+  // Watches running now, shown as chips with a Stop button each.
   const [watches, setWatches] = useState<readonly RunningWatch[]>([]);
   const turns = useRef(new Map<string, TurnInfo>());
   const pets = givenPets ?? fetchedPets;
@@ -196,7 +201,8 @@ export function ChatPanel({
         break;
       }
       default:
-        // Audio and tool events belong to later phases.
+        // Every other notification (tool calls, hand-offs, connector confirms, routines,
+        // moods, settings) is not shown in this panel.
         break;
     }
   });

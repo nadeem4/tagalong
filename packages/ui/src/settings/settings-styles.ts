@@ -1,11 +1,11 @@
-import { officeTokens as t } from '../office/tokens';
-
 /**
- * The Settings window's sheet, built from the office tokens so Settings and Home share one
+ * The Settings window's sheet, built from the design tokens so Settings and Home share one
  * palette. Everything is scoped under `.tg-settings`: navy chrome for the bar and the side
  * menu, off-white panels for the sections you read and edit, gold only for what is
  * selected, focused or primary.
  */
+import { officeTokens as t } from '../office/tokens';
+
 export const SETTINGS_CSS = `
 .tg-settings {
   display: grid; grid-template-columns: ${t.size.partyWidth}px 1fr;

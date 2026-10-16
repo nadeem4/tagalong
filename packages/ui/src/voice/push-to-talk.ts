@@ -1,3 +1,9 @@
+/**
+ * Hold-to-talk from a global hotkey that only reports presses: tells a held key from a
+ * fresh press and decides when the mic starts and stops. Contains PushToTalk, TalkAction
+ * and FRESH_PRESS_MS.
+ */
+
 /** What the microphone should do after a press, a release or a click. */
 export type TalkAction = 'start' | 'stop' | 'none';
 

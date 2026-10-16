@@ -1,3 +1,5 @@
+/** Tests for ConnectionsPanel: Popular, Claude Code servers, Add a connector, Disconnect. */
+
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import type { ConnectionState, FoundConnector, PopularConnector } from '@tagalong/protocol';

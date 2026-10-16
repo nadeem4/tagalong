@@ -1,3 +1,10 @@
+/**
+ * Scout's bubble beside the dock pet: asks with what Scout can see, streams the answer,
+ * and hosts the cards (hand-off, connector confirm, routine, settings, pick-up, drop, health).
+ * Also the one-time invitation after setup and the quiet GreetingLine. Contains
+ * CompanionBubble, GreetingLine, BubbleTalk and their props. Used by the desktop panel window.
+ */
+
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Pushable } from '@tagalong/protocol';
