@@ -1,3 +1,10 @@
+/**
+ * The engine's WebSocket JSON-RPC server, on loopback only. Contains `EngineServer` (hello
+ * with the pairing token, dispatch to `MethodHandlers`, broadcast), `HostSession` (the
+ * engine's requests to one host: capture, readText, listWindows, recall, diff, pointAt and
+ * more), `RpcFailure`, and `EXTENSION_METHODS`, the only methods the browser extension may
+ * call.
+ */
 import { randomUUID } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import type { WebSocket } from 'ws';
@@ -84,9 +91,9 @@ export interface HostSession {
   captureRegion(params: CaptureRegionParams): Promise<PerceptionCaptureRegionResultType>;
   /** Asks the host for a screenshot of one listed window, in front or not. */
   captureWindow(params: PerceptionCaptureWindowParams): Promise<PerceptionCaptureWindowResult>;
-  /** Phase 3B. The buffered frame nearest a moment ago, from rolling memory. */
+  /** The buffered frame nearest a moment ago, from the host's rolling memory. */
   recall(params: RecallParams): Promise<RecallResult>;
-  /** Phase 3B. How a display, or a region of it, changed since a moment ago. */
+  /** How a display, or a region of it, changed since a moment ago. */
   diff(params: DiffParams): Promise<DiffResult>;
   /** Asks the host to draw a ring around one thing on screen. It only draws. */
   pointAt(params: ScreenPointAtParams): Promise<ScreenPointAtResultType>;
@@ -136,7 +143,7 @@ const HELLO_TIMEOUT_MS = 10_000;
 /** A hello is a few hundred bytes; anything this big before one is not a host. */
 const MAX_BYTES_BEFORE_HELLO = 64 * 1024;
 
-/** How long the engine waits for a host to answer perception.capture. */
+/** How long the engine waits for a host to answer any request it sent. */
 const CAPTURE_TIMEOUT_MS = 5_000;
 
 interface Connection {
@@ -344,7 +351,7 @@ export class EngineServer {
       return;
     }
 
-    // A response to one of our own perception.capture requests.
+    // A response to a request the engine sent this host.
     const asResponse = parsed as { id?: RpcId; result?: unknown; error?: unknown; method?: string };
     if (asResponse.method === undefined && asResponse.id !== undefined) {
       connection.session?.settle(asResponse.id, asResponse.result, asResponse.error);

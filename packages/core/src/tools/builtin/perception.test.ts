@@ -1,3 +1,4 @@
+/** Tests for the look_at_screen and get_selection tools: exclusions and per-turn vision. */
 import { describe, expect, it } from 'vitest';
 import type { CaptureExclusions, ContextSnapshotPatch, PerceptionTarget } from '@tagalong/protocol';
 import type { PerceptionHost } from '../../perception/host';
@@ -70,14 +71,12 @@ function screenshotHost(): ReturnType<typeof fakeHost> {
 
 describe('perception tool definitions', () => {
   it('offers the Phase 2 pair first, ahead of the full-view tools', () => {
-    // Was "exactly look_at_screen and get_selection" until Phase 2B added five more.
-    // Flipped here and nowhere earlier: the ordering is what this assertion still
-    // protects, because a model reads the catalog top down and these two are the cheap
-    // answers to "what is the user looking at". The full-view set has its own test.
+    // A model reads the catalog top down, and these two are the cheap answers to
+    // "what is the user looking at". The full-view set has its own test.
     const names = toolset([]).definitions.map((tool) => tool.name);
     expect(names.slice(0, 2)).toEqual([LOOK_AT_SCREEN, GET_SELECTION]);
-    // Seven since Phase 2B; nine since Phase 3B added recall_screen and what_changed; ten
-    // with look_at_window; eleven with point_at.
+    // The two above, the six display and window tools, recall_screen, what_changed and
+    // point_at.
     expect(names).toHaveLength(11);
   });
 

@@ -1,3 +1,4 @@
+/** Tests for Engine: boot, and the JSON-RPC handlers end to end over a real socket in fake mode. */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

@@ -1,3 +1,4 @@
+/** Tests for budgetSpent: the daily budget gate. */
 import { describe, expect, it } from 'vitest';
 import { budgetSpent } from './budget';
 

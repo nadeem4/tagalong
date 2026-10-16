@@ -1,3 +1,8 @@
+/**
+ * Setup's key test. Contains `checkKey` (one tiny request on the provider's recommended
+ * model) and `plainKeyProblem` (a failure as one plain sentence, never holding the key).
+ * Called by the `providers.check` handler.
+ */
 import type { Pet, ProvidersCheckResult } from '@tagalong/protocol';
 import { getRole, recommendedModel } from '../roles';
 import { BrainError } from './index';

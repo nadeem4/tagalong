@@ -1,3 +1,4 @@
+/** Tests for watchModelsFor: the check model on each provider, and the pet overrides. */
 import { describe, expect, it } from 'vitest';
 import { NEMOTRON_VISION_MODEL } from './nebius-models';
 import { NEMOTRON_NANO_MODEL, watchModelsFor } from './watch-models';

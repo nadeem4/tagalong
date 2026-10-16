@@ -1,3 +1,4 @@
+/** Tests for checkKey: one brief request on the recommended model, and plain failure sentences. */
 import { describe, expect, it } from 'vitest';
 import type { Pet } from '@tagalong/protocol';
 import { BrainError, FakeBrainProvider } from './index';

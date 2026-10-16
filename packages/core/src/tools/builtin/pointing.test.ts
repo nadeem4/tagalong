@@ -1,3 +1,4 @@
+/** Tests for the point_at tool: its schema, the host request and its refusals. */
 import { describe, expect, it } from 'vitest';
 import type { ScreenPointAtParams, ScreenPointAtResult } from '@tagalong/protocol';
 import type { PerceptionHost } from '../../perception/host';

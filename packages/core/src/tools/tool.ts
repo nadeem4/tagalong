@@ -1,13 +1,16 @@
+/**
+ * The one shape every Scout tool has. Contains `Tool`, `ToolContext` (what a turn hands a
+ * tool), `ToolOutcome`, `RoutineTurnContext`, `ToolKind` and `defineTool`.
+ */
 import type { ContextSnapshot, Pet } from '@tagalong/protocol';
 import type { BrainContentBlock, BrainTool } from '../providers';
 
 /**
  * Whether running a tool changes stored state.
  *
- * The rule: a tool is `write` when it leaves something behind after the turn — a memory
- * filed, a watch started. Everything that only looks, reads or asks is `read`, even when
- * it costs a model call.
- * Phase 8 grants will lean on this, so decide it by the state, not by how risky it feels.
+ * The rule: a tool is `write` when it leaves something behind after the turn (a memory
+ * filed, a watch started). Everything that only looks, reads or asks is `read`, even when
+ * it costs a model call. Decide it by the state, not by how risky it feels.
  */
 export type ToolKind = 'read' | 'write';
 

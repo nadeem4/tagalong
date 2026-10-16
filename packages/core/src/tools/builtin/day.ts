@@ -1,14 +1,15 @@
+/**
+ * "What did we do today?": one read over the records Tagalong already keeps (the log of
+ * what Scout saw, the activity record, pick-up and the briefs waiting for Send). Nothing
+ * is tracked in the background for it, and no answer an expert or a turn gave is passed on.
+ * Contains `recallDayTool` and `estimateSpan`.
+ */
 import type { ActivityEntry, SightLogEntry } from '@tagalong/protocol';
 import type { PickUpSnapshot } from '../../pick-up/store';
 import { hideSecrets } from '../../privacy/secrets';
 import type { BrainTool } from '../../providers';
 import { defineTool, type Tool } from '../tool';
 
-/**
- * "What did we do today?": one read over the records Tagalong already keeps (the log of
- * what Scout saw, the activity record, pick-up and the briefs waiting for Send). Nothing
- * is tracked in the background for it, and no answer an expert or a turn gave is passed on.
- */
 export const RECALL_DAY = 'recall_day';
 
 /** The most the tool hands back. */

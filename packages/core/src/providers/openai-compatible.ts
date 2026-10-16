@@ -1,3 +1,9 @@
+/**
+ * A provider over the OpenAI chat-completions wire format, used for Nebius Token Factory
+ * and OpenRouter. Contains `OpenAiCompatibleProvider` and `NEBIUS_BASE_URL`. Handles
+ * routing pictures to a vision model, tool calls, refusals, and the live model list
+ * (`fetchModels`).
+ */
 import OpenAI, {
   APIConnectionError,
   APIUserAbortError,
@@ -265,20 +271,20 @@ export class OpenAiCompatibleProvider implements BrainProvider {
     });
   }
 
-  /** Where requests go. Read by Settings to show which service a pet is on. */
+  /** Where requests go. */
   get baseURL(): string {
     return this.#baseURL;
   }
 
-  /** The built-in list. Never touches the network, so Settings can always show something. */
+  /** The built-in list. Never touches the network. */
   listModels(): Promise<string[]> {
     return Promise.resolve([...this.#models]);
   }
 
   /**
    * The service's own list, from `GET /models`, sorted so a long list is scannable.
-   * Throws a `BrainError` when the service cannot be asked; the caller decides whether
-   * to fall back to `listModels`.
+   * Throws a `BrainError` when the service cannot be asked; the caller falls back to the
+   * preset's built-in list.
    */
   async fetchModels(): Promise<string[]> {
     try {

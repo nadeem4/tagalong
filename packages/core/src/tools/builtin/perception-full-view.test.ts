@@ -1,3 +1,4 @@
+/** Tests for the display and window tools: definitions, input checks and host refusals. */
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_WINDOW_TEXT_CHARS } from '@tagalong/protocol';
 import type { CaptureExclusions } from '@tagalong/protocol';
@@ -153,9 +154,9 @@ describe('the full-view toolset', () => {
   });
 
   it('has no tool that reads every window at once', () => {
-    // The whole cost argument of this phase rests on this absence. Measured on a
-    // twelve-window desktop, reading everything is ~11,600 tokens in a single call. A
-    // tool taking an array of window ids, or named for "all", would reopen it quietly.
+    // Reading every window costs about 11,600 tokens on a twelve-window desktop, so no
+    // tool may do it. A tool taking an array of window ids, or named for "all", would
+    // reopen it quietly.
     for (const tool of toolset([fullViewHost()]).definitions) {
       expect(JSON.stringify(tool.inputSchema), tool.name).not.toMatch(/"type":\s*"array"/);
       // Whole words only: `recall_screen` has "all" inside "recall" and reads nothing.

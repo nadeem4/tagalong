@@ -1,14 +1,15 @@
+/**
+ * Point, don't click: a ring the host draws around one thing on screen, so "where's the
+ * export button?" gets a place as well as words. The host only draws; nothing is moved,
+ * pressed or typed. `read`, because it leaves nothing stored behind.
+ * Contains `pointAtTool`.
+ */
 import { POINT_LABEL_MAX, ScreenPointAtParams } from '@tagalong/protocol';
 import type { BrainTool } from '../../providers';
 import type { PerceptionHost } from '../../perception/host';
 import { defineTool, type Tool, type ToolOutcome } from '../tool';
 import { hostFailure, noHost } from './perception';
 
-/**
- * Point, don't click: a ring the host draws around one thing on screen, so "where's the
- * export button?" gets a place as well as words. The host only draws; nothing is moved,
- * pressed or typed. `read`, because it leaves nothing stored behind.
- */
 export const POINT_AT = 'point_at';
 
 export interface PointingDeps {

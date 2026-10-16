@@ -1,3 +1,13 @@
+/**
+ * The tools of the person's connected apps, one Scout tool per app tool, named
+ * `<connection>__<tool>`. The companion role gets them all by listing `connections`.
+ *
+ * Reads run at once. A write (a tool the app does not mark read-only) shows the person a
+ * confirm card first and runs only on Allow once. What an app returns is wrapped as data:
+ * it may carry text written to steer Scout, and Scout is told never to follow it.
+ *
+ * Contains `connectorTools`.
+ */
 import type { ToolAccess } from '@tagalong/protocol';
 import type { ApprovalAnswer } from '../../connections/approvals';
 import type { AppTool, CallResult } from '../../connections/manager';
@@ -5,14 +15,6 @@ import { hideSecrets } from '../../privacy/secrets';
 import type { BrainTool } from '../../providers';
 import { defineTool, type Tool, type ToolOutcome } from '../tool';
 
-/**
- * The tools of the person's connected apps, one Scout tool per app tool, named
- * `<connection>__<tool>`. A role gets them all by listing `connections`.
- *
- * Reads run at once. A write (a tool the app does not mark read-only) shows the person a
- * confirm card first and runs only on Allow once. What an app returns is wrapped as data:
- * it may carry text written to steer Scout, and Scout is told never to follow it.
- */
 export const CONNECTIONS_GROUP = 'connections';
 export const CONNECTOR_SEPARATOR = '__';
 

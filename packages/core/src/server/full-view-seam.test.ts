@@ -1,3 +1,4 @@
+/** Tests for the full-view tools over a real socket: a perception method missing on a side fails. */
 import { afterEach, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
 import { EngineServer, type HostSession } from './ws-server';
@@ -6,13 +7,9 @@ import { fakeTurnTools } from '../tools/fake-turn';
 import type { TurnTools } from '../tools';
 
 /**
- * The seam the last two bugs lived in.
- *
  * Every tool test in `perception` hands the toolset a fake host, and every parser test in
- * the desktop host feeds fixture output — so a tool can be perfect, a host can be perfect,
- * and the method between them can be unimplemented with the whole suite green. That is
- * exactly how Phase 2B shipped a dead window enumeration and then a capture path that
- * answered `perception.capture(['displays'])` with nothing.
+ * the desktop host feeds fixture output, so a tool can be perfect, a host can be perfect,
+ * and the method between them can be unimplemented with the whole suite green.
  *
  * These tests run a real `EngineServer`, connect a real socket, and drive the tools the
  * model actually calls. If a `perception.*` method is missing from `HostSession`, or the

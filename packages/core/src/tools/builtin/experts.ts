@@ -1,3 +1,8 @@
+/**
+ * The expert tools: `hand_to_expert` writes a brief and hands it to an expert, and
+ * `tell_expert` passes the person's words to one already working. Contains
+ * `handToExpertTool`, `tellExpertTool` and `enabledExperts`.
+ */
 import type { Brief, Expert } from '@tagalong/protocol';
 import type { BrainTool } from '../../providers';
 import {

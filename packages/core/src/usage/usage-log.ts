@@ -1,3 +1,7 @@
+/**
+ * `UsageLog`: one row per model call or expert run in the `usage` table, counts and price
+ * only, summed by day and month in the person's time zone. Read by Home's Spend card.
+ */
 import type { Database } from 'better-sqlite3';
 import type { UsageRow, UsageSource } from '@tagalong/protocol';
 import { costUsd } from './prices';

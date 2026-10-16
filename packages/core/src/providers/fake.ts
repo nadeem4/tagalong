@@ -1,3 +1,9 @@
+/**
+ * The scripted provider behind `TAGALONG_FAKE_PROVIDERS=1`. Contains `FakeBrainProvider`,
+ * `FakeScript` and `FAKE_MODELS`. Streams word by word, can call one tool first and
+ * honours interruption, so UI and end-to-end tests run the real streaming paths with no
+ * network.
+ */
 import type {
   BrainCapabilities,
   BrainEvents,
@@ -10,7 +16,7 @@ import type {
 export interface FakeScript {
   text: string;
   toolCall?: { id: string; name: string; input: unknown };
-  /** Milliseconds between words. Zero keeps unit tests fast; demos raise it. */
+  /** Milliseconds between words. Zero by default, which keeps tests fast. */
   delayMs?: number;
 }
 

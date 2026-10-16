@@ -1,3 +1,12 @@
+/**
+ * The awareness tools: the screen over time. `recall_screen` and `what_changed` look back
+ * (`read`); `watch_for` starts a watch that outlives the turn (`write`).
+ *
+ * The recall pair share a spine the perception tools do not: a moment in time, which
+ * every answer names so the pet can tell the user which moment it is describing.
+ *
+ * Contains `recallTools`, `watchForTool` and `ago`.
+ */
 import type {
   DisplayBounds,
   HostCapability,
@@ -12,14 +21,6 @@ import { renderInventory } from '../../perception/inventory';
 import type { WatchManager } from '../../watch/watch-manager';
 import { defineTool, type Tool, type ToolOutcome } from '../tool';
 import { canSee, hostFailure, noHost, type PerceptionToolsOptions } from './perception';
-
-/**
- * The awareness tools: the screen over time. `recall_screen` and `what_changed` look back
- * (`read`); `watch_for` starts a watch that outlives the turn (`write`).
- *
- * The recall pair share a spine the perception tools do not — a moment in time, which
- * every answer names so the pet can tell the user which moment it is describing.
- */
 
 export const RECALL_SCREEN = 'recall_screen';
 export const WHAT_CHANGED = 'what_changed';
@@ -111,7 +112,6 @@ const WATCH_FOR_DEFINITION: BrainTool = {
   },
 };
 
-// ---------------------------------------------------------------------------------------
 // recall_screen and what_changed.
 
 interface RecallMethods {
@@ -315,7 +315,6 @@ async function runWhatChanged(context: RecallContext, input: unknown): Promise<T
   return { content };
 }
 
-// ---------------------------------------------------------------------------------------
 // watch_for.
 
 export interface WatchToolDeps {

@@ -1,3 +1,4 @@
+/** Tests for the hand_to_expert and tell_expert tools: when offered, which expert, briefs. */
 import { describe, expect, it } from 'vitest';
 import type { Brief, ContextSnapshot, Expert } from '@tagalong/protocol';
 import { FAKE_TURN_PET, fakeTurnTools as fakeTools } from '../fake-turn';

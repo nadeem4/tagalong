@@ -1,3 +1,8 @@
+/**
+ * `Routines`: runs each saved routine when its time, trigger or meeting comes, as a
+ * background Scout turn, and delivers what it said. Also holds the routine card (propose,
+ * confirm, dismiss), Run now and the budget skip. The engine owns one.
+ */
 import { randomUUID } from 'node:crypto';
 import {
   RPC_ERROR_CODES,

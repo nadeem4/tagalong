@@ -1,3 +1,4 @@
+/** Tests for KeyedProviderResolver: missing keys, keys saved after boot, rebuilds, fake mode. */
 import { describe, expect, it } from 'vitest';
 import type { Pet } from '@tagalong/protocol';
 import { InMemorySecretStore } from '../settings/settings';
@@ -40,7 +41,7 @@ describe('KeyedProviderResolver', () => {
     await resolver.refresh();
     expect(() => resolver.resolve(pet('nebius'))).toThrow(BrainError);
 
-    // What the onboarding wizard does: the key lands in the keychain while the app runs.
+    // What Welcome and Settings do: the key lands in the keychain while the app runs.
     await secrets.set(SECRET_KEYS.nebius!, 'nb-test');
     await resolver.refresh();
 

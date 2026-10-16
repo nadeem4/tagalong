@@ -1,3 +1,9 @@
+/**
+ * A brain that thinks through the person's Claude Code sign-in, so no API key is needed.
+ * Contains `ClaudeCodeBrain` and `CLAUDE_CODE_MODELS`. Each step runs `claude -p` once
+ * with its own tools off; the pet's tools are described in the message and called with a
+ * `<tool_call>` tag.
+ */
 import { tmpdir } from 'node:os';
 import { spawnChild, type ChildRun, type SpawnFn } from '../experts/claude-code';
 import type {

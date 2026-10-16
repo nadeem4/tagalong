@@ -1,3 +1,4 @@
+/** Tests for hideSecrets: each secret shape is hidden, ordinary text and code are left alone. */
 import { describe, expect, it } from 'vitest';
 import { hideSecrets } from './secrets';
 

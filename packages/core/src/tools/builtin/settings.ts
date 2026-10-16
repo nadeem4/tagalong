@@ -1,3 +1,16 @@
+/**
+ * Change settings by talking: "talk a bit slower and call me Sam". The tool only builds and
+ * checks a patch and shows the settings card; nothing is saved until the person clicks
+ * Apply, and the host saves it through its ordinary settings path. `write`, like
+ * `create_routine`, because an applied card outlives the turn.
+ *
+ * Only the settings on the chat allowlist below are reachable. Keys, logins, provider URLs,
+ * the calendar link and the model are not: they live in the keychain or in Settings, and
+ * this tool has no path to either.
+ *
+ * Contains `changeSettingsTool`, the chat allowlist (`CHAT_SETTINGS`) and
+ * `talkPatchProblem`, which the desktop re-runs on Apply.
+ */
 import { randomUUID } from 'node:crypto';
 import {
   EARS_IDS,
@@ -13,16 +26,6 @@ import type { BrainTool } from '../../providers';
 import { hideSecrets } from '../../privacy/secrets';
 import { defineTool, type Tool, type ToolOutcome } from '../tool';
 
-/**
- * Change settings by talking: "talk a bit slower and call me Sam". The tool only builds and
- * checks a patch and shows the settings card; nothing is saved until the person clicks
- * Apply, and the host saves it through its ordinary settings path. `write`, like
- * `create_routine`, because an applied card outlives the turn.
- *
- * Only the settings on the chat allowlist below are reachable. Keys, logins, provider URLs,
- * the calendar link and the model are not: they live in the keychain or in Settings, and
- * this tool has no path to either.
- */
 export const CHANGE_SETTINGS = 'change_settings';
 
 export interface SettingsToolDeps {

@@ -1,3 +1,4 @@
+/** Tests for recordBrain: one sight-log row per call, counts only, even when the call fails. */
 import { describe, expect, it } from 'vitest';
 import type { SightRow } from '../memory/sight-log';
 import type { BrainEvents, BrainProvider, BrainRequest } from './brain';

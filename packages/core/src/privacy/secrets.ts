@@ -1,14 +1,10 @@
 /**
  * Hides keys, tokens, passwords and card numbers in text before it leaves the machine.
- *
- * The last line of the built-in blind spots: a window rule only works when the title names
- * the file, so whatever slips past it is still caught here, on the way out. Each secret is
- * replaced with a marker that says what was there, so the model knows something was hidden
- * rather than seeing a gap.
- *
- * Errs towards hiding: a false positive costs a word of context, a false negative costs a
- * leaked key. It still leaves code alone where it can tell, so an expert keeps the
- * identifiers it needs.
+ * Contains `hideSecrets`, used by the brain guard and by every path that sends text to a
+ * model, an expert or an app. It catches what slips past the window blind spots; each
+ * secret becomes a `[hidden: kind]` marker, so the model knows something was there. It
+ * errs towards hiding, but leaves unquoted code identifiers alone so an expert can still
+ * read code.
  */
 
 const hidden = (kind: string) => `[hidden: ${kind}]`;

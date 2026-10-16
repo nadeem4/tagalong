@@ -1,3 +1,8 @@
+/**
+ * Settings on disk and the secret-store contract. Contains `SettingsStore` (settings.json
+ * with atomic saves, a .bak and a .corrupt copy), `SecretStore` (implemented by the host,
+ * Electron safeStorage on desktop) and `InMemorySecretStore` for tests.
+ */
 import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Settings, SettingsPatch } from '@tagalong/protocol';
@@ -16,7 +21,7 @@ export interface SecretStore {
   delete(key: string): Promise<void>;
 }
 
-/** Volatile SecretStore for tests and for the fake-provider demo path. */
+/** Volatile SecretStore for tests. */
 export class InMemorySecretStore implements SecretStore {
   readonly #secrets = new Map<string, string>();
 

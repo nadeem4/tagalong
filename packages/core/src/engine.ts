@@ -1,3 +1,9 @@
+/**
+ * The engine facade: boots every store, manager and the socket server, and wires them
+ * together. Contains `Engine` (boot, port, pairingToken, shutdown), `defaultConnectorFor`,
+ * and the JSON-RPC handler table hosts call. The desktop host starts one `Engine`; hosts
+ * only ever talk to it over the protocol.
+ */
 import { guardBrain } from './providers/guard';
 import { checkKey } from './providers/check-key';
 import type { Database } from 'better-sqlite3';
@@ -230,8 +236,7 @@ export function defaultConnectorFor(
  * Everything the engine owns, wired together and listening.
  *
  * The facade exists so a host has exactly one thing to start and stop. Hosts never
- * touch the store, the runner, or the provider directly — they speak the protocol,
- * which is what keeps the Electron host and the Chrome host interchangeable.
+ * touch the store, the runner, or the provider directly: they speak the protocol.
  */
 export class Engine {
   readonly #db: Database;
@@ -342,7 +347,7 @@ export class Engine {
     };
     // Every read through a host writes a row to the log of what Scout saw.
     const hosts = sightedHosts<PerceptionHost>(() => live.server?.sessions() ?? [], sightLog);
-    // Phase 3B. Watches outlive the turn that started them, so they belong to the engine.
+    // Watches outlive the turn that started them, so they belong to the engine.
     const watches = new WatchManager({
       clock: systemWatchClock,
       hosts,
@@ -646,7 +651,7 @@ export class Engine {
     return this.#token;
   }
 
-  /** Exposed for the acceptance test that restarts the app and expects its history. */
+  /** How many conversations are stored. Only tests read it. */
   conversationCount(): number {
     const row = this.#db
       .prepare<[], { count: number }>('SELECT COUNT(*) AS count FROM conversations')
@@ -665,7 +670,7 @@ export class Engine {
     this.#db.close();
   }
 
-  /** Present so the field is read; the registry is reached through RPC handlers. */
+  /** The settings now. Hosts read them over RPC (`settings.get`) instead. */
   get settings(): Settings {
     return this.#settings.get();
   }

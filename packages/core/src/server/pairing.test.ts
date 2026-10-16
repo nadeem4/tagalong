@@ -1,3 +1,4 @@
+/** Tests for the pairing token: created once, reused, compared safely. */
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

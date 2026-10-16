@@ -1,12 +1,13 @@
-import type { HistoryHit, HistorySearchParams } from '../../memory/history-search';
-import type { BrainTool } from '../../providers';
-import { defineTool, type Tool, type ToolOutcome } from '../tool';
-
 /**
  * Searchable work memory: "what was that article about vector databases I read Tuesday?"
  * One read over the local index of window titles Scout looked at and the activity record.
  * Titles only: no page text was ever kept.
+ * Contains `searchHistoryTool`.
  */
+import type { HistoryHit, HistorySearchParams } from '../../memory/history-search';
+import type { BrainTool } from '../../providers';
+import { defineTool, type Tool, type ToolOutcome } from '../tool';
+
 export const SEARCH_HISTORY = 'search_history';
 
 export interface HistoryToolDeps {

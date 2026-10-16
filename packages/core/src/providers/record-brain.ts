@@ -1,3 +1,8 @@
+/**
+ * `recordBrain`: wraps a provider so each call writes one "Sent to AI" row to the sight
+ * log (provider, model, characters and pictures sent), never the content. Composed with
+ * the guard and the meter in the engine's resolver.
+ */
 import type { SightRecorder } from '../memory/sight-log';
 import type { BrainContent, BrainContentBlock, BrainProvider, BrainRequest } from './brain';
 
@@ -6,8 +11,8 @@ import type { BrainContent, BrainContentBlock, BrainProvider, BrainRequest } fro
  * saw: the provider, the model, and how many characters and pictures went, the tool
  * results handed back mid-call included. Never the text or the pictures themselves.
  *
- * Composed in the engine's resolver next to `guardBrain`, so every call to a model — a
- * turn, a summary, a watch check, keep-an-eye, the launch line — is covered by
+ * Composed in the engine's resolver next to `guardBrain`, so every call to a model (a
+ * turn, a summary, a watch check, keep-an-eye, the launch line) is covered by
  * construction. The row is written when the call ends, failed or not: the request had
  * already left this computer.
  */

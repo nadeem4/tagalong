@@ -1,3 +1,9 @@
+/**
+ * Guesses which local project a hand-off is about. Contains `ProjectMemory` (projects the
+ * person confirmed, in the `projects` table), `ProjectFinder` (suggest and search), and
+ * the folder helpers `defaultProjectRoots`, `listChildDirs` and `looksLikeProject`.
+ * Reads folder names only, never file contents.
+ */
 import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join as joinPath } from 'node:path';
@@ -22,8 +28,8 @@ function nameOf(path: string): string {
 }
 
 /**
- * The projects the person confirmed for a hand-off, most recent first, in `projects`
- * (migration 10). Only paths and names: nothing inside a project is read or stored.
+ * The projects the person confirmed for a hand-off, most recent first, in the `projects`
+ * table. Only paths and names: nothing inside a project is read or stored.
  */
 export class ProjectMemory {
   constructor(private readonly db: Database) {}

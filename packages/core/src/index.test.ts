@@ -1,3 +1,4 @@
+/** Tests for the package entry: engineInfo and the role helpers it re-exports. */
 import { describe, expect, it } from 'vitest';
 import { PROTOCOL_VERSION } from '@tagalong/protocol';
 import { engineInfo, getRole, recommendedModel } from './index';

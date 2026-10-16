@@ -1,3 +1,6 @@
+/**
+ * Wellbeing nudges entry: `Wellbeing` and its timing constants and lines.
+ */
 export {
   BREAK_MS,
   LATE_ACTIVE_MS,

@@ -1,3 +1,4 @@
+/** Tests for OpenAiCompatibleProvider: streaming, tools, errors, vision and the model list. */
 import { describe, expect, it } from 'vitest';
 import type { BrainEvents, BrainRequest } from './brain';
 import { BrainError } from './errors';

@@ -1,3 +1,7 @@
+/**
+ * `guardBrain`: wraps a provider so no secret reaches a model. Applied once in the
+ * engine's resolver, so a new text source cannot forget it.
+ */
 import { hideSecrets } from '../privacy/secrets';
 import type { BrainContent, BrainContentBlock, BrainProvider, BrainRequest } from './brain';
 

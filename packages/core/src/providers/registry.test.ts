@@ -1,3 +1,4 @@
+/** Tests for createProvider: each provider id, base URLs, missing keys and fake mode. */
 import { describe, expect, it, vi } from 'vitest';
 import { BrainError } from './errors';
 import { FakeBrainProvider } from './fake';

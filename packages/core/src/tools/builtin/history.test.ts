@@ -1,3 +1,4 @@
+/** Tests for the search_history tool: the hits it lists, input checks and store failures. */
 import { describe, expect, it } from 'vitest';
 import { hostToCoreMethods } from '@tagalong/protocol';
 import type { HistoryHit, HistorySearchParams } from '../../memory/history-search';

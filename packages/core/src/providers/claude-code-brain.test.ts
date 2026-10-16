@@ -1,3 +1,4 @@
+/** Tests for ClaudeCodeBrain: no key, the tool-call loop, failed runs and stopping. */
 import { describe, expect, it, vi } from 'vitest';
 import type { ChildRun, SpawnFn } from '../experts/claude-code';
 import type { BrainEvents, BrainRequest } from './brain';

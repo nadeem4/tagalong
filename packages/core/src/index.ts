@@ -1,12 +1,8 @@
 /**
- * The Tagalong Engine.
- *
- * Pure Node TypeScript. This package must never import electron, react, or DOM globals;
- * an ESLint no-restricted-imports rule enforces that.
- *
- * A host boots an Engine and then speaks the protocol. Nothing below the facade is part
- * of the host-facing contract, which is what keeps the Electron host and the Chrome host
- * interchangeable.
+ * The public surface of @tagalong/core: the `Engine` and the few helpers the desktop host
+ * imports (settings store, secret store, capture-block and window-inventory helpers, role
+ * and model helpers). Pure Node: no electron, react or DOM globals (an ESLint rule enforces
+ * it). Hosts boot an Engine and then speak the protocol.
  */
 import { PROTOCOL_VERSION, engineUrl } from '@tagalong/protocol';
 
@@ -75,9 +71,9 @@ export {
   type ToolOutcome,
   type TurnTools,
 } from './tools';
-/** @deprecated Renamed to `PerceptionToolsOptions` when the tools moved to one module. */
+/** @deprecated Use `PerceptionToolsOptions`. */
 export type { PerceptionToolsOptions as PerceptionToolsetOptions } from './tools';
-/** @deprecated The per-turn tool set is `TurnTools`, from `ToolRegistry.forTurn`. */
+/** @deprecated Use `TurnTools`, from `ToolRegistry.forTurn`. */
 export type { TurnTools as PerceptionToolset } from './tools';
 
 export { DB_FILENAME, LATEST_SCHEMA_VERSION, migrate, openDatabase } from './memory/db';

@@ -1,7 +1,8 @@
 /**
- * Provider failures the runner can turn into a `turn.error` without inspecting
- * SDK internals. The code drives host behaviour (retry, prompt for a key, go offline);
- * the message is written for the person staring at the panel.
+ * `BrainError`: a provider failure with a code (`rate_limit`, `auth`, `connection`,
+ * `config`, `unknown`) the runner turns into `turn.error` without inspecting SDK internals.
+ * The code drives host behaviour (retry, prompt for a key, go offline); the message is
+ * written for the person.
  */
 export type BrainErrorCode = 'rate_limit' | 'auth' | 'connection' | 'config' | 'unknown';
 

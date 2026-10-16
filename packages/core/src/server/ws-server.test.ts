@@ -1,3 +1,4 @@
+/** Tests for EngineServer: pairing, extension scoping, RPC routing and the perception requests. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import WebSocket from 'ws';
 import { PROTOCOL_VERSION, RPC_ERROR_CODES } from '@tagalong/protocol';

@@ -1,8 +1,10 @@
+/**
+ * `remember`: files a fact or preference the user states, under the pet that asked, or for
+ * every pet when the model sets `shared`. `write`, because the memory outlives the turn.
+ */
 import type { BrainTool } from '../../providers';
 import type { MemoryKind, MemoryStore } from '../../memory/memories';
 import { defineTool, type Tool, type ToolOutcome } from '../tool';
-
-/** `remember`: files a memory under the pet that asked (`write`). */
 
 export const REMEMBER = 'remember';
 

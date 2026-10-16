@@ -1,3 +1,8 @@
+/**
+ * The Anthropic API provider. Contains `AnthropicProvider` and `ANTHROPIC_MODELS`.
+ * Translates brain messages to SDK blocks (images first), streams text, runs the tool loop
+ * and maps SDK errors to `BrainError`.
+ */
 import Anthropic, {
   APIConnectionError,
   APIUserAbortError,

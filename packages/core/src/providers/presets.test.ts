@@ -1,3 +1,4 @@
+/** Tests for the OpenAI-compatible presets and where each provider key is filed. */
 import { describe, expect, it } from 'vitest';
 import { NEMOTRON_NANO_MODEL, NEMOTRON_TEXT_MODEL, NEMOTRON_VISION_MODEL } from './nebius-models';
 import { OPENAI_COMPATIBLE_PRESETS, SECRET_KEYS, openAiPreset } from './presets';
