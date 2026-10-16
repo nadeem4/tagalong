@@ -1,3 +1,7 @@
+/**
+ * The pets in SQLite: SCOUT, the one default companion, and PetRegistry (seed, list, get,
+ * upsert).
+ */
 import type { Database } from 'better-sqlite3';
 import { Pet } from '@tagalong/protocol';
 
@@ -30,7 +34,7 @@ interface PetRow {
 
 /**
  * Pets live in SQLite as validated JSON blobs rather than columns, because a pet is
- * pure configuration whose shape grows every phase; migrating a JSON document beats
+ * pure configuration whose shape changes often; migrating a JSON document beats
  * migrating a table each time a field appears.
  */
 export class PetRegistry {
@@ -43,7 +47,7 @@ export class PetRegistry {
   /**
    * Inserts default pets that were never seeded before. Existing rows are left alone, so
    * a pet the user has edited survives every later boot, and a default that was removed
-   * (Ink and Bolt, in migration 11) stays removed: `pet_seeds` remembers it was offered once.
+   * (as in migration 11) stays removed: `pet_seeds` remembers it was offered once.
    */
   seedDefaults(): void {
     const insert = this.#db.prepare(

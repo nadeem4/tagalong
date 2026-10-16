@@ -1,3 +1,4 @@
+/** Tests for claude-setup: installed plugins, connected apps, allow rules and plugin install. */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

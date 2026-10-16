@@ -1,3 +1,8 @@
+/**
+ * Builds the provider-neutral request for one turn: system prompt (base rules, role, name,
+ * notes, reply style, memories), history, and the screen context attached to the question.
+ * Contains assemblePrompt and the headings and limits it uses. Pure: no IO.
+ */
 import type {
   ContextSnapshot,
   Message,
@@ -23,7 +28,7 @@ export const MAX_OUTPUT_TOKENS = 2048;
 /** Appended wherever text was cut, so the model never mistakes a stub for the whole thing. */
 export const TRUNCATION_MARKER = '… [truncated]';
 
-/** Section headings, exported because tests and the host both reason about the order. */
+/** Section headings of the screen context, in the order they appear. */
 export const CONTEXT_LABELS = {
   selection: 'Selected text',
   page: 'Page text',
@@ -134,10 +139,9 @@ export function assemblePrompt(input: AssembleInput): BrainRequest {
 /**
  * Which pictures ride along with the question.
  *
- * Phase 2's single screenshot is unchanged. A full-view capture sends the composite —
- * the map of how the monitors sit — plus the display the user is actually working on,
- * and names the rest in text for the pet to fetch by tool. Three monitors must not mean
- * three images on every ask; that is the whole cost argument of this phase.
+ * A single screenshot is sent as is. A full-view capture sends the composite (the map of
+ * how the monitors sit) plus the focused display, and names the rest in text for the pet
+ * to fetch by tool, so three monitors never mean three images on every ask.
  *
  * `sightDetail: 'all'` overrides it for someone who would rather pay than ask twice.
  *
@@ -168,7 +172,7 @@ function imagesToAttach(snapshot: ContextSnapshot, settings: Settings): BrainCon
 
 /**
  * Base rules, then who the pet is: its role's instructions, its name, and the user's notes
- * for it when there are any. Then the reply style and the memories, as before roles.
+ * for it when there are any. Then the reply style and the memories.
  * The person's name, when they gave one, follows the pet's, with a nudge to use it rarely.
  */
 function systemPrompt(pet: Pet, memories: readonly Memory[], userName: string): string {
@@ -349,10 +353,10 @@ function renderDisplays(snapshot: ContextSnapshot, detail: Settings['sightDetail
 /**
  * Which applications are on a display, from the window inventory when there is one.
  *
- * The phase page asks for the "focused app" of each display, which Windows cannot answer:
+ * Each display line names its apps rather than a "focused app", which Windows cannot answer:
  * there is one foreground window for the whole desktop, so an unfocused display has no
  * focused app. Naming what is open on it instead answers the question the user actually
- * has — which screen holds the thing I mean — using data already in the snapshot.
+ * has (which screen holds the thing I mean), using data already in the snapshot.
  */
 function appsOn(snapshot: ContextSnapshot, displayId: number): string[] {
   const names = new Set<string>();

@@ -1,3 +1,7 @@
+/**
+ * Hand-offs from Scout to experts: proposal, confirm, run, steering notes, follow-up steps,
+ * stop, and the Activity rows. Contains HandoffManager and its limits.
+ */
 import { randomUUID } from 'node:crypto';
 import {
   RPC_ERROR_CODES,
@@ -57,7 +61,10 @@ export interface StartParams {
   expertId: string;
   petId: string;
   brief: Brief;
-  /** The project to work in. Required: an old expert's default folder is ignored. */
+  /**
+   * The project to work in. Required unless the expert works in its own folder; a folder
+   * saved on the expert is never used.
+   */
   folder?: string | undefined;
   canEdit?: boolean | undefined;
   /** A follow-up step that starts in the same folder once this one finishes well. */
@@ -119,7 +126,7 @@ export class HandoffManager {
   }): { proposalId: string } {
     const expert = this.#expert(params.expertId);
     const next = params.then === undefined ? undefined : this.#expert(params.then.expertId);
-    // Only the guesses: an old expert's default folder is ignored, and with no guess at all
+    // Only the guesses: a folder saved on the expert is never offered, and with no guess
     // the hand-off card opens the folder picker.
     const projects =
       this.options.projects?.suggest(params.projectHint ?? params.brief.context?.windowTitle) ?? [];

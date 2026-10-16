@@ -1,3 +1,4 @@
+/** Tests for reading Claude Code's MCP servers: scopes, skipped transports and secrets kept out. */
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

@@ -1,3 +1,7 @@
+/**
+ * Remembers which expert takes which kind of task (RouteMemory, table expert_routes). A
+ * user's pick always wins.
+ */
 import type { Database } from 'better-sqlite3';
 
 export type RoutedBy = 'companion' | 'user';

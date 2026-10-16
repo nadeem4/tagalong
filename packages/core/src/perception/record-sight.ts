@@ -1,3 +1,7 @@
+/**
+ * Wraps hosts so every read writes one row to the privacy log (recordSight, sightedHosts,
+ * recordSnapshot).
+ */
 import type { CapturedImage, ContextSnapshotPatch, WindowEntry } from '@tagalong/protocol';
 import type { SightRecorder, SightRow } from '../memory/sight-log';
 import type { PerceptionHost } from './host';

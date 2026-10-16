@@ -1,3 +1,7 @@
+/**
+ * Writes a "Sent to expert" row to the privacy log for every brief and steering note sent
+ * (recordExpertSends).
+ */
 import type { Expert } from '@tagalong/protocol';
 import type { SightRecorder } from '../memory/sight-log';
 import { renderBrief, type Connector } from './connector';

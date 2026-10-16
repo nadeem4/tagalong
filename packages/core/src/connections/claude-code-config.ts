@@ -1,3 +1,8 @@
+/**
+ * Reads the MCP servers the person set up in Claude Code (~/.claude.json), read-only and
+ * without secrets, for Home's "Found on this PC" list. Contains readClaudeCodeConnectors,
+ * foundInClaudeCode and claudeCodeConfigPath.
+ */
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';

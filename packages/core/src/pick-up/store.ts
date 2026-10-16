@@ -1,3 +1,4 @@
+/** The one saved pick-up snapshot (PickUpStore, table pick_up) and its types. */
 import type { Database } from 'better-sqlite3';
 import type { PickUpEditor, PickUpHandoff } from '@tagalong/protocol';
 

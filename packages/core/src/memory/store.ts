@@ -1,3 +1,7 @@
+/**
+ * Conversations and messages in SQLite (ConversationStore): append, replay history,
+ * summaries and the screenshot retention sweep.
+ */
 import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import type {
@@ -116,8 +120,8 @@ export class ConversationStore {
    * about, and deleting it would leave answers with no question behind them.
    *
    * Takes `now` so a test can age a row without waiting, and so a caller sweeping several
-   * things at once uses one consistent instant. No timer lives here — Phase 4 owns
-   * background jobs; this is a method someone calls.
+   * things at once uses one consistent instant. No timer lives here: the runner calls it at
+   * the start of each turn.
    */
   purgeExpiredScreenshots(retention: ScreenshotRetention, now: Date = new Date()): number {
     // 'off' sweeps everything: the setting was turned off, so what was kept under it goes.

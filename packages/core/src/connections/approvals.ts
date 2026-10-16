@@ -1,3 +1,7 @@
+/**
+ * Holds an app call that writes until the person answers its confirm card. Contains
+ * Approvals, the answer type and APPROVAL_TIMEOUT_MS. Used by the connector tools.
+ */
 import { randomUUID } from 'node:crypto';
 import type { ConnectorConfirmParams } from '@tagalong/protocol';
 

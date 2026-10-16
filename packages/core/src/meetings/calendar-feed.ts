@@ -1,14 +1,14 @@
-import ICAL from 'ical.js';
-import type { CalendarCheckResult } from '@tagalong/protocol';
-import { zonedToEpoch } from '../routines/schedule';
-import type { SecretStore } from '../settings/settings';
-
 /**
  * Meeting prep's calendar: the person's secret .ics link, read every 15 minutes at most and
  * parsed by code, so finding "10 minutes before" never costs a model turn. The link is a
  * credential: it lives in the keychain under `calendar.ics` and is never logged, shown,
- * stored in settings or put in an error message.
+ * stored in settings or put in an error message. Contains CalendarFeed, parseMeetings and
+ * httpsFetchText.
  */
+import ICAL from 'ical.js';
+import type { CalendarCheckResult } from '@tagalong/protocol';
+import { zonedToEpoch } from '../routines/schedule';
+import type { SecretStore } from '../settings/settings';
 
 /** Where the link is filed in the host's SecretStore. */
 export const CALENDAR_SECRET = 'calendar.ics';

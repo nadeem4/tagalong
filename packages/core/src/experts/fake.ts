@@ -1,3 +1,7 @@
+/**
+ * FakeConnector: a scripted expert for tests and TAGALONG_FAKE_PROVIDERS=1. No process, no
+ * network.
+ */
 import {
   CANCELLED,
   type Brief,
@@ -20,7 +24,7 @@ export interface FakeConnectorScript {
   checkError?: string;
 }
 
-/** Scripted expert for tests and `TAGALONG_FAKE_PROVIDERS=1`: no process, no network. */
+/** Scripted expert: records each brief and plays back its script. */
 export class FakeConnector implements Connector {
   readonly sent: Brief[] = [];
   /** Every note from the person it took, as a live session would at the end of a turn. */

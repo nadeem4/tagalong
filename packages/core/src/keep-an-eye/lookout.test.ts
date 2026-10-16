@@ -1,3 +1,4 @@
+/** Tests for the lookout: trouble titles, meetings, the call rule and when a window gets a look. */
 import { describe, expect, it } from 'vitest';
 import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
 import {

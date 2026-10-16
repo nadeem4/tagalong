@@ -1,3 +1,4 @@
+/** Tests for the launch greeting: handwritten lines and the model call with its time limit. */
 import { describe, expect, it } from 'vitest';
 import type { Pet } from '@tagalong/protocol';
 import { BrainError, FakeBrainProvider } from '../providers';

@@ -1,3 +1,4 @@
+/** Tests for StuckWatch: three minutes, once per error, cooldown and quiet. */
 import { describe, expect, it } from 'vitest';
 import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
 import { STUCK_COOLDOWN_MS, STUCK_MS, StuckWatch } from './stuck';

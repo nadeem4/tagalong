@@ -1,3 +1,8 @@
+/**
+ * Capture exclusions: which window may not be read, by the built-in blind spots, secret file
+ * names and the person's own list. Contains findCaptureBlock, appCaptureBlock,
+ * secretFileRule and normalizeProcessName. Shared by core and the desktop host.
+ */
 import { BUILT_IN_EXCLUSIONS, SECRET_FILES } from '@tagalong/protocol';
 import type { CaptureBlock, CaptureExclusions } from '@tagalong/protocol';
 

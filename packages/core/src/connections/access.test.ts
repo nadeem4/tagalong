@@ -1,3 +1,4 @@
+/** Tests for access.ts: read or write classification and ${VAR} expansion. */
 import { describe, expect, it } from 'vitest';
 import { accessOf, expandEnv } from './access';
 

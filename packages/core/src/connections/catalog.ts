@@ -1,3 +1,7 @@
+/**
+ * The Popular list in Home, Connections: official remote MCP servers that connect with one
+ * button (POPULAR_CONNECTORS).
+ */
 import type { PopularConnector } from '@tagalong/protocol';
 
 /**

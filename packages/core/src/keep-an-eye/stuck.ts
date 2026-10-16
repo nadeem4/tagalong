@@ -1,11 +1,11 @@
-import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
-import { blind, callOrFullScreenInFront, looksLikeTrouble } from './lookout';
-
 /**
  * Stuck? An error that has stayed up for three minutes earns one offer to hand it to an
  * expert. Titles only, from the window list keeping an eye already gets: nothing is read and
  * no model is asked. The window's text is read later, and only if the person takes the offer.
+ * Contains StuckWatch.
  */
+import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
+import { blind, callOrFullScreenInFront, looksLikeTrouble } from './lookout';
 
 /** How long an error stays up before Scout offers to hand it over. */
 export const STUCK_MS = 3 * 60_000;

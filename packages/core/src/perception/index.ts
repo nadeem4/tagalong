@@ -1,4 +1,8 @@
-/** Pure capture-policy rules. Nothing here touches a screen; hosts do the capturing. */
+/**
+ * Perception rules the engine applies to what hosts capture: exclusions, the window
+ * inventory, browser routing, screenshot retention and text-layer notes. Nothing here
+ * touches a screen; hosts do the capturing.
+ */
 export {
   appCaptureBlock,
   findCaptureBlock,

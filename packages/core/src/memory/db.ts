@@ -1,3 +1,7 @@
+/**
+ * Opens tagalong.db and migrates it. Contains the numbered migrations, migrate and
+ * openDatabase. Migrations are never edited once shipped.
+ */
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -12,7 +16,7 @@ type Migration = string | ((db: Database.Database) => void);
 /**
  * The words of an activity row that search may find (migration 18): a turn's question, a
  * routine's name and a brief's ask (its first paragraph), never the window or selected text
- * a brief carried, and nothing for crew-era rows or app calls. `row` is `new.` or ``.
+ * a brief carried, and nothing for any other kind, such as app calls. `row` is `new.` or ``.
  */
 function activityAsk(row: string): string {
   const brief = `instr(${row}text, char(10, 10))`;
@@ -32,12 +36,11 @@ const MIGRATIONS: readonly Migration[] = [
    CREATE TABLE conversations (id TEXT PRIMARY KEY, pet_id TEXT NOT NULL, title TEXT, created_at TEXT NOT NULL);
    CREATE TABLE messages (id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, role TEXT NOT NULL, content_json TEXT NOT NULL, snapshot_json TEXT, created_at TEXT NOT NULL);
    CREATE INDEX messages_conv ON messages(conversation_id, created_at);`,
-  // Phase 4. Which default pets were ever seeded, so deleting one keeps it deleted while
-  // an install that predates the crew still gains the new members. Pets already present
-  // count as seeded: they came from an earlier seed or from the user.
+  // Migration 2. Which default pets were ever seeded, so a deleted one stays deleted.
+  // Pets already present count as seeded.
   `CREATE TABLE pet_seeds (id TEXT PRIMARY KEY, seeded_at TEXT NOT NULL);
    INSERT INTO pet_seeds (id, seeded_at) SELECT id, updated_at FROM pets;`,
-  // Phase 4. Memories: private to one pet (`scope = 'pet'`) or shared by the crew
+  // Migration 3. Memories, private to one pet (`scope = 'pet'`) or shared
   // (`scope = 'crew'`), searched through an external-content FTS5 index kept in step by
   // triggers. Porter stemming so "answers" finds "answer".
   `CREATE TABLE memories (
@@ -63,17 +66,16 @@ const MIGRATIONS: readonly Migration[] = [
      INSERT INTO memories_fts (memories_fts, rowid, text) VALUES ('delete', old.rowid, old.text);
      INSERT INTO memories_fts (rowid, text) VALUES (new.rowid, new.text);
    END;`,
-  // Phase 4. Set when a background summary has folded a message into a summary memory, so
-  // the history replayed to the model stays short while the full thread stays on disk.
+  // Migration 4. Set when a background summary has folded a message into a summary memory,
+  // so the history replayed to the model stays short while the full thread stays on disk.
   `ALTER TABLE messages ADD COLUMN summarized_at TEXT;`,
-  // Phase 8. Every stored pet gets a role; an edited persona becomes the pet's notes.
+  // Migration 5. Every stored pet gets a role; an edited persona becomes the pet's notes.
   upgradePetsToRoles,
-  // Phase 8. Recorded what migration 5 did, for a one-time notice that went with the crew.
-  // Now does nothing; kept so every later migration keeps its number.
+  // Migration 6. Does nothing; kept so every later migration keeps its number.
   () => undefined,
-  // Home. What the crew did — turns, consults, handoffs, roundtables — for the activity
-  // view. Written by ActivityLog; rowid orders the rows, newest last. IF NOT EXISTS so a
-  // database rolled back past it (the roles tests rewind to version 4) migrates again.
+  // Migration 7. The activity log, written by ActivityLog; rowid orders the rows, newest
+  // last. IF NOT EXISTS so a database rolled back past it (the roles tests rewind to
+  // version 4) migrates again.
   `CREATE TABLE IF NOT EXISTS activity (
      id TEXT PRIMARY KEY,
      kind TEXT NOT NULL CHECK (kind IN ('turn', 'consult', 'handoff', 'roundtable')),
@@ -95,27 +97,27 @@ const MIGRATIONS: readonly Migration[] = [
    CREATE INDEX IF NOT EXISTS activity_turn ON activity(turn_id);
    CREATE INDEX IF NOT EXISTS activity_run ON activity(run_id);`,
   addExperts,
-  // Which expert takes which kind of task: the companion's picks and the user's, the
-  // user's always winning. Written by RouteMemory.
+  // Migration 9. Which expert takes which kind of task: the companion's picks and the
+  // user's, the user's always winning. Written by RouteMemory.
   `CREATE TABLE IF NOT EXISTS expert_routes (
      task_kind TEXT PRIMARY KEY,
      expert_id TEXT NOT NULL,
      chosen_by TEXT NOT NULL CHECK (chosen_by IN ('companion', 'user')),
      updated_at TEXT NOT NULL
    )`,
-  // The projects the person confirmed for hand-offs, so the next suggestion starts there.
-  // Written by ProjectMemory; paths and names only.
+  // Migration 10. The projects the person confirmed for hand-offs, so the next suggestion
+  // starts there. Written by ProjectMemory; paths and names only.
   `CREATE TABLE IF NOT EXISTS projects (
      path TEXT PRIMARY KEY,
      name TEXT NOT NULL,
      last_used TEXT NOT NULL
    )`,
-  // One companion. Ink and Bolt came from the crew design and are gone; their conversations
-  // stay on disk. pet_seeds still lists them, so they are never seeded again.
+  // Migration 11. Removes the old default pets Ink and Bolt; their conversations stay on
+  // disk, and pet_seeds keeps them from being seeded again.
   `DELETE FROM pets WHERE id IN ('ink', 'bolt')`,
   addConnections,
   addRoutines,
-  // The roles notice went with the crew; an install that had one drops its table.
+  // Migration 14. Drops the notices table older installs have.
   `DROP TABLE IF EXISTS notices`,
   // Migration 15. What Scout saw: one row each time it looked or sent something away.
   // Metadata only, by design: there is no column for text, pixels or a brief. `kind` has no

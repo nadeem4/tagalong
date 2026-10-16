@@ -1,3 +1,4 @@
+/** Tests for migration 5 (upgradePetsToRoles). */
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LEGACY_DEFAULT_PERSONAS, upgradePetsToRoles } from './roles-upgrade';
@@ -13,7 +14,7 @@ afterEach(() => {
   db.close();
 });
 
-/** A pet as Phase 7 stored it: persona and an allowlist, no role. */
+/** A pet as stored before migration 5: persona and an allowlist, no role. */
 function storeLegacy(id: string, fields: Record<string, unknown> = {}): void {
   const pet = {
     id,

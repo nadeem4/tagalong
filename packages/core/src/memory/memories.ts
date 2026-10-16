@@ -1,7 +1,11 @@
+/**
+ * Scout's long-term memory: facts, preferences and summaries in SQLite with full-text search
+ * (MemoryStore, ftsQuery).
+ */
 import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
 
-/** Private to one pet, or shared by the whole crew. */
+/** Private to one pet, or shared (`crew`, the stored value for a shared memory). */
 export type MemoryScope = 'pet' | 'crew';
 
 /** What a memory is: something true, something the user likes, or a digest of a thread. */
@@ -33,7 +37,7 @@ interface MemoryRow {
   created_at: string;
 }
 
-/** The rows one pet may see: its own private memories and everything the crew shares. */
+/** The rows one pet may see: its own memories and every shared one. */
 const VISIBLE = "(m.scope = 'crew' OR m.pet_id = ?)";
 
 /** More words than this in one question add noise to the match, not recall. */
@@ -59,7 +63,7 @@ export function ftsQuery(text: string): string | null {
 }
 
 /**
- * The crew's memory: private notes per pet plus a shared notebook, with full-text search.
+ * Memories: private notes per pet plus shared ones, with full-text search.
  *
  * Visibility is enforced in SQL on every read rather than filtered afterwards, so there is
  * no code path that loads another pet's private memories and forgets to drop them.

@@ -1,3 +1,8 @@
+/**
+ * Routes reads between the desktop host and the browser extension: the selection
+ * (captureSelection) and the page context of an ask (browserContextFor), with the exclusion
+ * list applied.
+ */
 import type {
   CaptureExclusions,
   ContextSnapshot,

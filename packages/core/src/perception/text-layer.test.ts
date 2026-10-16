@@ -1,3 +1,4 @@
+/** Tests for textLayerNotes. */
 import { describe, expect, it } from 'vitest';
 
 import { THIN_TEXT_CHARS, textLayerNotes } from './text-layer';

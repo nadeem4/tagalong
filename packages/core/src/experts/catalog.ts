@@ -1,12 +1,14 @@
-import { CatalogEntry, type CatalogStatus, type Expert } from '@tagalong/protocol';
-import raw from './catalog.json' with { type: 'json' };
-
 /**
  * Tagalong's built-in expert catalog: ready-made experts that reuse what the person already
  * has in Claude Code, its plugins and its connectors. No server, no fetching: the entries
  * ship in `catalog.json` and are checked here when the engine loads. The app tool names
- * live only in that file.
+ * live only in that file. Contains CATALOG, catalogEntry, catalogStatus, catalogBundle and
+ * fromCatalog.
  */
+import { CatalogEntry, type CatalogStatus, type Expert } from '@tagalong/protocol';
+import raw from './catalog.json' with { type: 'json' };
+
+/** Checks the raw catalog.json entries against the protocol schema. */
 export function loadCatalog(value: unknown): CatalogEntry[] {
   if (!Array.isArray(value)) throw new Error('the expert catalog is not a list');
   return value.map((entry) => CatalogEntry.parse(entry));

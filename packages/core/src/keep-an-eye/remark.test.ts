@@ -1,3 +1,4 @@
+/** Tests for remarks: parsing the model's reply and the call itself. */
 import { describe, expect, it } from 'vitest';
 import type { Pet, WindowEntry } from '@tagalong/protocol';
 import { FakeBrainProvider } from '../providers';

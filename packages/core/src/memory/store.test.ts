@@ -1,3 +1,4 @@
+/** Tests for ConversationStore: messages, history replay, summaries and screenshot retention. */
 import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

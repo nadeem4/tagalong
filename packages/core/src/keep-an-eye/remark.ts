@@ -1,10 +1,10 @@
-import type { Pet, Settings, WindowEntry } from '@tagalong/protocol';
-import type { BrainProvider } from '../providers';
-
 /**
  * The one cheap model call behind a remark: is there one short, genuinely useful thing to
- * say about this window? The answer is usually NOTHING, and that is the point.
+ * say about this window? The answer is usually NOTHING, and that is the point. Contains
+ * composeRemark and parseRemark.
  */
+import type { Pet, Settings, WindowEntry } from '@tagalong/protocol';
+import type { BrainProvider } from '../providers';
 
 /** A remark is a nicety: a brain that has not answered in fifteen seconds is skipped. */
 export const REMARK_TIMEOUT_MS = 15_000;

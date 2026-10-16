@@ -1,3 +1,8 @@
+/**
+ * Runs one turn end to end: stores the question, recalls memories, assembles the prompt,
+ * streams the answer with tools, stores it, and reports turn events. Contains
+ * ConversationRunner and the turn types hosts see.
+ */
 import { randomUUID } from 'node:crypto';
 import type { ContextSnapshot, NotificationParamsOf, Pet, Settings } from '@tagalong/protocol';
 import type { BrainContentBlock, BrainProvider, BrainResult } from '../providers';
@@ -59,7 +64,7 @@ export interface ConversationRunnerOptions {
    */
   perception?: PerceptionToolsOptions | undefined;
   /**
-   * Phase 4. The pet's memory: recalled into every prompt, written by the `remember`
+   * The pet's memory: recalled into every prompt, written by the `remember`
    * tool and by preferences the user states. Optional so turn-mechanics tests stay small.
    */
   memory?: MemoryStore | undefined;
@@ -68,7 +73,7 @@ export interface ConversationRunnerOptions {
    * hangs off this, and nothing it does may slow the reply that just finished.
    */
   afterTurn?: ((turn: { pet: Pet; conversationId: string }) => void) | undefined;
-  /** Phase 3B. Gives every pet `watch_for`, which starts a watch on its behalf. */
+  /** Gives Scout `watch_for`, which starts a watch on its behalf. */
   watch?: WatchToolDeps | undefined;
   /** Gives a companion `hand_to_expert`, which briefs an expert and hands the work over. */
   experts?: ExpertToolDeps | undefined;
@@ -82,7 +87,7 @@ export interface ConversationRunnerOptions {
   history?: HistoryToolDeps | undefined;
   /** Gives a companion `change_settings`, which shows the settings card. */
   changeSettings?: SettingsToolDeps | undefined;
-  /** Narrows a pet's tools for a turn. Absent: every pet gets every tool. Phase 8 roles. */
+  /** Narrows a pet's tools for a turn. Absent: the role's tools (see tools/registry). */
   toolsFor?: ToolFilter | undefined;
 }
 
@@ -182,9 +187,9 @@ export class ConversationRunner {
     const conversationId =
       ask.conversationId ?? this.#options.store.createConversation({ petId: ask.pet.id }).id;
 
-    // Swept here rather than on a timer: a turn is the only moment this engine reliably
-    // wakes up, and Phase 4 owns background jobs. It also catches the case a timer would
-    // miss entirely — the user turning retention off and expecting the past to go with it.
+    // Swept here rather than on a timer: a turn is the one moment this engine reliably
+    // wakes up, and it also catches the person turning retention off and expecting the
+    // past to go with it.
     this.#options.store.purgeExpiredScreenshots(settings.screenshotRetention);
 
     // A screenshot is the most sensitive thing this app touches, so the row on disk gets
@@ -361,11 +366,10 @@ export class ConversationRunner {
           onToolUse: async (call) => {
             if (tools.definitions.length === 0) return { content: NO_TOOLS_YET, isError: true };
             modelCalls += 1;
-            // Announced around the call, not after it. A tool that takes seconds —
-            // enumerating windows walks an accessibility tree — leaves the user watching
-            // a pet that looks hung, and a turn whose tool activity is never broadcast
-            // cannot be observed end to end at all, which is how this phase shipped two
-            // dead perception paths behind a green suite.
+            // Announced around the call, not after it: a tool that takes seconds (listing
+            // windows walks an accessibility tree) would otherwise leave a pet that looks
+            // hung, and a turn whose tool activity is never broadcast cannot be observed
+            // end to end.
             this.#options.emit({
               method: 'turn.toolRequest',
               params: { turnId, approvalId: randomUUID(), tool: call.name, input: call.input },
@@ -378,7 +382,7 @@ export class ConversationRunner {
                 tool: call.name,
                 ok: outcome.isError !== true,
                 // The summary is for the panel, not the model: the model already has the
-                // content. Kept short so a 8,000-character window read does not travel
+                // content. Kept short so an 8,000-character window read does not travel
                 // twice, once to the provider and once to every open window.
                 summary: summarise(outcome.content),
               },

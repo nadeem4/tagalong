@@ -2,8 +2,9 @@
  * The contract between a companion and an expert.
  *
  * A companion never does the work: it writes a `Brief` and hands it to a `Connector`,
- * which carries it to whatever the expert really is (a command-line agent, a model API,
- * a tool server) and brings back a `ConnectorResult`. Each kind of expert is one adapter.
+ * which carries it to whatever the expert really is and brings back a `ConnectorResult`.
+ * Each kind of expert is one adapter; Claude Code is the one that ships. Also holds
+ * renderBrief and CANCELLED.
  */
 import { hideSecrets } from '../privacy/secrets';
 import type { Brief, HandoffStepKind } from '@tagalong/protocol';

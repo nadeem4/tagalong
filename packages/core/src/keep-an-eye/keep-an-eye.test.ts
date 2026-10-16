@@ -1,3 +1,4 @@
+/** Tests for KeepAnEye: remarks, moods, Stuck? offers, Not now and the budget gate. */
 import { describe, expect, it } from 'vitest';
 import { Expert, Settings } from '@tagalong/protocol';
 import type { Brief, Pet, PetMoodParams, PetRemarkParams, WindowEntry } from '@tagalong/protocol';

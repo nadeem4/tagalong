@@ -1,3 +1,4 @@
+/** Tests for history search: safe queries, retention and what is never returned. */
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { migrate } from './db';

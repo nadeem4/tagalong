@@ -1,3 +1,11 @@
+/**
+ * Pick up where you left off. One snapshot of what you were in the middle of, from window
+ * titles alone, overwritten every ten minutes while a host is connected. A gap of six hours
+ * since the last overwrite is the day ending: the snapshot is offered once, as one line and
+ * a card, and a new one starts. The line is handwritten from the facts, so it never invents
+ * a file, and nothing opens or runs without a click. Contains PickUp, takeSnapshot,
+ * describePickUp and readBranch.
+ */
 import { randomUUID } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -12,14 +20,6 @@ import type {
 import { findCaptureBlock } from '../perception/exclusions';
 import type { WatchClock } from '../watch/watch-manager';
 import type { PickUpSnapshot, PickUpStore, SnapshotHandoff, SnapshotProject } from './store';
-
-/**
- * Pick up where you left off. One snapshot of what you were in the middle of, from window
- * titles alone, overwritten every ten minutes while a host is connected. A gap of six hours
- * since the last overwrite is the day ending: the snapshot is offered once, as one line and
- * a card, and a new one starts. The line is handwritten from the facts, so it never invents
- * a file, and nothing opens or runs without a click.
- */
 
 export const SNAPSHOT_EVERY_MS = 10 * 60_000;
 export const BACK_AFTER_MS = 6 * 3_600_000;

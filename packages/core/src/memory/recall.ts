@@ -1,3 +1,7 @@
+/**
+ * What a turn remembers: recall picks the memories for one prompt, and statedPreference
+ * catches a preference the person states so it is kept even if no tool is called.
+ */
 import type { Memory, MemoryStore } from './memories';
 
 /** How many of the newest memories every turn carries. */

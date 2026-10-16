@@ -1,3 +1,4 @@
+/** Tests for ConnectionStore: save, list, get and delete. */
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import type { Connection } from '@tagalong/protocol';

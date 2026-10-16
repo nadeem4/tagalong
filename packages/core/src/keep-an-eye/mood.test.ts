@@ -1,3 +1,4 @@
+/** Tests for moods from window titles and finished hand-offs. */
 import { describe, expect, it } from 'vitest';
 import type { CaptureExclusions, HandoffFinishedParams, WindowEntry } from '@tagalong/protocol';
 import { MOOD_COOLDOWN_MS, MoodWatch, moodForHandoff } from './mood';

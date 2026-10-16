@@ -1,3 +1,7 @@
+/**
+ * Screenshot retention rules: whether a snapshot's pictures may be stored, and the snapshot
+ * without them.
+ */
 import type { ContextSnapshot, ScreenshotRetention } from '@tagalong/protocol';
 
 /**

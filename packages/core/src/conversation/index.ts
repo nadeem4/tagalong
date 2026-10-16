@@ -1,6 +1,6 @@
 /**
- * Turn assembly and execution. The engine imports from here so it never has to know
- * whether a change landed in the assembler or the runner.
+ * Turn assembly and execution: assemblePrompt builds one turn's request and
+ * ConversationRunner runs it. The engine imports from here.
  */
 export {
   CONTEXT_LABELS,

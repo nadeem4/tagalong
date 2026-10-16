@@ -1,3 +1,4 @@
+/** Tests for recordExpertSends: one log row per brief and per note, none for check. */
 import { describe, expect, it } from 'vitest';
 import type { Expert } from '@tagalong/protocol';
 import type { SightRow } from '../memory/sight-log';

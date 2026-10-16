@@ -1,16 +1,14 @@
+/**
+ * The one line Scout says when the app opens, after the first time. It reads no screen:
+ * only the time of day, time away, finished hand-offs and routines, a crash or update, and
+ * the person's name. One short call to the summaries model writes it; a handwritten line
+ * (fallbackGreeting) stands in when that fails, is slow or comes back unusable, so the
+ * greeting never waits on a provider that is not set up yet. Contains composeGreeting.
+ */
 import type { GreetingComposeResult, Pet, Settings } from '@tagalong/protocol';
 import type { BrainProvider } from '../providers';
 import type { LaunchScenario } from './scenario';
 import { DAY_MS } from './scenario';
-
-/**
- * The one line a pet says when the app opens, after the first time.
- *
- * It reads no screen: only the time of day, how long since the app last opened, and the
- * hand-offs that finished since then, and the person's name when they gave one. One short call to the summaries model writes it; a
- * handwritten line stands in when that fails, is slow, or comes back unusable, so the
- * greeting never waits on a provider that is not set up yet.
- */
 
 /** A hand-off that finished while the app was closed: who did it and the brief it got. */
 export interface FinishedHandoff {

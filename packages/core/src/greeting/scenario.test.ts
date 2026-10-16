@@ -1,3 +1,4 @@
+/** Tests for launchScenario: update, crash, pick-up, away and normal. */
 import { describe, expect, it } from 'vitest';
 import { launchScenario } from './scenario';
 import type { LaunchFacts } from './scenario';

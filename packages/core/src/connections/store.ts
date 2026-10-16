@@ -1,3 +1,7 @@
+/**
+ * Saves connection definitions in SQLite (ConnectionStore, table connections). Never holds
+ * tokens or keys.
+ */
 import type { Database } from 'better-sqlite3';
 import { Connection } from '@tagalong/protocol';
 

@@ -1,3 +1,4 @@
+/** Tests for renderBrief: sections and hidden secrets. */
 import { describe, expect, it } from 'vitest';
 import { renderBrief, type Brief } from './connector';
 

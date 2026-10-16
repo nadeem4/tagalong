@@ -1,3 +1,4 @@
+/** Tests for Summarizer: threshold, what is folded, model choice and failures. */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

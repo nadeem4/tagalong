@@ -1,3 +1,4 @@
+/** Tests for browser routing: which host reads the selection and page, timeouts, excluded tabs. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   CaptureExclusions,
