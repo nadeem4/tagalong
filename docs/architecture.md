@@ -186,7 +186,9 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   [Keeping an eye on things](#keeping-an-eye-on-things)), and the `connections.*`, `calendar.*` and
   `routines.*` methods, and `wellbeing.observe { idleMs, windows }` (see
   [Gentle nudges](#gentle-nudges)). Protocol 0.13.0: the crew's `pets.delete`, `roles.list`,
-  `roles.recommendModel`, `notices.rolesUpgrade` and `notices.dismiss` are gone. `hosts.status`
+  `roles.recommendModel`, `notices.rolesUpgrade` and `notices.dismiss` are gone. Protocol 0.14.0:
+  `ask` takes text only (the unread `input.audio` is gone, since speech becomes text on the host),
+  and the never-advertised `audioIn` and `audioOut` capabilities are gone. `hosts.status`
   → `{ extension }` says whether the browser extension is connected, for the health check (see
   [The companion's bubble](#the-companions-bubble)); the extension may not call it.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
@@ -1794,8 +1796,8 @@ installer, and listing the workspace packages there would ship their whole trees
 A fresh install opens setup, a renderer page (`onboarding.html`, titled "Set up Tagalong") in an
 ordinary framed window centred on the screen under the cursor. Main opens it from `start` when
 `shouldOpenWelcome(settings, env)` says so: the protocol setting `welcome.done` is false and
-`TAGALONG_SKIP_ONBOARDING` is not `1`. It replaced the Phase 7 setup wizard, so an install that
-finished the wizard (`onboarding.done`) still sees it once. **Open Welcome again** on Home's
+`TAGALONG_SKIP_ONBOARDING` is not `1`. It replaced an older setup wizard, whose saved `onboarding`
+key is dropped when settings load, so an install that finished the wizard still sees Welcome once. **Open Welcome again** on Home's
 Settings page opens it again, from the top.
 
 Setup is alone on screen: the pet's window is created hidden (`createAvatarWindow({ hidden })`)

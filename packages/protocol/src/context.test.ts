@@ -195,7 +195,7 @@ describe('ContextSnapshot, full view fields', () => {
     expect(parsed.windows?.[0]?.processName).toBe('Code.exe');
   });
 
-  it('still parses a Phase 1 snapshot with none of them', () => {
+  it('still parses a snapshot with none of them', () => {
     const parsed = ContextSnapshot.parse(valid);
     expect(parsed.displays).toBeUndefined();
     expect(parsed.composite).toBeUndefined();
@@ -220,7 +220,7 @@ describe('PerceptionTarget', () => {
     expect(PerceptionTarget.safeParse('windows').success).toBe(true);
   });
 
-  it('still knows the Phase 1 and Phase 2 targets', () => {
+  it('still knows the original perception targets', () => {
     for (const target of ['selection', 'screenshot', 'activeWindow', 'clipboard', 'pageText']) {
       expect(PerceptionTarget.safeParse(target).success, target).toBe(true);
     }

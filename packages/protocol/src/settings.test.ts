@@ -338,18 +338,11 @@ describe('Settings.watch', () => {
   });
 });
 
-describe('Settings.onboarding', () => {
-  it('starts not done, so a fresh install opens the setup wizard', () => {
-    expect(Settings.parse({}).onboarding).toEqual({ done: false });
-  });
-
-  it('parses a settings file written before onboarding existed', () => {
-    expect(Settings.parse({ hiddenPets: [] }).onboarding.done).toBe(false);
-  });
-
-  it('rides in a patch alone, so finishing the wizard touches nothing else', () => {
-    const patch = SettingsPatch.parse({ onboarding: { done: true } });
-    expect(patch).toEqual({ onboarding: { done: true } });
+describe('an old onboarding key', () => {
+  it('still parses, and is dropped', () => {
+    const parsed = Settings.parse({ onboarding: { done: true } });
+    expect(parsed).not.toHaveProperty('onboarding');
+    expect(SettingsPatch.parse({ onboarding: { done: true } })).toEqual({});
   });
 });
 

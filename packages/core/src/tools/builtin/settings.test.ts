@@ -300,7 +300,6 @@ describe('talkPatchProblem: main re-checks an applied card, never trusting the r
       { closedCleanly: !current.closedCleanly },
       { lastVersion: '9.9.9' },
       { userNameDeclined: !current.userNameDeclined },
-      { onboarding: { done: !current.onboarding.done } },
       { hiddenPets: ['scout'] },
       { watch: { ...current.watch, maxChecks: 500 } },
       { pageTextBudget: current.pageTextBudget + 1 },

@@ -117,8 +117,6 @@ export const HostCapability = z.enum([
   'activeWindow',
   'clipboard',
   'pageText',
-  'audioIn',
-  'audioOut',
   /** Can enumerate and photograph every display, not only the focused one. */
   'displays',
   /** Can read a window's text without photographing it. */
@@ -148,15 +146,8 @@ export const HelloResult = z.object({
   pets: z.array(Pet),
 });
 
-export const AskInput = z
-  .object({
-    text: z.string().optional(),
-    /** Audio instead of text. The engine ignores it: speech becomes text before an ask is sent. */
-    audio: z.object({ mime: z.string().min(1), base64: z.string().min(1) }).optional(),
-  })
-  .refine((i) => i.text !== undefined || i.audio !== undefined, {
-    message: 'an ask needs text or audio',
-  });
+/** What the person asked. Speech becomes text on the host before an ask is sent. */
+export const AskInput = z.object({ text: z.string() });
 
 export const AskParams = z.object({
   petId: z.string().min(1),

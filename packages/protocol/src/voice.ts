@@ -1,7 +1,6 @@
 /**
  * Scout's voice slots: Ears turn the microphone into words and a Mouth turns an answer into
- * speech. A Live voice would replace both; it is a slot only and none is built.
- * Contains the slot interfaces, the adapter facts Settings shows, mouthOrder,
+ * speech. Contains the slot interfaces, the adapter facts Settings shows, mouthOrder,
  * chosenMouth and Pushable. Imports nothing, so desktop main, the voice process and the
  * windows all share it.
  */
@@ -34,24 +33,7 @@ export interface Mouth {
   stop(): void;
 }
 
-/** What a Live provider asks of Scout: one turn, the same one typing and talking use. */
-export interface ScoutTurn {
-  ask(text: string): AsyncIterable<string>;
-}
-
-export interface LiveSession {
-  close(): void;
-}
-
-/** One hosted real-time service replacing Ears and Mouth. A slot only; nothing implements it. */
-export interface LiveVoice {
-  connect(scout: ScoutTurn): LiveSession;
-}
-
-export type VoiceSetup = { ears: Ears; mouth: Mouth } | { live: LiveVoice };
-
 export const EARS_IDS = ['local'] as const;
-export type EarsId = (typeof EARS_IDS)[number];
 
 export const MOUTH_IDS = ['kokoro', 'elevenlabs', 'system'] as const;
 export type MouthId = (typeof MOUTH_IDS)[number];
@@ -62,7 +44,7 @@ export const LOCAL_MOUTH: MouthId = 'kokoro';
 /** What a person needs to know before picking an adapter. */
 export interface VoiceAdapterFacts {
   id: string;
-  slot: 'ears' | 'mouth' | 'live';
+  slot: 'ears' | 'mouth';
   label: string;
   offline: boolean;
   needsKey: boolean;
