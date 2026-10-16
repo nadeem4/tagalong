@@ -1,3 +1,8 @@
+/**
+ * Starts the engine in this process and connects the desktop to it as a host. Contains
+ * startEngineHost and EngineHost.
+ */
+
 import { app, screen, shell } from 'electron';
 import { isSignInPage } from './links';
 import { Engine } from '@tagalong/core';
@@ -31,7 +36,7 @@ export interface StartEngineHostOptions {
   captureExclusions: () => CaptureExclusions;
   /** A pet's own tool can ask to look; that capture must be as visible as the hotkey's. */
   onCapture: (notice: CaptureNotice) => void;
-  /** Phase 3B: rolling memory and the watch diff, answered from in-memory frames. */
+  /** Rolling memory and the watch diff, answered from in-memory frames. */
   recall: (params: PerceptionRecallParams) => Promise<unknown>;
   diff: (params: PerceptionDiffParams) => Promise<unknown>;
   /** Point, don't click: draws the ring on the overlay. Only draws. */

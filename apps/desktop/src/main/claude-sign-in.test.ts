@@ -1,3 +1,5 @@
+/** Tests for reading Claude Code's sign-in, with fake and real runners. */
+
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

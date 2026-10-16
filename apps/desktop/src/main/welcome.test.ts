@@ -1,3 +1,7 @@
+/**
+ * Tests for finding agents, when Welcome opens, the launch line and what finishing Welcome sets up.
+ */
+
 import { describe, expect, it, vi } from 'vitest';
 import { Pet, Settings } from '@tagalong/protocol';
 import type { PickUpReadyParams, Role } from '@tagalong/protocol';

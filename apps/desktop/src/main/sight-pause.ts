@@ -9,6 +9,7 @@
  * Deliberately not persisted. Pause is a moment — a call starting, someone at the desk —
  * and an app that boots blind because of a keypress last Tuesday reads as broken rather
  * than private. The exclusion list is the setting that survives restarts.
+ * Contains SightPause; main owns the one instance.
  */
 export class SightPause {
   #paused = false;

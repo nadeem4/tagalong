@@ -1,3 +1,8 @@
+/**
+ * IPC for Home's connected apps and the answer to a change Scout asked to make in one. Contains
+ * registerConnectionIpc.
+ */
+
 import { ConnectionsAddParams } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
 import type { EngineCall, IpcHandle } from './handle';
@@ -7,7 +12,6 @@ export interface ConnectionIpcDeps {
   engine: () => EngineCall;
 }
 
-/** Connected apps, and the answer to a change Scout asked to make in one. */
 export function registerConnectionIpc(handle: IpcHandle, { engine }: ConnectionIpcDeps): void {
   handle(IPC.approveTool, async (_event, approvalId: string, decision: 'once' | 'deny') => {
     await engine().call('tool.approve', { approvalId, decision });

@@ -1,3 +1,5 @@
+/** Tests for the safeStorage secret store. */
+
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

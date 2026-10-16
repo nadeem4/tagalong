@@ -1,3 +1,5 @@
+/** Tests for the host view, saving settings, Apply, keys and models. */
+
 import { describe, expect, it, vi } from 'vitest';
 import { InMemorySecretStore, WATCH_MODEL_DEFAULTS } from '@tagalong/core';
 import { SETTINGS_DEFAULTS } from '@tagalong/protocol';

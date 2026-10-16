@@ -1,3 +1,5 @@
+/** Tests for the capture notice and the tray tooltip. */
+
 import { describe, expect, it } from 'vitest';
 import { captureNotice, captureTooltip } from './capture-notice';
 

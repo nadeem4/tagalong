@@ -1,3 +1,5 @@
+/** The tray icon, drawn in code. Contains createTrayIcon. */
+
 import { nativeImage } from 'electron';
 import type { NativeImage } from 'electron';
 
@@ -7,8 +9,8 @@ const SIZE = 16;
  * Draws the tray icon in code rather than shipping a PNG.
  *
  * Electron refuses to create a Tray from an empty image, and a build that silently loses
- * an asset file would fail at launch instead of at build time. A filled dot is all the
- * tray needs in Phase 1; artwork arrives with the rest of the pet design.
+ * an asset file would fail at launch instead of at build time. A filled dot is enough for
+ * a tray icon.
  */
 export function createTrayIcon(): NativeImage {
   // createFromBitmap takes premultiplied BGRA.

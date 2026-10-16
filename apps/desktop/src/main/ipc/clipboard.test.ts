@@ -1,3 +1,5 @@
+/** Tests for the draft's Copy and the sender check. */
+
 import { describe, expect, it, vi } from 'vitest';
 import { IPC } from '../../shared/ipc';
 import { fakeIpc } from './fake-ipc';

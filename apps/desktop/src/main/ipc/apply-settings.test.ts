@@ -1,3 +1,5 @@
+/** Tests for applying Scout's settings card. */
+
 import { describe, expect, it, vi } from 'vitest';
 import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import type { Settings, SettingsPatch } from '@tagalong/protocol';

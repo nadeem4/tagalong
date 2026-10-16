@@ -1,3 +1,8 @@
+/**
+ * IPC for asking, interrupting, stopping a watch and a remark's two buttons. Contains
+ * registerTurnIpc.
+ */
+
 import { randomUUID } from 'node:crypto';
 import type { ContextSnapshot, Dropped } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
@@ -17,7 +22,6 @@ export interface TurnIpcDeps {
   takeDrop?: () => Promise<Dropped>;
 }
 
-/** Asking, stopping and interrupting turns, and a remark's two buttons. */
 export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
   const { engine } = deps;
 

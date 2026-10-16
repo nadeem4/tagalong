@@ -1,3 +1,9 @@
+/**
+ * The health check's one engine call: whether the browser extension is connected. The rest
+ * of the card is read from calls the windows already make.
+ * Contains registerHealthIpc.
+ */
+
 import { IPC } from '../../shared/ipc';
 import type { EngineCall, IpcHandle } from './handle';
 
@@ -6,10 +12,6 @@ export interface HealthIpcDeps {
   engine: () => EngineCall;
 }
 
-/**
- * The health check's one engine call: whether the browser extension is connected. The rest
- * of the card is read from calls the windows already make.
- */
 export function registerHealthIpc(handle: IpcHandle, { engine }: HealthIpcDeps): void {
   handle(IPC.hostsStatus, async () => engine().call('hosts.status', {}));
 }

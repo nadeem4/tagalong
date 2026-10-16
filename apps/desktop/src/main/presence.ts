@@ -1,10 +1,11 @@
-import type { WindowEntry } from '@tagalong/protocol';
-
 /**
  * Whether the person is at the computer, for Scout's dozing face. It reads one number, the
  * system's idle time, every 15 s, and hears the screen lock and unlock. Nothing on screen
  * is read, and nothing leaves this computer.
+ * Also the wellbeing tick. Contains watchPresence, startPresence and startWellbeingTick.
  */
+
+import type { WindowEntry } from '@tagalong/protocol';
 
 /** No input for this long and Scout dozes. A constant, not a setting. */
 export const AWAY_AFTER_MS = 5 * 60_000;

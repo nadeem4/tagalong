@@ -1,3 +1,5 @@
+/** The tray menu's items. Contains trayMenuTemplate; main supplies the actions. */
+
 import type { MenuItemConstructorOptions } from 'electron';
 
 /** What each tray item does. Main supplies these; the template only arranges them. */

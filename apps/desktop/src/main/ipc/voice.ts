@@ -1,3 +1,8 @@
+/**
+ * IPC for Scout's voice and ears: speaking a line, the microphone's frames on their way to the
+ * voice process, Always listening and the model check. Contains registerVoiceIpc and forwardEars.
+ */
+
 import { addressedToScout, isStopListening, mightBeStop } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
 import type { SpeakPreview, VoiceModels } from '../../shared/ipc';
@@ -20,7 +25,6 @@ export interface VoiceIpcDeps {
   voiceDir?: () => string;
 }
 
-/** Scout's voice, and its ears: the mic's frames pass through main to the voice process. */
 export function registerVoiceIpc(handle: IpcHandle, deps: VoiceIpcDeps): void {
   // Only the line itself reaches a speech engine: never the screen or the conversation.
   handle(IPC.speak, (_event, text: string, preview?: SpeakPreview) =>

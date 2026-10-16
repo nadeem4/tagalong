@@ -1,3 +1,8 @@
+/**
+ * Where a routine's result shows on the desktop: the line beside Scout, its voice, a notification.
+ * Contains routineDelivery.
+ */
+
 import type { RoutineResultParams } from '@tagalong/protocol';
 
 const PREVIEW_CHARS = 180;

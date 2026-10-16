@@ -1,3 +1,5 @@
+/** Tests that the app keeps its name, so its user data folder never moves. */
+
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 

@@ -1,3 +1,5 @@
+/** Tests for the keep-an-eye timer. */
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WindowEntry } from '@tagalong/protocol';
 import { KEEP_AN_EYE_INTERVAL_MS, keepAnEyeAllowed, startKeepAnEye } from './keep-an-eye';

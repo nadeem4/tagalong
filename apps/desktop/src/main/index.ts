@@ -1,3 +1,10 @@
+/**
+ * The desktop app's main process: boots the engine, makes the windows (Scout, its bubble,
+ * Home, Welcome, the pointer overlay), the tray and the hotkeys, and wires every IPC channel.
+ * Handlers that need only the engine or settings live in `ipc/`; the ones here move windows
+ * or read the screen.
+ */
+
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -111,7 +118,7 @@ import type { CaptureNotice } from '../shared/ipc';
 
 /** Everything the app owns once it is up. Assembled in `start`, torn down on quit. */
 interface Desktop {
-  /** Null when the engine refused to boot — see `start` for why that is survivable. */
+  /** Null when the engine refused to boot; `start` says why the app runs on without it. */
   host: EngineHost | null;
   bootError: string | null;
   platform: Platform;
@@ -125,11 +132,11 @@ interface Desktop {
   panel: BrowserWindow | null;
   tray: Tray;
   settingsWindow: BrowserWindow | null;
-  /** Phase 7: the setup wizard, while it is open. */
+  /** The Welcome window, while it is open. */
   onboardingWindow: BrowserWindow | null;
   /** Scout is hidden until the first Welcome is done. */
   scoutWaits: boolean;
-  /** The Crew Office, while it is open. */
+  /** Home, while it is open. */
   officeWindow: BrowserWindow | null;
   /** The snapshot the last hotkey captured, handed to the panel and sent with the ask. */
   pendingSnapshot: ContextSnapshot | null;
@@ -139,9 +146,9 @@ interface Desktop {
   hotkeyError: string | null;
   /** Whether the user has sight turned off. Read by the platform gate on every read. */
   sightPause: SightPause;
-  /** Phase 3B: the last few minutes of the screen, in memory, opt-in. */
+  /** The last few minutes of the screen, in memory, opt-in. */
   rolling: RollingMemory;
-  /** Phase 3B: answers perception.recall and perception.diff. */
+  /** Answers perception.recall and perception.diff. */
   perceptionMemory: PerceptionMemory;
   /** Turns Scout's lines into audio for the panel to play. */
   voice: VoiceService;
@@ -158,12 +165,6 @@ const drops = dropDesk(nodeDropFs);
 /** The Claude sign-in check, started at boot so a cold `claude` has had time before the greeting. */
 let signInCheck: ReturnType<typeof signInFor> | null = null;
 
-/**
- * A second launch focuses the pet that is already running.
- *
- * Two engines would fight over the same port and the same SQLite file, so the lock is
- * taken before anything else happens.
- */
 // The fake ears need no real microphone: Chromium's fake device stands in for one, and
 // the permission prompt answers itself. Switches only take effect before the app is ready.
 if (process.env.TAGALONG_FAKE_STT === '1') {
@@ -171,6 +172,10 @@ if (process.env.TAGALONG_FAKE_STT === '1') {
   app.commandLine.appendSwitch('use-fake-ui-for-media-stream');
 }
 
+// A second launch focuses the pet that is already running.
+//
+// Two engines would fight over the same port and the same SQLite file, so the lock is
+// taken before anything else happens.
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
@@ -484,7 +489,7 @@ let stopKeepAnEye = (): void => undefined;
 let stopListeningGuard = (): void => undefined;
 /** Stops reading the idle time on quit. */
 let stopPresence = (): void => undefined;
-/** Why Always listening waits: a call or full screen in front, the pets hidden, or setup open. */
+/** Why Always listening waits: a call or full screen in front, the pets hidden, or Welcome open. */
 let listeningWhy = { blocked: false, petsShown: false, setupOpen: false };
 let pauseListening: (change: Partial<typeof listeningWhy>) => void = () => undefined;
 
@@ -594,7 +599,8 @@ async function greetOnLaunch(host: EngineHost): Promise<void> {
 }
 
 /**
- * Binds both hotkeys to what settings currently say, and reports what was refused.
+ * Binds the four hotkeys (ask, pause sight, stop voice, talk) to what settings say, and
+ * reports what was refused.
  *
  * Called again on every settings save, which is what makes a rebind take effect without
  * a restart: the manager releases only the accelerator that changed.
@@ -623,8 +629,8 @@ function applyHotkeys(settings: Settings): string | null {
 /**
  * The talk key, on every press, repeats included: the bubble comes up with the keyboard, so
  * it sees the key come up, and the panel tells a held key from a fresh press. The
- * microphone only ever opens in the panel, on this key or its mic button. While setup is open
- * the key brings setup forward instead: setup may be listening, and one mic is enough.
+ * microphone only ever opens in the panel, on this key or its mic button. While Welcome is
+ * open the key brings Welcome forward instead: Welcome may be listening, and one mic is enough.
  */
 function talkPressed(): void {
   if (desktop === null) return;
@@ -648,7 +654,7 @@ function stopVoice(): void {
   }
 }
 
-/** Re-renders the crew strip after the crew or its visibility changed in Settings. */
+/** Reloads Scout's window after its pet, or which pet it shows, changed. */
 function refreshStrip(): void {
   const avatar = desktop?.avatar;
   if (avatar !== null && avatar !== undefined && !avatar.isDestroyed()) avatar.webContents.reload();
@@ -869,7 +875,7 @@ function openSettingsPage(target?: unknown): void {
   else openOffice(page);
 }
 
-/** Opens the setup wizard, or brings the open one forward. */
+/** Opens Welcome, or brings the open one forward. */
 function openOnboarding(): void {
   if (desktop === null) return;
   if (desktop.onboardingWindow !== null && !desktop.onboardingWindow.isDestroyed()) {
@@ -877,7 +883,7 @@ function openOnboarding(): void {
     return;
   }
   const window = createOnboardingWindow();
-  // Always listening waits while setup is open, so the two never share the voice process.
+  // Always listening waits while Welcome is open, so the two never share the voice process.
   pauseListening({ setupOpen: true });
   window.on('closed', () => {
     pauseListening({ setupOpen: false });
@@ -1107,7 +1113,6 @@ function registerIpc(): void {
     captureForPanel(required(), targets),
   );
 
-  // A click on the crew strip opens the panel on that pet, the way the chat button does.
   ipcMain.handle(IPC.selectPet, (_event, petId: string) => {
     const current = required();
     // A click on the pet opens its bubble, or keeps the open one and gives it the keyboard

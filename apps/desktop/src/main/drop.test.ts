@@ -1,3 +1,5 @@
+/** Tests for dropping a file, image, link or text on Scout: the offer, the read and the hold. */
+
 import { describe, expect, it } from 'vitest';
 import type { CapturedImage } from '@tagalong/protocol';
 import { MAX_SELECTION_CHARS } from '@tagalong/protocol';

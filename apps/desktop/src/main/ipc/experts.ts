@@ -1,3 +1,8 @@
+/**
+ * IPC for Home's Activity, Spend and Experts pages, the expert catalog and the hand-off card.
+ * Contains registerExpertIpc.
+ */
+
 import type { Expert } from '@tagalong/protocol';
 import type { ConfirmHandoff } from '@tagalong/ui';
 import { IPC } from '../../shared/ipc';
@@ -8,7 +13,6 @@ export interface ExpertIpcDeps {
   engine: () => EngineCall;
 }
 
-/** Home's Activity and Experts tabs, and the hand-off card. */
 export function registerExpertIpc(handle: IpcHandle, { engine }: ExpertIpcDeps): void {
   // Home's activity view.
   handle(IPC.listActivity, async (_event, params: { before?: string; limit?: number }) =>

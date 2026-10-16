@@ -1,3 +1,8 @@
+/**
+ * The engine's SecretStore on this host: API keys encrypted with the OS keychain (Electron
+ * safeStorage) in secrets.json. Contains SafeStorageSecretStore.
+ */
+
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { safeStorage } from 'electron';

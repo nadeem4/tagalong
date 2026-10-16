@@ -1,3 +1,5 @@
+/** Tests for where a routine's result shows. */
+
 import { describe, expect, it } from 'vitest';
 import type { RoutineResultParams } from '@tagalong/protocol';
 import { routineDelivery } from './routine-delivery';

@@ -1,3 +1,5 @@
+/** Tests for the voice IPC, forwarding the ears and the model check. */
+
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';

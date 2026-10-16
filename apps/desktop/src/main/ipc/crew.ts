@@ -1,3 +1,8 @@
+/**
+ * IPC for Scout as a pet: listing and saving pets, switching Scout's brain, and finishing Welcome.
+ * Contains registerCrewIpc.
+ */
+
 import { getRole } from '@tagalong/core';
 import type { Pet, Settings, SettingsPatch } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
@@ -18,7 +23,6 @@ export interface CrewIpcDeps {
   welcomed: () => void;
 }
 
-/** The pets, and the two steps that move Scout to a brain. */
 export function registerCrewIpc(handle: IpcHandle, deps: CrewIpcDeps): void {
   const { engine, refreshStrip } = deps;
 
@@ -49,8 +53,8 @@ export function registerCrewIpc(handle: IpcHandle, deps: CrewIpcDeps): void {
     return saved;
   });
 
-  // Scout becomes the Companion on the chosen brain and docks alone; the others are hidden,
-  // not deleted. Then Welcome closes and Scout says hello in its bubble, without taking focus.
+  // Scout becomes the Companion on the chosen brain and is the only pet shown; any other is
+  // hidden, not deleted. Then Welcome closes and Scout says hello in its bubble, without taking focus.
   handle(IPC.finishWelcome, async (_event, providerId: string) => {
     const client = engine();
     const companion = getRole('companion');
@@ -64,7 +68,7 @@ export function registerCrewIpc(handle: IpcHandle, deps: CrewIpcDeps): void {
     for (const expert of welcomeExperts(await deps.findAgents(), experts)) {
       await client.call('experts.upsert', { expert });
     }
-    // The whole record is kept: a patch replaces `welcome`, and setup reads it again later.
+    // The whole record is kept: a patch replaces `welcome`, and Welcome reads it again.
     const welcome = { ...deps.settings().welcome, done: true, step: 'try' as const };
     const patch: SettingsPatch = { hiddenPets, welcome };
     deps.setSettings((await client.call('settings.set', { patch })).settings);

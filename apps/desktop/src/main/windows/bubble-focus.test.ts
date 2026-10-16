@@ -1,3 +1,5 @@
+/** Tests for when the bubble hides on blur. */
+
 import { describe, expect, it } from 'vitest';
 import { hidesOnBlur } from './bubble-focus';
 

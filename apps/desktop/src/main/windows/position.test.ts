@@ -1,3 +1,5 @@
+/** Tests for docking, the pet window's width, the bubble's place and display scale. */
+
 import { describe, expect, it } from 'vitest';
 import {
   AVATAR_EDGE_MARGIN,

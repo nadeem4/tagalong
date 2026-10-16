@@ -1,3 +1,5 @@
+/** Tests for the launch record, brain readiness and the launch line. */
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Pet, Settings, type PickUpReadyParams, type SettingsPatch } from '@tagalong/protocol';
 import { brainLine, brainReadiness, recordCleanClose, recordLaunch } from './launch';

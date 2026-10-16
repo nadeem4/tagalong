@@ -1,3 +1,5 @@
+/** Tests for the pointer overlay. */
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { FakeClock } from '../awareness/fake-clock';

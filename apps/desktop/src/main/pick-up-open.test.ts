@@ -1,3 +1,5 @@
+/** Tests for openFor, the pick-up allowlist and the wait. */
+
 import { describe, expect, it } from 'vitest';
 import type { PickUpReadyParams } from '@tagalong/protocol';
 import { PickUpAllowlist, PickUpWaiting, openFor } from './pick-up-open';

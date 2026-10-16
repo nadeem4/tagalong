@@ -1,3 +1,8 @@
+/**
+ * IPC for Home's Routines page, Scout's routine card and the calendar link. Saving, here or on the
+ * card, is consent. Contains registerRoutineIpc.
+ */
+
 import { RoutineDraft } from '@tagalong/protocol';
 import type { RoutineDraftInput, RoutineProposedParams } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
@@ -15,13 +20,12 @@ export interface RoutineWindow {
 export interface RoutineIpcDeps {
   /** Throws when the engine is not running. */
   engine: () => EngineCall;
-  /** Opens Home (the Crew Office) on a page. */
+  /** Opens Home on a page. */
   openOffice: (page: string) => void;
   /** Home's window, once it is open. */
   officeWindow: () => RoutineWindow | null;
 }
 
-/** Home's Routines page and the routine card. Saving, here or on the card, is consent. */
 export function registerRoutineIpc(handle: IpcHandle, deps: RoutineIpcDeps): void {
   const { engine } = deps;
 

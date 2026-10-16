@@ -1,3 +1,5 @@
+/** Tests for Home's minimum width. */
+
 import { describe, expect, it } from 'vitest';
 import { HOME_MIN_WIDTH } from './office';
 

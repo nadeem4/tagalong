@@ -1,3 +1,8 @@
+/**
+ * The draft's Copy button: main writes text to the clipboard, only from the bubble. Contains
+ * registerClipboardIpc and fromWindow, the sender check other handlers reuse.
+ */
+
 import { IPC } from '../../shared/ipc';
 import type { IpcHandle } from './handle';
 

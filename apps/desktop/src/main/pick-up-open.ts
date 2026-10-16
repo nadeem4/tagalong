@@ -1,3 +1,8 @@
+/**
+ * How the pick-up card's Open reaches a project, and the allowlist and one-slot wait behind it.
+ * Contains openFor, PickUpAllowlist and PickUpWaiting.
+ */
+
 import type { PickUpItem, PickUpReadyParams } from '@tagalong/protocol';
 
 /** How main reopens one project: an editor link for `shell.openExternal`, or a folder for `openPath`. */

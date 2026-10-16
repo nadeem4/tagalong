@@ -1,3 +1,7 @@
+/**
+ * Tests for Always listening's state, its pauses, the call and full-screen guard, and saving it.
+ */
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Settings, WindowEntry } from '@tagalong/protocol';
 import {

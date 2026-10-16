@@ -1,3 +1,9 @@
+/**
+ * The contract between main and the preload: every IPC channel name (IPC) and the shapes
+ * that cross it (HostView, GreetLine, CaptureNotice, SpeakResult and the rest), plus
+ * TagalongHostApi, the host-only calls on `window.tagalongHost`. Types only, apart from IPC.
+ */
+
 import type { CaptureBlock } from '@tagalong/core';
 import type {
   ContextSnapshot,
@@ -197,13 +203,13 @@ export interface CaptureNotice {
   paused?: boolean;
 }
 
-/** One brain a pet can run on, as the settings window shows it. */
+/** One brain Scout can run on, as Settings and Welcome list it. */
 export interface ProviderChoice {
   id: string;
   label: string;
   /** Present for OpenAI-compatible presets: the URL used when settings name none. */
   defaultBaseUrl?: string;
-  /** The variable `.env.example` lists for this key, for the form's hint. */
+  /** The environment variable for this key, as `.env.example` lists it. Nothing reads it today. */
   envVar?: string;
   needsKey: boolean;
   /** Whether a key is stored. The key itself never comes back out. */
@@ -250,7 +256,10 @@ export interface ModelList {
   source: 'live' | 'fallback';
 }
 
-/** What the settings window needs to render. Keys never come back out. */
+/**
+ * What a window reads about the host when it opens: settings, pets, brains and host facts.
+ * Keys never come back out.
+ */
 export interface HostView {
   settings: Settings;
   /** Empty while the engine is down: pets live in its database. */
@@ -265,11 +274,11 @@ export interface HostView {
   pairingToken?: string;
   /** Set when the global hotkey could not be registered, so settings can say why. */
   hotkeyError?: string;
-  /** Phase 3B. The check model a watch uses on each provider when a pet names none. */
+  /** The check model a watch uses on each provider when a pet names none. No window reads it. */
   watchModelDefaults: Record<string, string>;
-  /** Phase 7. `process.platform`, so a hotkey reads Ctrl on Windows and Cmd on a Mac. */
+  /** `process.platform`, so a hotkey reads Ctrl on Windows and Cmd on a Mac. */
   platform: string;
-  /** Phase 7. The unpacked Chrome extension's folder, when it is on this machine. */
+  /** The unpacked Chrome extension's folder, when it is on this machine. No window reads it. */
   extensionFolder?: string;
   /** Whether an ElevenLabs key is stored. The key itself never comes back out. */
   elevenLabsKeyStored: boolean;
@@ -302,43 +311,40 @@ export interface TagalongHostApi {
   /** Fires after every settings save, so an open window applies it without a restart. */
   onSettingsChanged(handler: (settings: Settings) => void): () => void;
   /**
-   * Flips sight off or on, returning the state it moved to.
-   *
-   * The shipped surfaces are the hotkey and the tray item; this exists because a window
-   * needs it too — settings will offer the toggle, and the smoke test drives the real
-   * gate through it, which is the only check in the repo that fails when the gate is
-   * left unwired.
+   * Flips sight off or on, returning the state it moved to. The bubble and Settings › Privacy
+   * call it; the smoke test drives the real gate through it, the one check that fails when
+   * the gate is left unwired.
    */
   toggleSightPause(): Promise<boolean>;
-  /** Phase 3B. Whether rolling memory is recording now, for a window that just opened. */
+  /** Whether rolling memory is recording now, for a window that just opened. */
   getRecording(): Promise<boolean>;
-  /** Phase 3B. Fires when rolling memory starts or stops: the avatar's red dot. */
+  /** Fires when rolling memory starts or stops: the avatar's red dot. */
   onRecording(handler: (recording: boolean) => void): () => void;
   getHostView(): Promise<HostView>;
   saveSettings(patch: SettingsPatch): Promise<Settings>;
   /** An empty key deletes the stored one. */
   saveApiKey(providerId: string, apiKey: string): Promise<void>;
-  /** Setup's one test of the key just saved for `providerId`. */
+  /** Welcome's one test of the key just saved for `providerId`. */
   checkKey(providerId: string): Promise<ProvidersCheckResult>;
-  /** Opens a terminal that signs in to Claude Code; setup waits and checks again. */
+  /** Opens a terminal that signs in to Claude Code; Welcome waits and checks again. */
   openClaudeSignIn(): Promise<void>;
   savePet(pet: Pet): Promise<Pet>;
-  /** Phase 4. A click on the crew strip: makes that pet the panel's and opens the panel. */
+  /** A click on Scout: opens its bubble on that pet, or gives the open bubble the keyboard back. */
   selectPet(petId: string): Promise<void>;
-  /** Phase 4. Fires in the panel when the strip picked a pet. */
+  /** Fires in the bubble when a click on the pet chose it. */
   onActivePet(handler: (petId: string) => void): () => void;
-  /** Phase 4. Sizes the avatar window to hold this many pets side by side. */
+  /** Sizes Scout's window to hold this many pets side by side. The avatar always asks for one. */
   resizeStrip(visiblePets: number): Promise<void>;
   listModels(providerId: string): Promise<ModelList>;
   /** Opens Settings, or the section or Home page a Fix it names. Main checks the target. */
   openSettings(target?: FixTarget): Promise<void>;
-  /** Opens the Welcome window, from Settings or the tray. */
+  /** Opens the Welcome window, from Settings › Advanced. */
   openOnboarding(): Promise<void>;
   /** Opens Home, or focuses it. The tray's Open Tagalong is the shipped way in. */
   openOffice(): Promise<void>;
   /** Main names the Home page to show, when the tray or the bubble opens a particular one. */
   onHomePage(handler: (page: string) => void): () => void;
-  /** The coding agents on this computer, for Welcome's list. */
+  /** The coding agents on this computer. No window calls it: finishing Welcome finds them in main. */
   findAgents(): Promise<FoundAgent[]>;
   /**
    * Finishes Welcome: Scout becomes the Companion thinking on `providerId` and docks alone,
@@ -352,9 +358,9 @@ export interface TagalongHostApi {
    * model. Settings calls it after storing a key when no Claude sign-in was found.
    */
   switchScout(providerId: string): Promise<Pet>;
-  /** Phase 7. Opens a provider's key page in the browser. Main refuses any other URL. */
+  /** Opens a provider's key page in the browser. Main refuses any other URL. */
   openLink(url: string): Promise<void>;
-  /** Phase 7. Shows the unpacked extension's folder in the file manager. */
+  /** Shows the unpacked extension's folder in the file manager. No window calls it. */
   showExtensionFolder(): Promise<void>;
   hidePanel(): Promise<void>;
   /** The panel measured its content; main resizes it, keeping it level with the pet. */

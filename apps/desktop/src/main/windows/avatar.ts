@@ -1,3 +1,8 @@
+/**
+ * Scout's window: a transparent, frameless square on top of everything. Contains
+ * createAvatarWindow.
+ */
+
 import { BrowserWindow, screen } from 'electron';
 import { guardNavigation } from '../drop';
 import { PRELOAD_PATH, loadPage } from './page';
@@ -15,9 +20,9 @@ export interface AvatarWindowOptions {
 /**
  * The pet itself: a transparent, frameless square that floats over everything.
  *
- * skipTaskbar keeps it out of Alt+Tab — it is an ornament on the desktop, not a window
- * the user manages — and the renderer marks its body as a drag region so the whole pet
- * can be picked up and moved.
+ * skipTaskbar keeps it out of Alt+Tab: it is an ornament on the desktop, not a window the
+ * user manages. It is moved by IPC.dragAvatar, not a drag region, which would swallow its
+ * clicks.
  */
 export function createAvatarWindow(options: AvatarWindowOptions): BrowserWindow {
   // The screen the pet was left on, or for a pet never moved the one the person is using:

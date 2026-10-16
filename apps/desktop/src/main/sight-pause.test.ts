@@ -1,3 +1,5 @@
+/** Tests for SightPause. */
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { SightPause } from './sight-pause';
