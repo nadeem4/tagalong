@@ -104,7 +104,7 @@
         "role": "neutral",
         "displayName": "Avatar Tile",
         "canonical": "#222845",
-        "source": "officeTokens.color.avatarTile",
+        "source": "hard-coded",
         "tonalRamp": [
           "oklch(15% 0.054 273.7)",
           "oklch(26% 0.054 273.7)",
@@ -736,7 +736,7 @@
       "welcomeWindow": "640x700",
       "standaloneSettingsWindow": "1080x760",
       "headerHeight": "64px (standalone Settings only)",
-      "partyWidth": "280px (standalone Settings nav only)",
+      "navWidth": "280px (standalone Settings nav only)",
       "fieldHeight": "40px",
       "bubbleFieldHeight": "44px",
       "bubblePrimaryHeight": "36px",
@@ -839,7 +839,7 @@
   ],
   "narrative": {
     "northStar": "A Pixel Friend in Modern Chrome",
-    "overview": "Tagalong is one companion, Scout, a 16x16 pixel-art figure (orange fur, pointed ears, a green shirt with a gold badge) that sits on the desktop and opens a speech bubble beside itself. The figure is the only game-like thing in the product; everything around it is calm, modern product chrome: a deep ink-navy for Scout's own surfaces (the dock tags, the bubble, Welcome, Home's nav), a cool off-white for reading (Home's pages and Settings), clean Onest type and one warm gold.\n\nTokens live in `packages/ui/src/office/tokens.ts` (`officeTokens`; the `office/` folder name is historical). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav and Welcome hard-code several hex values, recorded below as hard-coded. Sprites are plain data (rows, a palette, optional overlay pixels) drawn by `PixelSprite` as a CSS `box-shadow` on one 1px element, scaled by a whole number. No images, no canvas.\n\nScout's state is always a face plus a word: the eyes change per mood, a small tag says Seeing, Working or Done, and the accessible name says it in full. Motion is small and soft (a breath, a bob, a hop) and stops for reduced motion.",
+    "overview": "Tagalong is one companion, Scout, a 16x16 pixel-art figure (orange fur, pointed ears, a green shirt with a gold badge) that sits on the desktop and opens a speech bubble beside itself. The figure is the only game-like thing in the product; everything around it is calm, modern product chrome: a deep ink-navy for Scout's own surfaces (the dock tags, the bubble, Welcome, Home's nav), a cool off-white for reading (Home's pages and Settings), clean Onest type and one warm gold.\n\nTokens live in `packages/ui/src/office/tokens.ts` (`officeTokens`; the `office/` folder name is historical). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav and Welcome hard-code several hex values, recorded below as hard-coded. Sprites are plain data (rows and a palette) drawn by `PixelSprite` as a CSS `box-shadow` on one 1px element, scaled by a whole number. No images, no canvas.\n\nScout's state is always a face plus a word: the eyes change per mood, a small tag says Seeing, Working or Done, and the accessible name says it in full. Motion is small and soft (a breath, a bob, a hop) and stops for reduced motion.",
     "keyCharacteristics": [
       "One pixel figure; modern chrome around it.",
       "Navy for Scout's surfaces, off-white for reading.",

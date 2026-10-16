@@ -1242,7 +1242,7 @@ and on what.
 ### The companion in the hosts
 
 `ChatPanel` in `packages/ui` is the Chrome side panel's chat with Scout. It names the speaker from
-the pets (from the host, or `bridge.listPets()`), continues the conversation `turn.started` reported,
+the pets the host passes, continues the conversation `turn.started` reported,
 labels each answer `Name · model`, shows Watching chips and fired watches, and **Stop** interrupts the
 turn in flight. The footer shows a turn's `modelCalls` when it was more than one. The extension's port
 bridge forwards only `turn.*` notifications to it.

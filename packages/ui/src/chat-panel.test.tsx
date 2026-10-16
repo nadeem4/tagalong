@@ -209,6 +209,20 @@ describe('ChatPanel', () => {
     expect(screen.getByRole('textbox')).toHaveValue('');
   });
 
+  it('keeps a half-typed question when the host hands over a fresh capture', () => {
+    const bridge = createFakeHostBridge();
+    const { rerender } = renderPanel(bridge);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'What is th' } });
+
+    rerender(
+      <HostBridgeProvider bridge={bridge}>
+        <ChatPanel petId="sage" pets={[]} snapshot={screenshot} />
+      </HostBridgeProvider>,
+    );
+
+    expect(screen.getByRole('textbox')).toHaveValue('What is th');
+  });
+
   it('locks the composer while a turn streams and frees it when the turn completes', () => {
     const bridge = createFakeHostBridge();
     renderPanel(bridge);
