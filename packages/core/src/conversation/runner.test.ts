@@ -231,10 +231,10 @@ describe('ConversationRunner perception tools', () => {
     const runner = makeRunner(observed.provider, toolsFor([host]));
     await runner.run({ pet, text: 'hi' }).done;
 
-    // Asserted as a prefix. What this test
-    // is for is that the runner hands the toolset's definitions to the provider at all —
-    // which tools exist is the toolset's own test, and pinning the whole list here would
-    // make every future tool a two-file change for no extra coverage.
+    // Asserted as a prefix. What this test is for is that the runner hands the toolset's
+    // definitions to the provider at all. Which tools exist is the toolset's own test, and
+    // pinning the whole list here would make every future tool a two-file change for no
+    // extra coverage.
     const offered = observed.requests[0]?.tools?.map((tool) => tool.name) ?? [];
     expect(offered.slice(0, 2)).toEqual([LOOK_AT_SCREEN, GET_SELECTION]);
     expect(offered).toContain('read_window_text');

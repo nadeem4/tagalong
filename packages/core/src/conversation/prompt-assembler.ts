@@ -28,7 +28,7 @@ export const MAX_OUTPUT_TOKENS = 2048;
 /** Appended wherever text was cut, so the model never mistakes a stub for the whole thing. */
 export const TRUNCATION_MARKER = '… [truncated]';
 
-/** Section headings of the screen context, in the order they appear. */
+/** Section headings of the screen context block. */
 export const CONTEXT_LABELS = {
   selection: 'Selected text',
   page: 'Page text',
