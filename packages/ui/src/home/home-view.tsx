@@ -116,9 +116,7 @@ export function HomeView({ host, settings, page: asked, onPage, routineDraft }: 
       <nav aria-label="Tagalong" className="home-nav">
         <div className="home-nav__who">
           <span className="home-nav__tile">
-            {companion !== undefined && (
-              <PixelSprite sprite={SCOUT_SPRITE} scale={3} />
-            )}
+            {companion !== undefined && <PixelSprite sprite={SCOUT_SPRITE} scale={3} />}
           </span>
           <span>
             <strong>{name}</strong>

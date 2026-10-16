@@ -103,9 +103,7 @@ export function ChatPanel({
   const onTurnEvent = useEffectEvent((event: TurnEvent) => {
     switch (event.type) {
       case 'turn.started': {
-        const speaker = [pet.name]
-          .concat(event.model ?? [])
-          .join(' · ');
+        const speaker = [pet.name].concat(event.model ?? []).join(' · ');
         speakers.current.set(event.turnId, speaker);
         setConversationId(event.conversationId);
         setActiveTurnId(event.turnId);
@@ -215,33 +213,33 @@ export function ChatPanel({
         {...(lookLabel !== undefined ? { lookLabel } : {})}
       />
       {watches.map((watch) => (
-          <div
-            key={watch.watchId}
-            data-testid="watching"
-            className="flex items-center gap-2 border-b border-sky-200 bg-sky-50 px-3 py-1 text-xs text-sky-900"
+        <div
+          key={watch.watchId}
+          data-testid="watching"
+          className="flex items-center gap-2 border-b border-sky-200 bg-sky-50 px-3 py-1 text-xs text-sky-900"
+        >
+          <span aria-hidden="true">⏱</span>
+          <span className="font-semibold">Watching</span>
+          <span className="truncate">
+            {pet.name}: “{watch.condition}”
+          </span>
+          <span
+            className="ml-auto shrink-0 text-sky-700"
+            title="Model checks spent, and the small model answering them"
           >
-            <span aria-hidden="true">⏱</span>
-            <span className="font-semibold">Watching</span>
-            <span className="truncate">
-              {pet.name}: “{watch.condition}”
-            </span>
-            <span
-              className="ml-auto shrink-0 text-sky-700"
-              title="Model checks spent, and the small model answering them"
+            {watch.checks}/{watch.maxChecks} checks
+            {watch.checkModel === undefined ? '' : ` · ${watch.checkModel}`}
+          </span>
+          {bridge.stopWatch !== undefined && (
+            <button
+              type="button"
+              onClick={() => void bridge.stopWatch?.(watch.watchId)}
+              className="shrink-0 rounded-md border border-sky-300 bg-white px-2 py-0.5 font-medium"
             >
-              {watch.checks}/{watch.maxChecks} checks
-              {watch.checkModel === undefined ? '' : ` · ${watch.checkModel}`}
-            </span>
-            {bridge.stopWatch !== undefined && (
-              <button
-                type="button"
-                onClick={() => void bridge.stopWatch?.(watch.watchId)}
-                className="shrink-0 rounded-md border border-sky-300 bg-white px-2 py-0.5 font-medium"
-              >
-                Stop
-              </button>
-            )}
-          </div>
+              Stop
+            </button>
+          )}
+        </div>
       ))}
       <MessageList
         messages={messages}

@@ -446,11 +446,7 @@ function FirstRunWindow() {
             {line}
           </p>
           {scout !== undefined && (
-            <PixelSprite
-              className="first-run__sprite"
-              sprite={SCOUT_SPRITE}
-              scale={6}
-            />
+            <PixelSprite className="first-run__sprite" sprite={SCOUT_SPRITE} scale={6} />
           )}
         </aside>
         <section className="first-run__step" aria-labelledby="step-title">

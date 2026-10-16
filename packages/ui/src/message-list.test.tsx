@@ -18,7 +18,9 @@ describe('MessageList', () => {
   });
 
   it('renders the in-flight assistant text as a separate streaming bubble', () => {
-    const { rerender } = render(<MessageList messages={messages} petName="Scout" streamingText="A f" />);
+    const { rerender } = render(
+      <MessageList messages={messages} petName="Scout" streamingText="A f" />,
+    );
     expect(screen.getByTestId('streaming-message')).toHaveTextContent('A f');
 
     rerender(<MessageList messages={messages} petName="Scout" streamingText="A fox with" />);
