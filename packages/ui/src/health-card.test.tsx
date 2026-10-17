@@ -63,4 +63,18 @@ describe('HealthCard', () => {
     render(<HealthCard rows={ROWS} />);
     expect(screen.queryByRole('button')).toBeNull();
   });
+
+  it('offers Open logs folder when the host can open it', () => {
+    const onOpenLogs = vi.fn();
+    render(<HealthCard rows={ROWS} onOpenLogs={onOpenLogs} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open logs folder' }));
+    expect(onOpenLogs).toHaveBeenCalledOnce();
+  });
+
+  it('has no Open logs folder while checking, or when the host cannot open it', () => {
+    const { rerender } = render(<HealthCard rows={null} onOpenLogs={() => undefined} />);
+    expect(screen.queryByRole('button', { name: 'Open logs folder' })).toBeNull();
+    rerender(<HealthCard rows={ROWS} />);
+    expect(screen.queryByRole('button', { name: 'Open logs folder' })).toBeNull();
+  });
 });

@@ -28,6 +28,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [The Chrome extension](#the-chrome-extension)
 - [Installer](#installer)
 - [Scout's mind](#scouts-mind-real-brain-fast-tier)
+- [Log file](#log-file)
 - [Not in this build](#not-in-this-build)
 
 ## Configuration
@@ -266,7 +267,8 @@ _Only on a data folder from a build before Nebius was removed._
    Chrome extension not paired.
 2. **Action:** (a) type "Scout, what's wrong?" in the bubble; (b) press **Fix it** on the Brain
    row; (c) ask again and press **Fix it** on the Voice row; (d) say "are you OK?" with the talk
-   key; (e) type "what's wrong with this code?", then "what's broken?".
+   key; (e) type "what's wrong with this code?", then "what's broken?"; (f) press **Open logs
+   folder** on the card.
 3. **Expected:** (a) at once, with no "thinking", a card starting "Two things need you.", then a
    row each for Brain ("Signed out of Claude."), Experts, Connections, Voice ("The ElevenLabs
    voice has no key."), Microphone and Browser extension ("Not connected (optional)", grey, with
@@ -275,7 +277,8 @@ _Only on a data folder from a build before Nebius was removed._
    on Settings, scrolled to How Scout thinks. (c) Home opens at Settings › Voice. (d) the same card, and only its first line is spoken.
    (e) Scout answers both as normal questions; no card. With everything fixed, the card says "Everything's
    working.". With the engine stopped, the rows it cannot read say "Not checked." and the
-   card still shows. If the check itself fails, the bubble says "Health check failed.".
+   card still shows. If the check itself fails, the bubble says "Health check failed.". (f)
+   Explorer opens `%APPDATA%\Tagalong\logs`; nothing is put on the clipboard.
 
 ## Hand-offs to Claude Code
 
@@ -1741,6 +1744,21 @@ three times: the wording should vary, the behaviour should not.
    **Expected:** Scout deletes it (check Home: the row is gone), with no card. If two memories
    match, Scout asks which one, in its own words.
 4. **Nothing on a routine.** A routine's own run never deletes a memory (its turn has no `forget`).
+
+## Log file
+
+### L.1. A warning lands in the file
+
+1. **Setup:** quit Tagalong; delete `%APPDATA%\Tagalong\logs` if it exists. Start Tagalong.
+2. **Action:** (a) make a warning: in Settings → Voice pick a microphone, then unplug it and press
+   the talk key, or turn Always listening on with the microphone blocked in Windows privacy
+   settings; (b) open `%APPDATA%\Tagalong\logs\tagalong.log` in Notepad; (c) ask Scout a
+   question by voice and by typing, then look at the file again; (d) copy a file of 1.1 MB of
+   text over `tagalong.log`, make one more warning.
+3. **Expected:** (b) one line per warning: an ISO time, `WARN` or `ERROR`, the fixed text and
+   the error's name and message; no line over 300 characters. (c) no question, answer, speech or
+   screen text appears in the file. (d) the big file is now `tagalong.1.log` and `tagalong.log`
+   holds only the new line.
 
 ## Not in this build
 

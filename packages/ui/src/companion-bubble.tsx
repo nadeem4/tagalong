@@ -717,6 +717,7 @@ export function CompanionBubble({
         {...(bridge.openFix !== undefined
           ? { onFix: (target: FixTarget) => void bridge.openFix?.(target) }
           : {})}
+        {...(bridge.openLogs !== undefined ? { onOpenLogs: () => void bridge.openLogs?.() } : {})}
       />
     );
   const answerConfirm = (decision: 'once' | 'deny'): void => {

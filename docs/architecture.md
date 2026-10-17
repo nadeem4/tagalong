@@ -2198,7 +2198,19 @@ above a **Message** box. It is the same component, so it is the same conversatio
   checked."); a check that fails outright shows "Health check failed.". The ears count only once Always listening is on or
   a microphone was picked. The browser extension's row is `info` ("Not connected (optional)") and
   never counted. Each broken row has **Fix it**, the extension row **Set up**; both call
-  `openFix(target)`, which is `openSettings(target)`.
+  `openFix(target)`, which is `openSettings(target)`. Under the rows, **Open logs folder** calls
+  the bridge's optional `openLogs()` (the panel maps it to `openLogsFolder`, IPC
+  `tagalong:logs:open`, main runs `shell.openPath` on the logs folder); no log text crosses IPC.
+- **Log file.** `main/log-file.ts#installLogFile` runs before the app is ready and wraps
+  `console.warn` and `console.error` (the originals still run). The engine runs in main's
+  process, so core's warnings land too; the windows' warnings are not written. `logLine` keeps a
+  text first argument and an `Error`'s `name: message` (never its stack); any other argument
+  becomes its type (`[object]`, `[string]`), so no speech, screen text or turn payload can ride
+  in. The line goes through core's `hideSecrets` (exported from core's index), is put on one line
+  and cut at 300 characters: `<ISO time> WARN|ERROR <text>`. It is appended with `appendFileSync`
+  to `<userData>/logs/tagalong.log` (`%APPDATA%\Tagalong\logs`); before an append, a file over
+  1 MB is renamed `tagalong.1.log`, replacing the old one. Any failed write is swallowed. Rule for
+  call sites: never put speech, screen or file text in a warning's first argument.
 - **Fix it targets.** `openSettings(target?)` takes a `FixTarget` (`brain`, `voice`, `browser`,
   `privacy`, `experts`, `connections`). Main checks it against an allowlist (`main/fix-target.ts#fixPage`,
   anything else is refused) and opens Home on `settings#<section>` or the Experts or Connections

@@ -1,6 +1,6 @@
 /**
  * The health card in the bubble: a headline, then one row per check with a dot, a plain
- * line and Fix it or Set up. Contains HealthCard.
+ * line and Fix it or Set up, and Open logs folder. Contains HealthCard.
  */
 
 import { healthHeadline } from './health';
@@ -19,13 +19,16 @@ const STATE_WORDS: Record<HealthRow['state'], string> = {
  * "Scout, what's wrong?": a headline, then one row per check with a dot and a plain line.
  * A broken row has Fix it; an optional one (the browser extension) has Set up. `rows` is
  * null while the facts are still being read. Without `onFix` the card only reports.
+ * `onOpenLogs` adds Open logs folder, so the person chooses what log to send.
  */
 export function HealthCard({
   rows,
   onFix,
+  onOpenLogs,
 }: {
   rows: readonly HealthRow[] | null;
   onFix?: (target: FixTarget) => void;
+  onOpenLogs?: () => void;
 }) {
   return (
     <section className="handoff health" aria-label="Health check">
@@ -61,6 +64,11 @@ export function HealthCard({
               </li>
             ))}
           </ul>
+          {onOpenLogs !== undefined && (
+            <button type="button" className="bubble-quiet health-logs" onClick={onOpenLogs}>
+              Open logs folder
+            </button>
+          )}
         </>
       )}
     </section>
@@ -77,4 +85,5 @@ const HEALTH_CSS = `
 .health-what { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .health-what strong { font-size: 12px; font-weight: 600; }
 .health-fix { height: 28px; padding: 0 12px; font-size: 12px; }
+.health-logs { align-self: flex-start; font-size: 12px; }
 `;

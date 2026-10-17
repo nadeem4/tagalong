@@ -230,6 +230,7 @@ const host: TagalongHostApi = {
   listModels: (providerId: string) =>
     ipcRenderer.invoke(IPC.listModels, providerId) as Promise<ModelList>,
   openSettings: (target) => ipcRenderer.invoke(IPC.openSettings, target) as Promise<void>,
+  openLogsFolder: () => ipcRenderer.invoke(IPC.openLogsFolder) as Promise<void>,
   openWelcome: () => ipcRenderer.invoke(IPC.openWelcome) as Promise<void>,
   openHome: () => ipcRenderer.invoke(IPC.openHome) as Promise<void>,
   onHomePage: (handler) => homePage.listen(handler),
