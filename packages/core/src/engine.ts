@@ -619,6 +619,20 @@ export class Engine {
       todayUsd: usage.todayUsd(),
       budget: { dailyUsd: settings.get().budget.dailyUsd, spentOut: spentOut() },
     });
+    // Home's What Scout remembers. Deleting removes the memory for good.
+    handlers['memory.list'] = (params) => {
+      const page = memory.list(SCOUT_ID, params);
+      return {
+        ...page,
+        memories: page.memories.map(({ id, kind, text, createdAt }) => ({
+          id,
+          kind,
+          text,
+          createdAt,
+        })),
+      };
+    };
+    handlers['memory.delete'] = (params) => ({ deleted: memory.delete(params.id) });
 
     const server = await EngineServer.start({
       port: options.port ?? current.enginePort ?? DEFAULT_ENGINE_PORT,

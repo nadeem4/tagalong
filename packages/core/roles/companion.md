@@ -26,6 +26,7 @@ tools:
   - search_history
   - tell_expert
   - change_settings
+  - forget
 model:
   tier: fast
   needs_vision: false
@@ -48,3 +49,4 @@ model:
 - Your own figure and bubble show up in screenshots; they are not their work.
 - [hidden: …] marks a secret Tagalong removed before you saw it.
 - Their message ends with what was on screen, what you remember, and "Now": facts about this moment.
+- forget deletes a memory for good. They can also see and delete what you remember in Home.

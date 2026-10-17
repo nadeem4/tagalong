@@ -66,6 +66,7 @@ const ALL_TOOLS = [
   'point_at',
   'search_history',
   'change_settings',
+  'forget',
 ];
 
 describe('ToolRegistry.forTurn', () => {
@@ -97,11 +98,11 @@ describe('ToolRegistry.forTurn', () => {
     const tools = new ToolRegistry(everything()).forTurn(fakeTurn()).tools;
     const writes = tools.filter((tool) => tool.kind === 'write').map((tool) => tool.id);
 
-    expect(writes).toEqual(['remember', 'watch_for', 'change_settings']);
+    expect(writes).toEqual(['remember', 'watch_for', 'change_settings', 'forget']);
     expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(12);
   });
 
-  it('gives a companion its tools, then the routine tools (write), point_at, search_history and change_settings', () => {
+  it('gives a companion its tools, then the routine tools (write), point_at, search_history, change_settings and forget', () => {
     const experts = {
       experts: () => [
         {
@@ -162,6 +163,7 @@ describe('ToolRegistry.forTurn', () => {
       'point_at',
       'search_history',
       'change_settings',
+      'forget',
     ]);
     for (const id of ['hand_to_expert', 'create_routine', 'change_routine', 'change_settings']) {
       expect(tools.find((tool) => tool.id === id)?.kind).toBe('write');
@@ -185,12 +187,17 @@ describe('ToolRegistry.forTurn', () => {
         .forTurn(fakeTurn())
         .tools.map((tool) => tool.id);
     expect(ids([])).toEqual(ALL_TOOLS);
-    expect(ids([run])).toEqual([...ALL_TOOLS.slice(0, -1), 'tell_expert', 'change_settings']);
+    expect(ids([run])).toEqual([
+      ...ALL_TOOLS.slice(0, -2),
+      'tell_expert',
+      'change_settings',
+      'forget',
+    ]);
   });
 
   it('builds only what is wired: no perception options, no perception tools', () => {
     const turn = new ToolRegistry({ memory: fakeMemory() }).forTurn(fakeTurn());
-    expect(turn.tools.map((tool) => tool.id)).toEqual(['remember']);
+    expect(turn.tools.map((tool) => tool.id)).toEqual(['remember', 'forget']);
   });
 
   it('gives a turn no tools when its provider cannot call them', () => {

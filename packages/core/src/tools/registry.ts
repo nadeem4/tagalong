@@ -10,7 +10,7 @@ import { roleFor } from '../roles';
 import { recallTools, watchForTool, type WatchToolDeps } from './builtin/awareness';
 import { connectorTools, type ConnectorToolDeps } from './builtin/connections';
 import { searchHistoryTool, type HistoryToolDeps } from './builtin/history';
-import { rememberTool } from './builtin/memory';
+import { forgetTool, rememberTool } from './builtin/memory';
 import {
   enabledExperts,
   handToExpertTool,
@@ -44,7 +44,7 @@ export const toolsFor: ToolFilter = (pet, tools) => {
 export interface ToolRegistryOptions {
   /** Hosts, exclusions and budgets for the perception and recall tools. Absent: neither. */
   perception?: PerceptionToolsOptions | undefined;
-  /** Gives every pet `remember`. */
+  /** Gives every pet `remember`, and `forget` outside a routine's own turn. */
   memory?: MemoryStore | undefined;
   /** Gives every pet `watch_for`. */
   watch?: WatchToolDeps | undefined;
@@ -146,6 +146,8 @@ export class ToolRegistry {
       tools.push(tellExpertTool(experts, running));
     }
     if (changeSettings) tools.push(changeSettingsTool(changeSettings));
+    // Deleting a memory is the person's call: a routine's own turn has nobody to ask it.
+    if (memory && turn.routine === undefined) tools.push(forgetTool(memory));
     return tools;
   }
 }

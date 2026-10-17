@@ -31,7 +31,7 @@ export {
   type PerceptionToolsOptions,
 } from './builtin/perception';
 export { RECALL_SCREEN, WATCH_FOR, WHAT_CHANGED, type WatchToolDeps } from './builtin/awareness';
-export { REMEMBER } from './builtin/memory';
+export { FORGET, REMEMBER } from './builtin/memory';
 export { HAND_TO_EXPERT, TELL_EXPERT, type ExpertToolDeps } from './builtin/experts';
 export { CHANGE_ROUTINE, CREATE_ROUTINE, type RoutineToolDeps } from './builtin/routines';
 export { POINT_AT } from './builtin/pointing';

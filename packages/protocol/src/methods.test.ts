@@ -72,6 +72,8 @@ const HOST_TO_CORE = [
   'wellbeing.observe',
   'experts.catalog',
   'experts.install',
+  'memory.list',
+  'memory.delete',
 ] as const;
 
 const CORE_TO_HOST = ['perception.capture'] as const;

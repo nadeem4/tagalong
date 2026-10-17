@@ -12,6 +12,7 @@ import { NOW_HEADING } from './conversation/now';
 import { fakeMcpServer } from './connections/fake-server';
 import { ActivityLog } from './memory/activity';
 import { openDatabase } from './memory/db';
+import { MemoryStore } from './memory/memories';
 import { ConversationStore } from './memory/store';
 import {
   BrainError,
@@ -1989,6 +1990,66 @@ describe('what Scout saw over rpc', () => {
     });
     for (const method of ['sightLog.list', 'sightLog.delete', 'sightLog.clear']) {
       const res = await ext.call(method, method === 'sightLog.delete' ? { id: 'x' } : {});
+      expect(res['error']).toMatchObject({ code: RPC_ERROR_CODES.unauthorized });
+    }
+  });
+});
+
+describe('what Scout remembers over rpc', () => {
+  function seed(texts: string[]): string[] {
+    const db = openDatabase(dir);
+    const store = new MemoryStore(db);
+    const ids = texts.map((text) => store.add({ petId: 'scout', kind: 'fact', text }).id);
+    db.close();
+    return ids;
+  }
+
+  it('lists Scout’s memories newest first, in pages', async () => {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    seed(['Uses pnpm', 'Prefers tea', 'Works on Tagalong']);
+
+    const first = (await host.call('memory.list', { limit: 2 }))['result'] as {
+      memories: { id: string; kind: string; text: string; createdAt: string }[];
+      next?: string;
+    };
+    expect(first.memories.map((m) => m.text)).toEqual(['Works on Tagalong', 'Prefers tea']);
+    expect(first.memories[0]).toEqual({
+      id: expect.any(String),
+      kind: 'fact',
+      text: 'Works on Tagalong',
+      createdAt: expect.any(String),
+    });
+    const rest = (await host.call('memory.list', { before: first.next }))['result'] as {
+      memories: { text: string }[];
+      next?: string;
+    };
+    expect(rest).toEqual({ memories: [expect.objectContaining({ text: 'Uses pnpm' })] });
+  });
+
+  it('deletes one memory for good, and says when there was none', async () => {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const [tea] = seed(['Prefers tea']);
+
+    expect((await host.call('memory.delete', { id: tea! }))['result']).toEqual({ deleted: true });
+    expect((await host.call('memory.delete', { id: tea! }))['result']).toEqual({ deleted: false });
+    expect((await host.call('memory.list', {}))['result']).toEqual({ memories: [] });
+  });
+
+  it('is refused to the browser extension', async () => {
+    const e = await boot();
+    const ext = await TestHost.connect(e.port);
+    await ext.call('hello', {
+      host: 'extension',
+      version: '0.0.0',
+      capabilities: ['selection', 'pageText', 'activeWindow'],
+      token: e.pairingToken,
+    });
+    for (const method of ['memory.list', 'memory.delete']) {
+      const res = await ext.call(method, method === 'memory.delete' ? { id: 'x' } : {});
       expect(res['error']).toMatchObject({ code: RPC_ERROR_CODES.unauthorized });
     }
   });
