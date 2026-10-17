@@ -1,7 +1,6 @@
 /** Tests for SpokenStream: sentence-by-sentence speech while streaming. */
 
 import { describe, expect, it } from 'vitest';
-import { ONLY_IN_BUBBLE } from './speakable';
 import { SpokenStream } from './spoken-stream';
 
 function stream() {
@@ -49,28 +48,42 @@ describe('SpokenStream', () => {
     expect(said).toEqual(["Here's a draft.", 'Copy it and paste it in.']);
   });
 
-  it('skips list lines and strips markdown', () => {
+  it('reads a list the mind wrote outside a block, markers and markdown stripped', () => {
     const { said, stream: s } = stream();
-    s.push('Two steps, they’re in the bubble.\n- run **pnpm** install\n- run the tests\n');
+    s.push('Two steps.\n- run **pnpm** install\n- run the tests\n');
     s.end();
-    expect(said).toEqual(['Two steps, they’re in the bubble.']);
+    expect(said).toEqual(['Two steps.', 'run pnpm install', 'run the tests']);
   });
 
-  it('never reads any part of a list item, however its sentences split', () => {
+  it('reads every sentence of a list item, never its marker; a table row is never read', () => {
     const { said, stream: s } = stream();
     s.push('Two steps.\n1. Install it. Then wait.\n2. Run ');
-    s.push('the tests.\n- Use foo. It is fast.\n• Or bar.\n| a. b. |\nThat’s all.');
+    s.push('the tests.\n• Or bar.\n| a. b. |\nThat’s all.');
     s.end();
-    expect(said).toEqual(['Two steps.', 'That’s all.']);
+    expect(said).toEqual([
+      'Two steps.',
+      'Install it.',
+      'Then wait.',
+      'Run the tests.',
+      'Or bar.',
+      'That’s all.',
+    ]);
   });
 
-  it('never reads a list item whose marker arrives in pieces', () => {
+  it('drops a list marker that arrives in pieces', () => {
     const { said, stream: s } = stream();
     s.push('Here.\n1');
     s.push('. Install');
     s.push(' it. Then go.\nDone.');
     s.end();
-    expect(said).toEqual(['Here.', 'Done.']);
+    expect(said).toEqual(['Here.', 'Install it.', 'Then go.', 'Done.']);
+  });
+
+  it('says every sentence of a long answer, with no cap', () => {
+    const { said, stream: s } = stream();
+    s.push('One. Two. Three. Four. Five. Six.');
+    s.end();
+    expect(said).toEqual(['One.', 'Two.', 'Three.', 'Four.', 'Five.', 'Six.']);
   });
 
   it('still reads a line that only starts like a number', () => {
@@ -81,11 +94,11 @@ describe('SpokenStream', () => {
     expect(said).toEqual(['3.5 seconds, roughly.', 'Fast enough.']);
   });
 
-  it('points at the bubble when nothing in the answer could be said', () => {
+  it('says nothing when the whole answer is a block', () => {
     const { said, stream: s } = stream();
     s.push('```\ncode only\n```');
     s.end();
-    expect(said).toEqual([ONLY_IN_BUBBLE]);
+    expect(said).toEqual([]);
   });
 
   it('never says a quoted line, even when the > arrives alone, and says the lines after it', () => {
@@ -106,11 +119,11 @@ describe('SpokenStream', () => {
     expect(said).toEqual(['The build failed.', 'An import is missing.']);
   });
 
-  it('points at the bubble when the whole answer is a quote', () => {
+  it('says nothing when the whole answer is a quote', () => {
     const { said, stream: s } = stream();
     s.push('> Bonjour.\n> Merci.');
     s.end();
-    expect(said).toEqual([ONLY_IN_BUBBLE]);
+    expect(said).toEqual([]);
   });
 
   it('says nothing more after end', () => {

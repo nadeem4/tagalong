@@ -97,7 +97,7 @@ describe('SpeechQueue', () => {
   it('shapes what it speaks: no code, no markdown', () => {
     const player = controlledPlayer();
     new SpeechQueue({ prepare: player.prepare }).say('**Fixed.**\n```\ncode\n```');
-    expect(player.played).toEqual(['Fixed. The rest is in the bubble.']);
+    expect(player.played).toEqual(['Fixed.']);
   });
 
   it('merges short lines waiting together into one', async () => {
@@ -157,10 +157,10 @@ describe('SpeechQueue', () => {
     expect(player.played).toEqual([]);
   });
 
-  it('says a whole piece of a spoken answer, without cutting it to two sentences', () => {
+  it('says a long line whole, never cut to its first sentences', () => {
     const player = controlledPlayer();
     const piece = 'One thing first. Then another. And a third one, for good measure here.';
-    new SpeechQueue({ prepare: player.prepare }).say(piece, { whole: true });
+    new SpeechQueue({ prepare: player.prepare }).say(piece);
     expect(player.played).toEqual([piece]);
   });
 });

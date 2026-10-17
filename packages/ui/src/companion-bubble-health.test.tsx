@@ -60,7 +60,7 @@ describe('CompanionBubble, the health check', () => {
     expect(onSay).not.toHaveBeenCalled();
   });
 
-  it('says only the headline when the question was asked by voice', async () => {
+  it('says nothing aloud even when the question was asked by voice: health is shown', async () => {
     const onSay = vi.fn();
     let hear: (text: string) => void = () => undefined;
     const talk = {
@@ -84,7 +84,10 @@ describe('CompanionBubble, the health check', () => {
     );
     act(() => hear('Scout, what’s wrong?'));
     await flush();
-    expect(onSay).toHaveBeenCalledExactlyOnceWith('One thing needs you.');
+    expect(screen.getByRole('region', { name: 'Health check' })).toHaveTextContent(
+      'One thing needs you.',
+    );
+    expect(onSay).not.toHaveBeenCalled();
   });
 
   it('opens the fix the row names', async () => {

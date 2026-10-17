@@ -65,7 +65,9 @@ describe('renderNow', () => {
   it('says a spoken turn is heard, and a typed one says nothing about it', () => {
     const spoken = renderNow(facts({ reason: { kind: 'asked', spoken: true } }));
     expect(spoken).toMatch(/^Spoken: /m);
-    expect(spoken).toContain('read aloud');
+    expect(spoken).toContain('misheard');
+    // What is said aloud is the companion's mechanics for every turn, typed or spoken.
+    expect(spoken).not.toMatch(/bubble|read aloud/i);
     expect(renderNow(facts())).not.toMatch(/spoken|read aloud/i);
   });
 

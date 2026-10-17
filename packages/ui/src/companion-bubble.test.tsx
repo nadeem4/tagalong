@@ -790,18 +790,14 @@ describe('CompanionBubble, talking to Scout', () => {
     expect(screen.queryByRole('button', { name: 'Stop' })).toBeNull();
   });
 
-  it('speaks a typed "read this to me" whole, and any other typed question through onSay', async () => {
+  it('asks a typed "read this to me" as typed, and says the whole answer the mind wrote', async () => {
     const bridge = createFakeHostBridge();
     const onSay = vi.fn();
     const { mouth, spokenLines } = spokenMouth();
     renderBubble(bridge, { onSay, mouth, snapshot: SNAPSHOT });
     await act(async () => ask('read this to me'));
-    expect(bridge.asks[0]).toEqual({
-      petId: 'scout',
-      text: 'read this to me',
-      snapshot: SNAPSHOT,
-      spoken: true,
-    });
+    // No code decides from the words: the mind reads the passage because it was asked to.
+    expect(bridge.asks[0]).toEqual({ petId: 'scout', text: 'read this to me', snapshot: SNAPSHOT });
 
     const reading = 'Shuts down while a turn is running. Then it waits. Then it closes.';
     act(() => {
@@ -815,59 +811,9 @@ describe('CompanionBubble, talking to Scout', () => {
       bridge.emit(done('turn-1', reading));
     });
     await act(async () => undefined);
-    // Every sentence is said, not the first two and "the rest is in the bubble".
-    expect(spokenLines.join(' ')).toBe(reading);
-    expect(onSay).not.toHaveBeenCalled();
-
-    await act(async () => ask('what is this?'));
-    expect(bridge.asks[1]).not.toHaveProperty('spoken');
-    act(() => {
-      bridge.emit({
-        type: 'turn.started',
-        turnId: 'turn-2',
-        petId: 'scout',
-        conversationId: CONVERSATION,
-      });
-      bridge.emit(done('turn-2', 'A test.'));
-    });
-    expect(onSay).toHaveBeenCalledExactlyOnceWith('A test.');
-  });
-
-  it('keeps reading aloud when a typed "go on" answers "Shall I go on?"', async () => {
-    const bridge = createFakeHostBridge();
-    const { mouth } = spokenMouth();
-    renderBubble(bridge, { mouth });
-    await act(async () => ask('read it aloud'));
-    act(() => {
-      bridge.emit({
-        type: 'turn.started',
-        turnId: 'turn-1',
-        petId: 'scout',
-        conversationId: CONVERSATION,
-      });
-      bridge.emit(done('turn-1', 'The first part. Shall I go on?'));
-    });
-    await act(async () => ask('go on'));
-    expect(bridge.asks[1]).toMatchObject({ text: 'go on', spoken: true });
-  });
-
-  it('keeps a typed question after "Shall I go on?" unspoken unless it says to go on', async () => {
-    const bridge = createFakeHostBridge();
-    const onSay = vi.fn();
-    const { mouth } = spokenMouth();
-    renderBubble(bridge, { onSay, mouth });
-    await act(async () => ask('read it aloud'));
-    act(() => {
-      bridge.emit({
-        type: 'turn.started',
-        turnId: 'turn-1',
-        petId: 'scout',
-        conversationId: CONVERSATION,
-      });
-      bridge.emit(done('turn-1', 'The first part. Shall I go on?'));
-    });
-    await act(async () => ask('what is my bank password field called?'));
-    expect(bridge.asks[1]).not.toHaveProperty('spoken');
+    // The whole answer goes to the voice; the mouth shapes it but never cuts it.
+    expect(onSay).toHaveBeenCalledExactlyOnceWith(reading);
+    expect(spokenLines).toEqual([]);
   });
 
   it('does not show a typed read-aloud as something it heard', async () => {

@@ -1,9 +1,9 @@
 /**
- * A spoken answer said sentence by sentence while it streams, leaving code, lists and
- * quotes to the bubble. Contains SpokenStream.
+ * A spoken answer said sentence by sentence while it streams, leaving show-only blocks to
+ * the bubble. Contains SpokenStream.
  */
 
-import { ONLY_IN_BUBBLE, toSpeakable } from './speakable';
+import { toSpeakable } from './speakable';
 
 const FENCE = '```';
 
@@ -11,19 +11,23 @@ const FENCE = '```';
 const SENTENCE_END = /[.!?]+["')\]’”]*\s|\n/;
 
 /**
- * A line that is a list item, a table row or a quote, judged from its start. A quote holds a
+ * A show-only line, judged from its start: a table row or a quote. A quote holds a
  * translation into another language, which the English voice would mangle.
  */
-const LIST_LINE = /^[ \t]*(?:(?:[-*+•]|\d+[.)])\s|\||>)/;
+const SHOW_LINE = /^[ \t]*(?:\||>)/;
+
+/** A list item's marker, dropped so the item itself is read. */
+const LIST_MARKER = /^[ \t]*(?:[-*+•]|\d+[.)])[ \t]+/;
 
 /** A line start that could still turn out to be a list marker once more arrives. */
 const MAYBE_LIST = /^[ \t]*(?:[-*+•]|\d+[.)]?)?$/;
 
 /**
  * A spoken answer, said sentence by sentence while it streams: the first complete sentence
- * goes to the voice at once rather than after the whole reply. Code blocks, list lines and
- * quoted (`>`) lines are left to the bubble, whole: a list item is judged by how its line
- * starts, so none of its sentences is read. Markdown is stripped from the rest.
+ * goes to the voice at once rather than after the whole reply. Everything is said except
+ * show-only blocks: fenced blocks (a draft, code), table rows and quoted (`>`) lines, each
+ * judged by how its line starts, so none of its sentences is read. A list item is read
+ * without its marker. Markdown is stripped from the rest; nothing is cut or added.
  */
 export class SpokenStream {
   readonly #say: (line: string) => void;
@@ -31,9 +35,8 @@ export class SpokenStream {
   #inCode = false;
   /** The buffer starts a new line, which may be a list item. */
   #lineStart = true;
-  /** Inside a list line: everything up to the next line break is dropped. */
-  #inList = false;
-  #said = false;
+  /** Inside a show-only line: everything up to the next line break is dropped. */
+  #inShowLine = false;
   #ended = false;
 
   constructor(say: (line: string) => void) {
@@ -46,12 +49,11 @@ export class SpokenStream {
     this.#drain(false);
   }
 
-  /** The answer is complete: say what is left, or point at the bubble if nothing was said. */
+  /** The answer is complete: say what is left. */
   end(): void {
     if (this.#ended) return;
     this.#drain(true);
     this.#ended = true;
-    if (!this.#said) this.#say(ONLY_IN_BUBBLE);
   }
 
   #drain(final: boolean): void {
@@ -67,25 +69,26 @@ export class SpokenStream {
         this.#inCode = false;
         continue;
       }
-      if (this.#inList) {
+      if (this.#inShowLine) {
         const lineEnd = this.#buffer.indexOf('\n');
         if (lineEnd === -1) {
           this.#buffer = '';
           return;
         }
         this.#buffer = this.#buffer.slice(lineEnd + 1);
-        this.#inList = false;
+        this.#inShowLine = false;
         this.#lineStart = true;
         continue;
       }
       if (this.#lineStart) {
         const firstLine = this.#buffer.split('\n', 1)[0] ?? '';
-        if (LIST_LINE.test(firstLine)) {
-          this.#inList = true;
+        if (SHOW_LINE.test(firstLine)) {
+          this.#inShowLine = true;
           continue;
         }
         // "1" or "-" alone may be a list marker whose rest has not arrived yet.
         if (!final && !this.#buffer.includes('\n') && MAYBE_LIST.test(firstLine)) return;
+        this.#buffer = this.#buffer.replace(LIST_MARKER, '');
         this.#lineStart = false;
       }
       const fence = this.#buffer.indexOf(FENCE);
@@ -112,9 +115,7 @@ export class SpokenStream {
   }
 
   #speak(piece: string): void {
-    const line = toSpeakable(piece, { whole: true });
-    if (line === '') return;
-    this.#said = true;
-    this.#say(line);
+    const line = toSpeakable(piece);
+    if (line !== '') this.#say(line);
   }
 }

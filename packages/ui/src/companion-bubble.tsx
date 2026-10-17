@@ -42,7 +42,6 @@ import type { TurnEvent } from './host-bridge';
 import { themeTokens as t } from './theme/tokens';
 import { stopStatus } from './stop-status';
 import { SpokenStream } from './voice/spoken-stream';
-import { goesOn, wantsReadAloud } from './voice/read-aloud';
 
 /**
  * Talk to Scout, as the bubble sees it: the host holds the microphone and turns speech into
@@ -165,9 +164,6 @@ function without(snapshot: ContextSnapshot, removed: ReadonlySet<Chip['id']>): C
 /** What Try it now asks, from the hello: a first look at the screen. */
 const TRY_IT = 'What am I working on, and what could you hand to an expert?';
 
-/** The least time between two lines of an expert's narration said aloud. */
-const SAY_GAP_MS = 20_000;
-
 type Reply =
   | { state: 'idle' }
   | { state: 'running'; turnId: string | null; text: string }
@@ -211,8 +207,6 @@ export function CompanionBubble({
     resume === undefined ? { state: 'idle' } : { state: 'done', text: resume.answer },
   );
   const [handoff, setHandoff] = useState<Handoff | null>(null);
-  // When the expert's narration was last said aloud, for the 20-second gap.
-  const lastSaid = useRef(Number.NEGATIVE_INFINITY);
   // A change Scout wants to make in a connected app, waiting for Allow once or Cancel.
   const [confirm, setConfirm] = useState<ConnectorConfirmParams | null>(null);
   // A routine Scout wrote or changed, waiting for Save.
@@ -335,15 +329,7 @@ export function CompanionBubble({
           current?.phase === 'working' &&
           current.expertId === event.expertId &&
           (current.handoffId === null || current.handoffId === event.handoffId);
-        // What the expert writes between tools is said aloud, at most one line every 20
-        // seconds; tool steps and notes stay on the card.
-        if (event.kind === 'say' && isThis(handoff)) {
-          const now = Date.now();
-          if (now - lastSaid.current >= SAY_GAP_MS) {
-            lastSaid.current = now;
-            onSay?.(event.step);
-          }
-        }
+        // The expert's narration, tool steps and notes stay on the card, never said aloud.
         const { type: _type, ...params } = event;
         setHandoff((current) => (isThis(current) ? withProgress(current, params) : current));
         return;
@@ -568,7 +554,7 @@ export function CompanionBubble({
   /**
    * "Scout, what's wrong?": the health card instead of a turn, read from the host with no
    * model call, so it works when Scout cannot think. An answer still running is stopped.
-   * Only the headline is said, and only to a spoken question; the card's rows are for reading.
+   * Health is a vital sign: shown on the card, never said aloud.
    */
   const checkHealth = (text: string, asSpoken: boolean): void => {
     if (mine.current !== null) void bridge.interrupt(mine.current);
@@ -590,8 +576,6 @@ export function CompanionBubble({
         setHealth({ rows });
         // Kept as the answer, so the full chat's history shows what the check said.
         setReply({ state: 'done', text: headline });
-        // Said aloud only when the question was spoken; a typed one is read on the card.
-        if (asSpoken) onSay?.(headline);
       })
       .catch(() => {
         if (run !== healthRun.current) return;
@@ -604,16 +588,8 @@ export function CompanionBubble({
     const text = draft.trim();
     if (text === '' || reply.state === 'running') return;
     setDraft('');
-    // "Read this to me", or a "go on" in reply to "Shall I go on?" after a reading, is spoken
-    // whole. It was typed, so the bubble does not show it as heard.
-    const continuing =
-      spokenReply && reply.state === 'done' && /go on\?\s*$/i.test(reply.text) && goesOn(text);
-    submit(
-      text,
-      snapshot === undefined ? undefined : without(snapshot, removed),
-      wantsReadAloud(text) || continuing,
-      false,
-    );
+    // Asked as typed: the mind decides what of its answer is said aloud.
+    submit(text, snapshot === undefined ? undefined : without(snapshot, removed));
   };
 
   // A spoken question arrives from the host: ask it, once per new `seq`.
