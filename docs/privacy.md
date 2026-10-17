@@ -327,7 +327,7 @@ conversation of its own.
   points. Its only tools are searching your history and your connected apps' read-only tools; it
   shows no card, files no memory and starts no other job.
 - **On this computer.** One row per job in the `jobs` table: the task (secrets hidden), a short
-  note, how it ended, and its times; and its conversation (the brief and the answer). Both are
+  note, how it ended, and its times; and its conversation (the brief, secrets hidden, and the answer). Both are
   deleted 14 days after the job finishes. A job writes no row to Activity.
 - **Limits.** At most 3 run at once (fewer when the computer is short of memory or busy), 5 wait,
   each stops after 10 minutes, at most 20 start a day, and none starts once the daily budget is

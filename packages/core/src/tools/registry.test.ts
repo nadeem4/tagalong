@@ -47,7 +47,7 @@ function everything(overrides: Partial<ToolRegistryOptions> = {}): ToolRegistryO
     jobs: {
       jobs: {
         start: () => ({ ok: false, reason: 'empty' }),
-        stop: () => 'unknown',
+        stop: () => false,
         result: () => null,
       },
       board: () => [],

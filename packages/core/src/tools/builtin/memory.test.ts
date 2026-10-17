@@ -18,7 +18,7 @@ function jobDeps(store: JobStore): JobToolDeps {
   return {
     jobs: {
       start: () => ({ ok: false, reason: 'empty' }),
-      stop: () => 'unknown',
+      stop: () => false,
       result: () => null,
     },
     board: () => [],

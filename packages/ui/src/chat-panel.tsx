@@ -106,21 +106,8 @@ export function ChatPanel({
   const onTurnEvent = useEffectEvent((event: TurnEvent) => {
     if (event.type === 'turn.started' && event.background === true) {
       background.current.add(event.turnId);
-      return;
     }
-    if (
-      (event.type === 'turn.delta' ||
-        event.type === 'turn.completed' ||
-        event.type === 'turn.error' ||
-        event.type === 'turn.toolRequest' ||
-        event.type === 'turn.toolResult') &&
-      background.current.has(event.turnId)
-    ) {
-      if (event.type === 'turn.completed' || event.type === 'turn.error') {
-        background.current.delete(event.turnId);
-      }
-      return;
-    }
+    if (background.current.has((event as { turnId?: string }).turnId ?? '')) return;
     switch (event.type) {
       case 'turn.started': {
         const speaker = [pet.name].concat(event.model ?? []).join(' · ');

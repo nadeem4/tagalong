@@ -14,7 +14,6 @@ const DONE_ID = '1b2c0000-0000-4000-8000-000000000002';
 function row(overrides: Partial<JobRow> = {}): JobRow {
   return {
     id: DONE_ID,
-    kind: 'job',
     state: 'done',
     petId: 'scout',
     task: 'summarise the launch thread',
@@ -25,7 +24,6 @@ function row(overrides: Partial<JobRow> = {}): JobRow {
     createdAt: '2026-10-17T09:30:00.000Z',
     startedAt: '2026-10-17T09:31:00.000Z',
     finishedAt: '2026-10-17T09:40:00.000Z',
-    reportedAt: null,
     ...overrides,
   };
 }
@@ -102,11 +100,11 @@ function setup(
       },
       stop: (id) => {
         calls.push(`stop ${id}`);
-        return id === JOB_ID ? 'stopped' : 'not-running';
+        return id === JOB_ID;
       },
       result: (id) =>
         id === DONE_ID
-          ? { row: row(), text: `The thread agrees on Friday.\n~~~\n${'x'.repeat(13_000)}` }
+          ? `The thread agrees on Friday.\n~~~\n${'x'.repeat(13_000)}`
           : null,
     },
     board: () => ITEMS,
@@ -232,7 +230,7 @@ describe('board', () => {
   it('renders the board as facts', async () => {
     const outcome = await setup().run(BOARD, {});
     expect(text(outcome)).toContain(
-      'Working now:\n- j-7f3a your job, running 4 min: read the paper',
+      'Working now:\n- j-7f3a your job, running (4 min): read the paper',
     );
     expect(text(outcome)).toContain('Finished today:');
     factsOnly(outcome);

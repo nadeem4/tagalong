@@ -47,16 +47,23 @@ describe('machineCapacity', () => {
   }
 
   it('reads CPU use from the change in CPU times since the last reading', () => {
-    const os = fakeOs(8 * GB, [[{ idle: 100, busy: 100 }], [{ idle: 105, busy: 195 }]]);
+    const os = fakeOs(8 * GB, [[{ idle: 100, busy: 100 }], [{ idle: 150, busy: 1950 }]]);
     expect(machineCapacity(os)()).toEqual({ slots: 1, busy: 'cpu' });
   });
 
+  it('keeps the last CPU reading over a window too short to measure (under a second)', () => {
+    const os = fakeOs(8 * GB, [
+      [{ idle: 0, busy: 0 }],
+      [{ idle: 0, busy: 10 }], // 10 ms, all busy: too short, the last reading (none) stays
+      [{ idle: 100, busy: 1900 }], // since the first reading: 95% busy
+    ]);
+    const read = machineCapacity(os);
+    expect(read()).toEqual({ slots: 3 });
+    expect(read()).toEqual({ slots: 1, busy: 'cpu' });
+  });
+
   it('uses the load average where the system has one', () => {
-    const os = fakeOs(
-      8 * GB,
-      [[{ idle: 0, busy: 0 }], [{ idle: 0, busy: 0 }], [{ idle: 0, busy: 0 }]],
-      0.75,
-    );
+    const os = fakeOs(8 * GB, [[{ idle: 0, busy: 0 }]], 0.75);
     expect(machineCapacity(os)()).toEqual({ slots: 2, busy: 'cpu' });
   });
 

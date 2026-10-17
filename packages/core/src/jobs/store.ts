@@ -1,14 +1,10 @@
-/**
- * The `jobs` table (migration 21): Scout's own background work, one row per job. Contains
- * `JobStore` and `JobRow`. Times are passed in, so the caller's clock decides them.
- */
+/** The `jobs` table (migration 21): one row per job of Scout's. Times are passed in. */
 import type Database from 'better-sqlite3';
 
 export type JobState = 'queued' | 'running' | 'done' | 'error' | 'stopped';
 
 export interface JobRow {
   id: string;
-  kind: 'job' | 'digest';
   state: JobState;
   petId: string;
   task: string;
@@ -19,29 +15,14 @@ export interface JobRow {
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
-  reportedAt: string | null;
 }
 
-interface Row {
-  id: string;
-  kind: 'job' | 'digest';
-  state: JobState;
-  pet_id: string;
-  task: string;
-  dedupe_key: string;
-  conversation_id: string | null;
-  note: string | null;
-  error: string | null;
-  created_at: string;
-  started_at: string | null;
-  finished_at: string | null;
-  reported_at: string | null;
-}
-
-/** The error on a job a crash or a quit cut short (the same words as the activity log's). */
-const INTERRUPTED = 'Interrupted: Tagalong closed before this finished.';
-
+const COLUMNS = `id, state, pet_id AS petId, task, dedupe_key AS dedupeKey,
+  conversation_id AS conversationId, note, error, created_at AS createdAt,
+  started_at AS startedAt, finished_at AS finishedAt`;
 const LIVE = `state IN ('queued', 'running')`;
+const NEWEST = 'ORDER BY created_at DESC, rowid DESC';
+const INTERRUPTED = 'Interrupted: Tagalong closed before this finished.';
 
 export class JobStore {
   constructor(private readonly db: Database.Database) {}
@@ -75,121 +56,66 @@ export class JobStore {
   }
 
   get(id: string): JobRow | null {
-    const row = this.db.prepare<[string], Row>('SELECT * FROM jobs WHERE id = ?').get(id);
-    return row === undefined ? null : toJob(row);
+    return this.#rows('WHERE id = ?', id)[0] ?? null;
   }
 
-  /** Queued and running jobs, and those finished at or after `sinceIso`, newest first. */
+  /** Live jobs and those finished at or after `sinceIso`, newest first. */
   list(sinceIso: string): JobRow[] {
-    return this.db
-      .prepare<[string], Row>(
-        `SELECT * FROM jobs WHERE kind = 'job' AND (${LIVE} OR finished_at >= ?)
-         ORDER BY created_at DESC, rowid DESC`,
-      )
-      .all(sinceIso)
-      .map(toJob);
+    return this.#rows(`WHERE ${LIVE} OR finished_at >= ? ${NEWEST}`, sinceIso);
   }
 
-  /** The newest job with this dedupe key, whatever its state. */
   latestByKey(dedupeKey: string): JobRow | null {
-    const row = this.db
-      .prepare<[string], Row>(
-        `SELECT * FROM jobs WHERE kind = 'job' AND dedupe_key = ?
-         ORDER BY created_at DESC, rowid DESC LIMIT 1`,
-      )
-      .get(dedupeKey);
-    return row === undefined ? null : toJob(row);
+    return this.#rows(`WHERE dedupe_key = ? ${NEWEST} LIMIT 1`, dedupeKey)[0] ?? null;
   }
 
-  /** Jobs created at or after `sinceIso`: the daily cap counts these. */
+  /** Jobs created at or after `sinceIso`: the daily cap. */
   countSince(sinceIso: string): number {
-    return (
-      this.db
-        .prepare<[string], { n: number }>(
-          `SELECT COUNT(*) AS n FROM jobs WHERE kind = 'job' AND created_at >= ?`,
-        )
-        .get(sinceIso)?.n ?? 0
-    );
+    return this.#rows('WHERE created_at >= ?', sinceIso).length;
   }
 
   /** Finished jobs whose task shares a word with `query`, newest first: for `forget`. */
   search(query: string, limit: number): JobRow[] {
     const words = query.toLowerCase().match(/\p{L}{3,}/gu) ?? [];
-    if (words.length === 0) return [];
-    const rows = this.db
-      .prepare<[], Row>(
-        `SELECT * FROM jobs WHERE kind = 'job' AND NOT (${LIVE})
-         ORDER BY created_at DESC, rowid DESC LIMIT 300`,
-      )
-      .all();
-    return rows
+    return this.#rows(`WHERE NOT (${LIVE}) ${NEWEST} LIMIT 300`)
       .filter((row) => words.some((word) => row.task.toLowerCase().includes(word)))
-      .slice(0, limit)
-      .map(toJob);
+      .slice(0, limit);
   }
 
   /** Finished jobs whose id (dashes left out) starts with `prefix`. */
   finishedByPrefix(prefix: string): JobRow[] {
     const hex = prefix.toLowerCase().replace(/[^0-9a-f]/g, '');
     if (hex === '') return [];
-    return this.db
-      .prepare<[string], Row>(
-        `SELECT * FROM jobs WHERE kind = 'job' AND NOT (${LIVE})
-           AND replace(id, '-', '') LIKE ? || '%' LIMIT 3`,
-      )
-      .all(hex)
-      .map(toJob);
+    return this.#rows(`WHERE NOT (${LIVE}) AND replace(id, '-', '') LIKE ? || '%' LIMIT 3`, hex);
   }
 
-  /** Deletes a finished job with its conversation and messages. False for a live or unknown one. */
+  /** Deletes a finished job with its conversation. False for a live or unknown one. */
   delete(id: string): boolean {
-    return this.db.transaction(() => {
-      const row = this.get(id);
-      if (row === null || row.state === 'queued' || row.state === 'running') return false;
-      if (row.conversationId !== null) {
-        this.db.prepare('DELETE FROM messages WHERE conversation_id = ?').run(row.conversationId);
-        this.db.prepare('DELETE FROM conversations WHERE id = ?').run(row.conversationId);
-      }
-      return this.db.prepare('DELETE FROM jobs WHERE id = ?').run(id).changes > 0;
-    })();
+    return this.db.transaction(() => this.#remove(`id = ? AND NOT (${LIVE})`, id) > 0)();
   }
 
-  /** At boot, before anything runs: a queued or running job was cut short. Returns how many. */
+  /** At boot: a queued or running job was cut short. */
   interrupted(at: string): number {
     return this.db
       .prepare(`UPDATE jobs SET state = 'error', error = ?, finished_at = ? WHERE ${LIVE}`)
       .run(INTERRUPTED, at).changes;
   }
 
-  /** Jobs finished before `beforeIso` go, with their conversations and messages. */
+  /** Jobs finished before `beforeIso` go, with their conversations. */
   prune(beforeIso: string): number {
-    return this.db.transaction(() => {
-      const where = `FROM jobs WHERE NOT (${LIVE}) AND finished_at < ?`;
-      this.db
-        .prepare(`DELETE FROM messages WHERE conversation_id IN (SELECT conversation_id ${where})`)
-        .run(beforeIso);
-      this.db
-        .prepare(`DELETE FROM conversations WHERE id IN (SELECT conversation_id ${where})`)
-        .run(beforeIso);
-      return this.db.prepare(`DELETE ${where}`).run(beforeIso).changes;
-    })();
+    return this.db.transaction(() =>
+      this.#remove(`NOT (${LIVE}) AND finished_at < ?`, beforeIso),
+    )();
   }
-}
 
-function toJob(row: Row): JobRow {
-  return {
-    id: row.id,
-    kind: row.kind,
-    state: row.state,
-    petId: row.pet_id,
-    task: row.task,
-    dedupeKey: row.dedupe_key,
-    conversationId: row.conversation_id,
-    note: row.note,
-    error: row.error,
-    createdAt: row.created_at,
-    startedAt: row.started_at,
-    finishedAt: row.finished_at,
-    reportedAt: row.reported_at,
-  };
+  #rows(where: string, ...params: string[]): JobRow[] {
+    return this.db.prepare<string[], JobRow>(`SELECT ${COLUMNS} FROM jobs ${where}`).all(...params);
+  }
+
+  /** Deletes matching jobs and their conversations' messages; call inside a transaction. */
+  #remove(where: string, param: string): number {
+    const conversations = `(SELECT conversation_id FROM jobs WHERE ${where})`;
+    this.db.prepare(`DELETE FROM messages WHERE conversation_id IN ${conversations}`).run(param);
+    this.db.prepare(`DELETE FROM conversations WHERE id IN ${conversations}`).run(param);
+    return this.db.prepare(`DELETE FROM jobs WHERE ${where}`).run(param).changes;
+  }
 }

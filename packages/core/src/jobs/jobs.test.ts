@@ -5,7 +5,7 @@ import type { Pet } from '@tagalong/protocol';
 import { migrate } from '../memory/db';
 import { FakeClock } from '../watch/fake-clock';
 import { FAKE_TURN_PET } from '../tools/fake-turn';
-import { JobStore, type JobRow } from './store';
+import { JobStore } from './store';
 import {
   CONTEXT_CHARS,
   JOB_DAILY_CAP,
@@ -33,7 +33,6 @@ function setup(overrides: Partial<JobsOptions> = {}) {
   const turns: FakeTurn[] = [];
   const interrupted: string[] = [];
   const events: { running: number; queued: number }[] = [];
-  const finished: JobRow[] = [];
   const answers = new Map<string, string>();
   let capacity: Capacity = { slots: 3 };
   let spent = false;
@@ -61,7 +60,6 @@ function setup(overrides: Partial<JobsOptions> = {}) {
     spentOut: () => spent,
     capacity: () => capacity,
     emit: (event) => events.push(event.params),
-    finished: (row) => finished.push(row),
     ...overrides,
   });
   return {
@@ -71,7 +69,6 @@ function setup(overrides: Partial<JobsOptions> = {}) {
     turns,
     interrupted,
     events,
-    finished,
     answers,
     setCapacity: (next: Capacity) => (capacity = next),
     spend: () => (spent = true),
@@ -145,6 +142,13 @@ describe('Jobs.start', () => {
     expect(text.endsWith('\n~~~')).toBe(true);
   });
 
+  it('hides secrets in the context too: the brief is kept on disk in its conversation', () => {
+    const { jobs, turns } = setup();
+    jobs.start({ task: 'Read', context: 'const password = "hunter2pass";' });
+    expect(turns[0]!.ask.text).not.toContain('hunter2pass');
+    expect(turns[0]!.ask.text).toContain('[hidden:');
+  });
+
   it('sends only the task when there is no context', () => {
     const { jobs, turns } = setup();
     jobs.start({ task: 'Read the paper' });
@@ -191,8 +195,8 @@ describe('Jobs.start', () => {
 });
 
 describe('a job ending', () => {
-  it('keeps the first line as its note, clipped, and tells finished', async () => {
-    const { jobs, turns, store, finished } = setup();
+  it('keeps the first line as its note, clipped', async () => {
+    const { jobs, turns, store } = setup();
     const started = jobs.start({ task: 'Read' });
     const id = started.ok && 'id' in started ? started.id : '';
     turns[0]!.resolve({ text: `\n\n${'g'.repeat(400)}\nMore detail.` });
@@ -201,7 +205,6 @@ describe('a job ending', () => {
     expect(row.state).toBe('done');
     expect(row.note).toHaveLength(NOTE_CHARS);
     expect(row.conversationId).toBe('conv-1');
-    expect(finished.map((r) => r.id)).toEqual([id]);
   });
 
   it('is done with an empty note when the answer was empty', async () => {
@@ -216,14 +219,13 @@ describe('a job ending', () => {
   });
 
   it('ends in error with the turn’s error, clipped', async () => {
-    const { jobs, turns, store, finished } = setup();
+    const { jobs, turns, store } = setup();
     const started = jobs.start({ task: 'Read' });
     turns[0]!.resolve({ text: '', error: { message: 'e'.repeat(500) } });
     await settle();
     const row = store.get(started.ok && 'id' in started ? started.id : '')!;
     expect(row.state).toBe('error');
     expect(row.error!.length).toBeLessThanOrEqual(200);
-    expect(finished).toHaveLength(1);
   });
 
   it('is interrupted and ends in error after ten minutes', async () => {
@@ -249,6 +251,22 @@ describe('a job ending', () => {
     ]);
   });
 
+  it('a waiting job does not start once the budget is spent', async () => {
+    const { jobs, turns, store, spend, setCapacity } = setup();
+    setCapacity({ slots: 1 });
+    jobs.start({ task: 'one' });
+    const queued = jobs.start({ task: 'two' });
+    spend();
+    turns[0]!.resolve({ text: 'ok' });
+    await settle();
+    expect(turns).toHaveLength(1);
+    expect(store.get(queued.ok && 'id' in queued ? queued.id : '')).toMatchObject({
+      state: 'error',
+      error: "Not started: today's budget is spent.",
+    });
+    expect(jobs.counts()).toEqual({ running: 0, queued: 0 });
+  });
+
   it('a turn that throws on start ends the job in error and frees the slot', () => {
     const { jobs, store } = setup({
       run: () => {
@@ -266,23 +284,22 @@ describe('a job ending', () => {
 
 describe('Jobs.stop', () => {
   it('drops a queued job, interrupts a running one and knows finished and unknown ids', async () => {
-    const { jobs, turns, store, interrupted, finished, setCapacity } = setup();
+    const { jobs, turns, store, interrupted, setCapacity } = setup();
     setCapacity({ slots: 1 });
     const running = jobs.start({ task: 'one' });
     const queued = jobs.start({ task: 'two' });
     const runningId = running.ok && 'id' in running ? running.id : '';
     const queuedId = queued.ok && 'id' in queued ? queued.id : '';
 
-    expect(jobs.stop(queuedId)).toBe('stopped');
+    expect(jobs.stop(queuedId)).toBe(true);
     expect(store.get(queuedId)?.state).toBe('stopped');
-    expect(jobs.stop(runningId)).toBe('stopped');
+    expect(jobs.stop(runningId)).toBe(true);
     await settle();
     expect(interrupted).toEqual(['turn-1']);
     expect(store.get(runningId)?.state).toBe('stopped');
     expect(turns).toHaveLength(1);
-    expect(finished).toEqual([]);
-    expect(jobs.stop(runningId)).toBe('not-running');
-    expect(jobs.stop('nope')).toBe('unknown');
+    expect(jobs.stop(runningId)).toBe(false);
+    expect(jobs.stop('nope')).toBe(false);
   });
 
   it('stopAll stops everything and waits for the running turns', async () => {
@@ -302,11 +319,11 @@ describe('Jobs.list, result and prune', () => {
     const { jobs, turns, answers, clock } = setup();
     const started = jobs.start({ task: 'Read' });
     const id = started.ok && 'id' in started ? started.id : '';
-    expect(jobs.result(id)).toMatchObject({ text: null });
+    expect(jobs.result(id)).toBeNull();
     answers.set('conv-1', 'The whole answer.');
     turns[0]!.resolve({ text: 'The whole answer.' });
     await settle();
-    expect(jobs.result(id)).toMatchObject({ row: { id }, text: 'The whole answer.' });
+    expect(jobs.result(id)).toBe('The whole answer.');
     expect(jobs.result('nope')).toBeNull();
     expect(jobs.list().map((row) => row.id)).toEqual([id]);
 

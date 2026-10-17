@@ -9,7 +9,6 @@ const NOW = new Date('2026-10-17T10:00:00.000Z');
 function job(overrides: Partial<JobRow>): JobRow {
   return {
     id: '7f3a0000-0000-4000-8000-000000000001',
-    kind: 'job',
     state: 'running',
     petId: 'scout',
     task: 'read the agent-memory paper',
@@ -20,7 +19,6 @@ function job(overrides: Partial<JobRow>): JobRow {
     createdAt: '2026-10-17T09:55:00.000Z',
     startedAt: '2026-10-17T09:56:00.000Z',
     finishedAt: null,
-    reportedAt: null,
     ...overrides,
   };
 }
@@ -66,7 +64,6 @@ describe('boardItems', () => {
             state: 'done',
             note: 'Friday it is.',
             finishedAt: '2026-10-17T09:40:00.000Z',
-            reportedAt: '2026-10-17T09:41:00.000Z',
           }),
         ],
         experts: [
@@ -114,7 +111,7 @@ describe('boardItems', () => {
       ['h-55e0', 'expert', 'error'],
       ['r-aaaa', 'routine', 'done'],
     ]);
-    expect(items[6]).toMatchObject({ note: 'Friday it is.', told: true });
+    expect(items[6]).toMatchObject({ note: 'Friday it is.' });
     expect(items[7]).toMatchObject({
       title: 'Claude Code: fix dark mode',
       error: 'tests did not pass',
@@ -124,7 +121,7 @@ describe('boardItems', () => {
         '- r-aaaa Routine Morning papers, done 08:15. Note: Two new papers.',
     );
     expect(renderBoard(items, NOW, { timeZone: 'UTC' })).toContain(
-      '- j-1b2c your job, done 09:40 (mentioned): read the agent-memory paper. Note: Friday it is.',
+      '- j-1b2c your job, done 09:40: read the agent-memory paper. Note: Friday it is.',
     );
     expect(items[8]).toMatchObject({ title: 'Routine Morning papers', note: 'Two new papers.' });
     expect(items[3]).toMatchObject({ progress: '12 of 60 checks' });
@@ -174,7 +171,7 @@ describe('renderBoard', () => {
     expect(renderBoard(items, NOW, { timeZone: 'UTC' })).toBe(
       [
         'Working now:',
-        '- j-7f3a your job, running 4 min: read the agent-memory paper',
+        '- j-7f3a your job, running (4 min): read the agent-memory paper',
         'Finished today:',
         '- j-1b2c your job, done 09:40: read the agent-memory paper. Note: Friday it is.',
       ].join('\n'),

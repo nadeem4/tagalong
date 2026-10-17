@@ -396,10 +396,8 @@ export class Engine {
       store: jobStore,
       clock: systemWatchClock,
       pet: () => pets.get(SCOUT_ID),
-      run: ({ pet, text, jobId, task }) => {
-        const handle = runner.run({ pet, text, background: true, job: { jobId, task } });
-        return { turnId: handle.turnId, conversationId: handle.conversationId, done: handle.done };
-      },
+      run: ({ pet, text, jobId, task }) =>
+        runner.run({ pet, text, background: true, job: { jobId, task } }),
       interrupt: (turnId) => runner.interrupt(turnId),
       lastAnswer: (conversationId) => {
         const last = store.lastMessages(conversationId, 1)[0];

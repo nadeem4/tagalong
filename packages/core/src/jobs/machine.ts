@@ -1,13 +1,13 @@
 /**
  * The body's sense of the machine, read when a job would start: free memory and how busy the
- * CPU is decide how many jobs may run at once (1-3). A reflex, like energy: the mind cannot
- * measure RAM, so the board tells it the result and why. Contains `capacityFor` (pure) and
- * `machineCapacity` (reads `node:os`).
+ * CPU is decide how many jobs may run at once (1-3). The mind cannot measure RAM.
  */
 import * as nodeOs from 'node:os';
 import type { Capacity } from './jobs';
 
 const GB = 1024 ** 3;
+/** CPU time (ms, summed over cores) below which a window is too short to measure. */
+const MIN_WINDOW_MS_PER_CORE = 1_000;
 
 export interface MachineReading {
   freeBytes: number;
@@ -32,31 +32,34 @@ export function capacityFor(reading: MachineReading): Capacity {
 }
 
 /**
- * Reads the machine on each call. CPU use is the change in CPU times since the previous
- * reading (Windows has no load average), or the load average per core where there is one,
- * whichever is higher. A machine that cannot be read allows one.
+ * CPU use is the change in CPU times since the last measured reading (Windows has no load
+ * average: `loadavg` is 0 there), or the load average per core, whichever is higher. A
+ * machine that cannot be read allows one.
  */
 export function machineCapacity(os: MachineOs = nodeOs): () => Capacity {
-  let last = cpuTimes(os);
+  let last = cpuTimes(os.cpus());
+  let busy = 0;
   return () => {
     try {
-      const now = cpuTimes(os);
+      const cpus = os.cpus();
+      const now = cpuTimes(cpus);
       const total = now.total - last.total;
-      const sampled = total > 0 ? 1 - (now.idle - last.idle) / total : 0;
-      last = now;
-      const cores = Math.max(1, os.cpus().length);
-      const load = (os.loadavg()[0] ?? 0) / cores;
-      return capacityFor({ freeBytes: os.freemem(), cpuBusy: Math.max(sampled, load) });
+      if (total >= MIN_WINDOW_MS_PER_CORE * Math.max(1, cpus.length)) {
+        busy = 1 - (now.idle - last.idle) / total;
+        last = now;
+      }
+      const load = (os.loadavg()[0] ?? 0) / Math.max(1, cpus.length);
+      return capacityFor({ freeBytes: os.freemem(), cpuBusy: Math.max(busy, load) });
     } catch {
       return { slots: 1 };
     }
   };
 }
 
-function cpuTimes(os: MachineOs): { idle: number; total: number } {
+function cpuTimes(cpus: ReturnType<MachineOs['cpus']>): { idle: number; total: number } {
   let idle = 0;
   let total = 0;
-  for (const { times } of os.cpus()) {
+  for (const { times } of cpus) {
     idle += times.idle;
     total += times.user + times.nice + times.sys + times.idle + times.irq;
   }

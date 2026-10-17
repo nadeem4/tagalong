@@ -1,10 +1,10 @@
 /**
  * `remember`: files a fact or preference the user states, under the pet that asked.
- * `forget`: lists memories and finished jobs by query, or deletes one by id. Both `write`: they change what
- * outlives the turn.
+ * `forget`: lists memories and finished jobs by query, or deletes one by id. Both `write`: they
+ * change what outlives the turn.
  */
 import type { BrainTool } from '../../providers';
-import type { JobRow } from '../../jobs/store';
+import type { JobRow, JobStore } from '../../jobs/store';
 import type { Memory, MemoryKind, MemoryStore } from '../../memory/memories';
 import { defineTool, type Tool, type ToolOutcome } from '../tool';
 
@@ -50,13 +50,6 @@ const FORGET_DEFINITION: BrainTool = {
   },
 };
 
-/** Finished jobs, as `forget` reads and deletes them. */
-export interface ForgettableJobs {
-  search(query: string, limit: number): JobRow[];
-  finishedByPrefix(prefix: string): JobRow[];
-  delete(id: string): boolean;
-}
-
 function jobLine(job: JobRow): string {
   return `j-${job.id.replace(/-/g, '').slice(0, 8)} (finished job) ${job.task}`;
 }
@@ -77,7 +70,10 @@ function line(memory: Memory): string {
  * The `forget` tool: a query lists matches and deletes nothing, an id deletes one memory of
  * the pet that called it. Deleting is a tightening step, so it shows no card.
  */
-export function forgetTool(memories: MemoryStore, jobs?: ForgettableJobs): Tool {
+export function forgetTool(
+  memories: MemoryStore,
+  jobs?: Pick<JobStore, 'search' | 'finishedByPrefix' | 'delete'>,
+): Tool {
   return defineTool(FORGET_DEFINITION, 'write', (input, ctx): Promise<ToolOutcome> => {
     const fields = (input !== null && typeof input === 'object' ? input : {}) as {
       query?: unknown;

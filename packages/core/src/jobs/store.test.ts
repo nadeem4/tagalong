@@ -19,7 +19,7 @@ describe('JobStore', () => {
   it('inserts a queued job, starts it in its conversation and finishes it with a note', () => {
     const { jobs } = setup();
     const row = jobs.insert({ id: 'a1', ...NEW, at: T0 });
-    expect(row).toMatchObject({ id: 'a1', kind: 'job', state: 'queued', task: 'Read the paper' });
+    expect(row).toMatchObject({ id: 'a1', state: 'queued', task: 'Read the paper' });
 
     jobs.start('a1', 'conv-1', '2026-10-17T09:01:00.000Z');
     expect(jobs.get('a1')).toMatchObject({ state: 'running', conversationId: 'conv-1' });
@@ -30,7 +30,6 @@ describe('JobStore', () => {
       note: 'The gist.',
       error: null,
       finishedAt: '2026-10-17T09:05:00.000Z',
-      reportedAt: null,
     });
     expect(jobs.get('nope')).toBeNull();
   });
