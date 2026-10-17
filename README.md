@@ -310,7 +310,7 @@ change works at once.
 ## Home: one window for everything
 
 Right-click the tray icon and choose **Open Tagalong**. The tray has only four items: **Open
-Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in eight pages:
+Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in nine pages:
 
 - **Overview**: whether Scout is ready and what it thinks with, your experts, what was spent today
   and this month (**Spend**), and the latest activity. Spend shows dollars for models with a known

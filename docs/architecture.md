@@ -1368,7 +1368,7 @@ The renderer entry wraps `HomeView` (`packages/ui/src/home/home-view.tsx`)
 in the preload's `HostBridge` and hands it a `HomeHost` (the companion's id, the providers it can think
 on, the model list, `savePet`) and the settings form as a slot.
 
-`HomeView` is a navy side menu, with the companion's pixel character and name, and eight pages:
+`HomeView` is a navy side menu, with the companion's pixel character and name, and nine pages:
 
 - **Overview**: the companion (its state, the provider and model it thinks with), the experts (on or
   off, read-only or allowed to edit) and the three most recent activity entries, each with a button
