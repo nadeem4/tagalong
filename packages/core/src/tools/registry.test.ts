@@ -252,7 +252,7 @@ describe('toolsFor', () => {
 
   it('never offers or runs watch_for on a routine’s turn, so a watch routine cannot loop', async () => {
     const turn = new ToolRegistry(everything()).forTurn(
-      fakeTurn({ routine: { routineId: 'r', handedOff: () => undefined } }),
+      fakeTurn({ routine: { routineId: 'r', name: 'Routine', handedOff: () => undefined } }),
     );
     expect(turn.definitions.map((definition) => definition.name)).not.toContain('watch_for');
     const outcome = await turn.run({ name: 'watch_for', input: { condition: 'a build ends' } });
@@ -261,7 +261,7 @@ describe('toolsFor', () => {
 
   it('still offers change_settings on a routine’s turn: the tool refuses loosening there', () => {
     const turn = new ToolRegistry(everything()).forTurn(
-      fakeTurn({ routine: { routineId: 'r', handedOff: () => undefined } }),
+      fakeTurn({ routine: { routineId: 'r', name: 'Routine', handedOff: () => undefined } }),
     );
     expect(turn.definitions.map((definition) => definition.name)).toContain('change_settings');
   });
@@ -270,7 +270,7 @@ describe('toolsFor', () => {
     const turn = new ToolRegistry(everything({ toolsFor })).forTurn(
       fakeTurn({
         pet: { ...FAKE_TURN_PET, roleId: 'companion' },
-        routine: { routineId: 'r', handedOff: () => undefined },
+        routine: { routineId: 'r', name: 'Routine', handedOff: () => undefined },
       }),
     );
     expect(companion.tools).toContain('watch_for');

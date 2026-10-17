@@ -213,7 +213,14 @@ describe(HAND_TO_EXPERT, () => {
       };
       const tools = fakeTurnTools(
         { experts: d.value },
-        { routine: { routineId: 'r1', expertId: 'claude-code', handedOff: () => undefined } },
+        {
+          routine: {
+            routineId: 'r1',
+            name: 'Routine',
+            expertId: 'claude-code',
+            handedOff: () => undefined,
+          },
+        },
       );
       await tools.run({
         name: HAND_TO_EXPERT,
@@ -263,6 +270,7 @@ describe(HAND_TO_EXPERT, () => {
         {
           routine: {
             routineId: 'r1',
+            name: 'Routine',
             expertId: 'claude-code',
             instruction: 'Find new papers on agents each morning.',
             handedOff: (id) => handed.push(id),
@@ -303,6 +311,7 @@ describe(HAND_TO_EXPERT, () => {
         {
           routine: {
             routineId: 'r1',
+            name: 'Routine',
             expertId: 'claude-code',
             instruction: 'Research.',
             handedOff: () => undefined,
@@ -325,9 +334,12 @@ describe(HAND_TO_EXPERT, () => {
       const handedOff = () => undefined;
       await fakeTurnTools(
         { experts: d.value },
-        { routine: { routineId: 'r1', expertId: 'claude-code', handedOff } },
+        { routine: { routineId: 'r1', name: 'Routine', expertId: 'claude-code', handedOff } },
       ).run({ name: HAND_TO_EXPERT, input: { expert_id: 'gemini', task_kind: 'x', ask: 'x' } });
-      await fakeTurnTools({ experts: d.value }, { routine: { routineId: 'r1', handedOff } }).run({
+      await fakeTurnTools(
+        { experts: d.value },
+        { routine: { routineId: 'r1', name: 'Routine', handedOff } },
+      ).run({
         name: HAND_TO_EXPERT,
         input: { expert_id: 'claude-code', task_kind: 'y', ask: 'y' },
       });
@@ -375,7 +387,7 @@ describe(TELL_EXPERT, () => {
     expect(
       names(
         { experts: steering([CODER_RUN]).value },
-        { routine: { routineId: 'r1', handedOff: () => undefined } },
+        { routine: { routineId: 'r1', name: 'Routine', handedOff: () => undefined } },
       ),
     ).not.toContain(TELL_EXPERT);
   });

@@ -114,6 +114,29 @@ describe('ActivityLog: turns', () => {
   });
 });
 
+describe('ActivityLog.lastTurnAt, for the Now block', () => {
+  it('is null before this pet has had a turn', () => {
+    expect(log.lastTurnAt('scout')).toBeNull();
+  });
+
+  it("is when this pet's latest turn started, whatever happened to it", () => {
+    started('scout', asked('scout', 'first'));
+    const firstAt = log.list({}).entries[0]?.startedAt;
+    db.prepare(`UPDATE activity SET started_at = '2020-01-01T00:00:00.000Z'`).run();
+    const second = started('scout', asked('scout', 'second'));
+    completed(second, 'answered');
+    const secondAt = log.list({}).entries.find((entry) => entry.text === 'second')?.startedAt;
+    expect(firstAt).toBeDefined();
+    expect(log.lastTurnAt('scout')).toBe(secondAt);
+  });
+
+  it("counts only turns, and only this pet's", () => {
+    started('other', asked('other', 'not Scout'));
+    log.expertStarted({ petId: 'scout', expertId: 'cc', expertName: 'Claude Code', text: 'x' });
+    expect(log.lastTurnAt('scout')).toBeNull();
+  });
+});
+
 describe('ActivityLog: crew-era rows', () => {
   it('leaves consults, handoffs and roundtables a crew-era install recorded out of the list', () => {
     const add = db.prepare(

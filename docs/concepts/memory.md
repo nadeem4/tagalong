@@ -58,11 +58,13 @@ Every turn is assembled from scratch by the prompt assembler
 
 A turn contains, in order:
 
-1. The base instructions, the role's instructions and Scout's name (see
-   [roles-and-tools.md](roles-and-tools.md)).
-2. Recalled memories, within a budget (below).
-3. The thread: the last `historyMessages` messages of this conversation.
-4. The context you attached: selection, window, screenshot, page text.
+1. The system prompt: Scout's soul, the role's instructions and the person's name (see
+   [roles-and-tools.md](roles-and-tools.md)). The same on every turn.
+2. The thread: the last `historyMessages` messages of this conversation.
+3. On the person's latest message, after their words: the context they attached (selection,
+   window, screenshot, page text), then the recalled memories under `## What you remember`,
+   within a budget (below), then `## Now`, the facts about this moment. Memories ride here
+   rather than in the system prompt because they change with every question.
 
 ## Recall: which memories ride along
 

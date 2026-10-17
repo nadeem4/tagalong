@@ -213,6 +213,15 @@ it.
 - The name you give Scout (setup, or Settings → **You**; optional) is stored locally in settings.
   It is sent to the AI provider only as part of Scout's prompt: one line in its system prompt, and
   in the hello's facts when Tagalong opens. Clear the box and it is gone from both.
+- With every question, Scout's AI provider also gets a short **Now** block of facts about the
+  moment: your local time, day and time zone (for example `Europe/London`); how long since you
+  last talked to Scout; whether you asked out loud, or which routine is running; and, for each
+  expert running, finished since you last talked (and whether it finished, stopped or failed) or
+  waiting for your Send, the expert's name and the first line of what it was asked, at most 100
+  characters, through `hideSecrets`. An expert's answer is never in it. What Scout remembers
+  rides in the same message (it used to sit in the system prompt): the same notes, to the same
+  provider, nothing new. Nothing of this is stored by the block itself; it is rebuilt each turn
+  from what Tagalong already keeps on this computer.
 
 ## Connected apps: what goes to them
 

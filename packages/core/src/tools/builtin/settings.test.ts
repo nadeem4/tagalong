@@ -20,7 +20,9 @@ function deps(overrides: Partial<Settings> = {}) {
   return { value, emitted, current };
 }
 
-const ROUTINE: Partial<TurnRequest> = { routine: { routineId: 'r', handedOff: () => undefined } };
+const ROUTINE: Partial<TurnRequest> = {
+  routine: { routineId: 'r', name: 'Routine', handedOff: () => undefined },
+};
 
 async function change(
   d: ReturnType<typeof deps>,

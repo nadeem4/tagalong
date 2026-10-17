@@ -45,6 +45,8 @@ export interface RoutineAsk {
   pet: Pet;
   text: string;
   routineId: string;
+  /** The routine's name, which the turn's Now block names. */
+  name: string;
   /** The expert the saved card allowed: read-only, no project, no card. */
   preApprovedExpertId?: string | undefined;
   /** The routine's saved instruction, which the pre-approved brief is built from. */
@@ -558,6 +560,7 @@ export class Routines {
         pet,
         text: this.#prompt(routine, context),
         routineId: routine.id,
+        name: routine.name,
         instruction: routine.what,
         ...(routine.handTo !== undefined ? { preApprovedExpertId: routine.handTo } : {}),
         handedOff: (handoffId) => handoffs.push(handoffId),

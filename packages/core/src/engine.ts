@@ -444,6 +444,23 @@ export class Engine {
       provider: resolve,
       emit,
       memory,
+      // The Now facts on each question: time, last talk, and which experts are on what.
+      // Known gap: a routine's turn counts as the last talk.
+      now: {
+        clock: () => new Date(),
+        timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+        lastTalkAt: (petId) => activity.lastTurnAt(petId),
+        running: () => handoffs.running(),
+        waiting: () => handoffs.pending(),
+        finishedSince: (since) => [
+          ...activity.expertsFinishedSince(since).map((done) => ({
+            expertName: done.expertName,
+            ask: done.text,
+            state: 'done' as const,
+          })),
+          ...activity.expertsLeftSince(since),
+        ],
+      },
       // Off the request path: the reply is already on screen when the summary starts.
       afterTurn: ({ pet, conversationId }) => void summarizer.schedule(conversationId, pet),
       watch: { manager: watches, hosts },
@@ -530,6 +547,7 @@ export class Engine {
           background: true,
           routine: {
             routineId: ask.routineId,
+            name: ask.name,
             expertId: ask.preApprovedExpertId,
             instruction: ask.instruction,
             handedOff: ask.handedOff,

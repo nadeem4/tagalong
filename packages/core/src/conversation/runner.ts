@@ -1,7 +1,7 @@
 /**
- * Runs one turn end to end: stores the question, recalls memories, assembles the prompt,
- * streams the answer with tools, stores it, and reports turn events. Contains
- * ConversationRunner and the turn types hosts see.
+ * Runs one turn end to end: stores the question, gathers the Now facts, recalls memories,
+ * assembles the prompt, streams the answer with tools, stores it, and reports turn events.
+ * Contains ConversationRunner and the turn types hosts see.
  */
 import { randomUUID } from 'node:crypto';
 import type { ContextSnapshot, NotificationParamsOf, Pet, Settings } from '@tagalong/protocol';
@@ -26,6 +26,9 @@ import {
   type SettingsToolDeps,
 } from '../tools';
 import { assemblePrompt } from './prompt-assembler';
+import { gatherNow, type NowFacts, type NowSources } from './now';
+
+const SYSTEM_CLOCK: NowSources = { clock: () => new Date() };
 
 /**
  * What the engine forwards to hosts. Shaped like the JSON-RPC notifications it becomes,
@@ -89,6 +92,8 @@ export interface ConversationRunnerOptions {
   changeSettings?: SettingsToolDeps | undefined;
   /** Narrows a pet's tools for a turn. Absent: the role's tools (see tools/registry). */
   toolsFor?: ToolFilter | undefined;
+  /** Where the Now facts come from. Absent: the system clock and nothing else. */
+  now?: NowSources | undefined;
 }
 
 export interface RunAsk {
@@ -104,7 +109,7 @@ export interface RunAsk {
   background?: boolean | undefined;
   /** Set when a routine started the turn; rides on `turn.started` and reaches the tools. */
   routine?: RoutineTurnContext | undefined;
-  /** The question was spoken (Talk to Scout): the answer is shaped to be heard. */
+  /** The question was spoken (Talk to Scout): its Now block says so, and the answer is heard. */
   spoken?: boolean | undefined;
 }
 
@@ -218,6 +223,16 @@ export class ConversationRunner {
       });
     }
 
+    // Gathered before turn.started: that event writes this turn's activity row, so the
+    // "last talked" time read here is still the turn before.
+    const now = gatherNow(
+      this.#options.now ?? SYSTEM_CLOCK,
+      ask.pet.id,
+      ask.routine !== undefined
+        ? { kind: 'routine', name: ask.routine.name }
+        : { kind: 'asked', spoken: ask.spoken === true },
+    );
+
     const turnId = randomUUID();
     const controller = new AbortController();
     this.#active.set(turnId, {
@@ -237,11 +252,16 @@ export class ConversationRunner {
       },
     });
 
-    const done = this.#stream(ask, turnId, conversationId, settings, controller.signal).finally(
-      () => {
-        this.#active.delete(turnId);
-      },
-    );
+    const done = this.#stream(
+      ask,
+      turnId,
+      conversationId,
+      settings,
+      now,
+      controller.signal,
+    ).finally(() => {
+      this.#active.delete(turnId);
+    });
     const active = this.#active.get(turnId);
     if (active !== undefined) active.done = done;
 
@@ -291,6 +311,7 @@ export class ConversationRunner {
     turnId: string,
     conversationId: string,
     settings: Settings,
+    now: NowFacts,
     signal: AbortSignal,
   ): Promise<TurnOutcome> {
     // Read history after the question is stored so the prompt ends on what was asked.
@@ -338,7 +359,7 @@ export class ConversationRunner {
       settings,
       memories,
       ...(snapshot ? { snapshot } : {}),
-      spoken: ask.spoken,
+      now,
     });
 
     // One for the first call; every tool round trip adds another.

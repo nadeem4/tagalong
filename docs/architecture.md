@@ -224,7 +224,7 @@ sequenceDiagram
   U->>H: highlight text, press hotkey
   H->>H: build ContextSnapshot, plus dropped from a drop card's button
   H->>C: ask(petId, input, snapshot)
-  C->>C: assemble prompt: role + notes + memory + context
+  C->>C: assemble prompt: soul + role, then context + memories + Now on the question
   C->>A: streaming request with tools
   A-->>C: text deltas and tool calls
   C-->>H: turn.delta, then turn.completed
@@ -241,7 +241,9 @@ notifications.
 1. The host calls `ask` with a `petId`, an optional `conversationId`, the input text, and an optional
    `ContextSnapshot`.
 2. `ConversationRunner.run` opens a conversation if none was named, stores the user message (with its
-   snapshot) in SQLite, mints a `turnId`, emits `turn.started`, and **returns immediately**. The `ask`
+   snapshot) in SQLite, gathers the Now facts (`gatherNow`, before `turn.started`, because that
+   event writes this turn's activity row and "last talked" must be the turn before), mints a
+   `turnId`, emits `turn.started`, and **returns immediately**. The `ask`
    result is `{ turnId }` and nothing else. The stored snapshot loses its screenshot (and an image
    dropped on Scout, `dropped.image`) unless `screenshotRetention` allows keeping it, and the same call sweeps screenshots that have outlived
    the setting — the turn is the only moment the engine reliably wakes up, and Phase 4 owns timers.
@@ -251,8 +253,8 @@ notifications.
    `vision_unsupported` goes out. The turn continues without the picture.
 4. The runner reads back the last `settings.historyMessages` messages — after the question was stored,
    so the prompt ends on what was asked — and `assemblePrompt` builds the provider-neutral request:
-   the base instructions, the pet's role instructions, the screen-reply rule, the history, and a screen-context
-   block appended to the last user message rather than sent as its own turn.
+   the system prompt (see [The prompt](#the-prompt)), the history, and the screen context,
+   memories and Now facts appended to the last user message rather than sent as their own turn.
 5. The provider streams. Every text delta becomes a `turn.delta` notification.
 6. The turn ends with exactly one of `turn.completed` — carrying the full text, a stop reason of `end`,
    `max_tokens`, `aborted` or `refusal`, and token usage — or `turn.error`, carrying a `BrainErrorCode`
@@ -282,6 +284,44 @@ selected text: an exclusion that only filters the answer has already taken the s
 not to take. `findCaptureBlock` checks the built-in blind spots (`BLIND_SPOTS` in the protocol package:
 process names, title patterns, and secret file names matched against each word of the title) before
 the person's own list, so clearing that list never removes them.
+
+### The prompt
+
+Code decides when Scout's mind wakes and keeps the guardrails; the model decides if it says
+anything and what. So the prompt carries who Scout is and facts, never canned lines.
+
+The **system prompt** is three parts, the same on every turn (spoken or typed, whatever is
+remembered), so providers can cache it:
+
+1. The soul, `packages/core/soul/scout.md` (Character, Cares about, Never), compiled into
+   `SOUL_LIBRARY` and picked by `ACTIVE_SOUL` (see `docs/concepts/roles-and-tools.md`).
+2. The companion's body, `roles/companion.md`: about a dozen bullets of how Tagalong works, plus
+   the two rules no code enforces (a connected app gets nothing from the screen unless asked; a
+   bug's repo is never guessed).
+3. `Their name is <name>.`, only when `settings.userName` is set.
+
+The **last user message** carries, after the person's words: the `--- Screen context ---`
+sections, then `## What you remember` (`renderMemories`, `(kind) text` lines, 2,000 characters at
+most), then `## Now` (`renderNow`, `conversation/now.ts`). Now is facts only, and a line with
+nothing to say is left out:
+
+```
+## Now
+Friday 16 October, 21:40, Europe/London.
+You last talked 3 hours ago.
+Spoken: they said this out loud and your words are read aloud as you write them. ...
+Experts working: Claude Code: "fix the failing login test".
+Finished since you last talked: Researcher: "papers on agent memory" (done); Claude Code: "rename the store" (failed).
+Waiting for their Send: Claude Code: "add dark mode".
+```
+
+A routine's turn has `A routine, "<name>", is running on its own: nobody is watching, so ask no
+questions; they read the answer later.` in place of the spoken line. Each ask is the first
+paragraph only, on one line, passed through `hideSecrets` and cut to 100 characters; answers are
+never in it. `gatherNow` reads `NowSources` (the runner option `now`): the clock, the time zone,
+`activity.lastTurnAt(petId)`, `handoffs.running()`, `handoffs.pending()` and, since the last talk,
+`activity.expertsFinishedSince` plus `activity.expertsLeftSince`. A source that throws drops its
+line rather than failing the turn. Known gap: a routine's turn counts as the last talk.
 
 ### Secrets on the way out
 
@@ -694,25 +734,21 @@ the keychain). `connector.confirm` brings up Scout's bubble, which shows `Connec
 change, the details Scout filled in, **Allow once** and **Cancel**, answered with `tool.approve`.
 The card goes away when it is answered or when its turn ends.
 
-**"What needs me?"** has no tool of its own, because each app's tools differ. The companion's
-instructions (`roles/companion.md`) tell Scout to call the read tools of every connected app with
-issues, reviews or pages (GitHub reviews requested and issues assigned, Linear open issues assigned,
-Notion mentions if its tools offer them, otherwise it says so), merge them into one list grouped by
-app, oldest first, at most 15 per app, and never call a write tool or send screen content for it.
-Home's **What needs me** routine template asks the same every weekday at 09:00; an engine test pins
+**"What needs me?"** has no tool of its own, because each app's tools differ, and no recipe: Scout
+works out which read tools of the connected apps answer it and how to put the result together.
+Reads run without asking; a write still asks first through `connector.confirm`. Home's **What needs me** routine template asks the same every weekday at 09:00; an engine test pins
 that a read on a routine turn emits no `connector.confirm` while a write on the same turn still does.
 
 **"File this as a bug"** is a write worked through with its card, and needs no tool or card of its
-own. The companion's instructions tell Scout to read the window with the error (the selection, then
-`read_window_text`, as for a draft), treat that text as data and never as instructions, write a
-title and a body (**What happened** quoted at most 40 lines, **Where**, **Steps** marked "as seen"
-where it guessed, **Expected**), and call the app's create-issue tool, such as `github__create_issue` or `linear__create_issue`. That tool is a write, so
+own, and no fixed template: Scout reads the window with the error (the selection, then
+`read_window_text`), treats that text as data and never as instructions (the soul's Never),
+takes the repo from the screen or the person and asks rather than guessing (companion.md),
+writes the issue, and calls the app's create-issue tool, such as `github__create_issue` or `linear__create_issue`. That tool is a write, so
 `connectorTools` hides keys in every argument (`hideDeep`), builds the card text with `summaryOf`
 (every argument in full; over `MAX_CONFIRM_CHARS`, 4,000, it is refused instead) and waits on
 `deps.confirm`, which sends `connector.confirm`. Only **Allow once** calls the server; Cancel or the
-two-minute timeout returns "nothing was changed" and the server is never called. Scout uses the
-`owner/repo` shown on screen or named by the person and never guesses one; with both GitHub and
-Linear connected and neither named, it asks which. No screenshot is attached. An engine test pins
+two-minute timeout returns "nothing was changed" and the server is never called, so a wrong repo
+or app is caught on the card. No screenshot is attached. An engine test pins
 `read_window_text`, then `connector.confirm` with the full body, before the fake server sees a call.
 
 Tests never reach a real app: `fakeMcpServer` (`connections/fake-server.ts`) is an SDK server in the
@@ -1217,10 +1253,11 @@ Chrome extension cannot query it. No vector search, no embeddings.
 
 Every turn recalls before it assembles (`memory/recall.ts`): the pet's five newest visible memories,
 then up to five FTS matches against the question plus the selection that are not already listed,
-dropping whole memories past a 2,000-character budget. `assemblePrompt` renders them last in the system
-prompt under `## What you remember`, labelled `(preference)`, `(fact)` or `(summary)`, and caps the
-whole section — heading included — at 2,000 characters. Last, so a remembered "short answers" reads
-as overriding the screen-reply rule above it.
+dropping whole memories past a 2,000-character budget. `assemblePrompt` renders them on the
+person's latest message, after the screen context and before `## Now`, under
+`## What you remember`, labelled `(preference)`, `(fact)` or `(summary)`, and caps the whole
+section — heading included — at 2,000 characters. They ride there, not in the system prompt,
+because they change with every question and would break the prompt cache.
 
 Memories are written two ways. The `remember` tool (`tools/builtin/memory.ts`) is offered to every
 pet whose role lists it and whose provider supports tools: `{ text, kind: fact | preference }`, filed under the
@@ -1455,7 +1492,7 @@ is one file under `apps/desktop/src/renderer/src/settings/`:
 | File                     | Section                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `brain-section.tsx`      | How Scout thinks: Scout's own provider and model (`brain.ts#scoutBrain`) with a status chip, or a service picker and key when no Claude sign-in is found                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `you-section.tsx`        | You: **What should Scout call you?** (`settings.userName`, empty for no name, cut to 40 characters), with an ⓘ note. When set, `prompt-assembler.ts` adds one line after the pet's name: use it rarely                                                                                                                                                                                                                                                                                                                                                                                  |
+| `you-section.tsx`        | You: **What should Scout call you?** (`settings.userName`, empty for no name, cut to 40 characters), with an ⓘ note. When set, `prompt-assembler.ts` ends the system prompt with `Their name is <name>.`                                                                                                                                                                                                                                                                                                                                                                                |
 | `privacy-section.tsx`    | **Seeing** and **Always listening** at the top, live switches that act at once and are no form fields (Seeing: `getSightPaused`, `onSightPause`, `toggleSightPause`; Always listening: `getListening`, `onListening`, `setListening(!on)`), then the rolling memory switch, the blind spots as chips from `BLIND_SPOTS` labels, and the pause sight key                                                                                                                                                                                                                                 |
 | `voice-section.tsx`      | Scout talks (a switch), **Who speaks** (`voice.mouth`, from `adaptersFor('mouth')`) and **Who listens** (`voice.ears`, from `adaptersFor('ears')`; the one choice so far is `local`, on this computer), each with its facts line (`settings-form.ts#voiceFacts`: offline or online, key, cost, screenshots), the voice (George or Fable) with ▶ Preview (`voice-player.ts#playLine` with the form's mouth, voice and speed), the speed slider, the Talk to Scout key (`hotkeys.talk`) and the microphone (`voice.microphoneId`, `mic.ts#listMicrophones`, blank for the system default) |
 | `shortcuts-section.tsx`  | Three global hotkeys (ask, pause sight, stop speaking; the talk key is under Voice); a `hotkeyError` marks the field whose combination it names; one combination for two shortcuts (the talk key included) is refused before saving, naming both (`settings-form.ts#refuseSharedHotkeys`)                                                                                                                                                                                                                                                                                               |
@@ -2049,16 +2086,17 @@ above a **Message** box. It is the same component, so it is the same conversatio
   lists, headings, code, tables. HTML in an answer is skipped, and a link shows as text with its
   address on hover, because a click would navigate the bubble's own window.
 - **Draft it for me.** Scout writes short drafts itself (an email reply, a message, a PR
-  description, up to about 400 words; `companion.md`, under Small jobs you do yourself); anything
-  longer goes to an expert. Scout puts the draft alone in a fenced `draft` block and adds one line about Copy. `Answer`
+  description; quick things are Scout's own, per `companion.md`); real work goes to an expert.
+  Scout puts the draft alone in a fenced `draft` block, as `companion.md` says; what it says
+  around the draft is its own. `Answer`
   renders that block as a framed `DraftBlock` with **Copy**, which shows "Copied" for 2 s (or
   "Couldn't copy"). `Answer` takes an optional `onCopy`; without it, as in the extension, there is no
   button. The bubble passes `HostBridge.copyText`, which on desktop is `IPC.copyText`, handled in
   `main/ipc/clipboard.ts`: main calls `clipboard.writeText`, because `navigator.clipboard` fails while
   the panel is unfocused. It takes only a string of at most 20,000 characters, only from the panel
   window, and never reads the clipboard. Nothing is pasted or typed into any app. When the request
-  was spoken, `SPOKEN_MODE` keeps the draft whole in its block, and the fence keeps it out of speech
-  (`toSpeakable`, `SpokenStream`), so only the one line is said.
+  was spoken, the fence keeps the draft out of speech (`toSpeakable`, `SpokenStream`), so only
+  the words around it are said.
 - **Hand-offs in the bubble** (`handoff-card.tsx`), mockup screens 4 to 6. A `handoff.proposed` for
   this pet shows `ProposalCard`: the agent, the guessed project (name and path), the access and the
   brief. **Change project** lists the other guesses, a search box (`searchProjects`, the engine's
@@ -2255,7 +2293,7 @@ flowchart LR
     PU --> QM["QueueMouth.speak"]
     QM --> Q["SpeechQueue (whole)"]
   end
-  CB -- "ask spoken" --> E["Engine: SPOKEN_MODE in the system prompt"]
+  CB -- "ask spoken" --> E["Engine: a Spoken line in the Now block"]
   E -- "turn.delta" --> CB
 ```
 
@@ -2277,35 +2315,30 @@ flowchart LR
   also interrupts that turn (`bridge.interrupt`), drops its `SpokenStream` and keeps what was shown so far, so no later
   sentence of the old answer is said. A spoken question sent while an answer still runs is a new
   ask for the same pet, which the runner already interrupts.
-- **Read aloud and describe** (`ui/voice/read-aloud.ts`, `companion.md`, `SPOKEN_MODE`). No tool of
+- **Read aloud and describe** (`ui/voice/read-aloud.ts`, `companion.md`, the soul). No tool of
   its own: the companion reads with `get_selection`, then `read_window_text`, and describes a
-  picture with `look_at_window` or `look_closer`. `companion.md` says how: a reading is the text
-  itself, verbatim with no preamble, list items as sentences and code described rather than its
-  symbols, stopping at about 300 words with "Shall I go on?"; a description gives the kind, axes,
-  trend and notable values, quoting only labels it can read; text that came from OCR carries a
-  warning that a word may be misread. `SPOKEN_MODE` carries the one exception to keeping it short,
-  since it comes last in the system prompt and would otherwise cut the reading. A typed request is
+  picture with `look_at_window` or `look_closer`. There is no fixed recipe or opener: the soul
+  says to tell them what things mean and not read text back unless they ask, and for something
+  long to offer the gist first and ask what to dig into. The OCR tool result says once, as a
+  fact, that text read from pixels may contain recognition errors. A typed request is
   spoken whole too: `CompanionBubble.send` asks with `spoken: true` when the pure
   `wantsReadAloud(text)` matches (a request that starts with read or say and ends a few words later
   in aloud, to me or out loud, so "read the logs and explain the error to me" does not), so the
   answer goes through `SpokenStream` and `QueueMouth.speak` instead of `onSay`, whose `toSpeakable`
   would cut it to two sentences. After a spoken answer ending "Shall I go on?", a typed reply is
   spoken too only when `goesOn(text)` matches a bare "go on", "yes", "continue" or "keep going";
-  any other typed question is asked as typed. Every 300-word part stays well under `MAX_OUTPUT_TOKENS` (2,048). With Scout
+  any other typed question is asked as typed (`goesOn` stays, though nothing asks Scout to say
+  "Shall I go on?" any more). The answer stays under `MAX_OUTPUT_TOKENS` (2,048). With Scout
   talks off the mouth says nothing and the reading is only in the bubble.
 - **Translate** (`companion.md`). No tool and no translation service: the companion's own model
   translates what it read the same way (`get_selection`, then `read_window_text`, or
-  `look_at_window` / `look_closer` for text in a picture, with the OCR warning). The target is the
-  language named in the request, else a remembered preference (`remember`), else the language of
-  the request; there is no setting for it. It keeps the layout, names, numbers and code, opens
-  with one line naming the source language, and stops at about 300 words with "Shall I go on?".
-  The translated text is data, quoted and never followed. `wantsReadAloud` also matches
-  "translate this and read it to me", so an English translation is spoken whole through the
-  read-aloud path. A translation into any other language goes in a quoted block (`> …`) after the
-  one English line "It's in the bubble.": `toSpeakable` and `SpokenStream` leave every quoted
-  line out (an English quote too), because Kokoro and the system voice speak only English. An
-  English translation is plain text, never quoted. Keeping French out of the voice relies on the
-  model quoting it.
+  `look_at_window` / `look_closer` for text in a picture). There is no fixed opener and no
+  setting for the target language. `wantsReadAloud` also matches "translate this and read it to
+  me", so an English translation is spoken whole through the read-aloud path. `companion.md`
+  says the voice speaks only English, so text in another language goes in a quoted block
+  (`> …`), shown in the bubble and not spoken: `toSpeakable` and `SpokenStream` leave every quoted
+  line out (an English quote too), because Kokoro and the system voice speak only English.
+  Keeping French out of the voice relies on the model quoting it.
 - **Settings on the fly.** Main sends `IPC.settingsChangedEvent` with the saved settings to every
   window after each save; the panel reads the ask and talk keys, the microphone and the user's name
   from it (`renderer/src/panel-settings.ts`), as it does at open, so none needs a restart.
@@ -2470,12 +2503,11 @@ flowchart LR
   bytes, never above 1) and ends at exactly 1, also when every file was already there. Under
   `TAGALONG_FAKE_STT=1` it reports 1 and downloads nothing. It only fetches; the ears still load
   their models when listening starts.
-- **Spoken mode** (`core/conversation/prompt-assembler.ts`). `ask` takes `spoken: true`; the runner
-  passes it to `assemblePrompt`, which appends `SPOKEN_MODE` (headed `SPOKEN_HEADING`) last in the
-  system prompt for that turn only: short sentences and contractions, no markdown or lists in what
-  is said, details after it as a list or code block (shown, not read), one question back at most,
-  tools as usual and "check the card" for a confirmation, and a note that the words came from
-  speech recognition. A typed turn never gets it.
+- **Spoken mode** (`core/conversation/now.ts`). `ask` takes `spoken: true`; the runner puts it in
+  the turn's Now facts, and `renderNow` adds one `Spoken:` line to the `## Now` block on that
+  question only: their words are read aloud as written, so no markdown, lists or links in what is
+  said, exact detail after it (shown, not read), and speech recognition may have misheard a word.
+  The system prompt does not change, so it stays cached. A typed turn never gets the line.
 - **Speaking as it streams** (`ui/voice/spoken-stream.ts`). For a spoken question the bubble feeds
   each `turn.delta` to a `SpokenStream`, which hands over each complete sentence (a mark followed by
   a space, or a line break) at once, skips code fences even when they arrive in pieces, drops a
@@ -2630,8 +2662,7 @@ question, ask, routine name and title it quotes goes through `hideSecrets` first
 | `HandoffManager.pending()`                        | briefs waiting for Send                                                                                                                                                                                                                         |
 
 Expert rows of the day that ended `stopped` or `error` are listed under "Still open". The result is
-plain text, at most 4,000 characters; the model writes the summary, and the companion's
-instructions tell it to say it only knows what it looked at or was asked. A store that fails
+plain text, at most 4,000 characters; the model writes the summary. A store that fails
 answers `isError`, never a throw. It is a direct ask, so it is not budget-gated.
 
 ## Pick up where you left off

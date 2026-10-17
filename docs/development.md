@@ -32,8 +32,9 @@ tagalong/
       roles.ts                      # Role, ModelTier
                                     # plus activity, awareness, blind-spots, connections, experts,
                                     # limits and routines schemas
-    core/roles/                     # companion.md, the one role: YAML header plus instructions
-    core/scripts/gen-roles.mjs      # compiles core/roles/*.md into src/roles/library.generated.ts
+    core/roles/                     # companion.md, the one role: YAML header plus mechanics
+    core/soul/                      # scout.md, Scout's soul: Character, Cares about, Never
+    core/scripts/gen-roles.mjs      # compiles roles/*.md and soul/*.md into src/roles/library.generated.ts
     core/src/
       index.ts                      # the public facade hosts import
       engine.ts                     # Engine.boot: wires the parts together and listens
@@ -167,11 +168,12 @@ the extension are not measured: the Playwright suites cover them.
 Inside `packages/core`:
 
 ```bash
-pnpm gen:roles        # compile roles/*.md into src/roles/library.generated.ts (commit the result)
+pnpm gen:roles        # compile roles/*.md and soul/*.md into src/roles/library.generated.ts (commit the result)
 ```
 
-Run `pnpm --filter @tagalong/core gen:roles` from the root after editing any file in
-`packages/core/roles/`. It needs `packages/protocol` built first, because it validates each role
+Run `pnpm --filter @tagalong/core gen:roles` from the root (or `node scripts/gen-roles.mjs` from
+`packages/core`, which also works in a git worktree) after editing any file in
+`packages/core/roles/` or `packages/core/soul/`. It needs `packages/protocol` built first, because it validates each role
 against the protocol's `Role` schema. A test fails while the generated file is stale.
 
 ### Packaging

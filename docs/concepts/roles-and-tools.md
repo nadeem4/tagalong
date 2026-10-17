@@ -10,12 +10,11 @@ office's job labels and the one-time roles notice were removed with the crew.
 
 ## The role
 
-Tagalong ships one role, the **Companion**, and one pet, Scout, works as it. The Companion never does
-the work itself, with one exception: short drafts (an email reply, a message, a PR description, up
-to about 400 words), which it writes alone in a fenced `draft` block that the bubble shows with
-**Copy**. Anything longer goes to an expert, and it never says it sent, pasted or typed a draft.
-"File this as a bug" is written the same way but goes to the connected app's create-issue tool, so
-the person sees it in full on the confirm card first; it never guesses a repo. Its tools are only the ones that look (screen, selection, windows), `remember`,
+Tagalong ships one role, the **Companion**, and one pet, Scout, works as it. Quick things are the
+Companion's own (explaining, short drafts, translating, reading aloud, describing a picture); a
+draft goes alone in a fenced `draft` block that the bubble shows with **Copy**. Real work goes to
+an expert. "File this as a bug" goes to the connected app's create-issue tool, so the person sees
+it in full on the confirm card first; it never guesses a repo. Its tools are only the ones that look (screen, selection, windows), `remember`,
 `hand_to_expert`, which writes a brief and hands it to an expert such as Claude Code, the tools of
 the person's connected apps (`connections`), whose changes always ask first, `create_routine`
 and `change_routine`, which show a routine card the person saves, `point_at`, which draws a ring
@@ -23,24 +22,52 @@ around something on screen and never clicks, `recall_day`, which reads back what
 and was asked today or yesterday, `search_history`, which searches the window titles it looked
 at and the person's asks by words, `tell_expert`, which passes the person's words to an expert
 already working, and `change_settings`, which shows a settings card the person applies with a
-click; it has nothing that writes files or runs code. Its own figure and bubble show up in its screenshots, so its instructions tell it to look
-past them and never mention itself or Tagalong unless asked.
+click; it has nothing that writes files or runs code. Its own figure and bubble show up in its
+screenshots, and its instructions say so.
+
+Who Scout is lives apart from what Scout can do: the **soul** (below) is Scout's character, and the
+role is the tools, the model tier and the mechanics of how Tagalong works.
+
+### The soul file
+
+`packages/core/soul/scout.md` is Scout's soul: plain Markdown, no header, exactly three parts in
+this order, each with something under it:
+
+| Heading          | What it holds                      | Edit it to                                           |
+| ---------------- | ---------------------------------- | ---------------------------------------------------- |
+| `## Character`   | How Scout is and sounds            | change Scout's personality                           |
+| `## Cares about` | What Scout values, as bullets      | change Scout's priorities                            |
+| `## Never`       | Lines Scout doesn't cross, bullets | change the wording (the guarantees are also in code) |
+
+The safety lines in Never are enforced by code too: Scout has no click or type tool, every card
+needs a click, and blind spots and secret hiding happen before anything reaches the model. So
+editing the wording cannot remove a guarantee.
+
+The same generator compiles every `soul/*.md` into `SOUL_LIBRARY` in `library.generated.ts`,
+keyed by file name, and fails on a missing, extra, empty or misordered part. `ACTIVE_SOUL` in
+`packages/core/src/roles/index.ts` (`'scout'`) picks the soul and `soul()` returns its text.
+
+To re-character Scout, edit `soul/scout.md` and regenerate. For a second character, add
+`soul/<id>.md` and change `ACTIVE_SOUL`; there is no setting or picker until a second soul ships.
 
 ### The role file
 
 One Markdown file per role in `packages/core/roles/` (today only `companion.md`). The YAML header is
-data; the body is the role's instructions. The companion's body is grouped under `##` headings
-(Who you are, Looking at the screen, Handing work to experts, Connected apps, What needs me,
-Routines and watches, Pointing, Changing settings, Small jobs you do yourself, Your day and
-history, Privacy and safety), with each small job (drafts, reading aloud, describing a picture,
-translating, filing a bug) under its own `###` heading. The generator keeps the body as written,
-headings included, and the rest of the system prompt already uses `##` headings.
+data; the body is the role's instructions. The companion's body is short, about a dozen bullets under
+one heading, `## How Tagalong works`: mechanics only (look, talk and point, never click; quick
+things are Scout's and real work goes to an expert; cards need a click; keys and logins only in
+Settings, the calendar link only in Home's Meeting prep form; a connected app gets nothing from
+the screen unless they asked; a bug's repo is never guessed; a draft goes alone in a fenced `draft` block, which the bubble gives a Copy button; the
+voice speaks only English, so other languages go in a `"> "` quote; Scout's own figure shows up
+in screenshots; what `[hidden: …]` means; what rides at the end of the person's message). How
+Scout behaves is the soul's job, and how each tool is used is in the tool's own description. The
+generator keeps the body as written.
 
 ```markdown
 ---
 id: companion
 name: Companion
-version: 1
+version: 2
 summary: Sees what you are doing, briefs the right expert, and brings the answer back.
 good_at: [working out what you need, writing a clear brief, picking the right expert]
 not_for: [doing the work itself]
@@ -65,7 +92,10 @@ model:
   needs_vision: false
 ---
 
-You are a companion: you sit beside the person's work, ...
+## How Tagalong works
+
+- You can look at their screen, talk and point. You have no way to click or type.
+- ...
 ```
 
 A script compiles the files into `packages/core/src/roles/library.generated.ts`, which is
@@ -73,8 +103,9 @@ committed: core is compiled with `tsc` and bundled into Electron, so reading `.m
 would break after bundling. A test fails when the generated file is stale, a role file is invalid,
 a role's id does not match its file name, or a role names a tool that does not exist.
 
-The script is `packages/core/scripts/gen-roles.mjs`. After editing a role file, regenerate with
-`pnpm --filter @tagalong/core gen:roles` and commit both files. Each file is validated against the
+The script is `packages/core/scripts/gen-roles.mjs`. After editing a role or soul file, regenerate
+with `pnpm --filter @tagalong/core gen:roles` (or `node scripts/gen-roles.mjs` from
+`packages/core`) and commit both files. Each file is validated against the
 `Role` schema in `packages/protocol/src/roles.ts`, where the header's snake_case keys become
 camelCase (`good_at` becomes `goodAt`, `model.needs_vision` becomes `model.needsVision`) and the
 body becomes `instructions`.
@@ -90,8 +121,10 @@ error `-32602`.
 
 A pet's role sets two things on every turn:
 
-- **Its instructions.** The system prompt is the base rules, then the role's `instructions`, then
-  `Your name is <name>.`, then the screen-reply rule and the recalled memories.
+- **Its instructions.** The system prompt is the soul, then the role's `instructions`, then
+  `Their name is <name>.` when the person gave one. Nothing else, so it is the same on every turn
+  and providers can cache it. Recalled memories and the Now facts ride on the person's message
+  instead (see `docs/architecture.md`, "The prompt").
 - **Its tools.** `toolsFor` gives the pet exactly the tools its role lists.
 
 A pet whose `roleId` is not in the library works as the companion, for both.
