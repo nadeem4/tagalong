@@ -300,6 +300,16 @@ export class ActivityLog {
       });
   }
 
+  /** When this pet's latest turn started, or null before its first: "You last talked". */
+  lastTurnAt(petId: string): string | null {
+    const row = this.db
+      .prepare<[string], { at: string | null }>(
+        `SELECT MAX(started_at) AS at FROM activity WHERE kind = 'turn' AND pet_id = ?`,
+      )
+      .get(petId);
+    return row?.at ?? null;
+  }
+
   /** The routines that ran well after `since`, oldest first, at most five: their names only. */
   routinesFinishedSince(since: string): string[] {
     return this.db

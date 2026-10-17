@@ -165,7 +165,7 @@ describe(CREATE_ROUTINE, () => {
   it('is not offered on a routine’s own turn', () => {
     const t = tools(
       { routines: deps().value },
-      { routine: { routineId: 'r1', handedOff: () => undefined } },
+      { routine: { routineId: 'r1', name: 'Routine', handedOff: () => undefined } },
     );
     expect(t.definitions.map((d) => d.name)).not.toContain(CREATE_ROUTINE);
     expect(t.definitions.map((d) => d.name)).not.toContain(CHANGE_ROUTINE);

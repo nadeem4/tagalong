@@ -13,7 +13,7 @@ import { FakeBrainProvider } from '../providers';
 import type { BrainProvider, BrainRequest, FakeScript } from '../providers';
 import { SUMMARY_KEEP_RECENT, Summarizer } from '../memory/summarizer';
 import { REMEMBER } from '../tools';
-import { MEMORY_HEADING } from './prompt-assembler';
+import { MEMORY_HEADING } from './now';
 import { ConversationRunner, type TurnEvent } from './runner';
 
 const scout: Pet = {
@@ -76,9 +76,11 @@ describe('recall in a turn', () => {
 
     await runner(recordingFake({ text: 'ok' }, requests)).run({ pet: scout, text: 'hello' }).done;
 
-    expect(requests[0]?.system).toContain(MEMORY_HEADING);
-    expect(requests[0]?.system).toContain('Prefers short answers');
-    expect(requests[0]?.system).not.toContain('Ink only knows this');
+    // On the question, not in the system prompt, which stays the same every turn.
+    expect(question(requests[0])).toContain(MEMORY_HEADING);
+    expect(question(requests[0])).toContain('Prefers short answers');
+    expect(question(requests[0])).not.toContain('Ink only knows this');
+    expect(requests[0]?.system).not.toContain('Prefers short answers');
   });
 
   it('offers the remember tool and files what the pet saves', async () => {
@@ -126,7 +128,7 @@ describe('recall in a turn', () => {
     await runner(recordingFake({ text: 'ok' }, requests)).run({ pet: scout, text: 'Explain DNS' })
       .done;
 
-    expect(requests[1]?.system).toContain('I prefer short answers.');
+    expect(question(requests[1])).toContain('I prefer short answers.');
     expect(memories.recent('ink', 5)).toEqual([]);
   });
 
@@ -170,6 +172,13 @@ describe('the summary job after turns', () => {
     expect(turnRequests.at(-2)?.messages).toHaveLength(19);
     expect(turnRequests.at(-1)?.messages).toHaveLength(SUMMARY_KEEP_RECENT + 1);
     expect(memories.recent('scout', 5).some((memory) => memory.kind === 'summary')).toBe(true);
-    expect(turnRequests.at(-1)?.system).toContain('(summary)');
+    expect(question(turnRequests.at(-1))).toContain('(summary)');
   });
 });
+
+/** The text of a request's last user message, where memories ride. */
+function question(request: BrainRequest | undefined): string {
+  return (request?.messages.at(-1)?.content ?? [])
+    .map((block) => (block.type === 'text' ? block.text : ''))
+    .join('\n');
+}

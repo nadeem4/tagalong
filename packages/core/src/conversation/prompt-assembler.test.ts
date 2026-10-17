@@ -3,15 +3,24 @@ import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import type { ContextSnapshot, Message, Pet, Settings } from '@tagalong/protocol';
 import { MAX_SELECTION_CHARS, Settings as SettingsSchema } from '@tagalong/protocol';
-import {
-  CONTEXT_LABELS,
-  MEMORY_HEADING,
-  SPOKEN_HEADING,
-  SPOKEN_MODE,
-  TRUNCATION_MARKER,
-  assemblePrompt,
-} from './prompt-assembler';
-import { getRole } from '../roles';
+import { CONTEXT_LABELS, TRUNCATION_MARKER, assemblePrompt } from './prompt-assembler';
+import { MEMORY_HEADING, NOW_HEADING, renderNow, type NowFacts } from './now';
+import type { Memory } from '../memory/memories';
+import { getRole, soul } from '../roles';
+
+/** The facts of a moment, as the runner gathers them. */
+function now(overrides: Partial<NowFacts> = {}): NowFacts {
+  return {
+    at: new Date('2026-10-16T20:40:00Z'),
+    timeZone: 'Europe/London',
+    reason: { kind: 'asked', spoken: false },
+    lastTalkAt: null,
+    running: [],
+    finished: [],
+    waiting: [],
+    ...overrides,
+  };
+}
 
 const pet: Pet = {
   id: 'scout',
@@ -61,94 +70,55 @@ function lastText(request: ReturnType<typeof assemblePrompt>): string {
 }
 
 describe('assemblePrompt system prompt', () => {
-  it('states the base rules, the role and the name', () => {
+  const memory = (text: string): Memory => ({
+    id: randomUUID(),
+    petId: 'scout',
+    kind: 'preference',
+    text,
+    createdAt: new Date().toISOString(),
+  });
+
+  it('is the soul, then the role body, and nothing else when no name is set', () => {
     const { system } = assemblePrompt({ pet, history: [userMessage('hi')], settings });
-
-    expect(system).toContain('screen');
-    expect(system.toLowerCase()).toContain('concise');
-    expect(system).toMatch(/never claim/i);
-    expect(system).toMatch(/clicked|typed/i);
-    expect(system).toContain(getRole('companion')!.instructions);
-    expect(system).toContain('Your name is Scout.');
+    expect(system).toBe(`${soul()}\n\n${getRole('companion')!.instructions}`);
   });
 
-  it('orders the role instructions, then the name, then the screen-reply rule', () => {
-    const { system } = assemblePrompt({
-      pet,
-      history: [userMessage('hi')],
-      settings,
-    });
-
-    const role = system.indexOf(getRole('companion')!.instructions);
-    const name = system.indexOf('Your name is Scout.');
-    const style = system.indexOf('Your reply is read on screen.');
-    expect(system.indexOf('You are a Tagalong companion')).toBe(0);
-    expect(role).toBeGreaterThan(0);
-    expect(name).toBeGreaterThan(role);
-    expect(style).toBeGreaterThan(name);
-  });
-
-  it('says the reply is read on screen', () => {
-    const { system } = assemblePrompt({ pet, history: [userMessage('hi')], settings });
-    expect(system).toContain(
-      'Your reply is read on screen. Short paragraphs, lists, and code fences are fine.',
-    );
-  });
-
-  it('tells the pet the person’s name, to use rarely, only when one is set', () => {
+  it("ends with the person's name as a fact, only when one is set", () => {
     const named = assemblePrompt({
       pet,
       history: [userMessage('hi')],
-      settings: { ...settings, userName: 'Nadeem' },
+      settings: { ...settings, userName: '  Nadeem ' },
     }).system;
-    expect(named).toContain(
-      'The person’s name is Nadeem. Use it rarely: a greeting or a moment that warrants it, never every reply.',
-    );
-    expect(named.indexOf('The person’s name is')).toBeGreaterThan(
-      named.indexOf('Your name is Scout.'),
+    expect(named).toBe(
+      `${soul()}\n\n${getRole('companion')!.instructions}\n\nTheir name is Nadeem.`,
     );
 
-    const unnamed = assemblePrompt({ pet, history: [userMessage('hi')], settings }).system;
-    expect(unnamed).not.toContain('The person’s name');
+    const blank = assemblePrompt({
+      pet,
+      history: [userMessage('hi')],
+      settings: { ...settings, userName: '   ' },
+    }).system;
+    expect(blank).not.toContain('Their name is');
   });
 
-  it('adds the spoken-mode block only to a turn that came from voice', () => {
+  it('is the same for a spoken and a typed turn, and whatever is remembered', () => {
+    const typed = assemblePrompt({ pet, history: [userMessage('hi')], settings, now: now() });
     const spoken = assemblePrompt({
-      pet,
-      history: [userMessage('what is this')],
-      settings,
-      spoken: true,
-    }).system;
-    expect(spoken).toContain(SPOKEN_HEADING);
-    expect(spoken).toContain('check the card');
-    // Last, so it outranks the reply style for this one turn.
-    expect(spoken.trimEnd().endsWith(SPOKEN_MODE.trimEnd())).toBe(true);
-
-    const typed = assemblePrompt({ pet, history: [userMessage('hi')], settings }).system;
-    expect(typed).not.toContain(SPOKEN_HEADING);
-    const unspoken = assemblePrompt({
       pet,
       history: [userMessage('hi')],
       settings,
-      spoken: false,
-    }).system;
-    expect(unspoken).not.toContain(SPOKEN_HEADING);
-  });
-
-  it('keeps a spoken draft whole in its draft block', () => {
-    const spoken = assemblePrompt({
+      now: now({ reason: { kind: 'asked', spoken: true } }),
+      memories: [memory('Short answers.')],
+    });
+    const routine = assemblePrompt({
       pet,
-      history: [userMessage('reply yes but Friday')],
+      history: [userMessage('hi')],
       settings,
-      spoken: true,
-    }).system;
-    expect(spoken).toContain('A draft still goes whole in its draft block.');
-  });
-
-  it('lets a spoken read-aloud run long: the one exception to keeping it short', () => {
-    expect(SPOKEN_MODE).toContain(
-      'When asked to read something aloud, give the text in full as plain sentences; that is the exception to keeping it short.',
-    );
+      now: now({ reason: { kind: 'routine', name: 'Morning' } }),
+      memories: [memory('Uses pnpm.')],
+    });
+    expect(spoken.system).toBe(typed.system);
+    expect(routine.system).toBe(typed.system);
   });
 
   it("falls back to the companion's instructions for a role the library does not have", () => {
@@ -162,46 +132,68 @@ describe('assemblePrompt system prompt', () => {
   });
 });
 
-describe('assemblePrompt memory section', () => {
-  const memory = (text: string, overrides: Record<string, unknown> = {}) => ({
+describe('assemblePrompt memories and Now', () => {
+  const memory = (text: string, kind: Memory['kind'] = 'preference'): Memory => ({
     id: randomUUID(),
     petId: 'scout',
-    kind: 'preference' as const,
+    kind,
     text,
     createdAt: new Date().toISOString(),
-    ...overrides,
   });
 
-  it('adds what the pet remembers to the system prompt, labelled by kind', () => {
+  it('trails the last user message: screen context, then memories, then Now', () => {
+    const request = assemblePrompt({
+      pet,
+      history: [userMessage('what is this')],
+      settings,
+      snapshot: snapshotWithEverything(),
+      memories: [memory('Prefers short answers'), memory('The repo uses pnpm', 'fact')],
+      now: now({ reason: { kind: 'asked', spoken: true } }),
+    });
+    const text = lastText(request);
+    const question = text.indexOf('what is this');
+    const screen = text.indexOf('--- Screen context ---');
+    const remembered = text.indexOf(MEMORY_HEADING);
+    const moment = text.indexOf(NOW_HEADING);
+    // The screenshot leads as an image block, so the question is the first text.
+    expect(text.trimStart().startsWith('what is this')).toBe(true);
+    expect(screen).toBeGreaterThan(question);
+    expect(remembered).toBeGreaterThan(screen);
+    expect(moment).toBeGreaterThan(remembered);
+    expect(text).toContain('- (preference) Prefers short answers');
+    expect(text).toContain('- (fact) The repo uses pnpm');
+    expect(text.slice(moment)).toBe(renderNow(now({ reason: { kind: 'asked', spoken: true } })));
+  });
+
+  it('adds them to the question even when nothing came from the screen', () => {
     const request = assemblePrompt({
       pet,
       history: [userMessage('hi')],
       settings,
-      memories: [memory('Prefers short answers'), memory('The repo uses pnpm', { kind: 'fact' })],
+      memories: [memory('Short answers.')],
+      now: now(),
     });
-
-    expect(request.system).toContain(MEMORY_HEADING);
-    expect(request.system).toContain('- (preference) Prefers short answers');
-    expect(request.system).toContain('- (fact) The repo uses pnpm');
-    // Remembered preferences outrank the generic style rule, so they come after it.
-    expect(request.system.indexOf(MEMORY_HEADING)).toBeGreaterThan(
-      request.system.indexOf('Your reply is read on screen.'),
-    );
+    expect(request.messages).toHaveLength(1);
+    expect(lastText(request)).toContain(MEMORY_HEADING);
+    expect(lastText(request)).toContain(NOW_HEADING);
   });
 
-  it('keeps the section under the 2,000 character budget', () => {
-    const many = Array.from({ length: 10 }, (_, i) => memory(`${i} ${'y'.repeat(300)}`));
-    const request = assemblePrompt({ pet, history: [userMessage('hi')], settings, memories: many });
-
-    const section = request.system.slice(request.system.indexOf(MEMORY_HEADING));
-    expect(section.length).toBeLessThanOrEqual(2000);
-    expect(section).toContain('0 yyy');
+  it('puts them on the latest question only, never an older one', () => {
+    const request = assemblePrompt({
+      pet,
+      history: [userMessage('first'), assistantMessage('answer'), userMessage('second')],
+      settings,
+      memories: [memory('Short answers.')],
+      now: now(),
+    });
+    const first = request.messages[0]?.content ?? [];
+    expect(first).toEqual([{ type: 'text', text: 'first' }]);
+    expect(lastText(request)).toContain(NOW_HEADING);
   });
 
-  it('leaves the section out when there is nothing to remember', () => {
-    const request = assemblePrompt({ pet, history: [userMessage('hi')], settings, memories: [] });
-
-    expect(request.system).not.toContain(MEMORY_HEADING);
+  it('leaves out the memory section when there is nothing to remember', () => {
+    const request = assemblePrompt({ pet, history: [userMessage('hi')], settings, now: now() });
+    expect(lastText(request)).not.toContain(MEMORY_HEADING);
   });
 });
 
@@ -297,14 +289,6 @@ describe('assemblePrompt context block', () => {
 });
 
 describe('assemblePrompt vision rules', () => {
-  it('tells the model to describe, quote exactly, and admit an unreadable image', () => {
-    const { system } = assemblePrompt({ pet, history: [userMessage('hi')], settings });
-
-    expect(system).toMatch(/describe what is visible before interpreting/i);
-    expect(system).toMatch(/quote on-screen text exactly/i);
-    expect(system).toMatch(/unreadable/i);
-  });
-
   it('puts the image block ahead of every text block in the last user message', () => {
     const content =
       assemblePrompt({

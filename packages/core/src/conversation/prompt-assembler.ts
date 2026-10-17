@@ -1,14 +1,16 @@
 /**
- * Builds the provider-neutral request for one turn: system prompt (base rules, role, name,
- * the screen-reply rule, memories), history, and the screen context attached to the question.
- * Contains assemblePrompt and the headings and limits it uses. Pure: no IO.
+ * Builds the provider-neutral request for one turn: the system prompt (the soul, the role's
+ * mechanics, their name), history, and what rides on the question: the screen context, what
+ * Scout remembers and the Now facts. Contains assemblePrompt and the headings and limits it
+ * uses. Pure: no IO.
  */
 import type { ContextSnapshot, Message, MessageContent, Pet, Settings } from '@tagalong/protocol';
 import { MAX_SELECTION_CHARS } from '@tagalong/protocol';
 import type { BrainContent, BrainMessage, BrainRequest } from '../providers';
 import type { Memory } from '../memory/memories';
 import { renderInventory } from '../perception/inventory';
-import { roleFor } from '../roles';
+import { roleFor, soul } from '../roles';
+import { renderMemories, renderNow, type NowFacts } from './now';
 
 /**
  * Ceiling on a single answer. Generous enough for an explanation with a code block,
@@ -30,66 +32,16 @@ export const CONTEXT_LABELS = {
   dropped: 'Dropped on you',
 } as const;
 
-/**
- * The rules that make Tagalong Tagalong rather than a chat window. The last line is
- * the safety one: the pet can look but never act, and a model that narrates fake
- * clicks teaches the user to trust something that never happened.
- */
-const BASE_INSTRUCTIONS = [
-  'You are a Tagalong companion: a small character living on the edge of the screen.',
-  'The user shares what they are looking at with you — selected text, page text, the active window, sometimes a screenshot.',
-  'Answer about what is on screen first, and only then about anything else.',
-  'Be concise. A couple of sentences unless the user asks for depth.',
-  'Say so plainly when the context does not contain the answer.',
-  'With a screenshot, describe what is visible before interpreting it.',
-  'Quote on-screen text exactly when asked; never paraphrase it as a quote.',
-  'Say plainly when the image is unreadable rather than guessing at it.',
-  'You can only look and talk. You never click, type, or change anything on the machine, and you must never claim to have clicked or typed anything.',
-].join('\n');
-
-/** How Scout's answer is shown: read on screen. A spoken turn adds SPOKEN_MODE on top. */
-const SCREEN_REPLY =
-  'Your reply is read on screen. Short paragraphs, lists, and code fences are fine.';
-
-/** Heads the spoken-mode block, which only a question asked out loud gets. */
-export const SPOKEN_HEADING = '## This turn is spoken';
-
-/**
- * Talk to Scout: the question was said out loud and the answer is read aloud as it streams.
- * Lists and code blocks are left out of the speech, so details go there, in the bubble.
- */
-export const SPOKEN_MODE = [
-  SPOKEN_HEADING,
-  'The person asked this out loud, and your answer is read aloud as you write it. Answer like a person talking, not a document:',
-  '- Short sentences and contractions. Two or three sentences is usually plenty.',
-  '- When asked to read something aloud, give the text in full as plain sentences; that is the exception to keeping it short.',
-  '- No markdown, headings, links or lists in what you say. When exact detail helps (code, steps, a list), say so in a sentence and put the detail after it as a list or code block: that shows in the bubble and is not read aloud.',
-  '- A draft still goes whole in its draft block.',
-  '- Ask at most one question back, and only when you need the answer.',
-  '- Your tools work as usual. When a change waits for the person to confirm it on a card, say "check the card" rather than reading it out.',
-  '- The words came from speech recognition, so a word may be misheard: go with the likely meaning.',
-].join('\n');
-
-/** Heads the remembered notes in the system prompt. */
-export const MEMORY_HEADING = '## What you remember';
-
-/** The memory section never grows past this, heading included. */
-const MAX_MEMORY_SECTION_CHARS = 2000;
-
-const MEMORY_PREAMBLE =
-  'Notes kept from earlier conversations. Follow remembered preferences; treat facts as ' +
-  'background, and trust the screen over a note when they disagree.';
-
 export interface AssembleInput {
   pet: Pet;
-  /** What the pet recalls for this turn, already ranked. Rendered into the system prompt. */
+  /** What the pet recalls for this turn, already ranked. Rides on the question. */
   memories?: readonly Memory[] | undefined;
   /** Oldest first, ending with the question being asked. Trimmed to `historyMessages`. */
   history: Message[];
   snapshot?: ContextSnapshot | undefined;
   settings: Settings;
-  /** The question was spoken (Talk to Scout): the spoken-mode block goes last. */
-  spoken?: boolean | undefined;
+  /** Facts about this moment (time, why it woke, experts). Rides last on the question. */
+  now?: NowFacts | undefined;
 }
 
 /** Builds the provider-neutral request for one turn. Pure: no clock, no store, no IO. */
@@ -100,20 +52,23 @@ export function assemblePrompt(input: AssembleInput): BrainRequest {
 
   const contextText = input.snapshot ? contextBlock(input.snapshot, settings) : '';
   const leading = input.snapshot ? imagesToAttach(input.snapshot, settings) : [];
+  const momentText = [
+    renderMemories(input.memories ?? []),
+    input.now === undefined ? '' : renderNow(input.now),
+  ]
+    .filter((part) => part.length > 0)
+    .join('\n\n');
 
-  if (contextText || leading.length > 0) {
-    const trailing: BrainContent[] = contextText ? [{ type: 'text', text: contextText }] : [];
+  const trailing: BrainContent[] = [contextText, momentText]
+    .filter((text) => text.length > 0)
+    .map((text) => ({ type: 'text', text }));
+  if (trailing.length > 0 || leading.length > 0) {
     attachToLastUserMessage(messages, leading, trailing);
   }
 
   return {
     model: pet.model,
-    system: [
-      systemPrompt(pet, input.memories ?? [], settings.userName),
-      input.spoken === true ? SPOKEN_MODE : '',
-    ]
-      .filter((part) => part.length > 0)
-      .join('\n\n'),
+    system: systemPrompt(pet, settings.userName),
     messages,
     maxTokens: MAX_OUTPUT_TOKENS,
   };
@@ -154,42 +109,19 @@ function imagesToAttach(snapshot: ContextSnapshot, settings: Settings): BrainCon
 }
 
 /**
- * Base rules, then who the pet is: its role's instructions and its name. Then the
- * screen-reply rule and the memories. The person's name, when they gave one, follows the
- * pet's, with a nudge to use it rarely.
+ * Who Scout is (the soul), how Tagalong works (the role's body), and their name. The same on
+ * every turn, spoken or typed, whatever is remembered, so providers can cache it: everything
+ * that changes per turn rides on the question instead.
  */
-function systemPrompt(pet: Pet, memories: readonly Memory[], userName: string): string {
+function systemPrompt(pet: Pet, userName: string): string {
   const name = userName.trim();
   return [
-    BASE_INSTRUCTIONS,
+    soul(),
     roleFor(pet.roleId).instructions.trim(),
-    `Your name is ${pet.name}.`,
-    name.length > 0
-      ? `The person’s name is ${name}. Use it rarely: a greeting or a moment that warrants it, never every reply.`
-      : '',
-    SCREEN_REPLY,
-    memorySection(memories),
+    name.length > 0 ? `Their name is ${name}.` : '',
   ]
     .filter((part) => part.length > 0)
     .join('\n\n');
-}
-
-/**
- * The remembered notes, last in the system prompt so a remembered preference ("short
- * answers") reads as overriding the generic style rule above it. Lines that would push the
- * section past its budget are skipped whole.
- */
-function memorySection(memories: readonly Memory[]): string {
-  if (memories.length === 0) return '';
-  const lines = [MEMORY_HEADING, MEMORY_PREAMBLE];
-  let length = lines.join('\n').length;
-  for (const memory of memories) {
-    const line = `- (${memory.kind}) ${memory.text}`;
-    if (length + 1 + line.length > MAX_MEMORY_SECTION_CHARS) continue;
-    lines.push(line);
-    length += 1 + line.length;
-  }
-  return lines.length > 2 ? lines.join('\n') : '';
 }
 
 /**

@@ -23,7 +23,7 @@ import {
   type ToolOutcome,
 } from '../tools';
 import { ConversationRunner, type TurnEvent } from './runner';
-import { SPOKEN_HEADING } from './prompt-assembler';
+import { NOW_HEADING } from './now';
 
 const pet: Pet = {
   id: 'scout',
@@ -186,17 +186,72 @@ describe('ConversationRunner.run', () => {
     expect(seen[1]?.messages).toHaveLength(2);
   });
 
-  it('answers a spoken question in spoken mode, and only that one', async () => {
+  it('says a spoken question is spoken on that question only, and keeps the system the same', async () => {
     const seen: BrainRequest[] = [];
     const runner = makeRunner(recording(seen, 'ok'));
 
     await runner.run({ pet, text: 'what is this', spoken: true }).done;
     await runner.run({ pet, text: 'typed this time' }).done;
 
-    expect(seen[0]?.system).toContain(SPOKEN_HEADING);
-    expect(seen[1]?.system).not.toContain(SPOKEN_HEADING);
+    expect(lastUserText(seen[0])).toContain(NOW_HEADING);
+    expect(lastUserText(seen[0])).toMatch(/^Spoken: /m);
+    expect(lastUserText(seen[1])).toContain(NOW_HEADING);
+    expect(lastUserText(seen[1])).not.toMatch(/^Spoken: /m);
+    expect(seen[1]?.system).toBe(seen[0]?.system);
+  });
+
+  it('gathers Now before announcing the turn, so "last talked" is the turn before', async () => {
+    const seen: BrainRequest[] = [];
+    let announcedBeforeGather: boolean | undefined;
+    const runner = new ConversationRunner({
+      store,
+      settings,
+      provider: recording(seen, 'ok'),
+      emit: (event) => events.push(event),
+      now: {
+        clock: () => new Date('2026-10-16T20:40:00Z'),
+        timeZone: () => 'UTC',
+        lastTalkAt: (petId) => {
+          announcedBeforeGather = methods().includes('turn.started');
+          return petId === pet.id ? '2026-10-16T17:40:00Z' : null;
+        },
+        running: () => [{ expertName: 'Claude Code', ask: 'fix the login test' }],
+      },
+    });
+
+    await runner.run({ pet, text: 'anything new?' }).done;
+
+    expect(announcedBeforeGather).toBe(false);
+    const text = lastUserText(seen[0]);
+    expect(text).toContain('Friday 16 October, 20:40, UTC.');
+    expect(text).toContain('You last talked 3 hours ago.');
+    expect(text).toContain('Experts working: Claude Code: "fix the login test".');
+  });
+
+  it("tells a routine's turn it is a routine, by name, and nobody is watching", async () => {
+    const seen: BrainRequest[] = [];
+    const runner = makeRunner(recording(seen, 'ok'));
+
+    await runner.run({
+      pet,
+      text: 'run the routine',
+      background: true,
+      routine: { routineId: 'r1', name: 'Morning papers', handedOff: () => undefined },
+      spoken: true,
+    }).done;
+
+    const text = lastUserText(seen[0]);
+    expect(text).toContain('"Morning papers"');
+    expect(text).toContain('nobody is watching');
+    expect(text).not.toMatch(/^Spoken: /m);
   });
 });
+
+function lastUserText(request: BrainRequest | undefined): string {
+  return (request?.messages.at(-1)?.content ?? [])
+    .map((block) => (block.type === 'text' ? block.text : ''))
+    .join('\n');
+}
 
 describe('ConversationRunner perception tools', () => {
   const host = fakeHost({
@@ -386,7 +441,7 @@ describe('ConversationRunner.interrupt', () => {
       pet,
       text: 'the routine',
       background: true,
-      routine: { routineId, handedOff },
+      routine: { routineId, name: 'Routine', handedOff },
     });
     await firstDelta();
     const asked = runner.run({ pet, text: 'my own question' });
@@ -414,7 +469,12 @@ describe('ConversationRunner.interrupt', () => {
       undefined,
       only(spy),
     );
-    const routine = { routineId: randomUUID(), expertId: 'researcher', handedOff: () => undefined };
+    const routine = {
+      routineId: randomUUID(),
+      name: 'Routine',
+      expertId: 'researcher',
+      handedOff: () => undefined,
+    };
     await runner.run({ pet, text: 'go', background: true, routine }).done;
     expect(seen).toBe(routine);
   });

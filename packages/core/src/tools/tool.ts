@@ -23,6 +23,8 @@ export interface ToolOutcome {
 /** A turn a routine started: what the saved routine allows, and where a hand-off reports. */
 export interface RoutineTurnContext {
   routineId: string;
+  /** The routine's name, for the Now block. */
+  name: string;
   /** The expert the routine's card allowed: read-only, no project, no card. */
   expertId?: string | undefined;
   /** The routine's saved instruction: the pre-approved brief is built from it. */
