@@ -17,7 +17,7 @@ export interface MeteredCall {
  * report what they used before stopping). A call that throws records nothing. Text and
  * tool calls pass through untouched.
  *
- * One wrapper at the single resolver, like `guardBrain`, so turns, keep-an-eye, routines,
+ * One wrapper at the single resolver, like `guardBrain`, so turns, check-ins, routines,
  * watches, the greeting and summaries are all metered and nothing new can skip it.
  */
 export function meterBrain(

@@ -475,6 +475,26 @@ microphone; **I'll type** (or a fresh setup that has not been answered yet) leav
 - **Always listening is separate.** Its switch on the keys step is off by default and only you
   switch it on; it starts once setup is closed.
 
+## Check-ins: what goes with an unprompted call
+
+Now and then, when nobody asked, Scout asks the AI once whether anything is worth saying: after you
+settle on a new window, when a title reads like an error, after a long stretch (with Gentle nudges
+on), and when an expert you handed work to finishes. Most of the time the answer is nothing, and
+nothing is shown. Each of these calls goes to the summaries model (Settings → Summaries, else
+Scout's own) and carries, besides what that moment is about:
+
+- **your five newest memories, your name, the time, and what experts are doing right now;**
+- **your last exchange with Scout**: your latest question and Scout's answer to it, at most 300
+  characters of each;
+- the last three lines Scout said on its own (so it does not repeat itself), how long you have been
+  active (only with Gentle nudges on), and the names and ids of your experts.
+
+Keys, tokens and passwords are hidden in all of it before it leaves the computer, and a blind
+spot's app and title are never in it. The limits: at most 24 check-ins a day, at most one
+unprompted one every ten minutes, none for an hour after **Not now** (a finished hand-off still
+gets its line), none during a call or over a full-screen app, and none at all once the daily budget
+is reached. Each call is a "Sent to AI" row in **What Scout saw**.
+
 ## Keeping an eye on things
 
 On by default; switch it off under Settings → Privacy → **Keep an eye on things**. Off means no
@@ -484,35 +504,21 @@ tracking at all: the window list is not even taken.
   which one is in front, whether one fills its whole screen — and sends that list to the engine on
   this computer. No picture is taken, no window text is read, and no model is called. The list is
   kept in memory only, for the session.
-- **Rarely, one cheap look:** when you have stayed on a window new to this session for about thirty
+- **Rarely, one check-in:** when you have stayed on a window new to this session for about thirty
   seconds, or a title reads like trouble (`error`, `failed`, `failing`, `failure`, `exception`,
   `traceback`, `crashed`), Scout reads **that one window's text** (the last 4,000 characters) and
-  sends it, with its app and title, to the summaries model (Settings → Summaries, else Scout's own)
-  in one short call that asks whether there is one useful thing to say. Most of the time the answer
-  is nothing and nothing is shown.
-- **Limits:** at most one line every ten minutes; never two looks at the same window (same window
-  and same title); nothing while a full-screen app or a Teams, Zoom or Google Meet window is in
-  front; **Not now** on the line quiets it for an hour. Pausing sight stops it too.
+  sends it, with its app and title and the facts every check-in carries (above), in one short call
+  that asks whether anything is worth saying. Most of the time the answer is nothing and nothing is
+  shown. The same reply may set Scout's face (a wince or a cheer); titles alone no longer do.
+- **Limits:** as for every check-in, above; never two looks at the same window (same window and
+  same title). Pausing sight stops it too.
 - **Blind spots apply everywhere:** a window on the built-in list or your exclusion list is never
   considered, its title included, and its text is never read.
-- **Nothing is delegated on its own.** When the line offers help, **Hand it over** opens the usual
-  hand-off card; nothing goes to an expert until you press Send there.
-- **Stuck? reads nothing until you click.** When an error title (as above) has stayed in front for
-  three minutes, Scout says one fixed line, "That error’s still up. Want me to hand it to Coder?",
-  from the title alone: no window text is read and no model is called. Only if you press **Hand it
-  over** does Scout read that one window's text (the last 4,000 characters), hide any key, token or
-  password in it, and put it in the brief on the hand-off card, which says "Includes the end of the error window". The read is logged in **What Scout
-  saw** like every other read, and nothing goes to the expert until you press **Send**. At most once
-  every thirty minutes, never twice for the same error, and never during Not now, a call, full
-  screen or a blind spot.
-- **Scout's moods use the same titles.** A wince when the window in front newly reads like a failed
-  build, a cheer when it reads like passing tests: from the title alone, with no window text read
-  and no model called, at most once a minute, and never for a blind spot, a call or full screen.
-  A finished hand-off can make Scout wince or cheer too, from the expert's own reply, which is
-  already on this computer.
-- **The daily budget stops it too.** With a cap set under Settings → **Daily budget**, once that
-  day's priced spend reaches it no window is looked at and no call is made until midnight. Moods
-  carry on, since they call no model.
+- **An offer reads the window again only when you click.** A line may offer to hand the work to an
+  expert. Only if you press **Hand it over** does Scout read that window's text again (the last
+  4,000 characters), hide any key, token or password in it, and put it in the brief on the
+  hand-off card, which says "Includes the end of the error window". The read is logged in **What
+  Scout saw** like every other read, and nothing goes to the expert until you press **Send**.
 
 ### Dozing: your idle time
 
@@ -526,16 +532,26 @@ stored, and it never leaves this computer.
 Off by default; switch it on under Settings → Privacy → **Gentle nudges**. While it is on, and sight
 is not paused, the desktop sends the engine on this computer two things once a minute: the idle time
 (how long since the last key or mouse input) and the window titles keeping an eye already lists (no
-picture, no window text). Nothing is stored and no model is called: the lines are fixed text.
+picture, no window text). Neither is stored.
 
-- After an hour and a half with no five-minute break, Scout looks tired and suggests a stretch,
-  once. After 23:00, once you have been active for half an hour, it says it is late, once a night.
+- After an hour and a half with no five-minute break (once a stretch), or after 23:00 once you have
+  been active for half an hour (once a night), Scout makes one check-in. It carries how long you
+  have been at it, the app and title of the window in front (never a blind spot's), and the facts
+  every check-in carries (above). No window text is read.
+- Scout may say a line, offer to have an expert do something (nothing goes to the expert until you
+  press Send on the card), look tired, or say nothing. A tired face clears after a five-minute
+  break or when you switch nudges off.
 - Nothing appears during a call or over a full-screen app, and **Not now** quiets it for an hour.
-- **Nothing leaves this computer unless you take the offer.** With an expert switched on, the late
-  line offers **Hand it over**, which opens the hand-off card with "Write a short note of where I am
-  so I can pick up tomorrow" and the app and title of the window in front (never a blind spot's).
-  Nothing goes to the expert until you press Send there.
-- Nudges read nothing beyond the titles feed, so they add no rows to what Scout saw.
+
+## Finished hand-offs
+
+When an expert you handed work to finishes, Scout makes one check-in about it: the expert's name,
+the start of what it was asked (its first paragraph, at most 100 characters), how it ended, and the
+last 1,500 characters of its answer (or the first 1,500 of its error) go to the summaries model
+with the facts every check-in carries, so Scout can say one short line about the outcome. The
+answer and the error go fenced as data, never as instructions. The card keeps the whole answer;
+the answer is never read out. With the bubble closed, the line comes beside Scout like any other
+line. A routine's own hand-off is delivered by the routine and gets no check-in.
 
 ## Pick up where you left off
 
@@ -608,7 +624,7 @@ there is no switch, because it holds no content and an off switch would weaken t
 | **Listed windows**     | the window list is read (a tool or a routine)                                                                | how many windows                                                 |
 | **Read text**          | one window's text is read (accessibility tree or OCR), or a hotkey ask arrives with a selection or page text | the app, the window title, how many characters                   |
 | **Screenshot**         | a screenshot, a crop, a window picture, a frame from screen memory, or a watch's before-and-after crops      | the app and title when known, how many pictures                  |
-| **Sent to AI**         | any call to Scout's provider: a turn, a summary, a watch check, keeping an eye on things, the launch line    | the provider and model, how many characters and pictures         |
+| **Sent to AI**         | any call to Scout's provider: a turn, a summary, a watch check, a check-in, the launch line                  | the provider and model, how many characters and pictures         |
 | **Sent to expert**     | a brief goes to an expert, or a note from you reaches a working one                                          | the expert's name, how many characters                           |
 | **Read element names** | Scout points at a named button or field, so the window's element names are read to find it                   | the app and the window title; not the name asked or any it found |
 | **Changed by talk**    | you click Apply on a settings card Scout showed                                                              | which settings changed (such as `userName, voice`); never values |

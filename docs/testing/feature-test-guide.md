@@ -13,6 +13,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Settings](#settings)
 - [Greeting](#greeting)
 - [Keeping an eye on things](#keeping-an-eye-on-things)
+- [Check-ins](#c-check-ins-the-mind-decides)
 - [Voice: Scout talks](#voice-scout-talks)
 - [Talk to Scout](#talk-to-scout)
 - [Connections: your apps over MCP](#connections-your-apps-over-mcp)
@@ -288,7 +289,8 @@ _Only on a data folder from a build before Nebius was removed._
    **Allow edits**), and the **Brief**, which you can edit. Nothing runs until **Send**.
 4. **Action:** press **Cancel**. **Expected:** nothing runs.
 5. **Action:** ask again and press **Send**. **Expected:** the card shows Claude Code's steps; when
-   it finishes, Scout says "Claude Code has finished." and the answer shows in the bubble. Home →
+   it finishes, the answer shows on the card, and Scout may add one short line about the outcome
+   (the mind's, or nothing). Home →
    Activity lists the hand-off with its thread.
 
 _Fake provider:_ the same flow runs with a scripted expert that "read the brief and has nothing to
@@ -513,25 +515,28 @@ _Fake provider:_ with `TAGALONG_FAKE_PROVIDERS=1` both steps are scripted expert
 ## Keeping an eye on things
 
 On by default. Not active under `TAGALONG_FAKE_PROVIDERS=1` unless `TAGALONG_KEEP_AN_EYE=1` is set.
+Every line here is a check-in (see C below): the mind's own words, and usually nothing. Never pin
+the wording; check that a line is short, about the facts, and that silence is common.
 
-### K.1. A failed build gets one line
+### K.1. A failed build may get one line
 
 1. **Setup:** a real brain set up; the bubble closed; nothing said in the last ten minutes.
 2. **Action:** in a terminal, run a command that fails, and give the window a title with "failed"
    in it (PowerShell: `$host.UI.RawUI.WindowTitle = 'npm test failed'`). Keep typing elsewhere.
-3. **Expected:** within about five seconds one short line appears beside Scout, about the failure,
-   and your typing is not interrupted. It has **Not now** and fades after about twelve seconds. No
-   screenshot is taken. If the summaries model sees nothing useful, nothing appears, which is fine.
+3. **Expected:** within about twenty seconds either nothing, or one short line beside Scout about
+   what the failure means (not the error read back), and your typing is not interrupted. It has
+   **Not now** and fades after about twelve seconds. No screenshot is taken.
 
 ### K.2. Settling on a new window
 
 1. **Action:** open a document or page you have not opened this session and stay on it for 30 s.
-2. **Expected:** usually nothing. At most one line, and never a second one about the same window.
+2. **Expected:** almost always nothing. At most one line, and never a second one about the same
+   window.
 
 ### K.3. The limits
 
-1. **Action:** after a line, cause another failure within ten minutes.
-2. **Expected:** nothing until ten minutes have passed since the last line.
+1. **Action:** after a check-in (spoken or not), cause another failure within ten minutes.
+2. **Expected:** nothing until ten minutes have passed (What Scout saw shows no new "Sent to AI").
 3. **Action:** press **Not now** on a line, then cause failures.
 4. **Expected:** nothing for an hour.
 5. **Action:** put a video full screen, or join a Teams, Zoom or Google Meet call, then cause a
@@ -541,48 +546,35 @@ On by default. Not active under `TAGALONG_FAKE_PROVIDERS=1` unless `TAGALONG_KEE
 ### K.4. Blind spots and the switch
 
 1. **Action:** add `*failed*` to your exclusion list, then cause a failure whose title matches it.
-2. **Expected:** nothing; that window is never read.
+2. **Expected:** nothing; that window is never read and no call is made.
 3. **Action:** Settings → Privacy → **Keep an eye on things** → Off, Save.
 4. **Expected:** no further lines; the window list is no longer taken. The ⓘ note explains what is
-   followed and when a window is read.
+   followed, when a window is read, and what goes with the call.
 
 ### K.4b. Paused sight is said plainly
 
 1. **Action:** pause sight (`Ctrl+Shift+Alt+P`) and ask "look at my screen".
 2. **Expected:** Scout says sight is paused, not that the screen was empty.
 
-### K.5. Hand it over
+### K.5. Hand it over reads the window only on the click
 
-1. **Setup:** Claude Code switched on as an expert.
-2. **Action:** cause a failure that an expert could fix. When a line with **Hand it over** appears,
-   press it.
-3. **Expected:** the hand-off card opens with the task and the window title; nothing runs until you
-   press **Send**.
-
-### K.6. Stuck? Hand the error to Coder
-
-1. **Setup:** an expert named Coder (Home → Experts → Add expert → Coder) switched on; a project
-   open in the editor (for example `ai_pet` in VS Code).
-2. **Action:** click the editor, then bring a terminal to the front whose title reads like trouble
-   (for example run `title npm test - 2 failed` in `cmd`) and print an error in it. Leave it in front
-   for three minutes.
-3. **Expected:** Scout says "That error’s still up. Want me to hand it to Coder?" with **Hand it
-   over** and **Not now**. Apart from the one look keeping an eye takes when the title first reads
-   like trouble (K.1), **What Scout saw** shows no new read of the terminal before the click.
+1. **Setup:** one expert switched on (Claude Code), or several with clear "good at" lines; a
+   project open in the editor (for example `ai_pet` in VS Code).
+2. **Action:** click the editor, then bring a terminal to the front titled like trouble (for
+   example `title npm start - failed` in `cmd`) with `Error: listen EADDRINUSE :::3000` in it.
+3. **Expected:** a line may come with **Hand it over**. **What Scout saw** shows one read of the
+   terminal (the check-in's) and nothing more before the click.
 4. **Action:** press **Hand it over**.
-5. **Expected:** the hand-off card opens to Coder with "Fix the error in npm test - 2 failed" and
-   the editor's project already picked and "Includes the end of the error window" under the brief;
-   **What Scout saw** now shows one more read of the terminal.
-   Nothing runs until **Send**; after Send, Coder's brief ends with the terminal's last lines, any
-   key in them hidden.
-6. **Action:** leave a second error up for three minutes within half an hour, and separately press
-   **Not now** on the line.
-7. **Expected:** no second Stuck? line within thirty minutes; none for an hour after Not now; none
-   over a Teams call or a full-screen window.
+5. **Expected:** the hand-off card opens with the mind's task, the editor's project already picked
+   and "Includes the end of the error window" under the brief; **What Scout saw** now shows one
+   more read of the terminal. Nothing runs until **Send**; any key in the window's end is hidden.
+6. **Action:** with two experts on, repeat until a line offers help without naming a clear expert.
+7. **Expected:** the line shows without **Hand it over**: Scout never guesses an expert.
 
 ## Scout's moods
 
-Title moods need **Keep an eye on things** on and sight not paused, as in K.1.
+Faces other than dozing come only from the mind, in a check-in (with or without words). A title
+alone never makes Scout wince or cheer.
 
 ### M.1. Scout dozes while you are away
 
@@ -593,24 +585,22 @@ Title moods need **Keep an eye on things** on and sight not paused, as in K.1.
 3. **Action:** with Always listening on, repeat.
 4. **Expected:** the green listening dot stays on Scout the whole time it dozes.
 
-### M.2. A failing then passing test run
+### M.2. A face from a check-in
 
 1. **Action:** in a terminal in front, set the title to a failure
-   (`$host.UI.RawUI.WindowTitle = 'npm test - 2 failed'`).
-2. **Expected:** within about five seconds Scout winces (`> <`, one small shake) for about four
-   seconds, with no words. Setting the same title again does nothing.
-3. **Action:** a minute later, set `$host.UI.RawUI.WindowTitle = 'npm test - 12 passed'`.
-4. **Expected:** Scout cheers (a happy squint, two hops) for about four seconds. A second change
-   inside the same minute gets no reaction.
-5. **Action:** put a video full screen or join a call, then cause a failure title behind it.
-6. **Expected:** no reaction.
+   (`$host.UI.RawUI.WindowTitle = 'npm test - 2 failed'`), with real failing output in it.
+2. **Expected:** Scout may wince (`> <`, one small shake) for about four seconds, with or without a
+   line. Setting the title to `npm test - 12 passed` alone does nothing.
+3. **Action:** put a video full screen or join a call, then cause a failure title behind it.
+4. **Expected:** no reaction.
 
-### M.3. An expert's error
+### M.3. A finished hand-off
 
 1. **Setup:** Claude Code switched on as an expert.
-2. **Action:** hand off a task that fails (for example, a folder Claude Code cannot open).
-3. **Expected:** when it ends with an error, Scout winces for about four seconds, then shows the
-   usual **Done** face. A hand-off whose reply says the tests pass makes it cheer instead.
+2. **Action:** hand off a task that fails (for example, a folder Claude Code cannot open), then one
+   that succeeds.
+3. **Expected:** each may bring a face (a wince, a cheer) and one short line on its card, both from
+   the mind; or neither. The **Done** face follows as usual.
 
 ### M.4. Reduced motion
 
@@ -621,45 +611,85 @@ Title moods need **Keep an eye on things** on and sight not paused, as in K.1.
 ## Gentle nudges
 
 The thresholds (90 minutes, a 5-minute break, 23:00 to 05:00) are constants; the unit tests
-(`packages/core/src/wellbeing/wellbeing.test.ts`) shorten them through a fake clock and a fixed
-hour. By hand, check the switch, the hold during calls and the late-night offer.
+(`packages/core/src/check-in/active-time.test.ts`, `check-in.test.ts`) shorten them through a fake
+clock and a fixed hour. By hand, check the switch, the hold during calls and that the words are the
+mind's.
 
 ### N.1. Off by default
 
 1. **Action:** on a fresh profile, open Settings → Privacy.
 2. **Expected:** **Gentle nudges** sits directly below **Keep an eye on things**, switched Off. The ⓘ
-   note says what is read (idle time and titles), the limits, and that it is off by default. With it
-   off, no nudge ever appears.
+   note says what is read (idle time and titles), what goes with the one call, the limits, and that
+   it is off by default. With it off, no nudge check-in ever happens.
 
 ### N.2. A long stretch
 
 1. **Action:** switch **Gentle nudges** on, Save, then keep working for an hour and a half without a
    five-minute break.
-2. **Expected:** within a minute of the 90 minutes, Scout's eyes droop (half-lidded, slow breathing,
-   no blink; its name reads "Scout looks tired") and one quiet line appears: "You've been at it for
-   an hour and a half. Stretch?", with **Not now**. No second line in the same stretch.
+2. **Expected:** within a minute of the 90 minutes, one check-in ("Sent to AI" in What Scout saw).
+   Scout may look tired (half-lidded, slow breathing, no blink; "Scout looks tired"), say one
+   line in its own words, or do nothing. Never a fixed "Stretch?" line. No second check-in in the
+   same stretch.
 3. **Action:** step away for five minutes, then come back.
-4. **Expected:** the tired face clears.
+4. **Expected:** a tired face clears.
 5. **Action:** an hour into a new stretch, put the computer to sleep for ten minutes, then wake it.
-6. **Expected:** no line on waking; the stretch starts over.
+6. **Expected:** nothing on waking; the stretch starts over.
 
 ### N.3. Calls and full screen
 
 1. **Action:** with nudges on and a stretch nearly due, keep a Teams window (or a full-screen video)
    in front past the 90 minutes.
-2. **Expected:** nothing appears and the face does not change while it is in front. Switch to
-   another window: the face and the line come within a minute.
+2. **Expected:** no check-in while it is in front. Switch to another window: the check-in comes
+   within a minute.
 
 ### N.4. Late at night
 
 1. **Setup:** Claude Code switched on as an expert.
 2. **Action:** after 23:00, with nudges on, work for half an hour.
-3. **Expected:** Scout looks tired and says once "It's late. Want me to write up where you are?"
-   with **Hand it over**. Pressing it opens the hand-off card with the write-up task and the window
-   title; nothing runs until **Send**. With no expert switched on, the line has no button. At 05:00
-   the tired face clears.
-4. **Action:** press **Not now** on a nudge.
-5. **Expected:** no nudge for an hour.
+3. **Expected:** one check-in. Any line is the mind's; if it offers a write-up, **Hand it over**
+   opens the hand-off card with the task and the window title, and nothing runs until **Send**.
+4. **Action:** press **Not now** on a line.
+5. **Expected:** no unprompted check-in for an hour.
+
+## C. Check-ins (the mind decides)
+
+Run each three times with a real brain (a fast summaries model is fine) and compare with the
+previous build. Pass: lines are short, true to the facts, never boilerplate, often absent.
+
+### C.1. Silence is common
+
+1. **Action:** with Keep an eye on things on, settle on ten ordinary windows over an hour.
+2. **Expected:** almost always silent; at most six "Sent to AI" check-ins (the ten-minute
+   cooldown).
+
+### C.2. An error on screen
+
+1. **Action:** a terminal titled `npm start - failed` showing `EADDRINUSE :3000`.
+2. **Expected:** one line on what it means (the port is taken, an old server is probably still
+   running) or nothing; never the error read back. Hand it over behaves as in K.5.
+
+### C.3. A finished hand-off
+
+1. **Action:** hand off "fix the failing test" and wait for it to finish.
+2. **Expected:** the card shows the whole answer; at most one short line about the outcome appears
+   on the card and is spoken; nothing else of the answer is read aloud. If the mind is silent,
+   nothing is spoken.
+3. **Action:** hand off again and close the bubble as soon as the finished card shows, before the
+   line arrives.
+4. **Expected:** the line (if any) comes beside Scout as an ordinary line with Not now, spoken
+   once; opening the bubble does not say it again.
+
+### C.4. Not now
+
+1. **Action:** press **Not now** on any line, then cause an error and hand something off.
+2. **Expected:** nothing unprompted for an hour; the finished hand-off still gets its line.
+
+### C.5. Blind spots and memory
+
+1. **Action:** keep a blind-spot app (for example 1Password) in front for a minute; separately,
+   tell Scout "remember I prefer short answers" and then cause an error.
+2. **Expected:** no check-in about the blind-spot window (no "Sent to AI"); the error's line, if
+   any, is short.
 
 ## Voice: Scout talks
 
@@ -708,8 +738,8 @@ voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APP
 1. **Action:** finish Welcome and step through the intro with **Next**; restart Tagalong; hand a
    task to Claude Code; cause a line from keeping an eye on things (K.1).
 2. **Expected:** each intro beat is spoken as it appears; the line on a later launch is spoken;
-   "Claude Code has finished." and the start of its answer are spoken; the K.1 line is spoken, and
-   its × stops it.
+   when the hand-off finishes, only the mind's one line about it is spoken (if there is one; the
+   answer itself is not read out); the K.1 line is spoken, and its × stops it.
 
 ### V.5. Settings → Voice
 
@@ -1338,9 +1368,9 @@ monitor.
 3. **Action:** wait for the routine's time. **Expected:** it does not run; **Activity** shows it
    with "Skipped: today's budget is spent." Scout says nothing about it.
 4. **Action:** open a window whose title reads like trouble ("Build failed") and stay on it.
-   **Expected:** no keep-an-eye comment.
+   **Expected:** no check-in (no "Sent to AI" for it).
 5. **Action:** ask Scout a question, press **Run now** on the routine, start a watch and send a
-   hand-off. **Expected:** all of them run.
+   hand-off. **Expected:** all of them run; the finished hand-off gets no check-in line.
 6. **Action:** type `-1` or `abc` in the budget and save. **Expected:** the field says what it needs;
    nothing is saved. Clear the box and save: the cap is off and the paused line goes.
 7. **Action:** with only the Claude sign-in in use, set the cap to `0.01`. **Expected:** the cap

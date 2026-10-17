@@ -76,6 +76,11 @@ describe('renderNow', () => {
     expect(text).not.toMatch(/^Spoken/m);
   });
 
+  it('adds no reason line for a check-in: the check-in says why it woke itself', () => {
+    const lines = renderNow(facts({ reason: { kind: 'check-in' } })).split('\n');
+    expect(lines).toEqual([NOW_HEADING, 'Friday 16 October, 21:40, Europe/London.']);
+  });
+
   it('lists experts working, finished with their state, and briefs waiting for Send', () => {
     const text = renderNow(
       facts({

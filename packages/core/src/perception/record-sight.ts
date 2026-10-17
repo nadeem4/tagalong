@@ -10,7 +10,7 @@ import type { PerceptionHost } from './host';
  * Wraps a host so every read it answers writes one row to the log of what Scout saw.
  *
  * One wrapper at the host, as `guardBrain` sits at the provider: the tools, the watches,
- * keep-an-eye and the browser routing all read through `hosts()`, so a read path added
+ * check-ins and the browser routing all read through `hosts()`, so a read path added
  * later is logged without anyone remembering to. Only metadata is recorded. A read the
  * host refused (`blocked`) or that returned nothing is not logged, because nothing was read.
  *

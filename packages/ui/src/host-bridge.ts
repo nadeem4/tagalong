@@ -48,7 +48,9 @@ type TurnNotification =
   | 'routines.changed'
   | 'connections.changed'
   | 'pet.mood'
-  | 'settings.proposed';
+  | 'settings.proposed'
+  // Only the line about a finished hand-off (with `handoffId`); other lines show beside Scout.
+  | 'pet.remark';
 
 /**
  * Derived from the protocol catalog rather than restated, so a new turn.* notification

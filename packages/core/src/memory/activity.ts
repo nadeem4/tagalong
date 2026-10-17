@@ -310,6 +310,30 @@ export class ActivityLog {
     return row?.at ?? null;
   }
 
+  /** This pet's latest answered question and its answer (clipped as stored): for check-ins. */
+  lastExchange(petId: string): { said: string; answered: string } | null {
+    const row = this.db
+      .prepare<[string], { text: string; answer: string }>(
+        `SELECT text, answer FROM activity
+         WHERE kind = 'turn' AND pet_id = ? AND answer IS NOT NULL AND text IS NOT NULL
+         ORDER BY started_at DESC, rowid DESC LIMIT 1`,
+      )
+      .get(petId);
+    return row === undefined ? null : { said: row.text, answered: row.answer };
+  }
+
+  /** A hand-off's expert and what it was asked, by its id: for its check-in. */
+  expertEntry(id: string): { expertName: string; ask: string } | null {
+    const row = this.db
+      .prepare<[string], { expert_name: string | null; text: string | null }>(
+        `SELECT expert_name, text FROM activity WHERE id = ? AND kind = 'expert'`,
+      )
+      .get(id);
+    return row === undefined
+      ? null
+      : { expertName: row.expert_name ?? 'An expert', ask: row.text ?? '' };
+  }
+
   /** The routines that ran well after `since`, oldest first, at most five: their names only. */
   routinesFinishedSince(since: string): string[] {
     return this.db

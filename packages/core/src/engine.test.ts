@@ -586,6 +586,40 @@ describe('keep an eye over rpc', () => {
     });
     expect(accepted['result']).toEqual({ proposed: false });
   });
+
+  it('an offer the mind made opens the hand-off card on keepAnEye.accept, unsent', async () => {
+    const e = await boot(new FakeBrainProvider({ text: 'Port taken.\nOFFER: Free port 3000' }));
+    const host = await TestHost.connect(e.port);
+    host.onRequest = () => ({
+      windowId: 'w-7',
+      text: 'EADDRINUSE',
+      truncated: false,
+      source: 'uia',
+    });
+    await host.call('hello', {
+      ...helloParams(e.pairingToken),
+      capabilities: ['textLayer'] as const,
+    });
+    await host.call('experts.upsert', {
+      expert: { id: 'claude-code', name: 'Claude Code', connection: { type: 'claude-code' } },
+    });
+    const window = {
+      id: 'w-7',
+      processName: 'WindowsTerminal.exe',
+      title: 'npm start - failed',
+      state: 'foreground',
+      browser: false,
+    };
+    await host.call('keepAnEye.observe', { windows: [window] });
+    await vi.waitFor(() => expect(host.methods()).toContain('pet.remark'), { timeout: 5000 });
+    const remark = host.notifications.find((n) => n.method === 'pet.remark')!.params;
+    expect(remark['offer']).toBe('Free port 3000');
+    expect(host.methods()).not.toContain('handoff.proposed');
+    const accepted = await host.call('keepAnEye.accept', { remarkId: remark['remarkId'] });
+    expect(accepted['result']).toEqual({ proposed: true });
+    await vi.waitFor(() => expect(host.methods()).toContain('handoff.proposed'));
+    expect(host.methods()).not.toContain('handoff.progress');
+  });
 });
 
 describe('gentle nudges over rpc', () => {
@@ -601,11 +635,11 @@ describe('gentle nudges over rpc', () => {
   afterEach(() => vi.useRealTimers());
 
   /** A booted engine with nudges on, the clock held at a local hour, and one first tick. */
-  async function nudging(hour: number) {
+  async function nudging(hour: number, reply: string) {
     vi.useFakeTimers({ toFake: ['Date'] });
     const start = new Date(2026, 9, 15, hour, 0).getTime();
     vi.setSystemTime(start);
-    const e = await boot();
+    const e = await boot(new FakeBrainProvider({ text: reply }));
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
     await host.call('settings.set', { patch: { wellbeing: { enabled: true } } });
@@ -625,26 +659,15 @@ describe('gentle nudges over rpc', () => {
     return { host, at };
   }
 
-  it('Not now on a remark quiets the nudges too', async () => {
-    const { host, at } = await nudging(14);
-    await at(89);
-    await host.call('keepAnEye.notNow', {});
-    await at(91);
+  it('a long stretch asks the mind; its tired face clears when nudges are switched off', async () => {
+    const { host, at } = await nudging(14, 'NOTHING\nMOOD: tired');
+    await at(90);
     await vi.waitFor(() => expect(host.methods()).toContain('pet.mood'));
     expect(host.notifications.find((n) => n.method === 'pet.mood')?.params).toEqual({
       petId: 'scout',
       mood: 'tired',
     });
     expect(host.methods()).not.toContain('pet.remark');
-  });
-
-  it('a long stretch says the stretch line, and switching nudges off looks rested', async () => {
-    const { host, at } = await nudging(14);
-    await at(90);
-    await vi.waitFor(() => expect(host.methods()).toContain('pet.remark'));
-    expect(host.notifications.find((n) => n.method === 'pet.remark')?.params).toMatchObject({
-      text: "You've been at it for an hour and a half. Stretch?",
-    });
     await host.call('settings.set', { patch: { wellbeing: { enabled: false } } });
     await vi.waitFor(() =>
       expect(
@@ -653,19 +676,18 @@ describe('gentle nudges over rpc', () => {
     );
   });
 
-  it('the late-night offer opens the hand-off card through keepAnEye.accept', async () => {
-    const { host, at } = await nudging(23);
+  it('late at night, an offer the mind made opens the hand-off card on accept', async () => {
+    const { host, at } = await nudging(23, 'It is late.\nOFFER: Write up where I am');
     await host.call('experts.upsert', {
       expert: { id: 'claude-code', name: 'Claude Code', connection: { type: 'claude-code' } },
     });
     await at(30);
     await vi.waitFor(() => expect(host.methods()).toContain('pet.remark'));
     const remark = host.notifications.find((n) => n.method === 'pet.remark')!.params;
-    expect(remark['offer']).toBe('Write a short note of where I am so I can pick up tomorrow');
+    expect(remark['offer']).toBe('Write up where I am');
     const accepted = await host.call('keepAnEye.accept', { remarkId: remark['remarkId'] });
     expect(accepted['result']).toEqual({ proposed: true });
     await vi.waitFor(() => expect(host.methods()).toContain('handoff.proposed'));
-    expect(host.methods()).not.toContain('handoff.progress');
   });
 });
 
@@ -1202,7 +1224,7 @@ describe('a companion handing work to an expert', () => {
 });
 
 describe('the daily budget over rpc', () => {
-  it('once spent, stops keep-an-eye only: an ask, Run now and a confirmed hand-off still go', async () => {
+  it('once spent, stops every check-in: an ask, Run now and a confirmed hand-off still go', async () => {
     // A dollar already spent today, against a one-cent cap.
     const db = openDatabase(dir);
     db.prepare(
@@ -1235,7 +1257,7 @@ describe('the daily budget over rpc', () => {
     };
     expect(summary.budget).toEqual({ dailyUsd: 0.01, spentOut: true });
 
-    // Keep-an-eye is proactive: nothing is read and nothing is said.
+    // A check-in is proactive: nothing is read and nothing is said.
     const window = {
       id: 'w-7',
       processName: 'Code.exe',
@@ -1273,6 +1295,8 @@ describe('the daily budget over rpc', () => {
     await vi.waitFor(() => expect(host.methods()).toContain('handoff.finished'), {
       timeout: 5000,
     });
+    // Its finish gets a check-in only while there is budget.
+    expect(host.methods()).not.toContain('pet.remark');
 
     // Run now is the person's own ask too.
     const saved = (
@@ -1290,8 +1314,8 @@ describe('the daily budget over rpc', () => {
   });
 });
 
-describe('a mood from a finished hand-off', () => {
-  it('cheers when the expert reports the tests pass', async () => {
+describe('a finished hand-off checks in', () => {
+  it('the mind says one line tied to the hand-off, as pet.remark with its id', async () => {
     const provider = new FakeBrainProvider({
       text: 'Claude Code has it.',
       toolCall: {
@@ -1324,11 +1348,15 @@ describe('a mood from a finished hand-off', () => {
       canEdit: false,
     });
 
-    await vi.waitFor(() => expect(host.methods()).toContain('pet.mood'));
-    expect(host.notifications.find((n) => n.method === 'pet.mood')?.params).toEqual({
+    await vi.waitFor(() => expect(host.methods()).toContain('pet.remark'));
+    const finished = host.notifications.find((n) => n.method === 'handoff.finished')!;
+    expect(host.notifications.find((n) => n.method === 'pet.remark')?.params).toMatchObject({
       petId: 'scout',
-      mood: 'cheer',
+      text: 'Claude Code has it.',
+      handoffId: finished.params['handoffId'],
     });
+    // No face from patterns in the answer: a face comes only from the mind.
+    expect(host.methods()).not.toContain('pet.mood');
   });
 });
 

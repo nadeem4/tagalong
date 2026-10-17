@@ -174,6 +174,13 @@ describe('keep an eye', () => {
     expect(notificationParamsSchemaFor('pet.remark').safeParse(empty).success).toBe(false);
   });
 
+  it('ties a line to the finished hand-off it is about, by its id', () => {
+    const line = { remarkId, petId: 'scout', text: 'All green.', handoffId: remarkId };
+    expect(notificationParamsSchemaFor('pet.remark').parse(line)).toEqual(line);
+    const bad = { ...line, handoffId: 'not-an-id' };
+    expect(notificationParamsSchemaFor('pet.remark').safeParse(bad).success).toBe(false);
+  });
+
   it('quiets for a while on Not now, and accepts an offer by its remark', () => {
     expect(paramsSchemaFor('keepAnEye.notNow').parse({})).toEqual({});
     expect(paramsSchemaFor('keepAnEye.accept').parse({ remarkId })).toEqual({ remarkId });

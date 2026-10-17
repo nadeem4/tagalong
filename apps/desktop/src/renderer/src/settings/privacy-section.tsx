@@ -198,11 +198,13 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
         Scout follows which windows are open and which one is in front, from their titles only: no
         picture, no model call. When you settle on a new window for half a minute, or a title reads
         like an error or a failed build, Scout reads that one window&apos;s text and asks the
-        summaries model, in one short call, whether there is one useful thing to say. At most one
-        line every ten minutes, never twice about the same window, and nothing while a full-screen
-        app or a call is in front. Not now on the line quiets it for an hour. Blind spots are never
-        considered, titles included. The same titles make Scout wince when a build fails and cheer
-        when tests pass, with no read and no model call. Off means no tracking at all. On by
+        summaries model, in one short call, whether there is anything worth saying; the call also
+        carries your five newest memories, your name, the time and your last exchange with Scout.
+        Usually there is nothing. A line may come with an offer to hand the work to an expert: the
+        window is read again only when you press it, and nothing runs until you press Send. At most
+        one call every ten minutes and 24 a day, never twice about the same window, and nothing
+        while a full-screen app or a call is in front. Not now on the line quiets it for an hour.
+        Blind spots are never considered, titles included. Off means no tracking at all. On by
         default.
       </Tip>
       <hr className="tg-divider" />
@@ -214,7 +216,7 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
             </h3>
             <Info tip="wellbeing" label="About gentle nudges" />
           </div>
-          <p className="tg-help">After a long stretch or late at night, Scout suggests a break.</p>
+          <p className="tg-help">After a long stretch or late at night, Scout may say something.</p>
         </div>
         <button
           type="button"
@@ -230,13 +232,15 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
       </div>
       <Tip tip="wellbeing">
         Once a minute Scout reads how long since your last key press or click, and the window titles
-        it already gets for keeping an eye: no picture, no text, no model call. After an hour and a
-        half with no five-minute break, Scout looks tired and suggests a stretch, once. After 23:00,
-        once you have been at it for half an hour, it says it is late, once a night, and offers to
-        have your expert write up where you are; nothing runs until you press Send on the card.
+        it already gets for keeping an eye: no picture, no text. After an hour and a half with no
+        five-minute break, or after 23:00 once you have been at it for half an hour, Scout asks the
+        summaries model once (once a stretch, once a night) whether anything is worth saying. That
+        call carries how long you have been at it, the app and title in front (never a blind
+        spot&apos;s), your five newest memories, your name, the time and your last exchange with
+        Scout. Scout may say a line, offer to hand something to an expert (nothing runs until you
+        press Send), look tired, or say nothing. A tired face clears after a five-minute break.
         Nothing appears during a call, over a full-screen app or while sight is paused. Not now
-        quiets it for an hour. Nothing leaves this computer unless you take the offer. Off by
-        default.
+        quiets it for an hour. Off by default.
       </Tip>
       <hr className="tg-divider" />
       <div className="tg-setting">

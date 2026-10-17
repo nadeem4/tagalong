@@ -255,7 +255,7 @@ describe('the hand-off card', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Claude Code is not signed in.');
   });
 
-  it('announces aloud that the expert finished, with its answer', async () => {
+  it('says nothing by itself on a finish; the mind’s line shows on the card, said once', async () => {
     const bridge = createFakeHostBridge();
     const onSay = vi.fn();
     render(
@@ -274,9 +274,34 @@ describe('the hand-off card', () => {
         text: 'The engine closes the database first.',
       }),
     );
-    expect(onSay).toHaveBeenCalledExactlyOnceWith(
-      'Claude Code has finished. The engine closes the database first.',
+    expect(onSay).not.toHaveBeenCalled();
+    const line = 'The database closed first; Claude Code moved it.';
+    const remarkId = 'a3bb189e-8bf9-4888-9912-ace4e6543999';
+    // A line about another hand-off, or about none, is not this card's.
+    act(() =>
+      bridge.emit({
+        type: 'pet.remark',
+        remarkId,
+        petId: 'scout',
+        text: 'Not this one.',
+        handoffId: 'a3bb189e-8bf9-4888-9912-ace4e6543998',
+      }),
     );
+    act(() => bridge.emit({ type: 'pet.remark', remarkId, petId: 'scout', text: 'Nor this.' }));
+    act(() =>
+      bridge.emit({
+        type: 'pet.remark',
+        remarkId,
+        petId: 'scout',
+        text: line,
+        handoffId: 'handoff-1',
+      }),
+    );
+    const done = screen.getByRole('region', { name: 'Claude Code finished' });
+    expect(done).toHaveTextContent(line);
+    expect(done).not.toHaveTextContent('Not this one.');
+    expect(done).not.toHaveTextContent('Nor this.');
+    expect(onSay).toHaveBeenCalledExactlyOnceWith(line);
   });
 });
 
@@ -367,7 +392,7 @@ describe('a two-step hand-off', () => {
     expect(screen.getByRole('region', { name: 'Coder is on it' })).toBeVisible();
   });
 
-  it('follows the chain: 1 of 2, then 2 of 2, then both answers, spoken once', async () => {
+  it('follows the chain: 1 of 2, then 2 of 2, then both answers, with nothing said by the finish', async () => {
     const bridge = createFakeHostBridge();
     const onSay = vi.fn();
     render(
@@ -408,9 +433,8 @@ describe('a two-step hand-off', () => {
     expect(done).toHaveTextContent('The month was off by one.');
     expect(done).toHaveTextContent('Reviewer says');
     expect(done).toHaveTextContent('The fix is right.');
-    expect(onSay).toHaveBeenCalledExactlyOnceWith(
-      'Coder and Reviewer have finished. The fix is right.',
-    );
+    // The finish itself says nothing: a line, if any, comes from the mind's check-in.
+    expect(onSay).not.toHaveBeenCalled();
   });
 
   it('shows step 2 as stopped, with step 1’s answer kept, when Stop ends step 2', async () => {
@@ -436,7 +460,7 @@ describe('a two-step hand-off', () => {
     expect(stopped).toHaveTextContent('Coder changed date.ts');
     expect(stopped).toHaveTextContent('The month was off by one.');
     expect(stopped).not.toHaveTextContent('Reviewer says');
-    expect(onSay).toHaveBeenCalledExactlyOnceWith('Reviewer stopped without finishing.');
+    expect(onSay).not.toHaveBeenCalled();
   });
 
   it('ignores step 1’s late Send id after step 2 has already finished', async () => {
@@ -552,9 +576,7 @@ describe('steering a working expert', () => {
     );
     const done = screen.getByRole('region', { name: 'Claude Code finished' });
     expect(done).toHaveTextContent('Not passed on: one more thing');
-    expect(onSay).toHaveBeenCalledExactlyOnceWith(
-      'Claude Code has finished. Done. Claude Code finished before I could pass on your note.',
-    );
+    expect(onSay).not.toHaveBeenCalled();
   });
 
   it('speaks what the expert says at most once every 20 seconds; tool steps stay silent', async () => {

@@ -2,9 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
 import {
-  COOLDOWN_MS,
   Lookout,
-  NOT_NOW_MS,
   SETTLE_MS,
   callOrFullScreenInFront,
   isMeeting,
@@ -31,7 +29,8 @@ function setup() {
   const lookout = new Lookout(clock);
   const at = (ms: number, windows: WindowEntry[], exclusions = NONE) => {
     clock.t = ms;
-    return lookout.observe(windows, exclusions);
+    lookout.track(windows, exclusions);
+    return lookout.pick(windows, exclusions);
   };
   return { clock, lookout, at };
 }
@@ -127,46 +126,24 @@ describe('Lookout', () => {
     expect(at(SETTLE_MS, [hidden])).toBeNull();
   });
 
-  it('says at most one thing every ten minutes', () => {
-    const { at, lookout } = setup();
+  it('a window only tracked, never picked (the gate was shut), is still there to pick', () => {
+    const { clock, lookout, at } = setup();
     const a = win('w-1', 'a.ts - Code');
-    at(0, [a]);
-    expect(at(SETTLE_MS, [a])).not.toBeNull();
-    lookout.spoke();
-    const failing = bg(win('w-2', 'Build failed'));
-    expect(at(SETTLE_MS + 1_000, [a, failing])).toBeNull();
-    expect(at(SETTLE_MS + COOLDOWN_MS, [a, failing])).toEqual({ window: failing, why: 'trouble' });
+    clock.t = 0;
+    lookout.track([a], NONE);
+    clock.t = SETTLE_MS * 4;
+    lookout.track([a], NONE);
+    expect(at(SETTLE_MS * 5, [a])).toEqual({ window: a, why: 'settled' });
   });
 
-  it('a look that found nothing to say does not start the ten minutes', () => {
-    const { at } = setup();
-    const a = win('w-1', 'a.ts - Code');
-    at(0, [a]);
-    expect(at(SETTLE_MS, [a])).not.toBeNull();
-    const failing = bg(win('w-2', 'Build failed'));
-    expect(at(SETTLE_MS + 1_000, [a, failing])).toEqual({ window: failing, why: 'trouble' });
-  });
-
-  it('stays quiet for an hour after Not now', () => {
-    const { at, lookout } = setup();
-    const quietUntil = lookout.notNow();
-    expect(quietUntil).toBe(NOT_NOW_MS);
-    const failing = win('w-2', 'Build failed');
-    expect(at(1_000, [failing])).toBeNull();
-    expect(at(NOT_NOW_MS, [failing])).toEqual({ window: failing, why: 'trouble' });
-  });
-
-  it('stays quiet while a full-screen window or a meeting is in front', () => {
-    const { at } = setup();
-    const failing = bg(win('w-2', 'Build failed'));
-    const film = win('w-1', 'Movie', { fullScreen: true });
-    expect(at(0, [film, failing])).toBeNull();
-    const call = win('w-3', 'Meeting', { processName: 'Zoom.exe' });
-    expect(at(1_000, [call, bg(film), failing])).toBeNull();
-    expect(at(2_000, [bg(call), win('w-4', 'notes'), failing])).toEqual({
-      window: failing,
-      why: 'trouble',
-    });
+  it('remembers the last plain title in front, for the project an error belongs to', () => {
+    const { lookout, at } = setup();
+    expect(lookout.lastClean()).toBeNull();
+    at(0, [win('w-1', 'parser.ts - tagalong - Code')]);
+    at(1_000, [win('w-2', 'npm test - failed', { processName: 'WindowsTerminal.exe' })]);
+    at(2_000, [win('w-3', 'Vault', { processName: '1Password.exe' })]);
+    at(3_000, [win('w-4', '  ')]);
+    expect(lookout.lastClean()).toBe('parser.ts - tagalong - Code');
   });
 
   it('never considers a blind spot, by the host’s mark, the built-in list or the person’s own', () => {

@@ -1,7 +1,7 @@
 /** Tests for the finished hand-off notification. */
 
 import { describe, expect, it } from 'vitest';
-import { handoffNotice } from './handoff-notice';
+import { handoffLine, handoffNotice } from './handoff-notice';
 
 const id = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
 
@@ -68,5 +68,24 @@ describe('handoffNotice', () => {
 
   it('stays quiet for a hand-off the user stopped', () => {
     expect(handoffNotice({ handoffId: id, expertId: 'x', state: 'stopped' })).toBeNull();
+  });
+});
+
+describe('handoffLine', () => {
+  const remarkId = '7c9e6679-7425-40de-944b-e07fc1f90ae8';
+  const line = { remarkId, petId: 'scout', text: 'All green now.', handoffId: id };
+
+  it('goes to the hand-off card while the bubble is open', () => {
+    expect(handoffLine(line, true)).toEqual(line);
+  });
+
+  it('becomes an ordinary line once the bubble is closed, so it is not lost', () => {
+    expect(handoffLine(line, false)).toEqual({ remarkId, petId: 'scout', text: 'All green now.' });
+  });
+
+  it('leaves a line that is not about a hand-off alone', () => {
+    const plain = { remarkId, petId: 'scout', text: 'Hi.' };
+    expect(handoffLine(plain, false)).toEqual(plain);
+    expect(handoffLine(plain, true)).toEqual(plain);
   });
 });

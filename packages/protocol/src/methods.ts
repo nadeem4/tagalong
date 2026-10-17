@@ -416,7 +416,7 @@ export type GreetingComposeResult = z.infer<typeof GreetingComposeResult>;
 
 /**
  * Keep an eye on things. The host sends what is open, titles only, every few seconds; the
- * engine decides whether one window is worth a look. Most snapshots end there.
+ * engine decides whether one window is worth a check-in. Most snapshots end there.
  */
 export const KeepAnEyeObserveParams = z.object({ windows: z.array(WindowEntry) });
 export const KeepAnEyeObserveResult = Empty;
@@ -428,22 +428,25 @@ export const KeepAnEyeAcceptParams = z.object({ remarkId: z.uuid() });
 export const KeepAnEyeAcceptResult = z.object({ proposed: z.boolean() });
 
 /**
- * One short line a pet says on its own, from a window it kept an eye on. `offer` is a task
- * an expert could take, shown as a button that opens the hand-off card; nothing is sent
- * until the person presses Send there.
+ * One short line a pet says on its own, from a check-in: the mind's words, never a fixed
+ * line. `offer` is a task an expert could take, shown as a button that opens the hand-off
+ * card; nothing is sent until the person presses Send there. `handoffId` ties the line to a
+ * finished hand-off: it shows on that card in the bubble, not as a line of its own.
  */
 export const PetRemarkParams = z.object({
   remarkId: z.uuid(),
   petId: z.string().min(1),
   text: z.string().min(1),
   offer: z.string().min(1).optional(),
+  handoffId: z.uuid().optional(),
 });
 export type PetRemarkParams = z.infer<typeof PetRemarkParams>;
 
 /**
- * A short reaction on the pet's face, with no words: a wince at a failing build or an
- * expert's error, a cheer when tests pass. The host clears those after a few seconds.
- * `tired` (a long stretch, or late at night) stays until `rested` clears it.
+ * A face on the pet, chosen by the mind in a check-in (with or without words): a wince, a
+ * cheer, or tired. The host clears a wince or a cheer after a few seconds. `tired` (only
+ * while gentle nudges are on) stays until `rested` clears it, after a break or when nudges
+ * are switched off.
  */
 export const PetMoodParams = z.object({
   petId: z.string().min(1),
@@ -461,8 +464,9 @@ export type HostsStatusResult = z.infer<typeof HostsStatusResult>;
 
 /**
  * Gentle nudges. The host sends the idle time and the window titles once a minute, only
- * while the setting is on and sight is not paused. Any line comes back as `pet.remark`, the
- * face as `pet.mood` (`tired`, then `rested` after a break).
+ * while the setting is on and sight is not paused. After a long stretch, or late at night,
+ * the mind is asked once; any line comes back as `pet.remark`, any face as `pet.mood`
+ * (`tired`, then `rested` after a break).
  */
 export const WellbeingObserveParams = z.object({
   idleMs: z.number().nonnegative(),
