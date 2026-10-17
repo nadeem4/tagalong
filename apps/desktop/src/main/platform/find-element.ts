@@ -11,6 +11,7 @@ import type { WindowEntry } from '@tagalong/protocol';
 
 import type { WindowBounds } from './index';
 import type { RunScript } from './text-layer';
+import { PER_MONITOR_AWARE } from './window-helper';
 import { handleOf } from './window-list';
 import { WALK_PRELUDE, WINDOW_TEXT_WALK_MS } from './window-text';
 
@@ -21,19 +22,6 @@ function safeHandle(handle: number): number {
   }
   return handle;
 }
-
-/**
- * Per-monitor DPI awareness (v2), set before UI Automation loads. Windows PowerShell starts
- * unaware and UI Automation then makes it system-aware, and a system-aware process gets
- * rectangles on a monitor of a different scale virtualized, not in physical pixels. Best
- * effort: if it cannot be set, single-scale desks still come out right.
- */
-const PER_MONITOR_AWARE = String.raw`
-try {
-  Add-Type -Namespace Tagalong -Name Dpi -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr value);'
-  [void][Tagalong.Dpi]::SetProcessDpiAwarenessContext([IntPtr]-4)
-} catch {}
-`;
 
 /**
  * The script: the window by handle, then its first descendant whose name matches exactly,

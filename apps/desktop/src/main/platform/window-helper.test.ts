@@ -52,6 +52,15 @@ describe('LIST_WINDOWS_SCRIPT', () => {
     expect(LIST_WINDOWS_SCRIPT).not.toContain('ValuePattern');
   });
 
+  it('turns on per-monitor DPI awareness before UI Automation loads', () => {
+    // Left system-aware, PowerShell gets every rectangle on a monitor of another scale
+    // virtualized: on a 150 % laptop beside a 100 % monitor the monitor came back at
+    // x 2880 and 3840 wide instead of x 1920 and 2560, and no conversion undoes that.
+    const aware = LIST_WINDOWS_SCRIPT.indexOf('SetProcessDpiAwarenessContext');
+    expect(aware).toBeGreaterThan(-1);
+    expect(aware).toBeLessThan(LIST_WINDOWS_SCRIPT.indexOf('UIAutomationClient'));
+  });
+
   it('emits an array even for a single window', () => {
     // ConvertTo-Json unwraps a one-element array unless the input is forced to a list.
     expect(LIST_WINDOWS_SCRIPT).toContain('@(');
