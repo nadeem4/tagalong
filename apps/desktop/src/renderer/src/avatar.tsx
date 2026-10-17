@@ -6,6 +6,7 @@
 import { StrictMode, useEffect, useReducer, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { DockPet } from '@tagalong/ui';
+import type { ListeningDot } from '@tagalong/ui';
 import type { Pet, StatusMark } from '@tagalong/protocol';
 import type { ListeningState } from '../../shared/ipc';
 // Bundled, not fetched: the dock's tags are Onest 600, Latin subset only.
@@ -31,7 +32,13 @@ function Avatar() {
   const [dock, send] = useReducer(nextDock, IDLE_DOCK);
   const [sightPaused, setSightPaused] = useState(false);
   const [recording, setRecording] = useState(false);
-  const [listening, setListening] = useState<ListeningState>({ on: false, paused: false });
+  const [listening, setListening] = useState<ListeningState>({
+    on: false,
+    paused: false,
+    followUp: false,
+  });
+  // Speech heard while listening all the time: the dot pulses. The words are never read here.
+  const [hearing, setHearing] = useState(false);
   const [status, setStatus] = useState<StatusMark | null>(null);
   const [input] = useState(() => petInput(window.tagalongHost, send));
 
@@ -70,6 +77,20 @@ function Avatar() {
       .catch((error: unknown) => console.error('could not read Always listening', error));
     return window.tagalongHost.onListening(setListening);
   }, []);
+
+  // The ears' events reach every window: only whether speech started or the turn ended counts.
+  useEffect(
+    () =>
+      window.tagalongHost.onEarsEvent((event) => {
+        if (event === 'speechStart') setHearing(true);
+        else if (event === 'turnEnd') setHearing(false);
+      }),
+    [],
+  );
+  // A session that ended mid-turn never sends its turnEnd: a pause or the switch ends hearing.
+  useEffect(() => {
+    if (!listening.on || listening.paused) setHearing(false);
+  }, [listening.on, listening.paused]);
 
   // The top status mark (why Scout cannot think, Listening, ...), read on mount for the same reason.
   useEffect(() => {
@@ -155,12 +176,20 @@ function Avatar() {
           mood={dockMood(dock)}
           sightPaused={sightPaused}
           recording={recording}
-          listening={listening.on ? (listening.paused ? 'paused' : 'on') : undefined}
+          listening={listeningDot(listening, hearing)}
           status={status}
         />
       </button>
     </div>
   );
+}
+
+/** The listening dot: paused first, then speech heard, then the follow-up window's ring. */
+function listeningDot(listening: ListeningState, hearing: boolean): ListeningDot | undefined {
+  if (!listening.on) return undefined;
+  if (listening.paused) return 'paused';
+  if (hearing) return 'hearing';
+  return listening.followUp ? 'follow-up' : 'on';
 }
 
 const container = document.getElementById('root');

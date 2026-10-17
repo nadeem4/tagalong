@@ -19,7 +19,7 @@ export class AlwaysListening {
   readonly #listeners = new Set<(state: ListeningState) => void>();
 
   constructor(initialOn = false) {
-    this.#state = { on: initialOn, paused: false };
+    this.#state = { on: initialOn, paused: false, followUp: false };
   }
 
   get state(): ListeningState {
@@ -27,12 +27,17 @@ export class AlwaysListening {
   }
 
   set(on: boolean): ListeningState {
-    this.#move({ ...this.#state, on });
+    this.#move({ ...this.#state, on, followUp: on && this.#state.followUp });
     return this.#state;
   }
 
   setPaused(paused: boolean): void {
-    this.#move({ ...this.#state, paused });
+    this.#move({ ...this.#state, paused, followUp: !paused && this.#state.followUp });
+  }
+
+  /** The panel's follow-up window opened or closed; it opens only while listening is live. */
+  setFollowUp(open: boolean): void {
+    this.#move({ ...this.#state, followUp: open && this.#state.on && !this.#state.paused });
   }
 
   onChange(listener: (state: ListeningState) => void): () => void {
@@ -41,7 +46,8 @@ export class AlwaysListening {
   }
 
   #move(next: ListeningState): void {
-    if (next.on === this.#state.on && next.paused === this.#state.paused) return;
+    const now = this.#state;
+    if (next.on === now.on && next.paused === now.paused && next.followUp === now.followUp) return;
     this.#state = next;
     for (const listener of [...this.#listeners]) {
       try {

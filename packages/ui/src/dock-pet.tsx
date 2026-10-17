@@ -20,13 +20,30 @@ export interface DockPetProps {
   sightPaused?: boolean;
   /** Rolling memory holds the last minutes of the screen: never allowed to be invisible. */
   recording?: boolean;
-  /** Always listening is on, or paused for a call or full screen: shown the whole time. */
-  listening?: 'on' | 'paused' | undefined;
+  /**
+   * Always listening is on, or paused for a call or full screen: shown the whole time. While
+   * on, `hearing` (speech heard, a quick pulse, no words read) and `follow-up` (a ring: one
+   * reply needs no name) brighten the same dot.
+   */
+  listening?: ListeningDot | undefined;
   /** How often it blinks. Left out, every three to six seconds, never in step. */
   blinkEveryMs?: number;
   /** The top status mark (a problem, progress or a hint), as a tag at the bottom centre. */
   status?: StatusMarkValue | null;
 }
+
+export type ListeningDot = 'on' | 'paused' | 'hearing' | 'follow-up';
+
+/** The listening dot's tooltip, and the words it adds to Scout's label. */
+const LISTENING: Readonly<Record<ListeningDot, { title: string; words: string }>> = {
+  on: { title: STATUS_WORDS['listening-on'].detail, words: 'listening' },
+  hearing: { title: STATUS_WORDS['listening-on'].detail, words: 'listening' },
+  'follow-up': {
+    title: 'Listening for your reply, no name needed.',
+    words: 'listening for your reply',
+  },
+  paused: { title: STATUS_WORDS['listening-paused'].detail, words: 'listening paused' },
+};
 
 /** How long the eyes stay shut. */
 const BLINK_MS = 140;
@@ -119,7 +136,7 @@ export function DockPet({
   const tag = isTagged(mood) ? TAGS[mood] : undefined;
   const label = `${pet.name} ${WORDS[mood]}${sightPaused ? ', sight paused' : ''}${
     recording && !sightPaused ? ', recording the screen' : ''
-  }${listening === 'on' ? ', listening' : listening === 'paused' ? ', listening paused' : ''}${
+  }${listening === undefined ? '' : `, ${LISTENING[listening].words}`}${
     status == null ? '' : `, ${STATUS_WORDS[status.id].detail}`
   }`;
   return (
@@ -195,6 +212,7 @@ export function DockPet({
           className="dock-pet__listening"
           data-testid="listening-mark"
           data-state={listening}
+          title={LISTENING[listening].title}
           aria-hidden="true"
         />
       )}
@@ -227,6 +245,9 @@ const DOCK_CSS = `
 .dock-pet__listening { position: absolute; bottom: 4px; right: 4px; width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; border: 2px solid #7DD87F; background: #7DD87F; box-shadow: 0 0 0 1px #fff; }
 .dock-pet__listening[data-state='on'] { animation: dock-listening 2.4s ease-in-out infinite; }
 .dock-pet__listening[data-state='paused'] { background: transparent; }
+.dock-pet__listening[data-state='hearing'] { background: #B8F5B9; border-color: #B8F5B9; animation: dock-hearing 0.6s ease-out infinite; }
+.dock-pet__listening[data-state='follow-up'] { box-shadow: 0 0 0 1px #fff, 0 0 0 3px #7DD87F; }
+@keyframes dock-hearing { 0% { transform: scale(1); } 50% { transform: scale(1.35); } 100% { transform: scale(1); } }
 @keyframes dock-listening { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 @media (prefers-reduced-motion: reduce) { .dock-body, .dock-pet__listening { animation: none !important; } }
 `;

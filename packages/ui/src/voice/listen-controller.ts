@@ -4,7 +4,7 @@
  * ListenController and ListenMic. Used by the desktop renderer's talk wiring.
  */
 
-import { addressedToScout, isStopListening, mightBeStop } from '@tagalong/protocol';
+import { FOLLOW_UP_MS, addressedToScout, isStopListening, mightBeStop } from '@tagalong/protocol';
 import type { Ears, ListenMode, MicStream } from '@tagalong/protocol';
 
 /** The open microphone, as the controller needs it: its frames, and a way to close it. */
@@ -30,6 +30,13 @@ export interface ListenControllerOptions {
    */
   onDropped(): void;
   /**
+   * Listening all the time, a turn of three words or more did not start with the name (and
+   * no follow-up window was open). Never given its words.
+   */
+  onUnaddressed?(): void;
+  /** The follow-up window opened (true) or closed (false). */
+  onFollowUp?(open: boolean): void;
+  /**
    * Always listening: false hands over every turn whole, no "Scout" needed and "stop" is
    * just words. Default true.
    */
@@ -44,6 +51,8 @@ export interface ListenControllerOptions {
 }
 
 const RETRY_MS = 30_000;
+
+const words = (text: string): number => text.trim().split(/\s+/u).filter(Boolean).length;
 const MAX_RETRY_MS = 5 * 60_000;
 
 const setTimer = (run: () => void, ms: number): (() => void) => {
@@ -93,6 +102,8 @@ export class ListenController {
   /** The wait before the next retry after the ears failed, and the cancel of one pending. */
   #retryMs: number;
   #cancelRetry: (() => void) | null = null;
+  /** The follow-up window's cancel while it is open: one reply needs no name. */
+  #followUp: (() => void) | null = null;
 
   constructor(options: ListenControllerOptions) {
     this.#options = options;
@@ -105,6 +116,7 @@ export class ListenController {
 
   /** The talk key or the mic button: a question that needs no name, even while always listening. */
   hold(): void {
+    this.closeFollowUp();
     if (this.#session?.mode === 'held') return;
     // The voice process runs sessions in order: the always session stops before this one listens.
     this.#end();
@@ -133,6 +145,7 @@ export class ListenController {
    * listening is not a question: it goes on (or comes back after the held one).
    */
   cancel(): void {
+    this.closeFollowUp();
     this.#dropReleased();
     if (this.#session?.mode === 'held') this.#end();
     this.#sync();
@@ -147,6 +160,7 @@ export class ListenController {
    */
   earsFailed(): ListenMode | null {
     const mode = this.mode;
+    this.closeFollowUp();
     this.#dropReleased();
     this.#end();
     if (mode === 'always') this.#scheduleRetry();
@@ -156,7 +170,10 @@ export class ListenController {
   /** Always listening, as the person switched it. Off cancels a pending retry. */
   setAlways(on: boolean): void {
     this.#always = on;
-    if (!on) this.#resetRetry();
+    if (!on) {
+      this.#resetRetry();
+      this.closeFollowUp();
+    }
     this.#sync();
   }
 
@@ -180,7 +197,28 @@ export class ListenController {
   /** A call or a full-screen window, or the pets hidden: the mic closes until it is over. */
   setPaused(paused: boolean): void {
     this.#paused = paused;
+    if (paused) this.closeFollowUp();
     this.#sync();
+  }
+
+  /**
+   * Scout has just finished an answer aloud: for the next 20 s one reply needs no name, so a
+   * back-and-forth flows. Only while Always listening is on and not paused. Closed by the
+   * reply itself, the time running out, a pause, the talk key, cancel or switching off.
+   */
+  openFollowUp(): void {
+    if (!this.#always || this.#paused) return;
+    const wasOpen = this.#followUp !== null;
+    this.#followUp?.();
+    this.#followUp = (this.#options.setTimer ?? setTimer)(() => this.closeFollowUp(), FOLLOW_UP_MS);
+    if (!wasOpen) this.#options.onFollowUp?.(true);
+  }
+
+  closeFollowUp(): void {
+    if (this.#followUp === null) return;
+    this.#followUp();
+    this.#followUp = null;
+    this.#options.onFollowUp?.(false);
   }
 
   /** The system voice is not echo-cancelled: while it speaks, nothing heard counts. */
@@ -232,7 +270,9 @@ export class ListenController {
   #addressed(session: Session, text: string, partial = false): string | null {
     if (this.#taken || this.#released.size > 0) return null;
     const question =
-      this.#options.needsName === false ? text.trim() || null : addressedToScout(text);
+      this.#options.needsName === false
+        ? text.trim() || null
+        : addressedToScout(text, { followUp: this.#followUp !== null });
     if (partial && this.#options.needsName !== false && question !== null && mightBeStop(question))
       return null;
     if (question !== null && !session.barged) {
@@ -268,13 +308,20 @@ export class ListenController {
         const barged = session.barged;
         const question = this.#addressed(session, text);
         session.barged = false;
+        const named = this.#options.needsName !== false && addressedToScout(text) !== null;
+        const followUp = this.#followUp !== null;
+        // One reply is all the window takes, whatever it was.
+        if (question !== null) this.closeFollowUp();
         if (question === null) {
           // The final words dropped the name (or came back empty): the bubble lets go.
           if (barged) this.#options.onDropped();
+          if (!followUp && this.#released.size === 0 && words(text) >= 3)
+            this.#options.onUnaddressed?.();
           return;
         }
         if (this.#options.needsName !== false && isStopListening(question)) {
-          this.#options.onStopListening();
+          // A plain "stop" in the window only ends the window; "Scout, stop" switches off.
+          if (named) this.#options.onStopListening();
           // A stop that cut Scout off is never asked: the bubble lets go.
           if (barged) this.#options.onDropped();
         } else {

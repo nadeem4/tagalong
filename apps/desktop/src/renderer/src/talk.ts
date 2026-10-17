@@ -10,7 +10,9 @@ import { RemoteEars } from './remote-ears';
 import {
   EarsNotes,
   FailureStreak,
+  FollowUpCue,
   NOTHING_HEARD,
+  micMark,
   micNote,
   settles,
   shownPartial,
@@ -27,6 +29,17 @@ export interface TalkOptions {
   microphoneId: string | undefined;
   /** Listening starts: Scout stops talking at once and the bubble comes up. */
   onBegin: () => void;
+  /** Scout is speaking: as its spoken answer to a spoken question ends, the follow-up window opens. */
+  speaking: boolean;
+  /** A spoken answer is still streaming in: the window waits for all of it, not a gap. */
+  answering: boolean;
+}
+
+/** One of the panel's marks on Scout, set or cleared in main; a failure is only logged. */
+function mark(id: 'mic-busy' | 'mic-failed' | 'say-name', on: boolean): void {
+  void window.tagalongHost
+    .setStatusMark(id, on)
+    .catch((error: unknown) => console.warn('[talk] could not show a status mark', error));
 }
 
 /**
@@ -38,7 +51,12 @@ export interface TalkOptions {
  * voice speaks, and only talk that starts with "Scout" is asked; the key and the mic button
  * still ask without the name. The microphone never opens otherwise.
  */
-export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () => void } {
+export function useTalk(options: TalkOptions): {
+  talk: BubbleTalk;
+  cancel: () => void;
+  /** The person cut Scout off (the stop button or key): no follow-up window for this answer. */
+  hush: () => void;
+} {
   const latest = useRef(options);
   useEffect(() => {
     latest.current = options;
@@ -58,6 +76,16 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
   const [always, setAlwaysState] = useState({ on: false, paused: false });
   // A microphone that cannot open fails again on every always-listening retry: told once.
   const [micFailures] = useState(() => new FailureStreak());
+  // The mic mark on Scout for that failure, until the mic works again or the person acts.
+  const micMarked = useRef<'mic-busy' | 'mic-failed' | null>(null);
+  const [micOk] = useState(() => () => {
+    micFailures.clear();
+    if (micMarked.current !== null) mark(micMarked.current, false);
+    micMarked.current = null;
+  });
+  // Say “Scout” shows once per run, the first time a question without the name is dropped.
+  const saidName = useRef(false);
+  const [cue] = useState(() => new FollowUpCue());
   // The ears failing (offline the first time) fails again at every retry too: said once.
   const [earsNotes] = useState(() => new EarsNotes());
   // The bubble listens for each question heard, and asks it.
@@ -75,6 +103,8 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
 
   const [controller] = useState(() => {
     const bargeIn = (): void => {
+      // Talking over Scout: its answer is cut off, so it opens no follow-up window.
+      cue.hushed();
       latest.current.onBegin();
       for (const listen of listeners) listen();
     };
@@ -91,11 +121,12 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
       openMic: () => openMic(latest.current.microphoneId),
       onSpeechStart: bargeIn,
       onPartial: (text, mode) => {
-        micFailures.clear();
+        micOk();
         setPartial(shownPartial(text, mode));
       },
       onHeard: (text) => {
-        micFailures.clear();
+        micOk();
+        cue.asked();
         done(null);
         for (const hear of hearers) hear(text);
       },
@@ -105,6 +136,8 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
         clearTimeout(timer.current);
         if (!micFailures.fail()) return;
         console.warn('[talk] the microphone could not be opened', error);
+        micMarked.current = micMark(error);
+        mark(micMarked.current, true);
         done(micNote(error));
       },
       // The dot shows only once the mic is really open, never while it is still opening.
@@ -117,6 +150,17 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
           .setListening(false)
           .catch((error: unknown) => console.warn('[talk] listening could not stop', error)),
       onDropped: () => setPartial(null),
+      // Never the words: only that a question without the name went nowhere.
+      onUnaddressed: () => {
+        if (saidName.current) return;
+        saidName.current = true;
+        mark('say-name', true);
+      },
+      // Main raises the bubble for the reply, and Scout's dot shows the window.
+      onFollowUp: (open) =>
+        void window.tagalongHost
+          .setFollowUp(open)
+          .catch((error: unknown) => console.warn('[talk] could not share the follow-up', error)),
     });
     return { made, bargeIn };
   });
@@ -137,7 +181,7 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
     const act = (action: TalkAction): void => {
       if (action === 'start') {
         // Listening all the time too: the key still asks, without the name, then it resumes.
-        micFailures.clear();
+        micOk();
         earsNotes.clear();
         controller.bargeIn();
         listening.current = true;
@@ -162,6 +206,7 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
     };
     // The bubble closed: the question goes, always listening goes on.
     const cancel = (): void => {
+      cue.hushed();
       controller.made.cancel();
       quiet();
     };
@@ -189,7 +234,7 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
   // Always listening, as switched in the bubble or Settings, and paused for a call.
   useEffect(() => {
     const apply = (next: { on: boolean; paused: boolean }): void => {
-      setAlwaysState(next);
+      setAlwaysState({ on: next.on, paused: next.paused });
       // Paused first: switched on during a call, the mic must not open for a moment.
       controller.made.setPaused(next.paused);
       controller.made.setAlways(next.on);
@@ -200,6 +245,16 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
       .catch((error: unknown) => console.warn('[talk] could not read Always listening', error));
     return window.tagalongHost.onListening(apply);
   }, [controller]);
+
+  const [hush] = useState(() => () => {
+    cue.hushed();
+    controller.made.closeFollowUp();
+  });
+
+  // Scout's spoken answer to a spoken question has ended: one reply needs no name for a while.
+  useEffect(() => {
+    if (cue.update(options.speaking, options.answering)) controller.made.openFollowUp();
+  }, [cue, controller, options.speaking, options.answering]);
 
   // The system voice is not echo-cancelled: the ears stay deaf while it speaks.
   useEffect(() => onSystemVoice((speaking) => controller.made.setDeaf(speaking)), [controller]);
@@ -233,5 +288,6 @@ export function useTalk(options: TalkOptions): { talk: BubbleTalk; cancel: () =>
       },
     },
     cancel: control.cancel,
+    hush,
   };
 }

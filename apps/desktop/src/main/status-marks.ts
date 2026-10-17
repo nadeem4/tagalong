@@ -1,7 +1,7 @@
 /**
  * The status marks main holds for every window: a plain map of marks, the top one by the shared
  * order, and an optional time limit per mark. No I/O; main broadcasts each change. Contains
- * StatusMarks, markListening and clearBrainMarks.
+ * StatusMarks, markListening, setPanelMark and clearBrainMarks.
  */
 
 import { topStatus } from '@tagalong/protocol';
@@ -56,19 +56,45 @@ export const LISTENING_MARK_MS = 8_000;
 
 /**
  * "Listening" on Scout for a few seconds at launch when Always listening is on, and each time
- * it is switched on; switching it off clears it. A pause changes only the listening dot.
+ * it is switched on; switching it off clears it. "Not listening" while it is on but paused
+ * (a call, full screen, Welcome).
  */
 export function markListening(
   marks: StatusMarks,
   listening: Pick<AlwaysListening, 'state' | 'onChange'>,
 ): void {
+  const paused = (state: { on: boolean; paused: boolean }): void => {
+    if (state.on && state.paused) marks.set({ id: 'listening-paused' });
+    else marks.clear('listening-paused');
+  };
   let on = listening.state.on;
   if (on) marks.set({ id: 'listening-on' }, LISTENING_MARK_MS);
+  paused(listening.state);
   listening.onChange((state) => {
     if (state.on && !on) marks.set({ id: 'listening-on' }, LISTENING_MARK_MS);
     if (!state.on) marks.clear('listening-on');
+    paused(state);
     on = state.on;
   });
+}
+
+/** How long "Say “Scout”" shows after a question that did not start with the name. */
+export const SAY_NAME_MARK_MS = 8_000;
+
+/** The marks only the panel knows about: the microphone failing, and the hint to say the name. */
+const PANEL_MARKS: ReadonlySet<string> = new Set(['mic-busy', 'mic-failed', 'say-name']);
+
+/**
+ * A mark set or cleared from the panel. Only the panel's own marks: a window can never set or
+ * clear the brain or ears marks. Throws for anything else.
+ */
+export function setPanelMark(marks: StatusMarks, id: unknown, on: unknown): void {
+  if (typeof id !== 'string' || !PANEL_MARKS.has(id) || typeof on !== 'boolean') {
+    throw new Error('Not a mark the panel sets.');
+  }
+  const mark = id as 'mic-busy' | 'mic-failed' | 'say-name';
+  if (!on) marks.clear(mark);
+  else marks.set({ id: mark }, mark === 'say-name' ? SAY_NAME_MARK_MS : undefined);
 }
 
 /** Scout can think again: a turn answered, or the sign-in check came back signed in. */

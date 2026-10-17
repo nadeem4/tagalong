@@ -4,7 +4,9 @@ import {
   EarsNotes,
   FIRST_TIME,
   FailureStreak,
+  FollowUpCue,
   NOTHING_HEARD,
+  micMark,
   micNote,
   settles,
   shownPartial,
@@ -112,6 +114,72 @@ describe('EarsNotes', () => {
     notes.clear();
     expect(notes.status(null, 'loading')).toBe(FIRST_TIME);
     expect(notes.failed(FIRST_TIME, OFFLINE)).toBe(OFFLINE);
+  });
+});
+
+describe('micMark', () => {
+  it('names the mark on Scout: busy in another app, or not usable', () => {
+    expect(micMark({ name: 'NotReadableError' })).toBe('mic-busy');
+    expect(micMark({ name: 'NotFoundError' })).toBe('mic-failed');
+    expect(micMark(new Error('x'))).toBe('mic-failed');
+  });
+});
+
+describe('FollowUpCue', () => {
+  // `update(speaking, answering)`: Scout's voice, and a spoken answer still streaming in.
+  it('opens the window once, when the spoken answer to a spoken question ends', () => {
+    const cue = new FollowUpCue();
+    cue.asked();
+    expect(cue.update(false, true)).toBe(false);
+    expect(cue.update(true, true)).toBe(false);
+    expect(cue.update(true, false)).toBe(false);
+    expect(cue.update(false, false)).toBe(true);
+    expect(cue.update(true, false)).toBe(false);
+    expect(cue.update(false, false)).toBe(false);
+  });
+
+  it('waits out a streamed answer that pauses between sentences: only its very end opens it', () => {
+    const cue = new FollowUpCue();
+    cue.asked();
+    cue.update(false, true);
+    cue.update(true, true);
+    // The speech queue ran dry while the next sentence is still on its way.
+    expect(cue.update(false, true)).toBe(false);
+    cue.update(true, true);
+    cue.update(true, false);
+    expect(cue.update(false, false)).toBe(true);
+  });
+
+  it('never opens for speech that answered nothing asked by voice', () => {
+    const cue = new FollowUpCue();
+    cue.update(true, false);
+    expect(cue.update(false, false)).toBe(false);
+  });
+
+  it('never opens for an answer that said nothing, nor for a remark spoken after it', () => {
+    const cue = new FollowUpCue();
+    cue.asked();
+    cue.update(false, true);
+    // A quiet status or an error: the stream ended and nothing was said.
+    expect(cue.update(false, false)).toBe(false);
+    cue.update(true, false);
+    expect(cue.update(false, false)).toBe(false);
+  });
+
+  it('never opens when the person cut Scout off: the stop button, the close, talking over it', () => {
+    const cue = new FollowUpCue();
+    cue.asked();
+    cue.update(true, true);
+    cue.hushed();
+    expect(cue.update(false, false)).toBe(false);
+  });
+
+  it('waits for speech to start: an answer still on its way is not over', () => {
+    const cue = new FollowUpCue();
+    cue.asked();
+    expect(cue.update(false, false)).toBe(false);
+    cue.update(true, false);
+    expect(cue.update(false, false)).toBe(true);
   });
 });
 

@@ -419,6 +419,7 @@ Ink Navy, 1px Field Line border, 12px radius, 14px by 16px padding, 12px gap, wi
 - **Invitation:** one line typed in at 22ms a character, held at full height so the bubble does not grow, with Try it now and Got it (no Next, no step dots).
 - **Launch line:** one short line in a compact bubble (10px 8px 10px 14px padding) that fades out over 300ms. When Scout cannot think it shows the status row instead of words, with **Fix it**.
 - **Status marks:** neutral words, never Scout speaking. On Scout, a 1-2 word pill at the bottom centre, just above the corner dots (Onest 600 11px, 2px 7px, full radius; Warn Fill on Warn Ink for problems, `#6B7290` on Text for the rest), its sentence as the tooltip. In the bubble, a 12px `role="status"` row above the question box (`#F2D48A` for problems, Muted Text otherwise) with a quiet **Fix it** when there is a fix. No animation.
+- **Dock listening dot (Always listening):** the 8px green dot at Scout's bottom right, solid while on, outlined while paused, a lighter green (`#B8F5B9`) quick pulse (0.6s, to 1.35x) while speech is heard, and a 2px green ring outside its white ring during the follow-up window. Its tooltip names the state. Reduced motion stops the pulse.
 - **Listening and speaking:** a 28px mic button (Gold when on), heard speech in a Soft Text pill, an 8px pulsing dot (Gold while listening, Sky while hearing) and three 3px speaking bars in Gold driven by `--tg-voice-level`.
 
 ### Cards in the bubble

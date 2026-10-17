@@ -33,6 +33,27 @@ describe('QueueMouth', () => {
     expect(queue.say).not.toHaveBeenCalled();
   });
 
+  it('tells while a spoken answer is still streaming in, until it ends or is stopped', async () => {
+    const queue = { say: vi.fn(), stop: vi.fn() };
+    const onAnswering = vi.fn();
+    const mouth = new QueueMouth(queue, { onAnswering });
+    const first = new Pushable<string>();
+    mouth.speak(first);
+    expect(onAnswering).toHaveBeenLastCalledWith(true);
+    // A new spoken question ends the old stream as the new one starts: still answering.
+    const second = new Pushable<string>();
+    mouth.speak(second);
+    first.end();
+    await tick();
+    expect(onAnswering).toHaveBeenLastCalledWith(true);
+    second.end();
+    await tick();
+    expect(onAnswering).toHaveBeenLastCalledWith(false);
+    mouth.speak(new Pushable<string>());
+    mouth.stop();
+    expect(onAnswering).toHaveBeenLastCalledWith(false);
+  });
+
   it('says a bubble line shortened, as before', () => {
     const queue = { say: vi.fn(), stop: vi.fn() };
     new QueueMouth(queue).say('Done.');

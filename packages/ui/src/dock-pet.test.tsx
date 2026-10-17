@@ -79,6 +79,32 @@ describe('DockPet', () => {
     expect(screen.getByRole('img')).toHaveAccessibleName('Scout is idle');
   });
 
+  it('shows that it hears speech, and the follow-up window, on the listening dot', () => {
+    const { rerender } = render(<DockPet pet={SCOUT} mood="idle" listening="hearing" />);
+    expect(screen.getByTestId('listening-mark')).toHaveAttribute('data-state', 'hearing');
+    expect(screen.getByRole('img')).toHaveAccessibleName('Scout is idle, listening');
+    rerender(<DockPet pet={SCOUT} mood="idle" listening="follow-up" />);
+    expect(screen.getByTestId('listening-mark')).toHaveAttribute('data-state', 'follow-up');
+    expect(screen.getByTestId('listening-mark')).toHaveAttribute(
+      'title',
+      'Listening for your reply, no name needed.',
+    );
+    expect(screen.getByRole('img')).toHaveAccessibleName('Scout is idle, listening for your reply');
+  });
+
+  it('names what the listening dot means in its tooltip', () => {
+    const { rerender } = render(<DockPet pet={SCOUT} mood="idle" listening="on" />);
+    expect(screen.getByTestId('listening-mark')).toHaveAttribute(
+      'title',
+      'Always listening is on. Say “Scout, stop” to switch it off.',
+    );
+    rerender(<DockPet pet={SCOUT} mood="idle" listening="paused" />);
+    expect(screen.getByTestId('listening-mark')).toHaveAttribute(
+      'title',
+      'Always listening is paused for a call, a full-screen window or Welcome.',
+    );
+  });
+
   it('shows the top status mark as a tag, named in its label', () => {
     const { rerender } = render(
       <DockPet pet={SCOUT} mood="idle" status={{ id: 'brain-signed-out' }} />,

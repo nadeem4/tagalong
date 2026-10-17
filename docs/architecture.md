@@ -1336,7 +1336,8 @@ wince/cheer > tired > done > dozing > idle. `pet.mood` sets the reaction and the
 the `turnEvent` channel. The aria-label follows the mood ("Scout is dozing").
 The sight-paused mark and the recording dot stay, and so does the listening mark: while Always
 listening is on, `DockPet`'s `listening` prop draws a small green dot (`dock-pet__listening`), solid
-while on and an outline while paused, and the pet's name reads "…, listening" or "…, listening
+while on and an outline while paused (it also pulses while speech is heard and has a ring during
+the follow-up window; see Always listening), and the pet's name reads "…, listening" or "…, listening
 paused". The avatar reads `getListening` on mount and follows `onListening`, so the mark shows
 from the first second. The pet is alive: it blinks every three to six
 seconds (`withBlink`) in moods with open eyes, breathes with a 1 px rise when idle or seeing, bobs
@@ -2211,18 +2212,27 @@ Only the mind speaks in Scout's voice. The body shows what it knows as a neutral
 word or two on Scout and a sentence in the bubble, and never says it aloud.
 
 - **The wording table** is `packages/protocol/src/status.ts`: `StatusId` (`brain-signed-out`,
-  `brain-no-sign-in`, `brain-no-key`, `listening-on`, in the order that picks the top mark),
-  `StatusMark { id }`, `STATUS_WORDS` (`tag` for Scout, `detail` for the tooltip, the aria label
-  and the bubble row, and an optional `fix`; a mark with a fix is a problem) and `topStatus`. A
-  test refuses any first-person word in the table.
+  `brain-no-sign-in`, `brain-no-key`, `ears-failed`, `mic-busy`, `mic-failed`, `ears-loading`,
+  `listening-paused`, `say-name`, `listening-on`, in the order that picks the top mark: problems,
+  then progress, then the pause, then hints), `StatusMark { id, percent? }` (`percent` is the
+  speech models' download, shown as "Ears 40%" by `statusTag`), `STATUS_WORDS` (`tag` for Scout,
+  `detail` for the tooltip, the aria label and the bubble row, and an optional `fix`; a mark with a
+  fix is a problem) and `topStatus`. A test refuses any first-person word in the table.
 - **The holder** is `apps/desktop/src/main/status-marks.ts#StatusMarks`: one map, the top mark by
   `StatusId`'s order, an optional time limit per mark, and one change callback. Main broadcasts
   the top mark (or null) on `IPC.statusMarkEvent`; a window that opens asks `getStatusMark()` (the
   avatar is recreated on show). Who sets what: the brain marks from `brainReadiness` at launch,
   cleared by the first `turn.completed` with text or a Check again that finds Claude signed in
   (`clearBrainMarks`); `listening-on` for 8 s (`LISTENING_MARK_MS`) at launch when Always
-  listening is saved on and each time it is switched on, cleared when it is switched off
-  (`markListening`).
+  listening is saved on and each time it is switched on, cleared when it is switched off, and
+  `listening-paused` ("Not listening") while it is on but paused for a call, full screen or
+  Welcome (`markListening`); `ears-loading` (with the download's percent) and `ears-failed` from
+  `forwardEars` on the voice process's `ears.status` and `ears.progress`, cleared by the next
+  `ready` (a voice process that exits after the ears were used is an `ears-failed` too). The panel
+  sets only its own marks, through `IPC.setStatusMark(id, on)` (`setPanelMark`, which refuses
+  every other id): `mic-busy` / `mic-failed` on the first failure of a run (cleared when words are
+  heard or the talk key is pressed) and `say-name` ("Say “Scout”", 8 s, `SAY_NAME_MARK_MS`) once
+  per run, the first time a question without the name is dropped.
 - **One component**, `packages/ui/src/status-mark.tsx#StatusMark`, in two looks. `tag`: a pill at
   Scout's bottom centre, just above the recording and listening dots in the corners
   (`data-testid="status-mark"`, `data-id`), the `detail` as its tooltip and in `DockPet`'s aria
@@ -2495,7 +2505,7 @@ flowchart LR
   voice process posts `loading` only when the model files are not on disk yet, and the panel then
   says the first-time download (about 43 MB).
 - **Always listening, in main** (`main/always-listening.ts`, `main/ipc/voice.ts`). One
-  `AlwaysListening` state (`{ on, paused }`) is built from the saved `settings.listening.always`
+  `AlwaysListening` state (`{ on, paused, followUp }`) is built from the saved `settings.listening.always`
   before any window opens. Only the person switches it: `getListening` and `setListening(on)` (a
   boolean, anything else refused with "Always listening is on or off.") on the voice IPC. Each
   change goes to every window as `IPC.listeningEvent`, and when `on` changes main saves it with
@@ -2593,7 +2603,7 @@ Scout listens all the time only while the person has switched this on, and the c
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
 flowchart LR
   subgraph Main["Main process"]
-    AL["AlwaysListening: { on, paused }, from the saved setting"]
+    AL["AlwaysListening: { on, paused, followUp }, from the saved setting"]
     G["startListeningGuard: every 2 s, window titles only"]
     G -->|"listeningBlocked: call or full screen"| AL
     PH["Avatar show and hide: the pets hidden"] -->|"listeningPaused"| AL
@@ -2610,7 +2620,7 @@ flowchart LR
   OFF --> AL
 ```
 
-- **The state** (`main/always-listening.ts`). `AlwaysListening` holds `{ on, paused }` and starts
+- **The state** (`main/always-listening.ts`). `AlwaysListening` holds `{ on, paused, followUp }` and starts
   from the saved setting before any window opens. Only the person changes `on`: `getListening` and
   `setListening(on)` on the voice IPC, from the bubble's header switch, the Settings → Privacy
   switch or "Scout, stop". Each change reaches every window as `IPC.listeningEvent`, and main saves
@@ -2631,25 +2641,51 @@ flowchart LR
   and listening is paused until it shows again, so the mark is in sight whenever the mic is open.
 - **The controller** (`ui/voice/listen-controller.ts`). `setAlways`, `setPaused` and `setDeaf` keep
   one `always` session open exactly while it is on, not paused and not deaf (the system voice is
-  not echo-cancelled). `addressedToScout` (`@tagalong/protocol`) accepts a turn that starts with
-  "Scout", after an optional "hey", "ok" or "okay", and returns the rest as the question; "Scout's"
-  and "Scout-like" are not addressed. `isStopListening` matches "stop" or "stop listening" after
-  the name; `mightBeStop` is true for words that may still grow into "stop listening" ("st",
-  "stop list"), so such a partial is not a question yet. An unaddressed turn goes nowhere.
+  not echo-cancelled). `addressedToScout` (`@tagalong/protocol`) accepts a turn whose first word,
+  after an optional "hey", "ok" or "okay", sounds like "Scout", and returns the rest as the
+  question. Sounds like: the word starts "sc" (or "sk") and is at most one letter added, dropped
+  or changed away from "scout" (an edit distance of 1), so "Scott", "Scot", "Scoot", "Skout" and
+  "Scouts" count, and "shout", "scope", "about" and "count" do not. There is no fixed list of
+  aliases. "Scout's", "Scott's" and "Scout-like" are not addressed (the possessive guard holds for
+  every match). `isStopListening` matches "stop" or "stop listening" after the name; `mightBeStop`
+  is true for words that may still grow into "stop listening" ("st", "stop list"), so such a
+  partial is not a question yet. An unaddressed turn goes nowhere; one of three words or more,
+  outside the follow-up window, calls `onUnaddressed` (never with its words), and the panel shows
+  the `say-name` mark once per run.
+- **The follow-up window** (`FOLLOW_UP_MS`, 20 s, in protocol beside `addressedToScout`). As
+  Scout's spoken answer to a question asked by voice ends (`talk-rules.ts#FollowUpCue`: the
+  panel's `speaking` is false and `QueueMouth`'s `onAnswering` says the answer has finished
+  streaming in, so a gap between sentences does not open it; an answer that said nothing aloud
+  opens nothing), `useTalk` calls `openFollowUp()`: for 20 s one
+  reply needs no name (`addressedToScout(text, { followUp: true })` takes the whole turn, without
+  the name if it was said). It opens only while Always listening is on and not paused, and closes
+  on the reply itself (one turn), the time running out, a call or full screen (`setPaused`), the
+  talk key (`hold`), the bubble's close (`cancel`), switching off, the stop button or stop key
+  (`hush`), or a plain "stop" (which only ends the window: it is not asked and does not switch
+  listening off; "Scout, stop" still does). Talking over Scout, or stopping it, opens nothing.
+  `onFollowUp(open)` tells main through `IPC.setFollowUp`, which keeps `followUp` in
+  `AlwaysListening`'s state (only while on and not paused) for `forwardEars` and the avatar.
 - **Hold-to-talk and the mic button need no name**, in every case. They are the `held` mode, not
   the `always` mode, and `addressedToScout` is never applied to them: pressed while an always
   session runs, it ends for the held question and comes back after it.
 - **The bubble from main.** `forwardEars` takes `onSpoken`. A `partial` or `turnEnd` addressed to
   Scout brings the hidden bubble up beside a visible pet (`showPanelQuietly`), without taking the
-  keyboard.
+  keyboard. It asks the same `addressedToScout(text, { followUp })`, with `followUp` read from
+  `AlwaysListening`'s state, so main and the panel decide the same way.
 - **At launch.** No spoken line says listening is on: `markListening` sets the `listening-on`
   status mark ("Listening", tooltip "Always listening is on. Say “Scout, stop” to switch it
   off.") for 8 s at launch when `settings.listening.always` is on, and again each time it is
   switched on; the launch line is composed as usual. The panel is created hidden at launch, so the
   microphone and the mark are there from the first second.
-- **The mark.** `DockPet`'s `listening` prop (`'on'` or `'paused'`) draws `dock-pet__listening`,
-  solid while on and outlined while paused, and adds "listening" or "listening paused" to the pet's
-  accessible name. The avatar follows `getListening` and `onListening`.
+- **The mark.** `DockPet`'s `listening` prop (`'on'`, `'paused'`, `'hearing'` or `'follow-up'`)
+  draws `dock-pet__listening`: solid while on, outlined while paused, a brighter quick pulse while
+  speech is heard (`hearing`), and a ring around the dot while the follow-up window is open. Its
+  tooltip names what it means (the `listening-on` and `listening-paused` sentences, or "Listening
+  for your reply, no name needed."), and it adds "listening", "listening paused" or "listening for
+  your reply" to the pet's accessible name. The avatar follows `getListening` and `onListening`,
+  and `onEarsEvent` for the "heard you" cue: `speechStart` sets `hearing`, `turnEnd` (or a pause or
+  the switch) clears it. It reads only the event's name, never its words. The cue shows that the
+  ears work even when the name was missed. Reduced motion stops the pulse.
 - **The switches.** The bubble's header carries **Always listening** and **Seeing**
   (`role="switch"`); Settings → Privacy (`privacy-section.tsx`) has the same two as live switches
   that act at once and are not form fields.

@@ -1,7 +1,7 @@
 /**
  * The status marks the body shows on Scout and in the bubble: a neutral word or two, never a
  * sentence in Scout's voice (only the mind speaks as Scout). Shared by main and the UI.
- * Contains StatusId, StatusMark, FixTarget, STATUS_WORDS and topStatus.
+ * Contains StatusId, StatusMark, FixTarget, STATUS_WORDS, statusTag and topStatus.
  */
 
 import { z } from 'zod';
@@ -11,12 +11,20 @@ export const StatusId = z.enum([
   'brain-signed-out',
   'brain-no-sign-in',
   'brain-no-key',
+  'ears-failed',
+  'mic-busy',
+  'mic-failed',
+  'ears-loading',
+  'listening-paused',
+  'say-name',
   'listening-on',
 ]);
 export type StatusId = z.infer<typeof StatusId>;
 
 export interface StatusMark {
   id: StatusId;
+  /** The speech models' download so far, 0-100: shown on the tag ("Ears 40%"). */
+  percent?: number;
 }
 
 /** Where a Fix it button lands: a Settings section, or a Home page. */
@@ -40,11 +48,40 @@ export const STATUS_WORDS: Readonly<
     fix: 'brain',
   },
   'brain-no-key': { tag: 'No key', detail: 'Can’t think: no API key.', fix: 'brain' },
+  'ears-failed': {
+    tag: 'Can’t listen',
+    detail: 'Can’t listen: the speech models didn’t load. It retries on its own.',
+    fix: 'voice',
+  },
+  'mic-busy': {
+    tag: 'Mic busy',
+    detail:
+      'Another app is using the microphone. Close it and try again, or pick another in Settings.',
+    fix: 'voice',
+  },
+  'mic-failed': {
+    tag: 'No mic',
+    detail:
+      'The microphone could not be opened. Check that Windows lets apps use it, or pick another in Settings.',
+    fix: 'voice',
+  },
+  'ears-loading': { tag: 'Ears', detail: 'Speech models downloading, about 43 MB.' },
+  'listening-paused': {
+    tag: 'Not listening',
+    detail: 'Always listening is paused for a call, a full-screen window or Welcome.',
+  },
+  'say-name': { tag: 'Say “Scout”', detail: 'Start with “Scout” to ask.' },
   'listening-on': {
     tag: 'Listening',
     detail: 'Always listening is on. Say “Scout, stop” to switch it off.',
   },
 };
+
+/** The words on the tag: the table's, plus the download's percent when there is one. */
+export function statusTag(mark: StatusMark): string {
+  const { tag } = STATUS_WORDS[mark.id];
+  return mark.percent === undefined ? tag : `${tag} ${Math.round(mark.percent)}%`;
+}
 
 /** The mark that shows on Scout: the first in StatusId's order, or null when there is none. */
 export function topStatus(marks: Iterable<StatusMark>): StatusMark | null {

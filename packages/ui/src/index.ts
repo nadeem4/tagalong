@@ -12,7 +12,7 @@ export { ChatPanel } from './chat-panel';
 export { CompanionBubble, GreetingLine } from './companion-bubble';
 export type { DropOffer } from './drop-card';
 export { DockPet } from './dock-pet';
-export type { DockPetProps } from './dock-pet';
+export type { DockPetProps, ListeningDot } from './dock-pet';
 export type { DockMood } from './theme/sprites/expressions';
 export type { BubbleTalk, CompanionBubbleProps, GreetingLineProps } from './companion-bubble';
 export type { ChatPanelProps } from './chat-panel';

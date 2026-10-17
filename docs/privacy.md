@@ -419,16 +419,32 @@ tag for a few seconds (its tooltip says how to stop), and the mark shows from th
 Nothing is said aloud about it.
 
 - **The mark.** A small green dot on Scout shows the whole time. It is solid while Scout listens
-  and an outline while listening is paused. It is never hidden.
+  and an outline while listening is paused (Scout also shows **Not listening** then). It is never
+  hidden. It pulses for a moment when it hears speech, any speech in the room, so you can see the
+  ears work: the avatar only learns that speech started or ended, never the words.
 - **Hiding the pets pauses listening.** While the pets are hidden (the tray's **Hide pets**), the
   microphone is closed, so it is never open while the mark is out of sight. Showing the pets
   again resumes listening.
 - **Only Scout's name counts.** Scout acts only on what starts with "Scout" (optionally "hey
-  Scout" or "ok Scout"). Everything else is dropped on the computer and goes nowhere. "Scout's
-  plan" or "Scout-like" is talk about Scout, not to it, so it is dropped too. Only the
-  addressed question, with the name taken off, goes to Scout's provider as text, as typing does.
-  So you can have a conversation that is not for Scout without it leaving the computer, but
-  anything you say that starts with "Scout" is sent.
+  Scout" or "ok Scout"), or with a word that sounds like it. Speech to text often mishears the
+  name, so a first word that starts "sc" or "sk" and is one letter away from "scout" counts too:
+  "Scott", "Scot", "Scoot", "Skout", "Scouts". Everything else is dropped on the computer and
+  goes nowhere. "Scout's plan", "Scott's car" or "Scout-like" is talk about someone, not to
+  Scout, so it is dropped too. Only the addressed question, with the name taken off, goes to
+  Scout's provider as text, as typing does. So you can have a conversation that is not for Scout
+  without it leaving the computer, but anything you say that starts with "Scout", or a word that
+  sounds like it, is sent. **This can pick up room talk:** someone saying "Scott, can you…" to a
+  person called Scott reaches Scout as a question.
+- **The follow-up window.** Right after Scout finishes answering aloud a question you asked by
+  voice, your next reply needs no name for about 20 seconds, so a back-and-forth flows. It takes
+  one reply, then the name is needed again. It opens only after a spoken answer to a spoken
+  question, never after an answer you stopped or talked over, and it closes after 20 seconds, on a
+  call or full screen, the talk key, closing the bubble, the stop button or key, switching off,
+  or a plain "stop". While it is open the dot has a ring around it. **This can pick up room
+  talk:** whatever is said in that window, to Scout or not, is sent as the reply.
+- **A hint when the name was missed.** The first time in a run that a question of three words or
+  more is dropped for not starting with the name, Scout shows **Say “Scout”** for a few seconds.
+  Only the fact that something was dropped is used: the words are not kept or shown.
 - **"Scout, stop".** Saying "Scout, stop" (or "Scout, stop listening") switches Always listening
   off. So does the switch in the bubble or Settings.
 - **Paused while a call or a full-screen window is in front.** From window titles only, Scout

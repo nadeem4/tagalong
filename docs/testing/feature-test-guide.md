@@ -872,10 +872,11 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 1. **Action:** hold the key for a second in silence and let go. Then in Settings → Voice pick another
    microphone, Save, and talk again. Then turn off microphone access for desktop apps in Windows
    Settings and talk again.
-2. **Expected:** silence: "I didn't catch that." and nothing is asked. The picked microphone is used.
-   With access off, the bubble says the microphone could not be opened. With another app holding
-   the microphone exclusively, it says instead "Another app is using the microphone. Close it and
-   try again, or pick another in Settings."
+2. **Expected:** silence: "Nothing heard." and nothing is asked. The picked microphone is used.
+   With access off, the bubble says the microphone could not be opened and Scout shows **No mic**.
+   With another app holding the microphone exclusively, it says instead "Another app is using the
+   microphone. Close it and try again, or pick another in Settings." and Scout shows **Mic busy**.
+   The tag goes once words are heard or the talk key is pressed again.
 3. **Edge:** on a slow microphone, press the key: the dot and "Listening…" show only once the
    microphone has opened, never before it.
 
@@ -884,7 +885,7 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 1. **Setup:** a fresh profile (the speech models not downloaded yet), and the network off.
 2. **Action:** hold the talk key for about five seconds, then let go.
 3. **Expected:** the bubble says "Speech models didn’t download. Check the internet
-   connection." It does not flicker or keep retrying while the key is held, and the
+   connection." and Scout shows **Can't listen** until listening next works. It does not flicker or keep retrying while the key is held, and the
    Windows microphone icon goes away soon after the message (no raw "fetch failed" text).
 4. **Action:** turn the network on and hold the key again.
 5. **Expected:** the first-time download note shows, then listening works as in T.1.
@@ -937,7 +938,8 @@ looking at?" and Chromium's fake microphone stands in for a real one.
    says "Listening. Start with “Scout” to ask.", shows the words without "Scout", and Scout
    answers. Talk that does not start with "Scout" is ignored.
 5. **Action:** quit and restart Tagalong.
-6. **Expected:** listening is on from the start: Scout's first line says so and how to stop.
+6. **Expected:** listening is on from the start: Scout shows **Listening** for a few seconds
+   (its tooltip says how to stop); nothing is said aloud about it.
 7. **Action:** say "Scout, stop".
 8. **Expected:** the mark goes, and both switches show off.
 9. **Action:** switch **Seeing** off in Settings → Privacy.
@@ -946,8 +948,9 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 11. **Edge:** block the microphone in Windows privacy settings with Always listening on. The note
     "The microphone could not be opened…" shows once and stays; it does not flicker each time
     Scout finishes a line in the system voice.
-12. **Edge:** on a fresh install with no internet, switch **Always listening** on. The bubble says
-    the first-time download, then "Speech models didn’t download…" once; it does not
+12. **Edge:** on a fresh install with no internet, switch **Always listening** on. Scout shows
+    **Ears** while the models download (with a percent when Welcome downloads them) and then
+    **Can't listen**. The bubble says the first-time download, then "Speech models didn’t download…" once; it does not
     go back to the download note or repeat as Scout finishes lines. Connect and wait: within
     about 30 s (the wait doubles each failure, up to five minutes) it tries again on its own and
     listening works, with the switch untouched. Switching Always listening off and on retries
@@ -972,8 +975,24 @@ Run with a real microphone and without `TAGALONG_FAKE_STT`. Switch **Always list
 3. **Action:** say "Scout, what is this?" (also try "hey Scout, ..." and "ok Scout, ...").
 4. **Expected:** the bubble comes up without taking the keyboard, shows your words without
    "Scout", and Scout answers. Saying "Scout" while Scout speaks cuts it off.
-5. **Action:** say "Scout's plan is long" and "a Scout-like thing".
-6. **Expected:** both are ignored, as they are about Scout, not to it.
+5. **Action:** say "Scout's plan is long", "Scott's car is outside" and "a Scout-like thing".
+6. **Expected:** all are ignored, as they are about someone, not to Scout.
+   6a. **Action:** say "Scott, what is this?" (speech to text often writes the name that way), and
+   "Shout if you need me".
+   6b. **Expected:** the first is asked as "what is this?" (a first word that sounds like "Scout"
+   counts); the second is ignored.
+   6c. **Action:** watch the dot on Scout while you talk, with or without the name.
+   6d. **Expected:** it pulses brighter while you speak and settles when you stop: the ears hear
+   you even when the name was missed. The first time a question of three words or more is
+   ignored for want of the name, Scout shows **Say “Scout”** for a few seconds, once per run.
+   6e. **Action:** ask "Scout, what is the capital of France?" and, after the spoken answer ends,
+   say "and of Spain?" with no name within 20 seconds. Then say "and of Italy?" with no name.
+   6f. **Expected:** while Scout waits for the reply the dot has a ring (tooltip "Listening for your
+   reply, no name needed."). "and of Spain?" is asked and answered; that closes the window, so
+   after its spoken answer a new window opens; with no reply for 20 s the ring goes and
+   unnamed talk is ignored again. A plain "stop" in the window only closes it. The window does
+   not open after an answer you stopped (stop button, stop key, ×) or talked over, nor after a
+   typed question's answer, and the talk key, a call or full screen, or switching off closes it.
 7. **Action:** with Always listening on, hold `Ctrl+Shift+Alt+Space`, or click the mic in the text
    box, and ask a question without the name.
 8. **Expected:** the bubble listens as usual and shows your words as said; the question is asked
@@ -981,8 +1000,9 @@ Run with a real microphone and without `TAGALONG_FAKE_STT`. Switch **Always list
    carries on: "what time is it?" is still ignored and "Scout, what time is it?" is asked.
 9. **Action:** bring a call app to the front (for example a Teams, Zoom or Google Meet call), or
    put another app full screen, and wait a few seconds.
-10. **Expected:** within about 2 seconds the mark on Scout turns from solid to an outline, and
-    Windows shows no microphone use from Tagalong. Say "Scout, what is this?": nothing happens.
+10. **Expected:** within about 2 seconds the mark on Scout turns from solid to an outline, Scout
+    shows **Not listening** (its tooltip and the dot's say why), and Windows shows no microphone
+    use from Tagalong. Say "Scout, what is this?": nothing happens.
     Bring another window to the front, or leave full screen: the mark turns solid again and
     listening works. A Teams window in front pauses listening even with no call.
     Switching Always listening on while the call is already in front pauses it within a moment
