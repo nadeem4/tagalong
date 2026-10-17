@@ -1151,7 +1151,8 @@ A run counts as late only when it starts **more than five minutes** after its ti
    bubble; a notification carries it instead.
 4. Give a routine an instruction whose answer is often empty (for example "Reply with nothing
    unless a new file is on the Desktop") and **Run now**. **Expected:** no line, no voice and no
-   notification, and never "ran, with nothing to say"; **Activity** still shows the run as done.
+   notification, and never "ran, with nothing to say"; **Activity** still shows the run as done
+   (with Home open on Activity, the row turns from Working to Done without a reload).
 
 ### R7. Consent
 

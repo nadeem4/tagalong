@@ -24,6 +24,8 @@ export function changesActivity(event: TurnEvent): boolean {
     case 'turn.error':
     case 'handoff.finished':
     case 'routine.result':
+    // A routine run that ends with nothing to say sends no routine.result, only this.
+    case 'routines.changed':
       return true;
     default:
       return false;

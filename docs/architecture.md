@@ -893,7 +893,8 @@ with the error in `text`. A failed run is never spoken, whatever `deliver.voice`
 (`routineDelivery`): its line, notification and Activity row show it. A run that ends with nothing
 to say (an empty answer, or an expert it waited on that finished with none) is not delivered at
 all: no line, no voice, no notification, and no filler sentence; the Activity row and the
-routine's last run still record it. Results wait in
+routine's last run still record it, and Home's Activity re-reads on `routines.changed` so the
+row leaves "Working" without a `routine.result`. Results wait in
 memory while no host is connected, or while the window in front is full screen or a call
 (`callOrFullScreenInFront`, the same check keeping an eye on things uses), and go out on the first tick that is clear. A meeting
 prep still waiting when its meeting starts is useless later, so it goes out then with `deliver`
