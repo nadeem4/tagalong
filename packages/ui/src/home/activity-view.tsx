@@ -16,7 +16,10 @@ import { themeTokens as t } from '../theme/tokens';
 /** How many entries one page holds. */
 const PAGE = 30;
 
-/** The events after which Activity (and the Spend card) read again. */
+/**
+ * The events after which Activity (and the Spend card) read again. A routine run that ends with
+ * nothing to say sends no `routine.result`, only `routines.changed`.
+ */
 export function changesActivity(event: TurnEvent): boolean {
   switch (event.type) {
     case 'turn.started':
@@ -24,7 +27,6 @@ export function changesActivity(event: TurnEvent): boolean {
     case 'turn.error':
     case 'handoff.finished':
     case 'routine.result':
-    // A routine run that ends with nothing to say sends no routine.result, only this.
     case 'routines.changed':
       return true;
     default:
