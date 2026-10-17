@@ -1694,12 +1694,12 @@ flowchart LR
   M -- "a line, OFFER, EXPERT, MOOD" --> D["pet.remark and/or pet.mood"]
 ```
 
-| Reason         | When (code)                                                                                                  | Switch                    | Not now and cooldown | Facts it adds                                                                                    |
-| -------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------- | -------------------- | ------------------------------------------------------------------------------------------------ |
-| `settled`      | `Lookout`: a new window in front for 30 s (`SETTLE_MS`), never twice                                         | `keepAnEye`               | apply                | app, title, the window's last 4,000 characters                                                   |
-| `trouble`      | `Lookout`: a title reading like trouble (`looksLikeTrouble`, a cue only), never twice                        | `keepAnEye`               | apply                | same as settled                                                                                  |
-| `long-stretch` | `ActiveTime`: 90 min with no 5-min break, once a stretch; or 23:00 to 05:00 with 30 min active, once a night | `wellbeing.enabled`       | apply                | active time, late, the front app and title (no text read)                                        |
-| `finished`     | `handoff.finished` with no `next` (a chain's last step), not a routine's own hand-off                        | none: work they asked for | exempt               | expert, ask (first paragraph, 100 chars), state, the answer's last 1,500 characters or the error |
+| Reason         | When (code)                                                                                                  | Switch                    | Not now and cooldown | Facts it adds                                                                                            |
+| -------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------- |
+| `settled`      | `Lookout`: a new window in front for 30 s (`SETTLE_MS`), never twice                                         | `keepAnEye`               | apply                | app, title, the window's last 4,000 characters                                                           |
+| `trouble`      | `Lookout`: a title reading like trouble (`looksLikeTrouble`, a cue only), never twice                        | `keepAnEye`               | apply                | same as settled                                                                                          |
+| `long-stretch` | `ActiveTime`: 90 min with no 5-min break, once a stretch; or 23:00 to 05:00 with 30 min active, once a night | `wellbeing.enabled`       | apply                | active time, late, the front app and title (no text read)                                                |
+| `finished`     | `handoff.finished` with no `next` (a chain's last step), not a routine's own hand-off                        | none: work they asked for | exempt               | expert, ask (first paragraph, 100 chars), state, the answer's last 1,500 characters or the error, fenced |
 
 Every check-in also carries step 1's Now block (`renderNow`, with a `check-in` wake reason that adds
 no line of its own), the 5 newest memories (`renderMemories`), their name, the last exchange
@@ -1764,8 +1764,10 @@ On by default (`settings.keepAnEye`). The desktop only feeds window titles; the 
   listening all use it. The picked window's last 4,000 characters are read through the host's
   `readText` (a `blocked` read ends it) for the check-in.
 - **The line.** Main sends `pet.remark` to the panel as `remarkEvent` and shows it with
-  `showPanelQuietly`, but only when the bubble is closed and the line has no `handoffId` (a line
-  about a finished hand-off goes to its card instead). The panel renders `GreetingLine` with
+  `showPanelQuietly`, but only when the bubble is closed. A line about a finished hand-off goes to
+  its card while the bubble is open; with the bubble closed no card can take it, so main's
+  `routeHandoffLine` (`handoff-notice.ts#handoffLine`) drops its `handoffId` and it comes as an
+  ordinary line, shown and said once. The panel renders `GreetingLine` with
   **Not now** (`keepAnEye.notNow`) and, with an offer, **Hand it over** (`keepAnEye.accept`), and
   speaks it like any bubble line when voice is on.
 
@@ -2135,7 +2137,8 @@ above a **Message** box. It is the same component, so it is the same conversatio
   finished card lists any note that never arrived ("Not passed on: ..."). The finish itself says
   nothing: the `finished` check-in may send one line from the mind (`pet.remark` with this
   `handoffId`), which shows at the top of the finished card and is said once; the card keeps the
-  whole answer. A `say` step shows in the steps and is
+  whole answer (with the bubble closed, the line comes beside Scout as an ordinary line instead).
+  A `say` step shows in the steps and is
   passed to `onSay`, at most one line every 20 seconds (`SAY_GAP_MS`); tool steps stay silent. There
   is no text box on the card: notes go through Scout. Main brings the
   bubble up with focus for a proposal, and without focus for a finished hand-off; only when the

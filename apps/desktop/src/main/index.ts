@@ -24,6 +24,7 @@ import {
 import {
   ContextSnapshot,
   HandoffFinishedParams,
+  PetRemarkParams,
   RoutineResultParams,
   SCOUT_ID,
 } from '@tagalong/protocol';
@@ -42,7 +43,7 @@ import {
 } from './always-listening';
 import { startWellbeingTick, watchPresence } from './presence';
 import { systemClock } from './awareness/clock';
-import { handoffNotice } from './handoff-notice';
+import { handoffLine, handoffNotice } from './handoff-notice';
 import { StatusMarks, clearBrainMarks, markListening } from './status-marks';
 import {
   brainLine,
@@ -545,10 +546,25 @@ function showPickUp(params: unknown): void {
 }
 
 /**
+ * A line about a finished hand-off lands on its card while the bubble is open; with the
+ * bubble closed it loses its hand-off id and comes as an ordinary line, so it is not lost.
+ */
+function routeHandoffLine(notification: { method: string; params: unknown }): {
+  method: string;
+  params: unknown;
+} {
+  if (notification.method !== 'pet.remark') return notification;
+  const parsed = PetRemarkParams.safeParse(notification.params);
+  if (!parsed.success) return notification;
+  const bubbleOpen = desktop?.panel?.isVisible() === true;
+  return { method: notification.method, params: handoffLine(parsed.data, bubbleOpen) };
+}
+
+/**
  * Scout has one thing to say from a check-in: one quiet line beside the pet, without taking
  * the keyboard. Not while the bubble is already open: the person is busy with it, and a
- * remark is never worth interrupting them for. A line about a finished hand-off goes to its
- * card in the bubble instead (announceHandoff already brought it up), through the forward.
+ * remark is never worth interrupting them for. A line still tied to a finished hand-off
+ * (the bubble is open) goes to its card there instead, through the forward.
  */
 function showRemark(params: unknown): void {
   const panel = desktop?.panel;
@@ -699,7 +715,8 @@ function hasText(params: { text?: unknown }): boolean {
 }
 
 /** Turn notifications drive the UI, and main is the only thing holding the socket. */
-function forwardToRenderers(notification: { method: string; params: unknown }): void {
+function forwardToRenderers(incoming: { method: string; params: unknown }): void {
+  const notification = routeHandoffLine(incoming);
   const params = (notification.params ?? {}) as { turnId?: string; text?: unknown };
   if (notification.method === 'turn.started' && params.turnId !== undefined) {
     desktop?.activeTurns.add(params.turnId);

@@ -1,6 +1,9 @@
-/** The system notification for a finished hand-off. Contains handoffNotice. */
+/**
+ * The system notification for a finished hand-off, and where Scout's line about one goes.
+ * Contains handoffNotice and handoffLine.
+ */
 
-import type { HandoffFinishedParams } from '@tagalong/protocol';
+import type { HandoffFinishedParams, PetRemarkParams } from '@tagalong/protocol';
 
 const PREVIEW_CHARS = 160;
 
@@ -26,4 +29,15 @@ export function handoffNotice(
       ? ` Changed ${params.changedFiles.join(', ')}.`
       : '';
   return { title: `${who} finished`, body: `${preview}${changed} Open Home to read it all.` };
+}
+
+/**
+ * Scout's line about a finished hand-off. With the bubble open it lands on the hand-off card
+ * there. With the bubble closed no card can take it, so it becomes an ordinary line beside
+ * Scout (shown and said once, with the same rules as any other), rather than being lost.
+ */
+export function handoffLine(params: PetRemarkParams, bubbleOpen: boolean): PetRemarkParams {
+  if (params.handoffId === undefined || bubbleOpen) return params;
+  const { handoffId: _handoffId, ...line } = params;
+  return line;
 }

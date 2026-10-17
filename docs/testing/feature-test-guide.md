@@ -674,6 +674,10 @@ previous build. Pass: lines are short, true to the facts, never boilerplate, oft
 2. **Expected:** the card shows the whole answer; at most one short line about the outcome appears
    on the card and is spoken; nothing else of the answer is read aloud. If the mind is silent,
    nothing is spoken.
+3. **Action:** hand off again and close the bubble as soon as the finished card shows, before the
+   line arrives.
+4. **Expected:** the line (if any) comes beside Scout as an ordinary line with Not now, spoken
+   once; opening the bubble does not say it again.
 
 ### C.4. Not now
 
