@@ -1,5 +1,5 @@
 /**
- * The avatar window's page: Scout's pixel figure on the desktop, with its mood, the
+ * The avatar window's page: Scout on the desktop as Bean, the 3D figure, with its mood, the
  * sight-paused, recording and listening marks, and the top status mark. Mood rules live in dock.ts and pointer and
  * drop handling in pet-input.ts; this file only wires them to the host.
  */
@@ -13,14 +13,29 @@ import type { ListeningState } from '../../shared/ipc';
 import '@fontsource/onest/latin-600.css';
 import './app.css';
 import '../../shared/ipc';
+import { beanFigure } from './bean-figure';
+import manifest from './bean/manifest.json';
 import { IDLE_DOCK, REACTION_MS, dockMood, nextDock } from './dock';
 import { petInput } from './pet-input';
+
+/**
+ * Bean's strips, emitted by Vite as files of their own: the window's CSP (`default-src 'self'`)
+ * blocks the data: URL a small file would otherwise be inlined as.
+ */
+const FIGURE = beanFigure(
+  manifest,
+  import.meta.glob<string>('./bean/*.webp', {
+    eager: true,
+    query: '?url&no-inline',
+    import: 'default',
+  }),
+);
 
 /** How long "Seeing" shows after a capture. */
 const SEEING_MS = 2500;
 
 /**
- * The companion on the desktop: its pixel character in a small transparent window. The pet
+ * The companion on the desktop: Bean in a small transparent window. The pet
  * is a button that is dragged by hand rather than through a drag region, which would swallow
  * its clicks: a press that moves past a few pixels drags the pet (and its bubble), a press
  * that does not is a click, which opens the bubble and clears "Done". A file, link or text
@@ -174,6 +189,7 @@ function Avatar() {
         <DockPet
           pet={pet}
           mood={dockMood(dock)}
+          figure={FIGURE}
           sightPaused={sightPaused}
           recording={recording}
           listening={listeningDot(listening, hearing)}

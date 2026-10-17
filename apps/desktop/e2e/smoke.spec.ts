@@ -93,6 +93,24 @@ test('the app launches with its avatar and its panel', async () => {
   expect(windows.find((w) => w.url.includes('panel.html'))?.visible).toBe(false);
 });
 
+test('Bean draws on the dock: its strip loads past the window CSP', async () => {
+  const avatar = await windowFor('avatar');
+  const clip = avatar.getByTestId('bean-clip').first();
+  await expect(clip).toBeAttached();
+  // A CSP or packaging miss leaves the background blank with no error a unit test can see.
+  const loaded = await clip.evaluate((el) => {
+    const url = /url\("?(.+?)"?\)/.exec(getComputedStyle(el).backgroundImage)?.[1];
+    if (url === undefined) return 'no background';
+    return new Promise<string>((resolve) => {
+      const image = new Image();
+      image.onload = () => resolve('loaded');
+      image.onerror = () => resolve(`failed: ${url}`);
+      image.src = url;
+    });
+  });
+  expect(loaded).toBe('loaded');
+});
+
 test('clicking Scout opens its bubble, and clicking again keeps it open', async () => {
   const avatar = await windowFor('avatar');
   const panelVisible = () =>
