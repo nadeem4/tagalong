@@ -234,6 +234,21 @@ describe('MemoryStore for the digest', () => {
     expect(memories.count('scout', 'fact')).toBe(1);
   });
 
+  it('makes a memory the user’s when they say what the digest wrote themselves', () => {
+    const tidied = memories.add({
+      petId: 'scout',
+      kind: 'preference',
+      text: 'Short answers',
+      origin: 'digest',
+    });
+
+    const said = memories.addOnce({ petId: 'scout', kind: 'preference', text: 'Short answers' });
+
+    expect(said).toMatchObject({ id: tidied.id, origin: 'user' });
+    expect(memories.recent('scout', 1)[0]?.origin).toBe('user');
+    expect(memories.count('scout', 'preference')).toBe(1);
+  });
+
   it('evicts the oldest summaries beyond a cap, never another kind', () => {
     for (let i = 0; i < 5; i += 1) {
       memories.add({ petId: 'scout', kind: 'summary', text: `summary ${i}` });

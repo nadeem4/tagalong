@@ -99,8 +99,8 @@ export class MemoryStore {
   /**
    * Adds a memory unless the pet already holds an identical one, and returns
    * whichever is stored. Saying "I prefer short answers" every morning should not fill
-   * five recall slots with the same sentence. The stored row keeps its own origin, so the
-   * digest repeating something the user said leaves it the user's.
+   * five recall slots with the same sentence. The digest repeating what the user said leaves
+   * it the user's; the user saying what the digest wrote makes it theirs.
    */
   addOnce(input: NewMemory): Memory {
     const text = input.text.trim();
@@ -109,7 +109,12 @@ export class MemoryStore {
         'SELECT * FROM memories WHERE text = ? AND pet_id = ? LIMIT 1',
       )
       .get(text, input.petId);
-    return existing === undefined ? this.add(input) : toMemory(existing);
+    if (existing === undefined) return this.add(input);
+    if (existing.origin === 'digest' && (input.origin ?? 'user') === 'user') {
+      this.db.prepare("UPDATE memories SET origin = 'user' WHERE id = ?").run(existing.id);
+      return toMemory({ ...existing, origin: 'user' });
+    }
+    return toMemory(existing);
   }
 
   /** The newest memories one pet can see, newest first; only of `kinds` when given. */
