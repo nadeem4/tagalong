@@ -52,6 +52,11 @@ describe('routineDelivery', () => {
     ).toMatchObject({ line: false, notice: { title: 'Morning papers' } });
   });
 
+  it('never speaks a run that failed: the line and the notification show it', () => {
+    const failed = { ...result({ voice: true, bubble: true }), state: 'error' as const };
+    expect(routineDelivery(failed, shown)).toMatchObject({ line: true, speak: false });
+  });
+
   it('says a late run, a failed one, and cuts a long answer', () => {
     expect(
       routineDelivery({ ...result({ notification: true }), late: true }, shown).notice?.title,

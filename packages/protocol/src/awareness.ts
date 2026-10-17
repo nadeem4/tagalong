@@ -73,11 +73,16 @@ export const PerceptionDiffResult = z.object({
 });
 export type PerceptionDiffResult = z.infer<typeof PerceptionDiffResult>;
 
-/** A watch saw its condition come true. The panel shows `message`; the watch is over. */
+/**
+ * A watch saw its condition come true; the watch is over. `message` is the judge's own reason,
+ * or empty when it gave none: an empty message is never spoken, and the card and the
+ * notification show the `condition` instead.
+ */
 export const WatchFiredParams = z.object({
   watchId: z.uuid(),
   petId: z.string().min(1),
-  message: z.string().min(1),
+  condition: z.string().min(1),
+  message: z.string(),
   displayId: z.number().int(),
 });
 export type WatchFiredParams = z.infer<typeof WatchFiredParams>;

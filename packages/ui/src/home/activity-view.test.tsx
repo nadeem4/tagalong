@@ -168,6 +168,20 @@ describe('ActivityView', () => {
     await waitFor(() => expect(row(/Scout handed off to Claude Code/)).toHaveTextContent('Done'));
   });
 
+  it('updates live when a routine run ends with nothing to deliver', async () => {
+    // A quiet run sends no routine.result; routines.changed is all the engine says.
+    const running = entry({ id: 'r', kind: 'routine', state: 'running', text: 'Morning papers' });
+    const bridge = createFakeHostBridge({ activity: [running] });
+    await renderActivity(bridge);
+    expect(row(/Scout is running Morning papers/)).toHaveTextContent('Working');
+    bridge.activity[0] = { ...running, state: 'done', answer: '' };
+    await act(async () => {
+      bridge.emit({ type: 'routines.changed' });
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(row(/Scout ran Morning papers/)).toHaveTextContent('Done'));
+  });
+
   it('pages back through older activity', async () => {
     const many = Array.from({ length: 35 }, (_, index) =>
       entry({ id: `m${index}`, kind: 'turn', text: `question ${index}` }),

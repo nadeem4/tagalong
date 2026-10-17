@@ -201,6 +201,8 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   [What Scout remembers](#what-scout-remembers)); the extension may not call them.
   Protocol 0.20.0: `pet.remark` gains an optional `handoffId`, for the check-in line about a
   finished hand-off (see [The check-in moment](#the-check-in-moment)).
+  Protocol 0.21.0: `watch.fired` gains `condition`, and its `message` may be empty (the judge gave
+  no reason); an empty message is never spoken, and the card and notification show the condition.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
   `perception.listWindows` and `perception.readText`, then `perception.captureWindow`, and from Phase 3B `perception.recall` and
   `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
@@ -886,7 +888,13 @@ dontAsk`, so it cannot read a project or edit a file. The run then waits for tha
 
 **Delivery.** A finished run becomes `routine.result { routineId, name, petId, conversationId,
 state, line, text, late, deliver, activityId }`. `line` is the routine's name and the answer's first
-sentence (`Morning papers (ran late): ...`, or `Morning papers did not run: ...`). Results wait in
+sentence (`Morning papers (ran late): ...`), or for a failed run only `Morning papers did not run.`,
+with the error in `text`. A failed run is never spoken, whatever `deliver.voice` says
+(`routineDelivery`): its line, notification and Activity row show it. A run that ends with nothing
+to say (an empty answer, or an expert it waited on that finished with none) is not delivered at
+all: no line, no voice, no notification, and no filler sentence; the Activity row and the
+routine's last run still record it, and Home's Activity re-reads on `routines.changed` so the
+row leaves "Working" without a `routine.result`. Results wait in
 memory while no host is connected, or while the window in front is full screen or a call
 (`callOrFullScreenInFront`, the same check keeping an eye on things uses), and go out on the first tick that is clear. A meeting
 prep still waiting when its meeting starts is useless later, so it goes out then with `deliver`
@@ -1584,8 +1592,8 @@ catalog does not have — time.
   region of it, in display pixels) now with the frame nearest `sinceSeconds` ago, and returns a
   `changeRatio` from 0 to 1, the changed bounding box, and before and after crops of it. A watch polls
   with `includeImages: false` and asks for the crops only when it is about to show them to a model.
-- `watch.fired { watchId, petId, message, displayId }` says a watch's condition came true; the watch is
-  over. `watch.status` reports `watching`, then exactly one final state — `fired`, `stopped`,
+- `watch.fired { watchId, petId, condition, message, displayId }` says a watch's condition came true;
+  the watch is over. `message` is the check model's reason, or empty when it gave none. `watch.status` reports `watching`, then exactly one final state — `fired`, `stopped`,
   `timeout`, `capped` or `error` — with the checks spent and the check model, so a host can show a Watching chip and take
   it down. `watch.stop { watchId }` is the chip's Stop button.
 
@@ -1670,9 +1678,12 @@ flowchart LR
   (`defaultTimeoutMinutes`, 30, unless the pet names one, at most 240) ends it with `timeout`.
   `watch.stop` ends it with `stopped`. A host that refuses a diff for a while — paused sight, an
   excluded window in front — skips ticks rather than ending the watch.
-- **Fired.** `watch.fired` carries the model's one-sentence reason as `message`. The panel shows it as
-  a message from the pet and the avatar shows an alert. It is not spoken: Phase 3 (Voice) is not
-  built, and speaking it is deferred there.
+- **Fired.** `watch.fired` carries the watch's `condition` and the model's one-sentence reason as
+  `message`, or an empty `message` when the model gave none; no sentence is made up in its place.
+  The chat panel shows a card from the pet that names the condition, with the reason under it when
+  there is one, and the desktop shows a notification with the reason, or the condition without one.
+  The panel says a reason aloud (with Scout talks on) and says nothing for an empty one. A routine
+  **When a watch fires** gets the reason, or the condition, as its trigger detail.
 
 ### The check-in moment
 
@@ -2290,7 +2301,7 @@ flowchart LR
   the answer is never read out), plus a working expert's own narration
   (`say` steps such as "Found the bug in `date.ts`."), at most one line every 20 seconds. The panel adds the launch line
   (`GreetingLine`), remarks from keeping an eye on things (`remarkEvent`, sent by `showRemark`)
-  and `watch.fired` messages.
+  and `watch.fired` reasons (never an empty one). A failed routine run is never said.
   `SpeechQueue` shapes each line with `toSpeakable` (markdown stripped; code blocks, lists, tables,
   quoted `>` lines (any quote, English too, such as a quoted error line; they mostly hold a
   translation into another language) and URLs left out; at most two sentences or 200 characters, then "The rest is in the bubble.";

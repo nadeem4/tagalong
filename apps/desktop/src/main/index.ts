@@ -767,14 +767,16 @@ function forwardToRenderers(incoming: { method: string; params: unknown }): void
 }
 
 /**
- * A watch fired: say so where the user will see it. The panel gets the message as a card
- * through the ordinary event forward; this adds a system toast and brings the panel up
- * beside the avatar. The panel says the message aloud when Scout talks is on.
+ * A watch fired: say so where the user will see it. The panel gets it as a card through the
+ * ordinary event forward; this adds a system toast and brings the panel up beside the avatar.
+ * The toast carries the judge's reason, or the condition when it gave none; the panel says a
+ * reason aloud when Scout talks is on, and nothing without one.
  */
 function announceWatch(params: unknown): void {
-  const { message } = (params ?? {}) as { message?: string };
-  if (message !== undefined && Notification.isSupported()) {
-    new Notification({ title: 'Tagalong — a watch fired', body: message, silent: false }).show();
+  const { message, condition } = (params ?? {}) as { message?: string; condition?: string };
+  const body = message || condition;
+  if (body !== undefined && body !== '' && Notification.isSupported()) {
+    new Notification({ title: 'Tagalong — a watch fired', body, silent: false }).show();
   }
   if (desktop?.panel != null && desktop.avatar != null && !desktop.panel.isVisible()) {
     showPanelBeside(desktop.panel, desktop.avatar);

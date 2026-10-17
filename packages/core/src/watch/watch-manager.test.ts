@@ -167,6 +167,7 @@ describe('WatchManager', () => {
         params: {
           watchId,
           petId: 'scout',
+          condition: 'the build finishes',
           message: 'The terminal shows Build succeeded.',
           displayId: 1,
         },
@@ -178,6 +179,15 @@ describe('WatchManager', () => {
     await clock.advance(WATCH_POLL_MS * 5);
     expect(screen.diffs.length).toBe(polls);
     expect(manager.active()).toHaveLength(0);
+  });
+
+  it('fires with an empty message when the judge gives no reason, never a made-up line', async () => {
+    const { clock, screen, manager, fired } = setup({ answers: ['{"answer":"yes"}'] });
+    await started(manager);
+    await clock.advance(WATCH_POLL_MS * 2);
+    screen.state.version = 1;
+    await clock.advance(WATCH_POLL_MS + WATCH_SETTLE_MS);
+    expect(fired()[0]?.params).toMatchObject({ condition: 'the build finishes', message: '' });
   });
 
   it('fires within ten seconds of the change', async () => {

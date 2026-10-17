@@ -10,7 +10,7 @@ const PREVIEW_CHARS = 180;
 export interface RoutineDelivery {
   /** The quiet line beside Scout, which opens to the full answer. */
   line: boolean;
-  /** Said aloud, in Scout's voice. */
+  /** Said aloud, in Scout's voice. A failed run never is: its line and Activity say so. */
   speak: boolean;
   /** A Windows notification, or null. */
   notice: { title: string; body: string } | null;
@@ -38,7 +38,7 @@ export function routineDelivery(
         : result.name;
   return {
     line,
-    speak: deliver.voice,
+    speak: deliver.voice && result.state === 'done',
     notice: notify ? { title, body: body || result.line } : null,
   };
 }

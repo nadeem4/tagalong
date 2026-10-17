@@ -149,7 +149,8 @@ function Panel() {
     return window.tagalongHost.onSightPause((paused) => setSeeing(!paused));
   }, []);
 
-  // The stop key cuts Scout off mid-sentence, and a watch that fires is said aloud.
+  // The stop key cuts Scout off mid-sentence, and a watch that fires says its reason aloud.
+  // A watch with no reason says nothing: its card shows the condition.
   useEffect(
     () =>
       window.tagalongHost.onStopVoice(() => {
@@ -161,7 +162,7 @@ function Panel() {
   useEffect(
     () =>
       window.tagalong.onTurnEvent((event) => {
-        if (event.type === 'watch.fired') mouth.say(event.message);
+        if (event.type === 'watch.fired' && event.message !== '') mouth.say(event.message);
       }),
     [mouth],
   );

@@ -100,7 +100,7 @@ export function ChatPanel({
   }
 
   // An effect event, so the subscription below is made once per bridge yet always sees the
-  // current pet and the watches running now.
+  // current pet.
   const onTurnEvent = useEffectEvent((event: TurnEvent) => {
     switch (event.type) {
       case 'turn.started': {
@@ -157,8 +157,8 @@ export function ChatPanel({
           }
         }
         break;
-      case 'watch.fired': {
-        const condition = watches.find((watch) => watch.watchId === event.watchId)?.condition;
+      case 'watch.fired':
+        // The judge's reason, when it gave one; the card always names the condition.
         setMessages((current) => [
           ...current,
           {
@@ -166,11 +166,10 @@ export function ChatPanel({
             role: 'assistant',
             kind: 'watch',
             text: event.message,
-            ...(condition === undefined ? {} : { condition }),
+            condition: event.condition,
           },
         ]);
         break;
-      }
       default:
         // Every other notification (tool calls, warnings, hand-offs, connector confirms,
         // routines, connections, moods, settings) is not shown in this panel.
