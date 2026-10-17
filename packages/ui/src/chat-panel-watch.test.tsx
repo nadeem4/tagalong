@@ -103,6 +103,7 @@ describe('a fired watch', () => {
         type: 'watch.fired',
         watchId: W1,
         petId: 'scout',
+        condition: 'the build finishes',
         message: 'The terminal shows Build succeeded.',
         displayId: 1,
       });
@@ -114,5 +115,22 @@ describe('a fired watch', () => {
     expect(fired).toHaveTextContent('Scout');
     expect(fired).toHaveTextContent('the build finishes');
     expect(screen.queryByTestId('watching')).toBeNull();
+  });
+
+  it('shows only the condition when the judge gave no reason, with no made-up line', () => {
+    const bridge = renderPanel();
+    act(() => {
+      bridge.emit({
+        type: 'watch.fired',
+        watchId: W1,
+        petId: 'scout',
+        condition: 'the build finishes',
+        message: '',
+        displayId: 1,
+      });
+    });
+    const fired = screen.getByTestId('watch-fired');
+    expect(fired).toHaveTextContent('Scout — watching for “the build finishes”');
+    expect(fired.querySelectorAll('p')).toHaveLength(1);
   });
 });

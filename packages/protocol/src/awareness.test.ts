@@ -105,18 +105,33 @@ describe('perception.diff', () => {
 });
 
 describe('watch notifications', () => {
-  it('watch.fired names the watch, the pet, the message and the display', () => {
-    const fired = { watchId, petId: 'scout', message: 'The build finished.', displayId: 1 };
+  const condition = 'the build finishes';
+
+  it('watch.fired names the watch, the pet, the condition, the message and the display', () => {
+    const fired = { watchId, petId: 'scout', condition, message: 'Build succeeded.', displayId: 1 };
     expect(WatchFiredParams.safeParse(fired).success).toBe(true);
   });
 
-  it('watch.fired refuses a missing message or a non-uuid watch', () => {
-    expect(WatchFiredParams.safeParse({ watchId, petId: 'scout', displayId: 1 }).success).toBe(
-      false,
-    );
+  it('watch.fired takes an empty message: the judge gave no reason', () => {
+    const fired = { watchId, petId: 'scout', condition, message: '', displayId: 1 };
+    expect(WatchFiredParams.safeParse(fired).success).toBe(true);
+  });
+
+  it('watch.fired refuses a missing condition, a missing message or a non-uuid watch', () => {
     expect(
-      WatchFiredParams.safeParse({ watchId: 'w', petId: 'scout', message: 'x', displayId: 1 })
-        .success,
+      WatchFiredParams.safeParse({ watchId, petId: 'scout', message: 'x', displayId: 1 }).success,
+    ).toBe(false);
+    expect(
+      WatchFiredParams.safeParse({ watchId, petId: 'scout', condition, displayId: 1 }).success,
+    ).toBe(false);
+    expect(
+      WatchFiredParams.safeParse({
+        watchId: 'w',
+        petId: 'scout',
+        condition,
+        message: 'x',
+        displayId: 1,
+      }).success,
     ).toBe(false);
   });
 

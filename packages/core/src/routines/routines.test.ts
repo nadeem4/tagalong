@@ -295,7 +295,7 @@ describe('Routines, on a trigger', () => {
     t.store.save({ ...PAPERS, name: 'On watch', when: { type: 'watch' } }, MONDAY_759);
     t.routines.start();
     await t.clock.advance(0);
-    t.routines.watchFired('The build finished.');
+    t.routines.watchFired({ condition: 'the build finishes', message: 'The build finished.' });
     await t.clock.advance(0);
     expect(t.asks).toHaveLength(0);
     expect(t.activity.map((row) => row.name).sort()).toEqual(['Hello', 'On watch']);
@@ -363,9 +363,19 @@ describe('Routines, on a trigger', () => {
     const t = setup();
     t.store.save({ ...PAPERS, name: 'Build', when: { type: 'watch' } }, MONDAY_759);
     t.routines.start();
-    t.routines.watchFired('The build finished.');
+    t.routines.watchFired({ condition: 'the build finishes', message: 'The build finished.' });
     await t.clock.advance(0);
     expect(t.asks[0]?.text).toContain('The build finished.');
+    t.routines.stop();
+  });
+
+  it('names the condition when a watch fires with no reason', async () => {
+    const t = setup();
+    t.store.save({ ...PAPERS, name: 'Build', when: { type: 'watch' } }, MONDAY_759);
+    t.routines.start();
+    t.routines.watchFired({ condition: 'the build finishes', message: '' });
+    await t.clock.advance(0);
+    expect(t.asks[0]?.text).toContain('A watch fired: the build finishes');
     t.routines.stop();
   });
 });
@@ -417,9 +427,20 @@ describe('Routines, delivering', () => {
     await t.routines.runNow(saved.id);
     expect(t.results()[0]).toMatchObject({
       state: 'error',
-      line: 'Morning papers did not run: No key for Scout.',
+      line: 'Morning papers did not run.',
+      text: 'No key for Scout.',
     });
     expect(t.activity[0]).toMatchObject({ state: 'error', error: 'No key for Scout.' });
+  });
+
+  it('delivers nothing when a run ends with nothing to say; Activity still has the run', async () => {
+    const t = setup({ script: () => ({ text: '   ' }) });
+    const saved = t.store.save(PAPERS, MONDAY_759);
+    await t.routines.runNow(saved.id);
+    await t.clock.advance(ROUTINE_TICK_MS);
+    expect(t.results()).toEqual([]);
+    expect(t.activity[0]).toMatchObject({ name: 'Morning papers', state: 'done' });
+    expect(t.store.get(saved.id)?.lastState).toBe('done');
   });
 });
 
@@ -470,6 +491,34 @@ describe('Routines, handing to an expert', () => {
       text: '1. Agents that plan. Why it matters: fewer steps.',
       conversationId: t.answers[0]?.conversationId,
     });
+  });
+
+  it('delivers nothing when the expert finishes with nothing to say, and writes no filler', async () => {
+    const handoffId = randomUUID();
+    const t = setup({ script: () => ({ text: 'Researcher is looking.', handoff: handoffId }) });
+    const saved = t.store.save({ ...PAPERS, handTo: 'researcher' }, MONDAY_759);
+    await t.routines.runNow(saved.id);
+    t.routines.handoffFinished({ handoffId, expertId: 'researcher', state: 'done', text: ' ' });
+    await t.clock.advance(0);
+    expect(t.answers).toEqual([]);
+    expect(t.results()).toEqual([]);
+    expect(t.activity[0]).toMatchObject({ state: 'done' });
+    expect(t.store.get(saved.id)?.lastState).toBe('done');
+  });
+
+  it('says a stopped expert only as status, with no made-up reason', async () => {
+    const handoffId = randomUUID();
+    const t = setup({ script: () => ({ text: 'Researcher is looking.', handoff: handoffId }) });
+    const saved = t.store.save({ ...PAPERS, handTo: 'researcher' }, MONDAY_759);
+    await t.routines.runNow(saved.id);
+    t.routines.handoffFinished({ handoffId, expertId: 'researcher', state: 'stopped' });
+    await t.clock.advance(0);
+    expect(t.results()[0]).toMatchObject({
+      state: 'error',
+      line: 'Morning papers did not run.',
+      text: '',
+    });
+    expect(t.activity[0]).toMatchObject({ state: 'error' });
   });
 });
 

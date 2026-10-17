@@ -131,7 +131,6 @@ interface Waiting {
   context: RunContext;
   activityId: string;
   conversationId: string;
-  expertName: string;
 }
 
 interface Proposal {
@@ -345,10 +344,8 @@ export class Routines {
     if (waiting !== undefined) {
       this.#waiting.delete(params.handoffId);
       const done = params.state === 'done';
-      const text = done
-        ? (params.text ?? '').trim() || `${waiting.expertName} finished with nothing to add.`
-        : (params.error ?? `${waiting.expertName} stopped without finishing.`);
-      if (done) this.#options.answer(waiting.conversationId, text);
+      const text = done ? (params.text ?? '').trim() : (params.error ?? '');
+      if (done && text !== '') this.#options.answer(waiting.conversationId, text);
       this.#finish(waiting.stored, waiting.context, waiting.activityId, {
         state: done ? 'done' : 'error',
         text,
@@ -366,8 +363,9 @@ export class Routines {
     return false;
   }
 
-  watchFired(message: string): void {
-    const detail = `A watch fired: ${clip(message, DETAIL_CHARS)}`;
+  /** A watch fired: watch routines run, told the judge's reason, or the condition without one. */
+  watchFired(fired: { condition: string; message: string }): void {
+    const detail = `A watch fired: ${clip(fired.message || fired.condition, DETAIL_CHARS)}`;
     for (const stored of this.#enabled()) {
       if (stored.routine.when.type === 'watch') void this.#run(stored, { late: false, detail });
     }
@@ -571,14 +569,11 @@ export class Routines {
       const handoffId = handoffs[0];
       if (outcome.error === undefined && handoffId !== undefined) {
         // The expert's answer is the result; it arrives as handoff.finished.
-        const expertName =
-          this.#options.experts().find((e) => e.id === routine.handTo)?.name ?? 'The expert';
         this.#waiting.set(handoffId, {
           stored,
           context,
           activityId,
           conversationId: turn.conversationId,
-          expertName,
         });
         return true;
       }
@@ -630,13 +625,12 @@ export class Routines {
       conversationId: outcome.conversationId,
     });
     this.#options.store.runFinished(routine.id, outcome.state);
+    this.#changed();
     const label = context.late ? `${routine.name} (ran late)` : routine.name;
     const said = firstLine(outcome.text);
-    const line = done
-      ? said === ''
-        ? `${label} ran, with nothing to say.`
-        : `${label}: ${said}`
-      : `${label} did not run: ${said || 'something went wrong.'}`;
+    // Nothing to say is silence: the Activity row above is the record. An error is status only.
+    if (done && said === '') return;
+    const line = done ? `${label}: ${said}` : `${label} did not run.`;
     this.#pending.push({
       meetingStart: context.meetingStart,
       params: {
@@ -652,6 +646,5 @@ export class Routines {
         activityId,
       },
     });
-    this.#changed();
   }
 }

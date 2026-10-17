@@ -1145,8 +1145,13 @@ A run counts as late only when it starts **more than five minutes** after its ti
 1. Edit a routine: untick **In Scout's bubble**, tick **Windows notification**. **Run now**: a
    notification arrives and no line shows. Click it: the bubble opens on the result.
 2. Tick **Read aloud**: the result is spoken (with Scout talks on in Settings → Voice).
+   A run that failed (for example with no key for Scout's brain) is never spoken: its line reads
+   "<name> did not run." and the notification carries the error.
 3. Leave the bubble open and **Run now** on a bubble-only routine: the line does not cover the open
    bubble; a notification carries it instead.
+4. Give a routine an instruction whose answer is often empty (for example "Reply with nothing
+   unless a new file is on the Desktop") and **Run now**. **Expected:** no line, no voice and no
+   notification, and never "ran, with nothing to say"; **Activity** still shows the run as done.
 
 ### R7. Consent
 
@@ -1249,7 +1254,10 @@ monitor.
 1. **Setup:** screen memory on (SM.2) for a few minutes; a second monitor if you have one.
 2. **Action:** ask Scout "tell me when this window's title changes", then change it (for example
    save a Notepad file under a new name). **Expected:** Scout says in one line what it is watching
-   and that it stops on its own; when the title changes it tells you, and the watch ends.
+   and that it stops on its own; when the title changes it tells you, and the watch ends. The card
+   names what it was watching for and gives the reason under it; the notification carries the
+   reason. If the check gave no reason, the card and notification show only the condition, nothing
+   is said aloud, and you never hear "… — it happened."
 3. **Action:** ask "what was on screen a few minutes ago?". **Expected:** Scout describes that moment
    and names its time, not the screen now.
 4. **Action:** ask "what's on my other monitor?". **Expected:** Scout describes the other display.

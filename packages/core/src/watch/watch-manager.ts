@@ -334,7 +334,8 @@ export class WatchManager {
         params: {
           watchId: watch.watchId,
           petId: watch.petId,
-          message: verdict.reason || `"${watch.condition}" — it happened.`,
+          condition: watch.condition,
+          message: verdict.reason,
           displayId: watch.displayId,
         },
       });

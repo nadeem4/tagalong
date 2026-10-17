@@ -77,7 +77,9 @@ export function MessageList({
                 ⏰ {petName}
                 {message.condition === undefined ? '' : ` — watching for “${message.condition}”`}
               </p>
-              <p className="mt-1 whitespace-pre-wrap">{message.text}</p>
+              {message.text === '' ? null : (
+                <p className="mt-1 whitespace-pre-wrap">{message.text}</p>
+              )}
             </div>
           );
         }

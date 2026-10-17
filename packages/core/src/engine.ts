@@ -350,7 +350,7 @@ export class Engine {
       limits: () => settings.get().watch,
       emit: (event) => {
         live.server?.broadcast(event.method, event.params);
-        if (event.method === 'watch.fired') live.routines?.watchFired(event.params.message);
+        if (event.method === 'watch.fired') live.routines?.watchFired(event.params);
       },
       log: (message) => console.warn(`[engine] ${message}`),
     });
