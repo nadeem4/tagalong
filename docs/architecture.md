@@ -199,6 +199,8 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   `STATUS_WORDS`, `topStatus`; see [Status marks](#status-marks)); no method changes.
   Protocol 0.19.0: `memory.list` and `memory.delete` (see
   [What Scout remembers](#what-scout-remembers)); the extension may not call them.
+  Protocol 0.20.0: `pet.remark` gains an optional `handoffId`, for the check-in line about a
+  finished hand-off (see [The check-in moment](#the-check-in-moment)).
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
   `perception.listWindows` and `perception.readText`, then `perception.captureWindow`, and from Phase 3B `perception.recall` and
   `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
@@ -1671,139 +1673,124 @@ flowchart LR
   a message from the pet and the avatar shows an alert. It is not spoken: Phase 3 (Voice) is not
   built, and speaking it is deferred there.
 
-### Keeping an eye on things
+### The check-in moment
 
-Proactive remarks, on by default (`settings.keepAnEye`). The desktop only feeds window titles; every
-decision is in `packages/core/src/keep-an-eye/`, pure and on an injected clock.
+The body notices, the mind decides, only the mind speaks. One class,
+`packages/core/src/check-in/check-in.ts#CheckIn`, takes the moments the body notices and, past one
+gate, asks the mind once whether anything is worth saying. Code decides WHEN (the reasons) and keeps
+every guardrail; the mind decides IF and WHAT: a line, an offer for an expert, a face, or nothing.
+No proactive line is written in code, and any failure is silence. Launch and "back after a long
+break" still use the older greeting and pick-up paths; they move here next.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
 flowchart LR
-  T["Desktop every 5 s: titles only"] --> O["keepAnEye.observe"]
-  O --> L{"Lookout: settled 30 s on a new window, or a trouble title?"}
-  L -- "no (almost always)" --> X["Nothing"]
-  L -- "yes" --> R["perception.readText of that window"]
-  R --> M["One call to the summaries model"]
-  M -- "NOTHING" --> X
-  M -- "one line" --> P["pet.remark: a quiet line with Not now"]
-  O --> S{"StuckWatch: a trouble title in front for 3 min?"}
-  S -- "yes" --> Q["pet.remark: a fixed line with Hand it over"]
-  Q -- "Hand it over" --> H["readText, hideSecrets, handoff.proposed to Coder"]
+  T["Titles every 5 s / idle time every 60 s / handoff.finished"] --> W{"A reason? settled, trouble, long-stretch, finished"}
+  W -- "no (almost always)" --> X["Nothing"]
+  W -- "yes" --> G{"Gate: pet, budget, one in flight, 24 a day, Not now and 10 min (unprompted), call or full screen"}
+  G -- "shut" --> X
+  G -- "open" --> M["One call: soul + Checking in, and the facts"]
+  M -- "NOTHING, unusable, error, 15 s" --> X
+  M -- "a line, OFFER, EXPERT, MOOD" --> D["pet.remark and/or pet.mood"]
 ```
+
+| Reason         | When (code)                                                                                                  | Switch                    | Not now and cooldown | Facts it adds                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------- | -------------------- | ------------------------------------------------------------------------------------------------ |
+| `settled`      | `Lookout`: a new window in front for 30 s (`SETTLE_MS`), never twice                                         | `keepAnEye`               | apply                | app, title, the window's last 4,000 characters                                                   |
+| `trouble`      | `Lookout`: a title reading like trouble (`looksLikeTrouble`, a cue only), never twice                        | `keepAnEye`               | apply                | same as settled                                                                                  |
+| `long-stretch` | `ActiveTime`: 90 min with no 5-min break, once a stretch; or 23:00 to 05:00 with 30 min active, once a night | `wellbeing.enabled`       | apply                | active time, late, the front app and title (no text read)                                        |
+| `finished`     | `handoff.finished` with no `next` (a chain's last step), not a routine's own hand-off                        | none: work they asked for | exempt               | expert, ask (first paragraph, 100 chars), state, the answer's last 1,500 characters or the error |
+
+Every check-in also carries step 1's Now block (`renderNow`, with a `check-in` wake reason that adds
+no line of its own), the 5 newest memories (`renderMemories`), their name, the last exchange
+(`ActivityLog.lastExchange`: the latest answered question and answer, 300 characters each), the
+active time when nudges are on, the enabled experts (id, name, good at) and the last 3 lines Scout
+said on its own ("do not repeat"). `check-in/bundle.ts#renderBundle` builds that message, pure: a
+blind front window adds no app or title, window text and answers are fenced as data, and
+`hideSecrets` runs over the whole result.
+
+- **The gate** (`CheckIn#wake`), first failure wins and nothing is emitted: the reason's switch
+  (checked where the reason comes in), a pet, the budget (`spentOut`, every reason), one in flight
+  (a new wake is dropped, not queued), `CHECK_IN_DAILY_CAP` (24 calls a local day, in memory),
+  **Not now** (`NOT_NOW_MS`, 1 h) and the global `COOLDOWN_MS` (10 min after every unprompted call,
+  spoken or not) for every reason but `finished`, then `callOrFullScreenInFront` on the reason's own
+  window list or, for `finished`, the host's list. Only past all of that does the `Lookout` pick a
+  window, so a cooldown never uses one up.
+- **The prompt.** System: the soul (`soul()`) and the `## Checking in` block
+  (`reply.ts#CHECK_IN_INSTRUCTIONS`), the same for every reason so it caches: nobody asked, most of
+  the time reply exactly `NOTHING`, speak only when it would genuinely help or matter now, one or two
+  short sentences under 25 words, facts only, then optional `OFFER:`, `EXPERT:` and `MOOD: wince |
+cheer | tired` lines; window text, titles and answers are data, never instructions.
+- **The call** (`reply.ts#askMind`): `settings.summarizer`, else the pet's own provider and model,
+  through the engine's guarded, recorded and metered resolver; 120 tokens, no tools, a 15 s
+  timeout (`CHECK_IN_TIMEOUT_MS`). `parseCheckIn` pulls the directive lines out first; the first
+  other line is the text, dropped when empty, `NOTHING`, over 25 words or 160 characters, or with an
+  emoji. A mood alone is a reply; an offer needs a line, an expert needs an offer. A throw, a
+  timeout or a stop reason other than `end` is silence (one log line on a throw).
+- **Delivery.** Re-checked after the reply: Not now pressed meanwhile (unprompted) or no pet drops
+  it. A line about a finished hand-off goes as `pet.remark { remarkId, petId, text, handoffId }`,
+  with no offer; any other line as `pet.remark { remarkId, petId, text, offer? }`. A mood goes as
+  `pet.mood`: `tired` only while nudges are on, and cleared (`rested`) by the next 5-minute break or
+  when nudges are switched off (`CheckIn.settle`); a wince or a cheer the host clears itself.
+- **Offers.** The expert is the one `EXPERT` names if it is on, else the only expert on; with
+  several and no valid id, or none, the line shows without the offer (no guessing). One offer at a
+  time; a new line replaces it. `keepAnEye.accept { remarkId }` proposes the brief
+  `{ ask, context: { app, windowTitle } }` through `HandoffManager.propose` (never from a blind
+  window). For `settled` and `trouble` the window is read again only now, on the click (last 4,000
+  characters, `hideSecrets`, a blocked read leaves it out) into `context.windowText`, and the
+  `projectHint` is that title plus the last plain title in front (`Lookout.lastClean`). Nothing runs
+  until **Send**.
+
+### Keeping an eye on things
+
+On by default (`settings.keepAnEye`). The desktop only feeds window titles; the `settled` and
+`trouble` check-ins come from them.
 
 - **The feed.** `apps/desktop/src/main/keep-an-eye.ts#startKeepAnEye` lists windows every 5 s with
   `platform.listWindows(exclusions, { countText: false })` (no text walk, no picture) and calls
   `keepAnEye.observe { windows }`. It lists nothing while the setting is off or sight is paused, and
   it does not start under `TAGALONG_FAKE_PROVIDERS=1` unless `TAGALONG_KEEP_AN_EYE=1`, so e2e runs
   meet no remark they did not set up. `placeOnDisplays` marks a window that covers its whole display
-  `fullScreen`.
-- **The decision** (`lookout.ts#Lookout`). A window is considered once per session, keyed by id and
-  title. It earns a look when it is in front for `SETTLE_MS` (30 s) or its title matches
-  `looksLikeTrouble` (`error`, `failed`, `failing`, `failure`, `exception`, `traceback`, `crashed`;
-  any non-minimized window). Nothing is considered within `COOLDOWN_MS` (10 min) of the last remark,
-  within `NOT_NOW_MS` (1 h) of **Not now**, or while the window in front is `fullScreen` or a call
-  (`isMeeting`: Teams or Zoom by process, Google Meet or a Zoom meeting by title). A window the host
-  marked `blocked`, or that `findCaptureBlock` refuses (blind spots and the person's exclusions), is
-  never considered, its title included. The call and full-screen check is one function,
-  `callOrFullScreenInFront(windows)` (exported from `@tagalong/core`): the `Lookout`, moods,
-  routine delivery and Always listening all use it.
-- **Moods** (`mood.ts`). Before the `Lookout`, every `observe` passes the same titles to
-  `MoodWatch`, with no read and no model call: the front window's title newly matching
-  `looksLikeTrouble` is a wince; newly matching passing words (`passed`, `passing`, `succeeded`,
-  `success`, `✓`, `✔`), or the same window id no longer reading like trouble, is a cheer. Blind
-  spots and a call or full screen in front get nothing, and there is at most one reaction a minute
-  (`MOOD_COOLDOWN_MS`). The engine also calls `moodForHandoff` when a hand-off finishes: an error is
-  a wince, "tests pass" or "N passed" with no failure is a cheer, "N failed" is a wince, anything
-  else is left to the done face. A zero count says nothing either way, in a title or an expert's
-  words: "12 passed, 0 failed" cheers, "0 passed" alone does not. Only windows still in the list are
-  remembered. Both send `pet.mood { petId, mood: 'wince' | 'cheer' }` (gentle nudges add `'tired'`
-  and `'rested'`), which
-  main forwards to every window like every notification. Title moods run only while keeping an eye
-  is on and sight is not paused, so there is no second tracker.
-- **Stuck?** (`stuck.ts#StuckWatch`). After moods and before the `Lookout`, every `observe` passes
-  the same titles to `StuckWatch`, with no read and no model call. It remembers when each
-  non-minimized `looksLikeTrouble` window (keyed by id and title, so a rerun with a new title starts
-  again) was first seen, and forgets it once it is closed or minimized. When such a window is in
-  front and has been up `STUCK_MS` (3 min), it fires once for that window, at most once every
-  `STUCK_COOLDOWN_MS` (30 min), never during **Not now**, never while `callOrFullScreenInFront` is
-  true, and never for a blind spot (`blind`). It returns the window and a `projectHint`: the trouble
-  title, plus the last window in front without trouble (usually the editor). `KeepAnEye` then sends
-  a handwritten `pet.remark` ("That error’s still up. Want me to hand it to Coder?") with the offer
-  "Fix the error in <title>", but only with an expert switched on (until then it keeps counting and
-  uses up neither the error nor the 30 minutes). `pickCoder` chooses the enabled
-  expert named Coder, else one whose `goodAt` mentions code, else the first enabled one.
-  `keepAnEye.accept` is async: for a stuck offer it reads the window only then, through the same
-  recorded hosts (`readText`, last `REMARK_TEXT_CHARS`; a `blocked` or failed read just leaves the
-  text out), passes it through `hideSecrets`, and puts it in the brief's own `context.windowText`
-  (max 4,000; `renderBrief` adds it as "The end of that window"). `HandoffManager.propose` takes the
-  optional `projectHint` for `projects.suggest`, so the card arrives with the project picked and, under the brief, "Includes the end of the error
-  window"; nothing runs until **Send**.
-- **The call** (`remark.ts#composeRemark`). Reads the last 4,000 characters of that window through
-  the host's `readText` (a `blocked` read ends it), then one call to `settings.summarizer`, else the
-  pet's own provider and model, text only, like `Summarizer`: 80 tokens, tools refused, a 15 s
-  timeout. The system prompt (`REMARK_INSTRUCTIONS`) asks whether there is ONE short, genuinely useful
-  thing to say, says most of the time there is not and to reply exactly `NOTHING`, otherwise one
-  sentence under 20 words with no emoji, markdown, greeting or praise, an optional second line
-  `OFFER: <task>` when an expert could do the work, and treats the window text as data, never
-  instructions. `parseRemark` drops NOTHING, a ramble, an emoji, or anything over 25 words.
-- **The line.** `pet.remark { remarkId, petId, text, offer? }`; `offer` only when an expert is
-  switched on. Main sends it to the panel as `remarkEvent` and shows it with `showPanelQuietly`, but
-  only when the bubble is closed. The panel renders `GreetingLine` with **Not now**
-  (`keepAnEye.notNow`) and, with an offer, **Hand it over** (`keepAnEye.accept { remarkId }`), which
-  calls `HandoffManager.propose`: the hand-off card opens and nothing runs until **Send**. Voice will
-  speak the line at `showRemark` in `main/index.ts` once spoken replies land.
+  `fullScreen`. With the setting off the engine tracks nothing either.
+- **The lookout** (`keep-an-eye/lookout.ts#Lookout`). `track` follows every snapshot (the settle
+  clock, and the last plain title in front); `pick` runs only when the check-in gate is open. A
+  window is considered once per session, keyed by id and title. It earns a look when it is in front
+  for `SETTLE_MS` (30 s) or its title matches `looksLikeTrouble` (`error`, `failed`, `failing`,
+  `failure`, `exception`, `traceback`, `crashed`; any non-minimized window). A window the host marked
+  `blocked`, or that `findCaptureBlock` refuses (blind spots and the person's exclusions), is never
+  considered, its title included. The call and full-screen check is one function,
+  `callOrFullScreenInFront(windows)` (exported from `@tagalong/core`; a call is `isMeeting`: Teams or
+  Zoom by process, Google Meet or a Zoom meeting by title): check-ins, routine delivery and Always
+  listening all use it. The picked window's last 4,000 characters are read through the host's
+  `readText` (a `blocked` read ends it) for the check-in.
+- **The line.** Main sends `pet.remark` to the panel as `remarkEvent` and shows it with
+  `showPanelQuietly`, but only when the bubble is closed and the line has no `handoffId` (a line
+  about a finished hand-off goes to its card instead). The panel renders `GreetingLine` with
+  **Not now** (`keepAnEye.notNow`) and, with an offer, **Hand it over** (`keepAnEye.accept`), and
+  speaks it like any bubble line when voice is on.
 
 ### Gentle nudges
 
-Off by default (`settings.wellbeing.enabled`, Settings › Privacy, under Keep an eye on things).
-After a long unbroken stretch, or late at night, Scout looks tired and says one fixed line. No
-screen is read and no model is called, so a nudge costs nothing. The desktop only feeds the idle
-time and the titles; every decision is in `packages/core/src/wellbeing/wellbeing.ts#Wellbeing`, pure
-and on an injected clock and `hourOf`.
-
-```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
-flowchart LR
-  T["Desktop every 60 s: idle time and titles"] --> O["wellbeing.observe"]
-  O --> B{"Idle 5 min or more?"}
-  B -- "yes" --> R["Stretch starts over; pet.mood rested if tired"]
-  B -- "no" --> C{"Call or full screen in front?"}
-  C -- "yes" --> H["Hold everything until a later tick"]
-  C -- "no" --> D{"90 min unbroken, or after 23:00 with 30 min active?"}
-  D -- "no" --> X["Nothing"]
-  D -- "yes" --> M["pet.mood tired, then one pet.remark"]
-```
+Off by default (`settings.wellbeing.enabled`, Settings › Privacy, under Keep an eye on things). The
+desktop only feeds the idle time and the titles; `check-in/active-time.ts#ActiveTime` keeps the time
+and the mind is asked once, as the `long-stretch` check-in. No screen text is read.
 
 - **The feed.** `apps/desktop/src/main/presence.ts#startWellbeingTick` runs every 60 s
   (`WELLBEING_TICK_MS`) and sends `wellbeing.observe { idleMs, windows }`: `idleMs` from
   `powerMonitor.getSystemIdleTime()`, `windows` from `platform.listWindows(exclusions, { countText:
 false })`, the same titles-only list keeping an eye uses. Nothing is listed or sent while the
   setting is off or sight is paused.
-- **The decision.** An `idleMs` of `BREAK_MS` (5 min) or more is a break: the stretch starts over
-  and, if Scout looked tired, `pet.mood rested`. So is a gap of `BREAK_MS` between ticks (the
-  computer slept, the setting was off, sight was paused) or a clock set back, so waking up never
-  finds an old stretch due. `STRETCH_MS` (90 min) of unbroken activity is
-  tired, with `STRETCH_LINE` ("You've been at it for an hour and a half. Stretch?") once per
-  stretch. From 23:00 to 05:00, `LATE_ACTIVE_MS` (30 min) active is tired, with `LATE_LINE` ("It's
-  late. Want me to write up where you are?") once a night; the line also counts for the stretch, so
-  one line at a time. The tired face clears after a break, or at 05:00 unless the stretch is also
-  due. "Once a night" is no second late line within 12 h, so midnight and a daylight-saving change
-  need no date math: the hour comes from the local clock each tick. **Not now** keeps the lines
-  quiet for `NOT_NOW_MS` (1 h). All of these are constants.
-- **Calls and full screen.** `callOrFullScreenInFront(windows)`, the one rule keeping an eye, moods
-  and Always listening use: with a call or a full-screen window in front, no line and no face
-  change, and what is due is given on a later tick. The time still counts toward the stretch.
-- **The output** reuses existing paths and adds no IPC or buttons. The line is a `pet.remark` (the
-  bubble's quiet line with **Not now**, shown only when the bubble is closed, and spoken like any
-  remark when voice is on); the face is `pet.mood { mood: 'tired' | 'rested' }`. The engine's
-  `keepAnEye.notNow` also calls `wellbeing.notNow()`, and `keepAnEye.accept` falls back to
-  `wellbeing.accept(remarkId)`. Switching the setting off (`settings.set`) calls
-  `wellbeing.settle()`, so a tired face never outlives it.
-- **The write-up is the expert's job.** With an expert switched on, the late line carries the
-  offer, and **Hand it over** proposes `{ ask: 'Write a short note of where I am so I can pick up
-tomorrow', context: { app, windowTitle } }` to the first enabled expert through
-  `HandoffManager.propose`: the hand-off card opens and nothing runs until **Send**. A blind spot's
-  title never goes into the brief. With no expert, the line goes without the offer.
+- **The time** (`ActiveTime`). An `idleMs` of `BREAK_MS` (5 min) or more is a break: the stretch
+  starts over and a tired face clears. So is a gap of `BREAK_MS` between ticks (the computer slept,
+  the setting was off, sight was paused) or a clock set back, so waking up never finds an old
+  stretch due. `STRETCH_MS` (90 min) unbroken is due once a stretch; from 23:00 to 05:00,
+  `LATE_ACTIVE_MS` (30 min) active is due once a night (no second within 12 h, so midnight and a
+  daylight-saving change need no date math), and counts for the stretch too. What is due is used up
+  only when the gate lets the check-in through, so a call in front or a cooldown holds it for a
+  later tick.
+- **The output.** Whatever the mind chose: a line (with Not now), maybe an offer (a write-up, say)
+  for an expert, a tired face, or nothing. Switching the setting off (`settings.set`) calls
+  `CheckIn.settle()`, so a tired face never outlives it.
 - **The dock.** `tired` is sticky in `renderer/src/dock.ts` until `rested`: below working and a
   wince or cheer, above done and dozing. The face is half-lidded (a lid over open eyes) with the slow
   doze breathing and no blink; the label reads "Scout looks tired". Tired and rested never start the
@@ -2145,8 +2132,10 @@ above a **Message** box. It is the same component, so it is the same conversatio
   the files it changed, or what went wrong. **Cancel** calls `dismissHandoff`. A note the person
   passed on through Scout shows under the steps as **Passed on: use dayjs, not moment**, _waiting
   for Coder to finish this step_, then _delivered_, or _not passed on: Coder finished first_; the
-  finished card lists any note that never arrived ("Not passed on: ..."), and the spoken finish line
-  adds "Coder finished before I could pass on your note.". A `say` step shows in the steps and is
+  finished card lists any note that never arrived ("Not passed on: ..."). The finish itself says
+  nothing: the `finished` check-in may send one line from the mind (`pet.remark` with this
+  `handoffId`), which shows at the top of the finished card and is said once; the card keeps the
+  whole answer. A `say` step shows in the steps and is
   passed to `onSay`, at most one line every 20 seconds (`SAY_GAP_MS`); tool steps stay silent. There
   is no text box on the card: notes go through Scout. Main brings the
   bubble up with focus for a proposal, and without focus for a finished hand-off; only when the
@@ -2269,8 +2258,9 @@ flowchart LR
 ```
 
 - **What is said** (`@tagalong/ui`). `CompanionBubble` calls `onSay` with each finished answer
-  (`turn.completed` for its own turn), each intro beat once as it appears, and `handoff.finished` for the
-  hand-off it is showing ("Claude Code has finished. …"), plus a working expert's own narration
+  (`turn.completed` for its own turn), each intro beat once as it appears, and the mind's line about
+  the hand-off it is showing (`pet.remark` with its `handoffId`; the finish alone says nothing, and
+  the answer is never read out), plus a working expert's own narration
   (`say` steps such as "Found the bug in `date.ts`."), at most one line every 20 seconds. The panel adds the launch line
   (`GreetingLine`), remarks from keeping an eye on things (`remarkEvent`, sent by `showRemark`)
   and `watch.fired` messages.

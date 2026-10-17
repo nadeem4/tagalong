@@ -463,26 +463,29 @@ screenshot is attached.
 - Nothing on screen is read until you press a hotkey or ask, except screen memory and watches, which
   you turn on, and keeping an eye on things (below). Every look badges Scout and the tray says what
   was read and when.
+- **Check-ins.** Now and then, when nobody asked, Scout asks the summaries model once whether
+  anything is worth saying, and most of the time says nothing. Each such call carries what the
+  moment is about plus your five newest memories, your name, the time, what experts are doing and
+  your last exchange with Scout (secrets hidden, never a blind spot). At most 24 a day, one
+  unprompted every ten minutes, none for an hour after **Not now**, none over calls, full screen or
+  once the daily budget is spent.
 - **Keeping an eye on things** is on by default: Scout follows window titles only (no picture, no
   model call). Rarely, when you settle on a new window or a title reads like an error or a failed
-  build, it reads that one window and asks the summaries model in one short call whether there is
-  one useful thing to say; most of the time there is not. At most one line every ten minutes,
-  never twice about one window, quiet over full-screen apps and calls, and **Not now** quiets it for
-  an hour. Turn it off under **Settings → Privacy → Keep an eye on things**.
-- **Stuck?** When an error has stayed in front for three minutes, Scout offers once to hand it to
-  Coder, from the title alone. Only **Hand it over** reads that window (secrets hidden) into the
-  hand-off card, with the project picked; nothing runs until **Send**.
-- **Scout's moods** need nothing new: it winces at a failing build and cheers when tests pass, from
-  the same titles, and dozes after five minutes with no input or when the screen locks (one idle
-  time number from the OS, kept on this computer).
+  build, it reads that one window and checks in, never twice about one window. A line may offer to
+  hand the work to an expert: only **Hand it over** reads that window again (secrets hidden) into
+  the hand-off card, with the project picked; nothing runs until **Send**. Turn it off under
+  **Settings → Privacy → Keep an eye on things**.
+- **Scout's face** comes from the mind in a check-in (a wince, a cheer, tired), never from a title
+  alone; it dozes after five minutes with no input or when the screen locks (one idle time number
+  from the OS, kept on this computer).
 - **Pick up where you left off** is on by default: Scout keeps one note, from window titles only,
   of the projects open in your editor and the hand-offs left half done. Back after six hours or
   more, it says one line about it, once; nothing opens until you click on the card. Turn it off
   under **Settings → Privacy → Pick up where you left off**, which also deletes the note.
-- **Gentle nudges** are off by default (**Settings → Privacy → Gentle nudges**). On, Scout looks
-  tired and suggests a stretch after an hour and a half with no break, and late at night offers to
-  have your expert write up where you are. Idle time and titles only, fixed lines, no model call;
-  quiet during calls and full screen.
+- **Gentle nudges** are off by default (**Settings → Privacy → Gentle nudges**). On, after an hour
+  and a half with no break, or late at night, Scout checks in once with how long you have been at
+  it and the window in front: it may say a line, offer a write-up by your expert, look tired, or
+  say nothing. Idle time and titles only, no window text; quiet during calls and full screen.
 - Scout never looks at its built-in blind spots: password managers, the Windows sign-in and security
   prompts, secret files such as `.env` and SSH keys, private browsing, authenticator apps and Remote
   Desktop. They are always on and listed in Settings; you can add your own.

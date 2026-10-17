@@ -84,6 +84,12 @@ Scout files a memory with the `remember` tool (`{ text, kind: fact | preference 
 short answers" is kept across restarts; the summary also records preferences the user stated.
 Nothing is filed by matching phrases in what they typed: the model decides.
 
+Check-ins (when Scout wakes on its own: a settled window, an error title, a long stretch, a
+finished hand-off) have no question to match, so they carry the **5 newest** memories only, under
+the same `## What you remember` heading and 2,000-character cap, together with the last exchange
+(the latest answered question and answer, 300 characters each, from the activity record). See
+`packages/core/src/check-in/bundle.ts` and [privacy.md](../privacy.md).
+
 ## Seeing and deleting what Scout remembers
 
 Memories are kept until deleted, and the person can see and delete every one:

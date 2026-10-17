@@ -47,7 +47,8 @@ tagalong/
       experts/                      # hand-offs, the Claude Code connector, the fake connector
       routines/                     # the scheduler, schedules and triggers, the routine store
       meetings/                     # Meeting prep's calendar feed: the .ics link, parsed with ical.js
-      greeting/, keep-an-eye/       # the launch line; the remark from watching window titles
+      check-in/                     # the check-in moment: gate, facts, the one call, reply parsing
+      greeting/, keep-an-eye/       # the launch line; the lookout over window titles
       watch/, projects/, privacy/   # watches, the project finder, the blind spots
       pets/registry.ts              # PetRegistry, the default pet Scout
       roles/                        # library.generated.ts, getRole, roleFor, recommendedModel, tiers.ts
