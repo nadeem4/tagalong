@@ -7,6 +7,7 @@ import Database from 'better-sqlite3';
 import { migrate } from '../../memory/db';
 import { MemoryStore } from '../../memory/memories';
 import { fakeTurnTools } from '../fake-turn';
+import { directivesIn } from '../test-support';
 import { FORGET, REMEMBER } from './memory';
 
 let db: Database.Database;
@@ -57,7 +58,8 @@ describe('remember', () => {
 
 /** A result is facts only: no sentence that tells the mind what to say or do. */
 function expectFact(text: string): void {
-  expect(text).not.toMatch(/(^|[.:!?]\s+)(Tell|Say|Ask|Do not|Don't|Never|Always|Use|Try)\b/);
+  expect(directivesIn(text)).toEqual([]);
+  expect(text).not.toMatch(/(^|[.:!?]\s+)(Never|Always|Use|Try)\b/);
 }
 
 const forget = (input: unknown, overrides = {}) =>
