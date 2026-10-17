@@ -227,8 +227,8 @@ both answers. If the first step fails or is stopped, the second never runs. Whil
 you can tell Scout something for it ("tell Coder to use dayjs, not moment"): Scout says "I'll pass
 that to Coder", the card shows **Passed on:** with _waiting for Coder to finish this step_, then
 _delivered_, and the expert carries on in the same session with your note (or the card says it
-finished first). Scout also says the expert's key moments aloud, such as "Found the bug in
-`date.ts`", at most one line every 20 seconds.
+finished first). The expert's key moments, such as "Found the bug in `date.ts`", show on the
+card and are not said aloud.
 
 **Keeping an eye on things.** Now and then Scout says one short line on its own, beside itself and
 without taking the keyboard: a build that failed and why, say. It follows window titles only, reads
@@ -236,8 +236,9 @@ one window when you settle on it or its title reads like trouble, and most of th
 nothing. **Not now** on the line quiets it for an hour; when it offers help, **Hand it over** opens
 the hand-off card, and nothing is sent until you press **Send**. See [Privacy](#privacy).
 **Scout talks.** Scout reads its answers aloud, so you can look away: the answer, its hello, a
-line it says on its own, a routine's result and an expert that finished. It never reads code, lists or long text; it says the
-first sentence or two and "The rest is in the bubble." Bars beside the × show while it speaks;
+line it says on its own, a routine's result and its line about an expert that finished. Scout
+decides what to say: everything it writes is spoken, typed question or spoken, except what it
+puts in a block (a draft, code, a long list), which is shown in the bubble and not read. Bars beside the × show while it speaks;
 click them, close the bubble or press `Ctrl+Shift+Alt+M` to stop it at once. The voice is
 Kokoro, made on this computer: the first time Scout speaks it downloads the voice model (about
 92 MB) and uses the Windows voice until that is done. Turn it off, pick a voice, preview it or
@@ -257,7 +258,7 @@ audio is never sent or kept.
 
 **Read it to me.** Type or say "read this to me" and Scout reads your selection, or the window in
 front, aloud in full: the text itself, lists as sentences, code described rather than spelled out.
-After about 300 words it asks "Shall I go on?"; say or type "go on" for more. The stop key, ×
+Ask "summarise this" and it speaks a summary; for something long it gives the gist first. The stop key, ×
 and the bars cut it off. Ask "what's in this chart?" (or about a photo, diagram or screenshot) and
 Scout gives the kind, the axes, the trend and the values that stand out, and says when it can't
 make one out. With ElevenLabs as the voice, the text read goes to ElevenLabs.
@@ -292,7 +293,7 @@ preferences.
 **"Scout, what's wrong?"** Ask that (or "are you OK?", or "health check"), typed or spoken, and the
 bubble shows a health card: its sign-in, your experts, your connections, its voice, your
 microphone and the browser extension, each with a plain line, starting "Two things need you." or
-"Everything's working." (said aloud only when you asked by voice). **Fix it** on a row opens the place that fixes it. It calls no model and
+"Everything's working." (shown, never said aloud). **Fix it** on a row opens the place that fixes it. It calls no model and
 reads no screen, so it works even when Scout cannot think.
 
 Upgrading from an earlier build keeps only Scout; any other companion, with its conversations, is
