@@ -1058,7 +1058,7 @@ describe('a companion handing work to an expert', () => {
       toolCall: {
         id: 'call-1',
         name: 'hand_to_expert',
-        input: { ask: 'Why does the build fail?', task_kind: 'fix-code' },
+        input: { ask: 'Why does the build fail?' },
       },
     });
     const e = await boot(provider);
@@ -1130,7 +1130,6 @@ describe('a companion handing work to an expert', () => {
         name: 'hand_to_expert',
         input: {
           ask: 'Fix the date bug',
-          task_kind: 'fix-code',
           expert_id: 'coder',
           then: { expert_id: 'reviewer', ask: 'Check what Coder changed' },
         },
@@ -1206,7 +1205,7 @@ describe('the daily budget over rpc', () => {
       toolCall: {
         id: 'call-1',
         name: 'hand_to_expert',
-        input: { ask: 'Why does the build fail?', task_kind: 'fix-code' },
+        input: { ask: 'Why does the build fail?' },
       },
     });
     const e = await boot(provider);
@@ -1288,7 +1287,7 @@ describe('a mood from a finished hand-off', () => {
       toolCall: {
         id: 'call-1',
         name: 'hand_to_expert',
-        input: { ask: 'Fix the parser test', task_kind: 'fix-code' },
+        input: { ask: 'Fix the parser test' },
       },
     });
     const e = await boot(provider, {

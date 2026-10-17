@@ -97,8 +97,8 @@ const MIGRATIONS: readonly Migration[] = [
    CREATE INDEX IF NOT EXISTS activity_turn ON activity(turn_id);
    CREATE INDEX IF NOT EXISTS activity_run ON activity(run_id);`,
   addExperts,
-  // Migration 9. Which expert takes which kind of task: the companion's picks and the
-  // user's, the user's always winning. Written by RouteMemory.
+  // Migration 9. Which expert took which kind of task. Unused since the model picks the
+  // expert itself (PR "facts not scripts"); kept to avoid a migration.
   `CREATE TABLE IF NOT EXISTS expert_routes (
      task_kind TEXT PRIMARY KEY,
      expert_id TEXT NOT NULL,

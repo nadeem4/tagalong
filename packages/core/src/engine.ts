@@ -46,7 +46,6 @@ import {
   ExpertStore,
   FakeConnector,
   HandoffManager,
-  RouteMemory,
   type Connector,
 } from './experts';
 import {
@@ -386,7 +385,6 @@ export class Engine {
       projects,
       usage,
     });
-    const routes = new RouteMemory(db);
     const pickUpStore = new PickUpStore(db);
     /** What is open, titles only: null with no host connected, empty when none can list. */
     const listHostWindows = async () => {
@@ -467,7 +465,6 @@ export class Engine {
       // Read per turn: experts are added and switched off while the app runs.
       experts: {
         experts: () => experts.list(),
-        routes,
         propose: (params) => handoffs.propose(params),
         // Only reached on a routine's turn, for the expert its saved card allowed.
         startReadOnly: (params) => handoffs.startReadOnly(params),
@@ -598,7 +595,6 @@ export class Engine {
       hosts,
       watches,
       experts,
-      routes,
       handoffs,
       projects,
       connectorFor,
@@ -685,7 +681,6 @@ function buildHandlers(parts: {
   hosts: () => readonly PerceptionHost[];
   watches: WatchManager;
   experts: ExpertStore;
-  routes: RouteMemory;
   handoffs: HandoffManager;
   projects: ProjectFinder;
   connectorFor: (expert: Expert) => Connector;
@@ -715,7 +710,7 @@ function buildHandlers(parts: {
   checkResolve: ProviderResolver;
 }): MethodHandlers {
   const { activity, runner, pets, settings, models, hosts, watches } = parts;
-  const { refreshProviders, experts, routes, handoffs, projects, connectorFor, resolve } = parts;
+  const { refreshProviders, experts, handoffs, projects, connectorFor, resolve } = parts;
   const { keepAnEye, connections, approvals, routines, interruptedAtBoot, pickUp } = parts;
   const { sightLog, checkResolve } = parts;
   const { calendar } = parts;
@@ -808,7 +803,6 @@ function buildHandlers(parts: {
       return { expert: experts.upsert(fromCatalog(params.expert)) };
     },
     'experts.delete': (params) => {
-      routes.forgetExpert(params.expertId);
       return { deleted: experts.delete(params.expertId) };
     },
     'experts.test': async (params) => {

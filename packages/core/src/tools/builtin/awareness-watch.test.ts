@@ -5,6 +5,7 @@ import type { PerceptionHost } from '../../perception/host';
 import { FakeClock } from '../../watch/fake-clock';
 import { WatchManager } from '../../watch/watch-manager';
 import { fakeTurn } from '../fake-turn';
+import { directivesIn } from '../test-support';
 import { WATCH_FOR, watchForTool } from './awareness';
 
 const pet: Pet = {
@@ -66,6 +67,7 @@ describe('watch_for', () => {
     expect(tool.definition.name).toBe(WATCH_FOR);
     expect(tool.definition.inputSchema['required']).toEqual(['condition']);
     expect(tool.definition.description).toMatch(/condition/i);
+    expect(directivesIn(tool.definition.description)).toEqual([]);
   });
 
   it('watches the display of the window in front, and reads that window if it must', async () => {
@@ -78,6 +80,7 @@ describe('watch_for', () => {
     ]);
     expect(String(outcome.content)).toMatch(/display 2/);
     expect(String(outcome.content)).toMatch(/30 minutes/);
+    expect(directivesIn(outcome.content)).toEqual([]);
   });
 
   it('takes a display and a timeout the pet names', async () => {

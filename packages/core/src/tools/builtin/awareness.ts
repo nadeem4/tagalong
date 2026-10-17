@@ -77,7 +77,7 @@ const WATCH_FOR_DEFINITION: BrainTool = {
     'when this build finishes", "let me know when the download is done". Tagalong compares ' +
     'the screen locally every few seconds and only asks a small model when something ' +
     'changed, so it is cheap to leave running. Without a displayId it watches the display ' +
-    'of the window in front. Say you are watching and end your turn: the user is shown the ' +
+    'of the window in front. It runs on its own after this turn: the user is shown the ' +
     'moment it happens, and can stop the watch from its Watching chip.',
   inputSchema: {
     type: 'object',
@@ -197,14 +197,14 @@ async function runRecallScreen(context: RecallContext, input: unknown): Promise<
     if (!result.recording) {
       return {
         content:
-          'Rolling memory is off, so Tagalong remembers nothing of the screen. Tell the user ' +
-          'they can turn it on in Settings, under Privacy, and that it starts from then.',
+          'Rolling memory is off (Settings › Privacy); nothing of the screen is kept. Turned ' +
+          'on, it keeps the screen from then.',
       };
     }
     return {
       content:
         'Rolling memory is on but holds nothing from then yet: it starts empty each time the ' +
-        'app starts or sight is paused. Tell the user that rather than guessing.',
+        'app starts or sight is paused.',
     };
   }
 
@@ -215,12 +215,11 @@ async function runRecallScreen(context: RecallContext, input: unknown): Promise<
   if (actualAgo + TICK_SLACK_SECONDS < secondsAgo) {
     lines.push(
       `Memory only reaches back ${reach(actualAgo)}, so this is the oldest moment it holds, ` +
-        `not ${ago(secondsAgo)}. Say so.`,
+        `not ${ago(secondsAgo)}.`,
     );
   }
   lines.push(
-    `The screen at ${at} (${ago(actualAgo)}). Name this time when you describe it, and do not ` +
-      'present it as what is on screen now.',
+    `This is the screen at ${at} (${ago(actualAgo)}), not now.`,
   );
   if (result.focusedWindow !== undefined) {
     const { processName, title } = result.focusedWindow;
@@ -236,8 +235,8 @@ async function runRecallScreen(context: RecallContext, input: unknown): Promise<
       .join('; ');
     return {
       content:
-        `${summary}\n\nRecalled ${pictures}. This pet cannot look at images, so you have not ` +
-        'seen them; answer from the window list and say you could not see the pictures.',
+        `${summary}\n\nRecalled ${pictures}. This model cannot see images; the pictures ` +
+        'were not seen.',
     };
   }
 
@@ -279,7 +278,7 @@ async function runWhatChanged(context: RecallContext, input: unknown): Promise<T
       content:
         `There is nothing to compare with: Tagalong holds no earlier frame of display ` +
         `${displayId}. With rolling memory on (Settings, Privacy) it keeps the last few ` +
-        'minutes. Tell the user that.',
+        'minutes.',
     };
   }
 
@@ -397,8 +396,8 @@ export function watchForTool(deps: WatchToolDeps): Tool {
       content:
         `Watching display ${displayId}${rect === undefined ? '' : ' (one region of it)'} for ` +
         `"${condition}" — for up to ${outcome.timeoutMinutes} minutes and ${outcome.maxChecks} ` +
-        'checks. The user sees a Watching chip with a Stop button and will be shown the moment ' +
-        'it happens. Tell them briefly that you are watching, and do not wait for it in this turn.',
+        'checks. The user sees a Watching chip with a Stop button. It runs on its own; they ' +
+        'are shown the moment it happens.',
     };
   });
 }

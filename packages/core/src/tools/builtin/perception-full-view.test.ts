@@ -5,6 +5,7 @@ import type { CaptureExclusions } from '@tagalong/protocol';
 import type { BrainContentBlock } from '../../providers';
 import type { PerceptionHost } from '../../perception/host';
 import { fakeTurnTools } from '../fake-turn';
+import { directivesIn } from '../test-support';
 import type { TurnTools } from '../registry';
 import type { ToolOutcome } from '../tool';
 import {
@@ -208,7 +209,8 @@ describe(LOOK_AT_DISPLAY, () => {
       name: LOOK_AT_DISPLAY,
       input: { displayId: 77 },
     });
-    expect(asText(result.content).toLowerCase()).toContain('cannot look at images');
+    expect(asText(result.content).toLowerCase()).toContain('the picture was not seen');
+    expect(directivesIn(result.content)).toEqual([]);
   });
 
   it('reports a display id that is not there instead of guessing one', async () => {
@@ -238,6 +240,21 @@ describe(LOOK_AT_DISPLAY, () => {
     });
     expect(result.isError).toBe(true);
     expect(asText(result.content)).toContain('1Password.exe');
+    expect(directivesIn(result.content)).toEqual([]);
+  });
+
+  it('states that the host returned no picture of a display', async () => {
+    const host = fullViewHost();
+    const { id, bounds } = DISPLAY_ONE;
+    const bare = { id, bounds, scaleFactor: 1, primary: true, focused: true };
+    host.capture = () => Promise.resolve({ displays: [bare], composite: IMAGE });
+    const result = await toolset([host]).run({
+      name: LOOK_AT_DISPLAY,
+      input: { displayId: DISPLAY_ONE.id },
+    });
+    expect(result.isError).toBe(true);
+    expect(asText(result.content)).toContain('no picture');
+    expect(directivesIn(result.content)).toEqual([]);
   });
 });
 
@@ -432,6 +449,7 @@ describe(READ_WINDOW_TEXT, () => {
     const result = await toolset([host]).run({ name: READ_WINDOW_TEXT });
     expect(result.isError).toBe(true);
     expect(asText(result.content)).toContain('1Password.exe');
+    expect(directivesIn(result.content)).toEqual([]);
   });
 
   it('says OCR text may contain recognition errors', async () => {
@@ -462,6 +480,7 @@ describe('when no host can do it', () => {
       const result = await toolset([plain]).run({ name, input });
       expect(result.isError, name).toBe(true);
       expect(asText(result.content).toLowerCase(), name).toContain('no connected host');
+      expect(directivesIn(result.content), name).toEqual([]);
     }
   });
 
@@ -527,6 +546,16 @@ describe('look_at_window', () => {
       name: LOOK_AT_WINDOW,
       input: { windowId: 'w-1' },
     });
-    expect(asText(result.content)).toMatch(/cannot look at images/);
+    expect(asText(result.content)).toMatch(/cannot see images/);
+    expect(directivesIn(result.content)).toEqual([]);
+  });
+
+  it('states that a blind pet did not see a closer look', async () => {
+    const result = await toolset([fullViewHost()], false).run({
+      name: LOOK_CLOSER,
+      input: { displayId: 77, rect: { x: 0, y: 0, width: 40, height: 40 } },
+    });
+    expect(asText(result.content)).toMatch(/cannot see images/);
+    expect(directivesIn(result.content)).toEqual([]);
   });
 });

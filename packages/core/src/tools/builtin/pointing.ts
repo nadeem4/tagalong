@@ -29,8 +29,7 @@ const DEFINITION: BrainTool = {
     'on their screen for a few seconds. Prefer naming the element: give a windowId from ' +
     'list_windows and the exact name of the button, menu or field as it reads on screen. ' +
     'Only for something a picture alone shows, give a displayId and a rect in that ' +
-    "display's own pixels, as look_closer takes. Give one pair or the other, never both. " +
-    'Say where it is in words too.',
+    "display's own pixels, as look_closer takes. Give one pair or the other, never both.",
   // One flat object: the provider APIs refuse oneOf/anyOf/allOf at the top of a tool schema.
   // "Exactly one of the two pairs" is enforced when the call is parsed (paramsOf).
   inputSchema: {
@@ -94,7 +93,7 @@ async function pointAt(deps: PointingDeps, input: unknown): Promise<ToolOutcome>
       return {
         content:
           `That window is on the capture exclusion list (${answer.blocked.entry}), so nothing in ` +
-          'it was read and nothing was shown. Tell the person you cannot see that window.',
+          'it was read and nothing was shown.',
         isError: true,
       };
     }
@@ -107,8 +106,7 @@ async function pointAt(deps: PointingDeps, input: unknown): Promise<ToolOutcome>
     const where = answer.screen === undefined ? '' : ` on screen ${answer.screen}`;
     return {
       content:
-        `Pointing at ${what}${where}. The ring fades by itself in a few ` +
-        'seconds. Tell the person where it is in words too.',
+        `Pointing at ${what}${where}. The ring fades by itself in a few seconds.`,
     };
   } catch (error) {
     return hostFailure(error);

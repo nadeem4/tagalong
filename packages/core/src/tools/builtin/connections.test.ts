@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Connection } from '@tagalong/protocol';
 import { getRole } from '../../roles';
 import { FAKE_TURN_PET, fakeTurnTools } from '../fake-turn';
+import { directivesIn } from '../test-support';
 import { toolsFor } from '../registry';
 import type { ConnectorToolDeps } from './connections';
 
@@ -144,6 +145,7 @@ describe('connector tools', () => {
       const outcome = await tools.run({ name: 'notion__create_page', input: { title: 'x' } });
       expect(calls).toEqual([]);
       expect(outcome.content).toContain('nothing was changed in Notion');
+      expect(directivesIn(outcome.content)).toEqual([]);
       expect(records[0]).toMatchObject({ state: 'stopped' });
     }
   });

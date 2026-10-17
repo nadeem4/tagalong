@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Brief, ContextSnapshot, Expert } from '@tagalong/protocol';
 import { FAKE_TURN_PET, fakeTurnTools as fakeTools } from '../fake-turn';
+import { directivesIn } from '../test-support';
 import type { ToolRegistryOptions, TurnRequest } from '../registry';
 import { HAND_TO_EXPERT, TELL_EXPERT, type ExpertToolDeps } from './experts';
 
@@ -27,22 +28,14 @@ const GEMINI = expert('gemini', 'Gemini', 'Long documents');
 
 function deps(experts: Expert[]) {
   const started: { expertId: string; petId: string; brief: Brief }[] = [];
-  const routes = new Map<string, { expertId: string; by: 'companion' | 'user' }>();
   const value: ExpertToolDeps = {
     experts: () => experts,
-    routes: {
-      get: (kind) => routes.get(kind) ?? null,
-      remember: (kind, expertId, by) => {
-        if (routes.get(kind)?.by === 'user' && by === 'companion') return;
-        routes.set(kind, { expertId, by });
-      },
-    },
     propose: (params) => {
       started.push(params);
       return { proposalId: '7c9e6679-7425-40de-944b-e07fc1f90ae7' };
     },
   };
-  return { value, started, routes };
+  return { value, started };
 }
 
 /** The tool is the Companion role's, so the turn's pet is a companion. */
@@ -80,7 +73,6 @@ describe(HAND_TO_EXPERT, () => {
       name: HAND_TO_EXPERT,
       input: {
         expert_id: 'claude-code',
-        task_kind: 'fix-code',
         ask: 'Why does this test fail?',
         files: ['packages/core/src/conversation/runner.test.ts'],
         good_answer: 'The cause and the fix.',
@@ -100,46 +92,43 @@ describe(HAND_TO_EXPERT, () => {
       },
     ]);
     // Nothing runs yet: the person checks the brief and the project first.
-    expect(outcome.content).toContain('check');
-    expect(d.routes.get('fix-code')).toEqual({ expertId: 'claude-code', by: 'companion' });
+    expect(outcome.content).toContain('Send');
+    expect(directivesIn(outcome.content)).toEqual([]);
   });
 
-  it('uses the remembered expert for a kind of task when none is named', async () => {
+  it('has no task_kind: the model picks the expert from the list', () => {
+    const tools = fakeTurnTools({ experts: deps([CLAUDE, GEMINI]).value });
+    const definition = tools.definitions.find((d) => d.name === HAND_TO_EXPERT);
+    expect(JSON.stringify(definition)).not.toContain('task_kind');
+    expect(definition?.inputSchema['required']).toEqual(['ask']);
+  });
+
+  it('uses the expert the model names', async () => {
     const d = deps([CLAUDE, GEMINI]);
-    d.routes.set('summarise', { expertId: 'gemini', by: 'user' });
     const tools = fakeTurnTools({ experts: d.value });
-    await tools.run({ name: HAND_TO_EXPERT, input: { task_kind: 'summarise', ask: 'Sum it up' } });
+    await tools.run({ name: HAND_TO_EXPERT, input: { expert_id: 'gemini', ask: 'Sum it up' } });
     expect(d.started[0]?.expertId).toBe('gemini');
   });
 
-  it('keeps the user’s choice even when the companion names another expert', async () => {
-    const d = deps([CLAUDE, GEMINI]);
-    d.routes.set('summarise', { expertId: 'gemini', by: 'user' });
-    const tools = fakeTurnTools({ experts: d.value });
-    await tools.run({
-      name: HAND_TO_EXPERT,
-      input: { expert_id: 'claude-code', task_kind: 'summarise', ask: 'Sum it up' },
-    });
-    expect(d.started[0]?.expertId).toBe('gemini');
-  });
-
-  it('uses the only expert there is when nothing else decides', async () => {
+  it('uses the only expert there is when none is named', async () => {
     const d = deps([CLAUDE]);
     await fakeTurnTools({ experts: d.value }).run({
       name: HAND_TO_EXPERT,
-      input: { task_kind: 'fix-code', ask: 'x' },
+      input: { ask: 'x' },
     });
     expect(d.started[0]?.expertId).toBe('claude-code');
   });
 
-  it('asks the model to pick when there are several and no route', async () => {
+  it('needs expert_id when several are on, listing each with what it is good at', async () => {
     const d = deps([CLAUDE, GEMINI]);
     const outcome = await fakeTurnTools({ experts: d.value }).run({
       name: HAND_TO_EXPERT,
-      input: { task_kind: 'new-kind', ask: 'x' },
+      input: { ask: 'x' },
     });
     expect(outcome.isError).toBe(true);
     expect(outcome.content).toContain('expert_id');
+    expect(outcome.content).toContain('claude-code (Claude Code): Code changes in this repo');
+    expect(outcome.content).toContain('gemini (Gemini): Long documents');
     expect(d.started).toEqual([]);
   });
 
@@ -148,11 +137,11 @@ describe(HAND_TO_EXPERT, () => {
     const tools = fakeTurnTools({ experts: d.value });
     const unknown = await tools.run({
       name: HAND_TO_EXPERT,
-      input: { expert_id: 'nobody', task_kind: 'x', ask: 'x' },
+      input: { expert_id: 'nobody', ask: 'x' },
     });
     expect(unknown.isError).toBe(true);
     expect(unknown.content).toContain('claude-code');
-    const bad = await tools.run({ name: HAND_TO_EXPERT, input: { task_kind: 'x' } });
+    const bad = await tools.run({ name: HAND_TO_EXPERT, input: { files: ['a'] } });
     expect(bad.isError).toBe(true);
     expect(d.started).toEqual([]);
   });
@@ -166,7 +155,6 @@ describe(HAND_TO_EXPERT, () => {
         name: HAND_TO_EXPERT,
         input: {
           expert_id: 'claude-code',
-          task_kind: 'fix-code',
           ask: 'Fix the date bug',
           then: { expert_id: 'reviewer', ask: 'Check what Claude Code changed' },
         },
@@ -189,7 +177,7 @@ describe(HAND_TO_EXPERT, () => {
       const run = (then: unknown) =>
         tools.run({
           name: HAND_TO_EXPERT,
-          input: { expert_id: 'claude-code', task_kind: 'fix-code', ask: 'Fix it', then },
+          input: { expert_id: 'claude-code', ask: 'Fix it', then },
         });
       const unknown = await run({ expert_id: 'nobody', ask: 'Check' });
       expect(unknown.isError).toBe(true);
@@ -225,7 +213,6 @@ describe(HAND_TO_EXPERT, () => {
       await tools.run({
         name: HAND_TO_EXPERT,
         input: {
-          task_kind: 'fix-code',
           ask: 'Fix it',
           expert_id: 'claude-code',
           then: { expert_id: 'reviewer', ask: 'Check it' },
@@ -243,7 +230,7 @@ describe(HAND_TO_EXPERT, () => {
     };
     const outcome = await fakeTurnTools({ experts: d.value }).run({
       name: HAND_TO_EXPERT,
-      input: { task_kind: 'x', ask: 'x' },
+      input: { ask: 'x' },
     });
     expect(outcome).toEqual({
       content: 'The brief for Claude Code could not be shown: Claude Code is switched off',
@@ -281,13 +268,13 @@ describe(HAND_TO_EXPERT, () => {
         name: HAND_TO_EXPERT,
         input: {
           expert_id: 'claude-code',
-          task_kind: 'research',
           ask: 'New papers on agents',
           files: ['notes.txt'],
         },
       });
       expect(outcome.isError).toBeUndefined();
       expect(outcome.content).toContain('read-only');
+    expect(directivesIn(outcome.content)).toEqual([]);
       // Only the saved instruction and the model's request: no screen, no files.
       expect(d.research).toEqual([
         {
@@ -320,13 +307,13 @@ describe(HAND_TO_EXPERT, () => {
       );
       const call = {
         name: HAND_TO_EXPERT,
-        input: { expert_id: 'claude-code', task_kind: 'r', ask: 'a' },
+        input: { expert_id: 'claude-code', ask: 'a' },
       };
       await tools.run(call);
       const second = await tools.run(call);
       expect(d.research).toHaveLength(1);
       expect(d.started.map((s) => s.expertId)).toEqual(['claude-code']);
-      expect(second.content).toContain('in front of the user');
+      expect(second.content).toContain('on a card');
     });
 
     it('shows the normal card for any other expert, or when the routine allowed none', async () => {
@@ -335,13 +322,13 @@ describe(HAND_TO_EXPERT, () => {
       await fakeTurnTools(
         { experts: d.value },
         { routine: { routineId: 'r1', name: 'Routine', expertId: 'claude-code', handedOff } },
-      ).run({ name: HAND_TO_EXPERT, input: { expert_id: 'gemini', task_kind: 'x', ask: 'x' } });
+      ).run({ name: HAND_TO_EXPERT, input: { expert_id: 'gemini', ask: 'x' } });
       await fakeTurnTools(
         { experts: d.value },
         { routine: { routineId: 'r1', name: 'Routine', handedOff } },
       ).run({
         name: HAND_TO_EXPERT,
-        input: { expert_id: 'claude-code', task_kind: 'y', ask: 'y' },
+        input: { expert_id: 'claude-code', ask: 'y' },
       });
       expect(d.research).toEqual([]);
       expect(d.started.map((s) => s.expertId)).toEqual(['gemini', 'claude-code']);
@@ -408,6 +395,7 @@ describe(TELL_EXPERT, () => {
     });
     expect(outcome.isError).toBeUndefined();
     expect(outcome.content).toContain('Claude Code');
+    expect(directivesIn(outcome.content)).toEqual([]);
     expect(s.told).toEqual([{ handoffId: CODER_RUN.handoffId, text: 'use dayjs, not moment' }]);
   });
 

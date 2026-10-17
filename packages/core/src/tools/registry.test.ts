@@ -123,7 +123,6 @@ describe('ToolRegistry.forTurn', () => {
           },
         },
       ],
-      routes: { get: () => null, remember: () => undefined },
       propose: () => ({ proposalId: '7c9e6679-7425-40de-944b-e07fc1f90ae7' }),
     };
     const routines = {
@@ -175,7 +174,6 @@ describe('ToolRegistry.forTurn', () => {
   it('offers tell_expert just before change_settings, and only while a hand-off is running', () => {
     const base = {
       experts: () => [],
-      routes: { get: () => null, remember: () => undefined },
       propose: () => ({ proposalId: '7c9e6679-7425-40de-944b-e07fc1f90ae7' }),
       steer: () => ({ ok: true as const }),
     };

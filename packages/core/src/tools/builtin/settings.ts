@@ -228,7 +228,7 @@ const ALLOWED: Record<string, Entry> = {
       const parsed = num(value);
       if (typeof parsed === 'string') return parsed;
       return (parsed.value as number) > settings.sightLog.days
-        ? 'I can only lower how long the log is kept. Raising it is in Settings › Privacy.'
+        ? 'Talk can only lower sightLog.days; raising it is in Settings › Privacy.'
         : parsed;
     },
     show: (value) => `${String(value)} days`,
@@ -252,40 +252,20 @@ const ALLOWED: Record<string, Entry> = {
 export const CHAT_SETTINGS = Object.keys(ALLOWED);
 
 const ONLY_YOU =
-  "Only you can switch that on: it's in my bubble's header or Settings › Privacy. I never " +
-  'switch Always listening on myself.';
+  "Always listening is switched on only by the person, in the bubble's header or " +
+  'Settings › Privacy.';
 
-/** Asked for by name and refused by name, before anything else is looked at. */
-const REFUSED: [RegExp, string][] = [
-  [
-    /calendar|\bics\b|\.ics/,
-    "The calendar link is changed only in Settings or Home's Meeting prep form, never in chat.",
-  ],
-  [
-    /url|endpoint|base/,
-    'Provider URLs are changed only in Settings. I never set where a key is sent.',
-  ],
-  [
-    /key|token|secret|password|login|sign.?in|credential/,
-    'API keys, logins and tokens are changed only in Settings. I never see them, so never ' +
-      'paste one in chat.',
-  ],
-  [
-    /model|provider|brain|reply|notes|summar/,
-    'Your model, provider and my own notes are changed only in Settings.',
-  ],
-  [
-    /seeing|pause|sight\b/,
-    "That's not a setting: use the Seeing switch in my bubble or the pause key.",
-  ],
-  [/exclusion|exclude/, 'Removing a capture exclusion is done only in Settings › Privacy.'],
-];
-
+/**
+ * One fact for every name off the allowlist. The allowlist is the guardrail; the value
+ * asked for is never echoed, and the name only through hideSecrets.
+ */
 function refusal(setting: string): string {
-  const name = setting.toLowerCase();
-  for (const [pattern, message] of REFUSED) if (pattern.test(name)) return message;
   const shown = hideSecrets(setting).slice(0, 60);
-  return `'${shown}' is not something I can change by talk. I can change: ${CHAT_SETTINGS.join(', ')}.`;
+  return (
+    `'${shown}' cannot be changed by talk. Talk can change: ${CHAT_SETTINGS.join(', ')}. ` +
+    'Keys, logins, provider URLs, the model, the calendar link and removing a capture ' +
+    'exclusion are only in Settings.'
+  );
 }
 
 /** The settings `field` patches one key of; every other top-level setting goes `whole`. */
@@ -347,14 +327,11 @@ export function talkPatchProblem(settings: Settings, patch: SettingsPatch): stri
   return null;
 }
 
-const LOOSENING_ON_ROUTINE =
-  "A routine can't ask to let me see, keep or spend more. Ask the person to change it " +
-  'themselves, by talking to me or in Settings.';
+const LOOSENING_ON_ROUTINE = "A routine's turn cannot loosen a setting.";
 
 const SHOWN =
-  'The settings card is in front of the person. Tell them in one line to check it and click ' +
-  'Apply (Turn on, for a change marked as letting you see or keep more); nothing changes until ' +
-  'they click. A spoken "yes" does not apply it.';
+  'The change is on a card; nothing changes until they click Apply (Turn on, for a change ' +
+  'marked as letting Scout see or keep more). A spoken "yes" does not apply it.';
 
 function currentValues(settings: Settings): string {
   return Object.entries(ALLOWED)
@@ -369,14 +346,14 @@ function definition(settings: Settings): BrainTool {
     description:
       'Change one or more of the person’s Tagalong settings when they ask ("talk a bit slower ' +
       'and call me Sam"). It shows them a card with each setting now and after; nothing changes ' +
-      'until they click Apply, so never say it is done. A spoken "yes" never applies it. ' +
+      'until they click Apply. A spoken "yes" never applies it. ' +
       'voice and hotkeys fields change one at a time and keep the rest. captureExclusions.add ' +
       'adds an app (such as Signal.exe) or a window title pattern (such as *bank*) Scout never ' +
       'looks at; removing one is only in Settings. sightLog.days can only go down. ' +
-      'listening.always can only be switched off: if they ask to switch it on, say only they ' +
-      "can, in the bubble's header or Settings › Privacy. API keys, logins, provider URLs, " +
-      'the model and the calendar link are changed only in Settings: say so, and never ask ' +
-      'for or repeat one. The Seeing switch and the pause key are not settings. Use the current ' +
+      'listening.always can only be switched off; only the person switches it on, in the ' +
+      "bubble's header or Settings › Privacy. API keys, logins, provider URLs, the model and " +
+      'the calendar link are changed only in Settings. The Seeing switch and the pause key ' +
+      'are not settings. Use the current ' +
       `values below to answer "what's my voice speed?" without calling this.\nCurrent values:\n` +
       currentValues(settings),
     inputSchema: {

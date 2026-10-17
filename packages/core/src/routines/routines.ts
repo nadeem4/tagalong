@@ -273,7 +273,7 @@ export class Routines {
       manual: true,
       detail:
         next === undefined
-          ? 'No meeting is coming up in the next 36 hours: say so in one line.'
+          ? 'No meeting is coming up in the next 36 hours.'
           : asCalendarData([next], now, this.#options.timeZone()),
     });
   }
@@ -523,13 +523,11 @@ export class Routines {
       ...(routine.topics.trim() !== '' ? [`Topics: ${routine.topics.trim()}`] : []),
       ...(context.detail !== undefined ? [context.detail] : []),
       ...(context.late ? ['It ran late: the computer was asleep or Tagalong was closed.'] : []),
-      'This ran on its own, so the person is not watching: answer them directly and briefly, ' +
-        'as a message they will read later.',
+      // That the run is unattended is in the Now block; the prompt carries only facts.
       ...(expert !== undefined
         ? [
-            `You may hand this to ${expert.name} (expert_id ${expert.id}) with hand_to_expert: ` +
-              'it is already approved once per run, read-only, with web search and no project. ' +
-              'Say in one line that it is on it; its answer reaches the person on its own.',
+            `${expert.name} (expert_id ${expert.id}) is pre-approved once for this run: ` +
+              'read-only, web search, no project. Its answer reaches them on its own.',
           ]
         : []),
     ].join('\n');
