@@ -204,8 +204,9 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   Protocol 0.21.0: `watch.fired` gains `condition`, and its `message` may be empty (the judge gave
   no reason); an empty message is never spoken, and the card and notification show the condition.
   Protocol 0.22.0: `greeting.compose` and its `GreetingLaunch` / `GreetingComposeResult` are gone;
-  `checkIn.launch { launch: LaunchFacts }` → `{}` replaces it (`LaunchFacts` is `{ crashed,
-  lastVersion, version, releaseNotes, welcomed? }`), and `pickUp.ready`'s `text` is the mind's line.
+  `checkIn.launch { launch: LaunchFacts }` → `{}` replaces it, with `LaunchFacts` as
+  `{ crashed, lastVersion, version, releaseNotes, welcomed? }`, and `pickUp.ready`'s `text` is the
+  mind's line.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
   `perception.listWindows` and `perception.readText`, then `perception.captureWindow`, and from Phase 3B `perception.recall` and
   `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
