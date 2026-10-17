@@ -70,11 +70,14 @@ test.afterAll(async () => {
   rmSync(dataDir, { recursive: true, force: true });
 });
 
-test('signed out: the launch line says so plainly, and Fix it opens Settings', async () => {
+test('signed out: a status mark on Scout and in the line, and Fix it opens Settings', async () => {
   const panel = await windowFor('panel');
-  await expect(panel.getByText(/signed out of Claude, so I can.t think yet/)).toBeVisible({
+  await expect(panel.getByText('Can’t think: signed out of Claude.')).toBeVisible({
     timeout: 30_000,
   });
+  await expect(panel.getByText(/I can.t think yet/)).toHaveCount(0);
+  const avatar = await windowFor('avatar');
+  await expect(avatar.getByTestId('status-mark')).toHaveAttribute('data-id', 'brain-signed-out');
   await panel.getByRole('button', { name: 'Fix it' }).click();
   await windowFor('home');
 });

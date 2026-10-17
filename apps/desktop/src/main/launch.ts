@@ -1,9 +1,10 @@
 /**
  * What a launch remembers and says: the clean-close marker, whether Scout can think right now, and
- * the launch line's Fix it. Contains recordLaunch, recordCleanClose, brainReadiness and brainLine.
+ * the launch line's brain mark. Contains recordLaunch, recordCleanClose, brainReadiness,
+ * brainStatus and brainLine.
  */
 
-import type { Pet, PickUpReadyParams, Settings, SettingsPatch } from '@tagalong/protocol';
+import type { Pet, PickUpReadyParams, Settings, SettingsPatch, StatusId } from '@tagalong/protocol';
 import type { ClaudeSignIn, GreetLine, ProviderChoice } from '../shared/ipc';
 
 /** The slice of the settings store the launch record needs. */
@@ -74,28 +75,30 @@ export async function brainReadiness(deps: {
   return 'unknown';
 }
 
-/** The brain's line, or a plain one saying why Scout cannot think, with a fix. */
+/** The brain mark for a brain that cannot think; null when it can, or could not be checked. */
+export function brainStatus(brain: BrainReadiness): StatusId | null {
+  switch (brain) {
+    case 'signed-out':
+      return 'brain-signed-out';
+    case 'no-sign-in':
+      return 'brain-no-sign-in';
+    case 'no-key':
+      return 'brain-no-key';
+    default:
+      return null;
+  }
+}
+
+/**
+ * The brain's line, or, when Scout cannot think, a status mark (shown as a row with Fix it,
+ * never spoken): the body never talks in Scout's voice.
+ */
 export function brainLine(
   brain: BrainReadiness,
   composed: string,
-  userName: string,
   pickUp?: PickUpReadyParams,
 ): GreetLine {
-  const name = userName.trim();
-  const hi = name === '' ? '' : `Hi ${name}. `;
-  // Fix it lands on Settings' How Scout thinks section.
-  const fix = { fix: 'Fix it', fixTarget: 'brain' } as const;
-  switch (brain) {
-    case 'signed-out':
-      return { text: `${hi}I’m signed out of Claude, so I can’t think yet.`, ...fix };
-    case 'no-sign-in':
-      return {
-        text: `${hi}I can’t find Claude Code on this computer, so I can’t think yet.`,
-        ...fix,
-      };
-    case 'no-key':
-      return { text: `${hi}I have no API key, so I can’t think yet.`, ...fix };
-    default:
-      return pickUp === undefined ? { text: composed } : { text: composed, pickUp };
-  }
+  const status = brainStatus(brain);
+  if (status !== null) return { status };
+  return pickUp === undefined ? { text: composed } : { text: composed, pickUp };
 }

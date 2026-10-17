@@ -17,6 +17,7 @@ import type {
   PetRemarkParams,
   PickUpReadyParams,
   RoutineResultParams,
+  StatusMark,
 } from '@tagalong/protocol';
 import type { DropOffer } from '@tagalong/ui';
 // Bundled, not fetched: the bubble's two typefaces ship inside the app, Latin subset only.
@@ -112,6 +113,8 @@ function Panel() {
   // Seeing: off is sight paused, the same switch as the pause key and the tray.
   const [seeing, setSeeing] = useState(true);
   const [bridge] = useState(bubbleBridge);
+  // The top status mark: a muted row in the bubble, the same mark as the tag on Scout.
+  const [status, setStatus] = useState<StatusMark | null>(null);
   function apply(next: PanelSettings): void {
     setHotkeyLabel(next.hotkeyLabel);
     setTalkKey(next.talkKey);
@@ -167,13 +170,22 @@ function Panel() {
     [],
   );
 
-  // A later launch: one quiet line, which fades and hides the window unless touched.
+  useEffect(() => {
+    void window.tagalongHost
+      .getStatusMark()
+      .then(setStatus)
+      .catch(() => undefined);
+    return window.tagalongHost.onStatusMark(setStatus);
+  }, []);
+
+  // A later launch: one quiet line, which fades and hides the window unless touched. A brain
+  // that cannot think comes as a status mark: shown with Fix it, never said aloud.
   useEffect(
     () =>
       window.tagalongHost.onGreetLine((next) => {
         setMode('bubble');
         setLine(next);
-        mouth.say(next.text);
+        if ('text' in next) mouth.say(next.text);
       }),
     [mouth],
   );
@@ -351,6 +363,21 @@ function Panel() {
                   }
                 : {})}
             />
+          ) : line !== null && 'status' in line ? (
+            <GreetingLine
+              petName={petName}
+              status={{ id: line.status }}
+              tail={side === 'left' ? 'right' : 'left'}
+              onDone={() => {
+                setLine(null);
+                void window.tagalongHost.hidePanel();
+              }}
+              onFix={(target) => {
+                setLine(null);
+                void window.tagalongHost.openSettings(target);
+                void window.tagalongHost.hidePanel();
+              }}
+            />
           ) : line !== null ? (
             <GreetingLine
               petName={petName}
@@ -373,19 +400,6 @@ function Panel() {
                       onAccept: () => {
                         setPickUp(line.pickUp ?? null);
                         setLine(null);
-                      },
-                    },
-                  }
-                : {})}
-              {...(line.fix !== undefined
-                ? {
-                    offer: {
-                      label: line.fix,
-                      onAccept: () => {
-                        setLine(null);
-                        mouth.stop();
-                        void window.tagalongHost.openSettings(line.fixTarget);
-                        void window.tagalongHost.hidePanel();
                       },
                     },
                   }
@@ -420,6 +434,7 @@ function Panel() {
               {...(pickUp !== null ? { pickUp, onPickUpDone: () => setPickUp(null) } : {})}
               {...(drop !== null ? { drop } : {})}
               onDropDone={() => setDrop(null)}
+              status={status}
             />
           )}
         </div>

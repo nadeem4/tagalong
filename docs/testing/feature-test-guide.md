@@ -267,13 +267,14 @@ _Only on a data folder from a build before Nebius was removed._
    row; (c) ask again and press **Fix it** on the Voice row; (d) say "are you OK?" with the talk
    key; (e) type "what's wrong with this code?", then "what's broken?".
 3. **Expected:** (a) at once, with no "thinking", a card starting "Two things need you.", then a
-   row each for Brain ("I'm signed out of Claude."), Experts, Connections, Voice ("The ElevenLabs
+   row each for Brain ("Signed out of Claude."), Experts, Connections, Voice ("The ElevenLabs
    voice has no key."), Microphone and Browser extension ("Not connected (optional)", grey, with
-   **Set up**); only the first line is spoken; no key appears anywhere on the card. (b) Home opens
-   on Settings, scrolled to How Scout thinks. (c) Home opens at Settings › Voice. (d) the same card.
+   **Set up**); nothing is spoken, since the question was typed; no key appears anywhere on the
+   card. No row says "I" or "my". (b) Home opens
+   on Settings, scrolled to How Scout thinks. (c) Home opens at Settings › Voice. (d) the same card, and only its first line is spoken.
    (e) Scout answers both as normal questions; no card. With everything fixed, the card says "Everything's
-   working.". With the engine stopped, the rows it cannot read say "I couldn't check this." and the
-   card still shows.
+   working.". With the engine stopped, the rows it cannot read say "Not checked." and the
+   card still shows. If the check itself fails, the bubble says "Health check failed.".
 
 ## Hand-offs to Claude Code
 
@@ -443,8 +444,7 @@ _Fake provider:_ with `TAGALONG_FAKE_PROVIDERS=1` both steps are scripted expert
 3. **Expected:** Scout's bubble opens beside it without taking the keyboard and types in one line:
    "Here I am. Ask me one real thing about your screen. Press Ctrl+Shift+Space anytime." (with
    your name after "Here I am," when you gave one), with **Try it now** (focused) and **Got it**.
-   There is no **Next**. Tab reaches both buttons. This invitation is not a launch line: the next
-   launch with **Always listening** on says the listening line (G.2), not this one.
+   There is no **Next**. Tab reaches both buttons. This invitation is not a launch line.
 4. **Reduced motion:** with Windows Settings → Accessibility → Visual effects → **Animation effects**
    off, the line appears whole, with no typing.
 
@@ -461,8 +461,10 @@ _Fake provider:_ with `TAGALONG_FAKE_PROVIDERS=1` both steps are scripted expert
    Claude Code.
 5. **Time away:** leave Tagalong running for a day or more, quit it, and start it again a few
    minutes later. The line greets for the time of day; it does not say "Back after a day".
-6. **Always listening:** with Always listening on, the listening line comes first and the scenario
-   lines in G.5 to G.8 do not show.
+6. **Always listening:** with Always listening on, the launch line is the usual one (nothing is
+   said about listening); Scout shows a **Listening** tag at its bottom for about 8 s, with the
+   tooltip "Always listening is on. Say “Scout, stop” to switch it off.". Switching it on from
+   the bubble shows the same tag again; switching it off removes it.
 
 ### G.3. The greeting can be switched off
 
@@ -502,8 +504,11 @@ _Fake provider:_ with `TAGALONG_FAKE_PROVIDERS=1` both steps are scripted expert
 ### G.8. Signed out
 
 1. **Action:** run `claude auth logout`, then restart Tagalong.
-2. **Expected:** within about a second, "I'm signed out of Claude, so I can't think yet." with
-   **Fix it**, which opens Settings.
+2. **Expected:** within about a second, a quiet line "Can’t think: signed out of Claude." with
+   **Fix it**, which opens Settings. Nothing is said aloud, and no line says "I". Scout shows a
+   **Signed out** tag at its bottom (tooltip: the same sentence); the bubble shows the same row
+   with **Fix it** until a question gets an answer, or Settings' Check again finds Claude
+   signed in, which removes the tag.
 
 ## Keeping an eye on things
 
@@ -848,8 +853,8 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 
 1. **Setup:** a fresh profile (the speech models not downloaded yet), and the network off.
 2. **Action:** hold the talk key for about five seconds, then let go.
-3. **Expected:** the bubble says "I couldn’t download my listening models. Check the internet
-   connection and try again." It does not flicker or keep retrying while the key is held, and the
+3. **Expected:** the bubble says "Speech models didn’t download. Check the internet
+   connection." It does not flicker or keep retrying while the key is held, and the
    Windows microphone icon goes away soon after the message (no raw "fetch failed" text).
 4. **Action:** turn the network on and hold the key again.
 5. **Expected:** the first-time download note shows, then listening works as in T.1.
@@ -872,7 +877,7 @@ looking at?" and Chromium's fake microphone stands in for a real one.
    start Tagalong and ask Scout something.
 5. **Expected:** the answer is spoken by Kokoro (after the file is fetched again, the first line or
    two may use the system voice), and `config.json` is back to its original content.
-6. **Note:** the "The speech model I downloaded was damaged. Check the connection and try again."
+6. **Note:** the "The speech model download was damaged. Check the connection."
    message shows only when the fresh copy is wrong twice (a proxy that alters downloads); unit tests
    in `model-files.test.ts` and `ears-host.test.ts` cover it.
 
@@ -880,8 +885,8 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 
 1. **Setup:** a connected app (see [Connections](#connections-your-apps-over-mcp)).
 2. **Action:** hold the key and ask Scout to make a change in that app.
-3. **Expected:** the confirm card appears in the bubble and Scout says to check the card rather than
-   reading it out. Nothing changes until **Allow once**.
+3. **Expected:** the confirm card ("Change in <app> — allow?") appears in the bubble and Scout says
+   to check the card rather than reading it out. Nothing changes until **Allow once**.
 
 ### T.8. Settings → Voice
 
@@ -912,12 +917,12 @@ looking at?" and Chromium's fake microphone stands in for a real one.
     "The microphone could not be opened…" shows once and stays; it does not flicker each time
     Scout finishes a line in the system voice.
 12. **Edge:** on a fresh install with no internet, switch **Always listening** on. The bubble says
-    the first-time download, then "I couldn’t download my listening models…" once; it does not
+    the first-time download, then "Speech models didn’t download…" once; it does not
     go back to the download note or repeat as Scout finishes lines. Connect and wait: within
     about 30 s (the wait doubles each failure, up to five minutes) it tries again on its own and
     listening works, with the switch untouched. Switching Always listening off and on retries
     at once. The same happens if a speech model breaks while listening: the bubble stops showing
-    listening and says "I couldn’t start listening. Try again." once, then retries on its own.
+    listening and says "Listening couldn’t start. It retries on its own." once, then retries on its own.
     **Edge:** with Always listening on, say a short word that starts softly, such as "Scout,
     find...": the first syllable shows in the live words, not cut off.
 13. **Action:** with Always listening on, close the bubble with ×.
@@ -1561,7 +1566,7 @@ Needs GitHub connected (Home → Connections → GitHub, with a token) and a rea
    the hand-off card appears with the brief naming the file's path, and nothing runs until **Send**.
 4. Drop a PNG with a brain that cannot see images: Scout says the image was not sent. With
    **Screenshot retention** off, the stored conversation has no picture.
-5. Drop a `.env` file: "That looks like a secrets file, so I won’t read it or pass it on." and no
+5. Drop a `.env` file: "Looks like a secrets file: not read, not passed on." and no
    buttons.
 6. Drag a link from the browser: **Hand it to an expert** only. Drag selected text: **Explain**.
 7. **Cancel** sends nothing (Activity shows no new turn). With Always listening on and a card open,

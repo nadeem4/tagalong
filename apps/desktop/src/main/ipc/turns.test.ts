@@ -85,7 +85,7 @@ describe('registerTurnIpc', () => {
       engine: () => engine.client,
       maybeEngine: () => engine.client,
       pendingSnapshot: () => null,
-      takeDrop: () => Promise.reject(new Error('I couldn’t read gone.md.')),
+      takeDrop: () => Promise.reject(new Error('Couldn’t read gone.md.')),
     });
     await expect(ipc.invoke(IPC.ask, { petId: 'scout', text: 'x', drop: true })).rejects.toThrow(
       'gone.md',

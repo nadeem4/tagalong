@@ -55,8 +55,35 @@ describe('CompanionBubble, the health check', () => {
     expect(fake.asks).toEqual([]);
     const card = screen.getByRole('region', { name: 'Health check' });
     expect(card).toHaveTextContent('One thing needs you.');
-    expect(card).toHaveTextContent('I’m signed out of Claude.');
-    // Only the first line is said.
+    expect(card).toHaveTextContent('Signed out of Claude.');
+    // Typed: nothing is said aloud.
+    expect(onSay).not.toHaveBeenCalled();
+  });
+
+  it('says only the headline when the question was asked by voice', async () => {
+    const onSay = vi.fn();
+    let hear: (text: string) => void = () => undefined;
+    const talk = {
+      state: 'idle' as const,
+      onHeard: (handler: (text: string) => void) => {
+        hear = handler;
+        return () => undefined;
+      },
+      note: null,
+      keyLabel: 'Ctrl+Shift+Alt+Space',
+      onMic: vi.fn(),
+    };
+    const fake = createFakeHostBridge();
+    const bridge: HostBridge = Object.assign(fake, {
+      checkHealth: vi.fn(() => Promise.resolve(FACTS)),
+    });
+    render(
+      <HostBridgeProvider bridge={bridge}>
+        <CompanionBubble petId="scout" petName="Scout" talk={talk} onSay={onSay} />
+      </HostBridgeProvider>,
+    );
+    act(() => hear('Scout, what’s wrong?'));
+    await flush();
     expect(onSay).toHaveBeenCalledExactlyOnceWith('One thing needs you.');
   });
 
@@ -93,7 +120,7 @@ describe('CompanionBubble, the health check', () => {
     ask('health check');
     await flush();
     await flush();
-    expect(screen.getByRole('alert')).toHaveTextContent('I couldn’t run the health check.');
+    expect(screen.getByRole('alert')).toHaveTextContent('Health check failed.');
   });
 
   it('drops a check that finishes after a newer question', async () => {

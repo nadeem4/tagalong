@@ -17,6 +17,8 @@ import type {
   RoutineResultParams,
   Settings,
   SettingsPatch,
+  StatusId,
+  StatusMark,
   MouthId,
   VoiceId,
 } from '@tagalong/protocol';
@@ -132,6 +134,9 @@ export const IPC = {
   applySettings: 'tagalong:settings:apply',
   expertCatalog: 'tagalong:experts:catalog',
   installExpert: 'tagalong:experts:install',
+  // Status marks: the top one on Scout and in the bubble, read on mount and broadcast on change.
+  getStatusMark: 'tagalong:status:get',
+  statusMarkEvent: 'tagalong:status:event',
 } as const;
 
 /** What the figure hands its preload on a drop: the files, and the drag's link and text. */
@@ -216,16 +221,11 @@ export interface ProviderChoice {
  */
 export type ClaudeSignIn = 'signed-in' | 'signed-out' | 'not-installed' | 'unknown';
 
-/** The line main hands the bubble as the app opens: the words, and a fix when Scout cannot think. */
-export interface GreetLine {
-  text: string;
-  /** The fix button's label; it opens Home's Settings, where the brain is fixed. */
-  fix?: string;
-  /** A pick-up: Pick up on the line opens its card. Never with `fix`. */
-  pickUp?: PickUpReadyParams;
-  /** Where the fix button lands: the Settings section that fixes it. */
-  fixTarget?: FixTarget;
-}
+/**
+ * The line main hands the bubble as the app opens: the brain's words (with a pick-up, maybe),
+ * or, when Scout cannot think, a status mark shown as a row with Fix it and never spoken.
+ */
+export type GreetLine = { text: string; pickUp?: PickUpReadyParams } | { status: StatusId };
 
 /** Whether the voice models are on disk, for the health check: a look, never a download. */
 export interface VoiceModels {
@@ -352,7 +352,7 @@ export interface TagalongHostApi {
   fitPanel(height: number): Promise<void>;
   /** Main asks the bubble for its one-time hello, right after Welcome. */
   onGreet(handler: () => void): () => void;
-  /** Main hands the bubble the launch line, with a fix when Scout cannot think. */
+  /** Main hands the bubble the launch line, or the brain's status mark when Scout cannot think. */
   onGreetLine(handler: (line: GreetLine) => void): () => void;
   /** Main hands the bubble one line Scout says on its own, from keeping an eye on things. */
   onRemark(handler: (remark: PetRemarkParams) => void): () => void;
@@ -413,6 +413,10 @@ export interface TagalongHostApi {
   voiceModels(): Promise<VoiceModels>;
   /** The health check: whether the browser extension is connected to the engine. */
   hostsStatus(): Promise<{ extension: boolean }>;
+  /** The top status mark now, for a window that just opened. */
+  getStatusMark(): Promise<StatusMark | null>;
+  /** Fires with the new top status mark, or null when none is left. */
+  onStatusMark(handler: (mark: StatusMark | null) => void): () => void;
 }
 
 declare global {

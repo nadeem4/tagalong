@@ -397,8 +397,8 @@ flowchart LR
 - **Model files are checked.** Every model file (listening and Kokoro) is fetched from one fixed
   Hugging Face commit, never from a branch that can move, and must match a SHA-256 written into the
   app. A file that does not match is never kept: it is deleted and fetched once more. If the
-  listening models are still wrong, the bubble says "The speech model I downloaded was damaged.
-  Check the connection and try again."; if Kokoro's are, Scout keeps speaking in the system voice. The files on disk are checked again once each
+  listening models are still wrong, the bubble says "The speech model download was damaged.
+  Check the connection."; if Kokoro's are, Scout keeps speaking in the system voice. The files on disk are checked again once each
   time the voice process starts. The model library is told never to fetch anything itself, so it
   only reads files that were checked. Kokoro's voices come with the app's own packages. A copy an
   older version downloaded is checked like any other and replaced if it does not match.
@@ -414,8 +414,9 @@ flowchart LR
 ### Always listening
 
 Off by default. You switch it on in the bubble's header or in Settings → Privacy, once. It stays
-on, across restarts, until you switch it off. When it is on at launch, Scout's first line says it
-is listening and how to stop, and the mark shows from the first second.
+on, across restarts, until you switch it off. When it is on at launch, Scout shows a **Listening**
+tag for a few seconds (its tooltip says how to stop), and the mark shows from the first second.
+Nothing is said aloud about it.
 
 - **The mark.** A small green dot on Scout shows the whole time. It is solid while Scout listens
   and an outline while listening is paused. It is never hidden.
@@ -729,8 +730,8 @@ expert** and **Cancel**.
   (PDF, Word, a WebP or GIF, a file too big): its name, path and size only. Tagalong does not open
   it, and an expert you hand it to reads it from the path. A link or dropped text is passed as it is.
 - **Secrets files are refused.** A file whose name matches the secret-file list (`.env`,
-  `id_rsa`, `secrets.json`, `*.pem` and the rest) gets "That looks like a secrets file, so I won’t
-  read it or pass it on." with no buttons. Secrets inside other text are still hidden on the
+  `id_rsa`, `secrets.json`, `*.pem` and the rest) gets "Looks like a secrets file: not read, not
+  passed on." with no buttons. Secrets inside other text are still hidden on the
   way out, like everything sent to a brain.
 - **Only a button sends it.** With Always listening on, saying "Scout, explain it" while the card
   is open is an ordinary question and does not carry the dropped item.

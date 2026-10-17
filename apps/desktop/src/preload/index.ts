@@ -30,6 +30,7 @@ import type {
   Settings,
   SettingsPatch,
   SightLogEntry,
+  StatusMark,
 } from '@tagalong/protocol';
 import type { AskInput, DropOffer, HostBridge, TurnEvent } from '@tagalong/ui';
 import { IPC } from '../shared/ipc';
@@ -303,6 +304,12 @@ const host: TagalongHostApi = {
   },
   voiceModels: () => ipcRenderer.invoke(IPC.voiceModels) as Promise<VoiceModels>,
   hostsStatus: () => ipcRenderer.invoke(IPC.hostsStatus) as Promise<{ extension: boolean }>,
+  getStatusMark: () => ipcRenderer.invoke(IPC.getStatusMark) as Promise<StatusMark | null>,
+  onStatusMark: (handler) => {
+    const listener = (_event: IpcRendererEvent, mark: StatusMark | null): void => handler(mark);
+    ipcRenderer.on(IPC.statusMarkEvent, listener);
+    return () => void ipcRenderer.off(IPC.statusMarkEvent, listener);
+  },
 };
 
 contextBridge.exposeInMainWorld('tagalong', bridge);

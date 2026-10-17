@@ -112,7 +112,10 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
   handle(IPC.checkKey, async (_event, providerId: string): Promise<ProvidersCheckResult> => {
     const host = deps.host();
     if (host === null) {
-      return { ok: false, message: 'Tagalong’s engine isn’t running, so I couldn’t test the key.' };
+      return {
+        ok: false,
+        message: 'Tagalong’s engine isn’t running, so the key couldn’t be tested.',
+      };
     }
     return host.client.call('providers.check', { providerId });
   });

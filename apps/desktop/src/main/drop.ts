@@ -23,7 +23,7 @@ export const MAX_IMAGE_FILE_BYTES = 10 * 1024 * 1024;
 /** How long a dropped item waits for a button on its card before it is let go, unread. */
 export const DROP_HOLD_MS = 10 * 60_000;
 
-export const SECRET_REFUSAL = 'That looks like a secrets file, so I won’t read it or pass it on.';
+export const SECRET_REFUSAL = 'Looks like a secrets file: not read, not passed on.';
 
 // What Electron's nativeImage decodes everywhere. A WebP or a GIF it cannot, so those go
 // to an expert as files.
@@ -173,7 +173,7 @@ export async function readDrop(dropped: Dropped, fs: DropFs): Promise<DropRead> 
     const text = await fs.readText(path);
     return { ok: true, dropped: { ...named, text: text.slice(0, MAX_SELECTION_CHARS) } };
   } catch {
-    return { ok: false, error: `I couldn’t read ${name}.` };
+    return { ok: false, error: `Couldn’t read ${name}.` };
   }
 }
 

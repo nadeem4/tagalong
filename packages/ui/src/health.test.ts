@@ -40,12 +40,33 @@ describe('healthRows', () => {
     expect(rows.every((each) => each.state === 'ok')).toBe(true);
     expect(rows.every((each) => each.fix === undefined)).toBe(true);
     expect(healthHeadline(rows)).toBe('Everything’s working.');
+    expect(rows.map((each) => each.line)).toEqual([
+      'Ready.',
+      'All experts reachable.',
+      'All apps connected.',
+      'Ready.',
+      'A microphone is ready.',
+      'Connected.',
+    ]);
+  });
+
+  it('never words a row as Scout speaking', () => {
+    const voice = ALL_GOOD.voice as Exclude<HealthFacts['voice'], 'unknown'>;
+    const lines = [
+      ...healthRows(ALL_GOOD),
+      ...healthRows({ ...ALL_GOOD, brain: 'signed-out' }),
+      ...healthRows({ ...ALL_GOOD, brain: 'no-sign-in' }),
+      ...healthRows({ ...ALL_GOOD, brain: 'no-key', experts: 'unknown' }),
+      ...healthRows({ ...ALL_GOOD, voice: { ...voice, earsReady: false } }),
+      ...healthRows({ ...ALL_GOOD, voice: { ...voice, mouth: 'kokoro', mouthReady: false } }),
+    ].map((each) => each.line);
+    for (const line of lines) expect(line).not.toMatch(/^I\s|\bI’|\bmy\b/i);
   });
 
   it.each([
-    ['signed-out', 'I’m signed out of Claude.'],
-    ['no-sign-in', 'I can’t find Claude Code on this computer.'],
-    ['no-key', 'I have no API key.'],
+    ['signed-out', 'Signed out of Claude.'],
+    ['no-sign-in', 'Claude Code isn’t on this computer.'],
+    ['no-key', 'No API key.'],
   ] as const)('a %s brain is broken and fixed under How Scout thinks', (brain, line) => {
     expect(row(healthRows({ ...ALL_GOOD, brain }), 'brain')).toMatchObject({
       state: 'broken',
@@ -106,7 +127,7 @@ describe('healthRows', () => {
     ).toMatchObject({ state: 'broken', line: 'The ElevenLabs voice has no key.', fix: 'voice' });
     expect(
       row(healthRows({ ...ALL_GOOD, voice: { ...voice, earsReady: false } }), 'voice'),
-    ).toMatchObject({ state: 'broken', line: 'My ears’ model isn’t downloaded.', fix: 'voice' });
+    ).toMatchObject({ state: 'broken', line: 'Speech model not downloaded.', fix: 'voice' });
     // Ears nobody uses are not a problem.
     expect(
       row(
@@ -152,7 +173,7 @@ describe('healthRows', () => {
     });
     expect(rows.every((each) => each.state === 'unknown')).toBe(true);
     expect(rows.every((each) => each.fix === undefined)).toBe(true);
-    expect(row(rows, 'experts').line).toBe('I couldn’t check this.');
+    expect(row(rows, 'experts').line).toBe('Not checked.');
   });
 
   it('counts what needs the person in the headline', () => {

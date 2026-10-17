@@ -849,3 +849,33 @@ describe('CompanionBubble, talking to Scout', () => {
     expect(screen.queryByText(/to reply/)).toBeNull();
   });
 });
+
+describe('CompanionBubble status marks', () => {
+  it('shows the top status mark as a row, with Fix it opening the fix', () => {
+    const openFix = vi.fn(() => Promise.resolve());
+    const bridge = Object.assign(createFakeHostBridge(), { openFix });
+    renderBubble(bridge, { status: { id: 'brain-signed-out' } });
+    expect(screen.getByTestId('status-row')).toHaveTextContent(
+      'Can’t think: signed out of Claude.',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Fix it' }));
+    expect(openFix).toHaveBeenCalledWith('brain');
+  });
+});
+
+describe('GreetingLine with a status mark', () => {
+  it('shows the mark’s row and its Fix it instead of words', () => {
+    const onFix = vi.fn();
+    render(
+      <GreetingLine
+        petName="Scout"
+        status={{ id: 'brain-no-key' }}
+        onFix={onFix}
+        onDone={() => undefined}
+      />,
+    );
+    expect(screen.getByTestId('status-row')).toHaveTextContent('Can’t think: no API key.');
+    fireEvent.click(screen.getByRole('button', { name: 'Fix it' }));
+    expect(onFix).toHaveBeenCalledWith('brain');
+  });
+});

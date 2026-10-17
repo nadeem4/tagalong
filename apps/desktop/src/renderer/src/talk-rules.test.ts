@@ -1,6 +1,20 @@
 /** Tests for the talk rules: settling, partial words, and failures said once. */
 import { describe, expect, it } from 'vitest';
-import { EarsNotes, FIRST_TIME, FailureStreak, micNote, settles, shownPartial } from './talk-rules';
+import {
+  EarsNotes,
+  FIRST_TIME,
+  FailureStreak,
+  NOTHING_HEARD,
+  micNote,
+  settles,
+  shownPartial,
+} from './talk-rules';
+
+describe('NOTHING_HEARD', () => {
+  it('is a plain status, not Scout speaking', () => {
+    expect(NOTHING_HEARD).toBe('Nothing heard.');
+  });
+});
 
 describe('settles', () => {
   it('lets the bubble go quiet when no held question is being asked', () => {
@@ -52,7 +66,7 @@ describe('FailureStreak', () => {
 });
 
 describe('EarsNotes', () => {
-  const OFFLINE = 'I couldn’t download my listening models.';
+  const OFFLINE = 'Speech models didn’t download.';
 
   it('says the first-time download, and clears it once the ears are ready', () => {
     const notes = new EarsNotes();

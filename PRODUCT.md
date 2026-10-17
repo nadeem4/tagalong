@@ -109,8 +109,9 @@ its result.
   request), plays a sample voice line, teaches the one key beside an Always listening switch
   (off by default; Scout never switches it on itself), then lands in the corner and invites one real question. Each later launch it says
   one short line that fits what happened: the time of day, days away with the hand-offs and
-  routines that finished, a crash and what it cut short, an update and what is new, or, plainly
-  with a fix, that it is signed out or has no key. It fades, reads no screen for this, and
+  routines that finished, a crash and what it cut short, or an update and what is new. When it
+  cannot think (signed out, no Claude Code, no key) it says nothing: a status tag on Scout and a
+  quiet row with Fix it say why. The body never speaks as Scout; only the mind does. It fades, reads no screen for this, and
   Settings turns it off.
 - Scout can know your name: optional in setup ("Rather not" is remembered), editable in Settings → You. It
   uses it rarely (a hello, a moment that warrants it), and the invitation and the launch line

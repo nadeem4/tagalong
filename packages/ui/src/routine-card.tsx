@@ -23,11 +23,11 @@ const ASK: Record<RoutineAction, (name: string) => string> = {
 };
 
 const LEAD: Record<RoutineAction, string> = {
-  create: 'Here’s the routine I’d set up. Nothing runs until you save it.',
-  update: 'Here’s the routine with your change. Nothing changes until you save it.',
-  pause: 'I’d pause this routine until you turn it back on.',
-  resume: 'I’d turn this routine back on.',
-  delete: 'I’d delete this routine for good.',
+  create: 'Nothing runs until you save it.',
+  update: 'Nothing changes until you save it.',
+  pause: 'It stays paused until you turn it back on.',
+  resume: 'It runs again on its schedule.',
+  delete: 'This can’t be undone.',
 };
 
 const CONFIRM: Record<RoutineAction, string> = {

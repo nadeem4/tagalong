@@ -53,6 +53,20 @@ describe('the routine card', () => {
     expect(card).toHaveTextContent('Topics: AI agents');
     expect(card).toHaveTextContent('May hand to: Claude Code, read-only, no project');
     expect(card).toHaveTextContent('Bubble, voice, Activity');
+    expect(card).toHaveTextContent('Nothing runs until you save it.');
+    expect(card).not.toHaveTextContent(/I’d|Here’s/);
+  });
+
+  it.each([
+    ['update', 'Nothing changes until you save it.'],
+    ['pause', 'It stays paused until you turn it back on.'],
+    ['resume', 'It runs again on its schedule.'],
+    ['delete', 'This can’t be undone.'],
+  ] as const)('leads the %s card with what happens, not with Scout speaking', (action, lead) => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    act(() => bridge.emit(proposed({ action, routineId: SAVED_ID })));
+    expect(screen.getByText(lead)).toBeInTheDocument();
   });
 
   it('saves nothing until Save, then offers to run it now to test', async () => {

@@ -287,7 +287,7 @@ record of what Scout saw keeps.
 **"Scout, what's wrong?"** Ask that (or "are you OK?", or "health check"), typed or spoken, and the
 bubble shows a health card: its sign-in, your experts, your connections, its voice, your
 microphone and the browser extension, each with a plain line, starting "Two things need you." or
-"Everything's working." **Fix it** on a row opens the place that fixes it. It calls no model and
+"Everything's working." (said aloud only when you asked by voice). **Fix it** on a row opens the place that fixes it. It calls no model and
 reads no screen, so it works even when Scout cannot think.
 
 Upgrading from an earlier build keeps only Scout; any other companion, with its conversations, is
@@ -509,6 +509,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 
 | Problem                                                        | What to do                                                                                                                                      |
 | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scout shows **Signed out**, **No brain** or **No key**         | Click Scout: the bubble's row says why it can't think. **Fix it** opens the right place in Settings.                                            |
 | Scout says "No … API key is stored"                            | Paste that provider's key in Welcome or Settings. It works on the next question.                                                                |
 | Scout says the model was not found, or the provider refused it | Open Settings and pick the model from the live list next to the model box.                                                                      |
 | Scout ignores the screenshot, or warns it cannot see           | Its model is text-only. Move it to Claude (the sign-in, OpenRouter or Anthropic) on Home's Scout page.                                          |

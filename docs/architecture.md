@@ -194,7 +194,9 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   → `{ extension }` says whether the browser extension is connected, for the health check (see
   [The companion's bubble](#the-companions-bubble)); the extension may not call it. Protocol
   0.17.0: `turn.completed`'s `stopReason` gains `tool_limit`; a `refusal` or `tool_limit` comes with
-  empty text, and the bubble and chat panel show a quiet status instead (see the turn lifecycle).
+  empty text, and the bubble and chat panel show a quiet status instead (see the turn lifecycle). Protocol 0.18.0: the package adds
+  the status marks shared by main and the UI (`StatusId`, `StatusMark`, `FixTarget`,
+  `STATUS_WORDS`, `topStatus`; see [Status marks](#status-marks)); no method changes.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
   `perception.listWindows` and `perception.readText`, then `perception.captureWindow`, and from Phase 3B `perception.recall` and
   `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
@@ -737,8 +739,8 @@ switch, Sign in again, Disconnect with a second press), Popular (Connect; GitHub
 in a password field), Found on this PC (Use; any value Claude Code kept is asked for), and Add a
 connector (an https address with its sign-in kind, or a command with `NAME=value` lines that go to
 the keychain). `connector.confirm` brings up Scout's bubble, which shows `ConnectorConfirmCard`
-(`packages/ui/src/connector-confirm.tsx`, built from the hand-off card's styles): the app, what will
-change, the details Scout filled in, **Allow once** and **Cancel**, answered with `tool.approve`.
+(`packages/ui/src/connector-confirm.tsx`, built from the hand-off card's styles): a neutral "Change
+in Notion — allow?", the app, what will change, the details Scout filled in, **Allow once** and **Cancel**, answered with `tool.approve`.
 The card goes away when it is answered or when its turn ends.
 
 **"What needs me?"** has no tool of its own, because each app's tools differ, and no recipe: Scout
@@ -1970,14 +1972,12 @@ seam before it renders, so it can always listen.
   screen cannot be seen it asks without it. The line is read whole by a screen reader through a
   hidden `role="status"`, and appears whole under `prefers-reduced-motion`. The older three-beat
   intro went: setup now says who Scout is and the key to press, so the bubble only invites.
-  The invitation is not a launch line: the next launch with Always listening on says the
-  listening line.
-- **Every later launch says one quiet line.** `welcome.ts#launchLine` picks it. With Always
-  listening on at launch (`settings.listening.always`) it is the listening line,
-  `LISTENING_LINE` ("I’m listening. Say “Scout, stop”, or switch off Always listening in my
-  bubble."), even when the greeting is switched off, and nothing is composed. Otherwise, when
-  Welcome is done and `settings.greeting` is on (`welcome.ts#shouldGreetOnLaunch`, default on),
-  main calls `greeting.compose` for Scout (`SCOUT_ID`). Either way main sends the text as
+  The invitation is not a launch line.
+- **Every later launch says one quiet line.** `welcome.ts#launchLine` picks it: when Welcome is
+  done and `settings.greeting` is on (`welcome.ts#shouldGreetOnLaunch`, default on), main calls
+  `greeting.compose` for Scout (`SCOUT_ID`); otherwise there is no line. Always listening does
+  not change the line: it shows as the `listening-on` status mark on Scout for 8 s (see
+  [Status marks](#status-marks)). Main sends the line as
   `greetLineEvent` (the preload keeps one that arrives before the panel subscribes)
   and shows the panel with `showPanelQuietly`. The panel renders `GreetingLine`: `role="status"`,
   fades after about seven seconds unless pointed at or focused, opens the ask bubble on a click.
@@ -1996,24 +1996,26 @@ seam before it renders, so it can always listen.
   `brainReadiness` (Scout's provider needs a key and has none, Claude Code is not
   found, or the Claude sign-in check says signed out; the sign-in check gets
   `SIGN_IN_BUDGET_MS`, 1 s, and a slow or failing check reads as `unknown`, never as a problem).
-  `brainLine(brain, composed, userName)` then returns the composed line, or a plain one ("I’m
-  signed out of Claude, so I can’t think yet.", "I can’t find Claude Code on this computer…", "I
-  have no API key…") with `fix: 'Fix it'` and `fixTarget: 'brain'`; the panel shows that as a
-  button on the line that opens Settings at How Scout thinks (`openSettings('brain')`, the same
-  offer button the bubble uses for a hand-off). The engine's
+  `brainLine(brain, composed, pickUp?)` then returns the composed line, or, when Scout cannot
+  think, a status mark instead of words: `GreetLine` is `{ text, pickUp? } | { status }`, with
+  `status` one of `brain-signed-out`, `brain-no-sign-in`, `brain-no-key` (`launch.ts#brainStatus`).
+  The panel shows a status line as the mark's row ("Can’t think: signed out of Claude.") with
+  **Fix it**, which opens Settings at How Scout thinks (`openSettings('brain')`), and says
+  nothing aloud: the body never speaks in Scout's voice. Main also sets the same mark in
+  `StatusMarks`, so the tag stays on Scout until a turn answers with words or Settings' Check
+  again finds Claude signed in. The engine's
   `greeting/scenario.ts#launchScenario` picks one scenario from the recorded facts: an update (`lastVersion` differs from the
   running version; first, because an installer ends a running tray app by force, so that launch
   also reads as a crash), else a crash, else a pick-up (a snapshot is ready: see
   [Pick up where you left off](#pick-up-where-you-left-off)), else away (a day or more since
   `awaySince`), else normal. A pick-up line is handwritten (`describePickUp`, `source: 'fallback'`,
   no model call) and `GreetingComposeResult.pickUp` carries its items; `brainLine` passes them on
-  as `GreetLine.pickUp` unless the Fix it line wins. The handwritten line for each: "I closed unexpectedly last time…"
+  as `GreetLine.pickUp` unless the status line wins. The handwritten line for each: "I closed unexpectedly last time…"
   (saying how many tasks stopped), "Morning. I’ve been updated to x.y.z." (the time of day first) plus `WHATS_NEW`
   (`apps/desktop/src/main/whats-new.ts`, edited by hand in each release together with a bump of the
   version in `apps/desktop/package.json`, which is what makes the launch an update; the line plays
   once, because the next launch records the same version), "Back after a day.", with
-  the routines that ran while away named. With Always listening on, `launchLine` answers
-  `LISTENING_LINE` first and none of the scenario lines show.
+  the routines that ran while away named.
   The Claude sign-in check starts at the top of `start()` (the promise is kept in `signInCheck`), so
   by greet time a cold `claude auth status` has had the boot time; `brainReadiness`'s 1 s race
   still starts at greet time.
@@ -2023,19 +2025,17 @@ seam before it renders, so it can always listen.
 flowchart LR
   S["Start"] --> R["recordLaunch"]
   R --> G["greetOnLaunch"]
-  G --> L{"Always listening on?"}
-  L -- "yes" --> LL["LISTENING_LINE"]
-  L -- "no, greeting off" --> NL["no line"]
-  L -- "no" --> P1["brainReadiness (1 s sign-in race)"]
-  L -- "no" --> P2["greeting.compose with launch facts"]
+  G --> L{"Greeting allowed?"}
+  L -- "no" --> NL["no line"]
+  L -- "yes" --> P1["brainReadiness (1 s sign-in race)"]
+  L -- "yes" --> P2["greeting.compose with launch facts"]
   P2 --> SC{"launchScenario"}
   SC --> C1["update / crash / pickUp / away / normal"]
   P1 --> BL["brainLine"]
   C1 --> BL
-  BL -- "can't think" --> FX["plain line with Fix it"]
+  BL -- "can't think" --> FX["brain status mark: row with Fix it, tag on Scout"]
   BL -- "ready or unknown" --> CL["composed line"]
-  LL --> PN["panel"]
-  FX --> PN
+  FX --> PN["panel"]
   CL --> PN
 ```
 
@@ -2122,7 +2122,10 @@ above a **Message** box. It is the same component, so it is the same conversatio
   passed to `onSay`, at most one line every 20 seconds (`SAY_GAP_MS`); tool steps stay silent. There
   is no text box on the card: notes go through Scout. Main brings the
   bubble up with focus for a proposal, and without focus for a finished hand-off; only when the
-  pets are hidden does a finished hand-off become a Windows notification instead. The folder dialog
+  pets are hidden does a finished hand-off become a Windows notification instead, titled with the
+  expert's name ("Claude Code finished"; main looks it up with `experts.list` and falls back to
+  the id). The card asks "Hand this to Claude Code?" (a chain: "Hand this to Coder, then
+  Reviewer?"), never a sentence in Scout's voice. The folder dialog
   takes focus and hides the bubble, so main shows it again after the dialog closes.
   A proposal with `then` shows both steps on the one card ("Hand to Coder, then Reviewer"): one
   Project row, then **1. Coder** and **2. Reviewer**, each with its own Access and Edit brief, and
@@ -2132,8 +2135,8 @@ above a **Message** box. It is the same component, so it is the same conversatio
   `date.ts`" and its answer, then "Reviewer says" and its answer) and `onSay` speaks once. If step 1
   fails or is stopped, the card says "Reviewer did not start." A step that hands on raises no
   Windows notification (`handoffNotice` returns null for it); the last step's does.
-- **The settings card** (`settings-card.tsx`). A `settings.proposed` for this pet shows each setting
-  now → after. **Apply** calls `applySettings` with the card's patch; a row marked as letting Scout
+- **The settings card** (`settings-card.tsx`). A `settings.proposed` for this pet shows "Nothing
+  changes until you apply it." and each setting now → after. **Apply** calls `applySettings` with the card's patch; a row marked as letting Scout
   see or keep more shows that line and the button reads **Turn on**. **Cancel** changes nothing.
   Apply is a click only: a spoken "yes" is just another question. See
   [Changed by talking](#changed-by-talking).
@@ -2168,7 +2171,10 @@ above a **Message** box. It is the same component, so it is the same conversatio
   row for its own check only, so one slow call never hangs the card; `gatherHealth` never throws. The
   pure `healthRows(facts)` (`ui/health.ts`) turns that into one row per check, `ok`, `broken`,
   `info` or `unknown`, and `HealthCard` shows them under "Two things need you." or "Everything's
-  working.", which is the only line said aloud. The ears count only once Always listening is on or
+  working.", which is the only line said aloud, and only when the question was spoken (a typed
+  one is read on the card). The rows are neutral status words, never Scout speaking ("Ready.",
+  "Signed out of Claude.", "All experts reachable.", "Speech model not downloaded.", "Not
+  checked."); a check that fails outright shows "Health check failed.". The ears count only once Always listening is on or
   a microphone was picked. The browser extension's row is `info` ("Not connected (optional)") and
   never counted. Each broken row has **Fix it**, the extension row **Set up**; both call
   `openFix(target)`, which is `openSettings(target)`.
@@ -2176,7 +2182,35 @@ above a **Message** box. It is the same component, so it is the same conversatio
   `privacy`, `experts`, `connections`). Main checks it against an allowlist (`main/fix-target.ts#fixPage`,
   anything else is refused) and opens Home on `settings#<section>` or the Experts or Connections
   page; Home (`home.tsx`, `home-target.ts`) scrolls to the Settings `Section` with that id once it
-  is drawn. With no target it opens Settings, as before.
+  is drawn. With no target it opens Settings, as before. `FixTarget` lives in protocol
+  (`status.ts`) beside the status marks; `ui/health.ts` re-exports it.
+
+### Status marks
+
+Only the mind speaks in Scout's voice. The body shows what it knows as a neutral status mark, a
+word or two on Scout and a sentence in the bubble, and never says it aloud.
+
+- **The wording table** is `packages/protocol/src/status.ts`: `StatusId` (`brain-signed-out`,
+  `brain-no-sign-in`, `brain-no-key`, `listening-on`, in the order that picks the top mark),
+  `StatusMark { id }`, `STATUS_WORDS` (`tag` for Scout, `detail` for the tooltip, the aria label
+  and the bubble row, and an optional `fix`; a mark with a fix is a problem) and `topStatus`. A
+  test refuses any first-person word in the table.
+- **The holder** is `apps/desktop/src/main/status-marks.ts#StatusMarks`: one map, the top mark by
+  `StatusId`'s order, an optional time limit per mark, and one change callback. Main broadcasts
+  the top mark (or null) on `IPC.statusMarkEvent`; a window that opens asks `getStatusMark()` (the
+  avatar is recreated on show). Who sets what: the brain marks from `brainReadiness` at launch,
+  cleared by the first `turn.completed` with text or a Check again that finds Claude signed in
+  (`clearBrainMarks`); `listening-on` for 8 s (`LISTENING_MARK_MS`) at launch when Always
+  listening is saved on and each time it is switched on, cleared when it is switched off
+  (`markListening`).
+- **One component**, `packages/ui/src/status-mark.tsx#StatusMark`, in two looks. `tag`: a pill at
+  Scout's bottom centre, just above the recording and listening dots in the corners
+  (`data-testid="status-mark"`, `data-id`), the `detail` as its tooltip and in `DockPet`'s aria
+  label; not a button (Scout is the button). `row`: a muted `role="status"` line in the bubble
+  above the question box (`data-testid="status-row"`), with **Fix it** when the table names a fix.
+  Problems use the warn colour, the rest the muted one; nothing animates.
+- **Turn outcomes** are not status marks: a turn that ends with no words shows `stop-status.ts`'s
+  quiet line ("Declined", "Stopped: too many steps"), as described in the turn lifecycle.
 
 ## Scout talks
 
@@ -2492,8 +2526,7 @@ flowchart LR
   hashes each file on disk (streamed, never read whole) and deletes a mismatch; a download is
   streamed to `<file>.part`, hashed as it arrives and renamed into place only when it matches, so
   bad bytes never sit at the final path. A bad copy is deleted and fetched once more, and a second bad copy throws `ModelIntegrityError`, which `ears-host` posts
-  as `EARS_MODEL_DAMAGED` ("The speech model I downloaded was damaged. Check the connection and try
-  again."). `sharedEnsureFiles` remembers a successful check, so the files are hashed once per voice
+  as `EARS_MODEL_DAMAGED` ("The speech model download was damaged. Check the connection."). `sharedEnsureFiles` remembers a successful check, so the files are hashed once per voice
   process. `loadOrtParts` sets `env.allowRemoteModels = false` too. Bumping a model means a new
   commit and new hashes. Nothing heard is stored. `TAGALONG_FAKE_STT=1` makes the
   voice process use `FakeEars` (no model, no download; held, it hears `FAKE_TRANSCRIPT`, "What am I
@@ -2588,10 +2621,11 @@ flowchart LR
 - **The bubble from main.** `forwardEars` takes `onSpoken`. A `partial` or `turnEnd` addressed to
   Scout brings the hidden bubble up beside a visible pet (`showPanelQuietly`), without taking the
   keyboard.
-- **The launch line.** `welcome.ts#launchLine` returns `LISTENING_LINE` when
-  `settings.listening.always` is on, even with the greeting off, so Scout's first line says it is
-  listening and how to stop; it wins over the crash, update, days-away and signed-out lines. The panel is created hidden at launch, so the microphone and the mark
-  are there from the first second.
+- **At launch.** No spoken line says listening is on: `markListening` sets the `listening-on`
+  status mark ("Listening", tooltip "Always listening is on. Say “Scout, stop” to switch it
+  off.") for 8 s at launch when `settings.listening.always` is on, and again each time it is
+  switched on; the launch line is composed as usual. The panel is created hidden at launch, so the
+  microphone and the mark are there from the first second.
 - **The mark.** `DockPet`'s `listening` prop (`'on'` or `'paused'`) draws `dock-pet__listening`,
   solid while on and outlined while paused, and adds "listening" or "listening paused" to the pet's
   accessible name. The avatar follows `getListening` and `onListening`.
@@ -2702,9 +2736,9 @@ and no keys or mouse are driven.
   unspent, since nobody could see it.
 - **At launch** `greeting.compose` asks `PickUp#ready()`. `launchScenario` puts them in this
   order: `update`, `crash`, `pickUp`, `away`, `normal`. For `pickUp` it returns `describePickUp`'s line with
-  `source: 'fallback'` and `pickUp: { text, items }`, with no model call. The brain's Fix it line
+  `source: 'fallback'` and `pickUp: { text, items }`, with no model call. The brain's status line
   still wins in `brainLine`; the pick-up it displaced (already taken) follows through `showPickUp`
-  once that line's bubble hides. With Always listening on, `launchLine` composes nothing, so the
+  once that line's bubble hides. With the greeting off, `launchLine` composes nothing, so the
   snapshot stays ready and the first tick offers it as the `pickUp.ready` notification. Main
   (`showPickUp`) shows that like a remark, and waits for the bubble to hide if it is open:
   `PickUpWaiting` holds one at most (the latest, on one `hide` listener) and drops it if pick-up

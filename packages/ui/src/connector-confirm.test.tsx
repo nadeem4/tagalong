@@ -37,6 +37,9 @@ describe('the connector confirm card', () => {
     expect(card).toHaveTextContent('Notion');
     expect(card).toHaveTextContent('create-pages');
     expect(card).toHaveTextContent('title: Launch plan');
+    // Neutral: the body never asks in Scout's voice.
+    expect(card).toHaveTextContent('Change in Notion — allow?');
+    expect(card).not.toHaveTextContent(/\bI[’']/);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Allow once' }));
       await Promise.resolve();

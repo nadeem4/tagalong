@@ -99,10 +99,10 @@ describe('the drop card', () => {
 
   it('refuses a secrets file with no buttons at all', () => {
     renderBubble(createFakeHostBridge(), {
-      refusal: 'That looks like a secrets file, so I won’t read it or pass it on.',
+      refusal: 'Looks like a secrets file: not read, not passed on.',
     });
     const card = screen.getByRole('region', { name: 'Dropped on Scout' });
-    expect(card).toHaveTextContent('That looks like a secrets file');
+    expect(card).toHaveTextContent('Looks like a secrets file');
     expect(card.querySelectorAll('button')).toHaveLength(0);
   });
 

@@ -44,6 +44,8 @@ describe('the settings card', () => {
     expect(card).toHaveTextContent('0.85');
     expect(card).toHaveTextContent('(none)');
     expect(card).toHaveTextContent('Sam');
+    expect(card).toHaveTextContent('Nothing changes until you apply it.');
+    expect(card).not.toHaveTextContent(/\bI[’']/);
     expect(bridge.appliedSettings).toEqual([]);
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
     await flush();

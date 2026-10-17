@@ -256,8 +256,8 @@ export function ProposalCard({
     >
       <p className="bubble-text">
         {then === undefined
-          ? `I’ll ask ${expertName} to look into it. Is this right?`
-          : `I’ll ask ${expertName} first, then ${then.expertName}. Is this right?`}
+          ? `Hand this to ${expertName}?`
+          : `Hand this to ${expertName}, then ${then.expertName}?`}
       </p>
       <dl className="handoff-rows">
         {then === undefined && (
@@ -409,7 +409,7 @@ export function HandoffStatus({
           </div>
         )}
         <div className="bubble-row bubble-hints">
-          <span>{handoff.project} · keep working, I’ll tell you</span>
+          <span>{handoff.project} · runs in the background</span>
           <button type="button" className="bubble-quiet" onClick={onStop}>
             Stop
           </button>
