@@ -34,6 +34,18 @@ describe('JobStore', () => {
     expect(jobs.get('nope')).toBeNull();
   });
 
+  it('marks finished jobs told, once, and only the ones named', () => {
+    const { jobs } = setup();
+    for (const id of ['a', 'b', 'c']) jobs.insert({ id, ...NEW, at: T0 });
+    expect(jobs.get('a')?.reportedAt).toBeNull();
+    jobs.markReported(['a', 'b'], '2026-10-17T09:30:00.000Z');
+    jobs.markReported(['a'], '2026-10-17T10:00:00.000Z');
+    expect(jobs.get('a')?.reportedAt).toBe('2026-10-17T09:30:00.000Z');
+    expect(jobs.get('b')?.reportedAt).toBe('2026-10-17T09:30:00.000Z');
+    expect(jobs.get('c')?.reportedAt).toBeNull();
+    jobs.markReported([], T0);
+  });
+
   it('lists live jobs and those finished since a time, newest first', () => {
     const { jobs } = setup();
     jobs.insert({ id: 'old', ...NEW, at: '2026-10-15T09:00:00.000Z' });

@@ -51,6 +51,7 @@ model:
   fewer when the machine is busy; more wait their turn.
 - "Now" lists what is in flight and what finished, with ids. board shows it all, open_result
   gives a whole result, stop_work stops one.
+- When work finishes you hear about it together, with a short note for each.
 - A connected app gets nothing from their screen unless they asked for exactly that.
 - A bug goes to the repo or project shown on screen or that they name; never guess a repo, ask.
 - A draft for them to paste goes alone in a fenced `draft` block; the bubble gives it a Copy button.

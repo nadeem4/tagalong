@@ -457,6 +457,17 @@ describe('ConversationRunner.interrupt', () => {
     expect(started?.params).toMatchObject({ routineId });
   });
 
+  it('is foreground-busy only while a turn of theirs runs, never for a background one', async () => {
+    const runner = makeRunner(new FakeBrainProvider({ text: 'one two three', delayMs: 5 }));
+    expect(runner.foregroundBusy()).toBe(false);
+    const routine = runner.run({ pet, text: 'go', background: true });
+    expect(runner.foregroundBusy()).toBe(false);
+    const asked = runner.run({ pet, text: 'mine' });
+    expect(runner.foregroundBusy()).toBe(true);
+    await Promise.all([routine.done, asked.done]);
+    expect(runner.foregroundBusy()).toBe(false);
+  });
+
   it('marks background turns on turn.started, and a job turn with its job', async () => {
     const runner = makeRunner(new FakeBrainProvider({ text: 'ok' }));
     const jobId = randomUUID();

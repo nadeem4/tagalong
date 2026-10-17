@@ -240,6 +240,27 @@ describe('a job ending', () => {
     });
   });
 
+  it('hands each done or failed job to finished, never a stopped one', async () => {
+    const finished: { id: string; state: string; note: string | null; error: string | null }[] = [];
+    const { jobs, turns, clock } = setup({ finished: (row) => finished.push(row) });
+    const one = jobs.start({ task: 'one' });
+    jobs.start({ task: 'two' });
+    const three = jobs.start({ task: 'three' });
+    turns[0]!.resolve({ text: 'The gist.\nMore.' });
+    turns[1]!.resolve({ text: '', error: { message: 'offline' } });
+    jobs.stop(three.ok && 'id' in three ? three.id : '');
+    await settle();
+    expect(finished.map(({ state, note, error }) => ({ state, note, error }))).toEqual([
+      { state: 'done', note: 'The gist.', error: null },
+      { state: 'error', note: null, error: 'offline' },
+    ]);
+    expect(finished[0]!.id).toBe(one.ok && 'id' in one ? one.id : '');
+    jobs.start({ task: 'four' });
+    await clock.advance(JOB_TIMEOUT_MS);
+    await settle();
+    expect(finished.at(-1)).toMatchObject({ state: 'error', error: expect.stringContaining('10') });
+  });
+
   it('reports the counts on board.changed after each change', async () => {
     const { jobs, turns, events } = setup();
     jobs.start({ task: 'one' });

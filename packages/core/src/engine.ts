@@ -33,8 +33,8 @@ import { ConversationRunner } from './conversation';
 import type { TurnEventSink } from './conversation/runner';
 import { browserContextFor } from './perception';
 import type { PerceptionHost } from './perception';
-import { WatchManager, systemWatchClock } from './watch';
-import { CheckIn } from './check-in';
+import { WatchManager, systemWatchClock, type WatchClock } from './watch';
+import { AFTER_TALK_MS, Arrivals, CheckIn, fromHandoff, fromJob } from './check-in';
 import { getRole } from './roles';
 import { EngineServer, RpcFailure } from './server/ws-server';
 import {
@@ -187,6 +187,8 @@ export interface EngineOptions {
   claudePluginsRoot?: string | undefined;
   /** Starts `claude plugin install`. Tests pass a fake; fake mode never starts one. */
   claudeSpawn?: SpawnFn | undefined;
+  /** The clock finished work is gathered on. Tests pass a FakeClock. */
+  arrivalClock?: WatchClock | undefined;
 }
 
 /**
@@ -248,6 +250,7 @@ export class Engine {
   readonly #routines: Routines;
   readonly #pickUp: PickUp;
   readonly #jobs: Jobs;
+  readonly #arrivals: Arrivals;
 
   private constructor(parts: {
     db: Database;
@@ -260,8 +263,10 @@ export class Engine {
     routines: Routines;
     pickUp: PickUp;
     jobs: Jobs;
+    arrivals: Arrivals;
   }) {
     this.#jobs = parts.jobs;
+    this.#arrivals = parts.arrivals;
     this.#pickUp = parts.pickUp;
     this.#routines = parts.routines;
     this.#connections = parts.connections;
@@ -331,8 +336,8 @@ export class Engine {
     const live: {
       server?: EngineServer;
       routines?: Routines;
-      checkIn?: CheckIn;
       pickUp?: PickUp;
+      arrivals?: Arrivals;
     } = {};
     // Home's activity record is written before the broadcast, so a host that re-reads
     // activity.list on a notification already finds the row.
@@ -342,8 +347,16 @@ export class Engine {
     const interruptedAtBoot = activity.interrupted();
     const routineStore = new RoutineStore(db);
     routineStore.interrupted();
+    // When a turn of theirs last ended, on the clock finished work is gathered on.
+    const arrivalClock = options.arrivalClock ?? systemWatchClock;
+    const talk = { turns: new Set<string>(), endedAt: Number.NEGATIVE_INFINITY };
     const emit: TurnEventSink = (event) => {
       activity.observe(event);
+      if (event.method === 'turn.started' && event.params.background !== true) {
+        talk.turns.add(event.params.turnId);
+      } else if (event.method === 'turn.completed' || event.method === 'turn.error') {
+        if (talk.turns.delete(event.params.turnId)) talk.endedAt = arrivalClock.now();
+      }
       live.server?.broadcast(event.method, event.params);
     };
     // Every read through a host writes a row to the log of what Scout saw.
@@ -380,9 +393,11 @@ export class Engine {
       emit: (event) => {
         live.server?.broadcast(event.method, event.params);
         if (event.method !== 'handoff.finished') return;
-        // A routine's own hand-off is delivered by the routine; any other gets a check-in.
+        // A routine's own hand-off is delivered by the routine; any other arrives with the
+        // rest of the finished work.
         if (live.routines?.handoffFinished(event.params) === true) return;
-        void live.checkIn?.finished(event.params);
+        const arrival = fromHandoff(event.params, activity.expertEntry(event.params.handoffId));
+        if (arrival !== null) live.arrivals?.add(arrival);
       },
       projects,
       usage,
@@ -407,6 +422,7 @@ export class Engine {
       spentOut,
       capacity,
       emit: (event) => live.server?.broadcast(event.method, event.params),
+      finished: (row) => live.arrivals?.add(fromJob(row)),
       log: (message) => console.warn(`[engine] ${message}`),
     });
     jobs.prune();
@@ -455,16 +471,17 @@ export class Engine {
           state,
           startedAt: row.startedAt ?? undefined,
           note: (state === 'error' ? row.error : row.note) ?? undefined,
+          told: row.reportedAt !== null,
         });
         return {
           running: rows.filter((row) => row.state === 'running').map((row) => line(row, 'running')),
           queued,
           ...(queued > 0 ? { capacity: capacity() } : {}),
+          // Since the last talk, or never mentioned: silence keeps it here until told.
           finished: rows.flatMap((row) =>
-            lastTalkAt !== null &&
             (row.state === 'done' || row.state === 'error') &&
-            row.finishedAt !== null &&
-            row.finishedAt > lastTalkAt
+            (row.reportedAt === null ||
+              (lastTalkAt !== null && row.finishedAt !== null && row.finishedAt > lastTalkAt))
               ? [line(row, row.state)]
               : [],
           ),
@@ -498,13 +515,22 @@ export class Engine {
       interruptedAtBoot,
       // Built below: a pick-up is taken only by a launch or back check-in, after boot.
       takePickUp: () => live.pickUp?.take() ?? null,
-      handoff: (handoffId) => activity.expertEntry(handoffId),
+      reported: (jobIds) => jobStore.markReported(jobIds, new Date().toISOString()),
       propose: (params) => handoffs.propose(params),
       emit: (event) => live.server?.broadcast(event.method, event.params),
       spentOut,
       log: (message) => console.warn(`[engine] ${message}`),
     });
-    live.checkIn = checkIn;
+    // Finished jobs and hand-offs, gathered: one check-in once things are quiet, held
+    // through calls, full screen and a conversation of theirs.
+    const arrivals = new Arrivals({
+      clock: arrivalClock,
+      windows: listHostWindows,
+      talking: () => runner.foregroundBusy() || arrivalClock.now() - talk.endedAt < AFTER_TALK_MS,
+      wake: (batch) => checkIn.finished(batch),
+      log: (message) => console.warn(`[engine] ${message}`),
+    });
+    live.arrivals = arrivals;
     // The person's apps over MCP. Each connects on its own; one that fails never stops boot.
     const connections = new ConnectionManager({
       store: new ConnectionStore(db),
@@ -735,6 +761,7 @@ export class Engine {
       routines,
       pickUp,
       jobs,
+      arrivals,
     });
   }
 
@@ -751,6 +778,7 @@ export class Engine {
   async shutdown(): Promise<void> {
     this.#routines.stop();
     this.#pickUp.stop();
+    this.#arrivals.stop();
     this.#watches.stopAll();
     await this.#handoffs.stopAll();
     await this.#jobs.stopAll();

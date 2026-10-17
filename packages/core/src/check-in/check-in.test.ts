@@ -7,7 +7,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Expert, Settings } from '@tagalong/protocol';
 import type {
   Brief,
-  HandoffFinishedParams,
   LaunchFacts,
   PetMoodParams,
   PetRemarkParams,
@@ -15,6 +14,7 @@ import type {
   WindowEntry,
 } from '@tagalong/protocol';
 import type { PickUpReady } from '../pick-up/pick-up';
+import type { Arrival } from './arrivals';
 import type { PerceptionHost } from '../perception';
 import type { Memory } from '../memory/memories';
 import { soul } from '../roles';
@@ -77,6 +77,7 @@ function setup(options: SetupOptions = {}) {
   const pickUps: PickUpReadyParams[] = [];
   const pickUp = { ready: options.pickUp ?? null, takes: 0 };
   const routinesSince: string[] = [];
+  const reported: string[][] = [];
   const proposals: Array<{ expertId: string; petId: string; brief: Brief; projectHint?: string }> =
     [];
   const host: PerceptionHost = {
@@ -115,8 +116,6 @@ function setup(options: SetupOptions = {}) {
       closedCheck();
       return { said: 'Why is port 3000 taken?', answered: 'An old server still holds it.' };
     },
-    handoff: (handoffId) =>
-      handoffId === HANDOFF_ID ? { expertName: 'Claude Code', ask: 'fix the login test' } : null,
     routinesSince: (iso) => {
       routinesSince.push(iso);
       return options.routines ?? [];
@@ -128,6 +127,7 @@ function setup(options: SetupOptions = {}) {
       pickUp.ready = null;
       return ready;
     },
+    reported: (jobIds) => reported.push([...jobIds]),
     propose: (params) => proposals.push(params),
     emit: (event) => {
       if (event.method === 'pet.remark') remarks.push(event.params);
@@ -160,6 +160,7 @@ function setup(options: SetupOptions = {}) {
     pickUps,
     pickUp,
     routinesSince,
+    reported,
     proposals,
     logs,
     checkIn,
@@ -169,12 +170,23 @@ function setup(options: SetupOptions = {}) {
 }
 
 const HANDOFF_ID = '00000000-0000-4000-8000-000000000001';
-const finishedDone: HandoffFinishedParams = {
-  handoffId: HANDOFF_ID,
-  expertId: 'claude-code',
+const finishedDone: Arrival = {
+  id: 'h-0000',
+  kind: 'expert',
+  title: 'Claude Code: "fix the login test"',
   state: 'done',
-  text: 'All 12 tests pass now.',
+  note: 'All 12 tests pass now.',
+  detail: 'All 12 tests pass now.',
+  handoffId: HANDOFF_ID,
 };
+const job = (n: number): Arrival => ({
+  id: `j-000${n}`,
+  kind: 'job',
+  title: `task ${n}`,
+  state: 'done',
+  note: `gist ${n}`,
+  jobId: `job-${n}`,
+});
 
 afterEach(() => vi.useRealTimers());
 
@@ -191,7 +203,7 @@ describe('CheckIn: the gate', () => {
 
     // A finished hand-off is work they asked for: no switch.
     const done = setup({ settings: { keepAnEye: false, wellbeing: { enabled: false } } });
-    await done.checkIn.finished(finishedDone);
+    await done.checkIn.finished([finishedDone]);
     expect(done.mind.requests).toHaveLength(1);
   });
 
@@ -211,7 +223,7 @@ describe('CheckIn: the gate', () => {
     const t = setup({ noPet: true });
     await t.checkIn.observeWindows([failing]);
     await t.stretch();
-    await t.checkIn.finished(finishedDone);
+    await t.checkIn.finished([finishedDone]);
     expect(t.mind.requests).toHaveLength(0);
   });
 
@@ -219,7 +231,7 @@ describe('CheckIn: the gate', () => {
     const t = setup({ spentOut: true });
     await t.checkIn.observeWindows([failing]);
     await t.stretch();
-    await t.checkIn.finished(finishedDone);
+    await t.checkIn.finished([finishedDone]);
     expect(t.mind.requests).toHaveLength(0);
     expect(t.reads).toHaveLength(0);
   });
@@ -229,11 +241,15 @@ describe('CheckIn: the gate', () => {
     const t = setup({ mind: ['hang'] });
     const first = t.checkIn.observeWindows([failing]);
     await vi.advanceTimersByTimeAsync(0);
-    await t.checkIn.finished(finishedDone);
+    // Finished work is not lost: Arrivals keeps the batch and tries again.
+    await expect(t.checkIn.finished([finishedDone])).resolves.toBe(false);
     expect(t.mind.requests).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(15_000);
     await first;
     expect(t.remarks).toHaveLength(0);
+    const second = t.checkIn.finished([finishedDone]);
+    await vi.advanceTimersByTimeAsync(15_000);
+    await expect(second).resolves.toBe(true);
   });
 
   it('keeps ten minutes between unprompted wakes; a finished hand-off is exempt', async () => {
@@ -244,7 +260,7 @@ describe('CheckIn: the gate', () => {
     t.clock.t += MINUTE;
     await t.checkIn.observeWindows([other]);
     expect(t.mind.requests).toHaveLength(1);
-    await t.checkIn.finished(finishedDone);
+    await t.checkIn.finished([finishedDone]);
     expect(t.mind.requests).toHaveLength(2);
     t.clock.t += COOLDOWN_MS;
     // The cooldown did not use the other window up: it is still there to look at.
@@ -259,7 +275,7 @@ describe('CheckIn: the gate', () => {
     expect(until.getTime()).toBe(t.clock.t + NOT_NOW_MS);
     await t.checkIn.observeWindows([failing]);
     expect(t.mind.requests).toHaveLength(0);
-    await t.checkIn.finished(finishedDone);
+    await t.checkIn.finished([finishedDone]);
     expect(t.mind.requests).toHaveLength(1);
     t.clock.t += NOT_NOW_MS;
     await t.checkIn.observeWindows([failing]);
@@ -277,12 +293,12 @@ describe('CheckIn: the gate', () => {
 
   it('stops at the daily cap, and starts again the next day', async () => {
     const t = setup();
-    for (let i = 0; i < CHECK_IN_DAILY_CAP; i += 1) await t.checkIn.finished(finishedDone);
+    for (let i = 0; i < CHECK_IN_DAILY_CAP; i += 1) await t.checkIn.finished([finishedDone]);
     expect(t.mind.requests).toHaveLength(CHECK_IN_DAILY_CAP);
-    await t.checkIn.finished(finishedDone);
+    await t.checkIn.finished([finishedDone]);
     expect(t.mind.requests).toHaveLength(CHECK_IN_DAILY_CAP);
     t.clock.t += 24 * 60 * MINUTE;
-    await t.checkIn.finished(finishedDone);
+    await t.checkIn.finished([finishedDone]);
     expect(t.mind.requests).toHaveLength(CHECK_IN_DAILY_CAP + 1);
   });
 
@@ -291,7 +307,7 @@ describe('CheckIn: the gate', () => {
     const t = setup({ hostWindows: [call] });
     await t.checkIn.observeWindows([call, { ...failing, state: 'background' }]);
     await t.stretch([win('w-4', 'Film', { fullScreen: true })]);
-    await t.checkIn.finished(finishedDone);
+    await t.checkIn.finished([finishedDone]);
     expect(t.mind.requests).toHaveLength(0);
     // The error was not used up during the call.
     await t.checkIn.observeWindows([editor, { ...failing, state: 'background' }]);
@@ -321,7 +337,7 @@ describe('CheckIn: what the mind is given', () => {
   it('the system prompt is the soul and the check-in block, the same for every reason', async () => {
     const t = setup();
     await t.checkIn.observeWindows([failing]);
-    await t.checkIn.finished(finishedDone);
+    await t.checkIn.finished([finishedDone]);
     t.clock.t += COOLDOWN_MS;
     await t.stretch();
     expect(t.mind.requests).toHaveLength(3);
@@ -348,7 +364,7 @@ describe('CheckIn: what the mind is given', () => {
 
   it('a finished wake sends the expert, the ask and the answer', async () => {
     const t = setup();
-    await t.checkIn.finished(finishedDone);
+    await t.checkIn.finished([finishedDone]);
     const sent = sentText(t.mind.requests[0]!);
     expect(sent).toContain('Claude Code: "fix the login test" (done)');
     expect(sent).toContain('All 12 tests pass now.');
@@ -356,7 +372,7 @@ describe('CheckIn: what the mind is given', () => {
 
   it('sends the last lines it said, so it does not repeat them', async () => {
     const t = setup({ mind: ['One.', 'Two.', 'Three.', 'Four.', 'NOTHING'] });
-    for (let i = 0; i < 5; i += 1) await t.checkIn.finished(finishedDone);
+    for (let i = 0; i < 5; i += 1) await t.checkIn.finished([finishedDone]);
     const sent = sentText(t.mind.requests[4]!);
     expect(sent).toContain('- "Two."\n- "Three."\n- "Four."');
     expect(sent).not.toContain('"One."');
@@ -375,7 +391,7 @@ describe('CheckIn: failures are silence', () => {
   it('a memory store that throws still lets the mind be asked, without memories', async () => {
     const t = setup();
     t.state.closed = true;
-    await t.checkIn.finished(finishedDone);
+    await t.checkIn.finished([finishedDone]);
     expect(t.mind.requests).toHaveLength(1);
     expect(sentText(t.mind.requests[0]!)).not.toContain('What you remember');
   });
@@ -383,14 +399,14 @@ describe('CheckIn: failures are silence', () => {
   it('a store closed while the mind writes (a quit) is silence, never a throw', async () => {
     const t = setup({ mind: ['All green.'] });
     t.state.closed = true;
-    await expect(t.checkIn.finished(finishedDone)).resolves.toBeUndefined();
+    await expect(t.checkIn.finished([finishedDone])).resolves.toBe(true);
     expect(t.remarks).toHaveLength(0);
     expect(t.logs.join('\n')).toContain('not open');
   });
 
   it('a mind that throws says why in the log only', async () => {
     const t = setup({ mind: [{ throws: new Error('offline') }] });
-    await t.checkIn.finished(finishedDone);
+    await t.checkIn.finished([finishedDone]);
     expect(t.remarks).toHaveLength(0);
     expect(t.logs.join('\n')).toContain('offline');
   });
@@ -408,7 +424,7 @@ describe('CheckIn: silence', () => {
   ])('says and shows nothing for %j', async (step) => {
     const t = setup({ mind: [step] });
     await t.checkIn.observeWindows([failing]);
-    await t.checkIn.finished(finishedDone);
+    await t.checkIn.finished([finishedDone]);
     expect(t.mind.requests).toHaveLength(2);
     expect(t.remarks).toHaveLength(0);
     expect(t.moods).toHaveLength(0);
@@ -417,7 +433,7 @@ describe('CheckIn: silence', () => {
   it('a mind that hangs past fifteen seconds is silence', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const t = setup({ mind: ['hang'] });
-    const pending = t.checkIn.finished(finishedDone);
+    const pending = t.checkIn.finished([finishedDone]);
     await vi.advanceTimersByTimeAsync(15_000);
     await pending;
     expect(t.remarks).toHaveLength(0);
@@ -464,25 +480,40 @@ describe('CheckIn: delivery', () => {
 
   it('a finished hand-off gets a line tied to it, with no offer', async () => {
     const t = setup({ mind: ['All green.\nOFFER: Ship it\nMOOD: cheer'] });
-    await t.checkIn.finished(finishedDone);
+    await t.checkIn.finished([finishedDone]);
     expect(t.remarks).toEqual([
       { remarkId: expect.any(String), petId: 'scout', text: 'All green.', handoffId: HANDOFF_ID },
     ]);
     expect(t.moods).toEqual(['cheer']);
   });
 
-  it('a step that hands on to another asks nothing: only the last step checks in', async () => {
-    const t = setup();
-    await t.checkIn.finished({
-      ...finishedDone,
-      next: { handoffId: HANDOFF_ID, expertId: 'writer', expertName: 'Writer' },
-    });
-    expect(t.mind.requests).toHaveLength(0);
+  it('a batch is one call and one plain line; the jobs in it are marked told', async () => {
+    const t = setup({ mind: ['Three things are done. Which first?\nOFFER: Ship it'] });
+    await t.checkIn.finished([job(1), finishedDone, job(2)]);
+    expect(t.mind.requests).toHaveLength(1);
+    const sent = sentText(t.mind.requests[0]!);
+    expect(sent).toContain('Work finished: 3 things.');
+    expect(sent).toContain('gist 1');
+    expect(sent).toContain('gist 2');
+    expect(t.remarks).toEqual([
+      { remarkId: expect.any(String), petId: 'scout', text: 'Three things are done. Which first?' },
+    ]);
+    expect(t.reported).toEqual([['job-1', 'job-2']]);
   });
+
+  it.each<MindStep>(['NOTHING', 'NOTHING\nMOOD: cheer', { throws: new Error('offline') }])(
+    'silence about a batch marks nothing told (%j)',
+    async (step) => {
+      const t = setup({ mind: [step] });
+      await t.checkIn.finished([job(1), job(2)]);
+      expect(t.remarks).toHaveLength(0);
+      expect(t.reported).toEqual([]);
+    },
+  );
 
   it('a mood alone is shown with no words', async () => {
     const t = setup({ mind: ['NOTHING\nMOOD: wince'] });
-    await t.checkIn.finished({ ...finishedDone, state: 'error', error: 'boom' });
+    await t.checkIn.finished([{ ...finishedDone, state: 'error', note: 'boom' }]);
     expect(t.remarks).toHaveLength(0);
     expect(t.moods).toEqual(['wince']);
   });
@@ -492,7 +523,7 @@ describe('CheckIn: delivery', () => {
       settings: { wellbeing: { enabled: false } },
       mind: ['NOTHING\nMOOD: tired'],
     });
-    await off.checkIn.finished(finishedDone);
+    await off.checkIn.finished([finishedDone]);
     expect(off.moods).toEqual([]);
 
     const t = setup({ mind: ['NOTHING\nMOOD: tired'] });
@@ -502,7 +533,7 @@ describe('CheckIn: delivery', () => {
     await t.checkIn.observeActivity({ idleMs: BREAK_MS, windows: [editor] });
     expect(t.moods).toEqual(['tired', 'rested']);
 
-    await t.checkIn.finished(finishedDone);
+    await t.checkIn.finished([finishedDone]);
     expect(t.moods).toEqual(['tired', 'rested', 'tired']);
     t.checkIn.settle();
     t.checkIn.settle();
@@ -592,7 +623,7 @@ describe('CheckIn: offers and accept', () => {
   it('a new line replaces the last offer', async () => {
     const t = setup({ mind: ['That port is taken.\nOFFER: Free port 3000', 'All green.'] });
     await t.checkIn.observeWindows([failing]);
-    await t.checkIn.finished(finishedDone);
+    await t.checkIn.finished([finishedDone]);
     expect(await t.checkIn.accept(t.remarks[0]!.remarkId)).toBe(false);
   });
 });

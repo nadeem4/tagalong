@@ -264,6 +264,11 @@ export class ConversationRunner {
     return { turnId, conversationId, done };
   }
 
+  /** A turn of theirs, not a background one, is running. */
+  foregroundBusy(): boolean {
+    return [...this.#active.values()].some((active) => !active.background);
+  }
+
   /** Aborts a running turn. False means it had already finished or never existed. */
   interrupt(turnId: string): boolean {
     const active = this.#active.get(turnId);

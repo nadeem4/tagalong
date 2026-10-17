@@ -4,7 +4,7 @@
  * (reads them from the engine's sources), `renderNow` and `renderMemories`. Facts only: the
  * model decides what, if anything, to make of them.
  */
-import { busyLine } from '../jobs/board';
+import { busyLine, fencedNotes } from '../jobs/board';
 import type { Capacity } from '../jobs/jobs';
 import type { Memory } from '../memory/memories';
 import { hideSecrets } from '../privacy/secrets';
@@ -27,6 +27,8 @@ export interface JobLine {
   startedAt?: string | undefined;
   /** A finished job's gist, or why it failed. */
   note?: string | undefined;
+  /** A finished job: a check-in line about it was shown. */
+  told?: boolean | undefined;
 }
 
 /** Scout's own jobs: running, how many wait (and why, when the machine allows fewer), finished. */
@@ -34,7 +36,7 @@ export interface JobFacts {
   running: readonly JobLine[];
   queued: number;
   capacity?: Capacity | undefined;
-  /** Finished since the last talk. */
+  /** Finished since the last talk, or not mentioned yet. */
   finished: readonly JobLine[];
 }
 
@@ -142,11 +144,17 @@ export function renderNow(facts: NowFacts): string {
   if (jobs !== undefined && jobs.finished.length > 0) {
     const done = jobs.finished
       .map((job) => {
-        const head = `${job.id} "${clip(clean(job.task))}" (${job.state === 'error' ? 'failed' : 'done'})`;
-        return job.note ? `${head}: ${clean(job.note)}` : head;
+        const state = `${job.state === 'error' ? 'failed' : 'done'}${job.told === false ? ', not mentioned yet' : ''}`;
+        return `${job.id} "${clip(clean(job.task))}" (${state})`;
       })
       .join('; ');
-    lines.push(`Your jobs finished since you last talked: ${done}.`);
+    const notes = jobs.finished.flatMap((job) =>
+      job.note ? [`${job.id}: ${clean(job.note)}`] : [],
+    );
+    lines.push(
+      `Your jobs finished since you last talked or not mentioned yet: ${done}.` +
+        (notes.length === 0 ? '' : ` ${fencedNotes(notes)}`),
+    );
   }
 
   if (facts.running.length > 0) lines.push(`Experts working: ${expertList(facts.running)}.`);
