@@ -135,7 +135,8 @@ its result.
 - Name: **Tagalong**. The companion: **Scout** (a default the user can rename).
 - Voice: **warm and playful**. A companion with personality, friendly and a little fun, never
   childish. Anything about privacy, keys, cost or errors stays plain and exact.
-- Look: a **pixel-art feel** for Scout's figure. No logo, colours or fonts are fixed yet.
+- Look: Scout is **Bean**, a soft clay-like 3D figure, moving on the dock and still everywhere else;
+  pixel type for names and titles. No logo yet.
 
 ## Evidence on Hand
 

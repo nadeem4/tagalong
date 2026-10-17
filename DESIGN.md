@@ -406,7 +406,7 @@ Flat. Depth is tonal: navy steps (page, sidebar, active row, tile) and hairlines
 
 ## Shapes
 
-Gently rounded chrome, square pixels. The bubble, Home cards and Welcome's tile use 12px; fields and primary buttons 8px; activity entries, templates, chips and Home's Scout tile 10px; quiet bubble buttons, icon buttons, key caps and error boxes 6px; dock tags and bubble chips are pills. 12px, 6px and the pill are hard-coded. The bubble's tail is a 14px square rotated 45 degrees with two bordered edges, 34px from the bottom, on the side Scout is on. Your own chat messages round three corners at 12px and the one nearest you at 4px. Icons are 14px stroked SVGs (1.6 stroke, currentColor).
+Gently rounded chrome. The bubble, Home cards and Welcome's tile use 12px; fields and primary buttons 8px; activity entries, templates, chips and Home's Scout tile 10px; quiet bubble buttons, icon buttons, key caps and error boxes 6px; dock tags and bubble chips are pills. 12px, 6px and the pill are hard-coded. The bubble's tail is a 14px square rotated 45 degrees with two bordered edges, 34px from the bottom, on the side Scout is on. Your own chat messages round three corners at 12px and the one nearest you at 4px. Icons are 14px stroked SVGs (1.6 stroke, currentColor).
 
 ## Components
 
