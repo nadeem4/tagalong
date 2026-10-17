@@ -604,7 +604,8 @@ the time a line about it was shown.
 
 These go to the summaries model with the facts every check-in carries, so Scout can say one short
 line, or nothing. Answers, notes and errors go fenced as data, never as instructions; the same
-fence is used for job and expert notes on the board and in Now. The card keeps the whole answer;
+fence is used for job and expert notes on the board and in Now, and for conversation summaries
+and recent work recalled under "What you remember". The card keeps the whole answer;
 the answer is never read out. With the bubble closed, the line comes beside Scout like any other
 line. A routine's own hand-off is delivered by the routine, and a watch firing comes at once: neither
 waits for the others.
