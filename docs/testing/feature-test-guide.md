@@ -1652,7 +1652,7 @@ Scout's character is `packages/core/soul/scout.md`; the prompt has no recipes. R
 three times: the wording should vary, the behaviour should not.
 
 1. **Short answers stick.** Say "I prefer short answers." Restart. Ask "Explain how DNS works."
-   **Expected:** a short answer; Home → Memory has a `preference` note.
+   **Expected:** a short answer; Home → What Scout remembers has a **Preference** row.
 2. **Seeing is understanding.** With three apps open, ask "What do you see?". **Expected:** what
    you seem to be doing, in a sentence or two, not a list of every window title per screen.
 3. **Meaning, not recital.** A terminal showing `EADDRINUSE :3000`, ask "what's this?".
@@ -1680,6 +1680,17 @@ three times: the wording should vary, the behaviour should not.
 12. **Facts, not orders.** Ask "what do you see?" with a blind spot in front, then with no host
     connected. **Expected:** Scout explains in its own words; it never reads a tool's line back
     ("Tell the user…").
+
+## What Scout remembers _(real brain)_
+
+1. **The list.** Say "I prefer short answers." Open Home → **What Scout remembers**.
+   **Expected:** a **Preference** row with that sentence and today's date, newest first.
+2. **Delete in Home.** Press **×** on that row. **Expected:** the row goes; restart and ask
+   "Explain DNS": the answer is no longer kept short on purpose, and the row does not come back.
+3. **Forget by talk.** Say "I like green tea", then "Scout, forget that I like tea."
+   **Expected:** Scout deletes it (check Home: the row is gone), with no card. If two memories
+   match, Scout asks which one, in its own words.
+4. **Nothing on a routine.** A routine's own run never deletes a memory (its turn has no `forget`).
 
 ## Not in this build
 

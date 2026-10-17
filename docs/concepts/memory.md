@@ -84,6 +84,19 @@ Scout files a memory with the `remember` tool (`{ text, kind: fact | preference 
 short answers" is kept across restarts; the summary also records preferences the user stated.
 Nothing is filed by matching phrases in what they typed: the model decides.
 
+## Seeing and deleting what Scout remembers
+
+Memories are kept until deleted, and the person can see and delete every one:
+
+- **Home → What Scout remembers** lists Scout's facts, preferences and conversation summaries,
+  newest first, each with its kind, the day it was saved and a delete button (`memory.list`,
+  `memory.delete`). There is no Delete all.
+- **"Scout, forget that"**: the `forget` tool. With a query it lists up to five matching memories
+  with short ids (`m-3fa1c2d0`) and deletes nothing; with an id it deletes that one memory. A short
+  id that matches none, or two, deletes nothing. No card: deleting only takes away.
+
+A deleted memory leaves the full-text index with it, so recall never brings it back.
+
 ## Summarising long threads
 
 Built in `packages/core/src/memory/summarizer.ts`. When 20 unsummarised messages build up, they

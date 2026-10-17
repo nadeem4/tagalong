@@ -197,6 +197,8 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   empty text, and the bubble and chat panel show a quiet status instead (see the turn lifecycle). Protocol 0.18.0: the package adds
   the status marks shared by main and the UI (`StatusId`, `StatusMark`, `FixTarget`,
   `STATUS_WORDS`, `topStatus`; see [Status marks](#status-marks)); no method changes.
+  Protocol 0.19.0: `memory.list` and `memory.delete` (see
+  [What Scout remembers](#what-scout-remembers)); the extension may not call them.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
   `perception.listWindows` and `perception.readText`, then `perception.captureWindow`, and from Phase 3B `perception.recall` and
   `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
@@ -958,6 +960,7 @@ that takes `ipcMain.handle` and what it reads as arguments, so it is unit tested
 | `connections.ts` | connected apps and the answer to a change Scout asked to make                                             |
 | `routines.ts`    | Home's Routines page and the routine card, including its Edit                                             |
 | `sight-log.ts`   | Home's What Scout saw: list, delete one, delete all                                                       |
+| `memory.ts`      | Home's What Scout remembers: list, delete one                                                             |
 | `settings.ts`    | the settings view, saving settings and keys, model lists                                                  |
 | `voice.ts`       | speak; listen, mic frames and stop, to the voice process                                                  |
 
@@ -1279,6 +1282,14 @@ calling pet. The other way is the summary below, which records the preferences t
 Nothing is filed by matching phrases in the question: the model decides what is worth keeping.
 `addOnce` keeps the same sentence from filling five recall slots.
 
+Memories are deleted two ways: from Home's What Scout remembers (see
+[What Scout remembers](#what-scout-remembers)), or by the `forget` tool (`tools/builtin/memory.ts`,
+`write`, appended last in the registry and left off a routine's own turn). `forget { query }` lists up
+to five FTS matches as `m-<first 8 characters of the id> (kind) text` and deletes nothing;
+`forget { id }` resolves that short id (or the whole id) among the calling pet's memories with
+`MemoryStore.byPrefix` and deletes the one match. No match, or two, deletes nothing and answers with
+`isError`. Deleting only takes away, so there is no card. The results are facts only.
+
 ### Summaries
 
 `memory/summarizer.ts` keeps long conversations short. After every turn that answered, the runner's
@@ -1379,6 +1390,7 @@ on, the model list, `savePet`) and the settings form as a slot.
 - **Activity**: `ActivityView`; see [Activity](#activity).
 - **What Scout saw**: `SightLogView`; see [What Scout saw](#what-scout-saw). The days it keeps come
   from `HomeHost.setup().sightLogDays`.
+- **What Scout remembers**: `MemoryView`; see [What Scout remembers](#what-scout-remembers).
 - **Settings**: the host's settings form (`SettingsPage embedded`), described under
   [The Settings window](#the-settings-window).
 
@@ -1421,10 +1433,12 @@ flowchart LR
     Connections
     Activity
     Saw["What Scout saw"]
+    Mem["What Scout remembers"]
     Settings
   end
   Engine[(Engine)] -- "pets.list, experts.list, activity.list" --> Home
   Saw -- "sightLog.list, sightLog.delete, sightLog.clear" --> Engine
+  Mem -- "memory.list, memory.delete" --> Engine
   Scout -- "pets.upsert" --> Engine
   Experts -- "experts.upsert, experts.delete, experts.test" --> Engine
   Routines -- "routines.save, routines.setEnabled, routines.runNow" --> Engine
@@ -1489,6 +1503,19 @@ answers `{ deleted }`; `sightLog.clear` answers `{ deleted: count }`. None is in
 Home's `SightLogView` (`packages/ui/src/home/sight-log-view.tsx`) reads them through the optional
 bridge methods `listSightLog`, `deleteSightLog` and `clearSightLog`, which the desktop wires in
 `main/ipc/sight-log.ts`.
+
+### What Scout remembers
+
+Home's **What Scout remembers** page (`packages/ui/src/home/memory-view.tsx`, `MemoryView`) lists
+Scout's long-term memories (`memories`: facts, preferences and conversation summaries) newest first,
+each with its kind, the day it was saved and a Delete button. There is no Delete all. It re-reads
+after every `turn.completed`, since a turn may have remembered or forgotten something.
+`memory.list { before?, limit = 50 (max 200) }` answers `{ memories: { id, kind, text, createdAt }[],
+next? }` from `MemoryStore.list` (Scout's rows only, newest first by rowid; `next` is the id to pass
+as `before`; an unknown cursor gives an empty page). `memory.delete { id }` answers `{ deleted }`; the
+FTS row goes with it (trigger `memories_ad`), so recall no longer finds it. Neither is in
+`EXTENSION_METHODS`. The desktop wires the optional bridge methods `listMemories` and `deleteMemory`
+in `main/ipc/memory.ts`, which asks for the newest 200.
 
 ### The Settings window
 
