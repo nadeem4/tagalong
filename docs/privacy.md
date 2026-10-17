@@ -733,6 +733,9 @@ a day (a failed one is tried once more), and none once the daily budget is spent
   preference: those are yours to delete. At most 10 of each kind of change a day; anything it
   writes has secrets hidden. You see the result in **Home → What Scout remembers**, and the run on
   Scout's task board ("Added 2, changed 1, let 3 go.").
+- **What it writes is data, not your word.** When Scout recalls a memory the tidy added or
+  reworded, it reads it as data, never as instructions; only what you told Scout yourself stands
+  as your word. Memories you already had count as yours.
 - **Afterwards** background jobs older than 14 days are deleted with their conversations, and
   Scout keeps at most 200 conversation summaries, the oldest going first.
 

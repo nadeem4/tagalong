@@ -106,8 +106,9 @@ Built in `packages/core/src/memory/recall.ts`, one path for every turn and check
 
 - Matching is SQLite FTS5 full-text search, ranked by BM25. Every word of the question is quoted
   and OR-ed, so punctuation in a question can never break the query.
-- Preferences and facts are listed plain. Summaries and recent work can carry text from
-  connected apps or the web, so they go in one `~~~text` fence, as data, never as instructions.
+- Preferences and facts the user stated are listed plain. What the digest added or reworded
+  (`origin = 'digest'`), summaries and recent work can carry text from connected apps or the web,
+  so they go in one `~~~text` fence, as data, never as instructions.
 - The memories are capped at **2,000 characters**. Whole memories are dropped from the end rather than
   cut mid-sentence.
 - Visibility is decided in SQL on every read: `pet_id = <Scout>`. Older installs kept some
@@ -158,7 +159,8 @@ matters is the mind's call.
 - **What it may reply**: `ADD fact|preference|summary: ...`, `REPLACE <id>: ...`, `DROP <id>`, or
   `NOTHING`. Code applies at most 10 of each in one transaction; an id must be one it was shown;
   a `DROP` of a preference is ignored; facts and preferences are clipped to 300 characters and
-  summaries to 1,000; `ADD` never files a duplicate.
+  summaries to 1,000; `ADD` never files a duplicate. What it adds or rewords is stored with
+  `origin = 'digest'` (migration 22), so recall fences it as data.
 - **After**: the jobs it read are marked, jobs older than 14 days are deleted, and the oldest
   summaries beyond 200 go. The run is a `jobs` row (`kind = 'digest'`) the board shows as
   "Tidying your memory" and then "Tidied your memory ... Note: Added 2, changed 1, let 3 go." (a

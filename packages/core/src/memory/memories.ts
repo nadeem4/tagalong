@@ -8,6 +8,9 @@ import type Database from 'better-sqlite3';
 /** What a memory is: something true, something the user likes, or a digest of a thread. */
 export type MemoryKind = 'fact' | 'preference' | 'summary';
 
+/** Who wrote a memory: the user, or the daily digest (whose words can come from job results). */
+export type MemoryOrigin = 'user' | 'digest';
+
 export interface Memory {
   id: string;
   /** The pet the memory belongs to: Scout. */
@@ -15,12 +18,16 @@ export interface Memory {
   kind: MemoryKind;
   text: string;
   createdAt: string;
+  /** Absent means the user's. */
+  origin?: MemoryOrigin;
 }
 
 export interface NewMemory {
   petId: string;
   kind: MemoryKind;
   text: string;
+  /** The user's when absent. */
+  origin?: MemoryOrigin;
 }
 
 interface MemoryRow {
@@ -29,6 +36,7 @@ interface MemoryRow {
   kind: MemoryKind;
   text: string;
   created_at: string;
+  origin: MemoryOrigin;
 }
 
 /** The rows one pet may see: its own. */
@@ -78,19 +86,21 @@ export class MemoryStore {
       kind: input.kind,
       text,
       created_at: new Date().toISOString(),
+      origin: input.origin ?? 'user',
     };
     this.db
       .prepare(
-        "INSERT INTO memories (id, scope, pet_id, kind, text, created_at) VALUES (?, 'pet', ?, ?, ?, ?)",
+        "INSERT INTO memories (id, scope, pet_id, kind, text, created_at, origin) VALUES (?, 'pet', ?, ?, ?, ?, ?)",
       )
-      .run(row.id, row.pet_id, row.kind, row.text, row.created_at);
+      .run(row.id, row.pet_id, row.kind, row.text, row.created_at, row.origin);
     return toMemory(row);
   }
 
   /**
    * Adds a memory unless the pet already holds an identical one, and returns
    * whichever is stored. Saying "I prefer short answers" every morning should not fill
-   * five recall slots with the same sentence.
+   * five recall slots with the same sentence. The stored row keeps its own origin, so the
+   * digest repeating something the user said leaves it the user's.
    */
   addOnce(input: NewMemory): Memory {
     const text = input.text.trim();
@@ -122,14 +132,17 @@ export class MemoryStore {
       .get(petId, kind)!.n;
   }
 
-  /** Rewrites one of the pet's own memories (the digest's REPLACE); the search index follows. */
-  update(petId: string, id: string, text: string): boolean {
+  /**
+   * Rewrites one of the pet's own memories (the digest's REPLACE); the search index follows.
+   * The words are now the rewriter's, so the row takes `origin`.
+   */
+  update(petId: string, id: string, text: string, origin: MemoryOrigin = 'user'): boolean {
     const kept = text.trim();
     if (kept === '') return false;
     return (
       this.db
-        .prepare('UPDATE memories SET text = ? WHERE id = ? AND pet_id = ?')
-        .run(kept, id, petId).changes > 0
+        .prepare('UPDATE memories SET text = ?, origin = ? WHERE id = ? AND pet_id = ?')
+        .run(kept, origin, id, petId).changes > 0
     );
   }
 
@@ -218,5 +231,6 @@ function toMemory(row: MemoryRow): Memory {
     kind: row.kind,
     text: row.text,
     createdAt: row.created_at,
+    origin: row.origin,
   };
 }
