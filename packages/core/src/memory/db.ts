@@ -249,6 +249,7 @@ const MIGRATIONS: readonly Migration[] = [
      digested_at TEXT
    );
    CREATE INDEX IF NOT EXISTS jobs_state ON jobs(state, created_at);`,
+  addMemoryOrigin,
 ];
 
 /** The columns migration 7 gave `activity`, in order. */
@@ -398,6 +399,21 @@ function addRoutines(db: Database.Database): void {
    ALTER TABLE activity_v13 RENAME TO activity;
    CREATE INDEX activity_turn ON activity(turn_id);
    CREATE INDEX activity_run ON activity(run_id);`);
+}
+
+/**
+ * Migration 22. Who wrote a memory: the user (said it, or `remember`), or the digest (which
+ * reads job results, so web or file text can steer it). Recall fences digest rows as data.
+ * Rows the digest wrote before this cannot be told apart and count as the user's. The search
+ * triggers index `text` only, so they need no change. Skipped when the column is already
+ * there, so a database rolled back past it migrates again.
+ */
+function addMemoryOrigin(db: Database.Database): void {
+  const columns = db.prepare<[], { name: string }>('PRAGMA table_info(memories)').all();
+  if (columns.some((column) => column.name === 'origin')) return;
+  db.exec(
+    "ALTER TABLE memories ADD COLUMN origin TEXT NOT NULL DEFAULT 'user' CHECK (origin IN ('user', 'digest'))",
+  );
 }
 
 /** Version a fully migrated database reports. */

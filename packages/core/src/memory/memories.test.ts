@@ -193,6 +193,62 @@ describe('MemoryStore for the digest', () => {
     expect(memories.update('scout', fact.id, '   ')).toBe(false);
   });
 
+  it("keeps who wrote a memory: the user's by default, or the digest's", () => {
+    const told = memories.add({ petId: 'scout', kind: 'fact', text: 'Lives in Leeds' });
+    const tidied = memories.add({
+      petId: 'scout',
+      kind: 'fact',
+      text: 'Ships on Fridays',
+      origin: 'digest',
+    });
+
+    expect(told.origin).toBe('user');
+    expect(tidied.origin).toBe('digest');
+    expect(memories.search('scout', 'fridays', 5)[0]?.origin).toBe('digest');
+  });
+
+  it("a reworded memory takes the rewriter's origin, and the search still finds it", () => {
+    const fact = memories.add({ petId: 'scout', kind: 'preference', text: 'Short answers' });
+
+    expect(memories.update('scout', fact.id, 'Very short answers', 'digest')).toBe(true);
+    expect(memories.search('scout', 'very short', 5)[0]).toMatchObject({
+      text: 'Very short answers',
+      origin: 'digest',
+    });
+
+    expect(memories.update('scout', fact.id, 'Short answers again')).toBe(true);
+    expect(memories.recent('scout', 1)[0]?.origin).toBe('user');
+  });
+
+  it('does not let the digest launder a memory the user already holds', () => {
+    const mine = memories.add({ petId: 'scout', kind: 'fact', text: 'Uses pnpm' });
+
+    const again = memories.addOnce({
+      petId: 'scout',
+      kind: 'fact',
+      text: 'Uses pnpm',
+      origin: 'digest',
+    });
+
+    expect(again).toMatchObject({ id: mine.id, origin: 'user' });
+    expect(memories.count('scout', 'fact')).toBe(1);
+  });
+
+  it('makes a memory the user’s when they say what the digest wrote themselves', () => {
+    const tidied = memories.add({
+      petId: 'scout',
+      kind: 'preference',
+      text: 'Short answers',
+      origin: 'digest',
+    });
+
+    const said = memories.addOnce({ petId: 'scout', kind: 'preference', text: 'Short answers' });
+
+    expect(said).toMatchObject({ id: tidied.id, origin: 'user' });
+    expect(memories.recent('scout', 1)[0]?.origin).toBe('user');
+    expect(memories.count('scout', 'preference')).toBe(1);
+  });
+
   it('evicts the oldest summaries beyond a cap, never another kind', () => {
     for (let i = 0; i < 5; i += 1) {
       memories.add({ petId: 'scout', kind: 'summary', text: `summary ${i}` });

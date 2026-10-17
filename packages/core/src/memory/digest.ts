@@ -3,7 +3,8 @@
  * its recent work and conversation summaries beside what it already remembers, and replies
  * with ADD / REPLACE / DROP lines. Code decides only WHEN and enforces the guardrails: ids
  * must be ones it was shown, a preference is never dropped, each kind of line is capped,
- * text is clipped and secrets hidden, and summaries never pass 200. Silent on failure.
+ * text is clipped and secrets hidden, and summaries never pass 200. What it adds or rewords
+ * is marked `origin: 'digest'`, so recall fences it as data. Silent on failure.
  */
 import { randomUUID } from 'node:crypto';
 import type { Pet, Settings } from '@tagalong/protocol';
@@ -250,13 +251,18 @@ export class Digest {
       for (const add of ops.add) {
         // addOnce keeps a memory it already has, so only a real save counts.
         const before = this.#o.memories.count(petId, add.kind);
-        this.#o.memories.addOnce({ petId, kind: add.kind, text: clean(add.text, add.kind) });
+        this.#o.memories.addOnce({
+          petId,
+          kind: add.kind,
+          text: clean(add.text, add.kind),
+          origin: 'digest',
+        });
         counts.added += this.#o.memories.count(petId, add.kind) - before;
       }
       for (const change of ops.replace) {
         const memory = shown.get(memoryId(change.id));
         if (memory === undefined) continue;
-        if (this.#o.memories.update(petId, memory.id, clean(change.text, memory.kind))) {
+        if (this.#o.memories.update(petId, memory.id, clean(change.text, memory.kind), 'digest')) {
           counts.changed += 1;
         }
       }

@@ -613,6 +613,36 @@ describe('migrate', () => {
     }
   });
 
+  it('gives memories an origin in migration 22: existing rows are the user’s, others refused', () => {
+    const db = new Database(':memory:');
+    try {
+      expect(LATEST_SCHEMA_VERSION).toBe(22);
+      migrate(db, 21);
+      db.prepare(
+        `INSERT INTO memories (id, scope, pet_id, kind, text, created_at)
+         VALUES ('m1', 'pet', 'scout', 'fact', 'They live in Leeds', 'x')`,
+      ).run();
+      expect(migrate(db)).toBe(22);
+      expect(db.prepare('SELECT origin FROM memories WHERE id = ?').get('m1')).toEqual({
+        origin: 'user',
+      });
+      const insert = db.prepare(
+        `INSERT INTO memories (id, scope, pet_id, kind, text, created_at, origin)
+         VALUES (?, 'pet', 'scout', 'fact', 'x', 'x', ?)`,
+      );
+      insert.run('m2', 'digest');
+      expect(() => insert.run('m3', 'web')).toThrow();
+      // Rerunning 22 on its own keeps the rows and their origins.
+      db.prepare('DELETE FROM schema_version WHERE version >= 22').run();
+      expect(migrate(db)).toBe(22);
+      expect(db.prepare('SELECT origin FROM memories WHERE id = ?').get('m2')).toEqual({
+        origin: 'digest',
+      });
+    } finally {
+      db.close();
+    }
+  });
+
   it('survives reopening the same file', () => {
     openDatabase(dataDir).close();
     const db = openDatabase(dataDir);

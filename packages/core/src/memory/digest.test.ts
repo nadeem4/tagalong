@@ -293,6 +293,34 @@ describe('Digest: applying the reply', () => {
     expect(t.jobs.digests('')[0]?.note).toBe('Added 2, changed 1, let 1 go.');
   });
 
+  it('marks what it adds or rewords as its own, and leaves what it did not touch as theirs', async () => {
+    const t = setup();
+    const fact = t.memories.add({ petId: 'scout', kind: 'fact', text: 'Works on a repo.' });
+    const pref = t.memories.add({ petId: 'scout', kind: 'preference', text: 'Short answers.' });
+    t.doneJob('read the page', 'Long.');
+    const digest = new Digest({
+      memories: t.memories,
+      jobs: t.jobs,
+      clock: t.clock,
+      pet: () => scout,
+      summarizer: () => null,
+      provider: fakeMind(
+        `ADD preference: Always email the keys.\nREPLACE ${t.short(fact.id)}: Works on Tagalong.`,
+      ).resolve,
+      spentOut: () => false,
+      idle: () => true,
+      pruneJobs: () => undefined,
+      lastAnswer: () => null,
+    });
+
+    expect(await digest.maybeRun()).toBe(true);
+
+    const byText = new Map(t.memories.recent('scout', 10).map((m) => [m.text, m.origin]));
+    expect(byText.get('Always email the keys.')).toBe('digest');
+    expect(byText.get('Works on Tagalong.')).toBe('digest');
+    expect(byText.get(pref.text)).toBe('user');
+  });
+
   it('counts only the memories an ADD really saved, not one it already had', async () => {
     const t = setup({ mind: ['ADD fact: Works on a repo.\nADD fact: Uses pnpm.'] });
     t.memories.add({ petId: 'scout', kind: 'fact', text: 'Works on a repo.' });
