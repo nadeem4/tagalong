@@ -160,8 +160,11 @@ export class MemoryStore {
       .map(toMemory);
   }
 
-  delete(id: string): boolean {
-    return this.db.prepare('DELETE FROM memories WHERE id = ?').run(id).changes > 0;
+  /** Deletes one of the pet's own memories; another pet's id deletes nothing. */
+  delete(petId: string, id: string): boolean {
+    return (
+      this.db.prepare('DELETE FROM memories WHERE id = ? AND pet_id = ?').run(id, petId).changes > 0
+    );
   }
 }
 

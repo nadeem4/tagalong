@@ -81,7 +81,7 @@ export function forgetTool(memories: MemoryStore): Tool {
         });
       }
       const memory = found[0]!;
-      memories.delete(memory.id);
+      memories.delete(ctx.pet.id, memory.id);
       return Promise.resolve({ content: `Deleted: "${memory.text}".` });
     }
     if (query === '') {

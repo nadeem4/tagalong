@@ -62,8 +62,12 @@ function expectFact(text: string): void {
   expect(text).not.toMatch(/(^|[.:!?]\s+)(Never|Always|Use|Try)\b/);
 }
 
-const forget = (input: unknown, overrides = {}) =>
-  fakeTurnTools({ memory: memories }, overrides).run({ name: FORGET, input });
+/** Runs forget; its results are always plain text. */
+const forget = async (input: unknown) => {
+  const outcome = await fakeTurnTools({ memory: memories }).run({ name: FORGET, input });
+  if (typeof outcome.content !== 'string') throw new Error('forget answers in text');
+  return { ...outcome, content: outcome.content };
+};
 
 describe('forget', () => {
   it('lists what matches a query, with ids, and deletes nothing', async () => {
@@ -103,6 +107,7 @@ describe('forget', () => {
 
     expect(memories.recent('scout', 5)).toEqual([]);
     expect(memories.search('scout', 'tea', 5)).toEqual([]);
+    db.exec("INSERT INTO memories_fts (memories_fts) VALUES ('integrity-check')");
   });
 
   it('never deletes another pet’s memory', async () => {

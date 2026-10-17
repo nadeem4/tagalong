@@ -100,9 +100,17 @@ describe('MemoryStore', () => {
   it('forgets a deleted memory in both the table and the index', () => {
     const memory = memories.add({ petId: 'scout', kind: 'fact', text: 'Temporary walrus' });
 
-    expect(memories.delete(memory.id)).toBe(true);
+    expect(memories.delete('scout', memory.id)).toBe(true);
     expect(memories.search('scout', 'walrus', 5)).toEqual([]);
     expect(memories.recent('scout', 5)).toEqual([]);
+    db.exec("INSERT INTO memories_fts (memories_fts) VALUES ('integrity-check')");
+  });
+
+  it('deletes only a memory of the pet that asks', () => {
+    const theirs = memories.add({ petId: 'pip', kind: 'fact', text: 'Pip’s walrus' });
+
+    expect(memories.delete('scout', theirs.id)).toBe(false);
+    expect(memories.search('pip', 'walrus', 5)).toHaveLength(1);
   });
 
   it('refuses an empty memory', () => {

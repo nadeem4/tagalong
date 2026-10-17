@@ -2039,6 +2039,22 @@ describe('what Scout remembers over rpc', () => {
     expect((await host.call('memory.list', {}))['result']).toEqual({ memories: [] });
   });
 
+  it('deletes only Scout’s own memories', async () => {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const db = openDatabase(dir);
+    const theirs = new MemoryStore(db).add({ petId: 'pip', kind: 'fact', text: 'Pip’s note' });
+    db.close();
+
+    expect((await host.call('memory.delete', { id: theirs.id }))['result']).toEqual({
+      deleted: false,
+    });
+    const check = openDatabase(dir);
+    expect(new MemoryStore(check).recent('pip', 5)).toHaveLength(1);
+    check.close();
+  });
+
   it('is refused to the browser extension', async () => {
     const e = await boot();
     const ext = await TestHost.connect(e.port);

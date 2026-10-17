@@ -632,7 +632,7 @@ export class Engine {
         })),
       };
     };
-    handlers['memory.delete'] = (params) => ({ deleted: memory.delete(params.id) });
+    handlers['memory.delete'] = (params) => ({ deleted: memory.delete(SCOUT_ID, params.id) });
 
     const server = await EngineServer.start({
       port: options.port ?? current.enginePort ?? DEFAULT_ENGINE_PORT,

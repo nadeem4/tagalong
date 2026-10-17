@@ -1512,7 +1512,8 @@ each with its kind, the day it was saved and a Delete button. There is no Delete
 after every `turn.completed`, since a turn may have remembered or forgotten something.
 `memory.list { before?, limit = 50 (max 200) }` answers `{ memories: { id, kind, text, createdAt }[],
 next? }` from `MemoryStore.list` (Scout's rows only, newest first by rowid; `next` is the id to pass
-as `before`; an unknown cursor gives an empty page). `memory.delete { id }` answers `{ deleted }`; the
+as `before`; an unknown cursor gives an empty page). `memory.delete { id }` deletes only one of
+Scout's own rows (another pet's id answers `deleted: false`) and answers `{ deleted }`; the
 FTS row goes with it (trigger `memories_ad`), so recall no longer finds it. Neither is in
 `EXTENSION_METHODS`. The desktop wires the optional bridge methods `listMemories` and `deleteMemory`
 in `main/ipc/memory.ts`, which asks for the newest 200.
