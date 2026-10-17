@@ -7,14 +7,16 @@ last few minutes of your screen.
 
 ## The kinds of memory
 
-| Kind               | Where it lives                                 | Lifetime               | Status |
-| ------------------ | ---------------------------------------------- | ---------------------- | ------ |
-| **Working**        | The prompt, rebuilt for every turn             | One turn               | Built  |
-| **Thread**         | `messages` table, verbatim                     | Until deleted          | Built  |
-| **Thread summary** | `memories` table, kind `summary`               | Until deleted          | Built  |
-| **Memories**       | `memories` table, kind `fact` or `preference`  | Until deleted          | Built  |
-| **Screen**         | RAM in the desktop host, never written to disk | Ten minutes by default | Built  |
-| **Pick-up**        | `pick_up` table, one row from window titles    | Until used or off      | Built  |
+| Kind               | Where it lives                                    | Lifetime                | Status |
+| ------------------ | ------------------------------------------------- | ----------------------- | ------ |
+| **Working**        | The prompt, rebuilt for every turn                | One turn                | Built  |
+| **Thread**         | `messages` table, verbatim                        | Until deleted           | Built  |
+| **Thread summary** | `memories` table, kind `summary`                  | Until deleted           | Built  |
+| **Memories**       | `memories` table, kind `fact` or `preference`     | Until deleted           | Built  |
+| **Screen**         | RAM in the desktop host, never written to disk    | Ten minutes by default  | Built  |
+| **Pick-up**        | `pick_up` table, one row from window titles       | Until used or off       | Built  |
+| **Task board**     | Read live from jobs, hand-offs, watches, routines | Finished items 24 h     | Built  |
+| **Jobs**           | `jobs` table + one conversation per job           | 14 days after finishing | Built  |
 
 Everything except screen memory lives in `tagalong.db`, the local SQLite file in the data
 directory (`%APPDATA%\Tagalong` on Windows). Nothing leaves the machine except what a turn sends to
@@ -51,6 +53,17 @@ FTS5 indexes in `tagalong.db` (migration 18): the window titles and apps in `sig
 `activity` text (questions, expert asks, routine names). Triggers keep them in step, so a row
 deleted or pruned from the log of what Scout saw is gone from search too. At most 20 hits, newest
 first, never older than the log keeps. Titles only: no page text was ever stored.
+
+### Scout's own jobs and the task board
+
+Background work Scout starts with `work_on_it` is recent memory: one `jobs` row (migration 21:
+the task, a short note that is the answer's first line, how it ended) and a conversation of its
+own whose last answer is the whole result. Both are deleted 14 days after the job finishes. A job's
+conversation is never summarised into a memory, and its turn writes no activity row. The task
+board is working memory: a read model over the jobs, running and waiting hand-offs, watches,
+running routines and the last day's finished work, read by the `board` and `open_result` tools; Now
+carries the running jobs and those finished since the last talk on every turn. Folding what jobs
+learned into long-term memory (the digest) comes later.
 
 ## Working memory: building one turn
 

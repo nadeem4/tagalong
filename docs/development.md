@@ -46,6 +46,7 @@ tagalong/
       memory/                       # db.ts (numbered migrations), store.ts (ConversationStore)
       experts/                      # hand-offs, the Claude Code connector, the fake connector
       routines/                     # the scheduler, schedules and triggers, the routine store
+      jobs/                         # Scout's own background jobs (Jobs, JobStore), the machine reading, the task board
       meetings/                     # Meeting prep's calendar feed: the .ics link, parsed with ical.js
       check-in/                     # the check-in moment: gate, facts, the one call, reply parsing
       keep-an-eye/                  # the lookout over window titles

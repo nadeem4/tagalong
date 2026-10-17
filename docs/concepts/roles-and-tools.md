@@ -22,8 +22,10 @@ around something on screen and never clicks, `search_history`, which searches th
 it looked at and the person's asks by words, or, with no words, lists everything in a time range
 ("what did we do today?"), `tell_expert`, which passes the person's words to an expert
 already working, `change_settings`, which shows a settings card the person applies with a
-click, and `forget`, which lists or deletes one of its memories; it has nothing that writes files
-or runs code. Its own figure and bubble show up in its
+click, `forget`, which lists or deletes one of its memories or finished jobs, and its own
+background work: `work_on_it` starts a job, `board` lists everything in flight and finished today,
+`open_result` gives a whole result and `stop_work` stops a job, a hand-off or a watch; it has
+nothing that writes files or runs code. Its own figure and bubble show up in its
 screenshots, and its instructions say so.
 
 Who Scout is lives apart from what Scout can do: the **soul** (below) is Scout's character, and the
@@ -88,6 +90,10 @@ tools:
   - tell_expert
   - change_settings
   - forget
+  - work_on_it
+  - board
+  - open_result
+  - stop_work
 model:
   tier: fast # fast | balanced | deep
   needs_vision: false
@@ -183,16 +189,18 @@ packages/core/src/tools/
     pointing.ts    point_at
     history.ts     search_history
     settings.ts    change_settings: the chat allowlist, labels and loosening rules
+    jobs.ts        work_on_it, board, open_result, stop_work: Scout's own jobs and the task board
 ```
 
 The companion's role lists every one of them; `point_at` comes after `change_routine`, then
-`search_history` and `tell_expert`, then `change_settings`, and `forget` comes last (never on a
-routine's own turn).
+`search_history` and `tell_expert`, then `change_settings`, `forget` (never on a routine's own
+turn), and the four job tools come last.
 
 - **Kind.** A tool is `write` when it leaves stored state behind after the turn: `remember` files a
   memory, `forget` deletes one, `watch_for` starts a watch, `hand_to_expert` starts a hand-off, `tell_expert` queues a note in a running hand-off and its Activity row,
   `create_routine` and `change_routine` lead to a saved routine once the person presses Save, and
-  `change_settings` to saved settings once they click Apply. The rest are `read`.
+  `change_settings` to saved settings once they click Apply, `work_on_it` starts a job and
+  `stop_work` stops one. The rest are `read`.
 - **Context.** Every tool runs with the turn's pet, turn id, abort signal, snapshot, whether the
   pet's brain can see, and, on a routine's turn, the routine (`ToolContext.routine`): the expert its
   card allowed and where a hand-off reports.
@@ -204,7 +212,9 @@ routine's own turn).
   is saved. `tell_expert` is built only while a hand-off is running, never on a routine's own turn,
   and lists the running hand-offs (id, expert, ask) in its description. `change_settings` is
   offered on a routine's turn too, but refuses there any change that lets Scout see, keep or spend
-  more. An unknown name is refused by name.
+  more. A routine's turn gets `board` and `open_result` but not `work_on_it` or `stop_work`. A
+  job's own turn (`ToolContext.job`) keeps only `search_history` and the connected apps' read
+  tools. An unknown name is refused by name.
 - **`toolsFor(pet, tools)`** is the single place a turn's tools are narrowed: the tools the pet's
   role lists (see [What the role decides](#what-the-role-decides)).
   A role can list a group instead of single tools: `connections` gives it every tool of the
