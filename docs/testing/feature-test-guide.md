@@ -619,15 +619,33 @@ alone never makes Scout wince or cheer.
 
 ### M.5. Bean on the dock
 
-1. **Action:** watch Scout idle for half a minute, then press the hotkey to capture (Seeing), ask a
-   question (Working), and wait for a hand-off to finish (Done). Do it on a light wallpaper and on a
-   dark one.
+1. **Action:** watch Scout idle for half a minute, then press the hotkey to capture (Seeing), hand
+   off a task to an expert (Working), and wait for it to finish (Done). Do it on a light wallpaper
+   and on a dark one.
 2. **Expected:** Bean breathes and blinks now and then in idle and while Seeing, never mid-pose: a
-   blink never makes Bean jump. Each mood has its own pose (waves for Seeing, a laptop and a gear
-   for Working, a hop and a check mark for Done). The small tag at the top right sits beside the
-   gear or check mark, not over it, and reads clearly on both wallpapers. Turn sight off while
-   Working: the Paused chip shows at the top left and the Working tag goes, so the two never overlap;
-   the laptop and gear still show the work.
+   blink never makes Bean jump. Each mood has its own pose (waves for Seeing, a walkie-talkie and a
+   badge at the top left while an expert works, a hop and a check mark for Done). The small tag at
+   the top right sits beside the check mark and clear of the badge, and reads clearly on both
+   wallpapers. Turn sight off while an expert works: the Paused chip shows at the top left over the
+   badge and the Working tag goes, so the two never overlap; the walkie-talkie still shows the work.
+
+### M.6. What Scout is busy with
+
+1. **Action:** ask Scout a plain question (no screen needed), for example "what is a monad?".
+2. **Expected:** while it answers Bean holds its chin under a thought cloud, with **no tag**; the
+   name reads "Scout is thinking". It goes back to idle when the answer ends.
+3. **Action:** ask "what does this window say?" with a text-heavy window in front.
+4. **Expected:** a screenshot first shows Seeing for 2.5 s; while the screen tool still runs Bean
+   wears glasses and reads, with **no tag** ("Scout is reading your screen"), then thinks again until
+   the answer ends. Stop a turn mid-read: Bean never stays reading.
+5. **Action:** hand off a task to an expert, then ask Scout something while it runs.
+6. **Expected:** the expert pose (walkie-talkie, badge) with the **Working** tag ("Scout has an expert
+   working"); your question shows thinking on top, and the expert pose comes back after the answer.
+7. **Action:** ask Scout to take something on as a job of its own ("look into this in the
+   background"), or let a routine run.
+8. **Expected:** while the job's turn runs, Bean types at a laptop under a turning gear, with the
+   **Working** tag ("Scout is working on a job of its own"). An expert's task wins over a job, and
+   your own question wins over both.
 
 ## Gentle nudges
 

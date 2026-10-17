@@ -13,6 +13,9 @@ const BEAN = join(fileURLToPath(new URL('.', import.meta.url)), 'bean');
 const MOODS: readonly DockMood[] = [
   'idle',
   'listening',
+  'reading',
+  'thinking',
+  'expert',
   'working',
   'done',
   'dozing',
@@ -41,7 +44,7 @@ describe('the Bean strips', () => {
     for (const name of ['cheer', 'wince', 'idle-blink', 'listening-blink']) {
       expect(clips[name]!.loop).toBe(false);
     }
-    for (const name of ['idle', 'listening', 'working', 'done', 'dozing', 'tired']) {
+    for (const name of MOODS.filter((m) => m !== 'cheer' && m !== 'wince')) {
       expect(clips[name]!.loop).toBe(true);
     }
   });

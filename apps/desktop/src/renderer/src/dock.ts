@@ -1,10 +1,11 @@
 /**
  * What the companion on the dock is doing, kept apart from its rendering so it is tested
- * in plain Node. Seeing wins while a capture is fresh; then working, while the companion
- * answers or an expert has a task; then Seeing again while something is held over the pet
- * to drop on it; then a wince or a cheer, for a few seconds; then tired, from a gentle nudge
- * until `rested`; then done, until the person clicks to look; then dozing, while the person
- * is away.
+ * in plain Node. Seeing wins while a capture is fresh; then reading, while a screen tool is
+ * in flight; then thinking, while the companion answers the person; then expert, while an
+ * expert has a task; then working, while one of Scout's own background turns (a job, a
+ * routine) runs; then Seeing again while something is held over the pet to drop on it; then
+ * a wince or a cheer, for a few seconds; then tired, from a gentle nudge until `rested`;
+ * then done, until the person clicks to look; then dozing, while the person is away.
  * Contains nextDock and dockMood (the mood reducer) and startDrag/moveDrag (when a press
  * becomes a drag).
  */
@@ -12,8 +13,13 @@ import type { DockMood } from '@tagalong/ui';
 
 export interface DockState {
   seeing: boolean;
+  /** The person's own turns: Scout thinking. */
   turns: ReadonlySet<string>;
+  /** Background turns, a job's or a routine's: Scout working on its own. */
+  jobs: ReadonlySet<string>;
   handoffs: ReadonlySet<string>;
+  /** Turns with a screen tool in flight. */
+  reading: ReadonlySet<string>;
   done: boolean;
   /** No input for a while, or the screen is locked. */
   away: boolean;
@@ -28,7 +34,9 @@ export interface DockState {
 export const IDLE_DOCK: DockState = {
   seeing: false,
   turns: new Set(),
+  jobs: new Set(),
   handoffs: new Set(),
+  reading: new Set(),
   done: false,
   away: false,
   reaction: null,
@@ -49,7 +57,29 @@ export interface DockEvent {
   petId?: string | undefined;
   handoffId?: string | undefined;
   mood?: string | undefined;
+  /** On turn.started: a turn nobody is watching (a job's or a routine's). */
+  background?: true | undefined;
+  /** On turn.toolRequest and turn.toolResult: the tool's name. */
+  tool?: string | undefined;
 }
+
+/**
+ * The tools that read the screen: perception and screen memory. Spelled out here, as the
+ * renderer never bundles core. Scout has no file-read tool; a dropped file is read by the
+ * host before the turn starts.
+ */
+const READING_TOOLS: ReadonlySet<string> = new Set([
+  'look_at_screen',
+  'look_at_display',
+  'look_at_window',
+  'look_closer',
+  'read_window_text',
+  'get_selection',
+  'list_windows',
+  'list_displays',
+  'recall_screen',
+  'what_changed',
+]);
 
 function without(set: ReadonlySet<string>, id: string): ReadonlySet<string> {
   const next = new Set(set);
@@ -83,14 +113,36 @@ export function nextDock(state: DockState, event: DockEvent): DockState {
     case 'reacted':
       return state.reaction === null ? state : { ...state, reaction: null };
     case 'turn.started':
-      return event.turnId === undefined
-        ? state
+      if (event.turnId === undefined) return state;
+      return event.background === true
+        ? { ...state, jobs: new Set([...state.jobs, event.turnId]) }
         : { ...state, turns: new Set([...state.turns, event.turnId]) };
-    case 'turn.completed':
-    case 'turn.error':
-      return event.turnId === undefined || !state.turns.has(event.turnId)
+    case 'turn.toolRequest':
+      return event.turnId === undefined ||
+        !READING_TOOLS.has(event.tool ?? '') ||
+        state.reading.has(event.turnId)
         ? state
-        : { ...state, turns: without(state.turns, event.turnId) };
+        : { ...state, reading: new Set([...state.reading, event.turnId]) };
+    case 'turn.toolResult':
+      return event.turnId === undefined ||
+        !READING_TOOLS.has(event.tool ?? '') ||
+        !state.reading.has(event.turnId)
+        ? state
+        : { ...state, reading: without(state.reading, event.turnId) };
+    // An aborted turn sends no tool result: its end clears reading too.
+    case 'turn.completed':
+    case 'turn.error': {
+      const id = event.turnId;
+      if (id === undefined || ![state.turns, state.jobs, state.reading].some((s) => s.has(id))) {
+        return state;
+      }
+      return {
+        ...state,
+        turns: without(state.turns, id),
+        jobs: without(state.jobs, id),
+        reading: without(state.reading, id),
+      };
+    }
     case 'handoff.progress':
       return event.handoffId === undefined || state.handoffs.has(event.handoffId)
         ? state
@@ -106,7 +158,10 @@ export function nextDock(state: DockState, event: DockEvent): DockState {
 
 export function dockMood(state: DockState): DockMood {
   if (state.seeing) return 'listening';
-  if (state.turns.size > 0 || state.handoffs.size > 0) return 'working';
+  if (state.reading.size > 0) return 'reading';
+  if (state.turns.size > 0) return 'thinking';
+  if (state.handoffs.size > 0) return 'expert';
+  if (state.jobs.size > 0) return 'working';
   if (state.dropHover) return 'listening';
   if (state.reaction !== null) return state.reaction;
   if (state.tired) return 'tired';

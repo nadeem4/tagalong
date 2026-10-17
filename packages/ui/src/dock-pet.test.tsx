@@ -22,6 +22,9 @@ const SCOUT: Pet = {
 const MOODS: readonly DockMood[] = [
   'idle',
   'listening',
+  'reading',
+  'thinking',
+  'expert',
   'working',
   'done',
   'dozing',
@@ -40,6 +43,9 @@ const clip = (name: string, frames: number, loop = true) => ({
 const FIGURE: BeanFigure = {
   idle: clip('idle', 36),
   listening: clip('listening', 36),
+  reading: clip('reading', 36),
+  thinking: clip('thinking', 36),
+  expert: clip('expert', 24),
   working: clip('working', 24),
   done: clip('done', 30),
   dozing: clip('dozing', 48),
@@ -111,6 +117,24 @@ describe('DockPet', () => {
     rerender(<DockPet pet={SCOUT} mood="done" />);
     expect(screen.getByTestId('dock-tag')).toHaveTextContent('Done');
     expect(screen.getByRole('img')).toHaveAccessibleName('Scout has an answer for you');
+  });
+
+  it.each([
+    ['expert', 'Scout has an expert working'],
+    ['working', 'Scout is working on a job of its own'],
+  ] as const)('tags %s Working, and says which work in the label', (mood, label) => {
+    render(<DockPet pet={SCOUT} mood={mood} />);
+    expect(screen.getByTestId('dock-tag')).toHaveTextContent('Working');
+    expect(screen.getByRole('img')).toHaveAccessibleName(label);
+  });
+
+  it.each([
+    ['thinking', 'Scout is thinking'],
+    ['reading', 'Scout is reading your screen'],
+  ] as const)('gives %s no tag, as its sign and the bubble say it', (mood, label) => {
+    render(<DockPet pet={SCOUT} mood={mood} />);
+    expect(screen.queryByTestId('dock-tag')).toBeNull();
+    expect(screen.getByRole('img')).toHaveAccessibleName(label);
   });
 
   it('keeps the tag small, top right, so it sits beside Bean’s sign rather than on it', () => {
@@ -234,17 +258,24 @@ describe('a living pet', () => {
     expect(pet).toHaveAttribute('data-blink', 'true');
   });
 
-  it.each(['working', 'done', 'dozing', 'wince', 'cheer', 'tired'] as const)(
-    'never blinks while %s',
-    (mood) => {
-      vi.useFakeTimers();
-      render(<DockPet pet={SCOUT} mood={mood} blinkEveryMs={3000} />);
-      act(() => vi.advanceTimersByTime(3000));
-      loopRestarts();
-      expect(screen.getByRole('img')).toHaveAttribute('data-blink', 'false');
-      expect(screen.getAllByTestId('bean-clip')).toHaveLength(1);
-    },
-  );
+  it.each([
+    'reading',
+    'thinking',
+    'expert',
+    'working',
+    'done',
+    'dozing',
+    'wince',
+    'cheer',
+    'tired',
+  ] as const)('never blinks while %s', (mood) => {
+    vi.useFakeTimers();
+    render(<DockPet pet={SCOUT} mood={mood} blinkEveryMs={3000} />);
+    act(() => vi.advanceTimersByTime(3000));
+    loopRestarts();
+    expect(screen.getByRole('img')).toHaveAttribute('data-blink', 'false');
+    expect(screen.getAllByTestId('bean-clip')).toHaveLength(1);
+  });
 
   it('stops a waiting blink when the mood changes to one that does not blink', () => {
     vi.useFakeTimers();
@@ -324,7 +355,7 @@ describe('moods', () => {
   });
 
   it('gives the top to the Paused mark while sight is paused, and keeps the mood in words', () => {
-    render(<DockPet pet={SCOUT} mood="working" sightPaused />);
+    render(<DockPet pet={SCOUT} mood="expert" sightPaused />);
     expect(screen.getByTestId('paused-eye')).toBeInTheDocument();
     // The two would overlap at the top of the 96 px window; the pose still shows the work.
     expect(screen.queryByTestId('dock-tag')).toBeNull();

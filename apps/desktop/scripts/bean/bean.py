@@ -408,7 +408,7 @@ def build_bean():
     F.sweat = g(head, (.72, 1.55, .3), 'sweat')
     m(F.sweat, sph(.07), SWEAT, (0, 0, 0), (1, 1, .7))
     m(F.sweat, cone(.06, .12), SWEAT, (0, .02, 0), (1, 1, .7))
-    F.dims = dict(signY=2.32, headC=(0, 1.1, 0), headTop=2.0, headRx=.8, cloudX=.4, badgeX=.9, zX=.3, S=1.2)
+    F.dims = dict(signY=2.32, headC=(0, 1.1, 0), headTop=2.0, headRx=.8, cloudX=.4, badgeX=-.5, zX=.3, S=1.2)
     return F
 
 
@@ -529,7 +529,7 @@ def make_signs(F):
     F.gear, F.spark = gear, spark
 
     # Checking with an expert: a badge joined to the walkie by a dotted link
-    o = at((d['badgeX'], d['signY'] + .16, 0), 'sign badge')
+    o = at((d['badgeX'], d['signY'] + .22, 0), 'sign badge')   # top-left: clear of the app's tag at top right
     m(o, cyl(.25, .25, .07), NAVY_DEEP, r=(PI / 2, 0, 0))
     m(o, tor(.25, .036), GOLD)
     bevel(m(o, star(.12, .052, .02), OFF, (0, -.005, .04)), .012, 2)
@@ -771,7 +771,7 @@ def pose(F, name, ph=0.0, blink=0.0):
         inv = F.bob.matrix_world.inverted()
         p0 = inv @ F.walkie_tip.matrix_world.translation
         S = F.dims['S']
-        p2 = F.signs['badge'].location + Vector((-.2 * S, -.16 * S, 0))
+        p2 = F.signs['badge'].location + Vector((.2 * S, -.16 * S, 0))   # link meets the badge's lower right
         p1 = p0.lerp(p2, .5) + Vector((.05, .22, 0))
         n = len(F.link_dots)
         for i, o in enumerate(F.link_dots):

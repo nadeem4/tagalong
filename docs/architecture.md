@@ -1492,19 +1492,32 @@ one-shot (cheer, wince) plays once and holds its last frame. Every step lasts on
 so a one-shot of n frames runs (n-1)/12 s and then holds. Bean stands about 55 px tall with its
 floating sign above. `bean.py` (Blender, headless) and `pack.py` in `apps/desktop/scripts/bean/`
 regenerate the set (see its README); the masters and `.blend` stay out of git. The moods: idle;
-**Seeing** for 2.5 s after a capture (waves ripple out, ears perk); **Working** while the companion
-answers or an expert has a task (typing at a laptop, a turning gear); **Done** when a hand-off
+**Seeing** for 2.5 s after a capture (waves ripple out, ears perk); **reading** while a screen tool
+is in flight (glasses on, reading); **thinking** while Scout answers the person (a thought cloud);
+**expert** while an expert has a task (a walkie-talkie, a badge at the top left, clear of the tag), tagged Working; **working**
+while one of Scout's own background turns runs, a job's or a routine's (typing at a laptop, a turning
+gear), tagged Working too; **Done** when a hand-off
 finishes (a hop every loop, a check mark), until the pet is clicked. Three moods have a pose and no
-tag: **dozing** while the person is away (slow breathing, rising z's), **wince** for 4 s at a failing
+tag besides thinking and reading, which last seconds while the bubble already answers: **dozing** while the person is away (slow breathing, rising z's), **wince** for 4 s at a failing
 build or an expert's error (one shake, a sweat drop) and **cheer** for 4 s when tests pass (one hop).
 With gentle nudges on, **tired** is a fourth: slow breathing and a drooping head after a long
 stretch or late at night, until `rested` (see Gentle nudges). The tags are small (9 px) and sit in
 the top right corner, beside the sign rather than on it. While sight is paused the tag gives way
-to the Paused mark, which would overlap it; the pose and the label still say the mood. The mood comes
+to the Paused mark, which would overlap it; the pose and the label still say the mood. In the
+expert pose the Paused mark covers the badge at the top left; the walkie-talkie still shows. The mood comes
 from `dockMood(nextDock(...))`
-(`renderer/src/dock.ts`), a pure reducer over turn and hand-off notifications, capture notices,
-`pet.mood`, and main's `presence.away`/`presence.back`, in this order: seeing > working >
-wince/cheer > tired > done > dozing > idle. `pet.mood` sets the reaction and the avatar clears it after
+(`renderer/src/dock.ts`), a pure reducer over turn, tool and hand-off notifications, capture notices,
+`pet.mood`, and main's `presence.away`/`presence.back`, in this order: seeing > reading > thinking >
+expert > working > a drop held over the pet (Seeing) > wince/cheer > tired > done > dozing > idle.
+A `turn.started` without `background` is the person's turn (thinking); with `background: true` it
+is a job or a routine (working); both end on `turn.completed` or `turn.error`. Reading is a
+`turn.toolRequest` for one of the screen tools listed in `READING_TOOLS` (`look_at_screen`,
+`look_at_display`, `look_at_window`, `look_closer`, `read_window_text`, `get_selection`,
+`list_windows`, `list_displays`, `recall_screen`, `what_changed`; spelled out, as the renderer never
+bundles core) until its `turn.toolResult` or the turn's end, since an aborted turn sends no result.
+Scout has no file-read tool, so reading means the screen only. A screenshot shows Seeing for 2.5 s
+first, then reading while the tool still runs. No protocol change: main already sends every core
+notification to every window. `pet.mood` sets the reaction and the avatar clears it after
 `REACTION_MS` (4 s) with its own `reacted` event. Presence comes from
 `main/presence.ts#watchPresence`: `powerMonitor.getSystemIdleTime()` every 15 s (away at 5 min,
 `AWAY_AFTER_MS`, a constant) and the `lock-screen`/`unlock-screen` events, sent to the avatar on
@@ -2029,8 +2042,8 @@ false })`, the same titles-only list keeping an eye uses. Nothing is listed or s
 - **The output.** Whatever the mind chose: a line (with Not now), maybe an offer (a write-up, say)
   for an expert, a tired face, or nothing. Switching the setting off (`settings.set`) calls
   `CheckIn.settle()`, so a tired face never outlives it.
-- **The dock.** `tired` is sticky in `renderer/src/dock.ts` until `rested`: below working and a
-  wince or cheer, above done and dozing. Bean's tired clip breathes slowly with a drooping head and
+- **The dock.** `tired` is sticky in `renderer/src/dock.ts` until `rested`: below reading,
+  thinking, expert, working and a wince or cheer, above done and dozing. Bean's tired clip breathes slowly with a drooping head and
   never blinks; the label reads "Scout looks tired". Tired and rested never start the
   avatar's 4 s reaction timer.
 
