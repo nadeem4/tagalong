@@ -86,13 +86,14 @@ export const SETTINGS_DEFAULTS = {
   /** Whether the Welcome window has been finished. Every install sees Welcome once. */
   welcome: { done: false },
   /**
-   * Whether Scout says one short line when Tagalong opens, after the first time. On by
-   * default; the line reads no screen, only the time and the hand-offs that finished.
+   * Whether the launch check-in runs: as Tagalong opens, the mind may say one short line, or
+   * nothing. On by default; it reads no screen, only launch facts (time away, a crash or an
+   * update, routines, a ready pick-up) and what every check-in sends.
    */
   greeting: true,
-  /** When Tagalong last launched: the greeting names the hand-offs finished since. */
+  /** When Tagalong last launched: the launch check-in names the routines run since. */
   lastOpenedAt: null,
-  /** When Tagalong was last quit, so the greeting can say how long you were away. */
+  /** When Tagalong was last quit, so the launch check-in knows how long you were away. */
   lastClosedAt: null,
   /**
    * Whether the last launch closed cleanly. Main sets it false as each launch starts and
@@ -100,7 +101,7 @@ export const SETTINGS_DEFAULTS = {
    * defaults to true, so a file without it is never read as a crash.
    */
   closedCleanly: true,
-  /** The app version the last launch ran, so the greeting can say Tagalong was updated. */
+  /** The app version the last launch ran, so the launch check-in knows of an update. */
   lastVersion: null,
   /**
    * Whether Scout keeps an eye on things: it follows window titles (never pixels) and,
@@ -129,7 +130,8 @@ export const SETTINGS_DEFAULTS = {
   listening: { always: false },
   /**
    * Pick up where you left off: one snapshot of what you were in the middle of, from window
-   * titles, offered once when you are back after six hours. On by default; it opens nothing
+   * titles, handed to a check-in once when you are back after six hours (the mind may say a
+   * line with the Pick up card, or nothing). On by default; it opens nothing
    * without a click. Off means no snapshot at all, and switching it off deletes the one kept.
    */
   pickUp: true,

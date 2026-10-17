@@ -180,8 +180,8 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   (Phase 3B), and for Home `activity.list` (see [Activity](#activity)), and for experts `experts.list`,
   `experts.upsert`, `experts.delete`, `experts.test`, `handoffs.cancel`,
   `handoffs.confirm`, `handoffs.dismiss` and `projects.search` (see
-  [Experts and connectors](#experts-and-connectors)), and `greeting.compose { petId }` →
-  `{ text, source: 'model' | 'fallback' }`, the line said as the app opens (see Welcome below), and
+  [Experts and connectors](#experts-and-connectors)), and `checkIn.launch { launch }` → `{}`, the
+  launch check-in as the app opens (see Welcome below), and
   `keepAnEye.observe { windows }`, `keepAnEye.notNow` and `keepAnEye.accept { remarkId }` (see
   [Keeping an eye on things](#keeping-an-eye-on-things)), and the `connections.*`, `calendar.*` and
   `routines.*` methods, and `wellbeing.observe { idleMs, windows }` (see
@@ -203,6 +203,9 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   finished hand-off (see [The check-in moment](#the-check-in-moment)).
   Protocol 0.21.0: `watch.fired` gains `condition`, and its `message` may be empty (the judge gave
   no reason); an empty message is never spoken, and the card and notification show the condition.
+  Protocol 0.22.0: `greeting.compose` and its `GreetingLaunch` / `GreetingComposeResult` are gone;
+  `checkIn.launch { launch: LaunchFacts }` → `{}` replaces it (`LaunchFacts` is `{ crashed,
+  lastVersion, version, releaseNotes, welcomed? }`), and `pickUp.ready`'s `text` is the mind's line.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
   `perception.listWindows` and `perception.readText`, then `perception.captureWindow`, and from Phase 3B `perception.recall` and
   `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
@@ -1691,27 +1694,28 @@ The body notices, the mind decides, only the mind speaks. One class,
 `packages/core/src/check-in/check-in.ts#CheckIn`, takes the moments the body notices and, past one
 gate, asks the mind once whether anything is worth saying. Code decides WHEN (the reasons) and keeps
 every guardrail; the mind decides IF and WHAT: a line, an offer for an expert, a face, or nothing.
-No proactive line is written in code, and any failure is silence. Launch and "back after a long
-break" still use the older greeting and pick-up paths; they move here next.
+No proactive line is written in code, and any failure is silence.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
 flowchart LR
-  T["Titles every 5 s / idle time every 60 s / handoff.finished"] --> W{"A reason? settled, trouble, long-stretch, finished"}
+  T["Launch / pick-up ready / titles every 5 s / idle time every 60 s / handoff.finished"] --> W{"A reason? launch, back, settled, trouble, long-stretch, finished"}
   W -- "no (almost always)" --> X["Nothing"]
-  W -- "yes" --> G{"Gate: pet, budget, one in flight, 24 a day, Not now and 10 min (unprompted), call or full screen"}
+  W -- "yes" --> G{"Gate: pet, budget, one in flight, 24 a day, Not now and 10 min (not launch or finished), call or full screen"}
   G -- "shut" --> X
   G -- "open" --> M["One call: soul + Checking in, and the facts"]
   M -- "NOTHING, unusable, error, 15 s" --> X
-  M -- "a line, OFFER, EXPERT, MOOD" --> D["pet.remark and/or pet.mood"]
+  M -- "a line, OFFER, EXPERT, MOOD" --> D["pet.remark, or pickUp.ready with a pick-up; and/or pet.mood"]
 ```
 
-| Reason         | When (code)                                                                                                  | Switch                    | Not now and cooldown | Facts it adds                                                                                            |
-| -------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------- |
-| `settled`      | `Lookout`: a new window in front for 30 s (`SETTLE_MS`), never twice                                         | `keepAnEye`               | apply                | app, title, the window's last 4,000 characters                                                           |
-| `trouble`      | `Lookout`: a title reading like trouble (`looksLikeTrouble`, a cue only), never twice                        | `keepAnEye`               | apply                | same as settled                                                                                          |
-| `long-stretch` | `ActiveTime`: 90 min with no 5-min break, once a stretch; or 23:00 to 05:00 with 30 min active, once a night | `wellbeing.enabled`       | apply                | active time, late, the front app and title (no text read)                                                |
-| `finished`     | `handoff.finished` with no `next` (a chain's last step), not a routine's own hand-off                        | none: work they asked for | exempt               | expert, ask (first paragraph, 100 chars), state, the answer's last 1,500 characters or the error, fenced |
+| Reason         | When (code)                                                                                                  | Switch                    | Not now and cooldown | Facts it adds                                                                                                                                  |
+| -------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `launch`       | main calls `checkIn.launch` as the app opens (Scout can think), or just after Welcome (`welcomed`)           | `greeting`                | exempt (starts it)   | time away, a crash and runs cut short (not over an update), an update and its release notes, routines run since the last open, a ready pick-up |
+| `back`         | `PickUp`'s tick finds a snapshot ready (6 h since its last overwrite) and calls `onReady`                    | `pickUp`                  | apply                | time away, where they left off (projects, branch, file; hand-offs left unsent, stopped or failed)                                              |
+| `settled`      | `Lookout`: a new window in front for 30 s (`SETTLE_MS`), never twice                                         | `keepAnEye`               | apply                | app, title, the window's last 4,000 characters                                                                                                 |
+| `trouble`      | `Lookout`: a title reading like trouble (`looksLikeTrouble`, a cue only), never twice                        | `keepAnEye`               | apply                | same as settled                                                                                                                                |
+| `long-stretch` | `ActiveTime`: 90 min with no 5-min break, once a stretch; or 23:00 to 05:00 with 30 min active, once a night | `wellbeing.enabled`       | apply                | active time, late, the front app and title (no text read)                                                                                      |
+| `finished`     | `handoff.finished` with no `next` (a chain's last step), not a routine's own hand-off                        | none: work they asked for | exempt               | expert, ask (first paragraph, 100 chars), state, the answer's last 1,500 characters or the error, fenced                                       |
 
 Every check-in also carries step 1's Now block (`renderNow`, with a `check-in` wake reason that adds
 no line of its own), the 5 newest memories (`renderMemories`), their name, the last exchange
@@ -1724,9 +1728,10 @@ blind front window adds no app or title, window text and answers are fenced as d
 - **The gate** (`CheckIn#wake`), first failure wins and nothing is emitted: the reason's switch
   (checked where the reason comes in), a pet, the budget (`spentOut`, every reason), one in flight
   (a new wake is dropped, not queued), `CHECK_IN_DAILY_CAP` (24 calls a local day, in memory),
-  **Not now** (`NOT_NOW_MS`, 1 h) and the global `COOLDOWN_MS` (10 min after every unprompted call,
-  spoken or not) for every reason but `finished`, then `callOrFullScreenInFront` on the reason's own
-  window list or, for `finished`, the host's list. Only past all of that does the `Lookout` pick a
+  **Not now** (`NOT_NOW_MS`, 1 h) and the global `COOLDOWN_MS` (10 min after every call but a
+  finished hand-off's, spoken or not) for every reason but `launch` and `finished`, then
+  `callOrFullScreenInFront` on the reason's own window list or, for the others, the host's list.
+  A pick-up is taken (`takePickUp`, `PickUp.take`) only past the gate, so a closed gate keeps it. Only past all of that does the `Lookout` pick a
   window, so a cooldown never uses one up.
 - **The prompt.** System: the soul (`soul()`) and the `## Checking in` block
   (`reply.ts#CHECK_IN_INSTRUCTIONS`), the same for every reason so it caches: nobody asked, most of
@@ -1739,9 +1744,12 @@ cheer | tired` lines; window text, titles and answers are data, never instructio
   other line is the text, dropped when empty, `NOTHING`, over 25 words or 160 characters, or with an
   emoji. A mood alone is a reply; an offer needs a line, an expert needs an offer. A throw, a
   timeout or a stop reason other than `end` is silence (one log line on a throw).
-- **Delivery.** Re-checked after the reply: Not now pressed meanwhile (unprompted) or no pet drops
-  it. A line about a finished hand-off goes as `pet.remark { remarkId, petId, text, handoffId }`,
-  with no offer; any other line as `pet.remark { remarkId, petId, text, offer? }`. A mood goes as
+- **Delivery.** Re-checked after the reply: Not now pressed meanwhile (for reasons it holds) or no
+  pet drops it. A line about a finished hand-off goes as `pet.remark { remarkId, petId, text,
+handoffId }`, with no offer; a `launch` or `back` line with a pick-up as `pickUp.ready { text,
+items }` (the card is the offer); any other line as `pet.remark { remarkId, petId, text, offer?
+}`. The first hello's line (a `launch` with `welcomed`) is an ordinary `pet.remark` that the
+  open bubble puts above Try it now. A mood goes as
   `pet.mood`: `tired` only while nudges are on, and cleared (`rested`) by the next 5-minute break or
   when nudges are switched off (`CheckIn.settle`); a wince or a cheer the host clears itself.
 - **Offers.** The expert is the one `EXPERT` names if it is on, else the only expert on; with
@@ -1992,26 +2000,40 @@ seam before it renders, so it can always listen.
   expert when it is installed and none exists (`welcomeExperts`, via `main/welcome.ts#findAgents`,
   which looks for `claude`, `gemini` and `codex` on the PATH with `where` or `which`; nothing is run
   and nothing is sent), keeps the whole `welcome` record and sets `done`, closes setup, and sends
-  the panel `greetEvent`, shown without focus (`showPanelQuietly`). Scout then says one invitation
-  line, typed in at 22 ms a character (`companion-bubble.tsx#TryItInvite`): "Here I am, Alex. Ask
-  me one real thing about your screen. Press the ask key anytime." with **Try it now**
-  (focused) and **Got it**. It stays until **Got it** or a hotkey question. **Try it now**
+  the panel `greetEvent`, shown without focus (`showPanelQuietly`), then asks the engine for the
+  first hello: `checkIn.launch` with `{ crashed: false, lastVersion: null, version, releaseNotes:
+'', welcomed: true }` (no crash or update facts: the hello is about Welcome). The bubble shows
+  **Try it now** (focused) and **Got it** (`companion-bubble.tsx#TryItInvite`) and writes no line
+  of its own: the line above them is the mind's, a check-in `pet.remark` without a `handoffId`
+  that the bubble takes while the hello is up (main's `showRemark` skips it, since the bubble is
+  open), typed in at 22 ms a character and said once. If the mind says nothing, or no brain
+  answers, there is no line. It stays until **Got it** or a hotkey question. **Try it now**
   captures the active window and a screenshot (`capture(['activeWindow', 'screenshot'])`) and asks
   "What am I working on, and what could you hand to an expert?" in the same bubble; when the
   screen cannot be seen it asks without it. The line is read whole by a screen reader through a
-  hidden `role="status"`, and appears whole under `prefers-reduced-motion`. The older three-beat
-  intro went: setup now says who Scout is and the key to press, so the bubble only invites.
-  The invitation is not a launch line.
-- **Every later launch says one quiet line.** `welcome.ts#launchLine` picks it: when Welcome is
-  done and `settings.greeting` is on (`welcome.ts#shouldGreetOnLaunch`, default on), main calls
-  `greeting.compose` for Scout (`SCOUT_ID`); otherwise there is no line. Always listening does
-  not change the line: it shows as the `listening-on` status mark on Scout for 8 s (see
-  [Status marks](#status-marks)). Main sends the line as
-  `greetLineEvent` (the preload keeps one that arrives before the panel subscribes)
-  and shows the panel with `showPanelQuietly`. The panel renders `GreetingLine`: `role="status"`,
-  fades after about seven seconds unless pointed at or focused, opens the ask bubble on a click.
-  Then main stores `lastOpenedAt`, whether or not it greeted, and on `before-quit` it stores
-  `lastClosedAt`.
+  hidden `role="status"`, and appears whole under `prefers-reduced-motion`.
+- **Every later launch asks the mind once.** `welcome.ts#launchLine` runs it when Welcome is done
+  and `settings.greeting` is on (`welcome.ts#shouldGreetOnLaunch`, default on); otherwise nothing
+  happens. Always listening does not change it: it shows as the `listening-on` status mark on
+  Scout for 8 s (see [Status marks](#status-marks)). `greetOnLaunch` first checks
+  `brainReadiness` (Scout's provider needs a key and has none, Claude Code is not found, or the
+  Claude sign-in check says signed out; the sign-in check gets `SIGN_IN_BUDGET_MS`, 1 s, and a slow
+  or failing check reads as `unknown`, never as a problem). When Scout cannot think,
+  `launch.ts#brainLine` returns a status mark instead of words (`{ status }`, one of
+  `brain-signed-out`, `brain-no-sign-in`, `brain-no-key`, from `brainStatus`); main sends it as
+  `greetLineEvent` (the preload keeps one that arrives before the panel subscribes) and the panel
+  shows the mark's row ("Can’t think: signed out of Claude.") with **Fix it**, which opens Settings
+  at How Scout thinks (`openSettings('brain')`), and says nothing aloud. Main also sets the same
+  mark in `StatusMarks`, so the tag stays on Scout until a turn answers with words or Settings'
+  Check again finds Claude signed in. When Scout can think, `brainLine` is null and main calls
+  `checkIn.launch { launch }` (`launch` is `LaunchFacts { crashed, lastVersion, version,
+releaseNotes }`), which answers `{}` at once: main waits for no line. The line, if the mind says
+  one, arrives within 15 s as `pet.remark` (shown beside Scout by `showRemark`) or, with a pick-up,
+  as `pickUp.ready` (shown by `showPickUp` with the Pick up button); see
+  [The check-in moment](#the-check-in-moment). There is no fallback line and no 1.2 s race. Then
+  main stores `lastOpenedAt`, whether or not anything was said, and on `before-quit` it stores
+  `lastClosedAt`. The engine reads the settings before `checkIn.launch` returns, so the facts are
+  about the last launch.
   The launch record (`launch.ts`): first thing at start `recordLaunch` reads whether the last launch
   closed cleanly and which version it ran, then stores `closedCleanly: false` and `lastVersion`
   (the running version). `recordCleanClose` stores `closedCleanly: true` and `lastClosedAt` on
@@ -2019,69 +2041,43 @@ seam before it renders, so it can always listen.
   `closedCleanly` still false at the next start is a crash. A settings file that cannot be read
   or written reads as a plain launch. Known gap: a Windows logoff while the engine is down
   (degraded mode: no avatar window, so no `session-end`) can read as a crash next launch.
-  `greetOnLaunch` passes `launchLine` a compose closure that runs two things in parallel:
-  `greeting.compose { petId, launch? }` (`launch` is `{ crashed, lastVersion, version, whatsNew }`
-  plus the interrupted tasks counted at boot and the names of routines that ran) and
-  `brainReadiness` (Scout's provider needs a key and has none, Claude Code is not
-  found, or the Claude sign-in check says signed out; the sign-in check gets
-  `SIGN_IN_BUDGET_MS`, 1 s, and a slow or failing check reads as `unknown`, never as a problem).
-  `brainLine(brain, composed, pickUp?)` then returns the composed line, or, when Scout cannot
-  think, a status mark instead of words: `GreetLine` is `{ text, pickUp? } | { status }`, with
-  `status` one of `brain-signed-out`, `brain-no-sign-in`, `brain-no-key` (`launch.ts#brainStatus`).
-  The panel shows a status line as the mark's row ("Can’t think: signed out of Claude.") with
-  **Fix it**, which opens Settings at How Scout thinks (`openSettings('brain')`), and says
-  nothing aloud: the body never speaks in Scout's voice. Main also sets the same mark in
-  `StatusMarks`, so the tag stays on Scout until a turn answers with words or Settings' Check
-  again finds Claude signed in. The engine's
-  `greeting/scenario.ts#launchScenario` picks one scenario from the recorded facts: an update (`lastVersion` differs from the
-  running version; first, because an installer ends a running tray app by force, so that launch
-  also reads as a crash), else a crash, else a pick-up (a snapshot is ready: see
-  [Pick up where you left off](#pick-up-where-you-left-off)), else away (a day or more since
-  `awaySince`), else normal. A pick-up line is handwritten (`describePickUp`, `source: 'fallback'`,
-  no model call) and `GreetingComposeResult.pickUp` carries its items; `brainLine` passes them on
-  as `GreetLine.pickUp` unless the status line wins. The handwritten line for each: "I closed unexpectedly last time…"
-  (saying how many tasks stopped), "Morning. I’ve been updated to x.y.z." (the time of day first) plus `WHATS_NEW`
-  (`apps/desktop/src/main/whats-new.ts`, edited by hand in each release together with a bump of the
-  version in `apps/desktop/package.json`, which is what makes the launch an update; the line plays
-  once, because the next launch records the same version), "Back after a day.", with
-  the routines that ran while away named.
-  The Claude sign-in check starts at the top of `start()` (the promise is kept in `signInCheck`), so
-  by greet time a cold `claude auth status` has had the boot time; `brainReadiness`'s 1 s race
-  still starts at greet time.
+  `RELEASE_NOTES` (`apps/desktop/src/main/release-notes.ts`) is what is new in this version as
+  plain facts ("New in 0.1.0: short drafts, translation, …"), edited by hand in each release
+  together with a bump of the version in `apps/desktop/package.json`, which is what makes the
+  launch an update. It is a fact the mind may mention, never a line read out; with no brain,
+  nothing is said. The Claude sign-in check starts at the top of `start()` (the promise is kept
+  in `signInCheck`), so by launch time a cold `claude auth status` has had the boot time;
+  `brainReadiness`'s 1 s race still starts then.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff", "clusterBkg": "#ffffff", "clusterBorder": "#000000"}}}%%
 flowchart LR
   S["Start"] --> R["recordLaunch"]
   R --> G["greetOnLaunch"]
-  G --> L{"Greeting allowed?"}
-  L -- "no" --> NL["no line"]
+  G --> L{"Hello allowed?"}
+  L -- "no" --> NL["nothing"]
   L -- "yes" --> P1["brainReadiness (1 s sign-in race)"]
-  L -- "yes" --> P2["greeting.compose with launch facts"]
-  P2 --> SC{"launchScenario"}
-  SC --> C1["update / crash / pickUp / away / normal"]
-  P1 --> BL["brainLine"]
-  C1 --> BL
-  BL -- "can't think" --> FX["brain status mark: row with Fix it, tag on Scout"]
-  BL -- "ready or unknown" --> CL["composed line"]
+  P1 -- "can't think" --> FX["brain status mark: row with Fix it, tag on Scout"]
+  P1 -- "ready or unknown" --> CI["checkIn.launch with LaunchFacts, answers at once"]
+  CI --> M{"The mind, within 15 s"}
+  M -- "NOTHING, error, timeout" --> NL
+  M -- "a line" --> RM["pet.remark, or pickUp.ready with the card"]
   FX --> PN["panel"]
-  CL --> PN
+  RM --> PN
 ```
 
-In the engine, `greeting/greeting.ts#composeGreeting` reads no screen: only the
-local time of day, the time away (`awaySince`: the later of `lastClosedAt` and `lastOpenedAt`, so
-a crash that recorded no quit falls back to the last launch), and
-`ActivityLog#expertsFinishedSince(lastOpenedAt)` (expert hand-offs that finished well since the
-last launch, at most five, brief only), plus `settings.userName` when set (the model may greet by it,
-and the handwritten line becomes "Morning, Nadeem."). It makes one call to the summaries model (`settings.summarizer`,
-else the pet's own provider and model, text only), like `Summarizer`: 60 tokens, tools refused,
-a 1.2-second budget (`GREETING_TIMEOUT_MS`): an `AbortSignal.timeout` raced against the call, so a
-brain slow to notice the abort is not waited for either. A cold `claude -p` takes longer than
-that, so with the Claude Code sign-in the handwritten line is what is usually said, at once. The prompt asks for one sentence under 20 words, warm, no
-emoji, naming a finished hand-off if any, and never inventing facts. A failure, a timeout, an empty
-reply or one that is too long or has an emoji falls back to `fallbackGreeting`: "Morning." /
-"Afternoon." / "Evening." / "Working late?" or "Back after N days.", then "I'm here when you need
-me.", "Nothing waiting for you." or the hand-off that finished.
+In the engine, `CheckIn#launch` (the `launch` reason) reads no screen. Its facts, written as facts
+in the bundle's "Why you woke": the switch was on ("Say hello when Tagalong opens") or, for the
+first hello, that Welcome was just finished; the time away (from the later of `lastClosedAt` and
+`lastOpenedAt`, so a crash that recorded no quit falls back to the last launch); a crash and the
+runs boot found cut short (`ActivityLog#interrupted`), but not when the version changed, because an
+installer ends a running tray app by force; an update (`lastVersion` to `version`) with
+`releaseNotes`; the routines that ran since `lastOpenedAt` (`ActivityLog#routinesFinishedSince`);
+and a ready pick-up, taken here (see [Pick up where you left off](#pick-up-where-you-left-off)).
+Hand-offs that finished meanwhile are in Now ("Finished since you last talked"). Like every
+check-in it also carries Now, the newest memories, the name and the last exchange. The launch is
+exempt from Not now and the cooldown, but starts the cooldown, and the budget, the daily cap and a
+call or full screen in front still stop it.
 
 - **A new key answers the next question.** `KeyedProviderResolver` re-reads the keychain before every
   `ask` and rebuilds a provider only when its key or base URL changed, so a key pasted in Welcome is
@@ -2299,9 +2295,10 @@ flowchart LR
   (`turn.completed` for its own turn), each intro beat once as it appears, and the mind's line about
   the hand-off it is showing (`pet.remark` with its `handoffId`; the finish alone says nothing, and
   the answer is never read out), plus a working expert's own narration
-  (`say` steps such as "Found the bug in `date.ts`."), at most one line every 20 seconds. The panel adds the launch line
-  (`GreetingLine`), remarks from keeping an eye on things (`remarkEvent`, sent by `showRemark`)
-  and `watch.fired` reasons (never an empty one). A failed routine run is never said.
+  (`say` steps such as "Found the bug in `date.ts`."), at most one line every 20 seconds. The panel adds
+  check-in lines (`remarkEvent`, sent by `showRemark`, and the pick-up line with its card) and
+  `watch.fired` reasons (never an empty one); the brain mark at launch (`GreetingLine`) is never
+  spoken. A failed routine run is never said.
   `SpeechQueue` shapes each line with `toSpeakable` (markdown stripped; code blocks, lists, tables,
   quoted `>` lines (any quote, English too, such as a quoted error line; they mostly hold a
   translation into another language) and URLs left out; at most two sentences or 200 characters, then "The rest is in the bubble.";
@@ -2544,7 +2541,7 @@ flowchart LR
   stopped on quit. `forwardEars` takes an `onSpoken` callback: a
   `partial` or `turnEnd` whose words are addressed to Scout (`addressedToScout`, from
   `@tagalong/protocol`) brings the hidden bubble up beside a visible pet with `showPanelQuietly`,
-  without taking the keyboard, as a remark or the launch line does; bare speech, talk that does
+  without taking the keyboard, as a check-in line does; bare speech, talk that does
   not start with the name, "Scout, stop", and a partial that may still become it
   (`mightBeStop`, such as "Scout, st") never do.
 - **The ears, in the voice process** (`main/voice/worker/ears-host.ts`, `main/voice/ears/`).
@@ -2700,7 +2697,7 @@ flowchart LR
 - **At launch.** No spoken line says listening is on: `markListening` sets the `listening-on`
   status mark ("Listening", tooltip "Always listening is on. Say “Scout, stop” to switch it
   off.") for 8 s at launch when `settings.listening.always` is on, and again each time it is
-  switched on; the launch line is composed as usual. The panel is created hidden at launch, so the
+  switched on; the launch check-in runs as usual. The panel is created hidden at launch, so the
   microphone and the mark are there from the first second.
 - **The mark.** `DockPet`'s `listening` prop (`'on'`, `'paused'`, `'hearing'` or `'follow-up'`)
   draws `dock-pet__listening`: solid while on, outlined while paused, a brighter quick pulse while
@@ -2793,11 +2790,11 @@ fails answers `isError`, never a throw. It is a direct ask, so it is not budget-
 
 ## Pick up where you left off
 
-Back after a long break (next morning, after a weekend, a launch after a quit), Scout says one
-quiet line instead of the launch line: "Yesterday you were in ai_pet on feat/x, with engine.ts
-open, and Claude Code’s “fix the e2e tests” stopped halfway." with **Pick up** and **Not now**.
-Pick up opens the bubble on a card with one button per item. Nothing opens without a click there,
-and no keys or mouse are driven.
+Back after a long break (next morning, after a weekend, a launch after a quit), the snapshot of
+what you were in the middle of goes to a check-in, and the mind may say one line about it ("Back
+to the parser?"), which comes with **Pick up** and **Not now**, or nothing. No line about it is
+written in code. Pick up opens the bubble on a card with one button per item. Nothing opens
+without a click there, and no keys or mouse are driven.
 
 - **Snapshot** (`packages/core/src/pick-up/pick-up.ts#PickUp`, on `systemWatchClock`): the first
   look a minute after boot, then every ten minutes. `takeSnapshot` reads the host's window list
@@ -2811,20 +2808,22 @@ and no keys or mouse are driven.
 - **Store** (`pick-up/store.ts#PickUpStore`, migration 16, table `pick_up`): one row
   (`id = 1`), `started_at` (when this snapshot began), `taken_at` (the latest overwrite) and the
   JSON body.
-- **Back**: `now - taken_at >= 6 h` (`BACK_AFTER_MS`) with anything to say. At that point the
+- **Ready**: `now - taken_at >= 6 h` (`BACK_AFTER_MS`) with anything to list. At that point the
   hand-offs also include `ActivityLog#expertsLeftSince(started_at)`: expert rows that ended
-  `stopped` or `error`, interrupted ones included, ask only. The snapshot is offered once
-  (`take()`), and a new empty one starts. A tick with no host connected leaves a ready snapshot
-  unspent, since nobody could see it.
-- **At launch** `greeting.compose` asks `PickUp#ready()`. `launchScenario` puts them in this
-  order: `update`, `crash`, `pickUp`, `away`, `normal`. For `pickUp` it returns `describePickUp`'s line with
-  `source: 'fallback'` and `pickUp: { text, items }`, with no model call. The brain's status line
-  still wins in `brainLine`; the pick-up it displaced (already taken) follows through `showPickUp`
-  once that line's bubble hides. With the greeting off, `launchLine` composes nothing, so the
-  snapshot stays ready and the first tick offers it as the `pickUp.ready` notification. Main
-  (`showPickUp`) shows that like a remark, and waits for the bubble to hide if it is open:
-  `PickUpWaiting` holds one at most (the latest, on one `hide` listener) and drops it if pick-up
-  was switched off meanwhile, so no stale or second card appears.
+  `stopped` or `error`, interrupted ones included, ask only. A tick that finds it ready calls
+  `onReady` and leaves it in place (no overwrite); a tick with no host connected does not, since
+  nobody could see it. `take()` returns `{ items, takenAt }` once and starts a new empty snapshot.
+- **Taken by a check-in, only once its gate is open.** At launch, `CheckIn#launch` takes it (when
+  `settings.pickUp` is on) as one of its facts. Otherwise the tick's `onReady` calls
+  `CheckIn#back` (the `back` reason: switch `pickUp`, held by Not now and the cooldown); a closed
+  gate leaves the snapshot ready for the next tick. The bundle lists it under `## Where they left
+off (yesterday)` as facts: `- ai_pet on feat/pick-up, engine.ts open`, `- Claude Code: "add dark
+mode": never sent` (or `stopped halfway`, `did not finish`). A line goes as `pickUp.ready { text:
+<the mind's line>, items }`, no `pet.remark`; the card is the offer. A silent mind spends the
+  snapshot (it judged it not worth a word; "what was I doing?" by voice still works). Main
+  (`showPickUp`) shows the line beside Scout with Pick up, like a remark, and waits for the bubble
+  to hide if it is open: `PickUpWaiting` holds one at most (the latest, on one `hide` listener)
+  and drops it if pick-up was switched off meanwhile, so no stale or second card appears.
 - **The card** (`packages/ui/src/pick-up-card.tsx`, rendered by `CompanionBubble` from its
   `pickUp` prop): **Open in VS Code** / **Open in Cursor** / **Open folder** per project, **Brief
   again** per hand-off, **Not now**. Brief again calls `pickUp.rebrief { itemId }`, which calls
@@ -2843,11 +2842,16 @@ and no keys or mouse are driven.
 flowchart LR
   T["tick (10 min)"] --> R{"6 h since taken_at?"}
   R -- "no" --> S["overwrite the snapshot"]
-  R -- "yes, items" --> O["pickUp.ready, new snapshot"]
-  L["greeting.compose"] --> SC{"launchScenario"}
-  SC -- "pickUp" --> D["describePickUp line, no model"]
+  R -- "yes, items" --> B["CheckIn.back"]
+  L["checkIn.launch"] --> CI["CheckIn.launch"]
+  B --> G{"Gate open?"}
+  CI --> G
+  G -- "no" --> K["kept for the next tick"]
+  G -- "yes" --> TK["take(): items, new snapshot"]
+  TK --> MD{"The mind"}
+  MD -- "NOTHING" --> X["nothing, snapshot spent"]
+  MD -- "a line" --> O["pickUp.ready with the mind's line"]
   O --> M["main: line beside Scout"]
-  D --> M
   M -- "Pick up" --> C["card"]
   C -- "Open" --> A["allowlist, then openExternal / openPath"]
   C -- "Brief again" --> H["HandoffManager.propose"]
@@ -2871,7 +2875,7 @@ flowchart LR
 ```
 
 - **Two capture points.** Scout's: `meterBrain` wraps the single `resolve` in `engine.ts`, outside
-  `guardBrain`, so turns, keep-an-eye, routines, watches, the greeting, summaries and every later
+  `guardBrain`, so turns, check-ins, routines, watches, summaries and every later
   feature that calls `resolve` are metered with nothing to add. After each `complete` it records
   `provider.id`, `request.model` and `result.usage`, aborted calls included; a call that throws
   records nothing, and a record that fails never fails the call. The experts': `ClaudeCodeConnector`

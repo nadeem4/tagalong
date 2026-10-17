@@ -182,15 +182,16 @@ picks up at the same step, and Scout arrives on your screen either way.
 3. **Should I talk?** Scout speaks a sample line so you hear how it sounds; choose **Yes, talk** or
    **Text only**.
 4. **One key to remember.** Ctrl+Shift+Space asks Scout about whatever is on your screen.
-5. **Try it.** Scout docks on your screen and invites one real question about your
-   screen in a single line in its bubble, with the key to press. **Try it now** has Scout look at your screen and say what it could hand to an expert;
+5. **Try it.** Scout docks on your screen with **Try it now** and **Got it** in its bubble, under a
+   first hello in its own words when it has one. **Try it now** has Scout look at your screen and say what it could hand to an expert;
    **Got it** sends it back to the dock. If Claude Code is installed it becomes Scout's first
    expert, so hand-offs work straight away.
 
-After that, each time Tagalong opens Scout says one short line beside itself, without taking the
-keyboard, and it fades after a few seconds: the time of day, how long you were away, or a hand-off
-that finished meanwhile. It reads nothing on your screen. Turn it off under **Settings → Privacy →
-Say hello when Tagalong opens**.
+After that, each time Tagalong opens Scout may say one short line beside itself, in its own words,
+without taking the keyboard, or nothing at all; a line fades after a few seconds. It knows how long
+you were away, a crash or an update and what is new, routines that ran and where you left off, and
+reads nothing on your screen. Turn it off under **Settings → Privacy → Say hello when Tagalong
+opens**.
 
 Open Welcome again from **Home → Settings → Advanced → Open Welcome again**. A key saved in Welcome
 or in Settings works on the very next question. No restart is needed.
@@ -480,7 +481,8 @@ screenshot is attached.
   from the OS, kept on this computer).
 - **Pick up where you left off** is on by default: Scout keeps one note, from window titles only,
   of the projects open in your editor and the hand-offs left half done. Back after six hours or
-  more, it says one line about it, once; nothing opens until you click on the card. Turn it off
+  more, the mind may say one line about it with a Pick up card, or nothing, once; nothing opens
+  until you click on the card. Turn it off
   under **Settings → Privacy → Pick up where you left off**, which also deletes the note.
 - **Gentle nudges** are off by default (**Settings → Privacy → Gentle nudges**). On, after an hour
   and a half with no break, or late at night, Scout checks in once with how long you have been at

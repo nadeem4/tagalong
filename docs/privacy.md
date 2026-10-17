@@ -191,15 +191,18 @@ it.
   request is built and the host is told with a `turn.warning` (`code: "vision_unsupported"`), so the
   turn still answers instead of failing.
 - API keys live in the OS keychain through Electron safe storage, the ElevenLabs key included.
-- The hello Scout says as Tagalong opens reads nothing on screen. The summaries model is sent only
-  the time of day, how long since Tagalong last opened, the names and briefs of expert hand-offs
-  that finished meanwhile, the names of routines that ran, whether Tagalong closed unexpectedly last
-  time and how many tasks stopped, and, after an update, the new version and its what's-new text. Turn it off under Settings → Privacy → **Say hello when Tagalong opens**.
-  While Scout talks is on, the hello is also spoken (below).
+- The hello as Tagalong opens is a check-in (below) and reads nothing on screen. Besides what
+  every check-in carries, the summaries model is sent how long you were away, the names of routines
+  that ran since the last open, whether Tagalong closed unexpectedly last time and how many runs
+  that cut short, after an update the old and new version and the release notes (plain facts about
+  what is new), and, when you are back after a long break, where you left off (below). It may say
+  one short line, or nothing; if the call fails, nothing is said. The hello just after setup is the
+  same kind of call, with none of the launch facts. Turn it off under Settings → Privacy → **Say
+  hello when Tagalong opens**. While Scout talks is on, a line is also spoken (below).
 - Tagalong records, in its local settings file, whether the last launch closed cleanly and which
-  app version it ran, so Scout can say it crashed or was updated. The markers themselves
+  app version it ran, so the launch check-in knows of a crash or an update. The markers themselves
   stay in that file on this computer; only the facts listed above reach the brain you chose, inside
-  the prompt that writes the line.
+  the launch check-in.
 - Setup stores each answer in local settings as it is given: the step reached, how you answer, your
   name or that you declined it (`userNameDeclined`), how Scout thinks and whether it talks. A pasted
   key is saved to the OS keychain before its one test (one tiny request to that service); a key that
@@ -213,7 +216,7 @@ it.
   card never shows a key, token or secret.
 - The name you give Scout (setup, or Settings → **You**; optional) is stored locally in settings.
   It is sent to the AI provider only as part of Scout's prompt: one line in its system prompt, and
-  in the hello's facts when Tagalong opens. Clear the box and it is gone from both.
+  in the facts of every check-in. Clear the box and it is gone from both.
 - With every question, Scout's AI provider also gets a short **Now** block of facts about the
   moment: your local time, day and time zone (for example `Europe/London`); how long since you
   last talked to Scout; whether you asked out loud, or which routine is running; and, for each
@@ -493,9 +496,10 @@ microphone; **I'll type** (or a fresh setup that has not been answered yet) leav
 
 ## Check-ins: what goes with an unprompted call
 
-Now and then, when nobody asked, Scout asks the AI once whether anything is worth saying: after you
-settle on a new window, when a title reads like an error, after a long stretch (with Gentle nudges
-on), and when an expert you handed work to finishes. Most of the time the answer is nothing, and
+Now and then, when nobody asked, Scout asks the AI once whether anything is worth saying: as
+Tagalong opens (and just after setup), when you are back after a long break with something to
+pick up, after you settle on a new window, when a title reads like an error, after a long stretch
+(with Gentle nudges on), and when an expert you handed work to finishes. Most of the time the answer is nothing, and
 nothing is shown. Each of these calls goes to the summaries model (Settings → Summaries, else
 Scout's own) and carries, besides what that moment is about:
 
@@ -507,8 +511,8 @@ Scout's own) and carries, besides what that moment is about:
 
 Keys, tokens and passwords are hidden in all of it before it leaves the computer, and a blind
 spot's app and title are never in it. The limits: at most 24 check-ins a day, at most one
-unprompted one every ten minutes, none for an hour after **Not now** (a finished hand-off still
-gets its line), none during a call or over a full-screen app, and none at all once the daily budget
+unprompted one every ten minutes, none for an hour after **Not now** (the hello as Tagalong opens
+and a finished hand-off still get theirs), none during a call or over a full-screen app, and none at all once the daily budget
 is reached. Each call is a "Sent to AI" row in **What Scout saw**.
 
 ## Keeping an eye on things
@@ -579,12 +583,16 @@ snapshot at all, and switching it off deletes the one kept.
   editor (the project's name and folder, the branch read from its `.git/HEAD`, and the file name
   in the title, which is never opened or read), and up to three hand-offs left half done (the
   expert's name and the ask; never the selected text or window a brief carried).
-- **Nothing is sent.** No picture, no window text and no model call. The line is written from
-  these facts on this computer.
+- **Sent once, when you are back.** No picture and no window text, ever. When you are back after
+  six hours or more (at launch, or on the next ten-minute look), the note's items (project names,
+  branch, file name, and the experts and asks of hand-offs left half done) go to the summaries
+  model in one check-in (above), which may say one line about them, or nothing. No line is
+  written on this computer.
 - **Blind spots apply:** a window on the built-in list or your exclusion list is never noted, its
   title included.
-- **When you are back** after six hours or more, the snapshot is offered once and a new one
-  starts. Nothing opens until you press a button on the card. **Open** opens only a folder that
+- **When you are back** after six hours or more, the snapshot is used once (even when the
+  answer is nothing) and a new one starts; the line, if any, comes with a Pick up card. Nothing
+  opens until you press a button on the card. **Open** opens only a folder that
   pick-up named, through VS Code's or Cursor's own link or Explorer; **Brief again** only fills in
   the hand-off card, which waits for Send. No keys are typed and the mouse is never moved.
 
@@ -640,7 +648,7 @@ there is no switch, because it holds no content and an off switch would weaken t
 | **Listed windows**     | the window list is read (a tool or a routine)                                                                | how many windows                                                 |
 | **Read text**          | one window's text is read (accessibility tree or OCR), or a hotkey ask arrives with a selection or page text | the app, the window title, how many characters                   |
 | **Screenshot**         | a screenshot, a crop, a window picture, a frame from screen memory, or a watch's before-and-after crops      | the app and title when known, how many pictures                  |
-| **Sent to AI**         | any call to Scout's provider: a turn, a summary, a watch check, a check-in, the launch line                  | the provider and model, how many characters and pictures         |
+| **Sent to AI**         | any call to Scout's provider: a turn, a summary, a watch check, a check-in (the launch hello included)       | the provider and model, how many characters and pictures         |
 | **Sent to expert**     | a brief goes to an expert, or a note from you reaches a working one                                          | the expert's name, how many characters                           |
 | **Read element names** | Scout points at a named button or field, so the window's element names are read to find it                   | the app and the window title; not the name asked or any it found |
 | **Changed by talk**    | you click Apply on a settings card Scout showed                                                              | which settings changed (such as `userName, voice`); never values |
