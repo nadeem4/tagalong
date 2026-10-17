@@ -1,10 +1,10 @@
 /**
  * Pick up where you left off. One snapshot of what you were in the middle of, from window
  * titles alone, overwritten every ten minutes while a host is connected. A gap of six hours
- * since the last overwrite is the day ending: the snapshot is offered once, as one line and
- * a card, and a new one starts. The line is handwritten from the facts, so it never invents
- * a file, and nothing opens or runs without a click. Contains PickUp, takeSnapshot,
- * describePickUp and readBranch.
+ * since the last overwrite is the day ending: the snapshot is ready, and a check-in takes it
+ * once (at launch, or on the next tick when you are back); the mind may say a line about it,
+ * which comes with the card, or nothing. Then a new one starts. Nothing opens or runs
+ * without a click. Contains PickUp, takeSnapshot and readBranch.
  */
 import { randomUUID } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
@@ -13,7 +13,6 @@ import type {
   CaptureExclusions,
   PickUpEditor,
   PickUpItem,
-  PickUpReadyParams,
   ProjectCandidate,
   WindowEntry,
 } from '@tagalong/protocol';
@@ -23,10 +22,9 @@ import type { PickUpSnapshot, PickUpStore, SnapshotHandoff, SnapshotProject } fr
 
 export const SNAPSHOT_EVERY_MS = 10 * 60_000;
 export const BACK_AFTER_MS = 6 * 3_600_000;
-/** The first look after boot: late enough for the launch line to take a ready snapshot first. */
+/** The first look after boot: late enough for the launch check-in to take a ready snapshot first. */
 export const FIRST_LOOK_MS = 60_000;
 const MAX_ITEMS = 3;
-const ASK_CHARS = 60;
 
 /** Editors by process name, lower case and without `.exe`. VS Code and Cursor reopen by link. */
 const EDITORS: Record<string, PickUpEditor> = {
@@ -113,57 +111,10 @@ export function takeSnapshot(input: {
   return { projects, handoffs };
 }
 
-function clip(ask: string): string {
-  const flat = ask.replace(/\s+/g, ' ').trim();
-  return flat.length <= ASK_CHARS ? flat : `${flat.slice(0, ASK_CHARS - 1).trimEnd()}…`;
-}
-
-function when(takenAt: number, now: number): string {
-  const day = (at: number) => new Date(at).toDateString();
-  if (day(takenAt) === day(now)) return 'Earlier';
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  return day(takenAt) === yesterday.toDateString() ? 'Yesterday' : 'Last time';
-}
-
-const LEFT: Record<SnapshotHandoff['state'], string> = {
-  unsent: 'was never sent',
-  stopped: 'stopped halfway',
-  error: 'did not finish',
-};
-
-function more(count: number, noun: string): string {
-  return count > 0 ? `, and ${count} more ${noun}${count === 1 ? '' : 's'}` : '';
-}
-
-/** The one line, from the facts alone: no model call, so it never names a file it did not see. */
-export function describePickUp(input: {
-  items: readonly PickUpItem[];
+/** A ready pick-up: what the card lists, and when the snapshot was last overwritten. */
+export interface PickUpReady {
+  items: PickUpItem[];
   takenAt: number;
-  now: number;
-}): string {
-  const projects = input.items.filter((item) => item.kind === 'project');
-  const handoffs = input.items.filter((item) => item.kind === 'handoff');
-  const [project] = projects;
-  const [handoff] = handoffs;
-  if (project === undefined && handoff === undefined) return 'Welcome back.';
-  const opening = when(input.takenAt, input.now);
-  const where =
-    project === undefined
-      ? ''
-      : `you were in ${project.name}${project.branch === undefined ? '' : ` on ${project.branch}`}${
-          project.file === undefined ? '' : `, with ${project.file} open`
-        }${more(projects.length - 1, 'project')}`;
-  const left =
-    handoff === undefined
-      ? ''
-      : `${handoff.expertName}’s “${clip(handoff.ask)}” ${LEFT[handoff.state]}${more(
-          handoffs.length - 1,
-          'hand-off',
-        )}`;
-  if (left === '') return `${opening} ${where}.`;
-  if (where === '') return `${opening}, ${left}.`;
-  return `${opening} ${where}, and ${left}.`;
 }
 
 export interface PickUpOptions {
@@ -182,11 +133,12 @@ export interface PickUpOptions {
   stoppedSince: (since: string) => SnapshotHandoff[];
   /** Brief again: the saved ask goes to the hand-off card. Nothing starts. */
   propose: (handoff: { expertId: string; ask: string }) => void;
-  emit: (params: PickUpReadyParams) => void;
+  /** A snapshot is ready: the check-in takes it when its gate is open, else the next tick asks again. */
+  onReady: () => void;
   log?: (message: string) => void;
 }
 
-/** The snapshot's tick, the back check and the one offer it makes. */
+/** The snapshot's tick, the back check, and the one pick-up a check-in takes. */
 export class PickUp {
   readonly #options: PickUpOptions;
   /** The hand-offs of the pick-up last offered, by item id, for Brief again. */
@@ -213,7 +165,7 @@ export class PickUp {
     this.#timer = null;
   }
 
-  /** Offers a ready snapshot once; otherwise overwrites it with what is open now. */
+  /** Says a ready snapshot is there, leaving it in place; otherwise overwrites it with what is open now. */
   async tick(): Promise<void> {
     const options = this.#options;
     if (!options.enabled()) return;
@@ -226,9 +178,8 @@ export class PickUp {
     }
     // No host connected: nobody to offer it to, so a ready snapshot is kept, not spent.
     if (windows === null || !options.enabled()) return;
-    const ready = this.take();
-    if (ready !== null) {
-      options.emit(ready);
+    if (this.#ready() !== null) {
+      options.onReady();
       return;
     }
     const now = options.clock.now();
@@ -245,19 +196,14 @@ export class PickUp {
     });
   }
 
-  /** The pick-up you would be offered now, without offering it. */
-  ready(): PickUpReadyParams | null {
-    return this.#ready()?.params ?? null;
-  }
-
-  /** Offers the pick-up: returns it once and starts a new snapshot. */
-  take(): PickUpReadyParams | null {
+  /** Takes the pick-up: returns it once and starts a new snapshot. */
+  take(): PickUpReady | null {
     const ready = this.#ready();
     if (ready === null) return null;
     const now = this.#options.clock.now();
     this.#options.store.save({ startedAt: now, takenAt: now, projects: [], handoffs: [] });
     this.#offered = ready.handoffs;
-    return ready.params;
+    return ready.pickUp;
   }
 
   /** Brief again on one item of the pick-up last offered. False when there is no such hand-off. */
@@ -281,7 +227,7 @@ export class PickUp {
     this.#offered = null;
   }
 
-  #ready(): { params: PickUpReadyParams; handoffs: Map<string, SnapshotHandoff> } | null {
+  #ready(): { pickUp: PickUpReady; handoffs: Map<string, SnapshotHandoff> } | null {
     const options = this.#options;
     if (!options.enabled()) return null;
     const snapshot = options.store.get();
@@ -309,9 +255,6 @@ export class PickUp {
       })),
     ];
     if (items.length === 0) return null;
-    return {
-      params: { text: describePickUp({ items, takenAt: snapshot.takenAt, now }), items },
-      handoffs,
-    };
+    return { pickUp: { items, takenAt: snapshot.takenAt }, handoffs };
   }
 }

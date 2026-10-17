@@ -117,8 +117,8 @@ by tapping a card, or, after **Talk to me**, by saying it (W.9). W.1 to W.8 type
 3. **Expected:** the setup window closes, Scout docks on the desktop, and its invitation opens (see
    G.1). In Home → Experts, Claude Code is listed when it is installed. Home → Scout shows the
    brain you chose.
-4. **Action:** quit and start Tagalong again. **Expected:** setup does not open; one launch line
-   appears instead (G.2).
+4. **Action:** quit and start Tagalong again. **Expected:** setup does not open; the launch
+   check-in runs instead: a line or nothing (G.2).
 
 ### W.6. Closing mid-setup resumes
 
@@ -443,69 +443,71 @@ _Fake provider:_ with `TAGALONG_FAKE_PROVIDERS=1` both steps are scripted expert
 
 ## Greeting
 
-### G.1. The invitation after setup, in one line
+The hello is the launch check-in: the mind gets the facts and may say one short line, or nothing.
+No line is written in code, and the wording varies; run each check about three times.
+
+### G.1. The first hello after setup
 
 1. **Setup:** a fresh install (empty `%APPDATA%\Tagalong`).
 2. **Action:** finish setup with **Try it**.
-3. **Expected:** Scout's bubble opens beside it without taking the keyboard and types in one line:
-   "Here I am. Ask me one real thing about your screen. Press Ctrl+Shift+Space anytime." (with
-   your name after "Here I am," when you gave one), with **Try it now** (focused) and **Got it**.
-   There is no **Next**. Tab reaches both buttons. This invitation is not a launch line.
+3. **Expected:** Scout's bubble opens beside it without taking the keyboard with **Try it now**
+   (focused) and **Got it**, and within about 15 s usually one short line from Scout above them,
+   typed in and said once (it may greet you by name). Never "Here I am. Ask me one real thing…".
+   With no brain answering, or when the mind passes, there is no line, only the buttons. There is
+   no **Next**. Tab reaches both buttons.
 4. **Reduced motion:** with Windows Settings → Accessibility → Visual effects → **Animation effects**
    off, the line appears whole, with no typing.
 
-### G.2. A later launch says one quiet line
+### G.2. A later launch: a line or nothing
 
 1. **Setup:** an install that finished Welcome. Quit Tagalong.
 2. **Action:** start Tagalong again, and keep typing in another window.
-3. **Expected:** one short line appears beside Scout within about a second of Scout appearing (for
-   example "Morning. I'm here when you need me."), with the Claude Code sign-in too; your typing is
-   not interrupted. It fades after about seven seconds. Pointing at it keeps it;
-   clicking it opens the bubble to ask; × closes it. With no brain set up, or one that fails, a
-   handwritten line appears instead. Nothing is captured (no capture dot, nothing in Activity).
-4. **After a hand-off:** finish a hand-off to Claude Code, quit, start again. The line mentions
-   Claude Code.
-5. **Time away:** leave Tagalong running for a day or more, quit it, and start it again a few
-   minutes later. The line greets for the time of day; it does not say "Back after a day".
-6. **Always listening:** with Always listening on, the launch line is the usual one (nothing is
-   said about listening); Scout shows a **Listening** tag at its bottom for about 8 s, with the
-   tooltip "Always listening is on. Say “Scout, stop” to switch it off.". Switching it on from
-   the bubble shows the same tag again; switching it off removes it.
+3. **Expected:** within about 15 s of Scout appearing, either one short line beside Scout (in the
+   mind's own words; never "Morning. I'm here when you need me." boilerplate) or nothing at all;
+   your typing is not interrupted. A line fades after about seven seconds; pointing at it keeps
+   it, clicking it opens the bubble, × closes it. With a brain that fails or times out, nothing is
+   said: there is no handwritten line. Nothing is captured (no capture dot); What Scout saw shows
+   one "Sent to AI" row for the check-in.
+4. **After a hand-off:** finish a hand-off to Claude Code, quit, start again. The line, if any, may
+   mention it; it never invents a task, file or result.
+5. **Always listening:** with Always listening on, the launch is the usual one (nothing is said
+   about listening); Scout shows a **Listening** tag at its bottom for about 8 s, with the tooltip
+   "Always listening is on. Say “Scout, stop” to switch it off.". Switching it on from the bubble
+   shows the same tag again; switching it off removes it.
 
-### G.3. The greeting can be switched off
+### G.3. The hello can be switched off
 
 1. **Action:** Settings → Privacy → **Say hello when Tagalong opens** → Off, Save. Restart.
-2. **Expected:** Scout docks and says nothing. The ⓘ note says the hello reads no screen.
+2. **Expected:** Scout docks and says nothing, and no "Sent to AI" row appears for a launch. The ⓘ
+   note says the hello reads no screen and is often nothing.
 
 ### G.4. Scout knows your name
 
 1. **Action:** on a fresh install, type `Nadeem` in Welcome's **What should I call you?** and
    **Start**.
-2. **Expected:** the intro's first beat reads "Hi Nadeem, I'm Scout. …". Restart with the brain
-   signed out: the handwritten line reads like "Morning, Nadeem. I'm here when you need me."
-   Answers rarely use the name.
+2. **Expected:** the first hello may use the name; answers rarely do.
 3. **Action:** Settings → **You** → clear the box, Save. Restart.
-4. **Expected:** the line has no name. Skipping the field in Welcome gives "Hi, I'm Scout." as
-   before.
+4. **Expected:** no line uses the name.
 
 ### G.5. After a crash
 
 1. **Action:** end Tagalong in Task Manager, then start it.
-2. **Expected:** "I closed unexpectedly last time…", saying how many tasks stopped ("one task stopped. It's in Activity."). After an update over a running app (G.6), the update line wins over this one.
+2. **Expected:** a line that may mention, calmly and in Scout's own words, that Tagalong closed
+   unexpectedly (and that runs it cut short are in Activity), or nothing. Never an invented task.
+   After an update over a running app (G.6), the crash is not mentioned: the update is.
 
 ### G.6. After an update
 
 1. **Action:** install a newer build over the old one and start it.
-2. **Expected:** "Morning. I've been updated to x.y.z." (time of day first) plus the what's-new line.
-   From 0.0.0 to 0.1.0 the line is: "I can write short drafts, translate, read things aloud and
-   point at buttons now. Ask me “what needs me?” to see your reviews and issues in one list."
+2. **Expected:** a line that may mention the update and what is new (from the release notes, in
+   Scout's words), or nothing. Never the old fixed line "I can write short drafts, translate…".
 3. **Action:** quit and start again.
-4. **Expected:** the update line does not play a second time.
+4. **Expected:** the update is not mentioned a second time.
 
 ### G.7. Days away with routines
 
 1. **Action:** let a routine run, quit, then change the clock forward a day or wait a day, and start.
-2. **Expected:** "Back after a day. Morning papers ran while you were away."
+2. **Expected:** a line that may mention the time away or the routine by name, or nothing.
 
 ### G.8. Signed out
 
@@ -514,7 +516,7 @@ _Fake provider:_ with `TAGALONG_FAKE_PROVIDERS=1` both steps are scripted expert
    **Fix it**, which opens Settings. Nothing is said aloud, and no line says "I". Scout shows a
    **Signed out** tag at its bottom (tooltip: the same sentence); the bubble shows the same row
    with **Fix it** until a question gets an answer, or Settings' Check again finds Claude
-   signed in, which removes the tag.
+   signed in, which removes the tag. No check-in runs ("Sent to AI" has no launch row).
 
 ## Keeping an eye on things
 
@@ -695,6 +697,14 @@ previous build. Pass: lines are short, true to the facts, never boilerplate, oft
 2. **Expected:** no check-in about the blind-spot window (no "Sent to AI"); the error's line, if
    any, is short.
 
+### C.6. Launch after a night, a crash and an update
+
+1. **Action:** open Tagalong after a night away (G.2), then after ending it in Task Manager
+   (G.5), then after a version bump (G.6).
+2. **Expected:** each time a line or nothing; never "Morning." boilerplate. A finished hand-off
+   or the crash may be mentioned calmly; the new features may be mentioned in Scout's words; no
+   invented task. Pressing **Not now** before quitting does not stop the next launch's hello.
+
 ## Voice: Scout talks
 
 Run from source **without** `TAGALONG_FAKE_TTS` (it makes every line silent), with speakers on. The
@@ -739,9 +749,10 @@ voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APP
 
 ### V.4. The hello, an expert finishing and a remark
 
-1. **Action:** finish Welcome and step through the intro with **Next**; restart Tagalong; hand a
-   task to Claude Code; cause a line from keeping an eye on things (K.1).
-2. **Expected:** each intro beat is spoken as it appears; the line on a later launch is spoken;
+1. **Action:** finish Welcome; restart Tagalong; hand a task to Claude Code; cause a line from
+   keeping an eye on things (K.1).
+2. **Expected:** the first hello's line (if the mind says one) is spoken once as it appears; the
+   line on a later launch (if any) is spoken;
    when the hand-off finishes, only the mind's one line about it is spoken (if there is one; the
    answer itself is not read out); the K.1 line is spoken, and its × stops it.
 
@@ -1295,25 +1306,25 @@ monitor.
 
 ## Pick up where you left off
 
-### PU.1. Back the next morning, Scout offers what you were in
+### PU.1. Back the next morning, the mind may offer what you were in
 
 1. **Setup:** Settings → Privacy → **Pick up where you left off** is On. Open a git project in VS
    Code with a file in front. Ask Scout something that ends in a hand-off card and close the card
    without pressing Send. Leave Tagalong running for at least 15 minutes, then quit it.
 2. **Action:** to skip the six-hour wait, close Tagalong and, in `%APPDATA%\Tagalong\tagalong.db`
    (any SQLite tool), set `taken_at` in the `pick_up` row to seven hours ago. Start Tagalong.
-   **Expected:** instead of the usual hello, one line beside Scout names the project, its branch
-   and the file, and the unsent hand-off, with **Pick up** and **Not now**. An update or crash
-   line, or the "Fix it" line, would come first instead; the pick-up line then follows once that
-   line has gone (for an update or crash, within about a minute), once only.
+   **Expected:** within about 15 s, usually one line beside Scout in the mind's own words (never
+   the old handwritten "Yesterday you were in ai_pet on …") with **Pick up** and **Not now**, or
+   nothing at all (the snapshot is then spent). With the "Fix it" line, or the hello switched off,
+   the pick-up goes to the next ten-minute look instead, once only.
 3. **Action:** press **Pick up**. **Expected:** the bubble shows a card with one row per item.
    Nothing has opened yet.
 4. **Action:** press **Open in VS Code**. **Expected:** VS Code opens that folder with its own
    open files, and the button says **Opened**. Nothing is typed or clicked for you.
 5. **Action:** press **Brief again**. **Expected:** the normal hand-off card with the old ask.
    Nothing runs until you press Send.
-6. **Action:** repeat step 2 and press **Not now**. Restart again. **Expected:** the ordinary hello.
-   The pick-up is offered once.
+6. **Action:** repeat step 2 and press **Not now**. Restart again. **Expected:** no pick-up card.
+   The pick-up is used once.
 7. **Action:** switch the setting Off and save. **Expected:** the `pick_up` row is gone and no
    pick-up is ever offered. A password manager or `.env` window in front is never named.
 

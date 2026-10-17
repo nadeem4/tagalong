@@ -48,7 +48,7 @@ tagalong/
       routines/                     # the scheduler, schedules and triggers, the routine store
       meetings/                     # Meeting prep's calendar feed: the .ics link, parsed with ical.js
       check-in/                     # the check-in moment: gate, facts, the one call, reply parsing
-      greeting/, keep-an-eye/       # the launch line; the lookout over window titles
+      keep-an-eye/                  # the lookout over window titles
       watch/, projects/, privacy/   # watches, the project finder, the blind spots
       pets/registry.ts              # PetRegistry, the default pet Scout
       roles/                        # library.generated.ts, getRole, roleFor, recommendedModel, tiers.ts
@@ -294,8 +294,9 @@ you normally never call it yourself.
 `FakeBrainProvider` whatever settings say: no API key, no network, and a deterministic word-by-word
 stream. Hand-offs go to a scripted expert, so no Claude Code usage is spent. It is how the
 Playwright suites run, and the easiest way to see the app work before you have a key. Keeping an eye
-on things is off under it unless `TAGALONG_KEEP_AN_EYE=1` is set too. Without it, Scout asks the
-provider it names, with that provider's key from the OS keychain. A fresh install's Scout thinks
+on things is off under it unless `TAGALONG_KEEP_AN_EYE=1` is set too, and no window the engine lists
+counts as full screen, so the CI desktop never holds a check-in (the launch one included). Without
+it, Scout asks the provider it names, with that provider's key from the OS keychain. A fresh install's Scout thinks
 with the Claude sign-in (`claude-code`, Haiku), which needs Claude Code installed and signed in;
 Welcome offers a keyed provider instead. The engine itself boots without any key.
 

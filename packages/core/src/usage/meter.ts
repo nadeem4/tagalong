@@ -18,7 +18,7 @@ export interface MeteredCall {
  * tool calls pass through untouched.
  *
  * One wrapper at the single resolver, like `guardBrain`, so turns, check-ins, routines,
- * watches, the greeting and summaries are all metered and nothing new can skip it.
+ * watches and summaries are all metered and nothing new can skip it.
  */
 export function meterBrain(
   provider: BrainProvider,

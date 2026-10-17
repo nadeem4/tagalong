@@ -1,17 +1,16 @@
-/** Tests for pick-up: the snapshot, branch reading, the line, and the offer cycle. */
+/** Tests for pick-up: the snapshot, branch reading, and the ready / take / rebrief cycle. */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PickUpReadyParams, ProjectCandidate, WindowEntry } from '@tagalong/protocol';
+import type { ProjectCandidate, WindowEntry } from '@tagalong/protocol';
 import { migrate } from '../memory/db';
 import { FakeClock } from '../watch/fake-clock';
 import {
   BACK_AFTER_MS,
   PickUp,
   SNAPSHOT_EVERY_MS,
-  describePickUp,
   readBranch,
   takeSnapshot,
   type PickUpOptions,
@@ -165,69 +164,12 @@ describe('readBranch', () => {
   });
 });
 
-describe('describePickUp', () => {
-  const now = new Date(2026, 9, 15, 9).getTime();
-  const yesterday = new Date(2026, 9, 14, 18).getTime();
-  const project = {
-    id: 'p1',
-    kind: 'project',
-    name: 'ai_pet',
-    path: AI_PET,
-    editor: 'vscode',
-    branch: 'feat/scout-watch-tools',
-    file: 'engine.ts',
-  } as const;
-  const handoff = {
-    id: 'h1',
-    kind: 'handoff',
-    expertName: 'Claude Code',
-    ask: 'fix the e2e tests',
-    state: 'stopped',
-  } as const;
-
-  it('says the project, the branch, the file and the hand-off left halfway', () => {
-    expect(describePickUp({ items: [project, handoff], takenAt: yesterday, now })).toBe(
-      'Yesterday you were in ai_pet on feat/scout-watch-tools, with engine.ts open, and Claude Code’s “fix the e2e tests” stopped halfway.',
-    );
-  });
-
-  it('says one item plainly', () => {
-    const { branch: _b, file: _f, ...bare } = project;
-    expect(describePickUp({ items: [bare], takenAt: yesterday, now })).toBe(
-      'Yesterday you were in ai_pet.',
-    );
-    expect(
-      describePickUp({
-        items: [{ ...handoff, state: 'unsent' }],
-        takenAt: now - 7 * 3_600_000,
-        now,
-      }),
-    ).toBe('Earlier, Claude Code’s “fix the e2e tests” was never sent.');
-  });
-
-  it('counts the rest when there are many', () => {
-    const items = [
-      project,
-      { ...project, id: 'p2', name: 'web' },
-      { ...project, id: 'p3', name: 'docs' },
-      handoff,
-      { ...handoff, id: 'h2', state: 'error' as const },
-    ];
-    expect(describePickUp({ items, takenAt: now - 3 * 86_400_000, now })).toBe(
-      'Last time you were in ai_pet on feat/scout-watch-tools, with engine.ts open, and 2 more projects, and Claude Code’s “fix the e2e tests” stopped halfway, and 1 more hand-off.',
-    );
-  });
-
-  it('says only hello when there is nothing', () => {
-    expect(describePickUp({ items: [], takenAt: yesterday, now })).toBe('Welcome back.');
-  });
-});
-
 describe('PickUp', () => {
   let db: Database.Database;
   let store: PickUpStore;
   let clock: FakeClock;
-  let emitted: PickUpReadyParams[];
+  /** How many times a tick found the snapshot ready. */
+  let readied: number;
   let windows: WindowEntry[] | null;
   let enabled: boolean;
   let stopped: { expertId: string; expertName: string; ask: string; state: 'stopped' | 'error' }[];
@@ -238,7 +180,7 @@ describe('PickUp', () => {
     migrate(db);
     store = new PickUpStore(db);
     clock = new FakeClock(Date.UTC(2026, 9, 14, 9));
-    emitted = [];
+    readied = 0;
     windows = [win('engine.ts - ai_pet - Visual Studio Code', 'Code.exe', { state: 'foreground' })];
     enabled = true;
     stopped = [];
@@ -258,7 +200,7 @@ describe('PickUp', () => {
       pending: () => [],
       stoppedSince: () => stopped,
       propose: (h) => proposed.push(h),
-      emit: (params) => emitted.push(params),
+      onReady: () => (readied += 1),
       ...over,
     });
   }
@@ -275,50 +217,57 @@ describe('PickUp', () => {
     p.stop();
   });
 
-  it('offers nothing when the gap is under six hours', async () => {
+  it('is not ready when the gap is under six hours', async () => {
     const p = pickUp();
     await p.tick();
     await clock.sleep(BACK_AFTER_MS - 60_000);
     await p.tick();
-    expect(emitted).toEqual([]);
-    expect(p.ready()).toBeNull();
+    expect(readied).toBe(0);
+    expect(p.take()).toBeNull();
   });
 
-  it('fires once after six hours away, then starts a new snapshot', async () => {
+  it('says it is ready after six hours away, without spending it or writing a line', async () => {
     const p = pickUp();
     await p.tick();
+    const takenAt = store.get()?.takenAt;
     windows = [];
     await clock.sleep(BACK_AFTER_MS);
     await p.tick();
-    expect(emitted).toHaveLength(1);
-    expect(emitted[0]?.items[0]).toMatchObject({ kind: 'project', name: 'ai_pet', branch: 'main' });
-    expect(emitted[0]?.text).toContain('ai_pet');
-    await clock.sleep(BACK_AFTER_MS);
+    expect(readied).toBe(1);
+    // Not spent, and not overwritten: the check-in takes it only when its gate is open.
+    expect(store.get()?.takenAt).toBe(takenAt);
     await p.tick();
-    expect(emitted).toHaveLength(1);
+    expect(readied).toBe(2);
+    const ready = p.take();
+    expect(ready).toEqual({ items: [expect.any(Object)], takenAt });
+    expect(ready).not.toHaveProperty('text');
+    expect(ready?.items[0]).toMatchObject({ kind: 'project', name: 'ai_pet', branch: 'main' });
+    // Taken: a new snapshot starts, and the next tick finds nothing ready.
+    await p.tick();
+    expect(readied).toBe(2);
   });
 
-  it('keeps a ready snapshot while no host is connected, and offers it once one is', async () => {
+  it('keeps a ready snapshot while no host is connected, and says so once one is', async () => {
     const p = pickUp();
     await p.tick();
     await clock.sleep(BACK_AFTER_MS);
     windows = null;
     await p.tick();
-    // Nobody to show it to: it is not spent.
-    expect(emitted).toEqual([]);
-    expect(p.ready()).not.toBeNull();
+    // Nobody to show it to: not said.
+    expect(readied).toBe(0);
     windows = [];
     await p.tick();
-    expect(emitted).toHaveLength(1);
+    expect(readied).toBe(1);
   });
 
-  it('never fires an empty snapshot', async () => {
+  it('is never ready with an empty snapshot', async () => {
     windows = [];
     const p = pickUp();
     await p.tick();
     await clock.sleep(BACK_AFTER_MS * 2);
     await p.tick();
-    expect(emitted).toEqual([]);
+    expect(readied).toBe(0);
+    expect(p.take()).toBeNull();
   });
 
   it('adds hand-offs that stopped since the snapshot began, at the time it is offered', async () => {
@@ -342,15 +291,14 @@ describe('PickUp', () => {
     expect(since.at(-1)).toBe(new Date(Date.UTC(2026, 9, 14, 9)).toISOString());
   });
 
-  it('is taken once: a launch line that says it leaves nothing for the next tick', async () => {
+  it('is taken once: a launch check-in that takes it leaves nothing for the next tick', async () => {
     const p = pickUp();
     await p.tick();
     await clock.sleep(BACK_AFTER_MS);
-    expect(p.ready()).not.toBeNull();
     expect(p.take()).not.toBeNull();
     expect(p.take()).toBeNull();
     await p.tick();
-    expect(emitted).toEqual([]);
+    expect(readied).toBe(0);
   });
 
   it('briefs again by proposing the saved ask, and never starts anything', async () => {

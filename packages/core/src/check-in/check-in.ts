@@ -4,18 +4,22 @@
  *
  * Code decides WHEN (the reasons below) and keeps every guardrail (one gate, `#wake`); the
  * mind decides IF and WHAT: a line, an offer for an expert, a face, or nothing. Nothing here
- * writes a sentence for Scout. Reasons: `settled` and `trouble` (from the window titles
- * keeping an eye sends), `long-stretch` (from the activity feed gentle nudges sends) and
- * `finished` (an expert's hand-off came back). Any failure is silence.
+ * writes a sentence for Scout. Reasons: `launch` (the app opened, or Welcome was just
+ * finished), `back` (a pick-up snapshot is ready after a long break), `settled` and
+ * `trouble` (from the window titles keeping an eye sends), `long-stretch` (from the activity
+ * feed gentle nudges sends) and `finished` (an expert's hand-off came back). Any failure is
+ * silence.
  */
 import { randomUUID } from 'node:crypto';
 import type {
   Brief,
   Expert,
   HandoffFinishedParams,
+  LaunchFacts,
   Pet,
   PetMoodParams,
   PetRemarkParams,
+  PickUpReadyParams,
   Settings,
   WindowEntry,
 } from '@tagalong/protocol';
@@ -26,6 +30,7 @@ import { gatherNow, safe, type NowSources } from '../conversation/now';
 import { hideSecrets } from '../privacy/secrets';
 import { soul } from '../roles';
 import { Lookout, blind, callOrFullScreenInFront } from '../keep-an-eye/lookout';
+import type { PickUpReady } from '../pick-up/pick-up';
 import { ActiveTime } from './active-time';
 import { RECENT_LINES, WINDOW_TEXT_CHARS, renderBundle, type BundleReason } from './bundle';
 import { CHECK_IN_INSTRUCTIONS, CHECK_IN_TIMEOUT_MS, askMind, type CheckInReply } from './reply';
@@ -59,6 +64,12 @@ export interface CheckInOptions {
   memories: () => readonly Memory[];
   /** The last question and answer, or null before the first. */
   lastExchange: () => { said: string; answered: string } | null;
+  /** Names of the routines that ran well since an ISO time: a launch fact. */
+  routinesSince: (iso: string) => readonly string[];
+  /** Runs boot found still running and closed as interrupted: a launch fact after a crash. */
+  interruptedAtBoot: number;
+  /** `PickUp.take()`: the ready pick-up, once, or null. Taken only once the gate is open. */
+  takePickUp: () => PickUpReady | null;
   /** Which expert a finished hand-off was and what it was asked. */
   handoff: (handoffId: string) => { expertName: string; ask: string } | null;
   /** `HandoffManager.propose`: the brief goes to the card, and nothing runs until Send. */
@@ -71,7 +82,8 @@ export interface CheckInOptions {
   emit: (
     event:
       | { method: 'pet.remark'; params: PetRemarkParams }
-      | { method: 'pet.mood'; params: PetMoodParams },
+      | { method: 'pet.mood'; params: PetMoodParams }
+      | { method: 'pickUp.ready'; params: PickUpReadyParams },
   ) => void;
   /** The daily budget gate: true stops every check-in. */
   spentOut: () => boolean;
@@ -83,6 +95,8 @@ export interface CheckInOptions {
 interface Wake {
   reason: BundleReason;
   handoffId?: string;
+  /** A pick-up taken for this wake: the line, if any, rides with its card. */
+  pickUp?: PickUpReady;
 }
 
 interface Offer {
@@ -156,6 +170,55 @@ export class CheckIn {
     });
   }
 
+  /**
+   * The app opened (or Welcome was just finished). Exempt from the cooldown and Not now,
+   * but starts the cooldown. Settings are read before the first await: the host records
+   * this launch right after asking, and the facts are about the last one.
+   */
+  async launch(facts: LaunchFacts): Promise<void> {
+    const settings = this.#o.settings();
+    if (!settings.greeting) return;
+    const { lastOpenedAt, lastClosedAt } = settings;
+    const now = this.#o.clock.now();
+    // Away since the last quit; a crash records no quit, so then since the last launch.
+    const awaySince = [lastOpenedAt, lastClosedAt]
+      .filter((at): at is string => at !== null)
+      .map((at) => Date.parse(at))
+      .reduce<number | null>((latest, at) => (latest === null || at > latest ? at : latest), null);
+    const updated = facts.lastVersion !== null && facts.lastVersion !== facts.version;
+    await this.#wake('launch', undefined, () => {
+      const pickUp = this.#takePickUp();
+      return Promise.resolve({
+        reason: {
+          kind: 'launch',
+          welcomed: facts.welcomed === true,
+          awayMs: awaySince === null ? null : now - awaySince,
+          // An installer ends a running app by force: a "crash" over an update is the update.
+          crashed: facts.crashed && !updated ? { cutShort: this.#o.interruptedAtBoot } : null,
+          update:
+            updated && facts.lastVersion !== null
+              ? { from: facts.lastVersion, to: facts.version, notes: facts.releaseNotes }
+              : null,
+          routines:
+            lastOpenedAt === null ? [] : safe(() => this.#o.routinesSince(lastOpenedAt), []),
+          pickUp,
+        },
+        ...(pickUp === null ? {} : { pickUp }),
+      });
+    });
+  }
+
+  /** A pick-up is ready (back after a long break). Left in place when the gate is closed. */
+  async back(): Promise<void> {
+    if (!this.#o.settings().pickUp) return;
+    await this.#wake('back', undefined, () => {
+      const pickUp = this.#takePickUp();
+      if (pickUp === null) return Promise.resolve(null);
+      const awayMs = this.#o.clock.now() - pickUp.takenAt;
+      return Promise.resolve({ reason: { kind: 'back', awayMs, pickUp }, pickUp });
+    });
+  }
+
   /** An expert's hand-off came back. Only a chain's last step checks in. */
   async finished(params: HandoffFinishedParams): Promise<void> {
     if (params.next !== undefined) return;
@@ -215,8 +278,8 @@ export class CheckIn {
   /**
    * The one gate, then the one call. Each reason's own switch is checked where it comes in
    * (finished has none). Then the first failure wins and nothing is emitted: a pet, the
-   * budget, one in flight, the daily cap, Not now and the cooldown (unprompted reasons
-   * only), a call or full-screen app in front. `find` runs only past all of that, and may
+   * budget, one in flight, the daily cap, Not now and the cooldown (not for a launch or a
+   * finished hand-off), a call or full-screen app in front. `find` runs only past all of that, and may
    * still find nothing to ask about.
    */
   async #wake(
@@ -231,8 +294,8 @@ export class CheckIn {
     const day = (this.#o.dayOf ?? localDay)(now);
     if (this.#day.key !== day) this.#day = { key: day, calls: 0 };
     if (this.#day.calls >= CHECK_IN_DAILY_CAP) return;
-    const unprompted = kind !== 'finished';
-    if (unprompted && (now < this.#quietUntil || now - this.#lastUnpromptedAt < COOLDOWN_MS)) {
+    const held = kind !== 'finished' && kind !== 'launch';
+    if (held && (now < this.#quietUntil || now - this.#lastUnpromptedAt < COOLDOWN_MS)) {
       return;
     }
 
@@ -243,7 +306,8 @@ export class CheckIn {
       const wake = await find();
       if (wake === null) return;
       this.#day.calls += 1;
-      if (unprompted) this.#lastUnpromptedAt = now;
+      // Every call but a finished hand-off's starts the cooldown, a launch's included.
+      if (kind !== 'finished') this.#lastUnpromptedAt = now;
       const reply = await askMind({
         pet,
         summarizer: settings.summarizer,
@@ -255,7 +319,7 @@ export class CheckIn {
       });
       if (reply === null) return;
       // Not now may have been pressed, or the pet gone, while the mind was writing.
-      if (unprompted && this.#o.clock.now() < this.#quietUntil) return;
+      if (held && this.#o.clock.now() < this.#quietUntil) return;
       const speaker = this.#o.pet();
       if (speaker === null) return;
       this.#deliver(speaker, wake, reply);
@@ -294,6 +358,15 @@ export class CheckIn {
 
     this.#recent.push(reply.text);
     if (this.#recent.length > RECENT_LINES) this.#recent.shift();
+    if (wake.pickUp !== undefined) {
+      // The line rides with the Pick up card; the card is the offer.
+      this.#offer = null;
+      this.#o.emit({
+        method: 'pickUp.ready',
+        params: { text: reply.text, items: wake.pickUp.items },
+      });
+      return;
+    }
     const remarkId = randomUUID();
     if (wake.handoffId !== undefined) {
       this.#offer = null;
@@ -352,6 +425,12 @@ export class CheckIn {
         clean === null || clean === window.title ? window.title : `${window.title} - ${clean}`;
     }
     return offer;
+  }
+
+  /** The ready pick-up, when pick-up is on. A silent mind spends it: not worth a word. */
+  #takePickUp(): PickUpReady | null {
+    if (!this.#o.settings().pickUp) return null;
+    return safe(() => this.#o.takePickUp(), null);
   }
 
   /** The window's last lines, through the same recorded hosts; null when it cannot be read. */

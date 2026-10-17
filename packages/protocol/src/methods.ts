@@ -386,33 +386,29 @@ export const TurnWarningParams = z.object({
   code: z.string().min(1),
   message: z.string(),
 });
-/** What the host recorded about the last launch, for the line said as this one opens. */
-export const GreetingLaunch = z.object({
+/**
+ * What the host recorded about the last launch: facts the launch check-in may mention, in
+ * the mind's own words, or not at all.
+ */
+export const LaunchFacts = z.object({
   /** The last launch never recorded a clean close. */
   crashed: z.boolean(),
   /** The version the last launch ran; null when none was recorded. */
   lastVersion: z.string().min(1).nullable(),
   /** The version running now. */
   version: z.string().min(1),
-  /** One line on what is new in this version; empty when there is nothing to say. */
-  whatsNew: z.string(),
+  /** What is new in this version, as plain facts; empty when there is nothing to say. */
+  releaseNotes: z.string(),
+  /** Welcome has just been finished: this is the first hello. */
+  welcomed: z.boolean().optional(),
 });
-export type GreetingLaunch = z.infer<typeof GreetingLaunch>;
+export type LaunchFacts = z.infer<typeof LaunchFacts>;
 /**
- * The line a pet says when the app opens, after the first time. `model` when the summaries
- * model wrote it, `fallback` when a handwritten line stood in. It reads no screen.
+ * The app opened. Answers at once; the check-in runs off the request path and ends in a
+ * `pet.remark` (or `pickUp.ready` with the line) within 15 seconds, or in nothing.
  */
-export const GreetingComposeParams = z.object({
-  petId: z.string().min(1),
-  launch: GreetingLaunch.optional(),
-});
-export const GreetingComposeResult = z.object({
-  text: z.string().min(1),
-  source: z.enum(['model', 'fallback']),
-  /** Set when the line is a pick-up: what the card lists, for Pick up on the line. */
-  pickUp: PickUpReadyParams.optional(),
-});
-export type GreetingComposeResult = z.infer<typeof GreetingComposeResult>;
+export const CheckInLaunchParams = z.object({ launch: LaunchFacts });
+export const CheckInLaunchResult = z.object({});
 
 /**
  * Keep an eye on things. The host sends what is open, titles only, every few seconds; the
@@ -503,7 +499,7 @@ export const hostToCoreMethods = {
   'handoffs.confirm': { params: HandoffsConfirmParams, result: HandoffsConfirmResult },
   'handoffs.dismiss': { params: HandoffsDismissParams, result: HandoffsDismissResult },
   'projects.search': { params: ProjectsSearchParams, result: ProjectsSearchResult },
-  'greeting.compose': { params: GreetingComposeParams, result: GreetingComposeResult },
+  'checkIn.launch': { params: CheckInLaunchParams, result: CheckInLaunchResult },
   'keepAnEye.observe': { params: KeepAnEyeObserveParams, result: KeepAnEyeObserveResult },
   'keepAnEye.notNow': { params: KeepAnEyeNotNowParams, result: KeepAnEyeNotNowResult },
   'keepAnEye.accept': { params: KeepAnEyeAcceptParams, result: KeepAnEyeAcceptResult },

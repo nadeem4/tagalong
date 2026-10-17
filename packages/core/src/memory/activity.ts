@@ -1,6 +1,7 @@
 /**
  * The Activity log behind Home: turns, hand-offs, app calls and routine runs in the activity
- * table, plus the queries the greeting, pick-up and daily briefing read. Contains ActivityLog.
+ * table, plus the queries Now, check-ins, pick-up and the daily briefing read.
+ * Contains ActivityLog.
  */
 import { randomUUID } from 'node:crypto';
 import type Database from 'better-sqlite3';
@@ -247,7 +248,7 @@ export class ActivityLog {
 
   /**
    * The hand-offs that finished well after `since`, oldest first, at most five: what the
-   * greeting may mention. The brief is the only text kept; the answer stays in Home.
+   * Now may mention. The brief is the only text kept; the answer stays in Home.
    */
   expertsFinishedSince(since: string): { expertName: string; text: string }[] {
     return this.db

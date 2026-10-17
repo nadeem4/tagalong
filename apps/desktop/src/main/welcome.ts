@@ -63,12 +63,13 @@ export function shouldGreetOnLaunch(settings: Settings): boolean {
 }
 
 /**
- * Scout's one line as the app opens: the composed greeting when one is allowed, or nothing.
- * Always listening does not change it: that shows as a mark on Scout, not a line.
+ * The launch, when a hello is allowed: `compose` asks the check-in (whose line, if any, comes
+ * later as a notification) and returns null, or returns the brain's status mark. Nothing when
+ * the hello is off. Always listening does not change it: that shows as a mark on Scout.
  */
 export async function launchLine(
   settings: Settings,
-  compose: () => Promise<GreetLine>,
+  compose: () => Promise<GreetLine | null>,
 ): Promise<GreetLine | null> {
   return shouldGreetOnLaunch(settings) ? compose() : null;
 }

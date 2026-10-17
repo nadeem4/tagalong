@@ -152,7 +152,7 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
             </h3>
             <Info tip="greeting" label="About the hello" />
           </div>
-          <p className="tg-help">One short line beside Scout, then it fades.</p>
+          <p className="tg-help">Maybe one short line beside Scout, or nothing.</p>
         </div>
         <button
           type="button"
@@ -167,9 +167,11 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
         {greet && <input type="hidden" name="greeting" value="on" />}
       </div>
       <Tip tip="greeting">
-        Scout looks at nothing on screen for this. It knows only the time of day, how long since
-        Tagalong last opened, and which hand-offs finished meanwhile. The summaries model writes the
-        line in one short call; if that fails, Scout says a line of its own. On by default.
+        Scout may say one short line as it opens. Often nothing. It looks at nothing on screen for
+        this: one short call to the summaries model gets the time, how long you were away, a crash
+        or an update (and what is new), routines that ran, where you left off, your newest memories,
+        your name and your last exchange, and decides whether anything is worth saying. If that call
+        fails, Scout says nothing. On by default.
       </Tip>
       <hr className="tg-divider" />
       <div className="tg-setting">
@@ -251,7 +253,7 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
             </h3>
             <Info tip="pickUp" label="About picking up where you left off" />
           </div>
-          <p className="tg-help">Back after a long break, one line on what you were in.</p>
+          <p className="tg-help">Back after a long break, maybe a line on what you were in.</p>
         </div>
         <button
           type="button"
@@ -268,10 +270,10 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
       <Tip tip="pickUp">
         Every ten minutes Scout notes, from window titles only, which projects you have open in your
         editor (folder, branch and file name) and which hand-offs are unsent or stopped. One such
-        note is kept, on this computer. When you are back after six hours or more, Scout says one
-        line about it, once; each item on the card opens only when you click it, and Brief again
-        only fills in the hand-off card. Blind spots are never noted. Off deletes the note. On by
-        default.
+        note is kept, on this computer. When you are back after six hours or more, the note goes to
+        the summaries model once, and Scout may say one line about it with a Pick up card, or
+        nothing; each item on the card opens only when you click it, and Brief again only fills in
+        the hand-off card. Blind spots are never noted. Off deletes the note. On by default.
       </Tip>
       <hr className="tg-divider" />
       <div className="tg-setting">

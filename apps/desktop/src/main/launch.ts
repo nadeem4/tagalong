@@ -4,7 +4,7 @@
  * brainStatus and brainLine.
  */
 
-import type { Pet, PickUpReadyParams, Settings, SettingsPatch, StatusId } from '@tagalong/protocol';
+import type { Pet, Settings, SettingsPatch, StatusId } from '@tagalong/protocol';
 import type { ClaudeSignIn, GreetLine, ProviderChoice } from '../shared/ipc';
 
 /** The slice of the settings store the launch record needs. */
@@ -90,15 +90,10 @@ export function brainStatus(brain: BrainReadiness): StatusId | null {
 }
 
 /**
- * The brain's line, or, when Scout cannot think, a status mark (shown as a row with Fix it,
- * never spoken): the body never talks in Scout's voice.
+ * When Scout cannot think, a status mark (shown as a row with Fix it, never spoken): the body
+ * never talks in Scout's voice. Null when it can: the launch check-in has the line, if any.
  */
-export function brainLine(
-  brain: BrainReadiness,
-  composed: string,
-  pickUp?: PickUpReadyParams,
-): GreetLine {
+export function brainLine(brain: BrainReadiness): GreetLine | null {
   const status = brainStatus(brain);
-  if (status !== null) return { status };
-  return pickUp === undefined ? { text: composed } : { text: composed, pickUp };
+  return status === null ? null : { status };
 }

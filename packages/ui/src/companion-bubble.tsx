@@ -1,7 +1,8 @@
 /**
  * Scout's bubble beside the dock pet: asks with what Scout can see, streams the answer,
  * and hosts the cards (hand-off, connector confirm, routine, settings, pick-up, drop, health).
- * Also the one-time invitation after setup and the quiet GreetingLine. Contains
+ * Also the hello after setup (Try it now, under the mind's first line when it says one) and
+ * the quiet GreetingLine. Contains
  * CompanionBubble, GreetingLine, BubbleTalk and their props. Used by the desktop panel window.
  */
 
@@ -71,12 +72,11 @@ export interface CompanionBubbleProps {
   petName: string;
   /** What the hotkey captured. Each part shows as a chip the person can remove. */
   snapshot?: ContextSnapshot;
-  /** The one-line invitation after setup, instead of the question box. */
+  /**
+   * The hello after setup, instead of the question box: Try it now and Got it, under the
+   * first hello's check-in line (a `pet.remark`) when the mind says one.
+   */
   greeting?: boolean;
-  /** The ask key as a person reads it, for the hello. */
-  hotkeyLabel?: string;
-  /** What the person asked to be called, for the hello. Empty: no name. */
-  userName?: string;
   onDismiss?: () => void;
   onOpenChat?: () => void;
   /** The full chat: the whole conversation, not just the latest answer. */
@@ -185,8 +185,6 @@ export function CompanionBubble({
   petName,
   snapshot,
   greeting = false,
-  hotkeyLabel = 'Ctrl+Shift+Space',
-  userName = '',
   onDismiss,
   onOpenChat,
   expanded = false,
@@ -230,6 +228,8 @@ export function CompanionBubble({
   const [question, setQuestion] = useState<string | null>(resume?.question ?? null);
   // Try it now ends the hello here, even when the screen could not be seen.
   const [tried, setTried] = useState(false);
+  // The first hello's line, from the mind's check-in; empty until (unless) it says one.
+  const [hello, setHello] = useState('');
   const conversation = useRef<string | undefined>(resume?.conversationId);
   const mine = useRef<string | null>(null);
   // A spoken question's answer, said sentence by sentence as it streams.
@@ -395,14 +395,16 @@ export function CompanionBubble({
         return;
       }
       case 'pet.remark':
-        // The mind's line about the hand-off on the card: shown on it and said once.
-        if (
-          event.handoffId === undefined ||
-          handoff?.phase !== 'finished' ||
-          handoff.handoffId !== event.handoffId
-        ) {
+        if (event.handoffId === undefined) {
+          // The first hello's line, above Try it now, said once.
+          if (greeting && !tried && hello === '') {
+            setHello(event.text);
+            onSay?.(event.text);
+          }
           return;
         }
+        // The mind's line about the hand-off on the card: shown on it and said once.
+        if (handoff?.phase !== 'finished' || handoff.handoffId !== event.handoffId) return;
         setHandoff({ ...handoff, line: event.text });
         onSay?.(event.text);
         return;
@@ -646,11 +648,9 @@ export function CompanionBubble({
     return (
       <Speech tail={tail}>
         <TryItInvite
-          hotkeyLabel={hotkeyLabel}
-          userName={userName}
+          text={hello}
           onTry={() => void tryIt()}
           {...(onDismiss !== undefined ? { onDismiss } : {})}
-          {...(onSay !== undefined ? { onSay } : {})}
           indicator={speakingIndicator}
         />
       </Speech>
@@ -948,50 +948,39 @@ function useTyped(text: string): string {
 }
 
 /**
- * After setup, once: one line typed into the bubble that invites a real question about the
- * screen, with Try it now and Got it. Setup already said who Scout is and the key to press.
- * A screen reader hears the line whole; the typing is for the eyes only.
+ * After setup, once: Try it now and Got it. The line above them is the mind's, from the first
+ * hello's check-in, typed in as it arrives; until then, or if the mind says nothing, there is
+ * none: Scout's words are never written here. A screen reader hears the line whole.
  */
 function TryItInvite({
-  hotkeyLabel,
-  userName,
+  text,
   onTry,
   onDismiss,
-  onSay,
   indicator,
 }: {
-  hotkeyLabel: string;
-  userName: string;
+  /** The mind's line; empty for none. */
+  text: string;
   onTry: () => void;
   onDismiss?: () => void;
-  /** The line is said aloud once, as it appears. */
-  onSay?: (text: string) => void;
   /** The speaking indicator, while Scout speaks. */
   indicator?: ReactNode;
 }) {
-  const name = userName.trim();
-  const text = `${name === '' ? 'Here I am.' : `Here I am, ${name}.`} Ask me one real thing about your screen. Press ${hotkeyLabel} anytime.`;
   const typed = useTyped(text);
   const primary = useRef<HTMLButtonElement>(null);
-  const said = useRef(false);
-  const say = useEffectEvent(() => {
-    if (said.current) return;
-    said.current = true;
-    onSay?.(text);
-  });
   useEffect(() => {
-    say();
     primary.current?.focus();
   }, []);
   return (
     <div className="bubble bubble--intro">
       <style>{BUBBLE_CSS}</style>
       <div className="bubble-hello">
-        <p className="bubble-text bubble-typed" aria-hidden="true">
-          <span data-testid="intro-typed">{typed}</span>
-          {/* Holds the bubble at the line's full height, so it does not grow as it types. */}
-          <span className="bubble-ghost">{text.slice(typed.length)}</span>
-        </p>
+        {text !== '' && (
+          <p className="bubble-text bubble-typed" aria-hidden="true">
+            <span data-testid="intro-typed">{typed}</span>
+            {/* Holds the bubble at the line's full height, so it does not grow as it types. */}
+            <span className="bubble-ghost">{text.slice(typed.length)}</span>
+          </p>
+        )}
         <p role="status" className="bubble-sr">
           {text}
         </p>

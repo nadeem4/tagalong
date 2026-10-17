@@ -1,7 +1,7 @@
 /** Tests for the launch record, brain readiness and the launch line. */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Pet, Settings, type PickUpReadyParams, type SettingsPatch } from '@tagalong/protocol';
+import { Pet, Settings, type SettingsPatch } from '@tagalong/protocol';
 import { brainLine, brainReadiness, brainStatus, recordCleanClose, recordLaunch } from './launch';
 import { providerChoices } from './provider-choices';
 
@@ -114,24 +114,15 @@ describe('brainReadiness', () => {
 });
 
 describe('brainLine', () => {
-  it('says the brain’s line when Scout can think, or could not be checked', () => {
-    expect(brainLine('ready', 'Morning.')).toEqual({ text: 'Morning.' });
-    expect(brainLine('unknown', 'Morning.')).toEqual({ text: 'Morning.' });
+  it('is nothing when Scout can think, or could not be checked: the check-in has the line', () => {
+    expect(brainLine('ready')).toBeNull();
+    expect(brainLine('unknown')).toBeNull();
   });
 
   it('gives a status mark, never words in Scout’s voice, when Scout cannot think', () => {
-    expect(brainLine('signed-out', 'Morning.')).toEqual({ status: 'brain-signed-out' });
-    expect(brainLine('no-sign-in', 'Morning.')).toEqual({ status: 'brain-no-sign-in' });
-    expect(brainLine('no-key', 'Morning.')).toEqual({ status: 'brain-no-key' });
-  });
-
-  it('carries a pick-up when Scout can think, and drops it for the status line', () => {
-    const pickUp: PickUpReadyParams = {
-      text: 'Yesterday you were in ai_pet.',
-      items: [{ id: 'p1', kind: 'project', name: 'ai_pet', path: 'C:\\ai_pet', editor: 'vscode' }],
-    };
-    expect(brainLine('ready', pickUp.text, pickUp)).toEqual({ text: pickUp.text, pickUp });
-    expect(brainLine('no-key', pickUp.text, pickUp)).toEqual({ status: 'brain-no-key' });
+    expect(brainLine('signed-out')).toEqual({ status: 'brain-signed-out' });
+    expect(brainLine('no-sign-in')).toEqual({ status: 'brain-no-sign-in' });
+    expect(brainLine('no-key')).toEqual({ status: 'brain-no-key' });
   });
 });
 

@@ -2,7 +2,7 @@
  * The desktop's half of keeping an eye on things: every few seconds, the window titles go
  * to the engine, which decides everything else. No picture is taken and no window is read
  * here; while the setting is off, nothing is listed at all.
- * Contains keepAnEyeAllowed and startKeepAnEye.
+ * Contains keepAnEyeAllowed, fullScreenAsSeen and startKeepAnEye.
  */
 
 import type { WindowEntry } from '@tagalong/protocol';
@@ -16,6 +16,23 @@ export const KEEP_AN_EYE_INTERVAL_MS = 5_000;
  */
 export function keepAnEyeAllowed(env: Record<string, string | undefined>): boolean {
   return env.TAGALONG_FAKE_PROVIDERS !== '1' || env.TAGALONG_KEEP_AN_EYE === '1';
+}
+
+/**
+ * The windows as the engine sees them. Under fake providers no window counts as full screen:
+ * a check-in (the launch one included) waits behind a full-screen window, and the CI desktop's
+ * own windows must not make an end-to-end run silent at random.
+ */
+export function fullScreenAsSeen(
+  windows: WindowEntry[],
+  env: Record<string, string | undefined>,
+): WindowEntry[] {
+  if (env.TAGALONG_FAKE_PROVIDERS !== '1') return windows;
+  return windows.map((window) => {
+    const seen = { ...window };
+    delete seen.fullScreen;
+    return seen;
+  });
 }
 
 /** Starts the timer. Returns the function that stops it. */

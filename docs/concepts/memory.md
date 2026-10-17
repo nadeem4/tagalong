@@ -14,7 +14,7 @@ last few minutes of your screen.
 | **Thread summary** | `memories` table, kind `summary`               | Until deleted          | Built  |
 | **Memories**       | `memories` table, kind `fact` or `preference`  | Until deleted          | Built  |
 | **Screen**         | RAM in the desktop host, never written to disk | Ten minutes by default | Built  |
-| **Pick-up**        | `pick_up` table, one row from window titles    | Until offered or off   | Built  |
+| **Pick-up**        | `pick_up` table, one row from window titles    | Until used or off      | Built  |
 
 Everything except screen memory lives in `tagalong.db`, the local SQLite file in the data
 directory (`%APPDATA%\Tagalong` on Windows). Nothing leaves the machine except what a turn sends to
