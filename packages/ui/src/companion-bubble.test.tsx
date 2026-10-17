@@ -270,6 +270,37 @@ describe('CompanionBubble', () => {
   });
 });
 
+describe('CompanionBubble and background turns', () => {
+  it('never takes a background turn for the person’s own, whose answer still streams', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    await act(async () => ask('my question'));
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'job-turn',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+        background: true,
+        jobId: '20000000-0000-4000-8000-000000000001',
+      });
+    });
+    act(() => bridge.emit({ type: 'turn.delta', turnId: 'job-turn', text: 'Job gist.' }));
+    act(() => bridge.emit(done('job-turn', 'Job gist.')));
+    act(() =>
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'mine',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      }),
+    );
+    act(() => bridge.emit(done('mine', 'My answer.')));
+    expect(screen.queryByText('Job gist.')).toBeNull();
+    expect(screen.getByText('My answer.')).toBeVisible();
+  });
+});
+
 describe('CompanionBubble, expanded into the full chat', () => {
   async function twoExchanges(bridge: FakeHostBridge) {
     await act(async () => ask('first question'));

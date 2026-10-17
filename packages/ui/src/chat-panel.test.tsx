@@ -179,6 +179,33 @@ describe('ChatPanel', () => {
     expect(screen.getByText('A fox is a small canid.')).toHaveAttribute('data-role', 'assistant');
   });
 
+  it('ignores a background turn: it never streams into the panel over the person’s own', () => {
+    const bridge = createFakeHostBridge();
+    renderPanel(bridge);
+    send('Explain this');
+    act(() => {
+      bridge.emit({ type: 'turn.started', turnId: 't1', petId: 'scout', conversationId: 'c1' });
+      bridge.emit({ type: 'turn.delta', turnId: 't1', text: 'Mine' });
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'bg',
+        petId: 'scout',
+        conversationId: 'c2',
+        background: true,
+      });
+      bridge.emit({ type: 'turn.delta', turnId: 'bg', text: 'Routine words' });
+      bridge.emit({
+        type: 'turn.completed',
+        turnId: 'bg',
+        text: 'Routine words',
+        stopReason: 'end',
+        usage: { inputTokens: 1, outputTokens: 1 },
+      });
+    });
+    expect(screen.getByTestId('streaming-message')).toHaveTextContent('Mine');
+    expect(screen.queryByText('Routine words')).not.toBeInTheDocument();
+  });
+
   it('names the speaker from the pet the host passes, with the model', () => {
     const bridge = createFakeHostBridge();
     renderPanel(bridge);
