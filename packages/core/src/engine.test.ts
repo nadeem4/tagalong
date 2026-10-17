@@ -1384,68 +1384,57 @@ describe('the built-in blind spots', () => {
   });
 });
 
-describe('greeting.compose', () => {
-  it('returns the line the brain wrote for the opening app', async () => {
+/** A brain that answers every call with one reply and keeps what each call was sent. */
+function recordingBrain(text: string): { provider: BrainProvider; sent: string[] } {
+  const sent: string[] = [];
+  const provider: BrainProvider = {
+    id: 'fake',
+    capabilities: { vision: false, tools: false },
+    complete: (request) => {
+      sent.push(JSON.stringify(request.messages));
+      return Promise.resolve({ text, stopReason: 'end', usage: { inputTokens: 1, outputTokens: 1 } });
+    },
+  };
+  return { provider, sent };
+}
+
+describe('checkIn.launch', () => {
+  const launch = { crashed: false, lastVersion: '0.4.0', version: '0.4.0', releaseNotes: '' };
+
+  it('answers at once, and the mind’s line follows as pet.remark', async () => {
     const e = await boot(new FakeBrainProvider({ text: 'Morning. Good to see you again.' }));
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
-    const res = await host.call('greeting.compose', { petId: 'scout' });
-    expect(res['result']).toEqual({ text: 'Morning. Good to see you again.', source: 'model' });
-  });
-
-  it('greets by the name in settings when the brain cannot', async () => {
-    const failing: BrainProvider = {
-      id: 'fake',
-      capabilities: { vision: false, tools: false },
-      complete: () => Promise.reject(new Error('offline')),
-    };
-    const e = await boot(failing);
-    const host = await TestHost.connect(e.port);
-    await host.call('hello', helloParams(e.pairingToken));
-    await host.call('settings.set', { patch: { userName: 'Nadeem' } });
-    const res = await host.call('greeting.compose', { petId: 'scout' });
-    expect((res['result'] as { text: string }).text).toContain(', Nadeem');
-  });
-
-  it('counts the time away from when Tagalong was last closed, not last launched', async () => {
-    const failing: BrainProvider = {
-      id: 'fake',
-      capabilities: { vision: false, tools: false },
-      complete: () => Promise.reject(new Error('offline')),
-    };
-    const e = await boot(failing);
-    const host = await TestHost.connect(e.port);
-    await host.call('hello', helloParams(e.pairingToken));
-    const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
-    // Opened three days ago and left running until an hour ago: away an hour, not three days.
-    await host.call('settings.set', {
-      patch: { lastOpenedAt: hoursAgo(72), lastClosedAt: hoursAgo(1) },
+    const res = await host.call('checkIn.launch', { launch });
+    expect(res['result']).toEqual({});
+    await vi.waitFor(() => expect(host.methods()).toContain('pet.remark'), { timeout: 5000 });
+    expect(host.notifications.find((n) => n.method === 'pet.remark')?.params).toMatchObject({
+      petId: 'scout',
+      text: 'Morning. Good to see you again.',
     });
-    const away = await host.call('greeting.compose', { petId: 'scout' });
-    expect((away['result'] as { text: string }).text).not.toContain('Back after');
-
-    // A crash wrote no close: the last launch is the best guess.
-    await host.call('settings.set', {
-      patch: { lastOpenedAt: hoursAgo(72), lastClosedAt: hoursAgo(100) },
-    });
-    const crashed = await host.call('greeting.compose', { petId: 'scout' });
-    expect((crashed['result'] as { text: string }).text).toContain('Back after 3 days');
   });
 
-  it('refuses a pet that does not exist', async () => {
-    const e = await boot();
+  it('says nothing, and asks nothing, with "Say hello" off or when the mind passes', async () => {
+    const quiet = recordingBrain('Morning.');
+    const e = await boot(quiet.provider);
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
-    const res = await host.call('greeting.compose', { petId: 'nobody' });
-    expect(res['error']).toBeDefined();
+    await host.call('settings.set', { patch: { greeting: false } });
+    await host.call('checkIn.launch', { launch });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(quiet.sent).toEqual([]);
+    await e.shutdown();
+    engine = undefined;
+
+    const e2 = await boot(new FakeBrainProvider({ text: 'NOTHING' }));
+    const host2 = await TestHost.connect(e2.port);
+    await host2.call('hello', helloParams(e2.pairingToken));
+    await host2.call('checkIn.launch', { launch });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(host2.methods()).not.toContain('pet.remark');
   });
 
-  it('says it closed unexpectedly when main says the last launch crashed', async () => {
-    const failing: BrainProvider = {
-      id: 'fake',
-      capabilities: { vision: false, tools: false },
-      complete: () => Promise.reject(new Error('offline')),
-    };
+  it('sends the time away, a crash with the runs it cut short, and an update with its notes', async () => {
     // A hand-off still running when the last launch died: boot closes it as interrupted.
     const seeded = openDatabase(dir);
     new ActivityLog(seeded, new ConversationStore(seeded)).expertStarted({
@@ -1455,41 +1444,32 @@ describe('greeting.compose', () => {
       text: 'Fix the test.',
     });
     seeded.close();
-
-    const e = await boot(failing);
+    const brain = recordingBrain('NOTHING');
+    const e = await boot(brain.provider);
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
-    const launch = { crashed: true, lastVersion: '0.4.0', version: '0.4.0', whatsNew: '' };
-    const res = await host.call('greeting.compose', { petId: 'scout', launch });
-    expect((res['result'] as { text: string }).text).toContain(
-      'I closed unexpectedly last time, and one task stopped.',
-    );
-  });
+    const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
+    // Opened three days ago and left running until an hour ago: away an hour, not three days.
+    await host.call('settings.set', {
+      patch: { lastOpenedAt: hoursAgo(72), lastClosedAt: hoursAgo(1) },
+    });
+    await host.call('checkIn.launch', { launch: { ...launch, crashed: true } });
+    await vi.waitFor(() => expect(brain.sent).toHaveLength(1));
+    expect(brain.sent[0]).toContain('They were away for 1 hour.');
+    expect(brain.sent[0]).toContain('1 run was cut short');
 
-  it('says what is new when the version changed', async () => {
-    const failing: BrainProvider = {
-      id: 'fake',
-      capabilities: { vision: false, tools: false },
-      complete: () => Promise.reject(new Error('offline')),
-    };
-    const e = await boot(failing);
-    const host = await TestHost.connect(e.port);
-    await host.call('hello', helloParams(e.pairingToken));
-    const launch = {
-      crashed: false,
-      lastVersion: '0.4.0',
-      version: '0.5.0',
-      whatsNew: 'Setup by voice.',
-    };
-    const res = await host.call('greeting.compose', { petId: 'scout', launch });
-    expect((res['result'] as { text: string }).text).toContain(
-      'I’ve been updated to 0.5.0. Setup by voice.',
+    await host.call('checkIn.launch', {
+      launch: { ...launch, version: '0.5.0', releaseNotes: 'New in 0.5.0: setup by voice.' },
+    });
+    await vi.waitFor(() => expect(brain.sent).toHaveLength(2));
+    expect(brain.sent[1]).toContain(
+      'Tagalong was updated from 0.4.0 to 0.5.0. New in 0.5.0: setup by voice.',
     );
   });
 });
 
 describe('pick up where you left off', () => {
-  const launch = { crashed: false, lastVersion: '0.4.0', version: '0.4.0', whatsNew: '' };
+  const launch = { crashed: false, lastVersion: '0.4.0', version: '0.4.0', releaseNotes: '' };
 
   /** A snapshot taken eight hours ago, as a quit last night would leave it. */
   function seedSnapshot(): void {
@@ -1511,68 +1491,29 @@ describe('pick up where you left off', () => {
     seeded.close();
   }
 
-  function counting(): { provider: BrainProvider; calls: () => number } {
-    let calls = 0;
-    const provider: BrainProvider = {
-      id: 'fake',
-      capabilities: { vision: false, tools: false },
-      complete: () => {
-        calls += 1;
-        return Promise.resolve({
-          text: 'Morning.',
-          stopReason: 'end',
-          usage: { inputTokens: 1, outputTokens: 1 },
-        });
-      },
-    } as unknown as BrainProvider;
-    return { provider, calls: () => calls };
-  }
-
-  it('says the pick-up as the launch line, handwritten, with no model call', async () => {
+  it('a launch hands the snapshot to the mind, and its line rides with the Pick up card', async () => {
     seedSnapshot();
-    const { provider, calls } = counting();
-    const e = await boot(provider);
-    const host = await TestHost.connect(e.port);
-    await host.call('hello', helloParams(e.pairingToken));
-    const res = await host.call('greeting.compose', { petId: 'scout', launch });
-    const result = res['result'] as {
-      text: string;
-      source: string;
-      pickUp?: { text: string; items: { kind: string; id: string }[] };
-    };
-    expect(result.source).toBe('fallback');
-    expect(result.text).toContain('ai_pet');
-    expect(result.pickUp?.text).toBe(result.text);
-    expect(result.pickUp?.items.map((item) => item.kind)).toEqual(['project', 'handoff']);
-    expect(calls()).toBe(0);
-
-    // Once: the next launch line is an ordinary one.
-    const again = await host.call('greeting.compose', { petId: 'scout', launch });
-    expect((again['result'] as { pickUp?: unknown }).pickUp).toBeUndefined();
-  });
-
-  it('lets an update line win over the pick-up, which then waits', async () => {
-    seedSnapshot();
-    const e = await boot();
-    const host = await TestHost.connect(e.port);
-    await host.call('hello', helloParams(e.pairingToken));
-    const updated = { ...launch, version: '0.5.0', whatsNew: 'New things.' };
-    const res = await host.call('greeting.compose', { petId: 'scout', launch: updated });
-    expect((res['result'] as { pickUp?: unknown }).pickUp).toBeUndefined();
-  });
-
-  it('briefs again into the hand-off card, never starting it, and Not now drops it', async () => {
-    seedSnapshot();
-    const e = await boot();
+    const brain = recordingBrain('Back to ai_pet?');
+    const e = await boot(brain.provider);
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
     await host.call('experts.upsert', {
       expert: { id: 'claude-code', name: 'Claude Code', connection: { type: 'claude-code' } },
     });
-    const res = await host.call('greeting.compose', { petId: 'scout', launch });
-    const items = (res['result'] as { pickUp: { items: { kind: string; id: string }[] } }).pickUp
-      .items;
-    const handoff = items.find((item) => item.kind === 'handoff');
+    await host.call('checkIn.launch', { launch });
+    await vi.waitFor(() => expect(host.methods()).toContain('pickUp.ready'), { timeout: 5000 });
+    expect(brain.sent[0]).toContain('Where they left off');
+    expect(brain.sent[0]).toContain('ai_pet');
+    const ready = host.notifications.find((n) => n.method === 'pickUp.ready')!.params as {
+      text: string;
+      items: { kind: string; id: string }[];
+    };
+    expect(ready.text).toBe('Back to ai_pet?');
+    expect(ready.items.map((item) => item.kind)).toEqual(['project', 'handoff']);
+    expect(host.methods()).not.toContain('pet.remark');
+
+    // Brief again goes to the hand-off card, never starting it; Not now drops it.
+    const handoff = ready.items.find((item) => item.kind === 'handoff');
     const rebrief = await host.call('pickUp.rebrief', { itemId: handoff?.id });
     expect(rebrief['result']).toEqual({ proposed: true });
     await vi.waitFor(() => expect(host.methods()).toContain('handoff.proposed'));
@@ -1580,16 +1521,38 @@ describe('pick up where you left off', () => {
     expect(await host.call('pickUp.dismiss', {})).toMatchObject({ result: { dismissed: true } });
     const after = await host.call('pickUp.rebrief', { itemId: handoff?.id });
     expect(after['result']).toEqual({ proposed: false });
+
+    // Taken once: the next launch has nothing to pick up.
+    await host.call('checkIn.launch', { launch });
+    await vi.waitFor(() => expect(brain.sent).toHaveLength(2));
+    expect(brain.sent[1]).not.toContain('Where they left off');
   });
 
-  it('deletes the snapshot when switched off, and offers nothing', async () => {
+  it('a silent mind spends the snapshot and shows no card', async () => {
     seedSnapshot();
-    const e = await boot();
+    const brain = recordingBrain('NOTHING');
+    const e = await boot(brain.provider);
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('checkIn.launch', { launch });
+    await vi.waitFor(() => expect(brain.sent).toHaveLength(1));
+    expect(brain.sent[0]).toContain('Where they left off');
+    await host.call('checkIn.launch', { launch });
+    await vi.waitFor(() => expect(brain.sent).toHaveLength(2));
+    expect(brain.sent[1]).not.toContain('Where they left off');
+    expect(host.methods()).not.toContain('pickUp.ready');
+  });
+
+  it('deletes the snapshot when switched off, and sends none', async () => {
+    seedSnapshot();
+    const brain = recordingBrain('NOTHING');
+    const e = await boot(brain.provider);
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
     await host.call('settings.set', { patch: { pickUp: false } });
-    const res = await host.call('greeting.compose', { petId: 'scout', launch });
-    expect((res['result'] as { pickUp?: unknown }).pickUp).toBeUndefined();
+    await host.call('checkIn.launch', { launch });
+    await vi.waitFor(() => expect(brain.sent).toHaveLength(1));
+    expect(brain.sent[0]).not.toContain('Where they left off');
     await e.shutdown();
     engine = undefined;
     const db = openDatabase(dir);

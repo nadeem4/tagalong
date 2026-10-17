@@ -8,10 +8,13 @@ import { Expert, Settings } from '@tagalong/protocol';
 import type {
   Brief,
   HandoffFinishedParams,
+  LaunchFacts,
   PetMoodParams,
   PetRemarkParams,
+  PickUpReadyParams,
   WindowEntry,
 } from '@tagalong/protocol';
+import type { PickUpReady } from '../pick-up/pick-up';
 import type { PerceptionHost } from '../perception';
 import type { Memory } from '../memory/memories';
 import { soul } from '../roles';
@@ -44,6 +47,10 @@ interface SetupOptions {
   text?: string;
   hostWindows?: WindowEntry[] | null;
   memories?: Memory[];
+  /** A pick-up ready to take, once. */
+  pickUp?: PickUpReady | null;
+  routines?: string[];
+  interrupted?: number;
 }
 
 function setup(options: SetupOptions = {}) {
@@ -67,6 +74,9 @@ function setup(options: SetupOptions = {}) {
   const reads: Array<string | undefined> = [];
   const remarks: PetRemarkParams[] = [];
   const moods: PetMoodParams['mood'][] = [];
+  const pickUps: PickUpReadyParams[] = [];
+  const pickUp = { ready: options.pickUp ?? null, takes: 0 };
+  const routinesSince: string[] = [];
   const proposals: Array<{ expertId: string; petId: string; brief: Brief; projectHint?: string }> =
     [];
   const host: PerceptionHost = {
@@ -107,9 +117,21 @@ function setup(options: SetupOptions = {}) {
     },
     handoff: (handoffId) =>
       handoffId === HANDOFF_ID ? { expertName: 'Claude Code', ask: 'fix the login test' } : null,
+    routinesSince: (iso) => {
+      routinesSince.push(iso);
+      return options.routines ?? [];
+    },
+    interruptedAtBoot: options.interrupted ?? 0,
+    takePickUp: () => {
+      pickUp.takes += 1;
+      const ready = pickUp.ready;
+      pickUp.ready = null;
+      return ready;
+    },
     propose: (params) => proposals.push(params),
     emit: (event) => {
       if (event.method === 'pet.remark') remarks.push(event.params);
+      else if (event.method === 'pickUp.ready') pickUps.push(event.params);
       else moods.push(event.params.mood);
     },
     spentOut: () => state.spentOut,
@@ -128,7 +150,22 @@ function setup(options: SetupOptions = {}) {
       await checkIn.observeActivity({ idleMs: 0, windows });
     }
   };
-  return { clock, state, mind, reads, remarks, moods, proposals, logs, checkIn, settle, stretch };
+  return {
+    clock,
+    state,
+    mind,
+    reads,
+    remarks,
+    moods,
+    pickUps,
+    pickUp,
+    routinesSince,
+    proposals,
+    logs,
+    checkIn,
+    settle,
+    stretch,
+  };
 }
 
 const HANDOFF_ID = '00000000-0000-4000-8000-000000000001';
@@ -557,5 +594,161 @@ describe('CheckIn: offers and accept', () => {
     await t.checkIn.observeWindows([failing]);
     await t.checkIn.finished(finishedDone);
     expect(await t.checkIn.accept(t.remarks[0]!.remarkId)).toBe(false);
+  });
+});
+
+describe('CheckIn: launch and back', () => {
+  const facts: LaunchFacts = {
+    crashed: false,
+    lastVersion: '0.1.0',
+    version: '0.1.0',
+    releaseNotes: 'New in 0.1.0: translation.',
+  };
+  const ready: PickUpReady = {
+    takenAt: 10 * 24 * 60 * MINUTE - 14 * 60 * MINUTE,
+    items: [{ id: 'p1', kind: 'project', name: 'ai_pet', path: 'C:\\ai_pet', editor: 'vscode' }],
+  };
+  const iso = (t: number) => new Date(t).toISOString();
+
+  it('a launch waits for "Say hello", and is not held by the cooldown or Not now', async () => {
+    const off = setup({ settings: { greeting: false }, pickUp: ready });
+    await off.checkIn.launch(facts);
+    expect(off.mind.requests).toHaveLength(0);
+    // The pick-up stays for the back check.
+    expect(off.pickUp.takes).toBe(0);
+
+    const t = setup({ mind: ['NOTHING', 'Morning.'] });
+    t.checkIn.notNow();
+    t.clock.t += NOT_NOW_MS;
+    await t.checkIn.observeWindows([failing]);
+    t.checkIn.notNow();
+    await t.checkIn.launch(facts);
+    expect(t.mind.requests).toHaveLength(2);
+    expect(t.remarks.map((remark) => remark.text)).toEqual(['Morning.']);
+  });
+
+  it('a launch is stopped by the budget and by a call in front', async () => {
+    const spent = setup({ spentOut: true, pickUp: ready });
+    await spent.checkIn.launch(facts);
+    const call = setup({ hostWindows: [win('w-3', 'Meeting', { processName: 'Zoom.exe' })] });
+    await call.checkIn.launch(facts);
+    expect(spent.mind.requests).toHaveLength(0);
+    expect(spent.pickUp.takes).toBe(0);
+    expect(call.mind.requests).toHaveLength(0);
+  });
+
+  it('a launch starts the cooldown, so a window right after it waits', async () => {
+    const t = setup();
+    await t.checkIn.launch(facts);
+    t.clock.t += MINUTE;
+    await t.checkIn.observeWindows([failing]);
+    expect(t.mind.requests).toHaveLength(1);
+  });
+
+  it('a launch reads the last open before the host overwrites it, and sends its facts', async () => {
+    const opened = 10 * 24 * 60 * MINUTE - 20 * 60 * MINUTE;
+    const t = setup({
+      settings: { lastOpenedAt: iso(opened), lastClosedAt: iso(opened + 6 * 60 * MINUTE) },
+      routines: ['Morning papers'],
+      interrupted: 2,
+    });
+    const pending = t.checkIn.launch({ ...facts, crashed: true });
+    // The host records this launch at once; the check-in already has the last one.
+    t.state.settings = Settings.parse({ ...t.state.settings, lastOpenedAt: iso(t.clock.t) });
+    await pending;
+    expect(t.routinesSince).toEqual([iso(opened)]);
+    const sent = sentText(t.mind.requests[0]!);
+    expect(sent).toContain('Tagalong just opened.');
+    expect(sent).toContain('They were away for 14 hours.');
+    expect(sent).toContain('2 runs were cut short');
+    expect(sent).toContain('Routines that ran since: Morning papers.');
+    expect(sent).not.toContain('updated');
+    expect(sent).toContain('They said: "Why is port 3000 taken?"');
+  });
+
+  it('an update is said with its release notes; a crash over it is the installer, not said', async () => {
+    const t = setup({ interrupted: 1 });
+    await t.checkIn.launch({ ...facts, crashed: true, lastVersion: '0.0.9' });
+    const sent = sentText(t.mind.requests[0]!);
+    expect(sent).toContain('Tagalong was updated from 0.0.9 to 0.1.0. New in 0.1.0: translation.');
+    expect(sent).not.toContain('closed unexpectedly');
+    // A first launch knows no last version: no update, and no routines without a last open.
+    const first = setup();
+    await first.checkIn.launch({ ...facts, lastVersion: null });
+    expect(sentText(first.mind.requests[0]!)).not.toContain('updated');
+    expect(first.routinesSince).toEqual([]);
+  });
+
+  it('the first hello after Welcome says so', async () => {
+    const t = setup({ mind: ['Hi Sam.'] });
+    await t.checkIn.launch({ ...facts, lastVersion: null, welcomed: true });
+    expect(sentText(t.mind.requests[0]!)).toContain('They just finished setting Tagalong up');
+    expect(t.remarks.map((remark) => remark.text)).toEqual(['Hi Sam.']);
+  });
+
+  it('a launch with a pick-up sends it, and its line rides with the Pick up card', async () => {
+    const t = setup({ mind: ['Back to the parser?\nMOOD: cheer'], pickUp: ready });
+    await t.checkIn.launch(facts);
+    expect(sentText(t.mind.requests[0]!)).toContain('## Where they left off');
+    expect(sentText(t.mind.requests[0]!)).toContain('- ai_pet');
+    expect(t.pickUps).toEqual([{ text: 'Back to the parser?', items: ready.items }]);
+    expect(t.remarks).toHaveLength(0);
+    expect(t.moods).toEqual(['cheer']);
+  });
+
+  it('a silent launch spends the pick-up and shows nothing', async () => {
+    const t = setup({ mind: ['NOTHING'], pickUp: ready });
+    await t.checkIn.launch(facts);
+    expect(t.pickUp.takes).toBe(1);
+    expect(t.pickUp.ready).toBeNull();
+    expect(t.pickUps).toHaveLength(0);
+    expect(t.remarks).toHaveLength(0);
+  });
+
+  it('a launch with pick-up switched off takes none', async () => {
+    const t = setup({ settings: { pickUp: false }, pickUp: ready });
+    await t.checkIn.launch(facts);
+    expect(t.pickUp.takes).toBe(0);
+    expect(sentText(t.mind.requests[0]!)).not.toContain('Where they left off');
+  });
+
+  it('back: a ready pick-up wakes the mind once, and its line rides with the card', async () => {
+    const t = setup({ mind: ['Welcome back.'], pickUp: ready });
+    await t.checkIn.back();
+    expect(t.mind.requests).toHaveLength(1);
+    const sent = sentText(t.mind.requests[0]!);
+    expect(sent).toMatch(/^## Why you woke\nThey are back after 14 hours\./);
+    expect(t.pickUps).toEqual([{ text: 'Welcome back.', items: ready.items }]);
+    // Taken: the next back finds nothing to ask about.
+    t.clock.t += COOLDOWN_MS;
+    await t.checkIn.back();
+    expect(t.mind.requests).toHaveLength(1);
+  });
+
+  it('back waits for its switch, the cooldown and Not now, and leaves the pick-up for later', async () => {
+    const off = setup({ settings: { pickUp: false }, pickUp: ready });
+    await off.checkIn.back();
+    expect(off.pickUp.takes).toBe(0);
+
+    const t = setup({ pickUp: ready });
+    await t.checkIn.observeWindows([failing]);
+    await t.checkIn.back();
+    expect(t.mind.requests).toHaveLength(1);
+    expect(t.pickUp.takes).toBe(0);
+    t.clock.t += COOLDOWN_MS;
+    t.checkIn.notNow();
+    await t.checkIn.back();
+    expect(t.pickUp.takes).toBe(0);
+    t.clock.t += NOT_NOW_MS;
+    await t.checkIn.back();
+    expect(t.pickUp.takes).toBe(1);
+    expect(t.mind.requests).toHaveLength(2);
+  });
+
+  it('a source that throws is silence, never a throw', async () => {
+    const t = setup({ pickUp: ready });
+    t.state.closed = true;
+    await expect(t.checkIn.launch(facts)).resolves.toBeUndefined();
+    expect(t.pickUps).toHaveLength(0);
   });
 });

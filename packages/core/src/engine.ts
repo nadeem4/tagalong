@@ -14,8 +14,6 @@ import { ActivityLog } from './memory/activity';
 import { ConversationStore } from './memory/store';
 import { MemoryStore } from './memory/memories';
 import { Summarizer } from './memory/summarizer';
-import { composeGreeting } from './greeting/greeting';
-import { launchScenario } from './greeting/scenario';
 import { PetRegistry } from './pets/registry';
 import { SettingsStore } from './settings/settings';
 import type { SecretStore } from './settings/settings';
@@ -326,12 +324,17 @@ export class Engine {
     // The runner needs an event sink before the server exists, and the server needs the
     // runner's handlers before it starts. The holder ties that knot without a mutable
     // binding: no turn can run before boot returns, so the sink is never called empty.
-    const live: { server?: EngineServer; routines?: Routines; checkIn?: CheckIn } = {};
+    const live: {
+      server?: EngineServer;
+      routines?: Routines;
+      checkIn?: CheckIn;
+      pickUp?: PickUp;
+    } = {};
     // Home's activity record is written before the broadcast, so a host that re-reads
     // activity.list on a notification already finds the row.
     const activity = new ActivityLog(db, store);
     // Nothing runs yet, so anything still marked running was cut short by a crash or quit.
-    // The count is kept for the launch line, which names it only after a crash.
+    // The count is a launch fact the check-in may mention after a crash.
     const interruptedAtBoot = activity.interrupted();
     const routineStore = new RoutineStore(db);
     routineStore.interrupted();
@@ -425,6 +428,10 @@ export class Engine {
       now: nowSources,
       memories: () => memory.recent(SCOUT_ID, 5),
       lastExchange: () => activity.lastExchange(SCOUT_ID),
+      routinesSince: (iso) => activity.routinesFinishedSince(iso),
+      interruptedAtBoot,
+      // Built below: a pick-up is taken only by a launch or back check-in, after boot.
+      takePickUp: () => live.pickUp?.take() ?? null,
       handoff: (handoffId) => activity.expertEntry(handoffId),
       propose: (params) => handoffs.propose(params),
       emit: (event) => live.server?.broadcast(event.method, event.params),
@@ -560,7 +567,8 @@ export class Engine {
     });
     live.routines = routines;
 
-    // Pick up where you left off: one snapshot every ten minutes, offered once when you are back.
+    // Pick up where you left off: one snapshot every ten minutes; when it is ready (back after
+    // a long break) the check-in takes it and the mind decides whether to say anything.
     const pickUp = new PickUp({
       store: pickUpStore,
       clock: systemWatchClock,
@@ -573,9 +581,10 @@ export class Engine {
       stoppedSince: (since) => activity.expertsLeftSince(since),
       propose: ({ expertId, ask }) =>
         void handoffs.propose({ expertId, petId: SCOUT_ID, brief: { ask } }),
-      emit: (params) => live.server?.broadcast('pickUp.ready', params),
+      onReady: () => void checkIn.back(),
       log: (message) => console.warn(`[engine] ${message}`),
     });
+    live.pickUp = pickUp;
 
     const handlers = buildHandlers({
       activity,
@@ -588,11 +597,9 @@ export class Engine {
       handoffs,
       projects,
       connectorFor,
-      resolve,
       checkIn,
       connections,
       approvals,
-      interruptedAtBoot,
       routines,
       pickUp,
       calendar,
@@ -690,14 +697,10 @@ function buildHandlers(parts: {
   routines: Routines;
   pickUp: PickUp;
   calendar: CalendarFeed;
-  /** The guarded resolver turns use, for the one-off greeting call. */
-  resolve: ProviderResolver;
   models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
   checkIn: CheckIn;
   connections: ConnectionManager;
   approvals: Approvals;
-  /** Runs boot found still running and closed as interrupted. */
-  interruptedAtBoot: number;
   /** Which hosts are connected now, for the health check's browser row. */
   hostKinds: () => readonly HostKind[];
   claudeCodeConfigPath: string | undefined;
@@ -712,8 +715,8 @@ function buildHandlers(parts: {
   checkResolve: ProviderResolver;
 }): MethodHandlers {
   const { activity, runner, pets, settings, models, hosts, watches } = parts;
-  const { refreshProviders, experts, handoffs, projects, connectorFor, resolve } = parts;
-  const { checkIn, connections, approvals, routines, interruptedAtBoot, pickUp } = parts;
+  const { refreshProviders, experts, handoffs, projects, connectorFor } = parts;
+  const { checkIn, connections, approvals, routines, pickUp } = parts;
   const { sightLog, checkResolve } = parts;
   const { calendar } = parts;
   const { hostKinds } = parts;
@@ -821,53 +824,14 @@ function buildHandlers(parts: {
     'handoffs.dismiss': (params) => ({ dismissed: handoffs.dismiss(params.proposalId) }),
     'projects.search': (params) => ({ projects: projects.search(params.query) }),
 
-    // The line said as the app opens. Reads no screen: the time, the time away, and the
-    // hand-offs that finished since the last launch. Never fails: a fallback line stands in.
-    'greeting.compose': async (params) => {
-      const pet = pets.get(params.petId);
-      if (pet === null) {
-        throw new RpcFailure(RPC_ERROR_CODES.invalidParams, `no pet with id '${params.petId}'`);
-      }
-      await refreshProviders();
-      const { summarizer, lastOpenedAt, lastClosedAt, userName } = settings.get();
-      // Away since the last quit; a crash records no quit, so then since the last launch.
-      const awaySince = [lastOpenedAt, lastClosedAt]
-        .filter((at): at is string => at !== null)
-        .map((at) => new Date(at))
-        .reduce<Date | null>((latest, at) => (latest === null || at > latest ? at : latest), null);
-      const now = new Date();
-      const scenario =
-        params.launch === undefined
-          ? undefined
-          : launchScenario({
-              crashed: params.launch.crashed,
-              lastVersion: params.launch.lastVersion,
-              version: params.launch.version,
-              now,
-              awaySince,
-              pickUpReady: pickUp.ready() !== null,
-            });
-      // A pick-up is handwritten from what was open, with no model call, so it never
-      // invents a file. It is taken here, once.
-      const offered = scenario === 'pickUp' ? pickUp.take() : null;
-      if (offered !== null) return { text: offered.text, source: 'fallback', pickUp: offered };
-      return composeGreeting({
-        pet,
-        summarizer,
-        provider: resolve,
-        context: {
-          now,
-          awaySince,
-          handoffs: lastOpenedAt === null ? [] : activity.expertsFinishedSince(lastOpenedAt),
-          routines: lastOpenedAt === null ? [] : activity.routinesFinishedSince(lastOpenedAt),
-          userName,
-          interrupted: interruptedAtBoot,
-          ...(scenario === undefined ? {} : { scenario }),
-          ...(scenario === 'update' && params.launch !== undefined
-            ? { update: { version: params.launch.version, whatsNew: params.launch.whatsNew } }
-            : {}),
-        },
-      });
+    // The app opened: answers at once. The check-in reads the settings before this returns
+    // (the host records this launch right after), then runs off the request path and ends
+    // in a pet.remark or pickUp.ready notification within 15 seconds, or in nothing.
+    'checkIn.launch': async (params) => {
+      // A key saved since the last ask is used by this one.
+      await refreshProviders().catch(() => undefined);
+      void checkIn.launch(params.launch);
+      return {};
     },
     // Answers at once: a check-in, when there is one, runs off the request path and ends
     // in a pet.remark or pet.mood notification or, most of the time, in nothing.

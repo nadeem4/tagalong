@@ -44,7 +44,7 @@ const HOST_TO_CORE = [
   'handoffs.confirm',
   'handoffs.dismiss',
   'projects.search',
-  'greeting.compose',
+  'checkIn.launch',
   'keepAnEye.observe',
   'keepAnEye.notNow',
   'keepAnEye.accept',
@@ -240,43 +240,34 @@ describe('schema lookup helpers', () => {
   });
 });
 
-describe('greeting.compose', () => {
-  it('names the pet that says hello, and returns one line and where it came from', () => {
-    expect(paramsSchemaFor('greeting.compose').parse({ petId: 'scout' })).toEqual({
-      petId: 'scout',
-    });
-    const line = { text: 'Morning. I’m here when you need me.', source: 'fallback' };
-    expect(resultSchemaFor('greeting.compose').parse(line)).toEqual(line);
+describe('checkIn.launch', () => {
+  const launch = {
+    crashed: true,
+    lastVersion: '0.3.0',
+    version: '0.4.0',
+    releaseNotes: 'New in 0.4.0: setup by voice.',
+  };
+
+  it('carries what main recorded about the last launch, and answers at once with nothing', () => {
+    expect(paramsSchemaFor('checkIn.launch').parse({ launch })).toEqual({ launch });
+    expect(
+      paramsSchemaFor('checkIn.launch').parse({ launch: { ...launch, lastVersion: null } }),
+    ).toEqual({ launch: { ...launch, lastVersion: null } });
+    expect(resultSchemaFor('checkIn.launch').parse({})).toEqual({});
   });
 
-  it('refuses an empty line', () => {
-    expect(
-      resultSchemaFor('greeting.compose').safeParse({ text: '', source: 'model' }).success,
-    ).toBe(false);
+  it('marks the first hello, just after Welcome', () => {
+    const first = { ...launch, welcomed: true };
+    expect(paramsSchemaFor('checkIn.launch').parse({ launch: first })).toEqual({ launch: first });
   });
 
-  it('carries what main recorded about the last launch, when it has it', () => {
-    const launch = {
-      crashed: true,
-      lastVersion: '0.3.0',
-      version: '0.4.0',
-      whatsNew: 'Setup by voice.',
-    };
-    expect(paramsSchemaFor('greeting.compose').parse({ petId: 'scout', launch })).toEqual({
-      petId: 'scout',
-      launch,
-    });
+  it('allows empty release notes but not an empty version', () => {
     expect(
-      paramsSchemaFor('greeting.compose').parse({
-        petId: 'scout',
-        launch: { ...launch, lastVersion: null },
-      }),
-    ).toEqual({ petId: 'scout', launch: { ...launch, lastVersion: null } });
+      paramsSchemaFor('checkIn.launch').safeParse({ launch: { ...launch, releaseNotes: '' } })
+        .success,
+    ).toBe(true);
     expect(
-      paramsSchemaFor('greeting.compose').safeParse({
-        petId: 'scout',
-        launch: { ...launch, version: '' },
-      }).success,
+      paramsSchemaFor('checkIn.launch').safeParse({ launch: { ...launch, version: '' } }).success,
     ).toBe(false);
   });
 });

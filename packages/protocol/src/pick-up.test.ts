@@ -64,13 +64,4 @@ describe('pickUp.ready and its methods', () => {
       dismissed: false,
     });
   });
-
-  it('lets greeting.compose carry the pick-up it is saying', () => {
-    const line = {
-      text: 'Yesterday you were in ai_pet.',
-      source: 'fallback',
-      pickUp: { text: 'Yesterday you were in ai_pet.', items: [PROJECT] },
-    };
-    expect(resultSchemaFor('greeting.compose').parse(line)).toEqual(line);
-  });
 });

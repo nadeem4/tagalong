@@ -1,6 +1,7 @@
 /**
  * Pick up where you left off. Scout keeps one snapshot of what you were in the middle of,
- * from window titles only, and offers it once when you come back after a long break.
+ * from window titles only, and hands it to a check-in when you come back after a long break:
+ * the mind may say a line about it, which comes with the card, or nothing.
  * Nothing opens or runs without a click on the card.
  * Contains the pick-up items and the `pickUp.*` messages.
  */
@@ -37,7 +38,7 @@ export type PickUpHandoff = z.infer<typeof PickUpHandoff>;
 export const PickUpItem = z.discriminatedUnion('kind', [PickUpProject, PickUpHandoff]);
 export type PickUpItem = z.infer<typeof PickUpItem>;
 
-/** The one line Scout says when you are back, and what the card lists. */
+/** The mind's line when you are back (from a check-in), and what the card lists. */
 export const PickUpReadyParams = z.object({
   text: z.string().min(1),
   items: z.array(PickUpItem).min(1),
