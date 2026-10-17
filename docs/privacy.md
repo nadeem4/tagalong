@@ -546,7 +546,7 @@ picture, no window text). Neither is stored.
 ## Finished hand-offs
 
 When an expert you handed work to finishes, Scout makes one check-in about it: the expert's name,
-the first line of what it was asked, how it ended, and the last 1,500 characters of its answer (or
+the start of what it was asked (its first paragraph, at most 100 characters), how it ended, and the last 1,500 characters of its answer (or
 its error) go to the summaries model with the facts every check-in carries, so Scout can say one
 short line about the outcome. The card keeps the whole answer; the answer is never read out. A
 routine's own hand-off is delivered by the routine and gets no check-in.

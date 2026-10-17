@@ -113,7 +113,8 @@ export function renderMemories(memories: readonly Memory[]): string {
   return lines.length > 1 ? lines.join('\n') : '';
 }
 
-function safe<T>(read: () => T, fallback: T): T {
+/** A source that throws (a store closed under it) reads as the fallback. */
+export function safe<T>(read: () => T, fallback: T): T {
   try {
     return read();
   } catch {

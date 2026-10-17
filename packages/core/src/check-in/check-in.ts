@@ -22,7 +22,7 @@ import type {
 import type { BrainProvider } from '../providers';
 import type { PerceptionHost } from '../perception';
 import type { Memory } from '../memory/memories';
-import { gatherNow, type NowSources } from '../conversation/now';
+import { gatherNow, safe, type NowSources } from '../conversation/now';
 import { hideSecrets } from '../privacy/secrets';
 import { soul } from '../roles';
 import { Lookout, blind, callOrFullScreenInFront } from '../keep-an-eye/lookout';
@@ -82,10 +82,6 @@ export interface CheckInOptions {
 /** What a wake found to ask about, once the gate let it through. */
 interface Wake {
   reason: BundleReason;
-  /** The window an offer is about (settled, trouble), read again on accept. */
-  window?: WindowEntry;
-  /** The front window for an offer's context (long-stretch). */
-  front?: WindowEntry | null;
   handoffId?: string;
 }
 
@@ -132,7 +128,7 @@ export class CheckIn {
       if (glance === null) return null;
       const text = await this.#readEnd(glance.window);
       if (text === null) return null;
-      return { reason: { kind: glance.why, window: glance.window, text }, window: glance.window };
+      return { reason: { kind: glance.why, window: glance.window, text } };
     });
   }
 
@@ -156,7 +152,6 @@ export class CheckIn {
       this.#active.consume(due, now);
       return Promise.resolve({
         reason: { kind: 'long-stretch', activeMs: reading.activeMs, late: due === 'late', front },
-        front,
       });
     });
   }
@@ -254,7 +249,7 @@ export class CheckIn {
         summarizer: settings.summarizer,
         provider: this.#o.provider,
         system: `${soul()}\n\n${CHECK_IN_INSTRUCTIONS}`,
-        bundle: this.#bundle(wake, settings),
+        bundle: this.#bundle(pet, wake, settings),
         timeoutMs: this.#o.timeoutMs ?? CHECK_IN_TIMEOUT_MS,
         ...(this.#o.log === undefined ? {} : { log: this.#o.log }),
       });
@@ -272,11 +267,10 @@ export class CheckIn {
     }
   }
 
-  #bundle(wake: Wake, settings: Settings): string {
-    const pet = this.#o.pet();
+  #bundle(pet: Pet, wake: Wake, settings: Settings): string {
     return renderBundle({
       reason: wake.reason,
-      now: gatherNow(this.#o.now, pet?.id ?? '', { kind: 'check-in' }),
+      now: gatherNow(this.#o.now, pet.id, { kind: 'check-in' }),
       memories: safe(() => this.#o.memories(), []),
       userName: settings.userName,
       lastExchange: safe(() => this.#o.lastExchange(), null),
@@ -334,7 +328,11 @@ export class CheckIn {
   }
 
   #makeOffer(remarkId: string, petId: string, expertId: string, ask: string, wake: Wake): Offer {
-    const about = wake.window ?? wake.front ?? null;
+    const { reason } = wake;
+    // The window a settled or trouble line is about is read again on accept; a stretch's
+    // front window is context only.
+    const window = reason.kind === 'settled' || reason.kind === 'trouble' ? reason.window : null;
+    const about = window ?? (reason.kind === 'long-stretch' ? reason.front : null);
     const exclusions = this.#o.settings().captureExclusions;
     // A blind spot's app and title never go into a brief.
     const context =
@@ -347,13 +345,11 @@ export class CheckIn {
       expertId,
       brief: { ask, ...(context === undefined ? {} : { context }) },
     };
-    if (wake.window !== undefined) {
+    if (window !== null) {
       const clean = this.#lookout.lastClean();
-      offer.window = wake.window;
+      offer.window = window;
       offer.projectHint =
-        clean === null || clean === wake.window.title
-          ? wake.window.title
-          : `${wake.window.title} - ${clean}`;
+        clean === null || clean === window.title ? window.title : `${window.title} - ${clean}`;
     }
     return offer;
   }
@@ -383,13 +379,5 @@ export class CheckIn {
 
   #mood(petId: string, mood: PetMoodParams['mood']): void {
     this.#o.emit({ method: 'pet.mood', params: { petId, mood } });
-  }
-}
-
-function safe<T>(read: () => T, fallback: T): T {
-  try {
-    return read();
-  } catch {
-    return fallback;
   }
 }
