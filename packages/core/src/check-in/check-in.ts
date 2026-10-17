@@ -7,14 +7,13 @@
  * writes a sentence for Scout. Reasons: `launch` (the app opened, or Welcome was just
  * finished), `back` (a pick-up snapshot is ready after a long break), `settled` and
  * `trouble` (from the window titles keeping an eye sends), `long-stretch` (from the activity
- * feed gentle nudges sends) and `finished` (an expert's hand-off came back). Any failure is
- * silence.
+ * feed gentle nudges sends) and `finished` (Scout's own jobs and expert hand-offs that came
+ * back, batched by Arrivals). Any failure is silence.
  */
 import { randomUUID } from 'node:crypto';
 import type {
   Brief,
   Expert,
-  HandoffFinishedParams,
   LaunchFacts,
   Pet,
   PetMoodParams,
@@ -32,6 +31,7 @@ import { soul } from '../roles';
 import { Lookout, blind, callOrFullScreenInFront } from '../keep-an-eye/lookout';
 import type { PickUpReady } from '../pick-up/pick-up';
 import { ActiveTime } from './active-time';
+import type { Arrival } from './arrivals';
 import { RECENT_LINES, WINDOW_TEXT_CHARS, renderBundle, type BundleReason } from './bundle';
 import { CHECK_IN_INSTRUCTIONS, CHECK_IN_TIMEOUT_MS, askMind, type CheckInReply } from './reply';
 
@@ -70,8 +70,8 @@ export interface CheckInOptions {
   interruptedAtBoot: number;
   /** `PickUp.take()`: the ready pick-up, once, or null. Taken only once the gate is open. */
   takePickUp: () => PickUpReady | null;
-  /** Which expert a finished hand-off was and what it was asked. */
-  handoff: (handoffId: string) => { expertName: string; ask: string } | null;
+  /** A line about these finished jobs was shown: `JobStore.markReported`. */
+  reported?: ((jobIds: readonly string[]) => void) | undefined;
   /** `HandoffManager.propose`: the brief goes to the card, and nothing runs until Send. */
   propose: (params: {
     expertId: string;
@@ -97,6 +97,8 @@ interface Wake {
   handoffId?: string;
   /** A pick-up taken for this wake: the line, if any, rides with its card. */
   pickUp?: PickUpReady;
+  /** Jobs to mark told once a line about them is shown. */
+  jobIds?: readonly string[];
 }
 
 interface Offer {
@@ -219,26 +221,23 @@ export class CheckIn {
     });
   }
 
-  /** An expert's hand-off came back. Only a chain's last step checks in. */
-  async finished(params: HandoffFinishedParams): Promise<void> {
-    if (params.next !== undefined) return;
-    await this.#wake('finished', undefined, () => {
-      const handoff = this.#o.handoff(params.handoffId);
-      return Promise.resolve({
-        reason: {
-          kind: 'finished',
-          expertName: handoff?.expertName ?? 'An expert',
-          ask: handoff?.ask ?? '',
-          state: params.state,
-          text: params.text,
-          error: params.error,
-        },
-        handoffId: params.handoffId,
-      });
-    });
+  /**
+   * Finished work, gathered by Arrivals: one wake for the whole batch. False only when
+   * another check-in was running or a call or full screen came up, so the batch is kept and
+   * tried again.
+   */
+  async finished(items: readonly Arrival[]): Promise<boolean> {
+    const only = items.length === 1 ? items[0] : undefined;
+    return this.#wake('finished', undefined, () =>
+      Promise.resolve({
+        reason: { kind: 'finished', items },
+        ...(only?.handoffId === undefined ? {} : { handoffId: only.handoffId }),
+        jobIds: items.flatMap((item) => (item.jobId === undefined ? [] : [item.jobId])),
+      }),
+    );
   }
 
-  /** "Not now": unprompted check-ins wait an hour. A finished hand-off still comes. */
+  /** "Not now": unprompted check-ins wait an hour. Finished work still comes. */
   notNow(): Date {
     this.#quietUntil = this.#o.clock.now() + NOT_NOW_MS;
     return new Date(this.#quietUntil);
@@ -278,35 +277,38 @@ export class CheckIn {
   /**
    * The one gate, then the one call. Each reason's own switch is checked where it comes in
    * (finished has none). Then the first failure wins and nothing is emitted: a pet, the
-   * budget, one in flight, the daily cap, Not now and the cooldown (not for a launch or a
-   * finished hand-off), a call or full-screen app in front. `find` runs only past all of that, and may
-   * still find nothing to ask about.
+   * budget, one in flight, the daily cap, Not now and the cooldown (not for a launch or
+   * finished work), a call or full-screen app in front. `find` runs only past all of that,
+   * and may still find nothing to ask about. False only for "one already in flight" and, for
+   * finished work, a call or full screen in front.
    */
   async #wake(
     kind: Kind,
     list: readonly WindowEntry[] | undefined,
     find: () => Promise<Wake | null>,
-  ): Promise<void> {
+  ): Promise<boolean> {
+    if (this.#busy) return false;
     const settings = this.#o.settings();
     const pet = this.#o.pet();
-    if (pet === null || this.#o.spentOut() || this.#busy) return;
+    if (pet === null || this.#o.spentOut()) return true;
     const now = this.#o.clock.now();
     const day = (this.#o.dayOf ?? localDay)(now);
     if (this.#day.key !== day) this.#day = { key: day, calls: 0 };
-    if (this.#day.calls >= CHECK_IN_DAILY_CAP) return;
+    if (this.#day.calls >= CHECK_IN_DAILY_CAP) return true;
     const held = kind !== 'finished' && kind !== 'launch';
     if (held && (now < this.#quietUntil || now - this.#lastUnpromptedAt < COOLDOWN_MS)) {
-      return;
+      return true;
     }
 
     this.#busy = true;
     try {
       const windows = list ?? (await this.#o.windows());
-      if (windows !== null && callOrFullScreenInFront(windows)) return;
+      // Finished work is handed back, so Arrivals holds it until the call is over.
+      if (windows !== null && callOrFullScreenInFront(windows)) return kind !== 'finished';
       const wake = await find();
-      if (wake === null) return;
+      if (wake === null) return true;
       this.#day.calls += 1;
-      // Every call but a finished hand-off's starts the cooldown, a launch's included.
+      // Every call but finished work's starts the cooldown, a launch's included.
       if (kind !== 'finished') this.#lastUnpromptedAt = now;
       const reply = await askMind({
         pet,
@@ -317,11 +319,11 @@ export class CheckIn {
         timeoutMs: this.#o.timeoutMs ?? CHECK_IN_TIMEOUT_MS,
         ...(this.#o.log === undefined ? {} : { log: this.#o.log }),
       });
-      if (reply === null) return;
+      if (reply === null) return true;
       // Not now may have been pressed, or the pet gone, while the mind was writing.
-      if (held && this.#o.clock.now() < this.#quietUntil) return;
+      if (held && this.#o.clock.now() < this.#quietUntil) return true;
       const speaker = this.#o.pet();
-      if (speaker === null) return;
+      if (speaker === null) return true;
       this.#deliver(speaker, wake, reply);
     } catch (error) {
       // A store closed under it (quit), a source that throws: silence, never a crash.
@@ -329,6 +331,7 @@ export class CheckIn {
     } finally {
       this.#busy = false;
     }
+    return true;
   }
 
   #bundle(pet: Pet, wake: Wake, settings: Settings): string {
@@ -354,7 +357,9 @@ export class CheckIn {
     } else if (reply.mood !== undefined) {
       this.#mood(pet.id, reply.mood);
     }
+    // Silence tells nothing: what finished stays "not mentioned yet" in Now.
     if (reply.text === undefined) return;
+    if (wake.jobIds !== undefined && wake.jobIds.length > 0) this.#o.reported?.(wake.jobIds);
 
     this.#recent.push(reply.text);
     if (this.#recent.length > RECENT_LINES) this.#recent.shift();
@@ -368,11 +373,17 @@ export class CheckIn {
       return;
     }
     const remarkId = randomUUID();
-    if (wake.handoffId !== undefined) {
+    // Finished work gets no offer; a hand-off back on its own is tied to its line.
+    if (wake.reason.kind === 'finished') {
       this.#offer = null;
       this.#o.emit({
         method: 'pet.remark',
-        params: { remarkId, petId: pet.id, text: reply.text, handoffId: wake.handoffId },
+        params: {
+          remarkId,
+          petId: pet.id,
+          text: reply.text,
+          ...(wake.handoffId === undefined ? {} : { handoffId: wake.handoffId }),
+        },
       });
       return;
     }

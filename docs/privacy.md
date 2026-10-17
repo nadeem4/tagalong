@@ -520,7 +520,7 @@ microphone; **I'll type** (or a fresh setup that has not been answered yet) leav
 Now and then, when nobody asked, Scout asks the AI once whether anything is worth saying: as
 Tagalong opens (and just after setup), when you are back after a long break with something to
 pick up, after you settle on a new window, when a title reads like an error, after a long stretch
-(with Gentle nudges on), and when an expert you handed work to finishes. Most of the time the answer is nothing, and
+(with Gentle nudges on), and when work finishes (an expert you handed work to, or a job of Scout's own). Most of the time the answer is nothing, and
 nothing is shown. Each of these calls goes to the summaries model (Settings → Summaries, else
 Scout's own) and carries, besides what that moment is about:
 
@@ -533,7 +533,7 @@ Scout's own) and carries, besides what that moment is about:
 Keys, tokens and passwords are hidden in all of it before it leaves the computer, and a blind
 spot's app and title are never in it. The limits: at most 24 check-ins a day, at most one
 unprompted one every ten minutes, none for an hour after **Not now** (the hello as Tagalong opens
-and a finished hand-off still get theirs), none during a call or over a full-screen app, and none at all once the daily budget
+and finished work still get theirs), none during a call or over a full-screen app, and none at all once the daily budget
 is reached. Each call is a "Sent to AI" row in **What Scout saw**.
 
 ## Keeping an eye on things
@@ -584,15 +584,28 @@ picture, no window text). Neither is stored.
   break or when you switch nudges off.
 - Nothing appears during a call or over a full-screen app, and **Not now** quiets it for an hour.
 
-## Finished hand-offs
+## Finished work: hand-offs and jobs
 
-When an expert you handed work to finishes, Scout makes one check-in about it: the expert's name,
-the start of what it was asked (its first paragraph, at most 100 characters), how it ended, and the
-last 1,500 characters of its answer (or the first 1,500 of its error) go to the summaries model
-with the facts every check-in carries, so Scout can say one short line about the outcome. The
-answer and the error go fenced as data, never as instructions. The card keeps the whole answer;
+When an expert you handed work to or one of Scout's own jobs finishes, Scout waits a little (20
+seconds after the latest, a minute at most, longer during a call, a full-screen app or a
+conversation with you) and makes **one** check-in about everything that finished in that time,
+so five finished things are one call, not five. Nothing extra is stored for this; a job only gets
+the time a line about it was shown.
+
+- **One hand-off alone:** the expert's name, the start of what it was asked (its first paragraph,
+  at most 100 characters), how it ended, and the last 1,500 characters of its answer (or the first
+  1,500 of its error).
+- **Several things:** for each of at most five, its short id, the job's task or the expert and the
+  start of its ask, how it ended, and a note of at most 300 characters (the job's gist, the first
+  line of the expert's answer, or the error); the rest are only counted. No expert answer beyond
+  its first line.
+
+These go to the summaries model with the facts every check-in carries, so Scout can say one short
+line, or nothing. Answers, notes and errors go fenced as data, never as instructions; the same
+fence is used for job and expert notes on the board and in Now. The card keeps the whole answer;
 the answer is never read out. With the bubble closed, the line comes beside Scout like any other
-line. A routine's own hand-off is delivered by the routine and gets no check-in.
+line. A routine's own hand-off is delivered by the routine, and a watch firing comes at once: neither
+waits for the others.
 
 ## Pick up where you left off
 

@@ -15,11 +15,13 @@ export interface JobRow {
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+  /** When a check-in line about it was shown; null: not mentioned yet. */
+  reportedAt: string | null;
 }
 
 const COLUMNS = `id, state, pet_id AS petId, task, dedupe_key AS dedupeKey,
   conversation_id AS conversationId, note, error, created_at AS createdAt,
-  started_at AS startedAt, finished_at AS finishedAt`;
+  started_at AS startedAt, finished_at AS finishedAt, reported_at AS reportedAt`;
 const LIVE = `state IN ('queued', 'running')`;
 const NEWEST = 'ORDER BY created_at DESC, rowid DESC';
 const INTERRUPTED = 'Interrupted: Tagalong closed before this finished.';
@@ -53,6 +55,14 @@ export class JobStore {
     this.db
       .prepare(`UPDATE jobs SET state = ?, note = ?, error = ?, finished_at = ? WHERE id = ?`)
       .run(outcome.state, outcome.note ?? null, outcome.error ?? null, at, id);
+  }
+
+  /** A check-in line about these jobs was shown; a job already told keeps its first time. */
+  markReported(ids: readonly string[], at: string): void {
+    const mark = this.db.prepare(
+      'UPDATE jobs SET reported_at = ? WHERE id = ? AND reported_at IS NULL',
+    );
+    for (const id of ids) mark.run(at, id);
   }
 
   get(id: string): JobRow | null {

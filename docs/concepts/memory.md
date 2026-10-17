@@ -62,7 +62,8 @@ own whose last answer is the whole result. Both are deleted 14 days after the jo
 conversation is never summarised into a memory, and its turn writes no activity row. The task
 board is working memory: a read model over the jobs, running and waiting hand-offs, watches,
 running routines and the last day's finished work, read by the `board` and `open_result` tools; Now
-carries the running jobs and those finished since the last talk on every turn. Folding what jobs
+carries the running jobs and those finished since the last talk or not mentioned yet (no check-in
+line about them was shown, `reported_at`) on every turn. Folding what jobs
 learned into long-term memory (the digest) comes later.
 
 ## Working memory: building one turn

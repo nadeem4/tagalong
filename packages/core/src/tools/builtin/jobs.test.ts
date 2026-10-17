@@ -24,6 +24,7 @@ function row(overrides: Partial<JobRow> = {}): JobRow {
     createdAt: '2026-10-17T09:30:00.000Z',
     startedAt: '2026-10-17T09:31:00.000Z',
     finishedAt: '2026-10-17T09:40:00.000Z',
+    reportedAt: null,
     ...overrides,
   };
 }

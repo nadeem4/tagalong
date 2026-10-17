@@ -5,6 +5,7 @@ export {
   WATCH_SETTLE_MS,
   WatchManager,
   systemWatchClock,
+  type WatchClock,
   type WatchEvent,
   type WatchInfo,
 } from './watch-manager';

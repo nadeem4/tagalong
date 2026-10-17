@@ -53,6 +53,8 @@ export interface JobsOptions {
   /** Read each time a job would start. */
   capacity: () => Capacity;
   emit: (event: { method: 'board.changed'; params: { running: number; queued: number } }) => void;
+  /** A job came back done or failed (never stopped): to Arrivals. */
+  finished?: ((row: JobRow) => void) | undefined;
   log?: ((message: string) => void) | undefined;
 }
 
@@ -240,6 +242,8 @@ export class Jobs {
     }
     this.#pump();
     this.#changed();
+    const row = entry.stopped ? null : this.#o.store.get(id);
+    if (row !== null) this.#o.finished?.(row);
   }
 
   #fresh(row: JobRow): boolean {

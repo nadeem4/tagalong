@@ -115,6 +115,14 @@ describe('the role files', () => {
     expect(getRole('companion')?.instructions).toContain('work_on_it');
   });
 
+  // Shipped with batched arrivals, never before: the mind never claims an ability it lacks.
+  it('tell the companion finished work arrives together, and Scout it can work in the background', () => {
+    expect(getRole('companion')?.instructions).toContain('you hear about it together');
+    expect(soulSection(soul(), '## Character')).toContain(
+      'background, keep talking with them, and come back when you have something worth saying.',
+    );
+  });
+
   // The companion body says how Tagalong works, not how to behave: that is the soul's job.
   // Only the two lines the UI depends on are pinned, by what they name, not their wording.
   it('keep the companion body short: mechanics, not recipes', () => {

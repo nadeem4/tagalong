@@ -24,6 +24,8 @@ import {
 import type { BrainProvider } from './providers';
 import { InMemorySecretStore } from './settings/settings';
 import { PickUpStore } from './pick-up/store';
+import { AFTER_TALK_MS, ARRIVAL_WINDOW_MS } from './check-in';
+import { FakeClock } from './watch/fake-clock';
 
 let dir: string;
 let engine: Engine | undefined;
@@ -577,6 +579,40 @@ describe('Scout’s own background jobs over rpc', () => {
       entries: { kind: string }[];
     };
     expect(activity.entries.filter((entry) => entry.kind === 'turn')).toHaveLength(1);
+  });
+
+  it('a finished job arrives: one check-in line after the quiet window, and the job is told', async () => {
+    const clock = new FakeClock(Date.now());
+    const e = await boot(
+      new FakeBrainProvider({
+        text: 'The gist, first.',
+        toolCall: { id: 'call-1', name: 'work_on_it', input: { task: 'read the paper' } },
+      }),
+      { arrivalClock: clock },
+    );
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('ask', { petId: 'scout', input: { text: 'read this while I work' } });
+    await vi.waitFor(
+      () => {
+        const boards = host.notifications.filter((n) => n.method === 'board.changed');
+        expect(boards.at(-1)?.params).toEqual({ running: 0, queued: 0 });
+        expect(boards.length).toBeGreaterThanOrEqual(2);
+      },
+      { timeout: 5000 },
+    );
+    expect(host.methods()).not.toContain('pet.remark');
+    await clock.advance(ARRIVAL_WINDOW_MS + AFTER_TALK_MS);
+    await vi.waitFor(() => expect(host.methods()).toContain('pet.remark'), { timeout: 5000 });
+    const remarks = host.notifications.filter((n) => n.method === 'pet.remark');
+    expect(remarks).toHaveLength(1);
+    expect(remarks[0]!.params).not.toHaveProperty('handoffId');
+    await e.shutdown();
+    engine = undefined;
+    const db = openDatabase(dir);
+    const told = db.prepare(`SELECT reported_at AS at FROM jobs`).all() as { at: unknown }[];
+    db.close();
+    expect(told).toEqual([{ at: expect.any(String) }]);
   });
 
   it('closes a job a crash left running', async () => {
@@ -1375,8 +1411,10 @@ describe('a finished hand-off checks in', () => {
         input: { ask: 'Fix the parser test' },
       },
     });
+    const clock = new FakeClock(Date.now());
     const e = await boot(provider, {
       connectorFor: () => new FakeConnector({ steps: [], text: 'Fixed it. All tests pass.' }),
+      arrivalClock: clock,
     });
     const host = await TestHost.connect(e.port);
     await host.call('hello', helloParams(e.pairingToken));
@@ -1399,6 +1437,15 @@ describe('a finished hand-off checks in', () => {
       canEdit: false,
     });
 
+    // It arrives, waits out the quiet window and the end of their talk, then checks in.
+    await vi.waitFor(() =>
+      expect(host.methods()).toEqual(
+        expect.arrayContaining(['handoff.finished', 'turn.completed']),
+      ),
+    );
+    await clock.advance(ARRIVAL_WINDOW_MS);
+    expect(host.methods()).not.toContain('pet.remark');
+    await clock.advance(AFTER_TALK_MS);
     await vi.waitFor(() => expect(host.methods()).toContain('pet.remark'));
     const finished = host.notifications.find((n) => n.method === 'handoff.finished')!;
     expect(host.notifications.find((n) => n.method === 'pet.remark')?.params).toMatchObject({
