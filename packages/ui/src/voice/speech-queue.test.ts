@@ -97,7 +97,7 @@ describe('SpeechQueue', () => {
   it('shapes what it speaks: no code, no markdown', () => {
     const player = controlledPlayer();
     new SpeechQueue({ prepare: player.prepare }).say('**Fixed.**\n```\ncode\n```');
-    expect(player.played).toEqual(['Fixed. The rest is in the bubble.']);
+    expect(player.played).toEqual(['Fixed.']);
   });
 
   it('merges short lines waiting together into one', async () => {
@@ -157,10 +157,34 @@ describe('SpeechQueue', () => {
     expect(player.played).toEqual([]);
   });
 
-  it('says a whole piece of a spoken answer, without cutting it to two sentences', () => {
+  it('says a long line whole, never cut to its first sentences', () => {
     const player = controlledPlayer();
     const piece = 'One thing first. Then another. And a third one, for good measure here.';
-    new SpeechQueue({ prepare: player.prepare }).say(piece, { whole: true });
+    new SpeechQueue({ prepare: player.prepare }).say(piece);
     expect(player.played).toEqual([piece]);
+  });
+
+  it('says a long answer in full a sentence at a time, so the voice starts at once', async () => {
+    const player = controlledPlayer();
+    const queue = new SpeechQueue({ prepare: player.prepare });
+    queue.say(`${LONG_A} ${LONG_B}\n\n- ${LONG_C}`);
+    expect(player.prepared).toEqual([LONG_A, LONG_B]);
+    expect(player.played).toEqual([LONG_A]);
+
+    await player.finishCurrent();
+    await player.finishCurrent();
+    expect(player.played).toEqual([LONG_A, LONG_B, LONG_C]);
+  });
+
+  it('stops a long answer at once, dropping every sentence left', async () => {
+    const player = controlledPlayer();
+    const queue = new SpeechQueue({ prepare: player.prepare });
+    queue.say(`${LONG_A} ${LONG_B} ${LONG_C}`);
+    queue.stop();
+    expect(player.pending[0]?.signal.aborted).toBe(true);
+
+    await player.finishCurrent();
+    expect(player.played).toEqual([LONG_A]);
+    expect(player.prepared).toEqual([LONG_A, LONG_B]);
   });
 });

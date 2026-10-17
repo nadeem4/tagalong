@@ -128,10 +128,9 @@ The extension's public privacy policy, for the Chrome Web Store, is
   is its own "Sent to expert" row (its size, never its words), and it is added to the hand-off's
   Activity row under "What Coder was told". A note still waiting when the run ends is never sent,
   and the card says so; after Stop nothing more is passed on. At most 5 notes wait at a time, each
-  at most 2,000 characters. What the expert writes between its tools may be said aloud by Scout
-  (first sentence, at most 120 characters, keys hidden), at most once every 20 seconds, only while
-  Scout talks is on. What its tools read or return is never said aloud, and neither is its final
-  answer before the finish line.
+  at most 2,000 characters. What the expert writes between its tools shows on the card (first
+  sentence, at most 120 characters, keys hidden) and is never said aloud. What its tools read or
+  return is never said aloud, and neither is its final answer.
 - **A monitor with an excluded window on it.** If a password manager is open and visible on your
   second screen, that whole screen is blanked in the full-view capture — not just when it is the
   window you are working in. The blanked screen is replaced with a flat panel reading BLOCKED, so
@@ -336,25 +335,24 @@ conversation of its own.
 ## Scout's voice: what is spoken, and where it goes
 
 Scout says its bubble lines aloud while **Scout talks** is on (Settings → Voice, on by default).
-What reaches a speech engine is only the line being spoken, after it is shortened in the panel:
-markdown stripped, code blocks, lists, tables, quoted (`>`) lines, in any language, and URLs left out. An ordinary answer is cut to its
-first sentence or two, and a long sentence is cut at a word (about 200 characters), ending with
-"The rest is in the bubble." An answer to a spoken question, or to a typed "read this to me", is
-said in full, sentence by sentence, still without code or lists. Never the screen, the window list,
-the question or the conversation.
+What reaches a speech engine is only the line being spoken, shaped in the panel: markdown
+stripped, and show-only blocks left out (fenced blocks such as a draft or code, tables, quoted
+(`>`) lines in any language) along with URLs. Scout's mind decides what it says: everything it
+writes outside a block is spoken, whether you typed or spoke, with no length cap; "Scout, stop",
+the stop button and the talk key cut it off at once. Never the screen, the window list, the
+question or the conversation. A health check and an expert's narration are shown, never spoken.
 
 **Reading aloud.** When you ask Scout to read something to you, it reads your selection or the
-window in front (as for any question about your screen) and says that text, about 300 words at a
-time, asking "Shall I go on?" between parts. So the text of that window or selection goes to the
+window in front (as for any question about your screen) and says that text, typed or spoken; for
+something long it may give the gist first and ask what you want read. So the text of that window or selection goes to the
 chosen speech engine: it stays on this computer with Kokoro or the system voice, and is sent to
 ElevenLabs when ElevenLabs is the chosen voice. With **Scout talks** off, the reading is only shown
 in the bubble.
 
 **Translating.** Scout translates with its own model: there is no translation service, so the text
 it read goes only to Scout's model, like any question about your screen, and reads are logged as
-they are today. A translation into English is spoken like any answer while **Scout talks** is on:
-its first sentence or two, or all of it when you asked to hear it ("translate this and read it to
-me"). That goes to the chosen speech engine: it stays on this computer with Kokoro or the system
+they are today. A translation into English is spoken like any answer while **Scout talks** is on.
+That goes to the chosen speech engine: it stays on this computer with Kokoro or the system
 voice, and goes to ElevenLabs when ElevenLabs is the chosen voice. A translation into any other
 language is shown in the bubble as a quoted block and never spoken, with ElevenLabs too; only the
 English line before it ("It's in the bubble.") is. A target language you ask Scout to remember is kept as a remembered
@@ -832,7 +830,7 @@ writes the draft in the bubble.
   at most 20,000 characters, and only from the bubble's window.
 - **The clipboard is never read** for this, and nothing is pasted or typed into any app: pasting is
   yours.
-- A spoken request has only its one line spoken; the draft is shown, never read aloud.
+- Only the line around the draft is spoken; the draft is in a block, shown, never read aloud.
 - The draft is part of Scout's answer, so it is stored with the conversation like any answer.
 
 ## Dropping things on Scout

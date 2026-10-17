@@ -155,9 +155,9 @@ export const HandoffsCancelParams = z.object({ handoffId: z.uuid() });
 export const HandoffsCancelResult = z.object({ cancelled: z.boolean() });
 
 /**
- * What a progress step is: a tool the expert used, a line it wrote that Scout may say aloud,
- * or a note from the person, queued (`note`), passed on (`delivered`), or not passed on
- * because the run ended first (`dropped`). When `kind` is left out, the step is a tool step.
+ * What a progress step is: a tool the expert used, a line it wrote (shown on the card, never
+ * said aloud), or a note from the person, queued (`note`), passed on (`delivered`), or not
+ * passed on because the run ended first (`dropped`). When `kind` is left out, the step is a tool step.
  */
 export const HandoffStepKind = z.enum(['tool', 'say', 'note', 'delivered', 'dropped']);
 export type HandoffStepKind = z.infer<typeof HandoffStepKind>;

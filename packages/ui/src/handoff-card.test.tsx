@@ -579,25 +579,14 @@ describe('steering a working expert', () => {
     expect(onSay).not.toHaveBeenCalled();
   });
 
-  it('speaks what the expert says at most once every 20 seconds; tool steps stay silent', async () => {
-    vi.useFakeTimers();
-    try {
-      const onSay = vi.fn();
-      const card = await working(onSay);
-      step('Reading src/date.ts', 'tool');
-      step('Found the bug in date.ts.', 'say');
-      step('Fixing it now.', 'say');
-      expect(card).toHaveTextContent('Found the bug in date.ts.');
-      expect(card).toHaveTextContent('Fixing it now.');
-      expect(onSay.mock.calls).toEqual([['Found the bug in date.ts.']]);
-      act(() => vi.advanceTimersByTime(20_000));
-      step('Tests still failing in two places.', 'say');
-      expect(onSay.mock.calls).toEqual([
-        ['Found the bug in date.ts.'],
-        ['Tests still failing in two places.'],
-      ]);
-    } finally {
-      vi.useRealTimers();
-    }
+  it('shows what the expert says on the card and never says it aloud', async () => {
+    const onSay = vi.fn();
+    const card = await working(onSay);
+    step('Reading src/date.ts', 'tool');
+    step('Found the bug in date.ts.', 'say');
+    step('Fixing it now.', 'say');
+    expect(card).toHaveTextContent('Found the bug in date.ts.');
+    expect(card).toHaveTextContent('Fixing it now.');
+    expect(onSay).not.toHaveBeenCalled();
   });
 });

@@ -1,51 +1,26 @@
 /**
- * Turns a bubble line into what Scout says aloud: Markdown stripped, code, lists, tables,
- * quotes and URLs left out, and long answers cut to their first sentences. Contains
- * toSpeakable, mergeShortLines, SHORT_LINE and the spoken fallback lines.
+ * Turns a bubble line into what Scout says aloud: Markdown stripped, show-only blocks left
+ * out. The mind decides what is said; this only shapes it for the voice. Contains
+ * toSpeakable, mergeShortLines and SHORT_LINE.
  */
-
-/** Said after a line that was cut short, so the listener knows there is more to read. */
-export const REST_IN_BUBBLE = 'The rest is in the bubble.';
-
-/** Said when nothing in an answer can be read aloud: all code, a list, a table or a quote. */
-export const ONLY_IN_BUBBLE = 'The answer is in the bubble.';
-
-/** How many sentences are spoken before the rest is left to the bubble. */
-const MAX_SENTENCES = 2;
-
-/** A spoken line longer than this is cut, at a word. About fifteen seconds of speech. */
-const MAX_CHARS = 200;
 
 /** Below this a line is short enough that the local voice says it badly on its own. */
 export const SHORT_LINE = 40;
 
 /**
- * Turns a bubble line into what Scout says aloud: markdown stripped, code blocks, lists,
- * tables, quoted (`>`) lines and bare URLs left out, and only the first sentence or two.
- * Anything cut ends with "The rest is in the bubble.", so a listener who is not looking
- * knows to look.
- *
- * `whole` is a piece of a spoken answer (Talk to Scout), said as it streams: shaped the
- * same way but never cut, and nothing at all when the piece has nothing to say.
+ * Turns a bubble line into what Scout says aloud, all of it: the mind chose what to write,
+ * so nothing is cut. Show-only blocks are left out (a fenced block, a draft or code; a table
+ * row; a quoted `>` line, which mostly holds a translation the English voice would mangle),
+ * as are bare URLs. A list item is read with its marker stripped. Nothing is added: an answer
+ * that is all blocks says nothing.
  */
-export function toSpeakable(text: string, { whole = false }: { whole?: boolean } = {}): string {
+export function toSpeakable(text: string): string {
   if (text.trim() === '') return '';
-  let cut = false;
-
-  const withoutCode = text.replace(/```[\s\S]*?(?:```|$)/g, () => {
-    cut = true;
-    return '\n';
-  });
-  const lines = withoutCode.split('\n').filter((line) => {
-    // A quote, English or not, is never spoken. It mostly holds a translation into another
-    // language, after a line that already says "It's in the bubble", so it is not a cut.
-    if (/^\s*>/.test(line)) return false;
-    const listOrTable = /^\s*(?:[-*+•]|\d+[.)])\s+/.test(line) || /^\s*\|/.test(line);
-    if (listOrTable) cut = true;
-    return !listOrTable;
-  });
-  const plain = lines
-    .map((line) => line.replace(/^\s*#{1,6}\s+/, ''))
+  const withoutBlocks = text.replace(/```[\s\S]*?(?:```|$)/g, '\n');
+  return withoutBlocks
+    .split('\n')
+    .filter((line) => !/^\s*(?:>|\|)/.test(line))
+    .map((line) => line.replace(/^\s*#{1,6}\s+/, '').replace(/^\s*(?:[-*+•]|\d+[.)])\s+/, ''))
     .join(' ')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
@@ -55,25 +30,6 @@ export function toSpeakable(text: string, { whole = false }: { whole?: boolean }
     .replace(/\s+/g, ' ')
     .replace(/\s+([.,!?;:])/g, '$1')
     .trim();
-
-  if (whole) return plain;
-  if (plain === '') return ONLY_IN_BUBBLE;
-
-  const sentences = (plain.match(/[^.!?]*[.!?]+["')\]]*(?=\s|$)|[^.!?]+$/g) ?? [plain])
-    .map((sentence) => sentence.trim())
-    .filter((sentence) => sentence !== '');
-  if (sentences.length > MAX_SENTENCES) cut = true;
-  let spoken = sentences.slice(0, MAX_SENTENCES).join(' ');
-  if (spoken.length > MAX_CHARS && sentences.length > 1) {
-    spoken = sentences[0]!;
-    cut = true;
-  }
-  if (spoken.length > MAX_CHARS) {
-    const at = spoken.lastIndexOf(' ', MAX_CHARS);
-    spoken = spoken.slice(0, at > 0 ? at : MAX_CHARS);
-    cut = true;
-  }
-  return cut ? `${spoken} ${REST_IN_BUBBLE}` : spoken;
 }
 
 /**

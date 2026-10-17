@@ -274,9 +274,9 @@ _Only on a data folder from a build before Nebius was removed._
 3. **Expected:** (a) at once, with no "thinking", a card starting "Two things need you.", then a
    row each for Brain ("Signed out of Claude."), Experts, Connections, Voice ("The ElevenLabs
    voice has no key."), Microphone and Browser extension ("Not connected (optional)", grey, with
-   **Set up**); nothing is spoken, since the question was typed; no key appears anywhere on the
+   **Set up**); nothing is spoken; no key appears anywhere on the
    card. No row says "I" or "my". (b) Home opens
-   on Settings, scrolled to How Scout thinks. (c) Home opens at Settings › Voice. (d) the same card, and only its first line is spoken.
+   on Settings, scrolled to How Scout thinks. (c) Home opens at Settings › Voice. (d) the same card, and nothing is spoken: health is shown, never said.
    (e) Scout answers both as normal questions; no card. With everything fixed, the card says "Everything's
    working.". With the engine stopped, the rows it cannot read say "Not checked." and the
    card still shows. If the check itself fails, the bubble says "Health check failed.". (f)
@@ -723,12 +723,14 @@ voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APP
    later answer is spoken by the Kokoro voice. With Windows' reduce-animations setting on, the bars
    hold still.
 
-### V.2. Only a short form is spoken
+### V.2. Blocks are shown, not read
 
-1. **Action:** ask for "a bulleted list of five fruits, then a code sample".
-2. **Expected:** Scout says the sentence before the list and "The rest is in the bubble." No list
-   item or code is read. In a spoken question (hold the talk key) ask for "three numbered steps,
-   each two sentences long": no part of any step is read, not even its second sentence.
+1. **Action:** type "write a two-line email saying yes to Friday, then show me a code sample".
+2. **Expected:** Scout says its own words around the draft and the code, in full; nothing inside
+   the draft block or the code block is read, and Scout never says "The rest is in the bubble." or
+   "The answer is in the bubble." Then ask "give me three numbered steps to make tea": a short list
+   written outside a block is read item by item, without the numbers. Typed or spoken, the same
+   answer is said the same way.
 
 ### V.3. Stopping
 
@@ -742,6 +744,10 @@ voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APP
 1. **Setup:** the Kokoro voice downloaded (V.1).
 2. **Action:** ask a spoken question (hold the talk key) whose answer runs to several sentences.
 3. **Expected:** each sentence follows the last without a pause of a second or more between them.
+4. **Action:** type a question with a long answer ("explain how a CPU cache works, in detail").
+5. **Expected:** Scout starts speaking within a second or two of the answer showing, says all of
+   it a sentence at a time, and the bubble stays responsive throughout; pressing the stop key
+   cuts it at once.
 
 ### V.3b. Kokoro from the first line
 
@@ -781,18 +787,21 @@ voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APP
    words). With the key removed, or a wrong voice ID, Scout speaks with the local voice again.
    With the network cut while ElevenLabs is set, the local voice takes over within 15 seconds.
 
-### V.7. Read aloud
+### V.7. Read aloud: the mind decides what is said
 
-1. **Setup:** a real brain (not `TAGALONG_FAKE_PROVIDERS`), Scout talks on. Open a long article or
-   document (well over 300 words) in front, with a bulleted list and a code sample in it.
-2. **Action:** type "read this to me" in the bubble. Then select one paragraph and hold the talk
-   key to say "read this to me". Press `Ctrl+Shift+Alt+M` partway through one reading.
-3. **Expected:** for the long article Scout does not recite it all: it offers the gist and asks
-   what to dig into (the wording varies; there is no fixed opener or "Shall I go on?"). Asked to
-   read a part, it reads it in full sentences, not the first two and "The rest is in the bubble."
-   The spoken request reads the selected paragraph. The stop key, ×, and the bars cut the reading
-   off at once. A typed "what is this?" afterwards is still spoken only in its short form (V.2).
-   With Scout talks off, the reading shows in the bubble and nothing is spoken.
+1. **Setup:** a real brain (not `TAGALONG_FAKE_PROVIDERS`), Scout talks on. Have a research paper
+   (a PDF or an arXiv page, well over 300 words) and a short paragraph of plain text to hand.
+2. **Action:** (a) select the short paragraph and type "read this to me" in the bubble. (b) Type
+   "summarise this". (c) Put the research paper in front and type "read this to me". (d) Ask
+   "draft a reply saying I'll review it Friday". (e) Say "Scout, stop" (Always listening on), press
+   the bars, or hold the talk key partway through a reading.
+3. **Expected:** (a) the typed request reads the paragraph in full, every sentence, with no cap
+   and no "The rest is in the bubble."; the same holds when you say it with the talk key. (b) Scout
+   speaks a summary in its own words, not the text. (c) for the paper Scout does not recite it all:
+   it gives the gist first and asks what to dig into (the wording varies; there is no fixed opener).
+   (d) the draft shows in a block with Copy and is not read; only Scout's line around it is said.
+   (e) each of these cuts speech at once. With Scout talks off, everything shows in the bubble and
+   nothing is spoken.
 
 ### V.8. Describe a chart
 
@@ -860,7 +869,7 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 2. **Action:** hold the key and ask "what's a good way to name a test?".
 3. **Expected:** Scout starts speaking after the first sentence arrives, before the answer finishes
    streaming. The answer is a few short sentences with contractions, no list read aloud, at most
-   one question back. Any code or list shows in the bubble and is not spoken.
+   one question back. Any code or long list is in a block in the bubble and is not spoken.
 
 ### T.3. Barge-in
 
@@ -1657,9 +1666,9 @@ Needs GitHub connected (Home → Connections → GitHub, with a token) and a rea
 
 Needs Claude Code installed and signed in, and an expert that may edit a small test project.
 
-1. Ask Scout to fix something in the project and press **Send**. While "Coder is on it", Scout says
-   a line now and then from what Claude Code writes ("Found the bug in `date.ts`"), never more than
-   one every 20 seconds, and only while Scout talks is on. Tool steps ("Reading ...") stay silent.
+1. Ask Scout to fix something in the project and press **Send**. While "Coder is on it", the card
+   shows a line now and then from what Claude Code writes ("Found the bug in `date.ts`"); none of it
+   is said aloud. Tool steps ("Reading ...") show too and stay silent.
 2. Tell Scout "tell Coder to use dayjs, not moment". Scout says in its own words that Coder will
    get it (the wording varies; there is no fixed line). The
    card shows **Passed on: use dayjs, not moment**, _waiting for Coder to finish this step_, then

@@ -86,10 +86,7 @@ const JOB_LINE =
   'Background work you started for them. Nobody is watching, so ask no questions; your ' +
   'answer comes back to you, not to them. Begin with one line that gives the gist.';
 
-const SPOKEN_LINE =
-  'Spoken: they said this out loud and your words are read aloud as you write them. No ' +
-  'markdown, lists or links in what you say; put exact detail (code, steps) after, where it ' +
-  'shows in the bubble and is not read. Speech recognition may have misheard a word.';
+const SPOKEN_LINE = 'Spoken: they said this out loud. Speech recognition may have misheard a word.';
 
 /**
  * Reads the facts for this turn. A source that throws is left out (its line goes with it):

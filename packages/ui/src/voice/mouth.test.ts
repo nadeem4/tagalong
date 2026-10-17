@@ -7,14 +7,14 @@ import { QueueMouth } from './mouth';
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('QueueMouth', () => {
-  it('says each piece of a streamed answer whole, as it arrives', async () => {
+  it('says each piece of a streamed answer as it arrives', async () => {
     const queue = { say: vi.fn(), stop: vi.fn() };
     const mouth = new QueueMouth(queue);
     const pieces = new Pushable<string>();
     mouth.speak(pieces);
     pieces.push('It checks shutdown.');
     await tick();
-    expect(queue.say).toHaveBeenLastCalledWith('It checks shutdown.', { whole: true });
+    expect(queue.say).toHaveBeenLastCalledWith('It checks shutdown.');
     pieces.push('It is green.');
     pieces.end();
     await tick();
@@ -54,7 +54,7 @@ describe('QueueMouth', () => {
     expect(onAnswering).toHaveBeenLastCalledWith(false);
   });
 
-  it('says a bubble line shortened, as before', () => {
+  it('says a bubble line', () => {
     const queue = { say: vi.fn(), stop: vi.fn() };
     new QueueMouth(queue).say('Done.');
     expect(queue.say).toHaveBeenCalledWith('Done.');

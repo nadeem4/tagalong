@@ -3,7 +3,8 @@
  * Contains SpeechQueue, PreparedLine and SpeechQueueOptions.
  */
 
-import { SHORT_LINE, mergeShortLines, toSpeakable } from './speakable';
+import { SHORT_LINE, mergeShortLines } from './speakable';
+import { SpokenStream } from './spoken-stream';
 
 /** One line's audio, being got ready: playing it resolves when it is said or the signal aborts it. */
 export type PreparedLine = (signal: AbortSignal) => Promise<void>;
@@ -16,8 +17,9 @@ export interface SpeechQueueOptions {
 }
 
 /**
- * Scout's lines, spoken one at a time. Each line is shaped for speech first; short lines
- * waiting together are merged. The next line is got ready while the current one plays, so
+ * Scout's lines, spoken one at a time. Each line is shaped for speech first and split into
+ * its sentences, so a long answer starts at once and is said in full a sentence at a time;
+ * short lines waiting together are merged. The next line is got ready while the current one plays, so
  * there is no pause between them for synthesis; a short one waits, since a line after it
  * may still join it. `stop` cuts the current line and drops the rest, the one got ready
  * included, which is what dismissing the bubble, the stop key and barge-in do.
@@ -35,11 +37,13 @@ export class SpeechQueue {
     this.#onSpeaking = options.onSpeaking ?? (() => undefined);
   }
 
-  /** `whole` says a piece of a spoken answer in full, rather than its first sentences. */
-  say(text: string, options: { whole?: boolean } = {}): void {
-    const line = toSpeakable(text, options);
-    if (line === '') return;
-    this.#waiting.push(line);
+  say(text: string): void {
+    const lines: string[] = [];
+    const sentences = new SpokenStream((line) => lines.push(line));
+    sentences.push(text);
+    sentences.end();
+    if (lines.length === 0) return;
+    this.#waiting.push(...lines);
     if (this.#current === null) this.#next();
     else this.#getAheadReady();
   }

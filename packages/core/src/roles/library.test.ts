@@ -156,6 +156,14 @@ describe('the role files', () => {
     ).toBe(true);
   });
 
+  it('tell the companion everything it writes is spoken, except what it puts in a block', () => {
+    expect(
+      companionLines().some(
+        (line) => /spoken/i.test(line) && /\bblock\b/i.test(line) && /draft/i.test(line),
+      ),
+    ).toBe(true);
+  });
+
   it("place the calendar link in Home's Meeting prep form, where it is pasted", () => {
     const line = companionLines().find((text) => /calendar link/i.test(text)) ?? '';
     expect(line).toMatch(/Meeting prep/);

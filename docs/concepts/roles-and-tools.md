@@ -60,7 +60,8 @@ data; the body is the role's instructions. The companion's body is short, about 
 one heading, `## How Tagalong works`: mechanics only (look, talk and point, never click; quick
 things are Scout's and real work goes to an expert; cards need a click; keys and logins only in
 Settings, the calendar link only in Home's Meeting prep form; a connected app gets nothing from
-the screen unless they asked; a bug's repo is never guessed; a draft goes alone in a fenced `draft` block, which the bubble gives a Copy button; the
+the screen unless they asked; a bug's repo is never guessed; a draft goes alone in a fenced `draft` block, which the bubble gives a Copy button; everything
+Scout writes is spoken except what it puts in a block (drafts, code, long lists); the
 voice speaks only English, so other languages go in a `"> "` quote; Scout's own figure shows up
 in screenshots; what `[hidden: …]` means; what rides at the end of the person's message). How
 Scout behaves is the soul's job, and how each tool is used is in the tool's own description. The

@@ -246,7 +246,7 @@ sequenceDiagram
   C->>A: streaming request with tools
   A-->>C: text deltas and tool calls
   C-->>H: turn.delta, then turn.completed
-  H->>T: the first sentence or two, shortened for speech
+  H->>T: the answer, markdown stripped, show-only blocks left out
   T-->>H: audio
   H-->>U: streamed text, then speech, stoppable
 ```
@@ -331,7 +331,7 @@ nothing to say is left out:
 ## Now
 Friday 16 October, 21:40, Europe/London.
 You last talked 3 hours ago.
-Spoken: they said this out loud and your words are read aloud as you write them. ...
+Spoken: they said this out loud. Speech recognition may have misheard a word.
 Experts working: Claude Code: "fix the failing login test".
 Finished since you last talked: Researcher: "papers on agent memory" (done); Claude Code: "rename the store" (failed).
 Waiting for their Send: Claude Code: "add dark mode".
@@ -2320,9 +2320,8 @@ above a **Message** box. It is the same component, so it is the same conversatio
   button. The bubble passes `HostBridge.copyText`, which on desktop is `IPC.copyText`, handled in
   `main/ipc/clipboard.ts`: main calls `clipboard.writeText`, because `navigator.clipboard` fails while
   the panel is unfocused. It takes only a string of at most 20,000 characters, only from the panel
-  window, and never reads the clipboard. Nothing is pasted or typed into any app. When the request
-  was spoken, the fence keeps the draft out of speech (`toSpeakable`, `SpokenStream`), so only
-  the words around it are said.
+  window, and never reads the clipboard. Nothing is pasted or typed into any app. The fence keeps
+  the draft out of speech (`toSpeakable`, `SpokenStream`), so only the words around it are said.
 - **Hand-offs in the bubble** (`handoff-card.tsx`), mockup screens 4 to 6. A `handoff.proposed` for
   this pet shows `ProposalCard`: the agent, the guessed project (name and path), the access and the
   brief. **Change project** lists the other guesses, a search box (`searchProjects`, the engine's
@@ -2337,8 +2336,7 @@ above a **Message** box. It is the same component, so it is the same conversatio
   nothing: the `finished` check-in may send one line from the mind (`pet.remark` with this
   `handoffId`), which shows at the top of the finished card and is said once; the card keeps the
   whole answer (with the bubble closed, the line comes beside Scout as an ordinary line instead).
-  A `say` step shows in the steps and is
-  passed to `onSay`, at most one line every 20 seconds (`SAY_GAP_MS`); tool steps stay silent. There
+  A `say` step shows in the steps and is never said aloud, nor are tool steps. There
   is no text box on the card: notes go through Scout. Main brings the
   bubble up with focus for a proposal, and without focus for a finished hand-off; only when the
   pets are hidden does a finished hand-off become a Windows notification instead, titled with the
@@ -2390,8 +2388,8 @@ above a **Message** box. It is the same component, so it is the same conversatio
   row for its own check only, so one slow call never hangs the card; `gatherHealth` never throws. The
   pure `healthRows(facts)` (`ui/health.ts`) turns that into one row per check, `ok`, `broken`,
   `info` or `unknown`, and `HealthCard` shows them under "Two things need you." or "Everything's
-  working.", which is the only line said aloud, and only when the question was spoken (a typed
-  one is read on the card). The rows are neutral status words, never Scout speaking ("Ready.",
+  working.". Health is a vital sign: shown, never said aloud, however the question was asked (the
+  mind can talk about it when asked). The rows are neutral status words, never Scout speaking ("Ready.",
   "Signed out of Claude.", "All experts reachable.", "Speech model not downloaded.", "Not
   checked."); a check that fails outright shows "Health check failed.". The ears count only once Always listening is on or
   a microphone was picked. The browser extension's row is `info` ("Not connected (optional)") and
@@ -2465,7 +2463,7 @@ is a native ONNX runtime, and core stays pure.
 flowchart LR
   subgraph Panel["Panel renderer"]
     CB["CompanionBubble onSay"] --> QM["QueueMouth (Mouth)"]
-    QM --> Q["SpeechQueue: toSpeakable, merge short lines, one at a time, next one got ready"]
+    QM --> Q["SpeechQueue: toSpeakable, split into sentences, merge short lines, one at a time, next one got ready"]
     Q --> PL["voice-player prepareLine"]
     PL --> WA["WebAudio + AnalyserNode"]
     PL --> SS["speechSynthesis fallback"]
@@ -2485,15 +2483,24 @@ flowchart LR
 - **What is said** (`@tagalong/ui`). `CompanionBubble` calls `onSay` with each finished answer
   (`turn.completed` for its own turn), each intro beat once as it appears, and the mind's line about
   the hand-off it is showing (`pet.remark` with its `handoffId`; the finish alone says nothing, and
-  the answer is never read out), plus a working expert's own narration
-  (`say` steps such as "Found the bug in `date.ts`."), at most one line every 20 seconds. The panel adds
-  check-in lines (`remarkEvent`, sent by `showRemark`, and the pick-up line with its card) and
-  `watch.fired` reasons (never an empty one); the brain mark at launch (`GreetingLine`) is never
-  spoken. A failed routine run is never said.
-  `SpeechQueue` shapes each line with `toSpeakable` (markdown stripped; code blocks, lists, tables,
-  quoted `>` lines (any quote, English too, such as a quoted error line; they mostly hold a
-  translation into another language) and URLs left out; at most two sentences or 200 characters, then "The rest is in the bubble.";
-  an answer to a spoken question or a read-aloud, see Talk to Scout, is said whole),
+  the answer is never read out). A working expert's narration (`say` steps) stays on its card,
+  never spoken. The panel adds check-in lines (`remarkEvent`, sent by `showRemark`, and the
+  pick-up line with its card) and `watch.fired` reasons (never an empty one); the brain mark at
+  launch (`GreetingLine`) is never spoken. A failed routine run is never said.
+  The mind decides what is said aloud, not code and not whether the question was typed or
+  spoken: everything it writes is said, except what it puts in a show-only block, which is
+  shown in the bubble and not read. `companion.md` tells it so in one line ("put drafts, code and
+  long lists in a block"); the soul keeps it short and calm and has it read text back only when
+  asked. So "read this to me" reads the passage in full, "summarise this" speaks a summary, and a
+  long paper gets the gist first. `SpeechQueue` shapes each line with `toSpeakable`, which only
+  strips markdown (list markers included, so a short list is read) and leaves out the show-only
+  blocks: fenced blocks (a `draft`, code), table rows, quoted `>` lines (any quote, English too;
+  they mostly hold a translation into another language) and bare URLs. Nothing is cut and
+  nothing is added: an answer that is all blocks says nothing. There is no content cap; the stop
+  is a person's: "Scout, stop", the stop button and the talk key cut speech at once. A whole
+  answer handed to `say` (a typed question's answer, a routine read aloud) is split into its
+  sentences (through `SpokenStream`), so a long one starts at once and is said a sentence at a
+  time rather than synthesised in one piece. The queue then
   merges short lines waiting together (`mergeShortLines`, because Kokoro says a lone "Done." badly),
   and plays one line at a time. While a line plays, the next one is already being synthesised
   (`prepare` starts `speak` at once and returns how to play the result; one line ahead, and not a
@@ -2579,7 +2586,7 @@ flowchart LR
     CB --> SS["SpokenStream: sentence by sentence"]
     SS --> PU["Pushable"]
     PU --> QM["QueueMouth.speak"]
-    QM --> Q["SpeechQueue (whole)"]
+    QM --> Q["SpeechQueue"]
   end
   CB -- "ask spoken" --> E["Engine: a Spoken line in the Now block"]
   E -- "turn.delta" --> CB
@@ -2603,26 +2610,20 @@ flowchart LR
   also interrupts that turn (`bridge.interrupt`), drops its `SpokenStream` and keeps what was shown so far, so no later
   sentence of the old answer is said. A spoken question sent while an answer still runs is a new
   ask for the same pet, which the runner already interrupts.
-- **Read aloud and describe** (`ui/voice/read-aloud.ts`, `companion.md`, the soul). No tool of
+- **Read aloud and describe** (`companion.md`, the soul). No tool of
   its own: the companion reads with `get_selection`, then `read_window_text`, and describes a
   picture with `look_at_window` or `look_closer`. There is no fixed recipe or opener: the soul
   says to tell them what things mean and not read text back unless they ask, and for something
   long to offer the gist first and ask what to dig into. The OCR tool result says once, as a
-  fact, that text read from pixels may contain recognition errors. A typed request is
-  spoken whole too: `CompanionBubble.send` asks with `spoken: true` when the pure
-  `wantsReadAloud(text)` matches (a request that starts with read or say and ends a few words later
-  in aloud, to me or out loud, so "read the logs and explain the error to me" does not), so the
-  answer goes through `SpokenStream` and `QueueMouth.speak` instead of `onSay`, whose `toSpeakable`
-  would cut it to two sentences. After a spoken answer ending "Shall I go on?", a typed reply is
-  spoken too only when `goesOn(text)` matches a bare "go on", "yes", "continue" or "keep going";
-  any other typed question is asked as typed (`goesOn` stays, though nothing asks Scout to say
-  "Shall I go on?" any more). The answer stays under `MAX_OUTPUT_TOKENS` (2,048). With Scout
+  fact, that text read from pixels may contain recognition errors. No code decides from the
+  words or the channel: a typed question is asked as typed, and the mind reads the passage in full
+  because it was asked to, or speaks a summary when asked to summarise; whatever it writes outside a
+  block is said (see What is said). The answer stays under `MAX_OUTPUT_TOKENS` (2,048). With Scout
   talks off the mouth says nothing and the reading is only in the bubble.
 - **Translate** (`companion.md`). No tool and no translation service: the companion's own model
   translates what it read the same way (`get_selection`, then `read_window_text`, or
   `look_at_window` / `look_closer` for text in a picture). There is no fixed opener and no
-  setting for the target language. `wantsReadAloud` also matches "translate this and read it to
-  me", so an English translation is spoken whole through the read-aloud path. `companion.md`
+  setting for the target language. An English translation is said like any other answer. `companion.md`
   says the voice speaks only English, so text in another language goes in a quoted block
   (`> …`), shown in the bubble and not spoken: `toSpeakable` and `SpokenStream` leave every quoted
   line out (an English quote too), because Kokoro and the system voice speak only English.
@@ -2792,16 +2793,17 @@ flowchart LR
   their models when listening starts.
 - **Spoken mode** (`core/conversation/now.ts`). `ask` takes `spoken: true`; the runner puts it in
   the turn's Now facts, and `renderNow` adds one `Spoken:` line to the `## Now` block on that
-  question only: their words are read aloud as written, so no markdown, lists or links in what is
-  said, exact detail after it (shown, not read), and speech recognition may have misheard a word.
-  The system prompt does not change, so it stays cached. A typed turn never gets the line.
+  question only: they said it out loud, and speech recognition may have misheard a word. What is
+  said aloud is the same for every turn, typed or spoken (`companion.md`, see What is said). The
+  system prompt does not change, so it stays cached. A typed turn never gets the line.
 - **Speaking as it streams** (`ui/voice/spoken-stream.ts`). For a spoken question the bubble feeds
   each `turn.delta` to a `SpokenStream`, which hands over each complete sentence (a mark followed by
   a space, or a line break) at once, skips code fences even when they arrive in pieces, drops a
-  list item, table row or quoted line whole (judged by how its line starts, `-`, `*`, `+`, `•`,
-  `1.`, `1)`, `|` or `>`, waiting for more when a line start could still be a marker), and says
-  "The answer is in the bubble." when nothing was speakable. Each piece goes through
-  a `Pushable` to `mouth.speak` (the panel's `QueueMouth`), which calls `SpeechQueue.say(text, { whole: true })`: shaped by `toSpeakable` but never cut to two sentences. Stopping the mouth drops whatever is still streaming.
+  table row or quoted line whole (judged by how its line starts, `|` or `>`), reads a list item
+  without its marker (`-`, `*`, `+`, `•`, `1.`, `1)`, waiting for more when a line start could
+  still be a marker), and says nothing when nothing was speakable. Each piece goes through
+  a `Pushable` to `mouth.speak` (the panel's `QueueMouth`), which calls `SpeechQueue.say(text)`. A typed
+  question's answer goes whole to `onSay` once it is complete and is said in full, a sentence at a time. Stopping the mouth drops whatever is still streaming.
   The finished answer is not said again; the bubble shows what it heard and, after the answer,
   "Hold <key> to reply". The microphone does not reopen on its own: only the talk key, the mic button
   or Always listening opens it.
