@@ -118,7 +118,8 @@ describe('DockPet', () => {
     const tag = screen.getByTestId('dock-tag');
     expect(tag.style.fontSize).toBe('9px');
     expect(tag.style.top).toBe('4px');
-    expect(tag.style.right).toBe('4px');
+    expect(tag.style.right).toBe('0px');
+    expect(tag.style.padding).toBe('1px 3px');
   });
 
   it('shows that sight is paused, and that memory is recording, in marks and words', () => {
@@ -311,14 +312,24 @@ describe('moods', () => {
       <DockPet
         pet={SCOUT}
         mood="working"
-        sightPaused
+        recording
         listening="on"
         status={{ id: 'brain-signed-out' }}
       />,
     );
     expect(screen.getByTestId('dock-tag')).toHaveTextContent('Working');
-    expect(screen.getByTestId('paused-eye')).toBeInTheDocument();
+    expect(screen.getByTestId('recording-dot')).toBeInTheDocument();
     expect(screen.getByTestId('listening-mark')).toBeInTheDocument();
     expect(screen.getByTestId('status-mark')).toBeInTheDocument();
+  });
+
+  it('gives the top to the Paused mark while sight is paused, and keeps the mood in words', () => {
+    render(<DockPet pet={SCOUT} mood="working" sightPaused />);
+    expect(screen.getByTestId('paused-eye')).toBeInTheDocument();
+    // The two would overlap at the top of the 96 px window; the pose still shows the work.
+    expect(screen.queryByTestId('dock-tag')).toBeNull();
+    expect(screen.getByRole('img')).toHaveAccessibleName(
+      'Scout has an expert working, sight paused',
+    );
   });
 });

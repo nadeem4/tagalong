@@ -147,7 +147,9 @@ export function DockPet({
   };
 
   const showBlink = blinking && blinkMood !== undefined;
-  const tag = isTagged(mood) ? TAGS[mood] : undefined;
+  // The Paused mark takes the top while sight is off: the two would overlap in 96 px, and the
+  // pose (the gear, the check) and the label still say what Bean is doing.
+  const tag = isTagged(mood) && !sightPaused ? TAGS[mood] : undefined;
   const label = `${pet.name} ${WORDS[mood]}${sightPaused ? ', sight paused' : ''}${
     recording && !sightPaused ? ', recording the screen' : ''
   }${listening === undefined ? '' : `, ${LISTENING[listening].words}`}${
@@ -185,9 +187,10 @@ export function DockPet({
           style={{
             position: 'absolute',
             top: 4,
-            right: 4,
-            // Small, so it stays clear of Bean's floating sign (the gear, the check) beside it.
-            padding: '1px 4px',
+            right: 0,
+            // Small and tucked into the corner, so it stays clear of Bean's floating sign (the
+            // gear, the check) beside it.
+            padding: '1px 3px',
             borderRadius: 999,
             background: tag.color,
             color: t.color.goldInk,

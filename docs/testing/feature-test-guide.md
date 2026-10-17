@@ -625,7 +625,9 @@ alone never makes Scout wince or cheer.
 2. **Expected:** Bean breathes and blinks now and then in idle and while Seeing, never mid-pose: a
    blink never makes Bean jump. Each mood has its own pose (waves for Seeing, a laptop and a gear
    for Working, a hop and a check mark for Done). The small tag at the top right sits beside the
-   gear or check mark, not over it, and reads clearly on both wallpapers.
+   gear or check mark, not over it, and reads clearly on both wallpapers. Turn sight off while
+   Working: the Paused chip shows at the top left and the Working tag goes, so the two never overlap;
+   the laptop and gear still show the work.
 
 ## Gentle nudges
 

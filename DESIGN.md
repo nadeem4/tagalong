@@ -178,19 +178,19 @@ components:
     textColor: '{colors.gold-ink}'
     typography: '{typography.dock-tag}'
     rounded: '{rounded.pill}'
-    padding: '1px 4px'
+    padding: '1px 3px'
   dock-tag-working:
     backgroundColor: '{colors.gold}'
     textColor: '{colors.gold-ink}'
     typography: '{typography.dock-tag}'
     rounded: '{rounded.pill}'
-    padding: '1px 4px'
+    padding: '1px 3px'
   dock-tag-done:
     backgroundColor: '{colors.done-green}'
     textColor: '{colors.gold-ink}'
     typography: '{typography.dock-tag}'
     rounded: '{rounded.pill}'
-    padding: '1px 4px'
+    padding: '1px 3px'
   dock-paused:
     backgroundColor: '{colors.paused-grey}'
     textColor: '{colors.shell-text}'
@@ -384,7 +384,7 @@ Every window bundles its faces from `@fontsource` (Latin subset), nothing fetche
 
 ## Layout
 
-- **Dock:** the avatar window's button is 96px square, and so is one frame of Bean, with no padding. Bean stands about 55px tall at the bottom, its floating sign above; the tag sits 4px from the top right, the Paused chip 4px from the top and 12px from the left, the recording and listening dots 8px up and 16px in from the bottom corners, and the status tag 18px up, centred.
+- **Dock:** the avatar window's button is 96px square, and so is one frame of Bean, with no padding. Bean stands about 55px tall at the bottom, its floating sign above; the tag sits in the top right corner, 4px down and flush right, the Paused chip 4px from the top and 12px from the left, the recording and listening dots 8px up and 16px in from the bottom corners, and the status tag 18px up, centred.
 - **Bubble:** a 420px-wide window (`PANEL_WIDTH`) that sizes its own height (80 to 520px; the full chat takes 520px). It has 10px of padding on the side the tail points to.
 - **Home:** a 1440x800 window (min 880x600). A fixed 232px nav (20px by 12px padding) and a fluid main column (24px by 32px padding, 20px between blocks). Overview cards sit in an auto-fit grid (min 260px, 16px gap); routine templates in an auto-fill grid (min 220px, 8px gap). Embedded Settings sits in the main column, max 820px.
 - **Welcome:** a 900x620 window in two columns. A header of step chips (18px by 32px padding, 8px apart), then a 300px left column for Scout and its words and a right column for the question, 40px apart, 40px by 48px padding. The answer pill is pinned to the bottom of the right column.
@@ -413,7 +413,7 @@ Gently rounded chrome, square pixels. The bubble, Home cards and Welcome's tile 
 
 ### Scout on the dock (signature)
 
-`DockPet` draws Bean, the 3D Scout, with `role="img"` and a full label ("Scout is looking at your screen, sight paused"). Each mood is its own pre-rendered clip from one fixed camera, so Bean never jumps between them: idle (a breath, a tail sway), listening (waves ripple out, ears perk), working (typing at a laptop, a gear turns), done (a hop, a check mark), dozing (rising z's), wince (a shake, a sweat drop), cheer (one hop) and tired (a drooping head). Bean's colours (in `apps/desktop/scripts/bean/bean.py`): fur `#F39B5E`, belly `#FFF3E6`, ear tips `#5A3A2C`, cheeks `#F2A9A0`. The pixel sprite (`theme/sprites/characters.ts`) stays for Welcome, Home's nav and Activity. A tag sits top right: **Seeing** on Sky, **Working** on Gold, **Done** on Done Green, all in Gold Ink, Onest 600 9px. **Paused** is a Paused Grey pill top left; the Recording Red dot sits bottom left while rolling memory is on and sight is not paused.
+`DockPet` draws Bean, the 3D Scout, with `role="img"` and a full label ("Scout is looking at your screen, sight paused"). Each mood is its own pre-rendered clip from one fixed camera, so Bean never jumps between them: idle (a breath, a tail sway), listening (waves ripple out, ears perk), working (typing at a laptop, a gear turns), done (a hop, a check mark), dozing (rising z's), wince (a shake, a sweat drop), cheer (one hop) and tired (a drooping head). Bean's colours (in `apps/desktop/scripts/bean/bean.py`): fur `#F39B5E`, belly `#FFF3E6`, ear tips `#5A3A2C`, cheeks `#F2A9A0`. The pixel sprite (`theme/sprites/characters.ts`) stays for Welcome, Home's nav and Activity. A tag sits top right: **Seeing** on Sky, **Working** on Gold, **Done** on Done Green, all in Gold Ink, Onest 600 9px. **Paused** is a Paused Grey pill top left, and while it shows the tag gives way (the two would overlap; the pose and the label still say the mood); the Recording Red dot sits bottom left while rolling memory is on and sight is not paused.
 
 ### The bubble
 

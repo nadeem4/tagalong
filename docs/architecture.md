@@ -1488,7 +1488,8 @@ live in `apps/desktop/src/renderer/src/bean/`, and `avatar.tsx` turns them into 
 `@tagalong/ui`, whose `tsc -b` build never copies `.webp`, and are emitted as files so the window's
 CSP (`default-src 'self'`) never meets a `data:` URL. `BeanClip` (`theme/bean-clip.tsx`) shows one
 strip in a 96 px box as a CSS background and steps through it with `steps()`: a loop runs forever, a
-one-shot (cheer, wince) plays once and holds its last frame. Bean stands about 55 px tall with its
+one-shot (cheer, wince) plays once and holds its last frame. Every step lasts one frame time (1/12 s),
+so a one-shot of n frames runs (n-1)/12 s and then holds. Bean stands about 55 px tall with its
 floating sign above. `bean.py` (Blender, headless) and `pack.py` in `apps/desktop/scripts/bean/`
 regenerate the set (see its README); the masters and `.blend` stay out of git. The moods: idle;
 **Seeing** for 2.5 s after a capture (waves ripple out, ears perk); **Working** while the companion
@@ -1497,8 +1498,9 @@ finishes (a hop every loop, a check mark), until the pet is clicked. Three moods
 tag: **dozing** while the person is away (slow breathing, rising z's), **wince** for 4 s at a failing
 build or an expert's error (one shake, a sweat drop) and **cheer** for 4 s when tests pass (one hop).
 With gentle nudges on, **tired** is a fourth: slow breathing and a drooping head after a long
-stretch or late at night, until `rested` (see Gentle nudges). The tags are small (9 px) and sit at
-the top right, beside the sign rather than on it. The mood comes
+stretch or late at night, until `rested` (see Gentle nudges). The tags are small (9 px) and sit in
+the top right corner, beside the sign rather than on it. While sight is paused the tag gives way
+to the Paused mark, which would overlap it; the pose and the label still say the mood. The mood comes
 from `dockMood(nextDock(...))`
 (`renderer/src/dock.ts`), a pure reducer over turn and hand-off notifications, capture notices,
 `pet.mood`, and main's `presence.away`/`presence.back`, in this order: seeing > working >

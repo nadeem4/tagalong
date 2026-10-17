@@ -38,11 +38,19 @@ describe('BeanClip', () => {
   it('plays a one-shot once and holds its last frame', () => {
     render(<BeanClip clip={ONCE} />);
     const animation = clipStyle().animation;
-    expect(animation).toContain('1s');
+    // Eleven steps of 1/12 s each: every frame shows for one frame time, the last one held.
+    expect(animation).toContain(`${11 / 12}s`);
     expect(animation).toContain('steps(11)');
     expect(animation).toContain('forwards');
     expect(animation).not.toContain('infinite');
     expect(keyframes()).toContain('-1056px');
+  });
+
+  it('shows both frames of a two-frame blink, one frame time each', () => {
+    render(<BeanClip clip={{ src: 'fake://idle-blink.webp', frames: 2, fps: 12, loop: false }} />);
+    const animation = clipStyle().animation;
+    expect(animation).toContain(`${1 / 12}s`);
+    expect(animation).toContain('steps(1)');
   });
 
   it('stands still on frame 0 of a loop', () => {

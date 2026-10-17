@@ -32,6 +32,8 @@ const FRAME = 96;
  * A strip of Bean frames as a CSS background. A loop runs `steps(n)` to one frame past the
  * last, forever, so each frame shows once per loop. A one-shot runs `steps(n-1)` to its last
  * frame with `forwards` and holds it: `steps(n)` would end past the strip and show nothing.
+ * Either way each step lasts one frame time (1/fps), so a one-shot runs (n-1)/fps and its last
+ * frame lands one frame time before n/fps: a two-frame blink shown for 2/fps shows both.
  */
 export function BeanClip({
   clip,
@@ -43,6 +45,7 @@ export function BeanClip({
   const { frames, fps, loop } = clip;
   const last = -(frames - 1) * FRAME;
   const end = loop ? -frames * FRAME : last;
+  const steps = loop ? frames : frames - 1;
   const keyframes = `bean-to-${-end}`;
   const base: CSSProperties = {
     display: 'block',
@@ -56,9 +59,7 @@ export function BeanClip({
     ? { backgroundPosition: `${loop ? 0 : last}px 0px` }
     : {
         backgroundPosition: '0px 0px',
-        animation: `${keyframes} ${frames / fps}s steps(${loop ? frames : frames - 1}) ${
-          loop ? 'infinite' : 'forwards'
-        }`,
+        animation: `${keyframes} ${steps / fps}s steps(${steps}) ${loop ? 'infinite' : 'forwards'}`,
       };
   return (
     <span
