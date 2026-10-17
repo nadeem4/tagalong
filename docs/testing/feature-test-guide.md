@@ -278,7 +278,8 @@ _Only on a data folder from a build before Nebius was removed._
    (e) Scout answers both as normal questions; no card. With everything fixed, the card says "Everything's
    working.". With the engine stopped, the rows it cannot read say "Not checked." and the
    card still shows. If the check itself fails, the bubble says "Health check failed.". (f)
-   Explorer opens `%APPDATA%\Tagalong\logs`; nothing is put on the clipboard.
+   Explorer opens `%APPDATA%\Tagalong\logs` (even on a fresh install with nothing logged yet);
+   nothing is put on the clipboard.
 
 ## Hand-offs to Claude Code
 

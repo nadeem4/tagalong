@@ -44,7 +44,7 @@ import {
 import { startWellbeingTick, watchPresence } from './presence';
 import { systemClock } from './awareness/clock';
 import { handoffLine, handoffNotice } from './handoff-notice';
-import { installLogFile } from './log-file';
+import { installLogFile, openLogsFolder } from './log-file';
 import { StatusMarks, clearBrainMarks, markListening, setPanelMark } from './status-marks';
 import {
   brainLine,
@@ -1189,9 +1189,9 @@ function registerIpc(): void {
   ipcMain.handle(IPC.openSettings, (_event, target: unknown) => openSettingsPage(target));
   ipcMain.handle(IPC.openWelcome, () => openWelcome());
   // The health card's Open logs folder: the person picks what to send; no log text moves.
-  ipcMain.handle(IPC.openLogsFolder, async () => {
-    await shell.openPath(logsDir());
-  });
+  ipcMain.handle(IPC.openLogsFolder, () =>
+    openLogsFolder(logsDir(), (path) => shell.openPath(path)),
+  );
   ipcMain.handle(IPC.openHome, () => openHome());
 
   // Check again in Settings: signed in now clears the brain mark on Scout.

@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync, existsSync 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installLogFile, logLine } from './log-file';
+import { installLogFile, logLine, openLogsFolder } from './log-file';
 
 const NOW = new Date('2026-10-16T21:40:00.000Z');
 
@@ -110,5 +110,34 @@ describe('installLogFile', () => {
     installLogFile({ dir: join(blocker, 'logs'), console: fakeConsole, now: () => NOW });
     expect(() => fakeConsole.error('still fine')).not.toThrow();
     expect(existsSync(join(blocker, 'logs'))).toBe(false);
+  });
+
+  it('never throws when a line cannot be built', () => {
+    installLogFile({ dir: join(dir, 'logs'), console: fakeConsole, now: () => NOW });
+    const odd = new Error();
+    Object.defineProperty(odd, 'message', {
+      get() {
+        throw new Error('no message');
+      },
+    });
+    expect(() => fakeConsole.warn('odd', odd)).not.toThrow();
+  });
+});
+
+describe('openLogsFolder', () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'tagalong-log-'));
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  it('makes the folder first, so it opens before anything was logged', async () => {
+    const logs = join(dir, 'logs');
+    const open = vi.fn(async (path: string) => {
+      expect(existsSync(path)).toBe(true);
+      return '';
+    });
+    await openLogsFolder(logs, open);
+    expect(open).toHaveBeenCalledWith(logs);
   });
 });

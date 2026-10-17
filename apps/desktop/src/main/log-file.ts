@@ -1,6 +1,6 @@
 /**
  * The log file: main's warnings and errors, kept on disk so a person can send them when
- * something goes wrong. Contains logLine and installLogFile. The engine runs in main's
+ * something goes wrong. Contains logLine, installLogFile and openLogsFolder. The engine runs in main's
  * process, so core's warnings land here too.
  *
  * Privacy: a line keeps only a text first argument and, for an Error, its name and
@@ -49,8 +49,9 @@ export function installLogFile({
   now?: () => Date;
 }): void {
   const file = join(dir, 'tagalong.log');
-  const write = (line: string): void => {
+  const write = (level: Level, args: readonly unknown[]): void => {
     try {
+      const line = logLine(level, args, now());
       mkdirSync(dir, { recursive: true });
       try {
         if (statSync(file).size > MAX_FILE) renameSync(file, join(dir, 'tagalong.1.log'));
@@ -59,14 +60,23 @@ export function installLogFile({
       }
       appendFileSync(file, `${line}\n`);
     } catch {
-      // The disk said no; the console still has it.
+      // The disk said no, or the line could not be built; the console still has it.
     }
   };
   for (const level of ['warn', 'error'] as const) {
     const original = target[level].bind(target);
     target[level] = (...args: unknown[]) => {
       original(...args);
-      write(logLine(level, args, now()));
+      write(level, args);
     };
   }
+}
+
+/** Open logs folder: makes the folder first (nothing may be logged yet), then opens it. */
+export async function openLogsFolder(
+  dir: string,
+  open: (path: string) => Promise<string>,
+): Promise<void> {
+  mkdirSync(dir, { recursive: true });
+  await open(dir);
 }
