@@ -4,7 +4,9 @@ import {
   EarsNotes,
   FIRST_TIME,
   FailureStreak,
+  FollowUpCue,
   NOTHING_HEARD,
+  micMark,
   micNote,
   settles,
   shownPartial,
@@ -112,6 +114,47 @@ describe('EarsNotes', () => {
     notes.clear();
     expect(notes.status(null, 'loading')).toBe(FIRST_TIME);
     expect(notes.failed(FIRST_TIME, OFFLINE)).toBe(OFFLINE);
+  });
+});
+
+describe('micMark', () => {
+  it('names the mark on Scout: busy in another app, or not usable', () => {
+    expect(micMark({ name: 'NotReadableError' })).toBe('mic-busy');
+    expect(micMark({ name: 'NotFoundError' })).toBe('mic-failed');
+    expect(micMark(new Error('x'))).toBe('mic-failed');
+  });
+});
+
+describe('FollowUpCue', () => {
+  it('opens the window once, when the spoken answer to a spoken question ends', () => {
+    const cue = new FollowUpCue();
+    cue.asked();
+    expect(cue.speaking(true)).toBe(false);
+    expect(cue.speaking(false)).toBe(true);
+    expect(cue.speaking(true)).toBe(false);
+    expect(cue.speaking(false)).toBe(false);
+  });
+
+  it('never opens for speech that answered nothing asked by voice', () => {
+    const cue = new FollowUpCue();
+    cue.speaking(true);
+    expect(cue.speaking(false)).toBe(false);
+  });
+
+  it('never opens when the person cut Scout off: the stop button, the close, talking over it', () => {
+    const cue = new FollowUpCue();
+    cue.asked();
+    cue.speaking(true);
+    cue.hushed();
+    expect(cue.speaking(false)).toBe(false);
+  });
+
+  it('waits for speech to start: an answer still on its way is not over', () => {
+    const cue = new FollowUpCue();
+    cue.asked();
+    expect(cue.speaking(false)).toBe(false);
+    cue.speaking(true);
+    expect(cue.speaking(false)).toBe(true);
   });
 });
 

@@ -1,9 +1,10 @@
 /**
  * The pure rules behind talk.ts: when a question is over, what words to show, and saying a
- * microphone or ears failure once per run of failures. Contains settles, shownPartial, micNote,
- * FailureStreak, EarsNotes and NOTHING_HEARD.
+ * microphone or ears failure once per run of failures, and when the follow-up window opens.
+ * Contains settles, shownPartial, micMark, micNote, FailureStreak, FollowUpCue, EarsNotes and
+ * NOTHING_HEARD.
  */
-import { addressedToScout } from '@tagalong/protocol';
+import { STATUS_WORDS, addressedToScout } from '@tagalong/protocol';
 import type { ListenMode } from '@tagalong/protocol';
 import { micFailure } from './setup-ears';
 
@@ -12,14 +13,42 @@ export const FIRST_TIME =
 const EARS_FAILED = 'Listening stopped. Try again.';
 /** A held question that heard no words: a bubble note, never said aloud. */
 export const NOTHING_HEARD = 'Nothing heard.';
-const MIC_BUSY =
-  'Another app is using the microphone. Close it and try again, or pick another in Settings.';
-const NO_MICROPHONE =
-  'The microphone could not be opened. Check that Windows lets apps use it, or pick another in Settings.';
+/** The mark on Scout for a microphone that would not open: busy in another app, or not usable. */
+export function micMark(error: unknown): 'mic-busy' | 'mic-failed' {
+  return micFailure(error) === 'busy' ? 'mic-busy' : 'mic-failed';
+}
 
-/** The note for a microphone that would not open: busy in another app, or not usable. */
+/** The bubble note for the same failure: the mark's sentence. */
 export function micNote(error: unknown): string {
-  return micFailure(error) === 'busy' ? MIC_BUSY : NO_MICROPHONE;
+  return STATUS_WORDS[micMark(error)].detail;
+}
+
+/**
+ * When the follow-up window opens: as Scout's spoken answer to a question asked by voice ends.
+ * Not when the person cut Scout off (the stop button or key, the close, talking over it).
+ */
+export class FollowUpCue {
+  #asked = false;
+  #speaking = false;
+
+  /** A question was heard by voice: its spoken answer may open the window. */
+  asked(): void {
+    this.#asked = true;
+  }
+
+  /** The person had enough: this answer opens nothing. */
+  hushed(): void {
+    this.#asked = false;
+  }
+
+  /** Scout started or stopped speaking: true when the window should open now. */
+  speaking(on: boolean): boolean {
+    const ended = this.#speaking && !on;
+    this.#speaking = on;
+    if (!ended || !this.#asked) return false;
+    this.#asked = false;
+    return true;
+  }
 }
 
 /**

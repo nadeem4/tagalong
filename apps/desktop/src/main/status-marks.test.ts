@@ -3,7 +3,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StatusMark } from '@tagalong/protocol';
 import { AlwaysListening } from './always-listening';
-import { LISTENING_MARK_MS, StatusMarks, clearBrainMarks, markListening } from './status-marks';
+import {
+  LISTENING_MARK_MS,
+  SAY_NAME_MARK_MS,
+  StatusMarks,
+  clearBrainMarks,
+  markListening,
+  setPanelMark,
+} from './status-marks';
 
 describe('StatusMarks', () => {
   beforeEach(() => {
@@ -74,16 +81,61 @@ describe('markListening', () => {
     expect(marks.top()).toEqual({ id: 'listening-on' });
   });
 
-  it('clears it when switched off, and leaves it alone for a pause', () => {
+  it('clears it when switched off, and shows Not listening while paused', () => {
     const marks = new StatusMarks();
     const listening = new AlwaysListening(false);
     markListening(marks, listening);
     expect(marks.top()).toBeNull();
     listening.set(true);
     listening.setPaused(true);
+    expect(marks.top()).toEqual({ id: 'listening-paused' });
+    listening.setPaused(false);
     expect(marks.top()).toEqual({ id: 'listening-on' });
+    listening.setPaused(true);
     listening.set(false);
     expect(marks.top()).toBeNull();
+  });
+
+  it('a pause with listening off shows nothing', () => {
+    const marks = new StatusMarks();
+    const listening = new AlwaysListening(false);
+    markListening(marks, listening);
+    listening.setPaused(true);
+    expect(marks.top()).toBeNull();
+  });
+});
+
+describe('setPanelMark', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('sets and clears the mic marks the panel knows about', () => {
+    const marks = new StatusMarks();
+    setPanelMark(marks, 'mic-busy', true);
+    expect(marks.top()).toEqual({ id: 'mic-busy' });
+    setPanelMark(marks, 'mic-busy', false);
+    expect(marks.top()).toBeNull();
+  });
+
+  it('shows Say “Scout” for a few seconds only', () => {
+    const marks = new StatusMarks();
+    setPanelMark(marks, 'say-name', true);
+    expect(marks.top()).toEqual({ id: 'say-name' });
+    vi.advanceTimersByTime(SAY_NAME_MARK_MS);
+    expect(marks.top()).toBeNull();
+  });
+
+  it('refuses any other mark, so a window cannot claim Scout can think', () => {
+    const marks = new StatusMarks();
+    marks.set({ id: 'brain-signed-out' });
+    expect(() => setPanelMark(marks, 'brain-signed-out', false)).toThrow();
+    expect(() => setPanelMark(marks, 'nope', true)).toThrow();
+    expect(() => setPanelMark(marks, 'mic-busy', 'yes')).toThrow();
+    expect(marks.top()).toEqual({ id: 'brain-signed-out' });
   });
 });
 

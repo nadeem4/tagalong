@@ -727,3 +727,116 @@ describe('ListenController, always without the name', () => {
     expect(calls.speechStart).toHaveBeenCalledOnce();
   });
 });
+
+describe('ListenController, the follow-up window', () => {
+  async function inWindow(more: Partial<ListenControllerOptions> = {}) {
+    const timers = fakeTimers();
+    const onFollowUp = vi.fn();
+    const made = setup(undefined, { setTimer: timers.set, onFollowUp, ...more });
+    made.controller.setAlways(true);
+    await tick();
+    made.controller.openFollowUp();
+    return { ...made, timers, onFollowUp };
+  }
+
+  it('takes one reply with no name, then needs the name again', async () => {
+    const { ears, calls, onFollowUp } = await inWindow();
+    expect(onFollowUp).toHaveBeenLastCalledWith(true);
+    ears.say('partial', 'and tomorrow');
+    ears.say('turnEnd', 'and tomorrow?');
+    expect(calls.heard.mock.calls).toEqual([['and tomorrow?']]);
+    expect(calls.partial).toHaveBeenCalledWith('and tomorrow', 'always');
+    expect(onFollowUp).toHaveBeenLastCalledWith(false);
+    ears.say('turnEnd', 'and the day after?');
+    expect(calls.heard).toHaveBeenCalledOnce();
+  });
+
+  it('a reply that starts with the name is asked without it, and closes the window', async () => {
+    const { ears, calls, onFollowUp } = await inWindow();
+    ears.say('turnEnd', 'Scott, and tomorrow?');
+    expect(calls.heard.mock.calls).toEqual([['and tomorrow?']]);
+    expect(onFollowUp).toHaveBeenLastCalledWith(false);
+  });
+
+  it('closes after twenty seconds with no reply', async () => {
+    const { ears, calls, timers, onFollowUp } = await inWindow();
+    expect(timers.pending()).toContain(20_000);
+    timers.fire();
+    expect(onFollowUp).toHaveBeenLastCalledWith(false);
+    ears.say('turnEnd', 'and tomorrow?');
+    expect(calls.heard).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a call or full screen', (c: ListenController) => c.setPaused(true)],
+    ['the talk key', (c: ListenController) => c.hold()],
+    ['the bubble cancelled', (c: ListenController) => c.cancel()],
+    ['switching off', (c: ListenController) => c.setAlways(false)],
+    ['closing it', (c: ListenController) => c.closeFollowUp()],
+  ])('closes on %s', async (_why, close) => {
+    const { controller, ears, calls, onFollowUp, timers } = await inWindow();
+    close(controller);
+    expect(onFollowUp).toHaveBeenLastCalledWith(false);
+    expect(timers.pending()).not.toContain(20_000);
+    controller.cancel();
+    controller.setPaused(false);
+    controller.setAlways(true);
+    await tick();
+    ears.say('turnEnd', 'and tomorrow?');
+    expect(calls.heard).not.toHaveBeenCalledWith('and tomorrow?');
+  });
+
+  it('never opens while listening is off or paused', async () => {
+    const onFollowUp = vi.fn();
+    const { controller } = setup(undefined, { onFollowUp });
+    controller.openFollowUp();
+    controller.setAlways(true);
+    controller.setPaused(true);
+    controller.openFollowUp();
+    expect(onFollowUp).not.toHaveBeenCalled();
+  });
+
+  it('a plain "stop" closes the window without switching listening off or being asked', async () => {
+    const { ears, calls, onFollowUp } = await inWindow();
+    ears.say('turnEnd', 'Stop.');
+    expect(calls.stop).not.toHaveBeenCalled();
+    expect(calls.heard).not.toHaveBeenCalled();
+    expect(onFollowUp).toHaveBeenLastCalledWith(false);
+  });
+
+  it('"Scout, stop" in the window still switches listening off', async () => {
+    const { ears, calls } = await inWindow();
+    ears.say('turnEnd', 'Scout, stop.');
+    expect(calls.stop).toHaveBeenCalledOnce();
+    expect(calls.heard).not.toHaveBeenCalled();
+  });
+});
+
+describe('ListenController, a question without the name', () => {
+  it('says so, without its words, for three words or more', async () => {
+    const onUnaddressed = vi.fn();
+    const { controller, ears } = setup(undefined, { onUnaddressed });
+    controller.setAlways(true);
+    await tick();
+    ears.say('turnEnd', 'yes please');
+    expect(onUnaddressed).not.toHaveBeenCalled();
+    ears.say('turnEnd', 'what is this error');
+    expect(onUnaddressed).toHaveBeenCalledExactlyOnceWith();
+    ears.say('turnEnd', 'Scout, what is this error');
+    expect(onUnaddressed).toHaveBeenCalledOnce();
+  });
+
+  it('is quiet in the follow-up window, and when no name is needed', async () => {
+    const onUnaddressed = vi.fn();
+    const first = setup(undefined, { onUnaddressed });
+    first.controller.setAlways(true);
+    await tick();
+    first.controller.openFollowUp();
+    first.ears.say('turnEnd', 'what is this error');
+    const second = setup(undefined, { onUnaddressed, needsName: false });
+    second.controller.setAlways(true);
+    await tick();
+    second.ears.say('turnEnd', 'what is this error');
+    expect(onUnaddressed).not.toHaveBeenCalled();
+  });
+});

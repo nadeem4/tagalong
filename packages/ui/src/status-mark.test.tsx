@@ -23,6 +23,12 @@ describe('StatusMark, the tag on Scout', () => {
     expect(tag).toHaveAttribute('data-tone', 'muted');
   });
 
+  it('shows the speech models download with its percent', () => {
+    render(<StatusMark mark={{ id: 'ears-loading', percent: 42 }} variant="tag" />);
+    expect(screen.getByTestId('status-mark')).toHaveTextContent('Ears 42%');
+    expect(screen.getByTestId('status-mark')).toHaveAttribute('data-tone', 'muted');
+  });
+
   it('sits above the recording and listening dots in the bottom corners, not on them', () => {
     render(<StatusMark mark={{ id: 'brain-no-key' }} variant="tag" />);
     // The dots are 8 px, 4 px from the bottom: the tag starts above them.

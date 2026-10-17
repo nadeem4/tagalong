@@ -1,6 +1,6 @@
 /** Tests for the status wording table: neutral words for every mark, and the top mark. */
 import { describe, expect, it } from 'vitest';
-import { STATUS_WORDS, StatusId, topStatus } from './status';
+import { STATUS_WORDS, StatusId, statusTag, topStatus } from './status';
 
 describe('STATUS_WORDS', () => {
   it('gives every status a short tag and a sentence', () => {
@@ -29,6 +29,24 @@ describe('STATUS_WORDS', () => {
     expect(STATUS_WORDS['brain-no-key'].fix).toBe('brain');
     expect(STATUS_WORDS['listening-on'].fix).toBeUndefined();
   });
+
+  it('sends the ears and mic problems to the voice fix, and keeps progress and hints muted', () => {
+    for (const id of ['ears-failed', 'mic-busy', 'mic-failed'] as const) {
+      expect(STATUS_WORDS[id].fix).toBe('voice');
+    }
+    for (const id of ['ears-loading', 'listening-paused', 'say-name'] as const) {
+      expect(STATUS_WORDS[id].fix).toBeUndefined();
+    }
+    expect(STATUS_WORDS['say-name'].tag).toBe('Say “Scout”');
+  });
+});
+
+describe('statusTag', () => {
+  it('adds a download percent to the tag, rounded', () => {
+    expect(statusTag({ id: 'ears-loading', percent: 39.6 })).toBe('Ears 40%');
+    expect(statusTag({ id: 'ears-loading' })).toBe('Ears');
+    expect(statusTag({ id: 'mic-busy' })).toBe('Mic busy');
+  });
 });
 
 describe('topStatus', () => {
@@ -40,5 +58,20 @@ describe('topStatus', () => {
     expect(topStatus([{ id: 'brain-no-key' }, { id: 'brain-signed-out' }])).toEqual({
       id: 'brain-signed-out',
     });
+  });
+
+  it('puts problems before progress, a pause before the hints, and Listening last', () => {
+    expect(StatusId.options).toEqual([
+      'brain-signed-out',
+      'brain-no-sign-in',
+      'brain-no-key',
+      'ears-failed',
+      'mic-busy',
+      'mic-failed',
+      'ears-loading',
+      'listening-paused',
+      'say-name',
+      'listening-on',
+    ]);
   });
 });

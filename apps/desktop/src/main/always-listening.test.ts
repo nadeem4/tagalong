@@ -25,8 +25,8 @@ const win = (change: Partial<WindowEntry>): WindowEntry => ({
 
 describe('AlwaysListening', () => {
   it('starts from the saved setting', () => {
-    expect(new AlwaysListening().state).toEqual({ on: false, paused: false });
-    expect(new AlwaysListening(true).state).toEqual({ on: true, paused: false });
+    expect(new AlwaysListening().state).toEqual({ on: false, paused: false, followUp: false });
+    expect(new AlwaysListening(true).state).toEqual({ on: true, paused: false, followUp: false });
   });
 
   it('tells listeners only of real changes', () => {
@@ -38,10 +38,29 @@ describe('AlwaysListening', () => {
     listening.set(true);
     listening.setPaused(false);
     expect(seen).toEqual([
-      { on: false, paused: true },
-      { on: true, paused: true },
-      { on: true, paused: false },
+      { on: false, paused: true, followUp: false },
+      { on: true, paused: true, followUp: false },
+      { on: true, paused: false, followUp: false },
     ]);
+  });
+
+  it('holds the follow-up window only while listening is on and not paused', () => {
+    const listening = new AlwaysListening();
+    listening.setFollowUp(true);
+    expect(listening.state.followUp).toBe(false);
+    listening.set(true);
+    listening.setFollowUp(true);
+    expect(listening.state).toEqual({ on: true, paused: false, followUp: true });
+    listening.setPaused(true);
+    expect(listening.state.followUp).toBe(false);
+    listening.setPaused(false);
+    listening.setFollowUp(true);
+    listening.set(false);
+    expect(listening.state).toEqual({ on: false, paused: false, followUp: false });
+    listening.set(true);
+    listening.setFollowUp(true);
+    listening.setFollowUp(false);
+    expect(listening.state.followUp).toBe(false);
   });
 });
 
@@ -160,11 +179,11 @@ describe('saveListening', () => {
       settingsStore: () => ({ set: vi.fn() }),
       onSaved,
     });
-    save({ on: false, paused: true });
-    save({ on: true, paused: false });
+    save({ on: false, paused: true, followUp: false });
+    save({ on: true, paused: false, followUp: false });
     await vi.waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved(true)));
     expect(call.mock.calls).toEqual([['settings.set', { patch: { listening: { always: true } } }]]);
-    save({ on: true, paused: true });
+    save({ on: true, paused: true, followUp: false });
     expect(call).toHaveBeenCalledOnce();
   });
 
@@ -194,7 +213,7 @@ describe('saveListening', () => {
         settingsStore: () => ({ set: vi.fn() }),
         onSaved,
       });
-      for (const on of choices) save({ on, paused: false });
+      for (const on of choices) save({ on, paused: false, followUp: false });
       // One save at a time: the second waits for the first.
       expect(call).toHaveBeenCalledOnce();
       answer();
@@ -204,7 +223,7 @@ describe('saveListening', () => {
       expect(call.mock.calls.map(([, params]) => params.patch.listening.always)).toEqual(choices);
       expect(onSaved).toHaveBeenLastCalledWith(saved(start));
       // Saved now: a change that is no change saves nothing.
-      save({ on: start, paused: true });
+      save({ on: start, paused: true, followUp: false });
       expect(call).toHaveBeenCalledTimes(2);
     },
   );
@@ -218,7 +237,7 @@ describe('saveListening', () => {
       settingsStore: () => ({ set }),
       onSaved,
     });
-    save({ on: false, paused: false });
+    save({ on: false, paused: false, followUp: false });
     expect(set).toHaveBeenCalledWith({ listening: { always: false } });
     expect(onSaved).toHaveBeenCalledWith(saved(false));
   });
@@ -240,15 +259,15 @@ describe('saveListening', () => {
       settingsStore: () => ({ set }),
       onSaved,
     });
-    save({ on: false, paused: false });
+    save({ on: false, paused: false, followUp: false });
     expect(warn).toHaveBeenCalledOnce();
     host = hostWith(call);
-    save({ on: false, paused: true });
+    save({ on: false, paused: true, followUp: false });
     await vi.waitFor(() => expect(warn).toHaveBeenCalledTimes(2));
-    save({ on: false, paused: false });
+    save({ on: false, paused: false, followUp: false });
     await vi.waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved(false)));
     expect(call).toHaveBeenCalledTimes(2);
-    save({ on: false, paused: true });
+    save({ on: false, paused: true, followUp: false });
     expect(call).toHaveBeenCalledTimes(2);
     warn.mockRestore();
   });

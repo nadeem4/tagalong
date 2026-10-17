@@ -116,6 +116,7 @@ export const IPC = {
   earsProgressEvent: 'tagalong:voice:ears-progress',
   getListening: 'tagalong:voice:get-listening',
   setListening: 'tagalong:voice:set-listening',
+  setFollowUp: 'tagalong:voice:set-follow-up',
   listeningEvent: 'tagalong:voice:listening',
   // Point, don't click: the ring to draw on one display's overlay. Main to renderer only.
   pointerShow: 'tagalong:pointer:show',
@@ -139,6 +140,7 @@ export const IPC = {
   // Status marks: the top one on Scout and in the bubble, read on mount and broadcast on change.
   getStatusMark: 'tagalong:status:get',
   statusMarkEvent: 'tagalong:status:event',
+  setStatusMark: 'tagalong:status:set',
 } as const;
 
 /** What the figure hands its preload on a drop: the files, and the drag's link and text. */
@@ -158,6 +160,8 @@ export interface PointerRing {
 export interface ListeningState {
   on: boolean;
   paused: boolean;
+  /** Scout just answered aloud: for a short while one reply needs no name. */
+  followUp: boolean;
 }
 
 /** The ears' models: loading (the first time, a download), ready, or failed and why. */
@@ -400,8 +404,10 @@ export interface TagalongHostApi {
   getListening(): Promise<ListeningState>;
   /** Switches Always listening on or off, returning the state it moved to. */
   setListening(on: boolean): Promise<ListeningState>;
-  /** Fires whenever Always listening is switched, paused or resumed. */
+  /** Fires whenever Always listening is switched, paused or resumed, or its follow-up window moves. */
   onListening(handler: (state: ListeningState) => void): () => void;
+  /** The follow-up window after Scout answered aloud opened or closed. */
+  setFollowUp(open: boolean): Promise<void>;
   /** The pointer overlay: a ring to draw. It only draws; nothing is clicked or typed. */
   onPointer(handler: (ring: PointerRing) => void): () => void;
   /**
@@ -419,6 +425,8 @@ export interface TagalongHostApi {
   getStatusMark(): Promise<StatusMark | null>;
   /** Fires with the new top status mark, or null when none is left. */
   onStatusMark(handler: (mark: StatusMark | null) => void): () => void;
+  /** Sets or clears one of the panel's own marks: the mic failing, or Say “Scout”. */
+  setStatusMark(id: 'mic-busy' | 'mic-failed' | 'say-name', on: boolean): Promise<void>;
 }
 
 declare global {

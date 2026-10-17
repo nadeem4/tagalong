@@ -44,7 +44,7 @@ import {
 import { startWellbeingTick, watchPresence } from './presence';
 import { systemClock } from './awareness/clock';
 import { handoffLine, handoffNotice } from './handoff-notice';
-import { StatusMarks, clearBrainMarks, markListening } from './status-marks';
+import { StatusMarks, clearBrainMarks, markListening, setPanelMark } from './status-marks';
 import {
   brainLine,
   brainReadiness,
@@ -424,6 +424,8 @@ async function start(): Promise<void> {
         showPanelQuietly(panel, avatar);
       }
     },
+    // A reply in the follow-up window needs no name; the download and ears failures show on Scout.
+    { followUp: () => listening.state.followUp, marks: statusMarks },
   );
 
   if (host === null) {
@@ -1154,6 +1156,10 @@ function registerIpc(): void {
   ipcMain.handle(IPC.getSightPaused, () => required().sightPause.paused);
   ipcMain.handle(IPC.getRecording, () => required().rolling.recording);
   ipcMain.handle(IPC.getStatusMark, () => required().statusMarks.top());
+  // Only the panel's own marks (the mic failing, Say “Scout”); setPanelMark refuses the rest.
+  ipcMain.handle(IPC.setStatusMark, (_event, id: unknown, on: unknown) =>
+    setPanelMark(required().statusMarks, id, on),
+  );
   ipcMain.handle(IPC.toggleSightPause, () => {
     required();
     return toggleSightPause();

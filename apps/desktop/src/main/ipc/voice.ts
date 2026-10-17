@@ -9,6 +9,7 @@ import type { SpeakPreview, VoiceModels } from '../../shared/ipc';
 import { EARS_FILES, filesPresent } from '../voice/ears/model-files';
 import { kokoroDownloaded } from '../voice/kokoro';
 import type { AlwaysListening } from '../always-listening';
+import type { StatusMarks } from '../status-marks';
 import type { VoiceWorker } from '../voice/worker/client';
 import type { VoiceService } from '../voice/voice';
 import type { IpcHandle, IpcOn } from './handle';
@@ -19,7 +20,7 @@ export interface VoiceIpcDeps {
   /** Notes the window you are on, as the ask key does. */
   noteActiveWindow: () => Promise<unknown>;
   /** Always listening: only the person switches it, from the bubble. */
-  listening: () => Pick<AlwaysListening, 'state' | 'set'>;
+  listening: () => Pick<AlwaysListening, 'state' | 'set' | 'setFollowUp'>;
   on: IpcOn;
   /** The voice models' folder, for the health check's look on disk. */
   voiceDir?: () => string;
@@ -77,6 +78,11 @@ export function registerVoiceIpc(handle: IpcHandle, deps: VoiceIpcDeps): void {
     if (typeof on !== 'boolean') throw new Error('Always listening is on or off.');
     return deps.listening().set(on);
   });
+  // The panel's follow-up window after Scout answered aloud: main raises the bubble for the reply.
+  handle(IPC.setFollowUp, (_event, open: unknown) => {
+    if (typeof open !== 'boolean') throw new Error('The follow-up window is open or closed.');
+    deps.listening().setFollowUp(open);
+  });
 
   // A download, not a listening step: it stays out of the ordering queue. Progress comes back
   // through forwardEars as IPC.earsProgressEvent.
@@ -97,19 +103,34 @@ export function registerVoiceIpc(handle: IpcHandle, deps: VoiceIpcDeps): void {
 /**
  * What the ears say goes to the windows; a dead voice process is said plainly. `onSpoken`
  * hears words addressed to Scout, so the bubble can come up: never bare speech, never talk
- * that does not start with the name, and never "Scout, stop", which only switches listening off
- * (nor a partial such as "Scout, st" that may still become it).
+ * that does not start with the name (or a word that sounds like it), unless the follow-up window
+ * is open, and never "Scout, stop", which only switches listening off (nor a partial such as
+ * "Scout, st" that may still become it). The download and an ears failure show on Scout as marks.
  */
 export function forwardEars(
   worker: Pick<VoiceWorker, 'onMessage' | 'onExit'>,
   send: (channel: string, payload: unknown) => void,
   onSpoken?: () => void,
+  more: {
+    /** The follow-up window is open: a reply needs no name. */
+    followUp?: () => boolean;
+    /** The speech models downloading, or the ears failed: shown on Scout. */
+    marks?: Pick<StatusMarks, 'set' | 'clear'>;
+  } = {},
 ): void {
+  const { marks } = more;
+  // The ears were in use in this voice process: only then is its exit an ears failure.
+  let earsUsed = false;
+  const failed = (): void => {
+    marks?.clear('ears-loading');
+    marks?.set({ id: 'ears-failed' });
+  };
   worker.onMessage((message) => {
+    if (message.kind.startsWith('ears')) earsUsed = true;
     if (message.kind === 'ears') {
       const question =
         (message.event === 'partial' || message.event === 'turnEnd') && message.text !== undefined
-          ? addressedToScout(message.text)
+          ? addressedToScout(message.text, { followUp: more.followUp?.() === true })
           : null;
       // A partial "Scout, st" may still become "stop": not a question until it cannot.
       const stop =
@@ -123,8 +144,16 @@ export function forwardEars(
           : { event: message.event, text: message.text },
       );
     } else if (message.kind === 'ears.progress') {
+      if (message.fraction >= 1) marks?.clear('ears-loading');
+      else marks?.set({ id: 'ears-loading', percent: Math.round(message.fraction * 100) });
       send(IPC.earsProgressEvent, { fraction: message.fraction });
     } else if (message.kind === 'ears.status') {
+      if (message.status === 'loading') marks?.set({ id: 'ears-loading' });
+      else if (message.status === 'failed') failed();
+      else {
+        marks?.clear('ears-loading');
+        marks?.clear('ears-failed');
+      }
       send(
         IPC.earsStatusEvent,
         message.message === undefined
@@ -133,10 +162,12 @@ export function forwardEars(
       );
     }
   });
-  worker.onExit(() =>
+  worker.onExit(() => {
+    if (earsUsed) failed();
+    earsUsed = false;
     send(IPC.earsStatusEvent, {
       status: 'failed',
       message: 'Listening stopped unexpectedly. Try again.',
-    }),
-  );
+    });
+  });
 }

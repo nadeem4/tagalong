@@ -121,9 +121,14 @@ function Panel() {
     setMicrophoneId(next.microphoneId);
     setUserName(next.userName);
   }
-  const { talk, cancel: cancelTalk } = useTalk({
+  const {
+    talk,
+    cancel: cancelTalk,
+    hush,
+  } = useTalk({
     keyLabel: talkKey,
     microphoneId,
+    speaking,
     onBegin: () => {
       mouth.stop();
       setGreeting(false);
@@ -139,7 +144,14 @@ function Panel() {
   }, []);
 
   // The stop key cuts Scout off mid-sentence, and a watch that fires is said aloud.
-  useEffect(() => window.tagalongHost.onStopVoice(() => mouth.stop()), [mouth]);
+  useEffect(
+    () =>
+      window.tagalongHost.onStopVoice(() => {
+        hush();
+        mouth.stop();
+      }),
+    [mouth, hush],
+  );
   useEffect(
     () =>
       window.tagalong.onTurnEvent((event) => {
@@ -428,7 +440,10 @@ function Panel() {
               talk={talk}
               seeing={{ on: seeing, onToggle: () => void window.tagalongHost.toggleSightPause() }}
               speaking={speaking}
-              onStopSpeaking={() => mouth.stop()}
+              onStopSpeaking={() => {
+                hush();
+                mouth.stop();
+              }}
               {...(snapshot !== null ? { snapshot } : {})}
               {...(resume !== null ? { resume } : {})}
               {...(pickUp !== null ? { pickUp, onPickUpDone: () => setPickUp(null) } : {})}

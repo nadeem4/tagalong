@@ -1,6 +1,6 @@
 /** Tests for spotting a turn addressed to Scout and the "stop listening" phrases. */
 import { describe, expect, it } from 'vitest';
-import { addressedToScout, isStopListening, mightBeStop } from './addressing';
+import { FOLLOW_UP_MS, addressedToScout, isStopListening, mightBeStop } from './addressing';
 
 describe('addressedToScout', () => {
   it.each([
@@ -31,6 +31,47 @@ describe('addressedToScout', () => {
     'Hey, Scout!',
   ])('%j is not addressed', (text) => {
     expect(addressedToScout(text)).toBeNull();
+  });
+
+  // Speech to text often mishears the name: a leading word that sounds like "Scout" counts.
+  it.each([
+    ['Scott, what is this?', 'what is this?'],
+    ['scot what is this', 'what is this'],
+    ['Scoot, help me', 'help me'],
+    ['Skout, help me', 'help me'],
+    ['Scouts, what is this?', 'what is this?'],
+    ['Hey Scott, explain this.', 'explain this.'],
+    ['ok skott: help', 'help'],
+  ])('sounds like the name: %j -> %j', (text, rest) => {
+    expect(addressedToScout(text)).toBe(rest);
+  });
+
+  it.each([
+    "Scott's car is outside",
+    'Scout’s answer was long',
+    "scout's",
+    'Scope this out for me',
+    'About the meeting today',
+    'Count me in for lunch',
+    'Shout if you need me',
+    'Scotland is lovely',
+    'Hey, what is this',
+    'Okay. Fine.',
+  ])('%j does not sound like talk to Scout', (text) => {
+    expect(addressedToScout(text)).toBeNull();
+  });
+
+  it('in the follow-up window, any words are the question, the name taken off if said', () => {
+    expect(addressedToScout('and what about tomorrow?', { followUp: true })).toBe(
+      'and what about tomorrow?',
+    );
+    expect(addressedToScout('Scout, and then?', { followUp: true })).toBe('and then?');
+    expect(addressedToScout('   ', { followUp: true })).toBeNull();
+    expect(addressedToScout('and what about tomorrow?', { followUp: false })).toBeNull();
+  });
+
+  it('the follow-up window lasts about twenty seconds', () => {
+    expect(FOLLOW_UP_MS).toBe(20_000);
   });
 });
 
