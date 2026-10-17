@@ -282,7 +282,8 @@ Tuesday?" and Scout searches the window titles it looked at and what you asked i
 with the day, time and app. It only knows titles, never page text, and only as far back as the
 record of what Scout saw keeps.
 
-**Memory.** Tell Scout "I prefer short answers" and it remembers across restarts.
+**Memory.** Tell Scout "I prefer short answers" and it remembers across restarts. See and delete
+what it remembers in Home, or say "Scout, forget that".
 
 **"Scout, what's wrong?"** Ask that (or "are you OK?", or "health check"), typed or spoken, and the
 bubble shows a health card: its sign-in, your experts, your connections, its voice, your
@@ -309,7 +310,7 @@ change works at once.
 ## Home: one window for everything
 
 Right-click the tray icon and choose **Open Tagalong**. The tray has only four items: **Open
-Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in eight pages:
+Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in nine pages:
 
 - **Overview**: whether Scout is ready and what it thinks with, your experts, what was spent today
   and this month (**Spend**), and the latest activity. Spend shows dollars for models with a known
@@ -376,6 +377,8 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   first. Click one to read it.
 - **What Scout saw**: every time Scout looked at your screen or sent something to an AI or an
   expert, as metadata only, grouped by day. Delete a row, or **Delete all**.
+- **What Scout remembers**: its facts, preferences and conversation summaries, newest first.
+  Delete any one.
 - **Settings**, in seven sections. Press ⓘ beside a setting for the longer story.
   - **How Scout thinks**: Scout's real brain, and whether your Claude Code sign-in works (checked
     locally with `claude auth status`). Without Claude Code you pick a service and paste its key,
@@ -490,6 +493,8 @@ screenshot is attached.
 - **Home → What Scout saw** lists every look (windows listed, text read, screenshots) and every send
   to an AI or an expert: the app and window, where it went and how much, never the content. Kept 7
   days (1 to 30 in Settings → Privacy); delete one row or all.
+- **Home → What Scout remembers** lists what Scout keeps about you until you delete it; delete any
+  one there, or ask Scout to forget it.
 - What you ask goes only to the provider Scout runs on. There is no Tagalong server.
 - Scout's voice is made on your computer. With an ElevenLabs key and voice, only the words Scout
   says are sent to ElevenLabs, never your screen or your questions.

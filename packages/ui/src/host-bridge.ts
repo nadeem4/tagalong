@@ -27,6 +27,7 @@ import type {
   SettingsPatch,
   SightLogEntry,
   UsageSummaryResult,
+  MemoryEntry,
 } from '@tagalong/protocol';
 import type { FixTarget, HealthFacts } from './health';
 
@@ -167,6 +168,12 @@ export interface HostBridge {
   deleteSightLog?(id: string): Promise<boolean>;
   /** Deletes the whole log; resolves to how many rows went. */
   clearSightLog?(): Promise<number>;
+  /**
+   * Home's What Scout remembers: its facts, preferences and summaries, newest first, each
+   * deletable. Optional: a host without Home never shows the page.
+   */
+  listMemories?(): Promise<MemoryEntry[]>;
+  deleteMemory?(id: string): Promise<boolean>;
   /**
    * Draft it for me: puts a draft on the clipboard, on the person's Copy click only. It
    * never reads the clipboard and never pastes. Optional: without it a draft has no Copy.

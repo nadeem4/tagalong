@@ -20,6 +20,7 @@ import type {
   RoutineView,
   SightLogEntry,
   SettingsPatch,
+  MemoryEntry,
 } from '@tagalong/protocol';
 import type { AskInput, ConfirmHandoff, HostBridge, TurnEvent } from '../host-bridge';
 
@@ -38,6 +39,8 @@ export interface FakeHostBridge extends HostBridge {
   activity: ActivityEntry[];
   /** What Scout saw, newest first; delete and clear edit it. */
   sightLog: SightLogEntry[];
+  /** What Scout remembers, newest first; delete edits it. */
+  memories: MemoryEntry[];
   /** How many times the activity was listed. */
   activityReads: number;
   /** Home's experts, as saved; a test reads them back after a save. */
@@ -98,6 +101,8 @@ export function createFakeHostBridge(
     routines?: RoutineView[];
     /** What Scout saw, newest first. */
     sightLog?: SightLogEntry[];
+    /** What Scout remembers, newest first. */
+    memories?: MemoryEntry[];
     /** Whether a calendar link is kept; absent, none is. */
     calendar?: CalendarCheckResult;
   } = {},
@@ -351,6 +356,15 @@ export function createFakeHostBridge(
       const deleted = fake.sightLog.length;
       fake.sightLog = [];
       return Promise.resolve(deleted);
+    },
+    memories: [...(options.memories ?? [])],
+    listMemories() {
+      return Promise.resolve([...fake.memories]);
+    },
+    deleteMemory(id) {
+      const before = fake.memories.length;
+      fake.memories = fake.memories.filter((memory) => memory.id !== id);
+      return Promise.resolve(fake.memories.length < before);
     },
     copied,
     appliedSettings,

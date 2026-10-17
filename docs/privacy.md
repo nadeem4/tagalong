@@ -629,6 +629,18 @@ there is no switch, because it holds no content and an off switch would weaken t
   not what was already sent, and does not touch your conversations.
 - The Chrome extension cannot read or delete the log.
 
+## What Scout remembers: see it, delete it
+
+Scout keeps what it learns about you (facts, preferences, and short summaries of long
+conversations) in the database on this computer, until you delete it.
+
+- **Home → What Scout remembers** shows every one of them, newest first, with its kind and the
+  day it was saved. Each has a delete button; deleting is for good, and Scout no longer recalls it.
+- **Ask Scout to forget.** "Forget that I like tea": Scout finds the matching memories and deletes
+  the one you mean. Nothing is deleted on a routine's own run.
+- Deleting a memory does not take back what was already sent to the AI in earlier questions.
+- The Chrome extension cannot read or delete them.
+
 ## What did we do today?
 
 Ask Scout "What did we do today?" (or any other day or range) and it lists the records above

@@ -81,7 +81,7 @@ function renderHome(
 }
 
 describe('HomeView', () => {
-  it('is one window: Scout and eight pages', async () => {
+  it('is one window: Scout and nine pages', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     const nav = await screen.findByRole('navigation', { name: 'Tagalong' });
     expect(within(nav).getByText('Your companion')).toBeVisible();
@@ -97,8 +97,28 @@ describe('HomeView', () => {
       'Connections',
       'Activity',
       'What Scout saw',
+      'What Scout remembers',
       'Settings',
     ]);
+  });
+
+  it('shows What Scout remembers, each memory deletable', async () => {
+    const bridge = createFakeHostBridge({
+      pets: [SCOUT],
+      memories: [
+        {
+          id: 'm1',
+          kind: 'preference',
+          text: 'Short answers',
+          createdAt: '2026-10-16T09:00:00.000Z',
+        },
+      ],
+    });
+    renderHome(bridge);
+    fireEvent.click(await screen.findByRole('button', { name: 'What Scout remembers' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete: Short answers' }));
+    expect(await screen.findByText('Scout doesn’t remember anything yet.')).toBeVisible();
+    expect(bridge.memories).toEqual([]);
   });
 
   it('opens Routines with Scout’s card in the form when the host hands one over', async () => {
@@ -212,7 +232,12 @@ describe('HomeView', () => {
     const labels = within(nav)
       .getAllByRole('button')
       .map((button) => button.textContent);
-    expect(labels.slice(-3)).toEqual(['Activity', 'What Scout saw', 'Settings']);
+    expect(labels.slice(-4)).toEqual([
+      'Activity',
+      'What Scout saw',
+      'What Scout remembers',
+      'Settings',
+    ]);
 
     fireEvent.click(screen.getByRole('button', { name: 'What Scout saw' }));
     expect(await screen.findByText("Scout hasn't looked at anything yet.")).toBeVisible();

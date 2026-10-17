@@ -120,8 +120,51 @@ export class MemoryStore {
       .map(toMemory);
   }
 
-  delete(id: string): boolean {
-    return this.db.prepare('DELETE FROM memories WHERE id = ?').run(id).changes > 0;
+  /**
+   * One pet's memories for Home, newest first. `before` is the `next` of the page before; an
+   * unknown cursor gives an empty page rather than starting over.
+   */
+  list(
+    petId: string,
+    params: { before?: string | undefined; limit: number },
+  ): { memories: Memory[]; next?: string } {
+    const cursor =
+      params.before === undefined
+        ? Number.MAX_SAFE_INTEGER
+        : (this.db
+            .prepare<[string], { rowid: number }>('SELECT rowid FROM memories WHERE id = ?')
+            .get(params.before)?.rowid ?? 0);
+    const rows = this.db
+      .prepare<[string, number, number], MemoryRow>(
+        `SELECT m.* FROM memories m WHERE ${VISIBLE} AND m.rowid < ? ORDER BY m.rowid DESC LIMIT ?`,
+      )
+      .all(petId, cursor, params.limit + 1);
+    const memories = rows.slice(0, params.limit).map(toMemory);
+    const last = memories.at(-1);
+    return rows.length > params.limit && last !== undefined
+      ? { memories, next: last.id }
+      : { memories };
+  }
+
+  /**
+   * One pet's memories whose id starts with `prefix`, at most two: one is a match, two say
+   * the prefix is too short. Compared as plain text, so `%` and `_` are not wildcards.
+   */
+  byPrefix(petId: string, prefix: string): Memory[] {
+    if (prefix.length === 0) return [];
+    return this.db
+      .prepare<[string, number, string], MemoryRow>(
+        `SELECT m.* FROM memories m WHERE ${VISIBLE} AND substr(m.id, 1, ?) = ? LIMIT 2`,
+      )
+      .all(petId, prefix.length, prefix)
+      .map(toMemory);
+  }
+
+  /** Deletes one of the pet's own memories; another pet's id deletes nothing. */
+  delete(petId: string, id: string): boolean {
+    return (
+      this.db.prepare('DELETE FROM memories WHERE id = ? AND pet_id = ?').run(id, petId).changes > 0
+    );
   }
 }
 

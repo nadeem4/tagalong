@@ -109,6 +109,12 @@ import {
   SightLogListParams,
   SightLogListResult,
 } from './sight-log';
+import {
+  MemoryDeleteParams,
+  MemoryDeleteResult,
+  MemoryListParams,
+  MemoryListResult,
+} from './memory';
 
 /** What a host tells the engine it is able to perceive or play. */
 export const HostCapability = z.enum([
@@ -524,6 +530,9 @@ export const hostToCoreMethods = {
   'wellbeing.observe': { params: WellbeingObserveParams, result: WellbeingObserveResult },
   'experts.catalog': { params: ExpertsCatalogParams, result: ExpertsCatalogResult },
   'experts.install': { params: ExpertsInstallParams, result: ExpertsInstallResult },
+  // What Scout remembers, in Home.
+  'memory.list': { params: MemoryListParams, result: MemoryListResult },
+  'memory.delete': { params: MemoryDeleteParams, result: MemoryDeleteResult },
 } as const satisfies Record<string, MethodSpec>;
 
 export const coreToHostMethods = {

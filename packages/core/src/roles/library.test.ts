@@ -38,6 +38,7 @@ const BUILT_IN_TOOLS = [
   'search_history',
   'tell_expert',
   'change_settings',
+  'forget',
   // A group: every tool of the person's connected apps.
   'connections',
 ];

@@ -100,9 +100,17 @@ describe('MemoryStore', () => {
   it('forgets a deleted memory in both the table and the index', () => {
     const memory = memories.add({ petId: 'scout', kind: 'fact', text: 'Temporary walrus' });
 
-    expect(memories.delete(memory.id)).toBe(true);
+    expect(memories.delete('scout', memory.id)).toBe(true);
     expect(memories.search('scout', 'walrus', 5)).toEqual([]);
     expect(memories.recent('scout', 5)).toEqual([]);
+    db.exec("INSERT INTO memories_fts (memories_fts) VALUES ('integrity-check')");
+  });
+
+  it('deletes only a memory of the pet that asks', () => {
+    const theirs = memories.add({ petId: 'pip', kind: 'fact', text: 'Pip’s walrus' });
+
+    expect(memories.delete('scout', theirs.id)).toBe(false);
+    expect(memories.search('pip', 'walrus', 5)).toHaveLength(1);
   });
 
   it('refuses an empty memory', () => {
@@ -115,6 +123,43 @@ describe('MemoryStore', () => {
     db = openDatabase(dir);
 
     expect(new MemoryStore(db).search('scout', 'short', 5)).toHaveLength(1);
+  });
+});
+
+describe('MemoryStore.list', () => {
+  it('pages one pet’s memories newest first, continued by next', () => {
+    for (const text of ['one', 'two', 'three'])
+      memories.add({ petId: 'scout', kind: 'fact', text });
+    memories.add({ petId: 'pip', kind: 'fact', text: 'not yours' });
+
+    const first = memories.list('scout', { limit: 2 });
+    expect(first.memories.map((m) => m.text)).toEqual(['three', 'two']);
+    expect(first.next).toBe(first.memories[1]!.id);
+
+    const second = memories.list('scout', { before: first.next, limit: 2 });
+    expect(second.memories.map((m) => m.text)).toEqual(['one']);
+    expect(second.next).toBeUndefined();
+  });
+
+  it('gives an empty page for an unknown cursor, never the newest again', () => {
+    memories.add({ petId: 'scout', kind: 'fact', text: 'one' });
+    expect(memories.list('scout', { before: 'gone', limit: 5 }).memories).toEqual([]);
+  });
+});
+
+describe('MemoryStore.byPrefix', () => {
+  it('finds one pet’s memories whose id starts with the prefix, at most two', () => {
+    const tea = memories.add({ petId: 'scout', kind: 'preference', text: 'Tea' });
+    memories.add({ petId: 'pip', kind: 'fact', text: 'Pip’s' });
+
+    expect(memories.byPrefix('scout', tea.id.slice(0, 6)).map((m) => m.text)).toEqual(['Tea']);
+    expect(memories.byPrefix('scout', tea.id)).toHaveLength(1);
+    expect(memories.byPrefix('scout', 'zzzz')).toEqual([]);
+    expect(memories.byPrefix('scout', '')).toEqual([]);
+    for (let i = 0; i < 4; i += 1) memories.add({ petId: 'scout', kind: 'fact', text: `f${i}` });
+    // LIKE wildcards are plain characters here, so they match no uuid.
+    expect(memories.byPrefix('scout', '%')).toEqual([]);
+    expect(memories.byPrefix('scout', '_')).toEqual([]);
   });
 });
 

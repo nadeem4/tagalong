@@ -1,8 +1,8 @@
 /**
  * Home: the one window for the companion, its experts and the app. Scout in the corner and
- * eight pages (overview, Scout, experts, routines, connections, activity, what Scout saw,
- * settings). Contains HomeView, HomeHost, HomeProvider, HomePage and the Scout page.
- * Rendered by the desktop `home` page.
+ * nine pages (overview, Scout, experts, routines, connections, activity, what Scout saw,
+ * what Scout remembers, settings). Contains HomeView, HomeHost, HomeProvider, HomePage and
+ * the Scout page. Rendered by the desktop `home` page.
  */
 
 import { useEffect, useState } from 'react';
@@ -18,6 +18,7 @@ import { ConnectionsPanel } from './connections-panel';
 import { ExpertsPanel } from './experts-panel';
 import { HOME_CSS } from './home-styles';
 import { RoutinesPanel } from './routines-panel';
+import { MemoryView } from './memory-view';
 import { SightLogView } from './sight-log-view';
 import { SpendCard } from './spend-card';
 
@@ -29,6 +30,7 @@ export type HomePage =
   | 'connections'
   | 'activity'
   | 'sightLog'
+  | 'memory'
   | 'settings';
 
 const PAGES: readonly { id: HomePage; label: (name: string) => string }[] = [
@@ -39,6 +41,7 @@ const PAGES: readonly { id: HomePage; label: (name: string) => string }[] = [
   { id: 'connections', label: () => 'Connections' },
   { id: 'activity', label: () => 'Activity' },
   { id: 'sightLog', label: (name) => `What ${name} saw` },
+  { id: 'memory', label: (name) => `What ${name} remembers` },
   { id: 'settings', label: () => 'Settings' },
 ];
 
@@ -77,9 +80,10 @@ export interface HomeViewProps {
 }
 
 /**
- * Home: the one window for everything. The companion in the corner, and eight pages: an
+ * Home: the one window for everything. The companion in the corner, and nine pages: an
  * overview, how the companion thinks, the experts it hands work to, what it does on its own,
- * the apps it can use, what happened, what it looked at and sent, and the app's settings.
+ * the apps it can use, what happened, what it looked at and sent, what it remembers, and the
+ * app's settings.
  */
 export function HomeView({ host, settings, page: asked, onPage, routineDraft }: HomeViewProps) {
   const bridge = useHostBridge();
@@ -168,6 +172,7 @@ export function HomeView({ host, settings, page: asked, onPage, routineDraft }: 
             providerLabel={(providerId) => providerLabel(setup, providerId)}
           />
         )}
+        {page === 'memory' && <MemoryView name={name} />}
         {page === 'settings' && settings}
       </main>
     </div>

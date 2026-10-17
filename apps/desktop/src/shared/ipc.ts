@@ -57,6 +57,8 @@ export const IPC = {
   listSightLog: 'tagalong:sight-log:list',
   deleteSightLog: 'tagalong:sight-log:delete',
   clearSightLog: 'tagalong:sight-log:clear',
+  listMemories: 'tagalong:memory:list',
+  deleteMemory: 'tagalong:memory:delete',
   setCalendarLink: 'tagalong:calendar:set-link',
   checkCalendar: 'tagalong:calendar:check',
   usageSummary: 'tagalong:usage:summary',

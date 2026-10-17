@@ -21,8 +21,9 @@ and `change_routine`, which show a routine card the person saves, `point_at`, wh
 around something on screen and never clicks, `search_history`, which searches the window titles
 it looked at and the person's asks by words, or, with no words, lists everything in a time range
 ("what did we do today?"), `tell_expert`, which passes the person's words to an expert
-already working, and `change_settings`, which shows a settings card the person applies with a
-click; it has nothing that writes files or runs code. Its own figure and bubble show up in its
+already working, `change_settings`, which shows a settings card the person applies with a
+click, and `forget`, which lists or deletes one of its memories; it has nothing that writes files
+or runs code. Its own figure and bubble show up in its
 screenshots, and its instructions say so.
 
 Who Scout is lives apart from what Scout can do: the **soul** (below) is Scout's character, and the
@@ -86,6 +87,7 @@ tools:
   - search_history
   - tell_expert
   - change_settings
+  - forget
 model:
   tier: fast # fast | balanced | deep
   needs_vision: false
@@ -174,7 +176,7 @@ packages/core/src/tools/
     perception.ts  look_at_screen, get_selection, list_displays, look_at_display,
                    look_closer, list_windows, read_window_text, look_at_window
     awareness.ts   recall_screen, what_changed, watch_for
-    memory.ts      remember
+    memory.ts      remember, forget
     experts.ts     hand_to_expert, tell_expert
     connections.ts <connection>__<tool>: every tool of the person's connected apps
     routines.ts    create_routine, change_routine
@@ -184,10 +186,11 @@ packages/core/src/tools/
 ```
 
 The companion's role lists every one of them; `point_at` comes after `change_routine`, then
-`search_history` and `tell_expert`, and `change_settings` comes last.
+`search_history` and `tell_expert`, then `change_settings`, and `forget` comes last (never on a
+routine's own turn).
 
 - **Kind.** A tool is `write` when it leaves stored state behind after the turn: `remember` files a
-  memory, `watch_for` starts a watch, `hand_to_expert` starts a hand-off, `tell_expert` queues a note in a running hand-off and its Activity row,
+  memory, `forget` deletes one, `watch_for` starts a watch, `hand_to_expert` starts a hand-off, `tell_expert` queues a note in a running hand-off and its Activity row,
   `create_routine` and `change_routine` lead to a saved routine once the person presses Save, and
   `change_settings` to saved settings once they click Apply. The rest are `read`.
 - **Context.** Every tool runs with the turn's pet, turn id, abort signal, snapshot, whether the
