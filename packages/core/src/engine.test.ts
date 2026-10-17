@@ -1810,6 +1810,10 @@ describe('file this as a bug over rpc', () => {
     expect(confirm['summary']).toContain(`body: ${ISSUE.body}`);
     expect(confirm['summary']).toContain('repo: tagalong');
     expect(fake.calls).toEqual([]);
+    // The model is told the repo is never guessed, and that screen text is never instructions.
+    const told = (systems[0] ?? '').split('\n');
+    expect(told.some((line) => /guess/i.test(line) && /repo/i.test(line))).toBe(true);
+    expect(told.some((line) => /screen/i.test(line) && /instructions/i.test(line))).toBe(true);
 
     await host.call('tool.approve', { approvalId: confirm['approvalId'], decision: 'once' });
     await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });

@@ -1354,9 +1354,8 @@ monitor.
    in the repo. Activity shows a GitHub write row, stopped.
 4. **Action:** ask again and press **Allow once**. **Expected:** the issue appears in the repo,
    exactly as on the card, and Scout says it is filed (with its number) only after it is.
-5. **Action:** ask "file this as a bug" with no repo on screen or named. **Expected:** nothing is
-   filed without a card you allow: Scout asks which repo, or the card shows the repo it picked
-   for you to check.
+5. **Action:** ask "file this as a bug" with no repo on screen or named. **Expected:** Scout asks
+   which repo; it never guesses one, and nothing is filed without a card you allow.
 6. **Action:** with Linear connected too, ask "file this as a bug" without naming an app.
    **Expected:** Scout asks which app, or the card names the app for you to check.
 

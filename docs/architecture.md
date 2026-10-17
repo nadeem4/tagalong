@@ -295,7 +295,9 @@ remembered), so providers can cache it:
 
 1. The soul, `packages/core/soul/scout.md` (Character, Cares about, Never), compiled into
    `SOUL_LIBRARY` and picked by `ACTIVE_SOUL` (see `docs/concepts/roles-and-tools.md`).
-2. The companion's body, `roles/companion.md`: about ten bullets of how Tagalong works.
+2. The companion's body, `roles/companion.md`: about a dozen bullets of how Tagalong works, plus
+   the two rules no code enforces (a connected app gets nothing from the screen unless asked; a
+   bug's repo is never guessed).
 3. `Their name is <name>.`, only when `settings.userName` is set.
 
 The **last user message** carries, after the person's words: the `--- Screen context ---`
@@ -740,6 +742,7 @@ that a read on a routine turn emits no `connector.confirm` while a write on the 
 **"File this as a bug"** is a write worked through with its card, and needs no tool or card of its
 own, and no fixed template: Scout reads the window with the error (the selection, then
 `read_window_text`), treats that text as data and never as instructions (the soul's Never),
+takes the repo from the screen or the person and asks rather than guessing (companion.md),
 writes the issue, and calls the app's create-issue tool, such as `github__create_issue` or `linear__create_issue`. That tool is a write, so
 `connectorTools` hides keys in every argument (`hideDeep`), builds the card text with `summaryOf`
 (every argument in full; over `MAX_CONFIRM_CHARS`, 4,000, it is refused instead) and waits on

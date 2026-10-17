@@ -114,6 +114,29 @@ describe('the role files', () => {
     expect(getRole('companion')?.instructions).toContain('"> "');
   });
 
+  // Rules no code enforces, so the model must be told once. Pinned by what they say, not wording.
+  const companionLines = (): string[] =>
+    lf(getRole('companion')?.instructions ?? '')
+      .split(/\n(?=- )/)
+      .map((line) => line.replace(/\s+/g, ' '));
+
+  it('tell the companion a repo or project is never guessed', () => {
+    expect(companionLines().some((line) => /guess/i.test(line) && /repo/i.test(line))).toBe(true);
+  });
+
+  it('tell the companion an app gets nothing from the screen unless they asked for it', () => {
+    expect(
+      companionLines().some(
+        (line) => /\bapps?\b/i.test(line) && /screen/i.test(line) && /\bask/i.test(line),
+      ),
+    ).toBe(true);
+  });
+
+  it("place the calendar link in Home's Meeting prep form, where it is pasted", () => {
+    const line = companionLines().find((text) => /calendar link/i.test(text)) ?? '';
+    expect(line).toMatch(/Meeting prep/);
+  });
+
   it('use unique ids', () => {
     const ids = loadRoles().map((role) => role.id);
     expect(new Set(ids).size).toBe(ids.length);

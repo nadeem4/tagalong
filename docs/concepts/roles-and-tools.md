@@ -14,7 +14,7 @@ Tagalong ships one role, the **Companion**, and one pet, Scout, works as it. Qui
 Companion's own (explaining, short drafts, translating, reading aloud, describing a picture); a
 draft goes alone in a fenced `draft` block that the bubble shows with **Copy**. Real work goes to
 an expert. "File this as a bug" goes to the connected app's create-issue tool, so the person sees
-it in full on the confirm card first. Its tools are only the ones that look (screen, selection, windows), `remember`,
+it in full on the confirm card first; it never guesses a repo. Its tools are only the ones that look (screen, selection, windows), `remember`,
 `hand_to_expert`, which writes a brief and hands it to an expert such as Claude Code, the tools of
 the person's connected apps (`connections`), whose changes always ask first, `create_routine`
 and `change_routine`, which show a routine card the person saves, `point_at`, which draws a ring
@@ -53,10 +53,11 @@ To re-character Scout, edit `soul/scout.md` and regenerate. For a second charact
 ### The role file
 
 One Markdown file per role in `packages/core/roles/` (today only `companion.md`). The YAML header is
-data; the body is the role's instructions. The companion's body is short, about ten bullets under
+data; the body is the role's instructions. The companion's body is short, about a dozen bullets under
 one heading, `## How Tagalong works`: mechanics only (look, talk and point, never click; quick
 things are Scout's and real work goes to an expert; cards need a click; keys and logins only in
-Settings; a draft goes alone in a fenced `draft` block, which the bubble gives a Copy button; the
+Settings, the calendar link only in Home's Meeting prep form; a connected app gets nothing from
+the screen unless they asked; a bug's repo is never guessed; a draft goes alone in a fenced `draft` block, which the bubble gives a Copy button; the
 voice speaks only English, so other languages go in a `"> "` quote; Scout's own figure shows up
 in screenshots; what `[hidden: …]` means; what rides at the end of the person's message). How
 Scout behaves is the soul's job, and how each tool is used is in the tool's own description. The
