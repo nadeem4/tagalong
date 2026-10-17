@@ -15,8 +15,9 @@ export interface ExpertLine {
 
 export type FinishedLine = ExpertLine & { state: 'done' | 'stopped' | 'error' };
 
-/** Why the mind woke. */
-export type WakeReason = { kind: 'asked'; spoken: boolean } | { kind: 'routine'; name: string };
+/** Why the mind woke. A check-in says why in its own bundle, so Now adds no line for it. */
+export type WakeReason =
+  { kind: 'asked'; spoken: boolean } | { kind: 'routine'; name: string } | { kind: 'check-in' };
 
 export interface NowFacts {
   at: Date;
@@ -83,7 +84,7 @@ export function renderNow(facts: NowFacts): string {
       `A routine, "${clean(facts.reason.name)}", is running on its own: nobody is watching, ` +
         'so ask no questions; they read the answer later.',
     );
-  } else if (facts.reason.spoken) {
+  } else if (facts.reason.kind === 'asked' && facts.reason.spoken) {
     lines.push(SPOKEN_LINE);
   }
 

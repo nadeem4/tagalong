@@ -36,9 +36,7 @@ import type { TurnEventSink } from './conversation/runner';
 import { browserContextFor } from './perception';
 import type { PerceptionHost } from './perception';
 import { WatchManager, systemWatchClock } from './watch';
-import { KeepAnEye } from './keep-an-eye/keep-an-eye';
-import { moodForHandoff } from './keep-an-eye/mood';
-import { Wellbeing } from './wellbeing';
+import { CheckIn } from './check-in';
 import { getRole } from './roles';
 import { EngineServer, RpcFailure } from './server/ws-server';
 import {
@@ -328,7 +326,7 @@ export class Engine {
     // The runner needs an event sink before the server exists, and the server needs the
     // runner's handlers before it starts. The holder ties that knot without a mutable
     // binding: no turn can run before boot returns, so the sink is never called empty.
-    const live: { server?: EngineServer; routines?: Routines } = {};
+    const live: { server?: EngineServer; routines?: Routines; checkIn?: CheckIn } = {};
     // Home's activity record is written before the broadcast, so a host that re-reads
     // activity.list on a notification already finds the row.
     const activity = new ActivityLog(db, store);
@@ -375,12 +373,9 @@ export class Engine {
       emit: (event) => {
         live.server?.broadcast(event.method, event.params);
         if (event.method !== 'handoff.finished') return;
-        live.routines?.handoffFinished(event.params);
-        // A wince at an error, a cheer when tests pass; a plain finish keeps the done face.
-        const mood = moodForHandoff(event.params);
-        if (mood !== null) {
-          live.server?.broadcast('pet.mood', { petId: SCOUT_ID, mood });
-        }
+        // A routine's own hand-off is delivered by the routine; any other gets a check-in.
+        if (live.routines?.handoffFinished(event.params) === true) return;
+        void live.checkIn?.finished(event.params);
       },
       projects,
       usage,
@@ -400,29 +395,43 @@ export class Engine {
         return [];
       }
     };
-    // Keep an eye on things: the host sends window titles, and now and then one window is
-    // read and one cheap call decides whether Scout has anything worth saying.
-    const keepAnEye = new KeepAnEye({
+    // What Now says on every turn, and on every check-in.
+    const nowSources = {
+      clock: () => new Date(),
+      timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+      lastTalkAt: (petId: string) => activity.lastTurnAt(petId),
+      running: () => handoffs.running(),
+      waiting: () => handoffs.pending(),
+      finishedSince: (since: string) => [
+        ...activity.expertsFinishedSince(since).map((done) => ({
+          expertName: done.expertName,
+          ask: done.text,
+          state: 'done' as const,
+        })),
+        ...activity.expertsLeftSince(since),
+      ],
+    };
+    // The check-in moment: the body notices (window titles, the activity feed, a finished
+    // hand-off), the gate decides whether the mind may be asked, and the mind decides
+    // whether anything is worth saying. Usually nothing is.
+    const checkIn = new CheckIn({
       clock: { now: () => Date.now() },
       settings: () => settings.get(),
       pet: () => pets.get(SCOUT_ID),
-      hosts,
       provider: resolve,
+      hosts,
+      windows: listHostWindows,
       experts: () => experts.list(),
+      now: nowSources,
+      memories: () => memory.recent(SCOUT_ID, 5),
+      lastExchange: () => activity.lastExchange(SCOUT_ID),
+      handoff: (handoffId) => activity.expertEntry(handoffId),
       propose: (params) => handoffs.propose(params),
       emit: (event) => live.server?.broadcast(event.method, event.params),
-      log: (message) => console.warn(`[engine] ${message}`),
       spentOut,
+      log: (message) => console.warn(`[engine] ${message}`),
     });
-    // Gentle nudges: idle time and titles once a minute, fixed lines, no model call.
-    const wellbeing = new Wellbeing({
-      clock: { now: () => Date.now() },
-      settings: () => settings.get(),
-      pet: () => pets.get(SCOUT_ID),
-      experts: () => experts.list(),
-      propose: (params) => handoffs.propose(params),
-      emit: (event) => live.server?.broadcast(event.method, event.params),
-    });
+    live.checkIn = checkIn;
     // The person's apps over MCP. Each connects on its own; one that fails never stops boot.
     const connections = new ConnectionManager({
       store: new ConnectionStore(db),
@@ -444,21 +453,7 @@ export class Engine {
       memory,
       // The Now facts on each question: time, last talk, and which experts are on what.
       // Known gap: a routine's turn counts as the last talk.
-      now: {
-        clock: () => new Date(),
-        timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
-        lastTalkAt: (petId) => activity.lastTurnAt(petId),
-        running: () => handoffs.running(),
-        waiting: () => handoffs.pending(),
-        finishedSince: (since) => [
-          ...activity.expertsFinishedSince(since).map((done) => ({
-            expertName: done.expertName,
-            ask: done.text,
-            state: 'done' as const,
-          })),
-          ...activity.expertsLeftSince(since),
-        ],
-      },
+      now: nowSources,
       // Off the request path: the reply is already on screen when the summary starts.
       afterTurn: ({ pet, conversationId }) => void summarizer.schedule(conversationId, pet),
       watch: { manager: watches, hosts },
@@ -594,8 +589,7 @@ export class Engine {
       projects,
       connectorFor,
       resolve,
-      keepAnEye,
-      wellbeing,
+      checkIn,
       connections,
       approvals,
       interruptedAtBoot,
@@ -699,8 +693,7 @@ function buildHandlers(parts: {
   /** The guarded resolver turns use, for the one-off greeting call. */
   resolve: ProviderResolver;
   models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
-  keepAnEye: KeepAnEye;
-  wellbeing: Wellbeing;
+  checkIn: CheckIn;
   connections: ConnectionManager;
   approvals: Approvals;
   /** Runs boot found still running and closed as interrupted. */
@@ -720,11 +713,10 @@ function buildHandlers(parts: {
 }): MethodHandlers {
   const { activity, runner, pets, settings, models, hosts, watches } = parts;
   const { refreshProviders, experts, handoffs, projects, connectorFor, resolve } = parts;
-  const { keepAnEye, connections, approvals, routines, interruptedAtBoot, pickUp } = parts;
+  const { checkIn, connections, approvals, routines, interruptedAtBoot, pickUp } = parts;
   const { sightLog, checkResolve } = parts;
   const { calendar } = parts;
   const { hostKinds } = parts;
-  const { wellbeing } = parts;
   /** A manager refusal (an id taken, none such) as an invalidParams error the host shows. */
   const plainly = async <T>(work: () => Promise<T>): Promise<T> => {
     try {
@@ -778,7 +770,7 @@ function buildHandlers(parts: {
       // Switching pick-up off deletes the snapshot it kept.
       if (!next.pickUp) pickUp.clear();
       // Nudges switched off: a tired face clears now, as no more ticks will come.
-      if (!next.wellbeing.enabled) wellbeing.settle();
+      if (!next.wellbeing.enabled) checkIn.settle();
       return { settings: next };
     },
     'models.list': (params) => models(params.providerId),
@@ -877,22 +869,17 @@ function buildHandlers(parts: {
         },
       });
     },
-    // Answers at once: the look, when there is one, runs off the request path and ends
-    // in a pet.remark notification or, most of the time, in nothing.
+    // Answers at once: a check-in, when there is one, runs off the request path and ends
+    // in a pet.remark or pet.mood notification or, most of the time, in nothing.
     'keepAnEye.observe': (params) => {
-      void keepAnEye.observe(params.windows);
+      void checkIn.observeWindows(params.windows);
       return {};
     },
-    // A nudge is a remark too, so the same Not now and offer buttons serve both.
-    'keepAnEye.notNow': () => {
-      wellbeing.notNow();
-      return { quietUntil: keepAnEye.notNow().toISOString() };
-    },
-    'keepAnEye.accept': async (params) => ({
-      proposed: (await keepAnEye.accept(params.remarkId)) || wellbeing.accept(params.remarkId),
-    }),
+    // Every check-in line has the same Not now and offer buttons.
+    'keepAnEye.notNow': () => ({ quietUntil: checkIn.notNow().toISOString() }),
+    'keepAnEye.accept': async (params) => ({ proposed: await checkIn.accept(params.remarkId) }),
     'wellbeing.observe': (params) => {
-      wellbeing.observe(params);
+      void checkIn.observeActivity(params);
       return {};
     },
 

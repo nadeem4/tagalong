@@ -12,7 +12,7 @@ import type { BrainContent, BrainContentBlock, BrainProvider, BrainRequest } fro
  * results handed back mid-call included. Never the text or the pictures themselves.
  *
  * Composed in the engine's resolver next to `guardBrain`, so every call to a model (a
- * turn, a summary, a watch check, keep-an-eye, the launch line) is covered by
+ * turn, a summary, a watch check, a check-in, the launch line) is covered by
  * construction. The row is written when the call ends, failed or not: the request had
  * already left this computer.
  */

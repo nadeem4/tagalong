@@ -137,6 +137,35 @@ describe('ActivityLog.lastTurnAt, for the Now block', () => {
   });
 });
 
+describe('ActivityLog.lastExchange, for check-ins', () => {
+  it('is null before this pet has answered anything', () => {
+    expect(log.lastExchange('scout')).toBeNull();
+    started('scout', asked('scout', 'still running'));
+    expect(log.lastExchange('scout')).toBeNull();
+  });
+
+  it("is this pet's latest answered question and its answer", () => {
+    completed(started('scout', asked('scout', 'first')), 'one');
+    db.prepare(`UPDATE activity SET started_at = '2020-01-01T00:00:00.000Z'`).run();
+    completed(started('scout', asked('scout', 'second')), 'two');
+    completed(started('other', asked('other', 'not Scout')), 'no');
+    expect(log.lastExchange('scout')).toEqual({ said: 'second', answered: 'two' });
+  });
+});
+
+describe('ActivityLog.expertEntry, for a finished hand-off', () => {
+  it('names the expert and what it was asked, by hand-off id', () => {
+    const id = log.expertStarted({
+      petId: 'scout',
+      expertId: 'cc',
+      expertName: 'Claude Code',
+      text: 'fix the login test',
+    });
+    expect(log.expertEntry(id)).toEqual({ expertName: 'Claude Code', ask: 'fix the login test' });
+    expect(log.expertEntry(randomUUID())).toBeNull();
+  });
+});
+
 describe('ActivityLog: crew-era rows', () => {
   it('leaves consults, handoffs and roundtables a crew-era install recorded out of the list', () => {
     const add = db.prepare(

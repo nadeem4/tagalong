@@ -104,8 +104,8 @@ export const SETTINGS_DEFAULTS = {
   lastVersion: null,
   /**
    * Whether Scout keeps an eye on things: it follows window titles (never pixels) and,
-   * rarely, reads one window and says one short line. On by default; off means no
-   * tracking at all.
+   * rarely, reads one window and checks in (the mind may say one short line, or nothing).
+   * On by default; off means no tracking at all.
    */
   keepAnEye: true,
   /**
@@ -140,14 +140,15 @@ export const SETTINGS_DEFAULTS = {
   sightLog: { days: SIGHT_LOG_DEFAULT_DAYS },
   /**
    * A daily cap on priced spend. Off by default. Once today's priced dollars reach it,
-   * keep-an-eye comments and scheduled routines wait until local midnight; a direct ask,
+   * check-ins and scheduled routines wait until local midnight; a direct ask,
    * Run now, a watch, a confirmed hand-off and a summary always go through. Talk to change
    * settings may set it ("cap me at a dollar a day").
    */
   budget: { dailyUsd: null as number | null },
   /**
-   * Gentle nudges: after a long unbroken stretch, or late at night, Scout looks tired and
-   * says one fixed line. Off by default; it reads only the idle time and window titles.
+   * Gentle nudges: after a long unbroken stretch, or late at night, Scout checks in once
+   * (the mind may say a line, look tired, or say nothing). Off by default; it reads only the
+   * idle time and window titles. The tired face shows only while this is on.
    */
   wellbeing: { enabled: false },
 } as const;
@@ -269,7 +270,7 @@ const settingsFields = {
    */
   windowTextBudget: z.number().int().positive().max(MAX_WINDOW_TEXT_CHARS),
   /**
-   * The brain that writes conversation summaries, the greeting and keep-an-eye lines. Null
+   * The brain that writes conversation summaries, the greeting and check-in lines. Null
    * means each pet uses its own provider and model, so no extra key is needed.
    */
   summarizer: z.object({ providerId: z.string().min(1), model: z.string().min(1) }).nullable(),
@@ -313,7 +314,7 @@ const settingsFields = {
   closedCleanly: z.boolean(),
   /** The version the last launch ran; null before the first launch that recorded it. */
   lastVersion: z.string().min(1).nullable(),
-  /** Whether Scout follows window titles and now and then says one useful line. */
+  /** Whether Scout follows window titles and now and then checks in about one window. */
   keepAnEye: z.boolean(),
   /** Whether Scout speaks its bubble, in which voice and how fast. */
   voice: z.object({
@@ -346,7 +347,7 @@ const settingsFields = {
   }),
   /** Dollars of priced spend a day before proactive work pauses; null for no cap. */
   budget: z.object({ dailyUsd: z.number().positive().max(MAX_DAILY_BUDGET_USD).nullable() }),
-  /** Whether Scout gives a gentle nudge after a long stretch or late at night. */
+  /** Whether Scout checks in after a long stretch or late at night. */
   wellbeing: z.object({ enabled: z.boolean() }),
 };
 

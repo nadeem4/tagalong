@@ -345,12 +345,14 @@ describe('Routines, on a trigger', () => {
     const t = setup();
     t.store.save({ ...PAPERS, name: 'Recap', when: { type: 'expert' } }, MONDAY_759);
     t.routines.start();
-    t.routines.handoffFinished({
+    const mine = t.routines.handoffFinished({
       handoffId: randomUUID(),
       expertId: 'researcher',
       state: 'done',
       text: 'Found three papers.',
     });
+    // Not a routine's own hand-off: Scout's check-in may speak about it.
+    expect(mine).toBe(false);
     await t.clock.advance(0);
     expect(t.asks).toHaveLength(1);
     expect(t.asks[0]?.text).toContain('Researcher finished: Found three papers.');
@@ -451,12 +453,14 @@ describe('Routines, handing to an expert', () => {
     expect(t.results()).toHaveLength(0);
     expect(t.store.get(saved.id)?.lastState).toBe('running');
 
-    t.routines.handoffFinished({
+    const mine = t.routines.handoffFinished({
       handoffId,
       expertId: 'researcher',
       state: 'done',
       text: '1. Agents that plan. Why it matters: fewer steps.',
     });
+    // The routine delivers it, so no check-in speaks about it too.
+    expect(mine).toBe(true);
     await t.clock.advance(0);
     expect(t.answers).toEqual([
       expect.objectContaining({ text: '1. Agents that plan. Why it matters: fewer steps.' }),

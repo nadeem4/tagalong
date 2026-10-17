@@ -336,8 +336,11 @@ export class Routines {
     return this.#proposals.delete(proposalId);
   }
 
-  /** An expert finished: a routine waiting on it delivers, and expert routines run. */
-  handoffFinished(params: HandoffFinishedParams): void {
+  /**
+   * An expert finished: a routine waiting on it delivers, and expert routines run. True when
+   * the hand-off was a routine's own, which the routine delivers itself.
+   */
+  handoffFinished(params: HandoffFinishedParams): boolean {
     const waiting = this.#waiting.get(params.handoffId);
     if (waiting !== undefined) {
       this.#waiting.delete(params.handoffId);
@@ -352,14 +355,15 @@ export class Routines {
         conversationId: waiting.conversationId,
       });
       void this.#deliver();
-      return;
+      return true;
     }
-    if (params.state !== 'done') return;
+    if (params.state !== 'done') return false;
     const name = this.#options.experts().find((e) => e.id === params.expertId)?.name ?? 'An expert';
     const detail = `${name} finished: ${clip((params.text ?? '').trim(), DETAIL_CHARS)}`;
     for (const stored of this.#enabled()) {
       if (stored.routine.when.type === 'expert') void this.#run(stored, { late: false, detail });
     }
+    return false;
   }
 
   watchFired(message: string): void {

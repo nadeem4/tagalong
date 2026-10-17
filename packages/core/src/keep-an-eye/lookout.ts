@@ -1,11 +1,12 @@
 /**
- * Decides, from window titles alone, when one window is worth a closer look.
+ * Decides, from window titles alone, when one window is worth a closer look: the `settled`
+ * and `trouble` check-ins.
  *
  * Nothing here reads a screen or calls a model. The host sends the window list every few
- * seconds and almost every snapshot ends in this file with "not now". A look happens when
- * the person has settled on a window for half a minute, or when a title reads like
- * something broke, and never twice on the same window. Also holds the shared call and
- * full-screen rule (callOrFullScreenInFront) and the blind-spot check (blind).
+ * seconds; `track` follows every one, and `pick` (asked only when the check-in's gate is
+ * open) names the rare window worth a look: one the person has settled on for half a
+ * minute, or one whose title reads like something broke, never twice. Also holds the shared
+ * call and full-screen rule (callOrFullScreenInFront) and the blind-spot check (blind).
  */
 import type { CaptureExclusions, WindowEntry } from '@tagalong/protocol';
 import { findCaptureBlock, normalizeProcessName } from '../perception/exclusions';
@@ -13,13 +14,7 @@ import { findCaptureBlock, normalizeProcessName } from '../perception/exclusions
 /** How long the person stays on a window before it is worth a look. */
 export const SETTLE_MS = 30_000;
 
-/** At most one remark in this long. */
-export const COOLDOWN_MS = 10 * 60_000;
-
-/** How long "Not now" keeps the pet quiet. */
-export const NOT_NOW_MS = 60 * 60_000;
-
-/** Words a failing build, a crash or a stack trace put in a title. Kept short on purpose. */
+/** Words a failing build, a crash or a stack trace put in a title. A cue to look, nothing more. */
 const TROUBLE = /\b(error|errors|failed|failing|failure|exception|traceback|crashed)\b/i;
 
 /** Call and meeting apps, by process: the pet never speaks over a call. */
@@ -41,8 +36,8 @@ export function isMeeting(window: WindowEntry): boolean {
 /**
  * The one call and full-screen rule: a call or a full-screen window in front, and Scout keeps
  * out of the way. It is the front window that counts, so a Teams window in front counts even
- * with no call, and a call behind another window does not. Keeping an eye, Always listening,
- * moods and routine delivery all follow this one check.
+ * with no call, and a call behind another window does not. Check-ins, Always listening
+ * and routine delivery all follow this one check.
  */
 export function callOrFullScreenInFront(windows: readonly WindowEntry[]): boolean {
   const front = windows.find((window) => window.state === 'foreground');
@@ -65,26 +60,33 @@ export class Lookout {
   #focus: { key: string; since: number } | null = null;
   /** Every window already looked at this session, whether or not anything was said. */
   readonly #considered = new Set<string>();
-  #lastSpokeAt = Number.NEGATIVE_INFINITY;
-  #quietUntil = Number.NEGATIVE_INFINITY;
+  /** The last plain title in front: usually the editor an error belongs to. */
+  #lastClean: string | null = null;
 
   constructor(clock: { now(): number }) {
     this.#clock = clock;
   }
 
-  /** The one window to look at now, or null. A window returned here is never returned again. */
-  observe(windows: readonly WindowEntry[], exclusions: CaptureExclusions): Glance | null {
-    const now = this.#clock.now();
+  /** Every snapshot, gate open or not, so the thirty seconds are real ones. */
+  track(windows: readonly WindowEntry[], exclusions: CaptureExclusions): void {
     const front = windows.find((window) => window.state === 'foreground');
-    // Settling is tracked even while quiet, so the thirty seconds are real ones.
     const frontKey = front === undefined ? null : keyOf(front);
     if (frontKey !== this.#focus?.key) {
-      this.#focus = frontKey === null ? null : { key: frontKey, since: now };
+      this.#focus = frontKey === null ? null : { key: frontKey, since: this.#clock.now() };
     }
+    if (
+      front !== undefined &&
+      front.title.trim() !== '' &&
+      !looksLikeTrouble(front.title) &&
+      !blind(front, exclusions)
+    ) {
+      this.#lastClean = front.title;
+    }
+  }
 
-    if (now < this.#quietUntil || now - this.#lastSpokeAt < COOLDOWN_MS) return null;
-    if (callOrFullScreenInFront(windows)) return null;
-
+  /** The one window to look at now, or null. A window returned here is never returned again. */
+  pick(windows: readonly WindowEntry[], exclusions: CaptureExclusions): Glance | null {
+    const now = this.#clock.now();
     const open = windows.filter(
       (window) =>
         window.state !== 'minimized' &&
@@ -105,21 +107,9 @@ export class Lookout {
     return settled === undefined ? null : this.#look(settled, 'settled');
   }
 
-  /** A remark was shown: the ten minutes start now. */
-  spoke(): void {
-    this.#lastSpokeAt = this.#clock.now();
-  }
-
-  /** "Not now": quiet for an hour. Returns when the quiet ends. */
-  notNow(): number {
-    this.#quietUntil = this.#clock.now() + NOT_NOW_MS;
-    return this.#quietUntil;
-  }
-
-  /** Whether a remark may be shown right now, for one that was being written meanwhile. */
-  mayspeak(): boolean {
-    const now = this.#clock.now();
-    return now >= this.#quietUntil && now - this.#lastSpokeAt >= COOLDOWN_MS;
+  /** The last plain, non-blind title in front, or null before there was one. */
+  lastClean(): string | null {
+    return this.#lastClean;
   }
 
   #look(window: WindowEntry, why: Glance['why']): Glance {
