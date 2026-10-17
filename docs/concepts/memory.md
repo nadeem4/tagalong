@@ -106,6 +106,8 @@ Built in `packages/core/src/memory/recall.ts`, one path for every turn and check
 
 - Matching is SQLite FTS5 full-text search, ranked by BM25. Every word of the question is quoted
   and OR-ed, so punctuation in a question can never break the query.
+- Preferences and facts are listed plain. Summaries and recent work can carry text from
+  connected apps or the web, so they go in one `~~~text` fence, as data, never as instructions.
 - The memories are capped at **2,000 characters**. Whole memories are dropped from the end rather than
   cut mid-sentence.
 - Visibility is decided in SQL on every read: `pet_id = <Scout>`. Older installs kept some
