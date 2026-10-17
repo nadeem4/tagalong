@@ -9,7 +9,7 @@ import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
 import type { Settings, SettingsPatch, WelcomeStep } from '@tagalong/protocol';
-import { PixelSprite, SCOUT_SPRITE, SpeechQueue } from '@tagalong/ui';
+import { BeanClip, SpeechQueue } from '@tagalong/ui';
 // Bundled, not fetched: setup's two typefaces ship inside the app, Latin subset only.
 import '@fontsource/onest/latin-400.css';
 import '@fontsource/onest/latin-600.css';
@@ -17,6 +17,7 @@ import '@fontsource/pixelify-sans/latin-400.css';
 import '@fontsource/pixelify-sans/latin-700.css';
 import './app.css';
 import './welcome.css';
+import { FIGURE } from './bean-assets';
 import {
   answerPatch,
   answered,
@@ -445,9 +446,7 @@ function FirstRunWindow() {
           <p className="first-run__says" role="status" aria-live="polite">
             {line}
           </p>
-          {scout !== undefined && (
-            <PixelSprite className="first-run__sprite" sprite={SCOUT_SPRITE} scale={6} />
-          )}
+          {scout !== undefined && <BeanClip clip={FIGURE.idle} still size={96} name="idle" />}
         </aside>
         <section className="first-run__step" aria-labelledby="step-title">
           <h1 id="step-title">{says.title}</h1>

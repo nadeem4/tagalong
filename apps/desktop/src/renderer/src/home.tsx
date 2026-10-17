@@ -16,6 +16,7 @@ import '@fontsource/pixelify-sans/latin-600.css';
 import '@fontsource/pixelify-sans/latin-700.css';
 import './home.css';
 import '../../shared/ipc';
+import { FIGURE } from './bean-assets';
 import { overviewStatus, scoutBrain } from './settings/brain';
 import { SettingsPage } from './settings/settings-page';
 import { homeTarget, scrollToSection } from './home-target';
@@ -90,6 +91,7 @@ function Home() {
     <HostBridgeProvider bridge={window.tagalong}>
       <HomeView
         host={homeHost}
+        scout={FIGURE.idle}
         settings={<SettingsPage embedded onOpenScout={() => setPage('scout')} />}
         {...(page === undefined ? {} : { page })}
         {...(routineDraft === undefined ? {} : { routineDraft })}

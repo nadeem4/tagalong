@@ -9,8 +9,8 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ActivityEntry, Expert, Pet, RoutineProposedParams } from '@tagalong/protocol';
 import { useHostBridge } from '../host-bridge';
-import { PixelSprite } from '../theme/pixel-sprite';
-import { SCOUT_SPRITE } from '../theme/sprites/characters';
+import { BeanClip } from '../theme/bean-clip';
+import type { BeanClipData } from '../theme/bean-clip';
 import { SETTINGS_CSS } from '../settings/settings-styles';
 import { ActivityView } from './activity-view';
 import { brainLabel, modelLabel } from './brain-label';
@@ -70,6 +70,8 @@ export interface HomeHost {
 
 export interface HomeViewProps {
   host: HomeHost;
+  /** Bean's idle strip, drawn still in the nav tile and on each Activity entry. */
+  scout: BeanClipData;
   /** The host's settings form: keys, hotkey, sight, memory, the browser extension. */
   settings: ReactNode;
   /** The page to show; the host sets it when the tray or the bubble opens a page. */
@@ -85,7 +87,14 @@ export interface HomeViewProps {
  * the apps it can use, what happened, what it looked at and sent, what it remembers, and the
  * app's settings.
  */
-export function HomeView({ host, settings, page: asked, onPage, routineDraft }: HomeViewProps) {
+export function HomeView({
+  host,
+  scout,
+  settings,
+  page: asked,
+  onPage,
+  routineDraft,
+}: HomeViewProps) {
   const bridge = useHostBridge();
   const [page, setPage] = useState<HomePage>(asked ?? 'overview');
   const [pets, setPets] = useState<Pet[]>([]);
@@ -120,7 +129,8 @@ export function HomeView({ host, settings, page: asked, onPage, routineDraft }: 
       <nav aria-label="Tagalong" className="home-nav">
         <div className="home-nav__who">
           <span className="home-nav__tile">
-            {companion !== undefined && <PixelSprite sprite={SCOUT_SPRITE} scale={3} />}
+            {/* Larger than the tile, which crops it: Bean fills about two thirds of a frame. */}
+            {companion !== undefined && <BeanClip clip={scout} still size={76} name="idle" />}
           </span>
           <span>
             <strong>{name}</strong>
@@ -164,7 +174,7 @@ export function HomeView({ host, settings, page: asked, onPage, routineDraft }: 
           </div>
         )}
         {page === 'connections' && <ConnectionsPanel />}
-        {page === 'activity' && <ActivityView name={name} />}
+        {page === 'activity' && <ActivityView name={name} scout={scout} />}
         {page === 'sightLog' && (
           <SightLogView
             name={name}

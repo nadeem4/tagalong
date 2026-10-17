@@ -13,23 +13,9 @@ import type { ListeningState } from '../../shared/ipc';
 import '@fontsource/onest/latin-600.css';
 import './app.css';
 import '../../shared/ipc';
-import { beanFigure } from './bean-figure';
-import manifest from './bean/manifest.json';
+import { FIGURE } from './bean-assets';
 import { IDLE_DOCK, REACTION_MS, dockMood, nextDock } from './dock';
 import { petInput } from './pet-input';
-
-/**
- * Bean's strips, emitted by Vite as files of their own: the window's CSP (`default-src 'self'`)
- * blocks the data: URL a small file would otherwise be inlined as.
- */
-const FIGURE = beanFigure(
-  manifest,
-  import.meta.glob<string>('./bean/*.webp', {
-    eager: true,
-    query: '?url&no-inline',
-    import: 'default',
-  }),
-);
 
 /** How long "Seeing" shows after a capture. */
 const SEEING_MS = 2500;

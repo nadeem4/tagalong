@@ -1,7 +1,6 @@
 /**
  * Design tokens shared by Home, Settings, the bubble and the dock: colours, fonts, sizes,
- * spacing and radii. Contains themeTokens. Sprite palettes are character art and live in
- * `sprites/characters.ts`.
+ * spacing and radii. Contains themeTokens.
  */
 export const themeTokens = {
   color: {
@@ -61,6 +60,4 @@ export const themeTokens = {
     emptyTextWidth: 300,
   },
   letterSpacing: { pixel: 1, title: 0.5 },
-  /** Integer multipliers for sprites: a 16px pet drawn at 2 is 32px on screen. */
-  spriteScale: { tile: 2 },
 } as const;
