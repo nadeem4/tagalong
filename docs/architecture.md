@@ -1494,7 +1494,7 @@ floating sign above. `bean.py` (Blender, headless) and `pack.py` in `apps/deskto
 regenerate the set (see its README); the masters and `.blend` stay out of git. The moods: idle;
 **Seeing** for 2.5 s after a capture (waves ripple out, ears perk); **reading** while a screen tool
 is in flight (glasses on, reading); **thinking** while Scout answers the person (a thought cloud);
-**expert** while an expert has a task (a walkie-talkie, a badge above), tagged Working; **working**
+**expert** while an expert has a task (a walkie-talkie, a badge at the top left, clear of the tag), tagged Working; **working**
 while one of Scout's own background turns runs, a job's or a routine's (typing at a laptop, a turning
 gear), tagged Working too; **Done** when a hand-off
 finishes (a hop every loop, a check mark), until the pet is clicked. Three moods have a pose and no
@@ -1503,7 +1503,8 @@ build or an expert's error (one shake, a sweat drop) and **cheer** for 4 s when 
 With gentle nudges on, **tired** is a fourth: slow breathing and a drooping head after a long
 stretch or late at night, until `rested` (see Gentle nudges). The tags are small (9 px) and sit in
 the top right corner, beside the sign rather than on it. While sight is paused the tag gives way
-to the Paused mark, which would overlap it; the pose and the label still say the mood. The mood comes
+to the Paused mark, which would overlap it; the pose and the label still say the mood. In the
+expert pose the Paused mark covers the badge at the top left; the walkie-talkie still shows. The mood comes
 from `dockMood(nextDock(...))`
 (`renderer/src/dock.ts`), a pure reducer over turn, tool and hand-off notifications, capture notices,
 `pet.mood`, and main's `presence.away`/`presence.back`, in this order: seeing > reading > thinking >

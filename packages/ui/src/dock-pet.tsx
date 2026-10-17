@@ -113,8 +113,8 @@ function canBlinkIn(mood: DockMood): mood is BlinkMood {
 
 /**
  * The companion on the dock: Bean in a pose and a small tag for what it is doing (seeing,
- * working, done), a pose alone for thinking and reading and for its moods (dozing, wince, cheer, tired), plus the
- * sight-paused, recording and listening marks, which show in every mood.
+ * working, done), a pose alone for thinking and reading and for its moods (dozing, wince,
+ * cheer, tired), plus the sight-paused, recording and listening marks, which show in every mood.
  */
 export function DockPet({
   pet,

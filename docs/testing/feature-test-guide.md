@@ -624,11 +624,10 @@ alone never makes Scout wince or cheer.
    and on a dark one.
 2. **Expected:** Bean breathes and blinks now and then in idle and while Seeing, never mid-pose: a
    blink never makes Bean jump. Each mood has its own pose (waves for Seeing, a walkie-talkie and a
-   badge while an expert works, a hop and a check mark for Done). The small tag at the top right
-   sits beside the check mark, not over it, and reads clearly on both wallpapers; while an expert
-   works it covers the badge (known, see the dock PR). Turn sight off while an expert works: the
-   Paused chip shows at the top left and the Working tag goes, so the two never overlap; the
-   walkie-talkie and badge still show the work.
+   badge at the top left while an expert works, a hop and a check mark for Done). The small tag at
+   the top right sits beside the check mark and clear of the badge, and reads clearly on both
+   wallpapers. Turn sight off while an expert works: the Paused chip shows at the top left over the
+   badge and the Working tag goes, so the two never overlap; the walkie-talkie still shows the work.
 
 ### M.6. What Scout is busy with
 

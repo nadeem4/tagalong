@@ -1,4 +1,5 @@
 /** Tests for the dock's mood reducer and the press-to-drag threshold. */
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { IDLE_DOCK, dockMood, moveDrag, nextDock, startDrag } from './dock';
 
@@ -129,7 +130,7 @@ describe('reading the screen', () => {
     expect(dockMood(nextDock(look(), { type: 'turn.error', turnId: T }))).toBe('idle');
   });
 
-  it.each([
+  const READS = [
     'look_at_screen',
     'look_at_display',
     'look_at_window',
@@ -140,8 +141,24 @@ describe('reading the screen', () => {
     'list_displays',
     'recall_screen',
     'what_changed',
-  ])('counts %s as reading', (tool) => {
+  ];
+
+  it.each(READS)('counts %s as reading', (tool) => {
     expect(dockMood(look(turn, tool))).toBe('reading');
+  });
+
+  // The renderer never bundles core, so the names are spelled out in dock.ts. Read core's
+  // sources here so a perception tool added or renamed there fails this test.
+  it('names every perception and screen memory tool core defines', () => {
+    const names = (file: string) => {
+      const source = readFileSync(
+        new URL(`../../../../../packages/core/src/tools/builtin/${file}`, import.meta.url),
+        'utf8',
+      );
+      return [...source.matchAll(/^export const \w+ = '(\w+)';\r?$/gm)].map((m) => m[1]);
+    };
+    const awareness = names('awareness.ts').filter((name) => name !== 'watch_for');
+    expect([...names('perception.ts'), ...awareness].sort()).toEqual([...READS].sort());
   });
 
   it('changes nothing for a tool that does not read the screen, or a result never asked for', () => {
