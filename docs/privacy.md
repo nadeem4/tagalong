@@ -720,7 +720,7 @@ conversations) in the database on this computer, until you delete it.
 
 ### Tidying memory once a day
 
-Once a day, when you have not talked to Scout for 10 minutes and no job is running, Scout looks
+Once a day, while no answer to you and no background job is running, Scout looks
 back over its memory and its recent work and decides what to keep. That is one call, at most two
 a day (a failed one is tried once more), and none once the daily budget is spent:
 

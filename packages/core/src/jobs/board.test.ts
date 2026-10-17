@@ -202,6 +202,12 @@ describe('renderBoard', () => {
             note: 'Added 2, changed 1, let 3 go.',
             finishedAt: '2026-10-17T03:10:00.000Z',
           }),
+          digest({
+            id: 'd3000000-0000-4000-8000-000000000006',
+            state: 'error',
+            error: 'the digest came back max_tokens',
+            finishedAt: '2026-10-17T03:00:00.000Z',
+          }),
         ],
       }),
       NOW,
@@ -213,6 +219,7 @@ describe('renderBoard', () => {
         '- Tidying your memory, running (4 min)',
         'Finished today:',
         '- Tidied your memory, done 03:10. Note: Added 2, changed 1, let 3 go.',
+        '- Tidying your memory, failed 03:00',
       ].join('\n'),
     );
     expect(resolveId(items, 'd1000000-0000-4000-8000-000000000004')).toBeNull();

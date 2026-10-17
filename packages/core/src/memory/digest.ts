@@ -7,7 +7,8 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { Pet, Settings } from '@tagalong/protocol';
-import { shortId } from '../jobs/board';
+import { fenced, shortId } from '../jobs/board';
+import { clip } from '../jobs/jobs';
 import type { JobRow, JobStore } from '../jobs/store';
 import { hideSecrets } from '../privacy/secrets';
 import type { BrainProvider } from '../providers';
@@ -67,7 +68,7 @@ export interface DigestOptions {
   /** The engine's guarded, recorded and metered resolver. */
   provider: (pet: Pet) => BrainProvider;
   spentOut: () => boolean;
-  /** No foreground turn for 10 minutes and no job running. */
+  /** No turn of theirs and no job running. */
   idle: () => boolean;
   /** Finished jobs and their conversations go after 14 days. */
   pruneJobs: () => void;
@@ -220,31 +221,20 @@ export class Digest {
   ): string {
     const line = (memory: Memory, dated: boolean) =>
       `- ${memoryId(memory.id)} (${memory.kind}${dated ? `, ${day(memory.createdAt, now)}` : ''}) ${memory.text}`;
-    const sections: string[] = [];
-    if (facts.length > 0) {
-      sections.push(['## What you remember now', ...facts.map((m) => line(m, false))].join('\n'));
-    }
-    if (old.length > 0) {
-      sections.push(['## Older summaries (30+ days)', ...old.map((m) => line(m, true))].join('\n'));
-    }
-    if (recent.length > 0) {
-      sections.push(
-        ['## Recent conversation summaries', ...recent.map((m) => line(m, true))].join('\n'),
-      );
-    }
-    if (jobs.length > 0) {
-      const work = jobs.map((job) => {
-        const when = day(job.finishedAt ?? job.createdAt, now);
-        const head = (job.conversationId === null ? null : this.#o.lastAnswer(job.conversationId))
-          ?.slice(0, RESULT_HEAD_CHARS)
-          .replace(/~{3,}/g, '~~')
-          .trim();
-        const note = `- ${shortId('j', job.id)} "${job.task}" (done, ${when}): ${job.note ?? ''}`;
-        return head ? `${note} Start of the result:\n~~~text\n${head}\n~~~` : note;
-      });
-      sections.push(['## Recent work', ...work].join('\n'));
-    }
-    return hideSecrets(sections.join('\n\n'));
+    const work = jobs.map((job) => {
+      const when = day(job.finishedAt ?? job.createdAt, now);
+      const answer = job.conversationId === null ? null : this.#o.lastAnswer(job.conversationId);
+      const head = fenced(answer?.slice(0, RESULT_HEAD_CHARS) ?? '');
+      const note = `- ${shortId('j', job.id)} "${job.task}" (done, ${when}): ${job.note ?? ''}`;
+      return head ? `${note} Start of the result:\n~~~text\n${head}\n~~~` : note;
+    });
+    const sections = [
+      ['## What you remember now', ...facts.map((m) => line(m, false))],
+      ['## Older summaries (30+ days)', ...old.map((m) => line(m, true))],
+      ['## Recent conversation summaries', ...recent.map((m) => line(m, true))],
+      ['## Recent work', ...work],
+    ].filter((section) => section.length > 1);
+    return hideSecrets(sections.map((section) => section.join('\n')).join('\n\n'));
   }
 
   /** Applies what passes the rules, in one transaction; returns the counts. */
@@ -255,11 +245,13 @@ export class Digest {
   ): { added: number; changed: number; dropped: number } {
     const counts = { added: 0, changed: 0, dropped: 0 };
     const clean = (text: string, kind: MemoryKind) =>
-      clip(hideSecrets(text), kind === 'summary' ? SUMMARY_CHARS : FACT_CHARS);
+      clip(hideSecrets(text).trim(), kind === 'summary' ? SUMMARY_CHARS : FACT_CHARS);
     this.#o.memories.transaction(() => {
       for (const add of ops.add) {
+        // addOnce keeps a memory it already has, so only a real save counts.
+        const before = this.#o.memories.count(petId, add.kind);
         this.#o.memories.addOnce({ petId, kind: add.kind, text: clean(add.text, add.kind) });
-        counts.added += 1;
+        counts.added += this.#o.memories.count(petId, add.kind) - before;
       }
       for (const change of ops.replace) {
         const memory = shown.get(memoryId(change.id));
@@ -325,9 +317,4 @@ function day(iso: string, now: number): string {
   const at = new Date(iso);
   if (at.toDateString() === new Date(now).toDateString()) return 'today';
   return at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-}
-
-function clip(text: string, max: number): string {
-  const kept = text.trim();
-  return kept.length <= max ? kept : `${kept.slice(0, max - 1)}…`;
 }

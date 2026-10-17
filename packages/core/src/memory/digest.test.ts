@@ -293,6 +293,17 @@ describe('Digest: applying the reply', () => {
     expect(t.jobs.digests('')[0]?.note).toBe('Added 2, changed 1, let 1 go.');
   });
 
+  it('counts only the memories an ADD really saved, not one it already had', async () => {
+    const t = setup({ mind: ['ADD fact: Works on a repo.\nADD fact: Uses pnpm.'] });
+    t.memories.add({ petId: 'scout', kind: 'fact', text: 'Works on a repo.' });
+    t.doneJob('read the paper', 'Long.');
+
+    expect(await t.digest.maybeRun()).toBe(true);
+
+    expect(t.memories.count('scout', 'fact')).toBe(2);
+    expect(t.jobs.digests('')[0]?.note).toBe('Added 1, changed 0, let 0 go.');
+  });
+
   it('prunes old jobs and keeps at most 200 summaries, oldest going first', async () => {
     const t = setup();
     const first = t.memories.add({ petId: 'scout', kind: 'summary', text: 'The very first.' });

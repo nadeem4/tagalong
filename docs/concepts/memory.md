@@ -144,7 +144,7 @@ Built in `packages/core/src/memory/digest.ts`. Code decides only when and checks
 matters is the mind's call.
 
 - **When**: checked 5 minutes after start and every 30 minutes. It runs when Scout exists, the
-  budget is not spent, no turn of Scout's started in the last 10 minutes and no job is running, the
+  budget is not spent, no turn of theirs and no job is running, the
   last digest that worked ended at least 20 hours ago, and there is something new (a finished job
   not yet read, 3 or more summaries since the last digest, or more than 200 summaries). At most 2
   attempts a local day, so a failure is retried once.
@@ -159,8 +159,10 @@ matters is the mind's call.
   summaries to 1,000; `ADD` never files a duplicate.
 - **After**: the jobs it read are marked, jobs older than 14 days are deleted, and the oldest
   summaries beyond 200 go. The run is a `jobs` row (`kind = 'digest'`) the board shows as
-  "Tidying your memory" and then "Tidied your memory ... Note: Added 2, changed 1, let 3 go." It
-  is never spoken and never in Now. A failure or timeout changes nothing and is only logged.
+  "Tidying your memory" and then "Tidied your memory ... Note: Added 2, changed 1, let 3 go." (a
+  failed run: "Tidying your memory, failed"). The note counts only real changes: an `ADD` of a
+  memory it already has is not counted. It is never spoken, never in Now and never an Arrival. A
+  failure or timeout changes nothing and is only logged.
 
 ## Summarising long threads
 

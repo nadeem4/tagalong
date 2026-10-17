@@ -156,10 +156,12 @@ export function renderBoard(
       ...finished.map((item) => `- ${finishedLine(item, options.timeZone)}`),
     );
     // A digest's note is Scout's own count, said on its line; the rest are their own words.
-    const notes = finished.filter((item) => item.kind !== 'digest').flatMap((item) => [
-      ...(item.note ? [`${item.id}: ${item.note}`] : []),
-      ...(item.error ? [`${item.id} error: ${item.error}`] : []),
-    ]);
+    const notes = finished
+      .filter((item) => item.kind !== 'digest')
+      .flatMap((item) => [
+        ...(item.note ? [`${item.id}: ${item.note}`] : []),
+        ...(item.error ? [`${item.id} error: ${item.error}`] : []),
+      ]);
     if (notes.length > 0) lines.push(fencedNotes(notes));
   }
   return lines.join('\n');
@@ -260,7 +262,7 @@ function finishedLine(item: BoardItem, timeZone: string | undefined): string {
     item.kind === 'job'
       ? `${item.id} your job, ${when}: ${item.title}`
       : item.kind === 'digest'
-        ? `Tidied your memory, ${when}${item.note ? `. Note: ${item.note}` : ''}`
+        ? `${item.state === 'done' ? 'Tidied' : 'Tidying'} your memory, ${when}${item.note ? `. Note: ${item.note}` : ''}`
         : `${item.id} ${item.title}, ${when}`;
   return item.told === false ? `${head} (not mentioned yet)` : head;
 }
