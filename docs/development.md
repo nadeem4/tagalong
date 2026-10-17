@@ -48,7 +48,7 @@ tagalong/
       routines/                     # the scheduler, schedules and triggers, the routine store
       jobs/                         # Scout's own background jobs (Jobs, JobStore), the machine reading, the task board
       meetings/                     # Meeting prep's calendar feed: the .ics link, parsed with ical.js
-      check-in/                     # the check-in moment: gate, facts, the one call, reply parsing
+      check-in/                     # the check-in moment: gate, facts, the one call, reply parsing; Arrivals (finished work, together)
       keep-an-eye/                  # the lookout over window titles
       watch/, projects/, privacy/   # watches, the project finder, the blind spots
       pets/registry.ts              # PetRegistry, the default pet Scout

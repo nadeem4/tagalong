@@ -29,6 +29,8 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Installer](#installer)
 - [Scout's mind](#scouts-mind-real-brain-fast-tier)
 - [Log file](#log-file)
+- [Background jobs and the task board](#j-background-jobs-and-the-task-board-real-brain-fast-tier)
+- [Arrivals: finished work together](#arrivals-finished-work-together-real-brain-fast-tier)
 - [Not in this build](#not-in-this-build)
 
 ## Configuration
@@ -677,7 +679,8 @@ previous build. Pass: lines are short, true to the facts, never boilerplate, oft
 ### C.3. A finished hand-off
 
 1. **Action:** hand off "fix the failing test" and wait for it to finish.
-2. **Expected:** the card shows the whole answer; at most one short line about the outcome appears
+2. **Expected:** the card shows the whole answer; about 20 to 50 seconds later (20 s after it
+   finishes, and 30 s after your own last turn), at most one short line about the outcome appears
    on the card and is spoken; nothing else of the answer is read aloud. If the mind is silent,
    nothing is spoken.
 3. **Action:** hand off again and close the bubble as soon as the finished card shows, before the
@@ -1788,8 +1791,9 @@ times: the wording should vary, the behaviour should not.
 
 1. **Work while talking.** Open a long article and say "read this and give me the gist, I'll keep
    working". **Expected:** Scout says it is on it in its own words and you can keep chatting; the
-   chat panel and the bubble keep showing your own turn, never the job's text. On a later question,
-   Scout brings up the gist (it rides in Now); "go on" makes it use `open_result`.
+   chat panel and the bubble keep showing your own turn, never the job's text. When it finishes,
+   Scout may bring the gist up on its own (see Arrivals below) or on your next question (it rides
+   in Now); "go on" makes it use `open_result`.
 2. **Five at once.** Ask for five separate pieces of background work in a row. **Expected:** at most
    3 run and the rest wait (fewer run on a machine short of memory); Scout says so in its own
    words, never a fixed queue line. A sixth waiting is refused and Scout explains.
@@ -1805,6 +1809,34 @@ times: the wording should vary, the behaviour should not.
    reason.
 8. **Forget a job.** "Scout, forget the pricing job." **Expected:** `forget` deletes the finished
    job and its conversation, with no card; it is gone from the board.
+
+## Arrivals: finished work together _(real brain, fast tier)_
+
+Finished jobs and hand-offs are gathered (`packages/core/src/check-in/arrivals.ts`): one check-in
+20 s after the latest finishes (60 s at most), held during a call, a full-screen app or while you
+are talking with Scout. The unit tests (`arrivals.test.ts`) cover the timings with a fake clock;
+by hand, check that it is one line and that the order is the mind's. Run each three times.
+
+1. **Three at once.** Ask for three pieces of background work in a row (for example: the gist of
+   an open article, a comparison of two pages you name, and a summary of a thread), then stop
+   talking. **Expected:** when all three finish, about 20 to 50 seconds later, **one** check-in
+   ("Sent to AI" in What Scout saw) and at most one short line: a round-up that asks which to
+   open first, or the most urgent one first (a failure, say), in Scout's own words. Never three
+   lines, never a fixed "N things are done" sentence. The order and the wording vary between runs.
+2. **Silence keeps it.** If Scout says nothing, ask "anything finished?". **Expected:** Scout
+   knows all three (Now lists them as "not mentioned yet"); `board` says the same.
+3. **Told once.** After a line about them, ask a new question. **Expected:** the jobs are no longer
+   "not mentioned yet" on the board; Scout does not announce them again unprompted.
+4. **During a call.** Start a job, then join a Teams call (or put a video full screen) before it
+   finishes. **Expected:** nothing while the call is in front; the line (or silence) comes within
+   about 15 seconds of leaving it.
+5. **While talking.** Keep asking Scout things while a job finishes. **Expected:** no check-in
+   until about 30 seconds after your last answer ends.
+6. **A job and a hand-off.** Start a job and hand something to Claude Code so both finish within
+   a minute. **Expected:** one check-in covering both; the line shows beside Scout, not on the
+   hand-off card. A hand-off finishing alone still puts its line on its card (C.3).
+7. **Not batched.** A watch firing or a routine result during the wait. **Expected:** each comes
+   at once through its own channel, as before.
 
 ## Not in this build
 
