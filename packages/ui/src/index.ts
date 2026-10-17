@@ -13,6 +13,7 @@ export { CompanionBubble, GreetingLine } from './companion-bubble';
 export type { DropOffer } from './drop-card';
 export { DockPet } from './dock-pet';
 export type { BeanFigure, DockMood, DockPetProps, ListeningDot } from './dock-pet';
+export { BeanClip } from './theme/bean-clip';
 export type { BeanClipData } from './theme/bean-clip';
 export type { BubbleTalk, CompanionBubbleProps, GreetingLineProps } from './companion-bubble';
 export type { ChatPanelProps } from './chat-panel';
@@ -24,9 +25,6 @@ export { createFakeHostBridge } from './test-support/fake-host-bridge';
 export { HomeView } from './home/home-view';
 export type { HomeHost, HomePage, HomeViewProps } from './home/home-view';
 export { brainLabel } from './home/brain-label';
-export { PixelSprite } from './theme/pixel-sprite';
-export { SCOUT_SPRITE } from './theme/sprites/characters';
-export type { PixelSpriteProps } from './theme/pixel-sprite';
 
 export { SETTINGS_CSS } from './settings/settings-styles';
 

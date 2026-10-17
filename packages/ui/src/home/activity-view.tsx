@@ -9,8 +9,8 @@ import type { ReactNode } from 'react';
 import type { ActivityEntry, ActivityState } from '@tagalong/protocol';
 import { useHostBridge } from '../host-bridge';
 import type { TurnEvent } from '../host-bridge';
-import { PixelSprite } from '../theme/pixel-sprite';
-import { SCOUT_SPRITE } from '../theme/sprites/characters';
+import { BeanClip } from '../theme/bean-clip';
+import type { BeanClipData } from '../theme/bean-clip';
 import { themeTokens as t } from '../theme/tokens';
 
 /** How many entries one page holds. */
@@ -98,7 +98,7 @@ function time(iso: string): string {
  * on click. Read from the engine's record with `listActivity`, re-read whenever a turn, a
  * hand-off or a routine run is reported.
  */
-export function ActivityView({ name }: { name: string }) {
+export function ActivityView({ name, scout }: { name: string; scout: BeanClipData }) {
   const bridge = useHostBridge();
   const [page, setPage] = useState<{ entries: ActivityEntry[]; next?: string | undefined } | null>(
     null,
@@ -177,6 +177,7 @@ export function ActivityView({ name }: { name: string }) {
             key={entry.id}
             entry={entry}
             name={name}
+            scout={scout}
             open={open === entry.id}
             onToggle={() => setOpen(open === entry.id ? null : entry.id)}
           />
@@ -216,11 +217,13 @@ function Note({ children }: { children: ReactNode }) {
 function Entry({
   entry,
   name,
+  scout,
   open,
   onToggle,
 }: {
   entry: ActivityEntry;
   name: string;
+  scout: BeanClipData;
   open: boolean;
   onToggle: () => void;
 }) {
@@ -244,7 +247,8 @@ function Entry({
         onClick={onToggle}
       >
         <span className="home-entry__tile">
-          <PixelSprite sprite={SCOUT_SPRITE} scale={t.spriteScale.tile} />
+          {/* Larger than the tile, which crops it, as in Home's nav. */}
+          <BeanClip clip={scout} still size={44} name="idle" />
         </span>
         <span className="home-entry__body">
           <span className="home-entry__title">{title}</span>

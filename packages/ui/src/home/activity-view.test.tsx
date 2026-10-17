@@ -7,6 +7,9 @@ import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
 import { ActivityView } from './activity-view';
 
+/** A fake idle strip: Home passes Bean's real one. */
+const IDLE = { src: 'idle.webp', frames: 36, fps: 12, loop: true };
+
 const T1 = '10000000-0000-4000-8000-000000000001';
 const T2 = '10000000-0000-4000-8000-000000000002';
 const AT = '2026-10-07T10:00:00.000Z';
@@ -34,7 +37,7 @@ const HANDED = entry({
 async function renderActivity(bridge: FakeHostBridge) {
   render(
     <HostBridgeProvider bridge={bridge}>
-      <ActivityView name="Scout" />
+      <ActivityView name="Scout" scout={IDLE} />
     </HostBridgeProvider>,
   );
   return screen.findByRole('list', { name: 'Activity' }).catch(() => null);
@@ -54,6 +57,19 @@ describe('ActivityView', () => {
     expect(lines[1]).toContain('Scout answered');
     expect(lines[1]).toContain('fake-model');
     expect(lines[1]).toContain('3 calls');
+  });
+
+  it('draws Bean on each entry as a still idle frame, cropped to its 32 px tile', async () => {
+    await renderActivity(createFakeHostBridge({ activity: [HANDED, TURN] }));
+    const tiles = document.querySelectorAll<HTMLElement>('.home-entry__tile');
+    expect(tiles).toHaveLength(2);
+    for (const tile of tiles) {
+      const clip = within(tile).getByTestId('bean-clip');
+      expect(clip).toHaveAttribute('data-clip', 'idle');
+      expect(clip.style.backgroundImage).toBe('url("idle.webp")');
+      expect(clip.style.width).toBe('44px');
+      expect(clip.style.animation).toBe('');
+    }
   });
 
   it('opens a turn’s thread on click: the question and the answer', async () => {
@@ -197,7 +213,7 @@ describe('ActivityView', () => {
   it('says so when nothing has happened yet', async () => {
     render(
       <HostBridgeProvider bridge={createFakeHostBridge()}>
-        <ActivityView name="Scout" />
+        <ActivityView name="Scout" scout={IDLE} />
       </HostBridgeProvider>,
     );
     expect(await screen.findByText(/Nothing yet/)).toBeInTheDocument();
@@ -208,7 +224,7 @@ describe('ActivityView', () => {
     delete (bridge as { listActivity?: unknown }).listActivity;
     render(
       <HostBridgeProvider bridge={bridge}>
-        <ActivityView name="Scout" />
+        <ActivityView name="Scout" scout={IDLE} />
       </HostBridgeProvider>,
     );
     expect(screen.getByText(/not available here/)).toBeInTheDocument();

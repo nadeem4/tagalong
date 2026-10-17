@@ -11,6 +11,7 @@ import type { ElectronApplication, Page } from '@playwright/test';
 // Imported only for the `declare global` it carries: it is what types `window.tagalongHost`
 // inside the page evaluate below, so a renamed host method fails the typecheck, not the run.
 import type {} from '../src/shared/ipc';
+import { stripLoaded } from './bean-strip';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -97,18 +98,7 @@ test('Bean draws on the dock: its strip loads past the window CSP', async () => 
   const avatar = await windowFor('avatar');
   const clip = avatar.getByTestId('bean-clip').first();
   await expect(clip).toBeAttached();
-  // A CSP or packaging miss leaves the background blank with no error a unit test can see.
-  const loaded = await clip.evaluate((el) => {
-    const url = /url\("?(.+?)"?\)/.exec(getComputedStyle(el).backgroundImage)?.[1];
-    if (url === undefined) return 'no background';
-    return new Promise<string>((resolve) => {
-      const image = new Image();
-      image.onload = () => resolve('loaded');
-      image.onerror = () => resolve(`failed: ${url}`);
-      image.src = url;
-    });
-  });
-  expect(loaded).toBe('loaded');
+  expect(await stripLoaded(clip)).toBe('loaded');
 });
 
 test('clicking Scout opens its bubble, and clicking again keeps it open', async () => {
@@ -536,6 +526,11 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
   expect(pets.map((pet) => pet.id)).toEqual(['scout']);
   await expect(home.getByRole('region', { name: 'Scout' })).toContainText('Thinks with');
 
+  // Bean, still, in the nav tile: its strip loads past Home's CSP.
+  const navBean = nav.locator('.home-nav__tile [data-testid=bean-clip]');
+  await expect(navBean).toBeVisible();
+  expect(await stripLoaded(navBean)).toBe('loaded');
+
   // Settings is a page of Home: opening Settings anywhere lands here.
   await panel.evaluate(() => window.tagalongHost.openSettings());
   for (const section of ['How Scout thinks', 'Privacy', 'Shortcuts', 'Advanced']) {
@@ -576,6 +571,13 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
       .getByRole('list', { name: 'Activity' })
       .getByRole('button', { name: /Scout ran Smoke check/ }),
   ).toBeVisible({ timeout: 30_000 });
+  // Each entry carries Bean, still, and its strip loads too.
+  const entryBean = home
+    .getByRole('list', { name: 'Activity' })
+    .locator('.home-entry__tile [data-testid=bean-clip]')
+    .first();
+  await expect(entryBean).toBeVisible();
+  expect(await stripLoaded(entryBean)).toBe('loaded');
 
   // The bundled typefaces must load under the page's CSP, or Home falls back to system
   // fonts without saying so.

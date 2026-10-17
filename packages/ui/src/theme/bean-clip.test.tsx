@@ -65,6 +65,25 @@ describe('BeanClip', () => {
     expect(clipStyle().backgroundPosition).toBe('-1056px 0px');
   });
 
+  it('draws a still frame at another size, the whole strip scaled to it', () => {
+    render(<BeanClip clip={LOOP} still size={32} />);
+    const style = clipStyle();
+    expect(style.width).toBe('32px');
+    expect(style.height).toBe('32px');
+    expect(style.backgroundSize).toBe('1152px 32px');
+    expect(style.backgroundPosition).toBe('0px 0px');
+  });
+
+  it('holds the last frame of a one-shot at another size', () => {
+    render(<BeanClip clip={ONCE} still size={32} />);
+    expect(clipStyle().backgroundPosition).toBe(`${-11 * 32}px 0px`);
+  });
+
+  it('steps a moving clip by its own size', () => {
+    render(<BeanClip clip={LOOP} size={32} />);
+    expect(keyframes()).toContain('-1152px');
+  });
+
   it('names the clip it draws, and hides itself from assistive tech', () => {
     render(<BeanClip clip={LOOP} name="idle" />);
     expect(screen.getByTestId('bean-clip')).toHaveAttribute('data-clip', 'idle');

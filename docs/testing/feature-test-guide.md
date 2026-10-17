@@ -66,7 +66,7 @@ by tapping a card, or, after **Talk to me**, by saying it (W.9). W.1 to W.8 type
 1. **Setup:** a fresh profile.
 2. **Action:** start Tagalong.
 3. **Expected:** one window, **Set up Tagalong**, opens with the steps along the top (**Answer**,
-   **Name**, **How I think**, **Voice**, **Keys**, **Try it**), Scout at the left saying "Hi, I'm
+   **Name**, **How I think**, **Voice**, **Keys**, **Try it**), Scout at the left (Bean, still, below its line) saying "Hi, I'm
    Scout. A few quick questions and we're set. Will you talk to me, or type?" and the title **Talk
    or type?** with **Talk to me**, **I'll type** and an answer box. Scout itself is not on the
    desktop yet. The Windows microphone indicator is off.
@@ -646,6 +646,16 @@ alone never makes Scout wince or cheer.
 8. **Expected:** while the job's turn runs, Bean types at a laptop under a turning gear, with the
    **Working** tag ("Scout is working on a job of its own"). An expert's task wins over a job, and
    your own question wins over both.
+
+### M.5a. Bean, still, in Welcome and Home
+
+1. **Action:** open Welcome again (Home → Settings → Advanced → **Open Welcome again**), then open
+   Home → Activity after asking Scout one question. Turn on Windows' reduce-motion setting and look
+   again.
+2. **Expected:** Bean (still) shows beside Scout's line in Welcome, in the nav tile and on each
+   Activity entry: the same rest pose as the dock, smooth (not pixelated), filling the nav tile and
+   the small entry tile without its ears or feet cut off. None of the three ever moves, with or
+   without reduced motion. No pixel-art Scout appears anywhere.
 
 ## Gentle nudges
 

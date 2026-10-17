@@ -1,6 +1,7 @@
 /**
  * One clip of Bean, the 3D Scout: a pre-rendered strip of frames side by side, shown one
- * 96 px frame at a time and stepped through with CSS. Contains BeanClip and its clip type.
+ * frame at a time (96 px unless sized) and stepped through with CSS. Contains BeanClip and its
+ * clip type.
  */
 
 import type { AnimationEventHandler, CSSProperties } from 'react';
@@ -20,12 +21,14 @@ export interface BeanClipProps {
   still?: boolean;
   /** Which clip this is, for `data-clip`. */
   name?: string;
+  /** The frame's size on screen in px; the whole strip scales with it. */
+  size?: number;
   style?: CSSProperties;
   /** Fires each time a loop comes back round to frame 0. */
   onAnimationIteration?: AnimationEventHandler<HTMLSpanElement>;
 }
 
-/** The size of one frame on screen; the strips are rendered at twice this for HiDPI. */
+/** The dock's frame size on screen; the strips are rendered at twice this for HiDPI. */
 const FRAME = 96;
 
 /**
@@ -39,21 +42,22 @@ export function BeanClip({
   clip,
   still = false,
   name,
+  size = FRAME,
   style,
   onAnimationIteration,
 }: BeanClipProps) {
   const { frames, fps, loop } = clip;
-  const last = -(frames - 1) * FRAME;
-  const end = loop ? -frames * FRAME : last;
+  const last = -(frames - 1) * size;
+  const end = loop ? -frames * size : last;
   const steps = loop ? frames : frames - 1;
   const keyframes = `bean-to-${-end}`;
   const base: CSSProperties = {
     display: 'block',
-    width: FRAME,
-    height: FRAME,
+    width: size,
+    height: size,
     backgroundImage: `url("${clip.src}")`,
     backgroundRepeat: 'no-repeat',
-    backgroundSize: `${frames * FRAME}px ${FRAME}px`,
+    backgroundSize: `${frames * size}px ${size}px`,
   };
   const motion: CSSProperties = still
     ? { backgroundPosition: `${loop ? 0 : last}px 0px` }

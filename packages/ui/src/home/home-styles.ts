@@ -22,8 +22,10 @@ export const HOME_CSS = `
 .home-nav__who small { font-size: ${t.fontSize.small}px; color: #7CB8F2; }
 .home-nav__tile {
   width: 56px; height: 56px; flex: none; display: flex; align-items: center; justify-content: center;
-  border-radius: ${t.radius.tile}px; background: #222845;
+  border-radius: ${t.radius.tile}px; background: #222845; overflow: hidden;
 }
+/* Bean sits a little left of and below a frame's centre: nudge it into the middle of the tile. */
+.home-nav__tile > span { flex: none; transform: translate(2px, -6px); }
 .home-nav__item {
   height: ${t.size.fieldHeight}px; padding: 0 ${t.space.lg}px; border: 0; border-radius: ${t.radius.field}px;
   background: transparent; color: ${t.color.textMuted}; text-align: left; cursor: pointer;
@@ -70,7 +72,11 @@ export const HOME_CSS = `
   font-family: ${t.font.ui}; color: ${t.color.panelText};
 }
 .home-entry:hover, .home-entry[aria-expanded='true'] { background: ${t.color.panelTile}; }
-.home-entry__tile { flex: none; width: 32px; height: 32px; }
+.home-entry__tile {
+  flex: none; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.home-entry__tile > span { flex: none; transform: translate(1px, -3px); }
 .home-entry__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
 .home-entry__title { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; }
 .home-entry__meta {

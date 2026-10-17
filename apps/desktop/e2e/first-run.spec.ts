@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
+import { stripLoaded } from './bean-strip';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ENGINE = { timeout: 30_000 };
@@ -92,6 +93,10 @@ test.describe('setup by typing, signed in to Claude', () => {
     const setup = await windowFor(app, 'welcome');
     await chooseTyping(setup);
     await expect(heading(setup, 'What should I call you?')).toBeVisible(ENGINE);
+    // Bean, still, beside Scout's line: its strip loads past Welcome's CSP.
+    const bean = setup.locator('.first-run__scout [data-testid=bean-clip]');
+    await expect(bean).toBeVisible();
+    expect(await stripLoaded(bean)).toBe('loaded');
     await windowFor(app, 'avatar');
     expect(await visible(app, 'avatar')).toBe(false);
     await answer(setup, 'Alex');

@@ -1483,11 +1483,13 @@ bridge forwards only `turn.*` notifications to it.
 The desktop avatar window holds the companion alone: `DockPet` (`@tagalong/ui`) draws Bean, the 3D
 Scout, from pre-rendered frames. Each mood has its own clip: a WebP strip of 192 px frames side by
 side, at 12 fps, with the motion baked in. The strips and `manifest.json` (frames and loop per clip)
-live in `apps/desktop/src/renderer/src/bean/`, and `avatar.tsx` turns them into a `BeanFigure` with
-`import.meta.glob(..., { query: '?url&no-inline' })` and `bean-figure.ts`. They stay out of
-`@tagalong/ui`, whose `tsc -b` build never copies `.webp`, and are emitted as files so the window's
+live in `apps/desktop/src/renderer/src/bean/`, and `bean-assets.ts` turns them into one `BeanFigure`
+(`FIGURE`) with `import.meta.glob(..., { query: '?url&no-inline' })` and `bean-figure.ts`. Three
+windows import that one `FIGURE`: the avatar (every clip), Home and Welcome (the idle clip, still), so
+Vite emits each strip once, with a hashed name they all share. The strips stay out of
+`@tagalong/ui`, whose `tsc -b` build never copies `.webp`, and are emitted as files so the windows'
 CSP (`default-src 'self'`) never meets a `data:` URL. `BeanClip` (`theme/bean-clip.tsx`) shows one
-strip in a 96 px box as a CSS background and steps through it with `steps()`: a loop runs forever, a
+strip in a box of `size` px (96 on the dock) as a CSS background and steps through it with `steps()`: a loop runs forever, a
 one-shot (cheer, wince) plays once and holds its last frame. Every step lasts one frame time (1/12 s),
 so a one-shot of n frames runs (n-1)/12 s and then holds. Bean stands about 55 px tall with its
 floating sign above. `bean.py` (Blender, headless) and `pack.py` in `apps/desktop/scripts/bean/`
@@ -1561,7 +1563,8 @@ The renderer entry wraps `HomeView` (`packages/ui/src/home/home-view.tsx`)
 in the preload's `HostBridge` and hands it a `HomeHost` (the companion's id, the providers it can think
 on, the model list, `savePet`) and the settings form as a slot.
 
-`HomeView` is a navy side menu, with the companion's pixel character and name, and nine pages:
+`HomeView` is a navy side menu, with the companion's figure (Bean's idle frame, still; the host
+passes the clip as `scout`, and Activity draws it on each entry too) and name, and nine pages:
 
 - **Overview**: the companion (its state, the provider and model it thinks with), the experts (on or
   off, read-only or allowed to edit) and the three most recent activity entries, each with a button
