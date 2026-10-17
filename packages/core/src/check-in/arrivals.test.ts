@@ -214,6 +214,7 @@ describe('what arrives', () => {
   it('a job: its task, its note or why it failed', () => {
     const row: JobRow = {
       id: '1b2c0000-0000-4000-8000-000000000003',
+      kind: 'job',
       state: 'done',
       petId: 'scout',
       task: 'summarise the thread',

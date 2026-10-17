@@ -151,3 +151,58 @@ describe('JobStore', () => {
     expect(count(`SELECT COUNT(*) AS n FROM conversations`)).toBe(1);
   });
 });
+
+describe('JobStore for the digest', () => {
+  it('records a digest run as its own kind, kept out of the daily cap and the dedupe', () => {
+    const { jobs } = setup();
+    jobs.startDigest({ id: 'd1', petId: 'scout', at: T0 });
+    expect(jobs.get('d1')).toMatchObject({
+      kind: 'digest',
+      state: 'running',
+      task: 'Tidy memory',
+      startedAt: T0,
+    });
+    jobs.finish('d1', { state: 'done', note: 'Added 1.' }, '2026-10-17T09:01:00.000Z');
+    jobs.startDigest({ id: 'd2', petId: 'scout', at: '2026-10-17T10:00:00.000Z' });
+
+    expect(jobs.digests('2026-10-17T00:00:00.000Z').map((row) => row.id)).toEqual(['d2', 'd1']);
+    expect(jobs.digests('2026-10-17T09:30:00.000Z').map((row) => row.id)).toEqual(['d2']);
+    expect(jobs.countSince('2026-10-17T00:00:00.000Z')).toBe(0);
+    expect(jobs.latestByKey('')).toBeNull();
+    expect(jobs.insert({ id: 'j1', ...NEW, at: T0 }).kind).toBe('job');
+  });
+
+  it('lists finished jobs the digest has not read, and marks them read', () => {
+    const { jobs } = setup();
+    jobs.insert({ id: 'a', ...NEW, at: T0 });
+    jobs.finish('a', { state: 'done', note: 'A.' }, '2026-10-17T09:05:00.000Z');
+    jobs.insert({ id: 'b', ...NEW, at: T0 });
+    jobs.finish('b', { state: 'done', note: 'B.' }, '2026-10-17T09:06:00.000Z');
+    jobs.insert({ id: 'failed', ...NEW, at: T0 });
+    jobs.finish('failed', { state: 'error', error: 'boom' }, '2026-10-17T09:07:00.000Z');
+    jobs.insert({ id: 'live', ...NEW, at: T0 });
+    jobs.startDigest({ id: 'd', petId: 'scout', at: T0 });
+    jobs.finish('d', { state: 'done', note: '' }, '2026-10-17T09:08:00.000Z');
+
+    expect(jobs.undigested(10).map((row) => row.id)).toEqual(['b', 'a']);
+    expect(jobs.undigested(1).map((row) => row.id)).toEqual(['b']);
+
+    jobs.markDigested(['b'], '2026-10-17T10:00:00.000Z');
+    expect(jobs.undigested(10).map((row) => row.id)).toEqual(['a']);
+    jobs.markDigested([], '2026-10-17T10:00:00.000Z');
+  });
+
+  it('lists jobs that finished well since a time, for recall', () => {
+    const { jobs } = setup();
+    jobs.insert({ id: 'old', ...NEW, at: T0 });
+    jobs.finish('old', { state: 'done', note: '' }, '2026-10-01T09:00:00.000Z');
+    jobs.insert({ id: 'new', ...NEW, at: T0 });
+    jobs.finish('new', { state: 'done', note: 'N.' }, '2026-10-16T09:00:00.000Z');
+    jobs.insert({ id: 'failed', ...NEW, at: T0 });
+    jobs.finish('failed', { state: 'error', error: 'x' }, '2026-10-16T09:00:00.000Z');
+    jobs.startDigest({ id: 'd', petId: 'scout', at: T0 });
+    jobs.finish('d', { state: 'done', note: 'Added 1.' }, '2026-10-16T09:00:00.000Z');
+
+    expect(jobs.doneSince('2026-10-03T00:00:00.000Z').map((row) => row.id)).toEqual(['new']);
+  });
+});

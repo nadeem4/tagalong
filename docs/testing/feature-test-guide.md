@@ -1838,6 +1838,30 @@ by hand, check that it is one line and that the order is the mind's. Run each th
 7. **Not batched.** A watch firing or a routine result during the wait. **Expected:** each comes
    at once through its own channel, as before.
 
+## D. Memory digest, recall and retention _(real brain, fast tier)_
+
+The daily digest (`packages/core/src/memory/digest.ts`), one recall path and the retention
+numbers. To avoid waiting a day, quit Tagalong and move the last `digest` row's `finished_at` in
+`tagalong.db` back 21 hours (or delete the `digest` rows); the first check runs 5 minutes after
+start, then every 30 minutes, while no turn of yours and no job is running.
+
+1. **The digest runs.** After a day with a few finished jobs or longer chats, leave Scout alone.
+   **Expected:** `board` (or "what have you been doing?") shows "Tidied your memory ... Note:
+   Added N, changed N, let N go."; Scout never says it on its own. Home → What Scout remembers
+   shows anything new in Scout's own words.
+2. **Preferences stay.** With a preference saved ("I like short answers"), let the digest run.
+   **Expected:** the preference is still in Home afterwards (it may be reworded, never removed).
+3. **No digest on a spent budget.** Set a tiny daily budget and spend it. **Expected:** no digest
+   row appears that day; Activity shows nothing new from it.
+4. **Recall reaches jobs.** A few days after a job ("summarise the launch thread"), ask "what did
+   the launch thread say?". **Expected:** Scout answers from that job's note (it rides as "your
+   job, N days ago") without starting a new job.
+5. **Fifteen days later.** Move a finished job's `finished_at` back 15 days and restart.
+   **Expected:** the job and its conversation are gone; what the digest learned from it stays in
+   Home → What Scout remembers.
+6. **Activity keeps 90 days.** Move an Activity row's `started_at` back 91 days and restart.
+   **Expected:** it is gone from Home's Activity and from `search_history`; newer rows remain.
+
 ## Not in this build
 
 Do not test these here.

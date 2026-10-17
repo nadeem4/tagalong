@@ -36,6 +36,8 @@ export interface AssembleInput {
   pet: Pet;
   /** What the pet recalls for this turn, already ranked. Rides on the question. */
   memories?: readonly Memory[] | undefined;
+  /** Recall's matching recent jobs, one line each, under the memories. */
+  recentWork?: readonly string[] | undefined;
   /** Oldest first, ending with the question being asked. Trimmed to `historyMessages`. */
   history: Message[];
   snapshot?: ContextSnapshot | undefined;
@@ -53,7 +55,7 @@ export function assemblePrompt(input: AssembleInput): BrainRequest {
   const contextText = input.snapshot ? contextBlock(input.snapshot, settings) : '';
   const leading = input.snapshot ? imagesToAttach(input.snapshot, settings) : [];
   const momentText = [
-    renderMemories(input.memories ?? []),
+    renderMemories(input.memories ?? [], input.recentWork),
     input.now === undefined ? '' : renderNow(input.now),
   ]
     .filter((part) => part.length > 0)

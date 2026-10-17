@@ -285,7 +285,9 @@ with the day, time and app. It only knows titles, never page text, and only as f
 record of what Scout saw keeps.
 
 **Memory.** Tell Scout "I prefer short answers" and it remembers across restarts. See and delete
-what it remembers in Home, or say "Scout, forget that".
+what it remembers in Home, or say "Scout, forget that". Once a day, when you are away, Scout tidies
+its memory on its own: it keeps the gist of its recent work and lets stale details go, never your
+preferences.
 
 **"Scout, what's wrong?"** Ask that (or "are you OK?", or "health check"), typed or spoken, and the
 bubble shows a health card: its sign-in, your experts, your connections, its voice, your
@@ -467,7 +469,8 @@ screenshot is attached.
   was read and when.
 - **Check-ins.** Now and then, when nobody asked, Scout asks the summaries model once whether
   anything is worth saying, and most of the time says nothing. Each such call carries what the
-  moment is about plus your five newest memories, your name, the time, what experts are doing and
+  moment is about plus what Scout recalls for it (your preferences, its newest and matching
+  memories, up to two matching jobs of its own), your name, the time, what experts are doing and
   your last exchange with Scout (secrets hidden, never a blind spot). At most 24 a day, one
   unprompted every ten minutes, none for an hour after **Not now**, none over calls, full screen or
   once the daily budget is spent.
@@ -506,6 +509,9 @@ screenshot is attached.
   days (1 to 30 in Settings → Privacy); delete one row or all.
 - **Home → What Scout remembers** lists what Scout keeps about you until you delete it; delete any
   one there, or ask Scout to forget it.
+- Once a day Scout sends up to 150 of its memories, 30 conversation summaries and the notes of up
+  to 10 recent background jobs to its summaries model to tidy them. Background jobs are deleted
+  after 14 days, Home's Activity after 90.
 - What you ask goes only to the provider Scout runs on. There is no Tagalong server.
 - Scout's voice is made on your computer. With an ElevenLabs key and voice, only the words Scout
   says are sent to ElevenLabs, never your screen or your questions.

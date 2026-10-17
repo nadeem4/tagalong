@@ -1,10 +1,14 @@
-/** The `jobs` table (migration 21): one row per job of Scout's. Times are passed in. */
+/**
+ * The `jobs` table (migration 21): one row per job of Scout's, or per memory digest run
+ * (`kind = 'digest'`, shown on the board). Times are passed in.
+ */
 import type Database from 'better-sqlite3';
 
 export type JobState = 'queued' | 'running' | 'done' | 'error' | 'stopped';
 
 export interface JobRow {
   id: string;
+  kind: 'job' | 'digest';
   state: JobState;
   petId: string;
   task: string;
@@ -19,11 +23,12 @@ export interface JobRow {
   reportedAt: string | null;
 }
 
-const COLUMNS = `id, state, pet_id AS petId, task, dedupe_key AS dedupeKey,
+const COLUMNS = `id, kind, state, pet_id AS petId, task, dedupe_key AS dedupeKey,
   conversation_id AS conversationId, note, error, created_at AS createdAt,
   started_at AS startedAt, finished_at AS finishedAt, reported_at AS reportedAt`;
 const LIVE = `state IN ('queued', 'running')`;
 const NEWEST = 'ORDER BY created_at DESC, rowid DESC';
+const JOB = `kind = 'job'`;
 const INTERRUPTED = 'Interrupted: Tagalong closed before this finished.';
 
 export class JobStore {
@@ -37,6 +42,42 @@ export class JobStore {
       )
       .run(job.id, job.petId, job.task, job.dedupeKey, job.at);
     return this.get(job.id)!;
+  }
+
+  /** A digest run: running from the start, with no conversation. */
+  startDigest(run: { id: string; petId: string; at: string }): void {
+    this.db
+      .prepare(
+        `INSERT INTO jobs (id, kind, state, pet_id, task, dedupe_key, created_at, started_at)
+         VALUES (?, 'digest', 'running', ?, 'Tidy memory', '', ?, ?)`,
+      )
+      .run(run.id, run.petId, run.at, run.at);
+  }
+
+  /** Digest runs started at or after `sinceIso`, newest first. */
+  digests(sinceIso: string): JobRow[] {
+    return this.#rows(`WHERE kind = 'digest' AND created_at >= ? ${NEWEST}`, sinceIso);
+  }
+
+  /** Jobs that finished well and the digest has not read yet, newest first. */
+  undigested(limit: number): JobRow[] {
+    return this.#rows(
+      `WHERE ${JOB} AND state = 'done' AND digested_at IS NULL ${NEWEST} LIMIT ?`,
+      String(limit),
+    );
+  }
+
+  markDigested(ids: readonly string[], at: string): void {
+    const mark = this.db.prepare('UPDATE jobs SET digested_at = ? WHERE id = ?');
+    this.db.transaction(() => ids.forEach((id) => mark.run(at, id)))();
+  }
+
+  /** Jobs that finished well at or after `sinceIso`, newest first, at most 300: for recall. */
+  doneSince(sinceIso: string): JobRow[] {
+    return this.#rows(
+      `WHERE ${JOB} AND state = 'done' AND finished_at >= ? ${NEWEST} LIMIT 300`,
+      sinceIso,
+    );
   }
 
   start(id: string, conversationId: string, at: string): void {
@@ -75,18 +116,18 @@ export class JobStore {
   }
 
   latestByKey(dedupeKey: string): JobRow | null {
-    return this.#rows(`WHERE dedupe_key = ? ${NEWEST} LIMIT 1`, dedupeKey)[0] ?? null;
+    return this.#rows(`WHERE ${JOB} AND dedupe_key = ? ${NEWEST} LIMIT 1`, dedupeKey)[0] ?? null;
   }
 
   /** Jobs created at or after `sinceIso`: the daily cap. */
   countSince(sinceIso: string): number {
-    return this.#rows('WHERE created_at >= ?', sinceIso).length;
+    return this.#rows(`WHERE ${JOB} AND created_at >= ?`, sinceIso).length;
   }
 
   /** Finished jobs whose task shares a word with `query`, newest first: for `forget`. */
   search(query: string, limit: number): JobRow[] {
     const words = query.toLowerCase().match(/\p{L}{3,}/gu) ?? [];
-    return this.#rows(`WHERE NOT (${LIVE}) ${NEWEST} LIMIT 300`)
+    return this.#rows(`WHERE ${JOB} AND NOT (${LIVE}) ${NEWEST} LIMIT 300`)
       .filter((row) => words.some((word) => row.task.toLowerCase().includes(word)))
       .slice(0, limit);
   }
@@ -95,7 +136,10 @@ export class JobStore {
   finishedByPrefix(prefix: string): JobRow[] {
     const hex = prefix.toLowerCase().replace(/[^0-9a-f]/g, '');
     if (hex === '') return [];
-    return this.#rows(`WHERE NOT (${LIVE}) AND replace(id, '-', '') LIKE ? || '%' LIMIT 3`, hex);
+    return this.#rows(
+      `WHERE ${JOB} AND NOT (${LIVE}) AND replace(id, '-', '') LIKE ? || '%' LIMIT 3`,
+      hex,
+    );
   }
 
   /** Deletes a finished job with its conversation. False for a live or unknown one. */

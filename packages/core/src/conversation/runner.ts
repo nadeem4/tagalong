@@ -9,7 +9,7 @@ import type { BrainContentBlock, BrainProvider, BrainResult } from '../providers
 import { BrainError } from '../providers';
 import type { ConversationStore } from '../memory/store';
 import type { MemoryStore } from '../memory/memories';
-import { recall } from '../memory/recall';
+import { recall, type RecentJob } from '../memory/recall';
 import type { SettingsStore } from '../settings/settings';
 import { hasPixels, mayPersistScreenshot, withoutPixels } from '../perception';
 import {
@@ -71,6 +71,8 @@ export interface ConversationRunnerOptions {
    * tool and by preferences the user states. Optional so turn-mechanics tests stay small.
    */
   memory?: MemoryStore | undefined;
+  /** Scout's finished jobs, for recall's recent-work lines. */
+  recentWork?: (() => readonly RecentJob[]) | undefined;
   /**
    * Called after a turn that answered, without being awaited: the background summary job
    * hangs off this, and nothing it does may slow the reply that just finished.
@@ -346,19 +348,20 @@ export class ConversationRunner {
       });
     }
 
-    const memories = this.#options.memory
+    const recalled = this.#options.memory
       ? recall(
           this.#options.memory,
           ask.pet.id,
           [ask.text, ask.snapshot?.selection ?? ''].join(' '),
+          { jobs: this.#options.recentWork?.() ?? [], now: now.at },
         )
-      : [];
+      : { memories: [], recentWork: [] };
 
     const base = assemblePrompt({
       pet: ask.pet,
       history,
       settings,
-      memories,
+      ...recalled,
       ...(snapshot ? { snapshot } : {}),
       now,
     });

@@ -43,7 +43,7 @@ tagalong/
       tools/                        # tool.ts (the Tool shape), registry.ts, builtin/ (the built-ins and connected-app tools)
       connections/                  # MCP client: manager, OAuth + loopback, approvals, catalog, Claude Code reader, fake server
                                     # (Home's page: ui/src/home/connections-panel.tsx; the bubble's card: ui/src/connector-confirm.tsx)
-      memory/                       # db.ts (numbered migrations), store.ts (ConversationStore)
+      memory/                       # db.ts (numbered migrations), store.ts (ConversationStore), recall.ts, digest.ts (the daily memory digest)
       experts/                      # hand-offs, the Claude Code connector, the fake connector
       routines/                     # the scheduler, schedules and triggers, the routine store
       jobs/                         # Scout's own background jobs (Jobs, JobStore), the machine reading, the task board

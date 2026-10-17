@@ -524,7 +524,9 @@ pick up, after you settle on a new window, when a title reads like an error, aft
 nothing is shown. Each of these calls goes to the summaries model (Settings → Summaries, else
 Scout's own) and carries, besides what that moment is about:
 
-- **your five newest memories, your name, the time, and what experts are doing right now;**
+- **what Scout recalls for that moment (your preferences, its newest memories, those matching the
+  window title or the finished ask, and up to two matching jobs of its own, at most 2,500
+  characters), your name, the time, and what experts are doing right now;**
 - **your last exchange with Scout**: your latest question and Scout's answer to it, at most 300
   characters of each;
 - the last three lines Scout said on its own (so it does not repeat itself), how long you have been
@@ -715,6 +717,37 @@ conversations) in the database on this computer, until you delete it.
   conversation the same way. Nothing is deleted on a routine's own run.
 - Deleting a memory does not take back what was already sent to the AI in earlier questions.
 - The Chrome extension cannot read or delete them.
+
+### Tidying memory once a day
+
+Once a day, while no answer to you and no background job is running, Scout looks
+back over its memory and its recent work and decides what to keep. That is one call, at most two
+a day (a failed one is tried once more), and none once the daily budget is spent:
+
+- **What it sends**, to the summaries model (Settings → Summaries, else Scout's own), through the
+  same guard as every call (secrets hidden, one "Sent to AI" row, metered): up to 150 of Scout's
+  facts and preferences, up to 30 conversation summaries (20 older than 30 days, 10 since the last
+  tidy), and up to 10 finished background jobs not yet read (the task, its short note and the
+  first 1,500 characters of its result). Nothing from your screen, the log of what Scout saw or
+  Activity is sent.
+- **What it can change**: add memories, reword one, or let a fact or summary go. It never deletes a
+  preference: those are yours to delete. At most 10 of each kind of change a day; anything it
+  writes has secrets hidden. You see the result in **Home → What Scout remembers**, and the run on
+  Scout's task board ("Added 2, changed 1, let 3 go.").
+- **Afterwards** background jobs older than 14 days are deleted with their conversations, and
+  Scout keeps at most 200 conversation summaries, the oldest going first.
+
+### How long things are kept
+
+| What                                             | Kept                                                    |
+| ------------------------------------------------ | ------------------------------------------------------- |
+| Facts and preferences                            | Until you delete them (the daily tidy may reword facts) |
+| Conversation summaries                           | Until deleted, at most 200                              |
+| Conversations with Scout                         | Until deleted                                           |
+| Background jobs and their conversations          | 14 days after the job finishes                          |
+| Activity (Home)                                  | 90 days, deleted when Tagalong starts                   |
+| The log of what Scout saw                        | 7 days by default (1 to 30)                             |
+| Rolling screen memory (RAM only, off by default) | 10 minutes by default (1 to 30)                         |
 
 ## What did we do today?
 

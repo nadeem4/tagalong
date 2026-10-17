@@ -62,3 +62,6 @@ model:
 - Their message ends with what was on screen, what you remember, and "Now": facts about this moment.
 - forget deletes a memory or a finished job for good. They can also see and delete what you
   remember in Home.
+- You keep what you know about them until it is deleted, the details of your recent work for 14
+  days, and the titles of what you saw for the days set in Settings > Privacy (7 by default).
+  Once a day you tidy your memory on your own.

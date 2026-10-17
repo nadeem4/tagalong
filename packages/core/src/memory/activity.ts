@@ -16,6 +16,8 @@ export const ACTIVITY_TEXT_CHARS = 4_000;
 
 /** The error on a row a crash or a quit left running. */
 const INTERRUPTED = 'Interrupted: Tagalong closed before this finished.';
+/** Home's Activity keeps this many days (user decision 2026-10-16). */
+export const ACTIVITY_KEEP_DAYS = 90;
 
 /**
  * The kinds the list shows. Older databases also hold consult, handoff and roundtable
@@ -246,6 +248,17 @@ export class ActivityLog {
         `UPDATE activity SET state = 'error', error = ?, finished_at = ? WHERE state = 'running'`,
       )
       .run(INTERRUPTED, now()).changes;
+  }
+
+  /**
+   * At boot: rows that started more than 90 days ago go (the search index follows). The
+   * daily digest has kept the gist of that time in memory.
+   */
+  prune(): number {
+    const cutoff = new Date(Date.now() - ACTIVITY_KEEP_DAYS * 24 * 60 * 60_000).toISOString();
+    return this.db
+      .prepare(`DELETE FROM activity WHERE started_at < ? AND state <> 'running'`)
+      .run(cutoff).changes;
   }
 
   /**
