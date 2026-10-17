@@ -15,6 +15,9 @@ export interface BeanManifest {
 const CLIPS: readonly (keyof BeanFigure)[] = [
   'idle',
   'listening',
+  'reading',
+  'thinking',
+  'expert',
   'working',
   'done',
   'dozing',

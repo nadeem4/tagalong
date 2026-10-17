@@ -13,10 +13,22 @@ import { themeTokens as t } from './theme/tokens';
 
 /**
  * What the pet on the dock is doing, as its pose and tag show it. `listening` is "Seeing"
- * (a capture); dozing, wince, cheer and tired are moods with a pose and no tag.
+ * (a capture); `reading` is a screen tool in flight, `thinking` Scout's own turn, `expert` a
+ * hand-off running and `working` one of Scout's own background jobs. Dozing, wince, cheer and
+ * tired are moods with a pose and no tag.
  */
 export type DockMood =
-  'idle' | 'listening' | 'working' | 'done' | 'dozing' | 'wince' | 'cheer' | 'tired';
+  | 'idle'
+  | 'listening'
+  | 'reading'
+  | 'thinking'
+  | 'expert'
+  | 'working'
+  | 'done'
+  | 'dozing'
+  | 'wince'
+  | 'cheer'
+  | 'tired';
 
 /** The moods Bean blinks in; each has a blink clip rendered from frame 0 of its loop. */
 type BlinkMood = 'idle' | 'listening';
@@ -61,19 +73,29 @@ const LISTENING: Readonly<Record<ListeningDot, { title: string; words: string }>
 /** The avatar window is 96 px square, and so is one frame of Bean. */
 const SIZE = 96;
 
-/** The moods with a tag; dozing, wince, cheer and tired react in the pose alone. */
-type TaggedMood = 'listening' | 'working' | 'done';
+/**
+ * The moods with a tag. Working covers the two long back-office states, an expert's and a
+ * job's. Thinking and reading last seconds, their signs (the cloud, the glasses) say it and
+ * the bubble is already answering, so they go without; so do the moods, in the pose alone.
+ */
+type TaggedMood = 'listening' | 'expert' | 'working' | 'done';
+
+const WORKING = { text: 'Working', color: t.color.gold };
 
 const TAGS: Readonly<Record<TaggedMood, { text: string; color: string }>> = {
   listening: { text: 'Seeing', color: '#7CB8F2' },
-  working: { text: 'Working', color: t.color.gold },
+  expert: WORKING,
+  working: WORKING,
   done: { text: 'Done', color: '#7DD87F' },
 };
 
 const WORDS: Readonly<Record<DockMood, string>> = {
   idle: 'is idle',
   listening: 'is looking at your screen',
-  working: 'has an expert working',
+  reading: 'is reading your screen',
+  thinking: 'is thinking',
+  expert: 'has an expert working',
+  working: 'is working on a job of its own',
   done: 'has an answer for you',
   dozing: 'is dozing',
   wince: 'winces',
@@ -91,7 +113,7 @@ function canBlinkIn(mood: DockMood): mood is BlinkMood {
 
 /**
  * The companion on the dock: Bean in a pose and a small tag for what it is doing (seeing,
- * working, done), a pose alone for its moods (dozing, wince, cheer, tired), plus the
+ * working, done), a pose alone for thinking and reading and for its moods (dozing, wince, cheer, tired), plus the
  * sight-paused, recording and listening marks, which show in every mood.
  */
 export function DockPet({
