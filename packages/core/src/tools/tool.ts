@@ -49,6 +49,8 @@ export interface ToolContext {
   vision?: boolean | undefined;
   /** Set on a turn a routine started. */
   routine?: RoutineTurnContext | undefined;
+  /** Set on one of Scout's own background jobs: nobody is watching, and no screen. */
+  job?: { jobId: string } | undefined;
 }
 
 /** One built-in tool, in the one shape every tool has. */

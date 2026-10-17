@@ -728,8 +728,17 @@ function hasText(params: { text?: unknown }): boolean {
 /** Turn notifications drive the UI, and main is the only thing holding the socket. */
 function forwardToRenderers(incoming: { method: string; params: unknown }): void {
   const notification = routeHandoffLine(incoming);
-  const params = (notification.params ?? {}) as { turnId?: string; text?: unknown };
-  if (notification.method === 'turn.started' && params.turnId !== undefined) {
+  const params = (notification.params ?? {}) as {
+    turnId?: string;
+    text?: unknown;
+    background?: boolean;
+  };
+  // A background turn (a routine's, a job's) is not the panel streaming an answer.
+  if (
+    notification.method === 'turn.started' &&
+    params.turnId !== undefined &&
+    params.background !== true
+  ) {
     desktop?.activeTurns.add(params.turnId);
     // The next message puts the last ring away.
     pointerOverlay?.hide();

@@ -228,6 +228,27 @@ const MIGRATIONS: readonly Migration[] = [
     WHERE id = 'scout';
    DELETE FROM pet_seeds
     WHERE id = 'scout' AND NOT EXISTS (SELECT 1 FROM pets WHERE id = 'scout');`,
+  // Migration 21. Scout's own background work: one row per job (a background Scout turn in
+  // its own conversation) or memory digest. The full result is the conversation's last
+  // assistant message; the row keeps the task, a short note and how it ended. Rows and their
+  // conversations go 14 days after they finish (JobStore.prune). No column for screen text.
+  `CREATE TABLE IF NOT EXISTS jobs (
+     id TEXT PRIMARY KEY,
+     kind TEXT NOT NULL CHECK (kind IN ('job', 'digest')),
+     state TEXT NOT NULL CHECK (state IN ('queued', 'running', 'done', 'error', 'stopped')),
+     pet_id TEXT NOT NULL,
+     task TEXT NOT NULL,
+     dedupe_key TEXT NOT NULL,
+     conversation_id TEXT,
+     note TEXT,
+     error TEXT,
+     created_at TEXT NOT NULL,
+     started_at TEXT,
+     finished_at TEXT,
+     reported_at TEXT,
+     digested_at TEXT
+   );
+   CREATE INDEX IF NOT EXISTS jobs_state ON jobs(state, created_at);`,
 ];
 
 /** The columns migration 7 gave `activity`, in order. */

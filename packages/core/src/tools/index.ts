@@ -36,6 +36,7 @@ export { HAND_TO_EXPERT, TELL_EXPERT, type ExpertToolDeps } from './builtin/expe
 export { CHANGE_ROUTINE, CREATE_ROUTINE, type RoutineToolDeps } from './builtin/routines';
 export { POINT_AT } from './builtin/pointing';
 export { SEARCH_HISTORY, type HistoryToolDeps } from './builtin/history';
+export { BOARD, OPEN_RESULT, STOP_WORK, WORK_ON_IT, type JobToolDeps } from './builtin/jobs';
 export {
   CHANGE_SETTINGS,
   CHAT_SETTINGS,

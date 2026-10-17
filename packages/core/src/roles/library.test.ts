@@ -39,6 +39,10 @@ const BUILT_IN_TOOLS = [
   'tell_expert',
   'change_settings',
   'forget',
+  'work_on_it',
+  'board',
+  'open_result',
+  'stop_work',
   // A group: every tool of the person's connected apps.
   'connections',
 ];
@@ -97,6 +101,18 @@ describe('the role files', () => {
   it('give the companion change_settings, after tell_expert', () => {
     const tools = getRole('companion')?.tools ?? [];
     expect(tools.indexOf('change_settings')).toBe(tools.indexOf('tell_expert') + 1);
+  });
+
+  it('give the companion its own background work and the board, after forget', () => {
+    const tools = getRole('companion')?.tools ?? [];
+    const at = tools.indexOf('forget');
+    expect(tools.slice(at + 1, at + 5)).toEqual([
+      'work_on_it',
+      'board',
+      'open_result',
+      'stop_work',
+    ]);
+    expect(getRole('companion')?.instructions).toContain('work_on_it');
   });
 
   // The companion body says how Tagalong works, not how to behave: that is the soul's job.

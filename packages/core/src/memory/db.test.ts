@@ -58,6 +58,7 @@ describe('openDatabase', { timeout: 20_000 }, () => {
         'conversations',
         'expert_routes',
         'experts',
+        'jobs',
         'memories',
         'memories_fts',
         'memories_fts_config',
@@ -366,7 +367,7 @@ describe('migrate', () => {
       db.prepare<[string], { json: string }>('SELECT json FROM pets WHERE id = ?').get(id)?.json;
     try {
       migrate(db);
-      expect(LATEST_SCHEMA_VERSION).toBe(20);
+      expect(LATEST_SCHEMA_VERSION).toBeGreaterThanOrEqual(20);
       // A database from before 19: a pet still thinking on Nebius, one on OpenRouter.
       db.prepare('DELETE FROM schema_version WHERE version >= 19').run();
       const insert = db.prepare('INSERT INTO pets (id, json, updated_at) VALUES (?, ?, ?)');
@@ -585,6 +586,28 @@ describe('migrate', () => {
       new PetRegistry(db).seedDefaults();
 
       expect(new PetRegistry(db).list().map((p) => p.id)).toEqual(['scout']);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('creates the jobs table in migration 21, idempotently, with its kinds and states checked', () => {
+    const db = new Database(':memory:');
+    try {
+      expect(LATEST_SCHEMA_VERSION).toBeGreaterThanOrEqual(21);
+      migrate(db);
+      const insert = db.prepare(
+        `INSERT INTO jobs (id, kind, state, pet_id, task, dedupe_key, created_at)
+         VALUES (?, ?, ?, 'scout', 'read it', 'read it', 'x')`,
+      );
+      insert.run('j1', 'job', 'queued');
+      insert.run('j2', 'digest', 'done');
+      expect(() => insert.run('j3', 'other', 'queued')).toThrow();
+      expect(() => insert.run('j4', 'job', 'waiting')).toThrow();
+      // Rerunning 21 on its own keeps the rows.
+      db.prepare('DELETE FROM schema_version WHERE version >= 21').run();
+      expect(migrate(db)).toBe(LATEST_SCHEMA_VERSION);
+      expect(db.prepare('SELECT COUNT(*) AS n FROM jobs').get()).toEqual({ n: 2 });
     } finally {
       db.close();
     }

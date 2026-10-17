@@ -101,6 +101,51 @@ describe('renderNow', () => {
     expect(text).toContain('Waiting for their Send: Claude Code: "add dark mode".');
   });
 
+  it('names a running expert by its short id when it has one', () => {
+    expect(
+      renderNow(facts({ running: [{ id: 'h-91ab', expertName: 'Claude Code', ask: 'fix it' }] })),
+    ).toContain('Experts working: h-91ab Claude Code: "fix it".');
+  });
+
+  it('tells a job turn it is background work that reports back to the mind', () => {
+    const text = renderNow(facts({ reason: { kind: 'job', task: 'read the paper' } }));
+    expect(text).toContain(
+      'Background work you started for them. Nobody is watching, so ask no questions; your ' +
+        'answer comes back to you, not to them. Begin with one line that gives the gist.',
+    );
+  });
+
+  it('lists the jobs it is working on, how many wait and why, and those that finished', () => {
+    const text = renderNow(
+      facts({
+        jobs: {
+          running: [
+            {
+              id: 'j-7f3a',
+              task: 'read the agent-memory paper',
+              state: 'running',
+              startedAt: ago(4 * MINUTE),
+            },
+          ],
+          queued: 1,
+          capacity: { slots: 1, busy: 'memory' },
+          finished: [
+            { id: 'j-1b2c', task: 'summarise the thread', state: 'done', note: 'Friday it is.' },
+            { id: 'j-9e9e', task: 'compare prices', state: 'error', note: 'Took too long.' },
+          ],
+        },
+      }),
+    );
+    expect(text).toContain(
+      'You are working on: j-7f3a "read the agent-memory paper" (4 min). 1 more waiting to ' +
+        'start. The machine is short of free memory, so 1 runs at a time now.',
+    );
+    expect(text).toContain(
+      'Your jobs finished since you last talked: j-1b2c "summarise the thread" (done): Friday ' +
+        'it is.; j-9e9e "compare prices" (failed): Took too long.',
+    );
+  });
+
   it('leaves out every empty section rather than saying nothing is there', () => {
     const lines = renderNow(facts()).split('\n');
     expect(lines).toHaveLength(2);
@@ -203,6 +248,17 @@ describe('gatherNow', () => {
       waiting: [{ expertName: 'Claude Code', ask: 'add dark mode' }],
       finished: [{ expertName: 'Researcher', ask: 'papers', state: 'done' }],
     });
+  });
+
+  it('reads the jobs with the last-talk time, and an empty board when there is no source', () => {
+    const jobs = vi.fn(() => ({ running: [], queued: 2, finished: [] }));
+    const now = gatherNow({ clock: () => AT, lastTalkAt: () => ago(HOUR), jobs }, 'scout', {
+      kind: 'asked',
+      spoken: false,
+    });
+    expect(jobs).toHaveBeenCalledWith(ago(HOUR));
+    expect(now.jobs).toEqual({ running: [], queued: 2, finished: [] });
+    expect(gatherNow({ clock: () => AT }, 'scout', { kind: 'check-in' }).jobs).toBeUndefined();
   });
 
   it('asks nothing about what finished on the first turn', () => {

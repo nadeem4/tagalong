@@ -341,7 +341,20 @@ export const TurnStartedParams = z.object({
   model: z.string().min(1).optional(),
   /** Set when a routine started the turn: no bubble takes it for the person's own question. */
   routineId: z.uuid().optional(),
+  /**
+   * A turn nobody is watching (a routine's or one of Scout's own jobs): the bubble and the
+   * chat panel never take it for the person's own question.
+   */
+  background: z.literal(true).optional(),
+  /** Set on a job's turn: the job it works for. */
+  jobId: z.uuid().optional(),
 });
+/** Scout's own background jobs changed: how many run and how many wait, for its face. */
+export const BoardChangedParams = z.object({
+  running: z.number().int().nonnegative(),
+  queued: z.number().int().nonnegative(),
+});
+export type BoardChangedParams = z.infer<typeof BoardChangedParams>;
 export const TurnDeltaParams = z.object({ turnId: z.uuid(), text: z.string() });
 /** A pet's tool call is starting; `turn.toolResult` follows when it ends. */
 export const TurnToolRequestParams = z.object({
@@ -577,6 +590,7 @@ export const coreToHostNotifications = {
   'pet.mood': { params: PetMoodParams },
   'pickUp.ready': { params: PickUpReadyParams },
   'settings.proposed': { params: SettingsProposedParams },
+  'board.changed': { params: BoardChangedParams },
 } as const satisfies Record<string, NotificationSpec>;
 
 export type HostToCoreMethod = keyof typeof hostToCoreMethods;
