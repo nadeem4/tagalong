@@ -9,6 +9,25 @@ import { MemoryStore } from '../../memory/memories';
 import { fakeTurnTools } from '../fake-turn';
 import { directivesIn } from '../test-support';
 import { FORGET, REMEMBER } from './memory';
+import { JobStore } from '../../jobs';
+import { ConversationStore } from '../../memory/store';
+import type { JobToolDeps } from './jobs';
+
+/** Job tools wired with only the store `forget` reads; the rest is not under test here. */
+function jobDeps(store: JobStore): JobToolDeps {
+  return {
+    jobs: {
+      start: () => ({ ok: false, reason: 'empty' }),
+      stop: () => 'unknown',
+      result: () => null,
+    },
+    board: () => [],
+    entry: () => null,
+    cancelHandoff: () => false,
+    stopWatch: () => false,
+    finished: store,
+  };
+}
 
 let db: Database.Database;
 let memories: MemoryStore;
@@ -141,6 +160,59 @@ describe('forget', () => {
       expectFact(outcome.content);
     }
     expect(memories.recent('scout', 5)).toHaveLength(1);
+  });
+
+  it('lists matching finished jobs too, and deletes one with its conversation by id', async () => {
+    const jobs = new JobStore(db);
+    const conversations = new ConversationStore(db);
+    const conversation = conversations.createConversation({ petId: 'scout' });
+    conversations.appendMessage({
+      conversationId: conversation.id,
+      role: 'user',
+      content: [{ type: 'text', text: 'brief' }],
+    });
+    const at = '2026-10-17T09:00:00.000Z';
+    jobs.insert({
+      id: 'ab12cd34-0000-4000-8000-000000000001',
+      petId: 'scout',
+      task: 'compare the pricing pages',
+      dedupeKey: 'k',
+      at,
+    });
+    jobs.start('ab12cd34-0000-4000-8000-000000000001', conversation.id, at);
+    jobs.finish(
+      'ab12cd34-0000-4000-8000-000000000001',
+      { state: 'done', note: 'B is cheaper.' },
+      at,
+    );
+    jobs.insert({
+      id: 'ef560000-0000-4000-8000-000000000002',
+      petId: 'scout',
+      task: 'pricing again',
+      dedupeKey: 'k2',
+      at,
+    });
+    const tools = fakeTurnTools({ memory: memories, jobs: jobDeps(jobs) });
+    const text = async (input: unknown) => {
+      const outcome = await tools.run({ name: FORGET, input });
+      return { ...outcome, content: String(outcome.content) };
+    };
+
+    const listed = await text({ query: 'pricing' });
+    expect(listed.content).toContain('- j-ab12cd34 (finished job) compare the pricing pages');
+    expect(listed.content).not.toContain('pricing again');
+    expectFact(listed.content);
+
+    expect(await text({ id: 'j-ab12' })).toEqual({
+      content: 'Deleted: "compare the pricing pages".',
+    });
+    expect(jobs.get('ab12cd34-0000-4000-8000-000000000001')).toBeNull();
+    expect(conversations.listMessages(conversation.id)).toEqual([]);
+    expect(await text({ id: 'j-ef56' })).toEqual({
+      content: 'No finished job has the id j-ef56.',
+      isError: true,
+    });
+    expect(jobs.get('ef560000-0000-4000-8000-000000000002')).not.toBeNull();
   });
 
   it('is a write tool, and a routine’s own turn does not get it', () => {

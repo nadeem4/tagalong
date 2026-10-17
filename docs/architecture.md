@@ -1383,11 +1383,14 @@ Nothing is filed by matching phrases in the question: the model decides what is 
 
 Memories are deleted two ways: from Home's What Scout remembers (see
 [What Scout remembers](#what-scout-remembers)), or by the `forget` tool (`tools/builtin/memory.ts`,
-`write`, appended last in the registry and left off a routine's own turn). `forget { query }` lists up
+`write`, appended after `change_settings` in the registry and left off a routine's own turn). `forget { query }` lists up
 to five FTS matches as `m-<first 8 characters of the id> (kind) text` and deletes nothing;
 `forget { id }` resolves that short id (or the whole id) among the calling pet's memories with
 `MemoryStore.byPrefix` and deletes the one match. No match, or two, deletes nothing and answers with
-`isError`. Deleting only takes away, so there is no card. The results are facts only.
+`isError`. Deleting only takes away, so there is no card. The results are facts only. With the
+job tools wired, a query also lists finished jobs whose task shares a word with it
+(`JobStore.search`, up to five in all), and an id starting `j-` deletes that finished job with its
+conversation and messages (`JobStore.finishedByPrefix`, `JobStore.delete`).
 
 ### Summaries
 

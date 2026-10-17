@@ -63,6 +63,40 @@ describe('JobStore', () => {
     expect(jobs.countSince('2026-10-17T00:00:00.000Z')).toBe(2);
   });
 
+  it('finds finished jobs by words and by id prefix, and deletes one with its conversation', () => {
+    const { jobs, conversations, db } = setup();
+    const conversation = conversations.createConversation({ petId: 'scout' });
+    conversations.appendMessage({
+      conversationId: conversation.id,
+      role: 'user',
+      content: [{ type: 'text', text: 'brief' }],
+    });
+    jobs.insert({
+      id: 'ab12cd34-0000-4000-8000-000000000001',
+      ...NEW,
+      task: 'Compare pricing',
+      at: T0,
+    });
+    jobs.start('ab12cd34-0000-4000-8000-000000000001', conversation.id, T0);
+    jobs.finish('ab12cd34-0000-4000-8000-000000000001', { state: 'done', note: '' }, T0);
+    jobs.insert({
+      id: 'ab99ffff-0000-4000-8000-000000000002',
+      ...NEW,
+      task: 'pricing, live',
+      at: T0,
+    });
+
+    expect(jobs.search('the PRICING page', 5).map((row) => row.task)).toEqual(['Compare pricing']);
+    expect(jobs.search('', 5)).toEqual([]);
+    expect(jobs.finishedByPrefix('ab12').map((row) => row.task)).toEqual(['Compare pricing']);
+    expect(jobs.finishedByPrefix('ab99')).toEqual([]);
+
+    expect(jobs.delete('ab12cd34-0000-4000-8000-000000000001')).toBe(true);
+    expect(jobs.delete('ab99ffff-0000-4000-8000-000000000002')).toBe(false);
+    expect(jobs.get('ab12cd34-0000-4000-8000-000000000001')).toBeNull();
+    expect((db.prepare('SELECT COUNT(*) AS n FROM messages').get() as { n: number }).n).toBe(0);
+  });
+
   it('closes queued and running jobs at boot as interrupted', () => {
     const { jobs } = setup();
     jobs.insert({ id: 'q', ...NEW, at: T0 });

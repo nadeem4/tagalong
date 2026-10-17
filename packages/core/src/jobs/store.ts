@@ -112,6 +112,48 @@ export class JobStore {
     );
   }
 
+  /** Finished jobs whose task shares a word with `query`, newest first: for `forget`. */
+  search(query: string, limit: number): JobRow[] {
+    const words = query.toLowerCase().match(/\p{L}{3,}/gu) ?? [];
+    if (words.length === 0) return [];
+    const rows = this.db
+      .prepare<[], Row>(
+        `SELECT * FROM jobs WHERE kind = 'job' AND NOT (${LIVE})
+         ORDER BY created_at DESC, rowid DESC LIMIT 300`,
+      )
+      .all();
+    return rows
+      .filter((row) => words.some((word) => row.task.toLowerCase().includes(word)))
+      .slice(0, limit)
+      .map(toJob);
+  }
+
+  /** Finished jobs whose id (dashes left out) starts with `prefix`. */
+  finishedByPrefix(prefix: string): JobRow[] {
+    const hex = prefix.toLowerCase().replace(/[^0-9a-f]/g, '');
+    if (hex === '') return [];
+    return this.db
+      .prepare<[string], Row>(
+        `SELECT * FROM jobs WHERE kind = 'job' AND NOT (${LIVE})
+           AND replace(id, '-', '') LIKE ? || '%' LIMIT 3`,
+      )
+      .all(hex)
+      .map(toJob);
+  }
+
+  /** Deletes a finished job with its conversation and messages. False for a live or unknown one. */
+  delete(id: string): boolean {
+    return this.db.transaction(() => {
+      const row = this.get(id);
+      if (row === null || row.state === 'queued' || row.state === 'running') return false;
+      if (row.conversationId !== null) {
+        this.db.prepare('DELETE FROM messages WHERE conversation_id = ?').run(row.conversationId);
+        this.db.prepare('DELETE FROM conversations WHERE id = ?').run(row.conversationId);
+      }
+      return this.db.prepare('DELETE FROM jobs WHERE id = ?').run(id).changes > 0;
+    })();
+  }
+
   /** At boot, before anything runs: a queued or running job was cut short. Returns how many. */
   interrupted(at: string): number {
     return this.db

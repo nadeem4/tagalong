@@ -15,6 +15,7 @@ import {
   shortId,
   type BoardItem,
   type Capacity,
+  type JobStore,
   type Jobs,
   type StartResult,
 } from '../../jobs';
@@ -37,6 +38,8 @@ export interface JobToolDeps {
   entry: (id: string) => ActivityEntry | null;
   cancelHandoff: (handoffId: string) => boolean;
   stopWatch: (watchId: string) => boolean;
+  /** Finished jobs, for `forget`: found by words or id, deleted with their conversation. */
+  finished?: Pick<JobStore, 'search' | 'finishedByPrefix' | 'delete'> | undefined;
   /** How many jobs the machine allows now, for the board's counts. */
   capacity?: (() => Capacity) | undefined;
   clock?: (() => Date) | undefined;

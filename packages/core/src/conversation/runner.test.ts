@@ -486,7 +486,11 @@ describe('ConversationRunner.interrupt', () => {
   it('tells a job turn it is background work, hands its tools the job, and skips afterTurn', async () => {
     let seen: unknown;
     const spy = defineTool(
-      { name: 'spy', description: 'Spy.', inputSchema: { type: 'object', properties: {} } },
+      {
+        name: 'search_history',
+        description: 'A job turn keeps this one.',
+        inputSchema: { type: 'object', properties: {} },
+      },
       'read',
       (_input, ctx) => {
         seen = ctx.job;
@@ -496,7 +500,7 @@ describe('ConversationRunner.interrupt', () => {
     const requests: BrainRequest[] = [];
     const provider = new FakeBrainProvider({
       text: 'gist',
-      toolCall: { id: 't1', name: 'spy', input: {} },
+      toolCall: { id: 't1', name: 'search_history', input: {} },
     });
     const complete = provider.complete.bind(provider);
     provider.complete = (request, handlers, signal) => {

@@ -565,6 +565,7 @@ export class Engine {
         entry: (id) => activity.entry(id),
         cancelHandoff: (handoffId) => handoffs.cancel(handoffId),
         stopWatch: (watchId) => watches.stop(watchId),
+        finished: jobStore,
         capacity,
         timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
       },

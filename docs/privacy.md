@@ -698,7 +698,8 @@ conversations) in the database on this computer, until you delete it.
 - **Home → What Scout remembers** shows every one of them, newest first, with its kind and the
   day it was saved. Each has a delete button; deleting is for good, and Scout no longer recalls it.
 - **Ask Scout to forget.** "Forget that I like tea": Scout finds the matching memories and deletes
-  the one you mean. Nothing is deleted on a routine's own run.
+  the one you mean. "Forget the pricing job" deletes a finished background job and its
+  conversation the same way. Nothing is deleted on a routine's own run.
 - Deleting a memory does not take back what was already sent to the AI in earlier questions.
 - The Chrome extension cannot read or delete them.
 

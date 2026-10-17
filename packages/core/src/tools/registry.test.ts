@@ -173,7 +173,7 @@ describe('ToolRegistry.forTurn', () => {
     expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(14);
   });
 
-  it('gives a companion its tools, then the routine tools (write), point_at, search_history, change_settings and forget', () => {
+  it('gives a companion its tools, then the routine tools (write), point_at, search_history, change_settings, forget and the job tools', () => {
     const experts = {
       experts: () => [
         {
@@ -235,6 +235,10 @@ describe('ToolRegistry.forTurn', () => {
       'search_history',
       'change_settings',
       'forget',
+      'work_on_it',
+      'board',
+      'open_result',
+      'stop_work',
     ]);
     for (const id of ['hand_to_expert', 'create_routine', 'change_routine', 'change_settings']) {
       expect(tools.find((tool) => tool.id === id)?.kind).toBe('write');

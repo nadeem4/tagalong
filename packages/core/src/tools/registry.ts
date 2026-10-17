@@ -170,7 +170,7 @@ export class ToolRegistry {
     }
     if (changeSettings) tools.push(changeSettingsTool(changeSettings));
     // Deleting a memory is the person's call: a routine's own turn has nobody to ask it.
-    if (memory && turn.routine === undefined) tools.push(forgetTool(memory));
+    if (memory && turn.routine === undefined) tools.push(forgetTool(memory, jobs?.finished));
     // A routine's turn may read the board but starts and stops no work.
     if (jobs && turn.routine === undefined) tools.push(workOnItTool(jobs));
     if (jobs) tools.push(boardTool(jobs), openResultTool(jobs));

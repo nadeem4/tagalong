@@ -112,7 +112,9 @@ Memories are kept until deleted, and the person can see and delete every one:
   `memory.delete`). There is no Delete all.
 - **"Scout, forget that"**: the `forget` tool. With a query it lists up to five matching memories
   with short ids (`m-3fa1c2d0`) and deletes nothing; with an id it deletes that one memory. A short
-  id that matches none, or two, deletes nothing. No card: deleting only takes away.
+  id that matches none, or two, deletes nothing. No card: deleting only takes away. Finished jobs
+  are listed too (`j-1b2c9a0e (finished job) <task>`), and `forget { id: "j-…" }` deletes that job
+  row with its conversation; a job still queued or running is never deleted.
 
 A deleted memory leaves the full-text index with it, so recall never brings it back.
 
