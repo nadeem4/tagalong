@@ -194,7 +194,9 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   → `{ extension }` says whether the browser extension is connected, for the health check (see
   [The companion's bubble](#the-companions-bubble)); the extension may not call it. Protocol
   0.17.0: `turn.completed`'s `stopReason` gains `tool_limit`; a `refusal` or `tool_limit` comes with
-  empty text, and the bubble and chat panel show a quiet status instead (see the turn lifecycle).
+  empty text, and the bubble and chat panel show a quiet status instead (see the turn lifecycle). Protocol 0.18.0: the package adds
+  the status marks shared by main and the UI (`StatusId`, `StatusMark`, `FixTarget`,
+  `STATUS_WORDS`, `topStatus`; see [Status marks](#status-marks)); no method changes.
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
   `perception.listWindows` and `perception.readText`, then `perception.captureWindow`, and from Phase 3B `perception.recall` and
   `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
@@ -737,8 +739,8 @@ switch, Sign in again, Disconnect with a second press), Popular (Connect; GitHub
 in a password field), Found on this PC (Use; any value Claude Code kept is asked for), and Add a
 connector (an https address with its sign-in kind, or a command with `NAME=value` lines that go to
 the keychain). `connector.confirm` brings up Scout's bubble, which shows `ConnectorConfirmCard`
-(`packages/ui/src/connector-confirm.tsx`, built from the hand-off card's styles): the app, what will
-change, the details Scout filled in, **Allow once** and **Cancel**, answered with `tool.approve`.
+(`packages/ui/src/connector-confirm.tsx`, built from the hand-off card's styles): a neutral "Change
+in Notion — allow?", the app, what will change, the details Scout filled in, **Allow once** and **Cancel**, answered with `tool.approve`.
 The card goes away when it is answered or when its turn ends.
 
 **"What needs me?"** has no tool of its own, because each app's tools differ, and no recipe: Scout
@@ -2133,8 +2135,8 @@ above a **Message** box. It is the same component, so it is the same conversatio
   `date.ts`" and its answer, then "Reviewer says" and its answer) and `onSay` speaks once. If step 1
   fails or is stopped, the card says "Reviewer did not start." A step that hands on raises no
   Windows notification (`handoffNotice` returns null for it); the last step's does.
-- **The settings card** (`settings-card.tsx`). A `settings.proposed` for this pet shows each setting
-  now → after. **Apply** calls `applySettings` with the card's patch; a row marked as letting Scout
+- **The settings card** (`settings-card.tsx`). A `settings.proposed` for this pet shows "Nothing
+  changes until you apply it." and each setting now → after. **Apply** calls `applySettings` with the card's patch; a row marked as letting Scout
   see or keep more shows that line and the button reads **Turn on**. **Cancel** changes nothing.
   Apply is a click only: a spoken "yes" is just another question. See
   [Changed by talking](#changed-by-talking).
@@ -2189,29 +2191,26 @@ Only the mind speaks in Scout's voice. The body shows what it knows as a neutral
 word or two on Scout and a sentence in the bubble, and never says it aloud.
 
 - **The wording table** is `packages/protocol/src/status.ts`: `StatusId` (`brain-signed-out`,
-  `brain-no-sign-in`, `brain-no-key`, `ears-failed`, `mic-busy`, `mic-failed`, `ears-loading`,
-  `say-name`, `listening-on`, `declined`, `stopped`), `StatusMark { id, percent?, detail? }`,
-  `STATUS_WORDS` (`tag` for Scout, `detail` for the tooltip, the aria label and the bubble row,
-  and an optional `fix`), `STATUS_ORDER` (problems first, then progress, then hints) and
-  `topStatus`. A test refuses any first-person word in the table.
+  `brain-no-sign-in`, `brain-no-key`, `listening-on`, in the order that picks the top mark),
+  `StatusMark { id }`, `STATUS_WORDS` (`tag` for Scout, `detail` for the tooltip, the aria label
+  and the bubble row, and an optional `fix`; a mark with a fix is a problem) and `topStatus`. A
+  test refuses any first-person word in the table.
 - **The holder** is `apps/desktop/src/main/status-marks.ts#StatusMarks`: one map, the top mark by
-  `STATUS_ORDER`, an optional time limit per mark, and `onChange`. Main broadcasts the top mark
-  (or null) on `IPC.statusMarkEvent`; a window that opens asks `getStatusMark()` (the avatar is
-  recreated on show). Who sets what today: the brain marks from `brainReadiness` at launch,
+  `StatusId`'s order, an optional time limit per mark, and one change callback. Main broadcasts
+  the top mark (or null) on `IPC.statusMarkEvent`; a window that opens asks `getStatusMark()` (the
+  avatar is recreated on show). Who sets what: the brain marks from `brainReadiness` at launch,
   cleared by the first `turn.completed` with text or a Check again that finds Claude signed in
   (`clearBrainMarks`); `listening-on` for 8 s (`LISTENING_MARK_MS`) at launch when Always
   listening is saved on and each time it is switched on, cleared when it is switched off
-  (`markListening`). The ears, mic and say-name ids are in the table for the listening work that
-  follows; nothing sets them yet.
+  (`markListening`).
 - **One component**, `packages/ui/src/status-mark.tsx#StatusMark`, in two looks. `tag`: a pill at
-  Scout's bottom centre (`data-testid="status-mark"`, `data-id`), the `detail` as its tooltip and in
-  `DockPet`'s aria label; not a button (Scout is the button). `row`: a muted `role="status"` line
-  in the bubble above the question box (`data-testid="status-row"`), with **Fix it** when the table
-  names a fix. Problems use the warn colour, the rest the muted one; nothing animates.
-- **Turn outcomes.** A `turn.completed` with no text shows a row instead of an answer: "Declined."
-  for `stopReason: 'refusal'`, "Stopped." for `aborted`; nothing is said. The map
-  (`companion-bubble.tsx#TURN_OUTCOMES`) is keyed by string and already lists `tool_limit`, the
-  stop reason step 1 adds, so it needs no change when the engine starts sending it.
+  Scout's bottom centre, just above the recording and listening dots in the corners
+  (`data-testid="status-mark"`, `data-id`), the `detail` as its tooltip and in `DockPet`'s aria
+  label; not a button (Scout is the button). `row`: a muted `role="status"` line in the bubble
+  above the question box (`data-testid="status-row"`), with **Fix it** when the table names a fix.
+  Problems use the warn colour, the rest the muted one; nothing animates.
+- **Turn outcomes** are not status marks: a turn that ends with no words shows `stop-status.ts`'s
+  quiet line ("Declined", "Stopped: too many steps"), as described in the turn lifecycle.
 
 ## Scout talks
 

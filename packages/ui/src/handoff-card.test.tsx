@@ -181,7 +181,8 @@ describe('the hand-off card', () => {
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Send' })));
 
     const working = screen.getByRole('region', { name: 'Claude Code is on it' });
-    expect(working).toHaveTextContent('ai_pet');
+    expect(working).toHaveTextContent('ai_pet · runs in the background');
+    expect(working).not.toHaveTextContent(/\bI[’']/);
     act(() =>
       bridge.emit({
         type: 'handoff.progress',

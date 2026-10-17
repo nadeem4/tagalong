@@ -4,7 +4,7 @@
  * spoken, never in Scout's voice. Contains StatusMark.
  */
 
-import { STATUS_WORDS, isProblem } from '@tagalong/protocol';
+import { STATUS_WORDS } from '@tagalong/protocol';
 import type { FixTarget, StatusMark as Mark } from '@tagalong/protocol';
 import { themeTokens as t } from './theme/tokens';
 
@@ -16,12 +16,10 @@ export interface StatusMarkProps {
 }
 
 export function StatusMark({ mark, variant, onFix }: StatusMarkProps) {
-  const words = STATUS_WORDS[mark.id];
-  const detail = mark.detail ?? words.detail;
-  const tone = isProblem(mark.id) ? 'warn' : 'muted';
+  const { tag, detail, fix } = STATUS_WORDS[mark.id];
+  // A mark with a fix is a problem: the warn colour. A hint is muted.
+  const tone = fix !== undefined ? 'warn' : 'muted';
   if (variant === 'tag') {
-    const tag =
-      mark.percent === undefined ? words.tag : `${words.tag} ${Math.round(mark.percent)}%`;
     return (
       <span
         data-testid="status-mark"
@@ -30,7 +28,8 @@ export function StatusMark({ mark, variant, onFix }: StatusMarkProps) {
         title={detail}
         style={{
           position: 'absolute',
-          bottom: 0,
+          // Bottom centre, just above the 8 px recording and listening dots in the corners.
+          bottom: 14,
           left: '50%',
           transform: 'translateX(-50%)',
           padding: '2px 7px',
@@ -47,7 +46,6 @@ export function StatusMark({ mark, variant, onFix }: StatusMarkProps) {
       </span>
     );
   }
-  const fix = words.fix;
   return (
     <p
       role="status"

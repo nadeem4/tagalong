@@ -23,13 +23,6 @@ describe('StatusMarks', () => {
     expect(marks.top()).toEqual({ id: 'listening-on' });
   });
 
-  it('replaces a mark set again with the same id', () => {
-    const marks = new StatusMarks();
-    marks.set({ id: 'ears-loading', percent: 10 });
-    marks.set({ id: 'ears-loading', percent: 40 });
-    expect(marks.top()).toEqual({ id: 'ears-loading', percent: 40 });
-  });
-
   it('clears a mark when its time runs out, and a later set restarts the time', () => {
     const marks = new StatusMarks();
     marks.set({ id: 'listening-on' }, 8_000);
@@ -49,38 +42,15 @@ describe('StatusMarks', () => {
     expect(marks.top()).toEqual({ id: 'listening-on' });
   });
 
-  it('tells listeners the new top mark only when it changes', () => {
-    const marks = new StatusMarks();
+  it('tells its listener the new top mark only when it changes', () => {
     const seen: (StatusMark | null)[] = [];
-    marks.onChange((top) => seen.push(top));
+    const marks = new StatusMarks((top) => seen.push(top));
     marks.set({ id: 'brain-signed-out' });
     marks.set({ id: 'listening-on' });
-    marks.clear('ears-failed');
+    marks.clear('brain-no-key');
     marks.clear('brain-signed-out');
     marks.clear('listening-on');
     expect(seen).toEqual([{ id: 'brain-signed-out' }, { id: 'listening-on' }, null]);
-  });
-
-  it('keeps going when a listener throws', () => {
-    const marks = new StatusMarks();
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const seen: unknown[] = [];
-    marks.onChange(() => {
-      throw new Error('gone');
-    });
-    marks.onChange((top) => seen.push(top));
-    marks.set({ id: 'stopped' });
-    expect(seen).toEqual([{ id: 'stopped' }]);
-    warn.mockRestore();
-  });
-
-  it('stops telling a listener once it unsubscribes', () => {
-    const marks = new StatusMarks();
-    const seen: unknown[] = [];
-    const off = marks.onChange((top) => seen.push(top));
-    off();
-    marks.set({ id: 'stopped' });
-    expect(seen).toEqual([]);
   });
 });
 
@@ -121,6 +91,7 @@ describe('clearBrainMarks', () => {
   it('clears every brain mark and nothing else', () => {
     const marks = new StatusMarks();
     marks.set({ id: 'brain-signed-out' });
+    marks.set({ id: 'brain-no-sign-in' });
     marks.set({ id: 'brain-no-key' });
     marks.set({ id: 'listening-on' });
     clearBrainMarks(marks);

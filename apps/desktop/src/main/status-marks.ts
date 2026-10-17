@@ -11,8 +11,13 @@ import type { AlwaysListening } from './always-listening';
 export class StatusMarks {
   readonly #marks = new Map<StatusId, StatusMark>();
   readonly #timers = new Map<StatusId, ReturnType<typeof setTimeout>>();
-  readonly #listeners = new Set<(top: StatusMark | null) => void>();
+  readonly #onChange: (top: StatusMark | null) => void;
   #top: StatusMark | null = null;
+
+  /** `onChange` hears the new top mark (or null) each time it changes. */
+  constructor(onChange: (top: StatusMark | null) => void = () => undefined) {
+    this.#onChange = onChange;
+  }
 
   /** Sets or replaces a mark; with `ttlMs` it clears itself after that long. */
   set(mark: StatusMark, ttlMs?: number): void {
@@ -38,22 +43,11 @@ export class StatusMarks {
     return this.#top;
   }
 
-  onChange(listener: (top: StatusMark | null) => void): () => void {
-    this.#listeners.add(listener);
-    return () => void this.#listeners.delete(listener);
-  }
-
   #changed(): void {
     const next = topStatus(this.#marks.values());
     if (next === this.#top) return;
     this.#top = next;
-    for (const listener of [...this.#listeners]) {
-      try {
-        listener(next);
-      } catch (error) {
-        console.warn('[status] a listener failed:', error);
-      }
-    }
+    this.#onChange(next);
   }
 }
 
@@ -77,9 +71,9 @@ export function markListening(
   });
 }
 
-const BRAIN_MARKS = ['brain-signed-out', 'brain-no-sign-in', 'brain-no-key'] as const;
-
 /** Scout can think again: a turn answered, or the sign-in check came back signed in. */
 export function clearBrainMarks(marks: StatusMarks): void {
-  for (const id of BRAIN_MARKS) marks.clear(id);
+  marks.clear('brain-signed-out');
+  marks.clear('brain-no-sign-in');
+  marks.clear('brain-no-key');
 }

@@ -244,8 +244,7 @@ async function start(): Promise<void> {
   // From the saved setting, before any window opens, so the mark on Scout shows from the
   // first second listening is on.
   const listening = new AlwaysListening(settings.listening.always);
-  const statusMarks = new StatusMarks();
-  statusMarks.onChange((top) => {
+  const statusMarks = new StatusMarks((top) => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send(IPC.statusMarkEvent, top);
     }

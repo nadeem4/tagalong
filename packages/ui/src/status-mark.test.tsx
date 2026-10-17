@@ -16,17 +16,17 @@ describe('StatusMark, the tag on Scout', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 
-  it('shows a download’s percent and a mark’s own sentence', () => {
-    render(
-      <StatusMark
-        mark={{ id: 'ears-loading', percent: 40, detail: 'Downloading 43 MB.' }}
-        variant="tag"
-      />,
-    );
+  it('shows a hint in the muted tone', () => {
+    render(<StatusMark mark={{ id: 'listening-on' }} variant="tag" />);
     const tag = screen.getByTestId('status-mark');
-    expect(tag).toHaveTextContent('Ears 40%');
-    expect(tag).toHaveAttribute('title', 'Downloading 43 MB.');
+    expect(tag).toHaveTextContent('Listening');
     expect(tag).toHaveAttribute('data-tone', 'muted');
+  });
+
+  it('sits above the recording and listening dots in the bottom corners, not on them', () => {
+    render(<StatusMark mark={{ id: 'brain-no-key' }} variant="tag" />);
+    // The dots are 8 px, 4 px from the bottom: the tag starts above them.
+    expect(screen.getByTestId('status-mark').style.bottom).toBe('14px');
   });
 });
 
@@ -35,17 +35,20 @@ describe('StatusMark, the row in the bubble', () => {
     const onFix = vi.fn();
     render(<StatusMark mark={{ id: 'brain-no-key' }} variant="row" onFix={onFix} />);
     expect(screen.getByRole('status')).toHaveTextContent('Can’t think: no API key.');
+    expect(screen.getByRole('status')).toHaveAttribute('data-tone', 'warn');
     fireEvent.click(screen.getByRole('button', { name: 'Fix it' }));
-    expect(onFix).toHaveBeenCalledWith('brain');
+    expect(onFix).toHaveBeenCalledExactlyOnceWith('brain');
   });
 
-  it('has no Fix it for a hint, or with no handler', () => {
-    const { unmount } = render(<StatusMark mark={{ id: 'listening-on' }} variant="row" />);
+  it('has no Fix it for a hint, or for a problem with no handler', () => {
+    const { unmount } = render(
+      <StatusMark mark={{ id: 'listening-on' }} variant="row" onFix={vi.fn()} />,
+    );
     expect(screen.getByRole('status')).toHaveTextContent('Always listening is on.');
     expect(screen.queryByRole('button')).toBeNull();
     unmount();
-    render(<StatusMark mark={{ id: 'declined' }} variant="row" onFix={vi.fn()} />);
-    expect(screen.getByRole('status')).toHaveTextContent('Declined.');
+    render(<StatusMark mark={{ id: 'brain-signed-out' }} variant="row" />);
+    expect(screen.getByRole('status')).toHaveTextContent('Can’t think: signed out of Claude.');
     expect(screen.queryByRole('button')).toBeNull();
   });
 });

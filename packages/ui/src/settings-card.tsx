@@ -39,7 +39,7 @@ export function SettingsCard({
 
   return (
     <section className="handoff settings-card" aria-label="Change these settings?">
-      <p className="bubble-text">Here’s what I’d change. Nothing changes until you apply it.</p>
+      <p className="bubble-text">Nothing changes until you apply it.</p>
       <dl className="handoff-rows">
         {proposal.rows.map((row, index) => (
           <div key={`${row.setting}-${index}`} className={row.loosens ? 'loosens' : undefined}>

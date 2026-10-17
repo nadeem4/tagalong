@@ -522,12 +522,7 @@ export function CompanionBubble({
     withDrop = false,
   ): void => {
     if (question !== null && (reply.state === 'done' || reply.state === 'failed')) {
-      const answered = {
-        question,
-        answer:
-          reply.state === 'done' && reply.status !== undefined ? reply.status : reply.text,
-        failed: reply.state === 'failed',
-      };
+      const answered = { question, answer: reply.text, failed: reply.state === 'failed' };
       setPast((current) => [...current, answered]);
     }
     healthRun.current += 1;

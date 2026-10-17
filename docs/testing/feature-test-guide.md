@@ -509,9 +509,6 @@ _Fake provider:_ with `TAGALONG_FAKE_PROVIDERS=1` both steps are scripted expert
    **Signed out** tag at its bottom (tooltip: the same sentence); the bubble shows the same row
    with **Fix it** until a question gets an answer, or Settings' Check again finds Claude
    signed in, which removes the tag.
-3. **Declined / Stopped:** press **Stop** on an answer before any words arrive: the bubble shows
-   "Stopped." as a muted row, and nothing is spoken. A refusal with no words shows "Declined."
-   the same way.
 
 ## Keeping an eye on things
 
@@ -888,8 +885,8 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 
 1. **Setup:** a connected app (see [Connections](#connections-your-apps-over-mcp)).
 2. **Action:** hold the key and ask Scout to make a change in that app.
-3. **Expected:** the confirm card appears in the bubble and Scout says to check the card rather than
-   reading it out. Nothing changes until **Allow once**.
+3. **Expected:** the confirm card ("Change in <app> — allow?") appears in the bubble and Scout says
+   to check the card rather than reading it out. Nothing changes until **Allow once**.
 
 ### T.8. Settings → Voice
 
@@ -1569,7 +1566,7 @@ Needs GitHub connected (Home → Connections → GitHub, with a token) and a rea
    the hand-off card appears with the brief naming the file's path, and nothing runs until **Send**.
 4. Drop a PNG with a brain that cannot see images: Scout says the image was not sent. With
    **Screenshot retention** off, the stored conversation has no picture.
-5. Drop a `.env` file: "That looks like a secrets file, so I won’t read it or pass it on." and no
+5. Drop a `.env` file: "Looks like a secrets file: not read, not passed on." and no
    buttons.
 6. Drag a link from the browser: **Hand it to an expert** only. Drag selected text: **Explain**.
 7. **Cancel** sends nothing (Activity shows no new turn). With Always listening on and a card open,

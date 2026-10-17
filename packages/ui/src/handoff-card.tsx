@@ -409,7 +409,7 @@ export function HandoffStatus({
           </div>
         )}
         <div className="bubble-row bubble-hints">
-          <span>{handoff.project} · keep working, I’ll tell you</span>
+          <span>{handoff.project} · runs in the background</span>
           <button type="button" className="bubble-quiet" onClick={onStop}>
             Stop
           </button>

@@ -81,6 +81,10 @@ describe('offerFor', () => {
     ).toMatchObject({ dropped: { kind: 'file', path: '/a/b.txt' } });
   });
 
+  it('words the secrets refusal neutrally, not in Scout’s voice', () => {
+    expect(SECRET_REFUSAL).toBe('Looks like a secrets file: not read, not passed on.');
+  });
+
   it('refuses a secrets file without reading it', () => {
     for (const path of ['/repo/.env', 'C:\\Users\\a\\.ssh\\id_rsa', '/repo/secrets.json']) {
       expect(offerFor({ paths: [path] })).toEqual({ refusal: SECRET_REFUSAL });

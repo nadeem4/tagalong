@@ -19,7 +19,7 @@ export function ConnectorConfirmCard({
   const [what, ...filled] = confirm.summary.split('\n');
   return (
     <section className="handoff" aria-label={`Change something in ${confirm.app}?`}>
-      <p className="bubble-text">I’d like to make a change in {confirm.app}. Is this right?</p>
+      <p className="bubble-text">Change in {confirm.app} — allow?</p>
       <dl className="handoff-rows">
         <div>
           <dt>App</dt>

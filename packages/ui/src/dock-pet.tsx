@@ -120,7 +120,7 @@ export function DockPet({
   const label = `${pet.name} ${WORDS[mood]}${sightPaused ? ', sight paused' : ''}${
     recording && !sightPaused ? ', recording the screen' : ''
   }${listening === 'on' ? ', listening' : listening === 'paused' ? ', listening paused' : ''}${
-    status == null ? '' : `, ${status.detail ?? STATUS_WORDS[status.id].detail}`
+    status == null ? '' : `, ${STATUS_WORDS[status.id].detail}`
   }`;
   return (
     <span

@@ -202,7 +202,7 @@ describe('registerSettingsIpc: checkKey', () => {
     const { invoke } = setup({ engineUp: false });
     expect(await invoke(IPC.checkKey, 'openrouter')).toEqual({
       ok: false,
-      message: 'Tagalong’s engine isn’t running, so I couldn’t test the key.',
+      message: 'Tagalong’s engine isn’t running, so the key couldn’t be tested.',
     });
   });
 });

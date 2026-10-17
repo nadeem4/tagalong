@@ -730,8 +730,8 @@ expert** and **Cancel**.
   (PDF, Word, a WebP or GIF, a file too big): its name, path and size only. Tagalong does not open
   it, and an expert you hand it to reads it from the path. A link or dropped text is passed as it is.
 - **Secrets files are refused.** A file whose name matches the secret-file list (`.env`,
-  `id_rsa`, `secrets.json`, `*.pem` and the rest) gets "That looks like a secrets file, so I won’t
-  read it or pass it on." with no buttons. Secrets inside other text are still hidden on the
+  `id_rsa`, `secrets.json`, `*.pem` and the rest) gets "Looks like a secrets file: not read, not
+  passed on." with no buttons. Secrets inside other text are still hidden on the
   way out, like everything sent to a brain.
 - **Only a button sends it.** With Always listening on, saying "Scout, explain it" while the card
   is open is an ordinary question and does not carry the dropped item.
