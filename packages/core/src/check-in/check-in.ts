@@ -223,7 +223,8 @@ export class CheckIn {
 
   /**
    * Finished work, gathered by Arrivals: one wake for the whole batch. False only when
-   * another check-in was running, so the batch is kept and tried again.
+   * another check-in was running or a call or full screen came up, so the batch is kept and
+   * tried again.
    */
   async finished(items: readonly Arrival[]): Promise<boolean> {
     const only = items.length === 1 ? items[0] : undefined;
@@ -278,7 +279,8 @@ export class CheckIn {
    * (finished has none). Then the first failure wins and nothing is emitted: a pet, the
    * budget, one in flight, the daily cap, Not now and the cooldown (not for a launch or
    * finished work), a call or full-screen app in front. `find` runs only past all of that,
-   * and may still find nothing to ask about. False only for "one already in flight".
+   * and may still find nothing to ask about. False only for "one already in flight" and, for
+   * finished work, a call or full screen in front.
    */
   async #wake(
     kind: Kind,
@@ -301,7 +303,8 @@ export class CheckIn {
     this.#busy = true;
     try {
       const windows = list ?? (await this.#o.windows());
-      if (windows !== null && callOrFullScreenInFront(windows)) return true;
+      // Finished work is handed back, so Arrivals holds it until the call is over.
+      if (windows !== null && callOrFullScreenInFront(windows)) return kind !== 'finished';
       const wake = await find();
       if (wake === null) return true;
       this.#day.calls += 1;

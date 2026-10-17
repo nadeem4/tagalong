@@ -81,7 +81,7 @@ export interface ArrivalsOptions {
   windows: () => Promise<readonly WindowEntry[] | null>;
   /** A turn of theirs is running, or one ended under `AFTER_TALK_MS` ago. */
   talking: () => boolean;
-  /** The check-in. False: one was already running, so the batch waits and tries again. */
+  /** The check-in. False: one was already running, or a call or full screen came up: try again. */
   wake: (batch: readonly Arrival[]) => Promise<boolean>;
   log?: ((message: string) => void) | undefined;
 }

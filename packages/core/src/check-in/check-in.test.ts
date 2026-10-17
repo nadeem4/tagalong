@@ -307,7 +307,8 @@ describe('CheckIn: the gate', () => {
     const t = setup({ hostWindows: [call] });
     await t.checkIn.observeWindows([call, { ...failing, state: 'background' }]);
     await t.stretch([win('w-4', 'Film', { fullScreen: true })]);
-    await t.checkIn.finished([finishedDone]);
+    // Finished work is handed back to Arrivals, which holds it until the call is over.
+    await expect(t.checkIn.finished([finishedDone])).resolves.toBe(false);
     expect(t.mind.requests).toHaveLength(0);
     // The error was not used up during the call.
     await t.checkIn.observeWindows([editor, { ...failing, state: 'background' }]);
