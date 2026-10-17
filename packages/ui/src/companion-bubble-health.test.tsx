@@ -95,6 +95,22 @@ describe('CompanionBubble, the health check', () => {
     expect(openFix).toHaveBeenCalledWith('brain');
   });
 
+  it('opens the logs folder through the host', async () => {
+    const openLogs = vi.fn(() => Promise.resolve());
+    setup({ openLogs });
+    ask('are you ok?');
+    await flush();
+    fireEvent.click(screen.getByRole('button', { name: 'Open logs folder' }));
+    expect(openLogs).toHaveBeenCalledOnce();
+  });
+
+  it('has no Open logs folder on a host that cannot open it', async () => {
+    setup();
+    ask('are you ok?');
+    await flush();
+    expect(screen.queryByRole('button', { name: 'Open logs folder' })).toBeNull();
+  });
+
   it('leaves a real question to Scout', async () => {
     const { fake, checkHealth } = setup();
     ask('what’s wrong with this code?');

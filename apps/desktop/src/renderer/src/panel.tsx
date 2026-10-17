@@ -43,7 +43,8 @@ const unavailable = (): Promise<never> => Promise.reject(new Error('not availabl
 
 /**
  * The bubble's bridge: the preload's, plus the health check ("Scout, what's wrong?"), read
- * from calls Home and Settings already make, and its Fix it, which opens the right place.
+ * from calls Home and Settings already make, its Fix it, which opens the right place, and
+ * Open logs folder.
  */
 function bubbleBridge(): HostBridge {
   const bridge = window.tagalong;
@@ -63,6 +64,7 @@ function bubbleBridge(): HostBridge {
         testBudgetMs: HEALTH_TEST_BUDGET_MS,
       }),
     openFix: (target: FixTarget) => host.openSettings(target),
+    openLogs: () => host.openLogsFolder(),
   };
 }
 

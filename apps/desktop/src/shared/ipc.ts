@@ -75,6 +75,7 @@ export const IPC = {
   savePet: 'tagalong:pets:save',
   listModels: 'tagalong:models:list',
   openSettings: 'tagalong:settings:open',
+  openLogsFolder: 'tagalong:logs:open',
   hidePanel: 'tagalong:panel:hide',
   fitPanel: 'tagalong:panel:fit',
   greetEvent: 'tagalong:panel:greet',
@@ -330,6 +331,8 @@ export interface TagalongHostApi {
   listModels(providerId: string): Promise<ModelList>;
   /** Opens Settings, or the section or Home page a Fix it names. Main checks the target. */
   openSettings(target?: FixTarget): Promise<void>;
+  /** Opens the logs folder (the health card's Open logs folder). */
+  openLogsFolder(): Promise<void>;
   /** Opens the Welcome window, from Settings › Advanced. */
   openWelcome(): Promise<void>;
   /** Opens Home, or focuses it. The tray's Open Tagalong is the shipped way in. */

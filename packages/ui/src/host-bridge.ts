@@ -197,6 +197,8 @@ export interface HostBridge {
   checkHealth?(): Promise<HealthFacts>;
   /** A health card's Fix it: opens the Settings section or Home page that fixes it. */
   openFix?(target: FixTarget): Promise<void>;
+  /** The health card's Open logs folder: shows the folder; no log text leaves the host. */
+  openLogs?(): Promise<void>;
   /**
    * Apply on Scout's settings card: saves the card's patch through the host's ordinary
    * settings path, on the person's click only. Optional: without it the card cannot apply.
