@@ -152,7 +152,7 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
             </h3>
             <Info tip="greeting" label="About the hello" />
           </div>
-          <p className="tg-help">One short line beside Scout, then it fades.</p>
+          <p className="tg-help">Maybe one short line beside Scout, or nothing.</p>
         </div>
         <button
           type="button"
@@ -253,7 +253,7 @@ export function PrivacySection({ settings, platform }: { settings: Settings; pla
             </h3>
             <Info tip="pickUp" label="About picking up where you left off" />
           </div>
-          <p className="tg-help">Back after a long break, one line on what you were in.</p>
+          <p className="tg-help">Back after a long break, maybe a line on what you were in.</p>
         </div>
         <button
           type="button"

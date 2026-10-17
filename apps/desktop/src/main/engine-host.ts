@@ -15,6 +15,7 @@ import type {
 import { captureNotice } from './capture-notice';
 import { DESKTOP_CAPABILITIES, answerCapture, capturePatch } from './context';
 import { EngineClient } from './engine-client';
+import { fullScreenAsSeen } from './keep-an-eye';
 import type { EngineNotification } from './engine-client';
 import type { Platform } from './platform/index';
 import { answerPointAt } from './platform/point-target';
@@ -81,7 +82,9 @@ export async function startEngineHost(options: StartEngineHostOptions): Promise<
       return reading;
     },
     listWindows: async () => {
-      const { windows, displays } = await options.platform.listWindows(options.captureExclusions());
+      const listed = await options.platform.listWindows(options.captureExclusions());
+      const windows = fullScreenAsSeen(listed.windows, process.env);
+      const { displays } = listed;
       return displays === undefined ? { windows } : { windows, displays };
     },
     captureRegion: async (params) => {

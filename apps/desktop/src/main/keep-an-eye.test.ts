@@ -2,7 +2,12 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WindowEntry } from '@tagalong/protocol';
-import { KEEP_AN_EYE_INTERVAL_MS, keepAnEyeAllowed, startKeepAnEye } from './keep-an-eye';
+import {
+  KEEP_AN_EYE_INTERVAL_MS,
+  fullScreenAsSeen,
+  keepAnEyeAllowed,
+  startKeepAnEye,
+} from './keep-an-eye';
 
 const window: WindowEntry = {
   id: 'w-1',
@@ -25,6 +30,21 @@ describe('keepAnEyeAllowed', () => {
     expect(keepAnEyeAllowed({ TAGALONG_FAKE_PROVIDERS: '1', TAGALONG_KEEP_AN_EYE: '1' })).toBe(
       true,
     );
+  });
+});
+
+describe('fullScreenAsSeen', () => {
+  const full: WindowEntry = { ...window, fullScreen: true };
+
+  it('keeps full screen as listed in the real app: a check-in waits behind it', () => {
+    expect(fullScreenAsSeen([full], {})).toEqual([full]);
+  });
+
+  it('drops it under fake providers, so the CI desktop never silences an e2e check-in', () => {
+    expect(fullScreenAsSeen([full, window], { TAGALONG_FAKE_PROVIDERS: '1' })).toEqual([
+      window,
+      window,
+    ]);
   });
 });
 

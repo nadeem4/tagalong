@@ -630,11 +630,16 @@ describe('CheckIn: launch and back', () => {
   it('a launch is stopped by the budget and by a call in front', async () => {
     const spent = setup({ spentOut: true, pickUp: ready });
     await spent.checkIn.launch(facts);
-    const call = setup({ hostWindows: [win('w-3', 'Meeting', { processName: 'Zoom.exe' })] });
+    const call = setup({
+      hostWindows: [win('w-3', 'Meeting', { processName: 'Zoom.exe' })],
+      pickUp: ready,
+    });
     await call.checkIn.launch(facts);
     expect(spent.mind.requests).toHaveLength(0);
     expect(spent.pickUp.takes).toBe(0);
     expect(call.mind.requests).toHaveLength(0);
+    // The pick-up stays for the back check, once the call is over.
+    expect(call.pickUp.takes).toBe(0);
   });
 
   it('a launch starts the cooldown, so a window right after it waits', async () => {

@@ -540,6 +540,11 @@ function showPickUp(params: unknown): void {
   const panel = desktop?.panel;
   const avatar = desktop?.avatar;
   if (panel == null || avatar == null || !avatar.isVisible()) return;
+  // Right after launch the panel may still be loading: a line sent now would be lost.
+  if (panel.webContents.isLoading()) {
+    panel.webContents.once('did-finish-load', () => showPickUp(params));
+    return;
+  }
   if (panel.isVisible()) {
     if (pickUpWaiting.hold(pickUp)) {
       panel.once('hide', () => {
@@ -580,6 +585,11 @@ function showRemark(params: unknown): void {
   const avatar = desktop?.avatar;
   if ((params as { handoffId?: unknown } | null)?.handoffId !== undefined) return;
   if (panel == null || avatar == null || !avatar.isVisible() || panel.isVisible()) return;
+  // Right after launch the panel may still be loading: a line sent now would be lost.
+  if (panel.webContents.isLoading()) {
+    panel.webContents.once('did-finish-load', () => showRemark(params));
+    return;
+  }
   panel.webContents.send(IPC.remarkEvent, params);
   showPanelQuietly(panel, avatar);
   // The panel says the remark aloud like any bubble line: shortened, one at a time, and
