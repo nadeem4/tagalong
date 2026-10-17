@@ -587,8 +587,8 @@ alone never makes Scout wince or cheer.
 ### M.1. Scout dozes while you are away
 
 1. **Action:** touch nothing for five minutes (or lock the screen with `Win+L`).
-2. **Expected:** within about fifteen seconds of the five minutes (at once on lock), Scout's eyes
-   close to a line and it breathes more slowly; no tag, no "z". Its name reads "Scout is dozing".
+2. **Expected:** within about fifteen seconds of the five minutes (at once on lock), Bean closes its
+   eyes and breathes slowly while small z's rise above it; no tag. Its name reads "Scout is dozing".
    Move the mouse (or unlock): it wakes within fifteen seconds (at once on unlock).
 3. **Action:** with Always listening on, repeat.
 4. **Expected:** the green listening dot stays on Scout the whole time it dozes.
@@ -597,8 +597,8 @@ alone never makes Scout wince or cheer.
 
 1. **Action:** in a terminal in front, set the title to a failure
    (`$host.UI.RawUI.WindowTitle = 'npm test - 2 failed'`), with real failing output in it.
-2. **Expected:** Scout may wince (`> <`, one small shake) for about four seconds, with or without a
-   line. Setting the title to `npm test - 12 passed` alone does nothing.
+2. **Expected:** Scout may wince (eyes squeezed shut, one shake, a sweat drop, then it holds the
+   pose) for about four seconds, with or without a line. Setting the title to `npm test - 12 passed` alone does nothing.
 3. **Action:** put a video full screen or join a call, then cause a failure title behind it.
 4. **Expected:** no reaction.
 
@@ -612,9 +612,22 @@ alone never makes Scout wince or cheer.
 
 ### M.4. Reduced motion
 
-1. **Action:** Windows Settings → Accessibility → Visual effects → **Animation effects** off, then
-   repeat M.1 and M.2.
-2. **Expected:** the faces change but nothing moves and Scout never blinks.
+1. **Action:** Windows Settings → Accessibility → Visual effects → **Animation effects** off, restart
+   Tagalong (the setting is read when the window opens), then repeat M.1 and M.2.
+2. **Expected:** Bean's pose changes per mood but each is a still frame, nothing moves and Bean never
+   blinks.
+
+### M.5. Bean on the dock
+
+1. **Action:** watch Scout idle for half a minute, then press the hotkey to capture (Seeing), ask a
+   question (Working), and wait for a hand-off to finish (Done). Do it on a light wallpaper and on a
+   dark one.
+2. **Expected:** Bean breathes and blinks now and then in idle and while Seeing, never mid-pose: a
+   blink never makes Bean jump. Each mood has its own pose (waves for Seeing, a laptop and a gear
+   for Working, a hop and a check mark for Done). The small tag at the top right sits beside the
+   gear or check mark, not over it, and reads clearly on both wallpapers. Turn sight off while
+   Working: the Paused chip shows at the top left and the Working tag goes, so the two never overlap;
+   the laptop and gear still show the work.
 
 ## Gentle nudges
 
@@ -635,7 +648,7 @@ mind's.
 1. **Action:** switch **Gentle nudges** on, Save, then keep working for an hour and a half without a
    five-minute break.
 2. **Expected:** within a minute of the 90 minutes, one check-in ("Sent to AI" in What Scout saw).
-   Scout may look tired (half-lidded, slow breathing, no blink; "Scout looks tired"), say one
+   Scout may look tired (slow breathing, a drooping head, no blink; "Scout looks tired"), say one
    line in its own words, or do nothing. Never a fixed "Stretch?" line. No second check-in in the
    same stretch.
 3. **Action:** step away for five minutes, then come back.

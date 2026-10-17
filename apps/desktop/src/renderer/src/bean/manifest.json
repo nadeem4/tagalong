@@ -1,0 +1,71 @@
+{
+  "frameSize": 192,
+  "fps": 12,
+  "clips": {
+    "cheer": {
+      "file": "cheer.webp",
+      "frames": 12,
+      "loop": false
+    },
+    "done": {
+      "file": "done.webp",
+      "frames": 30,
+      "loop": true
+    },
+    "dozing": {
+      "file": "dozing.webp",
+      "frames": 48,
+      "loop": true
+    },
+    "expert": {
+      "file": "expert.webp",
+      "frames": 24,
+      "loop": true
+    },
+    "idle": {
+      "file": "idle.webp",
+      "frames": 36,
+      "loop": true
+    },
+    "idle-blink": {
+      "file": "idle-blink.webp",
+      "frames": 2,
+      "loop": false
+    },
+    "listening": {
+      "file": "listening.webp",
+      "frames": 36,
+      "loop": true
+    },
+    "listening-blink": {
+      "file": "listening-blink.webp",
+      "frames": 2,
+      "loop": false
+    },
+    "reading": {
+      "file": "reading.webp",
+      "frames": 36,
+      "loop": true
+    },
+    "thinking": {
+      "file": "thinking.webp",
+      "frames": 36,
+      "loop": true
+    },
+    "tired": {
+      "file": "tired.webp",
+      "frames": 36,
+      "loop": true
+    },
+    "wince": {
+      "file": "wince.webp",
+      "frames": 12,
+      "loop": false
+    },
+    "working": {
+      "file": "working.webp",
+      "frames": 24,
+      "loop": true
+    }
+  }
+}

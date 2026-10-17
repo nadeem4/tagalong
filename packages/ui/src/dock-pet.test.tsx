@@ -1,12 +1,14 @@
-/** Tests for DockPet: faces, tags, marks, blinking and reduced motion. */
+/** Tests for DockPet: Bean's clip per mood, tags, marks, blinking and reduced motion. */
 
-import { render, screen } from '@testing-library/react';
-import { act } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Pet } from '@tagalong/protocol';
-import { DockPet } from './dock-pet';
-import { SCOUT_SPRITE } from './theme/sprites/characters';
-import { withBlink, withMood } from './theme/sprites/expressions';
+import {
+  DockPet as RealDockPet,
+  type BeanFigure,
+  type DockMood,
+  type DockPetProps,
+} from './dock-pet';
 
 const SCOUT: Pet = {
   id: 'scout',
@@ -17,33 +19,86 @@ const SCOUT: Pet = {
   providerId: 'claude-code',
 };
 
-describe('withMood', () => {
-  const base = SCOUT_SPRITE;
+const MOODS: readonly DockMood[] = [
+  'idle',
+  'listening',
+  'working',
+  'done',
+  'dozing',
+  'wince',
+  'cheer',
+  'tired',
+];
 
-  it('keeps the face as drawn when idle', () => {
-    expect(withMood(base, 'idle')).toBe(base);
-  });
-
-  it('gives every other mood its own eyes, and changes nothing else', () => {
-    const faces = (['listening', 'working', 'done'] as const).map((mood) =>
-      withMood(base, mood).rows.join('\n'),
-    );
-    expect(new Set([base.rows.join('\n'), ...faces]).size).toBe(4);
-    for (const mood of ['listening', 'working', 'done'] as const) {
-      const rows = withMood(base, mood).rows;
-      expect(rows.slice(0, 4)).toEqual(base.rows.slice(0, 4));
-      expect(rows.slice(8)).toEqual(base.rows.slice(8));
-      expect(withMood(base, mood).palette).toBe(base.palette);
-    }
-  });
-
-  it('leaves a sprite of another shape alone', () => {
-    const tiny = { rows: ['ab'], palette: { a: '#000', b: '#fff' } };
-    expect(withMood(tiny, 'working')).toBe(tiny);
-  });
+/** A fake strip: a URL per clip, with the real clips' shape. */
+const clip = (name: string, frames: number, loop = true) => ({
+  src: `fake://${name}.webp`,
+  frames,
+  fps: 12,
+  loop,
 });
+const FIGURE: BeanFigure = {
+  idle: clip('idle', 36),
+  listening: clip('listening', 36),
+  working: clip('working', 24),
+  done: clip('done', 30),
+  dozing: clip('dozing', 48),
+  wince: clip('wince', 12, false),
+  cheer: clip('cheer', 12, false),
+  tired: clip('tired', 36),
+  'idle-blink': clip('idle-blink', 2, false),
+  'listening-blink': clip('listening-blink', 2, false),
+};
+
+/** DockPet with the fake figure, so each test names only what it is about. */
+function DockPet(props: Omit<DockPetProps, 'figure'>) {
+  return <RealDockPet figure={FIGURE} {...props} />;
+}
+
+/** The mood's own clip (a blink lays a second one over it). */
+function moodClip(): HTMLElement {
+  return screen.getAllByTestId('bean-clip')[0]!;
+}
+
+/** The mood's loop comes back round to frame 0. */
+function loopRestarts(): void {
+  act(() => {
+    fireEvent.animationIteration(moodClip());
+  });
+}
+
+function stubReducedMotion(): void {
+  // jsdom has no matchMedia of its own.
+  vi.stubGlobal(
+    'matchMedia',
+    (query: string) => ({ matches: query.includes('reduce'), media: query }) as never,
+  );
+}
 
 describe('DockPet', () => {
+  it.each(MOODS)('draws Bean in its own clip while %s', (mood) => {
+    render(<DockPet pet={SCOUT} mood={mood} />);
+    expect(moodClip()).toHaveAttribute('data-clip', mood);
+    expect(moodClip().style.backgroundImage).toBe(`url("fake://${mood}.webp")`);
+    expect(screen.getByRole('img')).toHaveAttribute('data-mood', mood);
+  });
+
+  it('is a fixed 96 px box with no padding', () => {
+    render(<DockPet pet={SCOUT} mood="idle" />);
+    const pet = screen.getByRole('img');
+    expect(pet.style.width).toBe('96px');
+    expect(pet.style.height).toBe('96px');
+    expect(pet.style.padding).toBe('0px');
+  });
+
+  it('plays a cheer from its start when it follows another mood', () => {
+    const { rerender } = render(<DockPet pet={SCOUT} mood="idle" />);
+    const idle = moodClip();
+    rerender(<DockPet pet={SCOUT} mood="cheer" />);
+    expect(moodClip()).not.toBe(idle);
+    expect(moodClip().style.animation).toContain('forwards');
+  });
+
   it('draws the pet and says what it is doing, with a tag for anything but idle', () => {
     const { rerender } = render(<DockPet pet={SCOUT} mood="idle" />);
     expect(screen.getByRole('img')).toHaveAccessibleName('Scout is idle');
@@ -56,6 +111,15 @@ describe('DockPet', () => {
     rerender(<DockPet pet={SCOUT} mood="done" />);
     expect(screen.getByTestId('dock-tag')).toHaveTextContent('Done');
     expect(screen.getByRole('img')).toHaveAccessibleName('Scout has an answer for you');
+  });
+
+  it('keeps the tag small, top right, so it sits beside Bean’s sign rather than on it', () => {
+    render(<DockPet pet={SCOUT} mood="working" />);
+    const tag = screen.getByTestId('dock-tag');
+    expect(tag.style.fontSize).toBe('9px');
+    expect(tag.style.top).toBe('4px');
+    expect(tag.style.right).toBe('0px');
+    expect(tag.style.padding).toBe('1px 3px');
   });
 
   it('shows that sight is paused, and that memory is recording, in marks and words', () => {
@@ -120,73 +184,98 @@ describe('DockPet', () => {
 });
 
 describe('a living pet', () => {
-  afterEach(() => vi.useRealTimers());
-
-  it('closes its eyes for a blink, and changes nothing else', () => {
-    const base = SCOUT_SPRITE;
-    const blink = withBlink(base);
-    expect(blink.rows).not.toEqual(base.rows);
-    expect(blink.rows.slice(0, 5)).toEqual(base.rows.slice(0, 5));
-    expect(blink.rows.slice(7)).toEqual(base.rows.slice(7));
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
-  it('blinks now and then, briefly', () => {
+  it.each(['idle', 'listening'] as const)(
+    'blinks now and then while %s, from frame 0 of the loop, for two frames',
+    (mood) => {
+      vi.useFakeTimers();
+      render(<DockPet pet={SCOUT} mood={mood} blinkEveryMs={3000} />);
+      const pet = screen.getByRole('img');
+      expect(pet).toHaveAttribute('data-blink', 'false');
+      act(() => vi.advanceTimersByTime(3000));
+      // Time to blink, but it waits for the loop to come round so nothing jumps.
+      expect(pet).toHaveAttribute('data-blink', 'false');
+      loopRestarts();
+      expect(pet).toHaveAttribute('data-blink', 'true');
+      expect(screen.getAllByTestId('bean-clip')[1]).toHaveAttribute('data-clip', `${mood}-blink`);
+      // The mood's own clip keeps running underneath, hidden, so it never restarts.
+      expect(moodClip()).toHaveAttribute('data-clip', mood);
+      expect(moodClip().style.visibility).toBe('hidden');
+      act(() => vi.advanceTimersByTime(Math.ceil((2 / 12) * 1000)));
+      expect(pet).toHaveAttribute('data-blink', 'false');
+      expect(screen.getAllByTestId('bean-clip')).toHaveLength(1);
+      expect(moodClip().style.visibility).toBe('');
+    },
+  );
+
+  it('does not blink at a loop that comes round before it is time', () => {
+    vi.useFakeTimers();
+    render(<DockPet pet={SCOUT} mood="idle" blinkEveryMs={3000} />);
+    loopRestarts();
+    expect(screen.getByRole('img')).toHaveAttribute('data-blink', 'false');
+  });
+
+  it('blinks again only after the next wait', () => {
     vi.useFakeTimers();
     render(<DockPet pet={SCOUT} mood="idle" blinkEveryMs={3000} />);
     const pet = screen.getByRole('img');
-    expect(pet).toHaveAttribute('data-blink', 'false');
     act(() => vi.advanceTimersByTime(3000));
-    expect(pet).toHaveAttribute('data-blink', 'true');
+    loopRestarts();
     act(() => vi.advanceTimersByTime(200));
     expect(pet).toHaveAttribute('data-blink', 'false');
+    loopRestarts();
+    expect(pet).toHaveAttribute('data-blink', 'false');
+    act(() => vi.advanceTimersByTime(3000));
+    loopRestarts();
+    expect(pet).toHaveAttribute('data-blink', 'true');
+  });
+
+  it.each(['working', 'done', 'dozing', 'wince', 'cheer', 'tired'] as const)(
+    'never blinks while %s',
+    (mood) => {
+      vi.useFakeTimers();
+      render(<DockPet pet={SCOUT} mood={mood} blinkEveryMs={3000} />);
+      act(() => vi.advanceTimersByTime(3000));
+      loopRestarts();
+      expect(screen.getByRole('img')).toHaveAttribute('data-blink', 'false');
+      expect(screen.getAllByTestId('bean-clip')).toHaveLength(1);
+    },
+  );
+
+  it('stops a waiting blink when the mood changes to one that does not blink', () => {
+    vi.useFakeTimers();
+    const { rerender } = render(<DockPet pet={SCOUT} mood="idle" blinkEveryMs={3000} />);
+    act(() => vi.advanceTimersByTime(3000));
+    rerender(<DockPet pet={SCOUT} mood="working" blinkEveryMs={3000} />);
+    loopRestarts();
+    expect(screen.getByRole('img')).toHaveAttribute('data-blink', 'false');
   });
 
   it('does not blink when the system asks for reduced motion', () => {
     vi.useFakeTimers();
-    // jsdom has no matchMedia of its own.
-    vi.stubGlobal(
-      'matchMedia',
-      (query: string) => ({ matches: query.includes('reduce'), media: query }) as never,
-    );
-    try {
-      render(<DockPet pet={SCOUT} mood="idle" blinkEveryMs={3000} />);
-      act(() => vi.advanceTimersByTime(3000));
-      expect(screen.getByRole('img')).toHaveAttribute('data-blink', 'false');
-    } finally {
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it('breathes when idle, bobs faster when working, and hops when done', () => {
-    const { rerender } = render(<DockPet pet={SCOUT} mood="idle" />);
-    expect(screen.getByTestId('dock-body')).toHaveAttribute('data-motion', 'breathe');
-    rerender(<DockPet pet={SCOUT} mood="working" />);
-    expect(screen.getByTestId('dock-body')).toHaveAttribute('data-motion', 'busy');
-    rerender(<DockPet pet={SCOUT} mood="done" />);
-    expect(screen.getByTestId('dock-body')).toHaveAttribute('data-motion', 'hop');
-  });
-
-  it('breathes slowly while dozing, shakes once at a wince, and hops twice to cheer', () => {
-    const { rerender } = render(<DockPet pet={SCOUT} mood="dozing" />);
-    expect(screen.getByTestId('dock-body')).toHaveAttribute('data-motion', 'doze');
-    rerender(<DockPet pet={SCOUT} mood="wince" />);
-    expect(screen.getByTestId('dock-body')).toHaveAttribute('data-motion', 'shake');
-    rerender(<DockPet pet={SCOUT} mood="cheer" />);
-    expect(screen.getByTestId('dock-body')).toHaveAttribute('data-motion', 'cheer');
-  });
-
-  it('breathes slowly while tired, and says so with no tag', () => {
-    render(<DockPet pet={SCOUT} mood="tired" />);
-    expect(screen.getByTestId('dock-body')).toHaveAttribute('data-motion', 'doze');
-    expect(screen.queryByTestId('dock-tag')).toBeNull();
-    expect(screen.getByRole('img')).toHaveAccessibleName('Scout looks tired');
-  });
-
-  it.each(['dozing', 'wince', 'cheer', 'tired'] as const)('never blinks while %s', (mood) => {
-    vi.useFakeTimers();
-    render(<DockPet pet={SCOUT} mood={mood} blinkEveryMs={3000} />);
+    stubReducedMotion();
+    render(<DockPet pet={SCOUT} mood="idle" blinkEveryMs={3000} />);
     act(() => vi.advanceTimersByTime(3000));
+    loopRestarts();
     expect(screen.getByRole('img')).toHaveAttribute('data-blink', 'false');
+  });
+
+  it.each(MOODS)('shows a still of Bean under reduced motion while %s', (mood) => {
+    stubReducedMotion();
+    render(<DockPet pet={SCOUT} mood={mood} />);
+    expect(moodClip()).toHaveAttribute('data-clip', mood);
+    expect(moodClip().style.animation).toBe('');
+  });
+
+  it('keeps a reduced-motion backstop for the clips and the listening dot', () => {
+    render(<DockPet pet={SCOUT} mood="idle" />);
+    const css = [...document.querySelectorAll('style')].map((s) => s.textContent).join('\n');
+    expect(css).toMatch(/prefers-reduced-motion: reduce\)\s*\{[^}]*\[data-testid='bean-clip'\]/);
+    expect(css).toMatch(/prefers-reduced-motion: reduce\)\s*\{[^}]*\.dock-pet__listening/);
   });
 });
 
@@ -201,6 +290,9 @@ describe('moods', () => {
     rerender(<DockPet pet={SCOUT} mood="cheer" />);
     expect(screen.queryByTestId('dock-tag')).toBeNull();
     expect(screen.getByRole('img')).toHaveAccessibleName('Scout is cheering');
+    rerender(<DockPet pet={SCOUT} mood="tired" />);
+    expect(screen.queryByTestId('dock-tag')).toBeNull();
+    expect(screen.getByRole('img')).toHaveAccessibleName('Scout looks tired');
   });
 
   it.each(['dozing', 'wince', 'cheer'] as const)(
@@ -215,13 +307,29 @@ describe('moods', () => {
     },
   );
 
-  it('stops every motion under reduced motion, the new ones included', () => {
-    render(<DockPet pet={SCOUT} mood="cheer" />);
-    const css = document.querySelector('style')?.textContent ?? '';
-    expect(css).toMatch(/prefers-reduced-motion: reduce\)\s*\{\s*\.dock-body\b/);
-    // The new motions are all on .dock-body, so the one rule stops them too.
-    for (const motion of ['doze', 'shake', 'cheer']) {
-      expect(css).toContain(`.dock-body[data-motion='${motion}']`);
-    }
+  it('keeps every mark over Bean: tag, paused, listening and status', () => {
+    render(
+      <DockPet
+        pet={SCOUT}
+        mood="working"
+        recording
+        listening="on"
+        status={{ id: 'brain-signed-out' }}
+      />,
+    );
+    expect(screen.getByTestId('dock-tag')).toHaveTextContent('Working');
+    expect(screen.getByTestId('recording-dot')).toBeInTheDocument();
+    expect(screen.getByTestId('listening-mark')).toBeInTheDocument();
+    expect(screen.getByTestId('status-mark')).toBeInTheDocument();
+  });
+
+  it('gives the top to the Paused mark while sight is paused, and keeps the mood in words', () => {
+    render(<DockPet pet={SCOUT} mood="working" sightPaused />);
+    expect(screen.getByTestId('paused-eye')).toBeInTheDocument();
+    // The two would overlap at the top of the 96 px window; the pose still shows the work.
+    expect(screen.queryByTestId('dock-tag')).toBeNull();
+    expect(screen.getByRole('img')).toHaveAccessibleName(
+      'Scout has an expert working, sight paused',
+    );
   });
 });

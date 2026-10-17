@@ -1,8 +1,10 @@
 /**
  * Vitest setup for the ui package: jest-dom matchers, cleanup after each test, a longer
- * async timeout and a jsdom dialog shim.
+ * async timeout and jsdom shims for dialogs and animation events.
  */
 
+// First, before React loads: React picks the animation event names it listens for at load.
+import './test-support/animation-event';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
 import { afterEach } from 'vitest';

@@ -31,8 +31,8 @@ describe('StatusMark, the tag on Scout', () => {
 
   it('sits above the recording and listening dots in the bottom corners, not on them', () => {
     render(<StatusMark mark={{ id: 'brain-no-key' }} variant="tag" />);
-    // The dots are 8 px, 4 px from the bottom: the tag starts above them.
-    expect(screen.getByTestId('status-mark').style.bottom).toBe('14px');
+    // The dots are 8 px, 8 px from the bottom of the 96 px dock: the tag starts above them.
+    expect(screen.getByTestId('status-mark').style.bottom).toBe('18px');
   });
 });
 

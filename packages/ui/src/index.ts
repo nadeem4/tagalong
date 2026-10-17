@@ -12,8 +12,8 @@ export { ChatPanel } from './chat-panel';
 export { CompanionBubble, GreetingLine } from './companion-bubble';
 export type { DropOffer } from './drop-card';
 export { DockPet } from './dock-pet';
-export type { DockPetProps, ListeningDot } from './dock-pet';
-export type { DockMood } from './theme/sprites/expressions';
+export type { BeanFigure, DockMood, DockPetProps, ListeningDot } from './dock-pet';
+export type { BeanClipData } from './theme/bean-clip';
 export type { BubbleTalk, CompanionBubbleProps, GreetingLineProps } from './companion-bubble';
 export type { ChatPanelProps } from './chat-panel';
 

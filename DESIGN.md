@@ -1,6 +1,6 @@
 ---
 name: Tagalong
-description: Scout, one pixel-art AI companion on your screen, with Home as its calm control centre.
+description: Scout, one AI companion on your screen (a soft 3D figure on the dock, pixel art in Welcome and Home), with Home as its calm control centre.
 colors:
   shell-navy: '#12162B'
   shell-text: '#E9ECF5'
@@ -85,6 +85,11 @@ typography:
     fontFamily: "'Onest', system-ui, sans-serif"
     fontSize: '12px'
     fontWeight: 400
+  dock-tag:
+    fontFamily: "'Onest', system-ui, sans-serif"
+    fontSize: '9px'
+    lineHeight: '11px'
+    fontWeight: 600
   label-min:
     fontFamily: "'Onest', system-ui, sans-serif"
     fontSize: '11px'
@@ -171,21 +176,21 @@ components:
   dock-tag-seeing:
     backgroundColor: '{colors.sky}'
     textColor: '{colors.gold-ink}'
-    typography: '{typography.label-min}'
+    typography: '{typography.dock-tag}'
     rounded: '{rounded.pill}'
-    padding: '2px 7px'
+    padding: '1px 3px'
   dock-tag-working:
     backgroundColor: '{colors.gold}'
     textColor: '{colors.gold-ink}'
-    typography: '{typography.label-min}'
+    typography: '{typography.dock-tag}'
     rounded: '{rounded.pill}'
-    padding: '2px 7px'
+    padding: '1px 3px'
   dock-tag-done:
     backgroundColor: '{colors.done-green}'
     textColor: '{colors.gold-ink}'
-    typography: '{typography.label-min}'
+    typography: '{typography.dock-tag}'
     rounded: '{rounded.pill}'
-    padding: '2px 7px'
+    padding: '1px 3px'
   dock-paused:
     backgroundColor: '{colors.paused-grey}'
     textColor: '{colors.shell-text}'
@@ -291,19 +296,19 @@ components:
 
 **Creative North Star: "A Pixel Friend in Modern Chrome"**
 
-Tagalong is one companion, Scout, a 16x16 pixel-art figure (orange fur, pointed ears, a green shirt with a gold badge) that sits on the desktop and opens a speech bubble beside itself. The figure is the only game-like thing in the product; everything around it is calm, modern product chrome: a deep ink-navy for Scout's own surfaces (the dock tags, the bubble, Welcome, Home's nav), a cool off-white for reading (Home's pages and Settings), clean Onest type and one warm gold.
+Tagalong is one companion, Scout. On the desktop it is Bean, a soft clay-like 3D figure (round orange body, cream belly, pointed ears) drawn from pre-rendered WebP strips; Welcome, Home's nav and Activity still draw it as a 16x16 pixel-art figure (orange fur, pointed ears, a green shirt with a gold badge). It sits on the desktop and opens a speech bubble beside itself. The figure is the only game-like thing in the product; everything around it is calm, modern product chrome: a deep ink-navy for Scout's own surfaces (the dock tags, the bubble, Welcome, Home's nav), a cool off-white for reading (Home's pages and Settings), clean Onest type and one warm gold.
 
-Tokens live in `packages/ui/src/theme/tokens.ts` (`themeTokens`). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav and Welcome hard-code several hex values, recorded below as hard-coded. Sprites are plain data (rows and a palette) drawn by `PixelSprite` as a CSS `box-shadow` on one 1px element, scaled by a whole number. No images, no canvas.
+Tokens live in `packages/ui/src/theme/tokens.ts` (`themeTokens`). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav and Welcome hard-code several hex values, recorded below as hard-coded. Sprites are plain data (rows and a palette) drawn by `PixelSprite` as a CSS `box-shadow` on one 1px element, scaled by a whole number. No images, no canvas. The dock's Bean is the one exception: one WebP strip per mood (192px frames, 12 fps, in `apps/desktop/src/renderer/src/bean/`), stepped through by `BeanClip` with CSS `steps()`.
 
-Scout's state is always a face plus a word: the eyes change per mood, a small tag says Seeing, Working or Done, and the accessible name says it in full. Motion is small and soft (a breath, a bob, a hop) and stops for reduced motion.
+Scout's state is always a pose plus a word: Bean's clip changes per mood (with a floating sign for some: a gear, a check mark, z's), a small tag says Seeing, Working or Done, and the accessible name says it in full. Motion is baked into the frames (a breath, typing, a hop) and becomes a still frame for reduced motion.
 
 **Key Characteristics:**
 
-- One pixel figure; modern chrome around it.
+- One figure (3D Bean on the dock, pixel Scout elsewhere for now); modern chrome around it.
 - Navy for Scout's surfaces, off-white for reading.
 - Gold for the primary action, an on state and Scout's active marks; sky blue for focus and fields inside the bubble.
 - Pixel type for names, titles and short uppercase labels; Onest for every sentence and control.
-- Sprites as data, drawn at whole-number scales only (4 on the dock, 6 in Welcome, 3 in Home's nav, 2 in Activity).
+- Sprites as data, drawn at whole-number scales only (6 in Welcome, 3 in Home's nav, 2 in Activity).
 - Flat: tone and hairlines, no drop shadows.
 
 ## Colors
@@ -367,18 +372,19 @@ Every window bundles its faces from `@fontsource` (Latin subset), nothing fetche
 - **Body lead** (Onest 400, 14px, 1.5): bubble text, answers, Home notes.
 - **Body** (Onest 400, 13px): card text, previews, the chat's messages, help text (1.55).
 - **Label** (Onest 400, 12px): meta lines, field labels, quiet bubble buttons, bubble chips.
-- **Label min** (Onest 600, 11px): chips, dock tags, bubble hints.
+- **Label min** (Onest 600, 11px): chips, the dock's Paused chip, bubble hints.
+- **Dock tag** (Onest 600, 9px, 11px line): Seeing, Working and Done on the dock, small so they sit beside Bean's floating sign rather than on it.
 - **Mono** (12px): an expert's live steps in the hand-off card; inline code in answers is 12.5px.
 
 ### Named Rules
 
 **The Pixel Is A Name Rule.** Pixelify Sans sets names, titles and short uppercase headings only. Sentences, controls, fields, statuses and numbers are Onest.
 
-**The 11px Floor Rule.** No functional text below 11px (`fontSize.min`).
+**The 11px Floor Rule.** No functional text below 11px (`fontSize.min`). The one exception is the dock tags (9px, a user decision, 2026-10-17): at 11px they covered Bean's sign in the 96px window, and the accessible name says the state in full.
 
 ## Layout
 
-- **Dock:** Scout at scale 4 (64px) inside a 20px top and 4px side/bottom padding that leaves room for the tag; the avatar window's button is 96px square.
+- **Dock:** the avatar window's button is 96px square, and so is one frame of Bean, with no padding. Bean stands about 55px tall at the bottom, its floating sign above; the tag sits in the top right corner, 4px down and flush right, the Paused chip 4px from the top and 12px from the left, the recording and listening dots 8px up and 16px in from the bottom corners, and the status tag 18px up, centred.
 - **Bubble:** a 420px-wide window (`PANEL_WIDTH`) that sizes its own height (80 to 520px; the full chat takes 520px). It has 10px of padding on the side the tail points to.
 - **Home:** a 1440x800 window (min 880x600). A fixed 232px nav (20px by 12px padding) and a fluid main column (24px by 32px padding, 20px between blocks). Overview cards sit in an auto-fit grid (min 260px, 16px gap); routine templates in an auto-fill grid (min 220px, 8px gap). Embedded Settings sits in the main column, max 820px.
 - **Welcome:** a 900x620 window in two columns. A header of step chips (18px by 32px padding, 8px apart), then a 300px left column for Scout and its words and a right column for the question, 40px apart, 40px by 48px padding. The answer pill is pinned to the bottom of the right column.
@@ -386,7 +392,7 @@ Every window bundles its faces from `@fontsource` (Latin subset), nothing fetche
 
 Spacing runs on the token scale (2, 3, 4, 6, 8, 12, 16, 20, 24). The bubble and cards also use 14px, 28px and 32px, hard-coded. Controls are 40px tall in Home and Settings, 36px for the bubble's primary button, 44px for the bubble field and Welcome's key field and Check key, 46px for Welcome's answer pill, 28px for quiet bubble controls.
 
-**The Integer Scale Rule.** A sprite is drawn at a whole-number scale and nothing else: 4 on the dock, 6 in Welcome, 3 in Home's nav, 2 (`spriteScale.tile`) in Activity.
+**The Integer Scale Rule.** A sprite is drawn at a whole-number scale and nothing else: 6 in Welcome, 3 in Home's nav, 2 (`spriteScale.tile`) in Activity.
 
 ## Elevation & Depth
 
@@ -407,7 +413,7 @@ Gently rounded chrome, square pixels. The bubble, Home cards and Welcome's tile 
 
 ### Scout on the dock (signature)
 
-`DockPet` draws Scout's sprite at scale 4 with `role="img"` and a full label ("Scout is looking at your screen, sight paused"). Scout's palette (in `theme/sprites/characters.ts`): outline and nose `#2A1B14`, fur `#E8873A`, inner ear `#F6B8A0`, muzzle `#FFF1E0`, eyes `#1B1B2A`, shirt `#3E8E5A` and `#2E6B44`, badge Gold. Moods change only the eye rows: idle, listening (eyes up), working (eyes down), done (a happy squint). A tag sits top right: **Seeing** on Sky, **Working** on Gold, **Done** on Done Green, all in Gold Ink, Onest 600 11px. **Paused** is a Paused Grey pill top left; the Recording Red dot sits bottom left while rolling memory is on and sight is not paused.
+`DockPet` draws Bean, the 3D Scout, with `role="img"` and a full label ("Scout is looking at your screen, sight paused"). Each mood is its own pre-rendered clip from one fixed camera, so Bean never jumps between them: idle (a breath, a tail sway), listening (waves ripple out, ears perk), working (typing at a laptop, a gear turns), done (a hop, a check mark), dozing (rising z's), wince (a shake, a sweat drop), cheer (one hop) and tired (a drooping head). Bean's colours (in `apps/desktop/scripts/bean/bean.py`): fur `#F39B5E`, belly `#FFF3E6`, ear tips `#5A3A2C`, cheeks `#F2A9A0`. The pixel sprite (`theme/sprites/characters.ts`) stays for Welcome, Home's nav and Activity. A tag sits top right: **Seeing** on Sky, **Working** on Gold, **Done** on Done Green, all in Gold Ink, Onest 600 9px. **Paused** is a Paused Grey pill top left, and while it shows the tag gives way (the two would overlap; the pose and the label still say the mood); the Recording Red dot sits bottom left while rolling memory is on and sight is not paused.
 
 ### The bubble
 
@@ -445,17 +451,17 @@ Setup, Scout's own voice on Ink Navy, 900x620, with no Next button: Scout asks a
 
 ## Motion
 
-- **Dock:** idle and listening breathe (2.8s ease-in-out, 1px up, endless); working bobs (0.9s, 2px); done hops three times (0.7s ease-out, 8px). Blinks last 140ms, every 3 to 6 seconds, only with open eyes (idle, listening).
+- **Dock:** the motion is in Bean's frames, 12 fps, stepped with CSS `steps()`: loops of 2 to 4 seconds, and cheer and wince play once (1s) and hold their last frame. Blinks are a 2-frame clip (about 170ms) every 3 to 6 seconds in idle and listening only, started when the loop comes back to frame 0, the pose the blink was rendered from.
 - **Bubble:** the invitation and launch line enter over 220ms (fade and 4px rise, ease-out); the launch line leaves over 300ms (fade and 4px drop). The invitation types at 22ms a character. The listening dot pulses (1.2s, to 35% opacity); speaking bars follow the voice level with a 90ms linear transition.
 
-Under `prefers-reduced-motion: reduce`: the dock body stops and Scout does not blink, the bubble appears and leaves without moving, the dot stops pulsing (Welcome's listening dot too), the bars hold at 60%, and the invitation appears whole.
+Under `prefers-reduced-motion: reduce`: Bean shows one still frame per mood (frame 0 of a loop, the held last frame of cheer and wince) and does not blink, the bubble appears and leaves without moving, the dot stops pulsing (Welcome's listening dot too), the bars hold at 60%, and the invitation appears whole.
 
 ## Accessibility
 
 - **Reduced motion** is honoured everywhere above.
 - **Status is never colour alone:** dock tags are words, the Paused chip says Paused, the recording dot has a title and is in Scout's label, Activity states are an icon plus a word, chips carry words, the Overview dot sits beside "Ready".
 - **Focus rings:** 2px at 2px offset, Gold in Settings (`.tg-settings :focus-visible`), Home (`.home :focus-visible`) and Welcome (`.welcome :focus-visible`), and Sky in the bubble.
-- **The sprite:** `PixelSprite` is `aria-hidden`; on the dock the wrapper is `role="img"` with Scout's name and state. The invitation is announced whole through a hidden status line while the visible text types; in Welcome, Scout's bubble is the `role="status"` line. The chat log is `role="log"`; errors are `role="alert"`; expert steps are `aria-live="polite"`.
+- **The figure:** `PixelSprite` and `BeanClip` are `aria-hidden`; on the dock the wrapper is `role="img"` with Scout's name and state. The invitation is announced whole through a hidden status line while the visible text types; in Welcome, Scout's bubble is the `role="status"` line. The chat log is `role="log"`; errors are `role="alert"`; expert steps are `aria-live="polite"`.
 
 ## Do's and Don'ts
 

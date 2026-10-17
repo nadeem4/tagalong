@@ -29,7 +29,7 @@ export function StatusMark({ mark, variant, onFix }: StatusMarkProps) {
         style={{
           position: 'absolute',
           // Bottom centre, just above the 8 px recording and listening dots in the corners.
-          bottom: 14,
+          bottom: 18,
           left: '50%',
           transform: 'translateX(-50%)',
           padding: '2px 7px',
