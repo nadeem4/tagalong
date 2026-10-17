@@ -83,6 +83,13 @@ export function listeningPaused(why: {
 
 export const LISTENING_GUARD_MS = 2_000;
 
+/** Why the guard paused listening, for the log: the kind of window and its app, never its title. */
+function blockReason(windows: readonly WindowEntry[]): string {
+  const front = windows.find((window) => window.state === 'foreground');
+  const kind = front?.fullScreen === true ? 'a full-screen window' : 'a call app';
+  return `${kind} in front (${front?.processName ?? 'unknown'})`;
+}
+
 /**
  * Checks the front window while listening is on: every 2 s, and at once when it comes on (at
  * launch or switched on), so the mic never opens for a moment during a call. Switched off, it
@@ -106,6 +113,9 @@ export function startListeningGuard(options: {
         if (!on()) return;
         const blocked = listeningBlocked(windows);
         if (blocked !== last) {
+          // Visible in the log next time: which kind of window paused it, and the app.
+          if (blocked) console.warn(`[listening] paused: ${blockReason(windows)}`);
+          else if (last === true) console.warn('[listening] resumed');
           last = blocked;
           options.onBlocked(blocked);
         }

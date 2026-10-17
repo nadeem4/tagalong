@@ -52,6 +52,26 @@ describe('VoiceWorker', () => {
     expect(seen).toEqual([{ kind: 'kokoro.ready' }]);
   });
 
+  it("logs the voice process's warnings and errors in main, not to listeners", () => {
+    const proc = fakeProcess();
+    const worker = new VoiceWorker(() => proc.child);
+    const seen: FromWorker[] = [];
+    worker.onMessage((m) => seen.push(m));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      worker.call({ kind: 'call', method: 'kokoro.warm' }).catch(() => undefined);
+      proc.reply({ kind: 'log', level: 'warn', text: '[ears] the models could not load' });
+      proc.reply({ kind: 'log', level: 'error', text: '[voice] boom' });
+      expect(warn).toHaveBeenCalledWith('[voice process] [ears] the models could not load');
+      expect(error).toHaveBeenCalledWith('[voice process] [voice] boom');
+      expect(seen).toEqual([]);
+    } finally {
+      warn.mockRestore();
+      error.mockRestore();
+    }
+  });
+
   it('rejects every pending call when the process dies, tells listeners, and starts afresh next time', async () => {
     const procs = [fakeProcess(), fakeProcess()];
     let spawned = 0;

@@ -150,6 +150,53 @@ describe('startListeningGuard', () => {
     stop();
   });
 
+  it('logs one line when it pauses, with the reason and the app, and one when it resumes', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const list = vi
+        .fn()
+        .mockResolvedValueOnce([win({ fullScreen: true, title: 'my private doc' })])
+        .mockResolvedValueOnce([win({ fullScreen: true })])
+        .mockResolvedValueOnce([win({ processName: 'ms-teams.exe' })])
+        .mockResolvedValue([win({})]);
+      const stop = startListeningGuard({
+        listening: new AlwaysListening(true),
+        list,
+        onBlocked: vi.fn(),
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(LISTENING_GUARD_MS);
+      await vi.advanceTimersByTimeAsync(LISTENING_GUARD_MS);
+      await vi.advanceTimersByTimeAsync(LISTENING_GUARD_MS);
+      expect(warn.mock.calls).toEqual([
+        ['[listening] paused: a full-screen window in front (Code.exe)'],
+        ['[listening] resumed'],
+      ]);
+      // The title never reaches the log.
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('my private doc');
+      stop();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('names a call app as the reason when one is in front', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const list = vi.fn().mockResolvedValue([win({ processName: 'ms-teams.exe' })]);
+      const stop = startListeningGuard({
+        listening: new AlwaysListening(true),
+        list,
+        onBlocked: vi.fn(),
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(warn.mock.calls).toEqual([['[listening] paused: a call app in front (ms-teams.exe)']]);
+      stop();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('ignores a listing that comes back after listening was switched off', async () => {
     let answer!: (windows: WindowEntry[]) => void;
     const listening = new AlwaysListening(true);

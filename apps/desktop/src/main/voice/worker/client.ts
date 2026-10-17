@@ -69,6 +69,11 @@ export class VoiceWorker {
       else waiting?.reject(new Error(message.message));
       return;
     }
+    // Into main's console, and so the log file.
+    if (message.kind === 'log') {
+      console[message.level](`[voice process] ${message.text}`);
+      return;
+    }
     for (const listener of [...this.#listeners]) listener(message);
   }
 

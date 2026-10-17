@@ -44,7 +44,7 @@ import {
 import { startWellbeingTick, watchPresence } from './presence';
 import { systemClock } from './awareness/clock';
 import { handoffLine, handoffNotice } from './handoff-notice';
-import { installLogFile, openLogsFolder } from './log-file';
+import { installLogFile, openLogsFolder, rendererConsole } from './log-file';
 import { StatusMarks, clearBrainMarks, markListening, setPanelMark } from './status-marks';
 import {
   brainLine,
@@ -195,6 +195,10 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   // Warnings and errors also go to %APPDATA%\Tagalong\logs\tagalong.log (log-file.ts).
   installLogFile({ dir: logsDir() });
+  // Every window's warnings and errors join main's in the log file.
+  app.on('web-contents-created', (_event, contents) =>
+    contents.on('console-message', (details) => rendererConsole(details)),
+  );
   app.on('second-instance', () => showPets());
 
   app

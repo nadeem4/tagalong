@@ -4,7 +4,8 @@ import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync, existsSync 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { installLogFile, logLine, openLogsFolder } from './log-file';
+import { installLogFile, logLine, openLogsFolder, rendererConsole } from './log-file';
+import { forwardConsole } from './log-text';
 
 const NOW = new Date('2026-10-16T21:40:00.000Z');
 
@@ -121,6 +122,51 @@ describe('installLogFile', () => {
       },
     });
     expect(() => fakeConsole.warn('odd', odd)).not.toThrow();
+  });
+});
+
+describe('forwardConsole', () => {
+  // The voice process has no log file of its own: its warnings travel to main's.
+  it('passes on the kept text of each warning and error, and the originals still run', () => {
+    const warn = vi.fn();
+    const error = vi.fn();
+    const target = { warn, error };
+    const post = vi.fn();
+    forwardConsole(post, target);
+    target.warn('[ears] the models could not load', new Error('no file'), 'heard words');
+    target.error('[voice] boom', { text: 'my secret plans' });
+    expect(post.mock.calls).toEqual([
+      ['warn', '[ears] the models could not load Error: no file [string]'],
+      ['error', '[voice] boom [object]'],
+    ]);
+    expect(warn).toHaveBeenCalledOnce();
+    expect(error).toHaveBeenCalledOnce();
+  });
+
+  it('never throws when posting fails', () => {
+    const target = { warn: vi.fn(), error: vi.fn() };
+    forwardConsole(() => {
+      throw new Error('port closed');
+    }, target);
+    expect(() => target.warn('x')).not.toThrow();
+  });
+});
+
+describe('rendererConsole', () => {
+  it('logs a window’s warnings and errors, marked as the renderer’s', () => {
+    const target = { warn: vi.fn(), error: vi.fn() };
+    rendererConsole({ level: 'warning', message: '[talk] could not show a status mark' }, target);
+    rendererConsole({ level: 'error', message: 'Uncaught TypeError: x' }, target);
+    expect(target.warn).toHaveBeenCalledWith('[renderer] [talk] could not show a status mark');
+    expect(target.error).toHaveBeenCalledWith('[renderer] Uncaught TypeError: x');
+  });
+
+  it('leaves out info and debug messages', () => {
+    const target = { warn: vi.fn(), error: vi.fn() };
+    rendererConsole({ level: 'info', message: 'hello' }, target);
+    rendererConsole({ level: 'debug', message: 'hello' }, target);
+    expect(target.warn).not.toHaveBeenCalled();
+    expect(target.error).not.toHaveBeenCalled();
   });
 });
 
