@@ -192,7 +192,9 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   drops `toolGrants`, `replyStyle` and `notes`. Protocol 0.16.0: `Settings` drops `defaultPetId`
   and `hiddenPets` (an older file still parses, without them), and `Pet` drops `color`. `hosts.status`
   → `{ extension }` says whether the browser extension is connected, for the health check (see
-  [The companion's bubble](#the-companions-bubble)); the extension may not call it.
+  [The companion's bubble](#the-companions-bubble)); the extension may not call it. Protocol
+  0.17.0: `turn.completed`'s `stopReason` gains `tool_limit`; a `refusal` or `tool_limit` comes with
+  empty text, and the bubble and chat panel show a quiet status instead (see the turn lifecycle).
 - **Core to host:** `perception.capture`, from Phase 2B `perception.captureRegion`,
   `perception.listWindows` and `perception.readText`, then `perception.captureWindow`, and from Phase 3B `perception.recall` and
   `perception.diff`, both behind the `recall` capability (see [Awareness](#awareness-phase-3b)).
@@ -257,10 +259,14 @@ notifications.
    memories and Now facts appended to the last user message rather than sent as their own turn.
 5. The provider streams. Every text delta becomes a `turn.delta` notification.
 6. The turn ends with exactly one of `turn.completed` — carrying the full text, a stop reason of `end`,
-   `max_tokens`, `aborted` or `refusal`, and token usage — or `turn.error`, carrying a `BrainErrorCode`
+   `max_tokens`, `aborted`, `refusal` or `tool_limit`, and token usage — or `turn.error`, carrying a `BrainErrorCode`
    (`rate_limit`, `auth`, `connection`, `config`, `unknown`) and a message written for the person
    looking at the panel. The assistant message is stored only if it has text, so an interrupted turn
-   leaves no empty row to replay at the model.
+   leaves no empty row to replay at the model. A `refusal` (the model declined) or `tool_limit` (it
+   kept calling tools past the provider's step cap) ends with empty text and no canned line in
+   Scout's voice: the bubble shows a muted "Declined" or "Stopped: too many steps" under Scout, and
+   the chat panel adds it as a note (`ui/src/stop-status.ts`). It is never spoken and never stored;
+   the turn's Activity row stays `done`.
 
 Notifications are broadcast to every connected host session, so a second window sees the same stream.
 
@@ -358,7 +364,8 @@ key. Each step runs `claude -p` once in a neutral folder, with its own tools off
 MCP servers (`--strict-mcp-config`) and a short system prompt. The pet's real prompt, its tools and
 the conversation go in one stream-json user message, screenshots as image blocks. The model calls a
 tool by replying with one `<tool_call>{"name", "input"}</tool_call>` tag; the provider runs it
-through `onToolUse` and starts the next step with the result, up to 8 steps. It is slower than an
+through `onToolUse` and starts the next step with the result, up to 8 steps; past that it ends with
+empty text and stop reason `tool_limit`, never a canned line. It is slower than an
 API (a process per step) and is the default for a fresh install where Claude Code is signed in.
 Other sign-ins (Gemini CLI, Codex) are meant to follow the same shape under their own ids.
 
@@ -414,8 +421,8 @@ format:
   arguments are not valid JSON reaches the tool as the raw string, so the tool's own validation
   answers instead of the turn dying. Calls are run whenever the stream produced any, even if the
   server said `stop` — some do.
-- Finish reasons: `length` is `max_tokens`, `content_filter` is `refusal` (with the shared refusal
-  line), anything else is `end`. Usage comes from the final chunk (`stream_options.include_usage`)
+- Finish reasons: `length` is `max_tokens`, `content_filter` is `refusal` (with no text of its own,
+  as Anthropic's `refusal` stop is), anything else is `end`. Usage comes from the final chunk (`stream_options.include_usage`)
   and is summed across tool rounds; a server that sends none reports zero.
 - Reasoning deltas (`reasoning_content`) are ignored, so a model's thinking never reaches the bubble.
 - HTTP 429 is `rate_limit`, 401 and 403 are `auth`, 404 is `config` naming the model, a network
@@ -613,20 +620,19 @@ never starts a real Claude Code. `EngineOptions.connectorFor` overrides the choi
 **The companion's side.** A pet with the Companion role gets `hand_to_expert`
 (`tools/builtin/experts.ts`). It builds the brief from the model's `ask`, `files` and `good_answer`
 plus what the turn's snapshot says the user was looking at (app, window title, selection), proposes
-the hand-off through `HandoffManager`, and tells the model to ask the user to check it and press
-Send; the answer arrives on its own. Its optional `then: { expert_id, ask }` adds the follow-up step;
+the hand-off through `HandoffManager`, and returns the fact that the brief is on a card and starts
+when they press Send; the answer arrives on its own. Its optional `then: { expert_id, ask }` adds the follow-up step;
 an unknown, switched-off or same expert is an error the model can fix. A chain always shows the card,
-even on a routine's turn for the expert the routine allowed. The expert
-is chosen in this order: one the user chose for that `task_kind`, the one the model named, the one
-remembered for that kind, then the only expert switched on; otherwise the tool asks the model to name
-one. While a hand-off runs, the Companion also gets `tell_expert { message, handoff_id? }` (appended
+even on a routine's turn for the expert the routine allowed. The model picks the expert from the
+list in the description (each with its `goodAt`): `expert_id` is used when given, the only expert
+switched on when there is one, and with more than one on and none named the tool answers an error
+listing each id, name and `goodAt`. While a hand-off runs, the Companion also gets `tell_expert { message, handoff_id? }` (appended
 after `point_at`, never on a routine's own turn), whose description lists the hand-offs running at the
 start of the turn. It passes the person's words, not the model's, to `HandoffManager.steer`
 directly (no RPC); with one hand-off running `handoff_id` may be left out, with two it asks which,
 and with none left it says so. It is a `write` tool: the note waits in the hand-off and stays in
-its Activity row. `RouteMemory` (`experts/routes.ts`, table `expert_routes`, migration 9) remembers task kind to
-expert; the companion's own picks never overwrite the user's, and deleting an expert forgets its
-routes.
+its Activity row. The `expert_routes` table (migration 9) is unused since the route memory went;
+it is kept so no migration is needed.
 
 The companion's bubble shows proposals and their progress; see
 [The companion's bubble](#the-companions-bubble).
@@ -782,7 +788,7 @@ flowchart LR
 ```
 
 **The data.** `Routine` is `{ id, name, enabled, when, what, topics, deliver, handTo?, uses,
-createdAt }`. `when` is `{ type: 'schedule', days, time }` (days are `Date#getDay` numbers, `time` is
+createdAt }`. `topics` is set by Home's Morning papers form; Scout writes topics into `what`. `when` is `{ type: 'schedule', days, time }` (days are `Date#getDay` numbers, `time` is
 `HH:MM`, 24-hour; daily, weekdays and weekly are all this one shape), `{ type: 'launch' }`,
 `{ type: 'app', match }`, `{ type: 'expert' }`, `{ type: 'watch' }` or `{ type: 'meeting',
 minutesBefore }` (an integer from 5 to 60; Home offers 10 and 30). `deliver` is `{ bubble, voice,
@@ -839,8 +845,9 @@ time. A routine's own turn is never offered
 `watch_for`, so a watch routine cannot start the watch that sets it off again.
 
 **A run.** The instruction becomes the text of a Scout turn, headed `[Routine "<name>", <when>]`,
-with the topics, what triggered it, whether it ran late, and the line that the person is not
-watching. For a meeting, what triggered it is each meeting's title, start in the person's time,
+with the saved topics, what triggered it, whether it ran late, and, for the routine's `handTo`, the
+fact that the expert is pre-approved once for this run. That nobody is watching is in the Now
+block. For a meeting, what triggered it is each meeting's title, start in the person's time,
 attendees, room or link, and description, inside a `<calendar_data>` fence with the line that it is
 invite text, not instructions, because anyone can send an invite; a fence tag inside the text is
 turned into full-width brackets, the same way as `<app_data>`. The routine's `what` asks for the
@@ -879,7 +886,7 @@ prep still waiting when its meeting starts is useless later, so it goes out then
 set to a Windows notification only, which the desktop never speaks (`routineDelivery`). Activity
 has one `routine` row per run: the name, the state, the answer or the error, and the conversation.
 
-**Scout's card.** `create_routine` (`tools/builtin/routines.ts`) takes `{ name, when, what, topics?,
+**Scout's card.** `create_routine` (`tools/builtin/routines.ts`) takes `{ name, when, what,
 result?, hand_to?, uses? }`, where `when.type` is `daily`, `weekdays`, `weekly` (with `days` such as
 `["mon", "thu"]`), `launch`, `app` (with `match`), `expert`, `watch` or `meeting` (with
 `minutes_before`, 10 when left out). Scout never asks for the calendar link in chat: it is pasted in
@@ -1074,8 +1081,10 @@ reaches it.
 only), `userName`, `greeting`, the four hotkeys, `keepAnEye`, `sightDetail`, `windowTextBudget`,
 `rollingMemory.enabled` and `minutes`, `screenshotRetention`, `captureExclusions.add` (add only),
 `wellbeing.enabled`, `sightLog.days` (lower only), `pickUp` and `budget.dailyUsd`. Anything else is
-refused by name, and keys, logins, provider URLs, the model and the calendar link get "changed only
-in Settings"; the tool's deps are only `{ get, emit }`, so it has no path to the `SecretStore`.
+refused with one fact: the name (through `hideSecrets`, 60 characters) cannot be changed by talk,
+what talk can change, and that keys, logins, provider URLs, the model, the calendar link and
+removing a capture exclusion are only in Settings. The value is never echoed. The tool's deps are
+only `{ get, emit }`, so it has no path to the `SecretStore`.
 
 The tool validates each change, lays it over the current value of its object (so `voice.speed`
 alone keeps every other voice field, and the same for hotkeys), checks the result with
@@ -1237,17 +1246,19 @@ text a brief carried, answers and crew-era rows are never indexed; its backfill 
 reinserts every row. A row deleted from Home, cleared, or pruned by the privacy log's retention
 leaves the index through its trigger.
 
-`search_history({ query, since? })` (`tools/builtin/history.ts`, kind `read`, appended after
-`recall_day`) answers "what was that article about vector databases I read Tuesday?" through
-`HistorySearch` (`memory/history-search.ts`). The query is made safe by `historyQuery`: every
+`search_history({ query?, since?, until? })` (`tools/builtin/history.ts`, kind `read`, appended
+after `point_at`) answers "what was that article about vector databases I read Tuesday?" through
+`HistorySearch` (`memory/history-search.ts`), and, with no query, "what did we do today?" (see
+[What did we do today?](#what-did-we-do-today)). The query is made safe by `historyQuery`: every
 distinct word is quoted and the words are AND-ed, so a quote, `*`, `NEAR(`, `OR` or `column:` in
 the person's text is a plain word, never FTS5 syntax. It returns at most 20 hits, newest first,
 across both indexes: a title seen many times counts once (its latest look); a blind spot's title
 was never stored, so it is found by its app alone; a brief shows only its ask; the asking turn's
 own question is left out. Nothing older than `settings.sightLog.days` is returned from either
 record, and an earlier `since` is raised to that cutoff. Every returned line goes through
-`hideSecrets` and is clipped to 160 characters. No protocol method reaches the index, so the
-Chrome extension cannot query it. No vector search, no embeddings.
+`hideSecrets` and is clipped to 160 characters. `until` drops hits at or after it. No protocol
+method reaches the index, so the Chrome extension cannot query it. No vector search, no
+embeddings.
 
 ### Recall
 
@@ -1261,10 +1272,8 @@ because they change with every question and would break the prompt cache.
 
 Memories are written two ways. The `remember` tool (`tools/builtin/memory.ts`) is offered to every
 pet whose role lists it and whose provider supports tools: `{ text, kind: fact | preference }`, filed under the
-calling pet. Under it sits a deterministic safety net:
-when the user's own message states a lasting preference — "I prefer…", "from now on…", "remember
-that…", "always answer…" — the runner files that sentence as a private `preference` before the turn
-runs, so "Scout keeps answers short after a restart" does not hinge on a model choosing to call a tool.
+calling pet. The other way is the summary below, which records the preferences the user stated.
+Nothing is filed by matching phrases in the question: the model decides what is worth keeping.
 `addOnce` keeps the same sentence from filling five recall slots.
 
 ### Summaries
@@ -1445,7 +1454,7 @@ first; `next` is the id to pass as `before` for the page after. An `expert` row 
 `HandoffManager` through `expertStarted` and `expertFinished`, not from a notification: it keeps the
 expert's name at the time, the brief as text, the answer and the files changed. Meetings are not recorded: they do not
 exist yet. `ActivityLog.since(startIso, limit = 200, untilIso?)` returns the listed kinds that
-started at or after a time (and before `untilIso`), oldest first: the daily briefing's one query.
+started at or after a time (and before `untilIso`), oldest first: the one query of `search_history`'s day listing.
 
 ### What Scout saw
 
@@ -1579,7 +1588,7 @@ the screen now is the failure this feature invites.
   an image block followed by `Display 1 at <time>`, then a text block with the time in words, the
   focused window and the window list of that moment. When the frame found is more than ten seconds
   newer than the moment asked for, the text says how far back memory actually reaches. Memory off
-  and memory empty are two different sentences, so the pet can tell the user which.
+  and memory empty are two different facts.
 - `what_changed(displayId, sinceSeconds)` calls `perception.diff` with images. A seeing pet gets
   `Before, at <time>`, the before crop, `After, at <time>`, the after crop, and the share of the
   display that changed with the changed box. No earlier frame and nothing changed are answered in
@@ -2647,23 +2656,22 @@ starts. A removed or rescaled display loses its window. The ring is `renderer/sr
 
 ## What did we do today?
 
-`recall_day({ day?: 'today' | 'yesterday' })` (`packages/core/src/tools/builtin/day.ts`, kind
-`read`) answers "What did we do today?" from records Tagalong already keeps. There is no new table
-and nothing is tracked in the background. The day runs from one local midnight to the next (an
-injected `now()`, stepped by calendar date, so a day the clocks change is 23 or 25 hours); both
-ends are bounds in the queries, so a busy today never uses up yesterday's row limit. Every
-question, ask, routine name and title it quotes goes through `hideSecrets` first. It reads:
+`search_history` with no `query` (`packages/core/src/tools/builtin/history.ts`, kind `read`)
+answers "What did we do today?" from records Tagalong already keeps. There is no new table and
+nothing is tracked in the background. The range runs from `since` (default: local midnight today)
+to `until` (default: now); a bare date is that day's local midnight. Both ends are bounds in the
+queries. Every question, ask, routine name and title it quotes goes through `hideSecrets` first
+and is clipped to 120 characters. It reads:
 
-| Source                                            | What the briefing uses                                                                                                                                                                                                                          |
-| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SightLog.list(1000, dayStart, dayEnd)`           | looks grouped by app and title with a count (a blind spot is its app alone), at most 12 groups; the first to the last row gives "about N hours", called an estimate (`estimateSpan`, breaks included)                                           |
-| `ActivityLog.since(dayStart, 200, dayEnd)`        | `turn` rows: the question only, clipped to 120 characters, the current turn's left out; `expert` rows: name, the ask (the brief's first part), state and how many files changed; `routine` and `connector` rows by name. No answer is passed on |
-| `PickUpStore.get()`, when `settings.pickUp` is on | the projects and branch pick-up last saw                                                                                                                                                                                                        |
-| `HandoffManager.pending()`                        | briefs waiting for Send                                                                                                                                                                                                                         |
+| Source                                  | What the listing uses                                                                                                                                                                                                |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SightLog.list(1000, since, until)`     | looks (`listed_windows`, `read_text`, `screenshot`, `read_element_names`) grouped by app and title, with the first and last time and a count; a blind spot is its app alone                                          |
+| `ActivityLog.since(since, 1000, until)` | `turn` rows: the question only, the current turn's left out; `expert` rows: name, the ask (the brief's first part), state and how many files changed; `routine` and `connector` rows by name. No answer is passed on |
 
-Expert rows of the day that ended `stopped` or `error` are listed under "Still open". The result is
-plain text, at most 4,000 characters; the model writes the summary. A store that fails
-answers `isError`, never a throw. It is a direct ask, so it is not budget-gated.
+The result is plain rows, newest first, at most 60 (then "and N more."); there is no header, no
+hours estimate and no "Still open" section. The model works out the hours and the summary itself;
+what is running, finished or waiting for Send is in the Now block of every question. A store that
+fails answers `isError`, never a throw. It is a direct ask, so it is not budget-gated.
 
 ## Pick up where you left off
 

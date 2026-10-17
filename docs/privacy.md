@@ -47,9 +47,9 @@ computer, with nothing installed and nothing sent anywhere, and the picture hand
 never written to disk. That read is announced like a screenshot, covers only what the window shows,
 and may misread a word, and the pet is told so. A minimized window has nothing drawn, so when its
 text layer is thin the pet is told the difference between "this window is empty" and "I could not
-read inside it", and says so rather than guessing.
+read inside it".
 And a browser publishes only the tab you are on: the other tabs are not readable this way, and the
-pet is told to say so instead of pretending.
+pet is told that too, as a fact.
 
 ## What the Chrome extension reads
 
@@ -158,12 +158,13 @@ it.
   is kept.
 - **What chat can never change.** API keys, logins, provider URLs, the model, the calendar link
   (it lives in the keychain), removing a capture exclusion, raising the log's days, and the app's
-  own bookkeeping. Scout says these are changed only in Settings, never shows a card for them and
-  never repeats a key or a link. The tool has no way to read the keychain. On Apply the app checks
+  own bookkeeping. The tool answers that these are changed only in Settings, never shows a card for
+  them and never repeats a key or a link. The tool has no way to read the keychain. On Apply the app checks
   the card's changes again against this list, so a tampered card cannot reach anything else, and
   only the bubble can apply one. The card goes to the desktop only, never the browser extension.
-- **Always listening.** Scout can switch it off through the card, never on: "Only you can switch
-  that on". The Seeing switch and the pause key are not settings; Scout points you to them.
+- **Always listening.** Scout can switch it off through the card, never on: only you switch it on,
+  in the bubble's header or Settings › Privacy. The Seeing switch and the pause key are not
+  settings.
 - **Loosening always shows a marked card.** A change that lets Scout see, keep or spend more (keep
   an eye on things on, screen memory on or longer, screenshots kept, sight detail on every display,
   pick-up on, a higher or no spending cap) is marked "Lets Scout see or keep more of your screen" (or
@@ -276,7 +277,8 @@ every weekday at 8. Nothing becomes a routine until you press **Save**, on Scout
   routine's saved instruction plus Scout's request for this run, never what is on your screen, a
   selection or file names. A second hand-off in the same run, or to any other expert, shows the
   usual card and waits for Send.
-- **What a run sees.** The routine's own words and topics, and, for a trigger, what triggered it: the
+- **What a run sees.** The routine's own words and the topics saved with it (Home's Morning papers
+  form; Scout writes topics into the routine's words), and, for a trigger, what triggered it: the
   first 600 characters of an expert's answer, or a watch's message. A routine that waits for an app
   or site reads window titles only, every 15 seconds, never a picture or window text, and never a
   blind spot's title.
@@ -628,13 +630,14 @@ there is no switch, because it holds no content and an off switch would weaken t
 
 ## What did we do today?
 
-Ask Scout "What did we do today?" (or yesterday) and it reads back the records above: the apps and
-window titles in the log of what Scout saw, your questions (the first 120 characters), which experts
-got which ask and how they ended, routines and app calls by name, and what pick-up last saw (only
-when pick-up is on). Those titles, questions and asks go to **Scout's own model** to be summed up,
-like any tool result, with any key, token or password in them hidden first. Answers from experts, turns and routines are not included, nor the selection
-or window a brief carried. Nothing new is recorded for it, and the hours are an estimate from the
-first to the last look: Scout only knows what it looked at or was asked.
+Ask Scout "What did we do today?" (or any other day or range) and it lists the records above
+through `search_history` with no search words: the apps and window titles in the log of what Scout
+saw (with the first and last time and how many looks), your questions (the first 120 characters),
+which experts got which ask and how they ended, and routines and app calls by name, at most 60
+rows. Those titles, questions and asks go to **Scout's own model** to be summed up, like any tool
+result, with any key, token or password in them hidden first. Answers from experts, turns and
+routines are not included, nor the selection or window a brief carried, nor anything older than the
+log keeps. Nothing new is recorded for it: Scout only knows what it looked at or was asked.
 
 ## Searching your history
 

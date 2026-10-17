@@ -42,12 +42,17 @@ export function lookAtThingTool(deps: Deps): Tool {
 ```
 
 - **Use `defineTool`**, so the id can never drift from the definition's name.
-- **Never throw.** A host that fails or a bad input becomes `{ content, isError: true }` the model can
-  repeat to the user. A throw ends the whole turn.
-- **Pixels only with `vision`.** When `ctx.vision` is false, say in words what was captured and that
-  the pet could not see it.
-- **Read the description as the model will.** It is the tool's only documentation for the model; say
-  when to use it and what is cheaper.
+- **Never throw.** A host that fails or a bad input becomes `{ content, isError: true }`. A throw
+  ends the whole turn.
+- **Results are facts, not scripts.** Say what happened ("No connected host can take a
+  screenshot.", "The brief is on a card; it starts when they press Send."), never what to say
+  ("Tell the user…", "Say…", "Do not…"). The model decides if and what to tell them. Test it with
+  `expect(directivesIn(outcome.content)).toEqual([])` (`tools/test-support.ts`).
+- **Pixels only with `vision`.** When `ctx.vision` is false, state what was captured and that the
+  picture was not seen.
+- **Read the description as the model will.** It is the tool's only documentation for the model;
+  say when to use it and what is cheaper. Say each rule once: the soul and the companion's
+  mechanics already cover cards, keys in Settings and never claiming something is done.
 
 ## Read or write
 
@@ -67,7 +72,7 @@ const outcome = await tools.run({ name: LOOK_AT_THING, input: { id: 1 } });
 `fakeTurnTools` and `fakeTurn` (in `tools/fake-turn.ts`) give a turn with a stub pet; pass
 `{ vision: true }` and the like as overrides. A fake host is a plain object with `capabilities` and the
 methods the tool calls. Cover: the happy path, bad input, no host that can do it, a host that
-rejects, and the blind path if it returns pixels. Use `FakeBrainProvider` for anything that needs a
+rejects, and the blind path if it returns pixels, each with `directivesIn` empty. Use `FakeBrainProvider` for anything that needs a
 model, never a real one.
 
 ## Register it
@@ -92,5 +97,6 @@ Update `docs/concepts/roles-and-tools.md` (the tools module list), the tool's se
 - A tool name in `runner.ts`
 - `throw` inside a `run`
 - Returning image blocks without checking `ctx.vision`
+- "Tell the user", "Say" or "Do not" in a result or description
 - A test that needs a real screen, a real socket or a real API key
 - An import from `tools/builtin/` outside `tools/`
