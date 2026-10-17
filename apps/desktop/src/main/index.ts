@@ -44,6 +44,7 @@ import {
 import { startWellbeingTick, watchPresence } from './presence';
 import { systemClock } from './awareness/clock';
 import { handoffLine, handoffNotice } from './handoff-notice';
+import { installLogFile } from './log-file';
 import { StatusMarks, clearBrainMarks, markListening, setPanelMark } from './status-marks';
 import {
   brainLine,
@@ -192,6 +193,8 @@ if (process.env.TAGALONG_FAKE_STT === '1') {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
+  // Warnings and errors also go to %APPDATA%\Tagalong\logs\tagalong.log (log-file.ts).
+  installLogFile({ dir: logsDir() });
   app.on('second-instance', () => showPets());
 
   app
@@ -202,6 +205,11 @@ if (!app.requestSingleInstanceLock()) {
       dialog.showErrorBox('Tagalong could not start', String(error));
       app.quit();
     });
+}
+
+/** Where the log file lives: <userData>/logs, so %APPDATA%\Tagalong\logs on Windows. */
+function logsDir(): string {
+  return join(app.getPath('userData'), 'logs');
 }
 
 // The pets live in the tray, so closing a window is never a reason to quit.
@@ -1180,6 +1188,10 @@ function registerIpc(): void {
   // A Fix it names its target; fixPage refuses anything off the list.
   ipcMain.handle(IPC.openSettings, (_event, target: unknown) => openSettingsPage(target));
   ipcMain.handle(IPC.openWelcome, () => openWelcome());
+  // The health card's Open logs folder: the person picks what to send; no log text moves.
+  ipcMain.handle(IPC.openLogsFolder, async () => {
+    await shell.openPath(logsDir());
+  });
   ipcMain.handle(IPC.openHome, () => openHome());
 
   // Check again in Settings: signed in now clears the brain mark on Scout.

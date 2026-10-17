@@ -26,3 +26,5 @@ export { talkPatchProblem, type ToolKind } from './tools';
 export { OPENAI_COMPATIBLE_PRESETS, SECRET_KEYS, WATCH_MODEL_DEFAULTS } from './providers';
 
 export { callOrFullScreenInFront } from './keep-an-eye/lookout';
+
+export { hideSecrets } from './privacy/secrets';
