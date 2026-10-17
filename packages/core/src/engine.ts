@@ -537,8 +537,7 @@ export class Engine {
       windows: listHostWindows,
       experts: () => experts.list(),
       now: nowSources,
-      memories: (query) =>
-        recall(memory, SCOUT_ID, query, { jobs: recentWork(), now: new Date() }),
+      memories: (query) => recall(memory, SCOUT_ID, query, { jobs: recentWork(), now: new Date() }),
       lastExchange: () => activity.lastExchange(SCOUT_ID),
       routinesSince: (iso) => activity.routinesFinishedSince(iso),
       interruptedAtBoot,

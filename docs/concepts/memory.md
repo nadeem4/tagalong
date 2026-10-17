@@ -1,22 +1,28 @@
 # Memory
 
-**Status: built (thread, summaries, memories, screen) + design (vector search).**
+**Status: built (thread, summaries, memories, screen, digest) + design (vector search).**
 
 Scout remembers what is being said now, what it has learned about you, and, if you turn it on, the
 last few minutes of your screen.
 
-## The kinds of memory
+## The layers
 
-| Kind               | Where it lives                                    | Lifetime                | Status |
-| ------------------ | ------------------------------------------------- | ----------------------- | ------ |
-| **Working**        | The prompt, rebuilt for every turn                | One turn                | Built  |
-| **Thread**         | `messages` table, verbatim                        | Until deleted           | Built  |
-| **Thread summary** | `memories` table, kind `summary`                  | Until deleted           | Built  |
-| **Memories**       | `memories` table, kind `fact` or `preference`     | Until deleted           | Built  |
-| **Screen**         | RAM in the desktop host, never written to disk    | Ten minutes by default  | Built  |
-| **Pick-up**        | `pick_up` table, one row from window titles       | Until used or off       | Built  |
-| **Task board**     | Read live from jobs, hand-offs, watches, routines | Finished items 24 h     | Built  |
-| **Jobs**           | `jobs` table + one conversation per job           | 14 days after finishing | Built  |
+| Layer         | What                                                                        | Kept                                              | How it fades                                                                                                 |
+| ------------- | --------------------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **Working**   | The prompt, rebuilt every turn: last 20 messages, the board, the screen now | One turn                                          | Rebuilt each turn                                                                                            |
+| **Recent**    | `jobs` rows + one conversation per job                                      | 14 days after the job finishes                    | Deleted (row, conversation, messages) at boot and after each digest                                          |
+|               | `messages`: chats, verbatim                                                 | Until deleted                                     | At 20 unsummarised messages, older ones fold into a `summary` memory                                         |
+|               | `activity`: questions, hand-offs, routines, app calls                       | 90 days                                           | Deleted at boot; the search index follows                                                                    |
+|               | `sight_log`: what Scout saw, titles only                                    | 7 days by default (1 to 30, Settings › Privacy)   | Deleted (`SightLog.prune`)                                                                                   |
+|               | Screen frames, RAM in the desktop host, never on disk                       | 10 minutes by default (1 to 30), off by default   | Dropped from RAM                                                                                             |
+|               | `pick_up`: one row from window titles                                       | Until offered or switched off                     | Replaced                                                                                                     |
+| **Long-term** | `memories`: `fact`, `preference`, `summary`                                 | Until deleted; at most 200 summaries              | The digest may change or let go of a fact or summary, never a preference; the oldest summaries beyond 200 go |
+| **Digest**    | Once a day the mind folds recent work into long-term memory                 | Its run is a `jobs` row on the board              | Same as jobs                                                                                                 |
+| **Recall**    | One path into every prompt and check-in                                     | 2,000 characters of memories + 500 of recent work | Whole items dropped, never cut                                                                               |
+
+Activity rows go after 90 days, but the digest has kept the gist in long-term memory first, so
+"what did I do six months ago?" can still be answered roughly from memories; the exact detail is
+not kept.
 
 Everything except screen memory lives in `tagalong.db`, the local SQLite file in the data
 directory (`%APPDATA%\Tagalong` on Windows). Nothing leaves the machine except what a turn sends to
@@ -32,9 +38,15 @@ flowchart LR
   end
   R["Screen frames, RAM only"]
   W["Working memory: one turn's prompt"]
+  J["Jobs, 14 days"]
+  D["Digest, once a day"]
   T -- "last N messages" --> W
   S -- "recall" --> W
   P -- "recall" --> W
+  J -- "recall: up to 2 matching" --> W
+  J --> D
+  S --> D
+  D -- "ADD / REPLACE / DROP" --> P
   R -. "recall_screen, what_changed, when asked" .-> W
 ```
 
@@ -63,8 +75,8 @@ conversation is never summarised into a memory, and its turn writes no activity 
 board is working memory: a read model over the jobs, running and waiting hand-offs, watches,
 running routines and the last day's finished work, read by the `board` and `open_result` tools; Now
 carries the running jobs and those finished since the last talk or not mentioned yet (no check-in
-line about them was shown, `reported_at`) on every turn. Folding what jobs
-learned into long-term memory (the digest) comes later.
+line about them was shown, `reported_at`) on every turn. What jobs learned reaches long-term memory
+through the daily digest (below) before the rows go.
 
 ## Working memory: building one turn
 
@@ -83,12 +95,18 @@ A turn contains, in order:
 
 ## Recall: which memories ride along
 
-Built in `packages/core/src/memory/recall.ts`:
+Built in `packages/core/src/memory/recall.ts`, one path for every turn and check-in, in order:
 
-- The **5 newest** memories, then **up to 5 more** that match the question.
+1. **Preferences**, the newest 5. They always ride, so a growing store cannot push them out.
+2. The **3 newest** other memories (facts and summaries).
+3. **Up to 5** memories that match the question.
+4. **Recent work**: up to **2** of Scout's own jobs that finished well in the last 14 days and share
+   words with the question (most shared words, then newest), as
+   `- (your job, 3 days ago, j-1b2c) "task": note`, within their own **500 characters**.
+
 - Matching is SQLite FTS5 full-text search, ranked by BM25. Every word of the question is quoted
   and OR-ed, so punctuation in a question can never break the query.
-- The total is capped at **2,000 characters**. Whole memories are dropped from the end rather than
+- The memories are capped at **2,000 characters**. Whole memories are dropped from the end rather than
   cut mid-sentence.
 - Visibility is decided in SQL on every read: `pet_id = <Scout>`. Older installs kept some
   memories in a shared crew notebook; migration 20 moved those to Scout, so none were lost (one
@@ -99,8 +117,9 @@ short answers" is kept across restarts; the summary also records preferences the
 Nothing is filed by matching phrases in what they typed: the model decides.
 
 Check-ins (when Scout wakes on its own: a settled window, an error title, a long stretch, a
-finished hand-off) have no question to match, so they carry the **5 newest** memories only, under
-the same `## What you remember` heading and 2,000-character cap, together with the last exchange
+finished hand-off) use the same recall, matched against the words of why it woke (the window's
+title, or the expert and its ask), under the same `## What you remember` heading and budgets,
+together with the last exchange
 (the latest answered question and answer, 300 characters each, from the activity record). See
 `packages/core/src/check-in/bundle.ts` and [privacy.md](../privacy.md).
 
@@ -118,6 +137,30 @@ Memories are kept until deleted, and the person can see and delete every one:
   row with its conversation; a job still queued or running is never deleted.
 
 A deleted memory leaves the full-text index with it, so recall never brings it back.
+
+## The digest: tidying memory once a day
+
+Built in `packages/core/src/memory/digest.ts`. Code decides only when and checks the reply; what
+matters is the mind's call.
+
+- **When**: checked 5 minutes after start and every 30 minutes. It runs when Scout exists, the
+  budget is not spent, no turn of Scout's started in the last 10 minutes and no job is running, the
+  last digest that worked ended at least 20 hours ago, and there is something new (a finished job
+  not yet read, 3 or more summaries since the last digest, or more than 200 summaries). At most 2
+  attempts a local day, so a failure is retried once.
+- **What it reads** (one call, no tools, 60 s, 800 tokens, on the Summaries model or Scout's): the
+  newest 150 facts and preferences with short ids (`m-3fa1c2d0`), up to 20 summaries older than
+  30 days, up to 10 summaries since the last digest, and up to 10 finished jobs not yet read (task,
+  note and the first 1,500 characters of the result). Secrets are hidden over all of it. The system
+  prompt is the soul and a fixed "Tidying your memory" block, the same every day.
+- **What it may reply**: `ADD fact|preference|summary: ...`, `REPLACE <id>: ...`, `DROP <id>`, or
+  `NOTHING`. Code applies at most 10 of each in one transaction; an id must be one it was shown;
+  a `DROP` of a preference is ignored; facts and preferences are clipped to 300 characters and
+  summaries to 1,000; `ADD` never files a duplicate.
+- **After**: the jobs it read are marked, jobs older than 14 days are deleted, and the oldest
+  summaries beyond 200 go. The run is a `jobs` row (`kind = 'digest'`) the board shows as
+  "Tidying your memory" and then "Tidied your memory ... Note: Added 2, changed 1, let 3 go." It
+  is never spoken and never in Now. A failure or timeout changes nothing and is only logged.
 
 ## Summarising long threads
 

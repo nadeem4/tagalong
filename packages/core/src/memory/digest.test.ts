@@ -233,7 +233,9 @@ describe('Digest: what it sends', () => {
     await t.digest.maybeRun();
     const sent = sentText(t.mind.requests[0]!);
 
-    expect(sent).toContain(`## What you remember now\n- ${t.short(pref.id)} (preference) Short answers.`);
+    expect(sent).toContain(
+      `## What you remember now\n- ${t.short(pref.id)} (preference) Short answers.`,
+    );
     expect(sent).not.toContain('Not Scout’s.');
     expect(sent).toContain('## Older summaries (30+ days)');
     expect(sent).toContain(`- ${t.short(old.id)} (summary,`);

@@ -260,7 +260,7 @@ function finishedLine(item: BoardItem, timeZone: string | undefined): string {
     item.kind === 'job'
       ? `${item.id} your job, ${when}: ${item.title}`
       : item.kind === 'digest'
-        ? `Tidied your memory, ${when}${item.note ? `. ${item.note}` : ''}`
+        ? `Tidied your memory, ${when}${item.note ? `. Note: ${item.note}` : ''}`
         : `${item.id} ${item.title}, ${when}`;
   return item.told === false ? `${head} (not mentioned yet)` : head;
 }

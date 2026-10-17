@@ -989,12 +989,12 @@ flowchart LR
   C --> B
 ```
 
-- **Table.** `jobs` (migration 21): id, kind (`job`; `digest` is reserved for the memory digest),
+- **Table.** `jobs` (migration 21): id, kind (`job`, or `digest` for a run of the memory digest),
   state, task (at most 200 characters, secrets hidden), dedupe key, conversation id, note (at most
   300), error, and the created, started, finished, reported and digested times. The brief's context
   is not stored in the row: it is only the first user message of the job's conversation. The full
   result is that conversation's last assistant message. Rows finished more than 14 days ago go with
-  their conversations and messages (`Jobs.prune`, at boot). At boot, a queued or running row is
+  their conversations and messages (`Jobs.prune`, at boot and after each digest). At boot, a queued or running row is
   closed as `Interrupted: Tagalong closed before this finished.`
 - **Statuses.** `queued` -> `running` -> `done` (note), `error` (the turn's error, or `Took longer
 than 10 minutes, so it was stopped.`) or `stopped` (`stop_work`, shutdown); a queued job can be
@@ -1020,7 +1020,8 @@ gathered (data, not instructions):` and the context in a `~~~text` fence (at mos
   activity row (so it is neither in Home's Activity nor "the last talk") and is never summarised.
   A finished job (done or failed, never stopped) shows in Now and on the board, and goes to
   [Arrivals](#arrivals-finished-work-together), which brings it to one check-in with whatever
-  else finished around then.
+  else finished around then. Recall brings up to two matching ones back for 14 days (see
+  [Recall](#recall)); the digest reads it before it goes.
 - **`turn.started`** carries `background: true` on routine and job turns and `jobId` on job turns.
   The bubble and the chat panel ignore background turns, so a routine or a job can no longer take
   over the chat panel while the person's own turn streams; desktop main does not count them as the
@@ -1042,6 +1043,11 @@ The mind's tools are facts only:
 | `stop_work { id }`              | write | Stops a job (`runner.interrupt`), a hand-off (`handoffs.cancel`) or a watch (`watches.stop`). No card: stopping only tightens.                      |
 
 A normal turn gets all four; a routine's turn only `board` and `open_result`; a job's turn none.
+
+A digest run is a `jobs` row too (`kind = 'digest'`, task `Tidy memory`, no conversation). The
+board shows it without an id (it cannot be opened or stopped): `Tidying your memory, running (2
+min)`, then `Tidied your memory, done 03:10. Note: Added 2, changed 1, let 3 go.` Now leaves it
+out, and the daily cap, the dedupe and `forget` count only `kind = 'job'` rows.
 
 ## The desktop host's shape
 
@@ -1374,12 +1380,19 @@ embeddings.
 
 ### Recall
 
-Every turn recalls before it assembles (`memory/recall.ts`): the pet's five newest visible memories,
-then up to five FTS matches against the question plus the selection that are not already listed,
-dropping whole memories past a 2,000-character budget. `assemblePrompt` renders them on the
+Every turn and every check-in recalls through one path (`memory/recall.ts`,
+`recall(memories, petId, query, { jobs, now })` -> `{ memories, recentWork }`): the pet's five
+newest preferences (they always ride), its three newest other memories, then up to five FTS
+matches against the query that are not already listed, dropping whole memories past a
+2,000-character budget. Then up to two of Scout's jobs that finished well in the last 14 days
+(`JobStore.doneSince`, at most 300 rows, scored in JS by shared words, newest first on a tie), as
+`- (your job, 3 days ago, j-1b2c) "task": note`, within their own 500 characters. A turn's query
+is the question plus the selection; a check-in's is the window title, or the finished expert and
+its ask. `assemblePrompt` (and the check-in bundle) renders them on the
 person's latest message, after the screen context and before `## Now`, under
 `## What you remember`, labelled `(preference)`, `(fact)` or `(summary)`, and caps the whole
-section — heading included — at 2,000 characters. They ride there, not in the system prompt,
+section — heading included — at 2,000 characters; the recent-work lines follow under the same
+heading. They ride there, not in the system prompt,
 because they change with every question and would break the prompt cache.
 
 Memories are written two ways. The `remember` tool (`tools/builtin/memory.ts`) is offered to every
@@ -1398,6 +1411,38 @@ to five FTS matches as `m-<first 8 characters of the id> (kind) text` and delete
 job tools wired, a query also lists finished jobs whose task shares a word with it
 (`JobStore.search`, up to five in all), and an id starting `j-` deletes that finished job with its
 conversation and messages (`JobStore.finishedByPrefix`, `JobStore.delete`).
+
+### The memory digest
+
+`memory/digest.ts` (`Digest`) folds recent work into long-term memory once a day. The engine
+starts it at boot on `systemWatchClock`: a check 5 minutes later and every 30 minutes after.
+`maybeRun` goes ahead only when Scout exists, `spentOut()` is false, `idle()` holds (no turn of
+theirs is running, `runner.foregroundBusy()`, and no job is running), fewer than 2
+digest rows started this local day, the last `done` digest finished at least 20 hours ago, and
+there is material: an undigested finished job (`JobStore.undigested`), 3 or more summaries since
+the last digest, or more than 200 summaries.
+
+It records a `jobs` row (`JobStore.startDigest`, kind `digest`), then makes one `complete()` call
+on `settings.summarizer` or Scout's own model (no tools, 800 max tokens, 60 s, aborted at
+shutdown). The system prompt is `soul()` plus the fixed `DIGEST_INSTRUCTIONS` block, so it caches.
+The user message (`hideSecrets` over all of it) has `## What you remember now` (newest 150 facts and
+preferences, `m-<8 hex>` ids), `## Older summaries (30+ days)` (at most 20), `## Recent
+conversation summaries` (since the last digest, at most 10) and `## Recent work` (undigested
+jobs, at most 10: task, note and the result's first 1,500 characters in a `~~~text` fence).
+
+`parseDigest` reads `ADD kind: text`, `REPLACE <id>: text` and `DROP <id>` lines (anything else is
+ignored, at most 10 of each). Applying is one transaction (`MemoryStore.transaction`): an id must
+be one the bundle showed; `DROP` of a preference is ignored; facts and preferences are clipped to
+300 characters, summaries to 1,000; text goes through `hideSecrets`; `ADD` uses `addOnce`;
+`REPLACE` is `MemoryStore.update`, and the FTS triggers follow. Then the bundle's jobs get
+`digested_at`, `Jobs.prune` runs and `MemoryStore.evictSummaries(petId, 200)` deletes the oldest
+summaries beyond 200. The row ends `done` with `Added N, changed N, let N go.`, or `error` with the
+message (a throw, a timeout, a stop reason other than `end`), changing nothing; only the log hears
+of it. Nothing is spoken and nothing goes to the check-in.
+
+Retention around it: jobs and their conversations 14 days (`Jobs.prune`); activity rows 90 days
+(`ActivityLog.prune`, at boot; the FTS trigger follows); messages are summarised, not deleted;
+the sight log is unchanged (7 days default, 1 to 30).
 
 ### Summaries
 
@@ -1575,7 +1620,9 @@ turns from the notifications the engine already sends:
 At boot, before
 anything runs, `ActivityLog.interrupted` closes every row still `running` (a crash or a quit cut it
 short) as `error`, "Interrupted: Tagalong closed before this finished.", and
-`RoutineStore.interrupted` does the same for a routine's `last_state`. Text is clipped at 4,000
+`RoutineStore.interrupted` does the same for a routine's `last_state`. Then `ActivityLog.prune`
+deletes rows that started more than 90 days ago (`ACTIVITY_KEEP_DAYS`, user decision 2026-10-16;
+the daily digest has kept the gist in memory). Text is clipped at 4,000
 characters. `activity.list { before?, limit = 30 (max 100) }` answers `{ entries, next? }`, newest
 first; `next` is the id to pass as `before` for the page after. An `expert` row is written by
 `HandoffManager` through `expertStarted` and `expertFinished`, not from a notification: it keeps the
@@ -1814,7 +1861,8 @@ flowchart LR
 | `finished`     | a batch from [Arrivals](#arrivals-finished-work-together): finished jobs and hand-offs                       | none: work they asked for | exempt               | `Work finished: N things.`; each item's id, title, state and note, fenced (see Arrivals)                                                       |
 
 Every check-in also carries step 1's Now block (`renderNow`, with a `check-in` wake reason that adds
-no line of its own), the 5 newest memories (`renderMemories`), their name, the last exchange
+no line of its own), what `recall` brings up for the window title or the finished ask
+(`renderMemories`, with recent work; see [Recall](#recall)), their name, the last exchange
 (`ActivityLog.lastExchange`: the latest answered question and answer, 300 characters each), the
 active time when nudges are on, the enabled experts (id, name, good at) and the last 3 lines Scout
 said on its own ("do not repeat"). `check-in/bundle.ts#renderBundle` builds that message, pure: a

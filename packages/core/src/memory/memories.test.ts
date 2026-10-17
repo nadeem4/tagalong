@@ -209,9 +209,7 @@ describe('MemoryStore for the digest', () => {
     ]);
     expect(memories.count('scout', 'fact')).toBe(1);
     expect(memories.count('ink', 'summary')).toBe(1);
-    expect(memories.search('scout', 'summary 0', 10).map((m) => m.text)).not.toContain(
-      'summary 0',
-    );
+    expect(memories.search('scout', 'summary 0', 10).map((m) => m.text)).not.toContain('summary 0');
     expect(memories.evictSummaries('scout', 3)).toBe(0);
   });
 });

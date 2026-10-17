@@ -117,7 +117,11 @@ export class Digest {
     const jobs = this.#o.jobs.undigested(JOBS_SENT);
     const summaries = this.#o.memories.recent(pet.id, SUMMARY_CAP + 1, ['summary']);
     const fresh = summaries.filter((memory) => last === null || memory.createdAt > last);
-    if (jobs.length === 0 && fresh.length < NEW_SUMMARIES_TO_RUN && summaries.length <= SUMMARY_CAP) {
+    if (
+      jobs.length === 0 &&
+      fresh.length < NEW_SUMMARIES_TO_RUN &&
+      summaries.length <= SUMMARY_CAP
+    ) {
       return false;
     }
 
@@ -194,7 +198,11 @@ export class Digest {
       const message = error instanceof Error ? error.message : String(error);
       this.#o.log?.(`digest: ${message}`);
       try {
-        this.#o.jobs.finish(id, { state: 'error', error: message.slice(0, ERROR_CHARS) }, this.#iso());
+        this.#o.jobs.finish(
+          id,
+          { state: 'error', error: message.slice(0, ERROR_CHARS) },
+          this.#iso(),
+        );
       } catch {
         // The database closed under it at shutdown.
       }
