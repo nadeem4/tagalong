@@ -33,6 +33,8 @@ export interface HistoryToolDeps {
   activity: { since(startIso: string, limit?: number, untilIso?: string): ActivityEntry[] };
   /** Newest first, rows at or after `since` and before `until`. */
   sightLog: { list(limit?: number, since?: string, until?: string): SightLogEntry[] };
+  /** How many days the privacy log keeps: a range never reaches further back. */
+  days: () => number;
   now?: () => Date;
 }
 
@@ -126,13 +128,22 @@ function isoOf(value: string): string | null {
   return Number.isNaN(at.getTime()) ? null : at.toISOString();
 }
 
-/** Every row between since (default: local midnight today) and until (default: now). */
+/** The longest a day lasts, for the privacy log's cutoff. */
+const DAY_MS = 86_400_000;
+
+/**
+ * Every row between since (default: local midnight today) and until (default: now). An
+ * earlier since is raised to the privacy log's cutoff: the activity record is kept longer.
+ */
 function range(deps: HistoryToolDeps, params: Params, turnId: string): string {
   const now = deps.now?.() ?? new Date();
   const midnight = new Date(now);
   midnight.setHours(0, 0, 0, 0);
-  const since = params.since ?? midnight.toISOString();
+  const cutoff = new Date(now.getTime() - deps.days() * DAY_MS).toISOString();
+  const asked = params.since ?? midnight.toISOString();
+  const since = asked > cutoff ? asked : cutoff;
   const until = params.until ?? now.toISOString();
+  if (since >= until) return `Nothing on record between ${asked} and ${until}.`;
 
   const rows: { at: string; text: string }[] = [];
   for (const row of deps.activity.since(since, READ_LIMIT, until)) {

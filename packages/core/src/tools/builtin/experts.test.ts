@@ -132,6 +132,19 @@ describe(HAND_TO_EXPERT, () => {
     expect(d.started).toEqual([]);
   });
 
+  it('states that no expert is on when the last one was switched off during the turn', async () => {
+    const list = [CLAUDE];
+    const d = deps(list);
+    const tools = fakeTurnTools({ experts: { ...d.value, experts: () => list } });
+    list.splice(0, 1, { ...CLAUDE, enabled: false });
+    for (const input of [{ ask: 'x' }, { ask: 'x', expert_id: 'claude-code' }]) {
+      const outcome = await tools.run({ name: HAND_TO_EXPERT, input });
+      expect(outcome.isError).toBe(true);
+      expect(outcome.content).toBe('No expert is switched on.');
+    }
+    expect(d.started).toEqual([]);
+  });
+
   it('refuses an expert that is not there and a bad input, without throwing', async () => {
     const d = deps([CLAUDE]);
     const tools = fakeTurnTools({ experts: d.value });

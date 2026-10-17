@@ -626,7 +626,8 @@ an unknown, switched-off or same expert is an error the model can fix. A chain a
 even on a routine's turn for the expert the routine allowed. The model picks the expert from the
 list in the description (each with its `goodAt`): `expert_id` is used when given, the only expert
 switched on when there is one, and with more than one on and none named the tool answers an error
-listing each id, name and `goodAt`. While a hand-off runs, the Companion also gets `tell_expert { message, handoff_id? }` (appended
+listing each id, name and `goodAt`; with every expert switched off since the turn started it
+answers "No expert is switched on." While a hand-off runs, the Companion also gets `tell_expert { message, handoff_id? }` (appended
 after `point_at`, never on a routine's own turn), whose description lists the hand-offs running at the
 start of the turn. It passes the person's words, not the model's, to `HandoffManager.steer`
 directly (no RPC); with one hand-off running `handoff_id` may be left out, with two it asks which,
@@ -2659,8 +2660,9 @@ starts. A removed or rescaled display loses its window. The ring is `renderer/sr
 `search_history` with no `query` (`packages/core/src/tools/builtin/history.ts`, kind `read`)
 answers "What did we do today?" from records Tagalong already keeps. There is no new table and
 nothing is tracked in the background. The range runs from `since` (default: local midnight today)
-to `until` (default: now); a bare date is that day's local midnight. Both ends are bounds in the
-queries. Every question, ask, routine name and title it quotes goes through `hideSecrets` first
+to `until` (default: now); a bare date is that day's local midnight. An earlier `since` is raised
+to the privacy log's cutoff (`settings.sightLog.days`), because the activity record is kept longer
+than the log. Both ends are bounds in the queries. Every question, ask, routine name and title it quotes goes through `hideSecrets` first
 and is clipped to 120 characters. It reads:
 
 | Source                                  | What the listing uses                                                                                                                                                                                                |

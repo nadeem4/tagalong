@@ -116,6 +116,17 @@ describe(CHANGE_SETTINGS, () => {
     expect(d.emitted).toEqual([]);
   });
 
+  it('never repeats a key pasted into the setting name', async () => {
+    const d = deps();
+    const outcome = await change(d, [
+      { setting: 'openrouter key sk-or-v1-abcdef0123456789abcdef0123456789', value: 'x' },
+    ]);
+    expect(outcome.isError).toBe(true);
+    expect(outcome.content).toContain('only in Settings');
+    expect(outcome.content).not.toContain('abcdef0123456789');
+    expect(d.emitted).toEqual([]);
+  });
+
   it.each(['closedCleanly', 'lastVersion', 'userNameDeclined', 'captureExclusions.remove'])(
     'never reaches %s',
     async (setting) => {

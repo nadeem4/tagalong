@@ -70,6 +70,7 @@ function deps(
           .slice(0, limit);
       },
     },
+    days: () => 30,
     now: () => NOW,
   };
 }
@@ -177,6 +178,20 @@ describe('search_history', () => {
       expect(wired.ranges).toContain(
         `sight ${new Date(2026, 9, 15).toISOString()} ${new Date(2026, 9, 16).toISOString()}`,
       );
+    });
+
+    it('never reaches further back than the privacy log keeps', async () => {
+      const wired = { ...deps(world), days: () => 7 };
+      const outcome = await run(wired, { since: '2026-09-01' });
+      expect(outcome.isError).toBeUndefined();
+      const cutoff = new Date(NOW.getTime() - 7 * 86_400_000).toISOString();
+      expect(wired.ranges).toEqual([
+        `activity ${cutoff} ${NOW.toISOString()}`,
+        `sight ${cutoff} ${NOW.toISOString()}`,
+      ]);
+      // A range wholly older than the log keeps lists nothing.
+      const old = await run(wired, { since: '2026-09-01', until: '2026-09-02' });
+      expect(String(old.content)).toMatch(/^Nothing on record/);
     });
 
     it('stops at 60 rows', async () => {

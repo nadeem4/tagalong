@@ -501,6 +501,7 @@ export class Engine {
         history: new HistorySearch(db, { days: () => settings.get().sightLog.days }),
         activity,
         sightLog,
+        days: () => settings.get().sightLog.days,
       },
       // Both lookups are lazy: hosts connect and drop between turns, and the exclusion
       // list is edited while the app runs, so neither can be captured at boot.

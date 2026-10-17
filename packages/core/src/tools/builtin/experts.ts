@@ -158,6 +158,10 @@ export function handToExpertTool(deps: ExpertToolDeps, experts: readonly Expert[
     if (typeof parsed === 'string') return Promise.resolve({ content: parsed, isError: true });
 
     const available = enabledExperts(deps);
+    // Switched off since the turn started.
+    if (available.length === 0) {
+      return Promise.resolve({ content: 'No expert is switched on.', isError: true });
+    }
     const ids = available.map((e) => e.id).join(', ');
     // The model's pick; else the only expert on.
     const chosenId = parsed.expert_id ?? (available.length === 1 ? available[0]?.id : undefined);

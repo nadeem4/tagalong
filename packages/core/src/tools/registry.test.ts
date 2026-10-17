@@ -41,6 +41,7 @@ function everything(overrides: Partial<ToolRegistryOptions> = {}): ToolRegistryO
       history: { search: () => [] },
       activity: { since: () => [] },
       sightLog: { list: () => [] },
+      days: () => 7,
     },
     changeSettings: { get: () => Settings.parse(SETTINGS_DEFAULTS), emit: () => undefined },
     // Every wired tool: what the role library narrows is the toolsFor tests' business.
