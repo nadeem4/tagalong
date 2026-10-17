@@ -89,7 +89,7 @@ export interface CompanionBubbleProps {
   tail?: 'left' | 'right';
   /**
    * A line the bubble says, for the host to speak aloud: each finished answer, the hello,
-   * and an expert's finish. Called once per line, with the text as shown.
+   * and the mind's line about a finished hand-off. Called once per line, with the text as shown.
    */
   onSay?: (text: string) => void;
   /** Speaks the answer to a spoken question, sentence by sentence as it streams. */
@@ -355,22 +355,9 @@ export function CompanionBubble({
           current?.phase === 'working' &&
           current.expertId === event.expertId &&
           (current.handoffId === null || current.handoffId === event.handoffId);
-        // Step 1 of a chain hands on to step 2: no word yet, Scout speaks once at the end.
+        // Step 1 of a chain hands on to step 2. The finish itself says nothing: the mind's
+        // check-in may send one line about it (pet.remark with this hand-off's id).
         const next = event.state === 'done' ? event.next : undefined;
-        if (isThis(handoff) && next === undefined) {
-          const earlier = handoff.chain?.step === 2 ? handoff.chain.earlier : undefined;
-          const missed =
-            undelivered(handoff).length > 0
-              ? ` ${handoff.expertName} finished before I could pass on your note.`
-              : '';
-          onSay?.(
-            (event.state !== 'done'
-              ? `${handoff.expertName} stopped without finishing.`
-              : earlier !== undefined
-                ? `${earlier.expertName} and ${handoff.expertName} have finished. ${event.text ?? ''}`.trim()
-                : `${handoff.expertName} has finished. ${event.text ?? ''}`.trim()) + missed,
-          );
-        }
         setHandoff((current) => {
           if (!isThis(current)) return current;
           if (next !== undefined) {
@@ -394,6 +381,7 @@ export function CompanionBubble({
           }
           return {
             phase: 'finished',
+            handoffId: event.handoffId,
             expertName: current.expertName,
             state: event.state,
             text: event.text,
@@ -406,6 +394,18 @@ export function CompanionBubble({
         });
         return;
       }
+      case 'pet.remark':
+        // The mind's line about the hand-off on the card: shown on it and said once.
+        if (
+          event.handoffId === undefined ||
+          handoff?.phase !== 'finished' ||
+          handoff.handoffId !== event.handoffId
+        ) {
+          return;
+        }
+        setHandoff({ ...handoff, line: event.text });
+        onSay?.(event.text);
+        return;
       default:
         return;
     }

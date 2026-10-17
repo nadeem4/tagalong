@@ -45,6 +45,10 @@ export type Handoff =
     }
   | {
       phase: 'finished';
+      /** Which hand-off came back, so the mind's line about it lands on this card. */
+      handoffId?: string | undefined;
+      /** Scout's one line about the outcome, from the check-in, if the mind had one. */
+      line?: string | undefined;
       expertName: string;
       state: 'done' | 'error' | 'stopped';
       text?: string | undefined;
@@ -427,6 +431,7 @@ export function HandoffStatus({
   const { earlier } = handoff;
   return (
     <section className="handoff" aria-label={title}>
+      {handoff.line !== undefined && <p className="bubble-text">{handoff.line}</p>}
       {earlier !== undefined && (
         <>
           <p className="bubble-hints">

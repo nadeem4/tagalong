@@ -545,13 +545,15 @@ function showPickUp(params: unknown): void {
 }
 
 /**
- * Scout has one thing to say from keeping an eye on things: one quiet line beside the pet,
- * without taking the keyboard. Not while the bubble is already open: the person is busy
- * with it, and a remark is never worth interrupting them for.
+ * Scout has one thing to say from a check-in: one quiet line beside the pet, without taking
+ * the keyboard. Not while the bubble is already open: the person is busy with it, and a
+ * remark is never worth interrupting them for. A line about a finished hand-off goes to its
+ * card in the bubble instead (announceHandoff already brought it up), through the forward.
  */
 function showRemark(params: unknown): void {
   const panel = desktop?.panel;
   const avatar = desktop?.avatar;
+  if ((params as { handoffId?: unknown } | null)?.handoffId !== undefined) return;
   if (panel == null || avatar == null || !avatar.isVisible() || panel.isVisible()) return;
   panel.webContents.send(IPC.remarkEvent, params);
   showPanelQuietly(panel, avatar);
