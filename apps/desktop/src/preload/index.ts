@@ -31,6 +31,7 @@ import type {
   SettingsPatch,
   SightLogEntry,
   StatusMark,
+  MemoryEntry,
 } from '@tagalong/protocol';
 import type { AskInput, DropOffer, HostBridge, TurnEvent } from '@tagalong/ui';
 import { IPC } from '../shared/ipc';
@@ -124,6 +125,8 @@ const bridge: HostBridge = {
   listSightLog: () => ipcRenderer.invoke(IPC.listSightLog) as Promise<SightLogEntry[]>,
   deleteSightLog: (id: string) => ipcRenderer.invoke(IPC.deleteSightLog, id) as Promise<boolean>,
   clearSightLog: () => ipcRenderer.invoke(IPC.clearSightLog) as Promise<number>,
+  listMemories: () => ipcRenderer.invoke(IPC.listMemories) as Promise<MemoryEntry[]>,
+  deleteMemory: (id: string) => ipcRenderer.invoke(IPC.deleteMemory, id) as Promise<boolean>,
   copyText: (text: string) => ipcRenderer.invoke(IPC.copyText, text) as Promise<void>,
   setCalendarLink: (link: string | null) =>
     ipcRenderer.invoke(IPC.setCalendarLink, link) as Promise<CalendarCheckResult>,

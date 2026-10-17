@@ -115,6 +115,7 @@ import { registerRoutineIpc } from './ipc/routines';
 import { registerPickUpIpc } from './ipc/pick-up';
 import { PickUpAllowlist, PickUpWaiting } from './pick-up-open';
 import { registerSightLogIpc } from './ipc/sight-log';
+import { registerMemoryIpc } from './ipc/memory';
 import { registerSettingsIpc } from './ipc/settings';
 import { registerTurnIpc } from './ipc/turns';
 import { dropDesk, registerDropIpc } from './drop';
@@ -1069,6 +1070,7 @@ function registerIpc(): void {
     openPath: (folder) => shell.openPath(folder),
   });
   registerSightLogIpc(handle, { engine });
+  registerMemoryIpc(handle, { engine });
   registerRoutineIpc(handle, {
     engine,
     openHome: (page) => openHome(page),
