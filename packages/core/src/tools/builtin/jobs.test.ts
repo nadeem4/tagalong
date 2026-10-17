@@ -103,9 +103,7 @@ function setup(
         return id === JOB_ID;
       },
       result: (id) =>
-        id === DONE_ID
-          ? `The thread agrees on Friday.\n~~~\n${'x'.repeat(13_000)}`
-          : null,
+        id === DONE_ID ? `The thread agrees on Friday.\n~~~\n${'x'.repeat(13_000)}` : null,
     },
     board: () => ITEMS,
     entry: (id) =>
