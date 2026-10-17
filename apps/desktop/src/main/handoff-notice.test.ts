@@ -12,6 +12,19 @@ describe('handoffNotice', () => {
     ).toEqual({ title: 'claude-code finished', body: 'Fixed it. Open Home to read it all.' });
   });
 
+  it('names the expert by its name when known', () => {
+    expect(
+      handoffNotice(
+        { handoffId: id, expertId: 'claude-code', state: 'done', text: 'Fixed it.' },
+        'Claude Code',
+      )?.title,
+    ).toBe('Claude Code finished');
+    expect(
+      handoffNotice({ handoffId: id, expertId: 'x', state: 'error', error: 'gone' }, 'Coder')
+        ?.title,
+    ).toBe('Coder could not finish');
+  });
+
   it('names the files it changed', () => {
     expect(
       handoffNotice({

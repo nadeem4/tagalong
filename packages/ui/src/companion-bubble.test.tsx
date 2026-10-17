@@ -849,3 +849,77 @@ describe('CompanionBubble, talking to Scout', () => {
     expect(screen.queryByText(/to reply/)).toBeNull();
   });
 });
+
+describe('CompanionBubble status marks', () => {
+  const started = (bridge: FakeHostBridge) =>
+    bridge.emit({
+      type: 'turn.started',
+      turnId: 'turn-1',
+      petId: 'scout',
+      conversationId: CONVERSATION,
+    });
+
+  it('shows the top status mark as a row, with Fix it opening the fix', () => {
+    const openFix = vi.fn(() => Promise.resolve());
+    const bridge = Object.assign(createFakeHostBridge(), { openFix });
+    renderBubble(bridge, { status: { id: 'brain-signed-out' } });
+    expect(screen.getByTestId('status-row')).toHaveTextContent(
+      'Can’t think: signed out of Claude.',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Fix it' }));
+    expect(openFix).toHaveBeenCalledWith('brain');
+  });
+
+  it('shows Declined. for a refusal with no words, and says nothing', async () => {
+    const bridge = createFakeHostBridge();
+    const onSay = vi.fn();
+    renderBubble(bridge, { onSay });
+    await act(async () => ask('do something bad'));
+    act(() => {
+      started(bridge);
+      bridge.emit({ ...done('turn-1', ''), stopReason: 'refusal' });
+    });
+    expect(screen.getByTestId('status-row')).toHaveTextContent('Declined.');
+    expect(onSay).not.toHaveBeenCalled();
+  });
+
+  it('shows Stopped. for a stopped turn with no words', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    await act(async () => ask('what now?'));
+    act(() => {
+      started(bridge);
+      bridge.emit({ ...done('turn-1', ''), stopReason: 'aborted' });
+    });
+    expect(screen.getByTestId('status-row')).toHaveTextContent('Stopped.');
+  });
+
+  it('shows the words, not a row, when a stopped turn said something', async () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    await act(async () => ask('what now?'));
+    act(() => {
+      started(bridge);
+      bridge.emit({ ...done('turn-1', 'Half an answer'), stopReason: 'aborted' });
+    });
+    expect(screen.getByText('Half an answer')).toBeVisible();
+    expect(screen.queryByTestId('status-row')).toBeNull();
+  });
+});
+
+describe('GreetingLine with a status mark', () => {
+  it('shows the mark’s row and its Fix it instead of words', () => {
+    const onFix = vi.fn();
+    render(
+      <GreetingLine
+        petName="Scout"
+        status={{ id: 'brain-no-key' }}
+        onFix={onFix}
+        onDone={() => undefined}
+      />,
+    );
+    expect(screen.getByTestId('status-row')).toHaveTextContent('Can’t think: no API key.');
+    fireEvent.click(screen.getByRole('button', { name: 'Fix it' }));
+    expect(onFix).toHaveBeenCalledWith('brain');
+  });
+});

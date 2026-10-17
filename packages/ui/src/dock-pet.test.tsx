@@ -78,6 +78,19 @@ describe('DockPet', () => {
     expect(screen.queryByTestId('listening-mark')).toBeNull();
     expect(screen.getByRole('img')).toHaveAccessibleName('Scout is idle');
   });
+
+  it('shows the top status mark as a tag, named in its label', () => {
+    const { rerender } = render(
+      <DockPet pet={SCOUT} mood="idle" status={{ id: 'brain-signed-out' }} />,
+    );
+    expect(screen.getByTestId('status-mark')).toHaveTextContent('Signed out');
+    expect(screen.getByRole('img')).toHaveAccessibleName(
+      'Scout is idle, Can’t think: signed out of Claude.',
+    );
+    rerender(<DockPet pet={SCOUT} mood="idle" status={null} />);
+    expect(screen.queryByTestId('status-mark')).toBeNull();
+    expect(screen.getByRole('img')).toHaveAccessibleName('Scout is idle');
+  });
 });
 
 describe('a living pet', () => {

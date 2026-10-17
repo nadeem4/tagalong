@@ -43,9 +43,11 @@ import {
 import { startWellbeingTick, watchPresence } from './presence';
 import { systemClock } from './awareness/clock';
 import { handoffNotice } from './handoff-notice';
+import { StatusMarks, clearBrainMarks, markListening } from './status-marks';
 import {
   brainLine,
   brainReadiness,
+  brainStatus,
   recordCleanClose,
   recordLaunch,
   SIGN_IN_BUDGET_MS,
@@ -163,6 +165,8 @@ interface Desktop {
   voiceWorker: VoiceWorker;
   /** Always listening: from the saved setting at launch, saved again on each switch. */
   listening: AlwaysListening;
+  /** The status marks on Scout and in the bubble; the top one goes to every window. */
+  statusMarks: StatusMarks;
 }
 
 let desktop: Desktop | null = null;
@@ -240,6 +244,14 @@ async function start(): Promise<void> {
   // From the saved setting, before any window opens, so the mark on Scout shows from the
   // first second listening is on.
   const listening = new AlwaysListening(settings.listening.always);
+  const statusMarks = new StatusMarks();
+  statusMarks.onChange((top) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(IPC.statusMarkEvent, top);
+    }
+  });
+  // "Listening" on Scout for a few seconds: the mark, not a spoken line, says it is on.
+  markListening(statusMarks, listening);
 
   const rolling = new RollingMemory({
     platform,
@@ -320,6 +332,7 @@ async function start(): Promise<void> {
     perceptionMemory,
     voiceWorker,
     listening,
+    statusMarks,
     voice: (() => {
       // The model downloads into the data dir on first use, never at start.
       const local = new WorkerLocalVoice(voiceWorker);
@@ -560,9 +573,8 @@ async function greetOnLaunch(host: EngineHost): Promise<void> {
   let offered: PickUpReadyParams | undefined;
   let carried = false;
   try {
-    // With Always listening on, the first line says so and how to stop, greeting or not.
     const line = await launchLine(current.settings, async () => {
-      const { settings, previousLaunch } = current;
+      const { previousLaunch } = current;
       // Compose first, then check the brain beside it, so a slow check never delays the line.
       const composing = host.client.call('greeting.compose', {
         petId: SCOUT_ID,
@@ -579,7 +591,10 @@ async function greetOnLaunch(host: EngineHost): Promise<void> {
       })().catch(() => 'unknown' as const);
       const [brain, composed] = await Promise.all([readiness, composing]);
       offered = composed.pickUp;
-      return brainLine(brain, composed.text, settings.userName, composed.pickUp);
+      // Why Scout cannot think shows on Scout as a mark until it can again.
+      const status = brainStatus(brain);
+      if (status !== null) current.statusMarks.set({ id: status });
+      return brainLine(brain, composed.text, composed.pickUp);
     });
     if (line !== null) {
       const { panel, avatar } = current;
@@ -587,10 +602,11 @@ async function greetOnLaunch(host: EngineHost): Promise<void> {
         if (panel.webContents.isLoading()) {
           await new Promise<void>((resolve) => panel.webContents.once('did-finish-load', resolve));
         }
-        if (line.pickUp !== undefined) pickUpAllowlist.set(line.pickUp);
+        const pickUp = 'pickUp' in line ? line.pickUp : undefined;
+        if (pickUp !== undefined) pickUpAllowlist.set(pickUp);
         panel.webContents.send(IPC.greetLineEvent, line);
         showPanelQuietly(panel, avatar);
-        carried = line.pickUp !== undefined;
+        carried = pickUp !== undefined;
       }
     }
   } catch (error) {
@@ -675,9 +691,14 @@ function pointer(): ReturnType<typeof createPointerOverlay> {
   return pointerOverlay;
 }
 
+/** A finished turn that said something. */
+function hasText(params: { text?: unknown }): boolean {
+  return typeof params.text === 'string' && params.text !== '';
+}
+
 /** Turn notifications drive the UI, and main is the only thing holding the socket. */
 function forwardToRenderers(notification: { method: string; params: unknown }): void {
-  const params = (notification.params ?? {}) as { turnId?: string };
+  const params = (notification.params ?? {}) as { turnId?: string; text?: unknown };
   if (notification.method === 'turn.started' && params.turnId !== undefined) {
     desktop?.activeTurns.add(params.turnId);
     // The next message puts the last ring away.
@@ -688,6 +709,10 @@ function forwardToRenderers(notification: { method: string; params: unknown }): 
     params.turnId !== undefined
   ) {
     desktop?.activeTurns.delete(params.turnId);
+  }
+  // An answer with words means Scout can think: the brain mark goes.
+  if (notification.method === 'turn.completed' && desktop !== null && hasText(params)) {
+    clearBrainMarks(desktop.statusMarks);
   }
 
   if (notification.method === 'watch.fired') announceWatch(notification.params);
@@ -739,10 +764,18 @@ function announceHandoff(params: unknown): void {
     bringUpBubble(false);
     return;
   }
-  const notice = handoffNotice(parsed.data);
-  if (notice !== null && Notification.isSupported()) {
-    new Notification({ ...notice, silent: false }).show();
-  }
+  // The notice names the expert as Home does; its id stands in when the list cannot be read.
+  void (async () => {
+    const experts = await desktop?.host?.client
+      .call('experts.list', {})
+      .then((result) => result.experts)
+      .catch(() => undefined);
+    const name = experts?.find((expert) => expert.id === parsed.data.expertId)?.name;
+    const notice = handoffNotice(parsed.data, name);
+    if (notice !== null && Notification.isSupported()) {
+      new Notification({ ...notice, silent: false }).show();
+    }
+  })();
 }
 
 /**
@@ -1100,6 +1133,7 @@ function registerIpc(): void {
   // shows sight running while it is paused is the one lie this feature cannot afford.
   ipcMain.handle(IPC.getSightPaused, () => required().sightPause.paused);
   ipcMain.handle(IPC.getRecording, () => required().rolling.recording);
+  ipcMain.handle(IPC.getStatusMark, () => required().statusMarks.top());
   ipcMain.handle(IPC.toggleSightPause, () => {
     required();
     return toggleSightPause();
@@ -1122,7 +1156,12 @@ function registerIpc(): void {
   ipcMain.handle(IPC.openWelcome, () => openWelcome());
   ipcMain.handle(IPC.openHome, () => openHome());
 
-  ipcMain.handle(IPC.checkClaudeSignIn, () => signInFor(process.env));
+  // Check again in Settings: signed in now clears the brain mark on Scout.
+  ipcMain.handle(IPC.checkClaudeSignIn, async () => {
+    const state = await signInFor(process.env);
+    if (state === 'signed-in' && desktop !== null) clearBrainMarks(desktop.statusMarks);
+    return state;
+  });
   ipcMain.handle(IPC.openClaudeSignIn, () => openClaudeSignIn());
 
   // The pet is dragged by hand (a drag region would swallow its clicks), and its bubble

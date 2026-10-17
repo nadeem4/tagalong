@@ -48,6 +48,8 @@ describe('the hand-off card', () => {
     expect(card()).toHaveTextContent('C:\\projects\\ai_pet');
     expect(card()).toHaveTextContent('Reads only');
     expect(card()).toHaveTextContent('Find why the shutdown test fails.');
+    expect(card()).toHaveTextContent('Hand this to Claude Code?');
+    expect(card()).not.toHaveTextContent(/I’ll ask/);
 
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Send' })));
     expect(bridge.confirmedHandoffs).toEqual([
@@ -329,6 +331,7 @@ describe('a two-step hand-off', () => {
     expect(step2).toHaveTextContent('Reads only');
     expect(step2).toHaveTextContent('Check what Coder changed.');
     expect(within(chainCard()).getAllByText('ai_pet')).toHaveLength(1);
+    expect(chainCard()).toHaveTextContent('Hand this to Coder, then Reviewer?');
 
     fireEvent.click(within(step2).getByRole('button', { name: 'Allow edits' }));
     expect(step2).toHaveTextContent('Can change files');

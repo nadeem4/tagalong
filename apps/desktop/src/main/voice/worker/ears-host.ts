@@ -15,13 +15,11 @@ import type { FromWorker, ToWorker } from './messages';
 export const MAX_BUFFERED_FRAMES = 940;
 
 /** What the panel says when the models cannot be fetched (offline, the first time). */
-export const EARS_DOWNLOAD_FAILED =
-  'I couldn’t download my listening models. Check the internet connection and try again.';
+export const EARS_DOWNLOAD_FAILED = 'Speech models didn’t download. Check the internet connection.';
 /** What it says when a download failed its checksum twice (the file was not kept). */
-export const EARS_MODEL_DAMAGED =
-  'The speech model I downloaded was damaged. Check the connection and try again.';
+export const EARS_MODEL_DAMAGED = 'The speech model download was damaged. Check the connection.';
 /** What it says when models already on disk cannot start. */
-export const EARS_START_FAILED = 'I couldn’t start listening. Try again.';
+export const EARS_START_FAILED = 'Listening couldn’t start. It retries on its own.';
 
 export type EarsMessage = Extract<ToWorker, { kind: 'ears.listen' | 'ears.frame' | 'ears.stop' }>;
 

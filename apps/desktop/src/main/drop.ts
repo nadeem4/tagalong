@@ -173,7 +173,7 @@ export async function readDrop(dropped: Dropped, fs: DropFs): Promise<DropRead> 
     const text = await fs.readText(path);
     return { ok: true, dropped: { ...named, text: text.slice(0, MAX_SELECTION_CHARS) } };
   } catch {
-    return { ok: false, error: `I couldn’t read ${name}.` };
+    return { ok: false, error: `Couldn’t read ${name}.` };
   }
 }
 

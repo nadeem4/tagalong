@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Pet, Settings, type PickUpReadyParams, type SettingsPatch } from '@tagalong/protocol';
-import { brainLine, brainReadiness, recordCleanClose, recordLaunch } from './launch';
+import { brainLine, brainReadiness, brainStatus, recordCleanClose, recordLaunch } from './launch';
 import { providerChoices } from './provider-choices';
 
 afterEach(() => vi.useRealTimers());
@@ -115,38 +115,32 @@ describe('brainReadiness', () => {
 
 describe('brainLine', () => {
   it('says the brain’s line when Scout can think, or could not be checked', () => {
-    expect(brainLine('ready', 'Morning.', '')).toEqual({ text: 'Morning.' });
-    expect(brainLine('unknown', 'Morning.', '')).toEqual({ text: 'Morning.' });
+    expect(brainLine('ready', 'Morning.')).toEqual({ text: 'Morning.' });
+    expect(brainLine('unknown', 'Morning.')).toEqual({ text: 'Morning.' });
   });
 
-  it('says plainly why Scout cannot think, with a fix', () => {
-    expect(brainLine('signed-out', 'Morning.', 'Alex')).toEqual({
-      text: 'Hi Alex. I’m signed out of Claude, so I can’t think yet.',
-      fix: 'Fix it',
-      fixTarget: 'brain',
-    });
-    expect(brainLine('no-sign-in', 'Morning.', '')).toEqual({
-      text: 'I can’t find Claude Code on this computer, so I can’t think yet.',
-      fix: 'Fix it',
-      fixTarget: 'brain',
-    });
-    expect(brainLine('no-key', 'Morning.', '')).toEqual({
-      text: 'I have no API key, so I can’t think yet.',
-      fix: 'Fix it',
-      fixTarget: 'brain',
-    });
+  it('gives a status mark, never words in Scout’s voice, when Scout cannot think', () => {
+    expect(brainLine('signed-out', 'Morning.')).toEqual({ status: 'brain-signed-out' });
+    expect(brainLine('no-sign-in', 'Morning.')).toEqual({ status: 'brain-no-sign-in' });
+    expect(brainLine('no-key', 'Morning.')).toEqual({ status: 'brain-no-key' });
   });
 
-  it('carries a pick-up when Scout can think, and drops it for the Fix it line', () => {
+  it('carries a pick-up when Scout can think, and drops it for the status line', () => {
     const pickUp: PickUpReadyParams = {
       text: 'Yesterday you were in ai_pet.',
       items: [{ id: 'p1', kind: 'project', name: 'ai_pet', path: 'C:\\ai_pet', editor: 'vscode' }],
     };
-    expect(brainLine('ready', pickUp.text, '', pickUp)).toEqual({ text: pickUp.text, pickUp });
-    expect(brainLine('no-key', pickUp.text, '', pickUp)).toEqual({
-      text: 'I have no API key, so I can’t think yet.',
-      fix: 'Fix it',
-      fixTarget: 'brain',
-    });
+    expect(brainLine('ready', pickUp.text, pickUp)).toEqual({ text: pickUp.text, pickUp });
+    expect(brainLine('no-key', pickUp.text, pickUp)).toEqual({ status: 'brain-no-key' });
+  });
+});
+
+describe('brainStatus', () => {
+  it('names the brain mark for a brain that cannot think, or null', () => {
+    expect(brainStatus('signed-out')).toBe('brain-signed-out');
+    expect(brainStatus('no-sign-in')).toBe('brain-no-sign-in');
+    expect(brainStatus('no-key')).toBe('brain-no-key');
+    expect(brainStatus('ready')).toBeNull();
+    expect(brainStatus('unknown')).toBeNull();
   });
 });

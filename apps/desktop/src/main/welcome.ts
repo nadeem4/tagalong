@@ -62,20 +62,14 @@ export function shouldGreetOnLaunch(settings: Settings): boolean {
   return settings.welcome.done && settings.greeting;
 }
 
-/** Scout's first line when Always listening is on at launch: that it listens, and how to stop. */
-export const LISTENING_LINE =
-  'I’m listening. Say “Scout, stop”, or switch off Always listening in my bubble.';
-
 /**
- * Scout's one line as the app opens. With Always listening on it is always the listening
- * line, even with the greeting switched off, and nothing is composed; otherwise the composed
- * greeting when one is allowed, or nothing.
+ * Scout's one line as the app opens: the composed greeting when one is allowed, or nothing.
+ * Always listening does not change it: that shows as a mark on Scout, not a line.
  */
 export async function launchLine(
   settings: Settings,
   compose: () => Promise<GreetLine>,
 ): Promise<GreetLine | null> {
-  if (settings.listening.always) return { text: LISTENING_LINE };
   return shouldGreetOnLaunch(settings) ? compose() : null;
 }
 

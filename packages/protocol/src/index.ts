@@ -28,6 +28,7 @@ export * from './rpc';
 export * from './settings';
 export * from './voice';
 export * from './addressing';
+export * from './status';
 export * from './blind-spots';
 export * from './awareness';
 export * from './methods';

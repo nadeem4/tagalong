@@ -256,8 +256,8 @@ export function ProposalCard({
     >
       <p className="bubble-text">
         {then === undefined
-          ? `I’ll ask ${expertName} to look into it. Is this right?`
-          : `I’ll ask ${expertName} first, then ${then.expertName}. Is this right?`}
+          ? `Hand this to ${expertName}?`
+          : `Hand this to ${expertName}, then ${then.expertName}?`}
       </p>
       <dl className="handoff-rows">
         {then === undefined && (

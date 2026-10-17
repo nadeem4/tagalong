@@ -31,6 +31,16 @@ function partsOnce() {
   }));
 }
 
+describe('the ears’ failure messages', () => {
+  it('are neutral status lines, never Scout speaking', () => {
+    expect(EARS_DOWNLOAD_FAILED).toBe(
+      'Speech models didn’t download. Check the internet connection.',
+    );
+    expect(EARS_MODEL_DAMAGED).toBe('The speech model download was damaged. Check the connection.');
+    expect(EARS_START_FAILED).toBe('Listening couldn’t start. It retries on its own.');
+  });
+});
+
 describe('createEarsHost', () => {
   it('loads the models once, keeps the first words heard while loading, and posts each event', async () => {
     const posted: FromWorker[] = [];

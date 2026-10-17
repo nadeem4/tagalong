@@ -1,11 +1,13 @@
 /**
  * Scout on the dock: the pixel character with a face per mood, a small tag (Seeing,
- * Working, Done), blinking, and the sight-paused, recording and listening marks.
+ * Working, Done), blinking, the sight-paused, recording and listening marks, and the status tag.
  * Contains DockPet. Used by the desktop avatar window.
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import type { Pet } from '@tagalong/protocol';
+import { STATUS_WORDS } from '@tagalong/protocol';
+import type { Pet, StatusMark as StatusMarkValue } from '@tagalong/protocol';
+import { StatusMark } from './status-mark';
 import { PixelSprite } from './theme/pixel-sprite';
 import { SCOUT_SPRITE } from './theme/sprites/characters';
 import { withBlink, withMood, type DockMood } from './theme/sprites/expressions';
@@ -22,6 +24,8 @@ export interface DockPetProps {
   listening?: 'on' | 'paused' | undefined;
   /** How often it blinks. Left out, every three to six seconds, never in step. */
   blinkEveryMs?: number;
+  /** The top status mark (a problem, progress or a hint), as a tag at the bottom centre. */
+  status?: StatusMarkValue | null;
 }
 
 /** How long the eyes stay shut. */
@@ -75,6 +79,7 @@ export function DockPet({
   recording = false,
   listening,
   blinkEveryMs,
+  status,
 }: DockPetProps) {
   const [blinking, setBlinking] = useState(false);
   // Blinks in moods with open eyes; working looks down at the task, done and cheer squint,
@@ -114,7 +119,9 @@ export function DockPet({
   const tag = isTagged(mood) ? TAGS[mood] : undefined;
   const label = `${pet.name} ${WORDS[mood]}${sightPaused ? ', sight paused' : ''}${
     recording && !sightPaused ? ', recording the screen' : ''
-  }${listening === 'on' ? ', listening' : listening === 'paused' ? ', listening paused' : ''}`;
+  }${listening === 'on' ? ', listening' : listening === 'paused' ? ', listening paused' : ''}${
+    status == null ? '' : `, ${status.detail ?? STATUS_WORDS[status.id].detail}`
+  }`;
   return (
     <span
       role="img"
@@ -182,6 +189,7 @@ export function DockPet({
           }}
         />
       )}
+      {status != null && <StatusMark mark={status} variant="tag" />}
       {listening !== undefined && (
         <span
           className="dock-pet__listening"

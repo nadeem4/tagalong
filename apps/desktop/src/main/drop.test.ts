@@ -189,14 +189,14 @@ describe('readDrop', () => {
   it('returns an error for a missing file rather than throwing', async () => {
     const { fs } = fakeFs({});
     const read = await readDrop({ kind: 'file', name: 'gone.md', path: '/w/gone.md' }, fs);
-    expect(read).toEqual({ ok: false, error: 'I couldn’t read gone.md.' });
+    expect(read).toEqual({ ok: false, error: 'Couldn’t read gone.md.' });
   });
 
   it('returns an error when a picture cannot be decoded', async () => {
     const { fs } = fakeFs({ '/w/bad.png': { size: 10 } });
     fs.readImage = () => Promise.reject(new Error('not an image'));
     const read = await readDrop({ kind: 'image', name: 'bad.png', path: '/w/bad.png' }, fs);
-    expect(read).toEqual({ ok: false, error: 'I couldn’t read bad.png.' });
+    expect(read).toEqual({ ok: false, error: 'Couldn’t read bad.png.' });
   });
 
   it('passes text and a link through as they are', async () => {
@@ -228,7 +228,7 @@ describe('dropDesk', () => {
     await expect(desk.take()).rejects.toThrow(/nothing/i);
 
     desk.offer({ paths: ['/w/gone.md'] });
-    await expect(desk.take()).rejects.toThrow('I couldn’t read gone.md.');
+    await expect(desk.take()).rejects.toThrow('Couldn’t read gone.md.');
   });
 
   it('lets a held drop expire, unread, so a later ask cannot send it', async () => {

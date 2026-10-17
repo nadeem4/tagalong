@@ -1,7 +1,7 @@
 /**
  * The pure rules behind talk.ts: when a question is over, what words to show, and saying a
  * microphone or ears failure once per run of failures. Contains settles, shownPartial, micNote,
- * FailureStreak and EarsNotes.
+ * FailureStreak, EarsNotes and NOTHING_HEARD.
  */
 import { addressedToScout } from '@tagalong/protocol';
 import type { ListenMode } from '@tagalong/protocol';
@@ -10,6 +10,8 @@ import { micFailure } from './setup-ears';
 export const FIRST_TIME =
   'The first time, Tagalong downloads its speech models (about 43 MB). Speech is turned into text on this PC.';
 const EARS_FAILED = 'Listening stopped. Try again.';
+/** A held question that heard no words: a bubble note, never said aloud. */
+export const NOTHING_HEARD = 'Nothing heard.';
 const MIC_BUSY =
   'Another app is using the microphone. Close it and try again, or pick another in Settings.';
 const NO_MICROPHONE =

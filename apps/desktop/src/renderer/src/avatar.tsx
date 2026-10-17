@@ -1,12 +1,12 @@
 /**
- * The avatar window's page: Scout's pixel figure on the desktop, with its mood and the
- * sight-paused, recording and listening marks. Mood rules live in dock.ts and pointer and
+ * The avatar window's page: Scout's pixel figure on the desktop, with its mood, the
+ * sight-paused, recording and listening marks, and the top status mark. Mood rules live in dock.ts and pointer and
  * drop handling in pet-input.ts; this file only wires them to the host.
  */
 import { StrictMode, useEffect, useReducer, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { DockPet } from '@tagalong/ui';
-import type { Pet } from '@tagalong/protocol';
+import type { Pet, StatusMark } from '@tagalong/protocol';
 import type { ListeningState } from '../../shared/ipc';
 // Bundled, not fetched: the dock's tags are Onest 600, Latin subset only.
 import '@fontsource/onest/latin-600.css';
@@ -32,6 +32,7 @@ function Avatar() {
   const [sightPaused, setSightPaused] = useState(false);
   const [recording, setRecording] = useState(false);
   const [listening, setListening] = useState<ListeningState>({ on: false, paused: false });
+  const [status, setStatus] = useState<StatusMark | null>(null);
   const [input] = useState(() => petInput(window.tagalongHost, send));
 
   useEffect(() => {
@@ -68,6 +69,15 @@ function Avatar() {
       .then(setListening)
       .catch((error: unknown) => console.error('could not read Always listening', error));
     return window.tagalongHost.onListening(setListening);
+  }, []);
+
+  // The top status mark (why Scout cannot think, Listening, ...), read on mount for the same reason.
+  useEffect(() => {
+    window.tagalongHost
+      .getStatusMark()
+      .then(setStatus)
+      .catch((error: unknown) => console.error('could not read the status mark', error));
+    return window.tagalongHost.onStatusMark(setStatus);
   }, []);
 
   // Engine events, and main's presence.away and presence.back on the same channel. A wince
@@ -146,6 +156,7 @@ function Avatar() {
           sightPaused={sightPaused}
           recording={recording}
           listening={listening.on ? (listening.paused ? 'paused' : 'on') : undefined}
+          status={status}
         />
       </button>
     </div>

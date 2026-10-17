@@ -4,10 +4,10 @@
  * FixTarget, healthRows and healthHeadline.
  */
 
-import type { ConnectionStatus, MouthId } from '@tagalong/protocol';
+import type { ConnectionStatus, FixTarget, MouthId } from '@tagalong/protocol';
 
-/** Where a Fix it button lands: a Settings section, or a Home page. */
-export type FixTarget = 'brain' | 'voice' | 'browser' | 'privacy' | 'experts' | 'connections';
+/** Where a Fix it button lands; the type lives in protocol, beside the status marks. */
+export type { FixTarget };
 
 /**
  * What the health check read, from calls the host already makes. Each is `unknown` when its
@@ -47,7 +47,7 @@ export interface HealthRow {
   fix?: FixTarget;
 }
 
-const UNKNOWN = 'I couldn’t check this.';
+const UNKNOWN = 'Not checked.';
 
 const LABELS: Record<HealthCheckId, string> = {
   brain: 'Brain',
@@ -80,13 +80,13 @@ function names(list: readonly string[]): string {
 function brainRow(brain: HealthFacts['brain']): HealthRow {
   switch (brain) {
     case 'ready':
-      return make('brain', 'ok', 'I can think.');
+      return make('brain', 'ok', 'Ready.');
     case 'signed-out':
-      return make('brain', 'broken', 'I’m signed out of Claude.', 'brain');
+      return make('brain', 'broken', 'Signed out of Claude.', 'brain');
     case 'no-sign-in':
-      return make('brain', 'broken', 'I can’t find Claude Code on this computer.', 'brain');
+      return make('brain', 'broken', 'Claude Code isn’t on this computer.', 'brain');
     case 'no-key':
-      return make('brain', 'broken', 'I have no API key.', 'brain');
+      return make('brain', 'broken', 'No API key.', 'brain');
     default:
       return make('brain', 'unknown', UNKNOWN);
   }
@@ -98,7 +98,7 @@ function expertsRow(experts: HealthFacts['experts']): HealthRow {
   const down = experts.filter((expert) => !expert.ok).map((expert) => expert.name);
   return down.length > 0
     ? make('experts', 'broken', `${names(down)} can’t be reached.`, 'experts')
-    : make('experts', 'ok', 'My experts can be reached.');
+    : make('experts', 'ok', 'All experts reachable.');
 }
 
 function connectionsRow(connections: HealthFacts['connections']): HealthRow {
@@ -114,7 +114,7 @@ function connectionsRow(connections: HealthFacts['connections']): HealthRow {
   return make(
     'connections',
     'ok',
-    connections.length === 0 ? 'No apps connected.' : 'My apps are connected.',
+    connections.length === 0 ? 'No apps connected.' : 'All apps connected.',
   );
 }
 
@@ -124,13 +124,13 @@ function voiceRow(voice: HealthFacts['voice']): HealthRow {
   if (voice.enabled && voice.mouth === 'elevenlabs' && !voice.elevenLabsKey) {
     problems.push('The ElevenLabs voice has no key.');
   }
-  if (voice.earsUsed && !voice.earsReady) problems.push('My ears’ model isn’t downloaded.');
+  if (voice.earsUsed && !voice.earsReady) problems.push('Speech model not downloaded.');
   if (problems.length > 0) return make('voice', 'broken', problems.join(' '), 'voice');
   if (!voice.enabled) return make('voice', 'info', 'Voice is off.', 'voice');
   if (voice.mouth === 'kokoro' && !voice.mouthReady) {
-    return make('voice', 'ok', 'My voice downloads the first time I speak.');
+    return make('voice', 'ok', 'Voice downloads on first use.');
   }
-  return make('voice', 'ok', 'I can talk.');
+  return make('voice', 'ok', 'Ready.');
 }
 
 function microphoneRow(microphone: HealthFacts['microphone']): HealthRow {
@@ -163,7 +163,7 @@ export function healthRows(facts: HealthFacts): HealthRow[] {
 
 const COUNT = ['One', 'Two', 'Three', 'Four', 'Five', 'Six'];
 
-/** The card's first line, and the only one said aloud. */
+/** The card's first line, and the only one said aloud (only when the question was spoken). */
 export function healthHeadline(rows: readonly HealthRow[]): string {
   const broken = rows.filter((row) => row.state === 'broken').length;
   if (broken === 0) return 'Everything’s working.';

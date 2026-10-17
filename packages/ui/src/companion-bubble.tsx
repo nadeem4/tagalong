@@ -15,8 +15,10 @@ import type {
   PickUpReadyParams,
   RoutineProposedParams,
   SettingsProposedParams,
+  StatusMark as StatusMarkValue,
 } from '@tagalong/protocol';
 import { ANSWER_CSS, Answer } from './answer';
+import { StatusMark } from './status-mark';
 import {
   HANDOFF_CSS,
   HandoffStatus,
@@ -112,6 +114,8 @@ export interface CompanionBubbleProps {
   drop?: DropOffer;
   /** The drop card was answered or cancelled. */
   onDropDone?: () => void;
+  /** The top status mark from the host: a muted row above the question box, never spoken. */
+  status?: StatusMarkValue | null;
 }
 
 /** A question and how it was answered, once it is over. */
@@ -200,6 +204,7 @@ export function CompanionBubble({
   onPickUpDone,
   drop,
   onDropDone,
+  status,
 }: CompanionBubbleProps) {
   const bridge = useHostBridge();
   const [draft, setDraft] = useState('');
@@ -492,6 +497,15 @@ export function CompanionBubble({
       ) : null}
     </p>
   );
+  const statusRow = status != null && (
+    <StatusMark
+      mark={status}
+      variant="row"
+      {...(bridge.openFix !== undefined
+        ? { onFix: (target: FixTarget) => void bridge.openFix?.(target) }
+        : {})}
+    />
+  );
   const replyHint = talk !== undefined && spokenReply && reply.state === 'done' && (
     <span>Hold {talk.keyLabel} to reply</span>
   );
@@ -508,7 +522,12 @@ export function CompanionBubble({
     withDrop = false,
   ): void => {
     if (question !== null && (reply.state === 'done' || reply.state === 'failed')) {
-      const answered = { question, answer: reply.text, failed: reply.state === 'failed' };
+      const answered = {
+        question,
+        answer:
+          reply.state === 'done' && reply.status !== undefined ? reply.status : reply.text,
+        failed: reply.state === 'failed',
+      };
       setPast((current) => [...current, answered]);
     }
     healthRun.current += 1;
@@ -552,7 +571,7 @@ export function CompanionBubble({
   /**
    * "Scout, what's wrong?": the health card instead of a turn, read from the host with no
    * model call, so it works when Scout cannot think. An answer still running is stopped.
-   * Only the headline is said; the card's rows are for reading.
+   * Only the headline is said, and only to a spoken question; the card's rows are for reading.
    */
   const checkHealth = (text: string, asSpoken: boolean): void => {
     if (mine.current !== null) void bridge.interrupt(mine.current);
@@ -574,12 +593,13 @@ export function CompanionBubble({
         setHealth({ rows });
         // Kept as the answer, so the full chat's history shows what the check said.
         setReply({ state: 'done', text: headline });
-        onSay?.(headline);
+        // Said aloud only when the question was spoken; a typed one is read on the card.
+        if (asSpoken) onSay?.(headline);
       })
       .catch(() => {
         if (run !== healthRun.current) return;
         setHealth(null);
-        setReply({ state: 'failed', text: 'I couldn’t run the health check.' });
+        setReply({ state: 'failed', text: 'Health check failed.' });
       });
   };
 
@@ -846,6 +866,7 @@ export function CompanionBubble({
           </div>
           <footer className="bubble-foot">
             {chipList}
+            {statusRow}
             {talkStatus}
             {replyHint !== false && <p className="bubble-hints">{replyHint}</p>}
             {field(`Message ${petName}`)}
@@ -878,6 +899,7 @@ export function CompanionBubble({
         )}
         {answer}
         {handoffCard}
+        {statusRow}
         {talkStatus}
         {field(`Ask ${petName}`)}
         <div className="bubble-row bubble-hints">
@@ -994,7 +1016,11 @@ function TryItInvite({
 export interface GreetingLineProps {
   petName: string;
   /** The one line the pet says as the app opens. */
-  text: string;
+  text?: string;
+  /** Instead of words: a status mark's row (a launch where Scout cannot think), never spoken. */
+  status?: StatusMarkValue;
+  /** The status row's Fix it. */
+  onFix?: (target: FixTarget) => void;
   /** It left: the time ran out, or the person closed it. */
   onDone: () => void;
   /** The person clicked it: open the bubble to ask. */
@@ -1006,7 +1032,7 @@ export interface GreetingLineProps {
   onNotNow?: () => void;
   /**
    * A button on the line. For a task an expert could take it opens the hand-off card (nothing
-   * is sent yet); for a launch line that cannot think, Fix it opens Settings.
+   * is sent yet); for a pick-up, Pick up opens its card.
    */
   offer?: { label: string; onAccept: () => void };
 }
@@ -1028,6 +1054,8 @@ export function GreetingLine({
   holdMs = 7_000,
   onNotNow,
   offer,
+  status,
+  onFix,
 }: GreetingLineProps) {
   const [held, setHeld] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -1057,16 +1085,20 @@ export function GreetingLine({
       >
         <style>{BUBBLE_CSS}</style>
         <div className="bubble-top">
-          <button
-            type="button"
-            className="bubble-say"
-            aria-label={`Ask ${petName} something`}
-            onClick={onOpen}
-          >
-            <span role="status" aria-live="polite" className="bubble-text">
-              {text}
-            </span>
-          </button>
+          {status !== undefined ? (
+            <StatusMark mark={status} variant="row" {...(onFix !== undefined ? { onFix } : {})} />
+          ) : (
+            <button
+              type="button"
+              className="bubble-say"
+              aria-label={`Ask ${petName} something`}
+              onClick={onOpen}
+            >
+              <span role="status" aria-live="polite" className="bubble-text">
+                {text}
+              </span>
+            </button>
+          )}
           <button type="button" className="bubble-close" aria-label="Close" onClick={onDone}>
             ×
           </button>

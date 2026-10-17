@@ -53,6 +53,8 @@ test('Always listening: off at launch, on only when switched, Scout hears and an
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-checked', 'true');
   await expect(avatar.getByTestId('listening-mark')).toHaveAttribute('data-state', 'on');
+  // Switching on shows "Listening" on Scout for a few seconds: a mark, not a spoken line.
+  await expect(avatar.getByTestId('status-mark')).toHaveAttribute('data-id', 'listening-on');
 
   // The fake ears end one turn by themselves after a few frames of Chromium's fake mic. They
   // say "Scout, what am I looking at?": the bubble asks it without the name.
