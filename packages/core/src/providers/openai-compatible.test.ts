@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import type { BrainEvents, BrainRequest } from './brain';
 import { BrainError } from './errors';
 import { OpenAiCompatibleProvider } from './openai-compatible';
-import { REFUSAL_MESSAGE } from './brain';
 
 /**
  * Every test talks to a fake `fetch` that answers with canned server-sent events, so the
@@ -485,15 +484,15 @@ describe('OpenAiCompatibleProvider', () => {
     expect(result.stopReason).toBe('max_tokens');
   });
 
-  it('maps content_filter to a refusal with a friendly message', async () => {
+  it('maps content_filter to a refusal with no text', async () => {
     const { provider: p } = provider([textReply([], 'content_filter')]);
     const { events, deltas } = recorder();
 
     const result = await p.complete(request, events, signal());
 
     expect(result.stopReason).toBe('refusal');
-    expect(result.text).toBe(REFUSAL_MESSAGE);
-    expect(deltas).toEqual([REFUSAL_MESSAGE]);
+    expect(result.text).toBe('');
+    expect(deltas).toEqual([]);
   });
 
   it('treats a stream without usage as zero tokens rather than failing', async () => {

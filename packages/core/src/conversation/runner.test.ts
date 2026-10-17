@@ -383,7 +383,10 @@ describe('ConversationRunner perception tools', () => {
     const runner = makeRunner(observed.provider);
     await runner.run({ pet, text: 'what is this?' }).done;
 
-    expect(observed.toolResults[0]?.isError).toBe(true);
+    expect(observed.toolResults[0]).toEqual({
+      content: 'No tools are available on this turn.',
+      isError: true,
+    });
     expect(observed.requests[0]?.tools).toBeUndefined();
   });
 });

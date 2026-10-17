@@ -9,7 +9,7 @@ import type { BrainContentBlock, BrainProvider, BrainResult } from '../providers
 import { BrainError } from '../providers';
 import type { ConversationStore } from '../memory/store';
 import type { MemoryStore } from '../memory/memories';
-import { recall, statedPreference } from '../memory/recall';
+import { recall } from '../memory/recall';
 import type { SettingsStore } from '../settings/settings';
 import { hasPixels, mayPersistScreenshot, withoutPixels } from '../perception';
 import {
@@ -21,7 +21,6 @@ import {
   type ConnectorToolDeps,
   type RoutineTurnContext,
   type RoutineToolDeps,
-  type DayToolDeps,
   type HistoryToolDeps,
   type SettingsToolDeps,
 } from '../tools';
@@ -84,9 +83,7 @@ export interface ConversationRunnerOptions {
   connections?: ConnectorToolDeps | undefined;
   /** Gives a companion `create_routine` and `change_routine`, which show the routine card. */
   routines?: RoutineToolDeps | undefined;
-  /** Gives a companion `recall_day`, the daily briefing over the records already kept. */
-  day?: DayToolDeps | undefined;
-  /** Gives a companion `search_history`, the searchable work memory. */
+  /** Gives a companion `search_history`: the searchable work memory and day listings. */
   history?: HistoryToolDeps | undefined;
   /** Gives a companion `change_settings`, which shows the settings card. */
   changeSettings?: SettingsToolDeps | undefined;
@@ -146,7 +143,7 @@ interface ActiveTurn {
  * refuses an unknown name through the registry instead. Honest beats silent: an empty
  * result teaches the model the tool worked and returned nothing.
  */
-const NO_TOOLS_YET = 'No tools are available yet. Answer from the context you already have.';
+const NO_TOOLS_YET = 'No tools are available on this turn.';
 
 /** Code on the warning a host shows when the pet's brain cannot read the picture it was given. */
 const VISION_UNSUPPORTED = 'vision_unsupported';
@@ -172,7 +169,6 @@ export class ConversationRunner {
       experts: options.experts,
       connections: options.connections,
       routines: options.routines,
-      day: options.day,
       history: options.history,
       changeSettings: options.changeSettings,
       toolsFor: options.toolsFor,
@@ -212,16 +208,6 @@ export class ConversationRunner {
       content: [{ type: 'text', text: ask.text }],
       ...(stored ? { snapshot: stored } : {}),
     });
-
-    // Filed before the turn runs, so even a turn that fails still keeps what was said.
-    const preference = this.#options.memory ? statedPreference(ask.text) : null;
-    if (preference !== null) {
-      this.#options.memory?.addOnce({
-        petId: ask.pet.id,
-        kind: 'preference',
-        text: preference,
-      });
-    }
 
     // Gathered before turn.started: that event writes this turn's activity row, so the
     // "last talked" time read here is still the turn before.

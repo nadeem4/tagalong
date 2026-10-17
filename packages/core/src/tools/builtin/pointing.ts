@@ -105,8 +105,7 @@ async function pointAt(deps: PointingDeps, input: unknown): Promise<ToolOutcome>
       params.label === undefined || params.label === '' ? 'that spot' : `'${params.label}'`;
     const where = answer.screen === undefined ? '' : ` on screen ${answer.screen}`;
     return {
-      content:
-        `Pointing at ${what}${where}. The ring fades by itself in a few seconds.`,
+      content: `Pointing at ${what}${where}. The ring fades by itself in a few seconds.`,
     };
   } catch (error) {
     return hostFailure(error);

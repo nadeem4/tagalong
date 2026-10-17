@@ -271,6 +271,29 @@ describe('ChatPanel', () => {
     expect(screen.getByRole('textbox')).toBeEnabled();
   });
 
+  it.each([
+    ['refusal', 'Declined'],
+    ['tool_limit', 'Stopped: too many steps'],
+  ] as const)('notes a %s that said nothing, as a quiet status line', (stopReason, status) => {
+    const bridge = createFakeHostBridge();
+    renderPanel(bridge);
+    send('Explain this');
+
+    act(() => {
+      bridge.emit({ type: 'turn.started', turnId: 't1', petId: 'scout', conversationId: 'c1' });
+      bridge.emit({
+        type: 'turn.completed',
+        turnId: 't1',
+        text: '',
+        stopReason,
+        usage: { inputTokens: 1, outputTokens: 0 },
+      });
+    });
+
+    expect(screen.getByTestId('note')).toHaveTextContent(status);
+    expect(screen.getByRole('textbox')).toBeEnabled();
+  });
+
   it('shows a turn error instead of leaving the panel stuck streaming', () => {
     const bridge = createFakeHostBridge();
     renderPanel(bridge);

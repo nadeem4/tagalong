@@ -15,7 +15,6 @@ export type {
   BrainResult,
   BrainTool,
 } from './brain';
-export { REFUSAL_MESSAGE } from './brain';
 export { BrainError, type BrainErrorCode } from './errors';
 export { ANTHROPIC_MODELS, AnthropicProvider } from './anthropic';
 export { CLAUDE_CODE_MODELS, ClaudeCodeBrain } from './claude-code-brain';

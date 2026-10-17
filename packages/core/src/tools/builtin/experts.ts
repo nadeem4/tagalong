@@ -310,8 +310,7 @@ export function tellExpertTool(deps: ExpertToolDeps, running: readonly RunningHa
     };
     if (!steered.ok) return fail(steered.error);
     return Promise.resolve({
-      content:
-        `Queued for ${target.expertName}: it gets it when its current step ends.`,
+      content: `Queued for ${target.expertName}: it gets it when its current step ends.`,
     });
   });
 }

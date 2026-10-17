@@ -37,6 +37,7 @@ import type { FixTarget, HealthRow } from './health';
 import { HealthCard } from './health-card';
 import type { TurnEvent } from './host-bridge';
 import { themeTokens as t } from './theme/tokens';
+import { stopStatus } from './stop-status';
 import { SpokenStream } from './voice/spoken-stream';
 import { goesOn, wantsReadAloud } from './voice/read-aloud';
 
@@ -166,7 +167,7 @@ const SAY_GAP_MS = 20_000;
 type Reply =
   | { state: 'idle' }
   | { state: 'running'; turnId: string | null; text: string }
-  | { state: 'done'; text: string }
+  | { state: 'done'; text: string; status?: string }
   | { state: 'failed'; text: string };
 
 /**
@@ -289,9 +290,18 @@ export function CompanionBubble({
           current.state === 'running' ? { ...current, text: current.text + event.text } : current,
         );
         return;
-      case 'turn.completed':
+      case 'turn.completed': {
         if (event.turnId !== mine.current) return;
         mine.current = null;
+        // Nothing said, with a reason: a quiet status, never spoken.
+        const status = stopStatus(event.text, event.stopReason);
+        if (status !== null) {
+          spoken.current?.stream.end();
+          spoken.current?.lines.end();
+          spoken.current = null;
+          setReply({ state: 'done', text: '', status });
+          return;
+        }
         setReply({ state: 'done', text: event.text });
         if (spoken.current === null) {
           onSay?.(event.text);
@@ -302,6 +312,7 @@ export function CompanionBubble({
           setSpokenReply(true);
         }
         return;
+      }
       case 'turn.error':
         if (event.turnId !== mine.current) return;
         mine.current = null;
@@ -666,7 +677,10 @@ export function CompanionBubble({
           </button>
         </div>
       )}
-      {reply.state === 'done' && (
+      {reply.state === 'done' && reply.status !== undefined && (
+        <p className="bubble-status">{reply.status}</p>
+      )}
+      {reply.state === 'done' && reply.status === undefined && (
         <div className="bubble-answer">
           <Answer text={reply.text} onCopy={copyText} />
         </div>
@@ -1183,6 +1197,7 @@ const BUBBLE_CSS = `
   .bubble-speaking span, .bubble-speaking span:nth-child(2) { transform: scaleY(0.6); transition: none; }
 }
 .bubble-text { margin: 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+.bubble-status { margin: 0; color: #C9CEE0; font-size: 12px; }
 .bubble-answer { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
 .bubble-error { margin: 0; padding: 8px 12px; border-radius: 6px; background: #3a1d2a; color: #ffb4c0; font-size: 13px; }
 .bubble-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }

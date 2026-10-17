@@ -218,9 +218,7 @@ async function runRecallScreen(context: RecallContext, input: unknown): Promise<
         `not ${ago(secondsAgo)}.`,
     );
   }
-  lines.push(
-    `This is the screen at ${at} (${ago(actualAgo)}), not now.`,
-  );
+  lines.push(`This is the screen at ${at} (${ago(actualAgo)}), not now.`);
   if (result.focusedWindow !== undefined) {
     const { processName, title } = result.focusedWindow;
     lines.push(`In front then: ${processName}${title ? ` — ${title}` : ''}.`);

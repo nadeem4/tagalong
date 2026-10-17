@@ -235,8 +235,7 @@ async function capture(options: PerceptionToolsOptions, vision: boolean): Promis
   const host = options.hosts().find((candidate) => candidate.capabilities.includes(target));
   if (host === undefined) {
     return {
-      content:
-        'No connected host can take a screenshot.',
+      content: 'No connected host can take a screenshot.',
       isError: true,
     };
   }
@@ -272,8 +271,7 @@ async function selection(options: PerceptionToolsOptions): Promise<ToolOutcome> 
     });
     if (read === null) {
       return {
-        content:
-          'No connected host can read the selection.',
+        content: 'No connected host can read the selection.',
         isError: true,
       };
     }

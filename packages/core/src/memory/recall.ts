@@ -1,6 +1,6 @@
 /**
- * What a turn remembers: recall picks the memories for one prompt, and statedPreference
- * catches a preference the person states so it is kept even if no tool is called.
+ * What a turn remembers: recall picks the memories for one prompt. A preference the person
+ * states is kept by the `remember` tool or the conversation summary, not by pattern.
  */
 import type { Memory, MemoryStore } from './memories';
 
@@ -39,35 +39,4 @@ export function recall(memories: MemoryStore, petId: string, query: string): Mem
     used += memory.text.length;
   }
   return kept;
-}
-
-/** The longest stated preference worth keeping verbatim. */
-const MAX_PREFERENCE_CHARS = 200;
-
-/** Phrases that announce something lasting about how the user wants to be answered. */
-const PREFERENCE_PATTERNS: readonly RegExp[] = [
-  /\bI (?:really |strongly )?prefer\b/i,
-  /\bfrom now on\b/i,
-  /\bremember that\b/i,
-  /\b(?:always|never) (?:answer|reply|respond|use|write|explain|keep)\b/i,
-  /\bI(?:'d| would) like (?:you|your answers|answers)\b/i,
-];
-
-/**
- * The sentence in which the user states a lasting preference, or null.
- *
- * A safety net under the `remember` tool: a model may or may not decide to save "I prefer
- * short answers", and the acceptance promise — the pet still keeps answers short after a
- * restart — should not hinge on that choice. Questions are skipped, so "which do you
- * prefer?" is not mistaken for a preference.
- */
-export function statedPreference(text: string): string | null {
-  for (const match of text.matchAll(/[^.!?\n]+[.!?]?/g)) {
-    const sentence = match[0].trim();
-    if (sentence.length === 0 || sentence.endsWith('?')) continue;
-    if (PREFERENCE_PATTERNS.some((pattern) => pattern.test(sentence))) {
-      return sentence.slice(0, MAX_PREFERENCE_CHARS);
-    }
-  }
-  return null;
 }

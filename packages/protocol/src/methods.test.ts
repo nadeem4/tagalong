@@ -333,6 +333,18 @@ describe('notification schemas', () => {
     expect(parsed.stopReason).toBe('end');
   });
 
+  it('accepts a silent refusal and a tool limit: empty text with the reason', () => {
+    for (const stopReason of ['refusal', 'tool_limit'] as const) {
+      const parsed = notificationParamsSchemaFor('turn.completed').parse({
+        turnId,
+        text: '',
+        stopReason,
+        usage: { inputTokens: 1, outputTokens: 0 },
+      });
+      expect(parsed.stopReason).toBe(stopReason);
+    }
+  });
+
   it('rejects an unknown stop reason', () => {
     const bad = {
       turnId,

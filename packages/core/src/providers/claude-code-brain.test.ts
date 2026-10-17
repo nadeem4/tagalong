@@ -157,6 +157,20 @@ describe('ClaudeCodeBrain', () => {
     expect(answer.usage).toEqual({ inputTokens: 20, outputTokens: 6 });
   });
 
+  it('stops with tool_limit and no text when the model keeps calling tools', async () => {
+    const call = result('<tool_call>{"name":"look_at_screen","input":{}}</tool_call>');
+    const { spawn, calls } = fakeSpawn(Array.from({ length: 20 }, () => [call]));
+    const brain = new ClaudeCodeBrain({ spawn, cwd: 'C:\tmp' });
+    const { text, events: ev } = events();
+
+    const answer = await brain.complete(request(), ev, new AbortController().signal);
+
+    expect(answer.stopReason).toBe('tool_limit');
+    expect(answer.text).toBe('');
+    expect(text).toEqual([]);
+    expect(calls.length).toBeGreaterThan(1);
+  });
+
   it('says plainly when Claude Code is not installed', async () => {
     const spawn: SpawnFn = () => {
       throw Object.assign(new Error('spawn claude ENOENT'), { code: 'ENOENT' });

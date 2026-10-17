@@ -274,7 +274,7 @@ describe(HAND_TO_EXPERT, () => {
       });
       expect(outcome.isError).toBeUndefined();
       expect(outcome.content).toContain('read-only');
-    expect(directivesIn(outcome.content)).toEqual([]);
+      expect(directivesIn(outcome.content)).toEqual([]);
       // Only the saved instruction and the model's request: no screen, no files.
       expect(d.research).toEqual([
         {

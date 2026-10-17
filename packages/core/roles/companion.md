@@ -23,7 +23,6 @@ tools:
   - create_routine
   - change_routine
   - point_at
-  - recall_day
   - search_history
   - tell_expert
   - change_settings

@@ -1,12 +1,8 @@
 /**
  * The provider-neutral brain contract every model provider implements. Contains
- * `BrainProvider`, the request, message, content and result types, and `REFUSAL_MESSAGE`.
+ * `BrainProvider` and the request, message, content and result types.
  * The runner and every wrapper (guard, record, meter) speak only these types.
  */
-
-/** Shown instead of an empty bubble when the model declines to answer. Every provider uses it. */
-export const REFUSAL_MESSAGE =
-  "I'd rather not answer that one. Try rephrasing it, or ask me something else.";
 
 export interface BrainCapabilities {
   vision: boolean;
@@ -75,7 +71,11 @@ export interface BrainEvents {
 
 export interface BrainResult {
   text: string;
-  stopReason: 'end' | 'max_tokens' | 'aborted' | 'refusal';
+  /**
+   * `refusal`: the model declined; `tool_limit`: it kept calling tools past the step cap.
+   * Both come with no text of their own, so Scout never speaks a canned line.
+   */
+  stopReason: 'end' | 'max_tokens' | 'aborted' | 'refusal' | 'tool_limit';
   usage: { inputTokens: number; outputTokens: number };
 }
 

@@ -729,9 +729,17 @@ describe('activity over rpc', () => {
 });
 
 describe('memory across a restart', () => {
-  it('remembers a stated preference after the engine restarts', async () => {
+  it('remembers a preference the model saved after the engine restarts', async () => {
     const questions: string[] = [];
-    const fake = new FakeBrainProvider({ text: 'Sure.' });
+    // The model keeps it with remember; nothing is filed by pattern.
+    let fake = new FakeBrainProvider({
+      text: 'Sure.',
+      toolCall: {
+        id: 'mem-1',
+        name: 'remember',
+        input: { kind: 'preference', text: 'I prefer short answers.' },
+      },
+    });
     const recording: BrainProvider = {
       id: 'fake',
       capabilities: fake.capabilities,
@@ -753,6 +761,7 @@ describe('memory across a restart', () => {
     await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
     await first.shutdown();
     engine = undefined;
+    fake = new FakeBrainProvider({ text: 'Sure.' });
 
     const second = await boot(recording);
     host = await TestHost.connect(second.port);
