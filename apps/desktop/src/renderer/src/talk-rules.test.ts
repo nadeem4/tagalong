@@ -5,6 +5,7 @@ import {
   FIRST_TIME,
   FailureStreak,
   FollowUpCue,
+  HeardInbox,
   NOTHING_HEARD,
   micMark,
   micNote,
@@ -195,5 +196,53 @@ describe('micNote', () => {
       'The microphone could not be opened. Check that Windows lets apps use it, or pick another in Settings.',
     );
     expect(micNote(new Error('x'))).toMatch(/could not be opened/);
+  });
+});
+
+describe('HeardInbox', () => {
+  it('hands a heard question straight to the bubble listening for it', () => {
+    const inbox = new HeardInbox();
+    const asked: string[] = [];
+    inbox.subscribe((text) => asked.push(text));
+    expect(inbox.deliver('what time is it')).toBe(true);
+    expect(asked).toEqual(['what time is it']);
+  });
+
+  it('holds a question heard while no bubble listens, and asks it once one does', () => {
+    // A hello line, a remark or a routine line is up in the bubble's place, or Scout is
+    // still waking: the question used to be thrown away with nothing to say so.
+    const inbox = new HeardInbox();
+    expect(inbox.deliver('what is on my calendar')).toBe(false);
+    const asked: string[] = [];
+    inbox.subscribe((text) => asked.push(text));
+    expect(asked).toEqual(['what is on my calendar']);
+  });
+
+  it('asks a held question once, not again for the next bubble', () => {
+    const inbox = new HeardInbox();
+    inbox.deliver('first');
+    const asked: string[] = [];
+    const leave = inbox.subscribe((text) => asked.push(text));
+    leave();
+    inbox.subscribe((text) => asked.push(`again: ${text}`));
+    expect(asked).toEqual(['first']);
+  });
+
+  it('keeps every question held, in the order heard', () => {
+    const inbox = new HeardInbox();
+    inbox.deliver('one');
+    inbox.deliver('two');
+    const asked: string[] = [];
+    inbox.subscribe((text) => asked.push(text));
+    expect(asked).toEqual(['one', 'two']);
+  });
+
+  it('holds again once the bubble has gone', () => {
+    const inbox = new HeardInbox();
+    const asked: string[] = [];
+    const leave = inbox.subscribe((text) => asked.push(text));
+    leave();
+    expect(inbox.deliver('later')).toBe(false);
+    expect(asked).toEqual([]);
   });
 });
