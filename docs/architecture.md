@@ -1480,15 +1480,25 @@ labels each answer `Name · model`, shows Watching chips and fired watches, and 
 turn in flight. The footer shows a turn's `modelCalls` when it was more than one. The extension's port
 bridge forwards only `turn.*` notifications to it.
 
-The desktop avatar window holds the companion alone: `DockPet` (`@tagalong/ui`) draws its pixel
-character (`SCOUT_SPRITE`) at 4x, with a face and a tag per mood (`withMood`,
-`theme/sprites/expressions.ts`): idle; **Seeing** for 2.5 s after a capture, eyes up; **Working**
-while the companion answers or an expert has a task, eyes down; **Done** when a hand-off finishes, a
-happy squint, until the pet is clicked. Three moods have a face and no tag: **dozing** while the
-person is away (eyes closed to a line, slow breathing), **wince** for 4 s at a failing build or an
-expert's error (eyes squeezed shut, `> <`, one small shake) and **cheer** for 4 s when tests pass (a
-happy squint and two hops). With gentle nudges on, **tired** is a fourth: half-lidded eyes and slow
-breathing after a long stretch or late at night, until `rested` (see Gentle nudges). The mood comes
+The desktop avatar window holds the companion alone: `DockPet` (`@tagalong/ui`) draws Bean, the 3D
+Scout, from pre-rendered frames. Each mood has its own clip: a WebP strip of 192 px frames side by
+side, at 12 fps, with the motion baked in. The strips and `manifest.json` (frames and loop per clip)
+live in `apps/desktop/src/renderer/src/bean/`, and `avatar.tsx` turns them into a `BeanFigure` with
+`import.meta.glob(..., { query: '?url&no-inline' })` and `bean-figure.ts`. They stay out of
+`@tagalong/ui`, whose `tsc -b` build never copies `.webp`, and are emitted as files so the window's
+CSP (`default-src 'self'`) never meets a `data:` URL. `BeanClip` (`theme/bean-clip.tsx`) shows one
+strip in a 96 px box as a CSS background and steps through it with `steps()`: a loop runs forever, a
+one-shot (cheer, wince) plays once and holds its last frame. Bean stands about 55 px tall with its
+floating sign above. `bean.py` (Blender, headless) and `pack.py` in `apps/desktop/scripts/bean/`
+regenerate the set (see its README); the masters and `.blend` stay out of git. The moods: idle;
+**Seeing** for 2.5 s after a capture (waves ripple out, ears perk); **Working** while the companion
+answers or an expert has a task (typing at a laptop, a turning gear); **Done** when a hand-off
+finishes (a hop every loop, a check mark), until the pet is clicked. Three moods have a pose and no
+tag: **dozing** while the person is away (slow breathing, rising z's), **wince** for 4 s at a failing
+build or an expert's error (one shake, a sweat drop) and **cheer** for 4 s when tests pass (one hop).
+With gentle nudges on, **tired** is a fourth: slow breathing and a drooping head after a long
+stretch or late at night, until `rested` (see Gentle nudges). The tags are small (9 px) and sit at
+the top right, beside the sign rather than on it. The mood comes
 from `dockMood(nextDock(...))`
 (`renderer/src/dock.ts`), a pure reducer over turn and hand-off notifications, capture notices,
 `pet.mood`, and main's `presence.away`/`presence.back`, in this order: seeing > working >
@@ -1502,11 +1512,13 @@ listening is on, `DockPet`'s `listening` prop draws a small green dot (`dock-pet
 while on and an outline while paused (it also pulses while speech is heard and has a ring during
 the follow-up window; see Always listening), and the pet's name reads "…, listening" or "…, listening
 paused". The avatar reads `getListening` on mount and follows `onListening`, so the mark shows
-from the first second. The pet is alive: it blinks every three to six
-seconds (`withBlink`) in moods with open eyes, breathes with a 1 px rise when idle or seeing, bobs
-faster while working and hops three times when done; dozing, wince and cheer never blink.
-`prefers-reduced-motion` stops all of it: faces still change, nothing moves. The listening mark
-shows in every mood, dozing included.
+from the first second. The pet is alive: every three to six seconds it is time to blink in idle
+and Seeing, and the blink waits for the loop to come back round to frame 0 (`animationiteration`).
+Then the mood's `idle-blink` or `listening-blink` clip, two frames rendered from that frame-0 pose,
+shows over the loop for 2/12 s while the loop runs on hidden underneath, so nothing jumps or
+restarts. Other moods never blink. `prefers-reduced-motion` (read once) draws every clip as a still,
+frame 0 of a loop or the held last frame of a one-shot, and turns the blink off; poses still change,
+nothing moves. The listening mark shows in every mood, dozing included.
 
 The pet is dragged by hand, since a drag region would swallow its clicks: a press that moves past
 4 px (`startDrag`, `moveDrag` in `renderer/src/dock.ts`) sends each step to main (`dragAvatar`),
@@ -2016,8 +2028,8 @@ false })`, the same titles-only list keeping an eye uses. Nothing is listed or s
   for an expert, a tired face, or nothing. Switching the setting off (`settings.set`) calls
   `CheckIn.settle()`, so a tired face never outlives it.
 - **The dock.** `tired` is sticky in `renderer/src/dock.ts` until `rested`: below working and a
-  wince or cheer, above done and dozing. The face is half-lidded (a lid over open eyes) with the slow
-  doze breathing and no blink; the label reads "Scout looks tired". Tired and rested never start the
+  wince or cheer, above done and dozing. Bean's tired clip breathes slowly with a drooping head and
+  never blinks; the label reads "Scout looks tired". Tired and rested never start the
   avatar's 4 s reaction timer.
 
 ### What an ask with pictures costs
