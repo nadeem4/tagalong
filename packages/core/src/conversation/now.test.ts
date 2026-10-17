@@ -217,8 +217,17 @@ describe('renderMemories', () => {
     expect(text).toContain('0 yyy');
   });
 
+  it('lists recent work after the memories, under the same heading', () => {
+    const work = ['- (your job, today, j-1b2c) "summarise the thread": Friday.'];
+    expect(renderMemories([memory('Short answers.')], work)).toBe(
+      `${MEMORY_HEADING}\n- (preference) Short answers.\n${work[0]}`,
+    );
+    expect(renderMemories([], work)).toBe(`${MEMORY_HEADING}\n${work[0]}`);
+  });
+
   it('is empty when there is nothing to remember, or nothing fits', () => {
     expect(renderMemories([])).toBe('');
+    expect(renderMemories([], [])).toBe('');
     expect(renderMemories([memory('z'.repeat(3000))])).toBe('');
   });
 });

@@ -457,6 +457,24 @@ describe('after a crash', () => {
   });
 });
 
+describe('ActivityLog.prune, at boot', () => {
+  it('deletes rows that started more than 90 days ago, and search forgets them', () => {
+    const old = log.routineStarted({ routineId: randomUUID(), petId: 'scout', name: 'Papers' });
+    log.routineFinished(old, { state: 'done', answer: 'None.' });
+    const kept = log.routineStarted({ routineId: randomUUID(), petId: 'scout', name: 'Papers' });
+    const at = (days: number) => new Date(Date.now() - days * 24 * 60 * 60_000).toISOString();
+    db.prepare('UPDATE activity SET started_at = ? WHERE id = ?').run(at(91), old);
+    db.prepare('UPDATE activity SET started_at = ? WHERE id = ?').run(at(89), kept);
+
+    expect(log.prune()).toBe(1);
+
+    expect(log.list({}).entries.map((entry) => entry.id)).toEqual([kept]);
+    const indexed = db.prepare('SELECT COUNT(*) AS n FROM activity_fts').get() as { n: number };
+    expect(indexed.n).toBe(1);
+    expect(log.prune()).toBe(0);
+  });
+});
+
 describe('ActivityLog.since, for the daily briefing', () => {
   /** Moves a row's start, since the log stamps rows with the real clock. */
   function at(id: string, startedAt: string): void {

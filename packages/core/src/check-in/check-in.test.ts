@@ -51,6 +51,7 @@ interface SetupOptions {
   pickUp?: PickUpReady | null;
   routines?: string[];
   interrupted?: number;
+  recentWork?: string[];
 }
 
 function setup(options: SetupOptions = {}) {
@@ -67,6 +68,7 @@ function setup(options: SetupOptions = {}) {
     hour: 14,
   };
   const logs: string[] = [];
+  const queries: string[] = [];
   const closedCheck = () => {
     if (state.closed) throw new Error('The database connection is not open');
   };
@@ -108,9 +110,10 @@ function setup(options: SetupOptions = {}) {
     windows: () => Promise.resolve(options.hostWindows === undefined ? [] : options.hostWindows),
     experts: () => options.experts ?? [claudeCode],
     now: { clock: () => new Date(clock.t), timeZone: () => 'Europe/London' },
-    memories: () => {
+    memories: (query) => {
       closedCheck();
-      return options.memories ?? [];
+      queries.push(query);
+      return { memories: options.memories ?? [], recentWork: options.recentWork ?? [] };
     },
     lastExchange: () => {
       closedCheck();
@@ -163,6 +166,7 @@ function setup(options: SetupOptions = {}) {
     reported,
     proposals,
     logs,
+    queries,
     checkIn,
     settle,
     stretch,
@@ -361,6 +365,16 @@ describe('CheckIn: what the mind is given', () => {
     await t.stretch();
     expect(t.reads).toHaveLength(1);
     expect(sentText(t.mind.requests[1]!)).toContain('without a break');
+  });
+
+  it('recalls with the words of why it woke, and sends the recent work recall found', async () => {
+    const t = setup({ recentWork: ['- (your job, today, j-1b2c) "fix the login test": Done.'] });
+    await t.checkIn.observeWindows([failing]);
+    t.clock.t += COOLDOWN_MS;
+    await t.checkIn.finished([finishedDone]);
+    expect(t.queries[0]).toContain('npm test - failed - ai_pet');
+    expect(t.queries[1]).toContain('fix the login test');
+    expect(sentText(t.mind.requests[1]!)).toContain('j-1b2c');
   });
 
   it('a finished wake sends the expert, the ask and the answer', async () => {

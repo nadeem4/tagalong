@@ -46,14 +46,20 @@ const MAX_QUERY_WORDS = 16;
  * BM25 rank decides which memory is closest. Returns null when no word survives.
  */
 export function ftsQuery(text: string): string | null {
+  const words = queryWords(text);
+  return words.size === 0 ? null : [...words].map((word) => `"${word}"`).join(' OR ');
+}
+
+/** The distinct lower-case words of two characters or more, at most `max`. */
+export function queryWords(text: string, max = MAX_QUERY_WORDS): Set<string> {
   const words = new Set<string>();
   for (const match of text.toLowerCase().matchAll(/[\p{L}\p{N}]+/gu)) {
     const word = match[0];
     if (word.length < 2) continue;
     words.add(word);
-    if (words.size >= MAX_QUERY_WORDS) break;
+    if (words.size >= max) break;
   }
-  return words.size === 0 ? null : [...words].map((word) => `"${word}"`).join(' OR ');
+  return words;
 }
 
 /**
@@ -96,14 +102,51 @@ export class MemoryStore {
     return existing === undefined ? this.add(input) : toMemory(existing);
   }
 
-  /** The newest memories one pet can see, newest first. */
-  recent(petId: string, limit: number): Memory[] {
+  /** The newest memories one pet can see, newest first; only of `kinds` when given. */
+  recent(petId: string, limit: number, kinds?: readonly MemoryKind[]): Memory[] {
+    const only = kinds === undefined ? '' : `AND m.kind IN (${kinds.map(() => '?').join(', ')})`;
     return this.db
-      .prepare<[string, number], MemoryRow>(
-        `SELECT m.* FROM memories m WHERE ${VISIBLE} ORDER BY m.created_at DESC, m.rowid DESC LIMIT ?`,
+      .prepare<(string | number)[], MemoryRow>(
+        `SELECT m.* FROM memories m WHERE ${VISIBLE} ${only}
+         ORDER BY m.created_at DESC, m.rowid DESC LIMIT ?`,
       )
-      .all(petId, limit)
+      .all(petId, ...(kinds ?? []), limit)
       .map(toMemory);
+  }
+
+  count(petId: string, kind: MemoryKind): number {
+    return this.db
+      .prepare<[string, string], { n: number }>(
+        'SELECT COUNT(*) AS n FROM memories WHERE pet_id = ? AND kind = ?',
+      )
+      .get(petId, kind)!.n;
+  }
+
+  /** Rewrites one of the pet's own memories (the digest's REPLACE); the search index follows. */
+  update(petId: string, id: string, text: string): boolean {
+    const kept = text.trim();
+    if (kept === '') return false;
+    return (
+      this.db
+        .prepare('UPDATE memories SET text = ? WHERE id = ? AND pet_id = ?')
+        .run(kept, id, petId).changes > 0
+    );
+  }
+
+  /** Runs `apply` as one transaction: all of it lands, or none. */
+  transaction(apply: () => void): void {
+    this.db.transaction(apply)();
+  }
+
+  /** Deletes the pet's oldest summaries beyond `keep`; returns how many went. */
+  evictSummaries(petId: string, keep: number): number {
+    return this.db
+      .prepare(
+        `DELETE FROM memories WHERE id IN (
+           SELECT id FROM memories WHERE pet_id = ? AND kind = 'summary'
+           ORDER BY created_at DESC, rowid DESC LIMIT -1 OFFSET ?)`,
+      )
+      .run(petId, keep).changes;
   }
 
   /** The memories one pet can see that share words with `text`, best match first. */

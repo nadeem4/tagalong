@@ -83,6 +83,33 @@ describe('recall in a turn', () => {
     expect(requests[0]?.system).not.toContain('Prefers short answers');
   });
 
+  it('adds a recent job of its own that matches the question', async () => {
+    const requests: BrainRequest[] = [];
+    const turns = new ConversationRunner({
+      store: new ConversationStore(db),
+      settings: new SettingsStore(dir),
+      provider: recordingFake({ text: 'ok' }, requests),
+      emit: (event) => events.push(event),
+      memory: memories,
+      recentWork: () => [
+        {
+          id: '1b2c0000-0000-0000-0000-000000000000',
+          task: 'summarise the launch thread',
+          note: 'Friday it is.',
+          finishedAt: new Date().toISOString(),
+        },
+      ],
+    });
+
+    await turns.run({ pet: scout, text: 'what did the launch thread say?' }).done;
+    await turns.run({ pet: scout, text: 'pricing?' }).done;
+
+    expect(question(requests[0])).toContain(
+      '- (your job, today, j-1b2c) "summarise the launch thread": Friday it is.',
+    );
+    expect(question(requests[1])).not.toContain('your job');
+  });
+
   it('offers the remember tool and files what the pet saves', async () => {
     const requests: BrainRequest[] = [];
     const provider = recordingFake(

@@ -180,6 +180,27 @@ describe('Engine.boot', () => {
 
     expect(entries.find((entry) => entry.id === 'left-over')?.state).toBe('error');
   });
+
+  it('deletes activity older than 90 days at boot, and keeps the rest', async () => {
+    const db = openDatabase(dir);
+    const insert = db.prepare(
+      `INSERT INTO activity (id, kind, state, pet_id, text, started_at, finished_at)
+       VALUES (?, 'routine', 'done', 'scout', 'Papers', ?, ?)`,
+    );
+    const ago = (days: number) => new Date(Date.now() - days * 24 * 60 * 60_000).toISOString();
+    insert.run('old', ago(120), ago(120));
+    insert.run('recent', ago(10), ago(10));
+    db.close();
+
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const res = await host.call('activity.list', {});
+    const ids = (res['result'] as { entries: { id: string }[] }).entries.map((entry) => entry.id);
+
+    expect(ids).toContain('recent');
+    expect(ids).not.toContain('old');
+  });
 });
 
 describe('per-pet providers', () => {

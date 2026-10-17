@@ -169,8 +169,14 @@ export function renderNow(facts: NowFacts): string {
   return lines.join('\n');
 }
 
-/** "## What you remember", one `(kind) text` line each. A line that would not fit is skipped. */
-export function renderMemories(memories: readonly Memory[]): string {
+/**
+ * "## What you remember", one `(kind) text` line each (a line that would not fit is skipped),
+ * then recall's recent-work lines, which keep their own budget.
+ */
+export function renderMemories(
+  memories: readonly Memory[],
+  recentWork: readonly string[] = [],
+): string {
   const lines = [MEMORY_HEADING];
   let length = MEMORY_HEADING.length;
   for (const memory of memories) {
@@ -179,6 +185,7 @@ export function renderMemories(memories: readonly Memory[]): string {
     lines.push(line);
     length += 1 + line.length;
   }
+  lines.push(...recentWork);
   return lines.length > 1 ? lines.join('\n') : '';
 }
 

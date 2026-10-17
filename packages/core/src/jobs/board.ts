@@ -27,7 +27,7 @@ export interface BoardItem {
   id?: string;
   /** The full id behind it. */
   ref: string;
-  kind: 'job' | 'expert' | 'watch' | 'routine';
+  kind: 'job' | 'expert' | 'watch' | 'routine' | 'digest';
   state: 'queued' | 'running' | 'waiting' | 'done' | 'error' | 'stopped';
   title: string;
   startedAt?: string;
@@ -57,16 +57,17 @@ export function boardItems(src: BoardSources, now: Date): BoardItem[] {
 
   for (const job of src.jobs) {
     const item: BoardItem = {
-      id: shortId('j', job.id),
+      // A digest cannot be opened or stopped, so it has no id to say.
+      ...(job.kind === 'digest' ? {} : { id: shortId('j', job.id) }),
       ref: job.id,
-      kind: 'job',
+      kind: job.kind,
       state: job.state,
       title: title(job.task),
       ...(job.startedAt === null ? {} : { startedAt: job.startedAt }),
     };
     if (job.state === 'queued' || job.state === 'running') live.push(item);
     else {
-      if (job.state !== 'stopped') item.told = job.reportedAt !== null;
+      if (job.kind === 'job' && job.state !== 'stopped') item.told = job.reportedAt !== null;
       ended(item, job.finishedAt, job.note ?? '', job.error ?? undefined);
     }
   }
@@ -154,7 +155,8 @@ export function renderBoard(
       'Finished today:',
       ...finished.map((item) => `- ${finishedLine(item, options.timeZone)}`),
     );
-    const notes = finished.flatMap((item) => [
+    // A digest's note is Scout's own count, said on its line; the rest are their own words.
+    const notes = finished.filter((item) => item.kind !== 'digest').flatMap((item) => [
       ...(item.note ? [`${item.id}: ${item.note}`] : []),
       ...(item.error ? [`${item.id} error: ${item.error}`] : []),
     ]);
@@ -247,6 +249,8 @@ function liveLine(item: BoardItem, now: Date): string {
       return `${item.id} watching for "${item.title}" (${item.progress})`;
     case 'routine':
       return `${item.title}, running`;
+    case 'digest':
+      return `Tidying your memory, running${minutes(item.startedAt, now)}`;
   }
 }
 
@@ -255,7 +259,9 @@ function finishedLine(item: BoardItem, timeZone: string | undefined): string {
   const head =
     item.kind === 'job'
       ? `${item.id} your job, ${when}: ${item.title}`
-      : `${item.id} ${item.title}, ${when}`;
+      : item.kind === 'digest'
+        ? `Tidied your memory, ${when}${item.note ? `. ${item.note}` : ''}`
+        : `${item.id} ${item.title}, ${when}`;
   return item.told === false ? `${head} (not mentioned yet)` : head;
 }
 

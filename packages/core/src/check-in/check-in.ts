@@ -24,7 +24,7 @@ import type {
 } from '@tagalong/protocol';
 import type { BrainProvider } from '../providers';
 import type { PerceptionHost } from '../perception';
-import type { Memory } from '../memory/memories';
+import type { Recalled } from '../memory/recall';
 import { gatherNow, safe, type NowSources } from '../conversation/now';
 import { hideSecrets } from '../privacy/secrets';
 import { soul } from '../roles';
@@ -60,8 +60,8 @@ export interface CheckInOptions {
   windows: () => Promise<readonly WindowEntry[] | null>;
   experts: () => readonly Expert[];
   now: NowSources;
-  /** `memory.recent(SCOUT_ID, 5)`. */
-  memories: () => readonly Memory[];
+  /** `recall` with the words of why it woke: the one path every prompt uses. */
+  memories: (query: string) => Recalled;
   /** The last question and answer, or null before the first. */
   lastExchange: () => { said: string; answered: string } | null;
   /** Names of the routines that ran well since an ISO time: a launch fact. */
@@ -338,7 +338,10 @@ export class CheckIn {
     return renderBundle({
       reason: wake.reason,
       now: gatherNow(this.#o.now, pet.id, { kind: 'check-in' }),
-      memories: safe(() => this.#o.memories(), []),
+      ...safe(() => this.#o.memories(recallQuery(wake.reason)), {
+        memories: [],
+        recentWork: [],
+      }),
       userName: settings.userName,
       lastExchange: safe(() => this.#o.lastExchange(), null),
       activeMs: settings.wellbeing.enabled ? this.#activeMs : null,
@@ -469,5 +472,21 @@ export class CheckIn {
 
   #mood(petId: string, mood: PetMoodParams['mood']): void {
     this.#o.emit({ method: 'pet.mood', params: { petId, mood } });
+  }
+}
+
+/** The words recall matches against: what the person is looking at, or what finished. */
+function recallQuery(reason: BundleReason): string {
+  switch (reason.kind) {
+    case 'settled':
+    case 'trouble':
+      return reason.window.title;
+    case 'long-stretch':
+      return reason.front?.title ?? '';
+    case 'finished':
+      return reason.items.map((item) => item.title).join(' ');
+    case 'launch':
+    case 'back':
+      return '';
   }
 }

@@ -9,6 +9,7 @@ const NOW = new Date('2026-10-17T10:00:00.000Z');
 function job(overrides: Partial<JobRow>): JobRow {
   return {
     id: '7f3a0000-0000-4000-8000-000000000001',
+    kind: 'job',
     state: 'running',
     petId: 'scout',
     task: 'read the agent-memory paper',
@@ -186,6 +187,35 @@ describe('renderBoard', () => {
         '~~~',
       ].join('\n'),
     );
+  });
+
+  it('shows a memory digest without an id: it cannot be opened or stopped', () => {
+    const digest = (overrides: Partial<JobRow>) =>
+      job({ kind: 'digest', task: 'Tidy memory', conversationId: null, ...overrides });
+    const items = boardItems(
+      sources({
+        jobs: [
+          digest({ id: 'd1000000-0000-4000-8000-000000000004' }),
+          digest({
+            id: 'd2000000-0000-4000-8000-000000000005',
+            state: 'done',
+            note: 'Added 2, changed 1, let 3 go.',
+            finishedAt: '2026-10-17T03:10:00.000Z',
+          }),
+        ],
+      }),
+      NOW,
+    );
+    expect(items.every((item) => item.kind === 'digest' && item.id === undefined)).toBe(true);
+    expect(renderBoard(items, NOW, { timeZone: 'UTC' })).toBe(
+      [
+        'Working now:',
+        '- Tidying your memory, running (4 min)',
+        'Finished today:',
+        '- Tidied your memory, done 03:10. Note: Added 2, changed 1, let 3 go.',
+      ].join('\n'),
+    );
+    expect(resolveId(items, 'd1000000-0000-4000-8000-000000000004')).toBeNull();
   });
 
   it('gives the job counts and why fewer run when the machine is busy', () => {

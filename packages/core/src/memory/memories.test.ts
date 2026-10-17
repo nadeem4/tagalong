@@ -163,6 +163,59 @@ describe('MemoryStore.byPrefix', () => {
   });
 });
 
+describe('MemoryStore for the digest', () => {
+  it('reads the newest of some kinds only', () => {
+    memories.add({ petId: 'scout', kind: 'preference', text: 'Short answers' });
+    memories.add({ petId: 'scout', kind: 'fact', text: 'Uses pnpm' });
+    memories.add({ petId: 'scout', kind: 'summary', text: 'Talked about the build' });
+    memories.add({ petId: 'ink', kind: 'preference', text: 'Not mine' });
+
+    expect(memories.recent('scout', 10, ['preference']).map((m) => m.text)).toEqual([
+      'Short answers',
+    ]);
+    expect(memories.recent('scout', 10, ['fact', 'summary']).map((m) => m.text)).toEqual([
+      'Talked about the build',
+      'Uses pnpm',
+    ]);
+    expect(memories.count('scout', 'summary')).toBe(1);
+    expect(memories.count('scout', 'preference')).toBe(1);
+  });
+
+  it("changes one of the pet's own memories, and the search follows", () => {
+    const fact = memories.add({ petId: 'scout', kind: 'fact', text: 'Works on giraffes' });
+
+    expect(memories.update('ink', fact.id, 'Hijacked')).toBe(false);
+    expect(memories.update('scout', fact.id, '  Works on otters  ')).toBe(true);
+
+    expect(memories.recent('scout', 1)[0]?.text).toBe('Works on otters');
+    expect(memories.search('scout', 'otters', 5)).toHaveLength(1);
+    expect(memories.search('scout', 'giraffes', 5)).toEqual([]);
+    expect(memories.update('scout', fact.id, '   ')).toBe(false);
+  });
+
+  it('evicts the oldest summaries beyond a cap, never another kind', () => {
+    for (let i = 0; i < 5; i += 1) {
+      memories.add({ petId: 'scout', kind: 'summary', text: `summary ${i}` });
+    }
+    memories.add({ petId: 'scout', kind: 'fact', text: 'A fact' });
+    memories.add({ petId: 'ink', kind: 'summary', text: 'Ink summary' });
+
+    expect(memories.evictSummaries('scout', 3)).toBe(2);
+
+    expect(memories.recent('scout', 10, ['summary']).map((m) => m.text)).toEqual([
+      'summary 4',
+      'summary 3',
+      'summary 2',
+    ]);
+    expect(memories.count('scout', 'fact')).toBe(1);
+    expect(memories.count('ink', 'summary')).toBe(1);
+    expect(memories.search('scout', 'summary 0', 10).map((m) => m.text)).not.toContain(
+      'summary 0',
+    );
+    expect(memories.evictSummaries('scout', 3)).toBe(0);
+  });
+});
+
 describe('ftsQuery', () => {
   it('quotes each distinct word and joins them with OR', () => {
     expect(ftsQuery('Explain the "build" error, the build!')).toBe(

@@ -14,6 +14,8 @@ import { ActivityLog } from './memory/activity';
 import { ConversationStore } from './memory/store';
 import { MemoryStore } from './memory/memories';
 import { Summarizer } from './memory/summarizer';
+import { Digest } from './memory/digest';
+import { recall } from './memory/recall';
 import { PetRegistry } from './pets/registry';
 import { SettingsStore } from './settings/settings';
 import type { SecretStore } from './settings/settings';
@@ -251,6 +253,7 @@ export class Engine {
   readonly #pickUp: PickUp;
   readonly #jobs: Jobs;
   readonly #arrivals: Arrivals;
+  readonly #digest: Digest;
 
   private constructor(parts: {
     db: Database;
@@ -264,9 +267,11 @@ export class Engine {
     pickUp: PickUp;
     jobs: Jobs;
     arrivals: Arrivals;
+    digest: Digest;
   }) {
     this.#jobs = parts.jobs;
     this.#arrivals = parts.arrivals;
+    this.#digest = parts.digest;
     this.#pickUp = parts.pickUp;
     this.#routines = parts.routines;
     this.#connections = parts.connections;
@@ -345,6 +350,8 @@ export class Engine {
     // Nothing runs yet, so anything still marked running was cut short by a crash or quit.
     // The count is a launch fact the check-in may mention after a crash.
     const interruptedAtBoot = activity.interrupted();
+    // Home's Activity keeps 90 days; the digest has kept the gist of older work in memory.
+    activity.prune();
     const routineStore = new RoutineStore(db);
     routineStore.interrupted();
     // When a turn of theirs last ended, on the clock finished work is gathered on.
@@ -405,6 +412,12 @@ export class Engine {
     // Scout's own background work: background Scout turns in their own conversations. The
     // body reads the machine before each start, so fewer run while it is short of memory.
     const jobStore = new JobStore(db);
+    /** A conversation's last assistant message: a job's full result. */
+    const lastAnswer = (conversationId: string) => {
+      const last = store.lastMessages(conversationId, 1)[0];
+      if (last?.role !== 'assistant') return null;
+      return last.content.map((block) => (block.type === 'text' ? block.text : '')).join('');
+    };
     jobStore.interrupted(new Date().toISOString());
     const capacity = machineCapacity();
     const jobs: Jobs = new Jobs({
@@ -414,11 +427,7 @@ export class Engine {
       run: ({ pet, text, jobId, task }) =>
         runner.run({ pet, text, background: true, job: { jobId, task } }),
       interrupt: (turnId) => runner.interrupt(turnId),
-      lastAnswer: (conversationId) => {
-        const last = store.lastMessages(conversationId, 1)[0];
-        if (last?.role !== 'assistant') return null;
-        return last.content.map((block) => (block.type === 'text' ? block.text : '')).join('');
-      },
+      lastAnswer,
       spentOut,
       capacity,
       emit: (event) => live.server?.broadcast(event.method, event.params),
@@ -426,6 +435,24 @@ export class Engine {
       log: (message) => console.warn(`[engine] ${message}`),
     });
     jobs.prune();
+    /** Scout's jobs that finished well in the last 14 days: recall's recent work. */
+    const recentWork = () =>
+      jobStore.doneSince(new Date(Date.now() - 14 * 24 * 60 * 60_000).toISOString());
+    // Once a day, idle, the mind tidies its memory. Code decides when and checks the reply.
+    const digest = new Digest({
+      memories: memory,
+      jobs: jobStore,
+      clock: systemWatchClock,
+      pet: () => pets.get(SCOUT_ID),
+      summarizer: () => settings.get().summarizer,
+      provider: resolve,
+      spentOut,
+      // Not while a turn of theirs or a job is running.
+      idle: () => !runner.foregroundBusy() && jobs.counts().running === 0,
+      pruneJobs: () => void jobs.prune(),
+      lastAnswer,
+      log: (message) => console.warn(`[engine] ${message}`),
+    });
     /** The task board now: jobs, experts, watches, routines and the last day's finished work. */
     const board = () => {
       const now = new Date();
@@ -463,7 +490,8 @@ export class Engine {
       lastTalkAt: (petId: string) => activity.lastTurnAt(petId),
       running: () => handoffs.running().map((run) => ({ ...run, id: shortId('h', run.handoffId) })),
       jobs: (lastTalkAt: string | null) => {
-        const rows = jobs.list();
+        // A digest run shows on the board, never in Now: it is not news for them.
+        const rows = jobs.list().filter((row) => row.kind === 'job');
         const { queued } = jobs.counts();
         const line = (row: JobRow, state: 'running' | 'done' | 'error') => ({
           id: shortId('j', row.id),
@@ -509,7 +537,8 @@ export class Engine {
       windows: listHostWindows,
       experts: () => experts.list(),
       now: nowSources,
-      memories: () => memory.recent(SCOUT_ID, 5),
+      memories: (query) =>
+        recall(memory, SCOUT_ID, query, { jobs: recentWork(), now: new Date() }),
       lastExchange: () => activity.lastExchange(SCOUT_ID),
       routinesSince: (iso) => activity.routinesFinishedSince(iso),
       interruptedAtBoot,
@@ -550,6 +579,7 @@ export class Engine {
       provider: resolve,
       emit,
       memory,
+      recentWork,
       // The Now facts on each question: time, last talk, and which experts are on what.
       // Known gap: a routine's turn counts as the last talk.
       now: nowSources,
@@ -749,6 +779,7 @@ export class Engine {
     live.server = server;
     routines.start();
     pickUp.start();
+    digest.start();
 
     return new Engine({
       db,
@@ -762,6 +793,7 @@ export class Engine {
       pickUp,
       jobs,
       arrivals,
+      digest,
     });
   }
 
@@ -779,6 +811,7 @@ export class Engine {
     this.#routines.stop();
     this.#pickUp.stop();
     this.#arrivals.stop();
+    this.#digest.stop();
     this.#watches.stopAll();
     await this.#handoffs.stopAll();
     await this.#jobs.stopAll();

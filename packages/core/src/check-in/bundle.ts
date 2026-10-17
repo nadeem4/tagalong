@@ -47,6 +47,8 @@ export interface BundleInput {
   reason: BundleReason;
   now: NowFacts;
   memories: readonly Memory[];
+  /** Recall's matching recent jobs, one line each. */
+  recentWork?: readonly string[];
   userName: string;
   /** The last question and answer, or null before the first. */
   lastExchange: { said: string; answered: string } | null;
@@ -60,7 +62,7 @@ export interface BundleInput {
 export function renderBundle(input: BundleInput): string {
   const { reason } = input;
   const sections: string[] = [`## Why you woke\n${whyLine(reason)}`, renderNow(input.now)];
-  sections.push(renderMemories(input.memories));
+  sections.push(renderMemories(input.memories, input.recentWork));
 
   const facts: string[] = [];
   const name = input.userName.trim();
