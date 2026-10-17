@@ -1,6 +1,6 @@
 ---
 name: Tagalong
-description: Scout, one AI companion on your screen (a soft 3D figure on the dock, pixel art in Welcome and Home), with Home as its calm control centre.
+description: Scout, one AI companion on your screen (Bean, a soft 3D figure, on the dock and still in Welcome and Home), with Home as its calm control centre.
 colors:
   shell-navy: '#12162B'
   shell-text: '#E9ECF5'
@@ -294,21 +294,21 @@ components:
 
 ## Overview
 
-**Creative North Star: "A Pixel Friend in Modern Chrome"**
+**Creative North Star: "A Clay Friend in Modern Chrome"**
 
-Tagalong is one companion, Scout. On the desktop it is Bean, a soft clay-like 3D figure (round orange body, cream belly, pointed ears) drawn from pre-rendered WebP strips; Welcome, Home's nav and Activity still draw it as a 16x16 pixel-art figure (orange fur, pointed ears, a green shirt with a gold badge). It sits on the desktop and opens a speech bubble beside itself. The figure is the only game-like thing in the product; everything around it is calm, modern product chrome: a deep ink-navy for Scout's own surfaces (the dock tags, the bubble, Welcome, Home's nav), a cool off-white for reading (Home's pages and Settings), clean Onest type and one warm gold.
+Tagalong is one companion, Scout. On the desktop it is Bean, a soft clay-like 3D figure (round orange body, cream belly, pointed ears) drawn from pre-rendered WebP strips. Bean is the one figure everywhere: it moves on the dock and stands still (the first idle frame) beside Scout's line in Welcome, in Home's nav and on each Activity entry. It sits on the desktop and opens a speech bubble beside itself. The figure is the only game-like thing in the product; everything around it is calm, modern product chrome: a deep ink-navy for Scout's own surfaces (the dock tags, the bubble, Welcome, Home's nav), a cool off-white for reading (Home's pages and Settings), clean Onest type and one warm gold.
 
-Tokens live in `packages/ui/src/theme/tokens.ts` (`themeTokens`). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav and Welcome hard-code several hex values, recorded below as hard-coded. Sprites are plain data (rows and a palette) drawn by `PixelSprite` as a CSS `box-shadow` on one 1px element, scaled by a whole number. No images, no canvas. The dock's Bean is the one exception: one WebP strip per mood (192px frames, 12 fps, in `apps/desktop/src/renderer/src/bean/`), stepped through by `BeanClip` with CSS `steps()`.
+Tokens live in `packages/ui/src/theme/tokens.ts` (`themeTokens`). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav and Welcome hard-code several hex values, recorded below as hard-coded. Scout is drawn from one WebP strip per mood (192px frames, 12 fps, in `apps/desktop/src/renderer/src/bean/`) by `BeanClip`: stepped through with CSS `steps()` on the dock, held on frame 0 of the idle strip everywhere else. No canvas, no live 3D, no pixel sprites.
 
 Scout's state is always a pose plus a word: Bean's clip changes per mood (with a floating sign for some: a thought cloud, glasses, a badge, a gear, a check mark, z's), a small tag says Seeing, Working or Done for the states that last, and the accessible name says it in full. Motion is baked into the frames (a breath, typing, a hop) and becomes a still frame for reduced motion.
 
 **Key Characteristics:**
 
-- One figure (3D Bean on the dock, pixel Scout elsewhere for now); modern chrome around it.
+- One figure, Bean, everywhere (moving on the dock, still elsewhere); modern chrome around it.
 - Navy for Scout's surfaces, off-white for reading.
 - Gold for the primary action, an on state and Scout's active marks; sky blue for focus and fields inside the bubble.
 - Pixel type for names, titles and short uppercase labels; Onest for every sentence and control.
-- Sprites as data, drawn at whole-number scales only (6 in Welcome, 3 in Home's nav, 2 in Activity).
+- Bean outside the dock is always a still frame: 96px in Welcome, 56px in Home's nav, 32px on Activity entries.
 - Flat: tone and hairlines, no drop shadows.
 
 ## Colors
@@ -392,7 +392,7 @@ Every window bundles its faces from `@fontsource` (Latin subset), nothing fetche
 
 Spacing runs on the token scale (2, 3, 4, 6, 8, 12, 16, 20, 24). The bubble and cards also use 14px, 28px and 32px, hard-coded. Controls are 40px tall in Home and Settings, 36px for the bubble's primary button, 44px for the bubble field and Welcome's key field and Check key, 46px for Welcome's answer pill, 28px for quiet bubble controls.
 
-**The Integer Scale Rule.** A sprite is drawn at a whole-number scale and nothing else: 6 in Welcome, 3 in Home's nav, 2 (`spriteScale.tile`) in Activity.
+**The Still Bean Rule.** Outside the dock Bean is the idle strip's first frame, never animated, smoothly scaled: 96px uncropped in Welcome; in Home's 56px nav tile and Activity's 32px tile it is drawn larger (76px and 44px) and cropped by the tile (`overflow: hidden`, nudged to centre), since Bean fills only about two thirds of a frame.
 
 ## Elevation & Depth
 
@@ -400,7 +400,6 @@ Flat. Depth is tonal: navy steps (page, sidebar, active row, tile) and hairlines
 
 ### Shadow Vocabulary
 
-- **Sprite pixel** (`box-shadow: <x>px <y>px 0 0 <colour>`, one per painted pixel): how Scout is drawn.
 - **Recording ring** (`box-shadow: 0 0 0 1px #fff`): the white ring around the recording dot.
 
 **The No Lift Rule.** No drop shadows on the bubble, cards, buttons or the nav.
@@ -413,7 +412,7 @@ Gently rounded chrome, square pixels. The bubble, Home cards and Welcome's tile 
 
 ### Scout on the dock (signature)
 
-`DockPet` draws Bean, the 3D Scout, with `role="img"` and a full label ("Scout is looking at your screen, sight paused"). Each mood is its own pre-rendered clip from one fixed camera, so Bean never jumps between them: idle (a breath, a tail sway), listening (waves ripple out, ears perk), reading (glasses on, reading), thinking (a thought cloud), expert (a walkie-talkie, a badge at the top left), working (typing at a laptop, a gear turns), done (a hop, a check mark), dozing (rising z's), wince (a shake, a sweat drop), cheer (one hop) and tired (a drooping head). Bean's colours (in `apps/desktop/scripts/bean/bean.py`): fur `#F39B5E`, belly `#FFF3E6`, ear tips `#5A3A2C`, cheeks `#F2A9A0`. The pixel sprite (`theme/sprites/characters.ts`) stays for Welcome, Home's nav and Activity. A tag sits top right: **Seeing** on Sky, **Working** on Gold (for expert and for working, Scout's own job), **Done** on Done Green; thinking and reading have none, as they last seconds and the bubble is already answering; all in Gold Ink, Onest 600 9px. **Paused** is a Paused Grey pill top left, and while it shows the tag gives way (the two would overlap; the pose and the label still say the mood; in the expert pose it covers the badge, and the walkie-talkie still shows); the Recording Red dot sits bottom left while rolling memory is on and sight is not paused.
+`DockPet` draws Bean, the 3D Scout, with `role="img"` and a full label ("Scout is looking at your screen, sight paused"). Each mood is its own pre-rendered clip from one fixed camera, so Bean never jumps between them: idle (a breath, a tail sway), listening (waves ripple out, ears perk), reading (glasses on, reading), thinking (a thought cloud), expert (a walkie-talkie, a badge at the top left), working (typing at a laptop, a gear turns), done (a hop, a check mark), dozing (rising z's), wince (a shake, a sweat drop), cheer (one hop) and tired (a drooping head). Bean's colours (in `apps/desktop/scripts/bean/bean.py`): fur `#F39B5E`, belly `#FFF3E6`, ear tips `#5A3A2C`, cheeks `#F2A9A0`. Welcome, Home's nav and Activity show the idle clip's frame 0, still (see The Still Bean Rule). A tag sits top right: **Seeing** on Sky, **Working** on Gold (for expert and for working, Scout's own job), **Done** on Done Green; thinking and reading have none, as they last seconds and the bubble is already answering; all in Gold Ink, Onest 600 9px. **Paused** is a Paused Grey pill top left, and while it shows the tag gives way (the two would overlap; the pose and the label still say the mood; in the expert pose it covers the badge, and the walkie-talkie still shows); the Recording Red dot sits bottom left while rolling memory is on and sight is not paused.
 
 ### The bubble
 
@@ -434,9 +433,9 @@ The hand-off card, connector confirm card and routine card share `HANDOFF_CSS`: 
 
 ### Home
 
-- **Nav:** Sidebar Navy, 232px. Scout's 56px Avatar Tile tile (sprite at 3) with the name and "Your companion" in Sky, then the eight pages (Overview, Scout, Experts, Routines, Connections, Activity, What Scout saw, Settings) as 40px buttons in Onest 14px Shell Muted; hover Frost Text; current (`aria-current="page"`) on Active Row Navy in 600.
+- **Nav:** Sidebar Navy, 232px. Scout's 56px Avatar Tile tile (Bean, still, cropped to fill it) with the name and "Your companion" in Sky, then the eight pages (Overview, Scout, Experts, Routines, Connections, Activity, What Scout saw, Settings) as 40px buttons in Onest 14px Shell Muted; hover Frost Text; current (`aria-current="page"`) on Active Row Navy in 600.
 - **Cards:** white, 1px Panel Line, 12px radius, 16px by 20px padding, a pixel card label, 13px Panel Muted text and a quiet button. The Overview card leads with a status dot and a word ("Ready").
-- **Activity:** entries are full-width buttons (`aria-expanded`), 10px radius, 8px padding: Scout's sprite at 2, an Onest 600 14px headline, a 12px meta line (a 14px state icon, the state word, tool, model, calls, time) and a 13px one-line preview. Hover and open fill Panel Tile; the open thread is indented behind a 2px Panel Line rule. "Show older" is a 40px quiet button.
+- **Activity:** entries are full-width buttons (`aria-expanded`), 10px radius, 8px padding: Bean, still, in a 32px tile, an Onest 600 14px headline, a 12px meta line (a 14px state icon, the state word, tool, model, calls, time) and a 13px one-line preview. Hover and open fill Panel Tile; the open thread is indented behind a 2px Panel Line rule. "Show older" is a 40px quiet button.
 - **What Scout saw:** a header (the 20px title, a 13px Panel Muted retention line, and a quiet **Delete all** that turns into **Delete all for good** / **Keep them**), then Today, Yesterday and Earlier as 12px uppercase Panel Muted labels. Each row, 10px radius, 8px padding, Panel Tile on hover: a 12px tabular time, a 16px line icon per kind in Panel Muted, the kind in Onest 600 14px, the app and window or the destination in 13px (one line, ellipsis), the counts in 12px Panel Muted, and a 28px quiet × at the end.
 - **Routines:** template tiles (white, 2px Panel Line border, 10px radius, Panel Tile on hover) and day toggles (32px, min 52px, 1px Panel Muted border; Gold when pressed).
 - **Experts and Connections:** rows between Panel Line hairlines with status chips and switches.
@@ -461,14 +460,14 @@ Under `prefers-reduced-motion: reduce`: Bean shows one still frame per mood (fra
 - **Reduced motion** is honoured everywhere above.
 - **Status is never colour alone:** dock tags are words, the Paused chip says Paused, the recording dot has a title and is in Scout's label, Activity states are an icon plus a word, chips carry words, the Overview dot sits beside "Ready".
 - **Focus rings:** 2px at 2px offset, Gold in Settings (`.tg-settings :focus-visible`), Home (`.home :focus-visible`) and Welcome (`.welcome :focus-visible`), and Sky in the bubble.
-- **The figure:** `PixelSprite` and `BeanClip` are `aria-hidden`; on the dock the wrapper is `role="img"` with Scout's name and state. The invitation is announced whole through a hidden status line while the visible text types; in Welcome, Scout's bubble is the `role="status"` line. The chat log is `role="log"`; errors are `role="alert"`; expert steps are `aria-live="polite"`.
+- **The figure:** `BeanClip` is `aria-hidden`; on the dock the wrapper is `role="img"` with Scout's name and state. The invitation is announced whole through a hidden status line while the visible text types; in Welcome, Scout's bubble is the `role="status"` line. The chat log is `role="log"`; errors are `role="alert"`; expert steps are `aria-live="polite"`.
 
 ## Do's and Don'ts
 
 ### Do:
 
 - **Do** take colours, sizes, spacing and radii from `themeTokens`; add a token before adding another hard-coded value.
-- **Do** draw Scout as sprite data through `PixelSprite`, at a whole-number scale.
+- **Do** draw Scout as Bean through `BeanClip`: moving on the dock, still (`still`, sized with `size`) everywhere else.
 - **Do** keep gold for the one primary action, an on or pressed control, and Scout's active marks.
 - **Do** pair every status with a word (and an icon where there is room).
 - **Do** keep pixel type to names, titles and short uppercase headings; set sentences and controls in Onest.
@@ -477,7 +476,7 @@ Under `prefers-reduced-motion: reduce`: Bean shows one still frame per mood (fra
 
 ### Don't:
 
-- **Don't** scale a sprite by a fraction, smooth it, or replace it with an image.
+- **Don't** draw Scout any other way than Bean's strips.
 - **Don't** use gold for decoration or fills larger than a button.
 - **Don't** signal state by colour alone.
 - **Don't** set sentences, fields or errors in Pixelify Sans, or any text below 11px.

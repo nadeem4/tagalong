@@ -64,8 +64,7 @@ tagalong/
       home/                         # Home: HomeView and its Experts, Routines, Connections, Activity pages
       settings/settings-styles.ts   # the Settings sheet, used by Home's Settings page
       voice/                        # push to talk, the speech queue, what is spoken aloud
-      theme/                        # design tokens, BeanClip (a strip of Bean frames), PixelSprite
-                                    # and Scout's pixel sprite (Welcome, Home)
+      theme/                        # design tokens, BeanClip (a strip of Bean frames, moving or still)
       test-support/fake-host-bridge.ts
   apps/
     desktop/
@@ -90,7 +89,8 @@ tagalong/
       src/preload/index.ts          # exposes window.tagalong and window.tagalongHost
       src/renderer/                 # avatar (Scout), panel (the bubble), welcome (Welcome),
                                     # home (Home) and settings HTML, src/*.tsx
-      src/renderer/src/bean/        # Bean's WebP strips and manifest.json, drawn on the dock
+      src/renderer/src/bean/        # Bean's WebP strips and manifest.json
+      src/renderer/src/bean-assets.ts # FIGURE: the strips bundled once for the dock, Home and Welcome
       scripts/bean/                 # bean.py (Blender) and pack.py: regenerate Bean's strips
       src/shared/ipc.ts             # IPC channel names and the host-only API type
     extension/                      # Chrome MV3 host, built by Vite into dist/ (load unpacked)

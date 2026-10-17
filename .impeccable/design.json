@@ -649,11 +649,6 @@
     },
     "shadows": [
       {
-        "name": "sprite-pixel",
-        "value": "<x>px <y>px 0 0 <colour>",
-        "purpose": "One unblurred 1px shadow per painted sprite pixel, on a 1px element scaled by a whole number."
-      },
-      {
         "name": "recording-ring",
         "value": "0 0 0 1px #fff",
         "purpose": "The white ring around the dock's recording dot."
@@ -722,12 +717,6 @@
       },
       "note": "Home's own nav and cards and the Welcome window set no focus style; they show the browser default."
     },
-    "spriteScale": {
-      "dock": 4,
-      "welcome": 4,
-      "homeNav": 3,
-      "tile": 2
-    },
     "sizes": {
       "homeWindow": "1440x800 (min 880x600)",
       "homeNavWidth": "232px",
@@ -792,9 +781,9 @@
       "name": "Scout on the Dock",
       "kind": "custom",
       "refersTo": "dock-tag-working",
-      "description": "Scout drawn as box-shadow pixels at scale 4, with a mood tag (Seeing, Working, Done) and a breathing idle that stops for reduced motion.",
-      "html": "<span class=\"ds-dock\" role=\"img\" aria-label=\"Scout has an expert working\"><span class=\"ds-dock-body\"><span class=\"ds-sprite\"><span class=\"ds-px\"></span></span></span><span class=\"ds-dock-tag\">Working</span></span>",
-      "css": ".ds-dock { position: relative; display: inline-flex; padding: 20px 4px 4px; } .ds-dock-body { display: block; transform-origin: 50% 100%; animation: ds-busy 0.9s ease-in-out infinite; } .ds-sprite { position: relative; display: block; width: 64px; height: 64px; } .ds-px { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; transform: scale(4); box-shadow: 2px 0px 0 0 #2A1B14, 3px 0px 0 0 #2A1B14, 12px 0px 0 0 #2A1B14, 13px 0px 0 0 #2A1B14, 1px 1px 0 0 #2A1B14, 2px 1px 0 0 #F6B8A0, 3px 1px 0 0 #F6B8A0, 4px 1px 0 0 #2A1B14, 11px 1px 0 0 #2A1B14, 12px 1px 0 0 #F6B8A0, 13px 1px 0 0 #F6B8A0, 14px 1px 0 0 #2A1B14, 1px 2px 0 0 #2A1B14, 2px 2px 0 0 #E8873A, 3px 2px 0 0 #E8873A, 4px 2px 0 0 #E8873A, 5px 2px 0 0 #2A1B14, 6px 2px 0 0 #2A1B14, 7px 2px 0 0 #2A1B14, 8px 2px 0 0 #2A1B14, 9px 2px 0 0 #2A1B14, 10px 2px 0 0 #2A1B14, 11px 2px 0 0 #E8873A, 12px 2px 0 0 #E8873A, 13px 2px 0 0 #E8873A, 14px 2px 0 0 #2A1B14, 0px 3px 0 0 #2A1B14, 1px 3px 0 0 #E8873A, 2px 3px 0 0 #E8873A, 3px 3px 0 0 #E8873A, 4px 3px 0 0 #E8873A, 5px 3px 0 0 #E8873A, 6px 3px 0 0 #E8873A, 7px 3px 0 0 #E8873A, 8px 3px 0 0 #E8873A, 9px 3px 0 0 #E8873A, 10px 3px 0 0 #E8873A, 11px 3px 0 0 #E8873A, 12px 3px 0 0 #E8873A, 13px 3px 0 0 #E8873A, 14px 3px 0 0 #E8873A, 15px 3px 0 0 #2A1B14, 0px 4px 0 0 #2A1B14, 1px 4px 0 0 #E8873A, 2px 4px 0 0 #E8873A, 3px 4px 0 0 #E8873A, 4px 4px 0 0 #E8873A, 5px 4px 0 0 #E8873A, 6px 4px 0 0 #E8873A, 7px 4px 0 0 #E8873A, 8px 4px 0 0 #E8873A, 9px 4px 0 0 #E8873A, 10px 4px 0 0 #E8873A, 11px 4px 0 0 #E8873A, 12px 4px 0 0 #E8873A, 13px 4px 0 0 #E8873A, 14px 4px 0 0 #E8873A, 15px 4px 0 0 #2A1B14, 0px 5px 0 0 #2A1B14, 1px 5px 0 0 #E8873A, 2px 5px 0 0 #E8873A, 3px 5px 0 0 #1B1B2A, 4px 5px 0 0 #1B1B2A, 5px 5px 0 0 #E8873A, 6px 5px 0 0 #E8873A, 7px 5px 0 0 #E8873A, 8px 5px 0 0 #E8873A, 9px 5px 0 0 #E8873A, 10px 5px 0 0 #E8873A, 11px 5px 0 0 #1B1B2A, 12px 5px 0 0 #1B1B2A, 13px 5px 0 0 #E8873A, 14px 5px 0 0 #E8873A, 15px 5px 0 0 #2A1B14, 0px 6px 0 0 #2A1B14, 1px 6px 0 0 #E8873A, 2px 6px 0 0 #E8873A, 3px 6px 0 0 #1B1B2A, 4px 6px 0 0 #1B1B2A, 5px 6px 0 0 #E8873A, 6px 6px 0 0 #E8873A, 7px 6px 0 0 #E8873A, 8px 6px 0 0 #E8873A, 9px 6px 0 0 #E8873A, 10px 6px 0 0 #E8873A, 11px 6px 0 0 #1B1B2A, 12px 6px 0 0 #1B1B2A, 13px 6px 0 0 #E8873A, 14px 6px 0 0 #E8873A, 15px 6px 0 0 #2A1B14, 0px 7px 0 0 #2A1B14, 1px 7px 0 0 #E8873A, 2px 7px 0 0 #E8873A, 3px 7px 0 0 #FFF1E0, 4px 7px 0 0 #FFF1E0, 5px 7px 0 0 #FFF1E0, 6px 7px 0 0 #FFF1E0, 7px 7px 0 0 #FFF1E0, 8px 7px 0 0 #FFF1E0, 9px 7px 0 0 #FFF1E0, 10px 7px 0 0 #FFF1E0, 11px 7px 0 0 #FFF1E0, 12px 7px 0 0 #FFF1E0, 13px 7px 0 0 #E8873A, 14px 7px 0 0 #E8873A, 15px 7px 0 0 #2A1B14, 1px 8px 0 0 #2A1B14, 2px 8px 0 0 #E8873A, 3px 8px 0 0 #E8873A, 4px 8px 0 0 #FFF1E0, 5px 8px 0 0 #FFF1E0, 6px 8px 0 0 #FFF1E0, 7px 8px 0 0 #2A1B14, 8px 8px 0 0 #2A1B14, 9px 8px 0 0 #FFF1E0, 10px 8px 0 0 #FFF1E0, 11px 8px 0 0 #FFF1E0, 12px 8px 0 0 #E8873A, 13px 8px 0 0 #E8873A, 14px 8px 0 0 #2A1B14, 2px 9px 0 0 #2A1B14, 3px 9px 0 0 #E8873A, 4px 9px 0 0 #E8873A, 5px 9px 0 0 #FFF1E0, 6px 9px 0 0 #FFF1E0, 7px 9px 0 0 #FFF1E0, 8px 9px 0 0 #FFF1E0, 9px 9px 0 0 #FFF1E0, 10px 9px 0 0 #FFF1E0, 11px 9px 0 0 #E8873A, 12px 9px 0 0 #E8873A, 13px 9px 0 0 #2A1B14, 3px 10px 0 0 #2A1B14, 4px 10px 0 0 #2A1B14, 5px 10px 0 0 #2A1B14, 6px 10px 0 0 #2A1B14, 7px 10px 0 0 #2A1B14, 8px 10px 0 0 #2A1B14, 9px 10px 0 0 #2A1B14, 10px 10px 0 0 #2A1B14, 11px 10px 0 0 #2A1B14, 12px 10px 0 0 #2A1B14, 2px 11px 0 0 #2A1B14, 3px 11px 0 0 #3E8E5A, 4px 11px 0 0 #3E8E5A, 5px 11px 0 0 #3E8E5A, 6px 11px 0 0 #3E8E5A, 7px 11px 0 0 #F2C14E, 8px 11px 0 0 #F2C14E, 9px 11px 0 0 #3E8E5A, 10px 11px 0 0 #3E8E5A, 11px 11px 0 0 #3E8E5A, 12px 11px 0 0 #3E8E5A, 13px 11px 0 0 #2A1B14, 1px 12px 0 0 #2A1B14, 2px 12px 0 0 #3E8E5A, 3px 12px 0 0 #2E6B44, 4px 12px 0 0 #2E6B44, 5px 12px 0 0 #3E8E5A, 6px 12px 0 0 #3E8E5A, 7px 12px 0 0 #3E8E5A, 8px 12px 0 0 #3E8E5A, 9px 12px 0 0 #3E8E5A, 10px 12px 0 0 #3E8E5A, 11px 12px 0 0 #2E6B44, 12px 12px 0 0 #2E6B44, 13px 12px 0 0 #3E8E5A, 14px 12px 0 0 #2A1B14, 1px 13px 0 0 #2A1B14, 2px 13px 0 0 #3E8E5A, 3px 13px 0 0 #3E8E5A, 4px 13px 0 0 #3E8E5A, 5px 13px 0 0 #3E8E5A, 6px 13px 0 0 #3E8E5A, 7px 13px 0 0 #3E8E5A, 8px 13px 0 0 #3E8E5A, 9px 13px 0 0 #3E8E5A, 10px 13px 0 0 #3E8E5A, 11px 13px 0 0 #3E8E5A, 12px 13px 0 0 #3E8E5A, 13px 13px 0 0 #3E8E5A, 14px 13px 0 0 #2A1B14, 2px 14px 0 0 #2A1B14, 3px 14px 0 0 #E8873A, 4px 14px 0 0 #E8873A, 5px 14px 0 0 #2A1B14, 10px 14px 0 0 #2A1B14, 11px 14px 0 0 #E8873A, 12px 14px 0 0 #E8873A, 13px 14px 0 0 #2A1B14, 2px 15px 0 0 #2A1B14, 3px 15px 0 0 #2A1B14, 4px 15px 0 0 #2A1B14, 5px 15px 0 0 #2A1B14, 10px 15px 0 0 #2A1B14, 11px 15px 0 0 #2A1B14, 12px 15px 0 0 #2A1B14, 13px 15px 0 0 #2A1B14; } .ds-dock-tag { position: absolute; top: 0; right: -8px; padding: 2px 7px; border-radius: 999px; background: #F2C14E; color: #12162B; font-family: 'Onest', system-ui, sans-serif; font-size: 11px; font-weight: 600; white-space: nowrap; } @keyframes ds-busy { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } } @media (prefers-reduced-motion: reduce) { .ds-dock-body { animation: none; } }"
+      "description": "Scout on the dock is Bean, pre-rendered WebP strips stepped by BeanClip; the strips cannot live in this sidecar, so the sample stands in a plain box for the figure and shows the mood tag (Seeing, Working, Done) and the motion that stops for reduced motion.",
+      "html": "<span class=\"ds-dock\" role=\"img\" aria-label=\"Scout has an expert working\"><span class=\"ds-dock-body\"><span class=\"ds-sprite\"></span></span><span class=\"ds-dock-tag\">Working</span></span>",
+      "css": ".ds-dock { position: relative; display: inline-flex; padding: 20px 4px 4px; } .ds-dock-body { display: block; transform-origin: 50% 100%; animation: ds-busy 0.9s ease-in-out infinite; } .ds-sprite { display: block; width: 64px; height: 64px; border-radius: 50% 50% 46% 46%; background: #F39B5E; } .ds-dock-tag { position: absolute; top: 0; right: -8px; padding: 2px 7px; border-radius: 999px; background: #F2C14E; color: #12162B; font-family: 'Onest', system-ui, sans-serif; font-size: 11px; font-weight: 600; white-space: nowrap; } @keyframes ds-busy { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } } @media (prefers-reduced-motion: reduce) { .ds-dock-body { animation: none; } }"
     },
     {
       "name": "Bubble (ask)",
@@ -838,14 +827,14 @@
     }
   ],
   "narrative": {
-    "northStar": "A Pixel Friend in Modern Chrome",
-    "overview": "Tagalong is one companion, Scout, a 16x16 pixel-art figure (orange fur, pointed ears, a green shirt with a gold badge) that sits on the desktop and opens a speech bubble beside itself. The figure is the only game-like thing in the product; everything around it is calm, modern product chrome: a deep ink-navy for Scout's own surfaces (the dock tags, the bubble, Welcome, Home's nav), a cool off-white for reading (Home's pages and Settings), clean Onest type and one warm gold.\n\nTokens live in `packages/ui/src/theme/tokens.ts` (`themeTokens`). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav and Welcome hard-code several hex values, recorded below as hard-coded. Sprites are plain data (rows and a palette) drawn by `PixelSprite` as a CSS `box-shadow` on one 1px element, scaled by a whole number. No images, no canvas.\n\nScout's state is always a face plus a word: the eyes change per mood, a small tag says Seeing, Working or Done, and the accessible name says it in full. Motion is small and soft (a breath, a bob, a hop) and stops for reduced motion.",
+    "northStar": "A Clay Friend in Modern Chrome",
+    "overview": "Tagalong is one companion, Scout, drawn everywhere as Bean, a soft clay-like 3D figure (round orange body, cream belly, pointed ears), that sits on the desktop and opens a speech bubble beside itself. The figure is the only game-like thing in the product; everything around it is calm, modern product chrome: a deep ink-navy for Scout's own surfaces (the dock tags, the bubble, Welcome, Home's nav), a cool off-white for reading (Home's pages and Settings), clean Onest type and one warm gold.\n\nTokens live in `packages/ui/src/theme/tokens.ts` (`themeTokens`). Most components read from it, but not all: the bubble, the cards inside it, the dock tags, Home's nav and Welcome hard-code several hex values, recorded below as hard-coded. Scout is drawn from one WebP strip per mood (192px frames, 12 fps) by `BeanClip`: stepped through with CSS `steps()` on the dock, held on frame 0 of the idle strip in Welcome (96px), Home's nav (56px) and Activity (32px). No canvas, no live 3D, no pixel sprites.\n\nScout's state is always a face plus a word: the pose changes per mood, a small tag says Seeing, Working or Done, and the accessible name says it in full. Motion is small and soft (a breath, a bob, a hop) and stops for reduced motion.",
     "keyCharacteristics": [
-      "One pixel figure; modern chrome around it.",
+      "One figure, Bean, everywhere (moving on the dock, still elsewhere); modern chrome around it.",
       "Navy for Scout's surfaces, off-white for reading.",
       "Gold for the primary action, an on state and Scout's active marks; sky blue for focus and fields inside the bubble.",
       "Pixel type for names, titles and short uppercase labels; Onest for every sentence and control.",
-      "Sprites as data, drawn at whole-number scales only (4 on the dock and Welcome, 3 in Home's nav, 2 in Activity).",
+      "Bean outside the dock is always a still frame: 96px in Welcome, 56px in Home's nav, 32px on Activity entries.",
       "Flat: tone and hairlines, no drop shadows."
     ],
     "rules": [
@@ -870,8 +859,8 @@
         "section": "typography"
       },
       {
-        "name": "The Integer Scale Rule",
-        "body": "A sprite is drawn at a whole-number scale and nothing else: 4 on the dock and in Welcome, 3 in Home's nav, 2 (`spriteScale.tile`) in Activity.",
+        "name": "The Still Bean Rule",
+        "body": "Outside the dock Bean is the idle strip's first frame, never animated, smoothly scaled: 96px uncropped in Welcome; in Home's 56px nav tile and Activity's 32px tile it is drawn larger (76px and 44px) and cropped by the tile, since Bean fills only about two thirds of a frame.",
         "section": "layout"
       },
       {
@@ -882,7 +871,7 @@
     ],
     "dos": [
       "**Do** take colours, sizes, spacing and radii from `themeTokens`; add a token before adding another hard-coded value.",
-      "**Do** draw Scout as sprite data through `PixelSprite`, at a whole-number scale.",
+      "**Do** draw Scout as Bean through `BeanClip`: moving on the dock, still (`still`, sized with `size`) everywhere else.",
       "**Do** keep gold for the one primary action, an on or pressed control, and Scout's active marks.",
       "**Do** pair every status with a word (and an icon where there is room).",
       "**Do** keep pixel type to names, titles and short uppercase headings; set sentences and controls in Onest.",
@@ -890,7 +879,7 @@
       "**Do** build new bubble cards from `HANDOFF_CSS`: a lead sentence, labelled rows, one Gold primary and a quiet Cancel."
     ],
     "donts": [
-      "**Don't** scale a sprite by a fraction, smooth it, or replace it with an image.",
+      "**Don't** draw Scout any other way than Bean's strips.",
       "**Don't** use gold for decoration or fills larger than a button.",
       "**Don't** signal state by colour alone.",
       "**Don't** set sentences, fields or errors in Pixelify Sans, or any text below 11px.",
