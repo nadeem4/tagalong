@@ -2654,7 +2654,9 @@ flowchart LR
   the `say-name` mark once per run.
 - **The follow-up window** (`FOLLOW_UP_MS`, 20 s, in protocol beside `addressedToScout`). As
   Scout's spoken answer to a question asked by voice ends (`talk-rules.ts#FollowUpCue`: the
-  panel's `speaking` goes from true to false), `useTalk` calls `openFollowUp()`: for 20 s one
+  panel's `speaking` is false and `QueueMouth`'s `onAnswering` says the answer has finished
+  streaming in, so a gap between sentences does not open it; an answer that said nothing aloud
+  opens nothing), `useTalk` calls `openFollowUp()`: for 20 s one
   reply needs no name (`addressedToScout(text, { followUp: true })` takes the whole turn, without
   the name if it was said). It opens only while Always listening is on and not paused, and closes
   on the reply itself (one turn), the time running out, a call or full screen (`setPaused`), the

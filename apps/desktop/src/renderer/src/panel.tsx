@@ -100,10 +100,13 @@ function Panel() {
   const root = useRef<HTMLDivElement>(null);
   // Scout talks: one line at a time; main decides who says it, or that it stays quiet.
   const [speaking, setSpeaking] = useState(false);
+  // A spoken answer still streaming in: the follow-up window waits for the end of all of it.
+  const [answering, setAnswering] = useState(false);
   const [mouth] = useState(
     () =>
       new QueueMouth(
         new SpeechQueue({ prepare: (text) => prepareLine(text), onSpeaking: setSpeaking }),
+        { onAnswering: setAnswering },
       ),
   );
   // Talk to Scout: the talk key held, or the mic button. Talking cuts Scout off at once.
@@ -129,6 +132,7 @@ function Panel() {
     keyLabel: talkKey,
     microphoneId,
     speaking,
+    answering,
     onBegin: () => {
       mouth.stop();
       setGreeting(false);

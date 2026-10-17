@@ -31,6 +31,8 @@ export interface TalkOptions {
   onBegin: () => void;
   /** Scout is speaking: as its spoken answer to a spoken question ends, the follow-up window opens. */
   speaking: boolean;
+  /** A spoken answer is still streaming in: the window waits for all of it, not a gap. */
+  answering: boolean;
 }
 
 /** One of the panel's marks on Scout, set or cleared in main; a failure is only logged. */
@@ -251,8 +253,8 @@ export function useTalk(options: TalkOptions): {
 
   // Scout's spoken answer to a spoken question has ended: one reply needs no name for a while.
   useEffect(() => {
-    if (cue.speaking(options.speaking)) controller.made.openFollowUp();
-  }, [cue, controller, options.speaking]);
+    if (cue.update(options.speaking, options.answering)) controller.made.openFollowUp();
+  }, [cue, controller, options.speaking, options.answering]);
 
   // The system voice is not echo-cancelled: the ears stay deaf while it speaks.
   useEffect(() => onSystemVoice((speaking) => controller.made.setDeaf(speaking)), [controller]);

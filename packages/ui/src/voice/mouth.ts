@@ -9,14 +9,24 @@ import type { SpeechQueue } from './speech-queue';
 
 export class QueueMouth implements Mouth {
   readonly #queue: Pick<SpeechQueue, 'say' | 'stop'>;
+  readonly #onAnswering: (answering: boolean) => void;
   #run = 0;
+  /** Spoken answers still streaming in this run. */
+  #streams = 0;
 
-  constructor(queue: Pick<SpeechQueue, 'say' | 'stop'>) {
+  /** `onAnswering`: a spoken answer is still streaming in, or none is any more. */
+  constructor(
+    queue: Pick<SpeechQueue, 'say' | 'stop'>,
+    options: { onAnswering?: (answering: boolean) => void } = {},
+  ) {
     this.#queue = queue;
+    this.#onAnswering = options.onAnswering ?? (() => undefined);
   }
 
   speak(text: AsyncIterable<string>): void {
     const run = this.#run;
+    this.#streams += 1;
+    this.#onAnswering(true);
     void (async () => {
       try {
         for await (const piece of text) {
@@ -25,6 +35,11 @@ export class QueueMouth implements Mouth {
         }
       } catch (error) {
         console.warn('[voice] a spoken answer stopped early', error);
+      } finally {
+        if (run === this.#run) {
+          this.#streams -= 1;
+          if (this.#streams === 0) this.#onAnswering(false);
+        }
       }
     })();
   }
@@ -36,5 +51,7 @@ export class QueueMouth implements Mouth {
   stop(): void {
     this.#run += 1;
     this.#queue.stop();
+    this.#streams = 0;
+    this.#onAnswering(false);
   }
 }

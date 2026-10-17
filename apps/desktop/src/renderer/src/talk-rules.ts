@@ -24,16 +24,20 @@ export function micNote(error: unknown): string {
 }
 
 /**
- * When the follow-up window opens: as Scout's spoken answer to a question asked by voice ends.
- * Not when the person cut Scout off (the stop button or key, the close, talking over it).
+ * When the follow-up window opens: as Scout's spoken answer to a question asked by voice ends,
+ * all of it (a streamed answer can leave the voice quiet between sentences). Not when the
+ * person cut Scout off (the stop button or key, the close, talking over it), nor when the
+ * answer said nothing aloud.
  */
 export class FollowUpCue {
   #asked = false;
-  #speaking = false;
+  #spoke = false;
+  #busy = false;
 
   /** A question was heard by voice: its spoken answer may open the window. */
   asked(): void {
     this.#asked = true;
+    this.#spoke = false;
   }
 
   /** The person had enough: this answer opens nothing. */
@@ -41,13 +45,18 @@ export class FollowUpCue {
     this.#asked = false;
   }
 
-  /** Scout started or stopped speaking: true when the window should open now. */
-  speaking(on: boolean): boolean {
-    const ended = this.#speaking && !on;
-    this.#speaking = on;
+  /**
+   * Scout speaking, and its spoken answer still streaming in: true when the window should open
+   * now, once both are over and Scout said some of it aloud.
+   */
+  update(speaking: boolean, answering: boolean): boolean {
+    if (speaking && this.#asked) this.#spoke = true;
+    const busy = speaking || answering;
+    const ended = this.#busy && !busy;
+    this.#busy = busy;
     if (!ended || !this.#asked) return false;
     this.#asked = false;
-    return true;
+    return this.#spoke;
   }
 }
 
