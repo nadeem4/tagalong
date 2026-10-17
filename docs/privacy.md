@@ -884,7 +884,7 @@ wrong. It never leaves your computer on its own.
   an error, its name and message, for example
   `2026-10-16T21:40:00.000Z WARN [main] could not save Always listening Error: EPERM`. When Always
   listening pauses for a call or a full-screen window, one line says so with the app's process
-  name (for example `Code.exe`), never the window's title, and one more when it resumes.
+  name (for example `Code`), never the window's title, and one more when it resumes.
 - **What is never written.** Anything passed along with a warning other than an error (an object, a
   turn, a second piece of text) becomes just its type, such as `[object]`, so what you said, what
   is on your screen, file contents and Scout's answers never reach the file. The voice process

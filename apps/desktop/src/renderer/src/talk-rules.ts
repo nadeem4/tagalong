@@ -133,25 +133,26 @@ export class EarsNotes {
  * Where each heard question goes: to the bubble listening for it, or held until one does.
  * The bubble is not there while a one-line hello, remark or routine line takes its place,
  * nor while Scout is still waking; a question heard then is asked as soon as it mounts,
- * never dropped.
+ * never dropped. Only the latest is held: as with talking over Scout, a newer question
+ * replaces one not yet asked.
  */
 export class HeardInbox {
   readonly #hearers = new Set<(text: string) => void>();
-  #held: string[] = [];
+  #held: string | null = null;
 
-  /** The bubble listens; anything held is asked now, once. */
+  /** The bubble listens; a question held is asked now, once. */
   subscribe(hear: (text: string) => void): () => void {
     this.#hearers.add(hear);
     const held = this.#held;
-    this.#held = [];
-    for (const text of held) hear(text);
+    this.#held = null;
+    if (held !== null) hear(held);
     return () => void this.#hearers.delete(hear);
   }
 
   /** True when a bubble took it; false when it is held for the next one. */
   deliver(text: string): boolean {
     if (this.#hearers.size === 0) {
-      this.#held.push(text);
+      this.#held = text;
       return false;
     }
     for (const hear of this.#hearers) hear(text);

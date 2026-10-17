@@ -228,13 +228,15 @@ describe('HeardInbox', () => {
     expect(asked).toEqual(['first']);
   });
 
-  it('keeps every question held, in the order heard', () => {
+  it('holds only the latest question: a newer one replaces one still held', () => {
+    // As with talking over Scout, the newer question wins. Two asked back to back as the
+    // bubble mounts would race, and one answer could land under the other question.
     const inbox = new HeardInbox();
     inbox.deliver('one');
     inbox.deliver('two');
     const asked: string[] = [];
     inbox.subscribe((text) => asked.push(text));
-    expect(asked).toEqual(['one', 'two']);
+    expect(asked).toEqual(['two']);
   });
 
   it('holds again once the bubble has gone', () => {

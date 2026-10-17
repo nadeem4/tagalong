@@ -2749,7 +2749,8 @@ flowchart LR
   question being asked, never always listening. A heard question goes through `HeardInbox`: the
   bubble subscribes as it mounts, and a question heard while it is not mounted (a one-line hello,
   remark, routine or status line is up in its place, or Scout is still waking) is held, the line
-  gives way (`onBegin`), and the bubble asks it as it subscribes; none is dropped. The decisions
+  gives way (`onBegin`), and the bubble asks it as it subscribes; none is dropped. Only the latest
+  is held: as with talking over Scout, a newer question replaces one not yet asked. The decisions
   sit in `talk-rules.ts`, unit tested:
   `settles` (a heard question clears the words and the state unless a held question has started, so
   an always question and a held question heard after the always session resumed both settle),
@@ -2910,7 +2911,7 @@ flowchart LR
   titles and positions are read, never window text. A failed listing keeps the last answer;
   switched off, the guard forgets it. Each pause writes one warning to the log file naming the
   kind of window and its app, never its title, for example
-  `[listening] paused: a full-screen window in front (Code.exe)`, and the next unblock writes
+  `[listening] paused: a full-screen window in front (Code)`, and the next unblock writes
   `[listening] resumed`. Full screen is measured in DIPs
   (see `placeOnDisplays` under keeping an eye), so a maximized window on a scaled display never
   pauses it.
