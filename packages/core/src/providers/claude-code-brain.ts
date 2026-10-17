@@ -100,9 +100,8 @@ export class ClaudeCodeBrain implements BrainProvider {
         },
       );
     }
-    const text = 'I went round in circles on that one. Try asking it another way.';
-    events.onText(text);
-    return { text, stopReason: 'end', usage };
+    // No canned line: the stop reason says why, and the UI shows it.
+    return { text: '', stopReason: 'tool_limit', usage };
   }
 
   /** One claude run. Null means the turn was stopped while it ran. */

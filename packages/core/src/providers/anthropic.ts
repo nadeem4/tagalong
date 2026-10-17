@@ -27,7 +27,6 @@ import type {
   BrainResult,
   BrainTool,
 } from './brain';
-import { REFUSAL_MESSAGE } from './brain';
 import { BrainError } from './errors';
 
 /**
@@ -205,11 +204,7 @@ export class AnthropicProvider implements BrainProvider {
         continue;
       }
 
-      if (message.stop_reason === 'refusal') {
-        text += REFUSAL_MESSAGE;
-        events.onText(REFUSAL_MESSAGE);
-      }
-
+      // A refusal ends with no text of its own: the stop reason says why, and the UI shows it.
       return finish(mapStopReason(message.stop_reason));
     }
   }

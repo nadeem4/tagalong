@@ -124,7 +124,7 @@ function definition(entry: AppTool, name: string, many: boolean): BrainTool {
   const access =
     entry.tool.access === 'read'
       ? 'Only reads.'
-      : `Changes something in ${app}, so the person is asked first; say what you are about to do.`;
+      : `Changes something in ${app}, so the person is asked first.`;
   return {
     name,
     description: `${app}: ${what ? `${what} ` : ''}${access}`,
@@ -196,7 +196,7 @@ export function connectorTools(deps: ConnectorToolDeps): Tool[] {
               content:
                 answer === 'timeout'
                   ? `The person did not answer, so nothing was changed in ${app}.`
-                  : `The person said no, so nothing was changed in ${app}. Do not try again unless they ask.`,
+                  : `They said no; nothing was changed in ${app}.`,
             };
           }
         }

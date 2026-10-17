@@ -18,9 +18,9 @@ it in full on the confirm card first; it never guesses a repo. Its tools are onl
 `hand_to_expert`, which writes a brief and hands it to an expert such as Claude Code, the tools of
 the person's connected apps (`connections`), whose changes always ask first, `create_routine`
 and `change_routine`, which show a routine card the person saves, `point_at`, which draws a ring
-around something on screen and never clicks, `recall_day`, which reads back what Scout looked at
-and was asked today or yesterday, `search_history`, which searches the window titles it looked
-at and the person's asks by words, `tell_expert`, which passes the person's words to an expert
+around something on screen and never clicks, `search_history`, which searches the window titles
+it looked at and the person's asks by words, or, with no words, lists everything in a time range
+("what did we do today?"), `tell_expert`, which passes the person's words to an expert
 already working, and `change_settings`, which shows a settings card the person applies with a
 click; it has nothing that writes files or runs code. Its own figure and bubble show up in its
 screenshots, and its instructions say so.
@@ -83,7 +83,6 @@ tools:
   - create_routine
   - change_routine
   - point_at
-  - recall_day
   - search_history
   - tell_expert
   - change_settings
@@ -180,17 +179,15 @@ packages/core/src/tools/
     connections.ts <connection>__<tool>: every tool of the person's connected apps
     routines.ts    create_routine, change_routine
     pointing.ts    point_at
-    day.ts         recall_day
     history.ts     search_history
     settings.ts    change_settings: the chat allowlist, labels and loosening rules
 ```
 
 The companion's role lists every one of them; `point_at` comes after `change_routine`, then
-`recall_day`, `search_history` and `tell_expert`, and `change_settings` comes last.
+`search_history` and `tell_expert`, and `change_settings` comes last.
 
 - **Kind.** A tool is `write` when it leaves stored state behind after the turn: `remember` files a
-  memory, `watch_for` starts a watch, `hand_to_expert` starts a hand-off and remembers which expert
-  took that kind of task, `tell_expert` queues a note in a running hand-off and its Activity row,
+  memory, `watch_for` starts a watch, `hand_to_expert` starts a hand-off, `tell_expert` queues a note in a running hand-off and its Activity row,
   `create_routine` and `change_routine` lead to a saved routine once the person presses Save, and
   `change_settings` to saved settings once they click Apply. The rest are `read`.
 - **Context.** Every tool runs with the turn's pet, turn id, abort signal, snapshot, whether the
@@ -198,7 +195,8 @@ The companion's role lists every one of them; `point_at` comes after `change_rou
   card allowed and where a hand-off reports.
 - **Which tools a turn gets.** The registry builds what the engine is wired for, in a fixed order,
   and returns none when the pet's provider cannot call tools. `hand_to_expert` is built only when an
-  expert is switched on, and lists every such expert and what it is good at in its description. The
+  expert is switched on, and lists every such expert and what it is good at in its description;
+  the model picks one with `expert_id`, which is required when more than one is on. The
   routine tools are left off a routine's own turn, and `change_routine` is built only when a routine
   is saved. `tell_expert` is built only while a hand-off is running, never on a routine's own turn,
   and lists the running hand-offs (id, expert, ask) in its description. `change_settings` is
@@ -208,6 +206,11 @@ The companion's role lists every one of them; `point_at` comes after `change_rou
   role lists (see [What the role decides](#what-the-role-decides)).
   A role can list a group instead of single tools: `connections` gives it every tool of the
   person's connected apps, whose names are only known once they connect.
+- **Results are facts.** A tool result says what happened ("No connected host can take a
+  screenshot.", "The brief is on a card; it starts when they press Send."), never what to say: no
+  "Tell the user…" or "Say…". The model decides if and what to tell them; each rule (cards need a
+  click, keys only in Settings) is said once, in the soul or the companion's mechanics. Tests
+  check this with `directivesIn` (`tools/test-support.ts`).
 - **Connected apps.** An app tool is `read` when its server marks it read-only and `write`
   otherwise, unknown included. A write asks the person first with a confirm card and runs only on
   Allow once; see [Connected apps](../architecture.md#connected-apps-mcp).

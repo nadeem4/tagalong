@@ -46,7 +46,6 @@ import {
   ExpertStore,
   FakeConnector,
   HandoffManager,
-  RouteMemory,
   type Connector,
 } from './experts';
 import {
@@ -386,7 +385,6 @@ export class Engine {
       projects,
       usage,
     });
-    const routes = new RouteMemory(db);
     const pickUpStore = new PickUpStore(db);
     /** What is open, titles only: null with no host connected, empty when none can list. */
     const listHostWindows = async () => {
@@ -467,7 +465,6 @@ export class Engine {
       // Read per turn: experts are added and switched off while the app runs.
       experts: {
         experts: () => experts.list(),
-        routes,
         propose: (params) => handoffs.propose(params),
         // Only reached on a routine's turn, for the expert its saved card allowed.
         startReadOnly: (params) => handoffs.startReadOnly(params),
@@ -497,19 +494,14 @@ export class Engine {
         confirm: (params, signal) => approvals.ask(params, signal),
         record: (entry) => activity.connectorCalled(entry),
       },
-      // "What did we do today?": reads the records already kept, nothing new is tracked.
-      day: {
-        activity,
-        sightLog,
-        // Pick-up off: its snapshot is not read.
-        pickUp: { get: () => (settings.get().pickUp ? pickUpStore.get() : null) },
-        handoffs,
-        now: () => new Date(),
-      },
-      // "What was that article I read Tuesday?": the FTS index over the same records,
-      // limited to the days the privacy log keeps.
+      // "What was that article I read Tuesday?" and "what did we do today?": the FTS index
+      // and the records already kept, limited to the days the privacy log keeps. Nothing
+      // new is tracked for it.
       history: {
         history: new HistorySearch(db, { days: () => settings.get().sightLog.days }),
+        activity,
+        sightLog,
+        days: () => settings.get().sightLog.days,
       },
       // Both lookups are lazy: hosts connect and drop between turns, and the exclusion
       // list is edited while the app runs, so neither can be captured at boot.
@@ -598,7 +590,6 @@ export class Engine {
       hosts,
       watches,
       experts,
-      routes,
       handoffs,
       projects,
       connectorFor,
@@ -685,7 +676,6 @@ function buildHandlers(parts: {
   hosts: () => readonly PerceptionHost[];
   watches: WatchManager;
   experts: ExpertStore;
-  routes: RouteMemory;
   handoffs: HandoffManager;
   projects: ProjectFinder;
   connectorFor: (expert: Expert) => Connector;
@@ -715,7 +705,7 @@ function buildHandlers(parts: {
   checkResolve: ProviderResolver;
 }): MethodHandlers {
   const { activity, runner, pets, settings, models, hosts, watches } = parts;
-  const { refreshProviders, experts, routes, handoffs, projects, connectorFor, resolve } = parts;
+  const { refreshProviders, experts, handoffs, projects, connectorFor, resolve } = parts;
   const { keepAnEye, connections, approvals, routines, interruptedAtBoot, pickUp } = parts;
   const { sightLog, checkResolve } = parts;
   const { calendar } = parts;
@@ -808,7 +798,6 @@ function buildHandlers(parts: {
       return { expert: experts.upsert(fromCatalog(params.expert)) };
     },
     'experts.delete': (params) => {
-      routes.forgetExpert(params.expertId);
       return { deleted: experts.delete(params.expertId) };
     },
     'experts.test': async (params) => {

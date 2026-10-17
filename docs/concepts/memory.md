@@ -36,12 +36,13 @@ flowchart LR
   R -. "recall_screen, what_changed, when asked" .-> W
 ```
 
-### The daily briefing reads, never stores
+### The daily listing reads, never stores
 
-"What did we do today?" (`recall_day`) keeps nothing of its own. It reads the log of what Scout
-saw (`sight_log`), the activity record (`activity`: questions, hand-offs, routines and app calls,
-never their answers), the pick-up snapshot (`pick_up`, only while pick-up is on) and the briefs
-waiting for Send (in memory). Screen memory is not read.
+"What did we do today?" (`search_history` with no search words) keeps nothing of its own. It
+reads the log of what Scout saw (`sight_log`) and the activity record (`activity`: questions,
+hand-offs, routines and app calls, never their answers) for a time range, today by default.
+Screen memory is not read. What is running, finished or waiting for Send rides in the Now block of
+every question instead.
 
 ### Searchable work memory
 
@@ -80,7 +81,8 @@ Built in `packages/core/src/memory/recall.ts`:
   Scout already held is not copied twice).
 
 Scout files a memory with the `remember` tool (`{ text, kind: fact | preference }`), so "I prefer
-short answers" is kept across restarts.
+short answers" is kept across restarts; the summary also records preferences the user stated.
+Nothing is filed by matching phrases in what they typed: the model decides.
 
 ## Summarising long threads
 

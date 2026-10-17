@@ -81,7 +81,6 @@ test.describe('the hand-off card', () => {
   test.beforeAll(async () => {
     ({ app, dataDir } = await launch('hand_to_expert', {
       ask: 'Fix the failing login test',
-      task_kind: 'fix-code',
       expert_id: 'claude-code',
     }));
     // The expert Welcome would add. Fake mode answers it with a scripted connector: no

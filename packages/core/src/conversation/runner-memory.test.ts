@@ -119,25 +119,13 @@ describe('recall in a turn', () => {
     });
   });
 
-  it('keeps a preference the user states, privately, for the next conversation', async () => {
-    const requests: BrainRequest[] = [];
-    const first = runner(recordingFake({ text: 'Sure.' }, requests));
-    await first.run({ pet: scout, text: 'I prefer short answers.' }).done;
+  it('files nothing by pattern: a stated preference is kept by remember or the summary', async () => {
+    await runner(recordingFake({ text: 'Sure.' }, [])).run({
+      pet: scout,
+      text: 'I prefer short answers.',
+    }).done;
 
-    // A fresh runner and a fresh conversation: nothing carries over but the database.
-    await runner(recordingFake({ text: 'ok' }, requests)).run({ pet: scout, text: 'Explain DNS' })
-      .done;
-
-    expect(question(requests[1])).toContain('I prefer short answers.');
-    expect(memories.recent('ink', 5)).toEqual([]);
-  });
-
-  it('does not file the same stated preference twice', async () => {
-    const r = runner(recordingFake({ text: 'Sure.' }, []));
-    await r.run({ pet: scout, text: 'I prefer short answers.' }).done;
-    await r.run({ pet: scout, text: 'I prefer short answers.' }).done;
-
-    expect(memories.recent('scout', 5)).toHaveLength(1);
+    expect(memories.recent('scout', 5)).toEqual([]);
   });
 });
 

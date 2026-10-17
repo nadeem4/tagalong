@@ -1,4 +1,4 @@
-/** Tests for recall and statedPreference. */
+/** Tests for recall: which memories a prompt carries, within the budget. */
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Database } from 'better-sqlite3';
 import { openDatabase } from './db';
 import { MemoryStore } from './memories';
-import { RECALL_BUDGET_CHARS, recall, statedPreference } from './recall';
+import { RECALL_BUDGET_CHARS, recall } from './recall';
 
 let dir: string;
 let db: Database;
@@ -68,22 +68,5 @@ describe('recall', () => {
 
     expect(total).toBeLessThanOrEqual(RECALL_BUDGET_CHARS);
     expect(recalled[0]?.text.startsWith('9 ')).toBe(true);
-  });
-});
-
-describe('statedPreference', () => {
-  it('captures a lasting preference the user states', () => {
-    expect(statedPreference('I prefer short answers.')).toBe('I prefer short answers.');
-    expect(statedPreference('From now on, answer in bullet points please')).toBe(
-      'From now on, answer in bullet points please',
-    );
-    expect(statedPreference('Explain this. Remember that I am a beginner.')).toBe(
-      'Remember that I am a beginner.',
-    );
-  });
-
-  it('ignores an ordinary question', () => {
-    expect(statedPreference('What does this error mean?')).toBeNull();
-    expect(statedPreference('Which do you prefer, tabs or spaces?')).toBeNull();
   });
 });

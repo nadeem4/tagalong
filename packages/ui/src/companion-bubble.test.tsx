@@ -460,6 +460,27 @@ describe('CompanionBubble voice', () => {
     expect(onSay).toHaveBeenCalledExactlyOnceWith('Because the database closed first.');
   });
 
+  it.each([
+    ['refusal', 'Declined'],
+    ['tool_limit', 'Stopped: too many steps'],
+  ] as const)('shows a quiet %s status and speaks nothing', async (stopReason, status) => {
+    const bridge = createFakeHostBridge();
+    const onSay = vi.fn();
+    renderBubble(bridge, { onSay });
+    await act(async () => ask('why?'));
+    act(() => {
+      bridge.emit({
+        type: 'turn.started',
+        turnId: 'turn-1',
+        petId: 'scout',
+        conversationId: CONVERSATION,
+      });
+      bridge.emit({ ...done('turn-1', ''), stopReason });
+    });
+    expect(screen.getByText(status)).toBeInTheDocument();
+    expect(onSay).not.toHaveBeenCalled();
+  });
+
   it('does not speak the answer to a turn it did not start', () => {
     const bridge = createFakeHostBridge();
     const onSay = vi.fn();

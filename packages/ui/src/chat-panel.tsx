@@ -9,6 +9,7 @@ import { Composer } from './composer';
 import { MessageList, type ChatMessage } from './message-list';
 import { SightBar, type SightProblem } from './sight-bar';
 import { useHostBridge, type TurnEvent } from './host-bridge';
+import { stopStatus } from './stop-status';
 
 /** What Look asks the host to perceive: the picture, plus which window it came from. */
 const LOOK_TARGETS = ['screenshot', 'activeWindow'] as const;
@@ -126,6 +127,9 @@ export function ChatPanel({
           text: event.text,
           ...(speaker !== undefined ? { speaker } : {}),
         });
+        // Nothing said, with a reason: a quiet note, not a message from Scout.
+        const status = stopStatus(event.text, event.stopReason);
+        if (status !== null) note(status);
         break;
       }
       case 'turn.error':

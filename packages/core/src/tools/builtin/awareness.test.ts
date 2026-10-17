@@ -10,6 +10,7 @@ import type {
 import type { BrainContentBlock } from '../../providers';
 import type { PerceptionHost } from '../../perception/host';
 import { fakeTurnTools } from '../fake-turn';
+import { directivesIn } from '../test-support';
 import type { ToolOutcome } from '../tool';
 import { RECALL_SCREEN, WHAT_CHANGED } from './awareness';
 
@@ -100,7 +101,9 @@ describe('recall_screen', () => {
     expect(content).toContainEqual({ type: 'image', mime: 'image/png', base64: IMAGE.base64 });
     expect(text(content)).toContain(FIVE_MINUTES_AGO);
     expect(text(content)).toContain('5 minutes ago');
+    expect(text(content)).toContain('not now');
     expect(text(content)).toContain('Attention Is All You Need');
+    expect(directivesIn(outcome.content)).toEqual([]);
   });
 
   it('passes a display id through', async () => {
@@ -114,6 +117,14 @@ describe('recall_screen', () => {
     const outcome = await toolset([host]).run({ name: RECALL_SCREEN, input: { secondsAgo: 60 } });
     expect(text(outcome.content)).toMatch(/rolling memory is off/i);
     expect(text(outcome.content)).toMatch(/Settings/);
+    expect(directivesIn(outcome.content)).toEqual([]);
+  });
+
+  it('states that rolling memory is on but holds nothing yet', async () => {
+    const host = recallHost({ recording: true, frames: [], windows: [] });
+    const outcome = await toolset([host]).run({ name: RECALL_SCREEN, input: { secondsAgo: 60 } });
+    expect(text(outcome.content)).toMatch(/holds nothing/);
+    expect(directivesIn(outcome.content)).toEqual([]);
   });
 
   it('says how far back memory reaches when asked for something older', async () => {
@@ -125,6 +136,7 @@ describe('recall_screen', () => {
     });
     const outcome = await toolset([host]).run({ name: RECALL_SCREEN, input: { secondsAgo: 600 } });
     expect(text(outcome.content)).toMatch(/only reaches back 1 minute/i);
+    expect(directivesIn(outcome.content)).toEqual([]);
   });
 
   it('describes the frame in words for a pet that cannot see', async () => {
@@ -134,8 +146,9 @@ describe('recall_screen', () => {
       input: { secondsAgo: 300 },
     });
     expect(typeof outcome.content).toBe('string');
-    expect(text(outcome.content)).toMatch(/cannot look at images/);
+    expect(text(outcome.content)).toMatch(/pictures were not seen/);
     expect(text(outcome.content)).toContain('Attention Is All You Need');
+    expect(directivesIn(outcome.content)).toEqual([]);
   });
 
   it('refuses without a secondsAgo', async () => {
@@ -195,6 +208,7 @@ describe('what_changed', () => {
       input: { displayId: 1, sinceSeconds: 120 },
     });
     expect(text(outcome.content)).toMatch(/nothing to compare/i);
+    expect(directivesIn(outcome.content)).toEqual([]);
   });
 
   it('refuses a missing display or time', async () => {

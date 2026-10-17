@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Expert, RoutineAction, RoutineDraftInput, RoutineView } from '@tagalong/protocol';
 import { FAKE_TURN_PET, fakeTurnTools as fakeTools } from '../fake-turn';
+import { directivesIn } from '../test-support';
 import type { ToolRegistryOptions, TurnRequest } from '../registry';
 import { CHANGE_ROUTINE, CREATE_ROUTINE, type RoutineToolDeps } from './routines';
 
@@ -56,6 +57,14 @@ const tools = (options: ToolRegistryOptions, overrides: Partial<TurnRequest> = {
   fakeTools(options, { pet: COMPANION, ...overrides });
 
 describe(CREATE_ROUTINE, () => {
+  it('has no topics field and no recipe: the model writes the topics into what', () => {
+    const definition = tools({ routines: deps().value }).definitions.find(
+      (d) => d.name === CREATE_ROUTINE,
+    );
+    expect(JSON.stringify(definition?.inputSchema)).not.toContain('topics');
+    expect(definition?.description).not.toMatch(/arXiv|never say/i);
+  });
+
   it('shows the card with the routine as it would be saved, and saves nothing', async () => {
     const d = deps();
     const outcome = await tools({ routines: d.value }).run({
@@ -63,8 +72,7 @@ describe(CREATE_ROUTINE, () => {
       input: {
         name: 'Morning papers',
         when: { type: 'weekdays', time: '08:00' },
-        what: 'Find new papers on my topics and explain the best one simply.',
-        topics: 'AI agents',
+        what: 'Find new papers on AI agents and explain the best one simply.',
         result: ['bubble', 'voice'],
         hand_to: 'researcher',
         uses: ['Researcher (Claude Code)'],
@@ -72,6 +80,7 @@ describe(CREATE_ROUTINE, () => {
     });
     expect(outcome.isError).toBeUndefined();
     expect(outcome.content).toContain('Save');
+    expect(directivesIn(outcome.content)).toEqual([]);
     expect(d.proposed).toEqual([
       {
         petId: 'scout',
@@ -79,8 +88,7 @@ describe(CREATE_ROUTINE, () => {
         routine: {
           name: 'Morning papers',
           when: { type: 'schedule', days: [1, 2, 3, 4, 5], time: '08:00' },
-          what: 'Find new papers on my topics and explain the best one simply.',
-          topics: 'AI agents',
+          what: 'Find new papers on AI agents and explain the best one simply.',
           deliver: { bubble: true, voice: true, notification: false },
           handTo: 'researcher',
           uses: ['Researcher (Claude Code)'],

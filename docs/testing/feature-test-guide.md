@@ -1141,7 +1141,9 @@ meeting with someone else 15 to 20 minutes from now.
 1. **Setup:** the bubble open.
 2. **Action:** say "I prefer short answers." Wait for the reply. Quit Tagalong from the tray and
    start it again. Ask "Explain how DNS works."
-3. **Expected:** the DNS answer is noticeably short (a few sentences, no long lists).
+3. **Expected:** the DNS answer is noticeably short (a few sentences, no long lists). Home →
+   Memory has a `preference` note, filed by Scout's `remember` call or the summary (nothing is
+   filed by matching the words you typed).
 
 ### M.2. Long conversations are folded into a summary
 
@@ -1365,13 +1367,14 @@ monitor.
 
 1. **Setup:** use Tagalong for a while: ask Scout a couple of questions about windows (so it
    looks), hand one task to an expert and stop another.
-2. **Action:** ask "What did we do today?". **Expected:** two or three lines: about how many hours
-   (called an estimate), the main apps and projects, what the expert did and that one run stopped,
-   and anything still open. No expert answer text is quoted.
-3. **Action:** ask "And yesterday?". **Expected:** yesterday's day only, or "nothing on record" on a
+2. **Action:** ask "What did we do today?". **Expected:** Scout calls `search_history` with no
+   search words (Home → Activity shows the call) and answers in two or three lines: the main apps,
+   what the expert did and that one run stopped. No boilerplate "this is an estimate" disclaimer,
+   and no expert answer text is quoted.
+3. **Action:** ask "And yesterday?". **Expected:** yesterday's day only, or nothing on record on a
    fresh install.
-4. **Action:** turn pick-up off in Settings and ask again. **Expected:** no project or branch from
-   pick-up; a brief waiting for Send is still named.
+4. **Action:** leave a brief waiting for Send and ask "anything open?". **Expected:** Scout names
+   the waiting brief (it rides in the Now block of every question).
 
 ## Searching your history
 
@@ -1575,7 +1578,8 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
 1. Ask Scout to fix something in the project and press **Send**. While "Coder is on it", Scout says
    a line now and then from what Claude Code writes ("Found the bug in `date.ts`"), never more than
    one every 20 seconds, and only while Scout talks is on. Tool steps ("Reading ...") stay silent.
-2. Tell Scout "tell Coder to use dayjs, not moment". Scout answers "I'll pass that to Coder". The
+2. Tell Scout "tell Coder to use dayjs, not moment". Scout says in its own words that Coder will
+   get it (the wording varies; there is no fixed line). The
    card shows **Passed on: use dayjs, not moment**, _waiting for Coder to finish this step_, then
    _delivered_; the final answer reflects the note.
 3. Home → Activity: the expert row's "What Coder was told" ends with "Passed on while it worked:"
@@ -1597,11 +1601,12 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    talk** row naming `userName, voice`.
 3. Ask "keep my screenshots for 2 hours": the row is marked "Lets Scout see or keep more of your
    screen" and the button reads **Turn on**. **Cancel** changes nothing.
-4. Ask for an API key, a base URL, the model or the calendar link to change: Scout says those are
-   changed only in Settings, shows no card and repeats nothing.
+4. Ask for an API key, a base URL, the model or the calendar link to change: Scout says, in its own
+   words, those are changed only in Settings, shows no card and repeats nothing.
 5. With Always listening on, ask Scout to switch it off: a card; **Apply** closes the microphone and
-   the green mark goes. Ask it to switch it on: "Only you can switch that on", no card.
-6. Ask "keep the log of what Scout saw for 30 days" (from 7): refused, only lowering is allowed.
+   the green mark goes. Ask it to switch it on: Scout says only you can, and where; no card.
+6. Ask "keep the log of what Scout saw for 30 days" (from 7): no card; Scout says only lowering
+   works by talk.
    Ask for 3 days: a card.
 7. Ask "use ElevenLabs to speak" with no ElevenLabs key: the row says it needs a key in Settings.
 8. Ask "what's my voice speed?": Scout answers without a card.
@@ -1660,6 +1665,16 @@ three times: the wording should vary, the behaviour should not.
    question.
 9. **Your name.** Set Settings → You to a name. **Expected:** Scout knows it, and does not use it
    in every reply.
+10. **Two experts, no route memory.** Switch on Claude Code (code) and a Researcher (web). Ask "fix
+    the failing login test", then "find recent papers on agent memory". **Expected:** the first
+    card is for Claude Code, the second for the Researcher. Nothing names a task kind.
+11. **Silence with a reason.** Force a refusal, or the Claude Code sign-in's step cap (a question
+    that keeps it calling tools). **Expected:** no "I'd rather not…" or "went round in circles"
+    line; the bubble shows a muted **Declined** or **Stopped: too many steps** under Scout, the
+    chat panel shows it as a note, and nothing is spoken.
+12. **Facts, not orders.** Ask "what do you see?" with a blind spot in front, then with no host
+    connected. **Expected:** Scout explains in its own words; it never reads a tool's line back
+    ("Tell the user…").
 
 ## Not in this build
 

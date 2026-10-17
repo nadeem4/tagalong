@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { ScreenPointAtParams, ScreenPointAtResult } from '@tagalong/protocol';
 import type { PerceptionHost } from '../../perception/host';
 import { fakeTurnTools } from '../fake-turn';
+import { directivesIn } from '../test-support';
 import type { TurnTools } from '../registry';
 import { POINT_AT } from './pointing';
 
@@ -136,6 +137,7 @@ describe(POINT_AT, () => {
     ]).run({ name: POINT_AT, input: { windowId: 'w-1', name: 'Vault' } });
     expect(outcome.isError).toBe(true);
     expect(text(outcome.content)).toContain('exclusion list');
+    expect(directivesIn(outcome.content)).toEqual([]);
   });
 
   it('never mentions clicking anywhere in what the model sees', async () => {
@@ -148,5 +150,7 @@ describe(POINT_AT, () => {
     ]);
     const surface = JSON.stringify(definition) + outcomes.map((o) => text(o.content)).join(' ');
     expect(surface).not.toMatch(/click/i);
+    expect(directivesIn(definition?.description ?? '')).toEqual([]);
+    for (const outcome of outcomes) expect(directivesIn(outcome.content)).toEqual([]);
   });
 });

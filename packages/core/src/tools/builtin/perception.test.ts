@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { CaptureExclusions, ContextSnapshotPatch, PerceptionTarget } from '@tagalong/protocol';
 import type { PerceptionHost } from '../../perception/host';
 import { fakeTurnTools } from '../fake-turn';
+import { directivesIn } from '../test-support';
 import type { TurnTools } from '../registry';
 import type { ToolOutcome } from '../tool';
 import { GET_SELECTION, LOOK_AT_SCREEN } from './perception';
@@ -107,7 +108,8 @@ describe('look_at_screen', () => {
     // A blind model must never be handed base64: unreadable, enormous, and billed for.
     expect(result.content).not.toContain(PNG);
     // It has to be able to say why it cannot answer instead of inventing a description.
-    expect(String(result.content).toLowerCase()).toContain('cannot look at images');
+    expect(String(result.content).toLowerCase()).toContain('cannot see images');
+    expect(directivesIn(result.content)).toEqual([]);
   });
 
   it('assumes no vision when the caller does not say, so pixels are never sent blind', async () => {
@@ -147,6 +149,7 @@ describe('look_at_screen', () => {
     expect(result.isError).toBe(true);
     expect(result.content).toContain('blocked');
     expect(result.content).toMatch(/1password.exe/i);
+    expect(directivesIn(result.content)).toEqual([]);
     expect(result.content).not.toContain(PNG);
     expect(host.asked).toEqual([['activeWindow']]);
   });
@@ -172,7 +175,8 @@ describe('look_at_screen', () => {
     const result = await toolset([host]).run({ name: LOOK_AT_SCREEN });
 
     expect(result.isError).toBe(true);
-    expect(asText(result.content).toLowerCase()).toContain('cannot');
+    expect(asText(result.content).toLowerCase()).toContain('no connected host');
+    expect(directivesIn(result.content)).toEqual([]);
     expect(host.asked).toEqual([]);
   });
 
@@ -226,6 +230,15 @@ describe('get_selection', () => {
     expect(result.isError).toBe(true);
     expect(result.content).toContain('blocked');
     expect(result.content).not.toContain('a password');
+    expect(directivesIn(result.content)).toEqual([]);
+  });
+
+  it('states that no host can read the selection', async () => {
+    const result = await toolset([fakeHost(['screenshot'], {})]).run({ name: GET_SELECTION });
+
+    expect(result.isError).toBe(true);
+    expect(asText(result.content)).toContain('No connected host can read the selection');
+    expect(directivesIn(result.content)).toEqual([]);
   });
 });
 

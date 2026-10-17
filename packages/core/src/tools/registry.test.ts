@@ -37,13 +37,12 @@ function everything(overrides: Partial<ToolRegistryOptions> = {}): ToolRegistryO
       }),
       hosts,
     },
-    day: {
+    history: {
+      history: { search: () => [] },
       activity: { since: () => [] },
       sightLog: { list: () => [] },
-      handoffs: { pending: () => [] },
-      now: () => new Date(0),
+      days: () => 7,
     },
-    history: { history: { search: () => [] } },
     changeSettings: { get: () => Settings.parse(SETTINGS_DEFAULTS), emit: () => undefined },
     // Every wired tool: what the role library narrows is the toolsFor tests' business.
     toolsFor: (_pet, tools) => tools,
@@ -65,7 +64,6 @@ const ALL_TOOLS = [
   'remember',
   'watch_for',
   'point_at',
-  'recall_day',
   'search_history',
   'change_settings',
 ];
@@ -100,10 +98,10 @@ describe('ToolRegistry.forTurn', () => {
     const writes = tools.filter((tool) => tool.kind === 'write').map((tool) => tool.id);
 
     expect(writes).toEqual(['remember', 'watch_for', 'change_settings']);
-    expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(13);
+    expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(12);
   });
 
-  it('gives a companion its tools, then the routine tools (write), point_at, recall_day, search_history and change_settings', () => {
+  it('gives a companion its tools, then the routine tools (write), point_at, search_history and change_settings', () => {
     const experts = {
       experts: () => [
         {
@@ -123,7 +121,6 @@ describe('ToolRegistry.forTurn', () => {
           },
         },
       ],
-      routes: { get: () => null, remember: () => undefined },
       propose: () => ({ proposalId: '7c9e6679-7425-40de-944b-e07fc1f90ae7' }),
     };
     const routines = {
@@ -163,7 +160,6 @@ describe('ToolRegistry.forTurn', () => {
       'create_routine',
       'change_routine',
       'point_at',
-      'recall_day',
       'search_history',
       'change_settings',
     ]);
@@ -175,7 +171,6 @@ describe('ToolRegistry.forTurn', () => {
   it('offers tell_expert just before change_settings, and only while a hand-off is running', () => {
     const base = {
       experts: () => [],
-      routes: { get: () => null, remember: () => undefined },
       propose: () => ({ proposalId: '7c9e6679-7425-40de-944b-e07fc1f90ae7' }),
       steer: () => ({ ok: true as const }),
     };

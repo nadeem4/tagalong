@@ -17,7 +17,6 @@ import type {
   ChatCompletionMessageFunctionToolCall,
   ChatCompletionMessageParam,
 } from 'openai/resources/chat/completions';
-import { REFUSAL_MESSAGE } from './brain';
 import type {
   BrainCapabilities,
   BrainContentBlock,
@@ -339,9 +338,8 @@ export class OpenAiCompatibleProvider implements BrainProvider {
       switch (finishReason) {
         case 'length':
           return finish('max_tokens');
+        // No text of its own: the stop reason says why, and the UI shows it.
         case 'content_filter':
-          text += REFUSAL_MESSAGE;
-          events.onText(REFUSAL_MESSAGE);
           return finish('refusal');
         default:
           return finish('end');

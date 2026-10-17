@@ -7,6 +7,7 @@ import {
   type SettingsPatch,
 } from '@tagalong/protocol';
 import { FAKE_TURN_PET, fakeTurnTools } from '../fake-turn';
+import { directivesIn } from '../test-support';
 import type { TurnRequest } from '../registry';
 import { CHANGE_SETTINGS, talkPatchProblem, type SettingsToolDeps } from './settings';
 
@@ -44,6 +45,7 @@ describe(CHANGE_SETTINGS, () => {
     ]);
     expect(outcome.isError).toBeUndefined();
     expect(outcome.content).toContain('Apply');
+    expect(directivesIn(outcome.content)).toEqual([]);
     expect(d.emitted).toHaveLength(1);
     const card = d.emitted[0]!;
     expect(SettingsProposedParams.parse(card)).toEqual(card);
@@ -80,7 +82,7 @@ describe(CHANGE_SETTINGS, () => {
     });
   });
 
-  it('refuses an unknown setting and providerBaseUrls by name, with no card', async () => {
+  it('refuses an unknown setting and providerBaseUrls with one fact, with no card', async () => {
     const d = deps();
     const unknown = await change(d, [{ setting: 'enginePort', value: 9000 }]);
     expect(unknown.isError).toBe(true);
@@ -89,6 +91,11 @@ describe(CHANGE_SETTINGS, () => {
     expect(urls.isError).toBe(true);
     expect(urls.content).toContain('only in Settings');
     expect(urls.content).not.toContain('evil.example');
+    // One plain fact for every refused name: what talk can change, and what only Settings can.
+    expect(urls.content).toContain('cannot be changed by talk');
+    expect(urls.content).toContain('voice.speed');
+    expect(directivesIn(urls.content)).toEqual([]);
+    expect(String(urls.content)).not.toMatch(/\bI\b/);
     expect(d.emitted).toEqual([]);
   });
 
@@ -99,12 +106,24 @@ describe(CHANGE_SETTINGS, () => {
     ['calendar link', 'calendar link'],
     ['ics', 'calendar.ics'],
     ['model', 'model'],
-  ])('refuses %s by name and never repeats the value', async (_name, setting) => {
+  ])('refuses %s and never repeats the value', async (_name, setting) => {
     const d = deps();
     const outcome = await change(d, [{ setting, value: 'sk-or-v1-abcdef0123456789abcdef' }]);
     expect(outcome.isError).toBe(true);
     expect(outcome.content).toContain('only in Settings');
     expect(outcome.content).not.toContain('sk-or-v1');
+    expect(directivesIn(outcome.content)).toEqual([]);
+    expect(d.emitted).toEqual([]);
+  });
+
+  it('never repeats a key pasted into the setting name', async () => {
+    const d = deps();
+    const outcome = await change(d, [
+      { setting: 'openrouter key sk-or-v1-abcdef0123456789abcdef0123456789', value: 'x' },
+    ]);
+    expect(outcome.isError).toBe(true);
+    expect(outcome.content).toContain('only in Settings');
+    expect(outcome.content).not.toContain('abcdef0123456789');
     expect(d.emitted).toEqual([]);
   });
 
@@ -118,12 +137,19 @@ describe(CHANGE_SETTINGS, () => {
     },
   );
 
-  it('points the Seeing switch and the pause key at the bubble, not a card', async () => {
+  it('refuses the Seeing switch, which is not a setting, with no card', async () => {
     const d = deps();
     const outcome = await change(d, [{ setting: 'seeing', value: false }]);
     expect(outcome.isError).toBe(true);
-    expect(outcome.content).toContain('Seeing switch');
+    expect(outcome.content).toContain('cannot be changed by talk');
     expect(d.emitted).toEqual([]);
+  });
+
+  it('describes its rules once, as facts', () => {
+    const tool = fakeTurnTools({ changeSettings: deps().value }).definitions.find(
+      (candidate) => candidate.name === CHANGE_SETTINGS,
+    );
+    expect(tool!.description).not.toMatch(/never say|say so|say only/i);
   });
 
   it('returns isError for an out-of-range speed or minutes, never a throw', async () => {
@@ -181,6 +207,7 @@ describe(CHANGE_SETTINGS, () => {
     const outcome = await change(d, [{ setting: 'pickUp', value: true }], ROUTINE);
     expect(outcome.isError).toBe(true);
     expect(outcome.content).toContain('routine');
+    expect(directivesIn(outcome.content)).toEqual([]);
     expect(d.emitted).toEqual([]);
     const ok = await change(d, [{ setting: 'voice.speed', value: 0.8 }], ROUTINE);
     expect(ok.isError).toBeUndefined();
@@ -207,7 +234,8 @@ describe(CHANGE_SETTINGS, () => {
     expect(d.emitted[0]!.patch.listening).toEqual({ always: false });
     const on = await change(deps(), [{ setting: 'listening.always', value: true }]);
     expect(on.isError).toBe(true);
-    expect(on.content).toContain('Only you can switch that on');
+    expect(on.content).toContain('switched on only by the person');
+    expect(directivesIn(on.content)).toEqual([]);
   });
 
   it('picks a mouth or ears, notes the ElevenLabs key, and refuses an unknown mouth', async () => {
@@ -235,6 +263,7 @@ describe(CHANGE_SETTINGS, () => {
     const up = await change(d, [{ setting: 'sightLog.days', value: 30 }]);
     expect(up.isError).toBe(true);
     expect(up.content).toContain('only lower');
+    expect(String(up.content)).not.toMatch(/\bI\b/);
   });
 
   it('sets a spending cap, and marks raising or removing it', async () => {
@@ -328,7 +357,9 @@ describe('talkPatchProblem: main re-checks an applied card, never trusting the r
     ).toContain('Settings');
     expect(talkPatchProblem(current, { sightLog: { days: 30 } })).not.toBeNull();
     const off = Settings.parse({ ...current, listening: { always: false } });
-    expect(talkPatchProblem(off, { listening: { always: true } })).toContain('Only you');
+    expect(talkPatchProblem(off, { listening: { always: true } })).toContain(
+      'switched on only by the person',
+    );
   });
 
   it('lets through a patch that changes nothing', () => {

@@ -274,8 +274,8 @@ content. An app that isn't connected is named once at the end; a signed-out one 
 again.
 
 **What did we do today?** Ask it (or "how much did I work yesterday?") and Scout sums up the day
-from what it looked at and was asked: about how many hours (an estimate), the apps and projects,
-what experts did and what is still open. It only knows what it saw; nothing extra is tracked.
+from what it looked at and was asked: the apps and windows, when, what you asked and what experts
+did. It only knows what it saw; nothing extra is tracked.
 
 **What was that article I read?** Ask "what was that article about vector databases I read
 Tuesday?" and Scout searches the window titles it looked at and what you asked it, and answers

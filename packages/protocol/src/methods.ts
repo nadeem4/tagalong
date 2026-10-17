@@ -353,7 +353,8 @@ export const TurnToolResultParams = z.object({
 export const TurnCompletedParams = z.object({
   turnId: z.uuid(),
   text: z.string(),
-  stopReason: z.enum(['end', 'max_tokens', 'aborted', 'refusal']),
+  /** `refusal` and `tool_limit` come with empty text: the UI shows a quiet status instead. */
+  stopReason: z.enum(['end', 'max_tokens', 'aborted', 'refusal', 'tool_limit']),
   usage: z.object({
     inputTokens: z.number().int().nonnegative(),
     outputTokens: z.number().int().nonnegative(),

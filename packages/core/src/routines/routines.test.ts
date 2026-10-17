@@ -14,6 +14,7 @@ import type {
 import type { Meeting } from '../meetings/calendar-feed';
 import * as lookout from '../keep-an-eye/lookout';
 import { migrate } from '../memory/db';
+import { directivesIn } from '../tools/test-support';
 import { FakeClock } from '../watch/fake-clock';
 import { Routines, ROUTINE_TICK_MS, type RoutineAsk, type RoutineEvent } from './routines';
 import { RoutineStore } from './store';
@@ -184,6 +185,9 @@ describe('Routines, on a schedule', () => {
     expect(t.asks[0]?.pet.id).toBe('scout');
     expect(t.asks[0]?.text).toContain('Find new papers on my topics.');
     expect(t.asks[0]?.text).toContain('Topics: AI agents');
+    // Facts only: the Now block says it runs unattended; the prompt gives no orders.
+    expect(directivesIn(t.asks[0]?.text ?? '')).toEqual([]);
+    expect(t.asks[0]?.text).not.toContain('not watching');
     expect(t.results()).toEqual([
       expect.objectContaining({
         routineId: saved.id,
@@ -426,6 +430,8 @@ describe('Routines, handing to an expert', () => {
     expect(t.asks[0]?.instruction).toBe(PAPERS.what);
     expect(t.asks[0]?.text).toContain('Researcher');
     expect(t.asks[0]?.text).toContain('read-only');
+    expect(t.asks[0]?.text).toContain('pre-approved once for this run');
+    expect(directivesIn(t.asks[0]?.text ?? '')).toEqual([]);
   });
 
   it('offers none when the card did not say so', async () => {
@@ -683,5 +689,6 @@ describe('Routines, before a meeting', () => {
     const other = empty.store.save(PREP, MONDAY_759);
     await empty.routines.runNow(other.id);
     expect(empty.asks[0]?.text).toContain('No meeting is coming up');
+    expect(directivesIn(empty.asks[0]?.text ?? '')).toEqual([]);
   });
 });

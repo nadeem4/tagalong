@@ -9,7 +9,6 @@ import type { MemoryStore } from '../memory/memories';
 import { roleFor } from '../roles';
 import { recallTools, watchForTool, type WatchToolDeps } from './builtin/awareness';
 import { connectorTools, type ConnectorToolDeps } from './builtin/connections';
-import { recallDayTool, type DayToolDeps } from './builtin/day';
 import { searchHistoryTool, type HistoryToolDeps } from './builtin/history';
 import { rememberTool } from './builtin/memory';
 import {
@@ -55,9 +54,7 @@ export interface ToolRegistryOptions {
   connections?: ConnectorToolDeps | undefined;
   /** Gives a pet whose role lists them `create_routine` and `change_routine`. */
   routines?: RoutineToolDeps | undefined;
-  /** Gives a pet whose role lists it `recall_day`, the daily briefing. */
-  day?: DayToolDeps | undefined;
-  /** Gives a pet whose role lists it `search_history`, the searchable work memory. */
+  /** Gives a pet whose role lists it `search_history`: searches and day listings. */
   history?: HistoryToolDeps | undefined;
   /**
    * Gives a pet whose role lists it `change_settings`, which shows the settings card. It is
@@ -124,17 +121,8 @@ export class ToolRegistry {
 
   /** Every built-in this engine is wired for, in the order the model has always seen. */
   #all(turn: TurnRequest): Tool[] {
-    const {
-      perception,
-      memory,
-      watch,
-      experts,
-      connections,
-      routines,
-      day,
-      history,
-      changeSettings,
-    } = this.#options;
+    const { perception, memory, watch, experts, connections, routines, history, changeSettings } =
+      this.#options;
     const tools: Tool[] = [];
     if (perception) tools.push(...perceptionTools(perception), ...recallTools(perception));
     if (memory) tools.push(rememberTool(memory));
@@ -151,7 +139,6 @@ export class ToolRegistry {
     }
     // Appended last: the order is what the model has always seen.
     if (perception) tools.push(pointAtTool(perception));
-    if (day) tools.push(recallDayTool(day));
     if (history) tools.push(searchHistoryTool(history));
     // Only while an expert works, and never on a routine's own turn: nobody is there to say it.
     const running = experts?.running?.() ?? [];

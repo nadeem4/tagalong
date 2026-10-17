@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BrainEvents, BrainRequest } from './brain';
 import { BrainError } from './errors';
 import { AnthropicProvider } from './anthropic';
-import { REFUSAL_MESSAGE } from './brain';
 
 /**
  * The SDK is mocked wholesale: these tests must never open a socket, and the error
@@ -297,15 +296,15 @@ describe('AnthropicProvider', () => {
     });
   });
 
-  it('surfaces a friendly message when the model refuses', async () => {
+  it('returns no text when the model refuses: the stop reason says why', async () => {
     sdk.stream.mockReturnValue(streamOf(textMessage('', 'refusal')));
     const { events, deltas } = recorder();
 
     const result = await provider().complete(request, events, new AbortController().signal);
 
     expect(result.stopReason).toBe('refusal');
-    expect(result.text).toBe(REFUSAL_MESSAGE);
-    expect(deltas).toEqual([REFUSAL_MESSAGE]);
+    expect(result.text).toBe('');
+    expect(deltas).toEqual([]);
   });
 
   it('reports the max_tokens stop reason', async () => {

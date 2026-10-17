@@ -64,7 +64,6 @@ const FIELDS = {
     type: 'string',
     description: 'The instruction, in the person’s words, as you will run it each time.',
   },
-  topics: { type: 'string', description: 'Topics to look for, when it is about papers or news.' },
   result: {
     type: 'array',
     description: 'Where the result goes. Default bubble. Activity always gets it.',
@@ -96,11 +95,9 @@ function createDefinition(experts: readonly Expert[]): BrainTool {
     description:
       'Set up a routine the person asked for: something you do for them on a schedule or when ' +
       'something happens, such as "every weekday at 8, give me new papers on AI agents". It ' +
-      'shows them a card; nothing is saved until they press Save, so never say it is set up ' +
-      'until then. Each run is one of your turns with your normal tools: read tools of their ' +
-      'connected apps run, and anything that changes something still asks them each time. ' +
-      'For papers or news from the web, use an arXiv or paper app if one is connected; ' +
-      `otherwise set hand_to to an expert that can search the web. ${expertList(experts)}`,
+      'shows them a card; nothing is saved until they press Save. Each run is one of your ' +
+      'turns with your normal tools: read tools of their connected apps run, and anything ' +
+      `that changes something still asks them each time. ${expertList(experts)}`,
     inputSchema: {
       type: 'object',
       properties: FIELDS,
@@ -186,7 +183,6 @@ function draftFrom(
   const name = input['new_name'] ?? (base === undefined ? input['name'] : undefined);
   if (name !== undefined) fields['name'] = name;
   if (input['what'] !== undefined) fields['what'] = input['what'];
-  if (input['topics'] !== undefined) fields['topics'] = input['topics'];
   if (input['uses'] !== undefined) fields['uses'] = input['uses'];
   if (input['result'] !== undefined || base === undefined) {
     fields['deliver'] = deliverFrom(input['result']);
@@ -213,8 +209,8 @@ function draftFrom(
 }
 
 const SHOWN =
-  'The routine card is in front of the person. Tell them in one line to check it and press ' +
-  'Save; nothing runs until they do. Once saved, the card offers to run it now to test.';
+  'The routine is on a card; nothing runs until they press Save. Once saved, the card ' +
+  'offers to run it now to test.';
 
 export function createRoutineTool(deps: RoutineToolDeps): Tool {
   return defineTool(createDefinition(deps.experts()), 'write', (input, ctx) => {

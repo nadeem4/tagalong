@@ -35,7 +35,6 @@ const BUILT_IN_TOOLS = [
   'change_routine',
   'hand_to_expert',
   'point_at',
-  'recall_day',
   'search_history',
   'tell_expert',
   'change_settings',

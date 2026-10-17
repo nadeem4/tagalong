@@ -162,8 +162,8 @@ const READ_WINDOW_TEXT_DEFINITION: BrainTool = {
     'costs the user tokens for nothing. Editors and terminals draw their own text, so ' +
     'for those the text is read from a picture of the window instead: it covers only ' +
     'what is on screen and words may be misread. A short result may mean you could not ' +
-    'read inside the window rather than that it is empty. The result says so when that ' +
-    'happens; repeat it rather than guessing.',
+    'read inside the window rather than that it is empty; the result notes when that ' +
+    'happens.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -235,8 +235,7 @@ async function capture(options: PerceptionToolsOptions, vision: boolean): Promis
   const host = options.hosts().find((candidate) => candidate.capabilities.includes(target));
   if (host === undefined) {
     return {
-      content:
-        'No connected host can take a screenshot, so you cannot look at the screen right now. Tell the user that.',
+      content: 'No connected host can take a screenshot.',
       isError: true,
     };
   }
@@ -272,8 +271,7 @@ async function selection(options: PerceptionToolsOptions): Promise<ToolOutcome> 
     });
     if (read === null) {
       return {
-        content:
-          'No connected host can read the selection, so you cannot see what is selected. Tell the user that.',
+        content: 'No connected host can read the selection.',
         isError: true,
       };
     }
@@ -295,16 +293,14 @@ async function selection(options: PerceptionToolsOptions): Promise<ToolOutcome> 
 type SnapshotApp = NonNullable<ContextSnapshotPatch['app']>;
 
 /**
- * Says which entry blocked the capture, not just that something did. The pet has to be
- * able to tell the user "Tagalong is set not to look at 1Password" — a bare refusal
+ * Says which entry blocked the capture, not just that something did: a bare refusal
  * reads as a bug, and a silent empty result reads as the pet ignoring the question.
  */
 function refusal(block: CaptureBlock): string {
   const how = block.rule === 'processName' ? 'application' : 'window title pattern';
   return (
     `Capture is blocked here: the active window matches the ${how} '${block.entry}' on the ` +
-    "user's capture exclusion list. Nothing was captured. Tell the user Tagalong cannot " +
-    'look at this window, and do not guess what is on it.'
+    "user's capture exclusion list. Nothing was captured."
   );
 }
 
@@ -336,12 +332,10 @@ function describe(
     ];
   }
 
-  // Told plainly, so the pet can say "I can't see images" instead of narrating a picture
-  // it never received. A blind guess about the user's screen is worse than an admission.
+  // Told plainly, so the pet knows it never received the picture it might narrate.
   return (
     `Captured a screenshot${where ? ` of ${where}` : ''}: PNG, ${shot.width}×${shot.height}. ` +
-    'This pet cannot look at images, so you have not seen it. Tell the user that and do ' +
-    'not guess what is on screen.'
+    'This model cannot see images; the picture was not seen.'
   );
 }
 
@@ -454,7 +448,7 @@ function fullViewContext(options: PerceptionToolsOptions, vision: boolean): Full
 
 export function noHost(what: string): ToolOutcome {
   return {
-    content: `No connected host can ${what} right now. Tell the user that rather than guessing.`,
+    content: `No connected host can ${what} right now.`,
     isError: true,
   };
 }
@@ -538,14 +532,13 @@ async function runLookAtDisplay(context: FullViewContext, input: unknown): Promi
       return {
         content:
           `Display ${displayId} is blocked: a window on it matches ` +
-          `${refusalWording(display.blocked)}. Nothing was captured. Tell the user Tagalong ` +
-          `cannot look at that screen, and do not guess what is on it.`,
+          `${refusalWording(display.blocked)}. Nothing was captured.`,
         isError: true,
       };
     }
     if (display.image === undefined) {
       return {
-        content: `The host returned no picture of display ${displayId}. Tell the user that.`,
+        content: `The host returned no picture of display ${displayId}.`,
         isError: true,
       };
     }
@@ -554,9 +547,8 @@ async function runLookAtDisplay(context: FullViewContext, input: unknown): Promi
     if (!context.vision()) {
       return {
         content:
-          `Captured display ${displayId}: PNG, ${width}x${height}. This pet cannot look at ` +
-          `images, so you have not seen it. Tell the user that and do not guess what is on ` +
-          `that screen.`,
+          `Captured display ${displayId}: PNG, ${width}x${height}. This model cannot see ` +
+          'images; the picture was not seen.',
       };
     }
     return {
@@ -608,8 +600,7 @@ async function runLookCloser(context: FullViewContext, input: unknown): Promise<
       return {
         content:
           `Cropped ${rect.width}x${rect.height} from display ${displayId}: PNG, ${image.width}x` +
-          `${image.height}. This pet cannot look at images, so you have not seen it. Tell the ` +
-          `user that and do not guess what it shows.`,
+          `${image.height}. This model cannot see images; the picture was not seen.`,
       };
     }
     return {
@@ -663,7 +654,7 @@ async function runReadWindowText(context: FullViewContext, input: unknown): Prom
       return {
         content:
           `That window is blocked: it matches ${refusalWording(reading.blocked)}. Nothing was ` +
-          `read. Tell the user Tagalong cannot read that window, and do not guess what is in it.`,
+          'read.',
         isError: true,
       };
     }
@@ -714,9 +705,8 @@ async function runLookAtWindow(context: FullViewContext, input: unknown): Promis
     if (!context.vision()) {
       return {
         content:
-          `Window ${shot.windowId}: PNG, ${shot.image.width}x${shot.image.height}. This pet ` +
-          'cannot look at images, so you have not seen it. Tell the user that and do not ' +
-          `guess what it shows; ${READ_WINDOW_TEXT} may help.`,
+          `Window ${shot.windowId}: PNG, ${shot.image.width}x${shot.image.height}. This model ` +
+          `cannot see images; the picture was not seen. ${READ_WINDOW_TEXT} reads its text.`,
       };
     }
     return {
