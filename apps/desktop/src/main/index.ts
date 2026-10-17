@@ -70,7 +70,7 @@ import {
   providerChoices,
   storedKeys,
 } from './provider-choices';
-import { WHATS_NEW } from './whats-new';
+import { RELEASE_NOTES } from './release-notes';
 import { elevenLabsTts } from './voice/elevenlabs';
 import { kokoroDownloaded } from './voice/kokoro';
 import { createVoiceService, elevenLabsMouth, localMouth } from './voice/voice';
@@ -531,10 +531,9 @@ const pickUpAllowlist = new PickUpAllowlist();
 const pickUpWaiting = new PickUpWaiting();
 
 /**
- * Back after a long break, found on a tick rather than at launch (Always listening's line went
- * first, or the PC slept), or one the launch line could not carry (the Fix it line): the
- * pick-up line beside Scout, like a remark. With the bubble open, it waits until the bubble
- * next hides, and is dropped if pick-up was switched off meanwhile.
+ * A pick-up check-in spoke (at launch, or back after a long break found on a tick): the mind's
+ * line beside Scout with the Pick up card, like a remark. With the bubble open, it waits until
+ * the bubble next hides, and is dropped if pick-up was switched off meanwhile.
  */
 function showPickUp(params: unknown): void {
   const pickUp = params as PickUpReadyParams;
@@ -588,41 +587,38 @@ function showRemark(params: unknown): void {
 }
 
 /**
- * A later launch: Scout says one line beside itself without taking the keyboard, and the
- * launch is remembered (the quit is too, in before-quit) so the next one knows how long you
- * were away and which hand-offs finished since. The line reads no screen. It waits for the
- * composed line and for the sign-in check (at most SIGN_IN_BUDGET_MS), both in parallel; the
- * engine falls back to a handwritten line, so no brain is ever waited on past that.
+ * A later launch: when Scout can think, the engine's launch check-in is asked (it answers at
+ * once) and the mind's line, if any, comes later as a remark or with the Pick up card; when
+ * it cannot, the brain mark shows beside Scout with Fix it. The sign-in check takes at most
+ * SIGN_IN_BUDGET_MS. Then the launch is remembered (the quit is too, in before-quit) so the
+ * next one knows how long you were away. Nothing here writes a line in Scout's voice.
  */
 async function greetOnLaunch(host: EngineHost): Promise<void> {
   const current = desktop;
   if (current === null) return;
-  // The engine hands a pick-up out once, so one the line did not carry is shown after it.
-  let offered: PickUpReadyParams | undefined;
-  let carried = false;
   try {
     const line = await launchLine(current.settings, async () => {
-      const { previousLaunch } = current;
-      // Compose first, then check the brain beside it, so a slow check never delays the line.
-      const composing = host.client.call('greeting.compose', {
-        petId: SCOUT_ID,
-        launch: { ...previousLaunch, version: app.getVersion(), whatsNew: WHATS_NEW },
-      });
-      const readiness = (async () => {
-        const { pets } = await host.client.call('pets.list', {});
-        return brainReadiness({
-          pet: pets.find((pet) => pet.id === SCOUT_ID),
-          providers: providerChoices(await storedKeys(current.secrets)),
-          signIn: () => signInCheck ?? signInFor(process.env),
-          budgetMs: SIGN_IN_BUDGET_MS,
-        });
-      })().catch(() => 'unknown' as const);
-      const [brain, composed] = await Promise.all([readiness, composing]);
-      offered = composed.pickUp;
+      const { pets } = await host.client.call('pets.list', {});
+      const brain = await brainReadiness({
+        pet: pets.find((pet) => pet.id === SCOUT_ID),
+        providers: providerChoices(await storedKeys(current.secrets)),
+        signIn: () => signInCheck ?? signInFor(process.env),
+        budgetMs: SIGN_IN_BUDGET_MS,
+      }).catch(() => 'unknown' as const);
       // Why Scout cannot think shows on Scout as a mark until it can again.
       const status = brainStatus(brain);
-      if (status !== null) current.statusMarks.set({ id: status });
-      return brainLine(brain, composed.text, composed.pickUp);
+      if (status !== null) {
+        current.statusMarks.set({ id: status });
+        return brainLine(brain);
+      }
+      await host.client.call('checkIn.launch', {
+        launch: {
+          ...current.previousLaunch,
+          version: app.getVersion(),
+          releaseNotes: RELEASE_NOTES,
+        },
+      });
+      return null;
     });
     if (line !== null) {
       const { panel, avatar } = current;
@@ -630,18 +626,13 @@ async function greetOnLaunch(host: EngineHost): Promise<void> {
         if (panel.webContents.isLoading()) {
           await new Promise<void>((resolve) => panel.webContents.once('did-finish-load', resolve));
         }
-        const pickUp = 'pickUp' in line ? line.pickUp : undefined;
-        if (pickUp !== undefined) pickUpAllowlist.set(pickUp);
         panel.webContents.send(IPC.greetLineEvent, line);
         showPanelQuietly(panel, avatar);
-        carried = pickUp !== undefined;
       }
     }
   } catch (error) {
-    console.warn('[main] the greeting did not run:', error);
+    console.warn('[main] the launch check-in did not run:', error);
   }
-  // The Fix it line won, or the bubble was open: the pick-up follows once the bubble hides.
-  if (offered !== undefined && !carried) showPickUp(offered);
   try {
     const patch: SettingsPatch = { lastOpenedAt: new Date().toISOString() };
     current.settings = (await host.client.call('settings.set', { patch })).settings;
@@ -1090,6 +1081,19 @@ function registerIpc(): void {
         current.panel.webContents.send(IPC.greetEvent);
         showPanelQuietly(current.panel, current.avatar);
       }
+      // The first hello is the mind's: a launch check-in about Welcome alone (no crash or
+      // update facts), whose line, if any, lands in the hello above the Try it button.
+      void current.host?.client
+        .call('checkIn.launch', {
+          launch: {
+            crashed: false,
+            lastVersion: null,
+            version: app.getVersion(),
+            releaseNotes: '',
+            welcomed: true,
+          },
+        })
+        .catch((error: unknown) => console.warn('[main] the first hello did not run:', error));
     },
   });
   registerExpertIpc(handle, { engine });

@@ -137,6 +137,8 @@ test.describe('setup by typing, signed in to Claude', () => {
     await expect.poll(() => visible(app, 'avatar'), ENGINE).toBe(true);
     const panel = await windowFor(app, 'panel');
     await expect(panel.getByRole('button', { name: 'Try it now' })).toBeVisible(ENGINE);
+    // The hello's line is the mind's, from the first hello's check-in: the fake one here.
+    await expect(panel.getByText(/This is the fake pet/)).toBeVisible(ENGINE);
   });
 
   test('every answer was saved as given, and setup does not open again', async () => {

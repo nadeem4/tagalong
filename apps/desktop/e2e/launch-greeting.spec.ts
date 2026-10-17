@@ -1,6 +1,6 @@
 /**
- * End-to-end: Scout's launch line across launches on one profile (signed out, clean quit,
- * signed in, back after a long break).
+ * End-to-end: the launch across launches on one profile (signed out, clean quit, signed in,
+ * back after a long break). With a brain, the line is the launch check-in's: the fake mind's.
  */
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -90,7 +90,7 @@ test('a clean quit records the close and this version', async () => {
   expect(settingsFile()['lastVersion']).toBe(version);
 });
 
-test('signed in: the next launch says the brain’s own line', async () => {
+test('signed in: the next launch’s line is the mind’s, from the launch check-in', async () => {
   app = await launch('signed-in');
   const panel = await windowFor('panel');
   await expect(panel.getByText('This is the fake pet.', { exact: false })).toBeVisible({
@@ -98,7 +98,7 @@ test('signed in: the next launch says the brain’s own line', async () => {
   });
 });
 
-test('back after a long break: the launch line offers to pick up, and the card opens on a click', async () => {
+test('back after a long break: the mind’s line comes with Pick up, and the card opens on a click', async () => {
   await quit();
   // A snapshot from eight hours ago, as last night's session would leave it. Written by
   // Electron run as Node; better-sqlite3's prebuilt N-API binary loads there as in the app.
@@ -119,9 +119,9 @@ test('back after a long break: the launch line offers to pick up, and the card o
 
   app = await launch('signed-in');
   const panel = await windowFor('panel');
-  await expect(panel.getByText(/you were in ai_pet on feat\/pick-up/)).toBeVisible({
-    timeout: 30_000,
-  });
+  // The line is the mind's (the fake one here), never a handwritten "you were in ai_pet".
+  await expect(panel.getByText(/This is the fake pet/)).toBeVisible({ timeout: 30_000 });
+  await expect(panel.getByText(/you were in ai_pet/)).toHaveCount(0);
   await panel.getByRole('button', { name: 'Pick up' }).click();
   await expect(panel.getByRole('region', { name: 'Pick up where you left off' })).toBeVisible();
   await expect(panel.getByRole('button', { name: 'Open the ai_pet folder' })).toBeVisible();

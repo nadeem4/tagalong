@@ -84,10 +84,10 @@ describe('shouldGreetOnLaunch', () => {
 });
 
 describe('launchLine', () => {
-  it('composes the greeting with Always listening on too: listening shows as a mark, not a line', async () => {
-    const compose = vi.fn(async () => ({ text: 'Morning.' }));
+  it('runs the launch with Always listening on too: listening shows as a mark, not a line', async () => {
+    const compose = vi.fn(async () => ({ status: 'brain-no-key' as const }));
     const settings = Settings.parse({ welcome: { done: true }, listening: { always: true } });
-    expect(await launchLine(settings, compose)).toEqual({ text: 'Morning.' });
+    expect(await launchLine(settings, compose)).toEqual({ status: 'brain-no-key' });
     const quiet = Settings.parse({
       welcome: { done: true },
       greeting: false,
@@ -97,16 +97,22 @@ describe('launchLine', () => {
     expect(compose).toHaveBeenCalledOnce();
   });
 
-  it('says the composed greeting when listening is off and the greeting is allowed', async () => {
-    const compose = vi.fn(async () => ({ text: 'Morning.' }));
+  it('runs the launch when listening is off and the greeting is allowed', async () => {
+    const compose = vi.fn(async () => ({ status: 'brain-no-key' as const }));
     expect(await launchLine(Settings.parse({ welcome: { done: true } }), compose)).toEqual({
-      text: 'Morning.',
+      status: 'brain-no-key',
     });
     expect(compose).toHaveBeenCalledOnce();
   });
 
+  it('is nothing when the launch asked the check-in instead of showing a mark', async () => {
+    const compose = vi.fn(async () => null);
+    expect(await launchLine(Settings.parse({ welcome: { done: true } }), compose)).toBeNull();
+    expect(compose).toHaveBeenCalledOnce();
+  });
+
   it('says nothing when listening is off and the greeting is switched off', async () => {
-    const compose = vi.fn(async () => ({ text: 'Morning.' }));
+    const compose = vi.fn(async () => ({ status: 'brain-no-key' as const }));
     const settings = Settings.parse({ welcome: { done: true }, greeting: false });
     expect(await launchLine(settings, compose)).toBeNull();
     expect(compose).not.toHaveBeenCalled();

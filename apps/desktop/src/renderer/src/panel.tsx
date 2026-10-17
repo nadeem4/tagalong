@@ -78,8 +78,6 @@ function Panel() {
   const [snapshot, setSnapshot] = useState<ContextSnapshot | null>(null);
   const [petId, setPetId] = useState<string | null>(null);
   const [petName, setPetName] = useState('Scout');
-  const [hotkeyLabel, setHotkeyLabel] = useState('Ctrl+Shift+Space');
-  const [userName, setUserName] = useState('');
   const [hotkeyProblem, setHotkeyProblem] = useState<string | null>(null);
   const [mode, setMode] = useState<'bubble' | 'chat'>('bubble');
   const [greeting, setGreeting] = useState(false);
@@ -121,10 +119,8 @@ function Panel() {
   // The top status mark: a muted row in the bubble, the same mark as the tag on Scout.
   const [status, setStatus] = useState<StatusMark | null>(null);
   function apply(next: PanelSettings): void {
-    setHotkeyLabel(next.hotkeyLabel);
     setTalkKey(next.talkKey);
     setMicrophoneId(next.microphoneId);
-    setUserName(next.userName);
   }
   const {
     talk,
@@ -179,12 +175,8 @@ function Panel() {
       window.tagalongHost.onGreet(() => {
         setMode('bubble');
         setLine(null);
-        // Welcome has just saved the name, if one was typed: read it before the hello starts.
-        void window.tagalongHost
-          .getHostView()
-          .then((view) => setUserName(view.settings.userName))
-          .catch(() => undefined)
-          .finally(() => setGreeting(true));
+        // The hello's line, if any, is the mind's: it comes to the bubble as a check-in remark.
+        setGreeting(true);
       }),
     [],
   );
@@ -430,8 +422,6 @@ function Panel() {
               petId={petId}
               petName={petName}
               greeting={greeting}
-              hotkeyLabel={hotkeyLabel}
-              userName={userName}
               expanded={mode === 'chat'}
               onDismiss={dismissGreeting}
               onOpenChat={() => setMode('chat')}

@@ -166,10 +166,14 @@ describe('renderBundle', () => {
         }),
       }),
     );
-    expect(update).toContain('Tagalong was updated from 0.0.9 to 0.1.0. New in 0.1.0: translation.');
+    expect(update).toContain(
+      'Tagalong was updated from 0.0.9 to 0.1.0. New in 0.1.0: translation.',
+    );
     expect(update).toContain('Routines that ran since: Morning papers, Inbox sweep.');
     expect(
-      renderBundle(input({ reason: launch({ update: { from: '0.0.9', to: '0.1.0', notes: '' } }) })),
+      renderBundle(
+        input({ reason: launch({ update: { from: '0.0.9', to: '0.1.0', notes: '' } }) }),
+      ),
     ).toContain('updated from 0.0.9 to 0.1.0.');
   });
 
@@ -185,7 +189,9 @@ describe('renderBundle', () => {
     expect(atLaunch).toContain('## Where they left off (yesterday)');
     expect(atLaunch).toContain('- ai_pet on feat/pick-up, engine.ts open');
     expect(atLaunch).toContain('- Claude Code: "add dark mode": never sent');
-    const back = renderBundle(input({ reason: { kind: 'back', awayMs: 14 * HOUR, pickUp: leftOff } }));
+    const back = renderBundle(
+      input({ reason: { kind: 'back', awayMs: 14 * HOUR, pickUp: leftOff } }),
+    );
     expect(back).toMatch(/^## Why you woke\nThey are back after 14 hours\./);
     expect(back).toContain('## Where they left off (yesterday)');
     const earlier = renderBundle(
@@ -195,7 +201,10 @@ describe('renderBundle', () => {
           awayMs: 7 * HOUR,
           pickUp: {
             takenAt: now.at.getTime() - 7 * HOUR,
-            items: [{ ...stopped, state: 'stopped' }, { ...stopped, id: 'h3', state: 'error' }],
+            items: [
+              { ...stopped, state: 'stopped' },
+              { ...stopped, id: 'h3', state: 'error' },
+            ],
           },
         },
       }),

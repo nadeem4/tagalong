@@ -1392,7 +1392,11 @@ function recordingBrain(text: string): { provider: BrainProvider; sent: string[]
     capabilities: { vision: false, tools: false },
     complete: (request) => {
       sent.push(JSON.stringify(request.messages));
-      return Promise.resolve({ text, stopReason: 'end', usage: { inputTokens: 1, outputTokens: 1 } });
+      return Promise.resolve({
+        text,
+        stopReason: 'end',
+        usage: { inputTokens: 1, outputTokens: 1 },
+      });
     },
   };
   return { provider, sent };

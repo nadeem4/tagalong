@@ -149,7 +149,7 @@ function whyLine(reason: BundleReason): string {
 function launchLines(reason: Extract<BundleReason, { kind: 'launch' }>): string[] {
   const lines = [
     reason.welcomed
-      ? 'They just finished setting Tagalong up: this is the first time you speak to them. A Try it now button shows under your line.'
+      ? 'They just finished setting Tagalong up in Welcome. A Try it now button shows under your line.'
       : 'Tagalong just opened. They switched on "Say hello when Tagalong opens".',
   ];
   if (reason.awayMs !== null) lines.push(`They were away for ${away(reason.awayMs)}.`);

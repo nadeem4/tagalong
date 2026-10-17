@@ -57,8 +57,15 @@ const ask = (text: string) => {
   fireEvent.keyDown(input, { key: 'Enter' });
 };
 
-const INVITE =
-  'Here I am. Ask me one real thing about your screen. Press Ctrl+Shift+Space anytime.';
+const HELLO = 'Hi Sam. Ask me about anything on your screen.';
+const helloRemark = (text = HELLO, extra: Record<string, unknown> = {}) =>
+  ({
+    type: 'pet.remark',
+    remarkId: '00000000-0000-4000-8000-0000000000aa',
+    petId: 'scout',
+    text,
+    ...extra,
+  }) as const;
 
 /** Says whether the person asked for reduced motion; jsdom has no matchMedia of its own. */
 function prefersReducedMotion(reduce: boolean): void {
@@ -74,42 +81,57 @@ describe('CompanionBubble invitation after setup', () => {
     vi.useRealTimers();
   });
 
-  it('invites one real question in one line, with no Next', () => {
+  it('writes no line of its own: Try it now and Got it, until the mind says one', () => {
     prefersReducedMotion(true);
     const onDismiss = vi.fn();
-    renderBubble(createFakeHostBridge(), {
-      greeting: true,
-      hotkeyLabel: 'Ctrl+Shift+Space',
-      onDismiss,
-    });
-    expect(screen.getByRole('status')).toHaveTextContent(INVITE);
+    const onSay = vi.fn();
+    renderBubble(createFakeHostBridge(), { greeting: true, onDismiss, onSay });
+    expect(screen.getByRole('status')).toHaveTextContent('');
+    expect(screen.queryByText(/Here I am/)).toBeNull();
+    expect(onSay).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Next' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Try it now' })).toHaveFocus();
     fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
     expect(onDismiss).toHaveBeenCalledOnce();
   });
 
+  it('shows the first hello’s check-in line above Try it now, and says it once', () => {
+    prefersReducedMotion(true);
+    const bridge = createFakeHostBridge();
+    const onSay = vi.fn();
+    renderBubble(bridge, { greeting: true, onSay });
+    act(() => bridge.emit(helloRemark()));
+    expect(screen.getByRole('status')).toHaveTextContent(HELLO);
+    expect(screen.getByRole('button', { name: 'Try it now' })).toBeVisible();
+    expect(onSay).toHaveBeenCalledOnce();
+    expect(onSay).toHaveBeenCalledWith(HELLO);
+    // A line about a finished hand-off is not the hello.
+    act(() => bridge.emit(helloRemark('All green.', { handoffId: crypto.randomUUID() })));
+    expect(screen.getByRole('status')).toHaveTextContent(HELLO);
+    expect(onSay).toHaveBeenCalledOnce();
+  });
+
   it('types the line in, while a screen reader hears it whole', () => {
     prefersReducedMotion(false);
     vi.useFakeTimers();
-    renderBubble(createFakeHostBridge(), { greeting: true, hotkeyLabel: 'Ctrl+Shift+Space' });
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge, { greeting: true });
+    act(() => bridge.emit(helloRemark()));
     const shown = screen.getByTestId('intro-typed');
     expect(shown.closest('[aria-hidden="true"]')).not.toBeNull();
-    expect(shown.textContent!.length).toBeLessThan(INVITE.length);
+    expect(shown.textContent!.length).toBeLessThan(HELLO.length);
     act(() => vi.advanceTimersByTime(10_000));
-    expect(shown).toHaveTextContent(INVITE);
+    expect(shown).toHaveTextContent(HELLO);
   });
 
-  it('greets by name when the person gave one', () => {
-    prefersReducedMotion(true);
-    renderBubble(createFakeHostBridge(), {
-      greeting: true,
-      hotkeyLabel: 'Ctrl+Shift+Space',
-      userName: 'Nadeem',
-    });
-    expect(screen.getByRole('status')).toHaveTextContent(
-      INVITE.replace('Here I am.', 'Here I am, Nadeem.'),
-    );
+  it('takes no line once the hello is over', async () => {
+    const bridge = createFakeHostBridge({ capture: null });
+    const onSay = vi.fn();
+    renderBubble(bridge, { greeting: true, onSay });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Try it now' })));
+    act(() => bridge.emit(helloRemark()));
+    expect(screen.queryByText(HELLO)).toBeNull();
+    expect(onSay).not.toHaveBeenCalled();
   });
 });
 
@@ -487,13 +509,6 @@ describe('CompanionBubble voice', () => {
     renderBubble(bridge, { onSay });
     act(() => bridge.emit(done('someone-else', 'Not for this bubble.')));
     expect(onSay).not.toHaveBeenCalled();
-  });
-
-  it('says the invitation aloud once', () => {
-    const onSay = vi.fn();
-    renderBubble(createFakeHostBridge(), { greeting: true, onSay });
-    expect(onSay).toHaveBeenCalledOnce();
-    expect(onSay.mock.calls[0]?.[0]).toBe(INVITE);
   });
 
   it('shows that it is speaking, and stops when asked', () => {
