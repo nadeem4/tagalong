@@ -446,10 +446,10 @@ function userMessage(text: string): string {
   return `${JSON.stringify({ type: 'user', message: { role: 'user', content: text } })}\n`;
 }
 
-/** The most a spoken line from the expert's narration may be. */
+/** The most one line of the expert's narration on the card may be. */
 const SAY_CHARS = 120;
 
-/** The first sentence of what the expert wrote, secrets hidden, short enough to say aloud. */
+/** The first sentence of what the expert wrote, secrets hidden, short enough for the card. */
 function firstSentence(text: unknown): string | undefined {
   if (typeof text !== 'string') return undefined;
   const plain = hideSecrets(text).replace(/\s+/g, ' ').trim();

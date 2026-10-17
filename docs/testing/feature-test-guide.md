@@ -744,6 +744,10 @@ voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APP
 1. **Setup:** the Kokoro voice downloaded (V.1).
 2. **Action:** ask a spoken question (hold the talk key) whose answer runs to several sentences.
 3. **Expected:** each sentence follows the last without a pause of a second or more between them.
+4. **Action:** type a question with a long answer ("explain how a CPU cache works, in detail").
+5. **Expected:** Scout starts speaking within a second or two of the answer showing, says all of
+   it a sentence at a time, and the bubble stays responsive throughout; pressing the stop key
+   cuts it at once.
 
 ### V.3b. Kokoro from the first line
 

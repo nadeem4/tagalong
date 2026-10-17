@@ -2463,7 +2463,7 @@ is a native ONNX runtime, and core stays pure.
 flowchart LR
   subgraph Panel["Panel renderer"]
     CB["CompanionBubble onSay"] --> QM["QueueMouth (Mouth)"]
-    QM --> Q["SpeechQueue: toSpeakable, merge short lines, one at a time, next one got ready"]
+    QM --> Q["SpeechQueue: toSpeakable, split into sentences, merge short lines, one at a time, next one got ready"]
     Q --> PL["voice-player prepareLine"]
     PL --> WA["WebAudio + AnalyserNode"]
     PL --> SS["speechSynthesis fallback"]
@@ -2497,7 +2497,10 @@ flowchart LR
   blocks: fenced blocks (a `draft`, code), table rows, quoted `>` lines (any quote, English too;
   they mostly hold a translation into another language) and bare URLs. Nothing is cut and
   nothing is added: an answer that is all blocks says nothing. There is no content cap; the stop
-  is a person's: "Scout, stop", the stop button and the talk key cut speech at once.
+  is a person's: "Scout, stop", the stop button and the talk key cut speech at once. A whole
+  answer handed to `say` (a typed question's answer, a routine read aloud) is split into its
+  sentences (through `SpokenStream`), so a long one starts at once and is said a sentence at a
+  time rather than synthesised in one piece. The queue then
   merges short lines waiting together (`mergeShortLines`, because Kokoro says a lone "Done." badly),
   and plays one line at a time. While a line plays, the next one is already being synthesised
   (`prepare` starts `speak` at once and returns how to play the result; one line ahead, and not a
@@ -2800,7 +2803,7 @@ flowchart LR
   without its marker (`-`, `*`, `+`, `•`, `1.`, `1)`, waiting for more when a line start could
   still be a marker), and says nothing when nothing was speakable. Each piece goes through
   a `Pushable` to `mouth.speak` (the panel's `QueueMouth`), which calls `SpeechQueue.say(text)`. A typed
-  question's answer is said whole through `onSay` once it is complete. Stopping the mouth drops whatever is still streaming.
+  question's answer goes whole to `onSay` once it is complete and is said in full, a sentence at a time. Stopping the mouth drops whatever is still streaming.
   The finished answer is not said again; the bubble shows what it heard and, after the answer,
   "Hold <key> to reply". The microphone does not reopen on its own: only the talk key, the mic button
   or Always listening opens it.
