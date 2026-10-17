@@ -4,20 +4,46 @@
  * (reads them from the engine's sources), `renderNow` and `renderMemories`. Facts only: the
  * model decides what, if anything, to make of them.
  */
+import { busyLine } from '../jobs/board';
+import type { Capacity } from '../jobs/jobs';
 import type { Memory } from '../memory/memories';
 import { hideSecrets } from '../privacy/secrets';
 
 /** One expert and the first part of what it was asked. */
 export interface ExpertLine {
+  /** Its short id on the board (`h-91ab`), when it can be named. */
+  id?: string | undefined;
   expertName: string;
   ask: string;
 }
 
 export type FinishedLine = ExpertLine & { state: 'done' | 'stopped' | 'error' };
 
+/** One of Scout's own jobs, by its short id (`j-7f3a`). */
+export interface JobLine {
+  id: string;
+  task: string;
+  state: 'running' | 'done' | 'error';
+  startedAt?: string | undefined;
+  /** A finished job's gist, or why it failed. */
+  note?: string | undefined;
+}
+
+/** Scout's own jobs: running, how many wait (and why, when the machine allows fewer), finished. */
+export interface JobFacts {
+  running: readonly JobLine[];
+  queued: number;
+  capacity?: Capacity | undefined;
+  /** Finished since the last talk. */
+  finished: readonly JobLine[];
+}
+
 /** Why the mind woke. A check-in says why in its own bundle, so Now adds no line for it. */
 export type WakeReason =
-  { kind: 'asked'; spoken: boolean } | { kind: 'routine'; name: string } | { kind: 'check-in' };
+  | { kind: 'asked'; spoken: boolean }
+  | { kind: 'routine'; name: string }
+  | { kind: 'job'; task: string }
+  | { kind: 'check-in' };
 
 export interface NowFacts {
   at: Date;
@@ -29,6 +55,8 @@ export interface NowFacts {
   finished: readonly FinishedLine[];
   /** Briefs waiting for Send. Routine and settings cards are not tracked in core. */
   waiting: readonly ExpertLine[];
+  /** Absent with no jobs source. */
+  jobs?: JobFacts | undefined;
 }
 
 /** Everything optional but the clock, so turn-mechanics tests need no sources. */
@@ -39,6 +67,8 @@ export interface NowSources {
   running?(): readonly ExpertLine[];
   waiting?(): readonly ExpertLine[];
   finishedSince?(iso: string): readonly FinishedLine[];
+  /** Scout's own jobs; `finished` holds those finished after `lastTalkAt`. */
+  jobs?(lastTalkAt: string | null): JobFacts;
 }
 
 export const NOW_HEADING = '## Now';
@@ -49,6 +79,10 @@ const MAX_MEMORY_SECTION_CHARS = 2000;
 
 /** An ask is a reminder of which job, not the job: one short line. */
 const ASK_CHARS = 100;
+
+const JOB_LINE =
+  'Background work you started for them. Nobody is watching, so ask no questions; your ' +
+  'answer comes back to you, not to them. Begin with one line that gives the gist.';
 
 const SPOKEN_LINE =
   'Spoken: they said this out loud and your words are read aloud as you write them. No ' +
@@ -69,6 +103,9 @@ export function gatherNow(sources: NowSources, petId: string, reason: WakeReason
     running: safe(() => sources.running?.() ?? [], []),
     finished: lastTalkAt === null ? [] : safe(() => sources.finishedSince?.(lastTalkAt) ?? [], []),
     waiting: safe(() => sources.waiting?.() ?? [], []),
+    ...(sources.jobs === undefined
+      ? {}
+      : { jobs: safe(() => sources.jobs!(lastTalkAt), { running: [], queued: 0, finished: [] }) }),
   };
 }
 
@@ -84,8 +121,32 @@ export function renderNow(facts: NowFacts): string {
       `A routine, "${clean(facts.reason.name)}", is running on its own: nobody is watching, ` +
         'so ask no questions; they read the answer later.',
     );
+  } else if (facts.reason.kind === 'job') {
+    lines.push(JOB_LINE);
   } else if (facts.reason.kind === 'asked' && facts.reason.spoken) {
     lines.push(SPOKEN_LINE);
+  }
+
+  const jobs = facts.jobs;
+  if (jobs !== undefined && jobs.running.length > 0) {
+    const working = jobs.running
+      .map((job) => `${job.id} "${clip(clean(job.task))}"${minutesSince(facts.at, job.startedAt)}`)
+      .join('; ');
+    let line = `You are working on: ${working}.`;
+    if (jobs.queued > 0) {
+      line += ` ${jobs.queued} more waiting to start.`;
+      if (jobs.capacity?.busy !== undefined) line += ` ${busyLine(jobs.capacity)}`;
+    }
+    lines.push(line);
+  }
+  if (jobs !== undefined && jobs.finished.length > 0) {
+    const done = jobs.finished
+      .map((job) => {
+        const head = `${job.id} "${clip(clean(job.task))}" (${job.state === 'error' ? 'failed' : 'done'})`;
+        return job.note ? `${head}: ${clean(job.note)}` : head;
+      })
+      .join('; ');
+    lines.push(`Your jobs finished since you last talked: ${done}.`);
   }
 
   if (facts.running.length > 0) lines.push(`Experts working: ${expertList(facts.running)}.`);
@@ -174,7 +235,15 @@ function expertList(lines: readonly ExpertLine[]): string {
 }
 
 function expertLine(line: ExpertLine): string {
-  return `${clean(line.expertName)}: "${clip(clean(line.ask.split(/\n\s*\n/)[0] ?? ''))}"`;
+  const id = line.id === undefined ? '' : `${line.id} `;
+  return `${id}${clean(line.expertName)}: "${clip(clean(line.ask.split(/\n\s*\n/)[0] ?? ''))}"`;
+}
+
+/** " (4 min)" since a job started; nothing for a time that is missing or does not parse. */
+function minutesSince(at: Date, iso: string | undefined): string {
+  const then = iso === undefined ? Number.NaN : Date.parse(iso);
+  if (Number.isNaN(then)) return '';
+  return ` (${Math.max(0, Math.floor((at.getTime() - then) / 60_000))} min)`;
 }
 
 /** Secrets hidden, on one line. */

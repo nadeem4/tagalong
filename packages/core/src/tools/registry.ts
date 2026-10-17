@@ -8,8 +8,15 @@ import type { BrainTool } from '../providers';
 import type { MemoryStore } from '../memory/memories';
 import { roleFor } from '../roles';
 import { recallTools, watchForTool, type WatchToolDeps } from './builtin/awareness';
-import { connectorTools, type ConnectorToolDeps } from './builtin/connections';
-import { searchHistoryTool, type HistoryToolDeps } from './builtin/history';
+import { CONNECTIONS_GROUP, connectorTools, type ConnectorToolDeps } from './builtin/connections';
+import { SEARCH_HISTORY, searchHistoryTool, type HistoryToolDeps } from './builtin/history';
+import {
+  boardTool,
+  openResultTool,
+  stopWorkTool,
+  workOnItTool,
+  type JobToolDeps,
+} from './builtin/jobs';
 import { forgetTool, rememberTool } from './builtin/memory';
 import {
   enabledExperts,
@@ -61,6 +68,11 @@ export interface ToolRegistryOptions {
    * offered on a routine's turn too, but refuses there anything that loosens privacy.
    */
   changeSettings?: SettingsToolDeps | undefined;
+  /**
+   * Gives a pet whose role lists them Scout's own background work and the task board:
+   * `work_on_it`, `board`, `open_result`, `stop_work`.
+   */
+  jobs?: JobToolDeps | undefined;
   /** Defaults to `toolsFor`: the tools its role lists. */
   toolsFor?: ToolFilter | undefined;
 }
@@ -98,9 +110,19 @@ export class ToolRegistry {
   }
 
   forTurn(turn: TurnRequest): TurnTools {
-    const tools = turn.toolSupport
+    const listed = turn.toolSupport
       ? (this.#options.toolsFor ?? toolsFor)(turn.pet, this.#all(turn))
       : [];
+    // A job's turn: nobody is watching and nothing may need a click, so only reading tools
+    // that need no screen: the history and the connected apps' read tools.
+    const tools =
+      turn.job === undefined
+        ? listed
+        : listed.filter(
+            (tool) =>
+              tool.id === SEARCH_HISTORY ||
+              (tool.group === CONNECTIONS_GROUP && tool.kind === 'read'),
+          );
     const { toolSupport: _support, ...ctx } = turn;
     return {
       tools,
@@ -123,6 +145,7 @@ export class ToolRegistry {
   #all(turn: TurnRequest): Tool[] {
     const { perception, memory, watch, experts, connections, routines, history, changeSettings } =
       this.#options;
+    const { jobs } = this.#options;
     const tools: Tool[] = [];
     if (perception) tools.push(...perceptionTools(perception), ...recallTools(perception));
     if (memory) tools.push(rememberTool(memory));
@@ -147,7 +170,11 @@ export class ToolRegistry {
     }
     if (changeSettings) tools.push(changeSettingsTool(changeSettings));
     // Deleting a memory is the person's call: a routine's own turn has nobody to ask it.
-    if (memory && turn.routine === undefined) tools.push(forgetTool(memory));
+    if (memory && turn.routine === undefined) tools.push(forgetTool(memory, jobs?.finished));
+    // A routine's turn may read the board but starts and stops no work.
+    if (jobs && turn.routine === undefined) tools.push(workOnItTool(jobs));
+    if (jobs) tools.push(boardTool(jobs), openResultTool(jobs));
+    if (jobs && turn.routine === undefined) tools.push(stopWorkTool(jobs));
     return tools;
   }
 }

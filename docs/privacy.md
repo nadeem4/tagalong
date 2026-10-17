@@ -312,6 +312,27 @@ every weekday at 8. Nothing becomes a routine until you press **Save**, on Scout
 - Routines are kept in the database on this computer (`routines` table). Delete one in Home, or ask
   Scout to, and it is gone.
 
+## Scout's own background jobs: what a job sends
+
+Scout can start longer work of its own (reading something long, comparing, summarising) and keep
+talking with you meanwhile. Each job is one of Scout's turns, run in the background in a
+conversation of its own.
+
+- **What a job sends.** To Scout's own provider and model, through the same guard as every turn
+  (secrets hidden, one "Sent to AI" row, metered): Scout's usual system prompt, the brief Scout
+  wrote (the task, and context it chose: text you gave it or that it already read, at most 8,000
+  characters, so it may repeat window text the turn that started it already sent once), what Scout
+  remembers, the Now facts, and whatever the job's tools fetch.
+- **What a job cannot do.** It never looks at your screen, reads a window, takes a picture or
+  points. Its only tools are searching your history and your connected apps' read-only tools; it
+  shows no card, files no memory and starts no other job.
+- **On this computer.** One row per job in the `jobs` table: the task (secrets hidden), a short
+  note, how it ended, and its times; and its conversation (the brief, secrets hidden, and the answer). Both are
+  deleted 14 days after the job finishes. A job writes no row to Activity.
+- **Limits.** At most 3 run at once (fewer when the computer is short of memory or busy), 5 wait,
+  each stops after 10 minutes, at most 20 start a day, and none starts once the daily budget is
+  spent. You can ask Scout to stop one; shutting Tagalong stops them all.
+
 ## Scout's voice: what is spoken, and where it goes
 
 Scout says its bubble lines aloud while **Scout talks** is on (Settings → Voice, on by default).
@@ -677,7 +698,8 @@ conversations) in the database on this computer, until you delete it.
 - **Home → What Scout remembers** shows every one of them, newest first, with its kind and the
   day it was saved. Each has a delete button; deleting is for good, and Scout no longer recalls it.
 - **Ask Scout to forget.** "Forget that I like tea": Scout finds the matching memories and deletes
-  the one you mean. Nothing is deleted on a routine's own run.
+  the one you mean. "Forget the pricing job" deletes a finished background job and its
+  conversation the same way. Nothing is deleted on a routine's own run.
 - Deleting a memory does not take back what was already sent to the AI in earlier questions.
 - The Chrome extension cannot read or delete them.
 

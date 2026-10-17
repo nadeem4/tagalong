@@ -100,6 +100,7 @@ const CORE_TO_HOST_NOTIFICATIONS = [
   'pet.mood',
   'pickUp.ready',
   'settings.proposed',
+  'board.changed',
 ] as const;
 
 describe('method catalog', () => {
@@ -389,6 +390,36 @@ describe('notification schemas', () => {
     });
     expect(parsed.model).toBe('anthropic/claude-sonnet-5');
     expect(parsed.providerId).toBe('openrouter');
+  });
+
+  it('marks a background turn on turn.started, with the job it runs for', () => {
+    const parsed = notificationParamsSchemaFor('turn.started').parse({
+      turnId,
+      petId: 'scout',
+      conversationId: turnId,
+      background: true,
+      jobId: turnId,
+    });
+    expect(parsed.background).toBe(true);
+    expect(parsed.jobId).toBe(turnId);
+    expect(
+      notificationParamsSchemaFor('turn.started').safeParse({
+        turnId,
+        petId: 'scout',
+        conversationId: turnId,
+        background: false,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('counts Scout’s own running and waiting jobs on board.changed', () => {
+    expect(notificationParamsSchemaFor('board.changed').parse({ running: 2, queued: 1 })).toEqual({
+      running: 2,
+      queued: 1,
+    });
+    expect(
+      notificationParamsSchemaFor('board.changed').safeParse({ running: -1, queued: 0 }).success,
+    ).toBe(false);
   });
 
   it('counts model calls on turn.completed when the engine knows them', () => {

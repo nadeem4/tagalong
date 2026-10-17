@@ -71,6 +71,7 @@ import { recordBrain } from './providers/record-brain';
 import { recordExpertSends } from './experts/record-expert';
 import { CalendarFeed, httpsFetchText, type FetchText } from './meetings/calendar-feed';
 import { UsageLog, budgetSpent, meterBrain } from './usage';
+import { JobStore, Jobs, boardItems, machineCapacity, shortId, type JobRow } from './jobs';
 import {
   CATALOG,
   catalogBundle,
@@ -246,6 +247,7 @@ export class Engine {
   readonly #connections: ConnectionManager;
   readonly #routines: Routines;
   readonly #pickUp: PickUp;
+  readonly #jobs: Jobs;
 
   private constructor(parts: {
     db: Database;
@@ -257,7 +259,9 @@ export class Engine {
     connections: ConnectionManager;
     routines: Routines;
     pickUp: PickUp;
+    jobs: Jobs;
   }) {
+    this.#jobs = parts.jobs;
     this.#pickUp = parts.pickUp;
     this.#routines = parts.routines;
     this.#connections = parts.connections;
@@ -383,6 +387,44 @@ export class Engine {
       projects,
       usage,
     });
+    // Scout's own background work: background Scout turns in their own conversations. The
+    // body reads the machine before each start, so fewer run while it is short of memory.
+    const jobStore = new JobStore(db);
+    jobStore.interrupted(new Date().toISOString());
+    const capacity = machineCapacity();
+    const jobs: Jobs = new Jobs({
+      store: jobStore,
+      clock: systemWatchClock,
+      pet: () => pets.get(SCOUT_ID),
+      run: ({ pet, text, jobId, task }) =>
+        runner.run({ pet, text, background: true, job: { jobId, task } }),
+      interrupt: (turnId) => runner.interrupt(turnId),
+      lastAnswer: (conversationId) => {
+        const last = store.lastMessages(conversationId, 1)[0];
+        if (last?.role !== 'assistant') return null;
+        return last.content.map((block) => (block.type === 'text' ? block.text : '')).join('');
+      },
+      spentOut,
+      capacity,
+      emit: (event) => live.server?.broadcast(event.method, event.params),
+      log: (message) => console.warn(`[engine] ${message}`),
+    });
+    jobs.prune();
+    /** The task board now: jobs, experts, watches, routines and the last day's finished work. */
+    const board = () => {
+      const now = new Date();
+      return boardItems(
+        {
+          jobs: jobs.list(),
+          experts: handoffs.running(),
+          pending: handoffs.pending(),
+          watches: watches.active(),
+          routines: live.routines?.running() ?? [],
+          finished: activity.since(new Date(now.getTime() - 24 * 60 * 60_000).toISOString()),
+        },
+        now,
+      );
+    };
     const pickUpStore = new PickUpStore(db);
     /** What is open, titles only: null with no host connected, empty when none can list. */
     const listHostWindows = async () => {
@@ -403,7 +445,31 @@ export class Engine {
       clock: () => new Date(),
       timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
       lastTalkAt: (petId: string) => activity.lastTurnAt(petId),
-      running: () => handoffs.running(),
+      running: () => handoffs.running().map((run) => ({ ...run, id: shortId('h', run.handoffId) })),
+      jobs: (lastTalkAt: string | null) => {
+        const rows = jobs.list();
+        const { queued } = jobs.counts();
+        const line = (row: JobRow, state: 'running' | 'done' | 'error') => ({
+          id: shortId('j', row.id),
+          task: row.task,
+          state,
+          startedAt: row.startedAt ?? undefined,
+          note: (state === 'error' ? row.error : row.note) ?? undefined,
+        });
+        return {
+          running: rows.filter((row) => row.state === 'running').map((row) => line(row, 'running')),
+          queued,
+          ...(queued > 0 ? { capacity: capacity() } : {}),
+          finished: rows.flatMap((row) =>
+            lastTalkAt !== null &&
+            (row.state === 'done' || row.state === 'error') &&
+            row.finishedAt !== null &&
+            row.finishedAt > lastTalkAt
+              ? [line(row, row.state)]
+              : [],
+          ),
+        };
+      },
       waiting: () => handoffs.pending(),
       finishedSince: (since: string) => [
         ...activity.expertsFinishedSince(since).map((done) => ({
@@ -452,7 +518,7 @@ export class Engine {
     const approvals = new Approvals((params) =>
       live.server?.broadcast('connector.confirm', params),
     );
-    const runner = new ConversationRunner({
+    const runner: ConversationRunner = new ConversationRunner({
       store,
       settings,
       provider: resolve,
@@ -489,6 +555,17 @@ export class Engine {
             if (session.host === 'desktop') session.notify('settings.proposed', params);
           }
         },
+      },
+      // Scout's own background work and the task board: start, look, open, stop.
+      jobs: {
+        jobs,
+        board,
+        entry: (id) => activity.entry(id),
+        cancelHandoff: (handoffId) => handoffs.cancel(handoffId),
+        stopWatch: (watchId) => watches.stop(watchId),
+        finished: jobStore,
+        capacity,
+        timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
       connections: {
         tools: () => connections.tools(),
@@ -657,6 +734,7 @@ export class Engine {
       connections,
       routines,
       pickUp,
+      jobs,
     });
   }
 
@@ -675,6 +753,7 @@ export class Engine {
     this.#pickUp.stop();
     this.#watches.stopAll();
     await this.#handoffs.stopAll();
+    await this.#jobs.stopAll();
     await this.#connections.closeAll();
     await this.#runner.stopAll();
     await this.#server.close();

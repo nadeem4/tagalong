@@ -473,6 +473,8 @@ describe('Routines, handing to an expert', () => {
     await t.routines.runNow(saved.id);
     expect(t.results()).toHaveLength(0);
     expect(t.store.get(saved.id)?.lastState).toBe('running');
+    // The task board names what is running.
+    expect(t.routines.running()).toEqual([{ routineId: saved.id, name: 'Morning papers' }]);
 
     const mine = t.routines.handoffFinished({
       handoffId,
@@ -482,6 +484,7 @@ describe('Routines, handing to an expert', () => {
     });
     // The routine delivers it, so no check-in speaks about it too.
     expect(mine).toBe(true);
+    expect(t.routines.running()).toEqual([]);
     await t.clock.advance(0);
     expect(t.answers).toEqual([
       expect.objectContaining({ text: '1. Agents that plan. Why it matters: fewer steps.' }),

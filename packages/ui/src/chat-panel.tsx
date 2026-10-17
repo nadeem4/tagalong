@@ -57,6 +57,8 @@ export function ChatPanel({
   const [watches, setWatches] = useState<readonly RunningWatch[]>([]);
   // Who answered each turn, "Scout · haiku", from its `turn.started`.
   const speakers = useRef(new Map<string, string>());
+  // Background turns (routines, Scout's own jobs): nobody asked them here, so none streams in.
+  const background = useRef(new Set<string>());
 
   // React's documented way to reset state when a prop changes: a fresh host capture
   // replaces whatever the panel was holding, without an effect and an extra paint.
@@ -102,6 +104,10 @@ export function ChatPanel({
   // An effect event, so the subscription below is made once per bridge yet always sees the
   // current pet.
   const onTurnEvent = useEffectEvent((event: TurnEvent) => {
+    if (event.type === 'turn.started' && event.background === true) {
+      background.current.add(event.turnId);
+    }
+    if (background.current.has((event as { turnId?: string }).turnId ?? '')) return;
     switch (event.type) {
       case 'turn.started': {
         const speaker = [pet.name].concat(event.model ?? []).join(' · ');

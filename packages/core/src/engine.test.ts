@@ -546,6 +546,57 @@ describe('routines over rpc', () => {
   });
 });
 
+describe('Scout’s own background jobs over rpc', () => {
+  it('runs work_on_it as a background turn, counts it on board.changed, and keeps it out of Activity', async () => {
+    const e = await boot(
+      new FakeBrainProvider({
+        text: 'The gist, first.',
+        toolCall: {
+          id: 'call-1',
+          name: 'work_on_it',
+          input: { task: 'read the paper', context: 'Text.' },
+        },
+      }),
+    );
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('ask', { petId: 'scout', input: { text: 'read this while I work' } });
+    await vi.waitFor(
+      () => {
+        const boards = host.notifications.filter((n) => n.method === 'board.changed');
+        expect(boards.at(-1)?.params).toEqual({ running: 0, queued: 0 });
+        expect(boards.length).toBeGreaterThanOrEqual(2);
+      },
+      { timeout: 5000 },
+    );
+    const job = host.notifications.find(
+      (n) => n.method === 'turn.started' && n.params['jobId'] !== undefined,
+    );
+    expect(job?.params).toMatchObject({ background: true });
+    const activity = (await host.call('activity.list', {}))['result'] as {
+      entries: { kind: string }[];
+    };
+    expect(activity.entries.filter((entry) => entry.kind === 'turn')).toHaveLength(1);
+  });
+
+  it('closes a job a crash left running', async () => {
+    const db = openDatabase(dir);
+    db.prepare(
+      `INSERT INTO jobs (id, kind, state, pet_id, task, dedupe_key, created_at)
+       VALUES ('left-over', 'job', 'running', 'scout', 'read', 'read', '2026-10-12T06:00:00.000Z')`,
+    ).run();
+    db.close();
+    const e = await boot();
+    await e.shutdown();
+    engine = undefined;
+    const after = openDatabase(dir);
+    expect(after.prepare(`SELECT state FROM jobs WHERE id = 'left-over'`).get()).toEqual({
+      state: 'error',
+    });
+    after.close();
+  });
+});
+
 describe('keep an eye over rpc', () => {
   it('reads a window whose title reads like trouble, and says one line as pet.remark', async () => {
     const e = await boot(new FakeBrainProvider({ text: 'The build broke on a missing import.' }));

@@ -114,6 +114,37 @@ describe('ActivityLog: turns', () => {
   });
 });
 
+describe('ActivityLog: a job’s turn', () => {
+  it('writes no turn row for a job’s background turn: the jobs row is its record', () => {
+    const turnId = randomUUID();
+    log.observe({
+      method: 'turn.started',
+      params: {
+        turnId,
+        petId: 'scout',
+        conversationId: asked('scout', 'brief'),
+        background: true,
+        jobId: randomUUID(),
+      },
+    });
+    completed(turnId, 'gist');
+    expect(log.list({}).entries).toEqual([]);
+    expect(log.lastTurnAt('scout')).toBeNull();
+  });
+});
+
+describe('ActivityLog.entry, for open_result', () => {
+  it('reads one finished expert or routine row by id, and nothing else', () => {
+    const id = log.expertStarted({ petId: 'scout', expertId: 'e', expertName: 'E', text: 'ask' });
+    log.expertFinished(id, { ok: true, text: 'The answer.', changedFiles: [] });
+    expect(log.entry(id)).toMatchObject({ kind: 'expert', answer: 'The answer.' });
+    started('scout', asked('scout', 'hi'));
+    const turn = log.list({}).entries.find((row) => row.kind === 'turn')!;
+    expect(log.entry(turn.id)).toBeNull();
+    expect(log.entry('nope')).toBeNull();
+  });
+});
+
 describe('ActivityLog.lastTurnAt, for the Now block', () => {
   it('is null before this pet has had a turn', () => {
     expect(log.lastTurnAt('scout')).toBeNull();

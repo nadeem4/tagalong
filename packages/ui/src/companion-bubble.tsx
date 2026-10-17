@@ -282,8 +282,8 @@ export function CompanionBubble({
         return;
       }
       case 'turn.started':
-        // A routine's turn runs on its own; its result arrives as routine.result.
-        if (reply.state !== 'running' || event.routineId !== undefined) return;
+        // A background turn (a routine's, a job's) runs on its own; it never answers here.
+        if (reply.state !== 'running' || event.background === true) return;
         mine.current = event.turnId;
         conversation.current = event.conversationId;
         setReply({ state: 'running', turnId: event.turnId, text: '' });

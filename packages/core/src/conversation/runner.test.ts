@@ -457,6 +457,73 @@ describe('ConversationRunner.interrupt', () => {
     expect(started?.params).toMatchObject({ routineId });
   });
 
+  it('marks background turns on turn.started, and a job turn with its job', async () => {
+    const runner = makeRunner(new FakeBrainProvider({ text: 'ok' }));
+    const jobId = randomUUID();
+    const job = runner.run({
+      pet,
+      text: 'read it',
+      background: true,
+      job: { jobId, task: 'read it' },
+    });
+    const routine = runner.run({
+      pet,
+      text: 'go',
+      background: true,
+      routine: { routineId: randomUUID(), name: 'R', handedOff: () => undefined },
+    });
+    const asked = runner.run({ pet, text: 'mine' });
+    await Promise.all([job.done, routine.done, asked.done]);
+    const started = (turnId: string) =>
+      events.find((event) => event.method === 'turn.started' && event.params.turnId === turnId)
+        ?.params;
+    expect(started(job.turnId)).toMatchObject({ background: true, jobId });
+    expect(started(routine.turnId)).toMatchObject({ background: true });
+    expect(started(routine.turnId)).not.toHaveProperty('jobId');
+    expect(started(asked.turnId)).not.toHaveProperty('background');
+  });
+
+  it('tells a job turn it is background work, hands its tools the job, and skips afterTurn', async () => {
+    let seen: unknown;
+    const spy = defineTool(
+      {
+        name: 'search_history',
+        description: 'A job turn keeps this one.',
+        inputSchema: { type: 'object', properties: {} },
+      },
+      'read',
+      (_input, ctx) => {
+        seen = ctx.job;
+        return Promise.resolve({ content: 'ok' });
+      },
+    );
+    const requests: BrainRequest[] = [];
+    const provider = new FakeBrainProvider({
+      text: 'gist',
+      toolCall: { id: 't1', name: 'search_history', input: {} },
+    });
+    const complete = provider.complete.bind(provider);
+    provider.complete = (request, handlers, signal) => {
+      requests.push(request);
+      return complete(request, handlers, signal);
+    };
+    const after: unknown[] = [];
+    const runner = new ConversationRunner({
+      store,
+      settings,
+      provider,
+      emit: (event) => events.push(event),
+      toolsFor: only(spy),
+      afterTurn: (turn) => after.push(turn),
+    });
+    const jobId = randomUUID();
+    await runner.run({ pet, text: 'read it', background: true, job: { jobId, task: 'read it' } })
+      .done;
+    expect(seen).toEqual({ jobId });
+    expect(lastUserText(requests[0])).toContain('Background work you started for them.');
+    expect(after).toEqual([]);
+  });
+
   it('hands a routine turn’s tools the routine', async () => {
     let seen: unknown;
     const spy = defineTool(

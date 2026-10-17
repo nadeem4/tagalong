@@ -1781,6 +1781,31 @@ three times: the wording should vary, the behaviour should not.
    screen text appears in the file. (d) the big file is now `tagalong.1.log` and `tagalong.log`
    holds only the new line.
 
+## J. Background jobs and the task board _(real brain, fast tier)_
+
+Scout's own jobs are background Scout turns (`packages/core/src/jobs/`). Run each check three
+times: the wording should vary, the behaviour should not.
+
+1. **Work while talking.** Open a long article and say "read this and give me the gist, I'll keep
+   working". **Expected:** Scout says it is on it in its own words and you can keep chatting; the
+   chat panel and the bubble keep showing your own turn, never the job's text. On a later question,
+   Scout brings up the gist (it rides in Now); "go on" makes it use `open_result`.
+2. **Five at once.** Ask for five separate pieces of background work in a row. **Expected:** at most
+   3 run and the rest wait (fewer run on a machine short of memory); Scout says so in its own
+   words, never a fixed queue line. A sixth waiting is refused and Scout explains.
+3. **What are you working on?** **Expected:** Scout names the jobs, experts and watches from Now or
+   `board`, with how long each has run.
+4. **Stop by talk.** "Scout, stop the pricing one". **Expected:** `stop_work`; the job is gone from
+   the board and its row in the database is `stopped`.
+5. **A routine meanwhile.** Press **Run now** on a routine while you ask Scout something.
+   **Expected:** your answer streams in the chat panel; the routine's words never appear there.
+6. **Restart mid-job.** Quit Tagalong while a job runs and start it again. **Expected:** the job
+   shows as failed on the board ("Tagalong closed before this finished").
+7. **Ten minutes.** A job still running after 10 minutes stops and shows as failed with that
+   reason.
+8. **Forget a job.** "Scout, forget the pricing job." **Expected:** `forget` deletes the finished
+   job and its conversation, with no card; it is gone from the board.
+
 ## Not in this build
 
 Do not test these here.

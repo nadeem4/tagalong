@@ -23,6 +23,7 @@ import {
   type RoutineToolDeps,
   type HistoryToolDeps,
   type SettingsToolDeps,
+  type JobToolDeps,
 } from '../tools';
 import { assemblePrompt } from './prompt-assembler';
 import { gatherNow, type NowFacts, type NowSources } from './now';
@@ -87,6 +88,8 @@ export interface ConversationRunnerOptions {
   history?: HistoryToolDeps | undefined;
   /** Gives a companion `change_settings`, which shows the settings card. */
   changeSettings?: SettingsToolDeps | undefined;
+  /** Gives a companion its own background jobs and the task board. */
+  jobs?: JobToolDeps | undefined;
   /** Narrows a pet's tools for a turn. Absent: the role's tools (see tools/registry). */
   toolsFor?: ToolFilter | undefined;
   /** Where the Now facts come from. Absent: the system clock and nothing else. */
@@ -108,6 +111,8 @@ export interface RunAsk {
   routine?: RoutineTurnContext | undefined;
   /** The question was spoken (Talk to Scout): its Now block says so, and the answer is heard. */
   spoken?: boolean | undefined;
+  /** Set on one of Scout's own background jobs: rides on `turn.started` and reaches the tools. */
+  job?: { jobId: string; task: string } | undefined;
 }
 
 export interface TurnOutcome {
@@ -171,6 +176,7 @@ export class ConversationRunner {
       routines: options.routines,
       history: options.history,
       changeSettings: options.changeSettings,
+      jobs: options.jobs,
       toolsFor: options.toolsFor,
     });
   }
@@ -214,9 +220,11 @@ export class ConversationRunner {
     const now = gatherNow(
       this.#options.now ?? SYSTEM_CLOCK,
       ask.pet.id,
-      ask.routine !== undefined
-        ? { kind: 'routine', name: ask.routine.name }
-        : { kind: 'asked', spoken: ask.spoken === true },
+      ask.job !== undefined
+        ? { kind: 'job', task: ask.job.task }
+        : ask.routine !== undefined
+          ? { kind: 'routine', name: ask.routine.name }
+          : { kind: 'asked', spoken: ask.spoken === true },
     );
 
     const turnId = randomUUID();
@@ -235,6 +243,8 @@ export class ConversationRunner {
         providerId: ask.pet.providerId,
         model: ask.pet.model,
         ...(ask.routine === undefined ? {} : { routineId: ask.routine.routineId }),
+        ...(ask.background === true ? { background: true as const } : {}),
+        ...(ask.job === undefined ? {} : { jobId: ask.job.jobId }),
       },
     });
 
@@ -360,6 +370,7 @@ export class ConversationRunner {
       // outright, and the rest would only be told about an ability they cannot use.
       toolSupport: provider.capabilities.tools,
       ...(ask.routine !== undefined ? { routine: ask.routine } : {}),
+      ...(ask.job !== undefined ? { job: { jobId: ask.job.jobId } } : {}),
     });
     const request =
       tools.definitions.length > 0 ? { ...base, tools: [...tools.definitions] } : base;
@@ -419,7 +430,8 @@ export class ConversationRunner {
           modelCalls,
         },
       });
-      if (result.text.length > 0) {
+      // A job's conversation is its result, not a chat: it is never summarised.
+      if (result.text.length > 0 && ask.job === undefined) {
         this.#options.afterTurn?.({ pet: ask.pet, conversationId });
       }
       return { turnId, conversationId, ...result, modelCalls };

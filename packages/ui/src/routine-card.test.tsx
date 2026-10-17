@@ -126,6 +126,7 @@ describe('the bubble and routine turns', () => {
         petId: 'scout',
         conversationId: '40000000-0000-4000-8000-0000000000bb',
         routineId: SAVED_ID,
+        background: true,
       }),
     );
     act(() =>

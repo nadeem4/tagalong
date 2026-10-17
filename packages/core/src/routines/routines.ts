@@ -232,6 +232,14 @@ export class Routines {
     return this.#options.store.list().map((stored) => this.#view(stored));
   }
 
+  /** The routines running now, by name: for the task board. */
+  running(): { routineId: string; name: string }[] {
+    return [...this.#running].flatMap((routineId) => {
+      const stored = this.#options.store.get(routineId);
+      return stored === null ? [] : [{ routineId, name: stored.routine.name }];
+    });
+  }
+
   get(id: string): RoutineView | null {
     const stored = this.#options.store.get(id);
     return stored === null ? null : this.#view(stored);

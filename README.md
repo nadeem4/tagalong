@@ -153,6 +153,7 @@ app's own client is `apps/desktop/src/main/engine-client.ts`. Read
 | Scout thinks through your Claude Code sign-in, or OpenRouter, Anthropic or an OpenAI-compatible service                                | An "always allow" for changes in connected apps                     |
 | Connections: Scout uses your apps over MCP (Notion, GitHub, Linear, Claude Code's servers); every change asks first                    |                                                                     |
 | Routines: Scout does things on its own, on a schedule or when something happens, and tells you in the bubble, aloud or by notification |                                                                     |
+| Background work: Scout reads, compares and summarises on its own while you keep talking, and stops a job when you ask                  |                                                                     |
 | Spend: Home shows what Scout and the experts used, and an optional daily budget pauses proactive comments and routines                 |                                                                     |
 | Change settings by talking: "talk a bit slower" shows a card, and nothing changes until you click Apply                                |                                                                     |
 | Sight: selection, screenshot, every display, every open window, window text, built-in blind spots                                      | ElevenLabs voice cost on the Spend card                             |
@@ -470,6 +471,10 @@ screenshot is attached.
   your last exchange with Scout (secrets hidden, never a blind spot). At most 24 a day, one
   unprompted every ten minutes, none for an hour after **Not now**, none over calls, full screen or
   once the daily budget is spent.
+- **Background jobs.** When Scout works on something in the background, the job sees only the
+  brief Scout wrote (no screen, no pictures), uses only your history and your apps' read-only
+  tools, and is deleted 14 days after it finishes. At most 3 run at once (fewer on a busy
+  machine), 20 a day, none once the daily budget is spent.
 - **Keeping an eye on things** is on by default: Scout follows window titles only (no picture, no
   model call). Rarely, when you settle on a new window or a title reads like an error or a failed
   build, it reads that one window and checks in, never twice about one window. A line may offer to

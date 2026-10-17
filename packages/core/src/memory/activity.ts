@@ -77,7 +77,9 @@ export class ActivityLog {
   observe(event: TurnEvent): void {
     switch (event.method) {
       case 'turn.started': {
-        const { turnId, petId, conversationId, providerId, model } = event.params;
+        const { turnId, petId, conversationId, providerId, model, jobId } = event.params;
+        // A job's turn is recorded in its jobs row; nor is it the person talking.
+        if (jobId !== undefined) return;
         // The runner stores the question before it announces the turn.
         const last = this.store.lastMessages(conversationId, 1)[0];
         const question =
@@ -333,6 +335,16 @@ export class ActivityLog {
     return row === undefined
       ? null
       : { expertName: row.expert_name ?? 'An expert', ask: row.text ?? '' };
+  }
+
+  /** One expert or routine row by id, with its answer: for open_result. */
+  entry(id: string): ActivityEntry | null {
+    const row = this.db
+      .prepare<[string], ActivityRow>(
+        `SELECT * FROM activity WHERE id = ? AND kind IN ('expert', 'routine')`,
+      )
+      .get(id);
+    return row === undefined ? null : toEntry(row);
   }
 
   /** The routines that ran well after `since`, oldest first, at most five: their names only. */

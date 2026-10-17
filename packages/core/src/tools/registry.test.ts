@@ -44,6 +44,17 @@ function everything(overrides: Partial<ToolRegistryOptions> = {}): ToolRegistryO
       days: () => 7,
     },
     changeSettings: { get: () => Settings.parse(SETTINGS_DEFAULTS), emit: () => undefined },
+    jobs: {
+      jobs: {
+        start: () => ({ ok: false, reason: 'empty' }),
+        stop: () => false,
+        result: () => null,
+      },
+      board: () => [],
+      entry: () => null,
+      cancelHandoff: () => false,
+      stopWatch: () => false,
+    },
     // Every wired tool: what the role library narrows is the toolsFor tests' business.
     toolsFor: (_pet, tools) => tools,
     ...overrides,
@@ -67,7 +78,60 @@ const ALL_TOOLS = [
   'search_history',
   'change_settings',
   'forget',
+  'work_on_it',
+  'board',
+  'open_result',
+  'stop_work',
 ];
+
+const ROUTINE = { routineId: 'r', name: 'Routine', handedOff: () => undefined };
+
+/** One connected app with a read tool and a write tool. */
+const APP = {
+  tools: () =>
+    ['search', 'create'].map((name) => ({
+      connection: {
+        id: 'notion',
+        name: 'Notion',
+        transport: { type: 'http' as const, url: 'https://example.com/mcp' },
+        auth: 'oauth' as const,
+        secretNames: [],
+        enabled: true,
+      },
+      tool: {
+        name,
+        access: name === 'search' ? ('read' as const) : ('write' as const),
+        inputSchema: { type: 'object' },
+      },
+    })),
+  call: () => Promise.resolve({ ok: true as const, text: '' }),
+  confirm: () => Promise.resolve('allowed' as const),
+  record: () => undefined,
+};
+
+describe('ToolRegistry on background turns', () => {
+  it('offers only board and open_result of the job tools on a routine’s turn', () => {
+    const names = new ToolRegistry(everything())
+      .forTurn(fakeTurn({ routine: ROUTINE }))
+      .definitions.map((definition) => definition.name);
+    expect(names).toContain('board');
+    expect(names).toContain('open_result');
+    expect(names).not.toContain('work_on_it');
+    expect(names).not.toContain('stop_work');
+  });
+
+  it('gives a job’s turn only search_history and the apps’ read tools', async () => {
+    const turn = new ToolRegistry(everything({ connections: APP })).forTurn(
+      fakeTurn({ job: { jobId: 'j1' } }),
+    );
+    expect(turn.definitions.map((definition) => definition.name)).toEqual([
+      'notion__search',
+      'search_history',
+    ]);
+    const refused = await turn.run({ name: 'work_on_it', input: { task: 'again' } });
+    expect(refused.isError).toBe(true);
+  });
+});
 
 describe('ToolRegistry.forTurn', () => {
   it('builds every built-in tool, in the order the model has always seen them', () => {
@@ -98,11 +162,18 @@ describe('ToolRegistry.forTurn', () => {
     const tools = new ToolRegistry(everything()).forTurn(fakeTurn()).tools;
     const writes = tools.filter((tool) => tool.kind === 'write').map((tool) => tool.id);
 
-    expect(writes).toEqual(['remember', 'watch_for', 'change_settings', 'forget']);
-    expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(12);
+    expect(writes).toEqual([
+      'remember',
+      'watch_for',
+      'change_settings',
+      'forget',
+      'work_on_it',
+      'stop_work',
+    ]);
+    expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(14);
   });
 
-  it('gives a companion its tools, then the routine tools (write), point_at, search_history, change_settings and forget', () => {
+  it('gives a companion its tools, then the routine tools (write), point_at, search_history, change_settings, forget and the job tools', () => {
     const experts = {
       experts: () => [
         {
@@ -164,6 +235,10 @@ describe('ToolRegistry.forTurn', () => {
       'search_history',
       'change_settings',
       'forget',
+      'work_on_it',
+      'board',
+      'open_result',
+      'stop_work',
     ]);
     for (const id of ['hand_to_expert', 'create_routine', 'change_routine', 'change_settings']) {
       expect(tools.find((tool) => tool.id === id)?.kind).toBe('write');
@@ -187,12 +262,7 @@ describe('ToolRegistry.forTurn', () => {
         .forTurn(fakeTurn())
         .tools.map((tool) => tool.id);
     expect(ids([])).toEqual(ALL_TOOLS);
-    expect(ids([run])).toEqual([
-      ...ALL_TOOLS.slice(0, -2),
-      'tell_expert',
-      'change_settings',
-      'forget',
-    ]);
+    expect(ids([run])).toEqual([...ALL_TOOLS.slice(0, -6), 'tell_expert', ...ALL_TOOLS.slice(-6)]);
   });
 
   it('builds only what is wired: no perception options, no perception tools', () => {
