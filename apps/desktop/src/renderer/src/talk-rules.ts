@@ -1,8 +1,8 @@
 /**
  * The pure rules behind talk.ts: when a question is over, what words to show, and saying a
  * microphone or ears failure once per run of failures, and when the follow-up window opens.
- * Contains settles, shownPartial, micMark, micNote, FailureStreak, FollowUpCue, EarsNotes and
- * NOTHING_HEARD.
+ * Contains settles, shownPartial, micMark, micNote, FailureStreak, FollowUpCue, EarsNotes,
+ * HeardInbox and NOTHING_HEARD.
  */
 import { STATUS_WORDS, addressedToScout } from '@tagalong/protocol';
 import type { ListenMode } from '@tagalong/protocol';
@@ -126,5 +126,36 @@ export class EarsNotes {
   /** The talk key or the mic button started a question: the next failure is said again. */
   clear(): void {
     this.#told = null;
+  }
+}
+
+/**
+ * Where each heard question goes: to the bubble listening for it, or held until one does.
+ * The bubble is not there while a one-line hello, remark or routine line takes its place,
+ * nor while Scout is still waking; a question heard then is asked as soon as it mounts,
+ * never dropped. Only the latest is held: as with talking over Scout, a newer question
+ * replaces one not yet asked.
+ */
+export class HeardInbox {
+  readonly #hearers = new Set<(text: string) => void>();
+  #held: string | null = null;
+
+  /** The bubble listens; a question held is asked now, once. */
+  subscribe(hear: (text: string) => void): () => void {
+    this.#hearers.add(hear);
+    const held = this.#held;
+    this.#held = null;
+    if (held !== null) hear(held);
+    return () => void this.#hearers.delete(hear);
+  }
+
+  /** True when a bubble took it; false when it is held for the next one. */
+  deliver(text: string): boolean {
+    if (this.#hearers.size === 0) {
+      this.#held = text;
+      return false;
+    }
+    for (const hear of this.#hearers) hear(text);
+    return true;
   }
 }

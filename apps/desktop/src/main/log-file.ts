@@ -1,7 +1,8 @@
 /**
- * The log file: main's warnings and errors, kept on disk so a person can send them when
- * something goes wrong. Contains logLine, installLogFile and openLogsFolder. The engine runs in main's
- * process, so core's warnings land here too.
+ * The log file: the app's warnings and errors, kept on disk so a person can send them when
+ * something goes wrong. Contains logLine, installLogFile, rendererConsole and openLogsFolder.
+ * The engine runs in main's process, so core's warnings land here too; the windows' come in
+ * through rendererConsole and the voice process's through forwardConsole (log-text.ts).
  *
  * Privacy: a line keeps only a text first argument and, for an Error, its name and
  * message; every other argument becomes its type, so no speech, screen text or turn
@@ -13,24 +14,15 @@
 import { appendFileSync, mkdirSync, renameSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { hideSecrets } from '@tagalong/core';
+import { keptText } from './log-text';
+import type { Level } from './log-text';
 
 const MAX_LINE = 300;
 const MAX_FILE = 1024 * 1024;
 
-type Level = 'warn' | 'error';
-
-const errorText = (error: Error) => `${error.name}: ${error.message}`;
-
-function part(value: unknown, first: boolean): string {
-  if (value instanceof Error) return errorText(value);
-  if (first && typeof value === 'string') return value;
-  return value !== null && typeof value === 'object' ? '[object]' : `[${typeof value}]`;
-}
-
 /** One log line: time, level, the kept text, secrets hidden, on one line, at most 300 chars. */
 export function logLine(level: Level, args: readonly unknown[], now: Date): string {
-  const text = args.map((arg, i) => part(arg, i === 0)).join(' ');
-  const line = `${now.toISOString()} ${level.toUpperCase()} ${hideSecrets(text)}`;
+  const line = `${now.toISOString()} ${level.toUpperCase()} ${hideSecrets(keptText(args))}`;
   return line.replace(/\s*[\r\n]+\s*/g, ' ').slice(0, MAX_LINE);
 }
 
@@ -70,6 +62,20 @@ export function installLogFile({
       write(level, args);
     };
   }
+}
+
+/**
+ * A window's console message (Electron's 'console-message'): its warnings and errors go to
+ * main's console, and so to the log file. Chromium hands over the message already formatted,
+ * so the review rule (no speech, screen or file text in a warning) is what keeps it clean;
+ * secrets are hidden and the line is cut at 300 characters as for main's own.
+ */
+export function rendererConsole(
+  details: { level: string; message: string },
+  target: Pick<Console, Level> = console,
+): void {
+  if (details.level === 'warning') target.warn(`[renderer] ${details.message}`);
+  else if (details.level === 'error') target.error(`[renderer] ${details.message}`);
 }
 
 /** Open logs folder: makes the folder first (nothing may be logged yet), then opens it. */

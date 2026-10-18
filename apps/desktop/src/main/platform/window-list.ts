@@ -115,6 +115,12 @@ export interface EnumeratedWindow extends ObservedWindow {
 }
 
 export interface DisplayLookup {
+  /**
+   * Screen pixels to DIPs: Electron's `screen.screenToDipRect`, which knows each monitor's
+   * scale. The helper reports physical pixels and Electron's displays are in DIPs; compared
+   * raw, every maximized window on a 150 % display covered it and counted as full screen.
+   */
+  screenToDipRect(window: null, rect: WindowBounds): WindowBounds;
   /** Electron's Display carries its bounds; a lookup without them never marks full screen. */
   getDisplayMatching(bounds: WindowBounds): { id: number; bounds?: WindowBounds };
 }
@@ -143,8 +149,9 @@ export function placeOnDisplays(
   return windows.map(({ bounds, ...window }) => {
     if (!onScreen(bounds)) return window;
     try {
-      const display = screen.getDisplayMatching(bounds);
-      const fullScreen = display.bounds !== undefined && covers(bounds, display.bounds);
+      const dip = screen.screenToDipRect(null, bounds);
+      const display = screen.getDisplayMatching(dip);
+      const fullScreen = display.bounds !== undefined && covers(dip, display.bounds);
       return { ...window, displayId: display.id, ...(fullScreen ? { fullScreen } : {}) };
     } catch {
       return window;

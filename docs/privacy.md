@@ -878,14 +878,19 @@ wrong. It never leaves your computer on its own.
 - **Where.** `%APPDATA%\Tagalong\logs\tagalong.log`. The health card ("Scout, what's wrong?") has
   **Open logs folder**, which only opens the folder: you choose what to send, and no log text is
   copied anywhere.
-- **What is written.** Only the desktop app's warnings and errors (the engine's included, since it
-  runs in the same process): a time, `WARN` or `ERROR`, the app's own fixed text and, for an
-  error, its name and message, for example
-  `2026-10-16T21:40:00.000Z WARN [main] could not save Always listening Error: EPERM`.
+- **What is written.** Only the desktop app's warnings and errors: main's (the engine's included,
+  since it runs in the same process), the windows' (marked `[renderer]`) and the voice process's
+  (marked `[voice process]`). Each is a time, `WARN` or `ERROR`, the app's own fixed text and, for
+  an error, its name and message, for example
+  `2026-10-16T21:40:00.000Z WARN [main] could not save Always listening Error: EPERM`. When Always
+  listening pauses for a call or a full-screen window, one line says so with the app's process
+  name (for example `Code`), never the window's title, and one more when it resumes.
 - **What is never written.** Anything passed along with a warning other than an error (an object, a
   turn, a second piece of text) becomes just its type, such as `[object]`, so what you said, what
-  is on your screen, file contents and Scout's answers never reach the file. The windows' own
-  warnings are not written, and nothing is logged on ordinary use.
+  is on your screen, file contents and Scout's answers never reach the file. The voice process
+  sends main only that kept text. A window's warning arrives as one line Chromium has already put
+  together, so there it is the app's own rule (no speech, screen or file text in a warning) that
+  keeps it clean. Nothing is logged on ordinary use.
 - **Secrets are hidden** with the same rules as everything sent to a brain (a key becomes
   `[hidden: API key]`), and each line is cut at 300 characters.
 - **Small.** When the file passes 1 MB it is renamed `tagalong.1.log` (replacing the older one) and

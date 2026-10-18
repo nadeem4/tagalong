@@ -9,14 +9,28 @@
  */
 
 /**
- * Enumerates top-level windows and prints them as JSON.
+ * Per-monitor DPI awareness (v2), set before UI Automation loads. Windows PowerShell starts
+ * unaware and UI Automation then makes it system-aware, and a system-aware process gets
+ * rectangles on a monitor of a different scale virtualized, not in physical pixels: beside
+ * a 150 % laptop, a 100 % monitor came back at x 2880 and 3840 wide instead of x 1920 and
+ * 2560. Best effort: if it cannot be set, single-scale desks still come out right.
+ */
+export const PER_MONITOR_AWARE = String.raw`
+try {
+  Add-Type -Namespace Tagalong -Name Dpi -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr value);'
+  [void][Tagalong.Dpi]::SetProcessDpiAwarenessContext([IntPtr]-4)
+} catch {}
+`;
+
+/**
+ * Enumerates top-level windows and prints them as JSON, in physical screen pixels.
  *
  * Reads no window contents. That is what makes the inventory cheap enough to attach to
  * every capture: walking a window's descendants is what costs — on a real desktop one
  * background browser window alone yielded 34,588 characters. The text layer does that
  * deliberately, for one window, when asked.
  */
-export const LIST_WINDOWS_SCRIPT = String.raw`
+export const LIST_WINDOWS_SCRIPT = String.raw`${PER_MONITOR_AWARE}
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class TagalongWin { [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h); [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h); [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow(); }'

@@ -11,6 +11,7 @@ import {
   EarsNotes,
   FailureStreak,
   FollowUpCue,
+  HeardInbox,
   NOTHING_HEARD,
   micMark,
   micNote,
@@ -88,12 +89,10 @@ export function useTalk(options: TalkOptions): {
   const [cue] = useState(() => new FollowUpCue());
   // The ears failing (offline the first time) fails again at every retry too: said once.
   const [earsNotes] = useState(() => new EarsNotes());
-  // The bubble listens for each question heard, and asks it.
-  const [hearers] = useState(() => new Set<(text: string) => void>());
-  const [onHeard] = useState(() => (handler: (text: string) => void) => {
-    hearers.add(handler);
-    return () => void hearers.delete(handler);
-  });
+  // The bubble listens for each question heard, and asks it; one heard while it is not
+  // mounted waits for it.
+  const [inbox] = useState(() => new HeardInbox());
+  const [onHeard] = useState(() => (handler: (text: string) => void) => inbox.subscribe(handler));
   // The bubble listens for each start of listening: talking over Scout stops its answer.
   const [listeners] = useState(() => new Set<() => void>());
   const [onListen] = useState(() => (handler: () => void) => {
@@ -128,7 +127,9 @@ export function useTalk(options: TalkOptions): {
         micOk();
         cue.asked();
         done(null);
-        for (const hear of hearers) hear(text);
+        // No bubble to ask it (a one-line hello, remark or routine line is up): the line
+        // gives way and the bubble that mounts asks the question held for it.
+        if (!inbox.deliver(text)) latest.current.onBegin();
       },
       onNothingHeard: () => done(NOTHING_HEARD),
       onMicFailed: (error) => {

@@ -2003,7 +2003,13 @@ On by default (`settings.keepAnEye`). The desktop only feeds window titles; the 
   `keepAnEye.observe { windows }`. It lists nothing while the setting is off or sight is paused, and
   it does not start under `TAGALONG_FAKE_PROVIDERS=1` unless `TAGALONG_KEEP_AN_EYE=1`, so e2e runs
   meet no remark they did not set up. `placeOnDisplays` marks a window that covers its whole display
-  `fullScreen`. With the setting off the engine tracks nothing either.
+  `fullScreen`, comparing in DIPs: the window helper runs per-monitor DPI aware
+  (`PER_MONITOR_AWARE` in `platform/window-helper.ts`, shared with `find-element.ts`) so its
+  rectangles are physical pixels, and each one goes through Electron's `screen.screenToDipRect`
+  before it is matched to a display. Compared raw, a maximized window on a 150 % laptop (physical
+  `-11,-11,1942x1150` against DIP bounds `0,0,1280x800`) covered its display, and every check-in,
+  arrival, routine result and Always listening stopped while it was in front. With the setting off
+  the engine tracks nothing either.
 - **The lookout** (`keep-an-eye/lookout.ts#Lookout`). `track` follows every snapshot (the settle
   clock, and the last plain title in front); `pick` runs only when the check-in gate is open. A
   window is considered once per session, keyed by id and title. It earns a look when it is in front
@@ -2441,7 +2447,13 @@ above a **Message** box. It is the same component, so it is the same conversatio
   `shell.openPath` on it); no log text crosses IPC.
 - **Log file.** `main/log-file.ts#installLogFile` runs before the app is ready and wraps
   `console.warn` and `console.error` (the originals still run). The engine runs in main's
-  process, so core's warnings land too; the windows' warnings are not written. `logLine` keeps a
+  process, so core's warnings land too. The windows' warnings and errors come in through
+  `app.on('web-contents-created')` and each window's `console-message` event
+  (`rendererConsole`: levels `warning` and `error` only, written as `[renderer] <message>`;
+  Chromium hands the message over already formatted, so there the call-site rule is what keeps it
+  clean). The voice process wraps its own console with `log-text.ts#forwardConsole`, which posts
+  the kept text (the same rule as `logLine`, never the other arguments) as a `{ kind: 'log' }`
+  message; `VoiceWorker` logs it in main as `[voice process] <text>`. `logLine` keeps a
   text first argument and an `Error`'s `name: message` (never its stack); any other argument
   becomes its type (`[object]`, `[string]`), so no speech, screen text or turn payload can ride
   in. The line goes through core's `hideSecrets` (exported from core's index), is put on one line
@@ -2734,7 +2746,12 @@ flowchart LR
   the microphone…" when it is busy (`NotReadableError`, `AbortError`), otherwise that it could not
   be opened. Only `getUserMedia` itself can say busy: `openMic` rethrows an audio-graph failure
   (a worklet that would not load rejects with an `AbortError`) as a plain error. Closing the bubble cancels the
-  question being asked, never always listening. The decisions sit in `talk-rules.ts`, unit tested:
+  question being asked, never always listening. A heard question goes through `HeardInbox`: the
+  bubble subscribes as it mounts, and a question heard while it is not mounted (a one-line hello,
+  remark, routine or status line is up in its place, or Scout is still waking) is held, the line
+  gives way (`onBegin`), and the bubble asks it as it subscribes; none is dropped. Only the latest
+  is held: as with talking over Scout, a newer question replaces one not yet asked. The decisions
+  sit in `talk-rules.ts`, unit tested:
   `settles` (a heard question clears the words and the state unless a held question has started, so
   an always question and a held question heard after the always session resumed both settle),
   `shownPartial` (always words without the leading "Scout", as heard when they do not start with
@@ -2892,7 +2909,12 @@ flowchart LR
   `callOrFullScreenInFront` from `@tagalong/core` (`isMeeting` for the call; a Teams window in front
   counts even with no call), the same rule keeping an eye and moods use. Only
   titles and positions are read, never window text. A failed listing keeps the last answer;
-  switched off, the guard forgets it.
+  switched off, the guard forgets it. Each pause writes one warning to the log file naming the
+  kind of window and its app, never its title, for example
+  `[listening] paused: a full-screen window in front (Code)`, and the next unblock writes
+  `[listening] resumed`. Full screen is measured in DIPs
+  (see `placeOnDisplays` under keeping an eye), so a maximized window on a scaled display never
+  pauses it.
 - **The pets hidden.** The tray's Hide pets (or Welcome, before Scout arrives) hides the avatar,
   and listening is paused until it shows again, so the mark is in sight whenever the mic is open.
 - **The controller** (`ui/voice/listen-controller.ts`). `setAlways`, `setPaused` and `setDeaf` keep

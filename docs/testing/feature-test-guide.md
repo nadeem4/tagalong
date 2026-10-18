@@ -1076,6 +1076,17 @@ Run with a real microphone and without `TAGALONG_FAKE_STT`. Switch **Always list
     Switching Always listening on while the call is already in front pauses it within a moment
     (the front window is checked at once); a microphone that opened before that check closes
     unused.
+    **Edge (scaled display):** on a laptop at 125 % or 150 % (Windows display settings), with a
+    second monitor at 100 % if you have one, maximize VS Code or Chrome on each screen and keep it
+    in front for 10 seconds. The mark stays solid and "Scout, what time is it?" is answered: a
+    maximized window is not full screen. Press F11 in Chrome (true full screen) on either screen:
+    the mark turns to an outline, and `tagalong.log` gains
+    `[listening] paused: a full-screen window in front (chrome)`; leave F11 and it gains
+    `[listening] resumed`.
+    **Edge (a line is up):** wait for a hello, check-in or routine line in Scout's bubble and,
+    while it shows, say "Scout, what time is it?". The line gives way to the bubble and the
+    question is asked and answered, never dropped. The same holds for a question said while the
+    panel still shows "Waking Scout…" at launch: it is asked once Scout is up.
 11. **Action:** use the system voice (Settings → Voice → **Who speaks** → System voice) and ask
     for a long answer by typing.
 12. **Expected:** while the system voice speaks, Scout does not hear it and does not reply to
@@ -1833,6 +1844,13 @@ three times: the wording should vary, the behaviour should not.
    the error's name and message; no line over 300 characters. (c) no question, answer, speech or
    screen text appears in the file. (d) the big file is now `tagalong.1.log` and `tagalong.log`
    holds only the new line.
+4. **Action:** (a) with Always listening on and the microphone blocked, open the bubble: the
+   panel's own warning is written as a `[renderer]` line; (b) on a fresh install with no
+   internet, switch Always listening on: the ears' failure is written as a `[voice process]`
+   line; (c) with Always listening on, put a video full screen for a few seconds, then leave it.
+5. **Expected:** (a) and (b) one line each, with the same time, level and 300-character rules;
+   (c) one `[listening] paused: a full-screen window in front (<app>)` line and one
+   `[listening] resumed` line, with the app's process name and never a window title.
 
 ## J. Background jobs and the task board _(real brain, fast tier)_
 

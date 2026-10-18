@@ -115,8 +115,79 @@ describe('parseWindowList', () => {
   });
 });
 
+/** Single-scale desks: screen pixels already are DIPs. */
+const sameScale = (_window: null, rect: WindowBounds): WindowBounds => rect;
+
+/**
+ * The user's desk, as Electron reported it: a 1920x1200 laptop at 150 % (1280x800 DIPs)
+ * and a 2560x1080 monitor at 100 % to its right (DIP x 1280, physical x 1920). The
+ * conversion mirrors what `screen.screenToDipRect` returned for the real rectangles.
+ */
+const MIXED = [
+  { id: 1, dip: { x: 0, y: 0, width: 1280, height: 800 }, physicalX: 0, scale: 1.5 },
+  { id: 2, dip: { x: 1280, y: 0, width: 2560, height: 1080 }, physicalX: 1920, scale: 1 },
+] as const;
+
+const mixedScreen = {
+  screenToDipRect: (_window: null, rect: WindowBounds): WindowBounds => {
+    const centre = rect.x + rect.width / 2;
+    const display = centre >= 1920 ? MIXED[1] : MIXED[0];
+    const s = display.scale;
+    return {
+      x: Math.round(display.dip.x + (rect.x - display.physicalX) / s),
+      y: Math.round(rect.y / s),
+      width: Math.round(rect.width / s),
+      height: Math.round(rect.height / s),
+    };
+  },
+  getDisplayMatching: (bounds: WindowBounds) => {
+    const display = bounds.x + bounds.width / 2 >= 1280 ? MIXED[1] : MIXED[0];
+    return { id: display.id, bounds: display.dip };
+  },
+};
+
+describe('placeOnDisplays on a mixed-scale desk', () => {
+  // Rectangles measured on the user's machine with a per-monitor-aware helper.
+  const place = (bounds: WindowBounds) =>
+    placeOnDisplays(windowsFrom(JSON.stringify([raw({ bounds })])), mixedScreen)[0];
+
+  it('does not call a maximized window on the 150 % laptop full screen', () => {
+    // VS Code, Chrome and Claude maximized: 11 px of border past each edge, short of the
+    // taskbar. Compared in physical pixels against DIP bounds, this covered the display
+    // and paused listening for as long as any of them was open.
+    const placed = place({ x: -11, y: -11, width: 1942, height: 1150 });
+    expect(placed?.displayId).toBe(1);
+    expect(placed?.fullScreen).toBeUndefined();
+  });
+
+  it('does not call a maximized window on the 100 % monitor full screen', () => {
+    const placed = place({ x: 1912, y: -8, width: 2576, height: 1048 });
+    expect(placed?.displayId).toBe(2);
+    expect(placed?.fullScreen).toBeUndefined();
+  });
+
+  it('calls a borderless window covering the laptop exactly full screen', () => {
+    const placed = place({ x: 0, y: 0, width: 1920, height: 1200 });
+    expect(placed?.displayId).toBe(1);
+    expect(placed?.fullScreen).toBe(true);
+  });
+
+  it('calls a borderless window covering the monitor exactly full screen', () => {
+    const placed = place({ x: 1920, y: 0, width: 2560, height: 1080 });
+    expect(placed?.displayId).toBe(2);
+    expect(placed?.fullScreen).toBe(true);
+  });
+
+  it('places a window by its DIP rectangle, not its screen pixels', () => {
+    // 1500 physical px is inside the laptop; read as a DIP it would be on the monitor.
+    const placed = place({ x: 1500, y: 100, width: 300, height: 300 });
+    expect(placed?.displayId).toBe(1);
+  });
+});
+
 describe('placeOnDisplays', () => {
   const screen = {
+    screenToDipRect: sameScale,
     getDisplayMatching: (bounds: WindowBounds) => ({ id: bounds.x >= 1920 ? 2 : 1 }),
   };
 
@@ -152,6 +223,7 @@ describe('placeOnDisplays', () => {
 
   it('marks a window that covers its whole screen as full screen, and a maximized one not', () => {
     const withBounds = {
+      screenToDipRect: sameScale,
       getDisplayMatching: () => ({ id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 } }),
     };
     const placed = placeOnDisplays(
@@ -169,6 +241,7 @@ describe('placeOnDisplays', () => {
 
   it('leaves a window unplaced when the screen lookup throws', () => {
     const throwing = {
+      screenToDipRect: sameScale,
       getDisplayMatching: () => {
         throw new Error('no display');
       },

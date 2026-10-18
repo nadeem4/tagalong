@@ -28,7 +28,9 @@ export type FromWorker =
   | { kind: 'kokoro.ready' }
   | { kind: 'ears'; event: EarsEvent; text?: string }
   | { kind: 'ears.status'; status: 'loading' | 'ready' | 'failed'; message?: string }
-  | { kind: 'ears.progress'; fraction: number };
+  | { kind: 'ears.progress'; fraction: number }
+  /** A warning or error in the voice process, as the log file keeps it; main logs it. */
+  | { kind: 'log'; level: 'warn' | 'error'; text: string };
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
