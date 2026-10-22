@@ -3,7 +3,7 @@
  * `CHECK_IN_INSTRUCTIONS` (the `## Checking in` block after the soul), `parseCheckIn` and
  * `askMind`. The reply is usually NOTHING; anything unusable is treated the same way.
  */
-import type { Pet, Settings } from '@tagalong/protocol';
+import type { Pet } from '@tagalong/protocol';
 import type { BrainProvider } from '../providers';
 
 /** A check-in is never worth waiting for: a mind that has not answered by then stays silent. */
@@ -75,20 +75,24 @@ function usableText(line: string): string | null {
   return text;
 }
 
-/** One call, no tools. Any failure (no brain, a throw, a timeout, a cut-off reply) is silence. */
+/**
+ * One call, no tools. NOTHING comes back as an empty reply; any failure (no brain, a throw, a
+ * timeout, a cut-off reply) as null. Either way nothing is said.
+ */
 export async function askMind(options: {
   pet: Pet;
-  /** `settings.summarizer`: the summaries model, or null for the pet's own. */
-  summarizer: Settings['summarizer'];
   /** The engine's guarded, recorded and metered resolver. */
   provider: (pet: Pet) => BrainProvider;
   system: string;
   bundle: string;
   timeoutMs: number;
+  /** What the call cost, for the experience log; the engine's meter counts it for the budget. */
+  onUsage?: (usage: { inputTokens: number; outputTokens: number }) => void;
   log?: (message: string) => void;
 }): Promise<CheckInReply | null> {
-  const { pet, summarizer } = options;
-  const brainPet = summarizer === null ? pet : { ...pet, ...summarizer };
+  // Deciding whether to speak is the mind's own judgement, so it thinks on the pet's model,
+  // never the cheaper summaries model.
+  const brainPet = options.pet;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs);
   try {
@@ -105,7 +109,9 @@ export async function askMind(options: {
       },
       controller.signal,
     );
-    return result.stopReason === 'end' ? parseCheckIn(result.text) : null;
+    options.onUsage?.(result.usage);
+    // NOTHING is an answer (an empty reply); null is a mind that did not answer.
+    return result.stopReason === 'end' ? (parseCheckIn(result.text) ?? {}) : null;
   } catch (error) {
     options.log?.(`check-in: the mind did not answer: ${String(error)}`);
     return null;

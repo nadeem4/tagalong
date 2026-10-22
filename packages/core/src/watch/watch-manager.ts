@@ -39,6 +39,7 @@ const TEXT_TAIL_CHARS = 4_000;
 /** Longest timeout a pet may ask for, whatever it says. */
 const MAX_TIMEOUT_MINUTES = 240;
 
+/** A frequent yes/no matcher is plumbing, not speech: it never gets the soul. */
 const CHECK_SYSTEM =
   "You watch part of a user's screen for one condition. Decide only whether the condition " +
   'is clearly true in what you are shown right now. Reply with JSON and nothing else: ' +

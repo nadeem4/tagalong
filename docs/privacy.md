@@ -519,8 +519,8 @@ Now and then, when nobody asked, Scout asks the AI once whether anything is wort
 Tagalong opens (and just after setup), when you are back after a long break with something to
 pick up, after you settle on a new window, when a title reads like an error, after a long stretch
 (with Gentle nudges on), and when work finishes (an expert you handed work to, or a job of Scout's own). Most of the time the answer is nothing, and
-nothing is shown. Each of these calls goes to the summaries model (Settings → Summaries, else
-Scout's own) and carries, besides what that moment is about:
+nothing is shown. Each of these calls goes to Scout's own model and carries, besides what that
+moment is about:
 
 - **what Scout recalls for that moment (your preferences, its newest memories, those matching the
   window title or the finished ask, and up to two matching jobs of its own, at most 2,500
@@ -630,6 +630,34 @@ snapshot at all, and switching it off deletes the one kept.
   opens until you press a button on the card. **Open** opens only a folder that
   pick-up named, through VS Code's or Cursor's own link or Explorer; **Brief again** only fills in
   the hand-off card, which waits for Send. No keys are typed and the mouse is never moved.
+
+## The experience log: what Scout decided
+
+Scout keeps a record of what it decided and what came of it, so you can see why it did something
+and so it can learn from it later. One episode per question, background job, routine run and
+check-in, silent ones included.
+
+- **What an episode keeps:** what Scout was asked (your question, or a check-in's message to the
+  AI, as listed under [Check-ins](#check-ins-what-goes-with-an-unprompted-call), without anything
+  from your screen), what it decided (answered, stayed quiet, spoke, offered work, or wrote a line
+  that was never shown because you pressed **Not now** meanwhile), what it said, the model and its
+  token counts (check-ins included; every call also counts toward Spend and the daily budget).
+- **No screen text, no window titles.** Window text, text read from a picture, your selection and
+  anything a screen tool read are never kept: the log keeps a marker such as `[screen text, 412
+characters, not kept]` instead. Window titles, and the branch and file names read from them, are
+  not kept either; the app's name and the reason Scout woke are.
+- **Its steps:** each tool Scout called, with what it was called with and the first line of what
+  came back, except a screen tool's or a search of your history's, which keeps only the marker; a
+  picture is never kept.
+- **What you did about it:** **Not now** on a line or on the Pick up card, an offer taken, a
+  hand-off card sent or dismissed.
+- **Secrets hidden, clipped, local.** Keys, tokens and passwords are hidden before anything is
+  written; what was asked is cut at 8,000 characters and everything else at 4,000. It stays in
+  `tagalong.db` on this computer. An episode is deleted 30 days after it started, at launch and
+  every 30 minutes while Tagalong runs.
+- **Delete all.** Home › **How Scout decided** › **Delete all** (one confirm) deletes every episode
+  and its steps at once. Deleting a memory does not go back through old episodes: those go after 30
+  days, or with Delete all.
 
 ## Spend: what the cost meter keeps
 

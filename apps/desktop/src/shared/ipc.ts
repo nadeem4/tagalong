@@ -31,6 +31,9 @@ export const IPC = {
   listPets: 'tagalong:pets:list',
   // Home.
   listActivity: 'tagalong:activity:list',
+  listExperience: 'tagalong:experience:list',
+  getExperience: 'tagalong:experience:get',
+  clearExperience: 'tagalong:experience:clear',
   listExperts: 'tagalong:experts:list',
   saveExpert: 'tagalong:experts:save',
   deleteExpert: 'tagalong:experts:delete',

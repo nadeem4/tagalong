@@ -36,6 +36,9 @@ const HOST_TO_CORE = [
   'tool.approve',
   'watch.stop',
   'activity.list',
+  'experience.list',
+  'experience.get',
+  'experience.clear',
   'experts.list',
   'experts.upsert',
   'experts.delete',
@@ -410,6 +413,42 @@ describe('notification schemas', () => {
         background: false,
       }).success,
     ).toBe(false);
+  });
+
+  it('marks a spoken question on turn.started', () => {
+    const base = { turnId, petId: 'scout', conversationId: turnId };
+    expect(
+      notificationParamsSchemaFor('turn.started').parse({ ...base, spoken: true }).spoken,
+    ).toBe(true);
+    expect(
+      notificationParamsSchemaFor('turn.started').safeParse({ ...base, spoken: false }).success,
+    ).toBe(false);
+  });
+
+  it('ties a tool result to its call by the provider’s call id, when there is one', () => {
+    const request = notificationParamsSchemaFor('turn.toolRequest').parse({
+      turnId,
+      approvalId: turnId,
+      callId: 'toolu_1',
+      tool: 'recall',
+      input: {},
+    });
+    const result = notificationParamsSchemaFor('turn.toolResult').parse({
+      turnId,
+      callId: 'toolu_1',
+      tool: 'recall',
+      ok: true,
+      summary: 'x',
+    });
+    expect([request.callId, result.callId]).toEqual(['toolu_1', 'toolu_1']);
+    expect(
+      notificationParamsSchemaFor('turn.toolResult').parse({
+        turnId,
+        tool: 'recall',
+        ok: true,
+        summary: 'x',
+      }).callId,
+    ).toBeUndefined();
   });
 
   it('counts Scout’s own running and waiting jobs on board.changed', () => {

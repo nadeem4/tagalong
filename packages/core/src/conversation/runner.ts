@@ -247,6 +247,7 @@ export class ConversationRunner {
         ...(ask.routine === undefined ? {} : { routineId: ask.routine.routineId }),
         ...(ask.background === true ? { background: true as const } : {}),
         ...(ask.job === undefined ? {} : { jobId: ask.job.jobId }),
+        ...(ask.spoken === true ? { spoken: true as const } : {}),
       },
     });
 
@@ -397,13 +398,20 @@ export class ConversationRunner {
             // end to end.
             this.#options.emit({
               method: 'turn.toolRequest',
-              params: { turnId, approvalId: randomUUID(), tool: call.name, input: call.input },
+              params: {
+                turnId,
+                approvalId: randomUUID(),
+                ...(call.id === '' ? {} : { callId: call.id }),
+                tool: call.name,
+                input: call.input,
+              },
             });
             const outcome = await tools.run(call);
             this.#options.emit({
               method: 'turn.toolResult',
               params: {
                 turnId,
+                ...(call.id === '' ? {} : { callId: call.id }),
                 tool: call.name,
                 ok: outcome.isError !== true,
                 // The summary is for the panel, not the model: the model already has the

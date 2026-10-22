@@ -50,6 +50,13 @@ The same generator compiles every `soul/*.md` into `SOUL_LIBRARY` in `library.ge
 keyed by file name, and fails on a missing, extra, empty or misordered part. `ACTIVE_SOUL` in
 `packages/core/src/roles/index.ts` (`'scout'`) picks the soul and `soul()` returns its text.
 
+Every mind speaks from the same soul. A turn's system prompt is the soul, the role's body and their
+name. Every other mind's is `modeSystem(block)`: the soul, then that mode's own block. The modes
+are checking in (`## Checking in`), tidying memory (`DIGEST_INSTRUCTIONS`) and summarising
+(`## Summarising`). So what Scout says, keeps and judges all comes from one self. A watch's yes/no
+check is the exception: a frequent matcher is plumbing, not speech, so it gets a fixed instruction
+and no soul.
+
 To re-character Scout, edit `soul/scout.md` and regenerate. For a second character, add
 `soul/<id>.md` and change `ACTIVE_SOUL`; there is no setting or picker until a second soul ships.
 
@@ -96,7 +103,7 @@ tools:
   - open_result
   - stop_work
 model:
-  tier: fast # fast | balanced | deep
+  tier: balanced # fast | balanced | deep
   needs_vision: false
 ---
 

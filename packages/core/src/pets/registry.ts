@@ -17,7 +17,7 @@ export const SCOUT: Pet = {
   name: 'Scout',
   avatar: '🦊',
   roleId: 'companion',
-  model: 'haiku',
+  model: 'sonnet',
   providerId: 'claude-code',
 };
 

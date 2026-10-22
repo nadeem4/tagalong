@@ -9,6 +9,8 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { IpcRendererEvent } from 'electron';
 import type {
   ActivityListResult,
+  ExperienceGetResult,
+  ExperienceListResult,
   CalendarCheckResult,
   CatalogStatus,
   ConnectionState,
@@ -77,6 +79,11 @@ const bridge: HostBridge = {
   // Home.
   listActivity: (params: { before?: string; limit?: number } = {}) =>
     ipcRenderer.invoke(IPC.listActivity, params) as Promise<ActivityListResult>,
+  listExperience: (params: { before?: string; limit?: number } = {}) =>
+    ipcRenderer.invoke(IPC.listExperience, params) as Promise<ExperienceListResult>,
+  getExperience: (id: string) =>
+    ipcRenderer.invoke(IPC.getExperience, id) as Promise<ExperienceGetResult>,
+  clearExperience: () => ipcRenderer.invoke(IPC.clearExperience) as Promise<number>,
   listExperts: () => ipcRenderer.invoke(IPC.listExperts) as Promise<Expert[]>,
   saveExpert: (expert: Expert) => ipcRenderer.invoke(IPC.saveExpert, expert) as Promise<Expert>,
   deleteExpert: (expertId: string) =>

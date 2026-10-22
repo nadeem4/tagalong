@@ -11,6 +11,7 @@ import { DEFAULT_ENGINE_PORT, RPC_ERROR_CODES, SCOUT_ID } from '@tagalong/protoc
 import type { Expert, HostKind, Pet } from '@tagalong/protocol';
 import { openDatabase } from './memory/db';
 import { ActivityLog } from './memory/activity';
+import { ExperienceLog } from './memory/experience';
 import { ConversationStore } from './memory/store';
 import { MemoryStore } from './memory/memories';
 import { Summarizer } from './memory/summarizer';
@@ -352,6 +353,19 @@ export class Engine {
     const interruptedAtBoot = activity.interrupted();
     // Home's Activity keeps 90 days; the digest has kept the gist of older work in memory.
     activity.prune();
+    // What the mind decided and what came of it, for the inspector and, later, for learning.
+    // Written beside the activity record, from the same events; kept 30 days.
+    const experience = new ExperienceLog(db, store);
+    experience.interrupted();
+    experience.prune();
+    /** A record that could not be written is lost, never a turn or a card that fails with it. */
+    const record = (write: () => unknown): void => {
+      try {
+        write();
+      } catch (error) {
+        console.warn('[engine] the experience log did not take an entry:', error);
+      }
+    };
     const routineStore = new RoutineStore(db);
     routineStore.interrupted();
     // When a turn of theirs last ended, on the clock finished work is gathered on.
@@ -359,6 +373,7 @@ export class Engine {
     const talk = { turns: new Set<string>(), endedAt: Number.NEGATIVE_INFINITY };
     const emit: TurnEventSink = (event) => {
       activity.observe(event);
+      record(() => experience.observe(event));
       if (event.method === 'turn.started' && event.params.background !== true) {
         talk.turns.add(event.params.turnId);
       } else if (event.method === 'turn.completed' || event.method === 'turn.error') {
@@ -450,6 +465,8 @@ export class Engine {
       // Not while a turn of theirs or a job is running.
       idle: () => !runner.foregroundBusy() && jobs.counts().running === 0,
       pruneJobs: () => void jobs.prune(),
+      // The experience log's 30 days, kept while the app stays open, not only at boot.
+      tidy: () => void experience.prune(),
       lastAnswer,
       log: (message) => console.warn(`[engine] ${message}`),
     });
@@ -547,6 +564,7 @@ export class Engine {
       propose: (params) => handoffs.propose(params),
       emit: (event) => live.server?.broadcast(event.method, event.params),
       spentOut,
+      experience,
       log: (message) => console.warn(`[engine] ${message}`),
     });
     // Finished jobs and hand-offs, gathered: one check-in once things are quiet, held
@@ -588,7 +606,12 @@ export class Engine {
       // Read per turn: experts are added and switched off while the app runs.
       experts: {
         experts: () => experts.list(),
-        propose: (params) => handoffs.propose(params),
+        // A card a turn's tool put up is tied to that turn, so what the person does with it is.
+        propose: ({ turnId, ...params }) => {
+          const proposed = handoffs.propose(params);
+          record(() => experience.proposed(proposed.proposalId, turnId));
+          return proposed;
+        },
         // Only reached on a routine's turn, for the expert its saved card allowed.
         startReadOnly: (params) => handoffs.startReadOnly(params),
         // tell_expert: the person's words for an expert already working.
@@ -720,6 +743,8 @@ export class Engine {
 
     const handlers = buildHandlers({
       activity,
+      experience,
+      record,
       runner,
       pets,
       settings,
@@ -823,6 +848,9 @@ export class Engine {
 
 function buildHandlers(parts: {
   activity: ActivityLog;
+  experience: ExperienceLog;
+  /** Writes to the experience log, where a failure is logged and never fails the call. */
+  record: (write: () => unknown) => void;
   runner: ConversationRunner;
   pets: PetRegistry;
   settings: SettingsStore;
@@ -853,7 +881,7 @@ function buildHandlers(parts: {
   /** Guarded but not recorded: a key check sends no screen, so it writes no row. */
   checkResolve: ProviderResolver;
 }): MethodHandlers {
-  const { activity, runner, pets, settings, models, hosts, watches } = parts;
+  const { activity, experience, record, runner, pets, settings, models, hosts, watches } = parts;
   const { refreshProviders, experts, handoffs, projects, connectorFor } = parts;
   const { checkIn, connections, approvals, routines, pickUp } = parts;
   const { sightLog, checkResolve } = parts;
@@ -931,6 +959,9 @@ function buildHandlers(parts: {
     'watch.stop': (params) => ({ stopped: watches.stop(params.watchId) }),
 
     'activity.list': (params) => activity.list(params),
+    'experience.list': (params) => experience.list(params),
+    'experience.get': (params) => experience.get(params.id),
+    'experience.clear': () => ({ deleted: experience.clear() }),
 
     'experts.list': () => ({ experts: experts.list() }),
     'experts.upsert': (params) => {
@@ -959,8 +990,16 @@ function buildHandlers(parts: {
       return connectorFor(expert).check();
     },
     'handoffs.cancel': (params) => ({ cancelled: handoffs.cancel(params.handoffId) }),
-    'handoffs.confirm': (params) => handoffs.confirm(params),
-    'handoffs.dismiss': (params) => ({ dismissed: handoffs.dismiss(params.proposalId) }),
+    'handoffs.confirm': (params) => {
+      const confirmed = handoffs.confirm(params);
+      record(() => experience.proposalOutcome(params.proposalId, 'sent'));
+      return confirmed;
+    },
+    'handoffs.dismiss': (params) => {
+      const dismissed = handoffs.dismiss(params.proposalId);
+      if (dismissed) record(() => experience.proposalOutcome(params.proposalId, 'dismissed'));
+      return { dismissed };
+    },
     'projects.search': (params) => ({ projects: projects.search(params.query) }),
 
     // The app opened: answers at once. The check-in reads the settings before this returns
@@ -1043,7 +1082,12 @@ function buildHandlers(parts: {
     // Pick up: Brief again proposes the saved ask (nothing starts); Not now drops the offer.
     'pickUp.rebrief': (params) =>
       plainly(() => Promise.resolve({ proposed: pickUp.rebrief(params.itemId) })),
-    'pickUp.dismiss': () => ({ dismissed: pickUp.dismiss() }),
+    'pickUp.dismiss': () => {
+      const dismissed = pickUp.dismiss();
+      // The card's Not now answers the line that rode with it.
+      if (dismissed) record(() => checkIn.pickUpDismissed());
+      return { dismissed };
+    },
 
     // What Scout saw. Deleting removes the record, not what was already sent.
     'sightLog.list': (params) => ({ entries: sightLog.list(params.limit) }),

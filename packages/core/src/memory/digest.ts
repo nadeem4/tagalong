@@ -13,7 +13,7 @@ import { clip } from '../jobs/jobs';
 import type { JobRow, JobStore } from '../jobs/store';
 import { hideSecrets } from '../privacy/secrets';
 import type { BrainProvider } from '../providers';
-import { soul } from '../roles';
+import { modeSystem } from '../roles';
 import type { WatchClock } from '../watch/watch-manager';
 import type { Memory, MemoryKind, MemoryStore } from './memories';
 
@@ -73,6 +73,11 @@ export interface DigestOptions {
   idle: () => boolean;
   /** Finished jobs and their conversations go after 14 days. */
   pruneJobs: () => void;
+  /**
+   * Runs on every check, digest or not: records kept a set number of days (the experience
+   * log's 30) go while the app stays open, not only at the next boot.
+   */
+  tidy?: (() => void) | undefined;
   /** A conversation's last assistant message: a job's full result. */
   lastAnswer: (conversationId: string) => string | null;
   log?: ((message: string) => void) | undefined;
@@ -90,7 +95,7 @@ export class Digest {
     this.#o = options;
   }
 
-  /** The first check 5 minutes from now, then one every 30 minutes. */
+  /** The first check 5 minutes from now, then one every 30 minutes; each one tidies first. */
   start(): void {
     this.#schedule(FIRST_CHECK_MS);
   }
@@ -164,7 +169,7 @@ export class Digest {
       const result = await this.#o.provider(brainPet).complete(
         {
           model: brainPet.model,
-          system: `${soul()}\n\n${DIGEST_INSTRUCTIONS}`,
+          system: modeSystem(DIGEST_INSTRUCTIONS),
           messages: [
             {
               role: 'user',
@@ -279,6 +284,11 @@ export class Digest {
   #schedule(ms: number): void {
     if (this.#stopped) return;
     this.#timer = this.#o.clock.setTimeout(() => {
+      try {
+        this.#o.tidy?.();
+      } catch (error) {
+        this.#o.log?.(`digest: tidying failed: ${String(error)}`);
+      }
       void this.maybeRun()
         .catch((error: unknown) => this.#o.log?.(`digest: ${String(error)}`))
         .finally(() => this.#schedule(CHECK_EVERY_MS));

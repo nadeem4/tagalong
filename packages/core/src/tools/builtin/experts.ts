@@ -43,6 +43,8 @@ export interface ExpertToolDeps {
   propose(params: {
     expertId: string;
     petId: string;
+    /** The turn that proposed it, so the experience log ties the card's outcome to it. */
+    turnId?: string;
     brief: Brief;
     /** One follow-up step, on the same card, that runs after the first one finishes well. */
     then?: { expertId: string; ask: string };
@@ -238,6 +240,7 @@ export function handToExpertTool(deps: ExpertToolDeps, experts: readonly Expert[
       deps.propose({
         expertId: expert.id,
         petId: ctx.pet.id,
+        turnId: ctx.turnId,
         brief,
         ...(then === undefined ? {} : { then: { expertId: then.expert.id, ask: then.ask } }),
       });

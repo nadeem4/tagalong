@@ -27,7 +27,7 @@ const CLAUDE = expert('claude-code', 'Claude Code', 'Code changes in this repo')
 const GEMINI = expert('gemini', 'Gemini', 'Long documents');
 
 function deps(experts: Expert[]) {
-  const started: { expertId: string; petId: string; brief: Brief }[] = [];
+  const started: { expertId: string; petId: string; turnId?: string; brief: Brief }[] = [];
   const value: ExpertToolDeps = {
     experts: () => experts,
     propose: (params) => {
@@ -83,6 +83,8 @@ describe(HAND_TO_EXPERT, () => {
       {
         expertId: 'claude-code',
         petId: 'scout',
+        // The turn that proposed it, so what the person does with the card is tied to it.
+        turnId: 'turn-1',
         brief: {
           ask: 'Why does this test fail?',
           context: { app: 'Code', windowTitle: 'runner.test.ts', selection: 'expect(a).toBe(b)' },
@@ -178,6 +180,7 @@ describe(HAND_TO_EXPERT, () => {
         {
           expertId: 'claude-code',
           petId: 'scout',
+          turnId: 'turn-1',
           brief: { ask: 'Fix the date bug' },
           then: { expertId: 'reviewer', ask: 'Check what Claude Code changed' },
         },

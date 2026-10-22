@@ -5,6 +5,8 @@
 
 import type {
   ActivityEntry,
+  Episode,
+  EpisodeEvent,
   CalendarCheckResult,
   ConnectionState,
   ConnectionsAddParams,
@@ -43,6 +45,9 @@ export interface FakeHostBridge extends HostBridge {
   memories: MemoryEntry[];
   /** How many times the activity was listed. */
   activityReads: number;
+  /** The experience log, newest first, and each episode's events by id. */
+  episodes: Episode[];
+  episodeEvents: Record<string, EpisodeEvent[]>;
   /** Home's experts, as saved; a test reads them back after a save. */
   experts: Expert[];
   /** Every expert id tested, in order. */
@@ -84,6 +89,9 @@ export function createFakeHostBridge(
     capture?: ContextSnapshot | null;
     /** Home's activity, newest first. */
     activity?: ActivityEntry[];
+    /** The experience log, newest first. */
+    episodes?: Episode[];
+    episodeEvents?: Record<string, EpisodeEvent[]>;
     experts?: Expert[];
     /** What testing an expert answers; absent answers ready. */
     testExpert?: (expertId: string) => { ok: boolean; error?: string };
@@ -199,6 +207,30 @@ export function createFakeHostBridge(
       const last = entries.at(-1);
       const more = start + limit < fake.activity.length && last !== undefined;
       return Promise.resolve(more ? { entries, next: last.id } : { entries });
+    },
+    episodes: [...(options.episodes ?? [])],
+    episodeEvents: { ...options.episodeEvents },
+    listExperience(params = {}) {
+      const limit = params.limit ?? 30;
+      const start =
+        params.before === undefined
+          ? 0
+          : fake.episodes.findIndex((episode) => episode.id === params.before) + 1;
+      const episodes = fake.episodes.slice(start, start + limit);
+      const last = episodes.at(-1);
+      const more = start + limit < fake.episodes.length && last !== undefined;
+      return Promise.resolve(more ? { episodes, next: last.id } : { episodes });
+    },
+    clearExperience() {
+      const deleted = fake.episodes.length;
+      fake.episodes = [];
+      return Promise.resolve(deleted);
+    },
+    getExperience(id) {
+      const episode = fake.episodes.find((candidate) => candidate.id === id);
+      return Promise.resolve(
+        episode === undefined ? null : { episode, events: fake.episodeEvents[id] ?? [] },
+      );
     },
     experts: [...(options.experts ?? [])],
     testedExperts,

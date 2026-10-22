@@ -9,6 +9,8 @@ import type { ReactNode } from 'react';
 import type {
   CalendarCheckResult,
   ActivityListResult,
+  ExperienceGetResult,
+  ExperienceListResult,
   Brief,
   ConnectionState,
   ConnectionsAddParams,
@@ -103,6 +105,16 @@ export interface HostBridge {
    * shows the activity view.
    */
   listActivity?(params?: { before?: string; limit?: number }): Promise<ActivityListResult>;
+  /**
+   * Home's decisions page: the experience log, every turn and check-in with what Scout was
+   * shown, what it decided and what came of it, newest first, a page at a time. Optional, like
+   * the activity view.
+   */
+  listExperience?(params?: { before?: string; limit?: number }): Promise<ExperienceListResult>;
+  /** One episode with its tool calls and outcomes, or null once it is gone. */
+  getExperience?(id: string): Promise<ExperienceGetResult>;
+  /** Delete all: every decision and its steps. Resolves with how many went. */
+  clearExperience?(): Promise<number>;
   /**
    * Home's Experts page: the tools a companion hands work to. All optional: a host without
    * Home, such as the browser extension, never shows the page.

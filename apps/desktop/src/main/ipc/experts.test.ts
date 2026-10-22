@@ -11,6 +11,9 @@ function setup() {
   const ipc = fakeIpc();
   const engine = fakeEngine({
     'activity.list': { items: [] },
+    'experience.list': { episodes: [] },
+    'experience.get': null,
+    'experience.clear': { deleted: 4 },
     'experts.list': { experts: [EXPERT] },
     'experts.upsert': { expert: EXPERT },
     'experts.delete': { deleted: true },
@@ -34,6 +37,24 @@ describe('registerExpertIpc', () => {
       ['activity.list', { limit: 30 }],
       ['activity.list', { limit: 5, before: 'a9' }],
     ]);
+  });
+
+  it("lists Home's decisions thirty at a time, and reads one when it is opened", async () => {
+    const { invoke, calls } = setup();
+    expect(await invoke(IPC.listExperience, {})).toEqual({ episodes: [] });
+    await invoke(IPC.listExperience, { before: 'e9', limit: 5 });
+    expect(await invoke(IPC.getExperience, 'e1')).toBeNull();
+    expect(calls).toEqual([
+      ['experience.list', { limit: 30 }],
+      ['experience.list', { limit: 5, before: 'e9' }],
+      ['experience.get', { id: 'e1' }],
+    ]);
+  });
+
+  it("deletes all of Home's decisions, and says how many went", async () => {
+    const { invoke, calls } = setup();
+    expect(await invoke(IPC.clearExperience)).toBe(4);
+    expect(calls).toEqual([['experience.clear', {}]]);
   });
 
   it("reads Home's Spend card from the engine as it is", async () => {

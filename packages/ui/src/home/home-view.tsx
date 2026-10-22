@@ -1,7 +1,7 @@
 /**
  * Home: the one window for the companion, its experts and the app. Scout in the corner and
- * nine pages (overview, Scout, experts, routines, connections, activity, what Scout saw,
- * what Scout remembers, settings). Contains HomeView, HomeHost, HomeProvider, HomePage and
+ * ten pages (overview, Scout, experts, routines, connections, activity, how Scout decided,
+ * what Scout saw, what Scout remembers, settings). Contains HomeView, HomeHost, HomeProvider, HomePage and
  * the Scout page. Rendered by the desktop `home` page.
  */
 
@@ -15,6 +15,7 @@ import { SETTINGS_CSS } from '../settings/settings-styles';
 import { ActivityView } from './activity-view';
 import { brainLabel, modelLabel } from './brain-label';
 import { ConnectionsPanel } from './connections-panel';
+import { DecisionsView } from './decisions-view';
 import { ExpertsPanel } from './experts-panel';
 import { HOME_CSS } from './home-styles';
 import { RoutinesPanel } from './routines-panel';
@@ -29,6 +30,7 @@ export type HomePage =
   | 'routines'
   | 'connections'
   | 'activity'
+  | 'decisions'
   | 'sightLog'
   | 'memory'
   | 'settings';
@@ -40,6 +42,7 @@ const PAGES: readonly { id: HomePage; label: (name: string) => string }[] = [
   { id: 'routines', label: () => 'Routines' },
   { id: 'connections', label: () => 'Connections' },
   { id: 'activity', label: () => 'Activity' },
+  { id: 'decisions', label: (name) => `How ${name} decided` },
   { id: 'sightLog', label: (name) => `What ${name} saw` },
   { id: 'memory', label: (name) => `What ${name} remembers` },
   { id: 'settings', label: () => 'Settings' },
@@ -82,10 +85,10 @@ export interface HomeViewProps {
 }
 
 /**
- * Home: the one window for everything. The companion in the corner, and nine pages: an
+ * Home: the one window for everything. The companion in the corner, and ten pages: an
  * overview, how the companion thinks, the experts it hands work to, what it does on its own,
- * the apps it can use, what happened, what it looked at and sent, what it remembers, and the
- * app's settings.
+ * the apps it can use, what happened, why it decided what it did, what it looked at and sent,
+ * what it remembers, and the app's settings.
  */
 export function HomeView({
   host,
@@ -175,6 +178,7 @@ export function HomeView({
         )}
         {page === 'connections' && <ConnectionsPanel />}
         {page === 'activity' && <ActivityView name={name} scout={scout} />}
+        {page === 'decisions' && <DecisionsView name={name} />}
         {page === 'sightLog' && (
           <SightLogView
             name={name}

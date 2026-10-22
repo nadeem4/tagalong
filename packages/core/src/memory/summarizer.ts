@@ -4,6 +4,7 @@
  */
 import type { Message, Pet } from '@tagalong/protocol';
 import type { BrainProvider } from '../providers';
+import { modeSystem } from '../roles';
 import type { SettingsStore } from '../settings/settings';
 import type { MemoryStore } from './memories';
 import type { ConversationStore } from './store';
@@ -22,8 +23,10 @@ const SUMMARY_MAX_TOKENS = 400;
 /** A summary is housekeeping: if the brain has not answered in a minute, try next turn. */
 export const SUMMARY_TIMEOUT_MS = 60_000;
 
-const SUMMARY_INSTRUCTIONS = [
-  'You condense a conversation between a user and an assistant into a memory note.',
+/** The `## Summarising` block after the soul. */
+export const SUMMARY_INSTRUCTIONS = [
+  '## Summarising',
+  'An older stretch of your conversation with them is below. Fold it into a note for your own memory.',
   'Write one paragraph of plain prose, at most 120 words.',
   'Keep what will matter later: what the user was working on, decisions made, preferences the user stated, open questions.',
   'Drop greetings, filler, and anything that was only on screen for a moment.',
@@ -83,7 +86,7 @@ export class Summarizer {
       const result = await provider.complete(
         {
           model: brainPet.model,
-          system: SUMMARY_INSTRUCTIONS,
+          system: modeSystem(SUMMARY_INSTRUCTIONS),
           messages: [{ role: 'user', content: [{ type: 'text', text: transcript(folding, pet) }] }],
           maxTokens: SUMMARY_MAX_TOKENS,
         },

@@ -41,7 +41,7 @@ Home opens from the tray (**Open Tagalong**); Settings is a page in Home. A save
 used from the next question, with no restart.
 
 **The default for this guide: the Claude sign-in.** Install Claude Code, run `claude` once and sign
-in (`claude auth status` says `"loggedIn": true`). On a fresh install Scout thinks with it on Haiku.
+in (`claude auth status` says `"loggedIn": true`). On a fresh install Scout thinks with it on Sonnet.
 
 **OpenRouter + Claude.** Get a key at <https://openrouter.ai/keys>, paste it in Home → Settings →
 Advanced → API keys → OpenRouter, then on Home's **Scout** page set **Thinks with** to OpenRouter
@@ -1392,12 +1392,63 @@ monitor.
 7. **Action:** switch the setting Off and save. **Expected:** the `pick_up` row is gone and no
    pick-up is ever offered. A password manager or `.env` window in front is never named.
 
+## How Scout decided
+
+### DC.1. A question, its tools and its answer
+
+1. **Setup:** any brain (the fake one is enough: `TAGALONG_FAKE_PROVIDERS=1`).
+2. **Action:** ask Scout a question that makes it look at the screen ("what is on my screen?"),
+   then open Home → **How Scout decided**.
+3. **Expected:** the newest row reads **Scout answered**, with **You asked**, the model, a token
+   count and the time. Clicking it shows **Why it woke**, **What it was shown** (your question),
+   one **Tool** line per tool it used, and **What Scout said**. A screen tool's line (a look, a
+   window read, the window list) shows `[screen text, N characters, not kept]`, never what it read;
+   any other tool shows the first line of what came back.
+4. **Action:** ask the same with **Talk to Scout**. **Expected:** that row says **You asked out
+   loud**.
+
+### DC.2. Silence is a decision too _(real brain)_
+
+1. **Setup:** Keep an eye on things on.
+2. **Action:** open a terminal whose title says `failed`, wait for the check-in, then open the page.
+3. **Expected:** a row for the check-in: **Scout stayed quiet** or **Scout spoke up**, with **An
+   error on screen**. Opened, **What it was shown** is the message the check-in sent, keys and
+   tokens hidden, with an **App:** line but no window title, and the window's text as
+   `[screen text, N characters, not kept]`. The row's tokens are counted in Home's **Spend** too.
+
+### DC.3. What you did about it _(real brain)_
+
+1. **Action:** when Scout says something on its own, press **Not now**; reopen the page.
+2. **Expected:** that row, opened, ends with **What you did: You said Not now**. Taking an offer
+   reads **You took the offer**; sending or dismissing a hand-off card a turn showed reads **You
+   sent the hand-off** or **You dismissed the hand-off** on that turn. Pressing **Not now** a second
+   time adds nothing. **Not now** on the Pick up card reads **You said Not now** on the row of the
+   line that came with it.
+3. **Action:** press **Not now** while Scout is still thinking about a check-in. **Expected:** no
+   line shows; the row reads **Scout held a line back**, and opened shows **What Scout wrote, never
+   shown**.
+4. **Action:** take an offer from a check-in (the card shows), then send it. **Expected:** the
+   check-in's row reads **You took the offer**; no turn's row says **You sent the hand-off**.
+
+### DC.4. Delete all
+
+1. **Action:** on **How Scout decided**, press **Delete all**, then **Keep them**. **Expected:**
+   nothing is deleted.
+2. **Action:** press **Delete all**, then **Delete all for good**. **Expected:** the page shows its
+   empty note; quitting and reopening Tagalong shows it still empty.
+
+### DC.5. Thirty days, while the app stays open
+
+1. **Setup:** quit Tagalong; in `tagalong.db` set one episode's `started_at` to 31 days ago.
+2. **Action:** start Tagalong, then set another one's to 31 days ago while it runs, and wait 35
+   minutes. **Expected:** both are gone from the page, the second without a restart.
+
 ## What Scout saw
 
 ### WS.1. The page, empty
 
 1. **Setup:** a fresh install (or **Delete all** first).
-2. **Action:** open Home. **Expected:** **What Scout saw** sits between **Activity** and
+2. **Action:** open Home. **Expected:** **What Scout saw** sits between **How Scout decided** and
    **Settings**. Open it: "Scout hasn't looked at anything yet." and "Kept 7 days. Deleting removes
    this record, not what was already sent." No **Delete all** button.
 
@@ -1784,7 +1835,7 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    when Google Calendar is connected in Claude Code, writes its plan in its own folder, and never
    books anything. The tool names in `catalog.json` need this real-run check.
 
-## Scout's mind _(real brain, fast tier)_
+## Scout's mind _(real brain, balanced tier)_
 
 Scout's character is `packages/core/soul/scout.md`; the prompt has no recipes. Run each check
 three times: the wording should vary, the behaviour should not.
@@ -1852,7 +1903,7 @@ three times: the wording should vary, the behaviour should not.
    (c) one `[listening] paused: a full-screen window in front (<app>)` line and one
    `[listening] resumed` line, with the app's process name and never a window title.
 
-## J. Background jobs and the task board _(real brain, fast tier)_
+## J. Background jobs and the task board _(real brain, balanced tier)_
 
 Scout's own jobs are background Scout turns (`packages/core/src/jobs/`). Run each check three
 times: the wording should vary, the behaviour should not.
@@ -1878,7 +1929,7 @@ times: the wording should vary, the behaviour should not.
 8. **Forget a job.** "Scout, forget the pricing job." **Expected:** `forget` deletes the finished
    job and its conversation, with no card; it is gone from the board.
 
-## Arrivals: finished work together _(real brain, fast tier)_
+## Arrivals: finished work together _(real brain, balanced tier)_
 
 Finished jobs and hand-offs are gathered (`packages/core/src/check-in/arrivals.ts`): one check-in
 20 s after the latest finishes (60 s at most), held during a call, a full-screen app or while you
@@ -1906,7 +1957,7 @@ by hand, check that it is one line and that the order is the mind's. Run each th
 7. **Not batched.** A watch firing or a routine result during the wait. **Expected:** each comes
    at once through its own channel, as before.
 
-## D. Memory digest, recall and retention _(real brain, fast tier)_
+## D. Memory digest, recall and retention _(real brain, balanced tier)_
 
 The daily digest (`packages/core/src/memory/digest.ts`), one recall path and the retention
 numbers. To avoid waiting a day, quit Tagalong and move the last `digest` row's `finished_at` in

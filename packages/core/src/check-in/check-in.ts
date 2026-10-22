@@ -27,12 +27,19 @@ import type { PerceptionHost } from '../perception';
 import type { Recalled } from '../memory/recall';
 import { gatherNow, safe, type NowSources } from '../conversation/now';
 import { hideSecrets } from '../privacy/secrets';
-import { soul } from '../roles';
+import { modeSystem } from '../roles';
 import { Lookout, blind, callOrFullScreenInFront } from '../keep-an-eye/lookout';
 import type { PickUpReady } from '../pick-up/pick-up';
+import type { CheckInEpisode, ExperienceLog } from '../memory/experience';
 import { ActiveTime } from './active-time';
 import type { Arrival } from './arrivals';
-import { RECENT_LINES, WINDOW_TEXT_CHARS, renderBundle, type BundleReason } from './bundle';
+import {
+  RECENT_LINES,
+  WINDOW_TEXT_CHARS,
+  renderBundle,
+  type BundleInput,
+  type BundleReason,
+} from './bundle';
 import { CHECK_IN_INSTRUCTIONS, CHECK_IN_TIMEOUT_MS, askMind, type CheckInReply } from './reply';
 
 /** At most one unprompted check-in in this long, spoken or not. */
@@ -87,6 +94,8 @@ export interface CheckInOptions {
   ) => void;
   /** The daily budget gate: true stops every check-in. */
   spentOut: () => boolean;
+  /** Where every decision, silence included, and what the person did about it is kept. */
+  experience?: Pick<ExperienceLog, 'checkIn' | 'outcome'> | undefined;
   log?: (message: string) => void;
   timeoutMs?: number;
 }
@@ -124,6 +133,11 @@ export class CheckIn {
   #day = { key: '', calls: 0 };
   readonly #recent: string[] = [];
   #offer: Offer | null = null;
+  /**
+   * The last line shown, which Not now answers once: on the bubble, or on the Pick up card
+   * (`pickUp`) when the line rode with it. Cleared once an outcome is recorded.
+   */
+  #lastRemark: { id: string; pickUp: boolean } | null = null;
   #tired = false;
 
   constructor(options: CheckInOptions) {
@@ -240,7 +254,13 @@ export class CheckIn {
   /** "Not now": unprompted check-ins wait an hour. Finished work still comes. */
   notNow(): Date {
     this.#quietUntil = this.#o.clock.now() + NOT_NOW_MS;
+    if (this.#lastRemark !== null) this.#outcome(this.#lastRemark.id, 'not-now');
     return new Date(this.#quietUntil);
+  }
+
+  /** The Pick up card's own Not now: recorded against the line that rode with it, if any. */
+  pickUpDismissed(): void {
+    if (this.#lastRemark?.pickUp === true) this.#outcome(this.#lastRemark.id, 'not-now');
   }
 
   /** The person took an offer: its brief goes to the hand-off card, unsent. */
@@ -252,6 +272,7 @@ export class CheckIn {
       .find((candidate) => candidate.enabled && candidate.id === offer.expertId);
     if (expert === undefined) return false;
     this.#offer = null;
+    this.#outcome(remarkId, 'accepted');
     // Read now, on the click, and never before: the end of the window, secrets hidden.
     const windowText = offer.window === undefined ? null : await this.#readEnd(offer.window);
     const brief: Brief =
@@ -310,21 +331,34 @@ export class CheckIn {
       this.#day.calls += 1;
       // Every call but finished work's starts the cooldown, a launch's included.
       if (kind !== 'finished') this.#lastUnpromptedAt = now;
+      const facts = this.#facts(pet, wake, settings);
+      const bundle = renderBundle(facts);
+      let usage: { inputTokens: number; outputTokens: number } | undefined;
       const reply = await askMind({
         pet,
-        summarizer: settings.summarizer,
         provider: this.#o.provider,
-        system: `${soul()}\n\n${CHECK_IN_INSTRUCTIONS}`,
-        bundle: this.#bundle(pet, wake, settings),
+        system: modeSystem(CHECK_IN_INSTRUCTIONS),
+        bundle,
         timeoutMs: this.#o.timeoutMs ?? CHECK_IN_TIMEOUT_MS,
+        onUsage: (spent) => (usage = spent),
         ...(this.#o.log === undefined ? {} : { log: this.#o.log }),
       });
-      if (reply === null) return true;
-      // Not now may have been pressed, or the pet gone, while the mind was writing.
-      if (held && this.#o.clock.now() < this.#quietUntil) return true;
-      const speaker = this.#o.pet();
-      if (speaker === null) return true;
-      this.#deliver(speaker, wake, reply);
+      const remarkId = randomUUID();
+      // What was shown decides what is recorded: a line nobody saw never `spoke`.
+      let decision: CheckInEpisode['decision'] =
+        reply === null ? 'no-answer' : reply.text === undefined ? 'quiet' : 'held';
+      let shownOffer: string | undefined;
+      try {
+        // Not now may have been pressed, or the pet gone, while the mind was writing.
+        const cutOff = held && this.#o.clock.now() < this.#quietUntil;
+        const speaker = reply === null || cutOff ? null : this.#o.pet();
+        if (reply !== null && speaker !== null) {
+          shownOffer = this.#deliver(speaker, wake, reply, remarkId);
+          if (reply.text !== undefined) decision = shownOffer === undefined ? 'spoke' : 'offered';
+        }
+      } finally {
+        this.#record(pet, wake, facts, reply, remarkId, decision, shownOffer, usage);
+      }
     } catch (error) {
       // A store closed under it (quit), a source that throws: silence, never a crash.
       this.#o.log?.(`check-in: ${String(error)}`);
@@ -334,8 +368,9 @@ export class CheckIn {
     return true;
   }
 
-  #bundle(pet: Pet, wake: Wake, settings: Settings): string {
-    return renderBundle({
+  /** What the mind is shown, gathered once: sent as it is, and kept without screen text. */
+  #facts(pet: Pet, wake: Wake, settings: Settings): BundleInput {
+    return {
       reason: wake.reason,
       now: gatherNow(this.#o.now, pet.id, { kind: 'check-in' }),
       ...safe(() => this.#o.memories(recallQuery(wake.reason)), {
@@ -346,12 +381,56 @@ export class CheckIn {
       lastExchange: safe(() => this.#o.lastExchange(), null),
       activeMs: settings.wellbeing.enabled ? this.#activeMs : null,
       experts: this.#o.experts(),
-      recent: this.#recent,
+      recent: [...this.#recent],
       exclusions: settings.captureExclusions,
-    });
+    };
   }
 
-  #deliver(pet: Pet, wake: Wake, reply: CheckInReply): void {
+  /**
+   * What the mind decided and what was shown of it, kept whether or not anything was. The kept
+   * bundle has no screen text or window titles. A failed write is never a crash.
+   */
+  #record(
+    pet: Pet,
+    wake: Wake,
+    facts: BundleInput,
+    reply: CheckInReply | null,
+    remarkId: string,
+    decision: CheckInEpisode['decision'],
+    offer: string | undefined,
+    usage: { inputTokens: number; outputTokens: number } | undefined,
+  ): void {
+    if (this.#o.experience === undefined) return;
+    try {
+      this.#o.experience.checkIn({
+        ref: remarkId,
+        petId: pet.id,
+        trigger: wake.reason.kind,
+        model: pet.model,
+        input: renderBundle({ ...facts, forLog: true }),
+        decision,
+        said: reply?.text,
+        note: offer,
+        inputTokens: usage?.inputTokens,
+        outputTokens: usage?.outputTokens,
+      });
+    } catch (error) {
+      this.#o.log?.(`check-in: the experience log did not take it: ${String(error)}`);
+    }
+  }
+
+  #outcome(remarkId: string, name: string): void {
+    // Each line is answered once: a second Not now records nothing.
+    if (this.#lastRemark?.id === remarkId) this.#lastRemark = null;
+    try {
+      this.#o.experience?.outcome(remarkId, name);
+    } catch (error) {
+      this.#o.log?.(`check-in: the experience log did not take it: ${String(error)}`);
+    }
+  }
+
+  /** Shows the reply. Returns the offer shown as a button, if one was. */
+  #deliver(pet: Pet, wake: Wake, reply: CheckInReply, remarkId: string): string | undefined {
     if (reply.mood === 'tired') {
       if (this.#o.settings().wellbeing.enabled) {
         this.#tired = true;
@@ -361,21 +440,22 @@ export class CheckIn {
       this.#mood(pet.id, reply.mood);
     }
     // Silence tells nothing: what finished stays "not mentioned yet" in Now.
-    if (reply.text === undefined) return;
+    if (reply.text === undefined) return undefined;
     if (wake.jobIds !== undefined && wake.jobIds.length > 0) this.#o.reported?.(wake.jobIds);
 
     this.#recent.push(reply.text);
     if (this.#recent.length > RECENT_LINES) this.#recent.shift();
     if (wake.pickUp !== undefined) {
-      // The line rides with the Pick up card; the card is the offer.
+      // The line rides with the Pick up card; the card is the offer, and its Not now answers it.
       this.#offer = null;
+      this.#lastRemark = { id: remarkId, pickUp: true };
       this.#o.emit({
         method: 'pickUp.ready',
         params: { text: reply.text, items: wake.pickUp.items },
       });
-      return;
+      return undefined;
     }
-    const remarkId = randomUUID();
+    this.#lastRemark = { id: remarkId, pickUp: false };
     // Finished work gets no offer; a hand-off back on its own is tied to its line.
     if (wake.reason.kind === 'finished') {
       this.#offer = null;
@@ -388,7 +468,7 @@ export class CheckIn {
           ...(wake.handoffId === undefined ? {} : { handoffId: wake.handoffId }),
         },
       });
-      return;
+      return undefined;
     }
     const expert = reply.offer === undefined ? undefined : this.#expertFor(reply.expertId);
     this.#offer =
@@ -404,6 +484,7 @@ export class CheckIn {
         ...(this.#offer === null ? {} : { offer: this.#offer.brief.ask }),
       },
     });
+    return this.#offer?.brief.ask;
   }
 
   /** The expert the mind named, if it is on; else the only one on; else none (no guessing). */
