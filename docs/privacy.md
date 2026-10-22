@@ -659,6 +659,36 @@ characters, not kept]` instead. Window titles, and the branch and file names rea
   and its steps at once. Deleting a memory does not go back through old episodes: those go after 30
   days, or with Delete all.
 
+## What Scout learned: its own notes, and sleep
+
+Scout keeps notes about you and about itself: who you are and how you like to be helped
+(`you.md`), what it does differently now (`lessons.md`), what it promised to follow up on
+(`commitments.md`) and procedures that worked (`skills`).
+
+- **Where they live.** Plain files in `%APPDATA%\Tagalong\self`, on this computer. Keys, tokens and
+  passwords are hidden before anything is written.
+- **You decide what lasts.** In a conversation Scout can update you.md and commitments.md at once
+  (you can undo it). A new lesson or skill, and every change sleep makes, is only a **proposal**:
+  it is not used until you **Accept** it in **Home → What Scout learned**, where its text is shown.
+  **Reject** keeps it on record, unused. A proposal made before the page last changed cannot be
+  accepted, so accepting never quietly undoes a later change. A routine's own turn cannot change the notes at all.
+- **Every change is kept.** Each version records who made it (you, Scout in a conversation, or Scout
+  while sleeping), when and why, and its text, so What Scout learned can open it and undo the
+  newest. Your own edits, including edits to the files by hand, have secrets hidden and are cut to
+  the page's limit. Deleting the folder removes the notes; the versions stay in `tagalong.db` until
+  you delete that too.
+- **What goes to the AI.** The notes go with every question and check-in, at most 9,000
+  characters.
+- **Sleep.** Once a day, while you are away (30 minutes with no input and no conversation; when
+  gentle nudges are off and Tagalong has no idle time, 30 minutes since you last talked and since
+  it started), Scout sends its AI one more message:
+  - its notes, each skill by its first line only;
+  - one line for each of its recent decisions (up to 80): what woke it, what it was asked and
+    said, the tools it used, and what you did about it.
+
+  It sends no screen text and no pictures. The reply can propose changes to at most four pages;
+  each waits in What Scout learned for you to accept or reject.
+
 ## Spend: what the cost meter keeps
 
 Every model call Scout makes and every expert run is counted in the local database, for Home's

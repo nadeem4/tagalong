@@ -296,19 +296,37 @@ export class ExperienceLog {
     return rows.length > limit && last !== undefined ? { episodes, next: last.id } : { episodes };
   }
 
+  /**
+   * Episodes that ended after `iso`, oldest first, each with its events: what sleep reads.
+   * At most `limit`, the newest kept when there are more.
+   */
+  since(iso: string, limit: number): { episode: Episode; events: EpisodeEvent[] }[] {
+    const rows = this.db
+      .prepare<[string, number], EpisodeRow>(
+        `SELECT * FROM (SELECT rowid AS n, * FROM episodes WHERE ended_at > ?
+                        ORDER BY rowid DESC LIMIT ?)
+         ORDER BY n`,
+      )
+      .all(iso, limit);
+    return rows.map((row) => ({ episode: toEpisode(row), events: this.#events(row.id) }));
+  }
+
   get(id: string): ExperienceGetResult {
     const row = this.db
       .prepare<[string], EpisodeRow>('SELECT * FROM episodes WHERE id = ?')
       .get(id);
     if (row === undefined) return null;
-    const events = this.db
+    return { episode: toEpisode(row), events: this.#events(id) };
+  }
+
+  #events(episodeId: string): EpisodeEvent[] {
+    return this.db
       .prepare<[string], EventRow>(
         `SELECT kind, name, input, result, ok, at FROM episode_events
          WHERE episode_id = ? ORDER BY id`,
       )
-      .all(id)
+      .all(episodeId)
       .map(toEvent);
-    return { episode: toEpisode(row), events };
   }
 
   /** At boot nothing runs, so an episode still open was cut short by a quit or a crash. */

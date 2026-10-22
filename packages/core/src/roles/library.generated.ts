@@ -42,7 +42,9 @@ export const ROLE_LIBRARY: readonly Role[] = [
       "work_on_it",
       "board",
       "open_result",
-      "stop_work"
+      "stop_work",
+      "self_read",
+      "self_write"
     ],
     "model": {
       "tier": "balanced",

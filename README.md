@@ -315,7 +315,7 @@ change works at once.
 ## Home: one window for everything
 
 Right-click the tray icon and choose **Open Tagalong**. The tray has only four items: **Open
-Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in ten pages:
+Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in eleven pages:
 
 - **Overview**: whether Scout is ready and what it thinks with, your experts, what was spent today
   and this month (**Spend**), and the latest activity. Spend shows dollars for models with a known
@@ -388,6 +388,15 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   expert, as metadata only, grouped by day. Delete a row, or **Delete all**.
 - **What Scout remembers**: its facts, preferences and conversation summaries, newest first.
   Delete any one.
+- **What Scout learned**: Scout's own notes, the pages it keeps about you (**you.md**), what it
+  does differently now (**lessons.md**), what it promised to follow up on (**commitments.md**)
+  and procedures that worked (**skills**). In a conversation Scout updates you.md and
+  commitments.md at once; a new lesson or skill, and everything from **sleep** (once a day, while
+  you are away, Scout reads back what it did and what you made of it), arrives as a **proposed**
+  change you **Accept** or **Reject**, with its text shown. Each page says how many changes wait
+  on you. Every change shows who made it and why, and opens to its text; the newest one has
+  **Undo**. Edit any page and **Save** (a page longer than it holds is cut to fit, and says so).
+  The pages are plain files in `%APPDATA%\Tagalong\self`.
 - **Settings**, in seven sections. Press ⓘ beside a setting for the longer story.
   - **How Scout thinks**: Scout's real brain, and whether your Claude Code sign-in works (checked
     locally with `claude auth status`). Without Claude Code you pick a service and paste its key,

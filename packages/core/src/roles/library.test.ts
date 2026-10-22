@@ -43,6 +43,8 @@ const BUILT_IN_TOOLS = [
   'board',
   'open_result',
   'stop_work',
+  'self_read',
+  'self_write',
   // A group: every tool of the person's connected apps.
   'connections',
 ];
@@ -76,7 +78,9 @@ describe('the role files', () => {
   it('give the companion hand_to_expert and nothing that writes files or runs code', () => {
     const tools = getRole('companion')?.tools ?? [];
     expect(tools).toContain('hand_to_expert');
-    expect(tools.filter((tool) => /write|edit|file|run|exec|shell|command/.test(tool))).toEqual([]);
+    // self_write writes only Scout's own notes, pages it names inside the data folder.
+    const own = tools.filter((tool) => tool !== 'self_write');
+    expect(own.filter((tool) => /write|edit|file|run|exec|shell|command/.test(tool))).toEqual([]);
   });
 
   it('give the companion the watch and screen-memory tools', () => {

@@ -11,6 +11,8 @@ import type {
   ActivityListResult,
   ExperienceGetResult,
   ExperienceListResult,
+  SelfGetResult,
+  SelfListResult,
   CalendarCheckResult,
   CatalogStatus,
   ConnectionState,
@@ -84,6 +86,20 @@ const bridge: HostBridge = {
   getExperience: (id: string) =>
     ipcRenderer.invoke(IPC.getExperience, id) as Promise<ExperienceGetResult>,
   clearExperience: () => ipcRenderer.invoke(IPC.clearExperience) as Promise<number>,
+  listSelf: () => ipcRenderer.invoke(IPC.listSelf) as Promise<SelfListResult>,
+  getSelf: (path: string) => ipcRenderer.invoke(IPC.getSelf, path) as Promise<SelfGetResult>,
+  writeSelf: (path: string, text: string) =>
+    ipcRenderer.invoke(IPC.writeSelf, path, text) as Promise<{
+      ok: boolean;
+      reason?: string;
+      note?: string;
+    }>,
+  undoSelf: (versionId: number) =>
+    ipcRenderer.invoke(IPC.undoSelf, versionId) as Promise<{ ok: boolean; reason?: string }>,
+  acceptSelf: (versionId: number) =>
+    ipcRenderer.invoke(IPC.acceptSelf, versionId) as Promise<{ ok: boolean; reason?: string }>,
+  rejectSelf: (versionId: number) =>
+    ipcRenderer.invoke(IPC.rejectSelf, versionId) as Promise<{ ok: boolean; reason?: string }>,
   listExperts: () => ipcRenderer.invoke(IPC.listExperts) as Promise<Expert[]>,
   saveExpert: (expert: Expert) => ipcRenderer.invoke(IPC.saveExpert, expert) as Promise<Expert>,
   deleteExpert: (expertId: string) =>

@@ -16,6 +16,20 @@ import {
   ExperienceListParams,
   ExperienceListResult,
 } from './experience';
+import {
+  SelfAcceptParams,
+  SelfAcceptResult,
+  SelfGetParams,
+  SelfGetResult,
+  SelfListParams,
+  SelfListResult,
+  SelfRejectParams,
+  SelfRejectResult,
+  SelfUndoParams,
+  SelfUndoResult,
+  SelfWriteParams,
+  SelfWriteResult,
+} from './self';
 import { UsageSummaryParams, UsageSummaryResult } from './usage';
 import {
   ConnectionsAddParams,
@@ -520,6 +534,12 @@ export const hostToCoreMethods = {
   'experience.list': { params: ExperienceListParams, result: ExperienceListResult },
   'experience.get': { params: ExperienceGetParams, result: ExperienceGetResult },
   'experience.clear': { params: ExperienceClearParams, result: ExperienceClearResult },
+  'self.list': { params: SelfListParams, result: SelfListResult },
+  'self.get': { params: SelfGetParams, result: SelfGetResult },
+  'self.write': { params: SelfWriteParams, result: SelfWriteResult },
+  'self.undo': { params: SelfUndoParams, result: SelfUndoResult },
+  'self.accept': { params: SelfAcceptParams, result: SelfAcceptResult },
+  'self.reject': { params: SelfRejectParams, result: SelfRejectResult },
   'experts.list': { params: ExpertsListParams, result: ExpertsListResult },
   'experts.upsert': { params: ExpertsUpsertParams, result: ExpertsUpsertResult },
   'experts.delete': { params: ExpertsDeleteParams, result: ExpertsDeleteResult },

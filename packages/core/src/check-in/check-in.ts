@@ -67,6 +67,8 @@ export interface CheckInOptions {
   windows: () => Promise<readonly WindowEntry[] | null>;
   experts: () => readonly Expert[];
   now: NowSources;
+  /** Scout's own notes (the Self), rendered. */
+  notes?: (() => string) | undefined;
   /** `recall` with the words of why it woke: the one path every prompt uses. */
   memories: (query: string) => Recalled;
   /** The last question and answer, or null before the first. */
@@ -373,6 +375,7 @@ export class CheckIn {
     return {
       reason: wake.reason,
       now: gatherNow(this.#o.now, pet.id, { kind: 'check-in' }),
+      notes: safe(() => this.#o.notes?.() ?? '', ''),
       ...safe(() => this.#o.memories(recallQuery(wake.reason)), {
         memories: [],
         recentWork: [],

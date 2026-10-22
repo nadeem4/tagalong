@@ -83,6 +83,27 @@ describe('recall in a turn', () => {
     expect(requests[0]?.system).not.toContain('Prefers short answers');
   });
 
+  it('sends the pet’s own notes, read fresh each turn, and still answers when they fail', async () => {
+    const requests: BrainRequest[] = [];
+    let notes = '## Your notes\n~~~text\n### you.md\nWorks on Tagalong.\n~~~';
+    const turns = new ConversationRunner({
+      store: new ConversationStore(db),
+      settings: new SettingsStore(dir),
+      provider: recordingFake({ text: 'ok' }, requests),
+      emit: (event) => events.push(event),
+      notes: () => {
+        if (notes === 'broken') throw new Error('disk gone');
+        return notes;
+      },
+    });
+    await turns.run({ pet: scout, text: 'hello' }).done;
+    expect(question(requests[0])).toContain('Works on Tagalong.');
+    expect(requests[0]?.system).not.toContain('Works on Tagalong.');
+    notes = 'broken';
+    const outcome = await turns.run({ pet: scout, text: 'again' }).done;
+    expect(outcome.stopReason).toBe('end');
+  });
+
   it('adds a recent job of its own that matches the question', async () => {
     const requests: BrainRequest[] = [];
     const turns = new ConversationRunner({

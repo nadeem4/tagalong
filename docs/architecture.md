@@ -1564,7 +1564,7 @@ in the preload's `HostBridge` and hands it a `HomeHost` (the companion's id, the
 on, the model list, `savePet`) and the settings form as a slot.
 
 `HomeView` is a navy side menu, with the companion's figure (Bean's idle frame, still; the host
-passes the clip as `scout`, and Activity draws it on each entry too) and name, and ten pages:
+passes the clip as `scout`, and Activity draws it on each entry too) and name, and eleven pages:
 
 - **Overview**: the companion (its state, the provider and model it thinks with), the experts (on or
   off, read-only or allowed to edit) and the three most recent activity entries, each with a button
@@ -1592,6 +1592,14 @@ passes the clip as `scout`, and Activity draws it on each entry too) and name, a
 - **What Scout saw**: `SightLogView`; see [What Scout saw](#what-scout-saw). The days it keeps come
   from `HomeHost.setup().sightLogDays`.
 - **What Scout remembers**: `MemoryView`; see [What Scout remembers](#what-scout-remembers).
+- **What Scout learned**: `LearnedView` (`home/learned-view.tsx`): the pages, each with how many
+  proposals wait on it, the open page as a text box with **Save** (`writeSelf` → `self.write`,
+  author `person`; a clipped edit shows the result's `note`), and its versions newest first with
+  who, why and state. A proposed version shows its text with **Accept** and **Reject**
+  (`acceptSelf` → `self.accept`, `rejectSelf` → `self.reject`); any other opens to its text with
+  **Show text**; only the newest applied one has **Undo** (`undoSelf` → `self.undo`). A failed call
+  shows "Not saved: …" (and so on) beside Save. The last night comes from `self.list`; a failed one
+  reads "Last sleep failed: <reason>". See [The Self](#the-self).
 - **Settings**: the host's settings form (`SettingsPage embedded`), described under
   [The Settings window](#the-settings-window).
 
@@ -1728,6 +1736,80 @@ digest check (`Digest`'s `tidy`, every 30 minutes). `experience.list { before?, 
 answers `{ episodes, next? }`, newest first; `experience.get { id }` answers `{ episode, events }`
 or null; `experience.clear {}` (Delete all) deletes every episode and event and answers
 `{ deleted }`. Deleting a memory does not scrub old episodes.
+
+### The Self
+
+Scout's own notes about the person and itself ([the mind](concepts/mind.md)), built in
+`packages/core/src/self/`.
+
+- **Pages.** `SelfStore` keeps them as plain Markdown files in `<dataDir>/self`:
+  - `you.md` (6,000 characters at most);
+  - `lessons.md` (6,000);
+  - `commitments.md` (3,000);
+  - up to 20 `skills/<lowercase-words>.md` (4,000 each).
+
+  No other path can be written. Text passes `hideSecrets`. Scout's or sleep's page over its limit
+  is refused with the numbers; the person's own text (Home, a hand edit, an undo) is clipped to the
+  limit instead, never refused. An empty skill is deleted.
+
+- **Versions.** Every change is a row in `self_versions` (migration 24): `path`, the whole text,
+  `author` (`person`, `scout` or `sleep`), `why`, `ref` (the turn id for a change made in a turn),
+  `at`, `state` and `accepted_by`. A file edited outside Tagalong is noticed on the next read and
+  kept as the person's version, secrets hidden and clipped, with the file put in step.
+  `undo(versionId)` works only on a page's newest `applied` version: it writes back the applied
+  text before it as a new version (clipped if an old one is over today's limit); older versions
+  are read-only.
+- **Proposals: persistent authority is the person's.** `write` applies a change at once only when
+  the person makes it, or when Scout changes `you.md` or `commitments.md` in a conversation. Every
+  change from `sleep`, and Scout's changes to `lessons.md` and skills, is stored as `proposed`: not
+  applied, not in the file, not in the notes. `accept(versionId)` applies it as a new `applied`
+  version (author and why kept, `accepted_by` `person`) and marks the proposal `accepted`;
+  `reject(versionId)` marks it `rejected`. A proposal made before the page's newest applied
+  version is refused on accept (it is a whole page and would undo that change); it can still be
+  rejected. `list()` counts each page's waiting proposals and lists a proposed new skill (no file
+  yet) so it can be opened; `pages()` leaves it out until it is accepted.
+- **On every turn and check-in.** `renderNotes` puts `## Your notes` on the question, ahead of
+  "What you remember", and in the check-in bundle:
+  - the pages with text, each under `### <path>`, then each skill by its first line (at most 120
+    characters), the skills section capped at 2,000 characters with a count of the rest;
+  - one fence, marked as data;
+  - at most 9,000 characters in all, the longest page cut first, so `you.md` and `lessons.md`
+    keep a fair share.
+
+  A failed read is no notes, never a failed turn.
+
+- **Tools.** `self_read` lists the pages or reads one. `self_write` replaces a whole page as
+  `scout`, with its `why` and the turn's id; for `lessons.md` or a skill it answers that the change
+  is proposed. A routine's own turn gets `self_read` only, and a job's own turn neither (it keeps
+  only reading tools).
+- **Sleep** (`self/sleep.ts`).
+  - **When.** Checks 10 minutes after boot, then every 30 minutes. It runs when Scout is idle (no
+    turn of theirs, no job), the person is away, within budget, at least 20 hours after the last
+    night that worked, at most twice a local day, and only with at least 5 of their conversations
+    (episodes of mode `turn`; check-ins do not count) since the last night.
+  - **Away.** 30 minutes without input and without a conversation. The input is the system idle
+    time the wellbeing tick sends (`wellbeing.observe` → `Sleep.observeIdle`), trusted while under
+    3 minutes old; without one (gentle nudges off), the time since the app started stands in for
+    it. The conversation is the engine's last ended foreground turn (`lastTalkAt`).
+  - **What it reads.** Scout's own model (never the summaries model), in `modeSystem` with
+    `SLEEP_INSTRUCTIONS`. The bundle holds the core pages as they are, each skill by its name and
+    first line only, and the newest 80 episodes since the last night, one line each: when, mode and
+    trigger, decision, what was asked and said, the tools, and the outcomes. All of it is fenced as
+    data with secrets hidden. `maxTokens` is 12,000: room for four whole pages.
+  - **The reply.** JSON `{ changes: [{ path, text, why }] }`. Code proposes at most four changes,
+    only to real pages, never emptying a core page, never rewriting an unchanged one, and skipping
+    (and logging) a page whose text changed since the bundle was built. Every change is a proposal
+    (see above); nothing sleep writes is applied until the person accepts it.
+  - **The record.** Each night is a `self_sleeps` row: `running`, `done` with "Proposed …" or
+    "Nothing to propose.", or `error` with the reason (a `max_tokens` stop reads "the night ran out
+    of room before it finished").
+- **Methods.**
+  - `self.list` answers `{ pages, nights }` (the last five nights).
+  - `self.get { path }` answers `{ path, text, versions }`, or null.
+  - `self.write { path, text }` writes as `person`; `{ ok, reason?, note? }`, `note` when it was
+    clipped.
+  - `self.undo { versionId }`, the newest applied version only.
+  - `self.accept { versionId }` and `self.reject { versionId }`, a proposal only.
 
 ### What Scout saw
 

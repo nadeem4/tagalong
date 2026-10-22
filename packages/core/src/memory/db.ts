@@ -251,6 +251,32 @@ const MIGRATIONS: readonly Migration[] = [
    CREATE INDEX IF NOT EXISTS jobs_state ON jobs(state, created_at);`,
   addMemoryOrigin,
   addExperienceLog,
+  // Migration 24. The Self: every version of every page of Scout's notes (the files in
+  // <dataDir>/self are the current text), with who wrote it (the person, Scout in a turn, or
+  // sleep), why, and the turn it came from; and each night's sleep. Written by SelfStore and
+  // Sleep. A version is `applied` (it was the page's text), or a `proposed` change the person
+  // has not decided on yet, then `accepted` (applied again as a new version, `accepted_by`
+  // them) or `rejected`.
+  `CREATE TABLE IF NOT EXISTS self_versions (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     path TEXT NOT NULL,
+     text TEXT NOT NULL,
+     author TEXT NOT NULL CHECK (author IN ('person', 'scout', 'sleep')),
+     why TEXT NOT NULL,
+     ref TEXT,
+     at TEXT NOT NULL,
+     state TEXT NOT NULL DEFAULT 'applied'
+       CHECK (state IN ('applied', 'proposed', 'accepted', 'rejected')),
+     accepted_by TEXT CHECK (accepted_by IS NULL OR accepted_by = 'person')
+   );
+   CREATE INDEX IF NOT EXISTS self_versions_path ON self_versions(path, id);
+   CREATE TABLE IF NOT EXISTS self_sleeps (
+     id TEXT PRIMARY KEY,
+     state TEXT NOT NULL CHECK (state IN ('running', 'done', 'error')),
+     started_at TEXT NOT NULL,
+     finished_at TEXT,
+     note TEXT
+   );`,
 ];
 
 /** The columns migration 7 gave `activity`, in order. */

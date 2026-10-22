@@ -18,6 +18,7 @@ import {
   type JobToolDeps,
 } from './builtin/jobs';
 import { forgetTool, rememberTool } from './builtin/memory';
+import { selfReadTool, selfWriteTool, type SelfToolDeps } from './builtin/self';
 import {
   enabledExperts,
   handToExpertTool,
@@ -73,6 +74,8 @@ export interface ToolRegistryOptions {
    * `work_on_it`, `board`, `open_result`, `stop_work`.
    */
   jobs?: JobToolDeps | undefined;
+  /** Gives a pet whose role lists them `self_read` and `self_write`: its own notes. */
+  self?: SelfToolDeps | undefined;
   /** Defaults to `toolsFor`: the tools its role lists. */
   toolsFor?: ToolFilter | undefined;
 }
@@ -175,6 +178,11 @@ export class ToolRegistry {
     if (jobs && turn.routine === undefined) tools.push(workOnItTool(jobs));
     if (jobs) tools.push(boardTool(jobs), openResultTool(jobs));
     if (jobs && turn.routine === undefined) tools.push(stopWorkTool(jobs));
+    // The notes are the person's: a routine's own turn reads them but changes none.
+    if (this.#options.self) tools.push(selfReadTool(this.#options.self));
+    if (this.#options.self && turn.routine === undefined) {
+      tools.push(selfWriteTool(this.#options.self));
+    }
     return tools;
   }
 }

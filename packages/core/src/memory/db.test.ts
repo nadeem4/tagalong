@@ -74,6 +74,8 @@ describe('openDatabase', { timeout: 20_000 }, () => {
         'projects',
         'routines',
         'schema_version',
+        'self_sleeps',
+        'self_versions',
         'sight_log',
         'sight_log_fts',
         'sight_log_fts_config',
@@ -649,7 +651,7 @@ describe('migrate', () => {
   it('adds the experience log in migration 23: episodes, and events that go with them', () => {
     const db = new Database(':memory:');
     try {
-      expect(LATEST_SCHEMA_VERSION).toBe(23);
+      expect(LATEST_SCHEMA_VERSION).toBeGreaterThanOrEqual(23);
       migrate(db);
       db.pragma('foreign_keys = ON');
       db.prepare(
@@ -665,7 +667,7 @@ describe('migrate', () => {
       expect(db.prepare('SELECT COUNT(*) AS n FROM episode_events').get()).toEqual({ n: 0 });
       // Rerunning 23 on its own is harmless.
       db.prepare('DELETE FROM schema_version WHERE version >= 23').run();
-      expect(migrate(db)).toBe(23);
+      expect(migrate(db, 23)).toBe(23);
       const columns = () =>
         db
           .prepare<[], { name: string }>('PRAGMA table_info(episode_events)')
@@ -679,8 +681,32 @@ describe('migrate', () => {
            kind TEXT NOT NULL, name TEXT NOT NULL, input TEXT, result TEXT, ok INTEGER, at TEXT NOT NULL)`,
       );
       db.prepare('DELETE FROM schema_version WHERE version >= 23').run();
-      expect(migrate(db)).toBe(23);
+      expect(migrate(db, 23)).toBe(23);
       expect(columns()).toContain('call_id');
+    } finally {
+      db.close();
+    }
+  });
+
+  it('adds the Self in migration 24: page versions by author and state, and sleeps', () => {
+    const db = new Database(':memory:');
+    try {
+      expect(LATEST_SCHEMA_VERSION).toBe(24);
+      migrate(db);
+      const version = db.prepare(
+        `INSERT INTO self_versions (path, text, author, why, at) VALUES ('you.md', 'x', ?, 'y', 'z')`,
+      );
+      version.run('sleep');
+      expect(() => version.run('stranger')).toThrow();
+      // Applied unless it says otherwise; a proposal is kept until they decide.
+      expect(db.prepare('SELECT state, accepted_by FROM self_versions').get()).toEqual({
+        state: 'applied',
+        accepted_by: null,
+      });
+      expect(() => db.prepare(`UPDATE self_versions SET state = 'maybe'`).run()).toThrow();
+      db.prepare(`UPDATE self_versions SET state = 'proposed'`).run();
+      db.prepare('DELETE FROM schema_version WHERE version >= 24').run();
+      expect(migrate(db)).toBe(24);
     } finally {
       db.close();
     }

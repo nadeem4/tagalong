@@ -55,6 +55,11 @@ function everything(overrides: Partial<ToolRegistryOptions> = {}): ToolRegistryO
       cancelHandoff: () => false,
       stopWatch: () => false,
     },
+    self: {
+      list: () => [],
+      read: () => '',
+      write: () => ({ ok: true as const, versionId: 1, proposed: false, clipped: false }),
+    },
     // Every wired tool: what the role library narrows is the toolsFor tests' business.
     toolsFor: (_pet, tools) => tools,
     ...overrides,
@@ -82,6 +87,8 @@ const ALL_TOOLS = [
   'board',
   'open_result',
   'stop_work',
+  'self_read',
+  'self_write',
 ];
 
 const ROUTINE = { routineId: 'r', name: 'Routine', handedOff: () => undefined };
@@ -118,6 +125,18 @@ describe('ToolRegistry on background turns', () => {
     expect(names).toContain('open_result');
     expect(names).not.toContain('work_on_it');
     expect(names).not.toContain('stop_work');
+  });
+
+  it('never offers or runs self_write on a routine’s turn: nobody is there to own the change', async () => {
+    const turn = new ToolRegistry(everything()).forTurn(fakeTurn({ routine: ROUTINE }));
+    const names = turn.definitions.map((definition) => definition.name);
+    expect(names).toContain('self_read');
+    expect(names).not.toContain('self_write');
+    const refused = await turn.run({
+      name: 'self_write',
+      input: { path: 'you.md', text: 'x', why: 'y' },
+    });
+    expect(refused.isError).toBe(true);
   });
 
   it('gives a job’s turn only search_history and the apps’ read tools', async () => {
@@ -169,8 +188,9 @@ describe('ToolRegistry.forTurn', () => {
       'forget',
       'work_on_it',
       'stop_work',
+      'self_write',
     ]);
-    expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(14);
+    expect(tools.filter((tool) => tool.kind === 'read')).toHaveLength(15);
   });
 
   it('gives a companion its tools, then the routine tools (write), point_at, search_history, change_settings, forget and the job tools', () => {
@@ -239,6 +259,8 @@ describe('ToolRegistry.forTurn', () => {
       'board',
       'open_result',
       'stop_work',
+      'self_read',
+      'self_write',
     ]);
     for (const id of ['hand_to_expert', 'create_routine', 'change_routine', 'change_settings']) {
       expect(tools.find((tool) => tool.id === id)?.kind).toBe('write');
@@ -262,7 +284,7 @@ describe('ToolRegistry.forTurn', () => {
         .forTurn(fakeTurn())
         .tools.map((tool) => tool.id);
     expect(ids([])).toEqual(ALL_TOOLS);
-    expect(ids([run])).toEqual([...ALL_TOOLS.slice(0, -6), 'tell_expert', ...ALL_TOOLS.slice(-6)]);
+    expect(ids([run])).toEqual([...ALL_TOOLS.slice(0, -8), 'tell_expert', ...ALL_TOOLS.slice(-8)]);
   });
 
   it('builds only what is wired: no perception options, no perception tools', () => {

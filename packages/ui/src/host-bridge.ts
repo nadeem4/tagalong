@@ -11,6 +11,8 @@ import type {
   ActivityListResult,
   ExperienceGetResult,
   ExperienceListResult,
+  SelfGetResult,
+  SelfListResult,
   Brief,
   ConnectionState,
   ConnectionsAddParams,
@@ -115,6 +117,17 @@ export interface HostBridge {
   getExperience?(id: string): Promise<ExperienceGetResult>;
   /** Delete all: every decision and its steps. Resolves with how many went. */
   clearExperience?(): Promise<number>;
+  /**
+   * Home's What Scout learned: Scout's own notes (the Self), their versions, the person's
+   * edits and undo. Optional, like the activity view.
+   */
+  listSelf?(): Promise<SelfListResult>;
+  getSelf?(path: string): Promise<SelfGetResult>;
+  writeSelf?(path: string, text: string): Promise<{ ok: boolean; reason?: string; note?: string }>;
+  undoSelf?(versionId: number): Promise<{ ok: boolean; reason?: string }>;
+  /** A proposed change: accepted applies it, rejected keeps it on record, never applied. */
+  acceptSelf?(versionId: number): Promise<{ ok: boolean; reason?: string }>;
+  rejectSelf?(versionId: number): Promise<{ ok: boolean; reason?: string }>;
   /**
    * Home's Experts page: the tools a companion hands work to. All optional: a host without
    * Home, such as the browser extension, never shows the page.

@@ -35,6 +35,7 @@ export * from './methods';
 export * from './roles';
 export * from './activity';
 export * from './experience';
+export * from './self';
 export * from './experts';
 export * from './connections';
 export * from './routines';

@@ -275,6 +275,21 @@ describe('ExperienceLog: outcomes', () => {
   });
 });
 
+describe('ExperienceLog: since', () => {
+  it('gives the episodes that ended after a time, oldest first, with their events, newest kept', () => {
+    const before = new Date(Date.now() - 1000).toISOString();
+    for (const text of ['a', 'b', 'c']) completed(started(asked(text)), text);
+    const remarkId = randomUUID();
+    log.checkIn({ ref: remarkId, petId: 'scout', trigger: 'back', input: 'x', decision: 'spoke' });
+    log.outcome(remarkId, 'not-now');
+    const all = log.since(before, 10);
+    expect(all.map(({ episode }) => episode.input)).toEqual(['a', 'b', 'c', 'x']);
+    expect(all.at(-1)?.events).toEqual([expect.objectContaining({ name: 'not-now' })]);
+    expect(log.since(before, 2).map(({ episode }) => episode.input)).toEqual(['c', 'x']);
+    expect(log.since(new Date(Date.now() + 60_000).toISOString(), 10)).toEqual([]);
+  });
+});
+
 describe('ExperienceLog: paging, boot and pruning', () => {
   it('pages newest first', () => {
     for (const text of ['a', 'b', 'c']) completed(started(asked(text)), text);

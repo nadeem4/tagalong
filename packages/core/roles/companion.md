@@ -31,6 +31,8 @@ tools:
   - board
   - open_result
   - stop_work
+  - self_read
+  - self_write
 model:
   tier: balanced
   needs_vision: false

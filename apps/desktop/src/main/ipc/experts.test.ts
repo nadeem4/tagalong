@@ -14,6 +14,12 @@ function setup() {
     'experience.list': { episodes: [] },
     'experience.get': null,
     'experience.clear': { deleted: 4 },
+    'self.list': { pages: [], nights: [] },
+    'self.get': null,
+    'self.write': { ok: true },
+    'self.undo': { ok: true },
+    'self.accept': { ok: true },
+    'self.reject': { ok: true },
     'experts.list': { experts: [EXPERT] },
     'experts.upsert': { expert: EXPERT },
     'experts.delete': { deleted: true },
@@ -55,6 +61,24 @@ describe('registerExpertIpc', () => {
     const { invoke, calls } = setup();
     expect(await invoke(IPC.clearExperience)).toBe(4);
     expect(calls).toEqual([['experience.clear', {}]]);
+  });
+
+  it("reads, edits, undoes, accepts and rejects Scout's notes for What Scout learned", async () => {
+    const { invoke, calls } = setup();
+    expect(await invoke(IPC.listSelf)).toEqual({ pages: [], nights: [] });
+    await invoke(IPC.getSelf, 'you.md');
+    expect(await invoke(IPC.writeSelf, 'you.md', 'Works on Tagalong.')).toEqual({ ok: true });
+    await invoke(IPC.undoSelf, 7);
+    expect(await invoke(IPC.acceptSelf, 8)).toEqual({ ok: true });
+    expect(await invoke(IPC.rejectSelf, 9)).toEqual({ ok: true });
+    expect(calls).toEqual([
+      ['self.list', {}],
+      ['self.get', { path: 'you.md' }],
+      ['self.write', { path: 'you.md', text: 'Works on Tagalong.' }],
+      ['self.undo', { versionId: 7 }],
+      ['self.accept', { versionId: 8 }],
+      ['self.reject', { versionId: 9 }],
+    ]);
   });
 
   it("reads Home's Spend card from the engine as it is", async () => {

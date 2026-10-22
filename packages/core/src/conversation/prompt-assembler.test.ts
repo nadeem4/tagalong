@@ -191,6 +191,29 @@ describe('assemblePrompt memories and Now', () => {
     expect(lastText(request)).toContain(NOW_HEADING);
   });
 
+  it('puts Scout’s own notes ahead of what it remembers, and leaves them out when empty', () => {
+    const notes = '## Your notes\n~~~text\n### you.md\nWorks on Tagalong.\n~~~';
+    const request = assemblePrompt({
+      pet,
+      history: [userMessage('hi')],
+      settings,
+      notes,
+      memories: [memory('Short answers.')],
+      now: now(),
+    });
+    const text = lastText(request);
+    expect(text).toContain(notes);
+    expect(text.indexOf('## Your notes')).toBeLessThan(text.indexOf(MEMORY_HEADING));
+    const none = assemblePrompt({
+      pet,
+      history: [userMessage('hi')],
+      settings,
+      notes: '',
+      now: now(),
+    });
+    expect(lastText(none)).not.toContain('## Your notes');
+  });
+
   it('leaves out the memory section when there is nothing to remember', () => {
     const request = assemblePrompt({ pet, history: [userMessage('hi')], settings, now: now() });
     expect(lastText(request)).not.toContain(MEMORY_HEADING);
