@@ -102,6 +102,8 @@ tools:
   - board
   - open_result
   - stop_work
+  - self_read
+  - self_write
 model:
   tier: balanced # fast | balanced | deep
   needs_vision: false
@@ -198,17 +200,20 @@ packages/core/src/tools/
     history.ts     search_history
     settings.ts    change_settings: the chat allowlist, labels and loosening rules
     jobs.ts        work_on_it, board, open_result, stop_work: Scout's own jobs and the task board
+    self.ts        self_read, self_write: Scout's own notes, the Self
 ```
 
 The companion's role lists every one of them; `point_at` comes after `change_routine`, then
 `search_history` and `tell_expert`, then `change_settings`, `forget` (never on a routine's own
-turn), and the four job tools come last.
+turn), the four job tools, and `self_read` and `self_write` last (`self_write` never on a
+routine's own turn).
 
 - **Kind.** A tool is `write` when it leaves stored state behind after the turn: `remember` files a
   memory, `forget` deletes one, `watch_for` starts a watch, `hand_to_expert` starts a hand-off, `tell_expert` queues a note in a running hand-off and its Activity row,
   `create_routine` and `change_routine` lead to a saved routine once the person presses Save, and
-  `change_settings` to saved settings once they click Apply, `work_on_it` starts a job and
-  `stop_work` stops one. The rest are `read`.
+  `change_settings` to saved settings once they click Apply, `work_on_it` starts a job,
+  `stop_work` stops one and `self_write` changes a page of Scout's notes (or, for `lessons.md`
+  and skills, proposes the change for the person to accept). The rest are `read`.
 - **Context.** Every tool runs with the turn's pet, turn id, abort signal, snapshot, whether the
   pet's brain can see, and, on a routine's turn, the routine (`ToolContext.routine`): the expert its
   card allowed and where a hand-off reports.

@@ -37,6 +37,23 @@ export function registerExpertIpc(handle: IpcHandle, { engine }: ExpertIpcDeps):
     return deleted;
   });
 
+  // Home's What Scout learned: the notes, a page and its changes, the person's edit, undo,
+  // and their say on each proposed change.
+  handle(IPC.listSelf, async () => engine().call('self.list', {}));
+  handle(IPC.getSelf, async (_event, path: string) => engine().call('self.get', { path }));
+  handle(IPC.writeSelf, async (_event, path: string, text: string) =>
+    engine().call('self.write', { path, text }),
+  );
+  handle(IPC.undoSelf, async (_event, versionId: number) =>
+    engine().call('self.undo', { versionId }),
+  );
+  handle(IPC.acceptSelf, async (_event, versionId: number) =>
+    engine().call('self.accept', { versionId }),
+  );
+  handle(IPC.rejectSelf, async (_event, versionId: number) =>
+    engine().call('self.reject', { versionId }),
+  );
+
   // Home's Spend card.
   handle(IPC.usageSummary, async () => engine().call('usage.summary', {}));
 

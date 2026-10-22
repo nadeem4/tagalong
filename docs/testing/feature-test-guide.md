@@ -1443,6 +1443,50 @@ monitor.
 2. **Action:** start Tagalong, then set another one's to 31 days ago while it runs, and wait 35
    minutes. **Expected:** both are gone from the page, the second without a restart.
 
+## What Scout learned
+
+### SL.1. The pages, edited and undone
+
+1. **Action:** open Home → **What Scout learned**. **Expected:** "Scout has not slept yet", and
+   three pages: you.md, lessons.md, commitments.md, all empty.
+2. **Action:** type a line into you.md and press **Save**. **Expected:** "Saved.", and a change
+   below by **You**, "Edited in Home.". `%APPDATA%\Tagalong\self\you.md` holds the line.
+3. **Action:** edit that file in Notepad, save, then open the page again. **Expected:** your edit,
+   and a change by **You**, "Edited outside Tagalong.".
+4. **Action:** press **Undo** on the newest change. **Expected:** the page goes back to the line
+   from step 2. Only the newest change has **Undo**; the older ones have only **Show text**, which
+   opens what the page held then.
+5. **Action:** paste more than 6,000 characters into you.md and **Save**. **Expected:** "Saved the
+   first 6000 characters: the page holds no more."
+6. **Action:** quit the engine (or unplug it in a dev build) and press **Save**. **Expected:** "Not
+   saved: …" beside Save, never a silent failure.
+
+### SL.2. Scout writes a note in a conversation _(real brain)_
+
+1. **Action:** tell Scout "I work on Tagalong, a Windows app, and I like short answers."
+2. **Expected:** Scout saves it with `self_write` (How Scout decided shows the tool). What Scout
+   learned → you.md has it, with a change by **Scout, in a conversation**. Asking "what do you know
+   about me?" in a new conversation answers from it.
+3. **Action:** correct Scout ("no, lead with the gist next time") until it writes a lesson.
+   **Expected:** lessons.md says **1 to review**; the change reads **Proposed** with its text,
+   **Accept** and **Reject**, and the lesson is not in the page yet. **Accept** puts it on the page
+   with "accepted by you"; on another proposal, **Reject** marks it **Rejected** and the page stays
+   as it was. With two proposals on one page, accepting one makes **Accept** on the other say
+   "Not accepted: lessons.md changed after this was proposed…"; **Reject** still works. A skill
+   Scout proposes shows in the page list (**1 to review**) before it has any text.
+4. **Action:** run a routine that asks Scout to note something about you. **Expected:** no
+   `self_write` in How Scout decided for the routine's turn; the notes are unchanged.
+
+### SL.3. Sleep _(real brain, leave it overnight)_
+
+1. **Setup:** a day of use with a few check-ins, one answered **Not now**.
+2. **Expected:** sleep only starts after 30 minutes away from the keyboard with no conversation,
+   and only after at least five of your conversations (check-ins alone are not enough). The next
+   morning the page reads "Last slept …: Proposed …", and each page it touched says **N to
+   review**, with a **Proposed** change by **Scout, while sleeping**, its reason and its text.
+   Nothing changes until you **Accept**. No core page was emptied. A failed night reads "Last sleep
+   failed: <reason>".
+
 ## What Scout saw
 
 ### WS.1. The page, empty

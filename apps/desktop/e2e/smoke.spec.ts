@@ -506,7 +506,7 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
   const home = await windowFor('home');
   await expect(home).toHaveTitle('Home');
 
-  // One companion and ten pages.
+  // One companion and eleven pages.
   const nav = home.getByRole('navigation', { name: 'Tagalong' });
   await expect(nav.getByRole('button')).toHaveText(
     [
@@ -519,6 +519,7 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
       'How Scout decided',
       'What Scout saw',
       'What Scout remembers',
+      'What Scout learned',
       'Settings',
     ],
     { timeout: 15_000 },

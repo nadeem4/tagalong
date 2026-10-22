@@ -7,6 +7,8 @@ import type {
   ActivityEntry,
   Episode,
   EpisodeEvent,
+  SelfNight,
+  SelfVersion,
   CalendarCheckResult,
   ConnectionState,
   ConnectionsAddParams,
@@ -48,6 +50,10 @@ export interface FakeHostBridge extends HostBridge {
   /** The experience log, newest first, and each episode's events by id. */
   episodes: Episode[];
   episodeEvents: Record<string, EpisodeEvent[]>;
+  /** Scout's notes by path, their versions newest first, and the nights slept. */
+  selfPages: Record<string, string>;
+  selfVersions: SelfVersion[];
+  nights: SelfNight[];
   /** Home's experts, as saved; a test reads them back after a save. */
   experts: Expert[];
   /** Every expert id tested, in order. */
@@ -92,6 +98,12 @@ export function createFakeHostBridge(
     /** The experience log, newest first. */
     episodes?: Episode[];
     episodeEvents?: Record<string, EpisodeEvent[]>;
+    /** Scout's notes by path; the three core pages are always there. */
+    selfPages?: Record<string, string>;
+    selfVersions?: SelfVersion[];
+    nights?: SelfNight[];
+    /** writeSelf rejects, as when the engine is restarting. */
+    selfWriteFails?: boolean;
     experts?: Expert[];
     /** What testing an expert answers; absent answers ready. */
     testExpert?: (expertId: string) => { ok: boolean; error?: string };
@@ -231,6 +243,67 @@ export function createFakeHostBridge(
       return Promise.resolve(
         episode === undefined ? null : { episode, events: fake.episodeEvents[id] ?? [] },
       );
+    },
+    selfPages: { 'you.md': '', 'lessons.md': '', 'commitments.md': '', ...options.selfPages },
+    selfVersions: (options.selfVersions ?? []).map((version) => ({ ...version })),
+    nights: [...(options.nights ?? [])],
+    listSelf() {
+      return Promise.resolve({
+        pages: Object.entries(fake.selfPages).map(([path, text]) => ({
+          path,
+          chars: text.length,
+          proposals: fake.selfVersions.filter((v) => v.path === path && v.state === 'proposed')
+            .length,
+        })),
+        nights: fake.nights,
+      });
+    },
+    getSelf(path) {
+      const text = fake.selfPages[path];
+      return Promise.resolve(
+        text === undefined
+          ? null
+          : { path, text, versions: fake.selfVersions.filter((v) => v.path === path) },
+      );
+    },
+    writeSelf(path, text) {
+      if (options.selfWriteFails === true) return Promise.reject(new Error('engine restarting'));
+      const kept = text.slice(0, 6_000);
+      fake.selfPages[path] = kept;
+      fake.selfVersions.unshift({
+        id: fake.selfVersions.length + 100,
+        path,
+        author: 'person',
+        why: 'Edited in Home.',
+        state: 'applied',
+        text: kept,
+        chars: kept.length,
+        at: new Date(0).toISOString(),
+      });
+      return Promise.resolve(
+        kept.length < text.length
+          ? { ok: true, note: 'Saved the first 6000 characters: the page holds no more.' }
+          : { ok: true },
+      );
+    },
+    undoSelf(versionId) {
+      const version = fake.selfVersions.find((v) => v.id === versionId);
+      if (version === undefined) return Promise.resolve({ ok: false, reason: 'Gone.' });
+      fake.selfPages[version.path] = '';
+      return Promise.resolve({ ok: true });
+    },
+    acceptSelf(versionId) {
+      const version = fake.selfVersions.find((v) => v.id === versionId);
+      if (version?.state !== 'proposed') return Promise.resolve({ ok: false, reason: 'Gone.' });
+      version.state = 'accepted';
+      fake.selfPages[version.path] = version.text;
+      return Promise.resolve({ ok: true });
+    },
+    rejectSelf(versionId) {
+      const version = fake.selfVersions.find((v) => v.id === versionId);
+      if (version?.state !== 'proposed') return Promise.resolve({ ok: false, reason: 'Gone.' });
+      version.state = 'rejected';
+      return Promise.resolve({ ok: true });
     },
     experts: [...(options.experts ?? [])],
     testedExperts,

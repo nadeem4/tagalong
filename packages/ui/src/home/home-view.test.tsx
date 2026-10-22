@@ -85,7 +85,7 @@ function renderHome(
 }
 
 describe('HomeView', () => {
-  it('is one window: Scout and ten pages', async () => {
+  it('is one window: Scout and eleven pages', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     const nav = await screen.findByRole('navigation', { name: 'Tagalong' });
     expect(within(nav).getByText('Your companion')).toBeVisible();
@@ -103,6 +103,7 @@ describe('HomeView', () => {
       'How Scout decided',
       'What Scout saw',
       'What Scout remembers',
+      'What Scout learned',
       'Settings',
     ]);
   });
@@ -249,7 +250,7 @@ describe('HomeView', () => {
     expect(pages).toEqual(['experts', 'settings']);
   });
 
-  it('shows What Scout saw between How Scout decided and Settings, kept as the host says', async () => {
+  it('shows What Scout saw after How Scout decided, kept as the host says', async () => {
     const days: HomeHost = {
       ...host(),
       setup: async () => ({ ...(await host().setup()), sightLogDays: 3 }),
@@ -259,10 +260,11 @@ describe('HomeView', () => {
     const labels = within(nav)
       .getAllByRole('button')
       .map((button) => button.textContent);
-    expect(labels.slice(-4)).toEqual([
+    expect(labels.slice(-5)).toEqual([
       'How Scout decided',
       'What Scout saw',
       'What Scout remembers',
+      'What Scout learned',
       'Settings',
     ]);
 

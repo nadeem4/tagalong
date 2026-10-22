@@ -1,7 +1,8 @@
 # The mind
 
-**Status: design.** Agreed direction, not built yet. Nothing on `main` matches this page until the
-build steps at the end land.
+**Status: built (steps 1 and 3) + design (the rest).** Each step at the end says what is built. How
+the built parts work is in [the architecture](../architecture.md#the-experience-log) (the experience
+log, How Scout decided) and [The Self](../architecture.md#the-self).
 
 Tagalong becomes one assistant mind that lives on the person's computer. It has a fixed character
 and values, sees what they are doing, remembers their life and work, decides for itself when to
@@ -232,8 +233,12 @@ and writes with tools:
 Rules:
 
 - **Every change is a version.** Who changed it (the person, a turn, sleep), when, why, and the
-  episode it came from. The person sees the diff in **What I've learned** and can undo any
+  episode it came from. The person sees the diff in **What I've learned** and can undo the newest
   change.
+- **Persistent authority is the person's (D3).** In a live conversation the mind may change
+  `you.md` and `commitments.md` at once (undoable). Any change to `lessons.md` or a skill, and
+  every change sleep makes, is a **proposal**: kept as a version, not applied and not read by the
+  mind until the person accepts it. A routine's turn and a job's turn cannot write the Self.
 - **Written through tools, checked by code.** `self_read`, `self_write`, `self_forget`. Writes are
   size-capped per file, have secrets hidden, and are refused if they touch the constitution.
 - **No one-off clutter.** A lesson must be general: "they prefer the gist, then detail on request",
@@ -274,6 +279,9 @@ write, in order, linked to the episode.
 This replaces `activity` and stores what `messages` drops today (tool calls and results, every
 check-in decision including NOTHING).
 
+**Deferred (not built yet):** the log replacing `activity` (both run side by side), a retention
+setting (episodes are kept a fixed 30 days), and money cost per episode (tokens only).
+
 ## Sleep
 
 Once a day, when the machine is idle (today's digest slot), the mind wakes in _sleep_ mode with the
@@ -286,8 +294,9 @@ day's episodes and outcomes. It may:
 - close or chase commitments.
 
 A critic pass checks each proposed change before it is written: general, not one-off; no secrets;
-nothing that touches the constitution; not simply "speak less". Every change shows in **What I've
-learned**.
+nothing that touches the constitution; not simply "speak less". Every change sleep makes is a
+proposal (D3) that shows in **What I've learned** and applies only when the person accepts it.
+Sleep runs only while the person is away.
 
 **Balanced signals.** If the mind only learned from "Not now", the easy win would be to never
 speak. So missed chances count against it as much as unwanted interruptions, and the welcome rate
@@ -405,10 +414,17 @@ come.
    - Thinking moves to a stronger tier.
    - Done when every turn and check-in decision, including NOTHING, is an episode with its steps
      and outcomes, and the inspector shows them.
+   - **Built.** The inspector is Home's **How Scout decided**. Approvals of connected-app writes are
+     not outcomes yet.
 2. **The harness as data.** The folder, the schema, the hash on every episode, tool descriptions
    out of TS, `policy.json` replacing the tool conditionals.
 3. **The Self and sleep.** The folder, its tools and versions, **What I've learned**, sleep with its
    critic; migrate `memories`.
+   - **Built:** the pages, `self_read` and `self_write`, versions with undo of the newest change,
+     proposals with Accept and Reject (D3), notes on every turn and check-in, Home's **What Scout
+     learned**, and sleep with code guardrails, only while the person is away.
+   - **Not yet:** sleep's model critic pass, the learned bounded settings (`settings.json`), and
+     moving `memories` into the pages. Memories and recall still run beside the Self.
 4. **Asks, experts and the bubble.** Plan cards, the channel rules, the expert reviewed before it
    is shown, the bubble and panel replacing Bean. Voice: listening by name, the instant
    acknowledgement, say-the-gist, and stopping when interrupted.
@@ -417,14 +433,22 @@ come.
 6. **Scenarios.** `packages/evals`, the seed set, **Make this a scenario**, the health view.
 7. **Offline evolution.**
 
+**Decisions taken while building (2026-10-21):**
+
+- **D1.** The experience log keeps no screen-derived text and no window titles: what a check-in
+  was shown is replaced by a marker. Sleep learns from decisions and outcomes, not the screen.
+- **D2.** Check-ins keep thinking on Scout's own model, with their tokens recorded in the episode
+  and the daily budget; watch checks are plumbing and do not get the soul.
+- **D3.** Persistent authority is the person's: see [The Self](#the-self).
+
 ## Open questions
 
 - **Name and voice.** The new character needs its own name and voice, and the name has to be easy
   to catch locally as a wake word.
 - **Cost.** A strong thinking model is the main cost; the reflex split and the daily budget keep it
   in check, but the default budget needs a number.
-- **Experience log retention.** Default length, and whether screen-derived text in `inputs` is kept
-  at all or only referenced.
+- **Experience log retention.** Whether the person sets the length (30 days today). Screen-derived
+  text is settled: it is not kept (D1).
 - **Earning autonomy.** "Always ask" holds for now. Whether the person may later let it skip the ask
   for a kind of work it has always been approved for is a later decision, and would be theirs to
   switch on.

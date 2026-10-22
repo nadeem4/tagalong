@@ -34,6 +34,8 @@ export const CONTEXT_LABELS = {
 
 export interface AssembleInput {
   pet: Pet;
+  /** The pet's own notes (the Self), already rendered. Rides on the question, ahead of memories. */
+  notes?: string | undefined;
   /** What the pet recalls for this turn, already ranked. Rides on the question. */
   memories?: readonly Memory[] | undefined;
   /** Recall's matching recent jobs, one line each, under the memories. */
@@ -55,6 +57,7 @@ export function assemblePrompt(input: AssembleInput): BrainRequest {
   const contextText = input.snapshot ? contextBlock(input.snapshot, settings) : '';
   const leading = input.snapshot ? imagesToAttach(input.snapshot, settings) : [];
   const momentText = [
+    input.notes ?? '',
     renderMemories(input.memories ?? [], input.recentWork),
     input.now === undefined ? '' : renderNow(input.now),
   ]

@@ -24,6 +24,7 @@ import {
   type HistoryToolDeps,
   type SettingsToolDeps,
   type JobToolDeps,
+  type SelfToolDeps,
 } from '../tools';
 import { assemblePrompt } from './prompt-assembler';
 import { gatherNow, type NowFacts, type NowSources } from './now';
@@ -71,6 +72,8 @@ export interface ConversationRunnerOptions {
    * tool and by preferences the user states. Optional so turn-mechanics tests stay small.
    */
   memory?: MemoryStore | undefined;
+  /** The pet's own notes (the Self), rendered, read fresh each turn. */
+  notes?: ((pet: Pet) => string) | undefined;
   /** Scout's finished jobs, for recall's recent-work lines. */
   recentWork?: (() => readonly RecentJob[]) | undefined;
   /**
@@ -92,6 +95,8 @@ export interface ConversationRunnerOptions {
   changeSettings?: SettingsToolDeps | undefined;
   /** Gives a companion its own background jobs and the task board. */
   jobs?: JobToolDeps | undefined;
+  /** Gives a companion `self_read` and `self_write`: its own notes, the Self. */
+  self?: SelfToolDeps | undefined;
   /** Narrows a pet's tools for a turn. Absent: the role's tools (see tools/registry). */
   toolsFor?: ToolFilter | undefined;
   /** Where the Now facts come from. Absent: the system clock and nothing else. */
@@ -179,6 +184,7 @@ export class ConversationRunner {
       history: options.history,
       changeSettings: options.changeSettings,
       jobs: options.jobs,
+      self: options.self,
       toolsFor: options.toolsFor,
     });
   }
@@ -362,6 +368,7 @@ export class ConversationRunner {
       pet: ask.pet,
       history,
       settings,
+      notes: this.#notes(ask.pet),
       ...recalled,
       ...(snapshot ? { snapshot } : {}),
       now,
@@ -453,6 +460,16 @@ export class ConversationRunner {
       return { turnId, conversationId, ...result, modelCalls };
     } catch (error) {
       return this.#fail(turnId, conversationId, error);
+    }
+  }
+
+  /** The notes, or none when they cannot be read: a turn never fails over them. */
+  #notes(pet: Pet): string {
+    try {
+      return this.#options.notes?.(pet) ?? '';
+    } catch (error) {
+      console.warn('[runner] could not read the notes:', error);
+      return '';
     }
   }
 

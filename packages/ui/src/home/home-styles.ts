@@ -99,6 +99,31 @@ export const HOME_CSS = `
   font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelMuted};
 }
 .home-said p { margin: 0; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.home-learned { display: flex; flex-direction: column; gap: ${t.space.lg}px; padding: ${t.space.xxl}px; min-height: 0; }
+.home-learned__night { margin: 0; font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; line-height: 1.5; }
+.home-learned__body { display: flex; gap: ${t.space.xl}px; min-height: 0; flex-wrap: wrap; }
+.home-learned__pages { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: ${t.space.xxs}px; }
+.home-learned__page {
+  width: 100%; padding: ${t.space.sm}px ${t.space.md}px; border: 0; border-radius: ${t.radius.row}px;
+  background: transparent; cursor: pointer; text-align: left;
+  font-family: ${t.font.ui}; font-size: ${t.fontSize.body}px; color: ${t.color.panelText};
+}
+.home-learned__page:hover, .home-learned__page[aria-pressed='true'] { background: ${t.color.panelTile}; }
+.home-learned__open { flex: 1; min-width: 260px; display: flex; flex-direction: column; gap: ${t.space.md}px; }
+.home-learned__text {
+  min-height: 220px; resize: vertical; padding: ${t.space.md}px;
+  border: 1px solid ${t.color.panelLine}; border-radius: ${t.radius.row}px;
+  font-family: ${t.font.ui}; font-size: ${t.fontSize.body}px; line-height: 1.5; color: ${t.color.panelText};
+}
+.home-learned__actions { display: flex; align-items: center; gap: ${t.space.md}px; font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; }
+.home-learned__changes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: ${t.space.md}px; font-size: ${t.fontSize.body}px; }
+.home-learned__changes li { display: flex; flex-direction: column; gap: ${t.space.xxs}px; align-items: flex-start; }
+.home-learned__waiting { display: block; padding: 0 ${t.space.md}px; font-size: ${t.fontSize.small}px; color: ${t.color.panelMuted}; }
+.home-learned__version {
+  margin: 0; padding: ${t.space.sm}px ${t.space.md}px; max-height: 240px; overflow: auto; align-self: stretch;
+  border: 1px solid ${t.color.panelLine}; border-radius: ${t.radius.row}px;
+  font-family: ${t.font.ui}; font-size: ${t.fontSize.small}px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere;
+}
 .home-quiet {
   align-self: flex-start; height: ${t.size.fieldHeight}px; padding: 0 ${t.space.xl}px;
   border-radius: ${t.radius.field}px; border: 1px solid ${t.color.panelMuted};

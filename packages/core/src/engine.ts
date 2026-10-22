@@ -12,6 +12,9 @@ import type { Expert, HostKind, Pet } from '@tagalong/protocol';
 import { openDatabase } from './memory/db';
 import { ActivityLog } from './memory/activity';
 import { ExperienceLog } from './memory/experience';
+import { renderNotes } from './self/notes';
+import { Sleep } from './self/sleep';
+import { SelfStore } from './self/store';
 import { ConversationStore } from './memory/store';
 import { MemoryStore } from './memory/memories';
 import { Summarizer } from './memory/summarizer';
@@ -255,6 +258,7 @@ export class Engine {
   readonly #jobs: Jobs;
   readonly #arrivals: Arrivals;
   readonly #digest: Digest;
+  readonly #sleep: Sleep;
 
   private constructor(parts: {
     db: Database;
@@ -269,10 +273,12 @@ export class Engine {
     jobs: Jobs;
     arrivals: Arrivals;
     digest: Digest;
+    sleep: Sleep;
   }) {
     this.#jobs = parts.jobs;
     this.#arrivals = parts.arrivals;
     this.#digest = parts.digest;
+    this.#sleep = parts.sleep;
     this.#pickUp = parts.pickUp;
     this.#routines = parts.routines;
     this.#connections = parts.connections;
@@ -366,6 +372,10 @@ export class Engine {
         console.warn('[engine] the experience log did not take an entry:', error);
       }
     };
+    // The Self: Scout's own notes about them and itself, files in the data folder, every
+    // change a version. They ride on every turn and check-in.
+    const self = new SelfStore(db, join(options.dataDir, 'self'));
+    const notes = () => renderNotes(self.pages());
     const routineStore = new RoutineStore(db);
     routineStore.interrupted();
     // When a turn of theirs last ended, on the clock finished work is gathered on.
@@ -470,6 +480,20 @@ export class Engine {
       lastAnswer,
       log: (message) => console.warn(`[engine] ${message}`),
     });
+    // Once a day, idle and with them away, the mind reads what it did and what came of it, and
+    // proposes changes to its notes.
+    const sleep = new Sleep({
+      db,
+      self,
+      experience,
+      clock: systemWatchClock,
+      pet: () => pets.get(SCOUT_ID),
+      provider: resolve,
+      spentOut,
+      idle: () => !runner.foregroundBusy() && jobs.counts().running === 0,
+      lastTalkAt: () => talk.endedAt,
+      log: (message) => console.warn(`[engine] ${message}`),
+    });
     /** The task board now: jobs, experts, watches, routines and the last day's finished work. */
     const board = () => {
       const now = new Date();
@@ -554,6 +578,7 @@ export class Engine {
       windows: listHostWindows,
       experts: () => experts.list(),
       now: nowSources,
+      notes,
       memories: (query) => recall(memory, SCOUT_ID, query, { jobs: recentWork(), now: new Date() }),
       lastExchange: () => activity.lastExchange(SCOUT_ID),
       routinesSince: (iso) => activity.routinesFinishedSince(iso),
@@ -597,6 +622,8 @@ export class Engine {
       emit,
       memory,
       recentWork,
+      notes,
+      self,
       // The Now facts on each question: time, last talk, and which experts are on what.
       // Known gap: a routine's turn counts as the last talk.
       now: nowSources,
@@ -744,6 +771,8 @@ export class Engine {
     const handlers = buildHandlers({
       activity,
       experience,
+      self,
+      sleep,
       record,
       runner,
       pets,
@@ -804,6 +833,7 @@ export class Engine {
     routines.start();
     pickUp.start();
     digest.start();
+    sleep.start();
 
     return new Engine({
       db,
@@ -818,6 +848,7 @@ export class Engine {
       jobs,
       arrivals,
       digest,
+      sleep,
     });
   }
 
@@ -836,6 +867,7 @@ export class Engine {
     this.#pickUp.stop();
     this.#arrivals.stop();
     this.#digest.stop();
+    this.#sleep.stop();
     this.#watches.stopAll();
     await this.#handoffs.stopAll();
     await this.#jobs.stopAll();
@@ -849,6 +881,8 @@ export class Engine {
 function buildHandlers(parts: {
   activity: ActivityLog;
   experience: ExperienceLog;
+  self: SelfStore;
+  sleep: Sleep;
   /** Writes to the experience log, where a failure is logged and never fails the call. */
   record: (write: () => unknown) => void;
   runner: ConversationRunner;
@@ -882,6 +916,7 @@ function buildHandlers(parts: {
   checkResolve: ProviderResolver;
 }): MethodHandlers {
   const { activity, experience, record, runner, pets, settings, models, hosts, watches } = parts;
+  const { self, sleep } = parts;
   const { refreshProviders, experts, handoffs, projects, connectorFor } = parts;
   const { checkIn, connections, approvals, routines, pickUp } = parts;
   const { sightLog, checkResolve } = parts;
@@ -962,6 +997,28 @@ function buildHandlers(parts: {
     'experience.list': (params) => experience.list(params),
     'experience.get': (params) => experience.get(params.id),
     'experience.clear': () => ({ deleted: experience.clear() }),
+    // Home's What Scout learned: the notes, their versions, the person's edits and undo.
+    'self.list': () => ({ pages: self.list(), nights: sleep.nights(5) }),
+    'self.get': (params) => {
+      const text = self.read(params.path);
+      return text === null
+        ? null
+        : { path: params.path, text, versions: self.history(params.path) };
+    },
+    'self.write': (params) => {
+      const result = self.write(params.path, params.text, {
+        author: 'person',
+        why: 'Edited in Home.',
+      });
+      if (!result.ok) return { ok: false, reason: result.reason };
+      const kept = self.read(params.path)?.length ?? 0;
+      return result.clipped
+        ? { ok: true, note: `Saved the first ${kept} characters: the page holds no more.` }
+        : { ok: true };
+    },
+    'self.undo': (params) => self.undo(params.versionId),
+    'self.accept': (params) => self.accept(params.versionId),
+    'self.reject': (params) => self.reject(params.versionId),
 
     'experts.list': () => ({ experts: experts.list() }),
     'experts.upsert': (params) => {
@@ -1021,6 +1078,7 @@ function buildHandlers(parts: {
     'keepAnEye.notNow': () => ({ quietUntil: checkIn.notNow().toISOString() }),
     'keepAnEye.accept': async (params) => ({ proposed: await checkIn.accept(params.remarkId) }),
     'wellbeing.observe': (params) => {
+      sleep.observeIdle(params.idleMs);
       void checkIn.observeActivity(params);
       return {};
     },

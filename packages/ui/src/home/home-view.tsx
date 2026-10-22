@@ -1,7 +1,7 @@
 /**
  * Home: the one window for the companion, its experts and the app. Scout in the corner and
- * ten pages (overview, Scout, experts, routines, connections, activity, how Scout decided,
- * what Scout saw, what Scout remembers, settings). Contains HomeView, HomeHost, HomeProvider, HomePage and
+ * eleven pages (overview, Scout, experts, routines, connections, activity, how Scout decided,
+ * what Scout saw, what Scout remembers, what Scout learned, settings). Contains HomeView, HomeHost, HomeProvider, HomePage and
  * the Scout page. Rendered by the desktop `home` page.
  */
 
@@ -19,6 +19,7 @@ import { DecisionsView } from './decisions-view';
 import { ExpertsPanel } from './experts-panel';
 import { HOME_CSS } from './home-styles';
 import { RoutinesPanel } from './routines-panel';
+import { LearnedView } from './learned-view';
 import { MemoryView } from './memory-view';
 import { SightLogView } from './sight-log-view';
 import { SpendCard } from './spend-card';
@@ -33,6 +34,7 @@ export type HomePage =
   | 'decisions'
   | 'sightLog'
   | 'memory'
+  | 'learned'
   | 'settings';
 
 const PAGES: readonly { id: HomePage; label: (name: string) => string }[] = [
@@ -45,6 +47,7 @@ const PAGES: readonly { id: HomePage; label: (name: string) => string }[] = [
   { id: 'decisions', label: (name) => `How ${name} decided` },
   { id: 'sightLog', label: (name) => `What ${name} saw` },
   { id: 'memory', label: (name) => `What ${name} remembers` },
+  { id: 'learned', label: (name) => `What ${name} learned` },
   { id: 'settings', label: () => 'Settings' },
 ];
 
@@ -85,10 +88,10 @@ export interface HomeViewProps {
 }
 
 /**
- * Home: the one window for everything. The companion in the corner, and ten pages: an
+ * Home: the one window for everything. The companion in the corner, and eleven pages: an
  * overview, how the companion thinks, the experts it hands work to, what it does on its own,
  * the apps it can use, what happened, why it decided what it did, what it looked at and sent,
- * what it remembers, and the app's settings.
+ * what it remembers, what it has learned about them and itself, and the app's settings.
  */
 export function HomeView({
   host,
@@ -187,6 +190,7 @@ export function HomeView({
           />
         )}
         {page === 'memory' && <MemoryView name={name} />}
+        {page === 'learned' && <LearnedView name={name} />}
         {page === 'settings' && settings}
       </main>
     </div>

@@ -113,6 +113,12 @@ function input(overrides: Partial<BundleInput> = {}): BundleInput {
 }
 
 describe('renderBundle', () => {
+  it('carries Scout’s own notes ahead of what it remembers, when it has any', () => {
+    const notes = '## Your notes\n~~~text\n### lessons.md\nLead with the gist.\n~~~';
+    expect(renderBundle(input({ notes }))).toContain(notes);
+    expect(renderBundle(input({ notes: '' }))).not.toContain('## Your notes');
+  });
+
   it('says why it woke, for each reason, in plain facts', () => {
     expect(renderBundle(input())).toMatch(/^## Why you woke\n.*looks like something broke/);
     const settled = renderBundle(

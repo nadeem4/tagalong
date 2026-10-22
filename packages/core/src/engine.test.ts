@@ -191,6 +191,83 @@ describe('Engine.boot', () => {
     expect(after.episodes).toEqual([]);
   });
 
+  it('lets Home read, edit and undo Scout’s notes, each change a version', async () => {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+
+    const listed = (await host.call('self.list', {}))['result'] as {
+      pages: { path: string }[];
+      nights: unknown[];
+    };
+    expect(listed.pages.map((page) => page.path)).toEqual([
+      'you.md',
+      'lessons.md',
+      'commitments.md',
+    ]);
+    expect(listed.nights).toEqual([]);
+
+    expect(
+      (await host.call('self.write', { path: 'you.md', text: 'Works on Tagalong.' }))['result'],
+    ).toEqual({ ok: true });
+    expect((await host.call('self.write', { path: '../x', text: 'x' }))['result']).toMatchObject({
+      ok: false,
+    });
+    const page = (await host.call('self.get', { path: 'you.md' }))['result'] as {
+      text: string;
+      versions: { id: number; author: string }[];
+    };
+    expect(page.text).toBe('Works on Tagalong.');
+    expect(page.versions[0]?.author).toBe('person');
+
+    await host.call('self.undo', { versionId: page.versions[0]!.id });
+    const undone = (await host.call('self.get', { path: 'you.md' }))['result'] as { text: string };
+    expect(undone.text).toBe('');
+  });
+
+  it('lets Home accept or reject a proposed change, and clips an over-long edit with a note', async () => {
+    const db = openDatabase(dir);
+    const propose = db.prepare(
+      `INSERT INTO self_versions (path, text, author, why, at, state)
+       VALUES (?, ?, 'sleep', 'Seen twice.', '2026-10-20T03:00:00.000Z', 'proposed')`,
+    );
+    const lesson = Number(propose.run('lessons.md', 'Lead with the gist.').lastInsertRowid);
+    const skill = Number(propose.run('skills/triage.md', 'Read the first error.').lastInsertRowid);
+    db.close();
+
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    const listed = (await host.call('self.list', {}))['result'] as {
+      pages: { path: string; proposals: number }[];
+    };
+    expect(listed.pages.find((page) => page.path === 'lessons.md')?.proposals).toBe(1);
+
+    expect((await host.call('self.accept', { versionId: lesson }))['result']).toEqual({
+      ok: true,
+    });
+    expect((await host.call('self.reject', { versionId: skill }))['result']).toEqual({
+      ok: true,
+    });
+    expect((await host.call('self.accept', { versionId: skill }))['result']).toMatchObject({
+      ok: false,
+    });
+    const page = (await host.call('self.get', { path: 'lessons.md' }))['result'] as {
+      text: string;
+      versions: { state: string; author: string }[];
+    };
+    expect(page.text).toBe('Lead with the gist.');
+    expect(page.versions[0]).toMatchObject({ state: 'applied', author: 'sleep' });
+
+    const long = (
+      await host.call('self.write', {
+        path: 'commitments.md',
+        text: 'c'.repeat(3_100),
+      })
+    )['result'];
+    expect(long).toMatchObject({ ok: true, note: expect.stringContaining('3000') });
+  });
+
   it('closes activity a crash left running, so it does not spin forever', async () => {
     const db = openDatabase(dir);
     db.prepare(
