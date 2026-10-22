@@ -1,5 +1,6 @@
 /**
- * IPC for Home's Activity, Spend and Experts pages, the expert catalog and the hand-off card.
+ * IPC for Home's Activity, decisions, Spend and Experts pages, the expert catalog and the
+ * hand-off card.
  * Contains registerExpertIpc.
  */
 
@@ -21,6 +22,15 @@ export function registerExpertIpc(handle: IpcHandle, { engine }: ExpertIpcDeps):
       ...(params.before === undefined ? {} : { before: params.before }),
     }),
   );
+
+  // Home's decisions page: the experience log, and one episode when it is opened.
+  handle(IPC.listExperience, async (_event, params: { before?: string; limit?: number }) =>
+    engine().call('experience.list', {
+      limit: params.limit ?? 30,
+      ...(params.before === undefined ? {} : { before: params.before }),
+    }),
+  );
+  handle(IPC.getExperience, async (_event, id: string) => engine().call('experience.get', { id }));
 
   // Home's Spend card.
   handle(IPC.usageSummary, async () => engine().call('usage.summary', {}));

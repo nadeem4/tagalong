@@ -1392,12 +1392,39 @@ monitor.
 7. **Action:** switch the setting Off and save. **Expected:** the `pick_up` row is gone and no
    pick-up is ever offered. A password manager or `.env` window in front is never named.
 
+## How Scout decided
+
+### DC.1. A question, its tools and its answer
+
+1. **Setup:** any brain (the fake one is enough: `TAGALONG_FAKE_PROVIDERS=1`).
+2. **Action:** ask Scout a question that makes it look at the screen ("what is on my screen?"),
+   then open Home → **How Scout decided**.
+3. **Expected:** the newest row reads **Scout answered**, with **You asked**, the model, a token
+   count and the time. Clicking it shows **Why it woke**, **What it was shown** (your question),
+   one **Tool** line per tool it used with the first line of what came back, and **What Scout
+   said**.
+
+### DC.2. Silence is a decision too _(real brain)_
+
+1. **Setup:** Keep an eye on things on.
+2. **Action:** open a terminal whose title says `failed`, wait for the check-in, then open the page.
+3. **Expected:** a row for the check-in: **Scout stayed quiet** or **Scout spoke up**, with **An
+   error on screen**. Opened, **What it was shown** is the whole message the check-in sent, keys and
+   tokens hidden.
+
+### DC.3. What you did about it _(real brain)_
+
+1. **Action:** when Scout says something on its own, press **Not now**; reopen the page.
+2. **Expected:** that row, opened, ends with **What you did: You said Not now**. Taking an offer
+   reads **You took the offer**; sending or dismissing a hand-off card a turn showed reads **You
+   sent the hand-off** or **You dismissed the hand-off** on that turn.
+
 ## What Scout saw
 
 ### WS.1. The page, empty
 
 1. **Setup:** a fresh install (or **Delete all** first).
-2. **Action:** open Home. **Expected:** **What Scout saw** sits between **Activity** and
+2. **Action:** open Home. **Expected:** **What Scout saw** sits between **How Scout decided** and
    **Settings**. Open it: "Scout hasn't looked at anything yet." and "Kept 7 days. Deleting removes
    this record, not what was already sent." No **Delete all** button.
 

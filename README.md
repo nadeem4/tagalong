@@ -315,7 +315,7 @@ change works at once.
 ## Home: one window for everything
 
 Right-click the tray icon and choose **Open Tagalong**. The tray has only four items: **Open
-Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in nine pages:
+Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in ten pages:
 
 - **Overview**: whether Scout is ready and what it thinks with, your experts, what was spent today
   and this month (**Spend**), and the latest activity. Spend shows dollars for models with a known
@@ -380,6 +380,10 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
     **Cancel**.
 - **Activity**: every answer, every hand-off, every call to an app and every routine run, newest
   first. Click one to read it.
+- **How Scout decided**: every decision Scout made, newest first, including each time it chose to
+  stay quiet. Click one to see why it woke, what it was shown, each tool it used, what it said and
+  what you did about it (**Not now**, an offer taken, a hand-off sent or dismissed). Kept 30 days,
+  on this computer.
 - **What Scout saw**: every time Scout looked at your screen or sent something to an AI or an
   expert, as metadata only, grouped by day. Delete a row, or **Delete all**.
 - **What Scout remembers**: its facts, preferences and conversation summaries, newest first.

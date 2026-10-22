@@ -1564,7 +1564,7 @@ in the preload's `HostBridge` and hands it a `HomeHost` (the companion's id, the
 on, the model list, `savePet`) and the settings form as a slot.
 
 `HomeView` is a navy side menu, with the companion's figure (Bean's idle frame, still; the host
-passes the clip as `scout`, and Activity draws it on each entry too) and name, and nine pages:
+passes the clip as `scout`, and Activity draws it on each entry too) and name, and ten pages:
 
 - **Overview**: the companion (its state, the provider and model it thinks with), the experts (on or
   off, read-only or allowed to edit) and the three most recent activity entries, each with a button
@@ -1584,6 +1584,10 @@ passes the clip as `scout`, and Activity draws it on each entry too) and name, a
   and a card already saved is not opened again on the way back.
 - **Connections**: `ConnectionsPanel`; see [Connected apps](#connected-apps-mcp).
 - **Activity**: `ActivityView`; see [Activity](#activity).
+- **How Scout decided**: `DecisionsView` (`home/decisions-view.tsx`), the experience log in words:
+  `HostBridge.listExperience` → `experience.list`, a page of 30, re-read on the events that change
+  Activity and on `pet.remark`; an opened episode is read with `getExperience` → `experience.get`.
+  See [The experience log](#the-experience-log).
 - **What Scout saw**: `SightLogView`; see [What Scout saw](#what-scout-saw). The days it keeps come
   from `HomeHost.setup().sightLogDays`.
 - **What Scout remembers**: `MemoryView`; see [What Scout remembers](#what-scout-remembers).
