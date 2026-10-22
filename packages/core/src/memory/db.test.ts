@@ -56,6 +56,8 @@ describe('openDatabase', { timeout: 20_000 }, () => {
         'activity_fts_idx',
         'connections',
         'conversations',
+        'episode_events',
+        'episodes',
         'expert_routes',
         'experts',
         'jobs',
@@ -78,6 +80,7 @@ describe('openDatabase', { timeout: 20_000 }, () => {
         'sight_log_fts_data',
         'sight_log_fts_docsize',
         'sight_log_fts_idx',
+        'sqlite_sequence',
         'usage',
       ]);
       const row = db
@@ -616,13 +619,13 @@ describe('migrate', () => {
   it('gives memories an origin in migration 22: existing rows are the user’s, others refused', () => {
     const db = new Database(':memory:');
     try {
-      expect(LATEST_SCHEMA_VERSION).toBe(22);
+      expect(LATEST_SCHEMA_VERSION).toBeGreaterThanOrEqual(22);
       migrate(db, 21);
       db.prepare(
         `INSERT INTO memories (id, scope, pet_id, kind, text, created_at)
          VALUES ('m1', 'pet', 'scout', 'fact', 'They live in Leeds', 'x')`,
       ).run();
-      expect(migrate(db)).toBe(22);
+      expect(migrate(db, 22)).toBe(22);
       expect(db.prepare('SELECT origin FROM memories WHERE id = ?').get('m1')).toEqual({
         origin: 'user',
       });
@@ -634,10 +637,35 @@ describe('migrate', () => {
       expect(() => insert.run('m3', 'web')).toThrow();
       // Rerunning 22 on its own keeps the rows and their origins.
       db.prepare('DELETE FROM schema_version WHERE version >= 22').run();
-      expect(migrate(db)).toBe(22);
+      expect(migrate(db, 22)).toBe(22);
       expect(db.prepare('SELECT origin FROM memories WHERE id = ?').get('m2')).toEqual({
         origin: 'digest',
       });
+    } finally {
+      db.close();
+    }
+  });
+
+  it('adds the experience log in migration 23: episodes, and events that go with them', () => {
+    const db = new Database(':memory:');
+    try {
+      expect(LATEST_SCHEMA_VERSION).toBe(23);
+      migrate(db);
+      db.pragma('foreign_keys = ON');
+      db.prepare(
+        `INSERT INTO episodes (id, mode, trigger, pet_id, started_at)
+         VALUES ('e1', 'turn', 'asked', 'scout', 'x')`,
+      ).run();
+      const event = db.prepare(
+        `INSERT INTO episode_events (episode_id, kind, name, at) VALUES ('e1', ?, 'x', 'x')`,
+      );
+      event.run('step');
+      expect(() => event.run('dream')).toThrow();
+      db.prepare("DELETE FROM episodes WHERE id = 'e1'").run();
+      expect(db.prepare('SELECT COUNT(*) AS n FROM episode_events').get()).toEqual({ n: 0 });
+      // Rerunning 23 on its own is harmless.
+      db.prepare('DELETE FROM schema_version WHERE version >= 23').run();
+      expect(migrate(db)).toBe(23);
     } finally {
       db.close();
     }

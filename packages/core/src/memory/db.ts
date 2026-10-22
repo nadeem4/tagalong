@@ -250,6 +250,41 @@ const MIGRATIONS: readonly Migration[] = [
    );
    CREATE INDEX IF NOT EXISTS jobs_state ON jobs(state, created_at);`,
   addMemoryOrigin,
+  // Migration 23. The experience log: one episode per turn, job, routine run or check-in,
+  // with what the mind was shown (secrets hidden, clipped), what it decided and said, and its
+  // events: tool calls and what the person did about it afterwards. Written by ExperienceLog;
+  // kept EXPERIENCE_KEEP_DAYS days. Events go with their episode.
+  `CREATE TABLE IF NOT EXISTS episodes (
+     id TEXT PRIMARY KEY,
+     mode TEXT NOT NULL,
+     trigger TEXT NOT NULL,
+     pet_id TEXT NOT NULL,
+     ref TEXT,
+     conversation_id TEXT,
+     model TEXT,
+     input TEXT,
+     decision TEXT,
+     said TEXT,
+     note TEXT,
+     input_tokens INTEGER,
+     output_tokens INTEGER,
+     model_calls INTEGER,
+     started_at TEXT NOT NULL,
+     ended_at TEXT
+   );
+   CREATE INDEX IF NOT EXISTS episodes_ref ON episodes(ref);
+   CREATE INDEX IF NOT EXISTS episodes_started ON episodes(started_at);
+   CREATE TABLE IF NOT EXISTS episode_events (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     episode_id TEXT NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+     kind TEXT NOT NULL CHECK (kind IN ('step', 'outcome')),
+     name TEXT NOT NULL,
+     input TEXT,
+     result TEXT,
+     ok INTEGER,
+     at TEXT NOT NULL
+   );
+   CREATE INDEX IF NOT EXISTS episode_events_episode ON episode_events(episode_id);`,
 ];
 
 /** The columns migration 7 gave `activity`, in order. */

@@ -8,6 +8,12 @@
  */
 import { z } from 'zod';
 import { ActivityListParams, ActivityListResult } from './activity';
+import {
+  ExperienceGetParams,
+  ExperienceGetResult,
+  ExperienceListParams,
+  ExperienceListResult,
+} from './experience';
 import { UsageSummaryParams, UsageSummaryResult } from './usage';
 import {
   ConnectionsAddParams,
@@ -504,6 +510,8 @@ export const hostToCoreMethods = {
   'tool.approve': { params: ToolApproveParams, result: ToolApproveResult },
   'watch.stop': { params: WatchStopParams, result: WatchStopResult },
   'activity.list': { params: ActivityListParams, result: ActivityListResult },
+  'experience.list': { params: ExperienceListParams, result: ExperienceListResult },
+  'experience.get': { params: ExperienceGetParams, result: ExperienceGetResult },
   'experts.list': { params: ExpertsListParams, result: ExpertsListResult },
   'experts.upsert': { params: ExpertsUpsertParams, result: ExpertsUpsertResult },
   'experts.delete': { params: ExpertsDeleteParams, result: ExpertsDeleteResult },

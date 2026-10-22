@@ -36,6 +36,8 @@ const HOST_TO_CORE = [
   'tool.approve',
   'watch.stop',
   'activity.list',
+  'experience.list',
+  'experience.get',
   'experts.list',
   'experts.upsert',
   'experts.delete',
