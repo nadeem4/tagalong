@@ -172,6 +172,50 @@ Clicking it opens a panel: **Conversation**, **Waiting on you**, **Work in progr
 learned**, and the [inspector](#the-inspector). The dock's existing thinking, reading, expert and
 working states map onto these; Bean goes.
 
+## Talking and listening
+
+Voice is the main way in; typing and the screen are there when voice does not fit. Most of the
+pipe is built (`apps/desktop/src/main/voice/`): Silero detects speech, Moonshine turns it into
+words, a smart-turn model hears when the person has finished, and Kokoro (local) or ElevenLabs
+speaks, a sentence at a time so speech starts at once. All hearing runs on the machine.
+
+**How it listens**
+
+| Mode             | How                                                       | Built                                   |
+| ---------------- | --------------------------------------------------------- | --------------------------------------- |
+| Push to talk     | Hold the hotkey and speak                                 | Yes                                     |
+| Always listening | Opt in; it acts only on speech meant for it               | Partly: listening and pausing are built |
+| By name          | Say its name, then the ask; the name is caught locally    | No                                      |
+| Follow-up        | After it speaks, a few seconds to answer without the name | Partly                                  |
+
+- **Is that for me?** When always listening, the reflex decides whether speech was addressed to
+  the mind (its name, a question after it spoke, "can you…" while looking at it). Speech not meant
+  for it is dropped at once and never stored.
+- **Never during calls.** Listening pauses in calls and full screen, as today. Only the person
+  switches always-listening on; it never switches itself on.
+- **Always visible.** The bubble brightens whenever it is listening; there is no hidden listening.
+
+**How it talks**
+
+- **Say the gist, show the detail.** Spoken answers are one or two sentences; anything longer
+  (code, lists, diffs, a plan) goes in the panel with "I've put the details up."
+- **Acknowledge at once.** For a request that takes time, an instant short line ("On it.",
+  "Looking now.") comes first, then the real answer when ready. A silent pause of several seconds
+  breaks the feeling of talking to someone.
+- **Interruptible.** If the person starts speaking while it talks, it stops and listens. Not built
+  yet: it needs echo cancellation so it does not hear itself.
+- **Speaks unprompted only by the ask rules.** Out loud only when the person is free; in calls,
+  full screen or focus, the line waits in the bubble.
+- **Its own voice.** A voice chosen for the character, never an imitation of a real person's or a
+  film character's voice.
+
+**Voice and asks.** "Go ahead" answers an ask spoken aloud. Sending to other people, deleting,
+paying and pushing need a click or an explicit phrase ("yes, send it"), never an overheard "yeah".
+
+**Later: speech to speech.** Realtime voice models answer faster but are weaker at tools and
+judgement. The pipe stays words → thinking → speech, with the instant acknowledgement covering the
+gap. Revisit when realtime models can carry the mind.
+
 ## The Self
 
 A folder of plain Markdown in the data directory (`%APPDATA%\Tagalong\self\`), which the mind reads
@@ -366,7 +410,8 @@ come.
 3. **The Self and sleep.** The folder, its tools and versions, **What I've learned**, sleep with its
    critic; migrate `memories`.
 4. **Asks, experts and the bubble.** Plan cards, the channel rules, the expert reviewed before it
-   is shown, the bubble and panel replacing Bean.
+   is shown, the bubble and panel replacing Bean. Voice: listening by name, the instant
+   acknowledgement, say-the-gist, and stopping when interrupted.
 5. **Reflex.** The event stream and the reflex model replace the lookout, active-time, pick-up and
    arrivals triggers; their code is deleted.
 6. **Scenarios.** `packages/evals`, the seed set, **Make this a scenario**, the health view.
@@ -374,7 +419,8 @@ come.
 
 ## Open questions
 
-- **Name and voice.** The new character needs its own name and voice.
+- **Name and voice.** The new character needs its own name and voice, and the name has to be easy
+  to catch locally as a wake word.
 - **Cost.** A strong thinking model is the main cost; the reflex split and the daily budget keep it
   in check, but the default budget needs a number.
 - **Experience log retention.** Default length, and whether screen-derived text in `inputs` is kept
