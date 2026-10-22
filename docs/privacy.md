@@ -647,7 +647,8 @@ check-in, silent ones included.
 characters, not kept]` instead. Window titles, and the branch and file names read from them, are
   not kept either; the app's name and the reason Scout woke are.
 - **Its steps:** each tool Scout called, with what it was called with and the first line of what
-  came back, except a screen tool's, which keeps only the marker; a picture is never kept.
+  came back, except a screen tool's or a search of your history's, which keeps only the marker; a
+  picture is never kept.
 - **What you did about it:** **Not now** on a line or on the Pick up card, an offer taken, a
   hand-off card sent or dismissed.
 - **Secrets hidden, clipped, local.** Keys, tokens and passwords are hidden before anything is

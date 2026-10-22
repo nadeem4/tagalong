@@ -123,6 +123,24 @@ describe('ExperienceLog: turns', () => {
     ]);
   });
 
+  it('keeps no window titles from a history search either: only the marker', () => {
+    const turnId = started(asked('what was that article?'));
+    log.observe({
+      method: 'turn.toolRequest',
+      params: { turnId, approvalId: randomUUID(), tool: 'search_history', input: {} },
+    });
+    const titles = 'Tue 13 Oct 14:05 saw in chrome: "Re: offer letter - Inbox" (2)';
+    log.observe({
+      method: 'turn.toolResult',
+      params: { turnId, tool: 'search_history', ok: true, summary: titles },
+    });
+    completed(turnId, 'The offer letter.');
+
+    const [step] = only().events;
+    expect(step?.result).toBe(`[screen text, ${titles.length} characters, not kept]`);
+    expect(JSON.stringify(only())).not.toContain('offer letter - Inbox');
+  });
+
   it('matches each result to its call by the call id, even two of one tool at once', () => {
     const turnId = started(asked('both'));
     for (const callId of ['c1', 'c2']) {

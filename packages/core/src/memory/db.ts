@@ -422,7 +422,8 @@ function addMemoryOrigin(db: Database.Database): void {
  * what the mind was shown (secrets hidden, screen text left out, clipped), what it decided and
  * said, and its events: tool calls (with the provider's call id, when it gives one) and what
  * the person did about it afterwards. Written by ExperienceLog; kept EXPERIENCE_KEEP_DAYS days.
- * Events go with their episode. A database from an early build of 23 gains the call id.
+ * Events go with their episode. The call id is added guarded, so rerunning 23 over an early
+ * build's tables is harmless; a database that already recorded 23 does not rerun it.
  */
 function addExperienceLog(db: Database.Database): void {
   db.exec(`CREATE TABLE IF NOT EXISTS episodes (

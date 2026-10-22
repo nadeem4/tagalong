@@ -672,7 +672,7 @@ describe('migrate', () => {
           .all()
           .map((column) => column.name);
       expect(columns()).toContain('call_id');
-      // A database from an early build of 23, before events kept the call id, gains it.
+      // Rerun over an early build's events table, before it kept the call id, 23 adds it.
       db.exec('DROP TABLE episode_events');
       db.exec(
         `CREATE TABLE episode_events (id INTEGER PRIMARY KEY AUTOINCREMENT, episode_id TEXT NOT NULL,

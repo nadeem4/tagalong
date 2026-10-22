@@ -24,6 +24,7 @@ import {
   LOOK_CLOSER,
   READ_WINDOW_TEXT,
 } from '../tools/builtin/perception';
+import { SEARCH_HISTORY } from '../tools/builtin/history';
 import type { ConversationStore } from './store';
 
 /** What the mind was shown: a question, or a check-in's whole bundle. */
@@ -37,7 +38,8 @@ const WAITING_CARDS = 50;
 
 /**
  * Tools whose results are what is on the screen: window text, OCR, the selection, window
- * titles, what a look saw. The log keeps only how much there was, never the text.
+ * titles (a history search's included), what a look saw. The log keeps only how much there
+ * was, never the text.
  */
 const SCREEN_TOOLS: ReadonlySet<string> = new Set([
   LOOK_AT_SCREEN,
@@ -49,6 +51,7 @@ const SCREEN_TOOLS: ReadonlySet<string> = new Set([
   LOOK_AT_WINDOW,
   RECALL_SCREEN,
   WHAT_CHANGED,
+  SEARCH_HISTORY,
 ]);
 
 /** What stands in for screen text the log does not keep. */

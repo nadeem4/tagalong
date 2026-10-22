@@ -400,8 +400,8 @@ come.
 
 1. **Foundation.**
    - The experience log.
-   - One identity in every mode (the check-in, digest, summariser and watch prompts gain the soul
-     and a mode block).
+   - One identity in every mode (the check-in, digest and summariser prompts gain the soul and a
+     mode block; the watch judge stays a plain yes/no matcher, plumbing rather than speech).
    - Thinking moves to a stronger tier.
    - Done when every turn and check-in decision, including NOTHING, is an episode with its steps
      and outcomes, and the inspector shows them.

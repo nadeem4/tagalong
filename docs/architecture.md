@@ -1693,8 +1693,8 @@ forLog: true })` over the same facts the mind was sent: the window text becomes
 `notKept(text)` (`[screen text, N characters, not kept]`), a window keeps only its `App:` line, and a
 pick-up project keeps its name but not the branch or file read from a title. A step of a screen tool
 (`look_at_screen`, `get_selection`, `look_at_display`, `look_closer`, `list_windows`,
-`read_window_text`, `look_at_window`, `recall_screen`, `what_changed`) keeps `notKept(summary)` as
-its result.
+`read_window_text`, `look_at_window`, `recall_screen`, `what_changed`, and `search_history`, whose
+results are window titles) keeps `notKept(summary)` as its result.
 
 | Source                                       | Recorded                                          |
 | -------------------------------------------- | ------------------------------------------------- |
