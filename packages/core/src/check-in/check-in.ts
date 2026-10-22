@@ -27,7 +27,7 @@ import type { PerceptionHost } from '../perception';
 import type { Recalled } from '../memory/recall';
 import { gatherNow, safe, type NowSources } from '../conversation/now';
 import { hideSecrets } from '../privacy/secrets';
-import { soul } from '../roles';
+import { modeSystem } from '../roles';
 import { Lookout, blind, callOrFullScreenInFront } from '../keep-an-eye/lookout';
 import type { PickUpReady } from '../pick-up/pick-up';
 import { ActiveTime } from './active-time';
@@ -314,7 +314,7 @@ export class CheckIn {
         pet,
         summarizer: settings.summarizer,
         provider: this.#o.provider,
-        system: `${soul()}\n\n${CHECK_IN_INSTRUCTIONS}`,
+        system: modeSystem(CHECK_IN_INSTRUCTIONS),
         bundle: this.#bundle(pet, wake, settings),
         timeoutMs: this.#o.timeoutMs ?? CHECK_IN_TIMEOUT_MS,
         ...(this.#o.log === undefined ? {} : { log: this.#o.log }),

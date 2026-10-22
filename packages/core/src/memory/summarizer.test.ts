@@ -11,7 +11,13 @@ import { ConversationStore } from './store';
 import { SettingsStore } from '../settings/settings';
 import { BrainError, FakeBrainProvider } from '../providers';
 import type { BrainProvider, BrainRequest } from '../providers';
-import { SUMMARY_KEEP_RECENT, SUMMARY_THRESHOLD, Summarizer } from './summarizer';
+import { soul } from '../roles';
+import {
+  SUMMARY_INSTRUCTIONS,
+  SUMMARY_KEEP_RECENT,
+  SUMMARY_THRESHOLD,
+  Summarizer,
+} from './summarizer';
 
 const scout: Pet = {
   id: 'scout',
@@ -102,6 +108,17 @@ describe('Summarizer', () => {
     const sent = fake.requests[0]?.messages[0]?.content[0];
     expect(sent?.type === 'text' ? sent.text : '').toContain('Scout: message 1');
     expect(fake.requests[0]?.tools).toBeUndefined();
+  });
+
+  it('summarises as Scout, in its own soul, writing a note for its own memory', async () => {
+    const fake = brains();
+    await new Summarizer({ store, memories, settings, provider: fake.resolve }).schedule(
+      conversationWith(SUMMARY_THRESHOLD),
+      scout,
+    );
+
+    expect(fake.requests[0]?.system).toBe(`${soul()}\n\n${SUMMARY_INSTRUCTIONS}`);
+    expect(SUMMARY_INSTRUCTIONS).not.toMatch(/an assistant/);
   });
 
   it('defaults to the pet’s own provider and model', async () => {

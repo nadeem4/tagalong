@@ -14,6 +14,7 @@ import type {
 } from '@tagalong/protocol';
 import type { BrainContentBlock, BrainProvider } from '../providers';
 import { watchModelsFor } from '../providers';
+import { modeSystem } from '../roles';
 import type { PerceptionHost } from '../perception';
 
 /** How often a watch compares the region, in ms. */
@@ -39,11 +40,13 @@ const TEXT_TAIL_CHARS = 4_000;
 /** Longest timeout a pet may ask for, whatever it says. */
 const MAX_TIMEOUT_MINUTES = 240;
 
-const CHECK_SYSTEM =
-  "You watch part of a user's screen for one condition. Decide only whether the condition " +
-  'is clearly true in what you are shown right now. Reply with JSON and nothing else: ' +
-  '{"answer": "yes" or "no", "reason": "one short sentence about what you see"}. ' +
-  'When unsure, answer no.';
+/** The `## Watching` block after the soul. */
+export const WATCH_INSTRUCTIONS = [
+  '## Watching',
+  'They asked you to watch part of their screen for one condition. Decide only whether the condition is clearly true in what you are shown right now.',
+  'Reply with JSON and nothing else: {"answer": "yes" or "no", "reason": "one short sentence about what you see"}.',
+  'When unsure, answer no.',
+].join('\n');
 
 /** Time, injected so the watch runs under a fake clock in tests. */
 export interface WatchClock {
@@ -381,7 +384,7 @@ export class WatchManager {
     const result = await provider.complete(
       {
         model: models.model,
-        system: CHECK_SYSTEM,
+        system: modeSystem(WATCH_INSTRUCTIONS),
         messages: [{ role: 'user', content }],
         maxTokens: 120,
       },

@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 import type { PerceptionDiffParams, PerceptionDiffResult, Pet, Settings } from '@tagalong/protocol';
 import type { BrainProvider, BrainRequest, BrainResult } from '../providers';
 import type { PerceptionHost } from '../perception';
+import { soul } from '../roles';
 import { FakeClock } from './fake-clock';
 import {
   WATCH_CHANGE_THRESHOLD,
+  WATCH_INSTRUCTIONS,
   WATCH_POLL_MS,
   WATCH_SETTLE_MS,
   WatchManager,
@@ -211,6 +213,7 @@ describe('WatchManager', () => {
 
     const request = check.requests[0]!;
     expect(request.model).toBe('claude-haiku-4-5');
+    expect(request.system).toBe(`${soul()}\n\n${WATCH_INSTRUCTIONS}`);
     expect(request.system).toMatch(/yes/);
     expect(request.tools).toBeUndefined();
     const content = request.messages[0]!.content;

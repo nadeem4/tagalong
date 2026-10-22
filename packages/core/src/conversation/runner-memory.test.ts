@@ -11,7 +11,7 @@ import { ConversationStore } from '../memory/store';
 import { SettingsStore } from '../settings/settings';
 import { FakeBrainProvider } from '../providers';
 import type { BrainProvider, BrainRequest, FakeScript } from '../providers';
-import { SUMMARY_KEEP_RECENT, Summarizer } from '../memory/summarizer';
+import { SUMMARY_INSTRUCTIONS, SUMMARY_KEEP_RECENT, Summarizer } from '../memory/summarizer';
 import { REMEMBER } from '../tools';
 import { MEMORY_HEADING } from './now';
 import { ConversationRunner, type TurnEvent } from './runner';
@@ -182,7 +182,7 @@ describe('the summary job after turns', () => {
     await Promise.all(jobs);
 
     await r.run({ pet: scout, text: 'question 10', conversationId }).done;
-    const turnRequests = requests.filter((req) => !req.system.startsWith('You condense'));
+    const turnRequests = requests.filter((req) => !req.system.includes(SUMMARY_INSTRUCTIONS));
 
     expect(turnRequests.at(-2)?.messages).toHaveLength(19);
     expect(turnRequests.at(-1)?.messages).toHaveLength(SUMMARY_KEEP_RECENT + 1);

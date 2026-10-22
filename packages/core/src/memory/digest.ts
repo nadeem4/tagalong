@@ -13,7 +13,7 @@ import { clip } from '../jobs/jobs';
 import type { JobRow, JobStore } from '../jobs/store';
 import { hideSecrets } from '../privacy/secrets';
 import type { BrainProvider } from '../providers';
-import { soul } from '../roles';
+import { modeSystem } from '../roles';
 import type { WatchClock } from '../watch/watch-manager';
 import type { Memory, MemoryKind, MemoryStore } from './memories';
 
@@ -164,7 +164,7 @@ export class Digest {
       const result = await this.#o.provider(brainPet).complete(
         {
           model: brainPet.model,
-          system: `${soul()}\n\n${DIGEST_INSTRUCTIONS}`,
+          system: modeSystem(DIGEST_INSTRUCTIONS),
           messages: [
             {
               role: 'user',

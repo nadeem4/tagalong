@@ -14,7 +14,7 @@ import {
   parseSoulFile,
   renderLibrary,
 } from '../../scripts/gen-roles.mjs';
-import { ACTIVE_SOUL, getRole, roleFor, soul } from './index';
+import { ACTIVE_SOUL, getRole, modeSystem, roleFor, soul } from './index';
 import { ROLE_LIBRARY, SOUL_LIBRARY } from './library.generated';
 
 /** Every built-in tool a role may name. Update when a built-in tool is added or renamed. */
@@ -259,6 +259,10 @@ describe('the soul files', () => {
 
   it('give soul() the active soul', () => {
     expect(soul()).toBe(SOUL_LIBRARY[ACTIVE_SOUL]);
+  });
+
+  it('give every mode the same soul, then the mode block', () => {
+    expect(modeSystem('## Watching\nLook.')).toBe(`${soul()}\n\n## Watching\nLook.`);
   });
 });
 
