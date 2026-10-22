@@ -9,10 +9,11 @@ Each page starts with a status line:
 - **Built**: matches the code on `main`.
 - **Design**: agreed, not built yet.
 
-| Page                                  | Status         | Covers                                                         |
-| ------------------------------------- | -------------- | -------------------------------------------------------------- |
-| [Memory](memory.md)                   | Built + design | Threads, summaries, memories, recall, screen memory            |
-| [Roles and tools](roles-and-tools.md) | Built          | The companion's role file, the model it uses, the tools module |
+| Page                                  | Status         | Covers                                                            |
+| ------------------------------------- | -------------- | ----------------------------------------------------------------- |
+| [Memory](memory.md)                   | Built + design | Threads, summaries, memories, recall, screen memory               |
+| [Roles and tools](roles-and-tools.md) | Built          | The companion's role file, the model it uses, the tools module    |
+| [The mind](mind.md)                   | Design         | Where Scout is going: one mind, the Self, asks, experts, learning |
 
 ## The model in one paragraph
 
