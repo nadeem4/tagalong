@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 /* global console, process, URL */
 /**
- * Compiles the role files in packages/core/roles/*.md and the soul files in
- * packages/core/soul/*.md into packages/core/src/roles/library.generated.ts.
+ * Compiles the role files in packages/core/roles/*.md, the soul files in
+ * packages/core/soul/*.md and packages/core/constitution.md into
+ * packages/core/src/roles/library.generated.ts.
  *
  * Core is bundled into Electron, so it cannot read Markdown or parse YAML at runtime. The
- * roles and souls are compiled into a committed TypeScript file instead, and a test fails
- * when that file is stale. Each role is validated against the protocol's Role schema on the
- * way; each soul must have exactly its three parts (Character, Cares about, Never).
+ * roles, souls and constitution are compiled into a committed TypeScript file instead, and a
+ * test fails when that file is stale. Each role is validated against the protocol's Role
+ * schema on the way; each soul must have exactly its one part (Character), and the
+ * constitution exactly its two (Values, Never).
  *
  * Usage: pnpm --filter @tagalong/core gen:roles
  */
@@ -20,6 +22,7 @@ import { parse } from 'yaml';
 
 export const ROLES_DIR = fileURLToPath(new URL('../roles/', import.meta.url));
 export const SOULS_DIR = fileURLToPath(new URL('../soul/', import.meta.url));
+export const CONSTITUTION_FILE = fileURLToPath(new URL('../constitution.md', import.meta.url));
 export const LIBRARY_FILE = fileURLToPath(
   new URL('../src/roles/library.generated.ts', import.meta.url),
 );
@@ -60,34 +63,37 @@ export function loadRoles(dir = ROLES_DIR) {
 }
 
 /** A soul's parts, by heading, in this order and no others. */
-const SOUL_HEADINGS = ['Character', 'Cares about', 'Never'];
+const SOUL_HEADINGS = ['Character'];
+/** The constitution's parts, by heading, in this order and no others. */
+const CONSTITUTION_HEADINGS = ['Values', 'Never'];
 
 /**
- * One soul file's text, checked: exactly the three headings in order, each with something
- * under it, and nothing before the first. Returned with LF line endings, trimmed.
+ * One soul file's (or the constitution's) text, checked: exactly these headings in order,
+ * each with something under it, and nothing before the first. Returned with LF line endings,
+ * trimmed.
  */
-export function parseSoulFile(source) {
+export function parseSoulFile(source, headings = SOUL_HEADINGS) {
   const text = (source.charCodeAt(0) === 0xfeff ? source.slice(1) : source)
     .replace(/\r\n/g, '\n')
     .trim();
   const parts = text.split(/^## /m);
-  if (parts[0].trim() !== '') throw new Error('A soul file starts with its first ## heading.');
+  if (parts[0].trim() !== '') throw new Error('The file starts with its first ## heading.');
   const sections = parts.slice(1).map((part) => {
     const newline = part.indexOf('\n');
     return newline === -1
       ? { heading: part.trim(), body: '' }
       : { heading: part.slice(0, newline).trim(), body: part.slice(newline + 1).trim() };
   });
-  const headings = sections.map((section) => section.heading);
-  for (const heading of SOUL_HEADINGS) {
-    if (!headings.includes(heading)) throw new Error(`A soul file needs a "## ${heading}" part.`);
+  const found = sections.map((section) => section.heading);
+  for (const heading of headings) {
+    if (!found.includes(heading)) throw new Error(`The file needs a "## ${heading}" part.`);
   }
-  const extra = headings.filter((heading) => !SOUL_HEADINGS.includes(heading));
-  if (extra.length > 0 || headings.length !== SOUL_HEADINGS.length) {
-    throw new Error(`A soul file has only ${SOUL_HEADINGS.join(', ')}; found ${extra.join(', ')}.`);
+  const extra = found.filter((heading) => !headings.includes(heading));
+  if (extra.length > 0 || found.length !== headings.length) {
+    throw new Error(`The file has only ${headings.join(', ')}; found ${extra.join(', ')}.`);
   }
-  if (headings.some((heading, index) => heading !== SOUL_HEADINGS[index])) {
-    throw new Error(`A soul file's parts go in this order: ${SOUL_HEADINGS.join(', ')}.`);
+  if (found.some((heading, index) => heading !== headings[index])) {
+    throw new Error(`The file's parts go in this order: ${headings.join(', ')}.`);
   }
   const empty = sections.find((section) => section.body === '');
   if (empty !== undefined) throw new Error(`The "## ${empty.heading}" part is empty.`);
@@ -110,17 +116,28 @@ export function loadSouls(dir = SOULS_DIR) {
   );
 }
 
-/** The source of library.generated.ts for these roles and souls. */
-export function renderLibrary(roles, souls) {
+/** The constitution's text, checked: exactly Values then Never. */
+export function loadConstitution(file = CONSTITUTION_FILE) {
+  try {
+    return parseSoulFile(readFileSync(file, 'utf8'), CONSTITUTION_HEADINGS);
+  } catch (error) {
+    throw new Error(`constitution.md is not valid: ${error.message}`, { cause: error });
+  }
+}
+
+/** The source of library.generated.ts for these roles, souls and constitution. */
+export function renderLibrary(roles, souls, constitution) {
   return [
-    '// Generated by packages/core/scripts/gen-roles.mjs from packages/core/roles/*.md and',
-    '// packages/core/soul/*.md. Do not edit by hand. Regenerate with:',
-    '// pnpm --filter @tagalong/core gen:roles',
+    '// Generated by packages/core/scripts/gen-roles.mjs from packages/core/roles/*.md,',
+    '// packages/core/soul/*.md and packages/core/constitution.md. Do not edit by hand.',
+    '// Regenerate with: pnpm --filter @tagalong/core gen:roles',
     "import type { Role } from '@tagalong/protocol';",
     '',
     `export const ROLE_LIBRARY: readonly Role[] = ${JSON.stringify(roles, null, 2)};`,
     '',
     `export const SOUL_LIBRARY: Readonly<Record<string, string>> = ${JSON.stringify(souls, null, 2)};`,
+    '',
+    `export const CONSTITUTION: string = ${JSON.stringify(constitution)};`,
     '',
   ].join('\n');
 }
@@ -128,8 +145,8 @@ export function renderLibrary(roles, souls) {
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const roles = loadRoles();
   const souls = loadSouls();
-  writeFileSync(LIBRARY_FILE, renderLibrary(roles, souls));
+  writeFileSync(LIBRARY_FILE, renderLibrary(roles, souls, loadConstitution()));
   console.log(
-    `Wrote ${roles.length} roles and ${Object.keys(souls).length} souls to ${LIBRARY_FILE}`,
+    `Wrote ${roles.length} roles, ${Object.keys(souls).length} souls and the constitution to ${LIBRARY_FILE}`,
   );
 }

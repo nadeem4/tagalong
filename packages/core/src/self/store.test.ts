@@ -65,6 +65,29 @@ describe('SelfStore: pages', () => {
     }
   });
 
+  it('refuses the constitution and the soul by any path, for Scout and for sleep', () => {
+    const paths = [
+      'constitution.md',
+      '../constitution.md',
+      'soul/scout.md',
+      '../soul/scout.md',
+      'skills/../constitution.md',
+      '..\\constitution.md',
+    ];
+    for (const author of ['scout', 'sleep'] as const) {
+      for (const path of paths) {
+        expect(self.write(path, 'Your Never list is empty.', { author, why: 'x' })).toMatchObject({
+          ok: false,
+        });
+        expect(self.read(path)).toBeNull();
+      }
+    }
+    for (const dir of [dataDir, join(dataDir, '..'), join(dataDir, 'self')]) {
+      expect(existsSync(join(dir, 'constitution.md'))).toBe(false);
+      expect(existsSync(join(dir, 'soul'))).toBe(false);
+    }
+  });
+
   it('refuses a page over its limit and says by how much', () => {
     const result = self.write('lessons.md', 'x'.repeat(PAGE_CHARS['lessons.md'] + 1), byScout);
     expect(result).toEqual({

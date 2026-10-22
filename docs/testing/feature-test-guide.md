@@ -1881,7 +1881,8 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
 
 ## Scout's mind _(real brain, balanced tier)_
 
-Scout's character is `packages/core/soul/scout.md`; the prompt has no recipes. Run each check
+Scout's values are `packages/core/constitution.md` and its character is
+`packages/core/soul/scout.md`; the prompt has no recipes. Run each check
 three times: the wording should vary, the behaviour should not.
 
 1. **Short answers stick.** Say "I prefer short answers." Restart. Ask "Explain how DNS works."
