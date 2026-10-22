@@ -358,6 +358,14 @@ export class Engine {
     const experience = new ExperienceLog(db, store);
     experience.interrupted();
     experience.prune();
+    /** A record that could not be written is lost, never a turn or a card that fails with it. */
+    const record = (write: () => unknown): void => {
+      try {
+        write();
+      } catch (error) {
+        console.warn('[engine] the experience log did not take an entry:', error);
+      }
+    };
     const routineStore = new RoutineStore(db);
     routineStore.interrupted();
     // When a turn of theirs last ended, on the clock finished work is gathered on.
@@ -365,7 +373,7 @@ export class Engine {
     const talk = { turns: new Set<string>(), endedAt: Number.NEGATIVE_INFINITY };
     const emit: TurnEventSink = (event) => {
       activity.observe(event);
-      experience.observe(event);
+      record(() => experience.observe(event));
       if (event.method === 'turn.started' && event.params.background !== true) {
         talk.turns.add(event.params.turnId);
       } else if (event.method === 'turn.completed' || event.method === 'turn.error') {
@@ -407,7 +415,7 @@ export class Engine {
       emit: (event) => {
         // A card shown during a turn is tied to it, so what the person does with it is too.
         if (event.method === 'handoff.proposed') {
-          experience.proposed(event.params.proposalId, event.params.petId);
+          record(() => experience.proposed(event.params.proposalId, event.params.petId));
         }
         live.server?.broadcast(event.method, event.params);
         if (event.method !== 'handoff.finished') return;
@@ -733,6 +741,7 @@ export class Engine {
     const handlers = buildHandlers({
       activity,
       experience,
+      record,
       runner,
       pets,
       settings,
@@ -837,6 +846,8 @@ export class Engine {
 function buildHandlers(parts: {
   activity: ActivityLog;
   experience: ExperienceLog;
+  /** Writes to the experience log, where a failure is logged and never fails the call. */
+  record: (write: () => unknown) => void;
   runner: ConversationRunner;
   pets: PetRegistry;
   settings: SettingsStore;
@@ -867,7 +878,7 @@ function buildHandlers(parts: {
   /** Guarded but not recorded: a key check sends no screen, so it writes no row. */
   checkResolve: ProviderResolver;
 }): MethodHandlers {
-  const { activity, experience, runner, pets, settings, models, hosts, watches } = parts;
+  const { activity, experience, record, runner, pets, settings, models, hosts, watches } = parts;
   const { refreshProviders, experts, handoffs, projects, connectorFor } = parts;
   const { checkIn, connections, approvals, routines, pickUp } = parts;
   const { sightLog, checkResolve } = parts;
@@ -977,12 +988,12 @@ function buildHandlers(parts: {
     'handoffs.cancel': (params) => ({ cancelled: handoffs.cancel(params.handoffId) }),
     'handoffs.confirm': (params) => {
       const confirmed = handoffs.confirm(params);
-      experience.proposalOutcome(params.proposalId, 'sent');
+      record(() => experience.proposalOutcome(params.proposalId, 'sent'));
       return confirmed;
     },
     'handoffs.dismiss': (params) => {
       const dismissed = handoffs.dismiss(params.proposalId);
-      if (dismissed) experience.proposalOutcome(params.proposalId, 'dismissed');
+      if (dismissed) record(() => experience.proposalOutcome(params.proposalId, 'dismissed'));
       return { dismissed };
     },
     'projects.search': (params) => ({ projects: projects.search(params.query) }),
