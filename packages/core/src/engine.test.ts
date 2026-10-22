@@ -164,6 +164,27 @@ describe('Engine.boot', () => {
     expect(engine.pairingToken).toBe(token);
   });
 
+  it('keeps each turn in the experience log, with its decision, for experience.list and get', async () => {
+    const e = await boot();
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+
+    await host.call('ask', { petId: 'scout', input: { text: 'what time is it?' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+
+    const listed = (await host.call('experience.list', {}))['result'] as {
+      episodes: { id: string; mode: string; input?: string; decision?: string }[];
+    };
+    const turn = listed.episodes.find((episode) => episode.mode === 'turn');
+    expect(turn).toMatchObject({ input: 'what time is it?', decision: 'answered' });
+    const got = (await host.call('experience.get', { id: turn!.id }))['result'] as {
+      episode: { id: string };
+      events: unknown[];
+    };
+    expect(got.episode.id).toBe(turn!.id);
+    expect(Array.isArray(got.events)).toBe(true);
+  });
+
   it('closes activity a crash left running, so it does not spin forever', async () => {
     const db = openDatabase(dir);
     db.prepare(

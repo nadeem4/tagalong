@@ -14,6 +14,7 @@ import type {
   WindowEntry,
 } from '@tagalong/protocol';
 import type { PickUpReady } from '../pick-up/pick-up';
+import type { CheckInEpisode } from '../memory/experience';
 import type { Arrival } from './arrivals';
 import type { PerceptionHost } from '../perception';
 import type { Memory } from '../memory/memories';
@@ -82,6 +83,8 @@ function setup(options: SetupOptions = {}) {
   const reported: string[][] = [];
   const proposals: Array<{ expertId: string; petId: string; brief: Brief; projectHint?: string }> =
     [];
+  const episodes: CheckInEpisode[] = [];
+  const outcomes: Array<[string, string]> = [];
   const host: PerceptionHost = {
     capabilities: ['textLayer'],
     capture: () => Promise.resolve({}),
@@ -138,6 +141,16 @@ function setup(options: SetupOptions = {}) {
       else moods.push(event.params.mood);
     },
     spentOut: () => state.spentOut,
+    experience: {
+      checkIn: (entry) => {
+        episodes.push(entry);
+        return `e${episodes.length}`;
+      },
+      outcome: (ref, name) => {
+        outcomes.push([ref, name]);
+        return true;
+      },
+    },
     log: (message) => logs.push(message),
   });
   /** The front window settles, then one snapshot past the thirty seconds. */
@@ -165,6 +178,8 @@ function setup(options: SetupOptions = {}) {
     routinesSince,
     reported,
     proposals,
+    episodes,
+    outcomes,
     logs,
     queries,
     checkIn,
@@ -801,5 +816,54 @@ describe('CheckIn: launch and back', () => {
     t.state.closed = true;
     await expect(t.checkIn.launch(facts)).resolves.toBeUndefined();
     expect(t.pickUps).toHaveLength(0);
+  });
+});
+
+describe('CheckIn: the experience log', () => {
+  it('records a silent check-in as quiet, with what the mind was shown', async () => {
+    const t = setup();
+    await t.checkIn.observeWindows([failing]);
+    expect(t.episodes).toEqual([
+      expect.objectContaining({
+        petId: scout.id,
+        trigger: 'trouble',
+        model: scout.model,
+        decision: 'quiet',
+        input: sentText(t.mind.requests[0]!),
+      }),
+    ]);
+    expect(t.episodes[0]?.said).toBeUndefined();
+  });
+
+  it('records a brain that failed as no-answer, apart from silence', async () => {
+    const t = setup({ mind: [{ throws: new Error('offline') }] });
+    await t.checkIn.observeWindows([failing]);
+    expect(t.episodes[0]?.decision).toBe('no-answer');
+  });
+
+  it('records a line as spoke, under the remark id Not now comes back with', async () => {
+    const t = setup({ mind: ['That port is still taken.'] });
+    await t.checkIn.observeWindows([failing]);
+    const remarkId = t.remarks[0]!.remarkId;
+    expect(t.episodes[0]).toMatchObject({
+      ref: remarkId,
+      decision: 'spoke',
+      said: 'That port is still taken.',
+    });
+    t.checkIn.notNow();
+    expect(t.outcomes).toEqual([[remarkId, 'not-now']]);
+  });
+
+  it('records an offer as offered, and taking it as accepted', async () => {
+    const t = setup({ mind: ['That port is taken.\nOFFER: Free port 3000\nEXPERT: claude-code'] });
+    await t.checkIn.observeWindows([failing]);
+    const remarkId = t.remarks[0]!.remarkId;
+    expect(t.episodes[0]).toMatchObject({
+      ref: remarkId,
+      decision: 'offered',
+      note: 'Free port 3000',
+    });
+    expect(await t.checkIn.accept(remarkId)).toBe(true);
+    expect(t.outcomes).toEqual([[remarkId, 'accepted']]);
   });
 });

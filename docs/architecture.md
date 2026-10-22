@@ -1671,6 +1671,33 @@ expert's name at the time, the brief as text, the answer and the files changed. 
 exist yet. `ActivityLog.since(startIso, limit = 200, untilIso?)` returns the listed kinds that
 started at or after a time (and before `untilIso`), oldest first: the one query of `search_history`'s day listing.
 
+### The experience log
+
+What the mind decided and what came of it, the record [the mind](concepts/mind.md) learns from.
+`ExperienceLog` (`memory/experience.ts`) writes `episodes` and `episode_events` (migration 23). An
+episode is one turn, job, routine run or check-in: `mode`, `trigger` (`asked`, `job`, `routine`,
+or the check-in's reason), `ref` (the turn id or the remark id that outcomes come back with), the
+model, `input` (the question, or the check-in's whole bundle), `decision` (`answered`, `stopped`,
+`error`, `quiet`, `spoke`, `offered`, `no-answer`), `said`, `note` (an offer, or why a turn stopped
+or failed), token counts and model calls. Its events are `step`s (a tool call: name, input, the
+first line of its result, ok) and `outcome`s (`not-now`, `accepted`, `sent`, `dismissed`).
+
+| Source                                         | Recorded                                          |
+| ---------------------------------------------- | ------------------------------------------------- |
+| `turn.started`                                 | an episode: mode, trigger, model, the question    |
+| `turn.toolRequest` / `turn.toolResult`         | a step, then its result                           |
+| `turn.completed` / `turn.error`                | the decision, what was said, tokens, calls        |
+| `CheckIn#wake`, once the mind answered         | a check-in episode, NOTHING and failures included |
+| `CheckIn.notNow` / `CheckIn.accept`            | `not-now` / `accepted` on the last line's episode |
+| `handoff.proposed`, `handoffs.confirm/dismiss` | `sent` / `dismissed` on the turn that showed it   |
+
+`observe` sits in the engine's event sink beside `ActivityLog.observe`. Everything kept goes
+through `hideSecrets`; `input` is clipped at 8,000 characters, the rest at 4,000; pictures are
+never kept. At boot `interrupted` closes open episodes as `stopped` and `prune` deletes episodes
+older than 30 days (`EXPERIENCE_KEEP_DAYS`) with their events. `experience.list { before?, limit =
+30 (max 100) }` answers `{ episodes, next? }`, newest first; `experience.get { id }` answers
+`{ episode, events }` or null.
+
 ### What Scout saw
 
 `memory/sight-log.ts` keeps Home's record of Scout's own looking in `sight_log(id, kind, at, app,

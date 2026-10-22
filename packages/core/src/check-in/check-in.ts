@@ -30,6 +30,7 @@ import { hideSecrets } from '../privacy/secrets';
 import { modeSystem } from '../roles';
 import { Lookout, blind, callOrFullScreenInFront } from '../keep-an-eye/lookout';
 import type { PickUpReady } from '../pick-up/pick-up';
+import type { ExperienceLog } from '../memory/experience';
 import { ActiveTime } from './active-time';
 import type { Arrival } from './arrivals';
 import { RECENT_LINES, WINDOW_TEXT_CHARS, renderBundle, type BundleReason } from './bundle';
@@ -87,6 +88,8 @@ export interface CheckInOptions {
   ) => void;
   /** The daily budget gate: true stops every check-in. */
   spentOut: () => boolean;
+  /** Where every decision, silence included, and what the person did about it is kept. */
+  experience?: Pick<ExperienceLog, 'checkIn' | 'outcome'> | undefined;
   log?: (message: string) => void;
   timeoutMs?: number;
 }
@@ -124,6 +127,8 @@ export class CheckIn {
   #day = { key: '', calls: 0 };
   readonly #recent: string[] = [];
   #offer: Offer | null = null;
+  /** The last line shown, which Not now answers. */
+  #lastRemarkId: string | null = null;
   #tired = false;
 
   constructor(options: CheckInOptions) {
@@ -240,6 +245,7 @@ export class CheckIn {
   /** "Not now": unprompted check-ins wait an hour. Finished work still comes. */
   notNow(): Date {
     this.#quietUntil = this.#o.clock.now() + NOT_NOW_MS;
+    if (this.#lastRemarkId !== null) this.#outcome(this.#lastRemarkId, 'not-now');
     return new Date(this.#quietUntil);
   }
 
@@ -252,6 +258,7 @@ export class CheckIn {
       .find((candidate) => candidate.enabled && candidate.id === offer.expertId);
     if (expert === undefined) return false;
     this.#offer = null;
+    this.#outcome(remarkId, 'accepted');
     // Read now, on the click, and never before: the end of the window, secrets hidden.
     const windowText = offer.window === undefined ? null : await this.#readEnd(offer.window);
     const brief: Brief =
@@ -310,20 +317,23 @@ export class CheckIn {
       this.#day.calls += 1;
       // Every call but finished work's starts the cooldown, a launch's included.
       if (kind !== 'finished') this.#lastUnpromptedAt = now;
+      const bundle = this.#bundle(pet, wake, settings);
       const reply = await askMind({
         pet,
         provider: this.#o.provider,
         system: modeSystem(CHECK_IN_INSTRUCTIONS),
-        bundle: this.#bundle(pet, wake, settings),
+        bundle,
         timeoutMs: this.#o.timeoutMs ?? CHECK_IN_TIMEOUT_MS,
         ...(this.#o.log === undefined ? {} : { log: this.#o.log }),
       });
+      const remarkId = randomUUID();
+      this.#record(pet, wake, bundle, reply, remarkId);
       if (reply === null) return true;
       // Not now may have been pressed, or the pet gone, while the mind was writing.
       if (held && this.#o.clock.now() < this.#quietUntil) return true;
       const speaker = this.#o.pet();
       if (speaker === null) return true;
-      this.#deliver(speaker, wake, reply);
+      this.#deliver(speaker, wake, reply, remarkId);
     } catch (error) {
       // A store closed under it (quit), a source that throws: silence, never a crash.
       this.#o.log?.(`check-in: ${String(error)}`);
@@ -350,7 +360,47 @@ export class CheckIn {
     });
   }
 
-  #deliver(pet: Pet, wake: Wake, reply: CheckInReply): void {
+  /** What the mind decided, kept whether or not it is shown. A failed write is never a crash. */
+  #record(
+    pet: Pet,
+    wake: Wake,
+    bundle: string,
+    reply: CheckInReply | null,
+    remarkId: string,
+  ): void {
+    const decision =
+      reply === null
+        ? 'no-answer'
+        : reply.text === undefined
+          ? 'quiet'
+          : reply.offer === undefined
+            ? 'spoke'
+            : 'offered';
+    try {
+      this.#o.experience?.checkIn({
+        ref: remarkId,
+        petId: pet.id,
+        trigger: wake.reason.kind,
+        model: pet.model,
+        input: bundle,
+        decision,
+        said: reply?.text,
+        note: reply?.offer,
+      });
+    } catch (error) {
+      this.#o.log?.(`check-in: the experience log did not take it: ${String(error)}`);
+    }
+  }
+
+  #outcome(remarkId: string, name: string): void {
+    try {
+      this.#o.experience?.outcome(remarkId, name);
+    } catch (error) {
+      this.#o.log?.(`check-in: the experience log did not take it: ${String(error)}`);
+    }
+  }
+
+  #deliver(pet: Pet, wake: Wake, reply: CheckInReply, remarkId: string): void {
     if (reply.mood === 'tired') {
       if (this.#o.settings().wellbeing.enabled) {
         this.#tired = true;
@@ -374,7 +424,7 @@ export class CheckIn {
       });
       return;
     }
-    const remarkId = randomUUID();
+    this.#lastRemarkId = remarkId;
     // Finished work gets no offer; a hand-off back on its own is tied to its line.
     if (wake.reason.kind === 'finished') {
       this.#offer = null;

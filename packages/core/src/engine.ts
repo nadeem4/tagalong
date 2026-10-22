@@ -11,6 +11,7 @@ import { DEFAULT_ENGINE_PORT, RPC_ERROR_CODES, SCOUT_ID } from '@tagalong/protoc
 import type { Expert, HostKind, Pet } from '@tagalong/protocol';
 import { openDatabase } from './memory/db';
 import { ActivityLog } from './memory/activity';
+import { ExperienceLog } from './memory/experience';
 import { ConversationStore } from './memory/store';
 import { MemoryStore } from './memory/memories';
 import { Summarizer } from './memory/summarizer';
@@ -352,6 +353,11 @@ export class Engine {
     const interruptedAtBoot = activity.interrupted();
     // Home's Activity keeps 90 days; the digest has kept the gist of older work in memory.
     activity.prune();
+    // What the mind decided and what came of it, for the inspector and, later, for learning.
+    // Written beside the activity record, from the same events; kept 30 days.
+    const experience = new ExperienceLog(db, store);
+    experience.interrupted();
+    experience.prune();
     const routineStore = new RoutineStore(db);
     routineStore.interrupted();
     // When a turn of theirs last ended, on the clock finished work is gathered on.
@@ -359,6 +365,7 @@ export class Engine {
     const talk = { turns: new Set<string>(), endedAt: Number.NEGATIVE_INFINITY };
     const emit: TurnEventSink = (event) => {
       activity.observe(event);
+      experience.observe(event);
       if (event.method === 'turn.started' && event.params.background !== true) {
         talk.turns.add(event.params.turnId);
       } else if (event.method === 'turn.completed' || event.method === 'turn.error') {
@@ -398,6 +405,10 @@ export class Engine {
       activity,
       connectorFor,
       emit: (event) => {
+        // A card shown during a turn is tied to it, so what the person does with it is too.
+        if (event.method === 'handoff.proposed') {
+          experience.proposed(event.params.proposalId, event.params.petId);
+        }
         live.server?.broadcast(event.method, event.params);
         if (event.method !== 'handoff.finished') return;
         // A routine's own hand-off is delivered by the routine; any other arrives with the
@@ -547,6 +558,7 @@ export class Engine {
       propose: (params) => handoffs.propose(params),
       emit: (event) => live.server?.broadcast(event.method, event.params),
       spentOut,
+      experience,
       log: (message) => console.warn(`[engine] ${message}`),
     });
     // Finished jobs and hand-offs, gathered: one check-in once things are quiet, held
@@ -720,6 +732,7 @@ export class Engine {
 
     const handlers = buildHandlers({
       activity,
+      experience,
       runner,
       pets,
       settings,
@@ -823,6 +836,7 @@ export class Engine {
 
 function buildHandlers(parts: {
   activity: ActivityLog;
+  experience: ExperienceLog;
   runner: ConversationRunner;
   pets: PetRegistry;
   settings: SettingsStore;
@@ -853,7 +867,7 @@ function buildHandlers(parts: {
   /** Guarded but not recorded: a key check sends no screen, so it writes no row. */
   checkResolve: ProviderResolver;
 }): MethodHandlers {
-  const { activity, runner, pets, settings, models, hosts, watches } = parts;
+  const { activity, experience, runner, pets, settings, models, hosts, watches } = parts;
   const { refreshProviders, experts, handoffs, projects, connectorFor } = parts;
   const { checkIn, connections, approvals, routines, pickUp } = parts;
   const { sightLog, checkResolve } = parts;
@@ -931,6 +945,8 @@ function buildHandlers(parts: {
     'watch.stop': (params) => ({ stopped: watches.stop(params.watchId) }),
 
     'activity.list': (params) => activity.list(params),
+    'experience.list': (params) => experience.list(params),
+    'experience.get': (params) => experience.get(params.id),
 
     'experts.list': () => ({ experts: experts.list() }),
     'experts.upsert': (params) => {
@@ -959,8 +975,16 @@ function buildHandlers(parts: {
       return connectorFor(expert).check();
     },
     'handoffs.cancel': (params) => ({ cancelled: handoffs.cancel(params.handoffId) }),
-    'handoffs.confirm': (params) => handoffs.confirm(params),
-    'handoffs.dismiss': (params) => ({ dismissed: handoffs.dismiss(params.proposalId) }),
+    'handoffs.confirm': (params) => {
+      const confirmed = handoffs.confirm(params);
+      experience.proposalOutcome(params.proposalId, 'sent');
+      return confirmed;
+    },
+    'handoffs.dismiss': (params) => {
+      const dismissed = handoffs.dismiss(params.proposalId);
+      if (dismissed) experience.proposalOutcome(params.proposalId, 'dismissed');
+      return { dismissed };
+    },
     'projects.search': (params) => ({ projects: projects.search(params.query) }),
 
     // The app opened: answers at once. The check-in reads the settings before this returns

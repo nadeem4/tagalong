@@ -75,7 +75,10 @@ function usableText(line: string): string | null {
   return text;
 }
 
-/** One call, no tools. Any failure (no brain, a throw, a timeout, a cut-off reply) is silence. */
+/**
+ * One call, no tools. NOTHING comes back as an empty reply; any failure (no brain, a throw, a
+ * timeout, a cut-off reply) as null. Either way nothing is said.
+ */
 export async function askMind(options: {
   pet: Pet;
   /** The engine's guarded, recorded and metered resolver. */
@@ -104,7 +107,8 @@ export async function askMind(options: {
       },
       controller.signal,
     );
-    return result.stopReason === 'end' ? parseCheckIn(result.text) : null;
+    // NOTHING is an answer (an empty reply); null is a mind that did not answer.
+    return result.stopReason === 'end' ? (parseCheckIn(result.text) ?? {}) : null;
   } catch (error) {
     options.log?.(`check-in: the mind did not answer: ${String(error)}`);
     return null;
