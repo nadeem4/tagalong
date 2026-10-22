@@ -468,7 +468,7 @@ screenshot is attached.
 - Nothing on screen is read until you press a hotkey or ask, except screen memory and watches, which
   you turn on, and keeping an eye on things (below). Every look badges Scout and the tray says what
   was read and when.
-- **Check-ins.** Now and then, when nobody asked, Scout asks the summaries model once whether
+- **Check-ins.** Now and then, when nobody asked, Scout asks its own model once whether
   anything is worth saying, and most of the time says nothing. Each such call carries what the
   moment is about plus what Scout recalls for it (your preferences, its newest and matching
   memories, up to two matching jobs of its own), your name, the time, what experts are doing and

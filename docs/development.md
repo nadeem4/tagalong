@@ -301,7 +301,7 @@ Playwright suites run, and the easiest way to see the app work before you have a
 on things is off under it unless `TAGALONG_KEEP_AN_EYE=1` is set too, and no window the engine lists
 counts as full screen, so the CI desktop never holds a check-in (the launch one included). Without
 it, Scout asks the provider it names, with that provider's key from the OS keychain. A fresh install's Scout thinks
-with the Claude sign-in (`claude-code`, Haiku), which needs Claude Code installed and signed in;
+with the Claude sign-in (`claude-code`, Sonnet), which needs Claude Code installed and signed in;
 Welcome offers a keyed provider instead. The engine itself boots without any key.
 
 ### Choosing Scout's brain

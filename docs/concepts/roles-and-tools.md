@@ -102,7 +102,7 @@ tools:
   - open_result
   - stop_work
 model:
-  tier: fast # fast | balanced | deep
+  tier: balanced # fast | balanced | deep
   needs_vision: false
 ---
 

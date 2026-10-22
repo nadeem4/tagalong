@@ -312,7 +312,6 @@ export class CheckIn {
       if (kind !== 'finished') this.#lastUnpromptedAt = now;
       const reply = await askMind({
         pet,
-        summarizer: settings.summarizer,
         provider: this.#o.provider,
         system: modeSystem(CHECK_IN_INSTRUCTIONS),
         bundle: this.#bundle(pet, wake, settings),

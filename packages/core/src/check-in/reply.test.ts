@@ -64,7 +64,7 @@ describe('parseCheckIn', () => {
 describe('askMind', () => {
   afterEach(() => vi.useRealTimers());
 
-  const base = { pet: scout, summarizer: null, system: 'SYSTEM', bundle: 'BUNDLE' };
+  const base = { pet: scout, system: 'SYSTEM', bundle: 'BUNDLE' };
 
   it('asks once, with no tools, and parses the reply', async () => {
     const mind = fakeMind('That port is still taken.\nMOOD: wince');
@@ -77,17 +77,10 @@ describe('askMind', () => {
     expect(mind.requests[0]!.maxTokens).toBe(120);
   });
 
-  it('runs on the summaries model when one is chosen, else the pet’s own', async () => {
+  it('thinks on the pet’s own model: deciding whether to speak is the mind’s job, not housekeeping', async () => {
     const mind = fakeMind();
-    await askMind({
-      ...base,
-      summarizer: { providerId: 'openrouter', model: 'small' },
-      provider: mind.resolve,
-      timeoutMs: 1_000,
-    });
     await askMind({ ...base, provider: mind.resolve, timeoutMs: 1_000 });
-    expect(mind.asked[0]).toMatchObject({ providerId: 'openrouter', model: 'small' });
-    expect(mind.asked[1]).toMatchObject({ providerId: 'anthropic', model: 'claude-opus-5' });
+    expect(mind.asked[0]).toMatchObject({ providerId: 'anthropic', model: 'claude-opus-5' });
   });
 
   it('is silent when the brain throws, stops early, or hangs past the timeout', async () => {

@@ -41,7 +41,7 @@ Home opens from the tray (**Open Tagalong**); Settings is a page in Home. A save
 used from the next question, with no restart.
 
 **The default for this guide: the Claude sign-in.** Install Claude Code, run `claude` once and sign
-in (`claude auth status` says `"loggedIn": true`). On a fresh install Scout thinks with it on Haiku.
+in (`claude auth status` says `"loggedIn": true`). On a fresh install Scout thinks with it on Sonnet.
 
 **OpenRouter + Claude.** Get a key at <https://openrouter.ai/keys>, paste it in Home → Settings →
 Advanced → API keys → OpenRouter, then on Home's **Scout** page set **Thinks with** to OpenRouter
@@ -1784,7 +1784,7 @@ Needs Claude Code installed and signed in, and an expert that may edit a small t
    when Google Calendar is connected in Claude Code, writes its plan in its own folder, and never
    books anything. The tool names in `catalog.json` need this real-run check.
 
-## Scout's mind _(real brain, fast tier)_
+## Scout's mind _(real brain, balanced tier)_
 
 Scout's character is `packages/core/soul/scout.md`; the prompt has no recipes. Run each check
 three times: the wording should vary, the behaviour should not.
@@ -1852,7 +1852,7 @@ three times: the wording should vary, the behaviour should not.
    (c) one `[listening] paused: a full-screen window in front (<app>)` line and one
    `[listening] resumed` line, with the app's process name and never a window title.
 
-## J. Background jobs and the task board _(real brain, fast tier)_
+## J. Background jobs and the task board _(real brain, balanced tier)_
 
 Scout's own jobs are background Scout turns (`packages/core/src/jobs/`). Run each check three
 times: the wording should vary, the behaviour should not.
@@ -1878,7 +1878,7 @@ times: the wording should vary, the behaviour should not.
 8. **Forget a job.** "Scout, forget the pricing job." **Expected:** `forget` deletes the finished
    job and its conversation, with no card; it is gone from the board.
 
-## Arrivals: finished work together _(real brain, fast tier)_
+## Arrivals: finished work together _(real brain, balanced tier)_
 
 Finished jobs and hand-offs are gathered (`packages/core/src/check-in/arrivals.ts`): one check-in
 20 s after the latest finishes (60 s at most), held during a call, a full-screen app or while you
@@ -1906,7 +1906,7 @@ by hand, check that it is one line and that the order is the mind's. Run each th
 7. **Not batched.** A watch firing or a routine result during the wait. **Expected:** each comes
    at once through its own channel, as before.
 
-## D. Memory digest, recall and retention _(real brain, fast tier)_
+## D. Memory digest, recall and retention _(real brain, balanced tier)_
 
 The daily digest (`packages/core/src/memory/digest.ts`), one recall path and the retention
 numbers. To avoid waiting a day, quit Tagalong and move the last `digest` row's `finished_at` in

@@ -32,7 +32,7 @@ tools:
   - open_result
   - stop_work
 model:
-  tier: fast
+  tier: balanced
   needs_vision: false
 ---
 

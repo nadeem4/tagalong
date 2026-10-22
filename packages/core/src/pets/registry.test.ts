@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Database } from 'better-sqlite3';
 import { openDatabase } from '../memory/db';
 import { DEFAULT_PETS, PetRegistry, SCOUT } from './registry';
+import { recommendedModel, roleFor } from '../roles';
 
 let dir: string;
 let db: Database;
@@ -28,12 +29,12 @@ describe('PetRegistry seeding', () => {
     expect(registry.list().map((pet) => pet.id)).toEqual(['scout']);
   });
 
-  it('starts Scout as the Companion, thinking on the Claude Code sign-in', () => {
+  it('starts Scout as the Companion, thinking on the Claude Code sign-in at its role tier', () => {
     expect(DEFAULT_PETS).toEqual([SCOUT]);
     expect(SCOUT).toMatchObject({
       roleId: 'companion',
       providerId: 'claude-code',
-      model: 'haiku',
+      model: recommendedModel(roleFor('companion'), 'claude-code')?.model,
     });
   });
 

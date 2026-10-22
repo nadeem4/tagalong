@@ -169,6 +169,10 @@ describe('the role files', () => {
     expect(line).toMatch(/Meeting prep/);
   });
 
+  it('put the companion on the balanced tier, so the mind thinks on a strong model', () => {
+    expect(getRole('companion')?.model.tier).toBe('balanced');
+  });
+
   it('use unique ids', () => {
     const ids = loadRoles().map((role) => role.id);
     expect(new Set(ids).size).toBe(ids.length);
