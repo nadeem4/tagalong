@@ -38,6 +38,7 @@ export * from './experience';
 export * from './self';
 export * from './experts';
 export * from './connections';
+export * from './asks';
 export * from './routines';
 export * from './pick-up';
 export * from './sight-log';

@@ -263,6 +263,11 @@ export function ProposalCard({
           ? `Hand this to ${expertName}?`
           : `Hand this to ${expertName}, then ${then.expertName}?`}
       </p>
+      {proposal.restored === true && (
+        <p className="handoff-brief">
+          The window it was written from isn’t kept, so the expert gets only this brief.
+        </p>
+      )}
       <dl className="handoff-rows">
         {then === undefined && (
           <div>

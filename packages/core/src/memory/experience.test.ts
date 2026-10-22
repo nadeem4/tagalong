@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type Database from 'better-sqlite3';
+import { Asks } from '../asks/asks';
+import { AskStore } from '../asks/store';
 import { openDatabase } from './db';
 import { EXPERIENCE_INPUT_CHARS, EXPERIENCE_KEEP_DAYS, ExperienceLog } from './experience';
 import { ConversationStore } from './store';
@@ -246,32 +248,46 @@ describe('ExperienceLog: outcomes', () => {
     expect(only().events).toEqual([expect.objectContaining({ kind: 'outcome', name: 'accepted' })]);
   });
 
-  it('ties a hand-off card to the turn that proposed it, then records sent or dismissed', () => {
-    const turnId = started(asked('fix it'));
-    const other = started(asked('something else'));
-    log.proposed('p1', turnId);
-    // A card from no turn (a check-in offer, Brief again) is tied to nothing, not to `other`.
-    log.proposed('p2', undefined);
-    log.proposed('p3', 'no-such-turn');
-    completed(turnId, 'I have a brief ready.');
-    completed(other, 'ok');
-    expect(log.proposalOutcome('p1', 'sent')).toBe(true);
-    // Used up: the card is gone.
-    expect(log.proposalOutcome('p1', 'dismissed')).toBe(false);
-    expect(log.proposalOutcome('p2', 'dismissed')).toBe(false);
-    expect(log.proposalOutcome('p3', 'dismissed')).toBe(false);
-    const [second, first] = log.list({}).episodes;
-    expect(log.get(first!.id)!.events).toEqual([
-      expect.objectContaining({ kind: 'outcome', name: 'sent' }),
-    ]);
-    expect(log.get(second!.id)!.events).toEqual([]);
-  });
-
-  it('keeps only the newest cards waiting, so cards never acted on do not pile up', () => {
-    const turnId = started(asked('many'));
-    for (let i = 0; i < 60; i += 1) log.proposed(`p${i}`, turnId);
-    expect(log.proposalOutcome('p0', 'sent')).toBe(false);
-    expect(log.proposalOutcome('p59', 'sent')).toBe(true);
+  it('records how an ask ended on the episode of the turn that asked, by the ask states', async () => {
+    const asks = new Asks({
+      store: new AskStore(db),
+      emit: () => undefined,
+      outcome: (turnId, name) => void log.outcome(turnId, name),
+    });
+    const handedOff = started(asked('fix it'));
+    const wrote = started(asked('make a page'));
+    const quiet = started(asked('another page'));
+    // A card from no turn (a check-in offer, Brief again) is tied to nothing.
+    const card = asks.add({
+      petId: 'scout',
+      expertId: 'c',
+      summary: 'Fix it',
+      payload: {},
+      originTurnId: handedOff,
+    });
+    asks.add({ petId: 'scout', expertId: 'c', summary: 'Loose', payload: {} });
+    asks.answer(card.id, 'decline');
+    const write = {
+      petId: 'scout',
+      app: 'Notion',
+      tool: 'create_page',
+      summary: 'Create',
+      risk: 'change' as const,
+    };
+    const approved = asks.hold({ ...write, turnId: wrote }, new AbortController().signal);
+    asks.answer(asks.waiting().find((row) => row.originTurnId === wrote)!.id, 'approve');
+    await approved;
+    void asks.hold({ ...write, turnId: quiet }, new AbortController().signal);
+    asks.closeHeld();
+    const outcomeOf = (turnId: string) =>
+      log
+        .get(log.list({}).episodes.find((episode) => episode.ref === turnId)!.id)!
+        .events.filter((event) => event.kind === 'outcome')
+        .map((event) => event.name);
+    expect(outcomeOf(handedOff)).toEqual(['declined']);
+    expect(outcomeOf(wrote)).toEqual(['approved']);
+    expect(outcomeOf(quiet)).toEqual(['expired']);
+    asks.stop();
   });
 });
 

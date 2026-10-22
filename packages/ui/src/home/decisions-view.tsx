@@ -32,6 +32,12 @@ const WHY: Record<string, string> = {
 const DID: Record<string, string> = {
   'not-now': 'You said Not now',
   accepted: 'You took the offer',
+  // How an ask from the turn ended (a change in an app, a hand-off card).
+  approved: 'You approved it',
+  declined: 'You declined it',
+  expired: 'Expired with no answer',
+  cancelled: 'Cancelled before an answer',
+  // Hand-off cards before asks were saved.
   sent: 'You sent the hand-off',
   dismissed: 'You dismissed the hand-off',
 };

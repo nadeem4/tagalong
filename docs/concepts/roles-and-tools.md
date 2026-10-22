@@ -239,7 +239,12 @@ routine's own turn).
   check this with `directivesIn` (`tools/test-support.ts`).
 - **Connected apps.** An app tool is `read` when its server marks it read-only and `write`
   otherwise, unknown included. A write asks the person first with a confirm card and runs only on
-  Allow once; see [Connected apps](../architecture.md#connected-apps-mcp).
+  Allow once; see [Connected apps](../architecture.md#connected-apps-mcp). Each write also has a
+  risk class set by code (`riskOf`): `high` when the app marks it destructive or its name says send,
+  delete, merge, push and the like (the card says "Can’t be undone"), `change` otherwise, unknown
+  included. The ask is saved and listed in Home's Waiting on you; with no answer it expires after an
+  hour and nothing runs (see [Asks](../architecture.md#asks-waiting-on-you)). No tool can answer an
+  ask: only a click does.
 
 The runner asks the registry for a turn's tools and dispatches through it. An ESLint rule keeps
 `conversation/` and `engine.ts` importing tools only from `tools/registry` or the `tools` index,

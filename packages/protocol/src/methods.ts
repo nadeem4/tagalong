@@ -32,6 +32,15 @@ import {
 } from './self';
 import { UsageSummaryParams, UsageSummaryResult } from './usage';
 import {
+  AsksAnswerParams,
+  AsksAnswerResult,
+  AsksChangedParams,
+  AsksListParams,
+  AsksListResult,
+  AsksOpenParams,
+  AsksOpenResult,
+} from './asks';
+import {
   ConnectionsAddParams,
   ConnectionsAddResult,
   ConnectionsChangedParams,
@@ -529,6 +538,10 @@ export const hostToCoreMethods = {
   'models.list': { params: ModelsListParams, result: ModelsListResult },
   'providers.check': { params: ProvidersCheckParams, result: ProvidersCheckResult },
   'tool.approve': { params: ToolApproveParams, result: ToolApproveResult },
+  // Home's Waiting on you.
+  'asks.list': { params: AsksListParams, result: AsksListResult },
+  'asks.answer': { params: AsksAnswerParams, result: AsksAnswerResult },
+  'asks.open': { params: AsksOpenParams, result: AsksOpenResult },
   'watch.stop': { params: WatchStopParams, result: WatchStopResult },
   'activity.list': { params: ActivityListParams, result: ActivityListResult },
   'experience.list': { params: ExperienceListParams, result: ExperienceListResult },
@@ -620,6 +633,7 @@ export const coreToHostNotifications = {
   'pet.remark': { params: PetRemarkParams },
   'connections.changed': { params: ConnectionsChangedParams },
   'connector.confirm': { params: ConnectorConfirmParams },
+  'asks.changed': { params: AsksChangedParams },
   'routine.proposed': { params: RoutineProposedParams },
   'routine.result': { params: RoutineResultParams },
   'routines.changed': { params: RoutinesChangedParams },

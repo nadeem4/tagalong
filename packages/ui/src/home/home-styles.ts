@@ -124,6 +124,10 @@ export const HOME_CSS = `
   border: 1px solid ${t.color.panelLine}; border-radius: ${t.radius.row}px;
   font-family: ${t.font.ui}; font-size: ${t.fontSize.small}px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere;
 }
+.home-ask__details {
+  align-self: stretch; max-height: 160px; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+  font-size: ${t.fontSize.small}px; line-height: 1.5; color: ${t.color.panelMuted};
+}
 .home-quiet {
   align-self: flex-start; height: ${t.size.fieldHeight}px; padding: 0 ${t.space.xl}px;
   border-radius: ${t.radius.field}px; border: 1px solid ${t.color.panelMuted};

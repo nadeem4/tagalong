@@ -16,13 +16,14 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
   connectionIdFrom,
+  type AskRisk,
   type Connection,
   type ConnectionState,
   type ConnectionsAddParams,
   type ConnectorTool,
 } from '@tagalong/protocol';
 import type { SecretStore } from '../settings/settings';
-import { accessOf, expandEnv } from './access';
+import { accessOf, expandEnv, riskOf } from './access';
 import { SecretOAuthProvider, oauthSecretKey, startLoopback } from './oauth';
 import type { ConnectionStore } from './store';
 
@@ -44,7 +45,8 @@ export type TransportFor = (
 /** One tool of a connected app, as the registry turns it into a Scout tool. */
 export interface AppTool {
   connection: Connection;
-  tool: ConnectorTool & { inputSchema: Record<string, unknown> };
+  /** `risk`: how much asking a write needs (riskOf); `read` never asks. */
+  tool: ConnectorTool & { inputSchema: Record<string, unknown>; risk: AskRisk };
 }
 
 export interface CallResult {
@@ -394,6 +396,7 @@ export class ConnectionManager {
       name: tool.name,
       ...(tool.description !== undefined ? { description: tool.description } : {}),
       access: accessOf(tool.annotations),
+      risk: riskOf(tool.annotations, tool.name),
       inputSchema: tool.inputSchema as Record<string, unknown>,
     }));
     this.#live.set(connection.id, { client, tools });
@@ -467,7 +470,7 @@ export class ConnectionManager {
       ...(known?.error !== undefined && status !== 'connected' && status !== 'off'
         ? { error: known.error }
         : {}),
-      tools: (live?.tools ?? []).map(({ inputSchema: _schema, ...tool }) => tool),
+      tools: (live?.tools ?? []).map(({ inputSchema: _schema, risk: _risk, ...tool }) => tool),
     };
   }
 

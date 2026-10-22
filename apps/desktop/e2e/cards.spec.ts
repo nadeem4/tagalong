@@ -233,6 +233,26 @@ test.describe('the connector confirm card', () => {
     // Still the one note from Allow once: the cancelled change never reached the app.
     expect(written()).toBe('Buy milk\n');
   });
+
+  test('Allow once in Home’s Waiting on you runs it, and the bubble’s card goes', async () => {
+    const panel = await ask(app, 'note that I need milk once more');
+    const card = panel.getByRole('region', { name: 'Change something in Notes?' });
+    await expect(card).toBeVisible({ timeout: 30_000 });
+
+    const avatar = await windowFor(app, 'avatar');
+    await avatar.evaluate(() => window.tagalongHost.openHome());
+    const home = await windowFor(app, 'home');
+    const nav = home.getByRole('navigation', { name: 'Tagalong' });
+    await nav.getByRole('button', { name: 'Waiting on you (1)' }).click({ timeout: 15_000 });
+    const waiting = home.getByRole('region', { name: 'Waiting' });
+    await expect(waiting).toContainText('Change in Notes · add_note · Changes something');
+    await waiting.getByRole('button', { name: 'Allow once' }).click();
+
+    await expect(card).toHaveCount(0, { timeout: 30_000 });
+    await expect.poll(written, { timeout: 30_000 }).toBe('Buy milk\nBuy milk\n');
+    await expect(home.getByRole('region', { name: 'Answered' })).toContainText('Approved by you');
+    await home.close();
+  });
 });
 
 test.describe('the routine card', () => {

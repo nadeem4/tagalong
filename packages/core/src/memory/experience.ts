@@ -33,8 +33,6 @@ export const EXPERIENCE_INPUT_CHARS = 8_000;
 const TEXT_CHARS = 4_000;
 /** The experience log keeps this many days. */
 export const EXPERIENCE_KEEP_DAYS = 30;
-/** Hand-off cards waiting for Send, tied to the turn that proposed them; the oldest go first. */
-const WAITING_CARDS = 50;
 
 /**
  * Tools whose results are what is on the screen: window text, OCR, the selection, window
@@ -108,16 +106,15 @@ export interface CheckInEpisode {
 /**
  * The record behind the inspector, and later the input to sleep and the evals. Turns, jobs
  * and routine runs are written from the turn events the engine already sends (`observe` sits
- * in front of the broadcast, beside the activity log); check-ins, outcomes and hand-off cards
- * by their own hooks. Everything kept has secrets hidden and is clipped; pictures, screen text
- * and window titles are never kept. Local only, and gone after EXPERIENCE_KEEP_DAYS or Delete
- * all.
+ * in front of the broadcast, beside the activity log); check-ins and outcomes by their own
+ * hooks (how an ask ended, `approved` to `cancelled`, comes from the asks as an `outcome` on
+ * the turn that asked). Everything kept has secrets hidden and is clipped; pictures, screen
+ * text and window titles are never kept. Local only, and gone after EXPERIENCE_KEEP_DAYS or
+ * Delete all.
  */
 export class ExperienceLog {
   /** Running turns: turn id to episode id. */
   readonly #open = new Map<string, { episodeId: string; petId: string }>();
-  /** Hand-off cards a turn proposed, still waiting: proposal id to that turn's episode id. */
-  readonly #proposals = new Map<string, string>();
 
   constructor(
     private readonly db: Database.Database,
@@ -254,30 +251,6 @@ export class ExperienceLog {
     return true;
   }
 
-  /**
-   * A turn's tool put a hand-off card up: tied to that turn. A card from anywhere else (a
-   * check-in offer taken, Brief again) or from a turn already gone is tied to nothing.
-   */
-  proposed(proposalId: string, turnId: string | undefined): void {
-    const open = turnId === undefined ? undefined : this.#open.get(turnId);
-    if (open === undefined) return;
-    this.#proposals.set(proposalId, open.episodeId);
-    // Cards never sent nor dismissed (the window closed) would otherwise pile up.
-    for (const oldest of this.#proposals.keys()) {
-      if (this.#proposals.size <= WAITING_CARDS) break;
-      this.#proposals.delete(oldest);
-    }
-  }
-
-  /** The person sent or dismissed a hand-off card. False when no turn proposed it. */
-  proposalOutcome(proposalId: string, name: 'sent' | 'dismissed'): boolean {
-    const episodeId = this.#proposals.get(proposalId);
-    if (episodeId === undefined) return false;
-    this.#proposals.delete(proposalId);
-    this.#outcome(episodeId, name);
-    return true;
-  }
-
   list(params: { before?: string | undefined; limit?: number | undefined }): ExperienceListResult {
     const limit = params.limit ?? 30;
     const cursor =
@@ -338,7 +311,6 @@ export class ExperienceLog {
 
   /** Delete all: every episode and its events. Returns how many episodes went. */
   clear(): number {
-    this.#proposals.clear();
     return this.db.transaction(() => {
       this.db.prepare('DELETE FROM episode_events').run();
       return this.db.prepare('DELETE FROM episodes').run().changes;

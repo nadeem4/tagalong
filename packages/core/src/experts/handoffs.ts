@@ -2,7 +2,6 @@
  * Hand-offs from Scout to experts: proposal, confirm, run, steering notes, follow-up steps,
  * stop, and the Activity rows. Contains HandoffManager and its limits.
  */
-import { randomUUID } from 'node:crypto';
 import {
   RPC_ERROR_CODES,
   type Expert,
@@ -11,6 +10,7 @@ import {
   type HandoffProposedParams,
   type ProjectCandidate,
 } from '@tagalong/protocol';
+import type { Asks } from '../asks/asks';
 import type { ActivityLog } from '../memory/activity';
 import { hideSecrets } from '../privacy/secrets';
 import { RpcFailure } from '../server/ws-server';
@@ -55,6 +55,8 @@ export interface HandoffManagerOptions {
   };
   /** The cost meter: every expert run that reports tokens is recorded here, and only here. */
   usage?: { record(entry: UsageEntry): void };
+  /** Where a card waits for Send: saved, so it survives a restart. */
+  asks: Pick<Asks, 'add' | 'get' | 'settle' | 'waiting'>;
 }
 
 export interface StartParams {
@@ -88,11 +90,14 @@ interface Live {
   waiting: string[];
 }
 
-/** A brief waiting for the person to confirm it. */
+/**
+ * What a card's ask row keeps to be sent after a restart: the brief without its screen
+ * context (the window, the selection and the window text stay in memory only).
+ */
 interface Proposal {
   expertId: string;
   petId: string;
-  brief: Brief;
+  brief: Omit<Brief, 'context'>;
   then?: { expertId: string; ask: string } | undefined;
 }
 
@@ -104,7 +109,11 @@ interface Proposal {
  * activity log, so Home shows it whether or not a window was open.
  */
 export class HandoffManager {
-  readonly #proposals = new Map<string, Proposal>();
+  /**
+   * Every card proposed since launch, by ask id, with its screen context (undefined when it had
+   * none). Never saved: a card missing here was proposed before a restart.
+   */
+  readonly #context = new Map<string, Brief['context']>();
   readonly #running = new Map<string, AbortController>();
   /** Every hand-off from its Activity row until it finishes, stopped ones included. */
   readonly #live = new Map<string, Live>();
@@ -123,44 +132,116 @@ export class HandoffManager {
     /** Titles to guess the project from instead of the brief's window, such as the editor's. */
     projectHint?: string;
     then?: { expertId: string; ask: string } | undefined;
+    /** The turn whose tool put the card up, so what the person does with it is its outcome. */
+    turnId?: string | undefined;
   }): { proposalId: string } {
     const expert = this.#expert(params.expertId);
     const next = params.then === undefined ? undefined : this.#expert(params.then.expertId);
+    const { context, ...saved } = params.brief;
+    const proposal: Proposal = {
+      expertId: params.expertId,
+      petId: params.petId,
+      brief: { ...saved, ask: hideSecrets(saved.ask) },
+      ...(params.then === undefined ? {} : { then: params.then }),
+    };
+    const { id: proposalId } = this.options.asks.add({
+      petId: params.petId,
+      expertId: params.expertId,
+      summary: params.brief.ask,
+      payload: proposal,
+      originTurnId: params.turnId,
+    });
+    this.#context.set(proposalId, context);
     // Only the guesses: a folder saved on the expert is never offered, and with no guess
     // the hand-off card opens the folder picker.
     const projects =
-      this.options.projects?.suggest(params.projectHint ?? params.brief.context?.windowTitle) ?? [];
-    const proposalId = randomUUID();
-    this.#proposals.set(proposalId, {
-      expertId: params.expertId,
-      petId: params.petId,
-      brief: params.brief,
-      then: params.then,
-    });
+      this.options.projects?.suggest(params.projectHint ?? context?.windowTitle) ?? [];
+    this.#emitProposed(proposalId, expert, next, params.petId, params.brief, params.then, projects);
+    return { proposalId };
+  }
+
+  /**
+   * Open in Waiting on you: the card comes up again. Since launch it carries the window it
+   * was written from; after a restart, only the saved brief, marked restored. False when it
+   * no longer waits, or its expert is gone (then it ends cancelled).
+   */
+  reopen(proposalId: string): boolean {
+    const proposal = this.#waiting(proposalId);
+    if (proposal === null) return false;
+    const expert = this.#usable(proposal.expertId);
+    if (expert === null) {
+      this.#unavailable(proposalId);
+      return false;
+    }
+    const next = proposal.then === undefined ? null : this.#usable(proposal.then.expertId);
+    const restored = !this.#context.has(proposalId);
+    const context = this.#context.get(proposalId);
+    const brief: Brief = context === undefined ? proposal.brief : { ...proposal.brief, context };
+    this.#emitProposed(
+      proposalId,
+      expert,
+      next ?? undefined,
+      proposal.petId,
+      brief,
+      next === null ? undefined : proposal.then,
+      this.options.projects?.suggest(context?.windowTitle) ?? [],
+      restored,
+    );
+    return true;
+  }
+
+  #emitProposed(
+    proposalId: string,
+    expert: Expert,
+    next: Expert | undefined,
+    petId: string,
+    brief: Brief,
+    then: { expertId: string; ask: string } | undefined,
+    projects: ProjectCandidate[],
+    restored = false,
+  ): void {
     this.options.emit({
       method: 'handoff.proposed',
       params: {
         proposalId,
-        petId: params.petId,
+        petId,
         expertId: expert.id,
         expertName: expert.name,
-        brief: params.brief,
+        brief,
         projects,
         canEdit: expert.connection.canEdit,
         ...(expert.connection.workspace === 'own' ? { ownFolder: true } : {}),
-        ...(next === undefined || params.then === undefined
+        ...(next === undefined || then === undefined
           ? {}
           : {
               then: {
                 expertId: next.id,
                 expertName: next.name,
-                ask: params.then.ask,
+                ask: then.ask,
                 canEdit: next.connection.canEdit,
               },
             }),
+        ...(restored ? { restored: true as const } : {}),
       },
     });
-    return { proposalId };
+  }
+
+  /** The saved card, while it waits; null once it is answered, expired or never was. */
+  #waiting(proposalId: string): Proposal | null {
+    const row = this.options.asks.get(proposalId);
+    if (row?.kind !== 'handoff' || row.state !== 'waiting') return null;
+    return row.payload as Proposal;
+  }
+
+  /** The card's expert was removed or switched off: the card ends, and nothing is sent. */
+  #unavailable(proposalId: string): void {
+    this.options.asks.settle(proposalId, 'cancelled', { note: 'expert-unavailable' });
+    this.#context.delete(proposalId);
+  }
+
+  #usable(expertId: string): Expert | null {
+    const expert = this.options.experts.get(expertId);
+    return expert === null || !expert.enabled ? null : expert;
   }
 
   /** The person sent it: starts the hand-off in their folder and remembers the folder. */
@@ -173,10 +254,15 @@ export class HandoffManager {
     /** Null: the person removed the follow-up step. Left out: it runs as proposed. */
     then?: { canEdit: boolean; ask?: string | undefined } | null | undefined;
   }): { handoffId: string } {
-    const proposal = this.#proposals.get(params.proposalId);
-    if (proposal === undefined) {
+    const proposal = this.#waiting(params.proposalId);
+    if (proposal === null) {
       throw new RpcFailure(RPC_ERROR_CODES.invalidParams, 'that hand-off is no longer waiting');
     }
+    if (this.#usable(proposal.expertId) === null) {
+      this.#unavailable(params.proposalId);
+      throw new RpcFailure(RPC_ERROR_CODES.invalidParams, 'That expert is no longer available.');
+    }
+    const context = this.#context.get(params.proposalId);
     const proposed = proposal.then;
     const then: FollowUp | undefined =
       proposed === undefined || params.then === null
@@ -192,32 +278,38 @@ export class HandoffManager {
     const started = this.start({
       expertId: proposal.expertId,
       petId: proposal.petId,
-      brief: params.brief ?? proposal.brief,
+      brief:
+        params.brief ?? (context === undefined ? proposal.brief : { ...proposal.brief, context }),
       folder: params.folder,
       canEdit: params.canEdit,
       then,
     });
-    this.#proposals.delete(params.proposalId);
+    this.options.asks.settle(params.proposalId, 'approved', { by: 'you' });
+    this.#context.delete(params.proposalId);
     if (params.folder !== undefined) this.options.projects?.remember(params.folder);
     return started;
   }
 
   /**
-   * The briefs still waiting for Send, for a pick-up: who and the ask, nothing else. The
-   * selection and the window a brief carried stay here.
+   * The briefs still waiting for Send, read from the saved asks, for the board, the Now facts
+   * and a pick-up: who and the ask, nothing else. The selection and the window a brief
+   * carried are never saved.
    */
   pending(): { expertId: string; expertName: string; ask: string }[] {
-    return [...this.#proposals.values()].flatMap((proposal) => {
-      const expert = this.options.experts.get(proposal.expertId);
+    return this.options.asks.waiting().flatMap((row) => {
+      if (row.kind !== 'handoff' || row.expertId === undefined) return [];
+      const expert = this.options.experts.get(row.expertId);
       return expert === null
         ? []
-        : [{ expertId: expert.id, expertName: expert.name, ask: proposal.brief.ask }];
+        : [{ expertId: expert.id, expertName: expert.name, ask: row.summary }];
     });
   }
 
-  /** True when a waiting proposal was dropped. */
+  /** Dismiss: the card ends declined, by the person. True when it was still waiting. */
   dismiss(proposalId: string): boolean {
-    return this.#proposals.delete(proposalId);
+    if (this.#waiting(proposalId) === null) return false;
+    this.#context.delete(proposalId);
+    return this.options.asks.settle(proposalId, 'declined', { by: 'you' });
   }
 
   start(params: StartParams): { handoffId: string } {

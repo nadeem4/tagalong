@@ -9,6 +9,7 @@ import type { ReactNode } from 'react';
 import type {
   CalendarCheckResult,
   ActivityListResult,
+  AsksListResult,
   ExperienceGetResult,
   ExperienceListResult,
   SelfGetResult,
@@ -47,6 +48,7 @@ type TurnNotification =
   | 'handoff.progress'
   | 'handoff.finished'
   | 'connector.confirm'
+  | 'asks.changed'
   | 'routine.proposed'
   | 'routine.result'
   | 'routines.changed'
@@ -151,6 +153,14 @@ export interface HostBridge {
   searchProjects?(query: string): Promise<ProjectCandidate[]>;
   /** The person's answer to a connector confirm card: run it once, or cancel it. */
   approveTool?(approvalId: string, decision: 'once' | 'deny'): Promise<void>;
+  /**
+   * Home's Waiting on you: what waits on the person and the last answered. Allow once and
+   * Decline answer an ask (resolves false when it no longer waited); Open brings a hand-off
+   * card up again in the bubble. All optional: a host without Home never shows the page.
+   */
+  listAsks?(): Promise<AsksListResult>;
+  answerAsk?(id: string, decision: 'approve' | 'decline'): Promise<boolean>;
+  openAsk?(id: string): Promise<boolean>;
   /**
    * Home's Connections page: the person's apps over MCP, the Popular list and the servers
    * found in Claude Code. All optional: a host without Home never shows the page.

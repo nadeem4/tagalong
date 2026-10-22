@@ -170,13 +170,13 @@ seconds is closed, and so is one that sends more than 64 KiB before it.
 Methods are scoped by host kind. The desktop may call every method. A session that said
 `host: 'extension'` may call only `EXTENSION_METHODS` (`server/ws-server.ts`): `ask`, `interrupt`,
 and `pets.list`, which is what its side panel uses. Anything else, such as `settings.set`, `tool.approve`,
-`connections.*`, `routines.*`, `experts.*` or `handoffs.*`, gets `-32000` and never reaches a
+`asks.*`, `connections.*`, `routines.*`, `experts.*` or `handoffs.*`, gets `-32000` and never reaches a
 handler.
 
 The catalog in `packages/protocol/src/methods.ts` is the whole surface:
 
 - **Host to core:** `hello`, `ask`, `interrupt`, `pets.list`, `pets.upsert`,
-  `settings.get`, `settings.set`, `models.list`, `providers.check` (setup's one tiny test of a pasted key: `{ ok: true }` or `{ ok: false, message }` in plain words), `tool.approve` (`once` or `deny`), `watch.stop`
+  `settings.get`, `settings.set`, `models.list`, `providers.check` (setup's one tiny test of a pasted key: `{ ok: true }` or `{ ok: false, message }` in plain words), `tool.approve` (`once` or `deny`), `asks.list`, `asks.answer` and `asks.open` (Home's Waiting on you; see [Asks](#asks-waiting-on-you)), `watch.stop`
   (Phase 3B), and for Home `activity.list` (see [Activity](#activity)), and for experts `experts.list`,
   `experts.upsert`, `experts.delete`, `experts.test`, `handoffs.cancel`,
   `handoffs.confirm`, `handoffs.dismiss` and `projects.search` (see
@@ -224,7 +224,8 @@ The catalog in `packages/protocol/src/methods.ts` is the whole surface:
   be megabytes of IPC to render one line.
 - **Core to host notifications:** `turn.started`, `turn.delta`, `turn.completed`, `turn.error`,
   `turn.warning`, plus `turn.toolRequest` and `turn.toolResult` (Phase 5), and `watch.fired` and
-  `watch.status` (Phase 3B). The crew's `pet.message` and `crew.status`, and the never-sent
+  `watch.status` (Phase 3B), and `asks.changed { waiting }` on every change to what waits on the
+  person (see [Asks](#asks-waiting-on-you)). The crew's `pet.message` and `crew.status`, and the never-sent
   `turn.audio`, are gone.
   `turn.warning` carries the same `{ code, message }` as `turn.error`
   but does not end the turn — a host that aborts on it throws away a reply that is still coming.
@@ -580,11 +581,19 @@ later connectors go to the host's keychain.
 
 **Proposals.** A companion never starts a hand-off itself; it proposes one.
 `HandoffManager.propose` asks the project finder for guesses from the brief's window title (no
-expert default is added; with no guess the hand-off card opens the folder picker), keeps the proposal in memory and emits `handoff.proposed
-{ proposalId, petId, expertId, expertName, brief, projects, canEdit }`. Nothing runs until the person
-sends it: `handoffs.confirm { proposalId, folder, canEdit, brief? }` starts it in that folder (with
-the brief as they edited it) and remembers the folder; `handoffs.dismiss` drops it. Proposals do not
-survive a restart.
+expert default is added; with no guess the hand-off card opens the folder picker), saves the
+proposal as an ask (see [Asks](#asks-waiting-on-you)) and emits `handoff.proposed
+{ proposalId, petId, expertId, expertName, brief, projects, canEdit }`; the proposal id is the ask
+id. The saved row holds the brief **without its screen context**: `{ expertId, petId, brief: { ask,
+files?, goodAnswer? }, then? }`. The window, the selection and the window text stay only in an
+in-memory map in `HandoffManager`. Nothing runs until the person sends it: `handoffs.confirm
+{ proposalId, folder, canEdit, brief? }` reads the row, starts it in that folder (with the brief as
+they edited it, and the context while the app still has it), settles the ask `approved` and
+remembers the folder; `handoffs.dismiss` settles it `declined`. A card survives a restart: after
+one, **Open** in Waiting on you calls `HandoffManager.reopen`, which emits `handoff.proposed` from
+the row with `restored: true`, and the card says the window is not kept, so the expert gets only the
+brief shown. An expert removed or switched off settles the card `cancelled` (`expert-unavailable`)
+at Open or Send. `pending()` reads the waiting hand-off rows.
 
 **Two steps (a second opinion).** A proposal may carry one follow-up step, `then: { expertId,
 expertName, ask, canEdit }`, such as a Reviewer checking what a Coder changed. Never more than two
@@ -678,10 +687,10 @@ exactly). Everything lives in `packages/core/src/connections/`.
 flowchart LR
   S[Scout's turn] -- "notion__search" --> T[Connector tool]
   T -- read --> M[ConnectionManager]
-  T -- write --> A[Approvals]
+  T -- write --> A[Asks]
   A -- "connector.confirm" --> H[Host: confirm card]
   H -- "tool.approve once / deny" --> A
-  A -- allowed --> M
+  A -- approved --> M
   M -- MCP over Streamable HTTP or stdio --> P[The app's MCP server]
   T -- "app, tool, read/write, ok/error" --> L[Activity]
 ```
@@ -701,7 +710,11 @@ boot connects each one on its own, so a failing app is an `error` row and never 
 boot, or a turn. Status is `off`, `connecting`, `connected`, `needs-sign-in` or `error` with a plain
 `error` line; every change is broadcast as `connections.changed`. Connecting lists the app's tools and
 classifies each with `accessOf(annotations)`: **read** only when the server marks it `readOnlyHint`
-and not `destructiveHint`; anything else, unknown included, is **write**. `call()` never throws: an
+and not `destructiveHint`; anything else, unknown included, is **write**. `riskOf(annotations, name)`
+gives each tool a risk, kept on `AppTool` (not on Home's list): `read` for a read (never asked),
+`high` when the server says `destructiveHint` or a word in the name (split on `_`, `-` and camelCase)
+is one of `send, delete, remove, destroy, trash, pay, charge, purchase, transfer, push, merge,
+publish, post, share, invite`, and `change` for every other write, unknown tools included. `call()` never throws: an
 app's `isError` becomes "Notion said: ...", a timeout (30 seconds) "Notion did not answer in time",
 and a dropped connection "Notion is not connected right now". Text, embedded text and resource links
 are kept; images and audio are named, not passed on; an answer past 8,000 characters is cut.
@@ -723,11 +736,15 @@ connected, switched-on app into one Scout tool named `<connection>__<tool>`, suc
 that lists `connections` (the Companion does). The
 description is one line: the app, the tool's first line, and whether it only reads. Past 30 app
 tools, the descriptions inside the input schemas are dropped to keep the prompt small. A read runs at
-once. A write first asks `Approvals`, which emits `connector.confirm { approvalId, turnId, petId, app,
-tool, summary }` (the tool's line and every argument Scout filled in, in full; the card scrolls,
-and a summary over `MAX_CONFIRM_CHARS`, 4,000 characters, is refused without asking) and waits for `tool.approve
-{ approvalId, decision }`: `once` runs it, `deny` cancels it, and two minutes without an answer or a
-stopped turn cancels it too. A cancelled write tells Scout that nothing changed. Arguments pass
+once. A write first calls `Asks.hold`, which saves the ask and emits `connector.confirm { approvalId,
+turnId, petId, app, tool, summary, risk }` (the approval id is the ask id; the summary is the tool's
+line and every argument Scout filled in, in full; the card scrolls, and a summary over
+`MAX_CONFIRM_CHARS`, 4,000 characters, is refused without asking) and waits for the ask to end:
+`tool.approve { approvalId, decision }` (`once` approves, `deny` declines) or `asks.answer` from Home.
+Only `approved` runs it. An hour without an answer ends it `expired`; a stopped or replaced turn ends
+it `cancelled`. Scout is told plainly what happened: "They said no; nothing was changed in X.",
+"The person did not answer, so nothing was changed in X." or "That was stopped; nothing was changed
+in X." Arguments pass
 through `hideSecrets` before they leave. What comes back, an app's error included, is wrapped as
 data, with any `<app_data>` or `</app_data>` inside it broken with full-width brackets so the app
 cannot close the fence early:
@@ -768,7 +785,8 @@ connector (an https address with its sign-in kind, or a command with `NAME=value
 the keychain). `connector.confirm` brings up Scout's bubble, which shows `ConnectorConfirmCard`
 (`packages/ui/src/connector-confirm.tsx`, built from the hand-off card's styles): a neutral "Change
 in Notion — allow?", the app, what will change, the details Scout filled in, **Allow once** and **Cancel**, answered with `tool.approve`.
-The card goes away when it is answered or when its turn ends.
+A `high` ask adds the line "Can’t be undone". The card goes away when it is answered, when its turn
+ends, or when an `asks.changed` no longer lists it (answered in Home, expired, closed).
 
 **"What needs me?"** has no tool of its own, because each app's tools differ, and no recipe: Scout
 works out which read tools of the connected apps answer it and how to put the result together.
@@ -782,14 +800,87 @@ takes the repo from the screen or the person and asks rather than guessing (comp
 writes the issue, and calls the app's create-issue tool, such as `github__create_issue` or `linear__create_issue`. That tool is a write, so
 `connectorTools` hides keys in every argument (`hideDeep`), builds the card text with `summaryOf`
 (every argument in full; over `MAX_CONFIRM_CHARS`, 4,000, it is refused instead) and waits on
-`deps.confirm`, which sends `connector.confirm`. Only **Allow once** calls the server; Cancel or the
-two-minute timeout returns "nothing was changed" and the server is never called, so a wrong repo
+`deps.confirm`, which sends `connector.confirm`. Only **Allow once** calls the server; Cancel or an
+hour without an answer returns "nothing was changed" and the server is never called, so a wrong repo
 or app is caught on the card. No screenshot is attached. An engine test pins
 `read_window_text`, then `connector.confirm` with the full body, before the fake server sees a call.
 
 Tests never reach a real app: `fakeMcpServer` (`connections/fake-server.ts`) is an SDK server in the
 same process over the SDK's in-memory transport, `FakeOAuthTransport` plays an app behind OAuth, and
 `EngineOptions.connectorTransport` and `claudeCodeConfigPath` point the engine at them.
+
+## Asks (Waiting on you)
+
+An **ask** is one saved row for everything that waits on the person: a change in a connected app
+(`app-change`) and a hand-off card (`handoff`). The routine card and the settings card are consent
+cards for saving config, not actions, and stay in memory as before. Everything lives in
+`packages/core/src/asks/`: `AskStore` (the table) and `Asks` (the timers, the cards and the
+broadcasts), built by the engine; the schemas are in `packages/protocol/src/asks.ts`.
+
+- An **app change is held**: its turn awaits it (`Asks.hold`), as before. When the turn goes, the ask
+  ends.
+- A **hand-off card is free**: nothing awaits it (`Asks.add`), and the row holds what is needed to
+  send it.
+
+**The table** (migration 25, `asks`): `id, kind, pet_id, summary, risk, app, tool, expert_id,
+origin_turn_id, payload_json, state, answered_by, note, created_at, expires_at, answered_at`.
+`summary` is what will happen, written by Scout, secrets hidden, never a window title, a selection
+or window text. `payload_json` is only a hand-off card's brief without its context. `state` is
+`waiting`, then one of `approved`, `declined`, `expired`, `cancelled`; `answered_by` is `you` (or
+`NULL` when the app ended it; the CHECK also allows `rule` for later standing rules); `note` is a
+code (`turn-ended`, `closed`, `expert-unavailable`, `expired`) the UI turns into words.
+`origin_turn_id` is the turn that asked, which is its episode's `ref`.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000','secondaryColor':'#ffffff','tertiaryColor':'#ffffff'}}}%%
+stateDiagram-v2
+  [*] --> waiting: hold() / add()
+  waiting --> approved: Allow once / Send (by you)
+  waiting --> declined: Cancel / Decline / Dismiss (by you)
+  waiting --> expired: past expires_at (note expired)
+  waiting --> expired: quit or launch with a held ask (note closed)
+  waiting --> cancelled: turn stopped or replaced (note turn-ended)
+  waiting --> cancelled: expert gone at Open or Send (note expert-unavailable)
+  approved --> [*]
+  declined --> [*]
+  expired --> [*]
+  cancelled --> [*]
+```
+
+**Settling.** Every way out of `waiting` is one `UPDATE … WHERE id = ? AND state = 'waiting'`, so a
+card and Home answering at once cannot both win; the late click gets `accepted: false`. A winning
+settle writes the outcome (the state's name) on the episode of `origin_turn_id`
+(`ExperienceLog.outcome`), and broadcasts `asks.changed { waiting }`. Once settled, a row keeps only
+the first line of its summary (secrets hidden, cut to 120 characters) and drops its payload.
+Silence never approves: only a click sets `approved`, and no tool of Scout's can answer an ask
+(`asks.answer`, `tool.approve` and `handoffs.confirm` are host methods called only by buttons; a
+registry test pins that no role's tool is wired to the asks).
+
+**Expiry.** `HELD_ASK_MS` (1 hour) for an app change: its turn is held open the whole time, which
+holds arrivals, check-ins and sleep. `FREE_ASK_MS` (24 hours) for a hand-off card: a brief about
+yesterday's problem goes stale. One timer per waiting row, re-armed at boot for cards.
+
+**Restart.** `asks.boot()` runs beside `experience.interrupted()`: a waiting app change becomes
+`expired` with the note `closed` (its turn is gone, so nothing can run it, and the app is never
+called); a card past its time becomes `expired`; the other cards wait on, with their timers. On a
+clean quit, `shutdown()` calls `asks.closeHeld()` first, before any turn is stopped, so a held ask
+ends `expired/closed` rather than `cancelled/turn-ended`. Held app changes are not resumed after a
+restart; that comes with plan cards. `asks.prune()` runs at boot and in the digest's 30-minute
+`tidy`, and drops answered rows older than 30 days; waiting rows are never pruned. Delete all
+(`experience.clear`) also removes every answered ask, and keeps what waits.
+
+**Protocol.** `asks.list {}` → `{ waiting, recent }` (recent: the last 20 answered),
+`asks.answer { id, decision: 'approve' | 'decline' }` → `{ accepted }` (a hand-off is never approved
+here: Send needs a folder), `asks.open { id }` → `{ opened }` (a hand-off: `handoff.proposed` again),
+and the notification `asks.changed { waiting }`. `tool.approve` is a thin alias: `once` approves,
+`deny` declines. `connector.confirm` gains an optional `risk`, `handoff.proposed` an optional
+`restored: true`.
+
+**Desktop.** `main/ipc/asks.ts` (`registerAskIpc`) forwards `tagalong:asks:list`,
+`tagalong:asks:answer` and `tagalong:asks:open`; the preload adds `listAsks`, `answerAsk` and
+`openAsk`. `asks.changed` reaches every window through the ordinary notification forward, and
+`asks.open` raises the bubble through `handoff.proposed`. The bubble drops its confirm card or
+proposed hand-off card when `asks.changed` no longer lists it.
 
 ## Routines
 
@@ -1564,7 +1655,7 @@ in the preload's `HostBridge` and hands it a `HomeHost` (the companion's id, the
 on, the model list, `savePet`) and the settings form as a slot.
 
 `HomeView` is a navy side menu, with the companion's figure (Bean's idle frame, still; the host
-passes the clip as `scout`, and Activity draws it on each entry too) and name, and eleven pages:
+passes the clip as `scout`, and Activity draws it on each entry too) and name, and twelve pages:
 
 - **Overview**: the companion (its state, the provider and model it thinks with), the experts (on or
   off, read-only or allowed to edit) and the three most recent activity entries, each with a button
@@ -1575,6 +1666,17 @@ passes the clip as `scout`, and Activity draws it on each entry too) and name, a
   running" or "Ready, sight paused", with an amber dot. Below them the **Spend** card
   (`home/spend-card.tsx`, `HostBridge.usageSummary` → `usage.summary`) lists today and this month;
   see [Usage and budget](#usage-and-budget).
+- **Waiting on you**: `WaitingView` (`home/waiting-view.tsx`), second in the nav, labelled with the
+  count while asks wait ("Waiting on you (2)", from `listAsks` and `asks.changed`). Waiting lists
+  each ask: "Change in Notion · create_page" or "Hand to Claude Code", then "Changes something" or,
+  for a high ask, "Can’t be undone", the summary in full (the details scroll), when it was asked and
+  when it ends, and **Allow once** / **Decline** (`answerAsk` → `asks.answer`) or, for a hand-off,
+  **Open** (`openAsk` → `asks.open`, the card comes up in the bubble for its folder and Send) /
+  **Decline**. Answered lists the last 20 with fixed, neutral words: Approved by you, Declined by
+  you, Expired: no answer in time, Expired: Tagalong closed first, Cancelled: the conversation was
+  stopped, Cancelled: expert no longer available; each but Approved adds "Nothing was changed."
+  Empty: "Nothing is waiting on you." A failed answer shows as an alert. It re-reads on every
+  `asks.changed`. See [Asks](#asks-waiting-on-you).
 - **Scout** (the companion's name): how it thinks, a provider and a model, saved with `savePet`.
   Changing provider drops the vision and watch models, which named the old provider's models. Its
   role is always the Companion.
@@ -1724,10 +1826,12 @@ metered resolver already counts the same call in `usage` for Spend and the daily
 line's outcome is recorded once: `#lastRemark` is cleared once Not now or an accepted offer is
 recorded, and a line that rode with the Pick up card is answered by that card's Not now.
 
-A hand-off card is tied to a turn only when that turn's `hand_to_expert` proposed it: the tool passes
-`ctx.turnId` and the engine calls `ExperienceLog.proposed(proposalId, turnId)`. A card from
-anywhere else (a check-in offer taken, **Brief again**) is tied to nothing. A card leaves the map
-when it is sent or dismissed, and at most 50 wait (hand-off cards have no timeout of their own).
+How an ask ended is an outcome on the episode of the turn that asked: `approved`, `declined`,
+`expired` or `cancelled`, written by `Asks` when the ask settles (see [Asks](#asks-waiting-on-you)),
+for a change in an app and a hand-off card alike. A hand-off card is tied to a turn only when that
+turn's `hand_to_expert` proposed it (the tool passes `ctx.turnId`, saved as the ask's
+`origin_turn_id`); a card from anywhere else (a check-in offer taken, **Brief again**) is tied to
+nothing. Episodes from before keep the old `sent` and `dismissed`.
 
 Everything kept goes through `hideSecrets`; `input` is clipped at 8,000 characters, the rest at
 4,000; pictures are never kept. At boot `interrupted` closes open episodes as `stopped`; `prune`
@@ -2525,7 +2629,10 @@ above a **Message** box. It is the same component, so it is the same conversatio
   whole answer (with the bubble closed, the line comes beside Scout as an ordinary line instead).
   A `say` step shows in the steps and is never said aloud, nor are tool steps. There
   is no text box on the card: notes go through Scout. Main brings the
-  bubble up with focus for a proposal, and without focus for a finished hand-off; only when the
+  bubble up with focus for a proposal, and without focus for a finished hand-off. A proposal reopened
+  from Waiting on you after a restart (`restored: true`) adds "The window it was written from isn’t
+  kept, so the expert gets only this brief.", and a proposed card goes when `asks.changed` no
+  longer lists it; only when the
   pets are hidden does a finished hand-off become a Windows notification instead, titled with the
   expert's name ("Claude Code finished"; main looks it up with `experts.list` and falls back to
   the id). The card asks "Hand this to Claude Code?" (a chain: "Hand this to Coder, then

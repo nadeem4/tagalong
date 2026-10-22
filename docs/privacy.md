@@ -115,6 +115,11 @@ The extension's public privacy policy, for the Chrome Web Store, is
   Code loads any other, the run stops before it starts. **Install** runs `claude plugin install`
   only after you pressed it on a card that names each plugin. These experts work in their own
   folder in your temp folder, never in your projects. Templates and experts you make stay sealed.
+- **Hand-off cards are saved, without the window.** A card waiting for Send is kept as an ask in
+  Waiting on you, so it survives a restart, for up to 24 hours. The saved card holds the brief Scout
+  wrote (keys hidden) and the files it names; the window title, your selection and any window text
+  that came with it stay in memory only, and are gone when Tagalong closes. After a restart the card
+  says so, and the expert gets only the brief it shows.
 - **Two-step hand-offs.** When one card names two steps (say a Coder, then a Reviewer), both are
   confirmed by the one Send, with each step's access shown on the card; nothing starts later on its
   own. Step 2 is briefed with step 1's answer (already scrubbed by `hideSecrets`, and cut at 8,000
@@ -238,8 +243,19 @@ when Scout calls one of their tools in a turn you started.
 - **Changes ask first.** A tool the app marks read-only runs at once. Every other tool, including
   any the app says nothing about, shows a card in Scout's bubble saying which app, which tool and
   what Scout filled in, every argument in full (long ones scroll); it runs only on **Allow once**.
-  Cancel, or two minutes without an answer, and nothing changes. A change too long to show in full
-  (over 4,000 characters) is not offered at all.
+  Cancel, an hour without an answer, a stopped conversation, or Tagalong closing before you answer,
+  and nothing changes. A change still waiting when Tagalong closes is never run later. A change too
+  long to show in full (over 4,000 characters) is not offered at all. A change that cannot be undone
+  (the app says so, or its name says send, delete, merge and the like) is labelled "Can’t be undone".
+- **Waiting on you.** Each change waiting for you, and each hand-off card, is saved as an ask in
+  `tagalong.db` on this computer, listed in Home › **Waiting on you**, where you can answer it too. An
+  ask keeps Scout's summary of what will happen (the app, the tool and what Scout filled in, with
+  keys and passwords hidden) and, for a hand-off card, the brief. Tagalong never puts a window
+  title, your selection or window text into an ask by itself, though the summary keeps what Scout
+  wrote, which can quote the screen when you asked for that (a bug report, say). Once an ask is
+  answered, expired or closed, only the first line of its summary is kept (at most 120 characters),
+  the rest and the brief are deleted, and the row goes 30 days after it was answered. **Delete all**
+  in Home › **How Scout decided** deletes every answered ask too; what is still waiting stays.
 - **What comes back** is treated as data, not instructions: Scout is told never to follow anything
   written in it, and the app cannot end that fence early. An app's error message is fenced the
   same way. It goes to Scout's brain provider like any window text, and is not stored.
@@ -649,15 +665,16 @@ characters, not kept]` instead. Window titles, and the branch and file names rea
 - **Its steps:** each tool Scout called, with what it was called with and the first line of what
   came back, except a screen tool's or a search of your history's, which keeps only the marker; a
   picture is never kept.
-- **What you did about it:** **Not now** on a line or on the Pick up card, an offer taken, a
-  hand-off card sent or dismissed.
+- **What you did about it:** **Not now** on a line or on the Pick up card, an offer taken, and how
+  each ask from that turn ended (approved, declined, expired or cancelled), a change in an app and a
+  hand-off card alike.
 - **Secrets hidden, clipped, local.** Keys, tokens and passwords are hidden before anything is
   written; what was asked is cut at 8,000 characters and everything else at 4,000. It stays in
   `tagalong.db` on this computer. An episode is deleted 30 days after it started, at launch and
   every 30 minutes while Tagalong runs.
 - **Delete all.** Home › **How Scout decided** › **Delete all** (one confirm) deletes every episode
-  and its steps at once. Deleting a memory does not go back through old episodes: those go after 30
-  days, or with Delete all.
+  and its steps at once, and every answered ask in Waiting on you. Deleting a memory does not go
+  back through old episodes: those go after 30 days, or with Delete all.
 
 ## What Scout learned: its own notes, and sleep
 

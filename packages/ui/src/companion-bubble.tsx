@@ -265,6 +265,15 @@ export function CompanionBubble({
         setConfirm(params);
         return;
       }
+      case 'asks.changed': {
+        // Answered in Home, expired or closed: a card whose ask no longer waits goes.
+        const still = new Set(event.waiting.map((ask) => ask.id));
+        if (confirm !== null && !still.has(confirm.approvalId)) setConfirm(null);
+        setHandoff((current) =>
+          current?.phase === 'proposed' && !still.has(current.proposal.proposalId) ? null : current,
+        );
+        return;
+      }
       case 'routine.proposed': {
         const { type: _type, ...params } = event;
         setRoutine(params);

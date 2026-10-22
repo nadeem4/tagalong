@@ -80,6 +80,7 @@ describe('DecisionsView', () => {
             at: AT,
           },
           { kind: 'step', name: 'look_closer', ok: false, result: 'Blind spot', at: AT },
+          { kind: 'outcome', name: 'declined', at: AT },
         ],
         e2: [{ kind: 'outcome', name: 'not-now', at: AT }],
       },
@@ -95,6 +96,8 @@ describe('DecisionsView', () => {
     expect(turn).toHaveTextContent('look_closer');
     expect(turn).toHaveTextContent('failed: Blind spot');
     expect(turn).toHaveTextContent('Port 3000 is taken.');
+    // How an ask from the turn ended.
+    expect(turn).toHaveTextContent('You declined it');
 
     fireEvent.click(screen.getByRole('button', { name: /Scout offered to help/ }));
     const offer = await screen.findByRole('region', { name: /Scout offered to help/ });

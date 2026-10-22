@@ -2,7 +2,7 @@
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { ActivityEntry, Expert, Pet } from '@tagalong/protocol';
+import type { ActivityEntry, Ask, Expert, Pet } from '@tagalong/protocol';
 import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
 import { HomeView, type HomeHost, type HomePage } from './home-view';
@@ -85,7 +85,7 @@ function renderHome(
 }
 
 describe('HomeView', () => {
-  it('is one window: Scout and eleven pages', async () => {
+  it('is one window: Scout and twelve pages', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     const nav = await screen.findByRole('navigation', { name: 'Tagalong' });
     expect(within(nav).getByText('Your companion')).toBeVisible();
@@ -95,6 +95,7 @@ describe('HomeView', () => {
         .map((b) => b.textContent),
     ).toEqual([
       'Overview',
+      'Waiting on you',
       'Scout',
       'Experts',
       'Routines',
@@ -106,6 +107,32 @@ describe('HomeView', () => {
       'What Scout learned',
       'Settings',
     ]);
+  });
+
+  it('counts what waits on you in the nav, and follows asks.changed', async () => {
+    const waiting: Ask = {
+      id: '40000000-0000-4000-8000-000000000001',
+      kind: 'app-change',
+      petId: 'scout',
+      summary: 'Create a page',
+      risk: 'change',
+      app: 'Notion',
+      tool: 'create_page',
+      state: 'waiting',
+      createdAt: '2026-10-22T10:00:00.000Z',
+    };
+    const bridge = createFakeHostBridge({
+      pets: [SCOUT],
+      savedAsks: [waiting, { ...waiting, id: '40000000-0000-4000-8000-000000000002' }],
+    });
+    renderHome(bridge);
+    const nav = await screen.findByRole('navigation', { name: 'Tagalong' });
+    expect(await within(nav).findByRole('button', { name: 'Waiting on you (2)' })).toBeVisible();
+    act(() => bridge.emit({ type: 'asks.changed', waiting: [waiting] }));
+    expect(within(nav).getByRole('button', { name: 'Waiting on you (1)' })).toBeVisible();
+    act(() => bridge.emit({ type: 'asks.changed', waiting: [] }));
+    fireEvent.click(within(nav).getByRole('button', { name: 'Waiting on you' }));
+    expect(await screen.findByRole('heading', { name: 'Waiting on you' })).toBeVisible();
   });
 
   it('draws Scout in the nav tile as Bean, a still idle frame cropped to fill it', async () => {
