@@ -198,6 +198,11 @@ describe('ConversationRunner.run', () => {
     expect(lastUserText(seen[1])).toContain(NOW_HEADING);
     expect(lastUserText(seen[1])).not.toMatch(/^Spoken: /m);
     expect(seen[1]?.system).toBe(seen[0]?.system);
+    const started = events.filter((event) => event.method === 'turn.started');
+    expect(started.map((event) => (event.params as { spoken?: true }).spoken)).toEqual([
+      true,
+      undefined,
+    ]);
   });
 
   it('gathers Now before announcing the turn, so "last talked" is the turn before', async () => {
@@ -918,6 +923,16 @@ describe('tool notifications', () => {
     expect((request?.params as { tool?: string }).tool).toBe('list_windows');
     expect((result?.params as { tool?: string; ok?: boolean }).tool).toBe('list_windows');
     expect((result?.params as { ok?: boolean }).ok).toBe(true);
+  });
+
+  it("carries the provider's call id in both, so a result finds its own call", async () => {
+    const runner = makeRunner(callingProvider(), undefined, toolset({ content: 'two windows' }));
+    await runner.run({ pet, text: 'hi' }).done;
+
+    const request = events.find((event) => event.method === 'turn.toolRequest');
+    const result = events.find((event) => event.method === 'turn.toolResult');
+    expect((request?.params as { callId?: string }).callId).toBe('t-1');
+    expect((result?.params as { callId?: string }).callId).toBe('t-1');
   });
 
   it('reports a failed tool as ok false rather than staying silent', async () => {

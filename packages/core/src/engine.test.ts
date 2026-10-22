@@ -183,6 +183,12 @@ describe('Engine.boot', () => {
     };
     expect(got.episode.id).toBe(turn!.id);
     expect(Array.isArray(got.events)).toBe(true);
+
+    // Delete all.
+    const cleared = (await host.call('experience.clear', {}))['result'] as { deleted: number };
+    expect(cleared.deleted).toBeGreaterThanOrEqual(1);
+    const after = (await host.call('experience.list', {}))['result'] as { episodes: unknown[] };
+    expect(after.episodes).toEqual([]);
   });
 
   it('closes activity a crash left running, so it does not spin forever', async () => {
@@ -1260,6 +1266,16 @@ describe('a companion handing work to an expert', () => {
     });
     expect(confirmed['result']).toMatchObject({ handoffId: expect.any(String) });
     await vi.waitFor(() => expect(host.methods()).toContain('handoff.finished'));
+
+    // The card came from that turn, so sending it is that turn's outcome.
+    const episodes = (await host.call('experience.list', {}))['result'] as {
+      episodes: { id: string; mode: string }[];
+    };
+    const turn = episodes.episodes.find((episode) => episode.mode === 'turn')!;
+    const got = (await host.call('experience.get', { id: turn.id }))['result'] as {
+      events: { kind: string; name: string }[];
+    };
+    expect(got.events).toContainEqual(expect.objectContaining({ kind: 'outcome', name: 'sent' }));
 
     // The confirmed project is remembered and found by search.
     const found = await host.call('projects.search', { query: 'ai_pet' });

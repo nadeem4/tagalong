@@ -13,6 +13,7 @@ function setup() {
     'activity.list': { items: [] },
     'experience.list': { episodes: [] },
     'experience.get': null,
+    'experience.clear': { deleted: 4 },
     'experts.list': { experts: [EXPERT] },
     'experts.upsert': { expert: EXPERT },
     'experts.delete': { deleted: true },
@@ -48,6 +49,12 @@ describe('registerExpertIpc', () => {
       ['experience.list', { limit: 5, before: 'e9' }],
       ['experience.get', { id: 'e1' }],
     ]);
+  });
+
+  it("deletes all of Home's decisions, and says how many went", async () => {
+    const { invoke, calls } = setup();
+    expect(await invoke(IPC.clearExperience)).toBe(4);
+    expect(calls).toEqual([['experience.clear', {}]]);
   });
 
   it("reads Home's Spend card from the engine as it is", async () => {

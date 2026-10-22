@@ -83,6 +83,7 @@ const bridge: HostBridge = {
     ipcRenderer.invoke(IPC.listExperience, params) as Promise<ExperienceListResult>,
   getExperience: (id: string) =>
     ipcRenderer.invoke(IPC.getExperience, id) as Promise<ExperienceGetResult>,
+  clearExperience: () => ipcRenderer.invoke(IPC.clearExperience) as Promise<number>,
   listExperts: () => ipcRenderer.invoke(IPC.listExperts) as Promise<Expert[]>,
   saveExpert: (expert: Expert) => ipcRenderer.invoke(IPC.saveExpert, expert) as Promise<Expert>,
   deleteExpert: (expertId: string) =>

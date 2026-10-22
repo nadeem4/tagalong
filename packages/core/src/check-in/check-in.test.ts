@@ -820,28 +820,42 @@ describe('CheckIn: launch and back', () => {
 });
 
 describe('CheckIn: the experience log', () => {
-  it('records a silent check-in as quiet, with what the mind was shown', async () => {
+  it('records a silent check-in as quiet, with what it was shown but no screen text or title', async () => {
     const t = setup();
     await t.checkIn.observeWindows([failing]);
+    const sent = sentText(t.mind.requests[0]!);
+    expect(sent).toContain('EADDRINUSE');
     expect(t.episodes).toEqual([
       expect.objectContaining({
         petId: scout.id,
         trigger: 'trouble',
         model: scout.model,
         decision: 'quiet',
-        input: sentText(t.mind.requests[0]!),
       }),
     ]);
+    const kept = t.episodes[0]!.input;
+    expect(kept).toContain('## Why you woke');
+    expect(kept).toContain('App: WindowsTerminal');
+    expect(kept).toMatch(/\[screen text, [\d,]+ characters, not kept\]/);
+    expect(kept).not.toContain('EADDRINUSE');
+    expect(kept).not.toContain(failing.title);
     expect(t.episodes[0]?.said).toBeUndefined();
   });
 
-  it('records a brain that failed as no-answer, apart from silence', async () => {
+  it('records what the check-in cost, in tokens', async () => {
+    const t = setup();
+    await t.checkIn.observeWindows([failing]);
+    expect(t.episodes[0]).toMatchObject({ inputTokens: 1, outputTokens: 1 });
+  });
+
+  it('records a brain that failed as no-answer, apart from silence, with no tokens', async () => {
     const t = setup({ mind: [{ throws: new Error('offline') }] });
     await t.checkIn.observeWindows([failing]);
     expect(t.episodes[0]?.decision).toBe('no-answer');
+    expect(t.episodes[0]?.inputTokens).toBeUndefined();
   });
 
-  it('records a line as spoke, under the remark id Not now comes back with', async () => {
+  it('records a line as spoke, under the remark id Not now comes back with, once', async () => {
     const t = setup({ mind: ['That port is still taken.'] });
     await t.checkIn.observeWindows([failing]);
     const remarkId = t.remarks[0]!.remarkId;
@@ -851,10 +865,21 @@ describe('CheckIn: the experience log', () => {
       said: 'That port is still taken.',
     });
     t.checkIn.notNow();
+    t.checkIn.notNow();
     expect(t.outcomes).toEqual([[remarkId, 'not-now']]);
   });
 
-  it('records an offer as offered, and taking it as accepted', async () => {
+  it('records a line Not now cut off while it was being written as held, never spoke', async () => {
+    const t = setup({ mind: ['That port is still taken.'] });
+    const pending = t.checkIn.observeWindows([failing]);
+    t.checkIn.notNow();
+    await pending;
+    expect(t.remarks).toHaveLength(0);
+    expect(t.episodes[0]).toMatchObject({ decision: 'held', said: 'That port is still taken.' });
+    expect(t.outcomes).toEqual([]);
+  });
+
+  it('records an offer as offered, and taking it as accepted; Not now after it records nothing', async () => {
     const t = setup({ mind: ['That port is taken.\nOFFER: Free port 3000\nEXPERT: claude-code'] });
     await t.checkIn.observeWindows([failing]);
     const remarkId = t.remarks[0]!.remarkId;
@@ -864,6 +889,61 @@ describe('CheckIn: the experience log', () => {
       note: 'Free port 3000',
     });
     expect(await t.checkIn.accept(remarkId)).toBe(true);
+    t.checkIn.notNow();
     expect(t.outcomes).toEqual([[remarkId, 'accepted']]);
+  });
+
+  it('records an offer with no expert on as spoke: no button was shown', async () => {
+    const t = setup({
+      mind: ['That port is taken.\nOFFER: Free port 3000'],
+      experts: [{ ...claudeCode, enabled: false }],
+    });
+    await t.checkIn.observeWindows([failing]);
+    expect(t.remarks[0]?.offer).toBeUndefined();
+    expect(t.episodes[0]).toMatchObject({ decision: 'spoke' });
+    expect(t.episodes[0]?.note).toBeUndefined();
+  });
+
+  it('records a line on finished work as spoke, even when the mind offered more', async () => {
+    const t = setup({ mind: ['Your tests are green.\nOFFER: Ship it\nEXPERT: claude-code'] });
+    await t.checkIn.finished([finishedDone]);
+    expect(t.remarks[0]?.offer).toBeUndefined();
+    expect(t.episodes[0]).toMatchObject({ decision: 'spoke' });
+  });
+
+  it('ties the Pick up card to its line: the card’s Not now records not-now, once', async () => {
+    const ready: PickUpReady = {
+      takenAt: 0,
+      items: [
+        {
+          id: 'p1',
+          kind: 'project',
+          name: 'ai_pet',
+          path: 'C:\\ai_pet',
+          editor: 'vscode',
+          branch: 'feat/secret-plan',
+          file: 'payroll.ts',
+        },
+      ],
+    };
+    const t = setup({ mind: ['Back to the parser?'], pickUp: ready });
+    await t.checkIn.back();
+    expect(t.pickUps).toHaveLength(1);
+    const episode = t.episodes[0]!;
+    expect(episode).toMatchObject({ decision: 'spoke', trigger: 'back' });
+    // Names from window titles are not kept either.
+    expect(episode.input).toContain('- ai_pet');
+    expect(episode.input).not.toContain('payroll.ts');
+    expect(episode.input).not.toContain('feat/secret-plan');
+    t.checkIn.pickUpDismissed();
+    t.checkIn.pickUpDismissed();
+    expect(t.outcomes).toEqual([[episode.ref, 'not-now']]);
+  });
+
+  it('a dismissed Pick up card with no line of its own records nothing', async () => {
+    const t = setup({ mind: ['That port is still taken.'] });
+    await t.checkIn.observeWindows([failing]);
+    t.checkIn.pickUpDismissed();
+    expect(t.outcomes).toEqual([]);
   });
 });

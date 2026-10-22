@@ -17,6 +17,7 @@ const PAGE = 30;
 /** Why the mind woke, as a person would say it. Unknown reasons show as recorded. */
 const WHY: Record<string, string> = {
   asked: 'You asked',
+  voice: 'You asked out loud',
   job: 'Background job',
   routine: 'Routine',
   launch: 'Tagalong opened',
@@ -57,6 +58,8 @@ function headline(episode: Episode, who: string): string {
       return `${who} offered to help`;
     case 'no-answer':
       return `${who}’s mind did not answer`;
+    case 'held':
+      return `${who} held a line back`;
   }
 }
 
@@ -80,6 +83,7 @@ export function DecisionsView({ name }: { name: string }) {
   const [page, setPage] = useState<{ episodes: Episode[]; next?: string | undefined } | null>(null);
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const supported = bridge.listExperience !== undefined;
 
   const refresh = useCallback(() => {
@@ -128,6 +132,17 @@ export function DecisionsView({ name }: { name: string }) {
       .catch((error: unknown) => console.error('could not list older decisions', error));
   };
 
+  const clear = (): void => {
+    setConfirming(false);
+    void bridge
+      .clearExperience?.()
+      .then(() => {
+        setOpen(null);
+        setPage({ episodes: [] });
+      })
+      .catch((error: unknown) => console.error('could not delete the decisions', error));
+  };
+
   if (!supported) return <Note>Decisions are not available here.</Note>;
   if (failed && page === null) {
     return <Note>Tagalong could not read {name}’s decisions. Reopen Home to try again.</Note>;
@@ -138,13 +153,34 @@ export function DecisionsView({ name }: { name: string }) {
       <Note>
         Every time {name} decides something, answering you, speaking up or staying quiet, it shows
         up here: why it woke, what it was shown, the tools it used and what you did about it. Kept
-        for 30 days, on this computer.
+        for 30 days, on this computer. Screen text and window titles are never kept.
       </Note>
     );
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      {bridge.clearExperience !== undefined && (
+        <span
+          className="home-danger"
+          style={{ alignSelf: 'flex-end', padding: `${t.space.lg}px ${t.space.xxl}px 0` }}
+        >
+          {confirming ? (
+            <>
+              <button type="button" className="tg-btn-quiet" onClick={clear}>
+                Delete all for good
+              </button>
+              <button type="button" className="tg-btn-quiet" onClick={() => setConfirming(false)}>
+                Keep them
+              </button>
+            </>
+          ) : (
+            <button type="button" className="tg-btn-quiet" onClick={() => setConfirming(true)}>
+              Delete all
+            </button>
+          )}
+        </span>
+      )}
       <ul aria-label="Decisions" className="home-activity">
         {page.episodes.map((episode) => (
           <Row
@@ -281,7 +317,12 @@ function Detail({ id, name: who }: { id: string; name: string }) {
       {steps.map((event, index) => (
         <Said key={index} who={`Tool ${index + 1}`} text={step(event)} />
       ))}
-      {episode.said !== undefined && <Said who={`What ${who} said`} text={episode.said} />}
+      {episode.said !== undefined && (
+        <Said
+          who={episode.decision === 'held' ? `What ${who} wrote, never shown` : `What ${who} said`}
+          text={episode.said}
+        />
+      )}
       {quiet && <Said who={`What ${who} said`} text="Nothing." />}
       {episode.note !== undefined && (
         <Said who={episode.decision === 'offered' ? 'Offered' : 'Note'} text={episode.note} />

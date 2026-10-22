@@ -1,8 +1,8 @@
 /**
  * The experience log: what the mind decided and what came of it. One episode per turn, job,
  * routine run or check-in, each with its steps (tool calls) and outcomes (Not now, an offer
- * taken, a hand-off sent). Contains Episode, EpisodeEvent and the `experience.list` and
- * `experience.get` params and results.
+ * taken, a hand-off sent). Contains Episode, EpisodeEvent and the `experience.list`,
+ * `experience.get` and `experience.clear` params and results.
  */
 import { z } from 'zod';
 
@@ -13,7 +13,8 @@ export type EpisodeMode = z.infer<typeof EpisodeMode>;
 /**
  * What the mind decided. A turn `answered` (or was `stopped`, or hit an `error`); a check-in
  * stayed `quiet`, `spoke`, `offered` work, or got `no-answer` from a brain that failed or
- * timed out. Absent while it is still running.
+ * timed out. `held`: the mind wrote a line that was never shown (Not now was pressed, or the
+ * pet went, while it was writing). Absent while it is still running.
  */
 export const EpisodeDecision = z.enum([
   'answered',
@@ -23,6 +24,7 @@ export const EpisodeDecision = z.enum([
   'spoke',
   'offered',
   'no-answer',
+  'held',
 ]);
 export type EpisodeDecision = z.infer<typeof EpisodeDecision>;
 
@@ -86,3 +88,8 @@ export const ExperienceGetResult = z
   .nullable();
 export type ExperienceGetParams = z.infer<typeof ExperienceGetParams>;
 export type ExperienceGetResult = z.infer<typeof ExperienceGetResult>;
+
+/** Delete all: every episode and its events. */
+export const ExperienceClearParams = z.object({});
+export const ExperienceClearResult = z.object({ deleted: z.number().int().nonnegative() });
+export type ExperienceClearResult = z.infer<typeof ExperienceClearResult>;

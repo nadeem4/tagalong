@@ -221,6 +221,11 @@ export function createFakeHostBridge(
       const more = start + limit < fake.episodes.length && last !== undefined;
       return Promise.resolve(more ? { episodes, next: last.id } : { episodes });
     },
+    clearExperience() {
+      const deleted = fake.episodes.length;
+      fake.episodes = [];
+      return Promise.resolve(deleted);
+    },
     getExperience(id) {
       const episode = fake.episodes.find((candidate) => candidate.id === id);
       return Promise.resolve(

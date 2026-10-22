@@ -666,6 +666,21 @@ describe('migrate', () => {
       // Rerunning 23 on its own is harmless.
       db.prepare('DELETE FROM schema_version WHERE version >= 23').run();
       expect(migrate(db)).toBe(23);
+      const columns = () =>
+        db
+          .prepare<[], { name: string }>('PRAGMA table_info(episode_events)')
+          .all()
+          .map((column) => column.name);
+      expect(columns()).toContain('call_id');
+      // A database from an early build of 23, before events kept the call id, gains it.
+      db.exec('DROP TABLE episode_events');
+      db.exec(
+        `CREATE TABLE episode_events (id INTEGER PRIMARY KEY AUTOINCREMENT, episode_id TEXT NOT NULL,
+           kind TEXT NOT NULL, name TEXT NOT NULL, input TEXT, result TEXT, ok INTEGER, at TEXT NOT NULL)`,
+      );
+      db.prepare('DELETE FROM schema_version WHERE version >= 23').run();
+      expect(migrate(db)).toBe(23);
+      expect(columns()).toContain('call_id');
     } finally {
       db.close();
     }

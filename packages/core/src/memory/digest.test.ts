@@ -35,7 +35,14 @@ function setup(options: SetupOptions = {}) {
   start.setHours(12, 0, 0, 0);
   const clock = new FakeClock(start.getTime());
   const mind = fakeMind(...(options.mind ?? ['NOTHING']));
-  const state = { pet: scout as typeof scout | null, spentOut: false, idle: true, pruned: 0 };
+  const state = {
+    pet: scout as typeof scout | null,
+    spentOut: false,
+    idle: true,
+    pruned: 0,
+    tidied: 0,
+    tidyFails: false,
+  };
   const answers = new Map<string, string>();
   const logs: string[] = [];
   const digest = new Digest({
@@ -49,6 +56,10 @@ function setup(options: SetupOptions = {}) {
     idle: () => state.idle,
     pruneJobs: () => {
       state.pruned += 1;
+    },
+    tidy: () => {
+      state.tidied += 1;
+      if (state.tidyFails) throw new Error('database is locked');
     },
     lastAnswer: (conversationId) => answers.get(conversationId) ?? null,
     log: (message) => logs.push(message),
@@ -200,6 +211,22 @@ describe('Digest: when it runs', () => {
     expect(t.clock.pendingTimers).toBe(1);
     t.digest.stop();
     expect(t.clock.pendingTimers).toBe(0);
+  });
+
+  it('tidies on every check, with nothing to digest, and a failed tidy never stops the timer', async () => {
+    const t = setup();
+    t.digest.start();
+    await t.clock.advance(FIRST_CHECK_MS);
+    expect(t.mind.requests).toHaveLength(0);
+    expect(t.state.tidied).toBe(1);
+    t.state.tidyFails = true;
+    await t.clock.advance(CHECK_EVERY_MS);
+    expect(t.state.tidied).toBe(2);
+    expect(t.logs.some((line) => line.includes('database is locked'))).toBe(true);
+    t.state.tidyFails = false;
+    await t.clock.advance(CHECK_EVERY_MS);
+    expect(t.state.tidied).toBe(3);
+    t.digest.stop();
   });
 });
 

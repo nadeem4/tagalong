@@ -83,6 +83,20 @@ describe('askMind', () => {
     expect(mind.asked[0]).toMatchObject({ providerId: 'anthropic', model: 'claude-opus-5' });
   });
 
+  it('hands back what the call cost, a cut-off reply included, and nothing for a throw', async () => {
+    const seen: Array<{ inputTokens: number; outputTokens: number }> = [];
+    const onUsage = (usage: { inputTokens: number; outputTokens: number }) => seen.push(usage);
+    await askMind({ ...base, provider: fakeMind('Hi.').resolve, timeoutMs: 1_000, onUsage });
+    const cut = fakeMind({ reply: 'That port', stopReason: 'max_tokens' });
+    await askMind({ ...base, provider: cut.resolve, timeoutMs: 1_000, onUsage });
+    const thrown = fakeMind({ throws: new Error('offline') });
+    await askMind({ ...base, provider: thrown.resolve, timeoutMs: 1_000, onUsage });
+    expect(seen).toEqual([
+      { inputTokens: 1, outputTokens: 1 },
+      { inputTokens: 1, outputTokens: 1 },
+    ]);
+  });
+
   it('is silent when the brain throws, stops early, or hangs past the timeout', async () => {
     const thrown = fakeMind({ throws: new Error('offline') });
     expect(await askMind({ ...base, provider: thrown.resolve, timeoutMs: 1_000 })).toBeNull();

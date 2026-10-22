@@ -9,6 +9,8 @@
 import { z } from 'zod';
 import { ActivityListParams, ActivityListResult } from './activity';
 import {
+  ExperienceClearParams,
+  ExperienceClearResult,
   ExperienceGetParams,
   ExperienceGetResult,
   ExperienceListParams,
@@ -354,6 +356,8 @@ export const TurnStartedParams = z.object({
   background: z.literal(true).optional(),
   /** Set on a job's turn: the job it works for. */
   jobId: z.uuid().optional(),
+  /** The question was spoken (Talk to Scout), not typed. */
+  spoken: z.literal(true).optional(),
 });
 /** Scout's own background jobs changed: how many run and how many wait, for its face. */
 export const BoardChangedParams = z.object({
@@ -366,11 +370,14 @@ export const TurnDeltaParams = z.object({ turnId: z.uuid(), text: z.string() });
 export const TurnToolRequestParams = z.object({
   turnId: z.uuid(),
   approvalId: z.uuid(),
+  /** The provider's id for this call, when it gives one: its `turn.toolResult` carries it too. */
+  callId: z.string().min(1).optional(),
   tool: z.string().min(1),
   input: z.unknown(),
 });
 export const TurnToolResultParams = z.object({
   turnId: z.uuid(),
+  callId: z.string().min(1).optional(),
   tool: z.string().min(1),
   ok: z.boolean(),
   summary: z.string(),
@@ -512,6 +519,7 @@ export const hostToCoreMethods = {
   'activity.list': { params: ActivityListParams, result: ActivityListResult },
   'experience.list': { params: ExperienceListParams, result: ExperienceListResult },
   'experience.get': { params: ExperienceGetParams, result: ExperienceGetResult },
+  'experience.clear': { params: ExperienceClearParams, result: ExperienceClearResult },
   'experts.list': { params: ExpertsListParams, result: ExpertsListResult },
   'experts.upsert': { params: ExpertsUpsertParams, result: ExpertsUpsertResult },
   'experts.delete': { params: ExpertsDeleteParams, result: ExpertsDeleteResult },

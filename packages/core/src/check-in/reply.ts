@@ -86,6 +86,8 @@ export async function askMind(options: {
   system: string;
   bundle: string;
   timeoutMs: number;
+  /** What the call cost, for the experience log; the engine's meter counts it for the budget. */
+  onUsage?: (usage: { inputTokens: number; outputTokens: number }) => void;
   log?: (message: string) => void;
 }): Promise<CheckInReply | null> {
   // Deciding whether to speak is the mind's own judgement, so it thinks on the pet's model,
@@ -107,6 +109,7 @@ export async function askMind(options: {
       },
       controller.signal,
     );
+    options.onUsage?.(result.usage);
     // NOTHING is an answer (an empty reply); null is a mind that did not answer.
     return result.stopReason === 'end' ? (parseCheckIn(result.text) ?? {}) : null;
   } catch (error) {

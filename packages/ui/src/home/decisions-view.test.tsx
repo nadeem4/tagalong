@@ -1,7 +1,7 @@
 /** Tests for DecisionsView: episodes in words, silence included, and an episode opened. */
 
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Episode } from '@tagalong/protocol';
 import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
@@ -119,5 +119,52 @@ describe('DecisionsView', () => {
     expect(within(list).getAllByRole('button')).toHaveLength(30);
     fireEvent.click(screen.getByRole('button', { name: 'Show older' }));
     await waitFor(() => expect(within(list).getAllByRole('button')).toHaveLength(31));
+  });
+
+  it('Delete all asks once, then deletes every decision', async () => {
+    const bridge = createFakeHostBridge({ episodes: [QUIET, SPOKE, ANSWERED] });
+    await renderDecisions(bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all' }));
+    // One confirm: keeping them changes nothing.
+    fireEvent.click(screen.getByRole('button', { name: 'Keep them' }));
+    expect(bridge.episodes).toHaveLength(3);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all for good' }));
+    expect(await screen.findByText(/Every time Scout decides something/)).toBeInTheDocument();
+    expect(bridge.episodes).toEqual([]);
+  });
+
+  it('keeps every decision when Delete all fails', async () => {
+    const bridge = createFakeHostBridge({ episodes: [QUIET] });
+    bridge.clearExperience = () => Promise.reject(new Error('locked'));
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const list = await renderDecisions(bridge);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all for good' }));
+    await waitFor(() => expect(errors).toHaveBeenCalledOnce());
+    expect(within(list).getAllByRole('button')).toHaveLength(1);
+    errors.mockRestore();
+  });
+
+  it('says a spoken question, and a line that was never shown, in words', async () => {
+    const list = await renderDecisions(
+      createFakeHostBridge({
+        episodes: [
+          episode({
+            id: 'e5',
+            mode: 'check-in',
+            trigger: 'settled',
+            decision: 'held',
+            said: 'Hm.',
+          }),
+          episode({ id: 'e4', mode: 'turn', trigger: 'voice', decision: 'answered' }),
+        ],
+      }),
+    );
+    const lines = within(list)
+      .getAllByRole('button')
+      .map((button) => button.textContent ?? '');
+    expect(lines[0]).toContain('Scout held a line back');
+    expect(lines[1]).toContain('You asked out loud');
   });
 });

@@ -14,6 +14,16 @@ import type {
 } from '@tagalong/protocol';
 import type { TurnEvent } from '../conversation/runner';
 import { hideSecrets } from '../privacy/secrets';
+import { RECALL_SCREEN, WHAT_CHANGED } from '../tools/builtin/awareness';
+import {
+  GET_SELECTION,
+  LIST_WINDOWS,
+  LOOK_AT_DISPLAY,
+  LOOK_AT_SCREEN,
+  LOOK_AT_WINDOW,
+  LOOK_CLOSER,
+  READ_WINDOW_TEXT,
+} from '../tools/builtin/perception';
 import type { ConversationStore } from './store';
 
 /** What the mind was shown: a question, or a check-in's whole bundle. */
@@ -22,6 +32,29 @@ export const EXPERIENCE_INPUT_CHARS = 8_000;
 const TEXT_CHARS = 4_000;
 /** The experience log keeps this many days. */
 export const EXPERIENCE_KEEP_DAYS = 30;
+/** Hand-off cards waiting for Send, tied to the turn that proposed them; the oldest go first. */
+const WAITING_CARDS = 50;
+
+/**
+ * Tools whose results are what is on the screen: window text, OCR, the selection, window
+ * titles, what a look saw. The log keeps only how much there was, never the text.
+ */
+const SCREEN_TOOLS: ReadonlySet<string> = new Set([
+  LOOK_AT_SCREEN,
+  GET_SELECTION,
+  LOOK_AT_DISPLAY,
+  LOOK_CLOSER,
+  LIST_WINDOWS,
+  READ_WINDOW_TEXT,
+  LOOK_AT_WINDOW,
+  RECALL_SCREEN,
+  WHAT_CHANGED,
+]);
+
+/** What stands in for screen text the log does not keep. */
+export function notKept(text: string): string {
+  return `[screen text, ${text.length.toLocaleString('en-GB')} characters, not kept]`;
+}
 
 interface EpisodeRow {
   id: string;
@@ -59,25 +92,28 @@ export interface CheckInEpisode {
   /** The reason it woke: `trouble`, `settled`, `launch`… */
   trigger: string;
   model?: string | undefined;
-  /** The bundle the mind was shown. */
+  /** The bundle the mind was shown, with screen text and window titles already left out. */
   input: string;
-  decision: Extract<EpisodeDecision, 'quiet' | 'spoke' | 'offered' | 'no-answer'>;
+  decision: Extract<EpisodeDecision, 'quiet' | 'spoke' | 'offered' | 'no-answer' | 'held'>;
   said?: string | undefined;
-  /** The offer, when there was one. */
+  /** The offer, when one was shown. */
   note?: string | undefined;
+  inputTokens?: number | undefined;
+  outputTokens?: number | undefined;
 }
 
 /**
  * The record behind the inspector, and later the input to sleep and the evals. Turns, jobs
  * and routine runs are written from the turn events the engine already sends (`observe` sits
  * in front of the broadcast, beside the activity log); check-ins, outcomes and hand-off cards
- * by their own hooks. Everything kept has secrets hidden and is clipped; pictures are never
- * kept. Local only, and gone after EXPERIENCE_KEEP_DAYS.
+ * by their own hooks. Everything kept has secrets hidden and is clipped; pictures, screen text
+ * and window titles are never kept. Local only, and gone after EXPERIENCE_KEEP_DAYS or Delete
+ * all.
  */
 export class ExperienceLog {
   /** Running turns: turn id to episode id. */
   readonly #open = new Map<string, { episodeId: string; petId: string }>();
-  /** Hand-off cards shown during a turn: proposal id to that turn's episode id. */
+  /** Hand-off cards a turn proposed, still waiting: proposal id to that turn's episode id. */
   readonly #proposals = new Map<string, string>();
 
   constructor(
@@ -88,12 +124,12 @@ export class ExperienceLog {
   observe(event: TurnEvent): void {
     switch (event.method) {
       case 'turn.started': {
-        const { turnId, petId, conversationId, model, jobId, routineId } = event.params;
+        const { turnId, petId, conversationId, model, jobId, routineId, spoken } = event.params;
         const mode: EpisodeMode =
           jobId !== undefined ? 'job' : routineId !== undefined ? 'routine' : 'turn';
         const episodeId = this.#insert({
           mode,
-          trigger: mode === 'turn' ? 'asked' : mode,
+          trigger: mode !== 'turn' ? mode : spoken === true ? 'voice' : 'asked',
           petId,
           ref: turnId,
           conversationId,
@@ -108,12 +144,13 @@ export class ExperienceLog {
         if (open === undefined) return;
         this.db
           .prepare(
-            `INSERT INTO episode_events (episode_id, kind, name, input, at)
-             VALUES (?, 'step', ?, ?, ?)`,
+            `INSERT INTO episode_events (episode_id, kind, name, call_id, input, at)
+             VALUES (?, 'step', ?, ?, ?, ?)`,
           )
           .run(
             open.episodeId,
             event.params.tool,
+            event.params.callId ?? null,
             clip(JSON.stringify(event.params.input ?? null), TEXT_CHARS),
             now(),
           );
@@ -122,18 +159,23 @@ export class ExperienceLog {
       case 'turn.toolResult': {
         const open = this.#open.get(event.params.turnId);
         if (open === undefined) return;
-        // The newest unanswered call of that tool: calls run one after another.
+        const { tool, callId, summary } = event.params;
+        const result = SCREEN_TOOLS.has(tool) && summary !== '' ? notKept(summary) : summary;
+        // Its own call, by the provider's id; with none, the newest unanswered call of that tool.
         this.db
           .prepare(
             `UPDATE episode_events SET ok = ?, result = ?
              WHERE id = (SELECT MAX(id) FROM episode_events
-                         WHERE episode_id = ? AND kind = 'step' AND name = ? AND ok IS NULL)`,
+                         WHERE episode_id = ? AND kind = 'step' AND name = ? AND ok IS NULL
+                           AND (? IS NULL OR call_id = ?))`,
           )
           .run(
             event.params.ok ? 1 : 0,
-            clip(event.params.summary, TEXT_CHARS),
+            clip(result, TEXT_CHARS),
             open.episodeId,
-            event.params.tool,
+            tool,
+            callId ?? null,
+            callId ?? null,
           );
         return;
       }
@@ -176,8 +218,21 @@ export class ExperienceLog {
   checkIn(entry: CheckInEpisode): string {
     const id = this.#insert({ mode: 'check-in', ...entry });
     this.db
-      .prepare(`UPDATE episodes SET decision = ?, said = ?, note = ?, ended_at = ? WHERE id = ?`)
-      .run(entry.decision, clip(entry.said, TEXT_CHARS), clip(entry.note, TEXT_CHARS), now(), id);
+      .prepare(
+        `UPDATE episodes SET decision = ?, said = ?, note = ?, input_tokens = ?, output_tokens = ?,
+           model_calls = ?, ended_at = ?
+         WHERE id = ?`,
+      )
+      .run(
+        entry.decision,
+        clip(entry.said, TEXT_CHARS),
+        clip(entry.note, TEXT_CHARS),
+        entry.inputTokens ?? null,
+        entry.outputTokens ?? null,
+        entry.inputTokens === undefined ? null : 1,
+        now(),
+        id,
+      );
     return id;
   }
 
@@ -196,10 +251,19 @@ export class ExperienceLog {
     return true;
   }
 
-  /** A hand-off card was shown: tied to the pet's running turn, if one is running. */
-  proposed(proposalId: string, petId: string): void {
-    const open = [...this.#open.values()].reverse().find((turn) => turn.petId === petId);
-    if (open !== undefined) this.#proposals.set(proposalId, open.episodeId);
+  /**
+   * A turn's tool put a hand-off card up: tied to that turn. A card from anywhere else (a
+   * check-in offer taken, Brief again) or from a turn already gone is tied to nothing.
+   */
+  proposed(proposalId: string, turnId: string | undefined): void {
+    const open = turnId === undefined ? undefined : this.#open.get(turnId);
+    if (open === undefined) return;
+    this.#proposals.set(proposalId, open.episodeId);
+    // Cards never sent nor dismissed (the window closed) would otherwise pile up.
+    for (const oldest of this.#proposals.keys()) {
+      if (this.#proposals.size <= WAITING_CARDS) break;
+      this.#proposals.delete(oldest);
+    }
   }
 
   /** The person sent or dismissed a hand-off card. False when no turn proposed it. */
@@ -249,6 +313,15 @@ export class ExperienceLog {
     return this.db
       .prepare(`UPDATE episodes SET decision = 'stopped', ended_at = ? WHERE decision IS NULL`)
       .run(now()).changes;
+  }
+
+  /** Delete all: every episode and its events. Returns how many episodes went. */
+  clear(): number {
+    this.#proposals.clear();
+    return this.db.transaction(() => {
+      this.db.prepare('DELETE FROM episode_events').run();
+      return this.db.prepare('DELETE FROM episodes').run().changes;
+    })();
   }
 
   /** Forgets episodes older than EXPERIENCE_KEEP_DAYS, and their events with them. */

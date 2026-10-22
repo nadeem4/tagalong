@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   Episode,
   EpisodeEvent,
+  ExperienceClearParams,
+  ExperienceClearResult,
   ExperienceGetParams,
   ExperienceGetResult,
   ExperienceListParams,
@@ -38,6 +40,10 @@ describe('Episode', () => {
       startedAt: checkIn.startedAt,
     };
     expect(Episode.parse(running)).toEqual(running);
+  });
+
+  it('takes a line the mind wrote but that was never shown', () => {
+    expect(Episode.parse({ ...checkIn, decision: 'held' }).decision).toBe('held');
   });
 
   it('refuses a mode or decision the engine does not record', () => {
@@ -81,7 +87,15 @@ describe('experience.list and experience.get', () => {
     });
   });
 
+  it('clear deletes every episode and says how many', () => {
+    expect(ExperienceClearParams.parse({})).toEqual({});
+    expect(ExperienceClearResult.parse({ deleted: 3 })).toEqual({ deleted: 3 });
+    expect(ExperienceClearResult.safeParse({ deleted: -1 }).success).toBe(false);
+  });
+
   it('are host-to-core methods', () => {
+    expect(hostToCoreMethods['experience.clear'].params).toBe(ExperienceClearParams);
+    expect(hostToCoreMethods['experience.clear'].result).toBe(ExperienceClearResult);
     expect(hostToCoreMethods['experience.list'].params).toBe(ExperienceListParams);
     expect(hostToCoreMethods['experience.list'].result).toBe(ExperienceListResult);
     expect(hostToCoreMethods['experience.get'].params).toBe(ExperienceGetParams);

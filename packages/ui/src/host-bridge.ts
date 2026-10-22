@@ -113,6 +113,8 @@ export interface HostBridge {
   listExperience?(params?: { before?: string; limit?: number }): Promise<ExperienceListResult>;
   /** One episode with its tool calls and outcomes, or null once it is gone. */
   getExperience?(id: string): Promise<ExperienceGetResult>;
+  /** Delete all: every decision and its steps. Resolves with how many went. */
+  clearExperience?(): Promise<number>;
   /**
    * Home's Experts page: the tools a companion hands work to. All optional: a host without
    * Home, such as the browser extension, never shows the page.

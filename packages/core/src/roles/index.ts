@@ -1,7 +1,7 @@
 /**
  * The role and soul libraries and their helpers. Contains `getRole`, `roleFor` (falls back
  * to the companion), `ACTIVE_SOUL`, `soul()` (the soul the prompt starts with), `modeSystem`
- * (the soul plus a mode's block, for every mind that is not a turn) and
+ * (the soul plus a mode's block, for the minds that are not a turn) and
  * `recommendedModel` (a role's tier mapped to a model on one provider).
  * Used by the prompt assembler, the tool registry, the key check, the engine and the
  * desktop's Welcome.
@@ -24,9 +24,9 @@ export function soul(): string {
 }
 
 /**
- * The system prompt for every mind that is not a turn (checking in, tidying memory,
- * summarising, watching): the same soul a turn starts with, then the mode's own block. One
- * identity in every mode, so what Scout says, keeps and judges all comes from the same self.
+ * The system prompt for every mind that is not a turn but speaks or judges as Scout (checking
+ * in, tidying memory, summarising): the same soul a turn starts with, then the mode's own
+ * block. One identity in every mode. A watch's yes/no check is plumbing and gets no soul.
  */
 export function modeSystem(block: string): string {
   return `${soul()}\n\n${block}`;

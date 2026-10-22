@@ -413,10 +413,6 @@ export class Engine {
       activity,
       connectorFor,
       emit: (event) => {
-        // A card shown during a turn is tied to it, so what the person does with it is too.
-        if (event.method === 'handoff.proposed') {
-          record(() => experience.proposed(event.params.proposalId, event.params.petId));
-        }
         live.server?.broadcast(event.method, event.params);
         if (event.method !== 'handoff.finished') return;
         // A routine's own hand-off is delivered by the routine; any other arrives with the
@@ -469,6 +465,8 @@ export class Engine {
       // Not while a turn of theirs or a job is running.
       idle: () => !runner.foregroundBusy() && jobs.counts().running === 0,
       pruneJobs: () => void jobs.prune(),
+      // The experience log's 30 days, kept while the app stays open, not only at boot.
+      tidy: () => void experience.prune(),
       lastAnswer,
       log: (message) => console.warn(`[engine] ${message}`),
     });
@@ -608,7 +606,12 @@ export class Engine {
       // Read per turn: experts are added and switched off while the app runs.
       experts: {
         experts: () => experts.list(),
-        propose: (params) => handoffs.propose(params),
+        // A card a turn's tool put up is tied to that turn, so what the person does with it is.
+        propose: ({ turnId, ...params }) => {
+          const proposed = handoffs.propose(params);
+          record(() => experience.proposed(proposed.proposalId, turnId));
+          return proposed;
+        },
         // Only reached on a routine's turn, for the expert its saved card allowed.
         startReadOnly: (params) => handoffs.startReadOnly(params),
         // tell_expert: the person's words for an expert already working.
@@ -958,6 +961,7 @@ function buildHandlers(parts: {
     'activity.list': (params) => activity.list(params),
     'experience.list': (params) => experience.list(params),
     'experience.get': (params) => experience.get(params.id),
+    'experience.clear': () => ({ deleted: experience.clear() }),
 
     'experts.list': () => ({ experts: experts.list() }),
     'experts.upsert': (params) => {
@@ -1078,7 +1082,12 @@ function buildHandlers(parts: {
     // Pick up: Brief again proposes the saved ask (nothing starts); Not now drops the offer.
     'pickUp.rebrief': (params) =>
       plainly(() => Promise.resolve({ proposed: pickUp.rebrief(params.itemId) })),
-    'pickUp.dismiss': () => ({ dismissed: pickUp.dismiss() }),
+    'pickUp.dismiss': () => {
+      const dismissed = pickUp.dismiss();
+      // The card's Not now answers the line that rode with it.
+      if (dismissed) record(() => checkIn.pickUpDismissed());
+      return { dismissed };
+    },
 
     // What Scout saw. Deleting removes the record, not what was already sent.
     'sightLog.list': (params) => ({ entries: sightLog.list(params.limit) }),

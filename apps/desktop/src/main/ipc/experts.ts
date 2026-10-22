@@ -31,6 +31,11 @@ export function registerExpertIpc(handle: IpcHandle, { engine }: ExpertIpcDeps):
     }),
   );
   handle(IPC.getExperience, async (_event, id: string) => engine().call('experience.get', { id }));
+  // Delete all: every decision and its steps.
+  handle(IPC.clearExperience, async () => {
+    const { deleted } = await engine().call('experience.clear', {});
+    return deleted;
+  });
 
   // Home's Spend card.
   handle(IPC.usageSummary, async () => engine().call('usage.summary', {}));

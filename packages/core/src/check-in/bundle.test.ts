@@ -295,6 +295,29 @@ describe('renderBundle', () => {
     expect(stretch).toContain('## Front window\nApp: WindowsTerminal');
   });
 
+  it('for the experience log, keeps the app but no window title, text or file names', () => {
+    const kept = renderBundle(input({ forLog: true }));
+    expect(kept).toContain('## Window\nApp: WindowsTerminal');
+    expect(kept).not.toContain(terminal.title);
+    expect(kept).not.toContain('EADDRINUSE');
+    expect(kept).toContain('[screen text, 30 characters, not kept]');
+    const stretch = renderBundle(
+      input({
+        reason: { kind: 'long-stretch', activeMs: 1, late: false, front: terminal },
+        forLog: true,
+      }),
+    );
+    expect(stretch).toContain('## Front window\nApp: WindowsTerminal');
+    expect(stretch).not.toContain(terminal.title);
+    const back = renderBundle(
+      input({ reason: { kind: 'back', awayMs: DAY, pickUp: leftOff }, forLog: true }),
+    );
+    expect(back).toContain('- ai_pet\n');
+    expect(back).not.toContain('engine.ts');
+    expect(back).not.toContain('feat/pick-up');
+    expect(back).toContain('add dark mode');
+  });
+
   it('leaves out the front app and title of a blind window', () => {
     const vault = win('w-2', 'Vault - 1Password', { processName: '1Password.exe' });
     const mine = win('w-3', 'Payroll - Excel');

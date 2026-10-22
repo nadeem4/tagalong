@@ -37,7 +37,10 @@ function asked(text: string): string {
   return conversation.id;
 }
 
-function started(conversationId: string, extra: { jobId?: string; routineId?: string } = {}) {
+function started(
+  conversationId: string,
+  extra: { jobId?: string; routineId?: string; spoken?: true } = {},
+) {
   const turnId = randomUUID();
   log.observe({
     method: 'turn.started',
@@ -83,6 +86,14 @@ describe('ExperienceLog: turns', () => {
       method: 'turn.toolResult',
       params: { turnId, tool: 'read_window_text', ok: true, summary: 'EADDRINUSE :3000' },
     });
+    log.observe({
+      method: 'turn.toolRequest',
+      params: { turnId, approvalId: randomUUID(), tool: 'remember', input: { text: 'x' } },
+    });
+    log.observe({
+      method: 'turn.toolResult',
+      params: { turnId, tool: 'remember', ok: true, summary: 'Saved.' },
+    });
     completed(turnId, 'Port 3000 is taken by another server.');
 
     const { episode, events } = only();
@@ -100,14 +111,45 @@ describe('ExperienceLog: turns', () => {
     });
     expect(episode.endedAt).toBeDefined();
     expect(events).toEqual([
+      // What a screen tool read is never kept: only how much there was.
       expect.objectContaining({
         kind: 'step',
         name: 'read_window_text',
         input: '{"id":7}',
-        result: 'EADDRINUSE :3000',
+        result: '[screen text, 16 characters, not kept]',
         ok: true,
       }),
+      expect.objectContaining({ kind: 'step', name: 'remember', result: 'Saved.', ok: true }),
     ]);
+  });
+
+  it('matches each result to its call by the call id, even two of one tool at once', () => {
+    const turnId = started(asked('both'));
+    for (const callId of ['c1', 'c2']) {
+      log.observe({
+        method: 'turn.toolRequest',
+        params: { turnId, approvalId: randomUUID(), callId, tool: 'recall', input: { q: callId } },
+      });
+    }
+    // The first call finishes first: by name alone it would land on the newest call.
+    log.observe({
+      method: 'turn.toolResult',
+      params: { turnId, callId: 'c1', tool: 'recall', ok: true, summary: 'first' },
+    });
+    log.observe({
+      method: 'turn.toolResult',
+      params: { turnId, callId: 'c2', tool: 'recall', ok: false, summary: 'second' },
+    });
+    completed(turnId, 'ok');
+    expect(only().events).toEqual([
+      expect.objectContaining({ input: '{"q":"c1"}', result: 'first', ok: true }),
+      expect.objectContaining({ input: '{"q":"c2"}', result: 'second', ok: false }),
+    ]);
+  });
+
+  it('says a spoken question was spoken', () => {
+    completed(started(asked('hello'), { spoken: true }), 'Hi.');
+    expect(only().episode).toMatchObject({ mode: 'turn', trigger: 'voice' });
   });
 
   it('tells a job and a routine from a turn they asked for', () => {
@@ -188,13 +230,30 @@ describe('ExperienceLog: outcomes', () => {
 
   it('ties a hand-off card to the turn that proposed it, then records sent or dismissed', () => {
     const turnId = started(asked('fix it'));
-    log.proposed('p1', 'scout');
+    const other = started(asked('something else'));
+    log.proposed('p1', turnId);
+    // A card from no turn (a check-in offer, Brief again) is tied to nothing, not to `other`.
+    log.proposed('p2', undefined);
+    log.proposed('p3', 'no-such-turn');
     completed(turnId, 'I have a brief ready.');
-    log.proposed('p2', 'scout');
+    completed(other, 'ok');
     expect(log.proposalOutcome('p1', 'sent')).toBe(true);
-    // No turn was running for p2, so it is tied to nothing.
+    // Used up: the card is gone.
+    expect(log.proposalOutcome('p1', 'dismissed')).toBe(false);
     expect(log.proposalOutcome('p2', 'dismissed')).toBe(false);
-    expect(only().events).toEqual([expect.objectContaining({ kind: 'outcome', name: 'sent' })]);
+    expect(log.proposalOutcome('p3', 'dismissed')).toBe(false);
+    const [second, first] = log.list({}).episodes;
+    expect(log.get(first!.id)!.events).toEqual([
+      expect.objectContaining({ kind: 'outcome', name: 'sent' }),
+    ]);
+    expect(log.get(second!.id)!.events).toEqual([]);
+  });
+
+  it('keeps only the newest cards waiting, so cards never acted on do not pile up', () => {
+    const turnId = started(asked('many'));
+    for (let i = 0; i < 60; i += 1) log.proposed(`p${i}`, turnId);
+    expect(log.proposalOutcome('p0', 'sent')).toBe(false);
+    expect(log.proposalOutcome('p59', 'sent')).toBe(true);
   });
 });
 
@@ -210,6 +269,16 @@ describe('ExperienceLog: paging, boot and pruning', () => {
     started(asked('cut short'));
     expect(log.interrupted()).toBe(1);
     expect(only().episode).toMatchObject({ decision: 'stopped' });
+  });
+
+  it('deletes everything at once: Delete all', () => {
+    const remarkId = randomUUID();
+    log.checkIn({ ref: remarkId, petId: 'scout', trigger: 'back', input: 'x', decision: 'spoke' });
+    log.outcome(remarkId, 'not-now');
+    completed(started(asked('a')), 'b');
+    expect(log.clear()).toBe(2);
+    expect(log.list({}).episodes).toEqual([]);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM episode_events').get()).toEqual({ n: 0 });
   });
 
   it(`forgets episodes older than ${EXPERIENCE_KEEP_DAYS} days, and their events`, () => {
