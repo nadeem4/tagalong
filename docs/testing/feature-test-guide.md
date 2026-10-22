@@ -1401,23 +1401,47 @@ monitor.
    then open Home → **How Scout decided**.
 3. **Expected:** the newest row reads **Scout answered**, with **You asked**, the model, a token
    count and the time. Clicking it shows **Why it woke**, **What it was shown** (your question),
-   one **Tool** line per tool it used with the first line of what came back, and **What Scout
-   said**.
+   one **Tool** line per tool it used, and **What Scout said**. A screen tool's line (a look, a
+   window read, the window list) shows `[screen text, N characters, not kept]`, never what it read;
+   any other tool shows the first line of what came back.
+4. **Action:** ask the same with **Talk to Scout**. **Expected:** that row says **You asked out
+   loud**.
 
 ### DC.2. Silence is a decision too _(real brain)_
 
 1. **Setup:** Keep an eye on things on.
 2. **Action:** open a terminal whose title says `failed`, wait for the check-in, then open the page.
 3. **Expected:** a row for the check-in: **Scout stayed quiet** or **Scout spoke up**, with **An
-   error on screen**. Opened, **What it was shown** is the whole message the check-in sent, keys and
-   tokens hidden.
+   error on screen**. Opened, **What it was shown** is the message the check-in sent, keys and
+   tokens hidden, with an **App:** line but no window title, and the window's text as
+   `[screen text, N characters, not kept]`. The row's tokens are counted in Home's **Spend** too.
 
 ### DC.3. What you did about it _(real brain)_
 
 1. **Action:** when Scout says something on its own, press **Not now**; reopen the page.
 2. **Expected:** that row, opened, ends with **What you did: You said Not now**. Taking an offer
    reads **You took the offer**; sending or dismissing a hand-off card a turn showed reads **You
-   sent the hand-off** or **You dismissed the hand-off** on that turn.
+   sent the hand-off** or **You dismissed the hand-off** on that turn. Pressing **Not now** a second
+   time adds nothing. **Not now** on the Pick up card reads **You said Not now** on the row of the
+   line that came with it.
+3. **Action:** press **Not now** while Scout is still thinking about a check-in. **Expected:** no
+   line shows; the row reads **Scout held a line back**, and opened shows **What Scout wrote, never
+   shown**.
+4. **Action:** take an offer from a check-in (the card shows), then send it. **Expected:** the
+   check-in's row reads **You took the offer**; no turn's row says **You sent the hand-off**.
+
+### DC.4. Delete all
+
+1. **Action:** on **How Scout decided**, press **Delete all**, then **Keep them**. **Expected:**
+   nothing is deleted.
+2. **Action:** press **Delete all**, then **Delete all for good**. **Expected:** the page shows its
+   empty note; quitting and reopening Tagalong shows it still empty.
+
+### DC.5. Thirty days, while the app stays open
+
+1. **Setup:** quit Tagalong; in `tagalong.db` set one episode's `started_at` to 31 days ago.
+2. **Action:** start Tagalong, then set another one's to 31 days ago while it runs, and wait 35
+   minutes. **Expected:** both are gone from the page, the second without a restart.
 
 ## What Scout saw
 

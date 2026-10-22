@@ -1587,7 +1587,8 @@ passes the clip as `scout`, and Activity draws it on each entry too) and name, a
 - **How Scout decided**: `DecisionsView` (`home/decisions-view.tsx`), the experience log in words:
   `HostBridge.listExperience` → `experience.list`, a page of 30, re-read on the events that change
   Activity and on `pet.remark`; an opened episode is read with `getExperience` → `experience.get`.
-  See [The experience log](#the-experience-log).
+  **Delete all** (one confirm: **Delete all for good** or **Keep them**) calls `clearExperience` →
+  `experience.clear`. See [The experience log](#the-experience-log).
 - **What Scout saw**: `SightLogView`; see [What Scout saw](#what-scout-saw). The days it keeps come
   from `HomeHost.setup().sightLogDays`.
 - **What Scout remembers**: `MemoryView`; see [What Scout remembers](#what-scout-remembers).
@@ -1679,28 +1680,54 @@ started at or after a time (and before `untilIso`), oldest first: the one query 
 
 What the mind decided and what came of it, the record [the mind](concepts/mind.md) learns from.
 `ExperienceLog` (`memory/experience.ts`) writes `episodes` and `episode_events` (migration 23). An
-episode is one turn, job, routine run or check-in: `mode`, `trigger` (`asked`, `job`, `routine`,
-or the check-in's reason), `ref` (the turn id or the remark id that outcomes come back with), the
-model, `input` (the question, or the check-in's whole bundle), `decision` (`answered`, `stopped`,
-`error`, `quiet`, `spoke`, `offered`, `no-answer`), `said`, `note` (an offer, or why a turn stopped
-or failed), token counts and model calls. Its events are `step`s (a tool call: name, input, the
-first line of its result, ok) and `outcome`s (`not-now`, `accepted`, `sent`, `dismissed`).
+episode is one turn, job, routine run or check-in: `mode`, `trigger` (`asked`, `voice` for a spoken
+question, `job`, `routine`, or the check-in's reason), `ref` (the turn id or the remark id that
+outcomes come back with), the model, `input` (the question, or the check-in's bundle rendered
+`forLog`), `decision` (`answered`, `stopped`, `error`, `quiet`, `spoke`, `offered`, `no-answer`,
+`held`), `said`, `note` (the offer shown, or why a turn stopped or failed), token counts and model
+calls. Its events are `step`s (a tool call: name, the provider's `call_id` when it gives one, input,
+the first line of its result, ok) and `outcome`s (`not-now`, `accepted`, `sent`, `dismissed`).
 
-| Source                                         | Recorded                                          |
-| ---------------------------------------------- | ------------------------------------------------- |
-| `turn.started`                                 | an episode: mode, trigger, model, the question    |
-| `turn.toolRequest` / `turn.toolResult`         | a step, then its result                           |
-| `turn.completed` / `turn.error`                | the decision, what was said, tokens, calls        |
-| `CheckIn#wake`, once the mind answered         | a check-in episode, NOTHING and failures included |
-| `CheckIn.notNow` / `CheckIn.accept`            | `not-now` / `accepted` on the last line's episode |
-| `handoff.proposed`, `handoffs.confirm/dismiss` | `sent` / `dismissed` on the turn that showed it   |
+No screen text and no window titles are kept. A check-in's `input` is `renderBundle({ ...facts,
+forLog: true })` over the same facts the mind was sent: the window text becomes
+`notKept(text)` (`[screen text, N characters, not kept]`), a window keeps only its `App:` line, and a
+pick-up project keeps its name but not the branch or file read from a title. A step of a screen tool
+(`look_at_screen`, `get_selection`, `look_at_display`, `look_closer`, `list_windows`,
+`read_window_text`, `look_at_window`, `recall_screen`, `what_changed`) keeps `notKept(summary)` as
+its result.
 
-`observe` sits in the engine's event sink beside `ActivityLog.observe`. Everything kept goes
-through `hideSecrets`; `input` is clipped at 8,000 characters, the rest at 4,000; pictures are
-never kept. At boot `interrupted` closes open episodes as `stopped` and `prune` deletes episodes
-older than 30 days (`EXPERIENCE_KEEP_DAYS`) with their events. `experience.list { before?, limit =
-30 (max 100) }` answers `{ episodes, next? }`, newest first; `experience.get { id }` answers
-`{ episode, events }` or null.
+| Source                                       | Recorded                                          |
+| -------------------------------------------- | ------------------------------------------------- |
+| `turn.started`                               | an episode: mode, trigger, model, the question    |
+| `turn.toolRequest` / `turn.toolResult`       | a step, then its result, matched by `callId`      |
+| `turn.completed` / `turn.error`              | the decision, what was said, tokens, calls        |
+| `CheckIn#wake`, once delivery is known       | a check-in episode, NOTHING and failures included |
+| `CheckIn.notNow` / `CheckIn.accept`          | `not-now` / `accepted` on the last line's episode |
+| `CheckIn.pickUpDismissed` (`pickUp.dismiss`) | `not-now` on the line that rode with the card     |
+| `hand_to_expert`, `handoffs.confirm/dismiss` | `sent` / `dismissed` on the turn that proposed it |
+
+`observe` sits in the engine's event sink beside `ActivityLog.observe`. A tool result is matched to
+its call by `callId` (the provider's tool-use id, on both `turn.toolRequest` and `turn.toolResult`),
+and by the newest unanswered call of that name only when there is none. A check-in is recorded
+after delivery: a line Not now cut off while it was being written (or whose pet went) is `held`,
+never `spoke`; an `OFFER` with no expert on, or on finished work, is `spoke` with no note, since
+no button was shown. A check-in also records its tokens (`askMind`'s `onUsage`); the engine's
+metered resolver already counts the same call in `usage` for Spend and the daily budget. Each
+line's outcome is recorded once: `#lastRemark` is cleared once Not now or an accepted offer is
+recorded, and a line that rode with the Pick up card is answered by that card's Not now.
+
+A hand-off card is tied to a turn only when that turn's `hand_to_expert` proposed it: the tool passes
+`ctx.turnId` and the engine calls `ExperienceLog.proposed(proposalId, turnId)`. A card from
+anywhere else (a check-in offer taken, **Brief again**) is tied to nothing. A card leaves the map
+when it is sent or dismissed, and at most 50 wait (hand-off cards have no timeout of their own).
+
+Everything kept goes through `hideSecrets`; `input` is clipped at 8,000 characters, the rest at
+4,000; pictures are never kept. At boot `interrupted` closes open episodes as `stopped`; `prune`
+deletes episodes older than 30 days (`EXPERIENCE_KEEP_DAYS`) with their events at boot and on every
+digest check (`Digest`'s `tidy`, every 30 minutes). `experience.list { before?, limit = 30 (max 100) }`
+answers `{ episodes, next? }`, newest first; `experience.get { id }` answers `{ episode, events }`
+or null; `experience.clear {}` (Delete all) deletes every episode and event and answers
+`{ deleted }`. Deleting a memory does not scrub old episodes.
 
 ### What Scout saw
 
@@ -1811,7 +1838,7 @@ catalog does not have — time.
   `changeRatio` from 0 to 1, the changed bounding box, and before and after crops of it. A watch polls
   with `includeImages: false` and asks for the crops only when it is about to show them to a model.
 - `watch.fired { watchId, petId, condition, message, displayId }` says a watch's condition came true;
-  the watch is over. `message` is the check model's reason, or empty when it gave none. `watch.status` reports `watching`, then exactly one final state — `fired`, `stopped`,
+  the watch is over. `message` is the check model's reason, or empty when it gave none. The check's system prompt is a fixed yes/no instruction (`CHECK_SYSTEM`) with no soul: a frequent matcher is plumbing, not speech. `watch.status` reports `watching`, then exactly one final state — `fired`, `stopped`,
   `timeout`, `capped` or `error` — with the checks spent and the check model, so a host can show a Watching chip and take
   it down. `watch.stop { watchId }` is the chip's Stop button.
 
@@ -1962,7 +1989,7 @@ cheer | tired` lines; window text, titles and answers are data, never instructio
   emoji. A mood alone is a reply; an offer needs a line, an expert needs an offer. A throw, a
   timeout or a stop reason other than `end` is silence (one log line on a throw).
 - **Delivery.** Re-checked after the reply: Not now pressed meanwhile (for reasons it holds) or no
-  pet drops it. A line about finished work has no offer: about one hand-off alone it goes as
+  pet drops it (recorded as `held` in [the experience log](#the-experience-log)). A line about finished work has no offer: about one hand-off alone it goes as
   `pet.remark { remarkId, petId, text, handoffId }`, about a batch as plain
   `pet.remark { remarkId, petId, text }`, and the jobs in it are marked told
   (`JobStore.markReported`). A `launch` or `back` line with a pick-up goes as `pickUp.ready { text,

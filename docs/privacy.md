@@ -637,16 +637,26 @@ Scout keeps a record of what it decided and what came of it, so you can see why 
 and so it can learn from it later. One episode per question, background job, routine run and
 check-in, silent ones included.
 
-- **What an episode keeps:** what Scout was asked (your question, or a check-in's whole message to
-  the AI, as listed under [Check-ins](#check-ins-what-goes-with-an-unprompted-call)), what it decided
-  (answered, stayed quiet, spoke, offered work), what it said, the model and its token counts.
+- **What an episode keeps:** what Scout was asked (your question, or a check-in's message to the
+  AI, as listed under [Check-ins](#check-ins-what-goes-with-an-unprompted-call), without anything
+  from your screen), what it decided (answered, stayed quiet, spoke, offered work, or wrote a line
+  that was never shown because you pressed **Not now** meanwhile), what it said, the model and its
+  token counts (check-ins included; every call also counts toward Spend and the daily budget).
+- **No screen text, no window titles.** Window text, text read from a picture, your selection and
+  anything a screen tool read are never kept: the log keeps a marker such as `[screen text, 412
+characters, not kept]` instead. Window titles, and the branch and file names read from them, are
+  not kept either; the app's name and the reason Scout woke are.
 - **Its steps:** each tool Scout called, with what it was called with and the first line of what
-  came back (a window read keeps one line, never the window's text; a picture is never kept).
-- **What you did about it:** **Not now** on a line, an offer taken, a hand-off card sent or
-  dismissed.
+  came back, except a screen tool's, which keeps only the marker; a picture is never kept.
+- **What you did about it:** **Not now** on a line or on the Pick up card, an offer taken, a
+  hand-off card sent or dismissed.
 - **Secrets hidden, clipped, local.** Keys, tokens and passwords are hidden before anything is
   written; what was asked is cut at 8,000 characters and everything else at 4,000. It stays in
-  `tagalong.db` on this computer and is deleted 30 days after it started.
+  `tagalong.db` on this computer. An episode is deleted 30 days after it started, at launch and
+  every 30 minutes while Tagalong runs.
+- **Delete all.** Home › **How Scout decided** › **Delete all** (one confirm) deletes every episode
+  and its steps at once. Deleting a memory does not go back through old episodes: those go after 30
+  days, or with Delete all.
 
 ## Spend: what the cost meter keeps
 

@@ -383,7 +383,7 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 - **How Scout decided**: every decision Scout made, newest first, including each time it chose to
   stay quiet. Click one to see why it woke, what it was shown, each tool it used, what it said and
   what you did about it (**Not now**, an offer taken, a hand-off sent or dismissed). Kept 30 days,
-  on this computer.
+  on this computer, with no screen text or window titles. **Delete all** clears it.
 - **What Scout saw**: every time Scout looked at your screen or sent something to an AI or an
   expert, as metadata only, grouped by day. Delete a row, or **Delete all**.
 - **What Scout remembers**: its facts, preferences and conversation summaries, newest first.
