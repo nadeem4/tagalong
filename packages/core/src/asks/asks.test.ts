@@ -119,6 +119,16 @@ describe('Asks, held', () => {
     expect(asks.get(shownId())).toMatchObject({ state: 'expired', note: 'expired' });
   });
 
+  it('is never approved past its time, even when its timer is late (the computer slept)', async () => {
+    const asks = make();
+    const answer = asks.hold(HELD, new AbortController().signal);
+    // The clock moves past the hour, but the timer has not fired yet.
+    vi.setSystemTime(Date.now() + HELD_ASK_MS);
+    expect(asks.answer(shownId(), 'approve')).toBe(false);
+    expect(await answer).toBe('expired');
+    expect(asks.get(shownId())).toMatchObject({ state: 'expired', note: 'expired' });
+  });
+
   it('broadcasts the waiting list after every change', async () => {
     const asks = make();
     const answer = asks.hold(HELD, new AbortController().signal);
@@ -183,6 +193,14 @@ describe('Asks, free', () => {
     await vi.advanceTimersByTimeAsync(FREE_ASK_MS);
     expect(asks.get(id)).toMatchObject({ state: 'expired', note: 'expired' });
     expect(outcomes).toEqual([[TURN, 'expired']]);
+  });
+
+  it('reads a card past its time as expired, even when its timer is late', () => {
+    const asks = make();
+    const { id } = asks.add(FREE);
+    vi.setSystemTime(Date.now() + FREE_ASK_MS);
+    expect(asks.get(id)).toMatchObject({ state: 'expired', note: 'expired' });
+    expect(asks.answer(id, 'decline')).toBe(false);
   });
 });
 

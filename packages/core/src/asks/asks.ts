@@ -128,7 +128,7 @@ export class Asks {
    * needs a folder, so it goes through its card. False when it no longer waits.
    */
   answer(id: string, decision: 'approve' | 'decline'): boolean {
-    const row = this.options.store.get(id);
+    const row = this.get(id);
     if (row?.state !== 'waiting') return false;
     if (row.kind === 'handoff' && decision === 'approve') return false;
     return this.settle(id, decision === 'approve' ? 'approved' : 'declined', { by: 'you' });
@@ -148,7 +148,12 @@ export class Asks {
     return true;
   }
 
+  /** The ask. One past its time is expired here, so a late timer never lets it be answered. */
   get(id: string): AskRecord | null {
+    const row = this.options.store.get(id);
+    if (row?.state !== 'waiting' || row.expiresAt === undefined) return row;
+    if (Date.parse(row.expiresAt) > Date.now()) return row;
+    this.settle(id, 'expired', { note: 'expired' });
     return this.options.store.get(id);
   }
 

@@ -858,7 +858,9 @@ registry test pins that no role's tool is wired to the asks).
 
 **Expiry.** `HELD_ASK_MS` (1 hour) for an app change: its turn is held open the whole time, which
 holds arrivals, check-ins and sleep. `FREE_ASK_MS` (24 hours) for a hand-off card: a brief about
-yesterday's problem goes stale. One timer per waiting row, re-armed at boot for cards.
+yesterday's problem goes stale. One timer per waiting row, re-armed at boot for cards. An ask read
+past its time (`Asks.get`, which every answer and Send goes through) ends `expired` there, so a timer
+running late after the computer slept never lets it be answered.
 
 **Restart.** `asks.boot()` runs beside `experience.interrupted()`: a waiting app change becomes
 `expired` with the note `closed` (its turn is gone, so nothing can run it, and the app is never

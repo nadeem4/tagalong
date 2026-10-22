@@ -151,6 +151,10 @@ export class HandoffManager {
       payload: proposal,
       originTurnId: params.turnId,
     });
+    // A card declined in Home or expired ends without this manager: its window goes here.
+    for (const id of this.#context.keys()) {
+      if (this.options.asks.get(id)?.state !== 'waiting') this.#context.delete(id);
+    }
     this.#context.set(proposalId, context);
     // Only the guesses: a folder saved on the expert is never offered, and with no guess
     // the hand-off card opens the folder picker.
