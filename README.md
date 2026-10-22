@@ -315,7 +315,7 @@ change works at once.
 ## Home: one window for everything
 
 Right-click the tray icon and choose **Open Tagalong**. The tray has only four items: **Open
-Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in eleven pages:
+Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in twelve pages:
 
 - **Overview**: whether Scout is ready and what it thinks with, your experts, what was spent today
   and this month (**Spend**), and the latest activity. Spend shows dollars for models with a known
@@ -323,6 +323,11 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   **Settings → Daily budget** (off by default) pauses keep-an-eye comments and scheduled routines
   until midnight once that day's priced spend reaches it; asking Scout, Run now, watches and
   hand-offs always go through.
+- **Waiting on you**: every change Scout wants to make in a connected app and every hand-off card
+  still waiting for Send, with **Allow once**, **Open** and **Decline**, and the last ones answered
+  with how each ended. The nav shows how many wait. A change waits an hour and a card a day; a
+  change still waiting when Tagalong closes is never run later. "Can’t be undone" marks a delete,
+  a send and the like.
 - **Scout**: how Scout thinks, a provider and a model. **Save** applies from the next question.
 - **Experts**: the tools Scout hands work to. **Add expert** starts from a template (**Coder**,
   **Debugger**, **Designer**, **Reviewer**) or **Blank**, which fills in the name, what it is good

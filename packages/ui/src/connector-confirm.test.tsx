@@ -59,6 +59,38 @@ describe('the connector confirm card', () => {
     expect(bridge.approvals).toEqual([{ approvalId: APPROVAL, decision: 'deny' }]);
   });
 
+  it('says when a change cannot be undone', () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    act(() => bridge.emit({ ...confirm(), risk: 'change' }));
+    expect(
+      screen.getByRole('region', { name: 'Change something in Notion?' }),
+    ).not.toHaveTextContent('Can’t be undone');
+    act(() => bridge.emit({ ...confirm(), risk: 'high' }));
+    expect(screen.getByRole('region', { name: 'Change something in Notion?' })).toHaveTextContent(
+      'Can’t be undone',
+    );
+  });
+
+  it('goes away when the ask is answered elsewhere, and stays while it still waits', () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    act(() => bridge.emit(confirm()));
+    const still = {
+      id: APPROVAL,
+      kind: 'app-change' as const,
+      petId: 'scout',
+      summary: 'Create a page.',
+      risk: 'change' as const,
+      state: 'waiting' as const,
+      createdAt: '2026-10-22T10:00:00.000Z',
+    };
+    act(() => bridge.emit({ type: 'asks.changed', waiting: [still] }));
+    expect(screen.getByRole('button', { name: 'Allow once' })).toBeInTheDocument();
+    act(() => bridge.emit({ type: 'asks.changed', waiting: [] }));
+    expect(screen.queryByRole('button', { name: 'Allow once' })).toBeNull();
+  });
+
   it('goes away when the turn ends', () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge);

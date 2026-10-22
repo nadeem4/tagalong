@@ -506,11 +506,12 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
   const home = await windowFor('home');
   await expect(home).toHaveTitle('Home');
 
-  // One companion and eleven pages.
+  // One companion and twelve pages.
   const nav = home.getByRole('navigation', { name: 'Tagalong' });
   await expect(nav.getByRole('button')).toHaveText(
     [
       'Overview',
+      'Waiting on you',
       'Scout',
       'Experts',
       'Routines',

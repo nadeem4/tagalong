@@ -109,6 +109,7 @@ import { createPointerOverlay } from './windows/pointer';
 import { createWelcomeWindow } from './windows/welcome';
 import { createSettingsWindow } from './windows/settings';
 import { fromWindow, registerClipboardIpc } from './ipc/clipboard';
+import { registerAskIpc } from './ipc/asks';
 import { registerConnectionIpc } from './ipc/connections';
 import { registerScoutIpc } from './ipc/scout';
 import { registerExpertIpc } from './ipc/experts';
@@ -1121,6 +1122,7 @@ function registerIpc(): void {
   });
   registerExpertIpc(handle, { engine });
   registerConnectionIpc(handle, { engine });
+  registerAskIpc(handle, { engine });
   registerPickUpIpc(handle, {
     engine,
     allowlist: pickUpAllowlist,

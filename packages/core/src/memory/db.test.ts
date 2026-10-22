@@ -54,6 +54,7 @@ describe('openDatabase', { timeout: 20_000 }, () => {
         'activity_fts_data',
         'activity_fts_docsize',
         'activity_fts_idx',
+        'asks',
         'connections',
         'conversations',
         'episode_events',
@@ -691,7 +692,7 @@ describe('migrate', () => {
   it('adds the Self in migration 24: page versions by author and state, and sleeps', () => {
     const db = new Database(':memory:');
     try {
-      expect(LATEST_SCHEMA_VERSION).toBe(24);
+      expect(LATEST_SCHEMA_VERSION).toBeGreaterThanOrEqual(24);
       migrate(db);
       const version = db.prepare(
         `INSERT INTO self_versions (path, text, author, why, at) VALUES ('you.md', 'x', ?, 'y', 'z')`,
@@ -706,7 +707,34 @@ describe('migrate', () => {
       expect(() => db.prepare(`UPDATE self_versions SET state = 'maybe'`).run()).toThrow();
       db.prepare(`UPDATE self_versions SET state = 'proposed'`).run();
       db.prepare('DELETE FROM schema_version WHERE version >= 24').run();
-      expect(migrate(db)).toBe(24);
+      expect(migrate(db, 24)).toBe(24);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('adds asks in migration 25: waiting until answered, by you, with a code for why', () => {
+    const db = new Database(':memory:');
+    try {
+      expect(LATEST_SCHEMA_VERSION).toBe(25);
+      migrate(db);
+      const ask = db.prepare(
+        `INSERT INTO asks (id, kind, pet_id, summary, risk, created_at) VALUES (?, ?, 'scout', 'x', ?, 'z')`,
+      );
+      ask.run('a1', 'app-change', 'change');
+      ask.run('a2', 'handoff', 'high');
+      expect(() => ask.run('a3', 'routine', 'change')).toThrow();
+      expect(() => ask.run('a4', 'handoff', 'scary')).toThrow();
+      expect(db.prepare(`SELECT state, answered_by FROM asks WHERE id = 'a1'`).get()).toEqual({
+        state: 'waiting',
+        answered_by: null,
+      });
+      expect(() => db.prepare(`UPDATE asks SET state = 'sent'`).run()).toThrow();
+      expect(() => db.prepare(`UPDATE asks SET answered_by = 'scout'`).run()).toThrow();
+      db.prepare(`UPDATE asks SET state = 'approved', answered_by = 'you' WHERE id = 'a1'`).run();
+      db.prepare(`UPDATE asks SET answered_by = 'rule' WHERE id = 'a2'`).run();
+      db.prepare('DELETE FROM schema_version WHERE version >= 25').run();
+      expect(migrate(db)).toBe(25);
     } finally {
       db.close();
     }

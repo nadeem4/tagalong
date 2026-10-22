@@ -17,6 +17,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Voice: Scout talks](#voice-scout-talks)
 - [Talk to Scout](#talk-to-scout)
 - [Connections: your apps over MCP](#connections-your-apps-over-mcp)
+- [Waiting on you](#waiting-on-you)
 - [Routines](#routines)
 - [Memory](#memory)
 - [Screen memory](#screen-memory)
@@ -1127,7 +1128,9 @@ that calls tools (your Claude sign-in or OpenRouter + Claude).
 - [ ] Press **Cancel**. Scout says nothing was changed; Activity shows "Scout did not change Notion".
 - [ ] Ask again and press **Allow once**. The page appears in Notion; Activity shows "Scout changed
       Notion".
-- [ ] Ask again and leave the card for two minutes. Scout says you did not answer and nothing changed.
+- [ ] Ask again and leave the card. Home › **Waiting on you** lists it, with when it ends (an hour
+      after it was asked). The checks for answering from Home and for a restart are in
+      [Waiting on you](#waiting-on-you).
 - [ ] Ask for a page with a long body (a few paragraphs). The card shows the whole body, scrolling
       inside the card, never cut off with "...".
 
@@ -1158,6 +1161,61 @@ that calls tools (your Claude sign-in or OpenRouter + Claude).
 - [ ] Switch a connection **Off**. Scout no longer uses it, and says so if you ask for it.
 - [ ] **Disconnect** → **Disconnect ... and delete its sign-in**. It is gone; connecting again asks
       you to sign in again.
+
+## Waiting on you
+
+Everything that waits on you (a change in a connected app, a hand-off card) is saved and listed in
+Home › **Waiting on you**. Runs on the fake provider for the hand-off steps; the app steps need a
+connected app (see [Connections](#connections-your-apps-over-mcp)).
+
+### A1. Answer from Home, and the bubble's card goes
+
+1. **Action:** ask Scout to add a page in Notion. The confirm card comes up in the bubble.
+2. **Expected:** Home's nav reads **Waiting on you (1)**. The page lists "Change in Notion ·
+   <tool> · Changes something", the change in full, "Asked … · ends …", **Allow once** and
+   **Decline**.
+3. **Action:** press **Allow once** in Home.
+4. **Expected:** the card in the bubble goes at once; the page appears in Notion; the row moves to
+   Answered as "Approved by you". The nav reads **Waiting on you** with no count.
+
+### A2. Answer on the card, and Home follows
+
+1. **Action:** with Home open on Waiting on you, ask for another change and press **Cancel** on the
+   bubble's card.
+2. **Expected:** the row leaves Waiting at once and shows under Answered as "Declined by you.
+   Nothing was changed." Nothing changed in the app.
+
+### A3. Quit with a change waiting
+
+1. **Action:** ask for a change, leave the card up, and quit Tagalong from the tray.
+2. **Action:** start Tagalong again and open Home › Waiting on you.
+3. **Expected:** nothing waits; Answered shows the change as "Expired: Tagalong closed first.
+   Nothing was changed." Nothing changed in the app, then or after the relaunch.
+
+### A4. Quit with a hand-off card waiting
+
+1. **Action:** ask Scout to hand something to Claude Code; leave the card unsent, and quit.
+2. **Action:** start Tagalong again and open Home › Waiting on you.
+3. **Expected:** the card is listed as "Hand to Claude Code · Changes something", with **Open** and
+   **Decline**.
+4. **Action:** press **Open**.
+5. **Expected:** the bubble comes up with the card: the brief, no project guess (the picker opens),
+   and the line "The window it was written from isn’t kept, so the expert gets only this brief."
+6. **Action:** choose a folder and press **Send**. **Expected:** the expert starts with that brief;
+   the row shows "Approved by you".
+
+### A5. Can’t be undone
+
+1. **Action:** ask Scout to delete a page in Notion (or any tool named delete, send, merge, push).
+2. **Expected:** the card says "Can’t be undone", and so does its row in Waiting on you, in place of
+   "Changes something". It still runs only on **Allow once**.
+
+### A6. Expiry, and Delete all
+
+1. **Expected:** a change left unanswered for an hour ends "Expired: no answer in time. Nothing was
+   changed."; a hand-off card left a day ends the same way. Scout is told nothing was changed.
+2. **Action:** Home › How Scout decided › **Delete all**.
+3. **Expected:** Answered is empty; anything still waiting stays in Waiting.
 
 ## Routines
 

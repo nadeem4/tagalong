@@ -76,6 +76,13 @@ describe('ConnectionManager', () => {
       { name: 'slow', access: 'read' },
       { name: 'broken', access: 'read' },
     ]);
+    // Scout's tools carry how much asking each write needs; Home's list does not.
+    expect(manager.tools().map((t) => [t.tool.name, t.tool.risk])).toEqual([
+      ['search', 'read'],
+      ['create_page', 'change'],
+      ['slow', 'read'],
+      ['broken', 'read'],
+    ]);
     expect(changes.at(-1)?.[0]?.status).toBe('connected');
   });
 

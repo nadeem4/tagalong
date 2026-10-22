@@ -9,6 +9,7 @@
  * and connectionIdFrom.
  */
 import { z } from 'zod';
+import { AskRisk } from './asks';
 
 /** Lower-case letters, digits and dashes: it prefixes the app's tool names, `notion__search`. */
 export const CONNECTION_ID = /^[a-z0-9][a-z0-9-]{0,23}$/;
@@ -169,6 +170,8 @@ export const ConnectorConfirmParams = z.object({
   tool: z.string().min(1),
   /** What will happen, in plain words: the tool's own line and what Scout filled in. */
   summary: z.string().min(1),
+  /** `high`: it cannot be undone, and the card says so. */
+  risk: AskRisk.optional(),
 });
 export type ConnectorConfirmParams = z.infer<typeof ConnectorConfirmParams>;
 

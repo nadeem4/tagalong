@@ -29,7 +29,12 @@ function deps(overrides: Partial<ConnectorToolDeps> = {}, many = 0) {
   const confirms: Parameters<ConnectorToolDeps['confirm']>[0][] = [];
   const extra = Array.from({ length: many }, (_, i) => ({
     connection: notion,
-    tool: { name: `extra_${i}`, access: 'read' as const, inputSchema: schema },
+    tool: {
+      name: `extra_${i}`,
+      access: 'read' as const,
+      risk: 'read' as const,
+      inputSchema: schema,
+    },
   }));
   const value: ConnectorToolDeps = {
     tools: () => [
@@ -39,6 +44,7 @@ function deps(overrides: Partial<ConnectorToolDeps> = {}, many = 0) {
           name: 'search',
           description: 'Search pages.\nMore detail the prompt does not need.',
           access: 'read',
+          risk: 'read',
           inputSchema: schema,
         },
       },
@@ -48,6 +54,7 @@ function deps(overrides: Partial<ConnectorToolDeps> = {}, many = 0) {
           name: 'create.page',
           description: 'Create a page.',
           access: 'write',
+          risk: 'change',
           inputSchema: schema,
         },
       },
@@ -59,7 +66,7 @@ function deps(overrides: Partial<ConnectorToolDeps> = {}, many = 0) {
     },
     confirm: async (params) => {
       confirms.push(params);
-      return 'allowed';
+      return 'approved';
     },
     record: (entry) => records.push(entry),
     ...overrides,
@@ -132,22 +139,42 @@ describe('connector tools', () => {
         app: 'Notion',
         tool: 'create.page',
         summary: 'Create a page.\ntitle: Plan',
+        risk: 'change',
       },
     ]);
     expect(calls[0]?.name).toBe('create.page');
     expect(records[0]).toMatchObject({ access: 'write', state: 'done' });
   });
 
-  it('a cancelled or unanswered write never runs, and Scout is told nothing changed', async () => {
-    for (const answer of ['cancelled', 'timeout'] as const) {
+  it('a declined, expired or cancelled write never runs, and Scout is told which', async () => {
+    const said = {
+      declined: 'They said no; nothing was changed in Notion.',
+      expired: 'The person did not answer, so nothing was changed in Notion.',
+      cancelled: 'That was stopped; nothing was changed in Notion.',
+    } as const;
+    for (const answer of ['declined', 'expired', 'cancelled'] as const) {
       const { value, calls, records } = deps({ confirm: async () => answer });
       const tools = fakeTurnTools({ connections: value }, { pet: companion });
       const outcome = await tools.run({ name: 'notion__create_page', input: { title: 'x' } });
       expect(calls).toEqual([]);
-      expect(outcome.content).toContain('nothing was changed in Notion');
+      expect(outcome.content).toBe(said[answer]);
       expect(directivesIn(outcome.content)).toEqual([]);
       expect(records[0]).toMatchObject({ state: 'stopped' });
     }
+  });
+
+  it('a write the app marks high risk says so on its card', async () => {
+    const { value, confirms } = deps({
+      tools: () => [
+        {
+          connection: notion,
+          tool: { name: 'delete_page', access: 'write', risk: 'high', inputSchema: schema },
+        },
+      ],
+    });
+    const tools = fakeTurnTools({ connections: value }, { pet: companion });
+    await tools.run({ name: 'notion__delete_page', input: { id: 'p1' } });
+    expect(confirms[0]?.risk).toBe('high');
   });
 
   it('hides keys and passwords before anything goes to an app', async () => {
@@ -241,6 +268,7 @@ describe('filing a bug through the confirm card', () => {
             name: 'create_issue',
             description: 'Create a new issue in a GitHub repository.',
             access: 'write',
+            risk: 'change',
             inputSchema: schema,
           },
         },
@@ -290,7 +318,7 @@ describe('filing a bug through the confirm card', () => {
   });
 
   it('on Cancel never calls the app, and Scout is told nothing was filed', async () => {
-    const { value, calls, records } = githubDeps({ confirm: async () => 'cancelled' });
+    const { value, calls, records } = githubDeps({ confirm: async () => 'declined' });
     const tools = fakeTurnTools({ connections: value }, { pet: companion });
     const outcome = await tools.run({ name: 'github__create_issue', input: issue });
     expect(calls).toEqual([]);

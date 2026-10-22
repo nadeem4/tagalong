@@ -2,6 +2,8 @@
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Expert } from '@tagalong/protocol';
+import { Asks } from '../asks/asks';
+import { AskStore } from '../asks/store';
 import { ActivityLog } from '../memory/activity';
 import { migrate } from '../memory/db';
 import { ConversationStore } from '../memory/store';
@@ -22,6 +24,7 @@ let db: Database.Database;
 let experts: ExpertStore;
 let activity: ActivityLog;
 let events: HandoffEvent[];
+let asks: Asks;
 
 const claudeCode = Expert.parse({
   id: 'claude-code',
@@ -29,12 +32,22 @@ const claudeCode = Expert.parse({
   connection: { type: 'claude-code', folder: 'C:\\r' },
 });
 
+/** The asks over this test's database, as a fresh launch would build them. */
+function asksOver(database: Database.Database): Asks {
+  return new Asks({
+    store: new AskStore(database),
+    emit: () => undefined,
+    outcome: () => undefined,
+  });
+}
+
 beforeEach(() => {
   db = new Database(':memory:');
   migrate(db);
   experts = new ExpertStore(db);
   activity = new ActivityLog(db, new ConversationStore(db));
   events = [];
+  asks = asksOver(db);
   experts.upsert(claudeCode);
 });
 
@@ -46,6 +59,7 @@ function manager(connector: Connector): HandoffManager {
     activity,
     connectorFor: () => connector,
     emit: (event) => events.push(event),
+    asks,
   });
 }
 
@@ -63,6 +77,7 @@ describe('HandoffManager', () => {
         return connector;
       },
       emit: (event) => events.push(event),
+      asks,
     });
     experts.upsert({ ...claudeCode, connection: { ...claudeCode.connection, canEdit: true } });
     const { handoffId } = handoffs.startReadOnly({
@@ -91,6 +106,7 @@ describe('HandoffManager', () => {
         activity,
         connectorFor: () => connector,
         emit: (event) => events.push(event),
+        asks,
         usage: { record: (entry) => recorded.push(entry) },
       });
     make(withUsage).start({
@@ -347,6 +363,7 @@ describe('proposals', () => {
         return connector;
       },
       emit: (event) => events.push(event),
+      asks,
       projects,
     });
     return { handoffs, seen };
@@ -454,6 +471,182 @@ describe('proposals', () => {
     expect(handoffs.pending()).toEqual([]);
   });
 
+  describe('saved as an ask', () => {
+    const screen: Brief = {
+      ask: 'Fix the failing migration test',
+      context: {
+        app: 'Code',
+        windowTitle: 'db.test.ts - ai_pet - Visual Studio Code',
+        selection: 'SELECTED-TEXT',
+        windowText: 'WINDOW-TEXT',
+      },
+      files: ['src/db.ts'],
+    };
+    const TURN = '6f1c1b8e-3b1c-4c8e-9a51-0b1f6f1d2a3c';
+
+    it('keeps no window title, selection or window text in the saved row', () => {
+      const { handoffs } = proposing(new FakeConnector({ text: 'x' }));
+      const { proposalId } = handoffs.propose({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief: screen,
+        turnId: TURN,
+      });
+      const rows = db.prepare('SELECT * FROM asks').all();
+      expect(rows).toHaveLength(1);
+      const saved = JSON.stringify(rows);
+      for (const kept of [
+        'db.test.ts',
+        'SELECTED-TEXT',
+        'WINDOW-TEXT',
+        'context',
+        'Visual Studio',
+      ]) {
+        expect(saved).not.toContain(kept);
+      }
+      expect(asks.get(proposalId)).toMatchObject({
+        kind: 'handoff',
+        summary: 'Fix the failing migration test',
+        originTurnId: TURN,
+        payload: {
+          expertId: 'claude-code',
+          petId: 'scout',
+          brief: { ask: 'Fix the failing migration test', files: ['src/db.ts'] },
+        },
+      });
+    });
+
+    it('sends the window it was written from while the app runs', async () => {
+      const connector = new FakeConnector({ text: 'ok' });
+      const { handoffs } = proposing(connector);
+      const { proposalId } = handoffs.propose({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief: screen,
+      });
+      handoffs.confirm({ proposalId, folder: 'C:\\r', canEdit: false });
+      await vi.waitFor(() => expect(finished()).toBeDefined());
+      expect(connector.sent).toEqual([screen]);
+      expect(asks.get(proposalId)).toMatchObject({ state: 'approved', answeredBy: 'you' });
+    });
+
+    it('after a restart, lists the card and sends only the saved brief', async () => {
+      const { handoffs } = proposing(new FakeConnector({ text: 'x' }));
+      const { proposalId } = handoffs.propose({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief: screen,
+      });
+      handoffs.stopAll();
+
+      const connector = new FakeConnector({ text: 'Fixed.' });
+      const relaunched = new HandoffManager({
+        experts,
+        activity,
+        connectorFor: () => connector,
+        emit: (event) => events.push(event),
+        asks: asksOver(db),
+      });
+      expect(relaunched.pending()).toEqual([
+        {
+          expertId: 'claude-code',
+          expertName: 'Claude Code',
+          ask: 'Fix the failing migration test',
+        },
+      ]);
+      relaunched.confirm({ proposalId, folder: 'C:\\r', canEdit: false });
+      await vi.waitFor(() => expect(finished()).toBeDefined());
+      expect(connector.sent).toEqual([
+        { ask: 'Fix the failing migration test', files: ['src/db.ts'] },
+      ]);
+    });
+
+    it('reopens a card after a restart from the row, marked restored, with no context', () => {
+      const { handoffs } = proposing(new FakeConnector({ text: 'x' }));
+      const { proposalId } = handoffs.propose({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief: screen,
+      });
+      events = [];
+      const relaunched = new HandoffManager({
+        experts,
+        activity,
+        connectorFor: () => new FakeConnector({ text: 'x' }),
+        emit: (event) => events.push(event),
+        asks: asksOver(db),
+        projects,
+      });
+      expect(relaunched.reopen(proposalId)).toBe(true);
+      expect(events).toEqual([
+        {
+          method: 'handoff.proposed',
+          params: {
+            proposalId,
+            petId: 'scout',
+            expertId: 'claude-code',
+            expertName: 'Claude Code',
+            brief: { ask: 'Fix the failing migration test', files: ['src/db.ts'] },
+            projects: [],
+            canEdit: false,
+            restored: true,
+          },
+        },
+      ]);
+      expect(projects.suggest).toHaveBeenLastCalledWith(undefined);
+      expect(relaunched.reopen('00000000-0000-4000-8000-000000000000')).toBe(false);
+    });
+
+    it('reopens a card while the app runs with its window, not marked restored', () => {
+      const { handoffs } = proposing(new FakeConnector({ text: 'x' }));
+      const withWindow = handoffs.propose({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief: screen,
+      });
+      const without = handoffs.propose({
+        expertId: 'claude-code',
+        petId: 'scout',
+        brief: { ask: 'x' },
+      });
+      events = [];
+      handoffs.reopen(withWindow.proposalId);
+      handoffs.reopen(without.proposalId);
+      const shown = events.map((event) => event.params as { brief: Brief; restored?: true });
+      expect(shown[0]?.brief).toEqual(screen);
+      expect(shown.map((params) => params.restored)).toEqual([undefined, undefined]);
+    });
+
+    it('settles a dismissed card declined, by you', () => {
+      const { handoffs } = proposing(new FakeConnector({ text: 'x' }));
+      const { proposalId } = handoffs.propose({ expertId: 'claude-code', petId: 'scout', brief });
+      handoffs.dismiss(proposalId);
+      expect(asks.get(proposalId)).toMatchObject({ state: 'declined', answeredBy: 'you' });
+    });
+
+    it('settles a card whose expert was switched off as cancelled, expert-unavailable', () => {
+      const connector = new FakeConnector({ text: 'x' });
+      const { handoffs } = proposing(connector);
+      const first = handoffs.propose({ expertId: 'claude-code', petId: 'scout', brief });
+      const second = handoffs.propose({ expertId: 'claude-code', petId: 'scout', brief });
+      const off = experts.get('claude-code')!;
+      experts.upsert({ ...off, enabled: false });
+      expect(() =>
+        handoffs.confirm({ proposalId: first.proposalId, folder: 'C:\\r', canEdit: false }),
+      ).toThrow(/no longer available/);
+      expect(asks.get(first.proposalId)).toMatchObject({
+        state: 'cancelled',
+        note: 'expert-unavailable',
+      });
+      expect(handoffs.reopen(second.proposalId)).toBe(false);
+      expect(asks.get(second.proposalId)).toMatchObject({
+        state: 'cancelled',
+        note: 'expert-unavailable',
+      });
+      expect(connector.sent).toEqual([]);
+    });
+  });
+
   describe('with a follow-up step', () => {
     const reviewer = Expert.parse({
       id: 'reviewer',
@@ -472,6 +665,7 @@ describe('proposals', () => {
           return expert.id === 'reviewer' ? second : first;
         },
         emit: (event) => events.push(event),
+        asks,
         projects,
       });
       return { handoffs, seen };

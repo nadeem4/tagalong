@@ -8,8 +8,8 @@
  *
  * Contains `connectorTools`.
  */
-import type { ToolAccess } from '@tagalong/protocol';
-import type { ApprovalAnswer } from '../../connections/approvals';
+import type { AskRisk, ToolAccess } from '@tagalong/protocol';
+import type { AskAnswer } from '../../asks/asks';
 import type { AppTool, CallResult } from '../../connections/manager';
 import { hideSecrets } from '../../privacy/secrets';
 import type { BrainTool } from '../../providers';
@@ -30,11 +30,18 @@ export interface ConnectorToolDeps {
     args: Record<string, unknown>,
     signal: AbortSignal,
   ): Promise<CallResult>;
-  /** Shows the confirm card and waits for the person. */
+  /** Saves the ask, shows the confirm card and waits for how it ends. */
   confirm(
-    params: { turnId: string; petId: string; app: string; tool: string; summary: string },
+    params: {
+      turnId: string;
+      petId: string;
+      app: string;
+      tool: string;
+      summary: string;
+      risk: AskRisk;
+    },
     signal: AbortSignal,
-  ): Promise<ApprovalAnswer>;
+  ): Promise<AskAnswer>;
   /** One Activity row per call: never the content. */
   record(entry: {
     petId: string;
@@ -94,6 +101,13 @@ function hideDeep(value: unknown): unknown {
  * the person approves exactly what runs; a longer change is refused instead of asked about.
  */
 export const MAX_CONFIRM_CHARS = 4_000;
+
+/** What Scout is told when a write did not run, by how its ask ended. */
+const NOT_RUN: Record<Exclude<AskAnswer, 'approved'>, (app: string) => string> = {
+  declined: (app) => `They said no; nothing was changed in ${app}.`,
+  expired: (app) => `The person did not answer, so nothing was changed in ${app}.`,
+  cancelled: (app) => `That was stopped; nothing was changed in ${app}.`,
+};
 
 /** What the confirm card says will happen: the tool's own line, then what Scout filled in. */
 function summaryOf(tool: AppTool['tool'], args: Record<string, unknown>): string {
@@ -187,17 +201,13 @@ export function connectorTools(deps: ConnectorToolDeps): Tool[] {
               app,
               tool: real,
               summary,
+              risk: entry.tool.risk,
             },
             ctx.signal,
           );
-          if (answer !== 'allowed') {
+          if (answer !== 'approved') {
             record('stopped');
-            return {
-              content:
-                answer === 'timeout'
-                  ? `The person did not answer, so nothing was changed in ${app}.`
-                  : `They said no; nothing was changed in ${app}.`,
-            };
+            return { content: NOT_RUN[answer](app) };
           }
         }
         const result = await deps.call(entry.connection.id, real, args, ctx.signal);

@@ -58,8 +58,9 @@ import {
   looksLikeProject,
 } from './projects/finder';
 import type { MethodHandlers } from './server/ws-server';
+import { Asks } from './asks/asks';
+import { AskStore } from './asks/store';
 import {
-  Approvals,
   ConnectionManager,
   ConnectionStore,
   POPULAR_CONNECTORS,
@@ -259,6 +260,7 @@ export class Engine {
   readonly #arrivals: Arrivals;
   readonly #digest: Digest;
   readonly #sleep: Sleep;
+  readonly #asks: Asks;
 
   private constructor(parts: {
     db: Database;
@@ -274,7 +276,9 @@ export class Engine {
     arrivals: Arrivals;
     digest: Digest;
     sleep: Sleep;
+    asks: Asks;
   }) {
+    this.#asks = parts.asks;
     this.#jobs = parts.jobs;
     this.#arrivals = parts.arrivals;
     this.#digest = parts.digest;
@@ -407,6 +411,16 @@ export class Engine {
       log: (message) => console.warn(`[engine] ${message}`),
     });
     const experts = new ExpertStore(db);
+    // Everything that waits on the person, saved: changes in apps and hand-off cards. A change
+    // a quit left waiting ends expired, closed (its turn is gone); a card waits on.
+    const asks = new Asks({
+      store: new AskStore(db),
+      emit: (event) => live.server?.broadcast(event.method, event.params),
+      outcome: (turnId, name) => record(() => experience.outcome(turnId, name)),
+      expertName: (expertId) => experts.get(expertId)?.name,
+    });
+    asks.boot();
+    asks.prune();
     const connectorFor = recordExpertSends(
       options.connectorFor ??
         defaultConnectorFor(options.env ?? process.env, options.claudePluginsRoot),
@@ -433,6 +447,7 @@ export class Engine {
       },
       projects,
       usage,
+      asks,
     });
     // Scout's own background work: background Scout turns in their own conversations. The
     // body reads the machine before each start, so fewer run while it is short of memory.
@@ -475,8 +490,11 @@ export class Engine {
       // Not while a turn of theirs or a job is running.
       idle: () => !runner.foregroundBusy() && jobs.counts().running === 0,
       pruneJobs: () => void jobs.prune(),
-      // The experience log's 30 days, kept while the app stays open, not only at boot.
-      tidy: () => void experience.prune(),
+      // The experience log's and the answered asks' 30 days, kept while the app stays open.
+      tidy: () => {
+        experience.prune();
+        asks.prune();
+      },
       lastAnswer,
       log: (message) => console.warn(`[engine] ${message}`),
     });
@@ -612,9 +630,6 @@ export class Engine {
       env: options.env ?? process.env,
     });
     void connections.start();
-    const approvals = new Approvals((params) =>
-      live.server?.broadcast('connector.confirm', params),
-    );
     const runner: ConversationRunner = new ConversationRunner({
       store,
       settings,
@@ -634,11 +649,7 @@ export class Engine {
       experts: {
         experts: () => experts.list(),
         // A card a turn's tool put up is tied to that turn, so what the person does with it is.
-        propose: ({ turnId, ...params }) => {
-          const proposed = handoffs.propose(params);
-          record(() => experience.proposed(proposed.proposalId, turnId));
-          return proposed;
-        },
+        propose: (params) => handoffs.propose(params),
         // Only reached on a routine's turn, for the expert its saved card allowed.
         startReadOnly: (params) => handoffs.startReadOnly(params),
         // tell_expert: the person's words for an expert already working.
@@ -675,7 +686,7 @@ export class Engine {
       connections: {
         tools: () => connections.tools(),
         call: (id, name, args, signal) => connections.call(id, name, args, signal),
-        confirm: (params, signal) => approvals.ask(params, signal),
+        confirm: (params, signal) => asks.hold(params, signal),
         record: (entry) => activity.connectorCalled(entry),
       },
       // "What was that article I read Tuesday?" and "what did we do today?": the FTS index
@@ -785,7 +796,7 @@ export class Engine {
       connectorFor,
       checkIn,
       connections,
-      approvals,
+      asks,
       routines,
       pickUp,
       calendar,
@@ -843,6 +854,7 @@ export class Engine {
       watches,
       handoffs,
       connections,
+      asks,
       routines,
       pickUp,
       jobs,
@@ -863,6 +875,10 @@ export class Engine {
   }
 
   async shutdown(): Promise<void> {
+    // First, before any turn is stopped: a change still waiting ends expired, closed, so its
+    // row says Tagalong closed, not that the conversation was stopped.
+    this.#asks.closeHeld();
+    this.#asks.stop();
     this.#routines.stop();
     this.#pickUp.stop();
     this.#arrivals.stop();
@@ -901,7 +917,7 @@ function buildHandlers(parts: {
   models: (providerId: string) => Promise<{ models: string[]; source: 'live' | 'fallback' }>;
   checkIn: CheckIn;
   connections: ConnectionManager;
-  approvals: Approvals;
+  asks: Asks;
   /** Which hosts are connected now, for the health check's browser row. */
   hostKinds: () => readonly HostKind[];
   claudeCodeConfigPath: string | undefined;
@@ -918,7 +934,7 @@ function buildHandlers(parts: {
   const { activity, experience, record, runner, pets, settings, models, hosts, watches } = parts;
   const { self, sleep } = parts;
   const { refreshProviders, experts, handoffs, projects, connectorFor } = parts;
-  const { checkIn, connections, approvals, routines, pickUp } = parts;
+  const { checkIn, connections, asks, routines, pickUp } = parts;
   const { sightLog, checkResolve } = parts;
   const { calendar } = parts;
   const { hostKinds } = parts;
@@ -996,7 +1012,11 @@ function buildHandlers(parts: {
     'activity.list': (params) => activity.list(params),
     'experience.list': (params) => experience.list(params),
     'experience.get': (params) => experience.get(params.id),
-    'experience.clear': () => ({ deleted: experience.clear() }),
+    // Delete all: every decision, and every answered ask; what still waits stays.
+    'experience.clear': () => {
+      asks.clear();
+      return { deleted: experience.clear() };
+    },
     // Home's What Scout learned: the notes, their versions, the person's edits and undo.
     'self.list': () => ({ pages: self.list(), nights: sleep.nights(5) }),
     'self.get': (params) => {
@@ -1047,16 +1067,9 @@ function buildHandlers(parts: {
       return connectorFor(expert).check();
     },
     'handoffs.cancel': (params) => ({ cancelled: handoffs.cancel(params.handoffId) }),
-    'handoffs.confirm': (params) => {
-      const confirmed = handoffs.confirm(params);
-      record(() => experience.proposalOutcome(params.proposalId, 'sent'));
-      return confirmed;
-    },
-    'handoffs.dismiss': (params) => {
-      const dismissed = handoffs.dismiss(params.proposalId);
-      if (dismissed) record(() => experience.proposalOutcome(params.proposalId, 'dismissed'));
-      return { dismissed };
-    },
+    // Send and Dismiss settle the card's ask, which writes the outcome on its turn.
+    'handoffs.confirm': (params) => handoffs.confirm(params),
+    'handoffs.dismiss': (params) => ({ dismissed: handoffs.dismiss(params.proposalId) }),
     'projects.search': (params) => ({ projects: projects.search(params.query) }),
 
     // The app opened: answers at once. The check-in reads the settings before this returns
@@ -1113,9 +1126,14 @@ function buildHandlers(parts: {
     'connections.signIn': (params) =>
       plainly(async () => ({ connection: connections.beginSignIn(params.id) })),
     'connections.remove': async (params) => ({ removed: await connections.remove(params.id) }),
+    // The confirm card's answer: a thin alias of asks.answer.
     'tool.approve': (params) => ({
-      accepted: approvals.answer(params.approvalId, params.decision),
+      accepted: asks.answer(params.approvalId, params.decision === 'once' ? 'approve' : 'decline'),
     }),
+    // Home's Waiting on you. Only a click answers an ask; no tool of Scout's can.
+    'asks.list': () => asks.list(),
+    'asks.answer': (params) => ({ accepted: asks.answer(params.id, params.decision) }),
+    'asks.open': (params) => ({ opened: handoffs.reopen(params.id) }),
 
     // Routines. Saving one in Home, or pressing Save on Scout's card, is the person's consent.
     'routines.list': () => ({ routines: routines.list() }),

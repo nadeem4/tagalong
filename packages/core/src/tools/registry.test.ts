@@ -9,6 +9,7 @@ import { FAKE_TURN_PET, fakeTurn } from './fake-turn';
 import { ToolRegistry, toolsFor, type ToolRegistryOptions } from './registry';
 import type { Tool } from './tool';
 import { getRole } from '../roles';
+import { ROLE_LIBRARY } from '../roles/library.generated';
 import { SETTINGS_DEFAULTS, Settings } from '@tagalong/protocol';
 
 /** Only `addOnce` is reached by the tools; the rest of the store is not under test here. */
@@ -108,11 +109,12 @@ const APP = {
       tool: {
         name,
         access: name === 'search' ? ('read' as const) : ('write' as const),
+        risk: name === 'search' ? ('read' as const) : ('change' as const),
         inputSchema: { type: 'object' },
       },
     })),
   call: () => Promise.resolve({ ok: true as const, text: '' }),
-  confirm: () => Promise.resolve('allowed' as const),
+  confirm: () => Promise.resolve('approved' as const),
   record: () => undefined,
 };
 
@@ -264,6 +266,17 @@ describe('ToolRegistry.forTurn', () => {
     ]);
     for (const id of ['hand_to_expert', 'create_routine', 'change_routine', 'change_settings']) {
       expect(tools.find((tool) => tool.id === id)?.kind).toBe('write');
+    }
+  });
+
+  it('gives no role a tool that can answer an ask: only a click does (floor 12)', () => {
+    // No tool is wired to the asks at all.
+    expect(Object.keys(everything({ connections: APP }))).not.toContain('asks');
+    for (const role of ROLE_LIBRARY) {
+      const ids = new ToolRegistry(everything({ connections: APP, toolsFor }))
+        .forTurn(fakeTurn({ pet: { ...FAKE_TURN_PET, roleId: role.id } }))
+        .tools.map((tool) => tool.id);
+      for (const id of ids) expect(id).not.toMatch(/approve|answer/i);
     }
   });
 

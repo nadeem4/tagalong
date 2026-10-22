@@ -1,8 +1,9 @@
 /**
  * Home: the one window for the companion, its experts and the app. Scout in the corner and
- * eleven pages (overview, Scout, experts, routines, connections, activity, how Scout decided,
- * what Scout saw, what Scout remembers, what Scout learned, settings). Contains HomeView, HomeHost, HomeProvider, HomePage and
- * the Scout page. Rendered by the desktop `home` page.
+ * twelve pages (overview, waiting on you, Scout, experts, routines, connections, activity, how
+ * Scout decided, what Scout saw, what Scout remembers, what Scout learned, settings). Contains
+ * HomeView, HomeHost, HomeProvider, HomePage and the Scout page. Rendered by the desktop `home`
+ * page.
  */
 
 import { useEffect, useState } from 'react';
@@ -23,9 +24,11 @@ import { LearnedView } from './learned-view';
 import { MemoryView } from './memory-view';
 import { SightLogView } from './sight-log-view';
 import { SpendCard } from './spend-card';
+import { WaitingView } from './waiting-view';
 
 export type HomePage =
   | 'overview'
+  | 'waiting'
   | 'scout'
   | 'experts'
   | 'routines'
@@ -39,6 +42,7 @@ export type HomePage =
 
 const PAGES: readonly { id: HomePage; label: (name: string) => string }[] = [
   { id: 'overview', label: () => 'Overview' },
+  { id: 'waiting', label: () => 'Waiting on you' },
   { id: 'scout', label: (name) => name },
   { id: 'experts', label: () => 'Experts' },
   { id: 'routines', label: () => 'Routines' },
@@ -88,8 +92,8 @@ export interface HomeViewProps {
 }
 
 /**
- * Home: the one window for everything. The companion in the corner, and eleven pages: an
- * overview, how the companion thinks, the experts it hands work to, what it does on its own,
+ * Home: the one window for everything. The companion in the corner, and twelve pages: an
+ * overview, what waits on the person, how the companion thinks, the experts it hands work to, what it does on its own,
  * the apps it can use, what happened, why it decided what it did, what it looked at and sent,
  * what it remembers, what it has learned about them and itself, and the app's settings.
  */
@@ -111,6 +115,8 @@ export function HomeView({
     setLastAsked(asked);
     if (asked !== undefined) setPage(asked);
   }
+  // How many asks wait on the person, for the nav: read once, then kept by asks.changed.
+  const [waiting, setWaiting] = useState(0);
   const [routinesSeen, setRoutinesSeen] = useState(page === 'routines');
   if (page === 'routines' && !routinesSeen) setRoutinesSeen(true);
 
@@ -120,6 +126,16 @@ export function HomeView({
       setSetup(loaded);
     });
   }, [bridge, host]);
+
+  useEffect(() => {
+    void bridge
+      .listAsks?.()
+      .then((list) => setWaiting(list.waiting.length))
+      .catch(() => undefined);
+    return bridge.onTurnEvent((event) => {
+      if (event.type === 'asks.changed') setWaiting(event.waiting.length);
+    });
+  }, [bridge]);
 
   const companion = pets[0] as Pet | undefined;
   const name = companion?.name ?? 'Scout';
@@ -152,6 +168,7 @@ export function HomeView({
             onClick={() => go(item.id)}
           >
             {item.label(name)}
+            {item.id === 'waiting' && waiting > 0 ? ` (${waiting})` : ''}
           </button>
         ))}
       </nav>
@@ -159,6 +176,7 @@ export function HomeView({
         {page === 'overview' && (
           <Overview companion={companion} setup={setup} host={host} onGo={go} />
         )}
+        {page === 'waiting' && <WaitingView />}
         {page === 'scout' && companion !== undefined && setup !== null && (
           <ScoutPanel
             key={companion.id}

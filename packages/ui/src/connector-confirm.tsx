@@ -20,6 +20,7 @@ export function ConnectorConfirmCard({
   return (
     <section className="handoff" aria-label={`Change something in ${confirm.app}?`}>
       <p className="bubble-text">Change in {confirm.app} — allow?</p>
+      {confirm.risk === 'high' && <p className="handoff-brief">Can’t be undone</p>}
       <dl className="handoff-rows">
         <div>
           <dt>App</dt>

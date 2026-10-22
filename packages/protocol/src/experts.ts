@@ -209,6 +209,11 @@ export const HandoffProposedParams = z.object({
   /** True: the expert works in its own folder, so the card asks for no project. */
   ownFolder: z.boolean().optional(),
   /**
+   * Opened again from Waiting on you after a restart: the window it was written from is not
+   * kept, so the card says the expert gets only the brief shown.
+   */
+  restored: z.literal(true).optional(),
+  /**
    * One follow-up step, such as a Reviewer checking what a Coder changed. It runs after the
    * first step finishes well, in the same folder, with the first step's answer in its brief.
    */

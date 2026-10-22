@@ -9,6 +9,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { IpcRendererEvent } from 'electron';
 import type {
   ActivityListResult,
+  AsksListResult,
   ExperienceGetResult,
   ExperienceListResult,
   SelfGetResult,
@@ -117,6 +118,10 @@ const bridge: HostBridge = {
     ipcRenderer.invoke(IPC.searchProjects, query) as Promise<ProjectCandidate[]>,
   approveTool: (approvalId: string, decision: 'once' | 'deny') =>
     ipcRenderer.invoke(IPC.approveTool, approvalId, decision) as Promise<void>,
+  listAsks: () => ipcRenderer.invoke(IPC.listAsks) as Promise<AsksListResult>,
+  answerAsk: (id: string, decision: 'approve' | 'decline') =>
+    ipcRenderer.invoke(IPC.answerAsk, id, decision) as Promise<boolean>,
+  openAsk: (id: string) => ipcRenderer.invoke(IPC.openAsk, id) as Promise<boolean>,
   listConnections: () => ipcRenderer.invoke(IPC.listConnections) as Promise<ConnectionsListResult>,
   addConnection: (params: ConnectionsAddParams) =>
     ipcRenderer.invoke(IPC.addConnection, params) as Promise<ConnectionState>,

@@ -1352,7 +1352,9 @@ describe('a companion handing work to an expert', () => {
     const got = (await host.call('experience.get', { id: turn.id }))['result'] as {
       events: { kind: string; name: string }[];
     };
-    expect(got.events).toContainEqual(expect.objectContaining({ kind: 'outcome', name: 'sent' }));
+    expect(got.events).toContainEqual(
+      expect.objectContaining({ kind: 'outcome', name: 'approved' }),
+    );
 
     // The confirmed project is remembered and found by search.
     const found = await host.call('projects.search', { query: 'ai_pet' });
@@ -1969,6 +1971,145 @@ describe('connections over rpc', () => {
     });
     await vi.waitFor(() => expect(host.methods()).toContain('routine.result'), { timeout: 5000 });
     expect(fake.calls).toEqual([{ name: 'search', args: { q: 'me' } }]);
+  });
+});
+
+describe('Waiting on you over rpc', () => {
+  const server = () =>
+    fakeMcpServer([
+      {
+        name: 'create_page',
+        description: 'Create a page.',
+        run: () => ({ content: [{ type: 'text', text: 'Created.' }] }),
+      },
+    ]);
+  const writer = () =>
+    new FakeBrainProvider({
+      text: 'Done.',
+      toolCall: { id: 'call-1', name: 'wiki__create_page', input: { title: 'Plan' } },
+    });
+  const WIKI = {
+    name: 'Wiki',
+    transport: { type: 'http', url: 'https://wiki.example/mcp' },
+    auth: 'none',
+  };
+  type Listed = {
+    waiting: { id: string; kind: string; state: string; note?: string }[];
+    recent: { id: string; kind: string; state: string; note?: string; answeredBy?: string }[];
+  };
+  const list = async (host: TestHost) => (await host.call('asks.list', {}))['result'] as Listed;
+
+  async function asking(fake: ReturnType<typeof server>) {
+    const e = await boot(writer(), { connectorTransport: () => fake.transport() });
+    const host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('connections.add', WIKI);
+    await host.call('ask', { petId: 'scout', input: { text: 'make a plan page' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('connector.confirm'), {
+      timeout: 5000,
+    });
+    const confirm = host.notifications.find((n) => n.method === 'connector.confirm')!.params;
+    return { e, host, id: confirm['approvalId'] as string };
+  }
+
+  it('lists a waiting write; Home’s Allow once runs it, and a second answer loses', async () => {
+    const fake = server();
+    const { host, id } = await asking(fake);
+    expect((await list(host)).waiting).toEqual([
+      expect.objectContaining({ id, kind: 'app-change', state: 'waiting', risk: 'change' }),
+    ]);
+    expect(host.methods()).toContain('asks.changed');
+
+    expect((await host.call('asks.answer', { id, decision: 'approve' }))['result']).toEqual({
+      accepted: true,
+    });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+    expect(fake.calls).toEqual([{ name: 'create_page', args: { title: 'Plan' } }]);
+    expect((await host.call('asks.answer', { id, decision: 'decline' }))['result']).toEqual({
+      accepted: false,
+    });
+    expect(
+      (await host.call('tool.approve', { approvalId: id, decision: 'once' }))['result'],
+    ).toEqual({ accepted: false });
+    const listed = await list(host);
+    expect(listed.waiting).toEqual([]);
+    expect(listed.recent[0]).toMatchObject({ id, state: 'approved', answeredBy: 'you' });
+  });
+
+  it('a write waiting at quit ends expired, closed, after relaunch, and nothing ran', async () => {
+    const fake = server();
+    const { e, id } = await asking(fake);
+    await e.shutdown();
+    const again = await boot(undefined, { connectorTransport: () => fake.transport() });
+    const host = await TestHost.connect(again.port);
+    await host.call('hello', helloParams(again.pairingToken));
+    const listed = await list(host);
+    expect(listed.waiting).toEqual([]);
+    expect(listed.recent[0]).toMatchObject({ id, state: 'expired', note: 'closed' });
+    expect(listed.recent[0]?.answeredBy).toBeUndefined();
+    expect(fake.calls).toEqual([]);
+  });
+
+  it('a hand-off card waiting at quit is still waiting after relaunch, and Send starts it', async () => {
+    const e = await boot(
+      new FakeBrainProvider({
+        text: 'Claude Code has it.',
+        toolCall: { id: 'call-1', name: 'hand_to_expert', input: { ask: 'Why does it fail?' } },
+      }),
+    );
+    let host = await TestHost.connect(e.port);
+    await host.call('hello', helloParams(e.pairingToken));
+    await host.call('experts.upsert', {
+      expert: { id: 'claude-code', name: 'Claude Code', connection: { type: 'claude-code' } },
+    });
+    await host.call('ask', { petId: 'scout', input: { text: 'Why does it fail?' } });
+    await vi.waitFor(() => expect(host.methods()).toContain('handoff.proposed'), {
+      timeout: 5000,
+    });
+    const proposalId = host.notifications.find((n) => n.method === 'handoff.proposed')!.params[
+      'proposalId'
+    ] as string;
+    await e.shutdown();
+
+    const again = await boot();
+    host = await TestHost.connect(again.port);
+    await host.call('hello', helloParams(again.pairingToken));
+    expect((await list(host)).waiting).toEqual([
+      expect.objectContaining({ id: proposalId, kind: 'handoff', state: 'waiting' }),
+    ]);
+    // Open brings the card up again from the saved row, without the window it came from.
+    expect((await host.call('asks.open', { id: proposalId }))['result']).toEqual({
+      opened: true,
+    });
+    expect(host.notifications.find((n) => n.method === 'handoff.proposed')?.params).toMatchObject({
+      proposalId,
+      restored: true,
+      brief: { ask: 'Why does it fail?' },
+    });
+    await host.call('handoffs.confirm', { proposalId, folder: 'C:\\projects\\x', canEdit: false });
+    await vi.waitFor(() => expect(host.methods()).toContain('handoff.finished'), {
+      timeout: 5000,
+    });
+    expect((await list(host)).recent[0]).toMatchObject({ id: proposalId, state: 'approved' });
+  });
+
+  it('Delete all clears answered asks and keeps the waiting', async () => {
+    const fake = server();
+    const { host, id } = await asking(fake);
+    await host.call('asks.answer', { id, decision: 'decline' });
+    await vi.waitFor(() => expect(host.methods()).toContain('turn.completed'), { timeout: 5000 });
+    // A second write, left waiting.
+    await host.call('ask', { petId: 'scout', input: { text: 'and another' } });
+    await vi.waitFor(
+      () =>
+        expect(host.notifications.filter((n) => n.method === 'connector.confirm')).toHaveLength(2),
+      { timeout: 5000 },
+    );
+    expect((await list(host)).recent).toHaveLength(1);
+    await host.call('experience.clear', {});
+    const after = await list(host);
+    expect(after.recent).toEqual([]);
+    expect(after.waiting).toHaveLength(1);
   });
 });
 

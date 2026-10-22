@@ -277,6 +277,32 @@ const MIGRATIONS: readonly Migration[] = [
      finished_at TEXT,
      note TEXT
    );`,
+  // Migration 25. Asks: everything that waits on the person (a change in a connected app, a
+  // hand-off card). One row per ask, written by AskStore. `summary` is what will happen,
+  // written by Scout, secrets hidden; never a window title, a selection or window text (D1).
+  // Once answered, only its first line is kept. `payload_json` is only what a hand-off card
+  // needs to be sent after a restart (its brief without the screen context), dropped once
+  // answered. Answered rows are the audit trail, kept 30 days; waiting rows are never pruned.
+  `CREATE TABLE IF NOT EXISTS asks (
+     id TEXT PRIMARY KEY,
+     kind TEXT NOT NULL CHECK (kind IN ('app-change', 'handoff')),
+     pet_id TEXT NOT NULL,
+     summary TEXT NOT NULL,
+     risk TEXT NOT NULL CHECK (risk IN ('read', 'change', 'high')),
+     app TEXT,
+     tool TEXT,
+     expert_id TEXT,
+     origin_turn_id TEXT,
+     payload_json TEXT,
+     state TEXT NOT NULL DEFAULT 'waiting'
+       CHECK (state IN ('waiting', 'approved', 'declined', 'expired', 'cancelled')),
+     answered_by TEXT CHECK (answered_by IS NULL OR answered_by IN ('you', 'rule')),
+     note TEXT,
+     created_at TEXT NOT NULL,
+     expires_at TEXT,
+     answered_at TEXT
+   );
+   CREATE INDEX IF NOT EXISTS asks_state ON asks(state, created_at);`,
 ];
 
 /** The columns migration 7 gave `activity`, in order. */

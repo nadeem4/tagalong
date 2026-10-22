@@ -199,6 +199,16 @@ someone) is a new ask.
 Sending to other people, deleting, paying and pushing need a click or an explicit phrase, never an
 overheard "yeah".
 
+**Built so far.** Every ask is saved: a change in a connected app and a hand-off card are rows in
+the `asks` table, listed in Home's **Waiting on you** and answerable there or on the card, kept in
+step by `asks.changed`. Each ask has a risk class, set by code: `read` (never asked), `change`, and
+`high` for what cannot be undone (the app says destructive, or the tool's name says send, delete,
+merge, push and the like), which the card and the list label "Can’t be undone". Only a click
+answers an ask; no tool of the mind's can. Silence never approves: an unanswered change expires
+after an hour, a hand-off card after a day (D4). How an ask ended (`approved`, `declined`,
+`expired`, `cancelled`) is an outcome on the episode that asked. Plan cards, one ask per plan, the
+channel rules and voice answers are not built yet; the routine and settings cards are not asks yet.
+
 ## The bubble
 
 A small bubble at the screen's edge. Its look is its state:
@@ -461,8 +471,8 @@ come.
    - Thinking moves to a stronger tier.
    - Done when every turn and check-in decision, including NOTHING, is an episode with its steps
      and outcomes, and the inspector shows them.
-   - **Built.** The inspector is Home's **How Scout decided**. Approvals of connected-app writes are
-     not outcomes yet.
+   - **Built.** The inspector is Home's **How Scout decided**. Approvals are outcomes now: how each
+     ask ended is recorded on the episode that asked.
 2. **The harness as data.** The folder, the schema, the hash on every episode, tool descriptions
    out of TS, `policy.json` replacing the tool conditionals.
 3. **The Self and sleep.** The folder, its tools and versions, **What I've learned**, sleep with its
@@ -475,6 +485,10 @@ come.
 4. **Asks, experts and the bubble.** Plan cards, the channel rules, the expert reviewed before it
    is shown, the bubble and panel replacing Bean. Voice: listening by name, the instant
    acknowledgement, say-the-gist, and stopping when interrupted.
+   - **Partly built:** saved asks, risk classes, expiry and Home's **Waiting on you** (see
+     [Asks](#asks)).
+   - **Not yet:** plan cards and one approval per plan, the expert's scope taken from the plan,
+     standing rules, the reviewer model, the channel rules and voice answers.
 5. **Reflex.** The event stream and the reflex model replace the lookout, active-time, pick-up and
    arrivals triggers; their code is deleted.
 6. **Scenarios.** `packages/evals`, the seed set, **Make this a scenario**, the health view.
@@ -487,6 +501,18 @@ come.
 - **D2.** Check-ins keep thinking on Scout's own model, with their tokens recorded in the episode
   and the daily budget; watch checks are plumbing and get neither the constitution nor the soul.
 - **D3.** Persistent authority is the person's: see [The Self](#the-self).
+
+**Decisions taken while building (2026-10-22):**
+
+- **D4.** An ask expires: a change in an app after 1 hour (its turn is held open the whole time), a
+  hand-off card after 24 hours (a brief goes stale). Fixed in code, not a setting.
+- **D5.** A change in an app still waiting when Tagalong closes is not resumed after a restart: it
+  ends expired, closed, and nothing runs. A hand-off card waits on. Resuming comes with plan cards.
+- **D6.** An answered ask keeps only the first line of its summary (secrets hidden, at most 120
+  characters) for 30 days; Delete all removes answered asks. Asks never take window titles or screen
+  text by themselves (D1).
+- **D7.** One outcome set for every ask: `approved`, `declined`, `expired`, `cancelled` (hand-off
+  cards were `sent` and `dismissed`).
 
 ## Open questions
 

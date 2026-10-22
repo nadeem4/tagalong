@@ -165,6 +165,48 @@ describe('the hand-off card', () => {
     expect(card()).not.toHaveTextContent('Includes the end');
   });
 
+  it('says the window is not kept when the card was reopened after a restart', () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    propose(bridge);
+    expect(card()).not.toHaveTextContent('isn’t kept');
+    act(() =>
+      bridge.emit({
+        type: 'handoff.proposed',
+        proposalId: PROPOSAL,
+        petId: 'scout',
+        expertId: 'claude-code',
+        expertName: 'Claude Code',
+        brief: BRIEF,
+        projects: [],
+        canEdit: false,
+        restored: true,
+      }),
+    );
+    expect(card()).toHaveTextContent(
+      'The window it was written from isn’t kept, so the expert gets only this brief.',
+    );
+  });
+
+  it('goes away when its ask is no longer waiting', () => {
+    const bridge = createFakeHostBridge();
+    renderBubble(bridge);
+    propose(bridge);
+    const still = {
+      id: PROPOSAL,
+      kind: 'handoff' as const,
+      petId: 'scout',
+      summary: BRIEF.ask,
+      risk: 'change' as const,
+      state: 'waiting' as const,
+      createdAt: '2026-10-22T10:00:00.000Z',
+    };
+    act(() => bridge.emit({ type: 'asks.changed', waiting: [still] }));
+    expect(card()).toBeInTheDocument();
+    act(() => bridge.emit({ type: 'asks.changed', waiting: [] }));
+    expect(screen.queryByRole('region', { name: 'Hand to Claude Code' })).toBeNull();
+  });
+
   it('drops the proposal on Cancel', async () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge);

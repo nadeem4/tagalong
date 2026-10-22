@@ -5,6 +5,7 @@
 
 import type {
   ActivityEntry,
+  Ask,
   Episode,
   EpisodeEvent,
   SelfNight,
@@ -66,6 +67,11 @@ export interface FakeHostBridge extends HostBridge {
   readonly cancelledHandoffs: readonly string[];
   /** Every answer to a connector confirm card, in order. */
   readonly approvals: readonly { approvalId: string; decision: 'once' | 'deny' }[];
+  /** Every saved ask, waiting or answered; a test edits it, then emits `asks.changed`. */
+  savedAsks: Ask[];
+  /** Every answer from Waiting on you, and every Open, in order. */
+  readonly answeredAsks: readonly { id: string; decision: 'approve' | 'decline' }[];
+  readonly openedAsks: readonly string[];
   /** Home's connections; a test edits them, then emits `connections.changed`. */
   connections: ConnectionsListResult;
   readonly addedConnections: readonly ConnectionsAddParams[];
@@ -125,6 +131,10 @@ export function createFakeHostBridge(
     memories?: MemoryEntry[];
     /** Whether a calendar link is kept; absent, none is. */
     calendar?: CalendarCheckResult;
+    /** Every ask, waiting or answered. */
+    savedAsks?: Ask[];
+    /** answerAsk rejects, as when the engine is restarting. */
+    answerAskFails?: boolean;
   } = {},
 ): FakeHostBridge {
   const handlers = new Set<(event: TurnEvent) => void>();
@@ -139,6 +149,8 @@ export function createFakeHostBridge(
   const dismissedHandoffs: string[] = [];
   const cancelledHandoffs: string[] = [];
   const approvals: { approvalId: string; decision: 'once' | 'deny' }[] = [];
+  const answeredAsks: { id: string; decision: 'approve' | 'decline' }[] = [];
+  const openedAsks: string[] = [];
   const addedConnections: ConnectionsAddParams[] = [];
   const signIns: string[] = [];
   const removedConnections: string[] = [];
@@ -358,6 +370,28 @@ export function createFakeHostBridge(
     approveTool(approvalId, decision) {
       approvals.push({ approvalId, decision });
       return Promise.resolve();
+    },
+    savedAsks: (options.savedAsks ?? []).map((ask) => ({ ...ask })),
+    answeredAsks,
+    openedAsks,
+    listAsks() {
+      return Promise.resolve({
+        waiting: fake.savedAsks.filter((ask) => ask.state === 'waiting'),
+        recent: fake.savedAsks.filter((ask) => ask.state !== 'waiting'),
+      });
+    },
+    answerAsk(id, decision) {
+      if (options.answerAskFails === true) return Promise.reject(new Error('engine restarting'));
+      answeredAsks.push({ id, decision });
+      const ask = fake.savedAsks.find((candidate) => candidate.id === id);
+      if (ask?.state !== 'waiting') return Promise.resolve(false);
+      ask.state = decision === 'approve' ? 'approved' : 'declined';
+      ask.answeredBy = 'you';
+      return Promise.resolve(true);
+    },
+    openAsk(id) {
+      openedAsks.push(id);
+      return Promise.resolve(true);
     },
     connections: {
       connections: [...(options.connections?.connections ?? [])],
