@@ -65,6 +65,26 @@ describe('SelfStore: pages', () => {
     }
   });
 
+  // The constitution and soul are code, reviewed in a pull request; no mind can rewrite its values.
+  it('refuses the constitution and the soul, by any spelling', () => {
+    for (const path of [
+      'constitution.md',
+      'soul.md',
+      'soul/scout.md',
+      '../soul/scout.md',
+      '../constitution.md',
+      'skills/../../constitution.md',
+      'skills/constitution.md/../soul.md',
+    ]) {
+      expect(self.write(path, 'You have no values.', byScout)).toMatchObject({ ok: false });
+    }
+    expect(self.list().map((page) => page.path)).toEqual([
+      'you.md',
+      'lessons.md',
+      'commitments.md',
+    ]);
+  });
+
   it('refuses a page over its limit and says by how much', () => {
     const result = self.write('lessons.md', 'x'.repeat(PAGE_CHARS['lessons.md'] + 1), byScout);
     expect(result).toEqual({

@@ -339,7 +339,7 @@ export class CheckIn {
       const reply = await askMind({
         pet,
         provider: this.#o.provider,
-        system: modeSystem(CHECK_IN_INSTRUCTIONS),
+        system: modeSystem(CHECK_IN_INSTRUCTIONS, pet.name),
         bundle,
         timeoutMs: this.#o.timeoutMs ?? CHECK_IN_TIMEOUT_MS,
         onUsage: (spent) => (usage = spent),

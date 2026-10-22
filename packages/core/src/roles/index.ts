@@ -1,35 +1,43 @@
 /**
  * The role and soul libraries and their helpers. Contains `getRole`, `roleFor` (falls back
- * to the companion), `ACTIVE_SOUL`, `soul()` (the soul the prompt starts with), `modeSystem`
- * (the soul plus a mode's block, for the minds that are not a turn) and
+ * to the companion), `ACTIVE_SOUL`, `identity` (the constitution and soul every prompt starts
+ * with, named), `modeSystem` (the identity plus a mode's block, for every mind that is not a
+ * turn) and
  * `recommendedModel` (a role's tier mapped to a model on one provider).
  * Used by the prompt assembler, the tool registry, the key check, the engine and the
  * desktop's Welcome.
  */
 import type { Role } from '@tagalong/protocol';
-import { ROLE_LIBRARY, SOUL_LIBRARY } from './library.generated';
+import { CONSTITUTION, ROLE_LIBRARY, SOUL_LIBRARY } from './library.generated';
 import { MODEL_TIERS } from './tiers';
 
 /**
- * The soul Scout speaks with: who Scout is, apart from what Scout can do. To re-character
- * Scout, edit soul/scout.md; for a second character, add soul/<id>.md and change this.
+ * The soul the companion speaks with: who it is and how it talks, apart from what it can do. To
+ * re-character it, edit soul/scout.md; for a second character, add soul/<id>.md and change this.
  */
 export const ACTIVE_SOUL = 'scout';
 
-/** The active soul's text: Character, Cares about and Never, as written in its file. */
-export function soul(): string {
-  const text = SOUL_LIBRARY[ACTIVE_SOUL];
-  if (text === undefined) throw new Error(`the soul library has no "${ACTIVE_SOUL}"`);
-  return text;
+/** Where the companion's name goes in the constitution and the soul. */
+const NAME_SLOT = '{name}';
+
+/**
+ * Who the companion is, the start of every prompt: the constitution (its values, which wins when
+ * they conflict, and its Never list), then the active soul (its character and way of speaking),
+ * with its name filled in. The name is the pet's, so it is set in one place.
+ */
+export function identity(name: string): string {
+  const soul = SOUL_LIBRARY[ACTIVE_SOUL];
+  if (soul === undefined) throw new Error(`the soul library has no "${ACTIVE_SOUL}"`);
+  return `${CONSTITUTION}\n\n${soul}`.replaceAll(NAME_SLOT, name.trim());
 }
 
 /**
- * The system prompt for every mind that is not a turn but speaks or judges as Scout (checking
- * in, tidying memory, summarising): the same soul a turn starts with, then the mode's own
- * block. One identity in every mode. A watch's yes/no check is plumbing and gets no soul.
+ * The system prompt for every mind that is not a turn but speaks or judges as {name} (checking
+ * in, tidying memory, summarising, sleeping): the same identity a turn starts with, then the
+ * mode's own block. One identity in every mode. A watch's yes/no check is plumbing and gets none.
  */
-export function modeSystem(block: string): string {
-  return `${soul()}\n\n${block}`;
+export function modeSystem(block: string, name: string): string {
+  return `${identity(name)}\n\n${block}`;
 }
 
 /** The role with this id, or undefined when there is none. */

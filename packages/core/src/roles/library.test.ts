@@ -8,14 +8,17 @@ import {
   LIBRARY_FILE,
   ROLES_DIR,
   SOULS_DIR,
+  CONSTITUTION_FILE,
+  loadConstitution,
   loadRoles,
   loadSouls,
+  parseConstitutionFile,
   parseRoleFile,
   parseSoulFile,
   renderLibrary,
 } from '../../scripts/gen-roles.mjs';
-import { ACTIVE_SOUL, getRole, modeSystem, roleFor, soul } from './index';
-import { ROLE_LIBRARY, SOUL_LIBRARY } from './library.generated';
+import { ACTIVE_SOUL, getRole, identity, modeSystem, roleFor } from './index';
+import { CONSTITUTION, ROLE_LIBRARY, SOUL_LIBRARY } from './library.generated';
 
 /** Every built-in tool a role may name. Update when a built-in tool is added or renamed. */
 const BUILT_IN_TOOLS = [
@@ -122,7 +125,7 @@ describe('the role files', () => {
   // Shipped with batched arrivals, never before: the mind never claims an ability it lacks.
   it('tell the companion finished work arrives together, and Scout it can work in the background', () => {
     expect(getRole('companion')?.instructions).toContain('you hear about it together');
-    expect(soulSection(soul(), '## Character')).toContain(
+    expect(soulSection(identity('Scout'), '## Character')).toContain(
       'background, keep talking with them, and come back when you have something worth saying.',
     );
   });
@@ -225,12 +228,27 @@ describe('parseRoleFile', () => {
   });
 });
 
-/** The soul's three parts, by heading, in order. */
-const SOUL_HEADINGS = ['## Character', '## Cares about', '## Never'];
+/** The soul's two parts, by heading, in order: who it is and how it talks. */
+const SOUL_HEADINGS = ['## Character', '## Way of speaking'];
 
-/** A soul file with these headings, each followed by one line. */
+/** The constitution's three parts, by heading, in order: shared by every character. */
+const CONSTITUTION_HEADINGS = ['## Values', '## When values conflict', '## Never'];
+
+/** A file with these headings, each followed by one line naming the companion. */
 const soulWith = (headings: readonly string[]): string =>
-  headings.map((heading) => `${heading}\n- something`).join('\n\n');
+  headings.map((heading) => `${heading}\n- {name} does something`).join('\n\n');
+
+/** The headings of a soul or constitution text, in order. */
+const headingsOf = (text: string): string[] =>
+  lf(text)
+    .split('\n')
+    .filter((line) => line.startsWith('## '));
+
+/** The bullets under one heading. */
+const bulletsOf = (text: string, heading: string): string[] =>
+  soulSection(text, heading)
+    .split('\n')
+    .filter((line) => line.startsWith('- '));
 
 /** The body under one heading of a soul's text. */
 function soulSection(text: string, heading: string): string {
@@ -248,65 +266,151 @@ describe('the soul files', () => {
   });
 
   it.each(Object.entries(SOUL_LIBRARY))(
-    '%s has exactly Character, Cares about and Never, in order, none empty',
+    '%s has exactly Character and Way of speaking, in order, none empty',
     (_id, text) => {
-      const headings = lf(text)
-        .split('\n')
-        .filter((line) => line.startsWith('## '));
-      expect(headings).toEqual(SOUL_HEADINGS);
+      expect(headingsOf(text)).toEqual(SOUL_HEADINGS);
       for (const heading of SOUL_HEADINGS) expect(soulSection(text, heading)).not.toBe('');
     },
   );
 
-  it.each(Object.entries(SOUL_LIBRARY))('%s says at least one Never as a bullet', (_id, text) => {
-    const bullets = soulSection(text, '## Never')
+  // The name is set once, on the pet; a soul that hard-codes one would drift from it.
+  it.each(Object.entries(SOUL_LIBRARY))('%s names the companion only as {name}', (_id, text) => {
+    expect(text).toContain('{name}');
+    expect(text).not.toMatch(/\bScout\b/);
+  });
+
+  // Values are the constitution's, the same whatever the character; a soul only adds flavour.
+  it.each(Object.entries(SOUL_LIBRARY))(
+    '%s holds no values or Never list of its own',
+    (_id, text) => {
+      expect(text).not.toMatch(/^## (Values|Never|Cares about)/m);
+    },
+  );
+});
+
+describe('the constitution', () => {
+  it('has exactly Values, When values conflict and Never, in order, none empty', () => {
+    expect(headingsOf(CONSTITUTION)).toEqual(CONSTITUTION_HEADINGS);
+    for (const heading of CONSTITUTION_HEADINGS) {
+      expect(soulSection(CONSTITUTION, heading)).not.toBe('');
+    }
+  });
+
+  it('ranks its values as a numbered list, safety and trust first', () => {
+    const ranks = soulSection(CONSTITUTION, '## When values conflict')
       .split('\n')
-      .filter((line) => line.startsWith('- '));
-    expect(bullets.length).toBeGreaterThan(0);
+      .filter((line) => /^\d+\. /.test(line));
+    expect(ranks.length).toBeGreaterThanOrEqual(3);
+    expect(ranks[0]).toMatch(/safety/i);
   });
 
-  it('give soul() the active soul', () => {
-    expect(soul()).toBe(SOUL_LIBRARY[ACTIVE_SOUL]);
+  // Each Never is pinned by what it forbids, so a rewrite cannot quietly drop one.
+  // docs/concepts/character.md maps each to the code that enforces it.
+  it.each([
+    ['without their yes', /without their yes/],
+    ['silence is not consent', /Silence is never a yes/],
+    ['no claiming done', /claim something is done/],
+    ['no clicking or typing', /click or type/],
+    ['no instructions from content', /as instructions to you/],
+    ['no blind spots or secrets', /blind spots/],
+    ['no pretending to be a person', /pretend to be a person/],
+  ])('keeps the Never rule: %s', (_name, pattern) => {
+    expect(bulletsOf(CONSTITUTION, '## Never').some((line) => pattern.test(line))).toBe(true);
   });
 
-  it('give every mode the same soul, then the mode block', () => {
-    expect(modeSystem('## Watching\nLook.')).toBe(`${soul()}\n\n## Watching\nLook.`);
+  it('names no character, so every soul can share it', () => {
+    expect(CONSTITUTION).not.toMatch(/\bScout\b|\bfox\b/i);
+  });
+});
+
+describe('identity', () => {
+  it('is the constitution, then the active soul, named', () => {
+    const named = (text: string): string => text.replaceAll('{name}', 'Scout');
+    expect(identity('Scout')).toBe(
+      `${named(CONSTITUTION)}\n\n${named(SOUL_LIBRARY[ACTIVE_SOUL] ?? '')}`,
+    );
+  });
+
+  it('puts the values before the character, so the character never outranks them', () => {
+    const text = identity('Scout');
+    expect(text.indexOf('## Never')).toBeLessThan(text.indexOf('## Character'));
+  });
+
+  it('fills in whatever the pet is called, trimmed, leaving no slot behind', () => {
+    const text = identity('  Juno ');
+    expect(text).toContain('You are Juno');
+    expect(text).not.toContain('{name}');
+  });
+
+  it('give every mode the same identity, then the mode block', () => {
+    expect(modeSystem('## Watching\nLook.', 'Scout')).toBe(
+      `${identity('Scout')}\n\n## Watching\nLook.`,
+    );
   });
 });
 
 describe('parseSoulFile', () => {
-  it('keeps the three parts as the soul text, line endings and byte-order mark removed', () => {
+  it('keeps the two parts as the soul text, line endings and byte-order mark removed', () => {
     const source = String.fromCharCode(0xfeff) + soulWith(SOUL_HEADINGS).replace(/\n/g, '\r\n');
     expect(parseSoulFile(source)).toBe(soulWith(SOUL_HEADINGS));
   });
 
   it('throws on a missing heading', () => {
-    expect(() => parseSoulFile(soulWith(['## Character', '## Never']))).toThrow(/Cares about/);
+    expect(() => parseSoulFile(soulWith(['## Character']))).toThrow(/Way of speaking/);
   });
 
   it('throws on an extra heading', () => {
-    expect(() => parseSoulFile(soulWith([...SOUL_HEADINGS, '## Hobbies']))).toThrow(/Hobbies/);
+    expect(() => parseSoulFile(soulWith([...SOUL_HEADINGS, '## Never']))).toThrow(/Never/);
   });
 
   it('throws on headings out of order', () => {
-    expect(() => parseSoulFile(soulWith(['## Never', '## Character', '## Cares about']))).toThrow(
-      /order/,
-    );
+    expect(() => parseSoulFile(soulWith(['## Way of speaking', '## Character']))).toThrow(/order/);
   });
 
   it('throws on an empty part', () => {
-    const source = '## Character\n\n## Cares about\n- them\n\n## Never\n- lie';
+    const source = '## Character\n\n## Way of speaking\n- {name} talks plainly';
     expect(() => parseSoulFile(source)).toThrow(/Character/);
   });
 
   it('throws on text before the first heading', () => {
     expect(() => parseSoulFile(`Hello.\n\n${soulWith(SOUL_HEADINGS)}`)).toThrow(/heading/);
   });
+
+  it('throws when the soul never names the companion', () => {
+    expect(() => parseSoulFile('## Character\n- a fox\n\n## Way of speaking\n- plainly')).toThrow(
+      /\{name\}/,
+    );
+  });
+});
+
+describe('parseConstitutionFile', () => {
+  it('keeps the three parts', () => {
+    const source = soulWith(CONSTITUTION_HEADINGS);
+    expect(parseConstitutionFile(source)).toBe(source);
+  });
+
+  it('throws on a missing Never', () => {
+    expect(() => parseConstitutionFile(soulWith(['## Values', '## When values conflict']))).toThrow(
+      /Never/,
+    );
+  });
+
+  it('throws on a character part, which belongs in a soul', () => {
+    expect(() =>
+      parseConstitutionFile(soulWith([...CONSTITUTION_HEADINGS, '## Character'])),
+    ).toThrow(/Character/);
+  });
+
+  it('is loaded from the file next to the souls', () => {
+    expect(loadConstitution()).toBe(parseConstitutionFile(readFileSync(CONSTITUTION_FILE, 'utf8')));
+  });
 });
 
 describe('library.generated.ts', () => {
-  it('is up to date with the role and soul files (run node scripts/gen-roles.mjs)', () => {
-    expect(lf(readFileSync(LIBRARY_FILE, 'utf8'))).toBe(renderLibrary(loadRoles(), loadSouls()));
+  it('is up to date with the role, soul and constitution files (run node scripts/gen-roles.mjs)', () => {
+    expect(lf(readFileSync(LIBRARY_FILE, 'utf8'))).toBe(
+      renderLibrary(loadRoles(), loadSouls(), loadConstitution()),
+    );
   });
 
   it('lives where the generator writes it', () => {

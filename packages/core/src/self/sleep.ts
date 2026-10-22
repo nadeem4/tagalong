@@ -196,7 +196,7 @@ export class Sleep {
       const result = await this.#o.provider(pet).complete(
         {
           model: pet.model,
-          system: modeSystem(SLEEP_INSTRUCTIONS),
+          system: modeSystem(SLEEP_INSTRUCTIONS, pet.name),
           messages: [
             { role: 'user', content: [{ type: 'text', text: this.#bundle(seen, episodes) }] },
           ],

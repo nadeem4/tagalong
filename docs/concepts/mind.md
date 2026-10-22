@@ -76,7 +76,8 @@ flowchart LR
 
 ## Constitution
 
-The soul's **Never** list plus the limits code enforces. These are the only rules we write as code
+The **Never** list in `packages/core/constitution.md` plus the limits code enforces (built; see
+[Character](character.md)). These are the only rules we write as code
 branches, and each one has a test.
 
 - Never click or type for the person. No computer control, anywhere.
@@ -87,7 +88,7 @@ branches, and each one has a test.
 - Never claim something is done until it is.
 - Quiet during calls and full screen, except for something the person asked to be told about.
 - Daily budget and daily wake cap: when spent, the mind stays asleep until tomorrow.
-- The mind may not edit the constitution, the soul's Never list, or its own limits.
+- The mind may not edit the constitution, the soul, or its own limits.
 
 ## One mind, two speeds
 

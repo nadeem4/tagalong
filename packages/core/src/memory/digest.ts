@@ -169,7 +169,7 @@ export class Digest {
       const result = await this.#o.provider(brainPet).complete(
         {
           model: brainPet.model,
-          system: modeSystem(DIGEST_INSTRUCTIONS),
+          system: modeSystem(DIGEST_INSTRUCTIONS, pet.name),
           messages: [
             {
               role: 'user',

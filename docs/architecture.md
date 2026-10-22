@@ -242,7 +242,7 @@ sequenceDiagram
   U->>H: highlight text, press hotkey
   H->>H: build ContextSnapshot, plus dropped from a drop card's button
   H->>C: ask(petId, input, snapshot)
-  C->>C: assemble prompt: soul + role, then context + memories + Now on the question
+  C->>C: assemble prompt: identity + role, then context + memories + Now on the question
   C->>A: streaming request with tools
   A-->>C: text deltas and tool calls
   C-->>H: turn.delta, then turn.completed
@@ -315,8 +315,9 @@ anything and what. So the prompt carries who Scout is and facts, never canned li
 The **system prompt** is three parts, the same on every turn (spoken or typed, whatever is
 remembered), so providers can cache it:
 
-1. The soul, `packages/core/soul/scout.md` (Character, Cares about, Never), compiled into
-   `SOUL_LIBRARY` and picked by `ACTIVE_SOUL` (see `docs/concepts/roles-and-tools.md`).
+1. The identity: `packages/core/constitution.md` (Values, When values conflict, Never), then the
+   soul `packages/core/soul/scout.md` (Character, Way of speaking), named by `identity(name)`
+   (see `docs/concepts/character.md`).
 2. The companion's body, `roles/companion.md`: about a dozen bullets of how Tagalong works, plus
    the two rules no code enforces (a connected app gets nothing from the screen unless asked; a
    bug's repo is never guessed).
@@ -777,7 +778,7 @@ that a read on a routine turn emits no `connector.confirm` while a write on the 
 
 **"File this as a bug"** is a write worked through with its card, and needs no tool or card of its
 own, and no fixed template: Scout reads the window with the error (the selection, then
-`read_window_text`), treats that text as data and never as instructions (the soul's Never),
+`read_window_text`), treats that text as data and never as instructions (the constitution's Never),
 takes the repo from the screen or the person and asks rather than guessing (companion.md),
 writes the issue, and calls the app's create-issue tool, such as `github__create_issue` or `linear__create_issue`. That tool is a write, so
 `connectorTools` hides keys in every argument (`hideDeep`), builds the card text with `summaryOf`
@@ -1433,7 +1434,7 @@ the last digest, or more than 200 summaries.
 
 It records a `jobs` row (`JobStore.startDigest`, kind `digest`), then makes one `complete()` call
 on `settings.summarizer` or Scout's own model (no tools, 800 max tokens, 60 s, aborted at
-shutdown). The system prompt is `soul()` plus the fixed `DIGEST_INSTRUCTIONS` block, so it caches.
+shutdown). The system prompt is `identity(name)` plus the fixed `DIGEST_INSTRUCTIONS` block, so it caches.
 The user message (`hideSecrets` over all of it) has `## What you remember now` (newest 150 facts and
 preferences, `m-<8 hex>` ids), `## Older summaries (30+ days)` (at most 20), `## Recent
 conversation summaries` (since the last digest, at most 10) and `## Recent work` (undigested

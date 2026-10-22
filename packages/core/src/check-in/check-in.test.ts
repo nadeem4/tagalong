@@ -18,7 +18,7 @@ import type { CheckInEpisode } from '../memory/experience';
 import type { Arrival } from './arrivals';
 import type { PerceptionHost } from '../perception';
 import type { Memory } from '../memory/memories';
-import { soul } from '../roles';
+import { identity } from '../roles';
 import { SETTLE_MS } from '../keep-an-eye/lookout';
 import { BREAK_MS, STRETCH_MS } from './active-time';
 import { CHECK_IN_DAILY_CAP, COOLDOWN_MS, CheckIn, NOT_NOW_MS } from './check-in';
@@ -354,14 +354,14 @@ describe('CheckIn: the gate', () => {
 });
 
 describe('CheckIn: what the mind is given', () => {
-  it('the system prompt is the soul and the check-in block, the same for every reason', async () => {
+  it('the system prompt is the identity and the check-in block, the same for every reason', async () => {
     const t = setup();
     await t.checkIn.observeWindows([failing]);
     await t.checkIn.finished([finishedDone]);
     t.clock.t += COOLDOWN_MS;
     await t.stretch();
     expect(t.mind.requests).toHaveLength(3);
-    const system = `${soul()}\n\n${CHECK_IN_INSTRUCTIONS}`;
+    const system = `${identity('Scout')}\n\n${CHECK_IN_INSTRUCTIONS}`;
     for (const request of t.mind.requests) expect(request.system).toBe(system);
   });
 

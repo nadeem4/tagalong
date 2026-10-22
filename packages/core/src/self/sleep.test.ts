@@ -12,7 +12,7 @@ import { fakeMind, scout, sentText, type MindStep } from '../check-in/test-suppo
 import { openDatabase } from '../memory/db';
 import { ExperienceLog } from '../memory/experience';
 import { ConversationStore } from '../memory/store';
-import { soul } from '../roles';
+import { identity } from '../roles';
 import { FakeClock } from '../watch/fake-clock';
 import { AWAY_MS, MIN_EPISODES, SLEEP_GAP_MS, SLEEP_INSTRUCTIONS, Sleep } from './sleep';
 import { SelfStore } from './store';
@@ -198,7 +198,7 @@ describe('Sleep: what the mind is shown', () => {
     await t.sleep.maybeRun();
     const request = t.brain.requests[0]!;
     expect(t.brain.asked[0]).toMatchObject({ model: scout.model });
-    expect(request.system).toBe(`${soul()}\n\n${SLEEP_INSTRUCTIONS}`);
+    expect(request.system).toBe(`${identity('Scout')}\n\n${SLEEP_INSTRUCTIONS}`);
     const bundle = sentText(request);
     expect(bundle).toContain('### lessons.md\nLead with the gist.');
     expect(bundle).toContain('That build failed again (4).');
@@ -319,6 +319,24 @@ describe('Sleep: what it may change', () => {
       note: expect.stringMatching(/ran out of room/),
     });
     expect(self.proposals()).toEqual([]);
+  });
+
+  it('cannot rewrite its own values or character, however it asks', async () => {
+    day();
+    const before = identity('Scout');
+    const t = setup([
+      reply([
+        { path: 'constitution.md', text: '## Never\n- nothing', why: 'Be freer.' },
+        { path: '../soul/scout.md', text: 'You are someone else.', why: 'Be bolder.' },
+      ]),
+    ]);
+    await t.sleep.maybeRun();
+    expect(self.list().map((page) => page.path)).toEqual([
+      'you.md',
+      'lessons.md',
+      'commitments.md',
+    ]);
+    expect(identity('Scout')).toBe(before);
   });
 
   it('records a reply it cannot read as a failed night, and changes nothing', async () => {

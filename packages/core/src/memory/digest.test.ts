@@ -3,7 +3,7 @@ import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import { fakeMind, scout, sentText, type MindStep } from '../check-in/test-support';
 import { JobStore } from '../jobs/store';
-import { soul } from '../roles';
+import { identity } from '../roles';
 import { FakeClock } from '../watch/fake-clock';
 import { migrate } from './db';
 import {
@@ -231,7 +231,7 @@ describe('Digest: when it runs', () => {
 });
 
 describe('Digest: what it sends', () => {
-  it('sends the soul and the tidying block as a stable system prompt, on the summaries model', async () => {
+  it('sends the identity and the tidying block as a stable system prompt, on the summaries model', async () => {
     const t = setup({ summarizer: { providerId: 'ollama', model: 'small' } });
     t.doneJob('read the paper', 'Long.');
     await t.digest.maybeRun();
@@ -241,7 +241,7 @@ describe('Digest: what it sends', () => {
 
     expect(t.mind.requests).toHaveLength(2);
     for (const request of t.mind.requests) {
-      expect(request.system).toBe(`${soul()}\n\n${DIGEST_INSTRUCTIONS}`);
+      expect(request.system).toBe(`${identity('Scout')}\n\n${DIGEST_INSTRUCTIONS}`);
       expect(request.model).toBe('small');
       expect(request.tools ?? []).toEqual([]);
     }

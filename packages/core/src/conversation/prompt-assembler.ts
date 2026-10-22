@@ -9,7 +9,7 @@ import { MAX_SELECTION_CHARS } from '@tagalong/protocol';
 import type { BrainContent, BrainMessage, BrainRequest } from '../providers';
 import type { Memory } from '../memory/memories';
 import { renderInventory } from '../perception/inventory';
-import { roleFor, soul } from '../roles';
+import { identity, roleFor } from '../roles';
 import { renderMemories, renderNow, type NowFacts } from './now';
 
 /**
@@ -114,14 +114,14 @@ function imagesToAttach(snapshot: ContextSnapshot, settings: Settings): BrainCon
 }
 
 /**
- * Who Scout is (the soul), how Tagalong works (the role's body), and their name. The same on
+ * Who the companion is (the constitution and soul, named), how Tagalong works (the role's body), and their name. The same on
  * every turn, spoken or typed, whatever is remembered, so providers can cache it: everything
  * that changes per turn rides on the question instead.
  */
 function systemPrompt(pet: Pet, userName: string): string {
   const name = userName.trim();
   return [
-    soul(),
+    identity(pet.name),
     roleFor(pet.roleId).instructions.trim(),
     name.length > 0 ? `Their name is ${name}.` : '',
   ]

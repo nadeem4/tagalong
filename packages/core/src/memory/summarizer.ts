@@ -86,7 +86,7 @@ export class Summarizer {
       const result = await provider.complete(
         {
           model: brainPet.model,
-          system: modeSystem(SUMMARY_INSTRUCTIONS),
+          system: modeSystem(SUMMARY_INSTRUCTIONS, pet.name),
           messages: [{ role: 'user', content: [{ type: 'text', text: transcript(folding, pet) }] }],
           maxTokens: SUMMARY_MAX_TOKENS,
         },

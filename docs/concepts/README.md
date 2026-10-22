@@ -13,6 +13,7 @@ Each page starts with a status line:
 | ------------------------------------- | -------------- | ----------------------------------------------------------------- |
 | [Memory](memory.md)                   | Built + design | Threads, summaries, memories, recall, screen memory               |
 | [Roles and tools](roles-and-tools.md) | Built          | The companion's role file, the model it uses, the tools module    |
+| [Character](character.md)             | Built          | The constitution, the soul, the name slot, Never mapped to code   |
 | [The mind](mind.md)                   | Built + design | Where Scout is going: one mind, the Self, asks, experts, learning |
 
 ## The model in one paragraph

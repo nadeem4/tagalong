@@ -31,31 +31,32 @@ screenshots, and its instructions say so.
 Who Scout is lives apart from what Scout can do: the **soul** (below) is Scout's character, and the
 role is the tools, the model tier and the mechanics of how Tagalong works.
 
-### The soul file
+### The soul file and the constitution
 
-`packages/core/soul/scout.md` is Scout's soul: plain Markdown, no header, exactly three parts in
-this order, each with something under it:
+Who Scout is comes from two files (see [Character](character.md)):
 
-| Heading          | What it holds                      | Edit it to                                           |
-| ---------------- | ---------------------------------- | ---------------------------------------------------- |
-| `## Character`   | How Scout is and sounds            | change Scout's personality                           |
-| `## Cares about` | What Scout values, as bullets      | change Scout's priorities                            |
-| `## Never`       | Lines Scout doesn't cross, bullets | change the wording (the guarantees are also in code) |
+| File                            | Parts                                              | Edit it to                       |
+| ------------------------------- | -------------------------------------------------- | -------------------------------- |
+| `packages/core/constitution.md` | `## Values`, `## When values conflict`, `## Never` | change what it stands for (rare) |
+| `packages/core/soul/scout.md`   | `## Character`, `## Way of speaking`               | change how it is and sounds      |
+
+Neither names the companion; both say `{name}`. The same generator compiles every `soul/*.md` into
+`SOUL_LIBRARY` and the constitution into `CONSTITUTION` in `library.generated.ts`, and fails on a
+missing, extra, empty or misordered part, or on a soul without `{name}`. `ACTIVE_SOUL` in
+`packages/core/src/roles/index.ts` (`'scout'`) picks the soul, and `identity(name)` returns the
+constitution, then the soul, with the pet's name filled in.
 
 The safety lines in Never are enforced by code too: Scout has no click or type tool, every card
 needs a click, and blind spots and secret hiding happen before anything reaches the model. So
-editing the wording cannot remove a guarantee.
+editing the wording cannot remove a guarantee. `docs/concepts/character.md` maps each line to its
+code.
 
-The same generator compiles every `soul/*.md` into `SOUL_LIBRARY` in `library.generated.ts`,
-keyed by file name, and fails on a missing, extra, empty or misordered part. `ACTIVE_SOUL` in
-`packages/core/src/roles/index.ts` (`'scout'`) picks the soul and `soul()` returns its text.
-
-Every mind speaks from the same soul. A turn's system prompt is the soul, the role's body and their
-name. Every other mind's is `modeSystem(block)`: the soul, then that mode's own block. The modes
-are checking in (`## Checking in`), tidying memory (`DIGEST_INSTRUCTIONS`) and summarising
-(`## Summarising`). So what Scout says, keeps and judges all comes from one self. A watch's yes/no
-check is the exception: a frequent matcher is plumbing, not speech, so it gets a fixed instruction
-and no soul.
+Every mind speaks from the same identity. A turn's system prompt is the identity, the role's body
+and their name. Every other mind's is `modeSystem(block, name)`: the identity, then that mode's own
+block. The modes are checking in (`## Checking in`), tidying memory (`DIGEST_INSTRUCTIONS`),
+summarising (`## Summarising`) and sleeping. So what Scout says, keeps and judges all comes from
+one self. A watch's yes/no check is the exception: a frequent matcher is plumbing, not speech, so
+it gets a fixed instruction and no identity.
 
 To re-character Scout, edit `soul/scout.md` and regenerate. For a second character, add
 `soul/<id>.md` and change `ACTIVE_SOUL`; there is no setting or picker until a second soul ships.
@@ -138,7 +139,7 @@ error `-32602`.
 
 A pet's role sets two things on every turn:
 
-- **Its instructions.** The system prompt is the soul, then the role's `instructions`, then
+- **Its instructions.** The system prompt is the identity (constitution and soul), then the role's `instructions`, then
   `Their name is <name>.` when the person gave one. Nothing else, so it is the same on every turn
   and providers can cache it. Recalled memories and the Now facts ride on the person's message
   instead (see `docs/architecture.md`, "The prompt").
