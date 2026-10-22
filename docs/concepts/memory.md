@@ -86,7 +86,7 @@ Every turn is assembled from scratch by the prompt assembler
 
 A turn contains, in order:
 
-1. The system prompt: Scout's soul, the role's instructions and the person's name (see
+1. The system prompt: the constitution, Scout's soul, the role's instructions and the person's name (see
    [roles-and-tools.md](roles-and-tools.md)). The same on every turn.
 2. The thread: the last `historyMessages` messages of this conversation.
 3. On the person's latest message, after their words: the context they attached (selection,
@@ -156,7 +156,7 @@ matters is the mind's call.
   newest 150 facts and preferences with short ids (`m-3fa1c2d0`), up to 20 summaries older than
   30 days, up to 10 summaries since the last digest, and up to 10 finished jobs not yet read (task,
   note and the first 1,500 characters of the result). Secrets are hidden over all of it. The system
-  prompt is the soul and a fixed "Tidying your memory" block, the same every day.
+  prompt is the constitution, the soul and a fixed "Tidying your memory" block, the same every day.
 - **What it may reply**: `ADD fact|preference|summary: ...`, `REPLACE <id>: ...`, `DROP <id>`, or
   `NOTHING`. Code applies at most 10 of each in one transaction; an id must be one it was shown;
   a `DROP` of a preference is ignored; facts and preferences are clipped to 300 characters and

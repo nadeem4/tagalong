@@ -28,34 +28,40 @@ background work: `work_on_it` starts a job, `board` lists everything in flight a
 nothing that writes files or runs code. Its own figure and bubble show up in its
 screenshots, and its instructions say so.
 
-Who Scout is lives apart from what Scout can do: the **soul** (below) is Scout's character, and the
-role is the tools, the model tier and the mechanics of how Tagalong works.
+Who Scout is lives apart from what Scout values and what Scout can do: the **constitution** (below)
+is the values and the Never list, the **soul** is Scout's character, and the role is the tools, the
+model tier and the mechanics of how Tagalong works.
+
+### The constitution
+
+`packages/core/constitution.md` holds the values in their order and the Never list: plain
+Markdown, no header, exactly `## Values` then `## Never`, each with something under it. It names
+no character, so it applies to any soul. The generator compiles it into `CONSTITUTION` in
+`library.generated.ts` and fails on a missing, extra, empty or misordered part. It ships inside
+the bundle, so the mind can read it only as its system prompt and can never edit it: the Self and
+sleep write only their own pages. It comes first in every mind's system prompt.
+
+Most Never lines are held by code too: Scout has no click or type tool, every card needs a click,
+on-screen text and notes ride in data fences, and blind spots and secret hiding happen before
+anything reaches the model. So editing the wording cannot remove a guarantee. The full map of
+each line to the code that holds it is in [the mind](mind.md#constitution).
 
 ### The soul file
 
-`packages/core/soul/scout.md` is Scout's soul: plain Markdown, no header, exactly three parts in
-this order, each with something under it:
-
-| Heading          | What it holds                      | Edit it to                                           |
-| ---------------- | ---------------------------------- | ---------------------------------------------------- |
-| `## Character`   | How Scout is and sounds            | change Scout's personality                           |
-| `## Cares about` | What Scout values, as bullets      | change Scout's priorities                            |
-| `## Never`       | Lines Scout doesn't cross, bullets | change the wording (the guarantees are also in code) |
-
-The safety lines in Never are enforced by code too: Scout has no click or type tool, every card
-needs a click, and blind spots and secret hiding happen before anything reaches the model. So
-editing the wording cannot remove a guarantee.
+`packages/core/soul/scout.md` is Scout's soul: plain Markdown, no header, exactly one part,
+`## Character`: how Scout is and sounds. Edit it to change Scout's personality.
 
 The same generator compiles every `soul/*.md` into `SOUL_LIBRARY` in `library.generated.ts`,
-keyed by file name, and fails on a missing, extra, empty or misordered part. `ACTIVE_SOUL` in
+keyed by file name, and fails on a missing, extra or empty part. `ACTIVE_SOUL` in
 `packages/core/src/roles/index.ts` (`'scout'`) picks the soul and `soul()` returns its text.
 
-Every mind speaks from the same soul. A turn's system prompt is the soul, the role's body and their
-name. Every other mind's is `modeSystem(block)`: the soul, then that mode's own block. The modes
-are checking in (`## Checking in`), tidying memory (`DIGEST_INSTRUCTIONS`) and summarising
+Every mind speaks from the same constitution and soul. A turn's system prompt is the
+constitution, the soul, the role's body and their name. Every other mind's is
+`modeSystem(block)`: the constitution, the soul, then that mode's own block. The modes are
+checking in (`## Checking in`), sleeping, tidying memory (`DIGEST_INSTRUCTIONS`) and summarising
 (`## Summarising`). So what Scout says, keeps and judges all comes from one self. A watch's yes/no
 check is the exception: a frequent matcher is plumbing, not speech, so it gets a fixed instruction
-and no soul.
+and neither the constitution nor the soul.
 
 To re-character Scout, edit `soul/scout.md` and regenerate. For a second character, add
 `soul/<id>.md` and change `ACTIVE_SOUL`; there is no setting or picker until a second soul ships.
@@ -138,10 +144,11 @@ error `-32602`.
 
 A pet's role sets two things on every turn:
 
-- **Its instructions.** The system prompt is the soul, then the role's `instructions`, then
-  `Their name is <name>.` when the person gave one. Nothing else, so it is the same on every turn
-  and providers can cache it. Recalled memories and the Now facts ride on the person's message
-  instead (see `docs/architecture.md`, "The prompt").
+- **Its instructions.** The system prompt is the constitution, the soul, then the role's
+  `instructions`, then `Their name is <name>.` when the person gave one. Nothing else, so it is the
+  same on every turn and providers can cache it. The screen context, Scout's notes, recalled
+  memories and the Now facts ride on the person's message instead (see `docs/architecture.md`,
+  "The prompt").
 - **Its tools.** `toolsFor` gives the pet exactly the tools its role lists.
 
 A pet whose `roleId` is not in the library works as the companion, for both.
@@ -235,7 +242,7 @@ routine's own turn).
 - **Results are facts.** A tool result says what happened ("No connected host can take a
   screenshot.", "The brief is on a card; it starts when they press Send."), never what to say: no
   "Tell the user…" or "Say…". The model decides if and what to tell them; each rule (cards need a
-  click, keys only in Settings) is said once, in the soul or the companion's mechanics. Tests
+  click, keys only in Settings) is said once, in the constitution or the companion's mechanics. Tests
   check this with `directivesIn` (`tools/test-support.ts`).
 - **Connected apps.** An app tool is `read` when its server marks it read-only and `write`
   otherwise, unknown included. A write asks the person first with a confirm card and runs only on
