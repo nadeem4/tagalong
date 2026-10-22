@@ -18,7 +18,7 @@ import type { CheckInEpisode } from '../memory/experience';
 import type { Arrival } from './arrivals';
 import type { PerceptionHost } from '../perception';
 import type { Memory } from '../memory/memories';
-import { soul } from '../roles';
+import { CONSTITUTION, soul } from '../roles';
 import { SETTLE_MS } from '../keep-an-eye/lookout';
 import { BREAK_MS, STRETCH_MS } from './active-time';
 import { CHECK_IN_DAILY_CAP, COOLDOWN_MS, CheckIn, NOT_NOW_MS } from './check-in';
@@ -361,7 +361,7 @@ describe('CheckIn: what the mind is given', () => {
     t.clock.t += COOLDOWN_MS;
     await t.stretch();
     expect(t.mind.requests).toHaveLength(3);
-    const system = `${soul()}\n\n${CHECK_IN_INSTRUCTIONS}`;
+    const system = `${CONSTITUTION}\n\n${soul()}\n\n${CHECK_IN_INSTRUCTIONS}`;
     for (const request of t.mind.requests) expect(request.system).toBe(system);
   });
 

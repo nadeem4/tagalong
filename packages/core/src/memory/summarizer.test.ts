@@ -11,7 +11,7 @@ import { ConversationStore } from './store';
 import { SettingsStore } from '../settings/settings';
 import { BrainError, FakeBrainProvider } from '../providers';
 import type { BrainProvider, BrainRequest } from '../providers';
-import { soul } from '../roles';
+import { CONSTITUTION, soul } from '../roles';
 import {
   SUMMARY_INSTRUCTIONS,
   SUMMARY_KEEP_RECENT,
@@ -117,7 +117,9 @@ describe('Summarizer', () => {
       scout,
     );
 
-    expect(fake.requests[0]?.system).toBe(`${soul()}\n\n${SUMMARY_INSTRUCTIONS}`);
+    expect(fake.requests[0]?.system).toBe(
+      `${CONSTITUTION}\n\n${soul()}\n\n${SUMMARY_INSTRUCTIONS}`,
+    );
     expect(SUMMARY_INSTRUCTIONS).not.toMatch(/an assistant/);
   });
 

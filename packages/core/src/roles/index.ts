@@ -1,22 +1,26 @@
 /**
- * The role and soul libraries and their helpers. Contains `getRole`, `roleFor` (falls back
- * to the companion), `ACTIVE_SOUL`, `soul()` (the soul the prompt starts with), `modeSystem`
- * (the soul plus a mode's block, for the minds that are not a turn) and
- * `recommendedModel` (a role's tier mapped to a model on one provider).
+ * The role and soul libraries, the constitution and their helpers. Contains `getRole`,
+ * `roleFor` (falls back to the companion), `CONSTITUTION` (the values and the Never list
+ * every mind's prompt starts with), `ACTIVE_SOUL`, `soul()` (the character that follows it),
+ * `modeSystem` (the constitution, the soul and a mode's block, for the minds that are not a
+ * turn) and `recommendedModel` (a role's tier mapped to a model on one provider).
  * Used by the prompt assembler, the tool registry, the key check, the engine and the
  * desktop's Welcome.
  */
 import type { Role } from '@tagalong/protocol';
-import { ROLE_LIBRARY, SOUL_LIBRARY } from './library.generated';
+import { CONSTITUTION, ROLE_LIBRARY, SOUL_LIBRARY } from './library.generated';
 import { MODEL_TIERS } from './tiers';
 
+/** The values in their order and the Never list, from constitution.md. Read-only to the mind. */
+export { CONSTITUTION };
+
 /**
- * The soul Scout speaks with: who Scout is, apart from what Scout can do. To re-character
+ * The soul Scout speaks with: who Scout is, apart from its values and what it can do. To re-character
  * Scout, edit soul/scout.md; for a second character, add soul/<id>.md and change this.
  */
 export const ACTIVE_SOUL = 'scout';
 
-/** The active soul's text: Character, Cares about and Never, as written in its file. */
+/** The active soul's text: its Character, as written in its file. */
 export function soul(): string {
   const text = SOUL_LIBRARY[ACTIVE_SOUL];
   if (text === undefined) throw new Error(`the soul library has no "${ACTIVE_SOUL}"`);
@@ -25,11 +29,12 @@ export function soul(): string {
 
 /**
  * The system prompt for every mind that is not a turn but speaks or judges as Scout (checking
- * in, tidying memory, summarising): the same soul a turn starts with, then the mode's own
- * block. One identity in every mode. A watch's yes/no check is plumbing and gets no soul.
+ * in, sleeping, tidying memory, summarising): the constitution first, then the same soul a
+ * turn has, then the mode's own block. One identity and one set of values in every mode. A
+ * watch's yes/no check is plumbing and gets neither the constitution nor the soul.
  */
 export function modeSystem(block: string): string {
-  return `${soul()}\n\n${block}`;
+  return `${CONSTITUTION}\n\n${soul()}\n\n${block}`;
 }
 
 /** The role with this id, or undefined when there is none. */
