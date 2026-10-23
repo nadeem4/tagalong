@@ -67,7 +67,7 @@ desktop app and the Chrome extension run on it. It holds:
   `packages/protocol` (zod schemas).
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart LR
   desktop["Desktop app (Electron)"] -->|"JSON-RPC over ws://127.0.0.1"| engine["Engine (packages/core)"]
   extension["Chrome extension"] -->|"JSON-RPC over ws://127.0.0.1"| engine
@@ -572,9 +572,9 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 
 # For developers
 
+- [Engineering docs](docs/README.md): the index of every subsystem doc, with a reading order.
 - [Developer guide](docs/development.md): build, run, test and package from source.
-- [Architecture](docs/architecture.md): how the engine and its hosts fit together today.
+- [Architecture](docs/architecture.md): how the engine and its hosts fit together.
 - [Feature test guide](docs/testing/feature-test-guide.md): manual tests for this build.
-- [Concepts](docs/concepts/): how Scout remembers, and its role and tools.
 - [Product](PRODUCT.md) and [design system](DESIGN.md).
 - [Privacy in detail](docs/privacy.md): exactly what is read, when, and what never is.
