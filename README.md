@@ -244,12 +244,13 @@ Kokoro, made on this computer: the first time Scout speaks it downloads the voic
 92 MB) and uses the Windows voice until that is done. Turn it off, pick a voice, preview it or
 change the speed in **Home → Settings → Voice**.
 
-**Talk to Scout.** Hold `Ctrl+Shift+Alt+Space` (or click the mic in the bubble), say your
-question and let go (or click again). The bubble shows your words as you talk, then what it
+**Talk to Scout.** Hold `Right Ctrl` on its own (or click the mic in the bubble), say
+your question and let go (or click again). Press another key while holding it (Right Ctrl+C, say)
+and nothing is sent: you meant a shortcut. The bubble shows your words as you talk, then what it
 heard, and Scout answers out loud
 the way a person talks: short sentences, one question back at most, details left in the bubble.
 It starts speaking on the first sentence rather than waiting for the whole answer. Talking while
-Scout speaks cuts it off. When it is done the bubble says "Hold Ctrl+Shift+Alt+Space to reply".
+Scout speaks cuts it off. When it is done the bubble says "Hold Right Ctrl to reply".
 The microphone opens on that key or the mic button, or all the time only if you switch Always
 listening on in the bubble (then start with "Scout"; "Scout, stop" turns it off; it pauses while a
 call or a full-screen window is in front, and while the pets are hidden). Your speech is turned into text on this computer, by
@@ -301,15 +302,15 @@ removed.
 
 ## Hotkeys
 
-| Key                           | What it does                                                                           |
-| ----------------------------- | -------------------------------------------------------------------------------------- |
-| `Ctrl+Shift+Space`            | **Ask.** Opens the bubble with the text you have selected and the active window's name |
-| `Ctrl+Shift+Alt+P`            | **Pause sight.** Nothing is read until you press it again (also in the tray)           |
-| `Ctrl+Shift+Alt+M`            | **Stop speaking.** Scout stops talking at once and drops what it was about to say      |
-| `Ctrl+Shift+Alt+Space` (hold) | **Talk to Scout.** Listens while held; let go and Scout answers out loud               |
-| `Alt+Shift+Space`             | In Chrome, with the extension: opens the side panel with your selection                |
+| Key                        | What it does                                                                           |
+| -------------------------- | -------------------------------------------------------------------------------------- |
+| `Ctrl+Shift+Space`         | **Ask.** Opens the bubble with the text you have selected and the active window's name |
+| `Ctrl+Shift+Alt+P`         | **Pause sight.** Nothing is read until you press it again (also in the tray)           |
+| `Ctrl+Shift+Alt+M`         | **Stop speaking.** Scout stops talking at once and drops what it was about to say      |
+| `Right Ctrl` (hold, alone) | **Talk to Scout.** Listens while held; let go and Scout answers out loud               |
+| `Alt+Shift+Space`          | In Chrome, with the extension: opens the side panel with your selection                |
 
-Every key can be changed in **Home → Settings → Shortcuts** (the talk key under **Voice**), and the
+Every key can be changed in **Home → Settings → Shortcuts** (the talk key, one key held alone, under **Voice**), and the
 change works at once.
 
 ## Home: one window for everything

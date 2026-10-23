@@ -341,12 +341,12 @@ selection and the active window and opens the bubble beside it, Escape or focus 
 bubble (unless a turn is still streaming), and the tray menu opens Home (**Open Tagalong**), pauses
 sight, shows or hides Scout, and quits.
 
-| Hotkey                        | What rides along                                   | Roughly what it costs |
-| ----------------------------- | -------------------------------------------------- | --------------------- |
-| `Ctrl+Shift+Space`            | Selection and the active window                    | text only             |
-| `Ctrl+Shift+Alt+P`            | Nothing — turns all sight off, and on again        | nothing               |
-| `Ctrl+Shift+Alt+M`            | Nothing — Scout stops speaking                     | nothing               |
-| `Ctrl+Shift+Alt+Space` (hold) | The active window, and the spoken question as text | text only             |
+| Hotkey                     | What rides along                                   | Roughly what it costs |
+| -------------------------- | -------------------------------------------------- | --------------------- |
+| `Ctrl+Shift+Space`         | Selection and the active window                    | text only             |
+| `Ctrl+Shift+Alt+P`         | Nothing — turns all sight off, and on again        | nothing               |
+| `Ctrl+Shift+Alt+M`         | Nothing — Scout stops speaking                     | nothing               |
+| `Right Ctrl` (hold, alone) | The active window, and the spoken question as text | text only             |
 
 The ask key exists for the one thing only a key can do: read the selection and the window you are on
 before the bubble takes the focus. A click on Scout captures nothing, because it has just put
