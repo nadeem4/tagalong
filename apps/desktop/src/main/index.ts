@@ -27,6 +27,8 @@ import {
   PetRemarkParams,
   RoutineResultParams,
   SCOUT_ID,
+  TALK_KEY_LABELS,
+  TALK_KEY_RIGHT_CTRL,
 } from '@tagalong/protocol';
 import type {
   PerceptionTarget,
@@ -84,10 +86,11 @@ import type { EngineHost } from './engine-host';
 import {
   DEFAULT_PAUSE_SIGHT_HOTKEY,
   DEFAULT_STOP_VOICE_HOTKEY,
-  DEFAULT_TALK_HOTKEY,
   HotkeyManager,
   describeHotkeyProblems,
 } from './hotkeys';
+import type { HotkeyOutcome } from './hotkeys';
+import { TalkKeyWatch, loadKeyHook, startTalkKey } from './talk-key';
 import { createPlatform } from './platform/index';
 import { gateSight } from './platform/sight-gate';
 import { SightPause } from './sight-pause';
@@ -157,6 +160,10 @@ interface Desktop {
   activeTurns: Set<string>;
   hotkeys: HotkeyManager;
   hotkeyError: string | null;
+  /** The talk key, watched through the key hook: press, release and cancel. */
+  talkKey: TalkKeyWatch;
+  /** Why the key hook could not start, or null while it watches the talk key. */
+  talkKeyError: string | null;
   /** Whether the user has sight turned off. Read by the platform gate on every read. */
   sightPause: SightPause;
   /** The last few minutes of the screen, in memory, opt-in. */
@@ -223,9 +230,13 @@ app.on('window-all-closed', () => {});
 /** Set once quit begins, so a closing window never starts anything new on the way out. */
 let quitting = false;
 
+/** Stops the key hook that watches the talk key; nothing until it has started. */
+let stopTalkKey: () => void = () => {};
+
 app.on('before-quit', () => {
   quitting = true;
   desktop?.hotkeys.dispose();
+  stopTalkKey();
   desktop?.voiceWorker.stop();
   stopKeepAnEye();
   stopListeningGuard();
@@ -338,9 +349,14 @@ async function start(): Promise<void> {
       onAsk: () => void openPanelWithContext(),
       onPauseSight: () => toggleSightPause(),
       onStopVoice: () => stopVoice(),
-      onTalk: () => talkPressed(),
     }),
     hotkeyError: null,
+    talkKey: new TalkKeyWatch({
+      onPress: () => talkPressed(),
+      onRelease: () => toPanel(IPC.talkReleaseEvent),
+      onCancel: () => toPanel(IPC.talkCancelEvent),
+    }),
+    talkKeyError: null,
     sightPause,
     rolling,
     perceptionMemory,
@@ -486,6 +502,9 @@ async function start(): Promise<void> {
   // with the settings file as the only way back. The manager binds each key
   // independently, so the others are already live; the failure is surfaced in the panel
   // and in Settings, where there is something to do about it.
+  const talkKey = await startTalkKey(loadKeyHook, desktop.talkKey);
+  stopTalkKey = talkKey.stop;
+  desktop.talkKeyError = talkKey.error;
   applyHotkeys(settings);
 
   // A fresh install starts in Welcome: the agents found here, how Scout thinks, one key.
@@ -657,8 +676,8 @@ async function greetOnLaunch(host: EngineHost): Promise<void> {
 }
 
 /**
- * Binds the four hotkeys (ask, pause sight, stop voice, talk) to what settings say, and
- * reports what was refused.
+ * Binds the three hotkeys (ask, pause sight, stop voice) to what settings say, points the
+ * key hook at the talk key, and reports what was refused, the talk key included.
  *
  * Called again on every settings save, which is what makes a rebind take effect without
  * a restart: the manager releases only the accelerator that changed.
@@ -669,10 +688,20 @@ function applyHotkeys(settings: Settings): string | null {
     ask: settings.hotkeys.ask,
     pauseSight: settings.hotkeys.pauseSight ?? DEFAULT_PAUSE_SIGHT_HOTKEY,
     stopVoice: settings.hotkeys.stopVoice ?? DEFAULT_STOP_VOICE_HOTKEY,
-    talk: settings.hotkeys.talk ?? DEFAULT_TALK_HOTKEY,
   });
+  const talk = settings.hotkeys.talk ?? TALK_KEY_RIGHT_CTRL;
+  desktop.talkKey.setKey(talk);
+  const talkOutcome: HotkeyOutcome =
+    desktop.talkKeyError === null
+      ? { accelerator: TALK_KEY_LABELS[talk], action: 'talk', registered: true }
+      : {
+          accelerator: TALK_KEY_LABELS[talk],
+          action: 'talk',
+          registered: false,
+          error: desktop.talkKeyError,
+        };
 
-  desktop.hotkeyError = describeHotkeyProblems(outcomes);
+  desktop.hotkeyError = describeHotkeyProblems([...outcomes, talkOutcome]);
   if (desktop.hotkeyError !== null) console.error(`[main] ${desktop.hotkeyError}`);
 
   // Broadcast rather than wait for the next getHostView. The panel may already be open,
@@ -684,11 +713,18 @@ function applyHotkeys(settings: Settings): string | null {
   return desktop.hotkeyError;
 }
 
+/** Sends one talk event to the panel, if it is there. */
+function toPanel(channel: string): void {
+  const panel = desktop?.panel;
+  if (panel != null && !panel.isDestroyed()) panel.webContents.send(channel);
+}
+
 /**
- * The talk key, on every press, repeats included: the bubble comes up with the keyboard, so
- * it sees the key come up, and the panel tells a held key from a fresh press. The
- * microphone only ever opens in the panel, on this key or its mic button. While Welcome is
- * open the key brings Welcome forward instead: Welcome may be listening, and one mic is enough.
+ * The talk key went down. The bubble comes up without taking the keyboard: the release comes
+ * from the key hook, not the bubble, and a bubble that took the focus would swallow the
+ * shortcut the person meant if the press turns out to be Right Ctrl+C. The microphone only
+ * ever opens in the panel, on this key or its mic button. While Welcome is open the key brings
+ * Welcome forward instead: Welcome may be listening, and one mic is enough.
  */
 function talkPressed(): void {
   if (desktop === null) return;
@@ -698,9 +734,9 @@ function talkPressed(): void {
   }
   if (desktop.panel === null || desktop.avatar === null) return;
   const { panel, avatar } = desktop;
-  if (!panel.isVisible() || !panel.isFocused()) {
+  if (!panel.isVisible()) {
     avatar.show();
-    showPanelBeside(panel, avatar);
+    showPanelQuietly(panel, avatar);
   }
   panel.webContents.send(IPC.talkEvent, Date.now());
 }

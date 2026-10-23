@@ -7,6 +7,9 @@ import {
   MAX_USER_NAME_CHARS,
   SETTINGS_DEFAULTS,
   Settings,
+  TALK_KEY_LABELS,
+  TALK_KEY_RIGHT_CTRL,
+  TALK_KEYS,
   SettingsPatch,
   SettingsProposedParams,
   WELCOME_STEPS,
@@ -56,7 +59,7 @@ describe('Settings', () => {
       ask: 'CommandOrControl+Shift+Space',
       pauseSight: 'CommandOrControl+Shift+Alt+P',
       stopVoice: 'CommandOrControl+Shift+Alt+M',
-      talk: 'CommandOrControl+Shift+Alt+Space',
+      talk: 'RightControl',
     });
     expect(s.avatar).toEqual({ x: null, y: null });
   });
@@ -479,10 +482,36 @@ describe('Settings.hotkeys.stopVoice', () => {
 });
 
 describe('Settings.hotkeys.talk', () => {
-  it('defaults to a key of its own, apart from the ask key', () => {
+  it('defaults to Right Ctrl held alone, apart from the ask key', () => {
     const { hotkeys } = Settings.parse({});
-    expect(hotkeys.talk).toBe('CommandOrControl+Shift+Alt+Space');
+    expect(hotkeys.talk).toBe(TALK_KEY_RIGHT_CTRL);
+    expect(TALK_KEY_RIGHT_CTRL).toBe('RightControl');
     expect(hotkeys.talk).not.toBe(hotkeys.ask);
+  });
+
+  it('moves any saved accelerator, the old default or a custom combo, to Right Ctrl', () => {
+    for (const talk of ['CommandOrControl+Shift+Alt+Space', 'Alt+T']) {
+      expect(Settings.parse({ hotkeys: { ask: 'A', talk } }).hotkeys).toEqual({
+        ask: 'A',
+        talk: 'RightControl',
+      });
+    }
+  });
+
+  it('keeps a single talk key the person picked', () => {
+    expect(TALK_KEYS).toContain('RightShift');
+    expect(Settings.parse({ hotkeys: { ask: 'A', talk: 'RightShift' } }).hotkeys.talk).toBe(
+      'RightShift',
+    );
+  });
+
+  it('names every talk key as a person reads it', () => {
+    expect(TALK_KEY_LABELS.RightControl).toBe('Right Ctrl');
+    for (const key of TALK_KEYS) expect(TALK_KEY_LABELS[key]).toBeTruthy();
+  });
+
+  it('refuses a patch that sets the talk key to a combo', () => {
+    expect(SettingsPatch.safeParse({ hotkeys: { ask: 'A', talk: 'Alt+T' } }).success).toBe(false);
   });
 
   it('is optional, so a settings file from before it still parses', () => {

@@ -120,6 +120,8 @@ export const IPC = {
   speak: 'tagalong:voice:speak',
   stopVoiceEvent: 'tagalong:voice:stop',
   talkEvent: 'tagalong:voice:talk',
+  talkReleaseEvent: 'tagalong:voice:talk-release',
+  talkCancelEvent: 'tagalong:voice:talk-cancel',
   earsListen: 'tagalong:voice:ears-listen',
   micFrame: 'tagalong:voice:mic-frame',
   earsStop: 'tagalong:voice:ears-stop',
@@ -401,8 +403,12 @@ export interface TagalongHostApi {
   speak(text: string, preview?: SpeakPreview): Promise<SpeakResult>;
   /** Fires when the stop key is pressed: Scout stops speaking at once. */
   onStopVoice(handler: () => void): () => void;
-  /** Fires on every press of the talk key, repeats included, with when it fired. */
+  /** Fires when the talk key goes down (once per hold), with when it fired. */
   onTalk(handler: (at: number) => void): () => void;
+  /** Fires when the talk key comes up: the question is asked. Seen in main, so focus never matters. */
+  onTalkRelease(handler: () => void): () => void;
+  /** Fires when another key went down while the talk key was held: the mic closes, nothing is sent. */
+  onTalkCancel(handler: () => void): () => void;
   /** Listening starts in the voice process; a held question first notes the window you are on. */
   earsListen(mode: ListenMode): Promise<void>;
   /** One 16 kHz mono frame from the microphone, for the ears. Never kept. */

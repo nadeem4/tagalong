@@ -28,7 +28,7 @@ import './app.css';
 import '../../shared/ipc';
 import type { GreetLine } from '../../shared/ipc';
 import { prepareLine } from './voice-player';
-import { DEFAULT_TALK_KEY, panelSettings, readable } from './panel-settings';
+import { DEFAULT_TALK_KEY, panelSettings } from './panel-settings';
 import type { PanelSettings } from './panel-settings';
 import { useTalk } from './talk';
 import { installVoiceSeam } from './voice-seam';
@@ -110,9 +110,8 @@ function Panel() {
       ),
   );
   // Talk to Scout: the talk key held, or the mic button. Talking cuts Scout off at once.
-  const [talkKey, setTalkKey] = useState(readable(DEFAULT_TALK_KEY, 'win32'));
+  const [talkKey, setTalkKey] = useState(DEFAULT_TALK_KEY);
   const [microphoneId, setMicrophoneId] = useState<string | undefined>(undefined);
-  const platform = useRef('win32');
   // Seeing: off is sight paused, the same switch as the pause key and the tray.
   const [seeing, setSeeing] = useState(true);
   const [bridge] = useState(bubbleBridge);
@@ -293,18 +292,14 @@ function Panel() {
         const preferred = pets[0];
         setPetId(preferred?.id ?? null);
         if (preferred !== undefined) setPetName(preferred.name);
-        platform.current = view.platform;
-        apply(panelSettings(view.settings, view.platform));
+        apply(panelSettings(view.settings));
       })
       .catch((error: unknown) => console.error('could not list pets', error));
   }, []);
 
   // A save in Settings or Home reaches an open panel at once: keys, microphone, name.
   useEffect(
-    () =>
-      window.tagalongHost.onSettingsChanged((settings) =>
-        apply(panelSettings(settings, platform.current)),
-      ),
+    () => window.tagalongHost.onSettingsChanged((settings) => apply(panelSettings(settings))),
     [],
   );
 

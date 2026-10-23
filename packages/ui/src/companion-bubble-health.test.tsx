@@ -70,7 +70,7 @@ describe('CompanionBubble, the health check', () => {
         return () => undefined;
       },
       note: null,
-      keyLabel: 'Ctrl+Shift+Alt+Space',
+      keyLabel: 'Right Ctrl',
       onMic: vi.fn(),
     };
     const fake = createFakeHostBridge();

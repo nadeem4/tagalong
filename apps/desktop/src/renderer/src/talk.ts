@@ -44,7 +44,8 @@ function mark(id: 'mic-busy' | 'mic-failed' | 'say-name', on: boolean): void {
 }
 
 /**
- * Talk to Scout in the panel: the talk key (held) or the mic button opens the microphone,
+ * Talk to Scout in the panel: the talk key (held; main sees it go down and up) or the mic
+ * button opens the microphone,
  * its frames stream to the ears in the voice process, the words heard so far show as they
  * come, and letting go hands the question to the bubble. With Always listening switched on
  * (read at mount, so a launch with it on listens from the start) the microphone stays open
@@ -260,16 +261,26 @@ export function useTalk(options: TalkOptions): {
   // The system voice is not echo-cancelled: the ears stay deaf while it speaks.
   useEffect(() => onSystemVoice((speaking) => controller.made.setDeaf(speaking)), [controller]);
 
-  // Every press of the talk key, repeats included; PushToTalk tells them apart.
+  // The talk key went down (main's key hook sends it once per hold).
   useEffect(() => window.tagalongHost.onTalk((at) => control.act(ptt.press(at))), [control, ptt]);
 
-  // The bubble has the keyboard while the key is held: the first key up means "let go". Every
-  // key up goes to PushToTalk, listening or not: it also clears a hold that a failure ended.
-  useEffect(() => {
-    const up = (): void => control.act(ptt.release());
-    window.addEventListener('keyup', up);
-    return () => window.removeEventListener('keyup', up);
-  }, [control, ptt]);
+  // The talk key came up, seen in main, so it arrives whichever window has the keyboard. It
+  // goes to PushToTalk listening or not: it also clears a hold that a failure ended.
+  useEffect(
+    () => window.tagalongHost.onTalkRelease(() => control.act(ptt.release())),
+    [control, ptt],
+  );
+
+  // Another key went down while the talk key was held: a shortcut, so the mic closes and
+  // nothing is sent. The hold ends first, so the next press starts fresh.
+  useEffect(
+    () =>
+      window.tagalongHost.onTalkCancel(() => {
+        ptt.release();
+        control.cancel();
+      }),
+    [control, ptt],
+  );
 
   return {
     talk: {

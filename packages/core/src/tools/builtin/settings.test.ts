@@ -67,7 +67,7 @@ describe(CHANGE_SETTINGS, () => {
     await change(d, [
       { setting: 'voice.speed', value: 1.1 },
       { setting: 'voice.voice', value: 'bm_fable' },
-      { setting: 'hotkeys.talk', value: 'CommandOrControl+Shift+T' },
+      { setting: 'hotkeys.talk', value: 'RightShift' },
     ]);
     expect(d.emitted[0]!.patch.voice).toEqual({
       ...SETTINGS_DEFAULTS.voice,
@@ -78,8 +78,16 @@ describe(CHANGE_SETTINGS, () => {
     });
     expect(d.emitted[0]!.patch.hotkeys).toEqual({
       ...SETTINGS_DEFAULTS.hotkeys,
-      talk: 'CommandOrControl+Shift+T',
+      talk: 'RightShift',
     });
+  });
+
+  it('refuses a combo for the talk key: it is one key held alone', async () => {
+    const d = deps();
+    const refused = await change(d, [{ setting: 'hotkeys.talk', value: 'CommandOrControl+T' }]);
+    expect(refused.isError).toBe(true);
+    expect(refused.content).toContain('RightControl');
+    expect(d.emitted).toEqual([]);
   });
 
   it('refuses an unknown setting and providerBaseUrls with one fact, with no card', async () => {
@@ -311,7 +319,7 @@ describe('talkPatchProblem: main re-checks an applied card, never trusting the r
     });
     await change(d, [
       { setting: 'voice.speed', value: 0.85 },
-      { setting: 'hotkeys.talk', value: 'CommandOrControl+Shift+T' },
+      { setting: 'hotkeys.talk', value: 'RightShift' },
       { setting: 'listening.always', value: false },
       { setting: 'captureExclusions.add', value: 'Teams.exe' },
       { setting: 'sightLog.days', value: 3 },

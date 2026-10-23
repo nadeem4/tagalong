@@ -571,7 +571,7 @@ describe('CompanionBubble, talking to Scout', () => {
     state: 'idle' as const,
     onHeard: () => () => undefined,
     note: null,
-    keyLabel: 'Ctrl+Shift+Alt+Space',
+    keyLabel: 'Right Ctrl',
     onMic: vi.fn(),
     ...change,
   });
@@ -743,7 +743,7 @@ describe('CompanionBubble, talking to Scout', () => {
     await act(async () => undefined);
     expect(spokenLines).toEqual(['It checks shutdown.', 'It’s green.']);
     expect(onSay).not.toHaveBeenCalled();
-    expect(screen.getByText('Hold Ctrl+Shift+Alt+Space to reply')).toBeInTheDocument();
+    expect(screen.getByText('Hold Right Ctrl to reply')).toBeInTheDocument();
   });
 
   it('barge-in: talking while Scout answers stops that turn and says no more of it', async () => {
