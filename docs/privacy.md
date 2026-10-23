@@ -562,7 +562,7 @@ nothing is shown. Each of these calls goes to Scout's own model and carries, bes
 moment is about:
 
 - **what Scout recalls for that moment (your preferences, its newest memories, those matching the
-  window title or the finished ask, and up to two matching jobs of its own, at most 2,500
+  window title or the finished ask, and up to two matching jobs of its own, at most 2,000
   characters), your name, the time, and what experts are doing right now;**
 - **your last exchange with Scout**: your latest question and Scout's answer to it, at most 300
   characters of each;

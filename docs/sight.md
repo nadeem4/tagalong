@@ -436,8 +436,9 @@ Tool failures never throw out of a turn. `hostFailure` turns a host error into
 "sight is paused — <method> was refused. Press the pause hotkey again to resume." (JSON-RPC error
 `-32000` from `EngineClient`).
 
-The panel's `turn.toolResult.summary` is one line: the first 120 characters of text, or
-`N image(s)` for block content, so pixels never travel to the renderers.
+The panel's `turn.toolResult.summary` is one line: the text's first line cut to 120 characters, or
+`N image(s)` (`no content` when there is no image) for block content, so pixels never travel to the
+renderers.
 
 ### Pausing sight
 
@@ -578,16 +579,12 @@ sent and not conversations. `SightLog.list(limit, since, until)` also serves the
 The sight log and rolling memory are independent: the log is metadata on disk, rolling memory is
 pictures in RAM, and clearing one does not touch the other.
 
-### Episodes keep no screen text (D1)
+### Episodes keep no screen text
 
-The experience log (`memory/experience.ts`, see [mind.md](mind.md)) records each turn's tool steps.
-For any tool in `SCREEN_TOOLS` (`look_at_screen`, `get_selection`, `look_at_display`,
-`look_closer`, `list_windows`, `read_window_text`, `look_at_window`, `recall_screen`,
-`what_changed`, `search_history`), a non-empty result summary is replaced by
-`notKept(text)`: `[screen text, N characters, not kept]`. A check-in bundle rendered for the log
-(`renderBundle({ forLog: true })`, `check-in/bundle.ts`) replaces window text with the same marker
-and leaves out titles. Asks never take window titles or screen text by themselves either
-(migration 25 comment). Sleep learns from decisions and outcomes, not the screen.
+The experience log keeps `notKept(text)` (`[screen text, N characters, not kept]`) in place of any
+screen tool's result and of window text in a check-in bundle; the rules are in
+[mind.md](mind.md#the-experience-log). Asks never take window titles or screen text either (see
+[asks.md](asks.md#privacy-notes)). Sleep learns from decisions and outcomes, not the screen.
 
 Conversations store only the ask text, the snapshot and the final answer text. Tool results
 (window text, pictures from tools) are never written to `messages`.
@@ -784,7 +781,7 @@ sight, pointing and drops. Points that follow from this design:
 | Rolling memory: opt-in, 640 px every 5 s, skip on exclusion, clear on pause/off/quit, no `fs`                                                | `apps/desktop/src/main/awareness/rolling-memory.test.ts`, `frame-ring.test.ts`                                                                   |
 | Recall and diff, scratch ring expiry, refusal on exclusion                                                                                   | `awareness/perception-memory.test.ts`, `awareness/pixel-diff.test.ts`                                                                            |
 | Sight-log rows per method, no content, titles scrubbed or dropped                                                                            | `packages/core/src/perception/record-sight.test.ts`, `packages/core/src/memory/sight-log.test.ts`, `apps/desktop/src/main/ipc/sight-log.test.ts` |
-| D1 marker in episodes and check-in bundles                                                                                                   | `packages/core/src/memory/experience.test.ts`, `packages/core/src/check-in/bundle.test.ts`, `check-in.test.ts`                                   |
+| `notKept` marker in episodes and bundles                                                                                                     | `packages/core/src/memory/experience.test.ts`, `packages/core/src/check-in/bundle.test.ts`, `check-in.test.ts`                                   |
 | Screenshot retention                                                                                                                         | `packages/core/src/perception/retention.test.ts`                                                                                                 |
 | Image token estimate                                                                                                                         | `packages/ui/src/sight-bar.test.tsx`                                                                                                             |
 | Real downscaled PNG, sight pause and sight settings end to end                                                                               | `apps/desktop/e2e/smoke.spec.ts`                                                                                                                 |

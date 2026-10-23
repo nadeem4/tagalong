@@ -213,7 +213,7 @@ Table `asks`, migration 25, written only by `AskStore`:
 | `origin_turn_id`                          | The turn that asked, which is its episode's `ref`                                   |
 | `payload_json`                            | Only a hand-off card's brief without its screen context; set to `NULL` once settled |
 | `state`                                   | Default `waiting` (CHECK over the five states)                                      |
-| `answered_by`                             | `NULL`, `you` or `rule` (CHECK; nothing writes `rule` today)                        |
+| `answered_by`                             | `NULL`, `you` or `rule` (CHECK; no code path writes `rule`)                         |
 | `note`                                    | A code from `AskNote`                                                               |
 | `created_at`, `expires_at`, `answered_at` | ISO times                                                                           |
 

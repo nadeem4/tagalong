@@ -467,7 +467,7 @@ stateDiagram-v2
   the mic button still works, and nothing crashes. The hook stops on quit.
 - **Settings migration.** `withoutRetiredTalkKey`, in `packages/protocol/src/settings.ts`,
   preprocesses `hotkeys`. A `talk` value that is a string but not one of `TALK_KEYS`, such as an
-  old accelerator combo or the old default, loads as `RightControl`. A valid talk key is kept.
+  accelerator combo, loads as `RightControl`. A valid talk key is kept.
 
 The stop key (`hotkeys.stopVoice`, default `CommandOrControl+Shift+Alt+M`) is a normal global
 shortcut. It broadcasts `IPC.stopVoiceEvent`, and the panel calls `hush()` and `mouth.stop()`.
@@ -840,19 +840,10 @@ The ElevenLabs key is a secret (`elevenlabs.apiKey`), never a setting. See
 | Key hook will not load                                                               | One warning, and a `talk` hotkey problem shown in the panel and Settings. The mic button still works.                                                                                                                                                               |
 | A mic frame cannot reach the voice process                                           | It is logged, and the next frame still goes.                                                                                                                                                                                                                        |
 
-**Status marks** (`packages/protocol/src/status.ts`) are listed in display priority:
-
-| Mark               | Tag                                     | Set by                                                        |
-| ------------------ | --------------------------------------- | ------------------------------------------------------------- |
-| `ears-failed`      | "Can’t listen" (Fix it: voice)          | main, `forwardEars`                                           |
-| `mic-busy`         | "Mic busy" (Fix it: voice)              | the panel, `setStatusMark`                                    |
-| `mic-failed`       | "No mic" (Fix it: voice)                | the panel, `setStatusMark`                                    |
-| `ears-loading`     | "Ears NN%"                              | main, `forwardEars`, from `ears.status: loading` and progress |
-| `listening-paused` | "Not listening"                         | main, `markListening`                                         |
-| `say-name`         | "Say “Scout”" (8 s, once per panel run) | the panel, `onUnaddressed`                                    |
-| `listening-on`     | "Listening" (8 s)                       | main, `markListening`                                         |
-
-`ready` clears `ears-loading` and `ears-failed`. Progress of `1` clears `ears-loading`.
+**Status marks.** The voice marks are `ears-failed`, `mic-busy`, `mic-failed`, `ears-loading`,
+`listening-paused`, `say-name` and `listening-on` (`packages/protocol/src/status.ts`). Their order,
+words, holders and clearing rules are in [bubble.md](bubble.md#status-marks). `ready` clears
+`ears-loading` and `ears-failed`; progress of `1` clears `ears-loading`.
 
 ## Privacy notes
 

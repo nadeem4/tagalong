@@ -127,7 +127,7 @@ sequenceDiagram
    - Resolves the provider. A resolver that throws (no key, unknown id) becomes `turn.error`.
    - If the snapshot has pixels and `provider.capabilities.vision` is false, the pixels are
      dropped and `turn.warning { code: 'vision_unsupported' }` goes out. Every built-in provider
-     reports `vision: true`, so this path is for a future provider.
+     reports `vision: true`, so no built-in provider takes this path.
    - `recall(memory, petId, question + selection, { jobs: recentWork(), now })` picks the
      memories and recent work (see [memory.md](memory.md)).
    - `assemblePrompt` builds the request (next section).

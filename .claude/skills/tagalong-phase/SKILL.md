@@ -30,8 +30,10 @@ Fetch the phase page before starting the phase. Fetch the task rows before start
 1. Set the Notion task `Status` to `In progress`.
 2. **Write the failing test first.** No production code without a test that motivated it.
 3. Make it pass. Refactor.
-4. Update `README.md`, `docs/architecture.md`, and any doc the change invalidates. Docs are
-   part of done, not a follow-up.
+4. Update `README.md`, the subsystem doc in `docs/` (the index is `docs/README.md`;
+   `docs/architecture.md` for the processes, packages and the life of a turn), `docs/protocol.md`
+   ("How to add a method") for a new method, and any doc the change invalidates. Docs are part of
+   done, not a follow-up.
 5. Commit with a Conventional Commit message scoped to the package
    (`feat(core): add PromptAssembler`, `chore(repo): add eslint flat config`).
 6. Set the task `Status` to `Done` only when its `Acceptance` text is literally satisfied.

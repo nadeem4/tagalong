@@ -211,9 +211,10 @@ sequenceDiagram
   participant V as Voice process
   B->>M: IPC ask (text, spoken?)
   M->>E: ask {petId, input, snapshot, spoken}
-  E-->>M: {turnId}
+  E->>E: store question, gather Now
   E-->>M: turn.started
-  E->>E: store question, recall, assemble prompt
+  E-->>M: {turnId}
+  E->>E: recall, assemble prompt
   E->>P: complete(request, tools)
   P-->>E: text deltas
   E-->>M: turn.delta (repeated)
@@ -226,7 +227,7 @@ sequenceDiagram
   E-->>M: turn.completed
   M-->>B: IPC turnEvent (every notification)
   B->>M: IPC speak (line)
-  M->>V: synthesise (Kokoro) or ElevenLabs
+  M->>V: kokoro.speak (ElevenLabs is called from main)
   V-->>M: audio
   M-->>B: audio, played in the window
 ```
