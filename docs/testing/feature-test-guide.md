@@ -1,6 +1,6 @@
 # Tagalong feature test guide
 
-Step-by-step manual tests for what this build does, written so someone who did not build the
+Step-by-step manual tests for what the app does, written so someone who did not build the
 feature can run it and know whether it passed. Each step lists **Setup**, **Action** and
 **Expected**. A step passes only if everything under Expected is true.
 
@@ -28,11 +28,11 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [File this as a bug](#file-this-as-a-bug)
 - [The Chrome extension](#the-chrome-extension)
 - [Installer](#installer)
-- [Scout's mind](#scouts-mind-real-brain-fast-tier)
+- [Scout's mind](#scouts-mind-real-brain-balanced-tier)
 - [Log file](#log-file)
-- [Background jobs and the task board](#j-background-jobs-and-the-task-board-real-brain-fast-tier)
-- [Arrivals: finished work together](#arrivals-finished-work-together-real-brain-fast-tier)
-- [Not in this build](#not-in-this-build)
+- [Background jobs and the task board](#j-background-jobs-and-the-task-board-real-brain-balanced-tier)
+- [Arrivals: finished work together](#arrivals-finished-work-together-real-brain-balanced-tier)
+- [Not supported](#not-supported)
 
 ## Configuration
 
@@ -250,7 +250,7 @@ _Only on a data folder from a build before Nebius was removed._
 
 1. **Setup:** a `tagalong.db`, `settings.json` and `secrets.json` from a build where Scout thought
    on Token Factory (`providerId: 'nebius'`), with summaries on it too and some spend recorded.
-2. **Action:** launch this build, open Home, then ask Scout a question.
+2. **Action:** launch the app, open Home, then ask Scout a question.
 3. **Expected:** Scout thinks with **Your Claude sign-in** on Haiku and answers. Settings shows
    summaries on each pet's own brain. The Spend card still lists the old rows, as "Scout · nebius".
    `secrets.json` has no `nebius.apiKey` entry after the launch.
@@ -703,8 +703,7 @@ mind's.
 
 ## C. Check-ins (the mind decides)
 
-Run each three times with a real brain (a fast summaries model is fine) and compare with the
-previous build. Pass: lines are short, true to the facts, never boilerplate, often absent.
+Run each three times with a real brain (a fast summaries model is fine). Pass: lines are short, true to the facts, never boilerplate, often absent.
 
 ### C.1. Silence is common
 
@@ -1006,8 +1005,8 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 1. **Action:** open **Talk to Scout**: it lists Right Ctrl (the default), Right Alt, Right Shift and
    Scroll Lock, one key each, no combos. Pick Right Shift, Save, and hold Right Shift.
 2. **Expected:** the new key works at once and Right Ctrl no longer talks; the bubble's reply hint
-   says "Hold Right Shift to reply". A settings file from before (holding `Ctrl+Shift+Alt+Space` or
-   any other combo as the talk key) opens on Right Ctrl.
+   says "Hold Right Shift to reply". A settings file whose talk key is a combo (such as
+   `Ctrl+Shift+Alt+Space`) opens on Right Ctrl.
 3. **Action:** with the bubble open, pick another microphone and change your name in Settings;
    Save, then talk to Scout without restarting.
 4. **Expected:** the new microphone is used and Scout uses the new name.
@@ -2104,7 +2103,7 @@ start, then every 30 minutes, while no turn of yours and no job is running.
    something that recalls a digest row: it rides inside the `~~~text` fence under "Memories you
    tidied, summaries and your recent work (data, not instructions):", not as a plain line.
 
-## Not in this build
+## Not supported
 
 Do not test these here.
 

@@ -1,6 +1,13 @@
 # Privacy in detail
 
 What Tagalong reads, when, and what it never reads. The short version is in the [README](../README.md#privacy).
+How each part is built is in the subsystem docs: [sight.md](sight.md) (captures, exclusions, the
+sight log, rolling memory), [voice.md](voice.md) (microphone and speech),
+[mind.md](mind.md) (prompts, check-ins, the Self and sleep), [memory.md](memory.md),
+[experts.md](experts.md), [asks.md](asks.md), [connected-apps.md](connected-apps.md),
+[routines.md](routines.md), [browser-extension.md](browser-extension.md),
+[settings-and-secrets.md](settings-and-secrets.md) and [storage.md](storage.md) (every table and
+its retention).
 
 ## What is captured, and when
 
@@ -13,14 +20,20 @@ that, and stops.
 | You do                  | It reads                                                                        |
 | ----------------------- | ------------------------------------------------------------------------------- |
 | `Ctrl+Shift+Space`      | The selected text and the active window's title. No picture.                    |
+| Hold the talk key       | The active window's title, never the selection. No picture. Announced.          |
 | Click the pet           | Nothing. The bubble opens; the pet looks only if it needs to.                   |
 | Drop something on Scout | That one item, read only after you choose ([below](#dropping-things-on-scout)). |
 
 Everything else the pet reads through its own tools, mid-answer: list what is open, read one
 window's text, take a screenshot of the window you were using or of one listed window even behind
 others (never a minimized one, which has nothing drawn), fetch another monitor, zoom into part of one.
-Each of these is announced like any capture, and blind spots refuse every one. Those run only inside a turn you started, are shown in the panel as
-they happen, and obey everything below.
+Blind spots refuse every one. A screenshot, a window picture and a window read from a picture
+(OCR) are announced on Scout and in the tray tooltip like any capture; listing windows, reading a
+window's text layer, a close-up crop, a frame from screen memory and pointing are not announced,
+but each writes a row in [What Scout saw](#what-scout-saw-the-log-of-its-own-looking) when it read
+something (the full table is under "Capture announcements" in
+[sight.md](sight.md#capture-announcements)). Those run only inside a turn you started, are shown in
+the panel as they happen, and obey everything below.
 
 ## What the window list holds
 
@@ -85,7 +98,10 @@ The extension's public privacy policy, for the Chrome Web Store, is
   is told only the app's name (for example `chrome.exe`) and which rule blocked it, never the
   window or tab title, so the title stays out of the conversation and out of any expert's brief.
 
-- **Your own exclusions.** Add any app or window title in settings; they work the same way.
+- **Your own exclusions.** They work the same way. Settings has no editor for them: you add an app
+  or a window title by asking Scout ("never look at Signal"), which shows a settings card that
+  changes nothing until you click Apply. Chat can never remove one; removing an entry means
+  editing `captureExclusions` in `settings.json` by hand.
 - **Secrets that slip past.** A title rule only works while the title names the file (an editor
   shows `.env` only while that tab is open). So everything sent to a model — your question,
   selections, window text, tool results, memories — and every brief to an expert passes through
@@ -179,7 +195,8 @@ it.
 
 ## The rest
 
-- A visible indicator shows every capture.
+- A visible indicator shows every screenshot, window picture, OCR read and hotkey read; the other
+  reads are logged in What Scout saw.
 - Built-in blind spots and your own exclusion list block capture in password managers, secret
   files and other listed apps.
 - When Windows reports no foreground window at all — a locked session, a UAC prompt on the secure
@@ -227,8 +244,7 @@ it.
   expert running, finished since you last talked (and whether it finished, stopped or failed) or
   waiting for your Send, the expert's name and the first line of what it was asked, at most 100
   characters, through `hideSecrets`. An expert's answer is never in it. What Scout remembers
-  rides in the same message (it used to sit in the system prompt): the same notes, to the same
-  provider, nothing new. Nothing of this is stored by the block itself; it is rebuilt each turn
+  rides in the same message: the same notes, to the same provider, nothing new. Nothing of this is stored by the block itself; it is rebuilt each turn
   from what Tagalong already keeps on this computer.
 
 ## Connected apps: what goes to them
@@ -367,7 +383,7 @@ in the bubble.
 
 **Translating.** Scout translates with its own model: there is no translation service, so the text
 it read goes only to Scout's model, like any question about your screen, and reads are logged as
-they are today. A translation into English is spoken like any answer while **Scout talks** is on.
+any other read is. A translation into English is spoken like any answer while **Scout talks** is on.
 That goes to the chosen speech engine: it stays on this computer with Kokoro or the system
 voice, and goes to ElevenLabs when ElevenLabs is the chosen voice. A translation into any other
 language is shown in the bubble as a quoted block and never spoken, with ElevenLabs too; only the
@@ -375,7 +391,7 @@ English line before it ("It's in the bubble.") is. A target language you ask Sco
 preference, like anything else you ask it to remember.
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart LR
   B["Bubble line"] --> S["Shortened in the panel"]
   S --> M["Main process"]
@@ -393,7 +409,7 @@ flowchart LR
   checked like the listening models (see **Model files are checked** under "Talking to Scout" below).
 - **The system voice.** While the model downloads, or if it cannot load, the panel speaks through
   the operating system's own voice (a British male voice such as Microsoft George when installed).
-- **ElevenLabs (optional).** Used when picked under Settings → Voice → **Who speaks**, or when an older install already had a voice ID, and only with your own key and a voice ID you picked from your ElevenLabs
+- **ElevenLabs (optional).** Used when picked under Settings → Voice → **Who speaks**, or, while nothing is picked there, whenever an ElevenLabs voice ID is set, and only with your own key and a voice ID you picked from your ElevenLabs
   library, both under Settings → Advanced. Each spoken line is sent to ElevenLabs' Flash model and
   billed to your account, including every line of a reading aloud. The key is encrypted with the OS keychain like the others. If ElevenLabs
   fails, Scout uses Kokoro.
@@ -421,7 +437,7 @@ keys either. Pressing any other key while you hold the talk key (Right Ctrl+C, s
 microphone and sends nothing, because you meant a shortcut.
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart LR
   K["Talk key held, mic clicked, or Always listening on"] --> M["Mic (echo cancellation)"]
   M --> V["Voice process on this computer: VAD, Moonshine, Smart Turn"]
@@ -443,10 +459,10 @@ flowchart LR
   Hugging Face commit, never from a branch that can move, and must match a SHA-256 written into the
   app. A file that does not match is never kept: it is deleted and fetched once more. If the
   listening models are still wrong, the bubble says "The speech model download was damaged.
-  Check the connection."; if Kokoro's are, Scout keeps speaking in the system voice. The files on disk are checked again once each
+  Check the connection."; if Kokoro's are and Kokoro is the chosen voice, Scout keeps speaking in the system voice. The files on disk are checked again once each
   time the voice process starts. The model library is told never to fetch anything itself, so it
-  only reads files that were checked. Kokoro's voices come with the app's own packages. A copy an
-  older version downloaded is checked like any other and replaced if it does not match.
+  only reads files that were checked. Kokoro's voices come with the app's own packages. A copy
+  already on disk is checked like any other and replaced if it does not match.
 - **The audio never leaves the computer and is never stored.** It lives in memory until it has been
   turned into text, and is then dropped. Before you start to speak, only the last quarter of a
   second is held in memory (so the first syllable of a word is not cut off), each frame dropped as
@@ -546,7 +562,7 @@ nothing is shown. Each of these calls goes to Scout's own model and carries, bes
 moment is about:
 
 - **what Scout recalls for that moment (your preferences, its newest memories, those matching the
-  window title or the finished ask, and up to two matching jobs of its own, at most 2,500
+  window title or the finished ask, and up to two matching jobs of its own, at most 2,000
   characters), your name, the time, and what experts are doing right now;**
 - **your last exchange with Scout**: your latest question and Scout's answer to it, at most 300
   characters of each;
@@ -573,7 +589,7 @@ tracking at all: the window list is not even taken.
   `traceback`, `crashed`), Scout reads **that one window's text** (the last 4,000 characters) and
   sends it, with its app and title and the facts every check-in carries (above), in one short call
   that asks whether anything is worth saying. Most of the time the answer is nothing and nothing is
-  shown. The same reply may set Scout's face (a wince or a cheer); titles alone no longer do.
+  shown. The same reply may set Scout's face (a wince or a cheer); titles alone never do.
 - **Limits:** as for every check-in, above; never two looks at the same window (same window and
   same title). Pausing sight stops it too.
 - **Blind spots apply everywhere:** a window on the built-in list or your exclusion list is never
@@ -730,7 +746,9 @@ Off until you switch on **Remember the last few minutes of the screen** in Setti
 it is on:
 
 - Every five seconds the desktop takes a **640-pixel picture of each screen**, the **list of open
-  windows** (titles and positions, never their text) and which window was in front.
+  windows** (titles and positions, never their text) and which window was in front. Building that
+  list walks the accessibility tree of each window that is not blocked, only to count roughly how
+  many characters of text it holds; the count is kept with the frame, the text never is.
 - It keeps the last **ten minutes** by default (you choose one to thirty) and drops anything older.
 - It lives **in memory only**. Nothing is written to disk — not a file, not the database, not a
   cache — and the code that holds it imports no file APIs, which a test checks.

@@ -1,6 +1,6 @@
 # Developer guide
 
-How to build, run, test and package Tagalong from source, and the conventions the code follows. For how it works inside, see [architecture.md](architecture.md) and [concepts/](concepts/).
+How to build, run, test and package Tagalong from source, and the conventions the code follows. For how it works inside, start at [architecture.md](architecture.md); the [docs index](README.md) lists every subsystem doc.
 
 ## Repository layout
 
@@ -15,9 +15,13 @@ tagalong/
   eslint.config.js
   .github/workflows/ci.yml          # changes, build (Linux), e2e (Windows)
   docs/
-    architecture.md, development.md, privacy.md
-    concepts/                       # memory, roles and tools
-    testing/feature-test-guide.md   # manual tests for the current build
+    README.md                       # the index and reading order
+    architecture.md, protocol.md    # the whole system; the wire protocol
+    desktop.md, bubble.md, voice.md, browser-extension.md   # the hosts
+    sight.md, mind.md, memory.md, experts.md, asks.md, routines.md,
+    connected-apps.md               # the engine's subsystems
+    settings-and-secrets.md, storage.md, privacy.md, development.md
+    testing/feature-test-guide.md   # manual tests
     chrome-web-store/               # store listing kit and the extension's privacy policy
   packages/
     protocol/src/
@@ -30,8 +34,9 @@ tagalong/
       settings.ts                   # Settings, SettingsPatch, SETTINGS_DEFAULTS
       methods.ts                    # the method and notification catalog
       roles.ts                      # Role, ModelTier
-                                    # plus activity, awareness, blind-spots, connections, experts,
-                                    # limits and routines schemas
+                                    # plus activity, addressing, asks, awareness, blind-spots,
+                                    # connections, experience, experts, limits, memory, pick-up,
+                                    # routines, self, sight-log, status, usage and voice schemas
     core/roles/                     # companion.md, the one role: YAML header plus mechanics
     core/constitution.md            # values, their order, the Never list
     core/soul/                      # scout.md, Scout's soul: Character
@@ -39,32 +44,39 @@ tagalong/
     core/src/
       index.ts                      # the public facade hosts import
       engine.ts                     # Engine.boot: wires the parts together and listens
-      conversation/                 # ConversationRunner, prompt-assembler
+      conversation/                 # ConversationRunner, prompt-assembler, now.ts (the Now block)
       perception/                   # exclusions, retention, inventory, text layer, browser routing
       tools/                        # tool.ts (the Tool shape), registry.ts, builtin/ (the built-ins and connected-app tools)
       connections/                  # MCP client: manager, OAuth + loopback, approvals, catalog, Claude Code reader, fake server
-                                    # (Home's page: ui/src/home/connections-panel.tsx; the bubble's card: ui/src/connector-confirm.tsx)
-      memory/                       # db.ts (numbered migrations), store.ts (ConversationStore), recall.ts, digest.ts (the daily memory digest)
-      experts/                      # hand-offs, the Claude Code connector, the fake connector
+      memory/                       # db.ts (numbered migrations), store.ts (ConversationStore), recall.ts, digest.ts,
+                                    # activity, experience log, sight log, history search, summarizer
+      asks/                         # saved asks (Waiting on you)
+      experts/                      # hand-offs, the catalog, the Claude Code connector, the fake connector
       routines/                     # the scheduler, schedules and triggers, the routine store
-      jobs/                         # Scout's own background jobs (Jobs, JobStore), the machine reading, the task board
+      jobs/                         # Scout's own background jobs (Jobs, JobStore), the task board
       meetings/                     # Meeting prep's calendar feed: the .ics link, parsed with ical.js
-      check-in/                     # the check-in moment: gate, facts, the one call, reply parsing; Arrivals (finished work, together)
+      check-in/                     # the check-in moment: gate, facts, the one call, reply parsing; Arrivals
       keep-an-eye/                  # the lookout over window titles
+      pick-up/                      # pick up where you left off
+      self/                         # the Self (notes, proposals) and sleep
+      usage/                        # the meter, prices and the daily budget
       watch/, projects/, privacy/   # watches, the project finder, the blind spots
       pets/registry.ts              # PetRegistry, the default pet Scout
       roles/                        # library.generated.ts, getRole, roleFor, recommendedModel, tiers.ts
       providers/                    # brain.ts, claude-code-brain.ts, anthropic.ts, openai-compatible.ts,
-                                    # presets.ts, watch-models.ts, fake.ts, registry.ts, errors.ts
+                                    # presets.ts, watch-models.ts, guard.ts, key-resolver.ts, fake.ts,
+                                    # registry.ts, errors.ts
       server/                       # ws-server.ts (EngineServer), pairing.ts
       settings/settings.ts          # SettingsStore, SecretStore, InMemorySecretStore
     ui/src/
       index.ts, host-bridge.ts      # HostBridge contract and its React context
       dock-pet.tsx, companion-bubble.tsx, message-list.tsx, composer.tsx, sight-bar.tsx, chat-panel.tsx
-      handoff-card.tsx, connector-confirm.tsx, routine-card.tsx, answer.tsx
-      home/                         # Home: HomeView and its Experts, Routines, Connections, Activity pages
-      settings/settings-styles.ts   # the Settings sheet, used by Home's Settings page
-      voice/                        # push to talk, the speech queue, what is spoken aloud
+      handoff-card.tsx, connector-confirm.tsx, routine-card.tsx, settings-card.tsx, drop-card.tsx,
+      pick-up-card.tsx, health-card.tsx, status-mark.tsx, answer.tsx
+      home/                         # Home: HomeView and its pages (Experts, Routines, Connections, Activity,
+                                    # Waiting on you, What Scout saw, remembers and learned, How Scout decided, Spend)
+      settings/settings-styles.ts   # the Settings sheet's styles
+      voice/                        # push to talk, the listen controller, the speech queue, what is spoken aloud
       theme/                        # design tokens, BeanClip (a strip of Bean frames, moving or still)
       test-support/fake-host-bridge.ts
   apps/
@@ -74,22 +86,28 @@ tagalong/
       electron-builder.json         # installer config: NSIS (Windows), dmg, AppImage, deb
       scripts/ensure-electron.mjs   # fetches the Electron binary
       scripts/fetch-native.mjs      # fetches get-windows' prebuilt binding before packaging
-      e2e/                          # smoke, first-run, hotkey-recovery, listening (Always
-                                    # listening) and cards.spec.ts (the hand-off, connector
+      scripts/start-fresh.mjs       # runs the app on a new temp data folder
+      e2e/                          # smoke, first-run, launch-greeting, hotkey-recovery, listening
+                                    # (Always listening) and cards.spec.ts (the hand-off, connector
                                     # confirm and routine cards)
       e2e/fixtures/notes-mcp.mjs    # a tiny stdio MCP server with one write tool, for cards.spec.ts
       src/main/                     # index.ts, engine-host.ts, engine-client.ts, context.ts,
-                                    # hotkeys.ts, secret-store.ts, tray-icon.ts, tray-menu.ts,
-                                    # welcome.ts, claude-sign-in.ts, keep-an-eye.ts,
-                                    # routine-delivery.ts, links.ts, awareness/, ipc/,
+                                    # hotkeys.ts, talk-key.ts, always-listening.ts, secret-store.ts,
+                                    # tray-icon.ts, tray-menu.ts, welcome.ts, launch.ts,
+                                    # claude-sign-in.ts, keep-an-eye.ts, sight-pause.ts, drop.ts,
+                                    # routine-delivery.ts, log-file.ts, links.ts, awareness/, ipc/,
                                     # platform/, voice/, windows/
+      src/main/voice/               # voice.ts (the mouths), kokoro.ts, elevenlabs.ts, ears/ (models, LocalEars)
       src/main/voice/worker/        # the voice process: client.ts (VoiceWorker), messages.ts,
-                                    # handler.ts, worker-local-voice.ts, main.ts (its bootstrap)
-      src/main/platform/            # capture, downscale, composite, canvas, label, displays,
-                                    # window-helper, window-list, selection, win32
+                                    # handler.ts, ears-host.ts, worker-local-voice.ts, main.ts (its bootstrap)
+      src/main/platform/            # capture, downscale, composite, canvas, label, displays, ocr,
+                                    # read-text, text-layer, find-element, sight-gate,
+                                    # window-helper, window-list, window-shot, selection, win32
+      src/main/windows/             # one module per window: avatar, panel, home, settings, welcome, pointer
       src/preload/index.ts          # exposes window.tagalong and window.tagalongHost
       src/renderer/                 # avatar (Scout), panel (the bubble), welcome (Welcome),
-                                    # home (Home) and settings HTML, src/*.tsx
+                                    # home (Home), settings (Settings) and pointer HTML, src/*.tsx
+      src/renderer/src/settings/    # the Settings page, one file per section
       src/renderer/src/bean/        # Bean's WebP strips and manifest.json
       src/renderer/src/bean-assets.ts # FIGURE: the strips bundled once for the dock, Home and Welcome
       scripts/bean/                 # bean.py (Blender) and pack.py: regenerate Bean's strips
@@ -113,14 +131,13 @@ tagalong/
 
 Prerequisites:
 
-- Windows 11 (the only supported platform; `createPlatform` throws on any other platform today)
+- Windows 11 (the only supported platform; `createPlatform` throws on any other platform)
 - Node.js 22 or newer (`node -v`)
 - pnpm 10 — the root `packageManager` field pins the exact version. Two ways to get it:
   - `corepack enable` — only works from an **elevated** shell. From a normal shell on Windows it fails
     with `Internal Error: EPERM: operation not permitted, open 'C:\Program Files\nodejs\pnpm.ps1'`
     (the filename varies: `yarnpkg`, `pnpm.cmd`, and so on). If you see that, use the next line.
-  - `npm install -g pnpm@10` — installs into the user-level npm prefix and needs no elevation. This is
-    what the current machine uses.
+  - `npm install -g pnpm@10` — installs into the user-level npm prefix and needs no elevation.
 - Git
 
 No C++ toolchain is needed. `better-sqlite3` and `get-windows` ship prebuilt binaries, and their
@@ -196,20 +213,21 @@ against the protocol's `Role` schema. A test fails while the generated file is s
   `npmRebuild` is off and no C++ toolchain is ever needed. Every `.node` file is unpacked out of
   `app.asar`, where Node cannot load it. `get-windows`' Windows binary is downloaded by
   `scripts/fetch-native.mjs`, because pnpm skips the install script that normally fetches it.
-- **Only the native modules are packaged.** The workspace packages are bundled into `dist/` by
-  electron-vite, so they are `devDependencies`; the desktop's `dependencies` are exactly the three
-  native modules electron-builder copies.
+- **Only runtime modules are packaged.** The workspace packages are bundled into `dist/` by
+  electron-vite, so they are `devDependencies`; the desktop's `dependencies` are exactly what the
+  packaged app loads at runtime (the native modules and the voice libraries), which electron-builder
+  copies. The full list is under "Bundling the workspace packages" in
+  [desktop.md](desktop.md#bundling-the-workspace-packages).
 - **The Chrome extension ships inside.** `apps/extension/dist` is copied to `resources/extension`, so
   someone with only the installer can still load it unpacked. `pnpm package:win` from the root builds
   it first.
 - **macOS dmg and Linux AppImage/deb are configured but unverified**, and would not run anyway: there
-  is no macOS or Linux platform adapter in this build.
-- CI does not build the installer yet.
+  is no macOS or Linux platform adapter.
+- CI does not build the installer.
 
 ### CI
 
-`.github/workflows/ci.yml` runs on every pull request to `main` and every push to `main`. The repo
-is private, so Actions minutes are metered, and a Windows minute bills at twice a Linux one. Three
+`.github/workflows/ci.yml` runs on every pull request to `main` and every push to `main`. Three
 jobs:
 
 - **`changes`** (Linux, seconds). Asks `dorny/paths-filter` whether anything outside `docs/` that is
@@ -217,7 +235,7 @@ jobs:
   compile into core. When nothing counts, the other two jobs are skipped. If `changes` itself
   fails, `build` runs anyway rather than skipping.
 - **`build`** (Linux). Install, lint, format check, typecheck (`tsc -b` and the test project), and
-  the unit tests with coverage and the floors below.
+  the unit tests with coverage and the floors above.
 - **`e2e`** (Windows). Starts only after `build` passes. Runs `pnpm build` first, because the tests
   import the workspace packages from their compiled `dist` (on Linux the typecheck's `tsc -b` does
   this). Then the unit tests that skip themselves off Windows (`*.integration.test.ts` against a
@@ -239,10 +257,11 @@ runs somewhere.
 
 ### End-to-end tests and fakes
 
-The `e2e` CI job runs the Electron end-to-end suites. `apps/desktop/e2e/` holds five Playwright suites
+The `e2e` CI job runs the Electron end-to-end suites. `apps/desktop/e2e/` holds six Playwright suites
 that launch the built app: `smoke.spec.ts` (the bubble, talking, capture, pause, hotkeys, Welcome on
 request, Home),
-`first-run.spec.ts` (Welcome and Scout's intro on an empty data folder), `hotkey-recovery.spec.ts`
+`first-run.spec.ts` (Welcome and Scout's intro on an empty data folder), `launch-greeting.spec.ts`
+(the launch across launches on one profile), `hotkey-recovery.spec.ts`
 (a key another app owns), `listening.spec.ts` (Always listening: off at launch, switched on, a turn
 that starts with "Scout" is heard and answered, switched off) and `cards.spec.ts`. Run them with `pnpm --filter @tagalong/desktop
 test:e2e`.
@@ -333,8 +352,8 @@ warning.
 Scout's provider and model apply on its next ask, and so does a new key or base URL: the engine
 re-reads the keychain before every ask, so no restart is needed.
 
-The OpenRouter fallback ids could not be checked when they were written; they live in
-`packages/core/src/providers/presets.ts`. The live list in Settings is the authority.
+The OpenRouter fallback ids are a static list in `packages/core/src/providers/presets.ts`. The live
+list in Settings is the authority.
 
 Once running: Scout sits on screen as a small always-on-top window, `Ctrl+Shift+Space` captures the
 selection and the active window and opens the bubble beside it, Escape or focus loss hides the
@@ -370,7 +389,7 @@ immediately, with no restart.
 ### Scout
 
 A fresh install starts with one companion, **Scout**, on the Claude Code sign-in. Scout hands work
-to experts (see "Experts" in [architecture.md](architecture.md#experts-and-connectors)).
+to experts (see [experts.md](experts.md)).
 
 Scout remembers. Tell it "I prefer short answers" and it keeps that across restarts; it can also
 save facts on its own. Memories live in the same
@@ -450,8 +469,7 @@ Chrome's side panel.
 **It needs the desktop app running.** The extension holds no engine of its own; it connects to the
 one inside the Tagalong desktop app on `ws://127.0.0.1:47321`. With the app closed, the side panel
 says "Disconnected … Is the Tagalong app running?" and reconnects by itself — within a second or two
-with the panel open, within about thirty seconds without. A headless engine service that runs without
-the desktop app is a possible later option, recorded in the decisions log; it does not exist today.
+with the panel open, within about thirty seconds without.
 
 ### Build and load it
 
@@ -468,8 +486,9 @@ After a rebuild, click the reload arrow on the Tagalong card in `chrome://extens
 
 ### Pair it, once
 
-1. In the desktop app, open Home (tray → **Open Tagalong**) → **Settings**. Under **Browser
-   extension (optional)**, click **Copy** beside the pairing token.
+1. In the desktop app, open the Settings window (tray → **Open Tagalong** → **Settings**). In its
+   **Browser extension (optional)** section, click **Copy** beside the pairing token. How pairing
+   works is in [browser-extension.md](browser-extension.md#pairing).
 2. Chrome opens the extension's options page on first use (or right-click the toolbar button →
    **Options**). Paste the token and click **Save and connect**. Leave the port empty unless you
    moved the engine off `47321`.
@@ -507,7 +526,7 @@ opens a `.env` file. Copying it therefore changes nothing at runtime.
 Eight environment variables are read, all straight from the process environment. **Set them in the
 shell you launch from**, as shown above.
 
-| Variable                    | Status today                                                                                                                                                                                                                                                                                                                                                                                               |
+| Variable                    | Status                                                                                                                                                                                                                                                                                                                                                                                                     |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TAGALONG_FAKE_SIGN_IN`     | **Read** (`apps/desktop/src/main/claude-sign-in.ts#fakeSignIn`), in any build. One of `signed-in`, `signed-out`, `not-installed` or `unknown` stands in for the Claude Code sign-in check, so no claude binary runs. Under `TAGALONG_FAKE_PROVIDERS=1` the check reads as `signed-in` unless this says otherwise.                                                                                          |
 | `TAGALONG_FAKE_PROVIDERS=1` | **Read** (`packages/core/src/providers/registry.ts`, `engine.ts`). Forces the fake brain and a fake expert, for tests and demos. No keys, network or Claude Code usage.                                                                                                                                                                                                                                    |
@@ -556,10 +575,10 @@ than one planned implementation.
 - **Text to speech** lives in the desktop host, not in core: `Tts` in
   `apps/desktop/src/main/voice/voice.ts` (`speak(text, { voice, speed })` returns encoded audio),
   with Kokoro (`LazyLocalVoice` over `kokoro.ts`), ElevenLabs (`elevenlabs.ts`) and `fakeTts`.
-  `createVoiceService` picks one; see [Scout talks](architecture.md#scout-talks).
+  `createVoiceService` picks one; see [The mouth](voice.md#the-mouth).
 - **Speech to text** also lives in the desktop host: the `Ears` in the voice process, `LocalEars`
   (Silero VAD, Moonshine tiny and Smart Turn, `voice/ears/`) on this computer, or `FakeEars` under
-  `TAGALONG_FAKE_STT=1`; see [Talk to Scout](architecture.md#talk-to-scout).
+  `TAGALONG_FAKE_STT=1`; see [The ears](voice.md#the-ears).
 
 Implement `BrainProvider`, register it in `packages/core/src/providers/registry.ts`, give it a
 `SECRET_KEYS` entry if it takes a key, and pick it for Scout in Home. Do not widen the interface for a provider that is not being built.
@@ -570,7 +589,7 @@ Every built-in tool lives in `packages/core/src/tools/builtin/`, in one `Tool` s
 `read` or `write`, run), and reaches a turn through `ToolRegistry` in `tools/registry.ts`. The repo
 skill [`.claude/skills/tagalong-add-tool/SKILL.md`](../.claude/skills/tagalong-add-tool/SKILL.md)
 walks through it: which file, read versus write, testing with `fakeTurnTools`, registering, and the
-docs to update. The design is in [concepts/roles-and-tools.md](concepts/roles-and-tools.md#the-tools-module).
+docs to update. The design is in [Roles and tools](mind.md#roles-and-tools) in mind.md.
 
 ## Conventions
 
@@ -582,45 +601,18 @@ docs to update. The design is in [concepts/roles-and-tools.md](concepts/roles-an
   browser globals. An ESLint `no-restricted-imports` rule enforces it.
 - **Tools go through the registry.** `conversation/` and `engine.ts` import tools only from
   `tools/registry` or the `tools` index, never from `tools/builtin/*`. ESLint enforces it too.
-- **Docs are part of done.** Update `README.md`, `docs/architecture.md`, and
-  `docs/testing/feature-test-guide.md` with every change.
+- **Docs are part of done.** Update `README.md`, the subsystem doc in `docs/` that describes the
+  code you changed (the [index](README.md) lists them), and `docs/testing/feature-test-guide.md`
+  with every change.
 - **Comments.** Every file opens with a 2-6 line header: what it is for, what it contains, who uses
   it. Comments explain why, limits, units and parse-compat rules; phase numbers, PR references and
   history belong in git. Test files get a one-line header.
 - **Commits** use Conventional Commits, for example `feat(core): add PromptAssembler`.
-- **Diagrams** are Mermaid with a black and white theme only.
+- **Diagrams** are Mermaid only, and every block starts with the monochrome init line the docs
+  share (copy it from any doc in `docs/`): grey lines and titles, so diagrams read on GitHub's light
+  and dark themes.
 
-## Known gaps
-
-What is still standing, recorded here so nobody rediscovers it.
-
-- **No Tailwind build in the desktop renderer.** `@tagalong/ui`'s chat panel (`ChatPanel`, with its
-  internal `MessageList`, `Composer` and `SightBar`) is written against Tailwind utility classes, but the
-  desktop renderer has no Tailwind toolchain, so those class names resolve to nothing.
-  `apps/desktop/src/renderer/src/app.css` hand-writes the structural rules the utilities would have
-  supplied — enough for a usable panel, but the components are unstyled beyond that until the build
-  gains Tailwind.
-- **No cards in the side panel.** The side panel's `ChatPanel` draws no hand-off, connector confirm
-  or routine card; only the desktop bubble does.
-- **No Fast Refresh in dev.** `@vitejs/plugin-react` 6.x imports `vite/internal`, which only exists in
-  Vite 8, while electron-vite 5 pins Vite 7. The renderer config therefore drops the plugin and uses
-  Vite's own esbuild transform (`esbuild: { jsx: 'automatic' }`) for JSX. Everything builds and runs;
-  the only loss is Fast Refresh during `pnpm dev:desktop`.
-- **Scout is not offered the time tools.** `recall_screen`, `what_changed`, `watch_for`,
-  `look_closer`, `list_displays` and `look_at_display` are built, but the Companion role does not
-  list them.
-- **The installer is unsigned and uses Electron's default icon.** SmartScreen warns on first run.
-- **Windows only.** The macOS and Linux installers are configured, but there is no platform adapter for
-  either, so the app stops at launch there.
-- **Talk to Scout has no cloud speech to text.** Speech is turned into text on this computer only
-  (Silero VAD, Moonshine tiny, Smart Turn); ElevenLabs Scribe is not wired in. Welcome has no
-  microphone or speaker step.
-- **The local voice and ears are not checked end to end in CI.** Tests and the Electron suites run
-  on `TAGALONG_FAKE_TTS=1` and `TAGALONG_FAKE_STT=1`, so the Kokoro and ears model downloads,
-  synthesis and transcription are only exercised on a real run. The mic path itself (worklet, IPC,
-  the voice process) does run in the smoke suite, on the fake ears.
-
-### Voice models
+## Voice models
 
 The ears use three models, about 43 MB in all (43,001,836 bytes). They are not shipped in the
 installer. The first time listening is used, `apps/desktop/src/main/voice/ears/model-files.ts`
@@ -652,8 +644,21 @@ exact at the pinned commit. To bump a model, pick the new commit, read each file
 at that commit and check it against its git blob `oid`), and change the URL, `bytes` and `sha256`
 together. The static test in `model-files.test.ts` rejects a `resolve/main` URL.
 
-## Roadmap
+## Known gaps
 
-The plan and its phases live in Notion. What this build does and does not do is in the
-[README](../README.md#what-is-in-this-build) and the
-[feature test guide](testing/feature-test-guide.md).
+Gaps that are real in the code on `main`, each explained in the doc it links to.
+
+- **No Tailwind build.** `@tagalong/ui`'s chat parts (`ChatPanel`, `MessageList`, `Composer`,
+  `SightBar`) use Tailwind utility classes, but neither host ships Tailwind; `app.css` (desktop) and
+  `sidepanel.css` (extension) hand-write the structure instead. See [bubble.md](bubble.md) and
+  [browser-extension.md](browser-extension.md).
+- **No cards in the Chrome side panel.** It draws no hand-off, connector confirm or routine card;
+  only the desktop bubble does. See [browser-extension.md](browser-extension.md).
+- **No Fast Refresh in dev.** The renderer uses Vite's esbuild JSX transform, not
+  `@vitejs/plugin-react`. See [desktop.md](desktop.md#bundling-the-workspace-packages).
+- **Windows only, unsigned installer.** There is no macOS or Linux platform adapter, so the app
+  stops at launch there; the Windows installer is unsigned. See
+  [desktop.md](desktop.md#the-platform-adapter) and [desktop.md](desktop.md#packaging).
+- **Real voice models are not run in CI.** Tests and the Electron suites use `TAGALONG_FAKE_TTS=1`
+  and `TAGALONG_FAKE_STT=1`, so model downloads, synthesis and transcription run only on a real
+  machine. See [voice.md](voice.md#tests-that-pin-it).

@@ -1,0 +1,264 @@
+# Asks (Waiting on you)
+
+## Purpose
+
+An **ask** is one saved row for something that waits on the person's click: a change in a connected
+app (`app-change`) or a hand-off card (`handoff`). Asks give every card one outcome set, one expiry
+rule, one place in Home (**Waiting on you**) and one audit trail. Only a person's click approves an
+ask; silence never does.
+
+## Where it lives
+
+| File                                             | What it holds                                                                                                                         |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/protocol/src/asks.ts`                  | `Ask`, `AskKind`, `AskRisk`, `AskState`, `AskNote`, the `asks.*` params and results, `AsksChangedParams`                              |
+| `packages/core/src/asks/store.ts`                | `AskStore` (the `asks` table), `AskRecord`, `ASK_KEEP_DAYS`, `ANSWERED_SUMMARY_CHARS`                                                 |
+| `packages/core/src/asks/asks.ts`                 | `Asks`: `hold`, `add`, `answer`, `settle`, `get`, `list`, `boot`, `closeHeld`, `prune`, `clear`, `stop`; `HELD_ASK_MS`, `FREE_ASK_MS` |
+| `packages/core/src/memory/db.ts`                 | Migration 25, which creates `asks`                                                                                                    |
+| `packages/core/src/engine.ts`                    | Builds `Asks`, calls `boot` and `prune`, the `asks.*` and `tool.approve` handlers, `closeHeld` on shutdown                            |
+| `packages/core/src/tools/builtin/connections.ts` | Holds an app change through `deps.confirm` (`Asks.hold`); see [connected-apps.md](connected-apps.md)                                  |
+| `packages/core/src/experts/handoffs.ts`          | Adds a hand-off card (`Asks.add`), settles it on Send, Dismiss or a gone expert; see [experts.md](experts.md)                         |
+| `apps/desktop/src/main/ipc/asks.ts`              | `registerAskIpc`: `tagalong:asks:list`, `tagalong:asks:answer`, `tagalong:asks:open`                                                  |
+| `apps/desktop/src/preload/index.ts`              | `listAsks`, `answerAsk`, `openAsk` on the bridge                                                                                      |
+| `packages/ui/src/home/waiting-view.tsx`          | `WaitingView`, Home's Waiting on you page                                                                                             |
+| `packages/ui/src/home/home-view.tsx`             | The `Waiting on you (n)` nav item, counted from `asks.changed`                                                                        |
+| `packages/ui/src/companion-bubble.tsx`           | Drops a confirm card or proposed hand-off card that `asks.changed` no longer lists                                                    |
+| `packages/ui/src/connector-confirm.tsx`          | `ConnectorConfirmCard` (Allow once / Cancel)                                                                                          |
+
+## How it works
+
+### Two kinds
+
+- **An app change is held.** `Asks.hold(params, signal)` saves the row, emits `connector.confirm`,
+  and returns a promise the connector tool awaits. The turn stays open the whole time. When the
+  turn's `signal` aborts (stopped or replaced), the ask settles `cancelled` with note `turn-ended`;
+  a signal already aborted settles it at once and shows no card.
+- **A hand-off card is free.** `Asks.add(params)` saves the row with a `payload` (the brief without
+  its screen context) and returns `{ id }`. Nothing awaits it. The card is sent later through
+  `handoffs.confirm`, from the bubble or after **Open** in Home.
+
+The routine card (`routine.proposed`, held in `Routines`' in-memory `#proposals` map) and the
+settings card (`settings.proposed`, held only by the bubble until **Apply** calls `settings.set`) are
+consent cards for saving config, not actions. They are not asks and stay in memory.
+
+### Risk
+
+`AskRisk` is `read`, `change` or `high`.
+
+- `read` never asks: a read tool runs at once and no row is written.
+- `change` is every write that is not high, and every hand-off card.
+- `high` is a write the app marks `destructiveHint`, or whose tool name holds a word such as `send`,
+  `delete` or `publish` (`riskOf` in `connections/access.ts`). The confirm card and Waiting on you
+  add `Can’t be undone`.
+
+### States and settling
+
+`state` starts `waiting` and ends in exactly one of `approved`, `declined`, `expired`, `cancelled`.
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+stateDiagram-v2
+  [*] --> waiting: hold() or add()
+  waiting --> approved: Allow once or Send, by you
+  waiting --> declined: Cancel, Decline or Dismiss, by you
+  waiting --> expired: past expires_at (note expired)
+  waiting --> expired: quit or relaunch with an app change waiting (note closed)
+  waiting --> cancelled: turn stopped or replaced (note turn-ended)
+  waiting --> cancelled: expert gone at Open or Send (note expert-unavailable)
+  approved --> [*]
+  declined --> [*]
+  expired --> [*]
+  cancelled --> [*]
+```
+
+| Way out                                | State       | `answered_by` | `note`               |
+| -------------------------------------- | ----------- | ------------- | -------------------- |
+| Allow once (card, Home), Send          | `approved`  | `you`         |                      |
+| Cancel, Decline, Dismiss               | `declined`  | `you`         |                      |
+| Timer at `expires_at`, or read past it | `expired`   |               | `expired`            |
+| Quit, or relaunch, with an app change  | `expired`   |               | `closed`             |
+| Turn stopped or replaced               | `cancelled` |               | `turn-ended`         |
+| Expert removed or switched off         | `cancelled` |               | `expert-unavailable` |
+
+Every way out goes through `Asks.settle(id, state, how)`, which calls `AskStore.settle`:
+
+```sql
+UPDATE asks SET state = ?, answered_by = ?, note = ?, answered_at = ?, summary = ?, payload_json = NULL
+WHERE id = ? AND state = 'waiting'
+```
+
+Only one settle can win, so a card and Home answering at once cannot both: the late one gets
+`accepted: false`. A winning settle then, in order:
+
+1. clears the ask's timer;
+2. resolves a held ask's promise with the state, so the connector tool learns how it ended;
+3. writes the outcome on the episode of the turn that asked: `ExperienceLog.outcome(originTurnId,
+state)` finds the episode whose `ref` is that turn id and adds an `outcome` event named
+   `approved`, `declined`, `expired` or `cancelled` (see [mind.md](mind.md));
+4. broadcasts `asks.changed { waiting }`.
+
+`Asks.answer(id, decision)` refuses (`false`) an ask that no longer waits and a hand-off with
+`approve`: Send needs a folder, so a hand-off is only approved by `handoffs.confirm`.
+
+No tool of Scout's can answer an ask. `asks.answer`, `tool.approve` and `handoffs.confirm` are host
+methods called only by buttons, and `tools/registry.test.ts` pins that no role's tool is wired to the
+asks.
+
+### Expiry
+
+| Kind         | Constant      | Value    | Why                                                                              |
+| ------------ | ------------- | -------- | -------------------------------------------------------------------------------- |
+| `app-change` | `HELD_ASK_MS` | 1 hour   | Its turn is held open the whole time, which holds arrivals, check-ins and sleep. |
+| `handoff`    | `FREE_ASK_MS` | 24 hours | A brief about yesterday's problem goes stale.                                    |
+
+Each waiting ask has one `setTimeout` at its `expires_at` (unref'd). `Asks.get(id)`, which every
+answer, Open and Send goes through, settles an ask read past its time as `expired` there, so a timer
+running late after the computer slept never lets it be answered.
+
+### Restart
+
+Nothing is resumed after a restart.
+
+- `asks.boot()` runs at engine start, after `experience.interrupted()`. A waiting `app-change`
+  becomes `expired` with note `closed`: its turn is gone, so nothing can run it, and the app is never
+  called. A `handoff` past its time becomes `expired`; the others keep waiting with their timers
+  re-armed.
+- On a clean quit, `Engine.shutdown()` calls `asks.closeHeld()` first, before any turn is stopped,
+  so a held ask ends `expired/closed` rather than `cancelled/turn-ended`. Then `asks.stop()` clears
+  every timer, so none fires on a closed database.
+- A hand-off card that waited across a restart reopens from its row with `restored: true`, without
+  the window it was written from; see [experts.md](experts.md).
+
+### Home's Waiting on you
+
+`WaitingView` reads `listAsks()` and reads again on every `asks.changed`, so an ask answered on its
+card, expired or closed leaves the list at once.
+
+- **Waiting**, oldest first: a title (`Change in <app> · <tool>` or `Hand to <expert>`), the risk
+  label (`Changes something` or `Can’t be undone`), the summary's first line, the rest of the summary
+  in full in a scrollable, focusable block, `Asked <time> · ends <time>`, and the buttons: **Allow
+  once** and **Decline** for an app change, **Open** and **Decline** for a hand-off. No Allow once is
+  ever shown for a hand-off.
+- **Answered**, the last 20, newest first, with fixed words for how each ended: `Approved by you`,
+  `Declined by you`, `Expired: no answer in time`, `Expired: Tagalong closed first`,
+  `Cancelled: the conversation was stopped`, `Cancelled: expert no longer available`. Every outcome
+  but Approved adds `Nothing was changed.`
+- A failed call shows as an alert (`Not answered: …`, `Could not read what is waiting: …`).
+
+The nav item reads `Waiting on you (n)` while anything waits.
+
+The bubble removes its `ConnectorConfirmCard` and a proposed hand-off card when `asks.changed` no
+longer lists their id (answered in Home, expired, closed). `asks.open` raises the bubble through
+`handoff.proposed`.
+
+## Interfaces
+
+### RPC methods
+
+| Method         | Params                                       | Result                              | Notes                                                    |
+| -------------- | -------------------------------------------- | ----------------------------------- | -------------------------------------------------------- |
+| `asks.list`    | `{}`                                         | `{ waiting: Ask[], recent: Ask[] }` | `recent` is the last 20 answered                         |
+| `asks.answer`  | `{ id, decision: 'approve' \| 'decline' }`   | `{ accepted }`                      | `false` when it no longer waits, or approving a hand-off |
+| `asks.open`    | `{ id }`                                     | `{ opened }`                        | A hand-off: `handoff.proposed` again                     |
+| `tool.approve` | `{ approvalId, decision: 'once' \| 'deny' }` | `{ accepted }`                      | The confirm card's answer: an alias of `asks.answer`     |
+
+None of these is in `EXTENSION_METHODS`, so the browser extension cannot answer an ask.
+
+### Notifications
+
+- `asks.changed { waiting: Ask[] }` on every insert and every settle.
+- `connector.confirm { approvalId, turnId, petId, app, tool, summary, risk? }` when an app change is
+  held; `approvalId` is the ask id.
+- `handoff.proposed { …, restored? }` when a hand-off card is added or opened; `proposalId` is the
+  ask id.
+
+### Types
+
+```ts
+Ask = {
+  id: uuid; kind: 'app-change' | 'handoff'; petId; summary; risk: 'read' | 'change' | 'high';
+  app?; tool?; expertName?; originTurnId?: uuid;
+  state: 'waiting' | 'approved' | 'declined' | 'expired' | 'cancelled';
+  answeredBy?: 'you' | 'rule'; note?: 'turn-ended' | 'closed' | 'expert-unavailable' | 'expired';
+  createdAt; expiresAt?; answeredAt?;
+}
+```
+
+`Asks.list` maps each row to `Ask`: the payload is never sent, and `expertId` becomes `expertName`
+(left out once the expert is gone).
+
+## Constants and limits
+
+| Constant                 | Value    | File              |
+| ------------------------ | -------- | ----------------- |
+| `HELD_ASK_MS`            | 1 hour   | `asks/asks.ts`    |
+| `FREE_ASK_MS`            | 24 hours | `asks/asks.ts`    |
+| `ASK_KEEP_DAYS`          | 30       | `asks/store.ts`   |
+| `ANSWERED_SUMMARY_CHARS` | 120      | `asks/store.ts`   |
+| Recent answered listed   | 20       | `AskStore.recent` |
+
+## Storage
+
+Table `asks`, migration 25, written only by `AskStore`:
+
+| Column                                    | Holds                                                                               |
+| ----------------------------------------- | ----------------------------------------------------------------------------------- |
+| `id`                                      | UUID; also the `approvalId` or `proposalId` on the cards                            |
+| `kind`                                    | `app-change` or `handoff` (CHECK)                                                   |
+| `pet_id`                                  | The pet that asked                                                                  |
+| `summary`                                 | What will happen, written by Scout, secrets hidden on insert                        |
+| `risk`                                    | `read`, `change` or `high` (CHECK)                                                  |
+| `app`, `tool`                             | For an app change                                                                   |
+| `expert_id`                               | For a hand-off                                                                      |
+| `origin_turn_id`                          | The turn that asked, which is its episode's `ref`                                   |
+| `payload_json`                            | Only a hand-off card's brief without its screen context; set to `NULL` once settled |
+| `state`                                   | Default `waiting` (CHECK over the five states)                                      |
+| `answered_by`                             | `NULL`, `you` or `rule` (CHECK; no code path writes `rule`)                         |
+| `note`                                    | A code from `AskNote`                                                               |
+| `created_at`, `expires_at`, `answered_at` | ISO times                                                                           |
+
+Index `asks_state` on `(state, created_at)`.
+
+- **Answered rows shrink.** A settle replaces `summary` with its first non-empty line, secrets
+  hidden, cut to 120 characters, and drops `payload_json`.
+- **Retention.** `asks.prune()` deletes answered rows whose `answered_at` is older than 30 days. It
+  runs at boot and in the digest's 30-minute `tidy`. Waiting rows are never pruned.
+- **Delete all.** `experience.clear` also calls `asks.clear()`, which deletes every answered ask and
+  keeps what waits, so its card still works.
+
+See [storage.md](storage.md) for every table.
+
+## Failure handling
+
+- Two answers at once: the compare-and-set `UPDATE` lets one win; the other returns
+  `accepted: false`, and Home reloads.
+- A late timer (the PC slept): `Asks.get` expires the ask when it is read, before any answer.
+- A quit or crash with an app change waiting: `boot` or `closeHeld` ends it `expired/closed`, and the
+  app is never called.
+- An expert gone before Open or Send: `cancelled/expert-unavailable`; `handoffs.confirm` answers
+  `-32602` `That expert is no longer available.`; `asks.open` answers `{ opened: false }`.
+- An outcome for a turn whose episode was already pruned writes nothing (`ExperienceLog.outcome`
+  returns `false`).
+
+## Privacy notes
+
+`summary` is what will happen, in Scout's words: never a window title, a selection or window text.
+A hand-off's saved payload holds the brief without its context, which stays in memory only. Answered
+rows keep one short line for 30 days. See [privacy.md](privacy.md).
+
+## Tests that pin it
+
+- `packages/core/src/asks/asks.test.ts`: the held card with id and risk; decline; cancel on a stopped
+  turn and at once on an already-stopped one; expiry after an hour; never approved past its time
+  with a late timer; `asks.changed` after every change; the outcome on the episode; `closeHeld`; a
+  free card named by its expert; never approved from Home; expiry after a day; `boot` closing,
+  keeping, re-arming and expiring.
+- `packages/core/src/asks/store.test.ts`: secrets hidden in the summary; settle once; the short first
+  line and dropped payload; list order; the 30-day prune that never touches a waiting row; Delete all.
+- `packages/protocol/src/asks.test.ts`: the schemas, refusing unknown states, risks, kinds, answerers
+  and notes.
+- `packages/core/src/engine.test.ts` (asks over RPC): Home's Allow once runs a waiting write and a
+  second answer loses; a write waiting at quit is `expired/closed` after relaunch and nothing ran; a
+  hand-off card survives a relaunch and Send starts it; Delete all keeps the waiting.
+- `packages/core/src/tools/registry.test.ts`: no role's tool can answer an ask.
+- `packages/ui/src/home/waiting-view.test.tsx`, `apps/desktop/src/main/ipc/asks.test.ts`.

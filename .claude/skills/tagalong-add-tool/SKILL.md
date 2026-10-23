@@ -89,8 +89,10 @@ anywhere else.
 
 ## Docs
 
-Update `docs/concepts/roles-and-tools.md` (the tools module list), the tool's section of
-`docs/architecture.md`, and `README.md` if users will notice. Docs are part of done.
+Update `docs/mind.md` ("Roles and tools", the tool list), the tool's subsystem doc in `docs/`
+(for example `docs/sight.md` for a screen tool; the index is `docs/README.md`),
+`docs/protocol.md` ("How to add a method") if the tool needs a new method, and `README.md` if
+users will notice. Docs are part of done.
 
 ## Red flags
 
