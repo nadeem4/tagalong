@@ -18,7 +18,7 @@ const values: SettingsFormValues = {
   askHotkey: 'CommandOrControl+Shift+Space',
   pauseSightHotkey: 'CommandOrControl+Shift+Alt+P',
   stopVoiceHotkey: 'CommandOrControl+Shift+Alt+M',
-  talkHotkey: 'CommandOrControl+Shift+Alt+Space',
+  talkHotkey: 'RightControl',
   sightDetail: 'focused',
   windowTextBudget: '8000',
 };
@@ -64,8 +64,15 @@ describe('buildSettingsPatch', () => {
       ask: 'CommandOrControl+Shift+Space',
       pauseSight: 'CommandOrControl+Shift+Alt+P',
       stopVoice: 'CommandOrControl+Shift+Alt+M',
-      talk: 'CommandOrControl+Shift+Alt+Space',
+      talk: 'RightControl',
     });
+  });
+
+  it('carries the talk key picked: one key from the list, never a combo', () => {
+    expect(buildSettingsPatch({ ...values, talkHotkey: 'RightShift' }).hotkeys?.talk).toBe(
+      'RightShift',
+    );
+    expect(() => buildSettingsPatch({ ...values, talkHotkey: 'Alt+T' })).toThrow();
   });
 
   it('keeps a rebound hotkey exactly as typed', () => {

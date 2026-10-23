@@ -1,6 +1,7 @@
 /**
- * Scout's global shortcuts: the fallback accelerators for pausing sight, stopping the voice and
- * talking, and HotkeyManager, which binds each key on its own and reports any it could not take.
+ * Scout's global shortcuts: the fallback accelerators for pausing sight and stopping the voice,
+ * and HotkeyManager, which binds each key on its own and reports any it could not take. The talk
+ * key is no global shortcut: talk-key.ts watches it. Its failure is reported here too.
  */
 
 import { globalShortcut } from 'electron';
@@ -17,12 +18,6 @@ export const DEFAULT_PAUSE_SIGHT_HOTKEY = 'CommandOrControl+Shift+Alt+P';
 /** Stops Scout speaking at once and drops whatever it was about to say. */
 export const DEFAULT_STOP_VOICE_HOTKEY = 'CommandOrControl+Shift+Alt+M';
 
-/**
- * Talk to Scout: hold it and speak, let go and Scout hears the question. Not the ask key
- * held down: the ask key opens the bubble on a press, and a hold would open it too.
- */
-export const DEFAULT_TALK_HOTKEY = 'CommandOrControl+Shift+Alt+Space';
-
 /** The part of Electron globalShortcut this module uses, so tests can supply their own. */
 export interface HotkeyRegistrar {
   register(accelerator: string, callback: () => void): boolean;
@@ -33,8 +28,8 @@ export interface HotkeyRegistrar {
 export interface HotkeyOutcome {
   accelerator: string;
   registered: boolean;
-  /** Which action this accelerator was meant to trigger. */
-  action: keyof HotkeyBindings;
+  /** Which action this accelerator was meant to trigger; `talk` is the key hook's own. */
+  action: HotkeyAction;
   /** Present only on failure, so the caller can show the user what went wrong. */
   error?: string;
 }
@@ -44,8 +39,10 @@ export interface HotkeyBindings {
   ask: string;
   pauseSight: string;
   stopVoice: string;
-  talk: string;
 }
+
+/** Every action a key triggers: the global shortcuts, and the talk key the hook watches. */
+export type HotkeyAction = keyof HotkeyBindings | 'talk';
 
 export interface RegisterHotkeyOptions {
   accelerator: string;
@@ -60,7 +57,7 @@ export interface RegisterHotkeyOptions {
  * The key names are ours; these are what the settings window labels them, so a message
  * about a broken binding points at a control the reader can actually find.
  */
-const ACTION_LABELS: { readonly [K in keyof HotkeyBindings]: string } = {
+const ACTION_LABELS: { readonly [K in HotkeyAction]: string } = {
   ask: 'Ask',
   pauseSight: 'Pause sight',
   stopVoice: 'Stop speaking',
@@ -132,8 +129,6 @@ export interface HotkeyManagerOptions {
   onAsk: () => void;
   onPauseSight: () => void;
   onStopVoice: () => void;
-  /** Every press, including the repeats of a key held down: the bubble tells them apart. */
-  onTalk: () => void;
   registrar?: HotkeyRegistrar;
 }
 
@@ -154,7 +149,6 @@ export class HotkeyManager {
     ask: () => void;
     pauseSight: () => void;
     stopVoice: () => void;
-    talk: () => void;
   };
   /** Accelerators currently held by this process, keyed by action. */
   readonly #bound = new Map<keyof HotkeyBindings, string>();
@@ -165,13 +159,12 @@ export class HotkeyManager {
       ask: options.onAsk,
       pauseSight: options.onPauseSight,
       stopVoice: options.onStopVoice,
-      talk: options.onTalk,
     };
   }
 
-  /** Applies the bindings, one outcome per action in ask, pause, stop voice, talk order. */
+  /** Applies the bindings, one outcome per action in ask, pause, stop voice order. */
   apply(bindings: HotkeyBindings): HotkeyOutcome[] {
-    return (['ask', 'pauseSight', 'stopVoice', 'talk'] as const).map((action) =>
+    return (['ask', 'pauseSight', 'stopVoice'] as const).map((action) =>
       this.#bind(action, bindings[action]),
     );
   }

@@ -31,6 +31,24 @@ export const MAX_DAILY_BUDGET_USD = 1000;
 export const WELCOME_STEPS = ['answer', 'name', 'think', 'voice', 'keys', 'try'] as const;
 export type WelcomeStep = (typeof WELCOME_STEPS)[number];
 
+/**
+ * The keys Talk to Scout can be: one key, held alone. Never a combo: the desktop watches this
+ * one key go down and up itself, since no global shortcut reports a release.
+ */
+export const TALK_KEYS = ['RightControl', 'RightAlt', 'RightShift', 'ScrollLock'] as const;
+export type TalkKey = (typeof TALK_KEYS)[number];
+
+/** The default talk key: Right Ctrl held alone. */
+export const TALK_KEY_RIGHT_CTRL: TalkKey = 'RightControl';
+
+/** Each talk key as a person reads it. */
+export const TALK_KEY_LABELS: { readonly [K in TalkKey]: string } = {
+  RightControl: 'Right Ctrl',
+  RightAlt: 'Right Alt',
+  RightShift: 'Right Shift',
+  ScrollLock: 'Scroll Lock',
+};
+
 /** Default value for every setting, in one place so the patch schema can stay defaults-free. */
 export const SETTINGS_DEFAULTS = {
   enginePort: 47321,
@@ -42,7 +60,7 @@ export const SETTINGS_DEFAULTS = {
     ask: 'CommandOrControl+Shift+Space',
     pauseSight: 'CommandOrControl+Shift+Alt+P',
     stopVoice: 'CommandOrControl+Shift+Alt+M',
-    talk: 'CommandOrControl+Shift+Alt+Space',
+    talk: TALK_KEY_RIGHT_CTRL,
   },
   avatar: { x: null, y: null },
   /**
@@ -251,9 +269,9 @@ const settingsFields = {
     stopVoice: z.string().min(1).optional(),
     /**
      * Talk to Scout: held down, the microphone listens; let go, Scout hears the question.
-     * Optional for the same reasons as `pauseSight`.
+     * One key from TALK_KEYS, never a combo. Optional for the same reasons as `pauseSight`.
      */
-    talk: z.string().min(1).optional(),
+    talk: z.enum(TALK_KEYS).optional(),
   }),
   /** Remembered avatar position; null means "dock to the default edge". */
   avatar: z.object({ x: z.number().nullable(), y: z.number().nullable() }),
@@ -368,6 +386,16 @@ function withoutRetiredSummarizer(value: unknown): unknown {
   return typeof providerId === 'string' && RETIRED_PROVIDERS.includes(providerId) ? null : value;
 }
 
+/**
+ * The talk key was once an accelerator combo. A file still holding one, the old default or a
+ * custom combo, gets Right Ctrl; a single talk key the person picked stays.
+ */
+function withoutRetiredTalkKey(value: unknown): unknown {
+  const talk = (value as { talk?: unknown } | null | undefined)?.talk;
+  if (typeof talk !== 'string' || (TALK_KEYS as readonly string[]).includes(talk)) return value;
+  return { ...(value as object), talk: TALK_KEY_RIGHT_CTRL };
+}
+
 export const Settings = z.object({
   enginePort: settingsFields.enginePort.default(SETTINGS_DEFAULTS.enginePort),
   providerBaseUrls: z
@@ -375,7 +403,9 @@ export const Settings = z.object({
     .prefault({ ...SETTINGS_DEFAULTS.providerBaseUrls }),
   pageTextBudget: settingsFields.pageTextBudget.default(SETTINGS_DEFAULTS.pageTextBudget),
   historyMessages: settingsFields.historyMessages.default(SETTINGS_DEFAULTS.historyMessages),
-  hotkeys: settingsFields.hotkeys.prefault({ ...SETTINGS_DEFAULTS.hotkeys }),
+  hotkeys: z
+    .preprocess(withoutRetiredTalkKey, settingsFields.hotkeys)
+    .prefault({ ...SETTINGS_DEFAULTS.hotkeys }),
   avatar: settingsFields.avatar.prefault({ ...SETTINGS_DEFAULTS.avatar }),
   captureExclusions: settingsFields.captureExclusions.prefault({
     processNames: [...SETTINGS_DEFAULTS.captureExclusions.processNames],

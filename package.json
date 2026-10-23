@@ -44,7 +44,8 @@
       "get-windows",
       "onnxruntime-node",
       "protobufjs",
-      "sharp"
+      "sharp",
+      "uiohook-napi"
     ]
   }
 }

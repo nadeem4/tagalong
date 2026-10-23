@@ -98,10 +98,21 @@ describe('desktop runtime dependencies', () => {
       'get-windows',
       'kokoro-js',
       'onnxruntime-node',
+      'uiohook-napi',
     ]);
     // The version @huggingface/transformers pins, so one onnxruntime runs in the voice process.
     expect(manifest.dependencies['onnxruntime-node']).toBe('1.21.0');
     expect(manifest.devDependencies['@tagalong/core']).toBe('workspace:*');
+  });
+
+  it('keeps the talk key hook external, so its prebuilt binary loads from outside app.asar', () => {
+    const viteConfig = readFileSync(
+      fileURLToPath(new URL('../../electron.vite.config.ts', import.meta.url)),
+      'utf8',
+    );
+    expect(viteConfig).toMatch(/NATIVE_DEPS = \[[^\]]*'uiohook-napi'/);
+    // Its prebuilds are .node files, which every native binary's unpack rule covers.
+    expect(config.asarUnpack).toContain('**/*.node');
   });
 
   it('has a one-command Windows installer build', () => {

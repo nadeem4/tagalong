@@ -195,12 +195,14 @@ export function buildSettingsPatch(values: SettingsFormValues): SettingsPatchTyp
   });
 }
 
-/** The shortcuts, in the order Settings shows them, with the names it shows. */
+/**
+ * The shortcuts, in the order Settings shows them, with the names it shows. The talk key is
+ * one key held alone, picked from a list, so it can never share a combination.
+ */
 const HOTKEY_FIELDS = [
   ['askHotkey', 'Ask Scout'],
   ['pauseSightHotkey', 'Pause sight'],
   ['stopVoiceHotkey', 'Stop Scout speaking'],
-  ['talkHotkey', 'Talk to Scout'],
 ] as const;
 
 /** An accelerator compared as keys: case, order and the spelling of Ctrl do not matter. */

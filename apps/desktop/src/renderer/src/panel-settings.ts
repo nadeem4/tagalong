@@ -2,15 +2,11 @@
  * The few settings the panel uses (the talk key as a person reads it, the microphone), read
  * at open and on every save. Used by panel.tsx.
  */
+import { TALK_KEY_LABELS, TALK_KEY_RIGHT_CTRL } from '@tagalong/protocol';
 import type { Settings } from '@tagalong/protocol';
 
-/** The talk key until settings say otherwise. Matches main's DEFAULT_TALK_HOTKEY. */
-export const DEFAULT_TALK_KEY = 'CommandOrControl+Shift+Alt+Space';
-
-/** An accelerator as a person reads it on this platform. */
-export function readable(accelerator: string, platform: string): string {
-  return accelerator.replace('CommandOrControl', platform === 'darwin' ? 'Cmd' : 'Ctrl');
-}
+/** The talk key as read until settings say otherwise: Right Ctrl, held alone. */
+export const DEFAULT_TALK_KEY = TALK_KEY_LABELS[TALK_KEY_RIGHT_CTRL];
 
 /** What the panel takes from settings: read at open and again on every save. */
 export interface PanelSettings {
@@ -18,9 +14,9 @@ export interface PanelSettings {
   microphoneId: string | undefined;
 }
 
-export function panelSettings(settings: Settings, platform: string): PanelSettings {
+export function panelSettings(settings: Settings): PanelSettings {
   return {
-    talkKey: readable(settings.hotkeys.talk ?? DEFAULT_TALK_KEY, platform),
+    talkKey: TALK_KEY_LABELS[settings.hotkeys.talk ?? TALK_KEY_RIGHT_CTRL],
     microphoneId: settings.voice.microphoneId,
   };
 }

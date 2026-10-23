@@ -16,6 +16,7 @@ import {
   EARS_IDS,
   MOUTH_IDS,
   SETTINGS_DEFAULTS,
+  TALK_KEYS,
   SettingsPatch,
   VOICE_IDS,
   type Settings,
@@ -171,7 +172,12 @@ const ALLOWED: Record<string, Entry> = {
   }),
   greeting: whole('greeting', { label: 'Hello when Tagalong opens', parse: bool, show: onOff }),
   'hotkeys.ask': hotkey('ask', 'Ask key'),
-  'hotkeys.talk': hotkey('talk', 'Talk key'),
+  // One key held alone, never a combo: the desktop watches that key itself.
+  'hotkeys.talk': field('hotkeys', 'talk', {
+    label: 'Talk key',
+    parse: oneOf(TALK_KEYS),
+    show: plain,
+  }),
   'hotkeys.pauseSight': hotkey('pauseSight', 'Pause sight key'),
   'hotkeys.stopVoice': hotkey('stopVoice', 'Stop voice key'),
   keepAnEye: whole('keepAnEye', {

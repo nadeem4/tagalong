@@ -2900,19 +2900,30 @@ flowchart LR
   E -- "turn.delta" --> CB
 ```
 
-- **Hold to talk** (`main/hotkeys.ts`, `ui/voice/push-to-talk.ts`). `hotkeys.talk`, default
-  `Ctrl+Shift+Alt+Space` (not the ask key held: the ask key opens the bubble on a press). A global
-  shortcut reports presses only, repeating while the key is held, so main forwards every press as
-  `IPC.talkEvent` with its time and brings the bubble up with the keyboard. `PushToTalk` in the
-  panel turns presses into start and stop: the first press starts; presses within
-  `FRESH_PRESS_MS` (1.1 s) of the last are the key repeating; the first `keyup` in the bubble is the
-  release; a later fresh press stops if the release was missed. The mic button toggles. Listening
+- **Hold to talk** (`main/talk-key.ts`, `ui/voice/push-to-talk.ts`). `hotkeys.talk` is one key
+  held alone, from `TALK_KEYS` (Right Ctrl by default; Right Alt, Right Shift or Scroll Lock in
+  Settings), never a combo: a settings file holding an old accelerator, the old default
+  `Ctrl+Shift+Alt+Space` or a custom combo, loads as Right Ctrl. It is no global shortcut. A
+  global shortcut cannot bind a lone modifier and never reports a release, and the release used to
+  be a DOM `keyup` in the bubble, which Windows' focus-steal prevention often never delivered. Main
+  runs a key hook (`uiohook-napi`, N-API prebuilds, loaded in `loadKeyHook`) and `TalkKeyWatch`
+  compares each key's code with the talk key's and drops it: nothing typed is logged, stored or
+  sent, and no input is ever sent. The talk key held alone for `TALK_CONFIRM_MS` (250 ms;
+  repeats ignored) is `IPC.talkEvent` with its time; another key down or the key up before then
+  sends nothing at all, so a quick shortcut (Right Ctrl+C) never raises the bubble or cuts Scout
+  off, and a tap is nothing. Main brings the bubble up without the keyboard (`showPanelQuietly`),
+  so a shortcut the person meant still reaches their app. It coming up is
+  `IPC.talkReleaseEvent`. Any other key going down after the press is `IPC.talkCancelEvent`: the
+  panel ends the hold and, if the key was holding a question open, cancels it; the mic closes and
+  nothing is sent (Right Ctrl+C is a copy, not a question).
+  `PushToTalk` in the panel turns these into start and stop; a fresh press after
+  `FRESH_PRESS_MS` (1.1 s) stops if a release was ever missed. The mic button toggles. Listening
   ends on its own after 30 s. When listening ends some other way while the key is still held (the
-  30 s limit, the microphone or the ears failing), `end()` leaves it spent: the key's repeats start
-  nothing, so a failure does not reopen the mic at the repeat rate; the key coming up, or a fresh
-  press, clears it (the bubble passes every `keyup` on, listening or not), and the mic button starts
-  listening from it. Stopping with no question pending goes back to idle, never "Turning that into
-  text…".
+  30 s limit, the microphone or the ears failing), `end()` leaves it spent until the key comes up.
+  Stopping with no question pending goes back to idle, never "Turning that into text…". If the
+  hook will not load or start, main logs one warning and reports it as a `talk` outcome through
+  the hotkey-problem path (the panel and Settings show it); there is no fallback key, the mic
+  button still works, and nothing crashes. The hook stops on quit.
 - **Barge-in.** Starting to listen, and the ears' `speechStart`, call `SpeechQueue.stop()`: Scout stops mid-sentence. The
   bubble subscribes to `talk.onListen`; when listening starts while an answer still streams it
   also interrupts that turn (`bridge.interrupt`), drops its `SpokenStream` and keeps what was shown so far, so no later

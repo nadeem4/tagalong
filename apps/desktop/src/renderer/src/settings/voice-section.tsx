@@ -8,6 +8,8 @@ import {
   MAX_VOICE_SPEED,
   MIN_VOICE_SPEED,
   SETTINGS_DEFAULTS,
+  TALK_KEYS,
+  TALK_KEY_LABELS,
   adaptersFor,
   chosenMouth,
 } from '@tagalong/protocol';
@@ -38,7 +40,7 @@ export function VoiceSection({
 }) {
   const [talks, setTalks] = useState(settings.voice.enabled);
   const talkKey = settings.hotkeys.talk ?? SETTINGS_DEFAULTS.hotkeys.talk;
-  const talkRefused = hotkeyError?.includes(`(${talkKey})`) === true;
+  const talkRefused = hotkeyError?.includes(`(${TALK_KEY_LABELS[talkKey]})`) === true;
   const [microphones, setMicrophones] = useState<{ id: string; label: string }[]>([]);
   useEffect(() => {
     listMicrophones()
@@ -160,14 +162,20 @@ export function VoiceSection({
             <label htmlFor="f-talkHotkey">Talk to Scout</label>
             <Info tip="talk" label="About talking to Scout" />
           </div>
-          <input
+          <select
             id="f-talkHotkey"
             name="talkHotkey"
             defaultValue={talkKey}
             {...(talkRefused
               ? { 'aria-invalid': true as const, 'aria-describedby': 'hotkey-error' }
               : {})}
-          />
+          >
+            {TALK_KEYS.map((key) => (
+              <option key={key} value={key}>
+                {TALK_KEY_LABELS[key]}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <label htmlFor="f-microphone">Microphone</label>
@@ -185,8 +193,10 @@ export function VoiceSection({
         </div>
       </div>
       <p className="tg-help">
-        Hold the key and speak; let go and Scout answers out loud. Your speech is turned into text
-        on this PC, and the recording is never sent or kept.
+        Hold the key on its own and speak; let go and Scout answers out loud. Pressing another key
+        while you hold it (Right Ctrl+C, say) sends nothing. Tagalong watches only this key go down
+        and up; nothing you type is read or kept. Your speech is turned into text on this PC, and
+        the recording is never sent or kept.
       </p>
       <Tip tip="talk">
         Hold the key, or click the mic in the bubble, and say your question. Let go (or click again)

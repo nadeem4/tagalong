@@ -407,11 +407,18 @@ Scout listens continuously only after you switch **Always listening** on, once, 
 the whole time it is on, and Scout never switches it on itself. Audio is understood on the
 computer and is never sent or stored.
 
-Otherwise the microphone is used only while you hold the talk key (`Ctrl+Shift+Alt+Space` by
+Otherwise the microphone is used only while you hold the talk key (Right Ctrl on its own by
 default, Settings → Voice) or after you click the mic in the text box, until you let go or click
 again (at most 30 seconds). Hold-to-talk and the mic button need no name, whether or not Always
 listening is on. After an answer the bubble only offers the key to reply. Setup listens for its
 answers only after you choose **Talk to me** (below).
+
+To see the talk key go down and come up whichever app you are in, Tagalong watches the keyboard
+through a key hook. It compares each key with the talk key and drops it at once: Tagalong keeps
+only whether the talk key is down and whether some other key went down while it was, and nothing
+you type is read, logged, kept or sent. It sends no
+keys either. Pressing any other key while you hold the talk key (Right Ctrl+C, say) closes the
+microphone and sends nothing, because you meant a shortcut.
 
 ```mermaid
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#000000", "secondaryColor": "#ffffff", "tertiaryColor": "#ffffff", "background": "#ffffff"}}}%%

@@ -282,6 +282,16 @@ const host: TagalongHostApi = {
     ipcRenderer.on(IPC.talkEvent, listener);
     return () => void ipcRenderer.off(IPC.talkEvent, listener);
   },
+  onTalkRelease: (handler) => {
+    const listener = (): void => handler();
+    ipcRenderer.on(IPC.talkReleaseEvent, listener);
+    return () => void ipcRenderer.off(IPC.talkReleaseEvent, listener);
+  },
+  onTalkCancel: (handler) => {
+    const listener = (): void => handler();
+    ipcRenderer.on(IPC.talkCancelEvent, listener);
+    return () => void ipcRenderer.off(IPC.talkCancelEvent, listener);
+  },
   earsListen: (mode) => ipcRenderer.invoke(IPC.earsListen, mode) as Promise<void>,
   // A frame at a time, without waiting for an answer: the ears are in the voice process.
   micFrame: (samples) => ipcRenderer.send(IPC.micFrame, samples),

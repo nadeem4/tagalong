@@ -47,7 +47,7 @@ its result.
 - Runs all day in the background: tray icon, Scout docked on the desktop, a bubble that opens
   beside it on a hotkey and hides on Escape.
 - Hotkeys: `Ctrl+Shift+Space` ask (brings the selected text and the window you are on),
-  `Ctrl+Shift+Alt+P` pause sight, `Ctrl+Shift+Alt+M` stop speaking, `Ctrl+Shift+Alt+Space` held
+  `Ctrl+Shift+Alt+P` pause sight, `Ctrl+Shift+Alt+M` stop speaking, Right Ctrl held on its own
   to talk to Scout.
 - "What do you see?" is answered per screen from the window list, without a screenshot. Scout
   reads one window, or photographs it, only when you ask about it.

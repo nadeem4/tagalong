@@ -207,7 +207,7 @@ by tapping a card, or, after **Talk to me**, by saying it (W.9). W.1 to W.8 type
 ### W.14. The talk key during setup
 
 1. **Action:** with the setup window open (behind another window), press the talk key
-   (`Ctrl+Shift+Alt+Space`).
+   (Right Ctrl).
 2. **Expected:** setup comes to the front. The bubble does not open and no second microphone
    opens. With Always listening on (re-run via **Open Welcome again**), Scout's mark shows
    listening paused until the setup window closes.
@@ -895,7 +895,7 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 ### T.1. Hold to talk
 
 1. **Setup:** a fresh profile, so the speech models are not downloaded yet.
-2. **Action:** hold `Ctrl+Shift+Alt+Space`, say "what am I looking at?", let go.
+2. **Action:** hold Right Ctrl on its own, say "what am I looking at?", let go.
 3. **Expected:** the bubble opens with a pulsing dot and "Listening…" while the key is held, and a
    note that the first time downloads the speech models (about 43 MB). Once they have loaded, the
    words you are saying appear under "Listening…" as you talk. On letting go it says "Turning that
@@ -904,6 +904,17 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 4. **Action:** hold the key again and ask a second question, now that the models are downloaded.
 5. **Expected:** no download note; your words show live while you talk, and the answer follows the
    release. Quit and start Tagalong again, then hold the key: still no download note.
+6. **Action:** click into another app (Notepad, say) so it has the keyboard, hold Right Ctrl, ask
+   a question and let go.
+7. **Expected:** the bubble comes up without taking the keyboard, listens, and the question is sent
+   the moment you let go (never only after 30 seconds). Notepad keeps the keyboard.
+8. **Action:** in Notepad, select some text and press Right Ctrl+C.
+9. **Expected:** the copy works in Notepad. Typed at once, the bubble does not come up and Scout,
+   if speaking, is not cut off. Held over a quarter second before C, the bubble comes up but the
+   microphone closes as C goes down and nothing is asked: no "Turning that into text…", no answer.
+   A quick tap of Right Ctrl on its own does nothing.
+10. **Edge:** when the key hook cannot start (a broken install), Shortcuts and the bubble say "The
+    talk key could not start", the mic button still works, and Tagalong does not crash.
 
 ### T.2. Spoken answers start early and sound spoken
 
@@ -915,7 +926,8 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 
 ### T.3. Barge-in
 
-1. **Action:** ask a typed question that gets a long answer; while Scout speaks, hold the talk key.
+1. **Action:** ask a typed question that gets a long answer; while Scout speaks, hold the talk key
+   (Right Ctrl).
 2. **Expected:** Scout stops speaking at once, the bubble listens, and the new spoken question is
    answered.
 3. **Action:** ask a spoken question with a long answer and hold the talk key again while it is
@@ -927,14 +939,15 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 
 1. **Setup:** Always listening is off.
 2. **Action:** after a spoken answer finishes, wait ten seconds without touching anything.
-3. **Expected:** the bubble shows "Hold Ctrl+Shift+Alt+Space to reply". The microphone does not open
+3. **Expected:** the bubble shows "Hold Right Ctrl to reply". The microphone does not open
    (no microphone icon in the Windows tray). Holding the key again continues the same conversation.
 
 ### T.5. The mic button
 
 1. **Action:** click the mic beside × in the bubble, speak, click it again.
-2. **Expected:** the mic button turns gold while listening ("Stop listening"); the second click sends
-   the question. Closing the bubble while listening stops the microphone and sends nothing.
+2. **Expected:** the mic button turns gold while listening ("Stop listening", its tooltip names
+   Right Ctrl); the second click sends the question. Closing the bubble while listening stops the
+   microphone and sends nothing.
 
 ### T.6. Nothing said, and the microphone setting
 
@@ -990,9 +1003,11 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 
 ### T.8. Settings → Voice
 
-1. **Action:** change **Talk to Scout** to another combination, Save, and hold the new key.
-2. **Expected:** the new key works at once; the bubble's reply hint names it. A key another app owns is
-   reported in Shortcuts and the field is marked.
+1. **Action:** open **Talk to Scout**: it lists Right Ctrl (the default), Right Alt, Right Shift and
+   Scroll Lock, one key each, no combos. Pick Right Shift, Save, and hold Right Shift.
+2. **Expected:** the new key works at once and Right Ctrl no longer talks; the bubble's reply hint
+   says "Hold Right Shift to reply". A settings file from before (holding `Ctrl+Shift+Alt+Space` or
+   any other combo as the talk key) opens on Right Ctrl.
 3. **Action:** with the bubble open, pick another microphone and change your name in Settings;
    Save, then talk to Scout without restarting.
 4. **Expected:** the new microphone is used and Scout uses the new name.
@@ -1062,7 +1077,7 @@ Run with a real microphone and without `TAGALONG_FAKE_STT`. Switch **Always list
    unnamed talk is ignored again. A plain "stop" in the window only closes it. The window does
    not open after an answer you stopped (stop button, stop key, ×) or talked over, nor after a
    typed question's answer, and the talk key, a call or full screen, or switching off closes it.
-7. **Action:** with Always listening on, hold `Ctrl+Shift+Alt+Space`, or click the mic in the text
+7. **Action:** with Always listening on, hold Right Ctrl, or click the mic in the text
    box, and ask a question without the name.
 8. **Expected:** the bubble listens as usual and shows your words as said; the question is asked
    and answered. Hold-to-talk and the mic button need no name. Afterwards always listening
