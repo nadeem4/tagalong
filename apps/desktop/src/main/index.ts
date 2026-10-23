@@ -720,7 +720,8 @@ function toPanel(channel: string): void {
 }
 
 /**
- * The talk key went down. The bubble comes up without taking the keyboard: the release comes
+ * The talk key went down and stayed down alone for a moment (TALK_CONFIRM_MS), so a quick
+ * shortcut never gets here. The bubble comes up without taking the keyboard: the release comes
  * from the key hook, not the bubble, and a bubble that took the focus would swallow the
  * shortcut the person meant if the press turns out to be Right Ctrl+C. The microphone only
  * ever opens in the panel, on this key or its mic button. While Welcome is open the key brings

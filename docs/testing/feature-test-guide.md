@@ -909,8 +909,10 @@ looking at?" and Chromium's fake microphone stands in for a real one.
 7. **Expected:** the bubble comes up without taking the keyboard, listens, and the question is sent
    the moment you let go (never only after 30 seconds). Notepad keeps the keyboard.
 8. **Action:** in Notepad, select some text and press Right Ctrl+C.
-9. **Expected:** the copy works in Notepad. The bubble may come up for a moment, but the
+9. **Expected:** the copy works in Notepad. Typed at once, the bubble does not come up and Scout,
+   if speaking, is not cut off. Held over a quarter second before C, the bubble comes up but the
    microphone closes as C goes down and nothing is asked: no "Turning that into text…", no answer.
+   A quick tap of Right Ctrl on its own does nothing.
 10. **Edge:** when the key hook cannot start (a broken install), Shortcuts and the bubble say "The
     talk key could not start", the mic button still works, and Tagalong does not crash.
 

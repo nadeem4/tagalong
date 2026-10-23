@@ -1,7 +1,7 @@
 /** Tests for the talk key: one key held alone, watched through a key hook driven by fakes here. */
 
-import { describe, expect, it, vi } from 'vitest';
-import { TALK_KEYCODES, TalkKeyWatch, startTalkKey } from './talk-key';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { TALK_CONFIRM_MS, TALK_KEYCODES, TalkKeyWatch, startTalkKey } from './talk-key';
 import type { KeyHook } from './talk-key';
 
 const RIGHT_CTRL = TALK_KEYCODES.RightControl;
@@ -47,17 +47,59 @@ function fakeHook(failStart = false): KeyHook & {
   return hook;
 }
 
+/** Holds the talk key down long enough to count as a talk. */
+function hold(made: TalkKeyWatch, keycode = RIGHT_CTRL): void {
+  made.keyDown(keycode);
+  vi.advanceTimersByTime(TALK_CONFIRM_MS);
+}
+
 describe('TalkKeyWatch', () => {
-  it('is Right Ctrl until told otherwise: down is the press, up is the release', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('is Right Ctrl until told otherwise: held a moment is the press, up is the release', () => {
     const { watch: made, heard } = watch();
     made.keyDown(RIGHT_CTRL);
+    expect(heard).toEqual([]);
+    vi.advanceTimersByTime(TALK_CONFIRM_MS);
+    expect(heard).toEqual(['press']);
     made.keyUp(RIGHT_CTRL);
     expect(heard).toEqual(['press', 'release']);
   });
 
-  it('ignores the repeats of the key held down', () => {
+  it('a shortcut typed at once (Right Ctrl+C) sends nothing at all: no press, no cancel', () => {
     const { watch: made, heard } = watch();
     made.keyDown(RIGHT_CTRL);
+    made.keyDown(C);
+    vi.advanceTimersByTime(TALK_CONFIRM_MS * 2);
+    made.keyUp(C);
+    made.keyUp(RIGHT_CTRL);
+    expect(heard).toEqual([]);
+  });
+
+  it('a tap too short to be a talk sends nothing', () => {
+    const { watch: made, heard } = watch();
+    made.keyDown(RIGHT_CTRL);
+    made.keyUp(RIGHT_CTRL);
+    vi.advanceTimersByTime(TALK_CONFIRM_MS * 2);
+    expect(heard).toEqual([]);
+  });
+
+  it('a key changed in Settings while the old one waits drops that press', () => {
+    const { watch: made, heard } = watch();
+    made.keyDown(RIGHT_CTRL);
+    made.setKey('RightShift');
+    vi.advanceTimersByTime(TALK_CONFIRM_MS * 2);
+    expect(heard).toEqual([]);
+  });
+
+  it('ignores the repeats of the key held down', () => {
+    const { watch: made, heard } = watch();
+    hold(made);
     made.keyDown(RIGHT_CTRL);
     made.keyDown(RIGHT_CTRL);
     made.keyUp(RIGHT_CTRL);
@@ -66,7 +108,7 @@ describe('TalkKeyWatch', () => {
 
   it('cancels when another key goes down while it is held: a shortcut, not a question', () => {
     const { watch: made, heard } = watch();
-    made.keyDown(RIGHT_CTRL);
+    hold(made);
     made.keyDown(C);
     made.keyUp(C);
     made.keyDown(C);
@@ -84,10 +126,10 @@ describe('TalkKeyWatch', () => {
 
   it('starts fresh on the next press after a cancel', () => {
     const { watch: made, heard } = watch();
-    made.keyDown(RIGHT_CTRL);
+    hold(made);
     made.keyDown(C);
     made.keyUp(RIGHT_CTRL);
-    made.keyDown(RIGHT_CTRL);
+    hold(made);
     made.keyUp(RIGHT_CTRL);
     expect(heard).toEqual(['press', 'cancel', 'press', 'release']);
   });
@@ -95,9 +137,9 @@ describe('TalkKeyWatch', () => {
   it('watches the key picked in Settings instead', () => {
     const { watch: made, heard } = watch();
     made.setKey('RightShift');
-    made.keyDown(RIGHT_CTRL);
+    hold(made);
     made.keyUp(RIGHT_CTRL);
-    made.keyDown(TALK_KEYCODES.RightShift);
+    hold(made, TALK_KEYCODES.RightShift);
     made.keyUp(TALK_KEYCODES.RightShift);
     expect(heard).toEqual(['press', 'release']);
   });
@@ -115,8 +157,11 @@ describe('startTalkKey', () => {
     const started = await startTalkKey(async () => hook, made);
     expect(started.error).toBeNull();
     expect(hook.started).toBe(true);
+    vi.useFakeTimers();
     hook.down(RIGHT_CTRL);
+    vi.advanceTimersByTime(TALK_CONFIRM_MS);
     hook.up(RIGHT_CTRL);
+    vi.useRealTimers();
     expect(heard).toEqual(['press', 'release']);
     started.stop();
     expect(hook.stopped).toBe(true);

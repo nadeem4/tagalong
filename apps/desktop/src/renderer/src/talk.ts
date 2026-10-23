@@ -272,12 +272,12 @@ export function useTalk(options: TalkOptions): {
   );
 
   // Another key went down while the talk key was held: a shortcut, so the mic closes and
-  // nothing is sent. The hold ends first, so the next press starts fresh.
+  // nothing is sent. The hold ends first, so the next press starts fresh. Only a question the
+  // key is holding open goes: one from the mic button, or one the 30 s cap already sent, stays.
   useEffect(
     () =>
       window.tagalongHost.onTalkCancel(() => {
-        ptt.release();
-        control.cancel();
+        if (ptt.release() === 'stop') control.cancel();
       }),
     [control, ptt],
   );

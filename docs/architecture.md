@@ -2908,11 +2908,14 @@ flowchart LR
   be a DOM `keyup` in the bubble, which Windows' focus-steal prevention often never delivered. Main
   runs a key hook (`uiohook-napi`, N-API prebuilds, loaded in `loadKeyHook`) and `TalkKeyWatch`
   compares each key's code with the talk key's and drops it: nothing typed is logged, stored or
-  sent, and no input is ever sent. The talk key going down (repeats ignored) is `IPC.talkEvent`
-  with its time; main brings the bubble up without the keyboard (`showPanelQuietly`), so a
-  shortcut the person meant still reaches their app. It coming up is `IPC.talkReleaseEvent`. Any
-  other key going down while it is held is `IPC.talkCancelEvent`: the panel ends the hold and
-  cancels, the mic closes and nothing is sent (Right Ctrl+C is a copy, not a question).
+  sent, and no input is ever sent. The talk key held alone for `TALK_CONFIRM_MS` (250 ms;
+  repeats ignored) is `IPC.talkEvent` with its time; another key down or the key up before then
+  sends nothing at all, so a quick shortcut (Right Ctrl+C) never raises the bubble or cuts Scout
+  off, and a tap is nothing. Main brings the bubble up without the keyboard (`showPanelQuietly`),
+  so a shortcut the person meant still reaches their app. It coming up is
+  `IPC.talkReleaseEvent`. Any other key going down after the press is `IPC.talkCancelEvent`: the
+  panel ends the hold and, if the key was holding a question open, cancels it; the mic closes and
+  nothing is sent (Right Ctrl+C is a copy, not a question).
   `PushToTalk` in the panel turns these into start and stop; a fresh press after
   `FRESH_PRESS_MS` (1.1 s) stops if a release was ever missed. The mic button toggles. Listening
   ends on its own after 30 s. When listening ends some other way while the key is still held (the

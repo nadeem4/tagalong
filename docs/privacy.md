@@ -414,8 +414,9 @@ listening is on. After an answer the bubble only offers the key to reply. Setup 
 answers only after you choose **Talk to me** (below).
 
 To see the talk key go down and come up whichever app you are in, Tagalong watches the keyboard
-through a key hook. It compares each key with the talk key and drops it at once: Tagalong watches
-only the talk key's own presses, and nothing you type is read, logged, kept or sent. It sends no
+through a key hook. It compares each key with the talk key and drops it at once: Tagalong keeps
+only whether the talk key is down and whether some other key went down while it was, and nothing
+you type is read, logged, kept or sent. It sends no
 keys either. Pressing any other key while you hold the talk key (Right Ctrl+C, say) closes the
 microphone and sends nothing, because you meant a shortcut.
 
