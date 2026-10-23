@@ -165,7 +165,7 @@ test('talking to Scout: the mic listens, Scout hears the question and answers', 
   // The fake ears, in the real voice process, hear the same question every time; the bubble shows it.
   await expect(panel.getByText('What am I looking at?')).toBeVisible({ timeout: 30_000 });
   await expect(panel.getByText(/This is the fake pet/)).toBeVisible({ timeout: 30_000 });
-  await expect(panel.getByText(/Hold Ctrl\+Shift\+Alt\+Space to reply/)).toBeVisible({
+  await expect(panel.getByText(/Hold Right Ctrl to reply/)).toBeVisible({
     timeout: 30_000,
   });
 
