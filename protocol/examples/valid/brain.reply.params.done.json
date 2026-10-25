@@ -1,0 +1,5 @@
+{
+  "jsonrpc": "2.0",
+  "method": "reply",
+  "params": { "seq": 5, "turn": "t1", "body": "desktop", "done": true }
+}

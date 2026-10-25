@@ -1,0 +1,5 @@
+{
+  "jsonrpc": "2.0",
+  "method": "reply",
+  "params": { "seq": 4, "turn": "t1", "body": "desktop", "delta": "That's a missing import" }
+}

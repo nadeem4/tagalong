@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "method": "tool",
+  "params": {
+    "seq": 2,
+    "turn": "t1",
+    "call": "c1",
+    "name": "desktop__see_screen",
+    "state": "started"
+  }
+}

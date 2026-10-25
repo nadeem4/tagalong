@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "say",
+  "params": {
+    "text": "look at these",
+    "parts": [
+      { "type": "image", "mime": "image/png", "data": "iVBORw0..." },
+      { "type": "file", "mime": "text/plain", "name": "notes.txt", "data": "aGVsbG8=" }
+    ]
+  }
+}

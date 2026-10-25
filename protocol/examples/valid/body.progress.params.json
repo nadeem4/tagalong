@@ -1,0 +1,5 @@
+{
+  "jsonrpc": "2.0",
+  "method": "progress",
+  "params": { "call": "c1", "text": "Capturing the screen" }
+}

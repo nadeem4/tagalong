@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "hello",
+  "params": {
+    "protocol": 1,
+    "body": { "id": "Desktop", "kind": "desktop", "name": "Desktop" },
+    "tools": []
+  }
+}

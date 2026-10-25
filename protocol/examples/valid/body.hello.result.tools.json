@@ -1,0 +1,17 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "protocol": 1,
+    "session": "s1",
+    "tools": [
+      {
+        "name": "get_settings",
+        "description": "Read the settings",
+        "input_schema": { "type": "object" }
+      }
+    ],
+    "seq": 0,
+    "resync": false
+  }
+}

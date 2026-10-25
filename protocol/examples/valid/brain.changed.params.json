@@ -1,0 +1,1 @@
+{ "jsonrpc": "2.0", "method": "changed", "params": { "seq": 10, "what": "settings" } }

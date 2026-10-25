@@ -9,7 +9,7 @@ import globals from 'globals';
  * packages/core and packages/protocol: neither may reach for electron, react,
  * or the DOM. If that rule fires, fix the import, never the rule.
  */
-const PURE_PACKAGES = ['packages/core/**/*.ts', 'packages/protocol/**/*.ts'];
+const PURE_PACKAGES = ['packages/core/**/*.ts', 'packages/protocol/**/*.ts', 'protocol/ts/**/*.ts'];
 
 const PURITY_PATHS = [
   {
@@ -102,7 +102,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['packages/protocol/**/*.ts'],
+    files: ['packages/protocol/**/*.ts', 'protocol/ts/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -116,6 +116,28 @@ export default tseslint.config(
             {
               group: ['@tagalong/*'],
               message: 'packages/protocol sits at the bottom of the dependency graph.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The examples test reads the sample files, so tests alone may import node:fs, node:path
+    // and node:url. Repeats the other bans: a later block replaces a rule's options.
+    files: ['protocol/ts/**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'electron', message: 'protocol/ts depends on zod and nothing else.' },
+            { name: 'react', message: 'protocol/ts depends on zod and nothing else.' },
+          ],
+          patterns: [
+            {
+              group: ['@tagalong/*'],
+              message: 'protocol/ts sits at the bottom of the dependency graph.',
             },
           ],
         },
