@@ -351,3 +351,25 @@ async def test_tool_use_stop_without_blocks_is_end_turn():
     assert reason == "done"
     assert model.calls == 1
     assert len(history) == 2
+
+
+async def test_final_model_prices_the_answering_model():
+    budget = Spend()
+    final = Final(
+        [{"type": "text", "text": "hi"}], "end_turn", SimpleNamespace(), "claude-haiku-5-5"
+    )
+    await go([(["hi"], final)], budget=budget)
+    assert budget.spent == ["claude-haiku-5-5"]
+
+
+async def test_unexpected_exception_closes_history_and_sends_done():
+    class Boom(Spend):
+        def spend(self, usage, model):
+            raise OSError("disk full")
+
+    steps = [(["partial"], tool_step(("c1", "x"))[1])]
+    reason, history, sent, _ = await go(steps, budget=Boom())
+    assert reason == "error"
+    assert history[-1]["content"][0]["type"] == "tool_result"
+    assert history[-1]["content"][0]["tool_use_id"] == "c1"
+    assert len(dones(sent)) == 1

@@ -22,8 +22,9 @@ log = logging.getLogger("brain")
 
 
 async def _run() -> None:
+    # The data dir says where .env is, and .env may hold the other TAGALONG_* settings.
+    load_env_file(load_config().data_dir, os.environ)
     config = load_config()
-    load_env_file(config.data_dir, os.environ)
     if not os.environ.get("ANTHROPIC_API_KEY"):
         log.error(
             "ANTHROPIC_API_KEY is missing: put it in %s or the environment",

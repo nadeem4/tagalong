@@ -101,6 +101,22 @@ async def test_leftover_inbox_kept_in_history():
     assert session.say("desktop", say("next")).joined is False
 
 
+async def test_leftover_says_come_before_a_newer_say():
+    model = Gate(["one", "two"])
+    session, sent = make(model)
+    session.say("desktop", say("a"))
+    await finish(session)
+    session._inbox.append([{"type": "text", "text": "old"}])  # joined, but the loop had ended
+    # the finished task's done-callback has not run yet when the new say lands
+    session._task = asyncio.get_running_loop().create_future()
+    session._task.set_result("done")
+    session.say("desktop", say("new"))
+    await finish(session)
+    texts = [b["text"] for b in model.seen[-1][-1]["content"]]
+    assert texts == ["old", "new"]
+    assert session._inbox == []
+
+
 async def test_cancel_running_turn():
     session, sent = make(Gate([asyncio.Event(), "never"]))
     result = session.say("desktop", say("a"))

@@ -27,15 +27,17 @@ It needs an Anthropic key. With no `ANTHROPIC_API_KEY` in the environment or in
 | `TAGALONG_STEP_CAP`         | `25`              | Most model calls in one turn                         |
 | `ANTHROPIC_API_KEY`         | none, required    | Anthropic key                                        |
 
-`<TAGALONG_HOME>/.env` holds `KEY=value` lines (`#` comments and quotes allowed). It only fills
-keys the environment lacks, so the environment wins. A bad budget or step cap stops the brain at
+`<TAGALONG_HOME>/.env` holds `KEY=value` lines (`#` comments and quotes allowed). Any
+`TAGALONG_*` setting above except `TAGALONG_HOME`, and `ANTHROPIC_API_KEY`, may live there. It only
+fills keys the environment lacks, so the environment wins. A bad budget or step cap stops the brain at
 start.
 
 The `session` file keeps one id across restarts. `hello` returns it.
 
 `budget.json` holds `{"date": "2026-10-25", "spent_usd": 0.42}` and starts again at zero each
 local day. After each model call the brain adds its cost. A model call that would start at or
-over the limit ends the turn with `over_budget`. A cancelled or failed stream records no spend, so
+over the limit ends the turn with `over_budget`. Cost uses the top-level `usage` of the reply
+(not `usage.iterations`), priced at the model that actually answered, including a fallback. A cancelled or failed stream records no spend, so
 the total can run a little low.
 
 ## Files
@@ -91,7 +93,8 @@ flowchart TD
     G --> B
     E -->|pause_turn| B
     E -->|other| H{joined says waiting?}
-    H -->|yes| G
+    H -->|yes| J[add joined says]
+    J --> B
     H -->|no| Z
 ```
 
@@ -141,10 +144,9 @@ flowchart LR
 
 | Row   | Brings                                                                                                                                                                                                           |
 | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 4     | Live-state replay after `resync` (the thinking loop, `say`, `cancel`, budget and step cap are built)                                                                                                             |
 | 6     | Memory and saved chat history. A restart starts a fresh conversation                                                                                                                                             |
 | 7     | Body tools for Scout (`use` plugs into the loop), the brain's tools in the `hello` result, `use` and its `cancel` to bodies, `call`, model tool names `<body>__<tool>`, part size checks as `say` and tools land |
-| Later | Asks, `answer` and confirm guardrails                                                                                                                                                                            |
+| Later | Live-state replay after `resync`, asks, `answer` and confirm guardrails                                                                                                                                          |
 
 Until then `call` and `answer` answer `method_not_found`.
 

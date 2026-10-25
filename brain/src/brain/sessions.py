@@ -49,6 +49,9 @@ class Session:
             return SayResult(turn=self._turn_id, joined=True)
         turn_id = uuid.uuid4().hex
         self._turn_id = turn_id
+        if self._inbox:  # says from the finished turn come before this newer one
+            self._append_user([b for s in self._inbox for b in s])
+            self._inbox.clear()
         self._append_user(content)
         notify = self._bodies.notify
         # Deferred a tick so the say result goes out before the started notification.

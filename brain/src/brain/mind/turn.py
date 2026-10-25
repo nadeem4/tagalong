@@ -19,6 +19,7 @@ class Final:
     content: list[dict]
     stop_reason: str | None
     usage: Any
+    model: str | None = None  # who answered; differs from the request after a fallback
 
 
 class Model(Protocol):
@@ -57,7 +58,7 @@ class AnthropicModel:
             async for text in stream.text_stream:
                 yield text
             msg = await stream.get_final_message()
-        yield Final([b.to_dict() for b in msg.content], msg.stop_reason, msg.usage)
+        yield Final([b.to_dict() for b in msg.content], msg.stop_reason, msg.usage, msg.model)
 
 
 async def run_turn(
@@ -111,7 +112,7 @@ async def run_turn(
                 break
 
             history.append({"role": "assistant", "content": final.content})
-            budget.spend(final.usage, model.model_id)
+            budget.spend(final.usage, final.model or model.model_id)
             if final.stop_reason == "pause_turn":
                 continue
 
@@ -132,18 +133,24 @@ async def run_turn(
                 history[-1]["content"] += says
             else:
                 history.append({"role": "user", "content": says})
-    except asyncio.CancelledError:
-        # Swallowed so the caller gets a reason; uncancel keeps an outer timeout's count right.
-        task = asyncio.current_task()
-        if task:
-            task.uncancel()
+    except BaseException as err:
+        cancelled = isinstance(err, asyncio.CancelledError)
+        if cancelled:
+            # Swallowed so the caller gets a reason; uncancel keeps an outer timeout's count right.
+            task = asyncio.current_task()
+            if task:
+                task.uncancel()
+        elif not isinstance(err, Exception):
+            raise
+        else:
+            log.exception("turn failed")
         _close_dangling_tool_use(history)
         for call, name in running.items():
             notify(
                 "tool",
                 {"turn": turn_id, "call": call, "name": name, "state": "ended", "ok": False},
             )
-        reason = "cancelled"
+        reason = "cancelled" if cancelled else "error"
     if spoke:
         notify("reply", {"turn": turn_id, "body": body_id, "done": True})
     return reason
