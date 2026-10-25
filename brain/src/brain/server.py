@@ -2,7 +2,7 @@
 
 Each connection owns one queue drained by a single writer task, so Peer.send never raises
 or awaits (Bodies.notify loops over peers) and the hello result always precedes its backlog.
-Requests other than hello and tools are not built yet and answer method_not_found.
+Hello, tools, say and cancel are handled; any other request answers method_not_found.
 """
 
 import asyncio
@@ -15,7 +15,16 @@ from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.exceptions import ConnectionClosed
 
 from brain.bodies import Bodies
-from brain.protocol import PROTOCOL, ErrorCode, HelloParams, HelloResult, ToolsParams
+from brain.protocol import (
+    PROTOCOL,
+    CancelTurnParams,
+    ErrorCode,
+    HelloParams,
+    HelloResult,
+    SayParams,
+    ToolsParams,
+)
+from brain.sessions import Session
 
 MAX_FRAME = 28_000_000
 log = logging.getLogger("brain")
@@ -73,7 +82,7 @@ def _parse(raw: str | bytes) -> dict | str:
     return message
 
 
-async def _handler(ws: ServerConnection, bodies: Bodies, session: str) -> None:
+async def _handler(ws: ServerConnection, bodies: Bodies, session_id: str, session: Session) -> None:
     peer = _Peer()
     writer = asyncio.create_task(_writer(ws, peer))
     body_id: str | None = None
@@ -91,14 +100,14 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session: str) -> None:
                 if method != "hello":  # method may be None for a response
                     peer.send(_error(req_id, ErrorCode.invalid_request, "hello must come first"))
                     break
-                body_id = _hello(message, req_id, peer, bodies, session)
+                body_id = _hello(message, req_id, peer, bodies, session_id)
                 if body_id is None:
                     break
                 continue
             if not isinstance(method, str):
                 continue  # a response; nothing asks the body for one yet
             try:
-                reply = _dispatch(method, message, req_id, body_id, peer, bodies)
+                reply = _dispatch(method, message, req_id, body_id, peer, bodies, session)
             except Exception:
                 log.exception("handler failed for %s", method)
                 reply = _error(req_id, ErrorCode.internal_error, "Internal error")
@@ -113,7 +122,7 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session: str) -> None:
         await asyncio.gather(writer, return_exceptions=True)
 
 
-def _hello(message: dict, req_id: Any, peer: _Peer, bodies: Bodies, session: str) -> str | None:
+def _hello(message: dict, req_id: Any, peer: _Peer, bodies: Bodies, session_id: str) -> str | None:
     """Join the body and queue the result then the backlog; None means hello failed."""
     raw = message.get("params")
     # Check the version first: a future protocol may change the shape, and its body
@@ -130,7 +139,7 @@ def _hello(message: dict, req_id: Any, peer: _Peer, bodies: Bodies, session: str
         return None
     joined = bodies.connect(params.body, params.tools, peer, params.last_seq)
     result = HelloResult(
-        protocol=PROTOCOL, session=session, tools=[], seq=joined.seq, resync=joined.resync
+        protocol=PROTOCOL, session=session_id, tools=[], seq=joined.seq, resync=joined.resync
     )
     peer.send(_result(req_id, result))
     for frame in joined.backlog:
@@ -139,7 +148,13 @@ def _hello(message: dict, req_id: Any, peer: _Peer, bodies: Bodies, session: str
 
 
 def _dispatch(
-    method: str, message: dict, req_id: Any, body_id: str, peer: _Peer, bodies: Bodies
+    method: str,
+    message: dict,
+    req_id: Any,
+    body_id: str,
+    peer: _Peer,
+    bodies: Bodies,
+    session: Session,
 ) -> str | None:
     if method == "hello":
         return _error(req_id, ErrorCode.invalid_request, "hello was already sent")
@@ -150,12 +165,29 @@ def _dispatch(
             return _error(req_id, ErrorCode.invalid_params, str(exc))
         bodies.set_tools(body_id, peer, parsed.tools)
         return _result(req_id, {})
-    # event, cancel, progress and unknown notifications are dropped by the caller.
+    if method == "say":
+        if "id" not in message:
+            return None
+        try:
+            say = SayParams.model_validate(message.get("params"))
+            return _result(req_id, session.say(body_id, say))
+        except (ValidationError, ValueError) as exc:
+            return _error(req_id, ErrorCode.invalid_params, str(exc))
+    if method == "cancel":
+        try:
+            cancel = CancelTurnParams.model_validate(message.get("params"))
+        except ValidationError as exc:
+            return _error(req_id, ErrorCode.invalid_params, str(exc))
+        session.cancel(cancel.turn)
+        return _result(req_id, {})
+    # event, progress and unknown notifications are dropped by the caller.
     return _error(req_id, ErrorCode.method_not_found, f"Unknown method: {method}")
 
 
-async def start_server(host: str, port: int, bodies: Bodies, session: str) -> Server:
+async def start_server(
+    host: str, port: int, bodies: Bodies, session_id: str, session: Session
+) -> Server:
     async def handler(ws: ServerConnection) -> None:
-        await _handler(ws, bodies, session)
+        await _handler(ws, bodies, session_id, session)
 
     return await serve(handler, host, port, max_size=MAX_FRAME)
