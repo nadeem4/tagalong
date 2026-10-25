@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { ZodType } from 'zod';
-import { bodyToBrain, brainToBody } from './messages.js';
+import { bodyToBrain, brainToBody, type MethodSchemas } from './messages.js';
 import { ErrorObject } from './shapes.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../examples');
@@ -48,7 +48,8 @@ function load(dir: 'valid' | 'invalid'): Sample[] {
 
 function schemaFor(s: Sample): ZodType {
   if (s.kind === 'error') return ErrorObject;
-  const entry = (s.from === 'body' ? bodyToBrain : brainToBody)[s.method];
+  const map: Record<string, MethodSchemas> = s.from === 'body' ? bodyToBrain : brainToBody;
+  const entry = map[s.method];
   if (!entry) throw new Error(`${s.file}: no such method ${s.method}`);
   const schema = s.kind === 'params' ? entry.params : entry.result;
   if (!schema) throw new Error(`${s.file}: ${s.method} has no ${s.kind}`);

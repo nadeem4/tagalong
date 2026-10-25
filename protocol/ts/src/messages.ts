@@ -163,7 +163,7 @@ export interface MethodSchemas {
   result?: ZodType;
 }
 
-export const bodyToBrain: Record<string, MethodSchemas> = {
+export const bodyToBrain = {
   hello: { params: HelloParams, result: HelloResult },
   tools: { params: ToolsParams, result: EmptyResult },
   say: { params: SayParams, result: SayResult },
@@ -172,9 +172,9 @@ export const bodyToBrain: Record<string, MethodSchemas> = {
   answer: { params: AnswerParams, result: EmptyResult },
   cancel: { params: CancelTurnParams },
   progress: { params: ProgressParams },
-};
+} satisfies Record<string, MethodSchemas>;
 
-export const brainToBody: Record<string, MethodSchemas> = {
+export const brainToBody = {
   use: { params: UseParams, result: UseResult },
   cancel: { params: CancelCallParams },
   reply: { params: ReplyParams },
@@ -182,4 +182,7 @@ export const brainToBody: Record<string, MethodSchemas> = {
   tool: { params: ToolParams },
   ask: { params: AskParams },
   changed: { params: ChangedParams },
-};
+} satisfies Record<string, MethodSchemas>;
+
+export type BodyToBrainMethod = keyof typeof bodyToBrain;
+export type BrainToBodyMethod = keyof typeof brainToBody;

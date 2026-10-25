@@ -26,7 +26,8 @@ tagalong/
   protocol/                         # contract v1 for the Python brain (README.md is the spec)
     examples/                       # sample frames shared by the TypeScript and Python tests
     ts/                             # @tagalong/contract: zod schemas for contract v1
-  brain/                            # the Python brain: uv project, src/brain/protocol.py, tests/
+  brain/                            # the Python brain: uv project, tests/; src/brain/ has protocol.py,
+                                    # config.py, bodies.py, server.py and main.py (see docs/brain.md)
   packages/
     protocol/src/
       index.ts                      # PROTOCOL_VERSION, ENGINE_HOST, DEFAULT_ENGINE_PORT, engineUrl
@@ -184,6 +185,7 @@ uv sync                    # install dependencies into brain/.venv
 uv run pytest              # tests, including the shared protocol/examples
 uv run ruff check          # lint
 uv run ruff format --check # format check
+uv run brain               # starts the websocket server (see docs/brain.md)
 ```
 
 The `brain` job in CI runs these commands, installing with `uv sync --locked`.
