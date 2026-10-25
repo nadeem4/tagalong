@@ -40,16 +40,16 @@ class Session:
         self._inbox: list = []
         self._turn_id: str | None = None
         self._task: asyncio.Task | None = None
-        self._tasks: set[asyncio.Task] = set()  # strong references until each turn ends
 
     def say(self, body_id: str, params: SayParams) -> SayResult:
         content = user_content(params)  # may raise ValueError before anything changes
-        if self._turn_id is not None:
+        # A finished task whose callback has not run yet is a dead turn: start a new one.
+        if self._task is not None and not self._task.done():
             self._inbox.append(content)
             return SayResult(turn=self._turn_id, joined=True)
         turn_id = uuid.uuid4().hex
         self._turn_id = turn_id
-        self.history.append({"role": "user", "content": content})
+        self._append_user(content)
         notify = self._bodies.notify
         # Deferred a tick so the say result goes out before the started notification.
         asyncio.get_running_loop().call_soon(
@@ -71,7 +71,6 @@ class Session:
             )
         )
         self._task = task
-        self._tasks.add(task)
         task.add_done_callback(lambda t: self._ended(t, turn_id, body_id))
         return SayResult(turn=turn_id, joined=False)
 
@@ -79,8 +78,14 @@ class Session:
         if turn_id == self._turn_id and self._task is not None:
             self._task.cancel()
 
+    def _append_user(self, content: list) -> None:
+        # The API wants alternating roles, so consecutive user content shares one message.
+        if self.history and self.history[-1]["role"] == "user":
+            self.history[-1]["content"] += content
+        else:
+            self.history.append({"role": "user", "content": content})
+
     def _ended(self, task: asyncio.Task, turn_id: str, body_id: str) -> None:
-        self._tasks.discard(task)
         if task.cancelled():
             reason = "cancelled"
         elif task.exception() is not None:
@@ -88,11 +93,12 @@ class Session:
             reason = "error"
         else:
             reason = task.result()
-        if self._inbox:  # says that arrived too late for the loop must not be lost
-            self.history.append({"role": "user", "content": [b for s in self._inbox for b in s]})
-            self._inbox.clear()
-        self._turn_id = None
-        self._task = None
+        if self._task is task:  # a newer turn may already own the session
+            if self._inbox:  # says that arrived too late for the loop must not be lost
+                self._append_user([b for s in self._inbox for b in s])
+                self._inbox.clear()
+            self._turn_id = None
+            self._task = None
         self._bodies.notify(
             "turn", {"turn": turn_id, "body": body_id, "state": "ended", "reason": reason}
         )

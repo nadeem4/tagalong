@@ -1,4 +1,7 @@
-"""Checks Session: one running turn, says that join it, cancel, and the always-sent ended."""
+"""Checks Session: one running turn, says that join it, cancel, and the always-sent ended.
+
+A fake model stands in for the API; an Event step makes it wait so tests can act mid-turn.
+"""
 
 import asyncio
 import datetime
@@ -14,8 +17,6 @@ from brain.sessions import Session
 
 
 class Gate:
-    """A fake model; an Event step makes the next call wait so tests can act mid-turn."""
-
     model_id = "claude-sonnet-5-5"
 
     def __init__(self, steps):
@@ -57,7 +58,7 @@ def states(sent):
 
 
 async def finish(session):
-    await asyncio.gather(*session._tasks)
+    await session._task
 
 
 async def test_say_starts_turn():
@@ -96,7 +97,7 @@ async def test_leftover_inbox_kept_in_history():
     session.say("desktop", say("late"))
     session.cancel(result.turn)  # stops the turn before it can drain the inbox
     await finish(session)
-    assert session.history[-1] == {"role": "user", "content": [{"type": "text", "text": "late"}]}
+    assert session.history[-1]["content"][-1] == {"type": "text", "text": "late"}
     assert session.say("desktop", say("next")).joined is False
 
 
@@ -131,3 +132,43 @@ async def test_empty_say_raises():
     session, _ = make(Gate([]))
     with pytest.raises(ValueError):
         session.say("desktop", SayParams(text=None, parts=[]))
+
+
+async def test_say_after_task_finished_but_before_callback_starts_new_turn():
+    session, sent = make(Gate(["one", "two"]))
+    first = session.say("desktop", say("a"))
+    await asyncio.wait({session._task})  # done; the done-callback may not have run yet
+    second = session.say("desktop", say("b"))
+    assert second.joined is False and second.turn != first.turn
+    await finish(session)
+    assert states(sent).count("ended") == 2
+
+
+async def test_leftover_inbox_merges_into_last_user_message():
+    session, _ = make(Gate([asyncio.Event(), "x"]))
+    result = session.say("desktop", say("a"))
+    await asyncio.sleep(0)
+    session.say("desktop", say("late"))
+    session.cancel(result.turn)
+    await finish(session)
+    assert [m["role"] for m in session.history] == ["user"]
+    assert session.history[0]["content"] == [
+        {"type": "text", "text": "a"},
+        {"type": "text", "text": "late"},
+    ]
+
+
+async def test_cancel_right_after_say():
+    session, sent = make(Gate(["never"]))
+    result = session.say("desktop", say("a"))
+    session.cancel(result.turn)
+    await finish_quietly(session)
+    assert states(sent) == ["started", "ended"]
+    assert sent[-1][1]["reason"] == "cancelled"
+    assert session.say("desktop", say("b")).joined is False
+
+
+async def finish_quietly(session):
+    task = session._task
+    await asyncio.wait({task})
+    await asyncio.sleep(0)  # let the done-callback run

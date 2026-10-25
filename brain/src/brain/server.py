@@ -171,7 +171,7 @@ def _dispatch(
         try:
             say = SayParams.model_validate(message.get("params"))
             return _result(req_id, session.say(body_id, say))
-        except (ValidationError, ValueError) as exc:
+        except ValueError as exc:  # ValidationError is a ValueError
             return _error(req_id, ErrorCode.invalid_params, str(exc))
     if method == "cancel":
         try:
