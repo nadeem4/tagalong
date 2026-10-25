@@ -9,10 +9,11 @@ source of truth; each doc cites the files it describes. How to build and run fro
 
 ### The whole system
 
-| Doc                                | Covers                                                                                                                               |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| [architecture.md](architecture.md) | Processes, packages and import rules, host contracts, the host transport, the life of one turn, boot and shutdown, the subsystem map |
-| [protocol.md](protocol.md)         | `packages/protocol`: the JSON-RPC envelope, every method and notification, the main schemas, versioning, adding a method             |
+| Doc                                            | Covers                                                                                                                               |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| [architecture.md](architecture.md)             | Processes, packages and import rules, host contracts, the host transport, the life of one turn, boot and shutdown, the subsystem map |
+| [protocol.md](protocol.md)                     | `packages/protocol`: the JSON-RPC envelope, every method and notification, the main schemas, versioning, adding a method             |
+| [../protocol/README.md](../protocol/README.md) | Contract v1 between the Python brain and the bodies: the rewrite's source of truth                                                   |
 
 ### Hosts
 

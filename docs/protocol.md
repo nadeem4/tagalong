@@ -1,5 +1,7 @@
 # Protocol
 
+> This page describes the current TypeScript protocol in `packages/protocol`. The new contract v1 for the Python brain is [protocol/README.md](../protocol/README.md); it replaces this protocol when the rewrite lands.
+
 ## Purpose
 
 `packages/protocol` is the wire contract between the engine and every host: the JSON-RPC
