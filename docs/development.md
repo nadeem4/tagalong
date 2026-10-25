@@ -116,8 +116,8 @@ tagalong/
       src/renderer/src/bean/        # Bean's WebP strips and manifest.json
       src/renderer/src/bean-assets.ts # FIGURE: the strips bundled once for the dock, Home and Welcome
       scripts/bean/                 # bean.py (Blender) and pack.py: regenerate Bean's strips
-  apps/
       src/shared/ipc.ts             # IPC channel names and the host-only API type
+  apps/
     extension/                      # Chrome MV3 host, built by Vite into dist/ (load unpacked)
       src/manifest.ts               # the manifest as data; the build writes dist/manifest.json
       src/service-worker.ts         # Chrome glue: engine socket, side panel, shortcut
