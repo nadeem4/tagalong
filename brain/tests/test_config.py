@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from brain.config import load_config, session_id
+from brain.config import load_config, load_env_file, session_id
 
 
 def test_defaults():
@@ -45,3 +45,51 @@ def test_session_id_blank_file_replaced(tmp_path):
     new = session_id(tmp_path)
     assert len(new) == 32
     assert (tmp_path / "session").read_text().strip() == new
+
+
+def test_model_budget_step_defaults():
+    cfg = load_config({})
+    assert (cfg.model, cfg.daily_budget_usd, cfg.step_cap) == ("claude-opus-5-5", 5.0, 25)
+
+
+def test_model_budget_step_overrides():
+    cfg = load_config(
+        {
+            "TAGALONG_MODEL": "claude-sonnet-5-5",
+            "TAGALONG_DAILY_BUDGET_USD": "1.5",
+            "TAGALONG_STEP_CAP": "3",
+        }
+    )
+    assert (cfg.model, cfg.daily_budget_usd, cfg.step_cap) == ("claude-sonnet-5-5", 1.5, 3)
+
+
+@pytest.mark.parametrize(
+    "key,value",
+    [
+        ("TAGALONG_DAILY_BUDGET_USD", "abc"),
+        ("TAGALONG_DAILY_BUDGET_USD", "0"),
+        ("TAGALONG_DAILY_BUDGET_USD", "-1"),
+        ("TAGALONG_DAILY_BUDGET_USD", "nan"),
+        ("TAGALONG_STEP_CAP", "abc"),
+        ("TAGALONG_STEP_CAP", "0"),
+        ("TAGALONG_STEP_CAP", "2.5"),
+    ],
+)
+def test_bad_budget_or_step_cap_raises(key, value):
+    with pytest.raises(ValueError):
+        load_config({key: value})
+
+
+def test_load_env_file_sets_missing_keys_only(tmp_path):
+    (tmp_path / ".env").write_text(
+        "# comment\n\nANTHROPIC_API_KEY=\"sk-file\"\nOTHER='x y'\nKEEP=file\nBARE=1\n"
+    )
+    env = {"KEEP": "env"}
+    assert load_env_file(tmp_path, env) is None
+    assert env == {"KEEP": "env", "ANTHROPIC_API_KEY": "sk-file", "OTHER": "x y", "BARE": "1"}
+
+
+def test_load_env_file_missing_is_fine(tmp_path):
+    env = {}
+    load_env_file(tmp_path, env)
+    assert env == {}
