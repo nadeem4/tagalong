@@ -5,6 +5,7 @@ and so the Session can call these without any I/O of its own.
 """
 
 import base64
+import binascii
 import json
 from datetime import datetime
 from functools import cache
@@ -12,6 +13,8 @@ from importlib.resources import files
 from typing import Any
 
 from brain.protocol import Body, FilePart, ImagePart, SayParams, TextPart
+
+IMAGE_MIMES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
 
 @cache
@@ -36,14 +39,21 @@ def _source(mime: str, data: str) -> dict[str, str]:
     return {"type": "base64", "media_type": mime, "data": data}
 
 
+def _unreadable(name: str, mime: str) -> dict[str, Any]:
+    return _text(f"File {name} ({mime}) attached; it cannot be read here.")
+
+
 def _file_block(part: FilePart) -> dict[str, Any]:
     if part.mime == "application/pdf":
         return {"type": "document", "source": _source(part.mime, part.data)}
     name = part.name or "unnamed"
     if part.mime.startswith("text/"):
-        body = base64.b64decode(part.data).decode("utf-8", errors="replace")
+        try:
+            body = base64.b64decode(part.data, validate=True).decode("utf-8", errors="replace")
+        except binascii.Error:
+            return _unreadable(name, part.mime)
         return _text(f"File {name}:\n{body}")
-    return _text(f"File {name} ({part.mime}) attached; it cannot be read here.")
+    return _unreadable(name, part.mime)
 
 
 def user_content(params: SayParams) -> list[dict[str, Any]]:
@@ -52,13 +62,23 @@ def user_content(params: SayParams) -> list[dict[str, Any]]:
         blocks.append(_text(params.text))
     for part in params.parts or []:
         if isinstance(part, TextPart):
-            blocks.append(_text(part.text))
+            if part.text:
+                blocks.append(_text(part.text))
         elif isinstance(part, ImagePart):
-            blocks.append({"type": "image", "source": _source(part.mime, part.data)})
+            # The API rejects other image types, which would fail the whole turn.
+            if part.mime in IMAGE_MIMES:
+                blocks.append({"type": "image", "source": _source(part.mime, part.data)})
+            else:
+                blocks.append(_unreadable("unnamed", part.mime))
         elif isinstance(part, FilePart):
             blocks.append(_file_block(part))
     if params.context is not None:
-        blocks.append(_text("Context from the body (as sent):\n" + json.dumps(params.context)))
+        blocks.append(
+            _text(
+                "Context from the body (as sent):\n"
+                + json.dumps(params.context, ensure_ascii=False)
+            )
+        )
     if not blocks:
         raise ValueError("say has no content")
     return blocks

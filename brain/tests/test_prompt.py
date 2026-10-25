@@ -111,3 +111,29 @@ def test_other_file_is_noted_not_read():
 def test_empty_say_raises():
     with pytest.raises(ValueError):
         user_content(say(text="", parts=[]))
+
+
+def test_undecodable_text_file_falls_back_to_note():
+    blocks = user_content(
+        say(parts=[{"type": "file", "mime": "text/plain", "name": "n.txt", "data": "!!not b64"}])
+    )
+    assert blocks == [
+        {"type": "text", "text": "File n.txt (text/plain) attached; it cannot be read here."}
+    ]
+
+
+def test_empty_text_part_is_skipped():
+    blocks = user_content(say(parts=[{"type": "text", "text": ""}, {"type": "text", "text": "x"}]))
+    assert blocks == [{"type": "text", "text": "x"}]
+
+
+def test_unsupported_image_mime_becomes_note():
+    blocks = user_content(say(parts=[{"type": "image", "mime": "image/bmp", "data": b64(b"b")}]))
+    assert blocks == [
+        {"type": "text", "text": "File unnamed (image/bmp) attached; it cannot be read here."}
+    ]
+
+
+def test_context_keeps_non_ascii_readable():
+    blocks = user_content(say(text="hi", context={"window": "café"}))
+    assert "café" in blocks[-1]["text"]
