@@ -1,8 +1,8 @@
 # Tagalong contract v1
 
 The wire contract between the brain (Python) and its bodies (desktop, extension, later phone).
-This file is the source of truth: the TypeScript types in `ts/`, the Python types in `brain/src/brain/protocol.py`
-and the samples in `examples/` follow it, and a change here comes first.
+This file is the source of truth: the TypeScript package in `ts/` (`@tagalong/contract`), the Python types in `brain/src/brain/protocol.py`
+and the samples in `examples/` follow it, and a change here comes first. The sample file convention is in [examples/README.md](examples/README.md).
 
 ## Principles
 
@@ -16,6 +16,7 @@ and the samples in `examples/` follow it, and a change here comes first.
 - One websocket per body, JSON-RPC 2.0, one JSON object per text frame. Default address `ws://127.0.0.1:47321`; the brain's address is configurable so it can run on another machine.
 - Heartbeat is the websocket ping. A body that stops answering pings is offline.
 - Unknown fields are ignored by both sides. Field names are `snake_case`.
+- Optional fields are omitted when absent, never sent as `null`; a `null` on an optional field gets `invalid_params`. The only nullable fields are `turn.body` and `reply.body` (always present, may be `null`) and the free-form `data` and `context`.
 - Either side may send requests. Request ids are chosen by the sender (string or integer) and only need to be unique per connection and direction.
 - The first message on a connection must be `hello`. Anything else before it gets `invalid_request` and the connection is closed.
 
@@ -88,7 +89,7 @@ Request means a JSON-RPC request that gets a result or an error. Notification me
 
 - **use.** Run one of this body's tools. `tool` is the plain name the body declared. On failure the body returns an error: `tool_failed`, `cancelled`, `timeout` or `invalid_params`.
 - **cancel.** Stop that `use`. The body answers the `use` with `cancelled`, or with its result if it had already finished.
-- **reply.** Scout's words for a turn, streamed. Zero or more `delta` chunks, then exactly one `done` if any delta was sent. A turn that ends with no `reply` at all is a silent turn, and that is allowed.
+- **reply.** Scout's words for a turn, streamed. `body` follows the same rule as `turn.body`, so it is `null` for a brain-started turn with no body online. Zero or more `delta` chunks, then exactly one `done` if any delta was sent. A turn that ends with no `reply` at all is a silent turn, and that is allowed.
 - **turn.** A turn started or ended. `body` is the body the user was talking to: it shows and speaks the reply; other bodies may show it in history. For a turn the brain starts itself, `body` is the body the user last talked to if it is online, otherwise any online body, otherwise `null`. `reason` on `ended` is one of `done`, `cancelled`, `error`, `over_budget`, `step_cap`.
 - **tool.** A tool call in a turn started or ended, so bodies can show what Scout is doing. `name` is the full name as the model sees it. `summary` is a short line for people; it comes from the tool's result, not a template.
 - **ask.** Scout needs the user. `state: "open"` carries the question; every connected body shows it. When the ask closes, the brain sends `state: "closed"` to every body so the prompt disappears everywhere. `reason` is `answered`, `timeout` or `cancelled`; with `answered`, `option` is the chosen option and `by` is the body id that answered. First answer wins. For a confirm (see Asks and confirm) the ask has `confirm: true`, `tool` and `input`, and its options are exactly `["allow", "deny"]`.

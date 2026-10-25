@@ -19,12 +19,16 @@ The brain is being rewritten in Python; the TypeScript apps stay as bodies.
 - Setup: pnpm install (Node >= 22, pnpm 10)
 - Test: pnpm test (vitest, all packages); pnpm test:e2e for the Electron Playwright suites
 - Check: pnpm typecheck && pnpm lint && pnpm format:check
+- Brain: cd brain && uv sync; uv run pytest; uv run ruff check; uv run ruff format --check
 - Run: pnpm dev:desktop
 - Package: pnpm package:win
 
 ## Layout
 
-- protocol/README.md: contract v1 between the Python brain and the bodies (source of truth for the rewrite; types and examples come next)
+- protocol/README.md: contract v1 between the Python brain and the bodies (source of truth for the rewrite)
+- protocol/examples: sample frames shared by the TypeScript and Python tests
+- protocol/ts: `@tagalong/contract`, zod schemas for contract v1
+- brain/: the Python brain (uv project; `src/brain/protocol.py` holds the contract v1 pydantic types)
 - packages/protocol: wire types and the JSON-RPC method catalog shared by brain and bodies
 - packages/core: the current brain (Scout's mind, sight, memory, tools, experts, routines, providers, ws server)
 - packages/ui: shared React UI (bubble, dock pet, Home, settings, voice)
