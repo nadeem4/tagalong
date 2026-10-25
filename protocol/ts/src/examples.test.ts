@@ -32,8 +32,9 @@ function load(dir: 'valid' | 'invalid'): Sample[] {
       const parts = file.replace(/\.json$/, '').split('.');
       if (parts.length < 3) throw new Error(`${file}: too few segments`);
       const [from, method, kind] = parts as [string, string, string];
-      if (!(from in maps)) throw new Error(`${file}: bad <from>`);
-      if (!(method in maps[from]!)) throw new Error(`${file}: unknown method for ${from}`);
+      if (!Object.hasOwn(maps, from)) throw new Error(`${file}: bad <from>`);
+      if (!Object.hasOwn(maps[from]!, method))
+        throw new Error(`${file}: unknown method for ${from}`);
       if (!kinds.includes(kind)) throw new Error(`${file}: bad <kind>`);
       if (dir === 'invalid' && parts.length < 4) throw new Error(`${file}: needs a <why>`);
       const frame = JSON.parse(readFileSync(join(root, dir, file), 'utf8'));

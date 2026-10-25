@@ -1,7 +1,7 @@
 """Checks every sample frame in protocol/examples against the pydantic types.
 
 The TypeScript tests read the same files, so drift between the two implementations shows
-up as a failing example. This harness is stricter than the TS one about the filenames.
+up as a failing example. Both harnesses check the filename convention the same way.
 """
 
 import json
