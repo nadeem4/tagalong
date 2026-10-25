@@ -21,13 +21,27 @@ interface Sample {
   frame: Record<string, unknown>;
 }
 
+const maps: Record<string, Record<string, unknown>> = { body: bodyToBrain, brain: brainToBody };
+const kinds = ['params', 'result', 'error'];
+
+// Mirrors the Python loader: a malformed name or frame throws instead of counting as rejected.
 function load(dir: 'valid' | 'invalid'): Sample[] {
   return readdirSync(join(root, dir))
     .filter((f) => f.endsWith('.json'))
     .map((file) => {
-      const [from, method, kind] = file.split('.');
+      const parts = file.replace(/\.json$/, '').split('.');
+      if (parts.length < 3) throw new Error(`${file}: too few segments`);
+      const [from, method, kind] = parts as [string, string, string];
+      if (!(from in maps)) throw new Error(`${file}: bad <from>`);
+      if (!(method in maps[from]!)) throw new Error(`${file}: unknown method for ${from}`);
+      if (!kinds.includes(kind)) throw new Error(`${file}: bad <kind>`);
+      if (dir === 'invalid' && parts.length < 4) throw new Error(`${file}: needs a <why>`);
       const frame = JSON.parse(readFileSync(join(root, dir, file), 'utf8'));
-      return { file, from: from!, method: method!, kind: kind!, frame };
+      if (!(kind in frame)) throw new Error(`${file}: frame has no ${kind}`);
+      if (kind === 'params' && frame.method !== method) {
+        throw new Error(`${file}: method differs from filename`);
+      }
+      return { file, from, method, kind, frame };
     });
 }
 

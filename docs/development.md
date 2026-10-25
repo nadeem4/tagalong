@@ -186,7 +186,7 @@ uv run ruff check          # lint
 uv run ruff format --check # format check
 ```
 
-The `brain` job in CI runs the same commands.
+The `brain` job in CI runs these commands, installing with `uv sync --locked`.
 
 ### Coverage
 

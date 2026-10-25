@@ -143,6 +143,7 @@ def test_seq_bounds():
         BRAIN_TO_BODY["reply"][0].model_validate(reply)
     result = {"protocol": 1, "session": "s", "tools": [], "seq": 0, "resync": False}
     BODY_TO_BRAIN["hello"][1].model_validate(result)
+    # Python-only: JSON.parse cannot tell 1 from 1.0, so this is not a shared example.
     with pytest.raises(ValidationError):
         ErrorObject.model_validate({"code": -32007.0, "message": "m"})
 

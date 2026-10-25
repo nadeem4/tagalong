@@ -8,7 +8,9 @@ import { z, type ZodType } from 'zod';
 import { Body, Part, Tool } from './shapes.js';
 
 const Id = z.string();
-const Seq = z.int().min(0);
+// last_seq and the hello seq may be 0 (nothing seen yet); every notification seq starts at 1.
+const HandshakeSeq = z.int().min(0);
+const Seq = z.int().min(1);
 const Input = z.record(z.string(), z.unknown());
 
 export const EmptyResult = z.object({});
@@ -20,7 +22,7 @@ export const HelloParams = z.object({
   protocol: z.int(),
   body: Body,
   tools: z.array(Tool),
-  last_seq: Seq.optional(),
+  last_seq: HandshakeSeq.optional(),
 });
 export type HelloParams = z.infer<typeof HelloParams>;
 
@@ -28,7 +30,7 @@ export const HelloResult = z.object({
   protocol: z.int(),
   session: Id,
   tools: z.array(Tool),
-  seq: Seq,
+  seq: HandshakeSeq,
   resync: z.boolean(),
 });
 export type HelloResult = z.infer<typeof HelloResult>;
@@ -83,14 +85,14 @@ export const ReplyParams = z.union([
   z.object({
     seq: Seq,
     turn: Id,
-    body: z.string(),
+    body: z.string().nullable(),
     delta: z.string(),
     done: z.never().optional(),
   }),
   z.object({
     seq: Seq,
     turn: Id,
-    body: z.string(),
+    body: z.string().nullable(),
     done: z.literal(true),
     delta: z.never().optional(),
   }),

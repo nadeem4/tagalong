@@ -46,6 +46,8 @@ class ErrorCode(IntEnum):
 
 # An optional field may be absent but never null. Only these accept a JSON null: the nullable
 # `body` of reply and turn, and the free-form `data` and `context` payloads.
+# It matches by field name on every model, so a future optional field named body, data or
+# context would accept null too.
 NULLABLE = {"body", "data", "context"}
 
 

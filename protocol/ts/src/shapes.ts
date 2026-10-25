@@ -34,7 +34,7 @@ export const ErrorCode = {
 const errorCodes: readonly number[] = Object.values(ErrorCode);
 
 export const ErrorObject = z.object({
-  code: z.number().refine((c) => errorCodes.includes(c), 'unknown error code'),
+  code: z.int().refine((c) => errorCodes.includes(c), 'unknown error code'),
   message: z.string(),
   data: z.unknown().optional(),
 });
