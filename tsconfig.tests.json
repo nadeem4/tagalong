@@ -16,9 +16,12 @@
     "packages/*/src/**/*.test.tsx",
     "packages/*/src/**/*.test-d.ts",
     "apps/*/src/**/*.test.ts",
+    "bodies/*/src/**/*.test.ts",
     "protocol/ts/src/**/*.test.ts",
-    "apps/desktop/src/renderer/src/env.d.ts",
+    "bodies/desktop/src/renderer/src/env.d.ts",
     "apps/*/playwright.config.ts",
-    "apps/*/e2e/**/*.ts"
+    "apps/*/e2e/**/*.ts",
+    "bodies/*/playwright.config.ts",
+    "bodies/*/e2e/**/*.ts"
   ]
 }

@@ -163,7 +163,7 @@ every turn and waits for each to settle before the database closes.
 
 The runner adds `error` on its own `TurnOutcome` when the provider threw. A `refusal` or
 `tool_limit` is shown by the host as a muted status line, never spoken and never stored (see
-[bubble.md](bubble.md), `packages/ui/src/stop-status.ts`).
+[bubble.md](bubble.md), `bodies/ui/src/stop-status.ts`).
 
 **The tool loop and step limits.** The loop lives in each provider, not in the runner:
 

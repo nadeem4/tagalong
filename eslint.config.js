@@ -145,7 +145,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['packages/ui/**/*.{ts,tsx}'],
+    files: ['bodies/ui/**/*.{ts,tsx}'],
     plugins: { 'react-hooks': reactHooks },
     languageOptions: {
       globals: { ...globals.browser },
@@ -166,7 +166,7 @@ export default tseslint.config(
   },
   {
     // Runs on the audio thread, where the worklet's own globals are all there is.
-    files: ['apps/desktop/src/renderer/src/mic-worklet.js'],
+    files: ['bodies/desktop/src/renderer/src/mic-worklet.js'],
     languageOptions: {
       globals: { ...globals.audioWorklet },
     },

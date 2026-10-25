@@ -22,10 +22,10 @@ saved ask and runs only on **Allow once**.
 | `packages/core/src/tools/builtin/connections.ts`      | `connectorTools`: the Scout tools, the confirm, the data fence                                                                                                                                           |
 | `packages/core/src/asks/asks.ts`                      | `Asks.hold`, which holds every write; see [asks.md](asks.md)                                                                                                                                             |
 | `packages/core/src/engine.ts`                         | Builds the manager, the `connections.*` and `tool.approve` handlers                                                                                                                                      |
-| `apps/desktop/src/main/engine-host.ts`                | `openBrowser`: `shell.openExternal` for https sign-in pages only (`isSignInPage` in `links.ts`)                                                                                                          |
-| `apps/desktop/src/main/ipc/connections.ts`            | IPC: list, add, set enabled, sign in, remove, and `tool.approve`                                                                                                                                         |
-| `packages/ui/src/home/connections-panel.tsx`          | Home's Connections page                                                                                                                                                                                  |
-| `packages/ui/src/connector-confirm.tsx`               | `ConnectorConfirmCard` in the bubble                                                                                                                                                                     |
+| `bodies/desktop/src/main/engine-host.ts`              | `openBrowser`: `shell.openExternal` for https sign-in pages only (`isSignInPage` in `links.ts`)                                                                                                          |
+| `bodies/desktop/src/main/ipc/connections.ts`          | IPC: list, add, set enabled, sign in, remove, and `tool.approve`                                                                                                                                         |
+| `bodies/ui/src/home/connections-panel.tsx`            | Home's Connections page                                                                                                                                                                                  |
+| `bodies/ui/src/connector-confirm.tsx`                 | `ConnectorConfirmCard` in the bubble                                                                                                                                                                     |
 
 ## How it works
 
@@ -334,7 +334,7 @@ See [privacy.md](privacy.md).
   fence tag defused; every argument in full; too long refused without asking; "file this as a bug".
 - `engine.test.ts`: Scout reads at once, asks before a change and logs both; on a routine's turn a
   read emits no `connector.confirm` while a write still does; "file this as a bug" over RPC.
-- `packages/ui/src/home/connections-panel.test.tsx`, `packages/ui/src/connector-confirm.test.tsx`.
+- `bodies/ui/src/home/connections-panel.test.tsx`, `bodies/ui/src/connector-confirm.test.tsx`.
 - Tests never reach a real app: `fakeMcpServer` runs an SDK server in the same process over the
   in-memory transport, `FakeOAuthTransport` plays an app behind OAuth, and
   `EngineOptions.connectorTransport` and `claudeCodeConfigPath` point the engine at them.

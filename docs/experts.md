@@ -10,29 +10,29 @@ last session after a long break.
 
 ## Where it lives
 
-| File                                                     | What it holds                                                                                                                        |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `packages/protocol/src/experts.ts`                       | `Expert`, `ClaudeCodeConnection`, `CatalogEntry`, `Brief`, every `experts.*`, `handoffs.*`, `handoff.*` and `projects.search` schema |
-| `packages/core/src/experts/connector.ts`                 | `Connector`, `ConnectorResult`, `NoteQueue`, `renderBrief`, `CANCELLED`                                                              |
-| `packages/core/src/experts/claude-code.ts`               | `ClaudeCodeConnector`, `sealedArgs`, `bundledArgs`, `spawnChild` (shared with the Claude Code brain)                                 |
-| `packages/core/src/experts/catalog.json`, `catalog.ts`   | The built-in expert catalog; `catalogStatus`, `catalogBundle`, `fromCatalog`                                                         |
-| `packages/core/src/experts/claude-setup.ts`              | Reads Claude Code's own setup: `installedPlugins`, `connectedApps`, `userAllowRules`, `installPlugin`                                |
-| `packages/core/src/experts/handoffs.ts`                  | `HandoffManager`: propose, confirm, run, steer, follow-up step, cancel                                                               |
-| `packages/core/src/experts/store.ts`                     | `ExpertStore` (table `experts`)                                                                                                      |
-| `packages/core/src/experts/record-expert.ts`             | `recordExpertSends`: one "Sent to expert" row in the sight log per brief and per note                                                |
-| `packages/core/src/experts/fake.ts`                      | `FakeConnector`, used by tests and fake mode                                                                                         |
-| `packages/core/src/projects/finder.ts`                   | `ProjectFinder`, `ProjectMemory` (table `projects`)                                                                                  |
-| `packages/core/src/tools/builtin/experts.ts`             | Scout's tools `hand_to_expert` and `tell_expert`                                                                                     |
-| `packages/core/src/jobs/`                                | `Jobs`, `JobStore` (table `jobs`), `machineCapacity`, the board read model (`board.ts`)                                              |
-| `packages/core/src/tools/builtin/jobs.ts`                | Scout's tools `work_on_it`, `board`, `open_result`, `stop_work`                                                                      |
-| `packages/core/src/pick-up/`                             | `PickUp`, `takeSnapshot`, `readBranch`, `PickUpStore` (table `pick_up`)                                                              |
-| `packages/core/src/engine.ts`                            | `defaultConnectorFor`, wiring, and the RPC handlers                                                                                  |
-| `apps/desktop/src/main/ipc/experts.ts`, `ipc/pick-up.ts` | IPC from the renderers to these methods                                                                                              |
-| `apps/desktop/src/main/handoff-notice.ts`                | The system notification for a finished hand-off                                                                                      |
-| `apps/desktop/src/main/pick-up-open.ts`                  | `openFor`, `PickUpAllowlist`, `PickUpWaiting`                                                                                        |
-| `packages/ui/src/handoff-card.tsx`                       | The hand-off cards in the bubble (proposal, at work, answer)                                                                         |
-| `packages/ui/src/home/experts-panel.tsx`                 | Home's Experts page and the catalog install confirm                                                                                  |
-| `packages/ui/src/pick-up-card.tsx`                       | The pick-up card                                                                                                                     |
+| File                                                       | What it holds                                                                                                                        |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/protocol/src/experts.ts`                         | `Expert`, `ClaudeCodeConnection`, `CatalogEntry`, `Brief`, every `experts.*`, `handoffs.*`, `handoff.*` and `projects.search` schema |
+| `packages/core/src/experts/connector.ts`                   | `Connector`, `ConnectorResult`, `NoteQueue`, `renderBrief`, `CANCELLED`                                                              |
+| `packages/core/src/experts/claude-code.ts`                 | `ClaudeCodeConnector`, `sealedArgs`, `bundledArgs`, `spawnChild` (shared with the Claude Code brain)                                 |
+| `packages/core/src/experts/catalog.json`, `catalog.ts`     | The built-in expert catalog; `catalogStatus`, `catalogBundle`, `fromCatalog`                                                         |
+| `packages/core/src/experts/claude-setup.ts`                | Reads Claude Code's own setup: `installedPlugins`, `connectedApps`, `userAllowRules`, `installPlugin`                                |
+| `packages/core/src/experts/handoffs.ts`                    | `HandoffManager`: propose, confirm, run, steer, follow-up step, cancel                                                               |
+| `packages/core/src/experts/store.ts`                       | `ExpertStore` (table `experts`)                                                                                                      |
+| `packages/core/src/experts/record-expert.ts`               | `recordExpertSends`: one "Sent to expert" row in the sight log per brief and per note                                                |
+| `packages/core/src/experts/fake.ts`                        | `FakeConnector`, used by tests and fake mode                                                                                         |
+| `packages/core/src/projects/finder.ts`                     | `ProjectFinder`, `ProjectMemory` (table `projects`)                                                                                  |
+| `packages/core/src/tools/builtin/experts.ts`               | Scout's tools `hand_to_expert` and `tell_expert`                                                                                     |
+| `packages/core/src/jobs/`                                  | `Jobs`, `JobStore` (table `jobs`), `machineCapacity`, the board read model (`board.ts`)                                              |
+| `packages/core/src/tools/builtin/jobs.ts`                  | Scout's tools `work_on_it`, `board`, `open_result`, `stop_work`                                                                      |
+| `packages/core/src/pick-up/`                               | `PickUp`, `takeSnapshot`, `readBranch`, `PickUpStore` (table `pick_up`)                                                              |
+| `packages/core/src/engine.ts`                              | `defaultConnectorFor`, wiring, and the RPC handlers                                                                                  |
+| `bodies/desktop/src/main/ipc/experts.ts`, `ipc/pick-up.ts` | IPC from the renderers to these methods                                                                                              |
+| `bodies/desktop/src/main/handoff-notice.ts`                | The system notification for a finished hand-off                                                                                      |
+| `bodies/desktop/src/main/pick-up-open.ts`                  | `openFor`, `PickUpAllowlist`, `PickUpWaiting`                                                                                        |
+| `bodies/ui/src/handoff-card.tsx`                           | The hand-off cards in the bubble (proposal, at work, answer)                                                                         |
+| `bodies/ui/src/home/experts-panel.tsx`                     | Home's Experts page and the catalog install confirm                                                                                  |
+| `bodies/ui/src/pick-up-card.tsx`                           | The pick-up card                                                                                                                     |
 
 ## How it works
 
@@ -540,5 +540,5 @@ See [privacy.md](privacy.md).
   pre-approved hand-off; `tell_expert`.
 - `projects/finder.test.ts`; `jobs/jobs.test.ts`, `store.test.ts`, `machine.test.ts`,
   `board.test.ts`; `tools/builtin/jobs.test.ts`.
-- `pick-up/pick-up.test.ts`, `pick-up/store.test.ts`, `apps/desktop/src/main/pick-up-open.test.ts`.
+- `pick-up/pick-up.test.ts`, `pick-up/store.test.ts`, `bodies/desktop/src/main/pick-up-open.test.ts`.
 - `tools/registry.test.ts`: which tools a routine's turn and a job's turn get.

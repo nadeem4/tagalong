@@ -22,7 +22,7 @@ source of truth; each doc cites the files it describes. How to build and run fro
 | Doc                                          | Covers                                                                                                                                |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | [desktop.md](desktop.md)                     | The Electron host: windows, tray, hotkeys, IPC modules, the platform adapter, settings applied live, packaging, the log file, Welcome |
-| [bubble.md](bubble.md)                       | The companion bubble in `packages/ui`: status marks, pointing, drafts, drops                                                          |
+| [bubble.md](bubble.md)                       | The companion bubble in `bodies/ui`: status marks, pointing, drafts, drops                                                            |
 | [voice.md](voice.md)                         | Hearing and speaking: the talk key, always listening, follow-up, barge-in, models and downloads, the voice process                    |
 | [browser-extension.md](browser-extension.md) | The Chrome host: pairing, routing between hosts, what it reads                                                                        |
 

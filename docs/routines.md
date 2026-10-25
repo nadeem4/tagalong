@@ -21,11 +21,11 @@ schedule is days of the week and a time, and the triggers are a fixed set of fiv
 | `packages/core/src/tools/registry.ts`         | Which tools a routine's turn gets                                                                                                                                     |
 | `packages/core/src/conversation/now.ts`       | The Now line that says nobody is watching                                                                                                                             |
 | `packages/core/src/engine.ts`                 | Builds `Routines` and `CalendarFeed`, the RPC handlers                                                                                                                |
-| `apps/desktop/src/main/routine-delivery.ts`   | `routineDelivery`: line, voice, notification on the desktop                                                                                                           |
-| `apps/desktop/src/main/index.ts`              | `deliverRoutine`: applies it, and the notification click                                                                                                              |
-| `apps/desktop/src/main/ipc/routines.ts`       | IPC for Home and the card, and the calendar link                                                                                                                      |
-| `packages/ui/src/routine-card.tsx`            | `RoutineCard` in the bubble                                                                                                                                           |
-| `packages/ui/src/home/routines-panel.tsx`     | Home's Routines page, its form and its templates                                                                                                                      |
+| `bodies/desktop/src/main/routine-delivery.ts` | `routineDelivery`: line, voice, notification on the desktop                                                                                                           |
+| `bodies/desktop/src/main/index.ts`            | `deliverRoutine`: applies it, and the notification click                                                                                                              |
+| `bodies/desktop/src/main/ipc/routines.ts`     | IPC for Home and the card, and the calendar link                                                                                                                      |
+| `bodies/ui/src/routine-card.tsx`              | `RoutineCard` in the bubble                                                                                                                                           |
+| `bodies/ui/src/home/routines-panel.tsx`       | Home's Routines page, its form and its templates                                                                                                                      |
 
 ## How it works
 
@@ -403,4 +403,4 @@ See [privacy.md](privacy.md).
 - `tools/builtin/routines.test.ts`: the card only; days and triggers; meeting default 10; refusals
   by name; not offered on a routine's own turn; `change_routine` lists saved routines.
 - `tools/builtin/experts.test.ts` ("in a routine"), `tools/registry.test.ts`.
-- `apps/desktop/src/main/routine-delivery.test.ts`, `packages/ui/src/routine-card.test.tsx`.
+- `bodies/desktop/src/main/routine-delivery.test.ts`, `bodies/ui/src/routine-card.test.tsx`.

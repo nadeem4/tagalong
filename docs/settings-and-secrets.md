@@ -10,23 +10,23 @@ that leaves the machine.
 
 ## Where it lives
 
-| File                                          | What it holds                                                                                                                           |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol/src/settings.ts`           | `Settings`, `SETTINGS_DEFAULTS`, `SettingsPatch`, the bounds, `SettingsChangeRow`, `SettingsProposedParams`, the retired-value cleaners |
-| `packages/protocol/src/methods.ts`            | `settings.get`, `settings.set` (`byTalk`), `settings.proposed`                                                                          |
-| `packages/core/src/settings/settings.ts`      | `SettingsStore` (`settings.json`), the `SecretStore` interface, `InMemorySecretStore`                                                   |
-| `packages/core/src/engine.ts`                 | The `settings.get` and `settings.set` handlers; settings passed into stores as functions                                                |
-| `packages/core/src/tools/builtin/settings.ts` | `change_settings` tool, the chat allowlist (`CHAT_SETTINGS`), `talkPatchProblem`                                                        |
-| `packages/core/src/providers/presets.ts`      | `SECRET_KEYS`: where each brain's key is filed                                                                                          |
-| `packages/core/src/providers/key-resolver.ts` | `KeyedProviderResolver`: reads keys before each ask, rebuilds a provider when its key or URL changes                                    |
-| `packages/core/src/privacy/secrets.ts`        | `hideSecrets`                                                                                                                           |
-| `packages/core/src/providers/guard.ts`        | `guardBrain`: hides secrets in every request to a model                                                                                 |
-| `apps/desktop/src/main/secret-store.ts`       | `SafeStorageSecretStore` (`secrets.json`, Electron `safeStorage`)                                                                       |
-| `apps/desktop/src/main/provider-choices.ts`   | `providerChoices`, `storedKeys`, `secretKeyFor`, `forgetRetiredKeys`, `ELEVENLABS_SECRET_KEY`                                           |
-| `apps/desktop/src/main/ipc/settings.ts`       | `registerSettingsIpc`: host view, save, apply, save key, check key, model list                                                          |
-| `apps/desktop/src/main/ipc/apply-settings.ts` | `applySettings`: Apply on Scout's settings card                                                                                         |
-| `apps/desktop/src/main/index.ts`              | Builds the stores in `userData`; `broadcast`, `applyHotkeys`, `configureRolling` deps                                                   |
-| `packages/ui/src/settings-card.tsx`           | The settings card in the bubble                                                                                                         |
+| File                                            | What it holds                                                                                                                           |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/protocol/src/settings.ts`             | `Settings`, `SETTINGS_DEFAULTS`, `SettingsPatch`, the bounds, `SettingsChangeRow`, `SettingsProposedParams`, the retired-value cleaners |
+| `packages/protocol/src/methods.ts`              | `settings.get`, `settings.set` (`byTalk`), `settings.proposed`                                                                          |
+| `packages/core/src/settings/settings.ts`        | `SettingsStore` (`settings.json`), the `SecretStore` interface, `InMemorySecretStore`                                                   |
+| `packages/core/src/engine.ts`                   | The `settings.get` and `settings.set` handlers; settings passed into stores as functions                                                |
+| `packages/core/src/tools/builtin/settings.ts`   | `change_settings` tool, the chat allowlist (`CHAT_SETTINGS`), `talkPatchProblem`                                                        |
+| `packages/core/src/providers/presets.ts`        | `SECRET_KEYS`: where each brain's key is filed                                                                                          |
+| `packages/core/src/providers/key-resolver.ts`   | `KeyedProviderResolver`: reads keys before each ask, rebuilds a provider when its key or URL changes                                    |
+| `packages/core/src/privacy/secrets.ts`          | `hideSecrets`                                                                                                                           |
+| `packages/core/src/providers/guard.ts`          | `guardBrain`: hides secrets in every request to a model                                                                                 |
+| `bodies/desktop/src/main/secret-store.ts`       | `SafeStorageSecretStore` (`secrets.json`, Electron `safeStorage`)                                                                       |
+| `bodies/desktop/src/main/provider-choices.ts`   | `providerChoices`, `storedKeys`, `secretKeyFor`, `forgetRetiredKeys`, `ELEVENLABS_SECRET_KEY`                                           |
+| `bodies/desktop/src/main/ipc/settings.ts`       | `registerSettingsIpc`: host view, save, apply, save key, check key, model list                                                          |
+| `bodies/desktop/src/main/ipc/apply-settings.ts` | `applySettings`: Apply on Scout's settings card                                                                                         |
+| `bodies/desktop/src/main/index.ts`              | Builds the stores in `userData`; `broadcast`, `applyHotkeys`, `configureRolling` deps                                                   |
+| `bodies/ui/src/settings-card.tsx`               | The settings card in the bubble                                                                                                         |
 
 ## How it works
 
@@ -232,7 +232,7 @@ Tests use `InMemorySecretStore`.
 
 ### safeStorage in the desktop
 
-`SafeStorageSecretStore` (`apps/desktop/src/main/secret-store.ts`) stores
+`SafeStorageSecretStore` (`bodies/desktop/src/main/secret-store.ts`) stores
 `{ key: base64(safeStorage.encryptString(value)) }` in `secrets.json` in `userData`, written with
 mode `0o600`. Only ciphertext is written.
 
@@ -292,7 +292,7 @@ Where it runs:
 - **Connected apps.** String arguments to app tools (`tools/builtin/connections.ts`).
 - **What is kept.** `sight_log` titles, asks' summaries, job tasks and board titles, experience-log
   inputs, Self pages and reasons, digest output, history-search lines and the Now block.
-- **The log file.** Every line of `logs/tagalong.log` (`apps/desktop/src/main/log-file.ts`).
+- **The log file.** Every line of `logs/tagalong.log` (`bodies/desktop/src/main/log-file.ts`).
 
 ## Interfaces
 
@@ -323,19 +323,19 @@ neither read nor change settings.
 
 ## Constants and limits
 
-| Constant                              | Value           | File                                    |
-| ------------------------------------- | --------------- | --------------------------------------- |
-| `MAX_SCREENSHOT_RETENTION_HOURS`      | 24              | `packages/protocol/src/settings.ts`     |
-| `MAX_ROLLING_MEMORY_MINUTES`          | 30              | `packages/protocol/src/settings.ts`     |
-| `MAX_USER_NAME_CHARS`                 | 40              | `packages/protocol/src/settings.ts`     |
-| `MAX_DAILY_BUDGET_USD`                | 1,000           | `packages/protocol/src/settings.ts`     |
-| `MIN_VOICE_SPEED` / `MAX_VOICE_SPEED` | 0.7 / 1.3       | `packages/protocol/src/settings.ts`     |
-| `SIGHT_LOG_DEFAULT_DAYS`, min, max    | 7, 1, 30        | `packages/protocol/src/sight-log.ts`    |
-| `DEFAULT_WINDOW_TEXT_CHARS`           | 8,000           | `packages/protocol/src/limits.ts`       |
-| Refused setting name shown            | 60 characters   | `tools/builtin/settings.ts`             |
-| `SETTINGS_FILENAME`                   | `settings.json` | `core/src/settings/settings.ts`         |
-| `SECRETS_FILENAME`                    | `secrets.json`  | `apps/desktop/src/main/secret-store.ts` |
-| `secrets.json` file mode              | `0o600`         | `apps/desktop/src/main/secret-store.ts` |
+| Constant                              | Value           | File                                      |
+| ------------------------------------- | --------------- | ----------------------------------------- |
+| `MAX_SCREENSHOT_RETENTION_HOURS`      | 24              | `packages/protocol/src/settings.ts`       |
+| `MAX_ROLLING_MEMORY_MINUTES`          | 30              | `packages/protocol/src/settings.ts`       |
+| `MAX_USER_NAME_CHARS`                 | 40              | `packages/protocol/src/settings.ts`       |
+| `MAX_DAILY_BUDGET_USD`                | 1,000           | `packages/protocol/src/settings.ts`       |
+| `MIN_VOICE_SPEED` / `MAX_VOICE_SPEED` | 0.7 / 1.3       | `packages/protocol/src/settings.ts`       |
+| `SIGHT_LOG_DEFAULT_DAYS`, min, max    | 7, 1, 30        | `packages/protocol/src/sight-log.ts`      |
+| `DEFAULT_WINDOW_TEXT_CHARS`           | 8,000           | `packages/protocol/src/limits.ts`         |
+| Refused setting name shown            | 60 characters   | `tools/builtin/settings.ts`               |
+| `SETTINGS_FILENAME`                   | `settings.json` | `core/src/settings/settings.ts`           |
+| `SECRETS_FILENAME`                    | `secrets.json`  | `bodies/desktop/src/main/secret-store.ts` |
+| `secrets.json` file mode              | `0o600`         | `bodies/desktop/src/main/secret-store.ts` |
 
 ## Storage
 
@@ -349,7 +349,7 @@ data directory, `%APPDATA%\Tagalong` on Windows. Neither is in the database. See
   file is moved to `.corrupt` on the next save.
 - **A bad patch** throws before anything is written; over RPC it comes back as an error to the
   caller. The Settings form checks its own fields first and marks a refused one
-  (`SettingsFieldError`, `apps/desktop/src/renderer/src/settings-form.ts`).
+  (`SettingsFieldError`, `bodies/desktop/src/renderer/src/settings-form.ts`).
 - **No engine**: settings are read and saved from the file; key checks say the engine is not
   running; the model list is empty with `source: 'fallback'`.
 - **No OS encryption**: `SafeStorageSecretStore.set` throws `This machine has no OS encryption
@@ -368,15 +368,15 @@ renderer, a log line or a model. See [privacy.md](privacy.md).
 
 ## Tests that pin it
 
-| Test file                                          | Pins                                                                                                                                                                                            |
-| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/protocol/src/settings.test.ts`           | Defaults, bounds, retired fields dropped, no secret fields, patch never invents values                                                                                                          |
-| `packages/core/src/settings/settings.test.ts`      | Missing file, `.bak` fallback, `.corrupt`, atomic save, merge, bad patch writes nothing, retired values dropped on save, `InMemorySecretStore`                                                  |
-| `packages/core/src/tools/builtin/settings.test.ts` | Card rows, keeping other fields, talk key, refusals without echo, add-only exclusions, loosening on a routine, listening off only, days lower only, budget, no secret store, `talkPatchProblem` |
-| `apps/desktop/src/main/ipc/apply-settings.test.ts` | Listening off path, never on, re-check against the allowlist, refused patch keeps listening                                                                                                     |
-| `apps/desktop/src/main/ipc/settings.test.ts`       | Host view, no-engine mode, save fan-out (hotkeys, rolling memory, broadcast), bubble-only apply, `byTalk`, key save and delete                                                                  |
-| `apps/desktop/src/main/secret-store.test.ts`       | Round trip, survives restart, no plain text on disk, refuses with no encryption                                                                                                                 |
-| `apps/desktop/src/main/provider-choices.test.ts`   | Only `hasKey` crosses, no env var name, ElevenLabs key, retired key deleted only when present                                                                                                   |
-| `packages/core/src/providers/key-resolver.test.ts` | Key saved after boot used on next refresh, rebuild on key or URL change, fake mode                                                                                                              |
-| `packages/core/src/privacy/secrets.test.ts`        | Each `hideSecrets` rule, ordinary text untouched                                                                                                                                                |
-| `packages/core/src/providers/guard.test.ts`        | Messages and tool results hidden, images and ids kept                                                                                                                                           |
+| Test file                                            | Pins                                                                                                                                                                                            |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/protocol/src/settings.test.ts`             | Defaults, bounds, retired fields dropped, no secret fields, patch never invents values                                                                                                          |
+| `packages/core/src/settings/settings.test.ts`        | Missing file, `.bak` fallback, `.corrupt`, atomic save, merge, bad patch writes nothing, retired values dropped on save, `InMemorySecretStore`                                                  |
+| `packages/core/src/tools/builtin/settings.test.ts`   | Card rows, keeping other fields, talk key, refusals without echo, add-only exclusions, loosening on a routine, listening off only, days lower only, budget, no secret store, `talkPatchProblem` |
+| `bodies/desktop/src/main/ipc/apply-settings.test.ts` | Listening off path, never on, re-check against the allowlist, refused patch keeps listening                                                                                                     |
+| `bodies/desktop/src/main/ipc/settings.test.ts`       | Host view, no-engine mode, save fan-out (hotkeys, rolling memory, broadcast), bubble-only apply, `byTalk`, key save and delete                                                                  |
+| `bodies/desktop/src/main/secret-store.test.ts`       | Round trip, survives restart, no plain text on disk, refuses with no encryption                                                                                                                 |
+| `bodies/desktop/src/main/provider-choices.test.ts`   | Only `hasKey` crosses, no env var name, ElevenLabs key, retired key deleted only when present                                                                                                   |
+| `packages/core/src/providers/key-resolver.test.ts`   | Key saved after boot used on next refresh, rebuild on key or URL change, fake mode                                                                                                              |
+| `packages/core/src/privacy/secrets.test.ts`          | Each `hideSecrets` rule, ordinary text untouched                                                                                                                                                |
+| `packages/core/src/providers/guard.test.ts`          | Messages and tool results hidden, images and ids kept                                                                                                                                           |

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`apps/desktop` is the Electron host. Its main process boots the engine in-process, dials it over
+`bodies/desktop` is the Electron host. Its main process boots the engine in-process, dials it over
 the loopback websocket like any other host, and owns every window, the tray, the global hotkeys and
 the IPC that connects the windows to the engine. The renderers never talk to the engine directly.
 
@@ -13,7 +13,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 
 ## Where it lives
 
-| Path (under `apps/desktop/`)                           | What it holds                                                                                                                                                                              |
+| Path (under `bodies/desktop/`)                         | What it holds                                                                                                                                                                              |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `src/main/index.ts`                                    | The main process: single-instance lock, `start`, the `Desktop` record, window routing, tray, `registerIpc`                                                                                 |
 | `src/main/engine-host.ts`                              | `startEngineHost`, `EngineHost`: boots `Engine` and connects an `EngineClient` to it                                                                                                       |
@@ -517,7 +517,7 @@ on the avatar's `session-end`. The check-in itself is in [mind.md](mind.md).
   (`jsx: 'automatic'`), not `@vitejs/plugin-react` (it needs Vite 8; the app is on Vite 7), so
   there is no Fast Refresh in development.
 
-The workspace packages are `devDependencies` of `apps/desktop`. Its `dependencies` are exactly what
+The workspace packages are `devDependencies` of `bodies/desktop`. Its `dependencies` are exactly what
 the packaged app loads at runtime: `@huggingface/transformers` 3.8.1, `@nut-tree-fork/nut-js`
 4.2.6, `better-sqlite3` 13.0.3, `get-windows` 9.3.0, `kokoro-js` 1.2.1, `onnxruntime-node` 1.21.0
 (the version `@huggingface/transformers` pins, so one ONNX runtime serves every voice model) and
@@ -552,7 +552,7 @@ Node cannot `dlopen` from inside an asar archive; files under `app.asar.unpacked
 there by Electron's `require` redirect, which is why every `.node` file and the ONNX runtime's DLLs
 are unpacked.
 
-Scripts (`apps/desktop/package.json`): every build, run and package script first runs
+Scripts (`bodies/desktop/package.json`): every build, run and package script first runs
 `scripts/ensure-electron.mjs`.
 `package:win` runs `scripts/fetch-native.mjs win32 x64`, then `electron-vite build`, then
 `electron-builder --win nsis --x64 --publish never`. `fetch-native.mjs` exists because

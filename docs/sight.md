@@ -14,10 +14,10 @@ tools exist, what goes into the prompt and what is recorded. Windows is the only
 
 | Area                           | Files                                                                                                                                                                                                           |
 | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Platform interface and factory | `apps/desktop/src/main/platform/index.ts` (`Platform`, `createPlatform`, `WindowInventory`)                                                                                                                     |
-| Windows adapter                | `apps/desktop/src/main/platform/win32.ts` (`Win32Platform`)                                                                                                                                                     |
-| Sight pause gate               | `apps/desktop/src/main/platform/sight-gate.ts` (`gateSight`, `SIGHT_POLICY`, `SightPausedError`); `apps/desktop/src/main/sight-pause.ts` (`SightPause`)                                                         |
-| PowerShell transport           | `apps/desktop/src/main/platform/powershell.ts` (`runPowerShellScript`), `platform/window-helper.ts` (`runWindowHelper`, `LIST_WINDOWS_SCRIPT`, `PER_MONITOR_AWARE`)                                             |
+| Platform interface and factory | `bodies/desktop/src/main/platform/index.ts` (`Platform`, `createPlatform`, `WindowInventory`)                                                                                                                   |
+| Windows adapter                | `bodies/desktop/src/main/platform/win32.ts` (`Win32Platform`)                                                                                                                                                   |
+| Sight pause gate               | `bodies/desktop/src/main/platform/sight-gate.ts` (`gateSight`, `SIGHT_POLICY`, `SightPausedError`); `bodies/desktop/src/main/sight-pause.ts` (`SightPause`)                                                     |
+| PowerShell transport           | `bodies/desktop/src/main/platform/powershell.ts` (`runPowerShellScript`), `platform/window-helper.ts` (`runWindowHelper`, `LIST_WINDOWS_SCRIPT`, `PER_MONITOR_AWARE`)                                           |
 | Window list                    | `platform/window-list.ts` (`parseWindowList`, `placeOnDisplays`, `countableHandles`, `handleOf`, `screensOf`)                                                                                                   |
 | Window text                    | `platform/window-text.ts` (scripts, `parseWindowText`), `platform/text-layer.ts` (`TextLayerProvider`), `platform/read-text.ts` (`readWindowTextWith`)                                                          |
 | OCR                            | `platform/ocr.ts` (`recognizeText`, `OCR_SCRIPT`)                                                                                                                                                               |
@@ -25,12 +25,12 @@ tools exist, what goes into the prompt and what is recorded. Windows is the only
 | Composite drawing              | `platform/composite.ts`, `platform/canvas.ts`, `platform/label.ts`, `platform/downscale.ts` (`fitWithin`)                                                                                                       |
 | Selection                      | `platform/selection.ts` (`captureSelectionWith`)                                                                                                                                                                |
 | Pointing (sight side)          | `platform/find-element.ts`, `platform/point-target.ts`                                                                                                                                                          |
-| Capture paths and notices      | `apps/desktop/src/main/context.ts` (`captureAskSnapshot`, `capturePatch`, `answerCapture`, `DESKTOP_CAPABILITIES`), `capture-notice.ts`, `engine-host.ts`, `engine-client.ts`                                   |
-| Rolling memory and diff        | `apps/desktop/src/main/awareness/` (`rolling-memory.ts`, `frame-ring.ts`, `perception-memory.ts`, `pixel-diff.ts`, `native-codec.ts`, `clock.ts`)                                                               |
+| Capture paths and notices      | `bodies/desktop/src/main/context.ts` (`captureAskSnapshot`, `capturePatch`, `answerCapture`, `DESKTOP_CAPABILITIES`), `capture-notice.ts`, `engine-host.ts`, `engine-client.ts`                                 |
+| Rolling memory and diff        | `bodies/desktop/src/main/awareness/` (`rolling-memory.ts`, `frame-ring.ts`, `perception-memory.ts`, `pixel-diff.ts`, `native-codec.ts`, `clock.ts`)                                                             |
 | Exclusion rules and inventory  | `packages/core/src/perception/exclusions.ts`, `inventory.ts`, `text-layer.ts`, `retention.ts`, `browser-route.ts`, `host.ts`; `packages/protocol/src/blind-spots.ts`                                            |
 | Screen tools                   | `packages/core/src/tools/builtin/perception.ts`, `awareness.ts`, `pointing.ts`; registered in `packages/core/src/tools/registry.ts`                                                                             |
 | Prompt                         | `packages/core/src/conversation/prompt-assembler.ts` (`imagesToAttach`, `contextBlock`, `SCREEN_DATA_LABEL`)                                                                                                    |
-| Sight log                      | `packages/core/src/perception/record-sight.ts`, `packages/core/src/memory/sight-log.ts`, `packages/protocol/src/sight-log.ts`, `apps/desktop/src/main/ipc/sight-log.ts`                                         |
+| Sight log                      | `packages/core/src/perception/record-sight.ts`, `packages/core/src/memory/sight-log.ts`, `packages/protocol/src/sight-log.ts`, `bodies/desktop/src/main/ipc/sight-log.ts`                                       |
 | Wire shapes                    | `packages/protocol/src/context.ts`, `awareness.ts`, `methods.ts` (`coreToHostMethods`), `limits.ts`, `settings.ts`                                                                                              |
 
 ## How it works
@@ -571,7 +571,7 @@ insert and once at engine boot. RPC (`packages/protocol/src/sight-log.ts`):
 | `sightLog.clear`  | `{}`                       | `{ deleted: count }`        |
 
 None is in `EXTENSION_METHODS`, so the extension cannot read or delete the log. Home's
-`SightLogView` (`packages/ui/src/home/sight-log-view.tsx`) uses `IPC.listSightLog`,
+`SightLogView` (`bodies/ui/src/home/sight-log-view.tsx`) uses `IPC.listSightLog`,
 `IPC.deleteSightLog`, `IPC.clearSightLog` (`tagalong:sight-log:*`), registered in
 `ipc/sight-log.ts`, which lists the newest 200. Deleting removes the record only, not what was
 sent and not conversations. `SightLog.list(limit, since, until)` also serves the daily briefing.
@@ -624,7 +624,7 @@ crops, 640 for memory frames, 1024 for a watch's after-crop. With `sightDetail: 
 full-view snapshot carries two images (composite and focused display) however many monitors there
 are; `all` carries the composite plus one per display.
 
-`estimateImageTokens` (`packages/ui/src/sight-bar.tsx`) sums width × height ÷ 750 over the
+`estimateImageTokens` (`bodies/ui/src/sight-bar.tsx`) sums width × height ÷ 750 over the
 screenshot, the composite and each display image and shows `~N image tokens` in the `SightBar`.
 `SightBar` is part of `ChatPanel`, which the Chrome extension's side panel renders; the desktop
 bubble shows chips for the window, the selection and a screenshot, with no estimate. What a turn
@@ -652,7 +652,7 @@ actually costs is recorded by the usage meter (see [mind.md](mind.md)).
 `image?`), `composite?`, `windows?` (`WindowEntry`: `id`, `processName`, `title`, `displayId?`,
 `state`, `browser`, `textChars?`, `blocked?`, `fullScreen?`), `dropped?`.
 
-**Desktop IPC** (`apps/desktop/src/shared/ipc.ts`):
+**Desktop IPC** (`bodies/desktop/src/shared/ipc.ts`):
 
 | Channel                                                                                  | Direction      | Use                                                          |
 | ---------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------ |
@@ -672,7 +672,7 @@ actually costs is recorded by the usage meter (see [mind.md](mind.md)).
 
 | Constant                         | Value           | File                                                 |
 | -------------------------------- | --------------- | ---------------------------------------------------- |
-| `MAX_SCREENSHOT_LONG_SIDE`       | 1568            | `apps/desktop/src/main/context.ts`                   |
+| `MAX_SCREENSHOT_LONG_SIDE`       | 1568            | `bodies/desktop/src/main/context.ts`                 |
 | `CROP_LONG_SIDE`                 | 1568            | `packages/core/src/tools/builtin/perception.ts`      |
 | `FRAME_LONG_SIDE`                | 640             | `awareness/rolling-memory.ts`                        |
 | `AFTER_CROP_LONG_SIDE`           | 1024            | `awareness/perception-memory.ts`                     |
@@ -699,11 +699,11 @@ actually costs is recorded by the usage meter (see [mind.md](mind.md)).
 | `CHANNEL_TOLERANCE`              | 24              | `awareness/pixel-diff.ts`                            |
 | `TICK_SLACK_SECONDS`             | 10              | `packages/core/src/tools/builtin/awareness.ts`       |
 | `MAX_APPS_PER_DISPLAY`           | 2               | `packages/core/src/conversation/prompt-assembler.ts` |
-| `SEEING_MS`                      | 2,500           | `apps/desktop/src/renderer/src/avatar.tsx`           |
+| `SEEING_MS`                      | 2,500           | `bodies/desktop/src/renderer/src/avatar.tsx`         |
 | `POINT_LABEL_MAX`                | 40              | `packages/protocol/src/methods.ts`                   |
 | `SIGHT_LOG_DEFAULT_DAYS`         | 7 (1 to 30)     | `packages/protocol/src/sight-log.ts`                 |
 | `MAX_SCREENSHOT_RETENTION_HOURS` | 24              | `packages/protocol/src/settings.ts`                  |
-| `KEEP_AN_EYE_INTERVAL_MS`        | 5,000           | `apps/desktop/src/main/keep-an-eye.ts`               |
+| `KEEP_AN_EYE_INTERVAL_MS`        | 5,000           | `bodies/desktop/src/main/keep-an-eye.ts`             |
 
 ## Storage
 
@@ -760,28 +760,28 @@ sight, pointing and drops. Points that follow from this design:
 
 ## Tests that pin it
 
-| Behaviour                                                                                                                                    | Tests                                                                                                                                            |
-| -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Every `Platform` method has a pause class; gated reads never reach the adapter; pause read per call                                          | `apps/desktop/src/main/platform/sight-gate.test.ts`                                                                                              |
-| Pause state and listeners                                                                                                                    | `apps/desktop/src/main/sight-pause.test.ts`                                                                                                      |
-| Ask snapshot takes no picture; blocked window keeps no title and no Ctrl+C; looks past Tagalong's own windows; tool captures obey exclusions | `apps/desktop/src/main/context.test.ts`                                                                                                          |
-| Notice wording and tooltip                                                                                                                   | `apps/desktop/src/main/capture-notice.test.ts`                                                                                                   |
-| Display blanking (focused and unfocused, minimized ignored), composite placeholder, one `getSources` call                                    | `platform/displays.test.ts`, `platform/composite.test.ts`, `platform/canvas.test.ts`, `platform/label.test.ts`                                   |
-| Screenshot picking and resizing, never upscaling                                                                                             | `platform/capture.test.ts`, `platform/downscale.test.ts`, `platform/window-shot.test.ts`, `platform/region.test.ts`                              |
-| Window list parsing, failures, DPI placement, counts only for allowed windows                                                                | `platform/window-list.test.ts`, `platform/text-layer.test.ts`                                                                                    |
-| Text read order, caps, thin-text notes, OCR fallback, minimized not photographed                                                             | `platform/window-text.test.ts`, `platform/read-text.test.ts`, `platform/ocr.test.ts`                                                             |
-| `-EncodedCommand`, no here-strings, encoded length, never rejects                                                                            | `platform/powershell.test.ts`, `platform/window-helper.test.ts`                                                                                  |
-| Real PowerShell transport and real recogniser (Windows CI only)                                                                              | `platform/transport.integration.test.ts`, `platform/ocr.integration.test.ts`                                                                     |
-| Selection borrow and restore                                                                                                                 | `platform/selection.test.ts`                                                                                                                     |
-| Pointing lookup and mapping                                                                                                                  | `platform/find-element.test.ts`, `platform/point-target.test.ts`, `packages/core/src/tools/builtin/pointing.test.ts`                             |
-| Exclusion matching, blind spots, secret files                                                                                                | `packages/core/src/perception/exclusions.test.ts`, `packages/protocol/src/blind-spots.test.ts`                                                   |
-| Inventory classification and the 400-token budget                                                                                            | `packages/core/src/perception/inventory.test.ts`                                                                                                 |
-| Attach policy (composite + focused, `all`, no empty image block), fence as data, image before text                                           | `packages/core/src/conversation/prompt-assembler.test.ts`                                                                                        |
-| Screen tools                                                                                                                                 | `packages/core/src/tools/builtin/perception.test.ts`, `perception-full-view.test.ts`, `awareness.test.ts`                                        |
-| Rolling memory: opt-in, 640 px every 5 s, skip on exclusion, clear on pause/off/quit, no `fs`                                                | `apps/desktop/src/main/awareness/rolling-memory.test.ts`, `frame-ring.test.ts`                                                                   |
-| Recall and diff, scratch ring expiry, refusal on exclusion                                                                                   | `awareness/perception-memory.test.ts`, `awareness/pixel-diff.test.ts`                                                                            |
-| Sight-log rows per method, no content, titles scrubbed or dropped                                                                            | `packages/core/src/perception/record-sight.test.ts`, `packages/core/src/memory/sight-log.test.ts`, `apps/desktop/src/main/ipc/sight-log.test.ts` |
-| `notKept` marker in episodes and bundles                                                                                                     | `packages/core/src/memory/experience.test.ts`, `packages/core/src/check-in/bundle.test.ts`, `check-in.test.ts`                                   |
-| Screenshot retention                                                                                                                         | `packages/core/src/perception/retention.test.ts`                                                                                                 |
-| Image token estimate                                                                                                                         | `packages/ui/src/sight-bar.test.tsx`                                                                                                             |
-| Real downscaled PNG, sight pause and sight settings end to end                                                                               | `apps/desktop/e2e/smoke.spec.ts`                                                                                                                 |
+| Behaviour                                                                                                                                    | Tests                                                                                                                                              |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Every `Platform` method has a pause class; gated reads never reach the adapter; pause read per call                                          | `bodies/desktop/src/main/platform/sight-gate.test.ts`                                                                                              |
+| Pause state and listeners                                                                                                                    | `bodies/desktop/src/main/sight-pause.test.ts`                                                                                                      |
+| Ask snapshot takes no picture; blocked window keeps no title and no Ctrl+C; looks past Tagalong's own windows; tool captures obey exclusions | `bodies/desktop/src/main/context.test.ts`                                                                                                          |
+| Notice wording and tooltip                                                                                                                   | `bodies/desktop/src/main/capture-notice.test.ts`                                                                                                   |
+| Display blanking (focused and unfocused, minimized ignored), composite placeholder, one `getSources` call                                    | `platform/displays.test.ts`, `platform/composite.test.ts`, `platform/canvas.test.ts`, `platform/label.test.ts`                                     |
+| Screenshot picking and resizing, never upscaling                                                                                             | `platform/capture.test.ts`, `platform/downscale.test.ts`, `platform/window-shot.test.ts`, `platform/region.test.ts`                                |
+| Window list parsing, failures, DPI placement, counts only for allowed windows                                                                | `platform/window-list.test.ts`, `platform/text-layer.test.ts`                                                                                      |
+| Text read order, caps, thin-text notes, OCR fallback, minimized not photographed                                                             | `platform/window-text.test.ts`, `platform/read-text.test.ts`, `platform/ocr.test.ts`                                                               |
+| `-EncodedCommand`, no here-strings, encoded length, never rejects                                                                            | `platform/powershell.test.ts`, `platform/window-helper.test.ts`                                                                                    |
+| Real PowerShell transport and real recogniser (Windows CI only)                                                                              | `platform/transport.integration.test.ts`, `platform/ocr.integration.test.ts`                                                                       |
+| Selection borrow and restore                                                                                                                 | `platform/selection.test.ts`                                                                                                                       |
+| Pointing lookup and mapping                                                                                                                  | `platform/find-element.test.ts`, `platform/point-target.test.ts`, `packages/core/src/tools/builtin/pointing.test.ts`                               |
+| Exclusion matching, blind spots, secret files                                                                                                | `packages/core/src/perception/exclusions.test.ts`, `packages/protocol/src/blind-spots.test.ts`                                                     |
+| Inventory classification and the 400-token budget                                                                                            | `packages/core/src/perception/inventory.test.ts`                                                                                                   |
+| Attach policy (composite + focused, `all`, no empty image block), fence as data, image before text                                           | `packages/core/src/conversation/prompt-assembler.test.ts`                                                                                          |
+| Screen tools                                                                                                                                 | `packages/core/src/tools/builtin/perception.test.ts`, `perception-full-view.test.ts`, `awareness.test.ts`                                          |
+| Rolling memory: opt-in, 640 px every 5 s, skip on exclusion, clear on pause/off/quit, no `fs`                                                | `bodies/desktop/src/main/awareness/rolling-memory.test.ts`, `frame-ring.test.ts`                                                                   |
+| Recall and diff, scratch ring expiry, refusal on exclusion                                                                                   | `awareness/perception-memory.test.ts`, `awareness/pixel-diff.test.ts`                                                                              |
+| Sight-log rows per method, no content, titles scrubbed or dropped                                                                            | `packages/core/src/perception/record-sight.test.ts`, `packages/core/src/memory/sight-log.test.ts`, `bodies/desktop/src/main/ipc/sight-log.test.ts` |
+| `notKept` marker in episodes and bundles                                                                                                     | `packages/core/src/memory/experience.test.ts`, `packages/core/src/check-in/bundle.test.ts`, `check-in.test.ts`                                     |
+| Screenshot retention                                                                                                                         | `packages/core/src/perception/retention.test.ts`                                                                                                   |
+| Image token estimate                                                                                                                         | `bodies/ui/src/sight-bar.test.tsx`                                                                                                                 |
+| Real downscaled PNG, sight pause and sight settings end to end                                                                               | `bodies/desktop/e2e/smoke.spec.ts`                                                                                                                 |

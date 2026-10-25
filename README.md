@@ -138,7 +138,7 @@ await engine.shutdown();
 
 A real host also answers the engine's `perception.*` requests for the capabilities it advertises.
 The method catalog and every payload schema are in `packages/protocol/src/methods.ts`; the desktop
-app's own client is `apps/desktop/src/main/engine-client.ts`. Read
+app's own client is `bodies/desktop/src/main/engine-client.ts`. Read
 [Architecture](docs/architecture.md) for how the engine and its hosts fit together, and
 [How to add a host](docs/development.md#how-to-add-a-host) for the contracts a host implements.
 
@@ -567,7 +567,7 @@ The full detail is in [Privacy in detail](docs/privacy.md).
 | Sending logs with a problem report                             | Ask Scout "what's wrong?", press **Open logs folder** (`%APPDATA%\Tagalong\logs`). Warnings and errors only, never speech or screen text.       |
 | You want Welcome again                                         | Home → Settings → Advanced → **Open Welcome again**.                                                                                            |
 | You want to start over                                         | Quit Tagalong and delete `%APPDATA%\Tagalong`. That removes settings, conversations, memories and stored keys; Welcome opens on the next start. |
-| From source, a look always captures the whole screen           | The active-window helper was not downloaded: run `node apps/desktop/scripts/fetch-native.mjs`. The installer already includes it.               |
+| From source, a look always captures the whole screen           | The active-window helper was not downloaded: run `node bodies/desktop/scripts/fetch-native.mjs`. The installer already includes it.             |
 | It does not start on macOS or Linux                            | Not in this build: only Windows has a platform adapter so far.                                                                                  |
 
 # For developers

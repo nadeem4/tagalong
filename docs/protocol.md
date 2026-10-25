@@ -375,9 +375,9 @@ host's `SecretStore`. Both are described in [settings-and-secrets.md](settings-a
 6. **Extension.** Only if the side panel needs it, add the name to `EXTENSION_METHODS` and update
    the scoping tests in `packages/core/src/server/ws-server.test.ts`.
 7. **Hosts.** The desktop calls through `EngineClient.call` from an IPC handler in
-   `apps/desktop/src/main/ipc/`, exposed by the preload; a core-to-host request is answered in
+   `bodies/desktop/src/main/ipc/`, exposed by the preload; a core-to-host request is answered in
    `EngineClient`'s `#answer` (and `service-worker.ts` for the extension). A notification the UI
-   renders joins `TurnNotification` in `packages/ui/src/host-bridge.ts` (every `turn.*` joins
+   renders joins `TurnNotification` in `bodies/ui/src/host-bridge.ts` (every `turn.*` joins
    automatically).
 8. **Docs.** Add the row to the tables above and to the subsystem doc that owns it.
 

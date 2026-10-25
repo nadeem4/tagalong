@@ -18,12 +18,12 @@ ask; silence never does.
 | `packages/core/src/engine.ts`                    | Builds `Asks`, calls `boot` and `prune`, the `asks.*` and `tool.approve` handlers, `closeHeld` on shutdown                            |
 | `packages/core/src/tools/builtin/connections.ts` | Holds an app change through `deps.confirm` (`Asks.hold`); see [connected-apps.md](connected-apps.md)                                  |
 | `packages/core/src/experts/handoffs.ts`          | Adds a hand-off card (`Asks.add`), settles it on Send, Dismiss or a gone expert; see [experts.md](experts.md)                         |
-| `apps/desktop/src/main/ipc/asks.ts`              | `registerAskIpc`: `tagalong:asks:list`, `tagalong:asks:answer`, `tagalong:asks:open`                                                  |
-| `apps/desktop/src/preload/index.ts`              | `listAsks`, `answerAsk`, `openAsk` on the bridge                                                                                      |
-| `packages/ui/src/home/waiting-view.tsx`          | `WaitingView`, Home's Waiting on you page                                                                                             |
-| `packages/ui/src/home/home-view.tsx`             | The `Waiting on you (n)` nav item, counted from `asks.changed`                                                                        |
-| `packages/ui/src/companion-bubble.tsx`           | Drops a confirm card or proposed hand-off card that `asks.changed` no longer lists                                                    |
-| `packages/ui/src/connector-confirm.tsx`          | `ConnectorConfirmCard` (Allow once / Cancel)                                                                                          |
+| `bodies/desktop/src/main/ipc/asks.ts`            | `registerAskIpc`: `tagalong:asks:list`, `tagalong:asks:answer`, `tagalong:asks:open`                                                  |
+| `bodies/desktop/src/preload/index.ts`            | `listAsks`, `answerAsk`, `openAsk` on the bridge                                                                                      |
+| `bodies/ui/src/home/waiting-view.tsx`            | `WaitingView`, Home's Waiting on you page                                                                                             |
+| `bodies/ui/src/home/home-view.tsx`               | The `Waiting on you (n)` nav item, counted from `asks.changed`                                                                        |
+| `bodies/ui/src/companion-bubble.tsx`             | Drops a confirm card or proposed hand-off card that `asks.changed` no longer lists                                                    |
+| `bodies/ui/src/connector-confirm.tsx`            | `ConnectorConfirmCard` (Allow once / Cancel)                                                                                          |
 
 ## How it works
 
@@ -261,4 +261,4 @@ rows keep one short line for 30 days. See [privacy.md](privacy.md).
   second answer loses; a write waiting at quit is `expired/closed` after relaunch and nothing ran; a
   hand-off card survives a relaunch and Send starts it; Delete all keeps the waiting.
 - `packages/core/src/tools/registry.test.ts`: no role's tool can answer an ask.
-- `packages/ui/src/home/waiting-view.test.tsx`, `apps/desktop/src/main/ipc/asks.test.ts`.
+- `bodies/ui/src/home/waiting-view.test.tsx`, `bodies/desktop/src/main/ipc/asks.test.ts`.

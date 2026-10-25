@@ -9,7 +9,7 @@
  *
  * These notes live here rather than in the host because they are about meaning, not about
  * the operating system — the same split that puts window classification in this package
- * and enumeration in `apps/desktop`. Contains textLayerNotes and THIN_TEXT_CHARS.
+ * and enumeration in `bodies/desktop`. Contains textLayerNotes and THIN_TEXT_CHARS.
  */
 
 /** The reading a set of notes is derived from. */

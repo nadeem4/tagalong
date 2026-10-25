@@ -12,7 +12,7 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
  * @tagalong/ui. Resolving from the ui package still guarantees a single React instance in
  * the renderer, which is what matters for hooks and context.
  */
-const fromUi = createRequire(new URL('../../packages/ui/package.json', import.meta.url));
+const fromUi = createRequire(new URL('../ui/package.json', import.meta.url));
 const reactDir = dirname(fromUi.resolve('react/package.json'));
 const reactDomDir = dirname(fromUi.resolve('react-dom/package.json'));
 
