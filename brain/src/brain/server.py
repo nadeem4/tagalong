@@ -86,17 +86,17 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session: str) -> None:
                     break
                 continue
             method = message.get("method")
-            if not isinstance(method, str):
-                continue  # a response; nothing asks the body for one yet
             req_id = _usable_id(message)
             if body_id is None:
-                if method != "hello":
+                if method != "hello":  # method may be None for a response
                     peer.send(_error(req_id, ErrorCode.invalid_request, "hello must come first"))
                     break
                 body_id = _hello(message, req_id, peer, bodies, session)
                 if body_id is None:
                     break
                 continue
+            if not isinstance(method, str):
+                continue  # a response; nothing asks the body for one yet
             try:
                 reply = _dispatch(method, message, req_id, body_id, bodies)
             except Exception:

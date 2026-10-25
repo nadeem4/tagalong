@@ -171,3 +171,11 @@ async def test_second_connection_same_id_closes_first(env):
         await assert_closed(first)
         bodies.notify("changed", {"what": "settings"})
         assert json.loads(await second.recv())["params"]["what"] == "settings"
+
+
+async def test_response_before_hello_closes(env):
+    _, url = env
+    async with connect(url) as ws:
+        reply = await call(ws, {"jsonrpc": "2.0", "id": 1, "result": {}})
+        assert reply["error"]["code"] == -32600
+        await assert_closed(ws)

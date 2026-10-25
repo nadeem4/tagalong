@@ -70,9 +70,14 @@ flowchart LR
 
 ## Not built yet
 
-`say` and turns, `call` and the brain's own tools, `use`, asks and `answer`, `reply`, `turn` and
-`tool` notifications, part size checks, and the live-state replay after `resync`. Each lands in a
-later row of the launch board.
+| Row   | Brings                                                                                                                                                                |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 4     | The thinking loop and sessions: `say`, turn `cancel`, `turn`, `reply` and `tool` notifications, live-state replay after `resync`, the budget, the step cap            |
+| 6     | Memory                                                                                                                                                                |
+| 7     | Tools: the brain's tools in the `hello` result, `use` and its `cancel` to bodies, `call`, model tool names `<body>__<tool>`, part size checks as `say` and tools land |
+| Later | Asks, `answer` and confirm guardrails                                                                                                                                 |
+
+Until then these requests answer `method_not_found`.
 
 ## Tests
 
