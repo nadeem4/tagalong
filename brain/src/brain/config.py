@@ -1,7 +1,7 @@
 """Brain settings from environment variables, plus the persistent session id.
 
-The session id lives in a file so it survives restarts: bodies compare it to tell a
-restarted brain (new id) from a reconnect to the same one.
+The session id lives in a file so it survives restarts and every body sees one session.
+It is informational: hello returns it and bodies never send it back.
 """
 
 import os

@@ -99,9 +99,11 @@ class Bodies:
         if current is not None and current.peer is peer:
             del self._online[body_id]
 
-    def set_tools(self, body_id: str, tools: list[Tool]) -> None:
-        if body_id in self._online:
-            self._online[body_id].tools = tools
+    def set_tools(self, body_id: str, peer: Peer, tools: list[Tool]) -> None:
+        # A replaced connection may still deliver a frame; only the current peer counts.
+        current = self._online.get(body_id)
+        if current is not None and current.peer is peer:
+            current.tools = tools
 
     def tools(self, body_id: str) -> list[Tool]:
         return self._online[body_id].tools

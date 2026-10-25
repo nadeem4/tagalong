@@ -1,4 +1,8 @@
-"""Entry point for `uv run brain`: load config, start the websocket server, run until stopped."""
+"""Entry point for `uv run brain`.
+
+Loads config, starts the websocket server and runs until stopped. Logging is set up here
+so the library's own connection chatter stays quiet and only the brain's lines print.
+"""
 
 import asyncio
 import logging
@@ -21,6 +25,7 @@ async def _run() -> None:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logging.getLogger("websockets").setLevel(logging.WARNING)
     try:
         asyncio.run(_run())
     except KeyboardInterrupt:

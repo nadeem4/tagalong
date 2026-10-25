@@ -82,6 +82,26 @@ async def test_version_mismatch_closes(env):
         await assert_closed(ws)
 
 
+async def test_version_checked_before_shape(env):
+    _, url = env
+    frame = hello(protocol=2)
+    frame["params"]["body"] = {"id": "desktop", "kind": "desktop"}  # no name
+    async with connect(url) as ws:
+        reply = await call(ws, frame)
+        assert reply["error"]["code"] == -32000
+        assert reply["error"]["data"] == {"protocol": 1}
+        await assert_closed(ws)
+
+
+async def test_garbage_before_hello_closes(env):
+    _, url = env
+    async with connect(url) as ws:
+        reply = await call(ws, "{not json")
+        assert reply["error"]["code"] == -32700
+        assert reply["id"] is None
+        await assert_closed(ws)
+
+
 async def test_null_optional_is_invalid_params(env):
     _, url = env
     frame = hello()
@@ -169,6 +189,7 @@ async def test_second_connection_same_id_closes_first(env):
         await call(first, hello())
         await call(second, hello())
         await assert_closed(first)
+        # first is closed, so it can't send tools; the stale guard is tested in test_bodies.
         bodies.notify("changed", {"what": "settings"})
         assert json.loads(await second.recv())["params"]["what"] == "settings"
 

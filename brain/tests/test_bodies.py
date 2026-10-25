@@ -1,4 +1,8 @@
-"""Checks the per-body outbox (seq, replay, resync) and the Bodies registry."""
+"""Checks the per-body outbox (seq, replay, resync) and the Bodies registry.
+
+Pure unit tests with a fake peer: no sockets, and the clock is injected so the replay
+window can be tested without sleeping.
+"""
 
 import json
 
@@ -136,5 +140,16 @@ def test_newer_connection_wins():
 def test_set_tools_replaces():
     bodies = Bodies()
     bodies.connect(body("a"), [tool("x")], FakePeer(), None)
-    bodies.set_tools("a", [tool("y")])
+    peer = FakePeer()
+    bodies.connect(body("a"), [tool("x")], peer, None)
+    bodies.set_tools("a", peer, [tool("y")])
     assert bodies.tools("a") == [tool("y")]
+
+
+def test_set_tools_from_stale_peer_is_ignored():
+    bodies = Bodies()
+    old, new = FakePeer(), FakePeer()
+    bodies.connect(body("a"), [tool("x")], old, None)
+    bodies.connect(body("a"), [tool("x")], new, None)
+    bodies.set_tools("a", old, [tool("stale")])
+    assert bodies.tools("a") == [tool("x")]

@@ -1,4 +1,8 @@
-"""Checks env-var config parsing and the persistent session id."""
+"""Checks env-var config parsing and the persistent session id.
+
+The session id must survive a restart (same file, same value) and be created on first use,
+so every body sees one session across brain restarts.
+"""
 
 from pathlib import Path
 

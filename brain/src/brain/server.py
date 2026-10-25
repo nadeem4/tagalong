@@ -98,7 +98,7 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session: str) -> None:
             if not isinstance(method, str):
                 continue  # a response; nothing asks the body for one yet
             try:
-                reply = _dispatch(method, message, req_id, body_id, bodies)
+                reply = _dispatch(method, message, req_id, body_id, peer, bodies)
             except Exception:
                 log.exception("handler failed for %s", method)
                 reply = _error(req_id, ErrorCode.internal_error, "Internal error")
@@ -115,14 +115,18 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session: str) -> None:
 
 def _hello(message: dict, req_id: Any, peer: _Peer, bodies: Bodies, session: str) -> str | None:
     """Join the body and queue the result then the backlog; None means hello failed."""
-    try:
-        params = HelloParams.model_validate(message.get("params"))
-    except ValidationError as exc:
-        peer.send(_error(req_id, ErrorCode.invalid_params, str(exc)))
-        return None
-    if params.protocol != PROTOCOL:
+    raw = message.get("params")
+    # Check the version first: a future protocol may change the shape, and its body
+    # should learn "mismatch", not "invalid params".
+    version = raw.get("protocol") if isinstance(raw, dict) else None
+    if isinstance(version, int) and not isinstance(version, bool) and version != PROTOCOL:
         data = {"protocol": PROTOCOL}
         peer.send(_error(req_id, ErrorCode.version_mismatch, "Unsupported protocol", data))
+        return None
+    try:
+        params = HelloParams.model_validate(raw)
+    except ValidationError as exc:
+        peer.send(_error(req_id, ErrorCode.invalid_params, str(exc)))
         return None
     joined = bodies.connect(params.body, params.tools, peer, params.last_seq)
     result = HelloResult(
@@ -134,7 +138,9 @@ def _hello(message: dict, req_id: Any, peer: _Peer, bodies: Bodies, session: str
     return params.body.id
 
 
-def _dispatch(method: str, message: dict, req_id: Any, body_id: str, bodies: Bodies) -> str | None:
+def _dispatch(
+    method: str, message: dict, req_id: Any, body_id: str, peer: _Peer, bodies: Bodies
+) -> str | None:
     if method == "hello":
         return _error(req_id, ErrorCode.invalid_request, "hello was already sent")
     if method == "tools":
@@ -142,7 +148,7 @@ def _dispatch(method: str, message: dict, req_id: Any, body_id: str, bodies: Bod
             parsed = ToolsParams.model_validate(message.get("params"))
         except ValidationError as exc:
             return _error(req_id, ErrorCode.invalid_params, str(exc))
-        bodies.set_tools(body_id, parsed.tools)
+        bodies.set_tools(body_id, peer, parsed.tools)
         return _result(req_id, {})
     # event, cancel, progress and unknown notifications are dropped by the caller.
     return _error(req_id, ErrorCode.method_not_found, f"Unknown method: {method}")

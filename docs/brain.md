@@ -33,16 +33,19 @@ The `session` file keeps one id across restarts. `hello` returns it.
 
 ## What a connection does
 
-- The first message must be `hello`. Anything else gets `invalid_request` and the connection closes.
-- A bad `hello` closes the connection: `invalid_params`, or `version_mismatch` with
-  `data.protocol` set to `1`.
+- The first message must be `hello`. Anything else, including bad JSON, gets an error and the
+  connection closes.
+- A bad `hello` closes the connection. The protocol version is checked first, so a wrong
+  version gets `version_mismatch` with `data.protocol` set to `1` even if the rest of the shape
+  is wrong; otherwise a bad shape gets `invalid_params`.
 - After `hello`, `tools` replaces the body's tool list and answers `{}`. A second `hello` gets
   `invalid_request`. The connection stays open.
 - `say`, `call` and `answer` answer `method_not_found` until they are built. `event`, `cancel`,
   `progress` and unknown notifications are ignored. An unknown request gets `method_not_found`.
 - Bad JSON or a binary frame gets `parse_error`. Anything that is not a JSON-RPC object gets
-  `invalid_request`. After `hello` the connection stays open.
-- A newer connection with the same body id closes the older one.
+  `invalid_request`. After `hello` the connection stays open; before it, it closes.
+- A newer connection with the same body id closes the older one. Its `tools` frames are
+  ignored if one still arrives.
 - The largest frame is 28,000,000 bytes.
 
 ## Outbox and replay
