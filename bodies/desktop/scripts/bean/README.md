@@ -1,7 +1,7 @@
 # Bean: regenerating Scout's dock frames
 
 Bean, the 3D Scout on the dock, is pre-rendered. The app ships one WebP strip per clip and a
-`manifest.json` in `apps/desktop/src/renderer/src/bean/`. These two scripts make them:
+`manifest.json` in `bodies/desktop/src/renderer/src/bean/`. These two scripts make them:
 
 - `bean.py` builds the model, poses and clips in Blender, headless, and renders 512 px masters.
 - `pack.py` scales the masters down to 192 px frames (twice the 96 px window, for HiDPI), packs
@@ -13,7 +13,7 @@ Bean, the 3D Scout on the dock, is pre-rendered. The app ships one WebP strip pe
 Needs Blender on the PATH and Python 3 with Pillow.
 
 ```sh
-cd apps/desktop/scripts/bean
+cd bodies/desktop/scripts/bean
 blender -b -P bean.py -- frames          # every clip, masters in out/frames/<clip>/
 blender -b -P bean.py -- frames working  # or only the named clips
 python pack.py                           # strips and manifest in out/delivery/

@@ -31,8 +31,8 @@ All paths are under `packages/core/src` unless noted.
 | `jobs/store.ts`                              | `JobStore`: `doneSince` (recall's recent work), `undigested`, `digests`, `search`, `finishedByPrefix`                    |
 | `engine.ts`                                  | Wiring: stores, `Summarizer`, `Digest`, the `memory.list` and `memory.delete` handlers, boot prunes                      |
 | `packages/protocol/src/memory.ts`            | `MemoryEntry`, `MemoryListParams`, `MemoryListResult`, `MemoryDeleteParams`, `MemoryDeleteResult`                        |
-| `apps/desktop/src/main/ipc/memory.ts`        | `registerMemoryIpc`: `IPC.listMemories`, `IPC.deleteMemory`                                                              |
-| `packages/ui/src/home/memory-view.tsx`       | `MemoryView`: Home's What Scout remembers page                                                                           |
+| `bodies/desktop/src/main/ipc/memory.ts`      | `registerMemoryIpc`: `IPC.listMemories`, `IPC.deleteMemory`                                                              |
+| `bodies/ui/src/home/memory-view.tsx`         | `MemoryView`: Home's What Scout remembers page                                                                           |
 
 ## How it works
 
@@ -362,16 +362,16 @@ only, never page text or answers. See [privacy.md](privacy.md).
 
 ## Tests that pin it
 
-| Test file                                   | Pins                                                                                                                                                                                   |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `memory/memories.test.ts`                   | Per-pet visibility, `addOnce`, stemming, FTS syntax as plain words, delete leaves the index, paging and unknown cursor, `byPrefix`, origin rules, `evictSummaries`                     |
-| `memory/recall.test.ts`                     | Order (preferences, newest, matches), 5 preferences always, no duplicates, budget drops whole items, recent work: 2 jobs, 14 days, 500 chars                                           |
-| `memory/summarizer.test.ts`                 | Threshold, keep newest 4, summariser setting, failure leaves history alone, one job per conversation                                                                                   |
-| `memory/digest.test.ts`                     | Parse rules and caps, run conditions, 20-hour gap, retry once a day, timeout, timer, tidy on every check, secrets hidden in the bundle, apply rules, origin, counts, prune and 200 cap |
-| `memory/history-search.test.ts`             | AND query, both records, only the brief's ask, retention cutoff, deleted and pruned rows leave the index, blind spots by app, own turn excluded, secrets hidden                        |
-| `tools/builtin/memory.test.ts`              | `remember` filing, `forget` listing, short ids, ambiguity, jobs, not on a routine's turn                                                                                               |
-| `tools/builtin/history.test.ts`             | Hit lines, `until`, day listing, cutoff, 60 rows, `isError` on bad input and store failure, not callable by the extension                                                              |
-| `memory/db.test.ts`                         | Migrations 3, 4, 18, 20 and 22 for memory                                                                                                                                              |
-| `packages/protocol/src/memory.test.ts`      | The `memory.*` schemas                                                                                                                                                                 |
-| `apps/desktop/src/main/ipc/memory.test.ts`  | The desktop IPC                                                                                                                                                                        |
-| `packages/ui/src/home/memory-view.test.tsx` | Home's list and delete                                                                                                                                                                 |
+| Test file                                    | Pins                                                                                                                                                                                   |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `memory/memories.test.ts`                    | Per-pet visibility, `addOnce`, stemming, FTS syntax as plain words, delete leaves the index, paging and unknown cursor, `byPrefix`, origin rules, `evictSummaries`                     |
+| `memory/recall.test.ts`                      | Order (preferences, newest, matches), 5 preferences always, no duplicates, budget drops whole items, recent work: 2 jobs, 14 days, 500 chars                                           |
+| `memory/summarizer.test.ts`                  | Threshold, keep newest 4, summariser setting, failure leaves history alone, one job per conversation                                                                                   |
+| `memory/digest.test.ts`                      | Parse rules and caps, run conditions, 20-hour gap, retry once a day, timeout, timer, tidy on every check, secrets hidden in the bundle, apply rules, origin, counts, prune and 200 cap |
+| `memory/history-search.test.ts`              | AND query, both records, only the brief's ask, retention cutoff, deleted and pruned rows leave the index, blind spots by app, own turn excluded, secrets hidden                        |
+| `tools/builtin/memory.test.ts`               | `remember` filing, `forget` listing, short ids, ambiguity, jobs, not on a routine's turn                                                                                               |
+| `tools/builtin/history.test.ts`              | Hit lines, `until`, day listing, cutoff, 60 rows, `isError` on bad input and store failure, not callable by the extension                                                              |
+| `memory/db.test.ts`                          | Migrations 3, 4, 18, 20 and 22 for memory                                                                                                                                              |
+| `packages/protocol/src/memory.test.ts`       | The `memory.*` schemas                                                                                                                                                                 |
+| `bodies/desktop/src/main/ipc/memory.test.ts` | The desktop IPC                                                                                                                                                                        |
+| `bodies/ui/src/home/memory-view.test.tsx`    | Home's list and delete                                                                                                                                                                 |

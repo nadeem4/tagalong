@@ -72,7 +72,10 @@ describe('electron-builder config', () => {
   });
 
   it('ships the built Chrome extension next to app.asar, for Load unpacked', () => {
-    expect(config.extraResources).toContainEqual({ from: '../extension/dist', to: 'extension' });
+    expect(config.extraResources).toContainEqual({
+      from: '../../apps/extension/dist',
+      to: 'extension',
+    });
   });
 
   it('marks the macOS and Linux targets as configured, not verified', () => {

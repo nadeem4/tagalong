@@ -16,7 +16,7 @@ never knows which operating system or which host it is serving.
 A host is a thin shell around the engine. It perceives (selection, windows, screenshots, page
 text) and presents (the figure, the bubble, the voice). A host reaches the engine only through the
 JSON-RPC protocol in `packages/protocol`, over a loopback WebSocket. The desktop app runs the engine
-in its own main process and still dials it over the socket (`apps/desktop/src/main/engine-host.ts`,
+in its own main process and still dials it over the socket (`bodies/desktop/src/main/engine-host.ts`,
 `startEngineHost`), so it cannot come to depend on anything the Chrome host does not have.
 
 Speech is the one capability that lives in a host rather than the core: the speech-to-text and
@@ -50,20 +50,20 @@ flowchart LR
   M -- "ElevenLabs TTS" --> X
 ```
 
-| Process                  | Entry point                                  | What runs there                                                                                                                                                                               |
-| ------------------------ | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Electron main            | `apps/desktop/src/main/index.ts`             | The engine (`Engine.boot`), the desktop `EngineClient`, the platform adapter (window list, captures, OCR, selection), tray, global shortcuts, the talk key hook, IPC handlers, rolling memory |
-| Renderer windows         | `apps/desktop/src/renderer/*.html`           | One page per window: `avatar`, `panel` (the bubble), `home`, `settings`, `welcome`, `pointer` (`RendererPage` in `main/windows/page.ts`). Sandboxed, context-isolated, no Node                |
-| Voice utility process    | `apps/desktop/src/main/voice/worker/main.ts` | Kokoro text to speech and the local ears (speech to text, turn detection), started by `utilityProcess.fork` as `voice-worker.js` (`VoiceWorker` in `voice/worker/client.ts`)                  |
-| Extension service worker | `apps/extension/src/service-worker.ts`       | The extension's one socket to the engine (`EngineConnection`), answers `perception.capture` for the active tab                                                                                |
-| Extension side panel     | `apps/extension/src/sidepanel/main.tsx`      | Scout in Chrome's side panel, talking to the service worker over a runtime port (`port-bridge.ts`, `port-hub.ts`)                                                                             |
-| Extension content script | `apps/extension/src/content/page-reader.ts`  | Reads the page's readable text on request (Readability)                                                                                                                                       |
+| Process                  | Entry point                                    | What runs there                                                                                                                                                                               |
+| ------------------------ | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Electron main            | `bodies/desktop/src/main/index.ts`             | The engine (`Engine.boot`), the desktop `EngineClient`, the platform adapter (window list, captures, OCR, selection), tray, global shortcuts, the talk key hook, IPC handlers, rolling memory |
+| Renderer windows         | `bodies/desktop/src/renderer/*.html`           | One page per window: `avatar`, `panel` (the bubble), `home`, `settings`, `welcome`, `pointer` (`RendererPage` in `main/windows/page.ts`). Sandboxed, context-isolated, no Node                |
+| Voice utility process    | `bodies/desktop/src/main/voice/worker/main.ts` | Kokoro text to speech and the local ears (speech to text, turn detection), started by `utilityProcess.fork` as `voice-worker.js` (`VoiceWorker` in `voice/worker/client.ts`)                  |
+| Extension service worker | `apps/extension/src/service-worker.ts`         | The extension's one socket to the engine (`EngineConnection`), answers `perception.capture` for the active tab                                                                                |
+| Extension side panel     | `apps/extension/src/sidepanel/main.tsx`        | Scout in Chrome's side panel, talking to the service worker over a runtime port (`port-bridge.ts`, `port-hub.ts`)                                                                             |
+| Extension content script | `apps/extension/src/content/page-reader.ts`    | Reads the page's readable text on request (Readability)                                                                                                                                       |
 
 How they connect:
 
-- **Renderer to main.** Electron IPC only. The preload (`apps/desktop/src/preload/index.ts`)
+- **Renderer to main.** Electron IPC only. The preload (`bodies/desktop/src/preload/index.ts`)
   exposes `window.tagalong` and `window.tagalongHost` through `contextBridge`; channel names live in
-  `apps/desktop/src/shared/ipc.ts`. Handlers live in `apps/desktop/src/main/ipc/` and in
+  `bodies/desktop/src/shared/ipc.ts`. Handlers live in `bodies/desktop/src/main/ipc/` and in
   `main/index.ts` for the ones that need Electron itself. No renderer opens the socket.
 - **Main to engine.** `EngineClient` (`main/engine-client.ts`) dials the loopback socket with the
   pairing token read straight from the engine (`engine.pairingToken`). Engine notifications are
@@ -86,8 +86,8 @@ else, because two engines would fight over the port and the SQLite file.
 flowchart BT
   P["packages/protocol<br>zod only"]
   C["packages/core"]
-  U["packages/ui"]
-  D["apps/desktop"]
+  U["bodies/ui"]
+  D["bodies/desktop"]
   X["apps/extension"]
   C --> P
   U --> P
@@ -107,8 +107,8 @@ Arrows point at what a package depends on. The edges are the TypeScript project 
 | `packages/protocol`              | Zod schemas for every message, the method catalog, settings schema and defaults, limits, blind spots, status marks, shared voice and addressing helpers | `node:*`, `electron`, `react`, any `@tagalong/*`                                                                                | `eslint.config.js` (block for `packages/protocol/**`); its only dependency is `zod`                                  |
 | `packages/core`                  | The engine: `Engine` facade, runner, prompt, providers, memory, experts, connections, asks, routines, check-ins, the socket server                      | `electron`, `electron/*`, `react`, `react-dom`, `@tagalong/ui`, DOM globals (`window`, `document`, `navigator`, `localStorage`) | `eslint.config.js` (`PURITY_PATHS`, `PURITY_PATTERNS`, `no-restricted-globals`)                                      |
 | `packages/core` (runner, engine) | `conversation/**` and `engine.ts` reach tools through the registry                                                                                      | `tools/builtin/**`                                                                                                              | `eslint.config.js` (block for `conversation/**` and `engine.ts`)                                                     |
-| `packages/ui`                    | React components shared by both hosts: the bubble, dock pet, chat panel, Home, the Settings sheet, cards, the `HostBridge` contract and a fake bridge   | `electron`, `ws`, `node:*`, `@tagalong/core`                                                                                    | Dependencies and references only (`protocol`, `react`); browser globals in ESLint. No lint rule names these imports. |
-| `apps/desktop`                   | Electron host: windows, tray, hotkeys, talk key, platform adapter, perception, voice, `SafeStorageSecretStore`                                          | core internals                                                                                                                  | `@tagalong/core` exports only `.` (`packages/core/package.json`), so deep imports do not resolve                     |
+| `bodies/ui`                      | React components shared by both hosts: the bubble, dock pet, chat panel, Home, the Settings sheet, cards, the `HostBridge` contract and a fake bridge   | `electron`, `ws`, `node:*`, `@tagalong/core`                                                                                    | Dependencies and references only (`protocol`, `react`); browser globals in ESLint. No lint rule names these imports. |
+| `bodies/desktop`                 | Electron host: windows, tray, hotkeys, talk key, platform adapter, perception, voice, `SafeStorageSecretStore`                                          | core internals                                                                                                                  | `@tagalong/core` exports only `.` (`packages/core/package.json`), so deep imports do not resolve                     |
 | `apps/extension`                 | Chrome MV3 host: selection and page text, side panel, pairing                                                                                           | `@tagalong/core`                                                                                                                | Not a dependency and not a project reference                                                                         |
 
 The protocol's ESLint block replaces the shared purity options for its own files rather than
@@ -117,7 +117,7 @@ and `@tagalong/*`.
 
 The desktop bundles the workspace packages into its main, preload and renderer builds with
 electron-vite; only the native dependencies stay external (`better-sqlite3`, `get-windows`,
-`onnxruntime-node`, `uiohook-napi`; `apps/desktop/electron.vite.config.ts`). See
+`onnxruntime-node`, `uiohook-napi`; `bodies/desktop/electron.vite.config.ts`). See
 [desktop.md](desktop.md).
 
 ## Host contracts
@@ -133,7 +133,7 @@ advertised.
 
 | Host      | Capabilities (`hello`)                                                                               | Source                                                         |
 | --------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| Desktop   | `selection`, `activeWindow`, `clipboard`, `screenshot`, `displays`, `textLayer`, `recall`, `pointer` | `DESKTOP_CAPABILITIES`, `apps/desktop/src/main/context.ts`     |
+| Desktop   | `selection`, `activeWindow`, `clipboard`, `screenshot`, `displays`, `textLayer`, `recall`, `pointer` | `DESKTOP_CAPABILITIES`, `bodies/desktop/src/main/context.ts`   |
 | Extension | `selection`, `pageText`, `activeWindow`                                                              | `EXTENSION_CAPABILITIES`, `apps/extension/src/capabilities.ts` |
 
 Exclusions and the built-in blind spots are checked before anything is read; the details are in
@@ -141,7 +141,7 @@ Exclusions and the built-in blind spots are checked before anything is read; the
 
 **Presentation.** The host renders Scout and its bubble, streams `turn.*` notifications, shows the
 cards (hand-off, connector confirm, routine, settings) and speaks. The UI package draws all of it
-against `HostBridge` (`packages/ui/src/host-bridge.ts`), which each host implements: the desktop
+against `HostBridge` (`bodies/ui/src/host-bridge.ts`), which each host implements: the desktop
 over IPC, the extension over its runtime port. See [bubble.md](bubble.md).
 
 ### Routing between the desktop and the browser
@@ -278,7 +278,7 @@ when the turn had already ended.
 
 ## Boot and shutdown
 
-The desktop's `start()` (`apps/desktop/src/main/index.ts`) gates the platform adapter behind the
+The desktop's `start()` (`bodies/desktop/src/main/index.ts`) gates the platform adapter behind the
 sight pause, opens the secret store and settings, records the launch, builds rolling memory, then
 calls `startEngineHost`, which runs `Engine.boot` and connects `EngineClient`. If the engine fails
 to start, Settings opens with the error instead of quitting, because Settings is where the fix is.
@@ -355,20 +355,20 @@ flowchart LR
   Engine --> SS
 ```
 
-| Doc                                                | Covers                                                                                 | Main code                                                                                                       |
-| -------------------------------------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| [protocol.md](protocol.md)                         | Envelope, every method and notification, main schemas, versioning                      | `packages/protocol/src`                                                                                         |
-| [desktop.md](desktop.md)                           | Windows, tray, hotkeys, IPC modules, platform adapter, packaging, log file, Welcome    | `apps/desktop/src/main`, `apps/desktop/src/preload`, `apps/desktop/src/renderer`                                |
-| [bubble.md](bubble.md)                             | The companion bubble, status marks, pointing, drafts, drops                            | `packages/ui/src`                                                                                               |
-| [voice.md](voice.md)                               | Hearing, speaking, talk key, always listening, models and downloads, the voice process | `apps/desktop/src/main/voice`, `main/talk-key.ts`, `main/always-listening.ts`, `packages/protocol/src/voice.ts` |
-| [sight.md](sight.md)                               | Window list, captures, OCR, exclusions, pausing sight, sight log, rolling memory       | `apps/desktop/src/main/platform`, `main/awareness`, `packages/core/src/perception`                              |
-| [mind.md](mind.md)                                 | Prompt assembly, roles, Now, providers, check-ins, watches, the Self, sleep, usage     | `packages/core/src/conversation`, `providers`, `check-in`, `watch`, `self`, `usage`                             |
-| [memory.md](memory.md)                             | Memory store, recall, digest, summaries, forgetting                                    | `packages/core/src/memory`                                                                                      |
-| [experts.md](experts.md)                           | Experts and connectors, hand-offs, jobs and the task board, pick up where you left off | `packages/core/src/experts`, `jobs`, `projects`, `pick-up`                                                      |
-| [asks.md](asks.md)                                 | Saved asks (Waiting on you), risk, expiry, outcomes                                    | `packages/core/src/asks`                                                                                        |
-| [routines.md](routines.md)                         | Triggers, schedule, delivery, results, the calendar feed                               | `packages/core/src/routines`, `meetings`                                                                        |
-| [connected-apps.md](connected-apps.md)             | MCP connections, tool calls, approvals for writes                                      | `packages/core/src/connections`                                                                                 |
-| [browser-extension.md](browser-extension.md)       | The Chrome host, pairing, routing, what it reads                                       | `apps/extension/src`, `packages/core/src/perception/browser-route.ts`                                           |
-| [settings-and-secrets.md](settings-and-secrets.md) | Settings store, change by talking, the secret store, secrets on the way out            | `packages/core/src/settings`, `privacy`, `providers/guard.ts`, `apps/desktop/src/main/secret-store.ts`          |
-| [storage.md](storage.md)                           | SQLite tables, migrations, retention jobs                                              | `packages/core/src/memory/db.ts`                                                                                |
-| [privacy.md](privacy.md)                           | What is captured, sent, kept and deleted                                               | across the above                                                                                                |
+| Doc                                                | Covers                                                                                 | Main code                                                                                                         |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| [protocol.md](protocol.md)                         | Envelope, every method and notification, main schemas, versioning                      | `packages/protocol/src`                                                                                           |
+| [desktop.md](desktop.md)                           | Windows, tray, hotkeys, IPC modules, platform adapter, packaging, log file, Welcome    | `bodies/desktop/src/main`, `bodies/desktop/src/preload`, `bodies/desktop/src/renderer`                            |
+| [bubble.md](bubble.md)                             | The companion bubble, status marks, pointing, drafts, drops                            | `bodies/ui/src`                                                                                                   |
+| [voice.md](voice.md)                               | Hearing, speaking, talk key, always listening, models and downloads, the voice process | `bodies/desktop/src/main/voice`, `main/talk-key.ts`, `main/always-listening.ts`, `packages/protocol/src/voice.ts` |
+| [sight.md](sight.md)                               | Window list, captures, OCR, exclusions, pausing sight, sight log, rolling memory       | `bodies/desktop/src/main/platform`, `main/awareness`, `packages/core/src/perception`                              |
+| [mind.md](mind.md)                                 | Prompt assembly, roles, Now, providers, check-ins, watches, the Self, sleep, usage     | `packages/core/src/conversation`, `providers`, `check-in`, `watch`, `self`, `usage`                               |
+| [memory.md](memory.md)                             | Memory store, recall, digest, summaries, forgetting                                    | `packages/core/src/memory`                                                                                        |
+| [experts.md](experts.md)                           | Experts and connectors, hand-offs, jobs and the task board, pick up where you left off | `packages/core/src/experts`, `jobs`, `projects`, `pick-up`                                                        |
+| [asks.md](asks.md)                                 | Saved asks (Waiting on you), risk, expiry, outcomes                                    | `packages/core/src/asks`                                                                                          |
+| [routines.md](routines.md)                         | Triggers, schedule, delivery, results, the calendar feed                               | `packages/core/src/routines`, `meetings`                                                                          |
+| [connected-apps.md](connected-apps.md)             | MCP connections, tool calls, approvals for writes                                      | `packages/core/src/connections`                                                                                   |
+| [browser-extension.md](browser-extension.md)       | The Chrome host, pairing, routing, what it reads                                       | `apps/extension/src`, `packages/core/src/perception/browser-route.ts`                                             |
+| [settings-and-secrets.md](settings-and-secrets.md) | Settings store, change by talking, the secret store, secrets on the way out            | `packages/core/src/settings`, `privacy`, `providers/guard.ts`, `bodies/desktop/src/main/secret-store.ts`          |
+| [storage.md](storage.md)                           | SQLite tables, migrations, retention jobs                                              | `packages/core/src/memory/db.ts`                                                                                  |
+| [privacy.md](privacy.md)                           | What is captured, sent, kept and deleted                                               | across the above                                                                                                  |

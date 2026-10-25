@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`packages/ui` (`@tagalong/ui`) holds the React components both hosts render: Scout's bubble and
+`bodies/ui` (`@tagalong/ui`) holds the React components both hosts render: Scout's bubble and
 the cards it hosts, the dock pet, the status marks, Home and the extension's chat panel. It never
 imports Electron, opens a socket or calls a Node API. Each host hands it a `HostBridge`, and that
 is all it knows about the outside world.
@@ -13,7 +13,7 @@ decides to hand to it.
 
 ## Where it lives
 
-| Path (under `packages/ui/src/`)                                                                       | What it holds                                                                                  |
+| Path (under `bodies/ui/src/`)                                                                         | What it holds                                                                                  |
 | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `index.ts`                                                                                            | The public surface                                                                             |
 | `host-bridge.ts`                                                                                      | `HostBridge`, `TurnEvent`, `AskInput`, `ConfirmHandoff`, `HostBridgeProvider`, `useHostBridge` |
@@ -32,7 +32,7 @@ decides to hand to it.
 | `voice/` (the rest)                                                                                   | `SpeechQueue`, `QueueMouth`, `PushToTalk`, `ListenController` (see [voice.md](voice.md))       |
 | `theme/tokens.ts`, `settings/settings-styles.ts`                                                      | Theme tokens; `SETTINGS_CSS`                                                                   |
 
-Host-side files that feed these components: `apps/desktop/src/renderer/src/panel.tsx` (the bubble),
+Host-side files that feed these components: `bodies/desktop/src/renderer/src/panel.tsx` (the bubble),
 `avatar.tsx` and `dock.ts` (the dock pet's mood), `home.tsx` (Home),
 `apps/extension/src/sidepanel/app.tsx` (the chat panel).
 
@@ -276,7 +276,7 @@ percent? }`. `STATUS_WORDS[id]` holds `tag` (one or two words on Scout), `detail
     (`data-testid="status-row"`), with **Fix it** when the table names a fix and the host passed
     `onFix`.
     Problems use the warn colours, the rest the muted ones; nothing animates.
-- **The holder** is main's `StatusMarks` (`apps/desktop/src/main/status-marks.ts`): one map, an
+- **The holder** is main's `StatusMarks` (`bodies/desktop/src/main/status-marks.ts`): one map, an
   optional time limit per mark, and a callback that broadcasts the top mark on
   `IPC.statusMarkEvent`. Windows read `getStatusMark()` on mount. Who sets what:
 
@@ -319,7 +319,7 @@ one-shot. Each clip is keyed by mood, so a one-shot always plays from its first 
 | `tired`     | none                  | `pet.mood` `tired`, until `rested`                      | looks tired                    |
 
 **Where the mood comes from.** The desktop avatar page keeps `DockState` with a pure reducer,
-`nextDock` (`apps/desktop/src/renderer/src/dock.ts`), over every `TurnEvent`, main's
+`nextDock` (`bodies/desktop/src/renderer/src/dock.ts`), over every `TurnEvent`, main's
 `presence.away` / `presence.back`, and its own events (`seeing` and `seen` around a capture
 notice, `looked` on a click, `reacted`, `dropHover`, `dropLeave`). `dockMood(state)` picks, in
 order: seeing, reading, thinking, expert, working, a held drop (Seeing), the wince or cheer, tired,
@@ -467,25 +467,25 @@ status? }`, `DockMood`, `ListeningDot`, `BeanFigure`, `BeanClipData`.
 
 ## Constants and limits
 
-| Constant                                | Value                                                         | Where                                           |
-| --------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------- |
-| `TYPE_MS`                               | 22 ms a character (the hello's line)                          | `companion-bubble.tsx`                          |
-| `GreetingLine` `holdMs`                 | 7,000 ms default; 12,000 ms for remarks and routines          | `companion-bubble.tsx`, `panel.tsx`             |
-| `LEAVE_MS`                              | 300 ms fade                                                   | `companion-bubble.tsx`                          |
-| `TRY_IT`                                | "What am I working on, and what could you hand to an expert?" | `companion-bubble.tsx`                          |
-| Answer box height                       | 260 px max, then scrolls                                      | `companion-bubble.tsx` (`BUBBLE_CSS`)           |
-| `COPIED_MS`                             | 2,000 ms                                                      | `answer.tsx`                                    |
-| `SHORT_LINE`                            | 40 characters                                                 | `voice/speakable.ts`                            |
-| `HEALTH_TEST_BUDGET_MS`                 | 5,000 ms per call                                             | `apps/desktop/src/renderer/src/health-facts.ts` |
-| Dock size (`SIZE`)                      | 96 px                                                         | `dock-pet.tsx`                                  |
-| Blink interval                          | 3,000 to 6,000 ms                                             | `dock-pet.tsx`                                  |
-| `SEEING_MS`                             | 2,500 ms                                                      | `apps/desktop/src/renderer/src/avatar.tsx`      |
-| `REACTION_MS`                           | 4,000 ms                                                      | `apps/desktop/src/renderer/src/dock.ts`         |
-| `DRAG_THRESHOLD`                        | 4 px                                                          | `apps/desktop/src/renderer/src/dock.ts`         |
-| `LISTENING_MARK_MS`, `SAY_NAME_MARK_MS` | 8,000 ms each                                                 | `apps/desktop/src/main/status-marks.ts`         |
-| Activity page (`PAGE`)                  | 30 entries                                                    | `home/activity-view.tsx`                        |
-| Overview recent activity                | 3 entries                                                     | `home/home-view.tsx`                            |
-| Image token estimate                    | width x height / 750 per image                                | `sight-bar.tsx`                                 |
+| Constant                                | Value                                                         | Where                                             |
+| --------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------- |
+| `TYPE_MS`                               | 22 ms a character (the hello's line)                          | `companion-bubble.tsx`                            |
+| `GreetingLine` `holdMs`                 | 7,000 ms default; 12,000 ms for remarks and routines          | `companion-bubble.tsx`, `panel.tsx`               |
+| `LEAVE_MS`                              | 300 ms fade                                                   | `companion-bubble.tsx`                            |
+| `TRY_IT`                                | "What am I working on, and what could you hand to an expert?" | `companion-bubble.tsx`                            |
+| Answer box height                       | 260 px max, then scrolls                                      | `companion-bubble.tsx` (`BUBBLE_CSS`)             |
+| `COPIED_MS`                             | 2,000 ms                                                      | `answer.tsx`                                      |
+| `SHORT_LINE`                            | 40 characters                                                 | `voice/speakable.ts`                              |
+| `HEALTH_TEST_BUDGET_MS`                 | 5,000 ms per call                                             | `bodies/desktop/src/renderer/src/health-facts.ts` |
+| Dock size (`SIZE`)                      | 96 px                                                         | `dock-pet.tsx`                                    |
+| Blink interval                          | 3,000 to 6,000 ms                                             | `dock-pet.tsx`                                    |
+| `SEEING_MS`                             | 2,500 ms                                                      | `bodies/desktop/src/renderer/src/avatar.tsx`      |
+| `REACTION_MS`                           | 4,000 ms                                                      | `bodies/desktop/src/renderer/src/dock.ts`         |
+| `DRAG_THRESHOLD`                        | 4 px                                                          | `bodies/desktop/src/renderer/src/dock.ts`         |
+| `LISTENING_MARK_MS`, `SAY_NAME_MARK_MS` | 8,000 ms each                                                 | `bodies/desktop/src/main/status-marks.ts`         |
+| Activity page (`PAGE`)                  | 30 entries                                                    | `home/activity-view.tsx`                          |
+| Overview recent activity                | 3 entries                                                     | `home/home-view.tsx`                              |
+| Image token estimate                    | width x height / 750 per image                                | `sight-bar.tsx`                                   |
 
 ## Storage
 
@@ -519,7 +519,7 @@ never spoken. See [privacy.md](privacy.md).
 
 ## Tests that pin it
 
-| Test (under `packages/ui/src/` unless noted)                                                                                                            | Pins                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Test (under `bodies/ui/src/` unless noted)                                                                                                              | Pins                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `companion-bubble.test.tsx`                                                                                                                             | the hello writes no line of its own and takes the mind's once; Try it with and without sight; chips and `without`; streaming with Stop; formatted answers; continuing the conversation; failures; full chat; background turns ignored; × close; the tail side; draft Copy; `GreetingLine` timing, hold, Not now and offers; each answer said once; the header switches; mic, partials, spoken questions and barge-in; typed questions unspoken |
 | `companion-bubble-health.test.tsx`                                                                                                                      | the health card instead of a turn, nothing said aloud, Fix it, Open logs folder, real questions left to Scout, a host without the check, failure, late results dropped                                                                                                                                                                                                                                                                         |
@@ -529,7 +529,7 @@ never spoken. See [privacy.md](privacy.md).
 | `handoff-card.test.tsx`, `connector-confirm.test.tsx`, `routine-card.test.tsx`, `settings-card.test.tsx`, `pick-up-card.test.tsx`, `drop-card.test.tsx` | each card's buttons and bridge calls; the settings card's Turn on and its failure; the drop card's asks and secrets refusal                                                                                                                                                                                                                                                                                                                    |
 | `status-mark.test.tsx`                                                                                                                                  | the tag, its tooltip and tone, the percent, its position above the dots; the row with or without Fix it                                                                                                                                                                                                                                                                                                                                        |
 | `dock-pet.test.tsx`, `theme/bean-clip.test.tsx`                                                                                                         | the 96 px box, tags and their place, the paused, recording, listening and status marks, labels, blinking at frame 0, reduced motion, one-shots from their start                                                                                                                                                                                                                                                                                |
-| `apps/desktop/src/renderer/src/dock.test.ts`                                                                                                            | the mood reducer and its order, reading tools, background turns, drag threshold                                                                                                                                                                                                                                                                                                                                                                |
+| `bodies/desktop/src/renderer/src/dock.test.ts`                                                                                                          | the mood reducer and its order, reading tools, background turns, drag threshold                                                                                                                                                                                                                                                                                                                                                                |
 | `home/home-view.test.tsx`                                                                                                                               | twelve pages, the waiting count, Bean in the nav, the overview, Routines kept mounted, the status line, page routing, saving how Scout thinks                                                                                                                                                                                                                                                                                                  |
 | `home/waiting-view.test.tsx`, `home/activity-view.test.tsx` and the other `home/*.test.tsx`                                                             | each page's list, actions, live re-reads, paging, empty and failure states                                                                                                                                                                                                                                                                                                                                                                     |
 | `chat-panel.test.tsx`, `chat-panel-watch.test.tsx`, `message-list.test.tsx`, `composer.test.tsx`, `sight-bar.test.tsx`                                  | the extension chat: sight bar states and Look, streaming and settling, speakers, background turns ignored, conversation continuation, errors, watch chips; the composer's Enter rules; the image token estimate                                                                                                                                                                                                                                |

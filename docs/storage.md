@@ -14,15 +14,15 @@ every job that deletes old rows. Settings and secrets are separate files; see
 | `packages/core/src/memory/db.ts`          | `DB_FILENAME`, `MIGRATIONS`, `migrate`, `openDatabase`, `LATEST_SCHEMA_VERSION`                |
 | `packages/core/src/pets/roles-upgrade.ts` | `upgradePetsToRoles`, migration 5                                                              |
 | `packages/core/src/engine.ts`             | `Engine.boot` opens the database, builds every store, runs the boot prunes; `stop()` closes it |
-| `apps/desktop/src/main/index.ts`          | Picks the data directory: `app.getPath('userData')`                                            |
+| `bodies/desktop/src/main/index.ts`        | Picks the data directory: `app.getPath('userData')`                                            |
 
 The table owners are listed under [Tables](#tables).
 
 ### The data directory
 
 The desktop passes `app.getPath('userData')` as `dataDir`. On Windows that is `%APPDATA%\Tagalong`
-(Electron derives it from `productName` in `apps/desktop/package.json`; changing the name moves
-every install's data with no migration). `pnpm start:fresh` (`apps/desktop/scripts/start-fresh.mjs`)
+(Electron derives it from `productName` in `bodies/desktop/package.json`; changing the name moves
+every install's data with no migration). `pnpm start:fresh` (`bodies/desktop/scripts/start-fresh.mjs`)
 passes `--user-data-dir=<temp folder>` for a clean run.
 
 | Path in `dataDir`                                   | Written by                                         |
@@ -32,7 +32,7 @@ passes `--user-data-dir=<temp folder>` for a clean run.
 | `secrets.json`                                      | `SafeStorageSecretStore` (desktop)                 |
 | `pairing.token`                                     | `readOrCreatePairingToken` (`server/pairing.ts`)   |
 | `self/`                                             | `SelfStore`: the current text of Scout's notes     |
-| `logs/tagalong.log`                                 | `apps/desktop/src/main/log-file.ts`                |
+| `logs/tagalong.log`                                 | `bodies/desktop/src/main/log-file.ts`              |
 | `voice/`                                            | Downloaded voice models (see [voice.md](voice.md)) |
 
 ## How it works

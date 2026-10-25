@@ -4,8 +4,8 @@
     { "path": "./packages/protocol" },
     { "path": "./protocol/ts" },
     { "path": "./packages/core" },
-    { "path": "./packages/ui" },
-    { "path": "./apps/desktop" },
+    { "path": "./bodies/ui" },
+    { "path": "./bodies/desktop" },
     { "path": "./apps/extension" }
   ]
 }

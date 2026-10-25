@@ -11,8 +11,8 @@ build/
 
 # electron-builder
 release/
-apps/desktop/dist/
-apps/desktop/out/
+bodies/desktop/dist/
+bodies/desktop/out/
 
 # env & secrets
 .env

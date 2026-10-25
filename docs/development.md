@@ -11,7 +11,7 @@ tagalong/
   package.json                      # pnpm workspace root (private)
   pnpm-workspace.yaml
   tsconfig.base.json                # plus tsconfig.json and tsconfig.tests.json
-  vitest.config.ts                  # projects: packages/*, apps/*; coverage thresholds
+  vitest.config.ts                  # projects: packages/*, apps/*, bodies/*; coverage thresholds
   eslint.config.js
   .github/workflows/ci.yml          # changes, build (Linux), e2e (Windows)
   docs/
@@ -73,6 +73,7 @@ tagalong/
                                     # registry.ts, errors.ts
       server/                       # ws-server.ts (EngineServer), pairing.ts
       settings/settings.ts          # SettingsStore, SecretStore, InMemorySecretStore
+  bodies/
     ui/src/
       index.ts, host-bridge.ts      # HostBridge contract and its React context
       dock-pet.tsx, companion-bubble.tsx, message-list.tsx, composer.tsx, sight-bar.tsx, chat-panel.tsx
@@ -84,7 +85,6 @@ tagalong/
       voice/                        # push to talk, the listen controller, the speech queue, what is spoken aloud
       theme/                        # design tokens, BeanClip (a strip of Bean frames, moving or still)
       test-support/fake-host-bridge.ts
-  apps/
     desktop/
       electron.vite.config.ts       # main / preload / renderer builds
       playwright.config.ts
@@ -117,10 +117,11 @@ tagalong/
       src/renderer/src/bean-assets.ts # FIGURE: the strips bundled once for the dock, Home and Welcome
       scripts/bean/                 # bean.py (Blender) and pack.py: regenerate Bean's strips
       src/shared/ipc.ts             # IPC channel names and the host-only API type
+  apps/
     extension/                      # Chrome MV3 host, built by Vite into dist/ (load unpacked)
       src/manifest.ts               # the manifest as data; the build writes dist/manifest.json
       src/service-worker.ts         # Chrome glue: engine socket, side panel, shortcut
-      src/sidepanel/, src/options/  # side panel (packages/ui) and the pairing page
+      src/sidepanel/, src/options/  # side panel (bodies/ui) and the pairing page
       src/content/page-reader.ts    # injected on demand: selection, URL, title, page text
 ```
 
@@ -128,8 +129,8 @@ tagalong/
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/protocol` | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC, plus the method catalog. Depends only on zod.                                                                                    |
 | `packages/core`     | The Tagalong Engine: Scout, conversation runner, prompt assembly, SQLite memory, experts and hand-offs, connected apps (MCP client), routines, host protocol server, pairing, provider adapters. Pure Node. |
-| `packages/ui`       | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, `ChatPanel` (with its internal `MessageList`, `Composer` and `SightBar`), Home's `HomeView`, and the `HostBridge` context.    |
-| `apps/desktop`      | Electron host. Runs the engine in the main process, dials it over the loopback socket, and owns Scout's window, the bubble, Home, Welcome, the tray, hotkeys, secret storage, and Scout's voice and ears.   |
+| `bodies/ui`         | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, `ChatPanel` (with its internal `MessageList`, `Composer` and `SightBar`), Home's `HomeView`, and the `HostBridge` context.    |
+| `bodies/desktop`    | Electron host. Runs the engine in the main process, dials it over the loopback socket, and owns Scout's window, the bubble, Home, Welcome, the tray, hotkeys, secret storage, and Scout's voice and ears.   |
 | `apps/extension`    | Chrome MV3 host. Connects to the running engine and speaks the protocol only. Side panel, pairing page, on-demand page reader, and the open-panel shortcut.                                                 |
 
 ## How to run
@@ -164,7 +165,7 @@ pnpm package:mac     # dmg — configured, not verified
 pnpm package:linux   # AppImage and deb — configured, not verified
 ```
 
-Inside `apps/desktop`:
+Inside `bodies/desktop`:
 
 ```bash
 pnpm build            # ensure-electron, then electron-vite build into dist/
@@ -196,14 +197,14 @@ The `brain` job in CI runs these commands, installing with `uv sync --locked`.
 CI runs it in place of `pnpm test`, so a drop below any floor fails the build. The floors live in
 the root `vitest.config.ts`.
 
-| Area                                                   | Floor (statements / branches / functions / lines) |
-| ------------------------------------------------------ | ------------------------------------------------- |
-| `packages/core/src`                                    | 70 / 70 / 70 / 70                                 |
-| `packages/protocol/src`                                | 70 / 70 / 70 / 70                                 |
-| `packages/ui/src`                                      | 91 / 83 / 90 / 93                                 |
-| `apps/desktop/src/main` and `apps/desktop/src/preload` | 59 / 62 / 49 / 60                                 |
+| Area                                                       | Floor (statements / branches / functions / lines) |
+| ---------------------------------------------------------- | ------------------------------------------------- |
+| `packages/core/src`                                        | 70 / 70 / 70 / 70                                 |
+| `packages/protocol/src`                                    | 70 / 70 / 70 / 70                                 |
+| `bodies/ui/src`                                            | 91 / 83 / 90 / 93                                 |
+| `bodies/desktop/src/main` and `bodies/desktop/src/preload` | 59 / 62 / 49 / 60                                 |
 
-The `packages/ui` and desktop host floors sit just below what they measured when they were added.
+The `bodies/ui` and desktop host floors sit just below what they measured when they were added.
 Raise them when coverage grows; never lower them to make a change pass. The desktop renderer and
 the extension are not measured: the Playwright suites cover them.
 
@@ -220,8 +221,8 @@ against the protocol's `Role` schema. A test fails while the generated file is s
 
 ### Packaging
 
-`apps/desktop/electron-builder.json` drives every installer; the output lands in
-`apps/desktop/release/`.
+`bodies/desktop/electron-builder.json` drives every installer; the output lands in
+`bodies/desktop/release/`.
 
 - **Windows (the one that matters).** A per-user NSIS installer for x64: no admin rights, a choice of
   folder, Start menu and desktop shortcuts, and Tagalong starts when it finishes. Build it on Windows
@@ -276,7 +277,7 @@ runs somewhere.
 
 ### End-to-end tests and fakes
 
-The `e2e` CI job runs the Electron end-to-end suites. `apps/desktop/e2e/` holds six Playwright suites
+The `e2e` CI job runs the Electron end-to-end suites. `bodies/desktop/e2e/` holds six Playwright suites
 that launch the built app: `smoke.spec.ts` (the bubble, talking, capture, pause, hotkeys, Welcome on
 request, Home),
 `first-run.spec.ts` (Welcome and Scout's intro on an empty data folder), `launch-greeting.spec.ts`
@@ -298,7 +299,7 @@ Quit any running Tagalong before `pnpm test:e2e`. The main process takes a singl
 second copy quits immediately and Playwright reports the confusing
 `electron.launch: Target page, context or browser has been closed` instead of naming the real cause.
 
-The smoke suite saves screenshots of Home to `apps/desktop/test-results/` (gitignored) for design
+The smoke suite saves screenshots of Home to `bodies/desktop/test-results/` (gitignored) for design
 review: `home.png`, `connections.png` and `routines.png`.
 
 ## Running the desktop app
@@ -329,7 +330,7 @@ running Tagalong first; the fresh copy has no saved keys. The tray's **Open Taga
 
 **`ensure-electron`.** Electron 44.3.0 publishes no npm install script, so `pnpm install` unpacks the
 package without ever downloading the platform binary, and the first launch dies with an error that
-reads like a broken machine. `apps/desktop/scripts/ensure-electron.mjs` runs the Electron package's own
+reads like a broken machine. `bodies/desktop/scripts/ensure-electron.mjs` runs the Electron package's own
 `install.js` when `dist/` is missing, and it is wired into the `dev`, `build`, and `start` scripts — so
 you normally never call it yourself.
 
@@ -464,7 +465,7 @@ that capture is blocked here, naming only the exclusion entry that matched.
 
 On boot the engine writes a 32-byte hex token to `pairing.token` in its data dir, alongside
 `tagalong.db`, `settings.json`, and `secrets.json`. On Windows that directory is
-`%APPDATA%\Tagalong`, which is `productName` in `apps/desktop/package.json` — Electron derives the
+`%APPDATA%\Tagalong`, which is `productName` in `bodies/desktop/package.json` — Electron derives the
 data directory from it, and changing it moves everyone's settings, database and saved keys with no
 migration. The token is stable across restarts, so a host that has already paired does not have to
 pair again.
@@ -547,12 +548,12 @@ shell you launch from**, as shown above.
 
 | Variable                    | Status                                                                                                                                                                                                                                                                                                                                                                                                     |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TAGALONG_FAKE_SIGN_IN`     | **Read** (`apps/desktop/src/main/claude-sign-in.ts#fakeSignIn`), in any build. One of `signed-in`, `signed-out`, `not-installed` or `unknown` stands in for the Claude Code sign-in check, so no claude binary runs. Under `TAGALONG_FAKE_PROVIDERS=1` the check reads as `signed-in` unless this says otherwise.                                                                                          |
+| `TAGALONG_FAKE_SIGN_IN`     | **Read** (`bodies/desktop/src/main/claude-sign-in.ts#fakeSignIn`), in any build. One of `signed-in`, `signed-out`, `not-installed` or `unknown` stands in for the Claude Code sign-in check, so no claude binary runs. Under `TAGALONG_FAKE_PROVIDERS=1` the check reads as `signed-in` unless this says otherwise.                                                                                        |
 | `TAGALONG_FAKE_PROVIDERS=1` | **Read** (`packages/core/src/providers/registry.ts`, `engine.ts`). Forces the fake brain and a fake expert, for tests and demos. No keys, network or Claude Code usage.                                                                                                                                                                                                                                    |
 | `TAGALONG_FAKE_TOOL`        | **Read** (`providers/registry.ts`). Under the fake brain, the name of one tool it calls before it answers. `cards.spec.ts` and the smoke suite set it.                                                                                                                                                                                                                                                     |
 | `TAGALONG_FAKE_TOOL_INPUT`  | **Read** (`providers/registry.ts`). The JSON input for that tool call; bad JSON means no input.                                                                                                                                                                                                                                                                                                            |
-| `TAGALONG_KEEP_AN_EYE=1`    | **Read** (`apps/desktop/src/main/keep-an-eye.ts`). Keeps an eye on things under the fake brain, where it is otherwise off.                                                                                                                                                                                                                                                                                 |
-| `TAGALONG_SKIP_WELCOME=1`   | **Read** (`apps/desktop/src/main/welcome.ts`). Keeps Welcome shut. The Electron suites other than first-run set it.                                                                                                                                                                                                                                                                                        |
+| `TAGALONG_KEEP_AN_EYE=1`    | **Read** (`bodies/desktop/src/main/keep-an-eye.ts`). Keeps an eye on things under the fake brain, where it is otherwise off.                                                                                                                                                                                                                                                                               |
+| `TAGALONG_SKIP_WELCOME=1`   | **Read** (`bodies/desktop/src/main/welcome.ts`). Keeps Welcome shut. The Electron suites other than first-run set it.                                                                                                                                                                                                                                                                                      |
 | `TAGALONG_FAKE_TTS=1`       | **Read** (`voice/voice.ts`). Scout's voice becomes a short silent clip: no model download, no ElevenLabs call, no sound. Every Electron suite sets it.                                                                                                                                                                                                                                                     |
 | `TAGALONG_FAKE_STT=1`       | **Read** (`voice/worker/main.ts`, `main/index.ts`). The voice process uses the fake ears: a held question is heard as "What am I looking at?" every time, and in always mode (`FAKE_TURN_FRAMES` frames of the fake microphone end one turn) as "Scout, what am I looking at?", with no speech model download; Chromium's fake microphone stands in for a real one. The smoke and listening suites set it. |
 | `ANTHROPIC_API_KEY`         | **Not read.** The key for the `anthropic` BrainProvider is entered in Settings and stored via Electron `safeStorage`, never taken from the environment.                                                                                                                                                                                                                                                    |
@@ -573,7 +574,7 @@ Chrome extension, or something new. Adding one never touches the core.
    `packages/protocol`. Advertise only what you can actually read, in the `capabilities` array of
    `hello`.
 2. Implement the **Presentation** contract: render Scout, stream reply deltas, and show the cards.
-   The shared React components in `packages/ui` do this already — hand them a `HostBridge` and nothing
+   The shared React components in `bodies/ui` do this already — hand them a `HostBridge` and nothing
    else.
 3. Speak the JSON-RPC protocol over the localhost WebSocket the engine exposes
    (`ws://127.0.0.1:47321` by default), presenting the pairing token in `hello`. The method catalog and
@@ -592,7 +593,7 @@ than one planned implementation.
   service needs no code — see [Choosing Scout's brain](#choosing-scouts-brain); a new named preset
   is one entry in `packages/core/src/providers/presets.ts`.
 - **Text to speech** lives in the desktop host, not in core: `Tts` in
-  `apps/desktop/src/main/voice/voice.ts` (`speak(text, { voice, speed })` returns encoded audio),
+  `bodies/desktop/src/main/voice/voice.ts` (`speak(text, { voice, speed })` returns encoded audio),
   with Kokoro (`LazyLocalVoice` over `kokoro.ts`), ElevenLabs (`elevenlabs.ts`) and `fakeTts`.
   `createVoiceService` picks one; see [The mouth](voice.md#the-mouth).
 - **Speech to text** also lives in the desktop host: the `Ears` in the voice process, `LocalEars`
@@ -634,7 +635,7 @@ docs to update. The design is in [Roles and tools](mind.md#roles-and-tools) in m
 ## Voice models
 
 The ears use three models, about 43 MB in all (43,001,836 bytes). They are not shipped in the
-installer. The first time listening is used, `apps/desktop/src/main/voice/ears/model-files.ts`
+installer. The first time listening is used, `bodies/desktop/src/main/voice/ears/model-files.ts`
 downloads the missing files into the voice folder, each streamed to a `.part` file, hashed as it
 arrives and renamed only when it is complete and matches, so an interrupted or damaged download
 never looks done. Each file is pinned to one

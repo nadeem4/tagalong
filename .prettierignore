@@ -8,5 +8,5 @@ release/
 # Written by packages/core/scripts/gen-roles.mjs; a test keeps it in step with the role files.
 packages/core/src/roles/library.generated.ts
 .impeccable/
-apps/desktop/.impeccable/
+bodies/desktop/.impeccable/
 .claude/worktrees/
