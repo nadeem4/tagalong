@@ -37,7 +37,8 @@ class FakeModel:
         deltas, final = step
         for d in deltas:
             yield d
-        yield final
+        if final is not None:
+            yield final
 
 
 class Spend:
@@ -179,7 +180,7 @@ async def test_pause_turn_continues_without_user_message():
 async def test_refusal_is_error():
     reason, _, sent, _ = await go([text_step("no", stop="refusal")])
     assert reason == "error"
-    assert not any(p.get("done") for _, p in sent)
+    assert len(dones(sent)) == 1  # a delta went out, so the reply is closed
 
 
 async def test_model_exception_is_error_and_appends_nothing():
@@ -262,7 +263,6 @@ async def test_cancel_while_tools_run_closes_history():
     ended = [p for m, p in sent if m == "tool" and p["state"] == "ended"]
     assert sorted(p["call"] for p in ended) == ["c1", "c2"]
     assert all(p["ok"] is False for p in ended)
-    await asyncio.sleep(0)
     assert sorted(cancelled) == ["x", "y"]
 
 
@@ -281,3 +281,73 @@ def test_request_has_the_constants():
 
 def test_anthropic_model_constructs():
     assert AnthropicModel(object(), "claude-sonnet-5-5").model_id == "claude-sonnet-5-5"
+
+
+def dones(sent):
+    return [p for _, p in sent if p.get("done")]
+
+
+async def test_silent_turn_sends_no_done():
+    reason, _, sent, _ = await go([text_step("x", deltas=[])])
+    assert reason == "done"
+    assert sent == []
+
+
+async def test_done_sent_once_after_deltas_on_step_cap():
+    steps = [(["hi"], tool_step(("c1", "x"))[1]), text_step("never")]
+    reason, _, sent, _ = await go(steps, step_cap=1)
+    assert reason == "step_cap"
+    assert len(dones(sent)) == 1
+
+
+async def test_done_sent_once_after_deltas_on_error():
+    class Breaks(FakeModel):
+        async def stream(self, system, messages, tools):
+            yield "partial"
+            raise RuntimeError("down")
+
+    sent = []
+    history = [{"role": "user", "content": "go"}]
+    assert await start(Breaks([]), history, sent) == "error"
+    assert len(dones(sent)) == 1
+    assert len(history) == 1
+
+
+async def test_done_sent_once_after_deltas_on_cancel():
+    started = asyncio.Event()
+
+    class Slow(FakeModel):
+        async def stream(self, system, messages, tools):
+            yield "partial"
+            started.set()
+            await asyncio.sleep(10)
+
+    sent = []
+    task = asyncio.create_task(start(Slow([]), [{"role": "user", "content": "go"}], sent))
+    await started.wait()
+    task.cancel()
+    assert await task == "cancelled"
+    assert len(dones(sent)) == 1
+
+
+async def test_max_tokens_with_tool_use_is_closed():
+    step = tool_step(("c1", "x"), stop="max_tokens")
+    reason, history, _, model = await go([step])
+    assert reason == "done"
+    assert model.calls == 1
+    assert history[-1]["content"] == [
+        {"type": "tool_result", "tool_use_id": "c1", "content": "cancelled", "is_error": True}
+    ]
+
+
+async def test_stream_without_final_is_error():
+    reason, history, _, _ = await go([(["hi"], None)])
+    assert reason == "error"
+    assert len(history) == 1
+
+
+async def test_tool_use_stop_without_blocks_is_end_turn():
+    reason, history, _, model = await go([text_step("a", stop="tool_use")])
+    assert reason == "done"
+    assert model.calls == 1
+    assert len(history) == 2

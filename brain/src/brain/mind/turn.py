@@ -75,61 +75,78 @@ async def run_turn(
     step_cap: int,
 ) -> str:
     running: dict[str, str] = {}  # call id -> tool name, for tools that have not finished
-    try:
-        return await _loop(
-            turn_id, body_id, model, system, history, tools, run_tool, inbox, notify, budget,
-            step_cap, running,
-        )  # fmt: skip
-    except asyncio.CancelledError:
-        _close_dangling_tool_use(history)
-        for call, name in running.items():
-            notify(
-                "tool", {"turn": turn_id, "call": call, "name": name, "state": "ended", "ok": False}
-            )
-        return "cancelled"
-
-
-async def _loop(
-    turn_id, body_id, model, system, history, tools, run_tool, inbox, notify, budget,
-    step_cap, running,
-) -> str:  # fmt: skip
     steps = 0
-    while True:
-        if not budget.allows():
-            return "over_budget"
-        if steps == step_cap:
-            return "step_cap"
-        steps += 1
+    spoke = False  # the contract wants exactly one reply.done iff any delta went out
+    try:
+        while True:
+            if not budget.allows():
+                reason = "over_budget"
+                break
+            if steps == step_cap:
+                reason = "step_cap"
+                break
+            steps += 1
 
-        final = None
-        try:
-            async for item in model.stream(system(), history, tools):
+            stream = model.stream(system(), history, tools).__aiter__()
+            final = None
+            failed = False
+            while True:
+                try:
+                    item = await anext(stream)
+                except StopAsyncIteration:
+                    break
+                except Exception:
+                    log.exception("model call failed")
+                    failed = True
+                    break
                 if isinstance(item, Final):
                     final = item
                 else:
+                    spoke = True
                     notify("reply", {"turn": turn_id, "body": body_id, "delta": item})
-            if final is None:
-                raise RuntimeError("model stream ended without a final message")
-        except Exception:
-            log.exception("model call failed")
-            return "error"
+            if failed or final is None:
+                if not failed:
+                    log.error("model stream ended without a final message")
+                reason = "error"
+                break
 
-        history.append({"role": "assistant", "content": final.content})
-        budget.spend(final.usage, model.model_id)
-        if final.stop_reason == "refusal":
-            return "error"
-        if final.stop_reason == "pause_turn":
-            continue
+            history.append({"role": "assistant", "content": final.content})
+            budget.spend(final.usage, model.model_id)
+            if final.stop_reason == "pause_turn":
+                continue
 
-        calls = [b for b in final.content if b.get("type") == "tool_use"]
-        if final.stop_reason == "tool_use" and calls:
-            results = await _run_tools(turn_id, calls, run_tool, notify, running)
-            history.append({"role": "user", "content": results + _drain(inbox)})
-        elif says := _drain(inbox):
-            history.append({"role": "user", "content": says})
-        else:
-            notify("reply", {"turn": turn_id, "body": body_id, "done": True})
-            return "done"
+            calls = [b for b in final.content if b.get("type") == "tool_use"]
+            if final.stop_reason == "tool_use" and calls:
+                results = await _run_tools(turn_id, calls, run_tool, notify, running)
+                history.append({"role": "user", "content": results + _drain(inbox)})
+                continue
+            closed = _close_dangling_tool_use(history)
+            if final.stop_reason == "refusal":
+                reason = "error"
+                break
+            says = _drain(inbox)
+            if not says:
+                reason = "done"
+                break
+            if closed:
+                history[-1]["content"] += says
+            else:
+                history.append({"role": "user", "content": says})
+    except asyncio.CancelledError:
+        # Swallowed so the caller gets a reason; uncancel keeps an outer timeout's count right.
+        task = asyncio.current_task()
+        if task:
+            task.uncancel()
+        _close_dangling_tool_use(history)
+        for call, name in running.items():
+            notify(
+                "tool",
+                {"turn": turn_id, "call": call, "name": name, "state": "ended", "ok": False},
+            )
+        reason = "cancelled"
+    if spoke:
+        notify("reply", {"turn": turn_id, "body": body_id, "done": True})
+    return reason
 
 
 def _drain(inbox: list) -> list[dict]:
@@ -164,12 +181,15 @@ async def _run_tools(turn_id, calls, run_tool, notify, running) -> list[dict]:
     finally:
         for task in tasks:
             task.cancel()  # no-op for finished tasks; stops stragglers when the turn is cancelled
+        # A tool raising CancelledError leaves gather early; wait so no sibling outlives the turn.
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
-def _close_dangling_tool_use(history: list) -> None:
+def _close_dangling_tool_use(history: list) -> bool:
+    """Answer unanswered tool_use blocks in the last message; True if it appended anything."""
     last = history[-1] if history else None
     if not last or last["role"] != "assistant" or not isinstance(last["content"], list):
-        return
+        return False
     calls = [b for b in last["content"] if b.get("type") == "tool_use"]
     if calls:
         history.append(
@@ -186,3 +206,4 @@ def _close_dangling_tool_use(history: list) -> None:
                 ],
             }
         )
+    return bool(calls)
