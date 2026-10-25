@@ -9,6 +9,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Configuration](#configuration)
 - [First run: Welcome](#first-run-welcome)
 - [Scout's brain](#scouts-brain)
+- [Python brain: talk to Scout](#python-brain-talk-to-scout)
 - [Hand-offs to Claude Code](#hand-offs-to-claude-code)
 - [Settings](#settings)
 - [Greeting](#greeting)
@@ -283,6 +284,36 @@ _Only on a data folder from a build before Nebius was removed._
    card still shows. If the check itself fails, the bubble says "Health check failed.". (f)
    Explorer opens `%APPDATA%\Tagalong\logs` (even on a fresh install with nothing logged yet);
    nothing is put on the clipboard.
+
+## Python brain: talk to Scout
+
+The Python brain in `brain/` (see [docs/brain.md](../brain.md)). It runs on its own, with no
+desktop app. You need `uv` and an Anthropic key.
+
+1. **Setup:** put `ANTHROPIC_API_KEY=sk-ant-...` on one line in `~/.tagalong/.env`. In one
+   terminal run `cd brain && uv run brain`.
+   **Expected:** it prints `brain listening on ws://127.0.0.1:47321`.
+2. **Action:** in a second terminal run
+   `cd brain && uv run python -m websockets ws://127.0.0.1:47321`. Paste this hello and press
+   Enter:
+   `{"jsonrpc":"2.0","id":1,"method":"hello","params":{"protocol":1,"body":{"id":"desktop","kind":"desktop","name":"Desktop"},"tools":[]}}`
+   **Expected:** a result with the session id; the connection stays open.
+3. **Action:** paste
+   `{"jsonrpc":"2.0","id":2,"method":"say","params":{"text":"Say hello in five words."}}`
+   **Expected:** a result `{"turn":"...","joined":false}`, then notifications: `turn` with
+   `state: "started"`, `reply` frames whose `delta` spell out a short greeting, exactly one
+   `reply` with `done: true`, then `turn` with `state: "ended"` and `reason: "done"`.
+4. **Action:** paste a `say` asking for a long story, then at once
+   `{"jsonrpc":"2.0","method":"cancel","params":{"turn":"<the turn id>"}}`
+   **Expected:** deltas stop, one `reply` with `done: true`, and `turn` `ended` with
+   `reason: "cancelled"`. A new `say` after it works.
+5. **Action:** stop the brain. Remove the key from `~/.tagalong/.env` and from your
+   environment, then run `uv run brain` again.
+   **Expected:** one line saying `ANTHROPIC_API_KEY is missing` and where to put it; the process
+   exits with status 1 and never listens.
+6. **Action:** set `TAGALONG_DAILY_BUDGET_USD=0.0001`, start the brain, and send a `say` twice.
+   **Expected:** once `spent_usd` in `~/.tagalong/budget.json` passes the limit, a `say` gets a
+   result and its turn ends at once with `reason: "over_budget"` and no deltas.
 
 ## Hand-offs to Claude Code
 
