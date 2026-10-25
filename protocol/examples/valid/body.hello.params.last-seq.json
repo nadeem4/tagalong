@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "hello",
+  "params": {
+    "protocol": 1,
+    "body": { "id": "extension", "kind": "extension", "name": "Chrome" },
+    "tools": [],
+    "last_seq": 12
+  }
+}

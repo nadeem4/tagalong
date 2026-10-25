@@ -1,0 +1,5 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": { "protocol": 1, "session": "s1", "tools": [], "seq": 740, "resync": true }
+}

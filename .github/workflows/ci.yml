@@ -76,6 +76,32 @@ jobs:
       - name: Test (with coverage)
         run: pnpm test:coverage
 
+  # The Python brain. Gated like `build`; not a required check yet.
+  brain:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true') }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: brain
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Install
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run ruff check
+
+      - name: Format check
+        run: uv run ruff format --check
+
+      - name: Test
+        run: uv run pytest
+
   # Only what needs Windows, and only once the Linux job is green.
   e2e:
     needs: build

@@ -1,6 +1,6 @@
 # Protocol
 
-> This page describes the current TypeScript protocol in `packages/protocol`. The new contract v1 for the Python brain is [protocol/README.md](../protocol/README.md); it replaces this protocol when the rewrite lands.
+> This page describes the current TypeScript protocol in `packages/protocol`. The new contract v1 for the Python brain is [protocol/README.md](../protocol/README.md); it replaces this protocol when the rewrite lands. Its TypeScript schemas are the `@tagalong/contract` package in `protocol/ts`, its Python types are `brain.protocol` in `brain/src/brain/protocol.py`, and the shared samples are in `protocol/examples`. `packages/protocol` goes away when the bodies switch to the new contract.
 
 ## Purpose
 

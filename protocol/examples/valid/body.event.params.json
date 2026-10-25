@@ -1,0 +1,5 @@
+{
+  "jsonrpc": "2.0",
+  "method": "event",
+  "params": { "name": "window_changed", "data": { "title": "VS Code" } }
+}

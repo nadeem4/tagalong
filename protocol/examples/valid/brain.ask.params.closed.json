@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "method": "ask",
+  "params": {
+    "seq": 8,
+    "id": "a1",
+    "state": "closed",
+    "reason": "answered",
+    "option": "deny",
+    "by": "desktop"
+  }
+}

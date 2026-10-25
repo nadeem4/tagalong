@@ -23,6 +23,10 @@ tagalong/
     settings-and-secrets.md, storage.md, privacy.md, development.md
     testing/feature-test-guide.md   # manual tests
     chrome-web-store/               # store listing kit and the extension's privacy policy
+  protocol/                         # contract v1 for the Python brain (README.md is the spec)
+    examples/                       # sample frames shared by the TypeScript and Python tests
+    ts/                             # @tagalong/contract: zod schemas for contract v1
+  brain/                            # the Python brain: uv project, src/brain/protocol.py, tests/
   packages/
     protocol/src/
       index.ts                      # PROTOCOL_VERSION, ENGINE_HOST, DEFAULT_ENGINE_PORT, engineUrl
@@ -170,6 +174,19 @@ pnpm ensure-electron  # fetch the Electron binary on its own
 pnpm package:win      # fetch-native, electron-vite build, electron-builder --win nsis
 pnpm package:dir      # an unpacked app in release/, for checking what gets packaged
 ```
+
+### The Python brain
+
+Needs [uv](https://docs.astral.sh/uv/) and Python 3.12 or newer. From `brain/`:
+
+```bash
+uv sync                    # install dependencies into brain/.venv
+uv run pytest              # tests, including the shared protocol/examples
+uv run ruff check          # lint
+uv run ruff format --check # format check
+```
+
+The `brain` job in CI runs these commands, installing with `uv sync --locked`.
 
 ### Coverage
 

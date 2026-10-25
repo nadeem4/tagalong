@@ -1,0 +1,15 @@
+{
+  "jsonrpc": "2.0",
+  "method": "ask",
+  "params": {
+    "seq": 7,
+    "id": "a1",
+    "state": "open",
+    "turn": "t2",
+    "text": "I'll delete these 3 old logs.",
+    "options": ["yes", "no"],
+    "confirm": true,
+    "tool": "desktop__delete_files",
+    "input": { "paths": ["a", "b", "c"] }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "jsonrpc": "2.0",
+  "id": "b1",
+  "method": "use",
+  "params": { "call": "c1", "tool": "see_screen", "input": {} }
+}

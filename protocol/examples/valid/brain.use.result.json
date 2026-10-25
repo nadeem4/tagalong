@@ -1,0 +1,5 @@
+{
+  "jsonrpc": "2.0",
+  "id": "b1",
+  "result": { "output": [{ "type": "image", "mime": "image/png", "data": "iVBORw0..." }] }
+}

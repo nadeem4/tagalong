@@ -1,0 +1,5 @@
+{
+  "jsonrpc": "2.0",
+  "method": "turn",
+  "params": { "seq": 6, "turn": "t1", "body": "desktop", "state": "ended", "reason": "oops" }
+}

@@ -9,7 +9,7 @@ const uiFloor = { statements: 91, branches: 83, functions: 90, lines: 93 };
 
 export default defineConfig({
   test: {
-    projects: ['packages/*', 'apps/*'],
+    projects: ['packages/*', 'apps/*', 'protocol/ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
@@ -18,6 +18,7 @@ export default defineConfig({
       include: [
         'packages/core/src/**/*.{ts,tsx}',
         'packages/protocol/src/**/*.{ts,tsx}',
+        'protocol/ts/src/**/*.ts',
         'packages/ui/src/**/*.{ts,tsx}',
         'apps/desktop/src/main/**/*.ts',
         'apps/desktop/src/preload/**/*.ts',
@@ -26,6 +27,7 @@ export default defineConfig({
       thresholds: {
         'packages/core/src/**': { statements: 70, branches: 70, functions: 70, lines: 70 },
         'packages/protocol/src/**': { statements: 70, branches: 70, functions: 70, lines: 70 },
+        'protocol/ts/src/**': { statements: 70, branches: 70, functions: 70, lines: 70 },
         'packages/ui/src/**': uiFloor,
         'apps/desktop/src/{main,preload}/**': desktopHostFloor,
       },

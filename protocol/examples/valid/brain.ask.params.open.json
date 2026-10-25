@@ -1,0 +1,12 @@
+{
+  "jsonrpc": "2.0",
+  "method": "ask",
+  "params": {
+    "seq": 7,
+    "id": "a2",
+    "state": "open",
+    "turn": "t2",
+    "text": "Which folder?",
+    "options": ["Downloads", "Desktop"]
+  }
+}
