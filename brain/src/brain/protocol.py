@@ -44,8 +44,22 @@ class ErrorCode(IntEnum):
     over_limit = -32008
 
 
+# An optional field may be absent but never null. Only these accept a JSON null: the nullable
+# `body` of reply and turn, and the free-form `data` and `context` payloads.
+NULLABLE = {"body", "data", "context"}
+
+
 class Model(BaseModel):
     model_config = ConfigDict(strict=True, extra="ignore", frozen=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _no_explicit_null(cls, values: Any) -> Any:
+        if isinstance(values, dict):
+            for key, value in values.items():
+                if value is None and key in cls.model_fields and key not in NULLABLE:
+                    raise ValueError(f"{key} must be omitted rather than null")
+        return values
 
 
 Id = str

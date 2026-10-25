@@ -145,3 +145,43 @@ def test_seq_bounds():
     BODY_TO_BRAIN["hello"][1].model_validate(result)
     with pytest.raises(ValidationError):
         ErrorObject.model_validate({"code": -32007.0, "message": "m"})
+
+
+def test_null_allowed_only_where_nullable():
+    reply = BRAIN_TO_BODY["reply"][0]
+    reply.model_validate({"seq": 1, "turn": "t", "body": None, "done": True})
+    BRAIN_TO_BODY["turn"][0].model_validate(
+        {"seq": 1, "turn": "t", "body": None, "state": "started"}
+    )
+    BODY_TO_BRAIN["event"][0].model_validate({"name": "n", "data": None})
+    BODY_TO_BRAIN["say"][0].model_validate({"text": "hi", "context": None})
+    ErrorObject.model_validate({"code": -32007, "message": "m", "data": None})
+
+
+@pytest.mark.parametrize(
+    ("origin", "method", "params"),
+    [
+        ("body", "say", {"text": None}),
+        ("body", "say", {"text": "hi", "parts": None}),
+        ("body", "answer", {"ask": "a", "option": "o", "text": None}),
+        ("brain", "turn", {"seq": 1, "turn": "t", "body": "b", "state": "ended", "reason": None}),
+        (
+            "brain",
+            "tool",
+            {"seq": 1, "turn": "t", "call": "c", "name": "n", "state": "ended", "ok": None},
+        ),
+        (
+            "brain",
+            "ask",
+            {"seq": 1, "id": "a", "state": "closed", "reason": "answered", "by": None},
+        ),
+        (
+            "brain",
+            "ask",
+            {"seq": 1, "id": "a", "state": "open", "text": "t", "options": [], "turn": None},
+        ),
+    ],
+)
+def test_null_rejected_on_optional_fields(origin, method, params):
+    with pytest.raises(ValidationError):
+        MAPS[origin][method][0].model_validate(params)
