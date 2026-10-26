@@ -12,7 +12,7 @@ export interface ApplySettingsDeps {
   current: () => Promise<Settings>;
   /** The same off path as the bubble's switch: closes the microphone, then saves it off. */
   listeningOff: () => unknown;
-  /** The ordinary settings save, marked as applied from Scout's card. */
+  /** The ordinary settings save. */
   save: (patch: SettingsPatch) => Promise<Settings>;
 }
 

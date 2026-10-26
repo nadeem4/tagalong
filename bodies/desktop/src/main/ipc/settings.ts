@@ -1,6 +1,7 @@
 /**
  * IPC for Settings: the host view every window reads, saving settings, the keys and the model
- * lists. Works with no engine, from the settings file. Contains registerSettingsIpc.
+ * lists. Reads and writes the desktop's own settings file; the brain has no settings or model
+ * calls yet. Contains registerSettingsIpc.
  */
 
 import type { SecretStore } from '@tagalong/core';
@@ -13,16 +14,15 @@ import {
   secretKeyFor,
   storedKeys,
 } from '../provider-choices';
-import type { EngineCall, IpcHandle } from './handle';
+import type { IpcHandle } from './handle';
 import { applySettings } from './apply-settings';
+import { localScout } from './scout';
 
 export interface SettingsIpcDeps {
-  /** The running engine, or null when it refused to boot. */
-  host: () => { client: EngineCall; engine: { pairingToken: string } } | null;
-  /** The settings file, which still works with no engine. */
+  /** The desktop's own settings file. */
   settingsStore: () => { get(): Settings; set(patch: SettingsPatch): Settings };
   secrets: () => SecretStore;
-  /** Why a hotkey or the engine failed, for Settings to say. */
+  /** Why a hotkey failed, for Settings to say. */
   problem: () => string | null;
   version: () => string;
   setSettings: (settings: Settings) => void;
@@ -38,42 +38,27 @@ export interface SettingsIpcDeps {
 
 /** Settings, the keys, and the model lists. */
 export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): void {
-  /** Settings still work with no engine, which is the whole point of the degraded mode. */
-  const readSettings = async (): Promise<Settings> => {
-    const host = deps.host();
-    if (host === null) return deps.settingsStore().get();
-    return (await host.client.call('settings.get', {})).settings;
-  };
+  const readSettings = (): Promise<Settings> => Promise.resolve(deps.settingsStore().get());
 
   handle(IPC.hostView, async (): Promise<HostView> => {
     const secrets = deps.secrets();
     const settings = await readSettings();
     const stored = await storedKeys(secrets);
-    // Pets live in the engine's database; with no engine the form shows keys and URLs
-    // only, which is exactly what someone fixing a failed boot needs.
-    const host = deps.host();
-    const pets = host === null ? [] : (await host.client.call('pets.list', {})).pets;
     const problem = deps.problem();
     const elevenLabsKey = await secrets.get(ELEVENLABS_SECRET_KEY).catch(() => null);
     return {
       elevenLabsKeyStored: elevenLabsKey !== null && elevenLabsKey.length > 0,
       settings,
-      pets,
+      pets: [localScout()],
       providers: providerChoices(stored),
       engineVersion: deps.version(),
       platform: process.platform,
-      ...(host !== null ? { pairingToken: host.engine.pairingToken } : {}),
       ...(problem !== null ? { hotkeyError: problem } : {}),
     };
   });
 
-  /** `byTalk`: applied from Scout's settings card, so the engine logs a "Changed by talk" row. */
-  const save = async (patch: SettingsPatch, byTalk: boolean): Promise<Settings> => {
-    const host = deps.host();
-    const saved =
-      host === null
-        ? deps.settingsStore().set(patch)
-        : (await host.client.call('settings.set', byTalk ? { patch, byTalk } : { patch })).settings;
+  const save = (patch: SettingsPatch): Promise<Settings> => {
+    const saved = deps.settingsStore().set(patch);
 
     // Rebinding here is the whole point: a hotkey the user just typed has to work now,
     // not after a restart.
@@ -83,10 +68,10 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
     if (patch.rollingMemory !== undefined) deps.configureRolling(saved.rollingMemory);
     // An open panel reads its keys, microphone and the user's name from here, not a restart.
     deps.broadcast(saved);
-    return saved;
+    return Promise.resolve(saved);
   };
 
-  handle(IPC.saveSettings, (_event, patch: SettingsPatch) => save(patch, false));
+  handle(IPC.saveSettings, (_event, patch: SettingsPatch) => save(patch));
 
   // Apply on Scout's settings card: a click only. Always listening goes its own off path.
   // The patch is the renderer's, so it is checked again against the settings now.
@@ -97,7 +82,7 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
     return applySettings(patch, {
       current: readSettings,
       listeningOff: () => deps.listeningOff(),
-      save: (rest) => save(rest, true),
+      save,
     });
   });
 
@@ -109,21 +94,11 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
     else await secrets.set(secretKey, apiKey);
   });
 
-  handle(IPC.checkKey, async (_event, providerId: string): Promise<ProvidersCheckResult> => {
-    const host = deps.host();
-    if (host === null) {
-      return {
-        ok: false,
-        message: 'Tagalong’s engine isn’t running, so the key couldn’t be tested.',
-      };
-    }
-    return host.client.call('providers.check', { providerId });
-  });
+  handle(IPC.checkKey, (): ProvidersCheckResult => ({
+    ok: false,
+    message: 'Tagalong’s engine isn’t running, so the key couldn’t be tested.',
+  }));
 
-  handle(IPC.listModels, async (_event, providerId: string): Promise<ModelList> => {
-    const host = deps.host();
-    // No engine, no list: the form still takes a typed model id.
-    if (host === null) return { models: [], source: 'fallback' };
-    return host.client.call('models.list', { providerId });
-  });
+  // The brain has no model lists yet: the form still takes a typed model id.
+  handle(IPC.listModels, (): ModelList => ({ models: [], source: 'fallback' }));
 }

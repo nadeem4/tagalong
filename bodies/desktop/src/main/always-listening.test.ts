@@ -3,7 +3,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Settings, WindowEntry } from '@tagalong/protocol';
+import type { Settings, SettingsPatch, WindowEntry } from '@tagalong/protocol';
 import {
   AlwaysListening,
   LISTENING_GUARD_MS,
@@ -12,7 +12,6 @@ import {
   saveListening,
   startListeningGuard,
 } from './always-listening';
-import type { EngineCall } from './ipc/handle';
 
 const win = (change: Partial<WindowEntry>): WindowEntry => ({
   id: '1',
@@ -213,109 +212,38 @@ describe('startListeningGuard', () => {
 
 describe('saveListening', () => {
   const saved = (always: boolean) => ({ listening: { always } }) as unknown as Settings;
-  const hostWith = (call: ReturnType<typeof vi.fn>) => ({
-    client: { call } as unknown as EngineCall,
-  });
 
-  it('saves only a change of on, through the engine', async () => {
-    const call = vi.fn(async () => ({ settings: saved(true) }));
+  it('saves only a change of on, to the settings file', () => {
+    const set = vi.fn((patch: SettingsPatch) => saved(patch.listening?.always ?? false));
     const onSaved = vi.fn();
-    const save = saveListening({
-      saved: false,
-      host: () => hostWith(call),
-      settingsStore: () => ({ set: vi.fn() }),
-      onSaved,
-    });
+    const save = saveListening({ saved: false, settingsStore: () => ({ set }), onSaved });
     save({ on: false, paused: true, followUp: false });
+    expect(set).not.toHaveBeenCalled();
     save({ on: true, paused: false, followUp: false });
-    await vi.waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved(true)));
-    expect(call.mock.calls).toEqual([['settings.set', { patch: { listening: { always: true } } }]]);
+    expect(set.mock.calls).toEqual([[{ listening: { always: true } }]]);
+    expect(onSaved).toHaveBeenCalledWith(saved(true));
     save({ on: true, paused: true, followUp: false });
-    expect(call).toHaveBeenCalledOnce();
+    expect(set).toHaveBeenCalledOnce();
   });
 
-  /** Saves that wait until the test answers them, one by one. */
-  function deferredSaves() {
-    const answers: (() => void)[] = [];
-    const call = vi.fn(
-      (_method: string, params: { patch: { listening: { always: boolean } } }) =>
-        new Promise((resolve) =>
-          answers.push(() => resolve({ settings: saved(params.patch.listening.always) })),
-        ),
-    );
-    return { call, answer: () => answers.shift()?.() };
-  }
-
-  it.each([
-    [false, [true, false]],
-    [true, [false, true]],
-  ])(
-    'switched twice before the first save is done (saved %s), the last choice is the one saved',
-    async (start, choices) => {
-      const { call, answer } = deferredSaves();
-      const onSaved = vi.fn();
-      const save = saveListening({
-        saved: start,
-        host: () => hostWith(call as unknown as ReturnType<typeof vi.fn>),
-        settingsStore: () => ({ set: vi.fn() }),
-        onSaved,
-      });
-      for (const on of choices) save({ on, paused: false, followUp: false });
-      // One save at a time: the second waits for the first.
-      expect(call).toHaveBeenCalledOnce();
-      answer();
-      await vi.waitFor(() => expect(call).toHaveBeenCalledTimes(2));
-      answer();
-      await vi.waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2));
-      expect(call.mock.calls.map(([, params]) => params.patch.listening.always)).toEqual(choices);
-      expect(onSaved).toHaveBeenLastCalledWith(saved(start));
-      // Saved now: a change that is no change saves nothing.
-      save({ on: start, paused: true, followUp: false });
-      expect(call).toHaveBeenCalledTimes(2);
-    },
-  );
-
-  it('saves to the settings file when the engine is not running', () => {
-    const set = vi.fn(() => saved(false));
-    const onSaved = vi.fn();
-    const save = saveListening({
-      saved: true,
-      host: () => null,
-      settingsStore: () => ({ set }),
-      onSaved,
-    });
-    save({ on: false, paused: false, followUp: false });
-    expect(set).toHaveBeenCalledWith({ listening: { always: false } });
-    expect(onSaved).toHaveBeenCalledWith(saved(false));
-  });
-
-  it('tries again at the next change after a save failed, so switching off is never lost', async () => {
+  it('tries again at the next change after a save failed, so switching off is never lost', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const call = vi
+    const set = vi
       .fn()
-      .mockRejectedValueOnce(new Error('engine busy'))
-      .mockResolvedValue({ settings: saved(false) });
-    const set = vi.fn(() => {
-      throw new Error('disk full');
-    });
+      .mockImplementationOnce(() => {
+        throw new Error('disk full');
+      })
+      .mockReturnValue(saved(false));
     const onSaved = vi.fn();
-    let host: ReturnType<typeof hostWith> | null = null;
-    const save = saveListening({
-      saved: true,
-      host: () => host,
-      settingsStore: () => ({ set }),
-      onSaved,
-    });
+    const save = saveListening({ saved: true, settingsStore: () => ({ set }), onSaved });
     save({ on: false, paused: false, followUp: false });
     expect(warn).toHaveBeenCalledOnce();
-    host = hostWith(call);
+    expect(onSaved).not.toHaveBeenCalled();
     save({ on: false, paused: true, followUp: false });
-    await vi.waitFor(() => expect(warn).toHaveBeenCalledTimes(2));
+    expect(onSaved).toHaveBeenCalledWith(saved(false));
+    expect(set).toHaveBeenCalledTimes(2);
     save({ on: false, paused: false, followUp: false });
-    await vi.waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved(false)));
-    expect(call).toHaveBeenCalledTimes(2);
-    save({ on: false, paused: true, followUp: false });
-    expect(call).toHaveBeenCalledTimes(2);
+    expect(set).toHaveBeenCalledTimes(2);
     warn.mockRestore();
   });
 });

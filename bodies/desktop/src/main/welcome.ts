@@ -43,15 +43,14 @@ export function isOnPath(command: string): Promise<boolean> {
 }
 
 /**
- * Opens until Welcome is finished. `TAGALONG_SKIP_WELCOME=1` keeps it shut for the
- * end-to-end suites, which drive the panel, not Welcome.
+ * Never: the key is the brain's now, so there is nothing for Welcome to ask. The window and
+ * its code stay until the cleanup row deletes them.
  */
 export function shouldOpenWelcome(
-  settings: Settings,
-  env: Record<string, string | undefined>,
+  _settings: Settings,
+  _env: Record<string, string | undefined>,
 ): boolean {
-  if (env.TAGALONG_SKIP_WELCOME === '1') return false;
-  return !settings.welcome.done;
+  return false;
 }
 
 /**

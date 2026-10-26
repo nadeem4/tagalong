@@ -30,12 +30,7 @@ import {
   TALK_KEY_LABELS,
   TALK_KEY_RIGHT_CTRL,
 } from '@tagalong/protocol';
-import type {
-  PerceptionTarget,
-  PickUpReadyParams,
-  Settings,
-  SettingsPatch,
-} from '@tagalong/protocol';
+import type { PerceptionTarget, PickUpReadyParams, Settings } from '@tagalong/protocol';
 import { SettingsStore } from '@tagalong/core';
 import {
   AlwaysListening,
@@ -43,7 +38,7 @@ import {
   saveListening,
   startListeningGuard,
 } from './always-listening';
-import { startWellbeingTick, watchPresence } from './presence';
+import { watchPresence } from './presence';
 import { systemClock } from './awareness/clock';
 import { handoffLine, handoffNotice } from './handoff-notice';
 import { installLogFile, openLogsFolder, rendererConsole } from './log-file';
@@ -54,14 +49,7 @@ import {
   markListening,
   setPanelMark,
 } from './status-marks';
-import {
-  brainLine,
-  brainReadiness,
-  brainStatus,
-  recordCleanClose,
-  recordLaunch,
-  SIGN_IN_BUDGET_MS,
-} from './launch';
+import { recordCleanClose, recordLaunch } from './launch';
 import type { PreviousLaunch } from './launch';
 import { routineDelivery } from './routine-delivery';
 import { nativeCodec } from './awareness/native-codec';
@@ -72,15 +60,8 @@ import { captureAskSnapshot, capturePatch } from './context';
 import type { TurnEvent } from '@tagalong/ui';
 import { createTurnEvents } from './brain/turn-events';
 import { startBrain } from './brain/start';
-import { keepAnEyeAllowed, startKeepAnEye } from './keep-an-eye';
 import { isAllowedLink } from './links';
-import {
-  ELEVENLABS_SECRET_KEY,
-  forgetRetiredKeys,
-  providerChoices,
-  storedKeys,
-} from './provider-choices';
-import { RELEASE_NOTES } from './release-notes';
+import { ELEVENLABS_SECRET_KEY, forgetRetiredKeys } from './provider-choices';
 import { elevenLabsTts } from './voice/elevenlabs';
 import { kokoroDownloaded } from './voice/kokoro';
 import { createVoiceService, elevenLabsMouth, localMouth } from './voice/voice';
@@ -89,7 +70,7 @@ import type { WorkerProcess } from './voice/worker/messages';
 import { WorkerLocalVoice } from './voice/worker/worker-local-voice';
 import type { VoiceService } from './voice/voice';
 import { openClaudeSignIn, signInFor } from './claude-sign-in';
-import { findAgents, launchLine, shouldOpenWelcome } from './welcome';
+import { shouldOpenWelcome } from './welcome';
 import type { BrainClient } from './brain/brain-client';
 import {
   DEFAULT_PAUSE_SIGHT_HOTKEY,
@@ -242,10 +223,8 @@ app.on('before-quit', () => {
   desktop?.hotkeys.dispose();
   stopTalkKey();
   desktop?.voiceWorker.stop();
-  stopKeepAnEye();
   stopListeningGuard();
   stopPresence();
-  stopWellbeing();
   // Memory only, and gone on quit: nothing here was ever written anywhere to clean up.
   desktop?.rolling.dispose();
   desktop?.perceptionMemory.clear();
@@ -404,7 +383,6 @@ async function start(): Promise<void> {
   listening.onChange(
     saveListening({
       saved: settings.listening.always,
-      host: () => null,
       settingsStore: () => settingsStore,
       onSaved: (saved) => {
         if (desktop !== null) desktop.settings = saved;
@@ -496,37 +474,8 @@ async function start(): Promise<void> {
   // A fresh install starts in Welcome: the agents found here, how Scout thinks, one key.
   // Finishing it is remembered in settings; Home opens it again.
   if (welcoming) openWelcome();
-  else void greetOnLaunch();
-
-  // Keep an eye on things: window titles go to the engine every five seconds, never a
-  // picture. Off in Settings, or while sight is paused, nothing is listed at all.
-  if (keepAnEyeAllowed(process.env)) {
-    stopKeepAnEye = startKeepAnEye({
-      enabled: () => (desktop?.settings.keepAnEye ?? false) && !sightPause.paused,
-      list: async () => {
-        const exclusions = desktop?.settings.captureExclusions ?? settings.captureExclusions;
-        return (await platform.listWindows(exclusions, { countText: false })).windows;
-      },
-      send: (windows) => engine().call('keepAnEye.observe', { windows }),
-    });
-  }
-  // Gentle nudges: the idle time and titles once a minute, only while on and sight is not paused.
-  stopWellbeing = startWellbeingTick({
-    enabled: () => (desktop?.settings.wellbeing.enabled ?? false) && !sightPause.paused,
-    idleMs: () => powerMonitor.getSystemIdleTime() * 1000,
-    list: async () => {
-      const exclusions = desktop?.settings.captureExclusions ?? settings.captureExclusions;
-      return (await platform.listWindows(exclusions, { countText: false })).windows;
-    },
-    send: (params) => engine().call('wellbeing.observe', params),
-  });
 }
 
-/** Stops the gentle nudges' tick on quit. */
-let stopWellbeing = (): void => undefined;
-
-/** Stops the keep-an-eye timer on quit. */
-let stopKeepAnEye = (): void => undefined;
 /** Stops the Always-listening guard on quit. */
 let stopListeningGuard = (): void => undefined;
 /** Stops reading the idle time on quit. */
@@ -607,61 +556,6 @@ function showRemark(params: unknown): void {
 }
 
 /**
- * A later launch: when Scout can think, the engine's launch check-in is asked (it answers at
- * once) and the mind's line, if any, comes later as a remark or with the Pick up card; when
- * it cannot, the brain mark shows beside Scout with Fix it. The sign-in check takes at most
- * SIGN_IN_BUDGET_MS. Then the launch is remembered (the quit is too, in before-quit) so the
- * next one knows how long you were away. Nothing here writes a line in Scout's voice.
- */
-async function greetOnLaunch(): Promise<void> {
-  const current = desktop;
-  if (current === null) return;
-  try {
-    const line = await launchLine(current.settings, async () => {
-      const { pets } = await engine().call('pets.list', {});
-      const brain = await brainReadiness({
-        pet: pets.find((pet) => pet.id === SCOUT_ID),
-        providers: providerChoices(await storedKeys(current.secrets)),
-        signIn: () => signInCheck ?? signInFor(process.env),
-        budgetMs: SIGN_IN_BUDGET_MS,
-      }).catch(() => 'unknown' as const);
-      // Why Scout cannot think shows on Scout as a mark until it can again.
-      const status = brainStatus(brain);
-      if (status !== null) {
-        current.statusMarks.set({ id: status });
-        return brainLine(brain);
-      }
-      await engine().call('checkIn.launch', {
-        launch: {
-          ...current.previousLaunch,
-          version: app.getVersion(),
-          releaseNotes: RELEASE_NOTES,
-        },
-      });
-      return null;
-    });
-    if (line !== null) {
-      const { panel, avatar } = current;
-      if (panel !== null && avatar !== null && avatar.isVisible() && !panel.isVisible()) {
-        if (panel.webContents.isLoading()) {
-          await new Promise<void>((resolve) => panel.webContents.once('did-finish-load', resolve));
-        }
-        panel.webContents.send(IPC.greetLineEvent, line);
-        showPanelQuietly(panel, avatar);
-      }
-    }
-  } catch (error) {
-    console.warn('[main] the launch check-in did not run:', error);
-  }
-  try {
-    const patch: SettingsPatch = { lastOpenedAt: new Date().toISOString() };
-    current.settings = (await engine().call('settings.set', { patch })).settings;
-  } catch (error) {
-    console.warn('[main] could not remember this launch:', error);
-  }
-}
-
-/**
  * Binds the three hotkeys (ask, pause sight, stop voice) to what settings say, points the
  * key hook at the talk key, and reports what was refused, the talk key included.
  *
@@ -733,12 +627,6 @@ function stopVoice(): void {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) window.webContents.send(IPC.stopVoiceEvent);
   }
-}
-
-/** Reloads Scout's window after Scout's record changed. */
-function reloadAvatar(): void {
-  const avatar = desktop?.avatar;
-  if (avatar !== null && avatar !== undefined && !avatar.isDestroyed()) avatar.webContents.reload();
 }
 
 /**
@@ -1088,37 +976,7 @@ function registerIpc(): void {
     pendingSnapshot: () => required().pendingSnapshot,
     takeDrop: () => drops.take(),
   });
-  registerScoutIpc(handle, {
-    engine,
-    settings: () => required().settings,
-    setSettings: (settings) => {
-      required().settings = settings;
-    },
-    reloadAvatar,
-    findAgents: () => findAgents(),
-    welcomed: () => {
-      const current = required();
-      current.welcomeWindow?.close();
-      if (current.panel !== null && current.avatar !== null) {
-        current.avatar.show();
-        current.panel.webContents.send(IPC.greetEvent);
-        showPanelQuietly(current.panel, current.avatar);
-      }
-      // The first hello is the mind's: a launch check-in about Welcome alone (no crash or
-      // update facts), whose line, if any, lands in the hello above the Try it button.
-      void maybeEngine()
-        ?.call('checkIn.launch', {
-          launch: {
-            crashed: false,
-            lastVersion: null,
-            version: app.getVersion(),
-            releaseNotes: '',
-            welcomed: true,
-          },
-        })
-        .catch((error: unknown) => console.warn('[main] the first hello did not run:', error));
-    },
-  });
+  registerScoutIpc(handle);
   registerExpertIpc(handle, { engine });
   registerConnectionIpc(handle, { engine });
   registerAskIpc(handle, { engine });
@@ -1136,7 +994,6 @@ function registerIpc(): void {
     homeWindow: () => required().homeWindow,
   });
   registerSettingsIpc(handle, {
-    host: () => null,
     settingsStore: () => required().settingsStore,
     secrets: () => required().secrets,
     problem: () => {
