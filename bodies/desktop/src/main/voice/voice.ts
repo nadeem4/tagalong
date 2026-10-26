@@ -195,7 +195,7 @@ export function createVoiceService(options: VoiceServiceOptions) {
       if (env.TAGALONG_FAKE_TTS === '1')
         return { kind: 'audio', ...(await fakeTts.speak(text, how)) };
       for (const id of mouthOrder(preview?.mouth ?? chosenMouth(chosen))) {
-        if (id === 'system') return { kind: 'fallback' };
+        if (id === 'system') return { kind: 'fallback', speed: how.speed };
         try {
           const mouth = mouths[id];
           if (!(await mouth.usable())) continue;
@@ -205,7 +205,7 @@ export function createVoiceService(options: VoiceServiceOptions) {
           console.warn(`[voice] ${id} failed, trying the next voice`, error);
         }
       }
-      return { kind: 'fallback' };
+      return { kind: 'fallback', speed: how.speed };
     },
   };
 }

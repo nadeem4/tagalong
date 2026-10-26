@@ -663,7 +663,7 @@ preview (`prepareLine(text, {})`), so the sample plays even while Scout talks is
   - For each mouth other than `system`: if it is not `usable()`, the service skips it. If its
     `speak` returns `null` (not ready), the service moves on. If it throws, the service logs
     `[voice] <id> failed, trying the next voice` and moves on.
-  - Reaching `system` answers `{ kind: 'fallback' }`.
+  - Reaching `system` answers `{ kind: 'fallback', speed }`, the preview speed or the saved one.
 - **The mouths.** The `MouthEngines` registry has two entries:
   - `kokoro` (`localMouth`) is always usable. If Kokoro is not `ready()`, it calls `warm()` and
     returns `null`, so the first line before the model loads falls through.
@@ -703,7 +703,7 @@ process exits. In the voice process:
 - **`prepareLine(text, preview?)`** invokes `IPC.speak` at once and returns a player. A result
   that is never played has its rejection swallowed. When the player runs:
   - `off` plays nothing.
-  - `fallback` speaks through `speechSynthesis`.
+  - `fallback` speaks through `speechSynthesis` at the `speed` main sent (`rate`, 1 is normal).
   - `audio` decodes the bytes in one shared `AudioContext` and plays them through an
     `AnalyserNode` (`fftSize` 256). Each animation frame, the peak level goes to the CSS variable
     `--tg-voice-level` for the speaking indicator.
@@ -757,7 +757,7 @@ hears them in the order the panel sent them. A failed step does not hold up the 
 
 - `Ears { listen(mic), stop(), on(event, handler) }`, `Mouth { speak(AsyncIterable<string>), stop() }`
   (`packages/protocol/src/voice.ts`).
-- `SpeakResult = { kind: 'audio', audio, mime } | { kind: 'fallback' } | { kind: 'off' }`,
+- `SpeakResult = { kind: 'audio', audio, mime } | { kind: 'fallback', speed } | { kind: 'off' }`,
   `SpeakPreview { voice?, speed?, mouth? }`, `EarsStatus { status, message? }`,
   `ListeningState { on, paused, followUp }`, `VoiceModels { mouth, ears }` (`shared/ipc.ts`).
 - `TagalongVoice { ears, openMic, ensureEars }` (`voice-seam.ts`).

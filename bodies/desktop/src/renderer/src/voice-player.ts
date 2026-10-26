@@ -131,7 +131,7 @@ export function prepareLine(
   return async (signal) => {
     const spoken = await result;
     if (signal.aborted || spoken.kind === 'off') return;
-    if (spoken.kind === 'fallback') return speakWithSystem(text, signal, preview?.speed ?? 1);
+    if (spoken.kind === 'fallback') return speakWithSystem(text, signal, spoken.speed);
     return playAudio(spoken.audio, signal);
   };
 }

@@ -53,6 +53,31 @@ describe('prepareLine', () => {
     expect(speakSystem).not.toHaveBeenCalled();
   });
 
+  it('speaks the system voice at the speed main sends', async () => {
+    vi.stubGlobal('window', {
+      tagalongHost: { speak: () => Promise.resolve({ kind: 'fallback', speed: 1.3 }) },
+    });
+    vi.stubGlobal('document', { documentElement: { style: { setProperty: vi.fn() } } });
+    vi.stubGlobal(
+      'SpeechSynthesisUtterance',
+      class {
+        rate = 1;
+        onend: (() => void) | null = null;
+        constructor(readonly text: string) {}
+      },
+    );
+    let spoken!: { rate: number; onend: () => void };
+    vi.stubGlobal('speechSynthesis', {
+      speak: (utterance: { rate: number; onend: () => void }) => (spoken = utterance),
+      getVoices: () => [],
+    });
+    const playing = prepareLine('Hello there.')(new AbortController().signal);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(spoken.rate).toBe(1.3);
+    spoken.onend();
+    await playing;
+  });
+
   it('leaves no failed synthesis unhandled when the line is dropped', async () => {
     const unhandled = vi.fn();
     process.on('unhandledRejection', unhandled);
