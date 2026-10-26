@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import type {} from '../src/shared/ipc';
+import { closeApp } from './fixtures/close-app';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -49,8 +50,11 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  await app.close();
-  rmSync(dataDir, { recursive: true, force: true });
+  try {
+    await closeApp(app);
+  } finally {
+    rmSync(dataDir, { recursive: true, force: true });
+  }
 });
 
 async function windowFor(name: string): Promise<Page> {

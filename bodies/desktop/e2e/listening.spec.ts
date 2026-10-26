@@ -10,6 +10,7 @@ import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 // Imported only for the `declare global` it carries: it types `window.tagalongHost` below.
 import type {} from '../src/shared/ipc';
+import { closeApp } from './fixtures/close-app';
 import { startFakeBrain, type FakeBrain } from './fixtures/fake-brain';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -34,8 +35,11 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  await app.close();
-  await brain.close();
+  try {
+    await closeApp(app);
+  } finally {
+    await brain.close();
+  }
 });
 
 async function windowFor(name: string): Promise<Page> {

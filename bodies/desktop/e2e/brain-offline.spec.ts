@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication } from '@playwright/test';
+import { closeApp } from './fixtures/close-app';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 let app: ElectronApplication;
@@ -23,7 +24,7 @@ async function freePort(): Promise<number> {
 }
 
 test.afterAll(async () => {
-  await app?.close().catch(() => undefined);
+  await closeApp(app);
 });
 
 test('brain offline: app opens and shows the offline mark', async () => {

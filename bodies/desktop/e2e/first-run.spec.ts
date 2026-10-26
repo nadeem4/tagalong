@@ -12,7 +12,7 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import { stripLoaded } from './bean-strip';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
-test.skip(true, 'returns with row 13: first-run setup (old Welcome is deleted with core)');
+test.skip(true, 'removed with row 13: old Welcome and first-run');
 
 const ENGINE = { timeout: 30_000 };
 

@@ -293,8 +293,9 @@ The suites run offline on fakes. The desktop answers turns only through a brain,
 `brain-offline.spec.ts` points the app at a port nothing listens on and expects the offline mark. Other fakes:
 `TAGALONG_FAKE_TTS=1`, `TAGALONG_FAKE_STT=1`. Specs for features the new brain has not rebuilt yet are
 `test.skip` with a reason of the form `returns with row N: <feature>` (the Launch board row that brings
-the feature back): the tool-call round trip, the Experts page, `cards.spec.ts`, `first-run.spec.ts` and
-`launch-greeting.spec.ts`. When an e2e suite
+the feature back): the tool-call round trip, the Experts page, `cards.spec.ts` and `launch-greeting.spec.ts`.
+`first-run.spec.ts` is skipped as `removed with row 13`: the old Welcome goes with core. A quit that does not finish in time is
+killed by `e2e/fixtures/close-app.ts`, so a hung teardown cannot hold the single-instance lock. When an e2e suite
 fails in CI, its `test-results` folder (page snapshots and screenshots) is uploaded as the
 `e2e-test-results` artifact.
 
