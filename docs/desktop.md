@@ -355,6 +355,40 @@ Three handlers check the sender with `fromWindow(window)`, which compares `event
 Electron in main, so a page cannot forge it) with that window's `webContents`: `copyText` and
 `applySettings` (the panel only) and `dropOnPet` (the avatar only).
 
+### Talking to the brain
+
+`src/main/brain/brain-client.ts` is the desktop's end of contract v1 ([protocol/README.md](../protocol/README.md)).
+Nothing in the app uses it yet; slice 5c wires it in (`onNotification` into the mapper's `map`,
+`onResync` into its `resync`).
+
+- **Dial address:** `ws://<addr>`, with `addr` as `host:port`. The first frame is `hello` with
+  the protocol version, the body (`desktop`), the body's tools and, after a reconnect, `last_seq`.
+- **Status** (`onStatus`): `connecting`, `online`, `offline`, `outdated`. `outdated` means the brain
+  refused the protocol version; the client stops retrying. A closed socket is `offline` and is
+  redialled every `retryMs` (2 s).
+- **say / cancel:** `say(params)` is a request and resolves with the brain's `SayResult`. `cancel(turn)`
+  is a notification. Both need `online`; `say` otherwise rejects with `BrainOffline`, as does a
+  `say` still waiting when the socket drops. Requests time out after 30 s.
+- **Replay:** every notification has a `seq`. The client remembers the highest one, ignores repeats and
+  sends it as `last_seq` on reconnect, so the brain replays what was missed. If it cannot, the hello
+  answer has `resync: true`; the client restarts numbering from the brain's latest and calls `onResync`.
+- **`use` requests:** the brain asks the body to run one of the tools it announced in hello. Answers:
+  the tool's output parts; or an error with `invalid_params` (bad params), `unknown_tool` (not in
+  the hello list) or `tool_failed` (the tool threw).
+
+`turn-events.ts` turns the validated notifications into the TurnEvents the renderer already
+understands. It keeps each open turn's reply text, because `turn.completed` carries the whole reply.
+
+| Brain notification                             | UI TurnEvent                                                                                                                      |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `turn` started                                 | `turn.started` (`conversationId` is the session id, or `brain`)                                                                   |
+| `reply` delta                                  | `turn.delta`; `reply` done gives nothing                                                                                          |
+| `turn` ended `done` / `cancelled` / `step_cap` | `turn.completed` with stop reason `end` / `aborted` / `tool_limit` and the joined deltas (empty for a silent turn); usage is zero |
+| `turn` ended `over_budget` / `error`           | `turn.error` with code `over_budget` / `brain_error`                                                                              |
+| `tool` started / ended                         | `turn.toolRequest` (call id as `approvalId` and `callId`, empty input) / `turn.toolResult`                                        |
+| `ask`, `changed`                               | nothing yet                                                                                                                       |
+| resync                                         | `turn.error` `brain_restarted` for each open turn (started, or seen in a reply, and not ended), then the state is cleared         |
+
 ### Preload and the tagalongHost bridge
 
 `src/preload/index.ts` is the renderers' whole view of the outside world. It exposes two globals
