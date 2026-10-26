@@ -35,6 +35,8 @@ export interface BrainClientOptions {
   onNotification: (method: string, params: unknown) => void;
   onUse: (tool: string, input: Record<string, unknown>, call: string) => Promise<Part[]>;
   onStatus: (status: BrainStatus) => void;
+  /** The brain could not replay what was missed; drop what open turns were showing. */
+  onResync: () => void;
   retryMs?: number;
 }
 
@@ -55,7 +57,7 @@ interface Pending {
 }
 
 export class BrainClient {
-  session: string | null = null;
+  private sessionId: string | null = null;
   private socket: BrainSocket | null = null;
   private status: BrainStatus | null = null;
   private stopped = true;
@@ -66,7 +68,12 @@ export class BrainClient {
 
   constructor(private readonly options: BrainClientOptions) {}
 
+  get session(): string | null {
+    return this.sessionId;
+  }
+
   start(): void {
+    if (!this.stopped) return;
     this.stopped = false;
     this.connect();
   }
@@ -77,6 +84,7 @@ export class BrainClient {
     this.failPending();
     this.socket?.close();
     this.socket = null;
+    if (this.status !== 'outdated') this.setStatus('offline');
   }
 
   say(params: SayParams): Promise<SayResult> {
@@ -116,16 +124,23 @@ export class BrainClient {
       tools: this.options.tools(),
       ...(this.lastSeq === null ? {} : { last_seq: this.lastSeq }),
     };
-    this.request('hello', params).then(
+    // Handled inline, not in a promise callback: frames that follow the hello result in
+    // the same tick must already see the new lastSeq and status.
+    this.send(
+      'hello',
+      params,
       (r) => {
         const parsed = HelloResult.safeParse(r);
         if (!parsed.success) return this.socket?.close();
-        this.session = parsed.data.session;
-        // After a resync the old numbering is gone; continue from the brain's latest.
-        if (parsed.data.resync) this.lastSeq = parsed.data.seq;
+        this.sessionId = parsed.data.session;
+        if (parsed.data.resync) {
+          // The old numbering is gone; continue from the brain's latest.
+          this.lastSeq = parsed.data.seq;
+          this.options.onResync();
+        }
         this.setStatus('online');
       },
-      (e: unknown) => {
+      (e) => {
         if (e instanceof RpcError && e.code === ErrorCode.version_mismatch) {
           this.stopped = true;
           this.setStatus('outdated');
@@ -152,15 +167,22 @@ export class BrainClient {
   }
 
   private request(method: string, params: unknown): Promise<unknown> {
+    return new Promise((resolve, reject) => this.send(method, params, resolve, reject));
+  }
+
+  private send(
+    method: string,
+    params: unknown,
+    resolve: (result: unknown) => void,
+    reject: (error: Error) => void,
+  ): void {
     const id = `desktop-${this.nextId++}`;
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id);
-        reject(new Error(`${method} timed out`));
-      }, REQUEST_TIMEOUT_MS);
-      this.pending.set(id, { resolve, reject, timer });
-      this.socket?.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }));
-    });
+    const timer = setTimeout(() => {
+      this.pending.delete(id);
+      reject(new Error(`${method} timed out`));
+    }, REQUEST_TIMEOUT_MS);
+    this.pending.set(id, { resolve, reject, timer });
+    this.socket?.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }));
   }
 
   private receive(data: string): void {
@@ -179,10 +201,9 @@ export class BrainClient {
       error?: unknown;
     };
     if (typeof m.method === 'string') {
-      if (m.id === undefined) this.notification(m.method, m.params);
-      else if (typeof m.id === 'string' || typeof m.id === 'number') {
-        if (m.method === 'use') void this.use(m.id, m.params);
-      }
+      if (m.method === 'use') {
+        if (typeof m.id === 'string' || typeof m.id === 'number') void this.use(m.id, m.params);
+      } else if (m.id === undefined) this.notification(m.method, m.params);
     } else if (typeof m.id === 'string') {
       this.response(m.id, m.result, m.error);
     }
@@ -232,7 +253,7 @@ export class BrainClient {
   }
 }
 
-class RpcError extends Error {
+export class RpcError extends Error {
   constructor(
     readonly code: number,
     message: string,

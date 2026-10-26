@@ -4,7 +4,13 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Tool } from '@tagalong/contract';
-import { BrainClient, BrainOffline, type BrainSocket, type BrainStatus } from './brain-client.js';
+import {
+  BrainClient,
+  BrainOffline,
+  RpcError,
+  type BrainSocket,
+  type BrainStatus,
+} from './brain-client.js';
 
 class FakeSocket implements BrainSocket {
   sent: Record<string, any>[] = [];
@@ -30,6 +36,9 @@ class FakeSocket implements BrainSocket {
   opens(): void {
     this.open?.();
   }
+  raw(text: string): void {
+    this.message?.(text);
+  }
   receive(msg: unknown): void {
     this.message?.(JSON.stringify(msg));
   }
@@ -50,6 +59,7 @@ function setup(retryMs?: number) {
   const urls: string[] = [];
   const statuses: BrainStatus[] = [];
   const notes: [string, unknown][] = [];
+  const resyncs: number[] = [];
   const onUse = vi.fn(async () => [{ type: 'text' as const, text: 'ok' }]);
   const client = new BrainClient({
     addr: '127.0.0.1:47321',
@@ -62,10 +72,11 @@ function setup(retryMs?: number) {
     },
     onNotification: (m, p) => notes.push([m, p]),
     onUse,
+    onResync: () => resyncs.push(1),
     onStatus: (s) => statuses.push(s),
     ...(retryMs === undefined ? {} : { retryMs }),
   });
-  return { client, sockets, urls, statuses, notes, onUse };
+  return { client, sockets, urls, statuses, notes, onUse, resyncs };
 }
 
 async function online(retryMs?: number) {
@@ -166,6 +177,7 @@ describe('BrainClient', () => {
       s.receive({ jsonrpc: '2.0', method: 'turn', params: { seq: 'x', turn: 1 } }),
     ).not.toThrow();
     expect(() => s.receive('not an object')).not.toThrow();
+    expect(() => s.raw('{ not json')).not.toThrow();
     expect(notes).toEqual([]);
   });
 
@@ -289,5 +301,108 @@ describe('BrainClient', () => {
     const before = s.sent.length;
     client.cancel('t1');
     expect(s.sent).toHaveLength(before);
+  });
+
+  it('stop → say rejects BrainOffline; statuses end offline', async () => {
+    const { client, statuses } = await online();
+    client.stop();
+    expect(statuses.at(-1)).toBe('offline');
+    await expect(client.say({ text: 'hi' })).rejects.toBeInstanceOf(BrainOffline);
+  });
+
+  it('stop rejects a pending say with BrainOffline', async () => {
+    const { client } = await online();
+    const p = client.say({ text: 'hi' });
+    client.stop();
+    await expect(p).rejects.toBeInstanceOf(BrainOffline);
+  });
+
+  it('a duplicate or replayed seq is dropped', async () => {
+    const { s, notes } = await online();
+    s.receive(turn(1));
+    s.receive(turn(1));
+    s.receive(turn(2));
+    s.receive(turn(1));
+    expect(notes).toHaveLength(2);
+  });
+
+  it('resync: true with hello seq N lets N+1 through even when N is below the old lastSeq, back to back', async () => {
+    const { s, sockets, notes, resyncs } = await online(100);
+    s.receive(turn(1));
+    s.receive(turn(2));
+    s.receive(turn(3));
+    s.drop();
+    await vi.advanceTimersByTimeAsync(100);
+    const s2 = sockets[1]!;
+    s2.opens();
+    s2.receive({
+      jsonrpc: '2.0',
+      id: s2.sent[0]!.id,
+      result: { protocol: 1, session: 's1', tools: [], seq: 1, resync: true },
+    });
+    s2.receive(turn(2));
+    expect(resyncs).toHaveLength(1);
+    expect(notes.map(([, p]) => (p as { seq: number }).seq)).toEqual([1, 2, 3, 2]);
+  });
+
+  it('onResync is called before the notification that follows the hello result', async () => {
+    const { client, sockets } = setup();
+    const order: string[] = [];
+    void client;
+    const c = new BrainClient({
+      addr: 'x:1',
+      tools: () => tools,
+      openSocket: () => {
+        const sock = new FakeSocket();
+        sockets.push(sock);
+        return sock;
+      },
+      onNotification: () => order.push('note'),
+      onUse: async () => [],
+      onResync: () => order.push('resync'),
+      onStatus: () => {},
+    });
+    c.start();
+    const sock = sockets.at(-1)!;
+    sock.opens();
+    sock.receive({
+      jsonrpc: '2.0',
+      id: sock.sent[0]!.id,
+      result: { protocol: 1, session: 's1', tools: [], seq: 0, resync: true },
+    });
+    sock.receive(turn(1));
+    expect(order).toEqual(['resync', 'note']);
+  });
+
+  it('onResync is not called when resync is false', async () => {
+    const { resyncs } = await online();
+    expect(resyncs).toEqual([]);
+  });
+
+  it('a use frame without an id is not a notification', async () => {
+    const { s, notes, onUse } = await online();
+    s.receive({
+      jsonrpc: '2.0',
+      method: 'use',
+      params: { call: 'c1', tool: 'see_screen', input: {} },
+    });
+    expect(notes).toEqual([]);
+    expect(onUse).not.toHaveBeenCalled();
+  });
+
+  it('start twice opens one socket', () => {
+    const { client, sockets } = setup();
+    client.start();
+    client.start();
+    expect(sockets).toHaveLength(1);
+  });
+
+  it('exposes RpcError with the brain code', async () => {
+    const { client, s } = await online();
+    const p = client.say({ text: 'hi' });
+    s.receive({ jsonrpc: '2.0', id: s.sent[1]!.id, error: { code: -32008, message: 'big' } });
+    const e = await p.catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(RpcError);
+    expect((e as RpcError).code).toBe(-32008);
   });
 });
