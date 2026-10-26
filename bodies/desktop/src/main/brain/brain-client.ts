@@ -244,8 +244,11 @@ export class BrainClient {
     try {
       const output = await this.options.onUse(tool, input, call);
       if (this.socket === socket) this.reply(id, { output });
-    } catch {
-      if (this.socket === socket) this.reply(id, undefined, ErrorCode.tool_failed, 'tool failed');
+    } catch (error) {
+      if (this.socket !== socket) return;
+      // A tool that names its failure (timeout, a refusal with its sentence) keeps it.
+      if (error instanceof RpcError) this.reply(id, undefined, error.code, error.message);
+      else this.reply(id, undefined, ErrorCode.tool_failed, 'tool failed');
     }
   }
 
