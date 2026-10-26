@@ -50,10 +50,11 @@ async function sendCopy(): Promise<void> {
 /**
  * How long the window enumeration may take before partial output is used instead.
  *
- * Measured on a live twelve-window desktop the whole enumeration finished well inside
- * three seconds, and this read sits in front of a capture the user is waiting on.
+ * A warm enumeration of twelve windows finishes well inside three seconds, but a cold
+ * PowerShell start can take several more and look_at_window lists windows first. Eight
+ * seconds stays under the 15 s cap on a whole body-tool run.
  */
-const WINDOW_HELPER_TIMEOUT_MS = 3_000;
+const WINDOW_HELPER_TIMEOUT_MS = 8_000;
 
 /** Windows adapter. Selection comes from the clipboard trick; page text needs the extension. */
 export class Win32Platform implements Platform {
