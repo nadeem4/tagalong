@@ -663,7 +663,7 @@ preview (`prepareLine(text, {})`), so the sample plays even while Scout talks is
   - For each mouth other than `system`: if it is not `usable()`, the service skips it. If its
     `speak` returns `null` (not ready), the service moves on. If it throws, the service logs
     `[voice] <id> failed, trying the next voice` and moves on.
-  - Reaching `system` answers `{ kind: 'fallback' }`.
+  - Reaching `system` answers `{ kind: 'fallback', speed }`, the preview speed or the saved one.
 - **The mouths.** The `MouthEngines` registry has two entries:
   - `kokoro` (`localMouth`) is always usable. If Kokoro is not `ready()`, it calls `warm()` and
     returns `null`, so the first line before the model loads falls through.
@@ -691,7 +691,9 @@ process exits. In the voice process:
   `https://api.elevenlabs.io/v1/text-to-speech/<voiceId>/stream?output_format=mp3_44100_128`.
   The headers are `xi-api-key` and `accept: audio/mpeg`. The body is
   `{ text, model_id: 'eleven_flash_v2_5', voice_settings: { speed } }`.
-- The speed is clamped to 0.7–1.2, ElevenLabs' own bounds.
+- The speed is clamped to `MIN_VOICE_SPEED`–`MAX_ELEVENLABS_SPEED` (0.7–1.2), ElevenLabs' own bounds. The
+  settings slider matches: with ElevenLabs chosen it stops at 1.2 and shows a higher saved speed as 1.2.
+  Saving with ElevenLabs chosen stores the capped speed, which every voice then uses.
 - The request is aborted after `ELEVENLABS_TIMEOUT_MS` (15 s), audio included.
 - A non-OK status throws, so the line falls to Kokoro.
 - Only the line is sent.
@@ -703,7 +705,7 @@ process exits. In the voice process:
 - **`prepareLine(text, preview?)`** invokes `IPC.speak` at once and returns a player. A result
   that is never played has its rejection swallowed. When the player runs:
   - `off` plays nothing.
-  - `fallback` speaks through `speechSynthesis`.
+  - `fallback` speaks through `speechSynthesis` at the `speed` main sent (`rate`, 1 is normal).
   - `audio` decodes the bytes in one shared `AudioContext` and plays them through an
     `AnalyserNode` (`fftSize` 256). Each animation frame, the peak level goes to the CSS variable
     `--tg-voice-level` for the speaking indicator.
@@ -757,7 +759,7 @@ hears them in the order the panel sent them. A failed step does not hold up the 
 
 - `Ears { listen(mic), stop(), on(event, handler) }`, `Mouth { speak(AsyncIterable<string>), stop() }`
   (`packages/protocol/src/voice.ts`).
-- `SpeakResult = { kind: 'audio', audio, mime } | { kind: 'fallback' } | { kind: 'off' }`,
+- `SpeakResult = { kind: 'audio', audio, mime } | { kind: 'fallback', speed } | { kind: 'off' }`,
   `SpeakPreview { voice?, speed?, mouth? }`, `EarsStatus { status, message? }`,
   `ListeningState { on, paused, followUp }`, `VoiceModels { mouth, ears }` (`shared/ipc.ts`).
 - `TagalongVoice { ears, openMic, ensureEars }` (`voice-seam.ts`).
@@ -766,18 +768,18 @@ hears them in the order the panel sent them. A failed step does not hold up the 
 
 `packages/protocol/src/settings.ts`.
 
-| Field                     | Default                          | Meaning                                                                 |
-| ------------------------- | -------------------------------- | ----------------------------------------------------------------------- |
-| `voice.enabled`           | `true`                           | Scout talks.                                                            |
-| `voice.voice`             | `'bm_george'`                    | Kokoro voice: `bm_george` or `bm_fable`.                                |
-| `voice.speed`             | `0.95`                           | `MIN_VOICE_SPEED` 0.7 to `MAX_VOICE_SPEED` 1.3.                         |
-| `voice.elevenLabsVoiceId` | `''`                             | A voice from the person's ElevenLabs library.                           |
-| `voice.microphoneId`      | absent                           | Absent means the system default.                                        |
-| `voice.mouth`             | absent                           | `kokoro`, `elevenlabs` or `system`. Absent means `chosenMouth` decides. |
-| `voice.ears`              | absent                           | Only `local` exists (`EARS_IDS`).                                       |
-| `listening.always`        | `false`                          | Always listening.                                                       |
-| `hotkeys.talk`            | `'RightControl'`                 | One of `TALK_KEYS`.                                                     |
-| `hotkeys.stopVoice`       | `'CommandOrControl+Shift+Alt+M'` | The stop key.                                                           |
+| Field                     | Default                          | Meaning                                                                      |
+| ------------------------- | -------------------------------- | ---------------------------------------------------------------------------- |
+| `voice.enabled`           | `true`                           | Scout talks.                                                                 |
+| `voice.voice`             | `'bm_george'`                    | Kokoro voice: `bm_george` or `bm_fable`.                                     |
+| `voice.speed`             | `0.95`                           | `MIN_VOICE_SPEED` 0.7 to `MAX_VOICE_SPEED` 1.3 (slider: 1.2 for ElevenLabs). |
+| `voice.elevenLabsVoiceId` | `''`                             | A voice from the person's ElevenLabs library.                                |
+| `voice.microphoneId`      | absent                           | Absent means the system default.                                             |
+| `voice.mouth`             | absent                           | `kokoro`, `elevenlabs` or `system`. Absent means `chosenMouth` decides.      |
+| `voice.ears`              | absent                           | Only `local` exists (`EARS_IDS`).                                            |
+| `listening.always`        | `false`                          | Always listening.                                                            |
+| `hotkeys.talk`            | `'RightControl'`                 | One of `TALK_KEYS`.                                                          |
+| `hotkeys.stopVoice`       | `'CommandOrControl+Shift+Alt+M'` | The stop key.                                                                |
 
 The ElevenLabs key is a secret (`elevenlabs.apiKey`), never a setting. See
 `settings-and-secrets.md`. The voice fields that chat can change are listed there too.
@@ -807,7 +809,7 @@ The ElevenLabs key is a secret (`elevenlabs.apiKey`), never a setting. See
 | Unaddressed hint                         | 3 words or more                                          | `listen-controller.ts`                            |
 | `SHORT_LINE`                             | 40 characters                                            | `speakable.ts`                                    |
 | `ELEVENLABS_TIMEOUT_MS`                  | 15,000 ms                                                | `elevenlabs.ts`                                   |
-| ElevenLabs speed clamp                   | 0.7–1.2                                                  | `elevenlabs.ts`                                   |
+| ElevenLabs speed clamp                   | 0.7–1.2 (`MAX_ELEVENLABS_SPEED`)                         | `elevenlabs.ts`, `settings.ts`                    |
 | Download attempts per file               | 2                                                        | `model-files.ts`                                  |
 | Model sizes                              | ears 43,001,836 B; Kokoro 92,364,770 B                   | `model-files.ts`                                  |
 
@@ -825,23 +827,23 @@ The ElevenLabs key is a secret (`elevenlabs.apiKey`), never a setting. See
 
 ## Failure handling
 
-| Failure                                                                              | What happens                                                                                                                                                                                                                                                        |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mic busy (`NotReadableError`, `AbortError` from `getUserMedia`)                      | `onMicFailed`. The hold is `end()`ed, the 30 s cap is cleared, and the `mic-busy` mark is set. The note is `STATUS_WORDS['mic-busy'].detail`.                                                                                                                       |
-| Mic failed (any other error, including an audio-graph failure rethrown by `openMic`) | The same, with `mic-failed`.                                                                                                                                                                                                                                        |
-| Mic failing repeatedly                                                               | `FailureStreak` reports it once per run of failures. Always listening retries after each system-voice line. The mark and the streak clear on the next partial or heard question, or when the person presses the key or the mic button (`micOk`).                    |
-| First download offline                                                               | `ears.status: failed` with `EARS_DOWNLOAD_FAILED` ("Speech models didn’t download. Check the internet connection.").                                                                                                                                                |
-| Download damaged twice                                                               | `ModelIntegrityError`, then `EARS_MODEL_DAMAGED` ("The speech model download was damaged. Check the connection."). Nothing is kept at the final path.                                                                                                               |
-| Models on disk will not start, or a model breaks while always listening              | `EARS_START_FAILED` ("Listening couldn’t start. It retries on its own."). The loaded models are forgotten, and the next listen loads them again.                                                                                                                    |
-| A model breaks during a held question                                                | The turn ends with what was heard. No failure is posted.                                                                                                                                                                                                            |
-| End-of-turn model throws                                                             | The turn is taken as over (score 1).                                                                                                                                                                                                                                |
-| Voice process exits                                                                  | Pending calls reject. Windows get `failed`, "Listening stopped unexpectedly. Try again." The `ears-failed` mark is set only if the ears were used in that process. The next call forks a fresh process.                                                             |
-| Ears status `failed` in the panel                                                    | `earsFailed()` drops every question and ends the always session, then retries with back-off. `EarsNotes` shows the failure line once and clears the first-time download note. The note is shown only if a question was being asked or always listening was running. |
-| Kokoro not loaded or failed                                                          | The line falls through to `system` (`fallback`). The next line tries the load again.                                                                                                                                                                                |
-| ElevenLabs refused, timed out or offline                                             | It is logged, and the line falls through to Kokoro, then to the system voice.                                                                                                                                                                                       |
-| A line fails to play                                                                 | `SpeechQueue` logs `[voice] a line could not be spoken` and plays the next.                                                                                                                                                                                         |
-| Key hook will not load                                                               | One warning, and a `talk` hotkey problem shown in the panel and Settings. The mic button still works.                                                                                                                                                               |
-| A mic frame cannot reach the voice process                                           | It is logged, and the next frame still goes.                                                                                                                                                                                                                        |
+| Failure                                                                              | What happens                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mic busy (`NotReadableError`, `AbortError` from `getUserMedia`)                      | `onMicFailed`. The hold is `end()`ed, the 30 s cap is cleared, and the `mic-busy` mark is set. The note is `STATUS_WORDS['mic-busy'].detail`.                                                                                                                                                                 |
+| Mic failed (any other error, including an audio-graph failure rethrown by `openMic`) | The same, with `mic-failed`.                                                                                                                                                                                                                                                                                  |
+| Mic failing repeatedly                                                               | `FailureStreak` reports it once per run of failures. Always listening retries after each system-voice line. The mark and the streak clear on the next partial or heard question, or when the person presses the key or the mic button (`micOk`).                                                              |
+| First download offline                                                               | `ears.status: failed` with `EARS_DOWNLOAD_FAILED` ("Speech models didn’t download. Check the internet connection.").                                                                                                                                                                                          |
+| Download damaged twice                                                               | `ModelIntegrityError`, then `EARS_MODEL_DAMAGED` ("The speech model download was damaged. Check the connection."). Nothing is kept at the final path.                                                                                                                                                         |
+| Models on disk will not start, or a model breaks while always listening              | `EARS_START_FAILED` ("Listening couldn’t start. It retries on its own."). The loaded models are forgotten, and the next listen loads them again.                                                                                                                                                              |
+| A model breaks during a held question                                                | The turn ends with what was heard. No failure is posted.                                                                                                                                                                                                                                                      |
+| End-of-turn model throws                                                             | The turn is taken as over (score 1).                                                                                                                                                                                                                                                                          |
+| Voice process exits                                                                  | Pending calls reject. Windows get `failed`, "Listening stopped unexpectedly. Try again." The `ears-failed` mark is set only if the ears were used in that process. The next call forks a fresh process, so the next talk press listens again (pinned in `ipc/voice.test.ts` and `listen-controller.test.ts`). |
+| Ears status `failed` in the panel                                                    | `earsFailed()` drops every question and ends the always session, then retries with back-off. `EarsNotes` shows the failure line once and clears the first-time download note. The note is shown only if a question was being asked or always listening was running.                                           |
+| Kokoro not loaded or failed                                                          | The line falls through to `system` (`fallback`). The next line tries the load again.                                                                                                                                                                                                                          |
+| ElevenLabs refused, timed out or offline                                             | It is logged, and the line falls through to Kokoro, then to the system voice.                                                                                                                                                                                                                                 |
+| A line fails to play                                                                 | `SpeechQueue` logs `[voice] a line could not be spoken` and plays the next.                                                                                                                                                                                                                                   |
+| Key hook will not load                                                               | One warning, and a `talk` hotkey problem shown in the panel and Settings. The mic button still works.                                                                                                                                                                                                         |
+| A mic frame cannot reach the voice process                                           | It is logged, and the next frame still goes.                                                                                                                                                                                                                                                                  |
 
 **Status marks.** The voice marks are `ears-failed`, `mic-busy`, `mic-failed`, `ears-loading`,
 `listening-paused`, `say-name` and `listening-on` (`packages/protocol/src/status.ts`). Their order,

@@ -1,5 +1,6 @@
 /** Speech from ElevenLabs with the person's own key. Contains elevenLabsTts. */
 
+import { MAX_ELEVENLABS_SPEED, MIN_VOICE_SPEED } from '@tagalong/protocol';
 import type { Tts } from './voice';
 
 /** ElevenLabs' low-latency model, made for real-time speech. */
@@ -7,10 +8,6 @@ export const ELEVENLABS_MODEL = 'eleven_flash_v2_5';
 
 /** How long one line may take, the audio included, before the local voice takes over. */
 export const ELEVENLABS_TIMEOUT_MS = 15_000;
-
-/** ElevenLabs' own bounds on `voice_settings.speed`. */
-const MIN_SPEED = 0.7;
-const MAX_SPEED = 1.2;
 
 /**
  * Speech from ElevenLabs, with the person's own key and a voice from their library. Only
@@ -40,7 +37,9 @@ export function elevenLabsTts(
           body: JSON.stringify({
             text,
             model_id: ELEVENLABS_MODEL,
-            voice_settings: { speed: Math.min(MAX_SPEED, Math.max(MIN_SPEED, speed)) },
+            voice_settings: {
+              speed: Math.min(MAX_ELEVENLABS_SPEED, Math.max(MIN_VOICE_SPEED, speed)),
+            },
           }),
         },
       );

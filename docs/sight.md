@@ -129,7 +129,7 @@ calls this function rather than its own copy of the arguments.
 
 `listWindows` (`win32.ts`):
 
-1. Runs `LIST_WINDOWS_SCRIPT` with `WINDOW_HELPER_TIMEOUT_MS` = 3,000. The script walks the
+1. Runs `LIST_WINDOWS_SCRIPT` with `WINDOW_HELPER_TIMEOUT_MS` = 8,000. The script walks the
    desktop root's children through UI Automation, keeps windows that are visible or minimized
    (`IsWindowVisible`, `IsIconic`), and prints `handle`, `processName`, `title` (the UIA name),
    `minimized`, `foreground` (`GetForegroundWindow`) and `bounds` as JSON. It reads no window
@@ -681,7 +681,7 @@ actually costs is recorded by the usage meter (see [mind.md](mind.md)).
 | `AFTER_CROP_LONG_SIDE`           | 1024            | `awareness/perception-memory.ts`                     |
 | `OCR_MAX_LONG_SIDE`              | 2,500           | `platform/ocr.ts`                                    |
 | `OCR_TIMEOUT_MS`                 | 10,000          | `platform/ocr.ts`                                    |
-| `WINDOW_HELPER_TIMEOUT_MS`       | 3,000           | `platform/win32.ts`                                  |
+| `WINDOW_HELPER_TIMEOUT_MS`       | 8,000           | `platform/win32.ts`                                  |
 | `WINDOW_TEXT_WALK_MS`            | 2,500           | `platform/window-text.ts`                            |
 | `WINDOW_COUNT_WALK_MS`           | 400             | `platform/window-text.ts`                            |
 | `COUNT_PASS_TIMEOUT_MS`          | 5,000           | `platform/text-layer.ts`                             |

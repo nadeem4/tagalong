@@ -875,6 +875,10 @@ voice model (about 92 MB, each file checked against a pinned SHA-256) into `%APP
 
 1. **Action:** on a fresh profile, in Settings → Voice pick **The system voice** under **Who speaks**, then press **▶ Preview**.
 2. **Expected:** the preview plays in the system voice and no Kokoro download starts, with no Save needed (the voice folder under `%APPDATA%\Tagalong` stays empty).
+3. **Action:** set the speed slider to its fastest, Save, and ask a question.
+4. **Expected:** the answer is spoken in the system voice at the saved speed, not at normal speed.
+5. **Action:** in Settings → Voice, set the speed to 1.3 with **The system voice**, then switch **Who speaks** to **ElevenLabs**.
+6. **Expected:** the slider stops at 1.2 and reads 1.20×; switching back to the system voice allows 1.3 again.
 
 ### V.6. ElevenLabs (your own key)
 

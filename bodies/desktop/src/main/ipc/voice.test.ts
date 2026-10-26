@@ -8,7 +8,8 @@ import { IPC } from '../../shared/ipc';
 import { EARS_FILES } from '../voice/ears/model-files';
 import { KOKORO_MODEL } from '../voice/kokoro';
 import { AlwaysListening } from '../always-listening';
-import type { FromWorker } from '../voice/worker/messages';
+import { VoiceWorker } from '../voice/worker/client';
+import type { FromWorker, ToWorker, WorkerProcess } from '../voice/worker/messages';
 import { fakeIpc } from './fake-ipc';
 import { StatusMarks } from '../status-marks';
 import { forwardEars, registerVoiceIpc } from './voice';
@@ -118,6 +119,46 @@ describe('registerVoiceIpc, the follow-up window', () => {
     await expect(invoke(IPC.setFollowUp, 'yes')).rejects.toThrow('open or closed');
     await invoke(IPC.setFollowUp, false);
     expect(listening.state.followUp).toBe(false);
+  });
+});
+
+describe('a voice process that dies mid-question', () => {
+  it('tells the panel, and the next talk press starts a fresh process listening', async () => {
+    const processes: { sent: ToWorker[]; die: () => void }[] = [];
+    const worker = new VoiceWorker(() => {
+      const sent: ToWorker[] = [];
+      const exits: (() => void)[] = [];
+      processes.push({ sent, die: () => exits.forEach((exit) => exit()) });
+      return {
+        postMessage: (message: ToWorker) => void sent.push(message),
+        on: ((event: string, listener: () => void) => {
+          if (event === 'exit') exits.push(listener);
+        }) as WorkerProcess['on'],
+        kill: () => true,
+      };
+    });
+    const ipc = fakeIpc();
+    registerVoiceIpc(ipc.handle, {
+      voice: () => ({ speak: vi.fn() }),
+      worker: () => worker,
+      noteActiveWindow: () => Promise.resolve(),
+      listening: () => new AlwaysListening(),
+      on: ipc.on,
+    });
+    const statuses: unknown[] = [];
+    forwardEars(worker, (channel, payload) => {
+      if (channel === IPC.earsStatusEvent) statuses.push(payload);
+    });
+
+    await ipc.invoke(IPC.earsListen, 'held');
+    processes[0]!.die();
+    expect(statuses).toEqual([
+      { status: 'failed', message: 'Listening stopped unexpectedly. Try again.' },
+    ]);
+
+    await ipc.invoke(IPC.earsListen, 'held');
+    expect(processes).toHaveLength(2);
+    expect(processes[1]!.sent).toEqual([{ kind: 'ears.listen', mode: 'held' }]);
   });
 });
 

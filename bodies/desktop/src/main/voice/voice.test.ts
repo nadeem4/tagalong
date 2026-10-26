@@ -14,6 +14,7 @@ import {
 } from './voice';
 import type { LocalSynth, Tts } from './voice';
 
+const SPEED = SETTINGS_DEFAULTS.voice.speed;
 const AUDIO = { audio: new Uint8Array([1, 2, 3]), mime: 'audio/wav' };
 
 function tts(name: string, spoken: string[]): Tts {
@@ -69,9 +70,15 @@ describe('createVoiceService', () => {
 
   it('falls back to the system voice while the local model is not ready, and starts loading it', async () => {
     const { voice, local, spoken } = service({ ready: false });
-    expect(await voice.speak('Hello.')).toEqual({ kind: 'fallback' });
+    expect(await voice.speak('Hello.')).toEqual({ kind: 'fallback', speed: SPEED });
     expect(local.warm).toHaveBeenCalledOnce();
     expect(spoken).toEqual([]);
+  });
+
+  it('hands the system voice the saved speed, or the preview speed when one is given', async () => {
+    const { voice } = service({ ready: false });
+    expect(await voice.speak('Hello.')).toEqual({ kind: 'fallback', speed: SPEED });
+    expect(await voice.speak('Hello.', { speed: 1.3 })).toEqual({ kind: 'fallback', speed: 1.3 });
   });
 
   it('falls back to the system voice when the local voice fails', async () => {
@@ -79,7 +86,7 @@ describe('createVoiceService', () => {
     local.speak = async () => {
       throw new Error('onnx failed');
     };
-    expect(await voice.speak('Hello.')).toEqual({ kind: 'fallback' });
+    expect(await voice.speak('Hello.')).toEqual({ kind: 'fallback', speed: SPEED });
   });
 
   it('uses ElevenLabs only with both a key and a voice the person picked', async () => {
@@ -208,7 +215,7 @@ describe('createVoiceService', () => {
 
   it('uses the system voice straight away when the person picked it, and never loads Kokoro', async () => {
     const { voice, local, spoken } = service({ mouth: 'system' });
-    expect(await voice.speak('Hello.')).toEqual({ kind: 'fallback' });
+    expect(await voice.speak('Hello.')).toEqual({ kind: 'fallback', speed: SPEED });
     expect(spoken).toEqual([]);
     expect(local.warm).not.toHaveBeenCalled();
     voice.warmAtStart(true);
@@ -236,13 +243,16 @@ describe('createVoiceService', () => {
     });
     expect((await voice.speak('One.')).kind).toBe('audio');
     voiceSettings = { ...voiceSettings, mouth: 'system' };
-    expect(await voice.speak('Two.')).toEqual({ kind: 'fallback' });
+    expect(await voice.speak('Two.')).toEqual({ kind: 'fallback', speed: SPEED });
     expect(spoken).toEqual(['kokoro:One.']);
   });
 
   it('a preview with the system voice picked uses it, and never loads Kokoro, even when Kokoro is saved', async () => {
     const { voice, local, spoken } = service({ mouth: 'kokoro' });
-    expect(await voice.speak('Hello.', { mouth: 'system' })).toEqual({ kind: 'fallback' });
+    expect(await voice.speak('Hello.', { mouth: 'system' })).toEqual({
+      kind: 'fallback',
+      speed: SPEED,
+    });
     expect(spoken).toEqual([]);
     expect(local.warm).not.toHaveBeenCalled();
   });
@@ -267,7 +277,7 @@ describe('createVoiceService', () => {
     local.speak = async () => {
       throw new Error('onnx failed');
     };
-    expect(await voice.speak('Hi.')).toEqual({ kind: 'fallback' });
+    expect(await voice.speak('Hi.')).toEqual({ kind: 'fallback', speed: SPEED });
     warn.mockRestore();
   });
 });
@@ -359,6 +369,15 @@ describe('elevenLabsTts', () => {
       ),
     ).rejects.toThrow();
     expect(ELEVENLABS_TIMEOUT_MS).toBe(15_000);
+  });
+});
+
+describe('elevenLabsTts speed', () => {
+  it('sends at most 1.2, ElevenLabs’ own cap, for a saved 1.3', async () => {
+    const fetchFn = vi.fn(async () => new Response(new Uint8Array([7]), { status: 200 }));
+    await elevenLabsTts('xi-key', 'v', fetchFn).speak('Hi.', { voice: 'bm_george', speed: 1.3 });
+    const [, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).voice_settings.speed).toBe(1.2);
   });
 });
 

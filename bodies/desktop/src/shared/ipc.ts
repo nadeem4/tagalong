@@ -195,11 +195,13 @@ export interface SpeakPreview {
 
 /**
  * What main hands back for one line: encoded audio to play, the word to use the system
- * voice instead (the local model is downloading, or every engine failed), or nothing at
+ * voice instead, at `speed` (the local model is downloading, or every engine failed), or nothing at
  * all because Scout talks is switched off.
  */
 export type SpeakResult =
-  { kind: 'audio'; audio: Uint8Array; mime: string } | { kind: 'fallback' } | { kind: 'off' };
+  | { kind: 'audio'; audio: Uint8Array; mime: string }
+  | { kind: 'fallback'; speed: number }
+  | { kind: 'off' };
 
 /**
  * What the host announces the moment it looks at the screen — or refuses to.
