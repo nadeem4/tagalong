@@ -272,6 +272,19 @@ describe('BrainClient', () => {
     expect(s.sent.at(-1)).toMatchObject({ id: 'b1', error: { code: -32004, message: 'too slow' } });
   });
 
+  it('onUse throws RpcError with a code a use may not return -> tool_failed, message kept', async () => {
+    const { s, onUse } = await online();
+    onUse.mockRejectedValueOnce(new RpcError(-32001, 'odd'));
+    s.receive({
+      jsonrpc: '2.0',
+      id: 'b1',
+      method: 'use',
+      params: { call: 'c1', tool: 'see_screen', input: {} },
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(s.sent.at(-1)).toMatchObject({ id: 'b1', error: { code: -32007, message: 'odd' } });
+  });
+
   it('use for an undeclared tool → unknown_tool (-32001)', async () => {
     const { s, onUse } = await online();
     s.receive({

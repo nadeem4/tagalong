@@ -126,7 +126,7 @@ export function bodyTools(
       throw new RpcError(ErrorCode.invalid_params, 'windowId is required');
     }
     // Checked here so the refusal is the one sentence Scout is told to repeat.
-    const { windows } = await platform.listWindows(exclusions());
+    const { windows } = await platform.listWindows(exclusions(), { countText: false });
     const target = windows.find((w) => w.id === windowId);
     if (target?.state === 'minimized' && target.blocked === undefined) throw failed(MINIMIZED);
 
@@ -147,6 +147,8 @@ export function bodyTools(
   async function run(tool: string, input: Record<string, unknown>): Promise<Part[]> {
     const handler = handlers[tool];
     if (handler === undefined) throw new RpcError(ErrorCode.unknown_tool, 'unknown tool');
+    // The platform has no abort, so a call may finish after the timeout reply; a late OCR
+    // read still raises the capture notice, which is the honest record of it.
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<never>((_, reject) => {
       timer = setTimeout(
@@ -156,6 +158,10 @@ export function bodyTools(
     });
     try {
       return await Promise.race([handler(input), timeout]);
+    } catch (error) {
+      if (error instanceof RpcError) throw error;
+      // Anything else (sight paused, a helper failing) keeps its words instead of "tool failed".
+      throw failed(error instanceof Error ? error.message : String(error));
     } finally {
       clearTimeout(timer);
     }

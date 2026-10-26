@@ -5,6 +5,7 @@ import type { CaptureExclusions } from '@tagalong/protocol';
 import type { Platform } from '../platform/index';
 import { bodyTools } from './body-tools';
 import { RpcError } from './brain-client';
+import { SightPausedError } from '../platform/sight-gate';
 
 const exclusions = { processNames: [], titlePatterns: [] } as unknown as CaptureExclusions;
 
@@ -122,6 +123,38 @@ describe('look_at_window', () => {
     expect(platform.lookAtWindow).not.toHaveBeenCalled();
   });
 
+  it('gives a minimized and excluded window the exclusion sentence, not the minimized one', async () => {
+    const sentence = 'This window is a blind spot.';
+    const { run } = setup({
+      listWindows: async () => ({
+        windows: [
+          {
+            id: 'w2',
+            processName: 'vault',
+            title: '',
+            state: 'minimized',
+            browser: false,
+            blocked: { rule: 'processName', entry: 'vault' },
+          },
+        ],
+      }),
+      lookAtWindow: async () => ({
+        windowId: 'w2',
+        blocked: { rule: 'processName', entry: 'vault' },
+        notes: [sentence],
+      }),
+    });
+    await expect(run('look_at_window', { windowId: 'w2' })).rejects.toMatchObject({
+      message: sentence,
+    });
+  });
+
+  it('checks for a minimized window without counting every window text', async () => {
+    const { run, platform } = setup();
+    await run('look_at_window', { windowId: 'w1' });
+    expect(platform.listWindows).toHaveBeenCalledWith(exclusions, { countText: false });
+  });
+
   it('refuses an excluded window with the exclusion sentence', async () => {
     const sentence = 'This window is a blind spot.';
     const { run } = setup({
@@ -147,6 +180,19 @@ describe('run limits', () => {
     const result = run('list_windows', {}).catch((e: unknown) => e);
     await vi.advanceTimersByTimeAsync(15_000);
     expect(await result).toMatchObject({ code: ErrorCode.timeout });
+  });
+
+  it('turns a platform error into tool_failed carrying its message', async () => {
+    const paused = new SightPausedError('listWindows');
+    const { run } = setup({
+      listWindows: async () => {
+        throw paused;
+      },
+    });
+    await expect(run('list_windows', {})).rejects.toMatchObject({
+      code: ErrorCode.tool_failed,
+      message: paused.message,
+    });
   });
 
   it('rejects an unknown tool', async () => {
