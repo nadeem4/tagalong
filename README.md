@@ -42,10 +42,24 @@ walks you through the rest.
 
 You need Windows 11, Node.js 22 or newer and pnpm 10.
 
+The desktop talks to the Python brain, so start the brain first (you need `uv` and an Anthropic
+key in `~/.tagalong/.env`, see [docs/brain.md](docs/brain.md)).
+
+```powershell
+cd brain
+uv sync
+uv run brain        # leave this running
+```
+
+In a second terminal, from the repo root:
+
 ```powershell
 pnpm install
 pnpm dev:desktop
 ```
+
+If the brain is not running, the desktop still opens and shows "Scout's brain is not running." It
+connects by itself once the brain is up.
 
 The [developer guide](docs/development.md) covers getting pnpm, testing, packaging and the Chrome
 extension.

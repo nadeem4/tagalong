@@ -17,10 +17,10 @@ The brain is being rewritten in Python; the TypeScript apps stay as bodies.
 ## Commands
 
 - Setup: pnpm install (Node >= 22, pnpm 10)
-- Test: pnpm test (vitest, all packages); pnpm test:e2e for the Electron Playwright suites
+- Test: pnpm test (vitest, all packages); pnpm --filter @tagalong/desktop test:e2e for the Electron Playwright suites (they run on a fake brain, no real brain needed)
 - Check: pnpm typecheck && pnpm lint && pnpm format:check
 - Brain: cd brain && uv sync; uv run pytest; uv run ruff check; uv run ruff format --check; uv run brain (starts the websocket server)
-- Run: pnpm dev:desktop
+- Run: cd brain && uv run brain (leave it running), then pnpm dev:desktop; the desktop dials the brain at TAGALONG_BRAIN_ADDR (default 127.0.0.1:47321) and retries every 2 s
 - Package: pnpm package:win
 
 ## Layout
@@ -32,7 +32,7 @@ The brain is being rewritten in Python; the TypeScript apps stay as bodies.
 - packages/protocol: wire types and the JSON-RPC method catalog shared by brain and bodies
 - packages/core: the current brain (Scout's mind, sight, memory, tools, experts, routines, providers, ws server)
 - bodies/ui: shared React UI (bubble, dock pet, Home, settings, voice)
-- bodies/desktop: Electron body
+- bodies/desktop: Electron body (dials the Python brain; no longer boots packages/core)
 - apps/extension: Chrome extension body
 - docs/: one doc per subsystem; docs/development.md has the full layout and how-tos
 

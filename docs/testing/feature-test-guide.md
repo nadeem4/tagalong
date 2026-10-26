@@ -10,6 +10,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [First run: Welcome](#first-run-welcome)
 - [Scout's brain](#scouts-brain)
 - [Python brain: talk to Scout](#python-brain-talk-to-scout)
+- [The desktop on the Python brain](#the-desktop-on-the-python-brain)
 - [Hand-offs to Claude Code](#hand-offs-to-claude-code)
 - [Settings](#settings)
 - [Greeting](#greeting)
@@ -314,6 +315,31 @@ desktop app. You need `uv` and an Anthropic key.
 6. **Action:** set `TAGALONG_DAILY_BUDGET_USD=0.0001`, start the brain, and send a `say` twice.
    **Expected:** once `spent_usd` in `~/.tagalong/budget.json` passes the limit, a `say` gets a
    result and its turn ends at once with `reason: "over_budget"` and no deltas.
+
+## The desktop on the Python brain
+
+The desktop talks to the Python brain. Needs `uv` and an Anthropic key in `~/.tagalong/.env`.
+Most older sections below still describe the retired engine and are not expected to pass until
+their rows return.
+
+1. **Setup:** in one terminal run `cd brain && uv run brain`. In another run `pnpm dev:desktop`.
+   **Expected:** Scout appears. No "Scout's brain is not running." mark.
+2. **Action:** click Scout and ask "Say hello in five words."
+   **Expected:** the answer streams into the bubble and the turn ends done.
+3. **Action:** stop the brain (Ctrl+C in its terminal) while Scout is idle.
+   **Expected:** within a few seconds the status mark reads "Scout's brain is not running." An ask
+   now fails with that same sentence.
+4. **Action:** start the brain again and wait a few seconds.
+   **Expected:** the mark clears. Ask again: it works without restarting the app.
+5. **Action:** ask for a long story, and kill the brain process mid-answer.
+   **Expected:** the turn ends as failed and the offline mark appears.
+6. **Action:** start the brain again and ask.
+   **Expected:** the next ask works without restarting the app.
+7. **Action:** quit the app. Stop the brain. Start only the app.
+   **Expected:** the app opens normally with the offline mark and no error box. Start the brain:
+   the mark clears and an ask works.
+8. **Action:** ask with an interrupt: ask for a long story, press the stop control.
+   **Expected:** the answer stops and the turn ends cancelled.
 
 ## Hand-offs to Claude Code
 

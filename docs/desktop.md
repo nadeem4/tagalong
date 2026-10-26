@@ -2,9 +2,11 @@
 
 ## Purpose
 
-`bodies/desktop` is the Electron host. Its main process boots the engine in-process, dials it over
-the loopback websocket like any other host, and owns every window, the tray, the global hotkeys and
-the IPC that connects the windows to the engine. The renderers never talk to the engine directly.
+`bodies/desktop` is the Electron body. Its main process dials the Python brain over the websocket
+(contract v1, [protocol/README.md](../protocol/README.md)) and owns every window, the tray, the
+global hotkeys and the IPC that connects the windows to the brain. The renderers never talk to the
+brain directly. The desktop no longer boots the TypeScript engine (`packages/core`); start the brain
+yourself with `cd brain && uv run brain` (see [brain.md](brain.md#the-desktop-body)).
 
 Sight internals (the platform adapter's captures, the window inventory, OCR, exclusions) are in
 [sight.md](sight.md). Hearing, speaking, the talk key and Always listening are in
@@ -13,30 +15,29 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 
 ## Where it lives
 
-| Path (under `bodies/desktop/`)                         | What it holds                                                                                                                                                                              |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/main/index.ts`                                    | The main process: single-instance lock, `start`, the `Desktop` record, window routing, tray, `registerIpc`                                                                                 |
-| `src/main/engine-host.ts`                              | `startEngineHost`, `EngineHost`: boots `Engine` and connects an `EngineClient` to it                                                                                                       |
-| `src/main/engine-client.ts`                            | `EngineClient`: the one websocket JSON-RPC client; answers the engine's perception requests                                                                                                |
-| `src/main/hotkeys.ts`                                  | `HotkeyManager`, `registerHotkey`, `describeHotkeyProblems`, default accelerators                                                                                                          |
-| `src/main/talk-key.ts`                                 | `TalkKeyWatch`, `startTalkKey`, `loadKeyHook` (see [voice.md](voice.md))                                                                                                                   |
-| `src/main/tray-menu.ts`, `tray-icon.ts`                | `trayMenuTemplate`, `createTrayIcon`                                                                                                                                                       |
-| `src/main/windows/`                                    | One module per window: `avatar.ts`, `panel.ts`, `home.ts`, `settings.ts`, `welcome.ts`, `pointer.ts`; placement in `position.ts`, `move.ts`; `bubble-focus.ts`; `page.ts` (loading a page) |
-| `src/main/ipc/`                                        | One `register…Ipc(handle, deps)` per area; `handle.ts` (types), `fake-ipc.ts` (test double)                                                                                                |
-| `src/main/drop.ts`, `drop-io.ts`                       | Drop it on Scout: `dropDesk`, `readDrop`, `registerDropIpc`, `guardNavigation`                                                                                                             |
-| `src/main/status-marks.ts`                             | `StatusMarks` and the marks main sets (see [bubble.md](bubble.md#status-marks))                                                                                                            |
-| `src/main/launch.ts`, `welcome.ts`, `release-notes.ts` | The launch record, brain readiness, Welcome's main-process half, `RELEASE_NOTES`                                                                                                           |
-| `src/main/claude-sign-in.ts`                           | `signInFor`, `checkClaudeSignIn` (`claude auth status --json`), `openClaudeSignIn`                                                                                                         |
-| `src/main/links.ts`, `fix-target.ts`                   | `isAllowedLink`, `isSignInPage`; `fixPage` (the Fix it allowlist)                                                                                                                          |
-| `src/main/log-file.ts`, `log-text.ts`                  | The log file                                                                                                                                                                               |
-| `src/main/platform/`                                   | The platform adapter (`Platform`, `createPlatform`, `Win32Platform`, `gateSight`)                                                                                                          |
-| `src/preload/index.ts`, `held.ts`                      | The preload: `window.tagalong` and `window.tagalongHost`; `heldUntilHeard`                                                                                                                 |
-| `src/shared/ipc.ts`                                    | `IPC` (every channel name) and the shapes that cross it (`HostView`, `GreetLine`, `TagalongHostApi`, ...)                                                                                  |
-| `src/renderer/*.html`, `src/renderer/src/`             | One page per window: `avatar`, `panel`, `home`, `settings`, `welcome`, `pointer`                                                                                                           |
-| `electron.vite.config.ts`                              | The build: main and the voice worker, the preload, the six renderer pages                                                                                                                  |
-| `electron-builder.json`                                | The installer                                                                                                                                                                              |
-| `scripts/`                                             | `ensure-electron.mjs`, `fetch-native.mjs`, `start-fresh.mjs`, `bean/` (Bean's renders)                                                                                                     |
-| `e2e/`                                                 | Playwright suites run against the built app                                                                                                                                                |
+| Path (under `bodies/desktop/`)                         | What it holds                                                                                                                                                  |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main/index.ts`                                    | The main process: single-instance lock, `start`, the `Desktop` record, window routing, tray, `registerIpc`                                                     |
+| `src/main/brain/start.ts`                              | `startBrain`: builds and starts the `BrainClient` on the global `WebSocket`; address from `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`), no tools declared |
+| `src/main/hotkeys.ts`                                  | `HotkeyManager`, `registerHotkey`, `describeHotkeyProblems`, default accelerators                                                                              |
+| `src/main/talk-key.ts`                                 | `TalkKeyWatch`, `startTalkKey`, `loadKeyHook` (see [voice.md](voice.md))                                                                                       |
+| `src/main/tray-menu.ts`, `tray-icon.ts`                | `trayMenuTemplate`, `createTrayIcon`                                                                                                                           |
+| `src/main/windows/`                                    | One module per window: `avatar.ts`, `panel.ts`, `home.ts`, `welcome.ts`; placement in `position.ts`, `move.ts`; `bubble-focus.ts`; `page.ts` (loading a page)  |
+| `src/main/ipc/`                                        | One `register…Ipc(handle, deps)` per area; `handle.ts` (types), `fake-ipc.ts` (test double)                                                                    |
+| `src/main/drop.ts`, `drop-io.ts`                       | Drop it on Scout: `dropDesk`, `readDrop`, `registerDropIpc`, `guardNavigation`                                                                                 |
+| `src/main/status-marks.ts`                             | `StatusMarks` and the marks main sets (see [bubble.md](bubble.md#status-marks))                                                                                |
+| `src/main/launch.ts`, `welcome.ts`, `release-notes.ts` | The launch record, brain readiness, Welcome's main-process half, `RELEASE_NOTES`                                                                               |
+| `src/main/claude-sign-in.ts`                           | `signInFor`, `checkClaudeSignIn` (`claude auth status --json`), `openClaudeSignIn`                                                                             |
+| `src/main/links.ts`, `fix-target.ts`                   | `isAllowedLink`, `isSignInPage`; `fixPage` (the Fix it allowlist)                                                                                              |
+| `src/main/log-file.ts`, `log-text.ts`                  | The log file                                                                                                                                                   |
+| `src/main/platform/`                                   | The platform adapter (`Platform`, `createPlatform`, `Win32Platform`, `gateSight`)                                                                              |
+| `src/preload/index.ts`, `held.ts`                      | The preload: `window.tagalong` and `window.tagalongHost`; `heldUntilHeard`                                                                                     |
+| `src/shared/ipc.ts`                                    | `IPC` (every channel name) and the shapes that cross it (`HostView`, `GreetLine`, `TagalongHostApi`, ...)                                                      |
+| `src/renderer/*.html`, `src/renderer/src/`             | One page per window: `avatar`, `panel`, `home`, `welcome`                                                                                                      |
+| `electron.vite.config.ts`                              | The build: main and the voice worker, the preload, the six renderer pages                                                                                      |
+| `electron-builder.json`                                | The installer                                                                                                                                                  |
+| `scripts/`                                             | `ensure-electron.mjs`, `fetch-native.mjs`, `start-fresh.mjs`, `bean/` (Bean's renders)                                                                         |
+| `e2e/`                                                 | Playwright suites run against the built app                                                                                                                    |
 
 ## How it works
 
@@ -47,8 +48,7 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 1. With `TAGALONG_FAKE_STT=1` it appends Chromium's `use-fake-device-for-media-stream` and
    `use-fake-ui-for-media-stream` switches (a fake microphone for tests).
 2. `app.requestSingleInstanceLock()`. A second launch quits at once; the first gets
-   `second-instance` and runs `showPets()` (shows the pet and the bubble with focus). Two engines
-   would fight over the port and the SQLite file, so this happens before anything else.
+   `second-instance` and runs `showPets()` (shows the pet and the bubble with focus). This happens before anything else.
 3. `installLogFile({ dir: <userData>/logs })`, and `web-contents-created` hooks every window's
    `console-message` into `rendererConsole` (see [The log file](#the-log-file)).
 4. `app.whenReady().then(start)`. A rejection from `start` shows
@@ -58,74 +58,59 @@ Sight internals (the platform adapter's captures, the window inventory, OCR, exc
 
 `start()` then:
 
-1. Starts the Claude sign-in check (`signInFor(process.env)`, kept in `signInCheck`) so a cold
-   `claude` has had the boot time before the launch greeting asks for it.
-2. Builds the platform as `gateSight(createPlatform(), () => sightPause.paused)`: nothing downstream
+1. Builds the platform as `gateSight(createPlatform(), () => sightPause.paused)`: nothing downstream
    is ever handed the ungated adapter (see [sight.md](sight.md)).
-3. Opens `SafeStorageSecretStore(userData)` (and `forgetRetiredKeys`), `SettingsStore(userData)`,
+2. Opens `SafeStorageSecretStore(userData)` (and `forgetRetiredKeys`), `SettingsStore(userData)`,
    and calls `recordLaunch(settingsStore, app.getVersion())` before anything else reads settings.
-4. Creates `AlwaysListening` from `settings.listening.always`, `StatusMarks` (broadcasting the top
+3. Creates `AlwaysListening` from `settings.listening.always`, `StatusMarks` (broadcasting the top
    mark on `IPC.statusMarkEvent`), `RollingMemory` and `PerceptionMemory`.
-5. `startEngineHost(...)` inside a `try`. A throw is not fatal: the message becomes `bootError`
-   and the app runs on in degraded mode (see [Failure handling](#failure-handling)).
-6. Creates the `VoiceWorker` (a `utilityProcess.fork` of `voice-worker.js`, started lazily; see
+4. `startBrain(...)` builds the `BrainClient` (kept as `desktop.brain`) and starts it. It never
+   throws and never blocks boot: if the brain is not running, the client retries every 2 s.
+5. Creates the `VoiceWorker` (a `utilityProcess.fork` of `voice-worker.js`, started lazily; see
    [voice.md](voice.md)) and the `Desktop` record, including the tray, the `HotkeyManager` and the
    `TalkKeyWatch`.
-7. Wires the sight pause, Always listening, the listening guard and `forwardEars`, then
+6. Wires the sight pause, Always listening, the listening guard and `forwardEars`, then
    `registerIpc()`.
-8. With no engine: `openSettings()` and an error box ("Tagalong started without its engine"), and
-   `start` returns. Nothing below runs.
-9. Otherwise: `createPanelWindow`, then `createAvatarWindow({ hidden: welcoming })` where
-   `welcoming = shouldOpenWelcome(settings, env)`, presence watching, `startTalkKey`,
-   `applyHotkeys(settings)`, then either `openWelcome()` or `greetOnLaunch(host)`, then the
-   keep-an-eye and wellbeing ticks.
+7. Creates the panel and the avatar window, starts presence watching and `startTalkKey`, and calls
+   `applyHotkeys(settings)`. Welcome never opens, there is no launch greeting, and the keep-an-eye
+   and wellbeing ticks are not started.
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
 flowchart TD
   A["whenReady: start()"] --> B["gated platform, secrets, settings, recordLaunch"]
-  B --> C["startEngineHost"]
-  C -- "throws" --> D["degraded: Settings window and error box"]
-  C -- "ok" --> E["panel window, avatar window"]
+  B --> C["startBrain (retries every 2 s)"]
+  C --> E["panel window, avatar window"]
   E --> F["talk key hook, applyHotkeys"]
-  F --> G{"welcome.done?"}
-  G -- "no" --> H["openWelcome, avatar hidden"]
-  G -- "yes" --> I["greetOnLaunch"]
 ```
 
-### The engine in the main process
+### The brain in the main process
 
-`startEngineHost` (`engine-host.ts`) calls `Engine.boot({ dataDir, secretStore, engineVersion,
-env, openBrowser })`, then `EngineClient.connect({ port: engine.port, token: engine.pairingToken,
-hostVersion, capabilities: DESKTOP_CAPABILITIES, ... })`. The engine runs in this process but the
-host still speaks the protocol over the socket, so nothing in the host can depend on engine
-internals the Chrome host does not have. `openBrowser` opens a connected app's sign-in page only
-when `isSignInPage(url)` (https) passes.
+`startBrain` (`brain/start.ts`) builds a `BrainClient` (from `brain/client.ts`) on the global
+`WebSocket` and dials `ws://${TAGALONG_BRAIN_ADDR}` (default `127.0.0.1:47321`). The desktop
+declares no tools yet, and any `use` the brain sends is rejected. If the socket is down the client
+retries every 2 s, so the app opens whether or not the brain is running.
 
-The client is the only websocket client this host has. It sends `hello`, then serves the engine's
-host-side requests from the platform: `perception.capture`, `perception.readText`,
-`perception.listWindows`, `perception.captureRegion`, `perception.captureWindow`,
-`perception.recall`, `perception.diff` and `screen.pointAt`; anything else answers `-32601`. A
-handler that throws answers `-32000` with its message. Every capture path calls `onCapture` with a
-`CaptureNotice`, which main broadcasts on `IPC.captureEvent` and writes into the tray tooltip.
-The methods themselves are in [protocol.md](protocol.md); what they read is in
-[sight.md](sight.md).
+- **Status marks.** `markBrainLink` (`status-marks.ts`) sets `brain-offline` ("Scout's brain is not
+  running.") while the client is offline and `brain-outdated` ("Update Tagalong to talk to this
+  brain.") when the contract versions differ. Coming online clears either; "connecting" changes
+  nothing.
+- **Asking.** The `ask` IPC (`ipc/turns.ts`) sends `say` with the text, the pending screenshot as an
+  image part, dropped items as parts and the active window title as `context.window`, and returns
+  `{ turnId }`. While the brain is offline it throws "Scout's brain is not running." Interrupt sends
+  `cancel`.
+- **Turn events.** The brain's `reply` and `turn` notifications are mapped to the UI's turn events
+  and go to `forwardToRenderers`, which keeps `activeTurns` for the bubble's blur rule and sends the
+  events to every window on `IPC.turnEvent`. After a reconnect the client reports `resync`, and
+  main ends any turn that was open when the socket dropped (the bubble shows it as failed).
+- **Settings.** The desktop's local `SettingsStore` holds its own settings (hotkeys, listening,
+  rolling memory, exclusions). The brain's model, key and budget are in the brain's `.env`.
+- **Not wired yet.** Pets are a fixed local Scout. Welcome never opens. The pointer overlay, the
+  separate Settings window, the launch greeting, keep-an-eye, wellbeing, hand-offs, connected apps
+  and routines come back as the brain's rows land. Any IPC that needs them throws "Scout cannot do
+  that yet on the new brain."
 
-Engine notifications arrive in `forwardToRenderers`, which:
-
-- tracks `activeTurns` (a `turn.started` without `background: true` adds, `turn.completed` and
-  `turn.error` remove); the bubble's blur rule reads it;
-- hides the pointer ring on a new turn, and clears the brain marks on a `turn.completed` with text;
-- routes a `pet.remark` with a `handoffId` through `handoffLine` (kept on the card while the bubble
-  is open, stripped of its id otherwise);
-- reacts: `watch.fired` (system notification and bubble), `handoff.finished`, `pet.remark`
-  (`showRemark`), `pickUp.ready` (`showPickUp`), `handoff.proposed`, `connector.confirm`,
-  `routine.proposed`, `settings.proposed` (bubble with focus), `routine.result`
-  (`deliverRoutine`);
-- sends `{ type: method, ...params }` to every window on `IPC.turnEvent`. That object is the UI's
-  `TurnEvent`.
-
-`shutdown()` closes the client, then `engine.shutdown()`.
+`shutdown()` stops the client.
 
 ### The window inventory
 
@@ -134,14 +119,12 @@ preload `PRELOAD_PATH` (`dist/preload/index.cjs`). `loadPage` (`windows/page.ts`
 `${ELECTRON_RENDERER_URL}/<page>.html` in development and `dist/renderer/<page>.html` otherwise.
 Every page sets the CSP `default-src 'self'; style-src 'self' 'unsafe-inline'`.
 
-| Window   | Module                | Shape                                                                                                                     | Created                              | Shown                                   |
-| -------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | --------------------------------------- |
-| Avatar   | `windows/avatar.ts`   | 96 x 96 (`AVATAR_SIZE`), transparent, frameless, always on top (`floating`), `skipTaskbar`, not resizable                 | once, after the engine boots         | at creation, unless `hidden` (Welcome)  |
-| Panel    | `windows/panel.ts`    | 420 wide (`PANEL_WIDTH`), 180 high to start (`BUBBLE_HEIGHT`), transparent, frameless, always on top, `skipTaskbar`       | once, after the engine boots         | `showPanelBeside` or `showPanelQuietly` |
-| Home     | `windows/home.ts`     | framed, 1440 x 800 content, min 880 (`HOME_MIN_WIDTH`) x 600, centred, titled "Home", no menu bar                         | on `openHome`, again after it closes | `ready-to-show`                         |
-| Settings | `windows/settings.ts` | framed, 1080 x 760, min 860 x 560, "Tagalong Settings"                                                                    | only when the engine failed to boot  | `ready-to-show`                         |
-| Welcome  | `windows/welcome.ts`  | framed, 900 x 620 content, centred on the display under the cursor, "Set up Tagalong"                                     | `openWelcome`                        | `ready-to-show`                         |
-| Pointer  | `windows/pointer.ts`  | one per display, full bounds, transparent, `focusable: false`, click-through, content-protected, on top at `screen-saver` | the first ring on that display       | `showInactive` while a ring shows       |
+| Window  | Module               | Shape                                                                                                               | Created                              | Shown                                   |
+| ------- | -------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | --------------------------------------- |
+| Avatar  | `windows/avatar.ts`  | 96 x 96 (`AVATAR_SIZE`), transparent, frameless, always on top (`floating`), `skipTaskbar`, not resizable           | once, at start                       | at creation, unless `hidden` (Welcome)  |
+| Panel   | `windows/panel.ts`   | 420 wide (`PANEL_WIDTH`), 180 high to start (`BUBBLE_HEIGHT`), transparent, frameless, always on top, `skipTaskbar` | once, at start                       | `showPanelBeside` or `showPanelQuietly` |
+| Home    | `windows/home.ts`    | framed, 1440 x 800 content, min 880 (`HOME_MIN_WIDTH`) x 600, centred, titled "Home", no menu bar                   | on `openHome`, again after it closes | `ready-to-show`                         |
+| Welcome | `windows/welcome.ts` | framed, 900 x 620 content, centred on the display under the cursor, "Set up Tagalong"                               | `openWelcome`                        | `ready-to-show`                         |
 
 Rules each module enforces:
 
@@ -165,12 +148,8 @@ Rules each module enforces:
   scale.
 - **Home.** Escape closes it. `openHome(page?)` focuses an open one and sends
   `IPC.homePageEvent` with the page; a new one gets the page on `did-finish-load`.
-- **Settings.** `openSettingsPage(target)` opens this window only when `host === null` (Home
-  needs the engine); otherwise it opens Home on `fixPage(target)`.
+- **Settings.** `openSettingsPage(target)` opens Home on `fixPage(target)`.
 - **Welcome.** Escape closes it. See [First run (Welcome)](#first-run-welcome).
-- **Pointer.** `PointerOverlay` shows one ring at a time for `POINTER_MS` (6,000 ms), registers
-  `Escape` as a global shortcut only while a ring shows, hides on the next turn, and destroys a
-  display's window on `display-removed` or `display-metrics-changed`. It only draws.
 - **Navigation.** The avatar and panel call `guardNavigation`, which cancels every `will-navigate`,
   so a dropped file never opens in the window.
 
@@ -269,7 +248,7 @@ all failed, "Pick different combinations in Settings, or use the tray." The mess
 - is stored as `hotkeyError` and logged with `console.error`;
 - is broadcast on `IPC.hotkeyProblemEvent` (null once fixed) to every window;
 - is returned in `HostView.hotkeyError` by `IPC.hostView`, for a window opened later (the same
-  field carries `bootError` when there is no hotkey problem);
+  field carries no other error);
 - shows in the panel as a `role="status"` line with **Open Settings**
   (`data-testid="hotkey-problem"`).
 
@@ -281,7 +260,7 @@ which is how a rebind takes effect without a restart.
 ### Settings applied live
 
 `registerSettingsIpc`'s `save(patch, byTalk)` is the one save path for Settings, Home, Welcome and
-the bubble's settings card. After the engine (or, with no engine, `SettingsStore`) saves, it:
+the bubble's settings card. After `SettingsStore` saves, it:
 
 - stores the result as `desktop.settings`;
 - calls `applyHotkeys` when the patch has `hotkeys`;
@@ -298,8 +277,8 @@ and the settings card's checks are in [settings-and-secrets.md](settings-and-sec
 Each module in `src/main/ipc/` exports `register…Ipc(handle, deps)`. `handle` is
 `ipcMain.handle` in the app and a recording fake in tests (`fake-ipc.ts`), and `deps` carries
 only what the module reads, so every module is tested without Electron. `deps.engine()` throws
-"the engine is not running" (or the boot error) when there is no engine; `maybeEngine()` returns
-null instead.
+"Scout cannot do that yet on the new brain." for the calls that have no brain equivalent yet;
+`maybeEngine()` returns null instead. `ask` and `interrupt` use the brain client directly.
 
 | Module              | Channels (`IPC.<key>`: `tagalong:…`)                                                                                                                                                                                                                                                                                                 | Engine calls / notes                                                                                                                                                       |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -320,9 +299,8 @@ null instead.
 | `handle.ts`         | none                                                                                                                                                                                                                                                                                                                                 | `IpcHandle`, `IpcOn`, `IpcListener`, `EngineCall`                                                                                                                          |
 | `fake-ipc.ts`       | none                                                                                                                                                                                                                                                                                                                                 | The recording `handle` the module tests use                                                                                                                                |
 
-`HostView` (`IPC.hostView`) is what every window reads on open: `settings`, `pets` (empty with no
-engine), `providers` (`ProviderChoice[]`, with `hasKey` and never the key), `engineVersion`,
-`pairingToken` (only while the engine runs), `hotkeyError`, `platform` (`process.platform`) and
+`HostView` (`IPC.hostView`) is what every window reads on open: `settings`, `pets` (the fixed local Scout), `providers` (`ProviderChoice[]`, with `hasKey` and never the key), `engineVersion`,
+`hotkeyError`, `platform` (`process.platform`) and
 `elevenLabsKeyStored`.
 
 Channels handled directly in `index.ts`, because they need Electron itself (windows, dialogs, the
@@ -349,7 +327,7 @@ Events main sends to renderers (no answer): `turnEvent`, `contextEvent`, `captur
 `statusMarkEvent`, `listeningEvent`, `homePageEvent`, `routineEvent`, `routineDraftEvent`,
 `greetEvent`, `greetLineEvent`, `remarkEvent`, `panelSideEvent`, `dropEvent`, `stopVoiceEvent`,
 `talkEvent`, `talkReleaseEvent`, `talkCancelEvent`, `earsEvent`, `earsStatusEvent`,
-`earsProgressEvent` and `pointerShow`.
+`earsProgressEvent` and `pointerShow` (no longer sent).
 
 Three handlers check the sender with `fromWindow(window)`, which compares `event.sender` (set by
 Electron in main, so a page cannot forge it) with that window's `webContents`: `copyText` and
@@ -455,6 +433,9 @@ Review rule for call sites: never put speech, screen or file text in a warning's
 
 ### First run (Welcome)
 
+On the brain, `shouldOpenWelcome` always returns false: Welcome never opens and `finishWelcome` throws. The
+code below is kept for when the brain brings first run back.
+
 `shouldOpenWelcome(settings, env)` is true while `settings.welcome.done` is false, unless
 `TAGALONG_SKIP_WELCOME=1` (the end-to-end suites). Then the avatar is created hidden and
 `scoutWaits` is set; Scout appears when Welcome finishes, or when its window closes without
@@ -514,7 +495,7 @@ releaseNotes: '', welcomed: true }`. The bubble's Try it invite is in
   `pauseListening({ setupOpen: true })` (cleared on close), so Always listening never shares the
   voice process with setup's ears.
 
-**Later launches.** `greetOnLaunch` runs when `shouldGreetOnLaunch(settings)` (Welcome done and
+**Later launches.** (Not started on the brain: the launch greeting returns with the brain's check-in.) `greetOnLaunch` runs when `shouldGreetOnLaunch(settings)` (Welcome done and
 `settings.greeting` on). It first checks `brainReadiness` with the sign-in check limited to
 `SIGN_IN_BUDGET_MS` (1,000 ms; a slow or failed check reads `unknown`, never a problem). When Scout
 cannot think, `brainStatus` sets a brain mark in `StatusMarks` and `brainLine` sends
@@ -598,19 +579,16 @@ app on a new temporary `--user-data-dir`, so Welcome shows without touching real
 
 ## Interfaces
 
-- `Desktop` (`index.ts`): `host`, `bootError`, `platform`, `settingsStore`, `previousLaunch`,
-  `settings`, `secrets`, `avatar`, `panel`, `tray`, `settingsWindow`, `welcomeWindow`,
+- `Desktop` (`index.ts`): `brain`, `platform`, `settingsStore`, `previousLaunch`,
+  `settings`, `secrets`, `avatar`, `panel`, `tray`, `welcomeWindow`,
   `scoutWaits`, `homeWindow`, `pendingSnapshot`, `activeTurns`, `hotkeys`, `hotkeyError`,
   `talkKey`, `talkKeyError`, `sightPause`, `rolling`, `perceptionMemory`, `voice`, `voiceWorker`,
   `listening`, `statusMarks`.
-- `EngineHost { engine, client, shutdown }`; `StartEngineHostOptions { dataDir, secrets, platform,
-onNotification, captureExclusions, onCapture, recall, diff, showRing }`.
-- `EngineClient.call(method, params)`, typed by the protocol catalog; `EngineNotification
-{ method, params }`.
+- `startBrain({ onNotification, onStatus, onResync, env?, openSocket? })` returns the `BrainClient`.
 - `HotkeyBindings { ask, pauseSight, stopVoice }`, `HotkeyOutcome`, `HotkeyAction`
   (`ask | pauseSight | stopVoice | talk`), `HotkeyRegistrar` (the test seam over `globalShortcut`).
 - `IPC`, `HostView`, `TagalongHostApi`, `GreetLine` (`{ text, pickUp? } | { status }`),
-  `CaptureNotice`, `SpeakResult`, `ListeningState`, `PointerRing`, `PetDrop`, `ProviderChoice`,
+  `CaptureNotice`, `SpeakResult`, `ListeningState`, `PetDrop`, `ProviderChoice`,
   `ClaudeSignIn`, `VoiceModels`, `FoundAgent`, `ModelList` (`shared/ipc.ts`).
 - `Platform`, `WindowInventory`, `ActiveWindowInfo`, `CapturedImage` (`platform/index.ts`).
 
@@ -618,7 +596,6 @@ onNotification, captureExclusions, onCapture, recall, diff, showRing }`.
 
 | Constant                            | Value                          | Where                               |
 | ----------------------------------- | ------------------------------ | ----------------------------------- |
-| `CALL_TIMEOUT_MS`                   | 30,000 ms per engine call      | `engine-client.ts`                  |
 | `AVATAR_SIZE`, `AVATAR_EDGE_MARGIN` | 96 px, 16 px                   | `windows/position.ts`               |
 | `PANEL_WIDTH`, `PANEL_HEIGHT`       | 420 px, 520 px                 | `windows/panel.ts`                  |
 | `BUBBLE_HEIGHT`                     | 180 px (first height)          | `windows/panel.ts`                  |
@@ -626,7 +603,6 @@ onNotification, captureExclusions, onCapture, recall, diff, showRing }`.
 | Blur settle delay                   | 60 ms                          | `windows/panel.ts`                  |
 | `HOME_MIN_WIDTH`                    | 880 px (Home min height 600)   | `windows/home.ts`                   |
 | Welcome size                        | 900 x 620                      | `windows/welcome.ts`                |
-| `POINTER_MS`                        | 6,000 ms                       | `windows/pointer.ts`                |
 | `DEFAULT_PAUSE_SIGHT_HOTKEY`        | `CommandOrControl+Shift+Alt+P` | `hotkeys.ts`                        |
 | `DEFAULT_STOP_VOICE_HOTKEY`         | `CommandOrControl+Shift+Alt+M` | `hotkeys.ts`                        |
 | Default ask hotkey                  | `CommandOrControl+Shift+Space` | `packages/protocol/src/settings.ts` |
@@ -644,7 +620,7 @@ onNotification, captureExclusions, onCapture, recall, diff, showRing }`.
 The desktop host writes:
 
 - `<userData>/logs/tagalong.log` and `tagalong.1.log` (warnings and errors only).
-- Settings through the engine's `settings.set` or, with no engine, `SettingsStore`
+- Settings through `SettingsStore`
   (`settings.json` in `userData`): the avatar position, `lastOpenedAt`, the launch record, the
   Welcome record. See [settings-and-secrets.md](settings-and-secrets.md).
 - Keys through `SafeStorageSecretStore`. See [settings-and-secrets.md](settings-and-secrets.md).
@@ -653,21 +629,20 @@ The desktop host writes:
 
 Everything else main holds (`pendingSnapshot`, the dropped item, rolling memory, status marks) is
 in memory and gone on quit. `before-quit` disposes the hotkeys, the talk key hook, the voice
-worker, the keep-an-eye, listening-guard, presence and wellbeing timers and the pointer overlay,
-drops rolling memory and perception memory, records the clean close and shuts the engine down.
+worker, the listening-guard and presence timers, drops rolling memory and perception memory, records
+the clean close and stops the brain client.
 
 ## Failure handling
 
-- **Engine fails to boot.** `bootError` is kept and logged. The app does not quit: it opens the
-  standalone Settings window and an error box ("… Settings is open so you can fix it. Restart
-  Tagalong afterwards."). No avatar, panel, hotkeys or talk key exist in this mode. Settings reads
-  and writes fall back to `SettingsStore`, `hostView` returns no pets and no pairing token,
-  `checkKey` answers "Tagalong’s engine isn’t running, so the key couldn’t be tested.",
-  `listModels` answers `{ models: [], source: 'fallback' }`, and every engine-backed channel throws
-  the boot error.
+- **The brain is not running.** The app opens anyway and the client retries every 2 s. The
+  `brain-offline` status mark shows "Scout's brain is not running." and an ask throws the same
+  sentence. When the brain comes up the mark clears and the next ask works, without restarting the
+  app.
+- **The brain restarts mid-turn.** The socket drops, the offline mark shows, and on reconnect the
+  open turn is ended as failed. Ask again.
+- **The brain speaks another contract version.** The `brain-outdated` mark shows "Update Tagalong
+  to talk to this brain."
 - **`start` itself throws.** "Tagalong could not start" error box, then quit.
-- **An engine call stalls.** Rejected after 30 s; a closed socket rejects every pending call
-  with "the engine connection closed".
 - **A hotkey cannot be registered.** Reported, never fatal (see
   [The hotkey-problem path](#global-hotkeys)). The key hook failing to start reports the talk key
   the same way.
@@ -684,29 +659,28 @@ drops rolling memory and perception memory, records the clean close and shuts th
 
 ## Privacy notes
 
-Main holds the one engine connection, so the pairing token never reaches a window. Every capture
+Main holds the one brain connection, so the brain's address never needs to reach a window. Every capture
 is announced on the avatar and in the tray tooltip. The log file keeps only kept text with secrets
 hidden. The clipboard is only written, never read. A dropped item is named on drop and read only
 when a button on its card asks. See [privacy.md](privacy.md).
 
 ## Tests that pin it
 
-| Test                                                                                       | Pins                                                                                                                                                                                                                                             |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/main/hotkeys.test.ts`                                                                 | registration outcomes, defaults that do not collide, rebind without restart, one refusal costs one action, retry, dispose, the talk key is never a global shortcut, the problem message                                                          |
-| `e2e/hotkey-recovery.spec.ts`                                                              | the app starts with an unregisterable accelerator, the message names it, the panel shows it, the rest still work                                                                                                                                 |
-| `e2e/smoke.spec.ts`                                                                        | launch with avatar and panel, click opens and keeps the bubble, a rebound hotkey applies on save, sight pause refuses a real capture, a tool call over the real socket, Home is one window, setup opens                                          |
-| `src/main/windows/position.test.ts`                                                        | docking, a remembered position, clamping after a layout change, panel side and clamp, `crossesScale`                                                                                                                                             |
-| `src/main/windows/bubble-focus.test.ts`                                                    | `hidesOnBlur`: other app hides; streaming, the pet, or focus back keeps it                                                                                                                                                                       |
-| `src/main/windows/home.test.ts`                                                            | `HOME_MIN_WIDTH`                                                                                                                                                                                                                                 |
-| `src/main/windows/pointer.test.ts`, `pointer-electron.test.ts`                             | one window per display, click-through and content protection, one ring, 6 s, Esc only while shown, display removal                                                                                                                               |
-| `src/main/tray-menu.test.ts`                                                               | four items, the Pause sight check, each item's action                                                                                                                                                                                            |
-| `src/main/ipc/*.test.ts`                                                                   | each module's channels and engine calls; `settings.test.ts` the degraded mode, live rebinding, the card's sender check and re-check; `clipboard.test.ts` the 20,000 limit and sender check; `apply-settings.test.ts` listening never switched on |
-| `src/main/log-file.test.ts`                                                                | line format, kept text, hidden keys, 300 characters, rotation at 1 MB, never throws                                                                                                                                                              |
-| `src/main/welcome.test.ts`, `src/renderer/src/first-run*.test.ts`, `setup-ears.test.ts`    | finding agents, when Welcome opens and greets, `companionOn`; the step machine, matching, lines, when setup listens, one save at a time                                                                                                          |
-| `e2e/first-run.spec.ts`                                                                    | setup alone, resume after close, chips, typed answers, saved answers, key tested once                                                                                                                                                            |
-| `e2e/launch-greeting.spec.ts`                                                              | the brain mark with Fix it, the clean close record, the mind's launch line, the pick-up card                                                                                                                                                     |
-| `src/main/launch.test.ts`, `claude-sign-in.test.ts`, `links.test.ts`, `fix-target.test.ts` | the launch record and brain readiness; sign-in parsing and fakes; the link allowlist; Fix it targets                                                                                                                                             |
-| `src/preload/held.test.ts`                                                                 | `heldUntilHeard`                                                                                                                                                                                                                                 |
-| `src/main/platform/index.test.ts`                                                          | `createPlatform` builds win32 and throws elsewhere                                                                                                                                                                                               |
-| `src/main/packaging.test.ts`, `app-identity.test.ts`                                       | the installer config, unpack rules, runtime dependencies, `uiohook-napi` in `NATIVE_DEPS`, the one-command Windows build; `productName`                                                                                                          |
+| Test                                                                                       | Pins                                                                                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main/hotkeys.test.ts`                                                                 | registration outcomes, defaults that do not collide, rebind without restart, one refusal costs one action, retry, dispose, the talk key is never a global shortcut, the problem message                                                       |
+| `e2e/hotkey-recovery.spec.ts`                                                              | the app starts with an unregisterable accelerator, the message names it, the panel shows it, the rest still work                                                                                                                              |
+| `e2e/smoke.spec.ts`                                                                        | launch with avatar and panel, click opens and keeps the bubble, a rebound hotkey applies on save, sight pause refuses a real capture, a tool call over the real socket, Home is one window, setup opens                                       |
+| `src/main/windows/position.test.ts`                                                        | docking, a remembered position, clamping after a layout change, panel side and clamp, `crossesScale`                                                                                                                                          |
+| `src/main/windows/bubble-focus.test.ts`                                                    | `hidesOnBlur`: other app hides; streaming, the pet, or focus back keeps it                                                                                                                                                                    |
+| `src/main/windows/home.test.ts`                                                            | `HOME_MIN_WIDTH`                                                                                                                                                                                                                              |
+| `src/main/tray-menu.test.ts`                                                               | four items, the Pause sight check, each item's action                                                                                                                                                                                         |
+| `src/main/ipc/*.test.ts`                                                                   | each module's channels and brain calls; `settings.test.ts` the local store, live rebinding, the card's sender check and re-check; `clipboard.test.ts` the 20,000 limit and sender check; `apply-settings.test.ts` listening never switched on |
+| `src/main/log-file.test.ts`                                                                | line format, kept text, hidden keys, 300 characters, rotation at 1 MB, never throws                                                                                                                                                           |
+| `src/main/welcome.test.ts`, `src/renderer/src/first-run*.test.ts`, `setup-ears.test.ts`    | finding agents, when Welcome opens and greets, `companionOn`; the step machine, matching, lines, when setup listens, one save at a time                                                                                                       |
+| `e2e/first-run.spec.ts`                                                                    | setup alone, resume after close, chips, typed answers, saved answers, key tested once                                                                                                                                                         |
+| `e2e/launch-greeting.spec.ts`                                                              | the brain mark with Fix it, the clean close record, the mind's launch line, the pick-up card                                                                                                                                                  |
+| `src/main/launch.test.ts`, `claude-sign-in.test.ts`, `links.test.ts`, `fix-target.test.ts` | the launch record and brain readiness; sign-in parsing and fakes; the link allowlist; Fix it targets                                                                                                                                          |
+| `src/preload/held.test.ts`                                                                 | `heldUntilHeard`                                                                                                                                                                                                                              |
+| `src/main/platform/index.test.ts`                                                          | `createPlatform` builds win32 and throws elsewhere                                                                                                                                                                                            |
+| `src/main/packaging.test.ts`, `app-identity.test.ts`                                       | the installer config, unpack rules, runtime dependencies, `uiohook-napi` in `NATIVE_DEPS`, the one-command Windows build; `productName`                                                                                                       |

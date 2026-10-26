@@ -15,9 +15,9 @@ never knows which operating system or which host it is serving.
 
 A host is a thin shell around the engine. It perceives (selection, windows, screenshots, page
 text) and presents (the figure, the bubble, the voice). A host reaches the engine only through the
-JSON-RPC protocol in `packages/protocol`, over a loopback WebSocket. The desktop app runs the engine
-in its own main process and still dials it over the socket (`bodies/desktop/src/main/engine-host.ts`,
-`startEngineHost`), so it cannot come to depend on anything the Chrome host does not have.
+JSON-RPC protocol in `packages/protocol`, over a loopback WebSocket. The desktop app no longer
+runs the engine: its main process dials the Python brain instead (`bodies/desktop/src/main/brain/start.ts`, `startBrain`; start it with
+`cd brain && uv run brain`). The Chrome extension still uses the engine for now.
 
 Speech is the one capability that lives in a host rather than the core: the speech-to-text and
 text-to-speech models are native ONNX runtimes, which the pure core must not load. The core only
@@ -29,9 +29,8 @@ learns that an ask was spoken (`ask`'s `spoken: true`).
 %%{init: {"theme": "base", "themeVariables": {"primaryColor": "#ffffff", "primaryTextColor": "#000000", "primaryBorderColor": "#000000", "lineColor": "#808080", "secondaryColor": "#f2f2f2", "tertiaryColor": "#ffffff", "clusterBkg": "#f7f7f7", "clusterBorder": "#808080", "edgeLabelBackground": "#ffffff", "titleColor": "#808080", "fontFamily": "Segoe UI, Helvetica, Arial, sans-serif"}}}%%
 flowchart LR
   subgraph Electron["Tagalong desktop app"]
-    R["Renderer windows<br>avatar, panel, home,<br>settings, welcome, pointer"]
-    M["Electron main<br>EngineClient, platform,<br>tray, hotkeys, talk key"]
-    E["Engine<br>packages/core, in main"]
+    R["Renderer windows<br>avatar, panel, home,<br>welcome"]
+    M["Electron main<br>BrainClient, platform,<br>tray, hotkeys, talk key"]
     V["Voice utility process<br>Kokoro, local ears"]
   end
   subgraph Chrome["Chrome"]
@@ -39,25 +38,28 @@ flowchart LR
     SP["Side panel"]
     CS["Content script<br>page reader"]
   end
+  P["Python brain<br>brain/, started by hand"]
+  E["Engine (extension only)<br>packages/core"]
   X["Model providers,<br>Claude Code, MCP servers,<br>ElevenLabs"]
   R -- "IPC via preload" --> M
-  M -- "ws://127.0.0.1:47321" --> E
+  M -- "ws://127.0.0.1:47321" --> P
   M -- "parentPort messages" --> V
   SW -- "ws://127.0.0.1:47321" --> E
   SP -- "runtime port" --> SW
   CS -- "page text" --> SW
   E --> X
+  P --> X
   M -- "ElevenLabs TTS" --> X
 ```
 
-| Process                  | Entry point                                    | What runs there                                                                                                                                                                               |
-| ------------------------ | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Electron main            | `bodies/desktop/src/main/index.ts`             | The engine (`Engine.boot`), the desktop `EngineClient`, the platform adapter (window list, captures, OCR, selection), tray, global shortcuts, the talk key hook, IPC handlers, rolling memory |
-| Renderer windows         | `bodies/desktop/src/renderer/*.html`           | One page per window: `avatar`, `panel` (the bubble), `home`, `settings`, `welcome`, `pointer` (`RendererPage` in `main/windows/page.ts`). Sandboxed, context-isolated, no Node                |
-| Voice utility process    | `bodies/desktop/src/main/voice/worker/main.ts` | Kokoro text to speech and the local ears (speech to text, turn detection), started by `utilityProcess.fork` as `voice-worker.js` (`VoiceWorker` in `voice/worker/client.ts`)                  |
-| Extension service worker | `apps/extension/src/service-worker.ts`         | The extension's one socket to the engine (`EngineConnection`), answers `perception.capture` for the active tab                                                                                |
-| Extension side panel     | `apps/extension/src/sidepanel/main.tsx`        | Scout in Chrome's side panel, talking to the service worker over a runtime port (`port-bridge.ts`, `port-hub.ts`)                                                                             |
-| Extension content script | `apps/extension/src/content/page-reader.ts`    | Reads the page's readable text on request (Readability)                                                                                                                                       |
+| Process                  | Entry point                                    | What runs there                                                                                                                                                                        |
+| ------------------------ | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Electron main            | `bodies/desktop/src/main/index.ts`             | The desktop `BrainClient` (to the Python brain), the platform adapter (window list, captures, OCR, selection), tray, global shortcuts, the talk key hook, IPC handlers, rolling memory |
+| Renderer windows         | `bodies/desktop/src/renderer/*.html`           | One page per window: `avatar`, `panel` (the bubble), `home`, `welcome` (`RendererPage` in `main/windows/page.ts`). Sandboxed, context-isolated, no Node                                |
+| Voice utility process    | `bodies/desktop/src/main/voice/worker/main.ts` | Kokoro text to speech and the local ears (speech to text, turn detection), started by `utilityProcess.fork` as `voice-worker.js` (`VoiceWorker` in `voice/worker/client.ts`)           |
+| Extension service worker | `apps/extension/src/service-worker.ts`         | The extension's one socket to the engine (`EngineConnection`), answers `perception.capture` for the active tab                                                                         |
+| Extension side panel     | `apps/extension/src/sidepanel/main.tsx`        | Scout in Chrome's side panel, talking to the service worker over a runtime port (`port-bridge.ts`, `port-hub.ts`)                                                                      |
+| Extension content script | `apps/extension/src/content/page-reader.ts`    | Reads the page's readable text on request (Readability)                                                                                                                                |
 
 How they connect:
 
@@ -65,8 +67,8 @@ How they connect:
   exposes `window.tagalong` and `window.tagalongHost` through `contextBridge`; channel names live in
   `bodies/desktop/src/shared/ipc.ts`. Handlers live in `bodies/desktop/src/main/ipc/` and in
   `main/index.ts` for the ones that need Electron itself. No renderer opens the socket.
-- **Main to engine.** `EngineClient` (`main/engine-client.ts`) dials the loopback socket with the
-  pairing token read straight from the engine (`engine.pairingToken`). Engine notifications are
+- **Main to brain.** `BrainClient` dials `ws://${TAGALONG_BRAIN_ADDR}` (default 127.0.0.1:47321) and
+  retries every 2 s. There is no pairing token. Brain notifications are mapped to turn events and
   forwarded to every window as `IPC.turnEvent` by `forwardToRenderers` in `main/index.ts`.
 - **Main to voice process.** Numbered `call` messages and plain events over the utility
   process's `parentPort` (`voice/worker/messages.ts`). The process starts on first need; if it
