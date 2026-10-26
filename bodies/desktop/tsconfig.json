@@ -23,6 +23,7 @@
   "include": ["src/**/*", "src/renderer/src/bean/manifest.json"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"],
   "references": [
+    { "path": "../../protocol/ts" },
     { "path": "../../packages/protocol" },
     { "path": "../../packages/core" },
     { "path": "../ui" }
