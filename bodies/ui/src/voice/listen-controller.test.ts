@@ -497,6 +497,18 @@ describe('ListenController, always', () => {
     expect(controller.earsFailed()).toBeNull();
   });
 
+  it('the talk key listens again after the ears failed mid-question', async () => {
+    const { controller, ears, openMic } = setup();
+    controller.hold();
+    await tick();
+    expect(controller.earsFailed()).toBe('held');
+    controller.hold();
+    await tick();
+    expect(controller.mode).toBe('held');
+    expect(openMic).toHaveBeenCalledTimes(2);
+    expect(ears.made[1]?.ears.listening).not.toBeNull();
+  });
+
   it('still lets the talk key work during a call, and does not reopen afterwards on its own', async () => {
     const { controller, openMic } = setup();
     controller.setAlways(true);
