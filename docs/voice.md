@@ -693,6 +693,7 @@ process exits. In the voice process:
   `{ text, model_id: 'eleven_flash_v2_5', voice_settings: { speed } }`.
 - The speed is clamped to `MIN_VOICE_SPEED`–`MAX_ELEVENLABS_SPEED` (0.7–1.2), ElevenLabs' own bounds. The
   settings slider matches: with ElevenLabs chosen it stops at 1.2 and shows a higher saved speed as 1.2.
+  Saving with ElevenLabs chosen stores the capped speed, which every voice then uses.
 - The request is aborted after `ELEVENLABS_TIMEOUT_MS` (15 s), audio included.
 - A non-OK status throws, so the line falls to Kokoro.
 - Only the line is sent.

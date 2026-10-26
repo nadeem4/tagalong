@@ -1,4 +1,7 @@
-/** Tests for the Voice section's speed slider: ElevenLabs tops out at 1.2, the others at 1.3. */
+/**
+ * Tests for the Voice section's speed slider: ElevenLabs tops out at 1.2, the others at 1.3.
+ * Static render only (no DOM in this suite); switching voices live is a manual check.
+ */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { SETTINGS_DEFAULTS } from '@tagalong/protocol';
