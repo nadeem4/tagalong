@@ -10,17 +10,21 @@ import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 // Imported only for the `declare global` it carries: it types `window.tagalongHost` below.
 import type {} from '../src/shared/ipc';
+import { startFakeBrain, type FakeBrain } from './fixtures/fake-brain';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 let app: ElectronApplication;
+let brain: FakeBrain;
 
 test.beforeAll(async () => {
+  brain = await startFakeBrain();
   app = await electron.launch({
     // A fresh profile: Always listening is off at launch, as on a new install.
     args: ['.', `--user-data-dir=${mkdtempSync(join(tmpdir(), 'tagalong-listening-'))}`],
     cwd: appDir,
     env: {
       ...process.env,
+      TAGALONG_BRAIN_ADDR: brain.addr,
       TAGALONG_FAKE_PROVIDERS: '1',
       TAGALONG_FAKE_TTS: '1',
       TAGALONG_FAKE_STT: '1',
@@ -29,7 +33,10 @@ test.beforeAll(async () => {
   });
 });
 
-test.afterAll(async () => app.close());
+test.afterAll(async () => {
+  await app.close();
+  await brain.close();
+});
 
 async function windowFor(name: string): Promise<Page> {
   for (let attempt = 0; attempt < 60; attempt += 1) {
@@ -61,7 +68,7 @@ test('Always listening: off at launch, on only when switched, Scout hears and an
   await expect(panel.getByText(/what am I looking at\?/i).first()).toBeVisible({
     timeout: 30_000,
   });
-  await expect(panel.getByText(/This is the fake pet/)).toBeVisible({ timeout: 30_000 });
+  await expect(panel.getByText(/This is the fake brain/)).toBeVisible({ timeout: 30_000 });
 
   await panel.getByRole('switch', { name: 'Always listening' }).click();
   await expect(avatar.getByTestId('listening-mark')).toHaveCount(0);

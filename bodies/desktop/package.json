@@ -38,6 +38,7 @@
     "@types/cross-spawn": "6.0.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "@types/ws": "8.18.1",
     "@vitejs/plugin-react": "6.1.1",
     "cross-spawn": "7.0.6",
     "electron": "44.3.0",
@@ -45,7 +46,8 @@
     "electron-vite": "5.0.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "vite": "^7.3.6"
+    "vite": "^7.3.6",
+    "ws": "8.21.3"
   },
   "description": "Tagalong: Scout, an AI companion that sees what you are working on and hands work to experts.",
   "author": "Tagalong"

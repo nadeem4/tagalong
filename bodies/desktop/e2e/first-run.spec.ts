@@ -12,6 +12,8 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import { stripLoaded } from './bean-strip';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
+test.skip(true, 'returns with row 13: first-run setup (old Welcome is deleted with core)');
+
 const ENGINE = { timeout: 30_000 };
 
 function launch(dataDir: string, signIn: string): Promise<ElectronApplication> {

@@ -12,6 +12,11 @@ import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
+test.skip(
+  true,
+  'returns with row 6: the launch greeting and sign-in mark (memory and the brain check-in)',
+);
+
 let app: ElectronApplication;
 let dataDir: string;
 

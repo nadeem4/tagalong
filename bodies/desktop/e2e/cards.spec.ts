@@ -74,6 +74,7 @@ async function activity(app: ElectronApplication): Promise<Page> {
 }
 
 test.describe('the hand-off card', () => {
+  test.skip(true, 'returns with row 8: the hand-off card');
   let app: ElectronApplication;
   let dataDir: string;
   const project = mkdtempSync(join(tmpdir(), 'tagalong-project-'));
@@ -151,6 +152,7 @@ test.describe('the hand-off card', () => {
 });
 
 test.describe('the connector confirm card', () => {
+  test.skip(true, 'returns with row 9: the connector confirm card');
   let app: ElectronApplication;
   let dataDir: string;
   const notes = join(mkdtempSync(join(tmpdir(), 'tagalong-notes-')), 'notes.txt');
@@ -256,6 +258,7 @@ test.describe('the connector confirm card', () => {
 });
 
 test.describe('the routine card', () => {
+  test.skip(true, 'returns with row 10: the routine card');
   let app: ElectronApplication;
   let dataDir: string;
 

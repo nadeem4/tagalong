@@ -92,9 +92,10 @@ tagalong/
       scripts/ensure-electron.mjs   # fetches the Electron binary
       scripts/fetch-native.mjs      # fetches get-windows' prebuilt binding before packaging
       scripts/start-fresh.mjs       # runs the app on a new temp data folder
-      e2e/                          # smoke, first-run, launch-greeting, hotkey-recovery, listening
+      e2e/                          # smoke, brain-offline, first-run, launch-greeting, hotkey-recovery, listening
                                     # (Always listening) and cards.spec.ts (the hand-off, connector
                                     # confirm and routine cards)
+      e2e/fixtures/fake-brain.ts    # a ws server speaking contract v1, for smoke and listening
       e2e/fixtures/notes-mcp.mjs    # a tiny stdio MCP server with one write tool, for cards.spec.ts
       src/main/                     # index.ts, engine-host.ts, engine-client.ts, context.ts,
                                     # hotkeys.ts, talk-key.ts, always-listening.ts, secret-store.ts,
@@ -277,21 +278,23 @@ runs somewhere.
 
 ### End-to-end tests and fakes
 
-The `e2e` CI job runs the Electron end-to-end suites. `bodies/desktop/e2e/` holds six Playwright suites
+The `e2e` CI job runs the Electron end-to-end suites. `bodies/desktop/e2e/` holds seven Playwright suites
 that launch the built app: `smoke.spec.ts` (the bubble, talking, capture, pause, hotkeys, Welcome on
 request, Home),
 `first-run.spec.ts` (Welcome and Scout's intro on an empty data folder), `launch-greeting.spec.ts`
 (the launch across launches on one profile), `hotkey-recovery.spec.ts`
 (a key another app owns), `listening.spec.ts` (Always listening: off at launch, switched on, a turn
-that starts with "Scout" is heard and answered, switched off) and `cards.spec.ts`. Run them with `pnpm --filter @tagalong/desktop
+that starts with "Scout" is heard and answered, switched off) and `cards.spec.ts`, plus `brain-offline.spec.ts`. Run them with `pnpm --filter @tagalong/desktop
 test:e2e`.
 
-The suites run offline on fakes: `TAGALONG_FAKE_PROVIDERS=1` (a scripted brain and a scripted expert),
-`TAGALONG_FAKE_TTS=1`, `TAGALONG_FAKE_STT=1`, `TAGALONG_FAKE_SIGN_IN` (the Claude Code sign-in check reads as the state it names), and `TAGALONG_FAKE_TOOL` with `TAGALONG_FAKE_TOOL_INPUT`,
-which make the fake brain call one tool before it answers. `cards.spec.ts` uses the last pair to bring
-up each card: `hand_to_expert`, a connected app's `notes__add_note`, and `create_routine`. Each card
-gets its own launch, since the tool is read once at start. The native folder picker is stubbed
-through `app.evaluate`, so the hand-off card's Browse picks a temporary folder. When an e2e suite
+The suites run offline on fakes. The desktop answers turns only through a brain, so `smoke.spec.ts` and
+`listening.spec.ts` start `e2e/fixtures/fake-brain.ts`, a `ws` server that speaks contract v1 (it answers
+`hello`, then every `say` with one scripted reply), and pass its address as `TAGALONG_BRAIN_ADDR`.
+`brain-offline.spec.ts` points the app at a port nothing listens on and expects the offline mark. Other fakes:
+`TAGALONG_FAKE_TTS=1`, `TAGALONG_FAKE_STT=1`. Specs for features the new brain has not rebuilt yet are
+`test.skip` with a reason of the form `returns with row N: <feature>` (the Launch board row that brings
+the feature back): the tool-call round trip, the Experts page, `cards.spec.ts`, `first-run.spec.ts` and
+`launch-greeting.spec.ts`. When an e2e suite
 fails in CI, its `test-results` folder (page snapshots and screenshots) is uploaded as the
 `e2e-test-results` artifact.
 
