@@ -1,12 +1,13 @@
 /**
  * The status marks main holds for every window: a plain map of marks, the top one by the shared
  * order, and an optional time limit per mark. No I/O; main broadcasts each change. Contains
- * StatusMarks, markListening, setPanelMark and clearBrainMarks.
+ * StatusMarks, markListening, setPanelMark, clearBrainMarks and markBrainLink.
  */
 
 import { topStatus } from '@tagalong/protocol';
 import type { StatusId, StatusMark } from '@tagalong/protocol';
 import type { AlwaysListening } from './always-listening';
+import type { BrainStatus } from './brain/brain-client';
 
 export class StatusMarks {
   readonly #marks = new Map<StatusId, StatusMark>();
@@ -102,4 +103,13 @@ export function clearBrainMarks(marks: StatusMarks): void {
   marks.clear('brain-signed-out');
   marks.clear('brain-no-sign-in');
   marks.clear('brain-no-key');
+}
+
+/** Whether the brain can be reached: Offline while it is down, Update when it is too new. */
+export function markBrainLink(marks: StatusMarks, status: BrainStatus): void {
+  if (status === 'connecting') return;
+  if (status === 'offline') marks.set({ id: 'brain-offline' });
+  else marks.clear('brain-offline');
+  if (status === 'outdated') marks.set({ id: 'brain-outdated' });
+  else marks.clear('brain-outdated');
 }

@@ -8,6 +8,7 @@ import {
   SAY_NAME_MARK_MS,
   StatusMarks,
   clearBrainMarks,
+  markBrainLink,
   markListening,
   setPanelMark,
 } from './status-marks';
@@ -148,5 +149,26 @@ describe('clearBrainMarks', () => {
     marks.set({ id: 'listening-on' });
     clearBrainMarks(marks);
     expect(marks.top()).toEqual({ id: 'listening-on' });
+  });
+});
+
+describe('markBrainLink', () => {
+  it('shows Offline while the brain is down, and nothing once it is online', () => {
+    const marks = new StatusMarks();
+    markBrainLink(marks, 'offline');
+    expect(marks.top()).toEqual({ id: 'brain-offline' });
+    markBrainLink(marks, 'connecting');
+    expect(marks.top()).toEqual({ id: 'brain-offline' });
+    markBrainLink(marks, 'online');
+    expect(marks.top()).toBeNull();
+  });
+
+  it('swaps Offline for the update mark when the brain is too new', () => {
+    const marks = new StatusMarks();
+    markBrainLink(marks, 'offline');
+    markBrainLink(marks, 'outdated');
+    expect(marks.top()).toEqual({ id: 'brain-outdated' });
+    markBrainLink(marks, 'online');
+    expect(marks.top()).toBeNull();
   });
 });
