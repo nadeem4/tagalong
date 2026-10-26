@@ -180,6 +180,8 @@ export type VoiceId = (typeof VOICE_IDS)[number];
 /** Bounds on the speaking speed. Outside them speech stops sounding like speech. */
 export const MIN_VOICE_SPEED = 0.7;
 export const MAX_VOICE_SPEED = 1.3;
+/** ElevenLabs' own cap on speed: its API refuses more, so its slider stops here. */
+export const MAX_ELEVENLABS_SPEED = 1.2;
 
 /** A non-blank, trimmed entry. A blank one would match every window and blind the pet. */
 const exclusionEntry = z.string().trim().min(1);

@@ -691,7 +691,8 @@ process exits. In the voice process:
   `https://api.elevenlabs.io/v1/text-to-speech/<voiceId>/stream?output_format=mp3_44100_128`.
   The headers are `xi-api-key` and `accept: audio/mpeg`. The body is
   `{ text, model_id: 'eleven_flash_v2_5', voice_settings: { speed } }`.
-- The speed is clamped to 0.7–1.2, ElevenLabs' own bounds.
+- The speed is clamped to `MIN_VOICE_SPEED`–`MAX_ELEVENLABS_SPEED` (0.7–1.2), ElevenLabs' own bounds. The
+  settings slider matches: with ElevenLabs chosen it stops at 1.2 and shows a higher saved speed as 1.2.
 - The request is aborted after `ELEVENLABS_TIMEOUT_MS` (15 s), audio included.
 - A non-OK status throws, so the line falls to Kokoro.
 - Only the line is sent.
@@ -766,18 +767,18 @@ hears them in the order the panel sent them. A failed step does not hold up the 
 
 `packages/protocol/src/settings.ts`.
 
-| Field                     | Default                          | Meaning                                                                 |
-| ------------------------- | -------------------------------- | ----------------------------------------------------------------------- |
-| `voice.enabled`           | `true`                           | Scout talks.                                                            |
-| `voice.voice`             | `'bm_george'`                    | Kokoro voice: `bm_george` or `bm_fable`.                                |
-| `voice.speed`             | `0.95`                           | `MIN_VOICE_SPEED` 0.7 to `MAX_VOICE_SPEED` 1.3.                         |
-| `voice.elevenLabsVoiceId` | `''`                             | A voice from the person's ElevenLabs library.                           |
-| `voice.microphoneId`      | absent                           | Absent means the system default.                                        |
-| `voice.mouth`             | absent                           | `kokoro`, `elevenlabs` or `system`. Absent means `chosenMouth` decides. |
-| `voice.ears`              | absent                           | Only `local` exists (`EARS_IDS`).                                       |
-| `listening.always`        | `false`                          | Always listening.                                                       |
-| `hotkeys.talk`            | `'RightControl'`                 | One of `TALK_KEYS`.                                                     |
-| `hotkeys.stopVoice`       | `'CommandOrControl+Shift+Alt+M'` | The stop key.                                                           |
+| Field                     | Default                          | Meaning                                                                      |
+| ------------------------- | -------------------------------- | ---------------------------------------------------------------------------- |
+| `voice.enabled`           | `true`                           | Scout talks.                                                                 |
+| `voice.voice`             | `'bm_george'`                    | Kokoro voice: `bm_george` or `bm_fable`.                                     |
+| `voice.speed`             | `0.95`                           | `MIN_VOICE_SPEED` 0.7 to `MAX_VOICE_SPEED` 1.3 (slider: 1.2 for ElevenLabs). |
+| `voice.elevenLabsVoiceId` | `''`                             | A voice from the person's ElevenLabs library.                                |
+| `voice.microphoneId`      | absent                           | Absent means the system default.                                             |
+| `voice.mouth`             | absent                           | `kokoro`, `elevenlabs` or `system`. Absent means `chosenMouth` decides.      |
+| `voice.ears`              | absent                           | Only `local` exists (`EARS_IDS`).                                            |
+| `listening.always`        | `false`                          | Always listening.                                                            |
+| `hotkeys.talk`            | `'RightControl'`                 | One of `TALK_KEYS`.                                                          |
+| `hotkeys.stopVoice`       | `'CommandOrControl+Shift+Alt+M'` | The stop key.                                                                |
 
 The ElevenLabs key is a secret (`elevenlabs.apiKey`), never a setting. See
 `settings-and-secrets.md`. The voice fields that chat can change are listed there too.
@@ -807,7 +808,7 @@ The ElevenLabs key is a secret (`elevenlabs.apiKey`), never a setting. See
 | Unaddressed hint                         | 3 words or more                                          | `listen-controller.ts`                            |
 | `SHORT_LINE`                             | 40 characters                                            | `speakable.ts`                                    |
 | `ELEVENLABS_TIMEOUT_MS`                  | 15,000 ms                                                | `elevenlabs.ts`                                   |
-| ElevenLabs speed clamp                   | 0.7–1.2                                                  | `elevenlabs.ts`                                   |
+| ElevenLabs speed clamp                   | 0.7–1.2 (`MAX_ELEVENLABS_SPEED`)                         | `elevenlabs.ts`, `settings.ts`                    |
 | Download attempts per file               | 2                                                        | `model-files.ts`                                  |
 | Model sizes                              | ears 43,001,836 B; Kokoro 92,364,770 B                   | `model-files.ts`                                  |
 

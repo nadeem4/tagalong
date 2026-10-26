@@ -372,6 +372,15 @@ describe('elevenLabsTts', () => {
   });
 });
 
+describe('elevenLabsTts speed', () => {
+  it('sends at most 1.2, ElevenLabs’ own cap, for a saved 1.3', async () => {
+    const fetchFn = vi.fn(async () => new Response(new Uint8Array([7]), { status: 200 }));
+    await elevenLabsTts('xi-key', 'v', fetchFn).speak('Hi.', { voice: 'bm_george', speed: 1.3 });
+    const [, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).voice_settings.speed).toBe(1.2);
+  });
+});
+
 describe('fakeTts', () => {
   it('returns a short silent WAV', async () => {
     const { audio, mime } = await fakeTts.speak('Hi.', SETTINGS_DEFAULTS.voice);

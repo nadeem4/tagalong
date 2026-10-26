@@ -5,6 +5,7 @@
  */
 import { useEffect, useState } from 'react';
 import {
+  MAX_ELEVENLABS_SPEED,
   MAX_VOICE_SPEED,
   MIN_VOICE_SPEED,
   SETTINGS_DEFAULTS,
@@ -53,10 +54,17 @@ export function VoiceSection({
   const [speed, setSpeed] = useState(settings.voice.speed);
   const [previewing, setPreviewing] = useState(false);
   const speedField = useInvalid('voiceSpeed');
+  // ElevenLabs refuses more than its cap, so its slider stops there and shows a higher saved speed as the cap.
+  const maxSpeed = mouth === 'elevenlabs' ? MAX_ELEVENLABS_SPEED : MAX_VOICE_SPEED;
+  const shownSpeed = Math.min(speed, maxSpeed);
 
   const preview = (): void => {
     setPreviewing(true);
-    playLine(PREVIEW_LINE, new AbortController().signal, { voice, speed, mouth: mouth as MouthId })
+    playLine(PREVIEW_LINE, new AbortController().signal, {
+      voice,
+      speed: shownSpeed,
+      mouth: mouth as MouthId,
+    })
       .catch((error: unknown) => console.warn('[voice] preview failed', error))
       .finally(() => setPreviewing(false));
   };
@@ -142,14 +150,14 @@ export function VoiceSection({
           </div>
         </div>
         <div>
-          <label htmlFor={speedField.props.id}>Speed: {speed.toFixed(2)}×</label>
+          <label htmlFor={speedField.props.id}>Speed: {shownSpeed.toFixed(2)}×</label>
           <input
             name="voiceSpeed"
             type="range"
             min={MIN_VOICE_SPEED}
-            max={MAX_VOICE_SPEED}
+            max={maxSpeed}
             step={0.05}
-            value={speed}
+            value={shownSpeed}
             onChange={(event) => setSpeed(Number(event.target.value))}
             {...speedField.props}
           />
