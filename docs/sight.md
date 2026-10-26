@@ -2,6 +2,9 @@
 
 ## Purpose
 
+The desktop no longer boots `packages/core`: pointing, keep-an-eye and the engine-side screen tools
+below are not wired to the Python brain yet.
+
 How Scout sees the desktop: the window list, window text (accessibility tree and OCR), screenshots
 of a window, a display or a region, the composite of every display, and the opt-in rolling memory
 of the last few minutes. This doc covers how each read is made, what refuses it (blind spots,
@@ -25,7 +28,7 @@ tools exist, what goes into the prompt and what is recorded. Windows is the only
 | Composite drawing              | `platform/composite.ts`, `platform/canvas.ts`, `platform/label.ts`, `platform/downscale.ts` (`fitWithin`)                                                                                                       |
 | Selection                      | `platform/selection.ts` (`captureSelectionWith`)                                                                                                                                                                |
 | Pointing (sight side)          | `platform/find-element.ts`, `platform/point-target.ts`                                                                                                                                                          |
-| Capture paths and notices      | `bodies/desktop/src/main/context.ts` (`captureAskSnapshot`, `capturePatch`, `answerCapture`, `DESKTOP_CAPABILITIES`), `capture-notice.ts`, `engine-host.ts`, `engine-client.ts`                                 |
+| Capture paths and notices      | `bodies/desktop/src/main/context.ts` (`captureAskSnapshot`, `capturePatch`, `answerCapture`, `DESKTOP_CAPABILITIES`), `capture-notice.ts`                                                                       |
 | Rolling memory and diff        | `bodies/desktop/src/main/awareness/` (`rolling-memory.ts`, `frame-ring.ts`, `perception-memory.ts`, `pixel-diff.ts`, `native-codec.ts`, `clock.ts`)                                                             |
 | Exclusion rules and inventory  | `packages/core/src/perception/exclusions.ts`, `inventory.ts`, `text-layer.ts`, `retention.ts`, `browser-route.ts`, `host.ts`; `packages/protocol/src/blind-spots.ts`                                            |
 | Screen tools                   | `packages/core/src/tools/builtin/perception.ts`, `awareness.ts`, `pointing.ts`; registered in `packages/core/src/tools/registry.ts`                                                                             |
@@ -39,8 +42,8 @@ tools exist, what goes into the prompt and what is recorded. Windows is the only
 
 Every read the engine makes goes to a connected host over the loopback websocket as a core-to-host
 JSON-RPC call (see [architecture.md](architecture.md) and [protocol.md](protocol.md)). On the
-desktop, `EngineClient` (`engine-client.ts`) dispatches each method to a handler in
-`engine-host.ts`, which calls the sight-gated `Platform`. The engine side wraps each host once in
+desktop, the old engine path was `EngineClient` and `engine-host.ts`, which called the sight-gated
+`Platform`; both are gone, and the Python brain does not ask for reads yet. The engine side wraps each host once in
 `recordSight`, so every answered read writes one row to the sight log.
 
 ```mermaid

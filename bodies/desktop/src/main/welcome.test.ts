@@ -57,12 +57,9 @@ describe('findAgents', () => {
 });
 
 describe('shouldOpenWelcome', () => {
-  it('opens until Welcome is finished, even if an old onboarding flag is set', () => {
-    expect(shouldOpenWelcome(Settings.parse({ onboarding: { done: true } }), {})).toBe(true);
+  it("never opens: the key is the brain's now", () => {
+    expect(shouldOpenWelcome(Settings.parse({}), {})).toBe(false);
     expect(shouldOpenWelcome(Settings.parse({ welcome: { done: true } }), {})).toBe(false);
-  });
-
-  it('stays shut for the end-to-end smoke test', () => {
     expect(shouldOpenWelcome(Settings.parse({}), { TAGALONG_SKIP_WELCOME: '1' })).toBe(false);
   });
 });

@@ -92,11 +92,13 @@ tagalong/
       scripts/ensure-electron.mjs   # fetches the Electron binary
       scripts/fetch-native.mjs      # fetches get-windows' prebuilt binding before packaging
       scripts/start-fresh.mjs       # runs the app on a new temp data folder
-      e2e/                          # smoke, first-run, launch-greeting, hotkey-recovery, listening
+      e2e/                          # smoke, brain-offline, first-run, launch-greeting, hotkey-recovery, listening
                                     # (Always listening) and cards.spec.ts (the hand-off, connector
                                     # confirm and routine cards)
+      e2e/fixtures/fake-brain.ts    # a ws server speaking contract v1, for smoke and listening
       e2e/fixtures/notes-mcp.mjs    # a tiny stdio MCP server with one write tool, for cards.spec.ts
-      src/main/                     # index.ts, engine-host.ts, engine-client.ts, context.ts,
+      src/main/                     # index.ts, brain/ (brain-client.ts, turn-events.ts,
+                                    # start.ts), context.ts,
                                     # hotkeys.ts, talk-key.ts, always-listening.ts, secret-store.ts,
                                     # tray-icon.ts, tray-menu.ts, welcome.ts, launch.ts,
                                     # claude-sign-in.ts, keep-an-eye.ts, sight-pause.ts, drop.ts,
@@ -130,7 +132,7 @@ tagalong/
 | `packages/protocol` | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC, plus the method catalog. Depends only on zod.                                                                                    |
 | `packages/core`     | The Tagalong Engine: Scout, conversation runner, prompt assembly, SQLite memory, experts and hand-offs, connected apps (MCP client), routines, host protocol server, pairing, provider adapters. Pure Node. |
 | `bodies/ui`         | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, `ChatPanel` (with its internal `MessageList`, `Composer` and `SightBar`), Home's `HomeView`, and the `HostBridge` context.    |
-| `bodies/desktop`    | Electron host. Runs the engine in the main process, dials it over the loopback socket, and owns Scout's window, the bubble, Home, Welcome, the tray, hotkeys, secret storage, and Scout's voice and ears.   |
+| `bodies/desktop`    | Electron host. Dials the Python brain over the loopback socket, and owns Scout's window, the bubble, Home, Welcome, the tray, hotkeys, secret storage, and Scout's voice and ears.                          |
 | `apps/extension`    | Chrome MV3 host. Connects to the running engine and speaks the protocol only. Side panel, pairing page, on-demand page reader, and the open-panel shortcut.                                                 |
 
 ## How to run
@@ -170,8 +172,8 @@ Inside `bodies/desktop`:
 ```bash
 pnpm build            # ensure-electron, then electron-vite build into dist/
 pnpm start            # ensure-electron, then electron-vite preview against the built output
-pnpm start:fresh      # the same, on a new temp data folder: Welcome and the first hello, every time
-pnpm test:e2e         # ensure-electron, electron-vite build, then the Playwright smoke suite
+pnpm start:fresh      # the same, on a new temp data folder, so you start from a clean profile
+pnpm --filter @tagalong/desktop test:e2e  # ensure-electron, electron-vite build, then the Playwright smoke suite
 pnpm ensure-electron  # fetch the Electron binary on its own
 pnpm package:win      # fetch-native, electron-vite build, electron-builder --win nsis
 pnpm package:dir      # an unpacked app in release/, for checking what gets packaged
@@ -277,25 +279,29 @@ runs somewhere.
 
 ### End-to-end tests and fakes
 
-The `e2e` CI job runs the Electron end-to-end suites. `bodies/desktop/e2e/` holds six Playwright suites
+The `e2e` CI job runs the Electron end-to-end suites. `bodies/desktop/e2e/` holds seven Playwright suites
 that launch the built app: `smoke.spec.ts` (the bubble, talking, capture, pause, hotkeys, Welcome on
 request, Home),
 `first-run.spec.ts` (Welcome and Scout's intro on an empty data folder), `launch-greeting.spec.ts`
 (the launch across launches on one profile), `hotkey-recovery.spec.ts`
 (a key another app owns), `listening.spec.ts` (Always listening: off at launch, switched on, a turn
-that starts with "Scout" is heard and answered, switched off) and `cards.spec.ts`. Run them with `pnpm --filter @tagalong/desktop
+that starts with "Scout" is heard and answered, switched off) and `cards.spec.ts`, plus `brain-offline.spec.ts`. Run them with `pnpm --filter @tagalong/desktop
 test:e2e`.
 
-The suites run offline on fakes: `TAGALONG_FAKE_PROVIDERS=1` (a scripted brain and a scripted expert),
-`TAGALONG_FAKE_TTS=1`, `TAGALONG_FAKE_STT=1`, `TAGALONG_FAKE_SIGN_IN` (the Claude Code sign-in check reads as the state it names), and `TAGALONG_FAKE_TOOL` with `TAGALONG_FAKE_TOOL_INPUT`,
-which make the fake brain call one tool before it answers. `cards.spec.ts` uses the last pair to bring
-up each card: `hand_to_expert`, a connected app's `notes__add_note`, and `create_routine`. Each card
-gets its own launch, since the tool is read once at start. The native folder picker is stubbed
-through `app.evaluate`, so the hand-off card's Browse picks a temporary folder. When an e2e suite
+The suites run offline on fakes. The desktop answers turns only through a brain, so `smoke.spec.ts` and
+`listening.spec.ts` start `e2e/fixtures/fake-brain.ts`, a `ws` server that speaks contract v1 (it answers
+`hello`, then every `say` with one scripted reply), and pass its address as `TAGALONG_BRAIN_ADDR`.
+`brain-offline.spec.ts` points the app at a port nothing listens on and expects the offline mark. Other fakes:
+`TAGALONG_FAKE_TTS=1`, `TAGALONG_FAKE_STT=1`. Specs for features the new brain has not rebuilt yet are
+`test.skip` with a reason of the form `returns with row N: <feature>` (the Launch board row that brings
+the feature back): the tool-call round trip, the Experts page, `cards.spec.ts` and `launch-greeting.spec.ts`.
+`first-run.spec.ts` is skipped as `removed with row 13`: the old Welcome goes with core. A quit that does not finish in 45 s is
+killed by `e2e/fixtures/close-app.ts`, which then waits for the process to exit, so a hung teardown
+cannot hold the single-instance lock or the data folder. When an e2e suite
 fails in CI, its `test-results` folder (page snapshots and screenshots) is uploaded as the
 `e2e-test-results` artifact.
 
-Quit any running Tagalong before `pnpm test:e2e`. The main process takes a single-instance lock, so a
+Quit any running Tagalong before `pnpm --filter @tagalong/desktop test:e2e`. The main process takes a single-instance lock, so a
 second copy quits immediately and Playwright reports the confusing
 `electron.launch: Target page, context or browser has been closed` instead of naming the real cause.
 
@@ -322,10 +328,8 @@ TAGALONG_FAKE_PROVIDERS=1 pnpm dev:desktop
 PowerShell has no inline `VAR=value command` prefix; pasting the bash line into PowerShell fails with
 `TAGALONG_FAKE_PROVIDERS=1 : The term ... is not recognized`.
 
-On a fresh profile Welcome opens first; **Start** finishes it, and **Home → Settings → Open Welcome
-again** brings it back. To see what a new user sees, run `pnpm --filter @tagalong/desktop
-start:fresh`: it starts on a new folder in the temp directory (`--user-data-dir`), so Welcome and
-Scout's first hello show every time and your own `%APPDATA%\Tagalong` is never touched. Quit any
+Welcome does not open yet. To see what a new user sees, run `pnpm --filter @tagalong/desktop
+start:fresh`: it starts on a new folder in the temp directory (`--user-data-dir`), so your own `%APPDATA%\Tagalong` is never touched. Quit any
 running Tagalong first; the fresh copy has no saved keys. The tray's **Open Tagalong** item opens Home. Two more things are worth knowing before the first run.
 
 **`ensure-electron`.** Electron 44.3.0 publishes no npm install script, so `pnpm install` unpacks the

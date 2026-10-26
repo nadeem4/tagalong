@@ -12,6 +12,8 @@ import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
+test.skip(true, 'returns with row 10: launch greeting (scheduler events)');
+
 let app: ElectronApplication;
 let dataDir: string;
 
@@ -67,7 +69,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await app.close().catch(() => undefined);
-  rmSync(dataDir, { recursive: true, force: true });
+  rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
 });
 
 test('signed out: a status mark on Scout and in the line, and Fix it opens Settings', async () => {

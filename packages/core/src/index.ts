@@ -7,6 +7,7 @@
 export { Engine } from './engine';
 
 export { getRole, recommendedModel } from './roles';
+export { SCOUT } from './pets/registry';
 
 export { InMemorySecretStore, SettingsStore, type SecretStore } from './settings/settings';
 

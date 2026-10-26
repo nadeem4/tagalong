@@ -30,6 +30,13 @@ describe('STATUS_WORDS', () => {
     expect(STATUS_WORDS['listening-on'].fix).toBeUndefined();
   });
 
+  it('words the brain being down or too new, without a fix', () => {
+    expect(STATUS_WORDS['brain-offline'].detail).toBe("Scout's brain is not running.");
+    expect(STATUS_WORDS['brain-outdated'].detail).toBe('Update Tagalong to talk to this brain.');
+    expect(STATUS_WORDS['brain-offline'].fix).toBeUndefined();
+    expect(STATUS_WORDS['brain-outdated'].fix).toBeUndefined();
+  });
+
   it('sends the ears and mic problems to the voice fix, and keeps progress and hints muted', () => {
     for (const id of ['ears-failed', 'mic-busy', 'mic-failed'] as const) {
       expect(STATUS_WORDS[id].fix).toBe('voice');
@@ -62,6 +69,8 @@ describe('topStatus', () => {
 
   it('puts problems before progress, a pause before the hints, and Listening last', () => {
     expect(StatusId.options).toEqual([
+      'brain-offline',
+      'brain-outdated',
       'brain-signed-out',
       'brain-no-sign-in',
       'brain-no-key',

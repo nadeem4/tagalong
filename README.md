@@ -42,10 +42,24 @@ walks you through the rest.
 
 You need Windows 11, Node.js 22 or newer and pnpm 10.
 
+The desktop talks to the Python brain, so start the brain first (you need `uv` and an Anthropic
+key in `~/.tagalong/.env`, see [docs/brain.md](docs/brain.md)).
+
+```powershell
+cd brain
+uv sync
+uv run brain        # leave this running
+```
+
+In a second terminal, from the repo root:
+
 ```powershell
 pnpm install
 pnpm dev:desktop
 ```
+
+If the brain is not running, the desktop still opens and shows "Scout's brain is not running." It
+connects by itself once the brain is up.
 
 The [developer guide](docs/development.md) covers getting pnpm, testing, packaging and the Chrome
 extension.
@@ -138,7 +152,8 @@ await engine.shutdown();
 
 A real host also answers the engine's `perception.*` requests for the capabilities it advertises.
 The method catalog and every payload schema are in `packages/protocol/src/methods.ts`; the desktop
-app's own client is `bodies/desktop/src/main/engine-client.ts`. Read
+app's own client for the Python brain is `bodies/desktop/src/main/brain/brain-client.ts`; the
+desktop no longer boots the engine. Read
 [Architecture](docs/architecture.md) for how the engine and its hosts fit together, and
 [How to add a host](docs/development.md#how-to-add-a-host) for the contracts a host implements.
 

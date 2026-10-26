@@ -140,6 +140,22 @@ flowchart LR
 - Writes go through one queue per connection. `send` never waits and never raises, so one slow
   body cannot stop the others.
 
+## The desktop body
+
+The desktop app (`bodies/desktop`) is a body of this brain. It no longer runs the TypeScript engine.
+
+- Start the brain first (`cd brain && uv run brain`), then the desktop (`pnpm dev:desktop`). The
+  desktop dials `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`, the same variable the brain
+  listens on) and retries every 2 s, so either order works.
+- It sends `hello` with no tools. An ask is a `say` with the text, the screenshot as an image part
+  and `context.window`; interrupt is `cancel`.
+- With the brain down, the bubble shows "Scout's brain is not running." A brain restart ends the
+  open turn as failed; the next ask works without restarting the app.
+- The brain's model, key and budget are set in the brain's `.env`. The desktop keeps its own local
+  settings (hotkeys, listening, rolling memory).
+- Pets, Welcome, the launch greeting, keep-an-eye, wellbeing, the pointer overlay and the separate
+  Settings window are not wired to the brain yet. See [desktop.md](desktop.md#the-brain-in-the-main-process).
+
 ## Not built yet
 
 | Row   | Brings                                                                                                                                                                                                           |

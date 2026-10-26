@@ -2,6 +2,9 @@
 
 ## Purpose
 
+The desktop no longer boots `packages/core`, so the engine-side parts of voice (pointing, keep-an-eye
+check-ins) are not wired to the Python brain yet.
+
 How Scout hears and speaks. This covers the talk key, the mic button, Always listening, the
 follow-up window, barge-in, and the speech models in the voice utility process. On the speaking
 side it covers Kokoro, ElevenLabs and the system voice. Speech to text runs on this computer. The

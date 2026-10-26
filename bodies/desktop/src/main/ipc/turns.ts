@@ -1,18 +1,21 @@
 /**
- * IPC for asking, interrupting, stopping a watch and a remark's two buttons. Contains
+ * IPC for asking and interrupting: both go to the brain over contract v1. Stopping a watch
+ * and a remark's two buttons are kept as no-ops until the brain has them. Contains
  * registerTurnIpc.
  */
 
-import { randomUUID } from 'node:crypto';
+import type { Part, SayParams } from '@tagalong/contract';
+import { STATUS_WORDS } from '@tagalong/protocol';
 import type { ContextSnapshot, Dropped } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
-import type { EngineCall, IpcHandle } from './handle';
+import { BrainOffline } from '../brain/brain-client';
+import type { BrainClient, BrainStatus } from '../brain/brain-client';
+import type { IpcHandle } from './handle';
 
 export interface TurnIpcDeps {
-  /** Throws when the engine is not running: a turn needs the engine that runs it. */
-  engine: () => EngineCall;
-  /** The engine when it is running; null when it is not. */
-  maybeEngine: () => EngineCall | null;
+  brain: Pick<BrainClient, 'say' | 'cancel'>;
+  /** The link as last reported; a too-new brain gets the update words, not the offline ones. */
+  status: () => BrainStatus;
   /** The snapshot the last hotkey captured, sent with the ask. */
   pendingSnapshot: () => ContextSnapshot | null;
   /**
@@ -22,9 +25,18 @@ export interface TurnIpcDeps {
   takeDrop?: () => Promise<Dropped>;
 }
 
-export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
-  const { engine } = deps;
+/** What a dropped item adds to the ask, as parts. */
+function droppedParts(dropped: Dropped): Part[] {
+  const parts: Part[] = [];
+  const text = [dropped.name, dropped.text].filter((s) => s !== undefined).join('\n\n');
+  if (text !== '') parts.push({ type: 'text', text });
+  if (dropped.image) {
+    parts.push({ type: 'image', mime: dropped.image.mime, data: dropped.image.base64 });
+  }
+  return parts;
+}
 
+export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
   handle(
     IPC.ask,
     async (
@@ -37,44 +49,44 @@ export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
         drop?: boolean;
       },
     ) => {
-      const pending = deps.pendingSnapshot();
+      const snapshot = deps.pendingSnapshot();
       // Only a drop card's button sends the dropped item, and it is read only now.
       const dropped = input.drop === true && deps.takeDrop ? await deps.takeDrop() : null;
-      const snapshot: ContextSnapshot | null =
-        dropped === null
-          ? pending
-          : {
-              ...(pending ?? {
-                id: randomUUID(),
-                capturedAt: new Date().toISOString(),
-                host: 'desktop' as const,
-              }),
-              dropped,
-            };
-      return engine().call('ask', {
-        petId: input.petId,
-        ...(input.conversationId !== undefined ? { conversationId: input.conversationId } : {}),
-        input: { text: input.text ?? '' },
-        ...(snapshot !== null ? { snapshot } : {}),
+      const parts: Part[] = [];
+      if (snapshot?.screenshot) {
+        parts.push({
+          type: 'image',
+          mime: snapshot.screenshot.mime,
+          data: snapshot.screenshot.base64,
+        });
+      }
+      if (dropped !== null) parts.push(...droppedParts(dropped));
+      const windowTitle = snapshot?.app?.windowTitle;
+      const say: SayParams = {
+        text: input.text ?? '',
+        ...(parts.length > 0 ? { parts } : {}),
+        ...(windowTitle !== undefined ? { context: { window: windowTitle } } : {}),
         ...(input.spoken === true ? { spoken: true } : {}),
-      });
+      };
+      try {
+        return { turnId: (await deps.brain.say(say)).turn };
+      } catch (error) {
+        // The desktop's own words, never the brain's message.
+        if (error instanceof BrainOffline) {
+          const words = deps.status() === 'outdated' ? 'brain-outdated' : 'brain-offline';
+          throw new Error(STATUS_WORDS[words].detail, { cause: error });
+        }
+        throw error;
+      }
     },
   );
 
-  handle(IPC.stopWatch, async (_event, watchId: string) => {
-    await engine().call('watch.stop', { watchId });
+  handle(IPC.stopWatch, () => undefined);
+
+  handle(IPC.interrupt, (_event, turnId: string) => {
+    deps.brain.cancel(turnId);
   });
 
-  handle(IPC.interrupt, async (_event, turnId: string) => {
-    await engine().call('interrupt', { turnId });
-  });
-
-  // A remark's two buttons. Not now quiets Scout for an hour; taking the offer sends its
-  // brief to the hand-off card, where nothing runs until the person presses Send.
-  handle(IPC.remarkNotNow, async () => {
-    await deps.maybeEngine()?.call('keepAnEye.notNow', {});
-  });
-  handle(IPC.remarkAccept, async (_event, remarkId: string) => {
-    await deps.maybeEngine()?.call('keepAnEye.accept', { remarkId });
-  });
+  handle(IPC.remarkNotNow, () => undefined);
+  handle(IPC.remarkAccept, () => undefined);
 }

@@ -1,7 +1,7 @@
 /**
- * The desktop app's main process: boots the engine, makes the windows (Scout, its bubble,
+ * The desktop app's main process: dials the brain, makes the windows (Scout, its bubble,
  * Home, Welcome, the pointer overlay), the tray and the hotkeys, and wires every IPC channel.
- * Handlers that need only the engine, settings or voice live in `ipc/`; the ones here need
+ * Handlers that need only the brain, settings or voice live in `ipc/`; the ones here need
  * Electron itself: they move windows, read the screen or open things through the shell.
  */
 
@@ -30,12 +30,7 @@ import {
   TALK_KEY_LABELS,
   TALK_KEY_RIGHT_CTRL,
 } from '@tagalong/protocol';
-import type {
-  PerceptionTarget,
-  PickUpReadyParams,
-  Settings,
-  SettingsPatch,
-} from '@tagalong/protocol';
+import type { PerceptionTarget, PickUpReadyParams, Settings } from '@tagalong/protocol';
 import { SettingsStore } from '@tagalong/core';
 import {
   AlwaysListening,
@@ -43,19 +38,18 @@ import {
   saveListening,
   startListeningGuard,
 } from './always-listening';
-import { startWellbeingTick, watchPresence } from './presence';
+import { watchPresence } from './presence';
 import { systemClock } from './awareness/clock';
 import { handoffLine, handoffNotice } from './handoff-notice';
 import { installLogFile, openLogsFolder, rendererConsole } from './log-file';
-import { StatusMarks, clearBrainMarks, markListening, setPanelMark } from './status-marks';
 import {
-  brainLine,
-  brainReadiness,
-  brainStatus,
-  recordCleanClose,
-  recordLaunch,
-  SIGN_IN_BUDGET_MS,
-} from './launch';
+  StatusMarks,
+  clearBrainMarks,
+  markBrainLink,
+  markListening,
+  setPanelMark,
+} from './status-marks';
+import { recordCleanClose, recordLaunch } from './launch';
 import type { PreviousLaunch } from './launch';
 import { routineDelivery } from './routine-delivery';
 import { nativeCodec } from './awareness/native-codec';
@@ -63,16 +57,11 @@ import { PerceptionMemory } from './awareness/perception-memory';
 import { RollingMemory } from './awareness/rolling-memory';
 import { captureNotice, captureTooltip } from './capture-notice';
 import { captureAskSnapshot, capturePatch } from './context';
-import { startEngineHost } from './engine-host';
-import { keepAnEyeAllowed, startKeepAnEye } from './keep-an-eye';
+import type { TurnEvent } from '@tagalong/ui';
+import { createTurnEvents } from './brain/turn-events';
+import { startBrain } from './brain/start';
 import { isAllowedLink } from './links';
-import {
-  ELEVENLABS_SECRET_KEY,
-  forgetRetiredKeys,
-  providerChoices,
-  storedKeys,
-} from './provider-choices';
-import { RELEASE_NOTES } from './release-notes';
+import { ELEVENLABS_SECRET_KEY, forgetRetiredKeys } from './provider-choices';
 import { elevenLabsTts } from './voice/elevenlabs';
 import { kokoroDownloaded } from './voice/kokoro';
 import { createVoiceService, elevenLabsMouth, localMouth } from './voice/voice';
@@ -81,8 +70,11 @@ import type { WorkerProcess } from './voice/worker/messages';
 import { WorkerLocalVoice } from './voice/worker/worker-local-voice';
 import type { VoiceService } from './voice/voice';
 import { openClaudeSignIn, signInFor } from './claude-sign-in';
-import { findAgents, launchLine, shouldOpenWelcome } from './welcome';
-import type { EngineHost } from './engine-host';
+import { saveAvatarSpot } from './avatar-spot';
+import { offlineWatch } from './brain/offline-watch';
+import type { BrainStatus } from './brain/brain-client';
+import { shouldOpenWelcome } from './welcome';
+import type { BrainClient } from './brain/brain-client';
 import {
   DEFAULT_PAUSE_SIGHT_HOTKEY,
   DEFAULT_STOP_VOICE_HOTKEY,
@@ -108,9 +100,7 @@ import {
 } from './windows/panel';
 import { moveWindow } from './windows/move';
 import { createHomeWindow } from './windows/home';
-import { createPointerOverlay } from './windows/pointer';
 import { createWelcomeWindow } from './windows/welcome';
-import { createSettingsWindow } from './windows/settings';
 import { fromWindow, registerClipboardIpc } from './ipc/clipboard';
 import { registerAskIpc } from './ipc/asks';
 import { registerConnectionIpc } from './ipc/connections';
@@ -134,9 +124,8 @@ import type { CaptureNotice } from '../shared/ipc';
 
 /** Everything the app owns once it is up. Assembled in `start`, torn down on quit. */
 interface Desktop {
-  /** Null when the engine refused to boot; `start` says why the app runs on without it. */
-  host: EngineHost | null;
-  bootError: string | null;
+  /** The connection to the brain; always there, offline until the brain answers. */
+  brain: BrainClient;
   platform: Platform;
   settingsStore: SettingsStore;
   /** What the last launch left behind: whether it crashed, and which version it ran. */
@@ -147,7 +136,6 @@ interface Desktop {
   avatar: BrowserWindow | null;
   panel: BrowserWindow | null;
   tray: Tray;
-  settingsWindow: BrowserWindow | null;
   /** The Welcome window, while it is open. */
   welcomeWindow: BrowserWindow | null;
   /** Scout is hidden until the first Welcome is done. */
@@ -181,11 +169,19 @@ interface Desktop {
 }
 
 let desktop: Desktop | null = null;
+/** The brain link as last reported, for the ask handler's choice of words. */
+let brainStatus: BrainStatus = 'connecting';
+
+/** Scout's spot goes to the settings file and the live settings: the brain has no settings. */
+function rememberAvatarSpot(position: { x: number | null; y: number | null }): void {
+  if (desktop === null) return;
+  saveAvatarSpot(desktop.settingsStore, position, (saved) => {
+    if (desktop !== null) desktop.settings = saved;
+  });
+}
 
 /** The item last dropped on Scout, held unread until a button on its card takes it. */
 const drops = dropDesk(nodeDropFs);
-/** The Claude sign-in check, started at boot so a cold `claude` has had time before the greeting. */
-let signInCheck: ReturnType<typeof signInFor> | null = null;
 
 // The fake ears need no real microphone: Chromium's fake device stands in for one, and
 // the permission prompt answers itself. Switches only take effect before the app is ready.
@@ -196,8 +192,8 @@ if (process.env.TAGALONG_FAKE_STT === '1') {
 
 // A second launch focuses the pet that is already running.
 //
-// Two engines would fight over the same port and the same SQLite file, so the lock is
-// taken before anything else happens.
+// Two copies would fight over the same settings file and hotkeys, so the lock is taken
+// before anything else happens.
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
@@ -238,22 +234,17 @@ app.on('before-quit', () => {
   desktop?.hotkeys.dispose();
   stopTalkKey();
   desktop?.voiceWorker.stop();
-  stopKeepAnEye();
   stopListeningGuard();
-  pointerOverlay?.dispose();
   stopPresence();
-  stopWellbeing();
   // Memory only, and gone on quit: nothing here was ever written anywhere to clean up.
   desktop?.rolling.dispose();
   desktop?.perceptionMemory.clear();
   // The next launch's greeting counts the time away from now, not from when this one opened.
   recordCleanClose(desktop?.settingsStore, new Date());
-  void desktop?.host?.shutdown();
+  desktop?.brain.stop();
 });
 
 async function start(): Promise<void> {
-  signInCheck = signInFor(process.env);
-  signInCheck.catch(() => undefined); // a failure here reads as unknown at greet time, never unhandled
   const sightPause = new SightPause();
   // Gated at the source, so every present and future reader is covered by construction.
   // Nothing downstream is handed the ungated adapter, which is what makes forgetting to
@@ -298,26 +289,26 @@ async function start(): Promise<void> {
     exclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
   });
 
-  let host: EngineHost | null = null;
-  let bootError: string | null = null;
-  try {
-    host = await startEngineHost({
-      dataDir,
-      secrets,
-      platform,
-      onNotification: forwardToRenderers,
-      captureExclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
-      onCapture: announceCapture,
-      recall: (params) => perceptionMemory.recall(params),
-      diff: (params) => perceptionMemory.diff(params),
-      showRing: (ring) => pointer().show(ring),
-    });
-  } catch (error) {
-    // A missing API key is the ordinary first run, not a crash. Quitting here would leave
-    // the user with no way to reach the settings window that fixes it.
-    bootError = error instanceof Error ? error.message : String(error);
-    console.error('[main] the engine did not start:', bootError);
-  }
+  // The brain is a separate process the user runs; this only dials it and retries.
+  const turnEvents = createTurnEvents(
+    () => SCOUT_ID,
+    () => brain.session,
+  );
+  const forwardTurn = (event: TurnEvent): void => {
+    const { type, ...params } = event;
+    forwardToRenderers({ method: type, params });
+  };
+  // A brain that stays down fails the open turns, so the bubble does not stream forever.
+  const watchOffline = offlineWatch(() => turnEvents.resync().forEach(forwardTurn));
+  const brain = startBrain({
+    onNotification: (method, params) => turnEvents.map(method, params).forEach(forwardTurn),
+    onResync: () => turnEvents.resync().forEach(forwardTurn),
+    onStatus: (status) => {
+      brainStatus = status;
+      markBrainLink(statusMarks, status);
+      watchOffline(status);
+    },
+  });
 
   // The voice models run in their own process; it starts when first needed: at launch if an earlier run downloaded Kokoro, otherwise on Scout's first line.
   const voiceWorker = new VoiceWorker(
@@ -329,8 +320,7 @@ async function start(): Promise<void> {
   );
 
   desktop = {
-    host,
-    bootError,
+    brain,
     platform,
     settingsStore,
     previousLaunch,
@@ -339,7 +329,6 @@ async function start(): Promise<void> {
     avatar: null,
     panel: null,
     tray: createTray(),
-    settingsWindow: null,
     welcomeWindow: null,
     scoutWaits: false,
     homeWindow: null,
@@ -409,7 +398,6 @@ async function start(): Promise<void> {
   listening.onChange(
     saveListening({
       saved: settings.listening.always,
-      host: () => desktop?.host ?? null,
       settingsStore: () => settingsStore,
       onSaved: (saved) => {
         if (desktop !== null) desktop.settings = saved;
@@ -457,15 +445,6 @@ async function start(): Promise<void> {
     { followUp: () => listening.state.followUp, marks: statusMarks },
   );
 
-  if (host === null) {
-    openSettings();
-    dialog.showErrorBox(
-      'Tagalong started without its engine',
-      `${bootError}\n\nSettings is open so you can fix it. Restart Tagalong afterwards.`,
-    );
-    return;
-  }
-
   desktop.panel = createPanelWindow({
     isStreaming: () => (desktop?.activeTurns.size ?? 0) > 0,
     pet: () => desktop?.avatar ?? null,
@@ -476,11 +455,7 @@ async function start(): Promise<void> {
   desktop.avatar = createAvatarWindow({
     hidden: welcoming,
     position: settings.avatar,
-    onMoved: (position) => {
-      void host.client
-        .call('settings.set', { patch: { avatar: position } })
-        .catch((error: unknown) => console.warn('[main] could not persist avatar position', error));
-    },
+    onMoved: (position) => rememberAvatarSpot(position),
   });
   // Windows ends a session (shutdown, restart, sign-out) without before-quit; that is a
   // clean close too, not a crash.
@@ -510,37 +485,8 @@ async function start(): Promise<void> {
   // A fresh install starts in Welcome: the agents found here, how Scout thinks, one key.
   // Finishing it is remembered in settings; Home opens it again.
   if (welcoming) openWelcome();
-  else void greetOnLaunch(host);
-
-  // Keep an eye on things: window titles go to the engine every five seconds, never a
-  // picture. Off in Settings, or while sight is paused, nothing is listed at all.
-  if (keepAnEyeAllowed(process.env)) {
-    stopKeepAnEye = startKeepAnEye({
-      enabled: () => (desktop?.settings.keepAnEye ?? false) && !sightPause.paused,
-      list: async () => {
-        const exclusions = desktop?.settings.captureExclusions ?? settings.captureExclusions;
-        return (await platform.listWindows(exclusions, { countText: false })).windows;
-      },
-      send: (windows) => host.client.call('keepAnEye.observe', { windows }),
-    });
-  }
-  // Gentle nudges: the idle time and titles once a minute, only while on and sight is not paused.
-  stopWellbeing = startWellbeingTick({
-    enabled: () => (desktop?.settings.wellbeing.enabled ?? false) && !sightPause.paused,
-    idleMs: () => powerMonitor.getSystemIdleTime() * 1000,
-    list: async () => {
-      const exclusions = desktop?.settings.captureExclusions ?? settings.captureExclusions;
-      return (await platform.listWindows(exclusions, { countText: false })).windows;
-    },
-    send: (params) => host.client.call('wellbeing.observe', params),
-  });
 }
 
-/** Stops the gentle nudges' tick on quit. */
-let stopWellbeing = (): void => undefined;
-
-/** Stops the keep-an-eye timer on quit. */
-let stopKeepAnEye = (): void => undefined;
 /** Stops the Always-listening guard on quit. */
 let stopListeningGuard = (): void => undefined;
 /** Stops reading the idle time on quit. */
@@ -621,61 +567,6 @@ function showRemark(params: unknown): void {
 }
 
 /**
- * A later launch: when Scout can think, the engine's launch check-in is asked (it answers at
- * once) and the mind's line, if any, comes later as a remark or with the Pick up card; when
- * it cannot, the brain mark shows beside Scout with Fix it. The sign-in check takes at most
- * SIGN_IN_BUDGET_MS. Then the launch is remembered (the quit is too, in before-quit) so the
- * next one knows how long you were away. Nothing here writes a line in Scout's voice.
- */
-async function greetOnLaunch(host: EngineHost): Promise<void> {
-  const current = desktop;
-  if (current === null) return;
-  try {
-    const line = await launchLine(current.settings, async () => {
-      const { pets } = await host.client.call('pets.list', {});
-      const brain = await brainReadiness({
-        pet: pets.find((pet) => pet.id === SCOUT_ID),
-        providers: providerChoices(await storedKeys(current.secrets)),
-        signIn: () => signInCheck ?? signInFor(process.env),
-        budgetMs: SIGN_IN_BUDGET_MS,
-      }).catch(() => 'unknown' as const);
-      // Why Scout cannot think shows on Scout as a mark until it can again.
-      const status = brainStatus(brain);
-      if (status !== null) {
-        current.statusMarks.set({ id: status });
-        return brainLine(brain);
-      }
-      await host.client.call('checkIn.launch', {
-        launch: {
-          ...current.previousLaunch,
-          version: app.getVersion(),
-          releaseNotes: RELEASE_NOTES,
-        },
-      });
-      return null;
-    });
-    if (line !== null) {
-      const { panel, avatar } = current;
-      if (panel !== null && avatar !== null && avatar.isVisible() && !panel.isVisible()) {
-        if (panel.webContents.isLoading()) {
-          await new Promise<void>((resolve) => panel.webContents.once('did-finish-load', resolve));
-        }
-        panel.webContents.send(IPC.greetLineEvent, line);
-        showPanelQuietly(panel, avatar);
-      }
-    }
-  } catch (error) {
-    console.warn('[main] the launch check-in did not run:', error);
-  }
-  try {
-    const patch: SettingsPatch = { lastOpenedAt: new Date().toISOString() };
-    current.settings = (await host.client.call('settings.set', { patch })).settings;
-  } catch (error) {
-    console.warn('[main] could not remember this launch:', error);
-  }
-}
-
-/**
  * Binds the three hotkeys (ask, pause sight, stop voice) to what settings say, points the
  * key hook at the talk key, and reports what was refused, the talk key included.
  *
@@ -749,17 +640,15 @@ function stopVoice(): void {
   }
 }
 
-/** Reloads Scout's window after Scout's record changed. */
-function reloadAvatar(): void {
-  const avatar = desktop?.avatar;
-  if (avatar !== null && avatar !== undefined && !avatar.isDestroyed()) avatar.webContents.reload();
+/**
+ * The old engine is gone; the brain has no equivalent of these calls yet. Handlers not yet
+ * moved over fail with this one sentence (`engine`) or do nothing (`maybeEngine`).
+ */
+function engine(): EngineCall {
+  throw new Error('Scout cannot do that yet on the new brain.');
 }
-
-/** Point, don't click: the ring overlay, made the first time Scout points. */
-let pointerOverlay: ReturnType<typeof createPointerOverlay> | null = null;
-function pointer(): ReturnType<typeof createPointerOverlay> {
-  pointerOverlay ??= createPointerOverlay();
-  return pointerOverlay;
+function maybeEngine(): EngineCall | null {
+  return null;
 }
 
 /** A finished turn that said something. */
@@ -782,8 +671,6 @@ function forwardToRenderers(incoming: { method: string; params: unknown }): void
     params.background !== true
   ) {
     desktop?.activeTurns.add(params.turnId);
-    // The next message puts the last ring away.
-    pointerOverlay?.hide();
   }
   if (
     (notification.method === 'turn.completed' || notification.method === 'turn.error') &&
@@ -849,8 +736,8 @@ function announceHandoff(params: unknown): void {
   }
   // The notice names the expert as Home does; its id stands in when the list cannot be read.
   void (async () => {
-    const experts = await desktop?.host?.client
-      .call('experts.list', {})
+    const experts = await maybeEngine()
+      ?.call('experts.list', {})
       .then((result) => result.experts)
       .catch(() => undefined);
     const name = experts?.find((expert) => expert.id === parsed.data.expertId)?.name;
@@ -952,19 +839,6 @@ function createTray(): Tray {
   return tray;
 }
 
-function openSettings(): void {
-  if (desktop === null) return;
-  if (desktop.settingsWindow !== null && !desktop.settingsWindow.isDestroyed()) {
-    desktop.settingsWindow.focus();
-    return;
-  }
-  const window = createSettingsWindow();
-  window.on('closed', () => {
-    if (desktop !== null) desktop.settingsWindow = null;
-  });
-  desktop.settingsWindow = window;
-}
-
 /**
  * Opens Home, or brings the open one forward, on `page` when one is named (Settings, say).
  * A fresh window is told its page once it has loaded.
@@ -990,13 +864,10 @@ function openHome(page?: string): void {
 }
 
 /**
- * Settings is a page of Home. The standalone Settings window only opens when the engine
- * failed to start, since Home cannot work without it.
+ * Settings is a page of Home.
  */
 function openSettingsPage(target?: unknown): void {
-  const page = fixPage(target);
-  if (desktop?.host === null) openSettings();
-  else openHome(page);
+  openHome(fixPage(target));
 }
 
 /** Opens Welcome, or brings the open one forward. */
@@ -1108,55 +979,16 @@ function registerIpc(): void {
     return desktop;
   };
 
-  /** Anything that needs a turn to run needs the engine that runs it. */
-  const engine = (): EngineCall => {
-    const current = required();
-    if (current.host === null) {
-      throw new Error(current.bootError ?? 'the engine is not running');
-    }
-    return current.host.client;
-  };
-
   const handle: IpcHandle = (channel, listener) =>
     ipcMain.handle(channel, listener as (event: unknown, ...args: unknown[]) => unknown);
 
   registerTurnIpc(handle, {
-    engine,
-    maybeEngine: () => required().host?.client ?? null,
+    brain: required().brain,
+    status: () => brainStatus,
     pendingSnapshot: () => required().pendingSnapshot,
     takeDrop: () => drops.take(),
   });
-  registerScoutIpc(handle, {
-    engine,
-    settings: () => required().settings,
-    setSettings: (settings) => {
-      required().settings = settings;
-    },
-    reloadAvatar,
-    findAgents: () => findAgents(),
-    welcomed: () => {
-      const current = required();
-      current.welcomeWindow?.close();
-      if (current.panel !== null && current.avatar !== null) {
-        current.avatar.show();
-        current.panel.webContents.send(IPC.greetEvent);
-        showPanelQuietly(current.panel, current.avatar);
-      }
-      // The first hello is the mind's: a launch check-in about Welcome alone (no crash or
-      // update facts), whose line, if any, lands in the hello above the Try it button.
-      void current.host?.client
-        .call('checkIn.launch', {
-          launch: {
-            crashed: false,
-            lastVersion: null,
-            version: app.getVersion(),
-            releaseNotes: '',
-            welcomed: true,
-          },
-        })
-        .catch((error: unknown) => console.warn('[main] the first hello did not run:', error));
-    },
-  });
+  registerScoutIpc(handle);
   registerExpertIpc(handle, { engine });
   registerConnectionIpc(handle, { engine });
   registerAskIpc(handle, { engine });
@@ -1174,12 +1006,11 @@ function registerIpc(): void {
     homeWindow: () => required().homeWindow,
   });
   registerSettingsIpc(handle, {
-    host: () => required().host,
     settingsStore: () => required().settingsStore,
     secrets: () => required().secrets,
     problem: () => {
       const current = required();
-      return current.hotkeyError ?? current.bootError;
+      return current.hotkeyError;
     },
     version: () => app.getVersion(),
     setSettings: (settings) => {
@@ -1280,12 +1111,10 @@ function registerIpc(): void {
     if (panel !== null && panel.isVisible()) placePanel(panel, avatar);
   });
   ipcMain.handle(IPC.dropAvatar, () => {
-    const { host, avatar } = required();
-    if (avatar === null || host === null) return;
+    const { avatar } = required();
+    if (avatar === null) return;
     const [x, y] = avatar.getPosition();
-    void host.client
-      .call('settings.set', { patch: { avatar: { x: x ?? null, y: y ?? null } } })
-      .catch((error: unknown) => console.warn('[main] could not persist avatar position', error));
+    rememberAvatarSpot({ x: x ?? null, y: y ?? null });
   });
 
   // Drop it on Scout: name the item, open the bubble on its card. Nothing is read yet.

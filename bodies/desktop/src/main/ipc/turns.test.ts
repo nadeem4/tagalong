@@ -1,120 +1,102 @@
-/** Tests for the turn IPC: ask, interrupt, watches and remarks. */
+/** Tests for the turn IPC: ask and interrupt go to the brain; the old watch and remark buttons do nothing. */
 
 import { describe, expect, it } from 'vitest';
+import type { SayParams } from '@tagalong/contract';
 import type { ContextSnapshot } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
-import { fakeEngine, fakeIpc } from './fake-ipc';
+import { BrainOffline } from '../brain/brain-client';
+import { fakeIpc } from './fake-ipc';
 import { registerTurnIpc } from './turns';
 
-const SNAPSHOT = { id: 's1' } as unknown as ContextSnapshot;
+const PNG = { mime: 'image/png' as const, base64: 'AAAA', width: 1, height: 1 };
 
-function setup(snapshot: ContextSnapshot | null = null, engineUp = true) {
+function setup(
+  snapshot: Partial<ContextSnapshot> | null = null,
+  options: { offline?: boolean; outdated?: boolean; takeDrop?: () => Promise<never> } = {},
+) {
   const ipc = fakeIpc();
-  const engine = fakeEngine({ ask: { turnId: 't1' } });
+  const said: SayParams[] = [];
+  const cancelled: string[] = [];
   registerTurnIpc(ipc.handle, {
-    engine: () => engine.client,
-    maybeEngine: () => (engineUp ? engine.client : null),
-    pendingSnapshot: () => snapshot,
+    brain: {
+      say: (params) => {
+        said.push(params);
+        return options.offline === true
+          ? Promise.reject(new BrainOffline())
+          : Promise.resolve({ turn: 't1', joined: false });
+      },
+      cancel: (turn) => void cancelled.push(turn),
+    },
+    status: () => (options.outdated === true ? 'outdated' : 'online'),
+    pendingSnapshot: () => snapshot as ContextSnapshot | null,
+    ...(options.takeDrop ? { takeDrop: options.takeDrop } : {}),
   });
-  return { ...ipc, calls: engine.calls };
+  return { ...ipc, said, cancelled };
 }
 
 describe('registerTurnIpc', () => {
-  it('asks with the captured snapshot and only the fields that were given', async () => {
-    const { invoke, calls } = setup(SNAPSHOT);
+  it('ask sends say with text and returns turnId', async () => {
+    const { invoke, said } = setup();
     expect(await invoke(IPC.ask, { petId: 'scout', text: 'hi', spoken: true })).toEqual({
       turnId: 't1',
     });
-    expect(calls).toEqual([
-      ['ask', { petId: 'scout', input: { text: 'hi' }, snapshot: SNAPSHOT, spoken: true }],
+    expect(said).toEqual([{ text: 'hi', spoken: true }]);
+  });
+
+  it('ask with a pending snapshot adds an image part', async () => {
+    const { invoke, said } = setup({ screenshot: PNG, app: { name: 'Code', windowTitle: 'a.ts' } });
+    await invoke(IPC.ask, { petId: 'scout', text: 'what is this?' });
+    expect(said).toEqual([
+      {
+        text: 'what is this?',
+        parts: [{ type: 'image', mime: 'image/png', data: 'AAAA' }],
+        context: { window: 'a.ts' },
+      },
     ]);
   });
 
-  it('asks with empty text and no snapshot when there is none', async () => {
-    const { invoke, calls } = setup();
-    await invoke(IPC.ask, { petId: 'scout', conversationId: 'c1' });
-    expect(calls).toEqual([['ask', { petId: 'scout', conversationId: 'c1', input: { text: '' } }]]);
+  it('ask when the brain is too new rejects with the update sentence', async () => {
+    const { invoke } = setup(null, { outdated: true, offline: true });
+    await expect(invoke(IPC.ask, { petId: 'scout', text: 'hi' })).rejects.toThrow(
+      'Update Tagalong to talk to this brain.',
+    );
   });
 
-  it('attaches the item dropped on Scout only when the ask is for it', async () => {
-    const ipc = fakeIpc();
-    const engine = fakeEngine({ ask: { turnId: 't1' } });
-    const dropped = { kind: 'file' as const, name: 'a.md', path: '/w/a.md', text: 'abc' };
-    let taken = 0;
-    registerTurnIpc(ipc.handle, {
-      engine: () => engine.client,
-      maybeEngine: () => engine.client,
-      pendingSnapshot: () => null,
-      takeDrop: () => {
-        taken += 1;
-        return Promise.resolve(dropped);
-      },
-    });
-
-    // An ordinary ask, typed or spoken, never carries the drop.
-    await ipc.invoke(IPC.ask, { petId: 'scout', text: 'Scout, explain it', spoken: true });
-    expect(taken).toBe(0);
-    expect(engine.calls[0]?.[1]).not.toHaveProperty('snapshot');
-
-    await ipc.invoke(IPC.ask, { petId: 'scout', text: 'Explain this.', drop: true });
-    expect(taken).toBe(1);
-    expect(engine.calls[1]?.[1]).toMatchObject({
-      input: { text: 'Explain this.' },
-      snapshot: { host: 'desktop', dropped },
-    });
+  it('ask when brain offline rejects with the offline sentence', async () => {
+    const { invoke } = setup(null, { offline: true });
+    await expect(invoke(IPC.ask, { petId: 'scout', text: 'hi' })).rejects.toThrow(
+      "Scout's brain is not running",
+    );
   });
 
-  it('adds the drop to the snapshot the hotkey captured', async () => {
-    const ipc = fakeIpc();
-    const engine = fakeEngine({ ask: { turnId: 't1' } });
-    const dropped = { kind: 'text' as const, text: 'hi' };
-    registerTurnIpc(ipc.handle, {
-      engine: () => engine.client,
-      maybeEngine: () => engine.client,
-      pendingSnapshot: () => SNAPSHOT,
-      takeDrop: () => Promise.resolve(dropped),
-    });
-    await ipc.invoke(IPC.ask, { petId: 'scout', text: 'x', drop: true });
-    expect(engine.calls[0]?.[1]).toMatchObject({ snapshot: { id: 's1', dropped } });
-  });
+  it('ask with a dropped item sends it as parts, and a failed read asks nothing', async () => {
+    const dropped = { kind: 'file' as const, name: 'a.md', text: 'abc' };
+    const ok = setup(null, { takeDrop: () => Promise.resolve(dropped as never) });
+    await ok.invoke(IPC.ask, { petId: 'scout', text: 'Explain this.', drop: true });
+    expect(ok.said).toEqual([
+      { text: 'Explain this.', parts: [{ type: 'text', text: 'a.md\n\nabc' }] },
+    ]);
 
-  it('fails the ask with the read error, and asks nothing', async () => {
-    const ipc = fakeIpc();
-    const engine = fakeEngine({ ask: { turnId: 't1' } });
-    registerTurnIpc(ipc.handle, {
-      engine: () => engine.client,
-      maybeEngine: () => engine.client,
-      pendingSnapshot: () => null,
+    const bad = setup(null, {
       takeDrop: () => Promise.reject(new Error('Couldn’t read gone.md.')),
     });
-    await expect(ipc.invoke(IPC.ask, { petId: 'scout', text: 'x', drop: true })).rejects.toThrow(
+    await expect(bad.invoke(IPC.ask, { petId: 'scout', text: 'x', drop: true })).rejects.toThrow(
       'gone.md',
     );
-    expect(engine.calls).toEqual([]);
+    expect(bad.said).toEqual([]);
   });
 
-  it('stops a watch and interrupts a turn', async () => {
-    const { invoke, calls } = setup();
-    await invoke(IPC.stopWatch, 'w1');
+  it('interrupt sends cancel', async () => {
+    const { invoke, cancelled } = setup();
     await invoke(IPC.interrupt, 't1');
-    expect(calls).toEqual([
-      ['watch.stop', { watchId: 'w1' }],
-      ['interrupt', { turnId: 't1' }],
-    ]);
+    expect(cancelled).toEqual(['t1']);
   });
 
-  it("passes a remark's two buttons on, and does nothing with no engine", async () => {
-    const up = setup();
-    await up.invoke(IPC.remarkNotNow);
-    await up.invoke(IPC.remarkAccept, 'r1');
-    expect(up.calls).toEqual([
-      ['keepAnEye.notNow', {}],
-      ['keepAnEye.accept', { remarkId: 'r1' }],
-    ]);
-
-    const down = setup(null, false);
-    await down.invoke(IPC.remarkNotNow);
-    await down.invoke(IPC.remarkAccept, 'r1');
-    expect(down.calls).toEqual([]);
+  it('watch stop and the remark buttons do nothing', async () => {
+    const { invoke, said, cancelled } = setup();
+    await invoke(IPC.stopWatch, 'w1');
+    await invoke(IPC.remarkNotNow);
+    await invoke(IPC.remarkAccept, 'r1');
+    expect([said, cancelled]).toEqual([[], []]);
   });
 });

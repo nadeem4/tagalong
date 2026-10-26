@@ -10,7 +10,6 @@
 import { callOrFullScreenInFront } from '@tagalong/core';
 import type { Settings, SettingsPatch, WindowEntry } from '@tagalong/protocol';
 import type { ListeningState } from '../shared/ipc';
-import type { EngineCall } from './ipc/handle';
 
 export type { ListeningState };
 
@@ -146,58 +145,24 @@ export function startListeningGuard(options: {
 }
 
 /**
- * Saves `on` each time it changes; `paused` is never saved, as a call or full screen is not a
- * choice the person made. With no engine it saves to the settings file, as Settings does. A
- * save that fails is tried again at the next change, so switching off is never lost. Saves run
- * one at a time, and each one done saves again if the choice changed meanwhile, so a quick
- * switch on then off never leaves "on" in the file; saved settings arrive in order.
+ * Saves `on` each time it changes, to the settings file; `paused` is never saved, as a call or
+ * full screen is not a choice the person made. A save that fails is tried again at the next
+ * change, so switching off is never lost.
  */
 export function saveListening(options: {
   /** What the settings file holds now. */
   saved: boolean;
-  host: () => { client: EngineCall } | null;
   settingsStore: () => { set(patch: SettingsPatch): Settings };
   onSaved: (settings: Settings) => void;
 }): (state: ListeningState) => void {
   let saved = options.saved;
-  let wanted = saved;
-  let saving = false;
-  const failed = (error: unknown): void =>
-    console.warn('[main] could not save Always listening', error);
-  const next = (): void => {
-    if (saving || wanted === saved) return;
-    const on = wanted;
-    const patch = { listening: { always: on } };
-    const done = (settings: Settings): void => {
-      saved = on;
-      options.onSaved(settings);
-    };
-    const host = options.host();
-    if (host === null) {
-      try {
-        done(options.settingsStore().set(patch));
-      } catch (error) {
-        failed(error);
-        return;
-      }
-      next();
-      return;
-    }
-    saving = true;
-    host.client
-      .call('settings.set', { patch })
-      .then(({ settings }) => {
-        saving = false;
-        done(settings);
-        next();
-      })
-      .catch((error: unknown) => {
-        saving = false;
-        failed(error);
-      });
-  };
   return (state) => {
-    wanted = state.on;
-    next();
+    if (state.on === saved) return;
+    try {
+      options.onSaved(options.settingsStore().set({ listening: { always: state.on } }));
+      saved = state.on;
+    } catch (error) {
+      console.warn('[main] could not save Always listening', error);
+    }
   };
 }

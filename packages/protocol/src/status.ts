@@ -8,6 +8,8 @@ import { z } from 'zod';
 
 /** In order: of the marks set, the first one here is the one that shows on Scout. */
 export const StatusId = z.enum([
+  'brain-offline',
+  'brain-outdated',
   'brain-signed-out',
   'brain-no-sign-in',
   'brain-no-key',
@@ -37,6 +39,11 @@ export type FixTarget = 'brain' | 'voice' | 'browser' | 'privacy' | 'experts' | 
 export const STATUS_WORDS: Readonly<
   Record<StatusId, { tag: string; detail: string; fix?: FixTarget }>
 > = {
+  'brain-offline': { tag: 'Offline', detail: "Scout's brain is not running." },
+  'brain-outdated': {
+    tag: 'Update',
+    detail: 'Update Tagalong to talk to this brain.',
+  },
   'brain-signed-out': {
     tag: 'Signed out',
     detail: 'Can’t think: signed out of Claude.',

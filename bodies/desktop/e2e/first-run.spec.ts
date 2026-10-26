@@ -12,6 +12,8 @@ import type { ElectronApplication, Page } from '@playwright/test';
 import { stripLoaded } from './bean-strip';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
+test.skip(true, 'removed with row 13: old Welcome and first-run');
+
 const ENGINE = { timeout: 30_000 };
 
 function launch(dataDir: string, signIn: string): Promise<ElectronApplication> {
@@ -86,7 +88,7 @@ test.describe('setup by typing, signed in to Claude', () => {
 
   test.afterAll(async () => {
     await quit(app);
-    rmSync(dataDir, { recursive: true, force: true });
+    rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   });
 
   test('a new install opens setup alone, asks talk or type, and a typed name moves it on', async () => {
@@ -180,7 +182,7 @@ test.describe('setup by typing, without Claude Code', () => {
 
   test.afterAll(async () => {
     await quit(app);
-    rmSync(dataDir, { recursive: true, force: true });
+    rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   });
 
   test('offers install or a key, and a key tested once moves setup on', async () => {
