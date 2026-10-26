@@ -9,11 +9,13 @@ import { STATUS_WORDS } from '@tagalong/protocol';
 import type { ContextSnapshot, Dropped } from '@tagalong/protocol';
 import { IPC } from '../../shared/ipc';
 import { BrainOffline } from '../brain/brain-client';
-import type { BrainClient } from '../brain/brain-client';
+import type { BrainClient, BrainStatus } from '../brain/brain-client';
 import type { IpcHandle } from './handle';
 
 export interface TurnIpcDeps {
   brain: Pick<BrainClient, 'say' | 'cancel'>;
+  /** The link as last reported; a too-new brain gets the update words, not the offline ones. */
+  status: () => BrainStatus;
   /** The snapshot the last hotkey captured, sent with the ask. */
   pendingSnapshot: () => ContextSnapshot | null;
   /**
@@ -70,8 +72,10 @@ export function registerTurnIpc(handle: IpcHandle, deps: TurnIpcDeps): void {
         return { turnId: (await deps.brain.say(say)).turn };
       } catch (error) {
         // The desktop's own words, never the brain's message.
-        if (error instanceof BrainOffline)
-          throw new Error(STATUS_WORDS['brain-offline'].detail, { cause: error });
+        if (error instanceof BrainOffline) {
+          const words = deps.status() === 'outdated' ? 'brain-outdated' : 'brain-offline';
+          throw new Error(STATUS_WORDS[words].detail, { cause: error });
+        }
         throw error;
       }
     },

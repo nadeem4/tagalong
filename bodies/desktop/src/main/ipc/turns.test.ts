@@ -12,7 +12,7 @@ const PNG = { mime: 'image/png' as const, base64: 'AAAA', width: 1, height: 1 };
 
 function setup(
   snapshot: Partial<ContextSnapshot> | null = null,
-  options: { offline?: boolean; takeDrop?: () => Promise<never> } = {},
+  options: { offline?: boolean; outdated?: boolean; takeDrop?: () => Promise<never> } = {},
 ) {
   const ipc = fakeIpc();
   const said: SayParams[] = [];
@@ -27,6 +27,7 @@ function setup(
       },
       cancel: (turn) => void cancelled.push(turn),
     },
+    status: () => (options.outdated === true ? 'outdated' : 'online'),
     pendingSnapshot: () => snapshot as ContextSnapshot | null,
     ...(options.takeDrop ? { takeDrop: options.takeDrop } : {}),
   });
@@ -52,6 +53,13 @@ describe('registerTurnIpc', () => {
         context: { window: 'a.ts' },
       },
     ]);
+  });
+
+  it('ask when the brain is too new rejects with the update sentence', async () => {
+    const { invoke } = setup(null, { outdated: true, offline: true });
+    await expect(invoke(IPC.ask, { petId: 'scout', text: 'hi' })).rejects.toThrow(
+      'Update Tagalong to talk to this brain.',
+    );
   });
 
   it('ask when brain offline rejects with the offline sentence', async () => {

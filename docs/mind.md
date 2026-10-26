@@ -2,6 +2,9 @@
 
 ## Purpose
 
+The desktop no longer boots `packages/core`; this is the old brain. The Python brain's mind is in
+[brain.md](brain.md). Pointing and keep-an-eye are not wired yet.
+
 Scout's mind is everything in `packages/core` that decides what Scout says and does: a turn
 (the person asked), a check-in (something happened and nobody asked), a watch check, sleep, and
 the records that let a person see why Scout did something. Code decides **when** the mind runs and

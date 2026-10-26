@@ -96,7 +96,7 @@ export function registerSettingsIpc(handle: IpcHandle, deps: SettingsIpcDeps): v
 
   handle(IPC.checkKey, (): ProvidersCheckResult => ({
     ok: false,
-    message: 'Tagalong’s engine isn’t running, so the key couldn’t be tested.',
+    message: 'Keys are checked by the brain now; Tagalong can’t test one here yet.',
   }));
 
   // The brain has no model lists yet: the form still takes a typed model id.

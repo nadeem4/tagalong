@@ -152,7 +152,8 @@ await engine.shutdown();
 
 A real host also answers the engine's `perception.*` requests for the capabilities it advertises.
 The method catalog and every payload schema are in `packages/protocol/src/methods.ts`; the desktop
-app's own client is `bodies/desktop/src/main/engine-client.ts`. Read
+app's own client for the Python brain is `bodies/desktop/src/main/brain/brain-client.ts`; the
+desktop no longer boots the engine. Read
 [Architecture](docs/architecture.md) for how the engine and its hosts fit together, and
 [How to add a host](docs/development.md#how-to-add-a-host) for the contracts a host implements.
 

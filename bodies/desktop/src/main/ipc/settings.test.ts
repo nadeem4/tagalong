@@ -162,7 +162,7 @@ describe('registerSettingsIpc: keys and models', () => {
     const { invoke } = setup();
     expect(await invoke(IPC.checkKey, 'openrouter')).toEqual({
       ok: false,
-      message: 'Tagalong’s engine isn’t running, so the key couldn’t be tested.',
+      message: 'Keys are checked by the brain now; Tagalong can’t test one here yet.',
     });
   });
 });

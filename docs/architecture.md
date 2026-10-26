@@ -282,9 +282,9 @@ when the turn had already ended.
 
 The desktop's `start()` (`bodies/desktop/src/main/index.ts`) gates the platform adapter behind the
 sight pause, opens the secret store and settings, records the launch, builds rolling memory, then
-calls `startEngineHost`, which runs `Engine.boot` and connects `EngineClient`. If the engine fails
-to start, Settings opens with the error instead of quitting, because Settings is where the fix is.
-Only then are the panel, the avatar and Welcome created.
+calls `startBrain` (`brain/start.ts`), which dials the Python brain over contract v1 and keeps
+retrying while it is down. The desktop does not boot `packages/core`. The panel and the avatar are
+created next; Welcome does not open yet. The sections below describe `packages/core`, the old brain.
 
 `Engine.boot` (`packages/core/src/engine.ts`) in order:
 

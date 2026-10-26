@@ -30,7 +30,7 @@ The brain is being rewritten in Python; the TypeScript apps stay as bodies.
 - protocol/ts: `@tagalong/contract`, zod schemas for contract v1
 - brain/: the Python brain (uv project; `src/brain/protocol.py` holds the contract v1 pydantic types; `server.py` is the websocket server, `sessions.py` the one conversation, `guardrails.py` the budget, `mind/` Scout's soul, prompt and thinking loop; see docs/brain.md)
 - packages/protocol: wire types and the JSON-RPC method catalog shared by brain and bodies
-- packages/core: the current brain (Scout's mind, sight, memory, tools, experts, routines, providers, ws server)
+- packages/core: the old brain (Scout's mind, sight, memory, tools, experts, routines, providers, ws server); the desktop no longer boots it, and it will be deleted
 - bodies/ui: shared React UI (bubble, dock pet, Home, settings, voice)
 - bodies/desktop: Electron body (dials the Python brain; no longer boots packages/core)
 - apps/extension: Chrome extension body

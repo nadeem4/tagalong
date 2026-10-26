@@ -97,7 +97,8 @@ tagalong/
                                     # confirm and routine cards)
       e2e/fixtures/fake-brain.ts    # a ws server speaking contract v1, for smoke and listening
       e2e/fixtures/notes-mcp.mjs    # a tiny stdio MCP server with one write tool, for cards.spec.ts
-      src/main/                     # index.ts, engine-host.ts, engine-client.ts, context.ts,
+      src/main/                     # index.ts, brain/ (brain-client.ts, turn-events.ts,
+                                    # start.ts), context.ts,
                                     # hotkeys.ts, talk-key.ts, always-listening.ts, secret-store.ts,
                                     # tray-icon.ts, tray-menu.ts, welcome.ts, launch.ts,
                                     # claude-sign-in.ts, keep-an-eye.ts, sight-pause.ts, drop.ts,
@@ -131,7 +132,7 @@ tagalong/
 | `packages/protocol` | Zod schemas for context snapshots, pets, messages, settings, and JSON-RPC, plus the method catalog. Depends only on zod.                                                                                    |
 | `packages/core`     | The Tagalong Engine: Scout, conversation runner, prompt assembly, SQLite memory, experts and hand-offs, connected apps (MCP client), routines, host protocol server, pairing, provider adapters. Pure Node. |
 | `bodies/ui`         | React components shared by hosts: `DockPet`, `CompanionBubble` and its cards, `ChatPanel` (with its internal `MessageList`, `Composer` and `SightBar`), Home's `HomeView`, and the `HostBridge` context.    |
-| `bodies/desktop`    | Electron host. Runs the engine in the main process, dials it over the loopback socket, and owns Scout's window, the bubble, Home, Welcome, the tray, hotkeys, secret storage, and Scout's voice and ears.   |
+| `bodies/desktop`    | Electron host. Dials the Python brain over the loopback socket, and owns Scout's window, the bubble, Home, Welcome, the tray, hotkeys, secret storage, and Scout's voice and ears.                          |
 | `apps/extension`    | Chrome MV3 host. Connects to the running engine and speaks the protocol only. Side panel, pairing page, on-demand page reader, and the open-panel shortcut.                                                 |
 
 ## How to run
@@ -171,8 +172,8 @@ Inside `bodies/desktop`:
 ```bash
 pnpm build            # ensure-electron, then electron-vite build into dist/
 pnpm start            # ensure-electron, then electron-vite preview against the built output
-pnpm start:fresh      # the same, on a new temp data folder: Welcome and the first hello, every time
-pnpm test:e2e         # ensure-electron, electron-vite build, then the Playwright smoke suite
+pnpm start:fresh      # the same, on a new temp data folder, so you start from a clean profile
+pnpm --filter @tagalong/desktop test:e2e  # ensure-electron, electron-vite build, then the Playwright smoke suite
 pnpm ensure-electron  # fetch the Electron binary on its own
 pnpm package:win      # fetch-native, electron-vite build, electron-builder --win nsis
 pnpm package:dir      # an unpacked app in release/, for checking what gets packaged
@@ -294,12 +295,13 @@ The suites run offline on fakes. The desktop answers turns only through a brain,
 `TAGALONG_FAKE_TTS=1`, `TAGALONG_FAKE_STT=1`. Specs for features the new brain has not rebuilt yet are
 `test.skip` with a reason of the form `returns with row N: <feature>` (the Launch board row that brings
 the feature back): the tool-call round trip, the Experts page, `cards.spec.ts` and `launch-greeting.spec.ts`.
-`first-run.spec.ts` is skipped as `removed with row 13`: the old Welcome goes with core. A quit that does not finish in time is
-killed by `e2e/fixtures/close-app.ts`, so a hung teardown cannot hold the single-instance lock. When an e2e suite
+`first-run.spec.ts` is skipped as `removed with row 13`: the old Welcome goes with core. A quit that does not finish in 45 s is
+killed by `e2e/fixtures/close-app.ts`, which then waits for the process to exit, so a hung teardown
+cannot hold the single-instance lock or the data folder. When an e2e suite
 fails in CI, its `test-results` folder (page snapshots and screenshots) is uploaded as the
 `e2e-test-results` artifact.
 
-Quit any running Tagalong before `pnpm test:e2e`. The main process takes a single-instance lock, so a
+Quit any running Tagalong before `pnpm --filter @tagalong/desktop test:e2e`. The main process takes a single-instance lock, so a
 second copy quits immediately and Playwright reports the confusing
 `electron.launch: Target page, context or browser has been closed` instead of naming the real cause.
 
@@ -326,10 +328,8 @@ TAGALONG_FAKE_PROVIDERS=1 pnpm dev:desktop
 PowerShell has no inline `VAR=value command` prefix; pasting the bash line into PowerShell fails with
 `TAGALONG_FAKE_PROVIDERS=1 : The term ... is not recognized`.
 
-On a fresh profile Welcome opens first; **Start** finishes it, and **Home → Settings → Open Welcome
-again** brings it back. To see what a new user sees, run `pnpm --filter @tagalong/desktop
-start:fresh`: it starts on a new folder in the temp directory (`--user-data-dir`), so Welcome and
-Scout's first hello show every time and your own `%APPDATA%\Tagalong` is never touched. Quit any
+Welcome does not open yet. To see what a new user sees, run `pnpm --filter @tagalong/desktop
+start:fresh`: it starts on a new folder in the temp directory (`--user-data-dir`), so your own `%APPDATA%\Tagalong` is never touched. Quit any
 running Tagalong first; the fresh copy has no saved keys. The tray's **Open Tagalong** item opens Home. Two more things are worth knowing before the first run.
 
 **`ensure-electron`.** Electron 44.3.0 publishes no npm install script, so `pnpm install` unpacks the

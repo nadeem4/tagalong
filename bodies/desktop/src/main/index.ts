@@ -70,6 +70,9 @@ import type { WorkerProcess } from './voice/worker/messages';
 import { WorkerLocalVoice } from './voice/worker/worker-local-voice';
 import type { VoiceService } from './voice/voice';
 import { openClaudeSignIn, signInFor } from './claude-sign-in';
+import { saveAvatarSpot } from './avatar-spot';
+import { offlineWatch } from './brain/offline-watch';
+import type { BrainStatus } from './brain/brain-client';
 import { shouldOpenWelcome } from './welcome';
 import type { BrainClient } from './brain/brain-client';
 import {
@@ -166,11 +169,19 @@ interface Desktop {
 }
 
 let desktop: Desktop | null = null;
+/** The brain link as last reported, for the ask handler's choice of words. */
+let brainStatus: BrainStatus = 'connecting';
+
+/** Scout's spot goes to the settings file and the live settings: the brain has no settings. */
+function rememberAvatarSpot(position: { x: number | null; y: number | null }): void {
+  if (desktop === null) return;
+  saveAvatarSpot(desktop.settingsStore, position, (saved) => {
+    if (desktop !== null) desktop.settings = saved;
+  });
+}
 
 /** The item last dropped on Scout, held unread until a button on its card takes it. */
 const drops = dropDesk(nodeDropFs);
-/** The Claude sign-in check, started at boot so a cold `claude` has had time before the greeting. */
-let signInCheck: ReturnType<typeof signInFor> | null = null;
 
 // The fake ears need no real microphone: Chromium's fake device stands in for one, and
 // the permission prompt answers itself. Switches only take effect before the app is ready.
@@ -234,8 +245,6 @@ app.on('before-quit', () => {
 });
 
 async function start(): Promise<void> {
-  signInCheck = signInFor(process.env);
-  signInCheck.catch(() => undefined); // a failure here reads as unknown at greet time, never unhandled
   const sightPause = new SightPause();
   // Gated at the source, so every present and future reader is covered by construction.
   // Nothing downstream is handed the ungated adapter, which is what makes forgetting to
@@ -289,10 +298,16 @@ async function start(): Promise<void> {
     const { type, ...params } = event;
     forwardToRenderers({ method: type, params });
   };
+  // A brain that stays down fails the open turns, so the bubble does not stream forever.
+  const watchOffline = offlineWatch(() => turnEvents.resync().forEach(forwardTurn));
   const brain = startBrain({
     onNotification: (method, params) => turnEvents.map(method, params).forEach(forwardTurn),
     onResync: () => turnEvents.resync().forEach(forwardTurn),
-    onStatus: (status) => markBrainLink(statusMarks, status),
+    onStatus: (status) => {
+      brainStatus = status;
+      markBrainLink(statusMarks, status);
+      watchOffline(status);
+    },
   });
 
   // The voice models run in their own process; it starts when first needed: at launch if an earlier run downloaded Kokoro, otherwise on Scout's first line.
@@ -440,11 +455,7 @@ async function start(): Promise<void> {
   desktop.avatar = createAvatarWindow({
     hidden: welcoming,
     position: settings.avatar,
-    onMoved: (position) => {
-      void maybeEngine()
-        ?.call('settings.set', { patch: { avatar: position } })
-        .catch((error: unknown) => console.warn('[main] could not persist avatar position', error));
-    },
+    onMoved: (position) => rememberAvatarSpot(position),
   });
   // Windows ends a session (shutdown, restart, sign-out) without before-quit; that is a
   // clean close too, not a crash.
@@ -973,6 +984,7 @@ function registerIpc(): void {
 
   registerTurnIpc(handle, {
     brain: required().brain,
+    status: () => brainStatus,
     pendingSnapshot: () => required().pendingSnapshot,
     takeDrop: () => drops.take(),
   });
@@ -1102,9 +1114,7 @@ function registerIpc(): void {
     const { avatar } = required();
     if (avatar === null) return;
     const [x, y] = avatar.getPosition();
-    void maybeEngine()
-      ?.call('settings.set', { patch: { avatar: { x: x ?? null, y: y ?? null } } })
-      .catch((error: unknown) => console.warn('[main] could not persist avatar position', error));
+    rememberAvatarSpot({ x: x ?? null, y: y ?? null });
   });
 
   // Drop it on Scout: name the item, open the bubble on its card. Nothing is read yet.
