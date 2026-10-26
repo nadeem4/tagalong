@@ -23,6 +23,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Routines](#routines)
 - [Memory](#memory)
 - [Screen memory](#screen-memory)
+- [Window tools](#window-tools)
 - [Point, don't click](#point-dont-click)
 - [What Scout saw](#what-scout-saw)
 - [Draft it for me](#draft-it-for-me)
@@ -1473,6 +1474,20 @@ monitor.
    With one monitor it says there is only one.
 5. **Action:** put a blind-spot window (for example a password manager) in front and ask about it.
    **Expected:** Scout says it cannot see it.
+
+## Window tools
+
+The desktop declares `list_windows`, `read_window_text` and `look_at_window` to the brain. Until the
+brain routes them to the model, check them in the brain's logs or a contract-v1 test client.
+
+### WT.1. Minimized windows
+
+1. **Setup:** run the brain and the desktop; open Notepad with some text and minimize it.
+2. **Action:** send `use` for `list_windows`. **Expected:** JSON text listing Notepad with state
+   `minimized` next to the visible windows.
+3. **Action:** `use` `read_window_text` with Notepad's id. **Expected:** its text comes back.
+4. **Action:** `use` `look_at_window` with Notepad's id. **Expected:** error `tool_failed`
+   "That window is minimized, so there is nothing drawn to look at."
 
 ## Point, don't click
 

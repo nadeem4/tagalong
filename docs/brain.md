@@ -147,7 +147,9 @@ The desktop app (`bodies/desktop`) is a body of this brain. It no longer runs th
 - Start the brain first (`cd brain && uv run brain`), then the desktop (`pnpm dev:desktop`). The
   desktop dials `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`, the same variable the brain
   listens on) and retries every 2 s, so either order works.
-- It sends `hello` with no tools. An ask is a `say` with the text, the screenshot as an image part
+- It sends `hello` declaring the window body tools `list_windows`, `read_window_text` and
+  `look_at_window` (see [desktop.md](desktop.md)); the brain does not offer them to the model yet.
+  An ask is a `say` with the text, the screenshot as an image part
   and `context.window`; interrupt is `cancel`.
 - With the brain down, the bubble shows "Scout's brain is not running." A brain restart ends the
   open turn as failed; the next ask works without restarting the app.

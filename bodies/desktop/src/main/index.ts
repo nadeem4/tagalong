@@ -301,6 +301,9 @@ async function start(): Promise<void> {
   // A brain that stays down fails the open turns, so the bubble does not stream forever.
   const watchOffline = offlineWatch(() => turnEvents.resync().forEach(forwardTurn));
   const brain = startBrain({
+    platform,
+    exclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
+    onCapture: announceCapture,
     onNotification: (method, params) => turnEvents.map(method, params).forEach(forwardTurn),
     onResync: () => turnEvents.resync().forEach(forwardTurn),
     onStatus: (status) => {

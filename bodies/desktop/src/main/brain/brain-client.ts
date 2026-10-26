@@ -244,8 +244,20 @@ export class BrainClient {
     try {
       const output = await this.options.onUse(tool, input, call);
       if (this.socket === socket) this.reply(id, { output });
-    } catch {
-      if (this.socket === socket) this.reply(id, undefined, ErrorCode.tool_failed, 'tool failed');
+    } catch (error) {
+      if (this.socket !== socket) return;
+      // A tool that names its failure (timeout, a refusal with its sentence) keeps it.
+      // The contract allows only these codes for a failed use; anything else is tool_failed.
+      const allowed: number[] = [
+        ErrorCode.tool_failed,
+        ErrorCode.cancelled,
+        ErrorCode.timeout,
+        ErrorCode.invalid_params,
+      ];
+      if (error instanceof RpcError) {
+        const code = allowed.includes(error.code) ? error.code : ErrorCode.tool_failed;
+        this.reply(id, undefined, code, error.message);
+      } else this.reply(id, undefined, ErrorCode.tool_failed, 'tool failed');
     }
   }
 
