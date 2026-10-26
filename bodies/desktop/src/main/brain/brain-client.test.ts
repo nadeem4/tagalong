@@ -346,9 +346,8 @@ describe('BrainClient', () => {
   });
 
   it('onResync is called before the notification that follows the hello result', async () => {
-    const { client, sockets } = setup();
+    const sockets: FakeSocket[] = [];
     const order: string[] = [];
-    void client;
     const c = new BrainClient({
       addr: 'x:1',
       tools: () => tools,
@@ -404,5 +403,26 @@ describe('BrainClient', () => {
     const e = await p.catch((x: unknown) => x);
     expect(e).toBeInstanceOf(RpcError);
     expect((e as RpcError).code).toBe(-32008);
+  });
+
+  it('a use answer is dropped when the socket changed while onUse ran', async () => {
+    const { s, sockets, onUse } = await online(100);
+    let settle!: (p: { type: 'text'; text: string }[]) => void;
+    onUse.mockImplementationOnce(() => new Promise((r) => (settle = r)));
+    s.receive({
+      jsonrpc: '2.0',
+      id: 'b1',
+      method: 'use',
+      params: { call: 'c1', tool: 'see_screen', input: {} },
+    });
+    s.drop();
+    await vi.advanceTimersByTimeAsync(100);
+    const s2 = sockets[1]!;
+    s2.opens();
+    s2.receive(helloOk(s2.sent[0]!.id));
+    await vi.advanceTimersByTimeAsync(0);
+    settle([{ type: 'text', text: 'late' }]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(s2.sent.filter((m) => m.id === 'b1')).toEqual([]);
   });
 });

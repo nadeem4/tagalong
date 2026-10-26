@@ -128,6 +128,14 @@ describe('createTurnEvents', () => {
     expect(m.resync()).toEqual([]);
   });
 
+  it('a reply for an unseen turn counts as open for resync', () => {
+    const m = make();
+    m.map('reply', delta('Hi', 'z'));
+    expect(m.resync()).toMatchObject([
+      { type: 'turn.error', turnId: 'z', code: 'brain_restarted' },
+    ]);
+  });
+
   it('silent turn (no reply) completes with empty text', () => {
     const m = make();
     m.map('turn', turn('started'));

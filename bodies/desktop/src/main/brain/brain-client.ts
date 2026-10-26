@@ -232,6 +232,8 @@ export class BrainClient {
   }
 
   private async use(id: string | number, params: unknown): Promise<void> {
+    // Ids are per connection: an answer that outlives its socket must not reach the next one.
+    const socket = this.socket;
     const parsed = UseParams.safeParse(params);
     if (!parsed.success)
       return this.reply(id, undefined, ErrorCode.invalid_params, 'invalid params');
@@ -241,9 +243,9 @@ export class BrainClient {
     }
     try {
       const output = await this.options.onUse(tool, input, call);
-      this.reply(id, { output });
+      if (this.socket === socket) this.reply(id, { output });
     } catch {
-      this.reply(id, undefined, ErrorCode.tool_failed, 'tool failed');
+      if (this.socket === socket) this.reply(id, undefined, ErrorCode.tool_failed, 'tool failed');
     }
   }
 

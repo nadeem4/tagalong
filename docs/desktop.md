@@ -387,7 +387,7 @@ understands. It keeps each open turn's reply text, because `turn.completed` carr
 | `turn` ended `over_budget` / `error`           | `turn.error` with code `over_budget` / `brain_error`                                                                              |
 | `tool` started / ended                         | `turn.toolRequest` (call id as `approvalId` and `callId`, empty input) / `turn.toolResult`                                        |
 | `ask`, `changed`                               | nothing yet                                                                                                                       |
-| resync                                         | `turn.error` `brain_restarted` for each turn started and not ended, then the state is cleared                                     |
+| resync                                         | `turn.error` `brain_restarted` for each open turn (started, or seen in a reply, and not ended), then the state is cleared         |
 
 ### Preload and the tagalongHost bridge
 
