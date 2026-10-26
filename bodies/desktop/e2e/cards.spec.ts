@@ -113,7 +113,7 @@ test.describe('the hand-off card', () => {
 
   test.afterAll(async () => {
     await app.close();
-    rmSync(dataDir, { recursive: true, force: true });
+    rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     rmSync(project, { recursive: true, force: true });
   });
 
@@ -194,7 +194,7 @@ test.describe('the connector confirm card', () => {
 
   test.afterAll(async () => {
     await app.close();
-    rmSync(dataDir, { recursive: true, force: true });
+    rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
     rmSync(dirname(notes), { recursive: true, force: true });
   });
 
@@ -272,7 +272,7 @@ test.describe('the routine card', () => {
 
   test.afterAll(async () => {
     await app.close();
-    rmSync(dataDir, { recursive: true, force: true });
+    rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   });
 
   const routines = (page: Page) =>

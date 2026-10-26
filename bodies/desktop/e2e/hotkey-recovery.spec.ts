@@ -12,6 +12,7 @@ import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
 import type {} from '../src/shared/ipc';
 import { closeApp } from './fixtures/close-app';
+import { freePort } from './fixtures/free-port';
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -42,6 +43,8 @@ test.beforeAll(async () => {
     cwd: appDir,
     env: {
       ...process.env,
+      // Nothing listens here, so the spec never dials a developer's real brain.
+      TAGALONG_BRAIN_ADDR: `127.0.0.1:${await freePort()}`,
       TAGALONG_FAKE_PROVIDERS: '1',
       TAGALONG_FAKE_TTS: '1',
       TAGALONG_SKIP_WELCOME: '1',
@@ -53,7 +56,7 @@ test.afterAll(async () => {
   try {
     await closeApp(app);
   } finally {
-    rmSync(dataDir, { recursive: true, force: true });
+    rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 });
 

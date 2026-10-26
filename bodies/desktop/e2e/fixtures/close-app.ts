@@ -4,7 +4,7 @@
  */
 import type { ElectronApplication } from '@playwright/test';
 
-export async function closeApp(app: ElectronApplication | undefined, ms = 10_000): Promise<void> {
+export async function closeApp(app: ElectronApplication | undefined, ms = 45_000): Promise<void> {
   if (app === undefined) return;
   const proc = app.process();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -19,6 +19,10 @@ export async function closeApp(app: ElectronApplication | undefined, ms = 10_000
   clearTimeout(timer);
   if (outcome === 'hung') {
     console.warn('closeApp: the app did not quit in time; killing it');
+    // Wait for the exit: Chromium children hold files in the data dir until then, and a
+    // caller that removes the dir right after would hit EBUSY.
+    const exited = new Promise<void>((resolve) => proc.once('exit', () => resolve()));
     proc.kill();
+    await exited;
   }
 }

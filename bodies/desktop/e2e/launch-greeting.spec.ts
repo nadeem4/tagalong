@@ -69,7 +69,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await app.close().catch(() => undefined);
-  rmSync(dataDir, { recursive: true, force: true });
+  rmSync(dataDir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
 });
 
 test('signed out: a status mark on Scout and in the line, and Fix it opens Settings', async () => {
