@@ -363,6 +363,10 @@ their rows return.
    the mark clears and an ask works.
 8. **Action:** ask with an interrupt: ask for a long story, press the stop control.
    **Expected:** the answer stops and the turn ends cancelled.
+9. **Action:** with the brain and app running, ask "What windows do I have open?"
+   **Expected:** Scout lists them (it called `desktop__list_windows`).
+10. **Action:** ask the same, and quit the desktop app while Scout is working on it.
+    **Expected:** the reply says it could not reach the desktop; no hang.
 
 ## Hand-offs to Claude Code
 

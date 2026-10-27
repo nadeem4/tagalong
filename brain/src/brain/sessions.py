@@ -16,7 +16,7 @@ from brain.mind.prompt import render_know, system_prompt, user_content
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Model, run_turn
 from brain.protocol import SayParams, SayResult
-from brain.toolbox import BrainSource, Toolbox
+from brain.toolbox import BodySource, BrainSource, Toolbox
 from brain.tools import brain_tools
 
 log = logging.getLogger("brain")
@@ -37,7 +37,7 @@ class Session:
         self._bodies = bodies
         self._step_cap = step_cap
         self._memory = memory
-        self.toolbox = Toolbox([BrainSource(brain_tools(memory))])
+        self.toolbox = Toolbox([BrainSource(brain_tools(memory)), BodySource(bodies)])
         self._now = now
         loaded = memory.load_messages()
         self.history: list = rebuild_history(loaded)

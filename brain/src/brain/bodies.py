@@ -186,4 +186,6 @@ class Bodies:
     def _fail_pending(self, peer: Peer) -> None:
         for held, future in list(self._pending.values()):
             if held is peer and not future.done():
-                future.set_exception(RpcError(ErrorCode.body_offline, "the body disconnected"))
+                future.set_exception(
+                    RpcError(ErrorCode.body_offline, "the body went offline (disconnected)")
+                )

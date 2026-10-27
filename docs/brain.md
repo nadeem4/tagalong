@@ -3,7 +3,7 @@
 The brain is the Python side of contract v1 ([protocol/README.md](../protocol/README.md)). It is
 being built row by row and replaces `packages/core`. Today bodies can connect, declare their tools,
 catch up on missed notifications, and talk to Scout: `say` starts a turn and the reply streams
-back. Scout remembers through the `remember`, `recall` and `forget` tools, kept in `tagalong.db`
+back. Scout can use the tools bodies declare (see [Toolbox](#toolbox)). Scout remembers through the `remember`, `recall` and `forget` tools, kept in `tagalong.db`
 (see [memory.md](memory.md)). The chat is saved and picked up again after a restart (see [What a turn does](#what-a-turn-does)).
 
 ## Run it
@@ -51,7 +51,7 @@ the total can run a little low.
 | `brain/src/brain/sessions.py`    | The one conversation: history, the running turn, `say` joins, `cancel`                        |
 | `brain/src/brain/mind/resume.py` | Rebuilds a valid history from the saved chat at start                                         |
 | `brain/src/brain/memory.py`      | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                          |
-| `brain/src/brain/toolbox.py`     | `Toolbox`: every tool the model or Home may call, from sources (`BrainSource` now); lists scout tools and gates each call |
+| `brain/src/brain/toolbox.py`     | `Toolbox`: every tool the model or Home may call, from sources (`BrainSource`, `BodySource`); lists scout tools and gates each call |
 | `brain/src/brain/tools.py`       | The brain's own tools (`remember`, `recall`, `forget`) as specs and handlers for `BrainSource` |
 | `brain/src/brain/mind/soul.md`   | Scout's character, the start of the system prompt                                             |
 | `brain/src/brain/mind/prompt.py` | The system prompt (soul, local time, online bodies, "What you know") and `say` content blocks |
@@ -109,8 +109,8 @@ flowchart TD
   prompt from Scout's soul, that "What you know" block, the local time, and the bodies online.
 - Text streams as `reply` notifications with `delta`. Tools run at the same time, each with
   `tool` `started` then `ended`. The model is offered the memory tools (`remember`, `recall`,
-  `forget`); a refused or failed call ends as an error result the model reads. No body tools are
-  offered to the model yet.
+  `forget`) and every online body's tools (see Toolbox); a refused or failed call ends as an error
+  result the model reads.
 - A turn ends with one of `done`, `cancelled`, `error`, `over_budget` or `step_cap`. A refusal or
   a failed model call is `error`.
 - If any delta was sent, exactly one `reply` with `done: true` follows, whatever the end reason.
@@ -162,7 +162,7 @@ The desktop app (`bodies/desktop`) is a body of this brain. It no longer runs th
   desktop dials `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`, the same variable the brain
   listens on) and retries every 2 s, so either order works.
 - It sends `hello` declaring the window body tools `list_windows`, `read_window_text` and
-  `look_at_window` (see [desktop.md](desktop.md)); the brain does not offer them to the model yet.
+  `look_at_window` (see [desktop.md](desktop.md)); the brain offers them to the model as `desktop__<tool>`.
   An ask is a `say` with the text, the screenshot as an image part
   and `context.window`; interrupt is `cancel`.
 - With the brain down, the bubble shows "Scout's brain is not running." A brain restart ends the
@@ -172,11 +172,29 @@ The desktop app (`bodies/desktop`) is a body of this brain. It no longer runs th
 - Pets, Welcome, the launch greeting, keep-an-eye, wellbeing, the pointer overlay and the separate
   Settings window are not wired to the brain yet. See [desktop.md](desktop.md#the-brain-in-the-main-process).
 
+## Toolbox
+
+`Toolbox` (`toolbox.py`) is the one place tools come from. A `Session` builds it from two sources:
+`BrainSource` (remember, recall, forget) and `BodySource` (every online body's declared tools).
+
+- **Per step.** The model's tool list is rebuilt at every step, so a body that connects or leaves
+  between steps changes what Scout may call. A tool whose body is offline is never offered.
+- **Names.** Body tools reach the model as `<body id>__<tool>`; the body sees its plain name in
+  `use`. A full name over 64 characters is dropped and logged.
+- **Gate.** Each call is checked in order: unknown name, wrong caller (the tool's audience), then
+  a source that owns the name but cannot serve it now (body offline). Each failure becomes an
+  `is_error` tool result worded with the reason.
+- **Body calls.** `use` waits at most 30 s. On timeout or when the turn is cancelled the brain
+  sends the body `cancel {call}`. If the body disconnects mid-call the result says it went
+  offline. Response frames from a body are resolved in the read loop by `Bodies.resolve`.
+- **Results.** Parts a body returns are size-checked and turned into model blocks; a bad or
+  oversized result is an error result.
+
 ## Not built yet
 
 | Row   | Brings                                                                                                                                                                                                           |
 | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 7     | Body tools for Scout (`use` plugs into the loop), the brain's tools in the `hello` result, `use` and its `cancel` to bodies, `call`, model tool names `<body>__<tool>`, part size checks as `say` and tools land |
+| 7     | The brain's tools in the `hello` result, `call` (Home runs a tool), the gate steps that need asks |
 | Later | Live-state replay after `resync`, asks, `answer` and confirm guardrails                                                                                                                                          |
 
 Until then `call` and `answer` answer `method_not_found`.

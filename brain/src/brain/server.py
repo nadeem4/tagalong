@@ -3,6 +3,7 @@
 Each connection owns one queue drained by a single writer task, so Peer.send never raises
 or awaits (Bodies.notify loops over peers) and the hello result always precedes its backlog.
 Hello, tools, say and cancel are handled; any other request answers method_not_found.
+Response frames (a body's answer to `use`) go to Bodies.resolve.
 """
 
 import asyncio
@@ -105,7 +106,8 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session_id: str, sessio
                     break
                 continue
             if not isinstance(method, str):
-                continue  # a response; nothing asks the body for one yet
+                bodies.resolve(body_id, peer, message)  # a response to a `use`
+                continue
             try:
                 reply = _dispatch(method, message, req_id, body_id, peer, bodies, session)
             except Exception:

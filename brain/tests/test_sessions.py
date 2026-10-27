@@ -14,7 +14,7 @@ from brain.bodies import Bodies
 from brain.memory import Memory
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Final
-from brain.protocol import SayParams
+from brain.protocol import Body, SayParams, Tool
 from brain.sessions import Session
 from brain.toolbox import BrainSource, ToolSpec
 
@@ -422,3 +422,30 @@ async def test_no_merge_into_saved_message(tmp_path):
     assert [m["role"] for m in session.history] == ["user", "user"]
     assert session.history[0]["content"] == [{"type": "text", "text": "old"}]
     await finish_quietly(session)
+
+
+async def test_body_tools_offered_then_gone_after_disconnect():
+    class Peer:
+        def send(self, frame):
+            pass
+
+    peer = Peer()
+
+    class Leaving(Gate):
+        async def stream(self, system, messages, tools):
+            async for item in super().stream(system, messages, tools):
+                if len(self.tools) == 1:  # the body leaves during step 1
+                    session._bodies.disconnect("desktop", peer)
+                yield item
+
+    model = Leaving([remember_call("x"), "done"])
+    session, _ = make(model)
+    tool = Tool(name="see_screen", description="d", input_schema={"type": "object"})
+    body = Body(id="desktop", kind="desktop", name="Desktop")
+    session._bodies.connect(body, [tool], peer, None)
+    session.say("desktop", say("hi"))
+    await finish_quietly(session)
+    first = [t["name"] for t in model.tools[0]]
+    second = [t["name"] for t in model.tools[1]]
+    assert first == ["forget", "recall", "remember", "desktop__see_screen"]
+    assert second == ["forget", "recall", "remember"]
