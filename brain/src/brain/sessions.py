@@ -37,7 +37,11 @@ class Session:
         self._bodies = bodies
         self._step_cap = step_cap
         self._memory = memory
-        self.toolbox = Toolbox([BrainSource(brain_tools(memory)), BodySource(bodies)])
+        self.toolbox = Toolbox(
+            [BrainSource(brain_tools(memory)), BodySource(bodies)],
+            memory.permission_modes,
+            memory.set_permission_mode,
+        )
         self._now = now
         loaded = memory.load_messages()
         self.history: list = rebuild_history(loaded)

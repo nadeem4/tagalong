@@ -7,7 +7,7 @@ see, and gates each call: unknown name, wrong caller, or a source that cannot se
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 from pydantic import ValidationError
 
@@ -29,6 +29,9 @@ class ToolSpec:
     description: str
     input_schema: dict
     audience: frozenset[str] = frozenset({"scout"})  # the design's `for`; a Python keyword
+    effect: Literal["read", "change"] = "change"  # unknown effect is treated as a change
+    default_mode: Literal["ask", "auto"] | None = None  # beats the effect-based default
+    locked: bool = False  # always asks; the person cannot turn this to auto
 
 
 class Source(Protocol):
@@ -69,7 +72,13 @@ class BodySource:
         for body in sorted(self._bodies.online(), key=lambda b: b.id):
             for tool in self._bodies.tools(body.id):
                 out.append(
-                    ToolSpec(f"{body.id}{SEP}{tool.name}", tool.description, tool.input_schema)
+                    ToolSpec(
+                        f"{body.id}{SEP}{tool.name}",
+                        tool.description,
+                        tool.input_schema,
+                        effect=tool.effect or "change",
+                        locked=tool.confirm is True,
+                    )
                 )
         return out
 
@@ -96,8 +105,35 @@ class BodySource:
 
 
 class Toolbox:
-    def __init__(self, sources: list[Source]) -> None:
+    def __init__(
+        self,
+        sources: list[Source],
+        modes: Callable[[], dict[str, str]],
+        save_mode: Callable[[str, str], None],
+    ) -> None:
         self.sources = sources  # brain source first; later tasks append body sources
+        self._modes = modes  # stored per-tool choices, read on every call
+        self._save_mode = save_mode
+
+    def mode(self, spec: ToolSpec) -> Literal["ask", "auto"]:
+        if spec.locked:
+            return "ask"
+        stored = self._modes().get(spec.name)
+        if stored in ("ask", "auto"):
+            return stored
+        if spec.default_mode is not None:
+            return spec.default_mode
+        return "auto" if spec.effect == "read" else "ask"
+
+    def set_mode(self, name: str, mode: str) -> None:
+        spec = next((s for src in self.sources for s in src.specs() if s.name == name), None)
+        if spec is None:
+            raise RpcError(ErrorCode.unknown_tool, f"No tool named {name}.")
+        if mode not in ("ask", "auto"):
+            raise RpcError(ErrorCode.invalid_params, "mode must be ask or auto.")
+        if spec.locked and mode == "auto":
+            raise RpcError(ErrorCode.invalid_params, f"{name} always asks first.")
+        self._save_mode(name, mode)
 
     def model_tools(self) -> list[dict]:
         out = []

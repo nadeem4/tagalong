@@ -8,7 +8,14 @@ import pytest
 from brain.bodies import Bodies
 from brain.mind.turn import Call
 from brain.protocol import Body, ErrorCode, RpcError, Tool
-from brain.toolbox import BodySource, BrainSource, Toolbox, ToolSpec
+from brain.toolbox import BodySource, BrainSource, ToolSpec
+from brain.toolbox import Toolbox as RealToolbox
+
+
+def Toolbox(sources, stored=None):
+    """A toolbox whose stored modes are a plain dict, as the tests need no database."""
+    stored = {} if stored is None else stored
+    return RealToolbox(sources, lambda: stored, stored.__setitem__)
 
 
 def spec(name, audience=("scout",)):
@@ -202,3 +209,81 @@ def test_body_going_offline_mid_turn_drops_its_tools_from_next_list():
     assert len(box.model_tools()) == 1
     bodies.disconnect("desktop", peer)
     assert box.model_tools() == []
+
+
+def mode_spec(name="a", **kw):
+    return ToolSpec(name, "d", {"type": "object"}, **kw)
+
+
+def test_mode_defaults():
+    box = Toolbox([])
+    assert box.mode(mode_spec(effect="read")) == "auto"
+    assert box.mode(mode_spec(effect="change")) == "ask"
+    assert box.mode(mode_spec()) == "ask"
+    assert box.mode(mode_spec(effect="change", default_mode="auto")) == "auto"
+    stored = {"a": "ask"}
+    assert Toolbox([], stored).mode(mode_spec(effect="read")) == "ask"
+    stored = {"a": "auto"}
+    assert Toolbox([], stored).mode(mode_spec(effect="change", default_mode="ask")) == "auto"
+    assert Toolbox([], stored).mode(mode_spec(locked=True)) == "ask"
+
+
+def test_body_tool_without_effect_asks():
+    bodies = Bodies()
+    connect(bodies, "desktop")
+    box = body_box(bodies)
+    (s,) = BodySource(bodies).specs()
+    assert s.effect == "change" and not s.locked
+    assert box.mode(s) == "ask"
+
+
+def test_body_tool_effect_read_is_auto():
+    bodies = Bodies()
+    decl = [Tool(name="look", description="d", input_schema={"type": "object"}, effect="read")]
+    bodies.connect(
+        Body(id="desktop", kind="desktop", name="d"), decl, AutoPeer(bodies, "desktop", []), None
+    )
+    (s,) = BodySource(bodies).specs()
+    assert body_box(bodies).mode(s) == "auto"
+
+
+def test_body_tool_confirm_true_is_locked():
+    bodies = Bodies()
+    decl = [Tool(name="rm", description="d", input_schema={"type": "object"}, confirm=True)]
+    bodies.connect(
+        Body(id="desktop", kind="desktop", name="d"), decl, AutoPeer(bodies, "desktop", []), None
+    )
+    (s,) = BodySource(bodies).specs()
+    assert s.locked
+    assert Toolbox([BodySource(bodies)], {"desktop__rm": "auto"}).mode(s) == "ask"
+
+
+def test_set_mode_saves_and_changes_mode():
+    stored = {}
+    box = Toolbox([FakeSource([spec("a")])], stored)
+    box.set_mode("a", "auto")
+    assert stored == {"a": "auto"}
+    assert box.mode(box.sources[0].specs()[0]) == "auto"
+
+
+def test_set_mode_refuses_auto_on_locked():
+    locked = ToolSpec("a", "d", {"type": "object"}, locked=True)
+    stored = {}
+    box = Toolbox([FakeSource([locked])], stored)
+    with pytest.raises(RpcError) as e:
+        box.set_mode("a", "auto")
+    assert e.value.code == ErrorCode.invalid_params
+    assert stored == {}
+    box.set_mode("a", "ask")  # tightening a locked tool is fine
+
+
+def test_set_mode_unknown_tool():
+    with pytest.raises(RpcError) as e:
+        Toolbox([FakeSource([spec("a")])]).set_mode("nope", "auto")
+    assert e.value.code == ErrorCode.unknown_tool
+
+
+def test_set_mode_bad_mode():
+    with pytest.raises(RpcError) as e:
+        Toolbox([FakeSource([spec("a")])]).set_mode("a", "maybe")
+    assert e.value.code == ErrorCode.invalid_params
