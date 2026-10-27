@@ -58,7 +58,7 @@ pnpm install
 pnpm dev:desktop
 ```
 
-Scout remembers instructions and facts about you across restarts, in `~/.tagalong/tagalong.db`.
+Scout remembers instructions and facts about you across restarts, in `~/.tagalong/tagalong.db`, and picks the conversation back up after a restart.
 
 If the brain is not running, the desktop still opens and shows "Scout's brain is not running." It
 connects by itself once the brain is up.
