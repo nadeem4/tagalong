@@ -53,6 +53,7 @@ import {
   ConnectionsSignInParams,
   ConnectionsSignInResult,
   ConnectorConfirmParams,
+  ConnectorDismissParams,
 } from './connections';
 import {
   ExpertsCatalogParams,
@@ -633,6 +634,7 @@ export const coreToHostNotifications = {
   'pet.remark': { params: PetRemarkParams },
   'connections.changed': { params: ConnectionsChangedParams },
   'connector.confirm': { params: ConnectorConfirmParams },
+  'connector.dismiss': { params: ConnectorDismissParams },
   'asks.changed': { params: AsksChangedParams },
   'routine.proposed': { params: RoutineProposedParams },
   'routine.result': { params: RoutineResultParams },

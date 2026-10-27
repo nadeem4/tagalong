@@ -103,6 +103,63 @@ describe('the connector confirm card', () => {
       expect(bridge.approvals).toEqual([{ approvalId: APPROVAL, decision }]);
     });
 
+    it('shows a multi-line text whole, with no Details split', () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(ask({ summary: 'First I will look.\nThen I will move it.' })));
+      const card = screen.getByRole('region', { name: 'Allow desktop__move_window?' });
+      expect(card).toHaveTextContent('First I will look.');
+      expect(card).toHaveTextContent('Then I will move it.');
+      expect(screen.queryByText('Details')).toBeNull();
+    });
+
+    it('shows every open ask in turn: answering the first brings up the second', async () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(ask({ approvalId: 'a1', summary: 'Move the window.' })));
+      act(() => bridge.emit(ask({ approvalId: 'a2', summary: 'Close the tab.' })));
+      expect(screen.getByText('Move the window.')).toBeInTheDocument();
+      expect(screen.queryByText('Close the tab.')).toBeNull();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Allow once' }));
+        await Promise.resolve();
+      });
+      expect(screen.getByText('Close the tab.')).toBeInTheDocument();
+      expect(bridge.approvals).toEqual([{ approvalId: 'a1', decision: 'once' }]);
+    });
+
+    it('a dismissed ask removes its card and leaves the others', () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(ask({ approvalId: 'a1', summary: 'Move the window.' })));
+      act(() => bridge.emit(ask({ approvalId: 'a2', summary: 'Close the tab.' })));
+      act(() => bridge.emit({ type: 'connector.dismiss', approvalId: 'a2' }));
+      expect(screen.getByText('Move the window.')).toBeInTheDocument();
+      act(() => bridge.emit({ type: 'connector.dismiss', approvalId: 'a1' }));
+      expect(screen.queryByRole('button', { name: 'Allow once' })).toBeNull();
+    });
+
+    it('a dismissed first ask hands over to the next', () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(ask({ approvalId: 'a1', summary: 'Move the window.' })));
+      act(() => bridge.emit(ask({ approvalId: 'a2', summary: 'Close the tab.' })));
+      act(() => bridge.emit({ type: 'connector.dismiss', approvalId: 'a1' }));
+      expect(screen.getByText('Close the tab.')).toBeInTheDocument();
+    });
+
+    it('keeps the card when the answer did not get through (brain offline)', async () => {
+      const bridge = createFakeHostBridge();
+      bridge.approveTool = () => Promise.reject(new Error('brain offline'));
+      renderBubble(bridge);
+      act(() => bridge.emit(ask()));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Allow once' }));
+        await Promise.resolve();
+      });
+      expect(screen.getByRole('button', { name: 'Allow once' })).toBeInTheDocument();
+    });
+
     it('a locked tool has no Always allow', () => {
       const bridge = createFakeHostBridge();
       renderBubble(bridge);

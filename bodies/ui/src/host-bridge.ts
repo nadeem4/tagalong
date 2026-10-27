@@ -48,6 +48,7 @@ type TurnNotification =
   | 'handoff.progress'
   | 'handoff.finished'
   | 'connector.confirm'
+  | 'connector.dismiss'
   | 'asks.changed'
   | 'routine.proposed'
   | 'routine.result'

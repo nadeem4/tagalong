@@ -63,6 +63,10 @@ Scout remembers instructions and facts about you across restarts, in `~/.tagalon
 If the brain is not running, the desktop still opens and shows "Scout's brain is not running." It
 connects by itself once the brain is up.
 
+When Scout's brain wants to use a tool that needs your say-so, the bubble asks in Scout's words
+with **Allow once**, **Always allow** (not offered for a locked tool) and **Deny**. Several asks
+queue and show one at a time; if the brain is offline when you click, the card stays up.
+
 The [developer guide](docs/development.md) covers getting pnpm, testing, packaging and the Chrome
 extension.
 
@@ -78,7 +82,7 @@ desktop app and the Chrome extension run on it. It holds:
 - experts and hand-offs: briefs sent to Claude Code, with the project and edit permission you
   confirm;
 - connected apps over MCP (Notion, GitHub, Linear, or any MCP server): reads run at once, every
-  change waits for Allow once (the Python brain's permission asks also offer Always allow and Deny);
+  change waits for Allow once;
 - routines, and a local WebSocket server that speaks the JSON-RPC protocol defined in
   `packages/protocol` (zod schemas).
 

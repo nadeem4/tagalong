@@ -135,6 +135,26 @@ describe('HomeView', () => {
     expect(await screen.findByRole('heading', { name: 'Waiting on you' })).toBeVisible();
   });
 
+  it("leaves the count alone when a brain ask's card is dismissed", async () => {
+    const waiting: Ask = {
+      id: '40000000-0000-4000-8000-000000000001',
+      kind: 'app-change',
+      petId: 'scout',
+      summary: 'Create a page',
+      risk: 'change',
+      app: 'Notion',
+      tool: 'create_page',
+      state: 'waiting',
+      createdAt: '2026-10-22T10:00:00.000Z',
+    };
+    const bridge = createFakeHostBridge({ pets: [SCOUT], savedAsks: [waiting] });
+    renderHome(bridge);
+    const nav = await screen.findByRole('navigation', { name: 'Tagalong' });
+    expect(await within(nav).findByRole('button', { name: 'Waiting on you (1)' })).toBeVisible();
+    act(() => bridge.emit({ type: 'connector.dismiss', approvalId: 'brain-ask' }));
+    expect(within(nav).getByRole('button', { name: 'Waiting on you (1)' })).toBeVisible();
+  });
+
   it('draws Scout in the nav tile as Bean, a still idle frame cropped to fill it', async () => {
     renderHome(createFakeHostBridge({ pets: [SCOUT] }));
     const nav = await screen.findByRole('navigation', { name: 'Tagalong' });

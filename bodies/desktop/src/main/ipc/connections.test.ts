@@ -1,6 +1,8 @@
 /** Tests for the connected-app IPC. */
 
+import { ErrorCode } from '@tagalong/contract';
 import { describe, expect, it } from 'vitest';
+import { BrainOffline, RpcError } from '../brain/brain-client';
 import { IPC } from '../../shared/ipc';
 import { fakeEngine, fakeIpc } from './fake-ipc';
 import { registerConnectionIpc } from './connections';
@@ -41,13 +43,28 @@ describe('registerConnectionIpc', () => {
     expect(calls).toEqual([]);
   });
 
-  it('an answer the brain refuses (the ask already closed) does not throw into the card', async () => {
+  const failing = (error: Error) => {
     const ipc = fakeIpc();
     registerConnectionIpc(ipc.handle, {
       engine: () => fakeEngine({}).client,
-      answer: () => Promise.reject(new Error('no open ask')),
+      answer: () => Promise.reject(error),
     });
+    return ipc;
+  };
+
+  it('an ask the brain no longer has (not_found) does not throw into the card', async () => {
+    const ipc = failing(new RpcError(ErrorCode.not_found, 'no open ask'));
     await expect(ipc.invoke(IPC.approveTool, 'a1', 'once')).resolves.toBeUndefined();
+  });
+
+  it('an offline brain rejects, so the card stays up for another click', async () => {
+    const ipc = failing(new BrainOffline());
+    await expect(ipc.invoke(IPC.approveTool, 'a1', 'once')).rejects.toThrow('brain offline');
+  });
+
+  it('any other refusal rejects too', async () => {
+    const ipc = failing(new RpcError(ErrorCode.tool_failed, 'boom'));
+    await expect(ipc.invoke(IPC.approveTool, 'a1', 'once')).rejects.toThrow('boom');
   });
 
   it('fills the defaults of a new local connection before it goes out', async () => {

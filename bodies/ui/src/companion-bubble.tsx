@@ -208,7 +208,15 @@ export function CompanionBubble({
   );
   const [handoff, setHandoff] = useState<Handoff | null>(null);
   // A change Scout wants to make in a connected app, waiting for Allow once, Always allow or Deny.
-  const [confirm, setConfirm] = useState<ConnectorConfirmParams | null>(null);
+  // The brain can ask about several tools at once, so they queue oldest first and the card
+  // shows the head; answering or dismissing it brings up the next.
+  const [confirms, setConfirms] = useState<ConnectorConfirmParams[]>([]);
+  const confirm = confirms[0] ?? null;
+  const dropConfirms = (gone: (c: ConnectorConfirmParams) => boolean): void =>
+    setConfirms((current) => {
+      const next = current.filter((c) => !gone(c));
+      return next.length === current.length ? current : next;
+    });
   // A routine Scout wrote or changed, waiting for Save.
   const [routine, setRoutine] = useState<RoutineProposedParams | null>(null);
   // Settings Scout would change, waiting for Apply: a click only, never a spoken yes.
@@ -253,22 +261,29 @@ export function CompanionBubble({
   }
 
   const onTurnEvent = useEffectEvent((event: TurnEvent) => {
-    if (
-      (event.type === 'turn.completed' || event.type === 'turn.error') &&
-      event.turnId === confirm?.turnId
-    ) {
-      setConfirm(null);
+    if (event.type === 'turn.completed' || event.type === 'turn.error') {
+      const ended = event.turnId;
+      dropConfirms((c) => c.turnId === ended);
     }
     switch (event.type) {
       case 'connector.confirm': {
         const { type: _type, ...params } = event;
-        setConfirm(params);
+        // A repeat of a queued ask updates it in place; a new one waits its turn.
+        setConfirms((current) =>
+          current.some((c) => c.approvalId === params.approvalId)
+            ? current.map((c) => (c.approvalId === params.approvalId ? params : c))
+            : [...current, params],
+        );
         return;
       }
+      case 'connector.dismiss':
+        // A brain ask closed (answered elsewhere, timed out, cancelled): its card goes.
+        dropConfirms((c) => c.approvalId === event.approvalId);
+        return;
       case 'asks.changed': {
         // Answered in Home, expired or closed: a card whose ask no longer waits goes.
         const still = new Set(event.waiting.map((ask) => ask.id));
-        if (confirm !== null && !still.has(confirm.approvalId)) setConfirm(null);
+        dropConfirms((c) => !still.has(c.approvalId));
         setHandoff((current) =>
           current?.phase === 'proposed' && !still.has(current.proposal.proposalId) ? null : current,
         );
@@ -707,8 +722,13 @@ export function CompanionBubble({
     );
   const answerConfirm = (decision: 'once' | 'always' | 'deny'): void => {
     if (confirm === null) return;
-    void bridge.approveTool?.(confirm.approvalId, decision);
-    setConfirm(null);
+    const { approvalId } = confirm;
+    // The card goes once the answer got through. A refusal (the brain is offline) leaves it up
+    // to click again: the brain does not replay an ask after a plain reconnect.
+    void Promise.resolve(bridge.approveTool?.(approvalId, decision)).then(
+      () => dropConfirms((c) => c.approvalId === approvalId),
+      () => undefined,
+    );
   };
   const closeDrop = (): void => {
     setOpenDrop(undefined);

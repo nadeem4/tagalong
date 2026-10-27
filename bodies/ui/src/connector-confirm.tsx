@@ -20,15 +20,20 @@ export function ConnectorConfirmCard({
   confirm: ConnectorConfirmParams;
   onAnswer: (decision: Decision) => void;
 }) {
-  const [what, ...filled] = confirm.summary.split('\n');
   const isAsk = confirm.options !== undefined;
+  // An app change is a line plus its details; a brain ask is Scout's words, shown whole.
+  const [first, ...rest] = confirm.summary.split('\n');
+  const what = isAsk ? confirm.summary : (first ?? '');
+  const filled = isAsk ? [] : rest;
   const canAlways = confirm.options?.includes('always') ?? false;
   return (
     <section
       className="handoff"
       aria-label={isAsk ? `Allow ${confirm.tool}?` : `Change something in ${confirm.app}?`}
     >
-      <p className="bubble-text">{isAsk ? what : `Change in ${confirm.app} — allow?`}</p>
+      <p className="bubble-text" style={isAsk ? { whiteSpace: 'pre-line' } : undefined}>
+        {isAsk ? what : `Change in ${confirm.app} — allow?`}
+      </p>
       {confirm.risk === 'high' && <p className="handoff-brief">Can’t be undone</p>}
       <dl className="handoff-rows">
         <div>

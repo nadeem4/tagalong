@@ -3,7 +3,9 @@
  * registerConnectionIpc.
  */
 
+import { ErrorCode } from '@tagalong/contract';
 import { ConnectionsAddParams } from '@tagalong/protocol';
+import { RpcError } from '../brain/brain-client';
 import { IPC } from '../../shared/ipc';
 import type { EngineCall, IpcHandle } from './handle';
 
@@ -21,8 +23,14 @@ export function registerConnectionIpc(
   handle(
     IPC.approveTool,
     async (_event, approvalId: string, decision: 'once' | 'always' | 'deny') => {
-      // The card is already gone; an ask that closed or a brain that dropped has nobody to tell.
-      await answer(approvalId, decision).catch(() => undefined);
+      try {
+        await answer(approvalId, decision);
+      } catch (e) {
+        // An ask the brain no longer has needs no answer; the card goes with its closed frame.
+        // Anything else (offline, a failed send) rejects, so the card stays up to click again.
+        if (e instanceof RpcError && e.code === ErrorCode.not_found) return;
+        throw e;
+      }
     },
   );
   handle(IPC.listConnections, async () => engine().call('connections.list', {}));

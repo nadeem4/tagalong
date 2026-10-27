@@ -216,22 +216,27 @@ describe('createTurnEvents: asks', () => {
     expect(make().map('ask', plain)).toEqual([]);
   });
 
-  it('a closed ask dismisses it through asks.changed, keeping the others waiting', () => {
+  // Home counts asks.changed and lists them from the old engine, which knows nothing of the
+  // brain's asks, so a brain ask is dismissed through an event only the bubble handles.
+  it('a closed ask dismisses just that card and never emits asks.changed', () => {
     const m = make();
     m.map('ask', open());
     m.map('ask', open({ id: 'a2' }));
-    const [e] = m.map('ask', closed('a1'));
-    expect(e).toMatchObject({ type: 'asks.changed', waiting: [{ id: 'a2' }] });
-    expect(m.map('ask', closed('a2'))).toEqual([{ type: 'asks.changed', waiting: [] }]);
+    expect(m.map('ask', closed('a1'))).toEqual([{ type: 'connector.dismiss', approvalId: 'a1' }]);
+    expect(m.map('ask', closed('a2'))).toEqual([{ type: 'connector.dismiss', approvalId: 'a2' }]);
   });
 
   it('a closed ask it never showed maps to nothing', () => {
     expect(make().map('ask', closed('zz'))).toEqual([]);
   });
 
-  it('a lost brain drops open asks', () => {
+  it('a lost brain dismisses every open ask', () => {
     const m = make();
     m.map('ask', open());
-    expect(m.resync()).toEqual([{ type: 'asks.changed', waiting: [] }]);
+    m.map('ask', open({ id: 'a2' }));
+    expect(m.resync()).toEqual([
+      { type: 'connector.dismiss', approvalId: 'a1' },
+      { type: 'connector.dismiss', approvalId: 'a2' },
+    ]);
   });
 });

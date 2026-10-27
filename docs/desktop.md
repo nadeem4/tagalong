@@ -365,8 +365,8 @@ Nothing in the app uses it yet; slice 5c wires it in (`onNotification` into the 
 - **Answering an ask:** `answer(ask, decision)` is a request that sends `answer { ask, option }`,
   with the card's `once` sent as `allow` and `always` / `deny` as they are. It needs `online`
   (otherwise `BrainOffline`) and rejects if the brain refuses it (the ask already closed). The
-  `approveTool` IPC (`ipc/connections.ts`) calls it and swallows a refusal, because the card is
-  already gone; only the person's click answers an ask. The bubble is brought up when an ask opens.
+  `approveTool` IPC (`ipc/connections.ts`) calls it and swallows only `not_found` (the ask already closed), because that card goes with its closed frame.
+  Any other refusal (the brain offline) rejects back to the bubble, which keeps the card up to click again; only the person's click answers an ask. The bubble is brought up when an ask opens.
 
 `turn-events.ts` turns the validated notifications into the TurnEvents the renderer already
 understands. It keeps each open turn's reply text, because `turn.completed` carries the whole reply.
@@ -379,9 +379,9 @@ understands. It keeps each open turn's reply text, because `turn.completed` carr
 | `turn` ended `over_budget` / `error`           | `turn.error` with code `over_budget` / `brain_error`                                                                                                                                                                                                                                                             |
 | `tool` started / ended                         | `turn.toolRequest` (call id as `approvalId` and `callId`, empty input) / `turn.toolResult`                                                                                                                                                                                                                       |
 | `ask` open with `confirm: true`                | `connector.confirm`: `approvalId` is the ask id, `turnId` its turn, `app` the tool's body label (text before `__`, capitalised) or `Scout` for a brain tool, `summary` the ask `text` (or, when empty, the tool name and its input, one `key: value` per line), `options` carried (no `always` on a locked tool) |
-| `ask` closed                                   | `asks.changed` listing the asks still open, so the bubble drops the closed one (a closed ask the mapper never showed gives nothing)                                                                                                                                                                              |
+| `ask` closed                                   | `connector.dismiss { approvalId }`, which only the bubble handles (never `asks.changed`: Home counts and lists those from the old engine, which knows no brain ask); a closed ask the mapper never showed gives nothing                                                                                          |
 | `changed`                                      | nothing yet                                                                                                                                                                                                                                                                                                      |
-| resync                                         | `turn.error` `brain_restarted` for each open turn (started, or seen in a reply, and not ended), then `asks.changed` with none waiting if any ask was open; the state is cleared                                                                                                                                  |
+| resync                                         | `turn.error` `brain_restarted` for each open turn (started, or seen in a reply, and not ended), then `connector.dismiss` for each open ask; the state is cleared                                                                                                                                                 |
 
 ### Preload and the tagalongHost bridge
 

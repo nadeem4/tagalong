@@ -4,6 +4,7 @@ import {
   Connection,
   ConnectionsAddParams,
   ConnectorConfirmParams,
+  ConnectorDismissParams,
   connectionIdFrom,
 } from './connections';
 import { coreToHostNotifications, hostToCoreMethods } from './methods';
@@ -85,5 +86,22 @@ describe('catalog', () => {
       summary: 'Create a page called Plan',
     });
     expect(parsed.app).toBe('Notion');
+  });
+
+  it("takes the brain's ask ids (uuid hex) and an ask with no turn", () => {
+    const parsed = ConnectorConfirmParams.parse({
+      approvalId: '6f1c1b8e3b1c4c8e9a510b1f6f1d2a3b',
+      turnId: '',
+      petId: 'scout',
+      app: 'Scout',
+      tool: 'forget_memory',
+      summary: 'Forget it',
+    });
+    expect(parsed.turnId).toBe('');
+  });
+
+  it('a dismissal names the card to drop', () => {
+    expect(coreToHostNotifications['connector.dismiss'].params).toBe(ConnectorDismissParams);
+    expect(ConnectorDismissParams.parse({ approvalId: 'a1' })).toEqual({ approvalId: 'a1' });
   });
 });

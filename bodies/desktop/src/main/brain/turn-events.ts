@@ -4,7 +4,6 @@
  * the whole reply, but the brain streams it, so the mapper keeps each open turn's text.
  */
 import type { AskParams, ReplyParams, ToolParams, TurnParams } from '@tagalong/contract';
-import type { Ask } from '@tagalong/protocol';
 import type { TurnEvent } from '@tagalong/ui';
 
 const BUDGET_MESSAGE = "Scout has used today's budget. It starts again tomorrow.";
@@ -70,13 +69,15 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
     ];
   }
 
-  // Open confirm asks, so a closed frame can say who still waits.
-  const asks = new Map<string, Ask>();
+  // Ids of the confirm cards shown, so a closed frame only dismisses a card that was shown.
+  // The dismissal is its own event, not asks.changed: Home counts and lists those from the
+  // old engine, which knows nothing of the brain's asks.
+  const asks = new Set<string>();
 
-  const waiting = (): TurnEvent => ({ type: 'asks.changed', waiting: [...asks.values()] });
+  const dismiss = (approvalId: string): TurnEvent => ({ type: 'connector.dismiss', approvalId });
 
   function ask(p: AskParams): TurnEvent[] {
-    if (p.state === 'closed') return asks.delete(p.id) ? [waiting()] : [];
+    if (p.state === 'closed') return asks.delete(p.id) ? [dismiss(p.id)] : [];
     if (!p.confirm || p.tool === undefined) return [];
     const input = Object.entries(p.input ?? {}).map(
       ([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`,
@@ -86,17 +87,7 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
     // Body tools arrive as `<body>__<name>`; a name without it is the brain's own.
     const body = p.tool.includes('__') ? p.tool.split('__')[0]! : '';
     const app = body === '' ? 'Scout' : body.charAt(0).toUpperCase() + body.slice(1);
-    asks.set(p.id, {
-      id: p.id,
-      kind: 'app-change',
-      petId: petId(),
-      summary,
-      risk: 'change',
-      app,
-      tool: p.tool,
-      state: 'waiting',
-      createdAt: new Date().toISOString(),
-    });
+    asks.add(p.id);
     return [
       {
         type: 'connector.confirm',
@@ -141,10 +132,8 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
     resync(): TurnEvent[] {
       const events = [...open.keys()].map((id) => error(id, 'brain_restarted', LOST_MESSAGE));
       open.clear();
-      if (asks.size > 0) {
-        asks.clear();
-        events.push(waiting());
-      }
+      for (const id of asks) events.push(dismiss(id));
+      asks.clear();
       return events;
     },
   };
