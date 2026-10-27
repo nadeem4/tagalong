@@ -258,6 +258,31 @@ def test_images_and_documents_are_not_stored(tmp_path):
         assert big.encode() not in f.read_bytes()
 
 
+def test_image_inside_tool_result_is_not_stored(tmp_path):
+    path = tmp_path / "tr.db"
+    m = Memory(path)
+    big = "QUJD" * 500
+    m.save_messages(
+        [
+            _msg(
+                "user",
+                {
+                    "type": "tool_result",
+                    "tool_use_id": "t1",
+                    "content": [
+                        {"type": "image", "source": {"type": "base64", "data": big}},
+                    ],
+                },
+            )
+        ]
+    )
+    loaded = m.load_messages()
+    m.close()
+    assert loaded[0]["content"][0]["content"] == [{"type": "text", "text": "[screenshot]"}]
+    for f in tmp_path.glob("tr.db*"):
+        assert big.encode() not in f.read_bytes()
+
+
 def test_save_is_atomic_and_ordered(mem):
     mem.save_messages([{"role": "user", "content": "one"}])
     with pytest.raises(TypeError):
@@ -338,7 +363,11 @@ def test_failed_migration_rolls_back(tmp_path, monkeypatch):
     monkeypatch.setattr(memory, "MIGRATIONS", bad)
     with pytest.raises(sqlite3.OperationalError):
         Memory(tmp_path / "r.db")
-    db = sqlite3.connect(tmp_path / "r.db")
+    db = sqlite3.connect(tmp_path / "r.db", timeout=0, isolation_level=None)
+    db.execute("BEGIN IMMEDIATE")  # fails with "locked" if the failed migration left a write open
+    db.execute("ROLLBACK")
     assert db.execute("PRAGMA user_version").fetchone()[0] == len(memory.MIGRATIONS) - 1
     assert db.execute("SELECT name FROM sqlite_master WHERE name='half'").fetchall() == []
     db.close()
+    monkeypatch.undo()
+    Memory(tmp_path / "r.db").close()  # the real migrations still apply afterwards

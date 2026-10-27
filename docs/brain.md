@@ -118,7 +118,7 @@ flowchart TD
 - Chat is saved at the end of each turn (see [memory.md](memory.md)). A crash mid-turn loses that
   turn's unsaved messages.
 - On start the history is rebuilt from the saved chat. It begins at the turn of the latest
-  compaction block, is capped at 50 messages trimmed to whole turns, and a tool call left
+  compaction block, is capped at 50 messages trimmed to whole turns (a newest turn over 50 is kept whole), and a tool call left
   unanswered by a crash is closed with a "cancelled" result (stored on the next save).
 - Each compaction block's text is also saved once as a `summary` memory, written by code.
 - The model runs with adaptive thinking at medium effort, server-side compaction (beta

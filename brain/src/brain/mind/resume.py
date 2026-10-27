@@ -21,7 +21,8 @@ def _has_compaction(message: dict) -> bool:
     return (
         message["role"] == "assistant"
         and isinstance(content, list)
-        and any(b.get("type") == "compaction" for b in content)
+        # A failed compaction has content None and the server ignores it, so it is no cut point.
+        and any(b.get("type") == "compaction" and b.get("content") for b in content)
     )
 
 
@@ -44,7 +45,9 @@ def rebuild_history(messages: list[dict]) -> list[dict]:
             None,
         )
         if cut is None:
-            return []
+            # The newest turn alone is over the cap: keep it whole; server-side compaction
+            # bounds its size.
+            cut = max(i for i, m in enumerate(history) if _is_turn_start(m))
         history = history[cut:]
 
     last = history[-1] if history else None

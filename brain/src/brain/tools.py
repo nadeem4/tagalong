@@ -37,14 +37,14 @@ TOOLS: list[dict] = [
     {
         "name": "recall",
         "description": (
-            "Search your long-term memory by words. Use it when something not in your prompt "
-            "may have been saved earlier."
+            "Search your long-term memory and the saved chat by words. Use it when something "
+            "not in your prompt may have been saved or said earlier."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "query": {"type": "string"},
-                "kind": {"type": "string", "enum": list(KINDS)},
+                "kind": {"type": "string", "enum": [*KINDS, "chat"]},
             },
             "required": ["query"],
         },

@@ -30,6 +30,7 @@ def test_tool_list_names_and_schemas():
     assert "project" in remember["kind"]["enum"]
     assert remember["replaces"]["type"] == "integer"
     assert "summary" in TOOLS[1]["input_schema"]["properties"]["kind"]["enum"]
+    assert "chat" in TOOLS[1]["input_schema"]["properties"]["kind"]["enum"]
     assert TOOLS[2]["input_schema"]["properties"]["id"]["type"] == "integer"
 
 

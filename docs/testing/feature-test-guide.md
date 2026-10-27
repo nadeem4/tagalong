@@ -334,7 +334,8 @@ desktop app. You need `uv` and an Anthropic key.
     **Expected:** Scout answers about the Lisbon trip; the chat was picked up after the restart.
 11. **Action:** `say` with `Search our chat for Lisbon.`
     **Expected:** a `recall` tool call that finds the old message.
-12. **Action:** hold a long chat until the model compacts it (watch for a long exchange), then check
+12. **Action:** hold a long chat until the model compacts it (hard to trigger by hand; skip it if the
+    chat never gets that long), then run the SQL check with step 7's python one-liner:
     `select kind, text from memories where kind='summary'`.
     **Expected:** one `summary` row per compaction.
 

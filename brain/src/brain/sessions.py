@@ -92,7 +92,8 @@ class Session:
             self._task.cancel()
 
     def _append_user(self, content: list) -> None:
-        # The API wants alternating roles, so consecutive user content shares one message.
+        # Input arriving while the last user message is still unsaved joins it, so one burst is
+        # one saved message. (The API would also accept two user messages in a row and join them.)
         if len(self.history) > self._saved and self.history[-1]["role"] == "user":
             self.history[-1]["content"] += content
         else:

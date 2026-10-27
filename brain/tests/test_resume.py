@@ -97,13 +97,21 @@ def test_cap_skips_mid_turn_cut_points():
     assert out == msgs[-2:]
 
 
-def test_cap_with_one_huge_turn_returns_empty():
+def test_cap_with_one_huge_turn_keeps_the_whole_turn():
     msgs = [u("q")]
     for i in range(29):
         msgs += [call(str(i)), result(str(i))]
     msgs.append(a("end"))
     assert len(msgs) == 60
-    assert rebuild_history(msgs) == []
+    out = rebuild_history(msgs)
+    assert out == msgs
+    assert out[0] == u("q")
+
+
+def test_failed_compaction_block_is_not_a_cut_point():
+    failed = {"role": "assistant", "content": [{"type": "compaction", "content": None}]}
+    msgs = [u("one"), a("x"), u("two"), failed, a("y")]
+    assert rebuild_history(msgs) == msgs
 
 
 def test_dangling_tool_use_is_closed():
