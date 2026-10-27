@@ -7,11 +7,20 @@ its own; it only reports why it stopped.
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
 log = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class Call:
+    id: str
+    name: str
+    input: dict
+    turn: str
+    text: str  # the step's own words before the call, for tools that ask the user
 
 
 @dataclass
@@ -68,8 +77,8 @@ async def run_turn(
     model: Model,
     system: Callable[[], str],
     history: list,
-    tools: list,
-    run_tool: Callable[[str, dict], Any],
+    tools: Callable[[], list[dict]],
+    run_tool: Callable[[Call], Awaitable[str | list[dict]]],
     inbox: list,
     notify: Callable[[str, dict], None],
     budget,
@@ -88,7 +97,7 @@ async def run_turn(
                 break
             steps += 1
 
-            stream = model.stream(system(), history, tools).__aiter__()
+            stream = model.stream(system(), history, tools()).__aiter__()
             final = None
             failed = False
             while True:
@@ -117,8 +126,9 @@ async def run_turn(
                 continue
 
             calls = [b for b in final.content if b.get("type") == "tool_use"]
+            text = "".join(b.get("text", "") for b in final.content if b.get("type") == "text")
             if final.stop_reason == "tool_use" and calls:
-                results = await _run_tools(turn_id, calls, run_tool, notify, running)
+                results = await _run_tools(turn_id, calls, text, run_tool, notify, running)
                 history.append({"role": "user", "content": results + _drain(inbox)})
                 continue
             closed = _close_dangling_tool_use(history)
@@ -162,13 +172,13 @@ def _drain(inbox: list) -> list[dict]:
     return blocks
 
 
-async def _run_tools(turn_id, calls, run_tool, notify, running) -> list[dict]:
+async def _run_tools(turn_id, calls, said, run_tool, notify, running) -> list[dict]:
     async def one(call: dict) -> dict:
         info = {"turn": turn_id, "call": call["id"], "name": call["name"]}
         running[call["id"]] = call["name"]
         notify("tool", {**info, "state": "started"})
         try:
-            content = await run_tool(call["name"], call["input"])
+            content = await run_tool(Call(call["id"], call["name"], call["input"], turn_id, said))
             result = {"type": "tool_result", "tool_use_id": call["id"], "content": content}
         except Exception as err:
             text = str(err) or type(err).__name__

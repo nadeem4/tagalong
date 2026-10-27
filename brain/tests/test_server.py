@@ -307,3 +307,115 @@ async def test_bad_say_params(chat):
         for req_id, params in enumerate([{}, {"text": 5}, {"parts": []}], start=3):
             reply = await call(ws, request("say", params, req_id=req_id))
             assert reply["error"]["code"] == -32602
+
+
+# --- body tools end to end ---------------------------------------------------
+
+
+class ToolModel:
+    """Step 1 calls desktop__see_screen; step 2 records what the model was told."""
+
+    model_id = "claude-sonnet-5-5"
+
+    def __init__(self):
+        self.step = 0
+        self.seen = []
+
+    async def stream(self, system, messages, tools):
+        self.step += 1
+        self.seen.append(list(messages))
+        if self.step == 1:
+            block = {"type": "tool_use", "id": "c1", "name": "desktop__see_screen", "input": {}}
+            yield Final([block], "tool_use", SimpleNamespace())
+        else:
+            yield Final([{"type": "text", "text": "ok"}], "end_turn", SimpleNamespace())
+
+
+@pytest.fixture
+async def tool_env():
+    model = ToolModel()
+    bodies = Bodies()
+    session = Session(model, Open(), bodies, 10, Memory(":memory:"))
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
+    url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+    yield url, model
+    server.close()
+    await server.wait_closed()
+
+
+async def next_method(ws, method):
+    while True:
+        frame = json.loads(await ws.recv())
+        if frame.get("method") == method:
+            return frame
+
+
+async def start_tool_turn(ws):
+    await call(ws, hello())
+    reply = await call(ws, request("say", {"text": "look"}))
+    return reply["result"]["turn"]
+
+
+def tool_result(model):
+    return model.seen[1][-1]["content"][0]
+
+
+async def test_model_tool_call_reaches_body_and_result_returns(tool_env):
+    url, model = tool_env
+    async with connect(url) as ws:
+        await start_tool_turn(ws)
+        use = await next_method(ws, "use")
+        assert use["params"]["tool"] == "see_screen"
+        result = {
+            "jsonrpc": "2.0",
+            "id": use["id"],
+            "result": {"output": [{"type": "text", "text": "a desk"}]},
+        }
+        await ws.send(json.dumps(result))
+        async with asyncio.timeout(5):
+            while model.step < 2:
+                await asyncio.sleep(0.01)
+        assert tool_result(model)["tool_use_id"] == "c1"
+        assert "is_error" not in tool_result(model)
+        assert "a desk" in json.dumps(tool_result(model)["content"])
+
+
+async def test_body_disconnect_mid_use_gives_is_error_offline(tool_env):
+    url, model = tool_env
+    async with connect(url) as ws:
+        await start_tool_turn(ws)
+        await next_method(ws, "use")
+    async with asyncio.timeout(5):
+        while model.step < 2:
+            await asyncio.sleep(0.01)
+    assert tool_result(model)["is_error"] is True
+    assert "offline" in json.dumps(tool_result(model)["content"])
+
+
+async def test_turn_cancel_sends_cancel_to_body(tool_env):
+    url, _ = tool_env
+    async with connect(url) as ws:
+        turn = await start_tool_turn(ws)
+        await next_method(ws, "use")
+        await ws.send(json.dumps({"jsonrpc": "2.0", "method": "cancel", "params": {"turn": turn}}))
+        cancel = await next_method(ws, "cancel")
+        assert cancel["params"] == {"call": "c1"}
+        assert "seq" not in cancel and "id" not in cancel
+
+
+async def test_response_frame_is_not_an_error(tool_env):
+    url, _ = tool_env
+    async with connect(url) as ws:
+        await call(ws, hello())
+        await ws.send(json.dumps({"jsonrpc": "2.0", "id": "nope", "result": {"output": "x"}}))
+        reply = await call(ws, request("tools", {"tools": []}))
+        assert reply["result"] == {}
+
+
+async def test_malformed_response_keeps_connection(tool_env):
+    url, _ = tool_env
+    async with connect(url) as ws:
+        await call(ws, hello())
+        await ws.send(json.dumps({"jsonrpc": "2.0", "id": [1], "result": 1}))
+        reply = await call(ws, request("tools", {"tools": []}))
+        assert reply["result"] == {}

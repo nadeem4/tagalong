@@ -176,5 +176,5 @@ A body that is too far behind.
 ## Left to the builder
 
 - How the outbox is stored (memory or disk); a brain restart may simply mean `resync`.
-- Timeouts for `use` and for asks, and the exact JSON Schema subset tools may use.
+- Timeouts for asks, and the exact JSON Schema subset tools may use. The brain's `use` timeout is 30 s; a `use` that times out or whose turn is cancelled gets `cancel {call}` (no `seq`).
 - How the brain turns events, context and tool results into model input.

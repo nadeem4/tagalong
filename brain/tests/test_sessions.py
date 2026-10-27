@@ -14,8 +14,9 @@ from brain.bodies import Bodies
 from brain.memory import Memory
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Final
-from brain.protocol import SayParams
+from brain.protocol import Body, SayParams, Tool
 from brain.sessions import Session
+from brain.toolbox import BrainSource, ToolSpec
 
 
 class Gate:
@@ -214,7 +215,7 @@ async def test_turn_sends_memory_tools():
     session, _ = make(model)
     session.say("desktop", say("hello"))
     await finish(session)
-    assert [t["name"] for t in model.tools[0]] == ["remember", "recall", "forget"]
+    assert [t["name"] for t in model.tools[0]] == ["forget", "recall", "remember"]  # sorted
 
 
 async def test_what_you_know_in_system_prompt():
@@ -292,12 +293,13 @@ async def test_cancelled_turn_is_saved_valid(tmp_path):
     )
     running = asyncio.Event()
 
-    async def blocked(name, args):
+    async def blocked(args):
         running.set()
         await asyncio.Event().wait()
 
     session, _ = make(Gate([call, "never"]), memory)
-    session._run_tool = blocked
+    stuck = ToolSpec("recall", "blocks", {"type": "object"})
+    session.toolbox.sources[:] = [BrainSource([(stuck, blocked)])]
     result = session.say("desktop", say("a"))
     await running.wait()  # the cancel lands while the tool is running
     session.cancel(result.turn)
@@ -420,3 +422,30 @@ async def test_no_merge_into_saved_message(tmp_path):
     assert [m["role"] for m in session.history] == ["user", "user"]
     assert session.history[0]["content"] == [{"type": "text", "text": "old"}]
     await finish_quietly(session)
+
+
+async def test_body_tools_offered_then_gone_after_disconnect():
+    class Peer:
+        def send(self, frame):
+            pass
+
+    peer = Peer()
+
+    class Leaving(Gate):
+        async def stream(self, system, messages, tools):
+            async for item in super().stream(system, messages, tools):
+                if len(self.tools) == 1:  # the body leaves during step 1
+                    session._bodies.disconnect("desktop", peer)
+                yield item
+
+    model = Leaving([remember_call("x"), "done"])
+    session, _ = make(model)
+    tool = Tool(name="see_screen", description="d", input_schema={"type": "object"})
+    body = Body(id="desktop", kind="desktop", name="Desktop")
+    session._bodies.connect(body, [tool], peer, None)
+    session.say("desktop", say("hi"))
+    await finish_quietly(session)
+    first = [t["name"] for t in model.tools[0]]
+    second = [t["name"] for t in model.tools[1]]
+    assert first == ["forget", "recall", "remember", "desktop__see_screen"]
+    assert second == ["forget", "recall", "remember"]

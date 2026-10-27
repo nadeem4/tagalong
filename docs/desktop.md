@@ -98,7 +98,7 @@ running.
   capture notice. `look_at_window(windowId)` returns an image part and raises the notice; a
   minimized window fails with "That window is minimized, so there is nothing drawn to look at."
   An excluded window fails `tool_failed` with the exclusion sentence. Each run is bounded at 15 s
-  and answers `timeout` (-32004) past that. The brain does not route these to the model yet.
+  and answers `timeout` (-32004) past that. The brain now offers these to Scout as `desktop__<tool>`.
 
 - **Status marks.** `markBrainLink` (`status-marks.ts`) sets `brain-offline` ("Scout's brain is not
   running.") while the client is offline and `brain-outdated` ("Update Tagalong to talk to this
