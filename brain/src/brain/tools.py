@@ -1,13 +1,22 @@
-"""Scout's memory tools (remember, recall, forget) as specs plus handlers for a BrainSource.
+"""The brain's own tools as specs plus handlers for a BrainSource.
 
-Refusals and bad arguments raise; run_turn turns any exception into an is_error tool result
-the model reads.
+Scout's memory tools (remember, recall, forget) and Home-only tools (audience {"home"}, never
+offered to the model) that return one JSON string. Refusals and bad arguments raise; run_turn
+turns any exception into an is_error tool result the model reads. Handlers that change what
+Home shows send `changed` through the notify they are given.
 """
 
+import json
 import re
+from collections.abc import Callable
 
+from brain.guardrails import Budget
 from brain.memory import KINDS, Hit, Memory, MemoryRefused
-from brain.toolbox import Handler, ToolSpec
+from brain.protocol import ErrorCode, RpcError
+from brain.toolbox import Handler, Toolbox, ToolSpec
+
+Notify = Callable[[str, dict], None]
+LIST_MEMORIES_MAX = 200
 
 RECALL_MAX_CHARS = 4000
 
@@ -54,12 +63,15 @@ def _need(tool: str, args: dict, *names: str) -> None:
         raise MemoryRefused(f"{tool} needs {' and '.join(names)}.")
 
 
-def brain_tools(memory: Memory) -> list[tuple[ToolSpec, Handler]]:
+def brain_tools(
+    memory: Memory, notify: Notify = lambda method, params: None
+) -> list[tuple[ToolSpec, Handler]]:
     async def remember(args: dict) -> str:
         _need("remember", args, "kind", "text")
         item = memory.remember(
             args["kind"], args["text"], args.get("cadence"), args.get("replaces")
         )
+        notify("changed", {"what": "memory"})  # Scout's saves show up in Home
         verb = "replaced" if args.get("replaces") is not None else "saved"
         return f"{verb} {item.kind} #{item.id}"
 
@@ -71,7 +83,25 @@ def brain_tools(memory: Memory) -> list[tuple[ToolSpec, Handler]]:
     async def forget(args: dict) -> str:
         _need("forget", args, "id")
         item = memory.forget(args["id"])
+        notify("changed", {"what": "memory"})
         return f"forgot {item.kind} #{item.id}: {item.text}"
+
+    async def list_memories(args: dict) -> str:
+        items = memory.list_items(LIST_MEMORIES_MAX)
+        return json.dumps(
+            {
+                "memories": [
+                    {
+                        "id": i.id,
+                        "kind": i.kind,
+                        "text": i.text,
+                        "cadence": i.cadence,
+                        "at": i.updated_at,
+                    }
+                    for i in items
+                ]
+            }
+        )
 
     scout = frozenset({"scout"})
     return [
@@ -133,5 +163,92 @@ def brain_tools(memory: Memory) -> list[tuple[ToolSpec, Handler]]:
                 default_mode="auto",
             ),
             forget,
+        ),
+        (
+            ToolSpec(
+                "list_memories",
+                "Every saved memory, newest first (at most 200).",
+                {"type": "object", "properties": {}},
+                frozenset({"home"}),
+                effect="read",
+            ),
+            list_memories,
+        ),
+    ]
+
+
+def home_tools(budget: Budget, toolbox: Callable[[], Toolbox]) -> list[tuple[ToolSpec, Handler]]:
+    """Home-only tools about spending and permissions.
+
+    The toolbox is passed as a getter because these tools are part of the toolbox's own
+    source: it cannot exist before them.
+    """
+
+    async def spend_today(args: dict) -> str:
+        return json.dumps({"spent_usd": budget.spent, "limit_usd": budget.limit})
+
+    async def list_permissions(args: dict) -> str:
+        box = toolbox()
+        current = {s.name for source in box.sources for s in source.specs()}
+        rows = [
+            {
+                "name": s.name,
+                "description": s.description,
+                "effect": s.effect,
+                "mode": box.mode(s),
+                "locked": s.locked,
+                "online": s.name in current,
+            }
+            for s in sorted(box.known_specs(), key=lambda s: s.name)
+            if "scout" in s.audience
+        ]
+        return json.dumps({"tools": rows})
+
+    async def set_permission(args: dict) -> str:
+        if not args.get("tool") or not args.get("mode"):
+            # Home sent bad params; Scout never calls this, so it is not a MemoryRefused.
+            raise RpcError(ErrorCode.invalid_params, "set_permission needs tool and mode.")
+        toolbox().set_mode(args["tool"], args["mode"])  # the save path sends `changed`
+        return json.dumps({"tool": args["tool"], "mode": args["mode"]})
+
+    home = frozenset({"home"})
+    empty = {"type": "object", "properties": {}}
+    return [
+        (
+            ToolSpec(
+                "spend_today",
+                "Today's spend in USD and the daily limit.",
+                empty,
+                home,
+                effect="read",
+            ),
+            spend_today,
+        ),
+        (
+            ToolSpec(
+                "list_permissions",
+                "Every tool Scout may use, with its ask or auto mode and whether it is online.",
+                empty,
+                home,
+                effect="read",
+            ),
+            list_permissions,
+        ),
+        (
+            ToolSpec(
+                "set_permission",
+                "Set one tool to ask or auto.",
+                {
+                    "type": "object",
+                    "properties": {
+                        "tool": {"type": "string"},
+                        "mode": {"type": "string", "enum": ["ask", "auto"]},
+                    },
+                    "required": ["tool", "mode"],
+                },
+                home,
+                effect="change",
+            ),
+            set_permission,
         ),
     ]

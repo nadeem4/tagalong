@@ -7,6 +7,9 @@ import { registerExpertIpc } from './experts';
 
 const EXPERT = { id: 'claude-code', name: 'Claude Code' };
 
+let spend: () => unknown = () => [];
+const spendText = (value: unknown) => [{ type: 'text', text: JSON.stringify(value) }];
+
 function setup() {
   const ipc = fakeIpc();
   const engine = fakeEngine({
@@ -28,10 +31,16 @@ function setup() {
     'experts.catalog': { entries: [{ entry: { id: 'researcher' } }] },
     'experts.install': { ok: true, installed: ['firecrawl@claude-plugins-official'] },
     'projects.search': { projects: ['C:\\code\\app'] },
-    'usage.summary': { today: [], month: [] },
   });
-  registerExpertIpc(ipc.handle, { engine: () => engine.client });
-  return { ...ipc, calls: engine.calls };
+  const brainCalls: [string, object | undefined][] = [];
+  const brain = {
+    call: (tool: string, input?: object) => {
+      brainCalls.push([tool, input]);
+      return Promise.resolve(spend() as never);
+    },
+  };
+  registerExpertIpc(ipc.handle, { engine: () => engine.client, brain });
+  return { ...ipc, calls: engine.calls, brainCalls };
 }
 
 describe('registerExpertIpc', () => {
@@ -81,10 +90,19 @@ describe('registerExpertIpc', () => {
     ]);
   });
 
-  it("reads Home's Spend card from the engine as it is", async () => {
-    const { invoke, calls } = setup();
-    expect(await invoke(IPC.usageSummary)).toEqual({ today: [], month: [] });
-    expect(calls).toEqual([['usage.summary', {}]]);
+  it("reads Home's Spend card from the brain's spend_today", async () => {
+    spend = () => spendText({ spent_usd: 0.31, limit_usd: 1 });
+    const { invoke, calls, brainCalls } = setup();
+    expect(await invoke(IPC.usageSummary)).toEqual({ spentUsd: 0.31, limitUsd: 1 });
+    expect(brainCalls).toEqual([['spend_today', {}]]);
+    expect(calls).toEqual([]);
+  });
+
+  it('shows no limit when the brain has none, and rejects an answer it cannot read', async () => {
+    spend = () => spendText({ spent_usd: 0, limit_usd: null });
+    expect(await setup().invoke(IPC.usageSummary)).toEqual({ spentUsd: 0, limitUsd: null });
+    spend = () => spendText({ nope: true });
+    await expect(setup().invoke(IPC.usageSummary)).rejects.toThrow('brain sent bad spend');
   });
 
   it('lists, saves, deletes and tests experts, unwrapping each answer', async () => {

@@ -340,11 +340,9 @@ Right-click the tray icon and choose **Open Tagalong**. The tray has only four i
 Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in twelve pages:
 
 - **Overview**: whether Scout is ready and what it thinks with, your experts, what was spent today
-  and this month (**Spend**), and the latest activity. Spend shows dollars for models with a known
-  price, tokens and "price unknown" for the rest, and tokens "(your plan)" for the Claude sign-in.
-  **Settings → Daily budget** (off by default) pauses keep-an-eye comments and scheduled routines
-  until midnight once that day's priced spend reaches it; asking Scout, Run now, watches and
-  hand-offs always go through.
+  (**Spend**), and the latest activity. Spend shows the dollars spent today against the daily limit,
+  as the brain reports them. The brain's limit is $5 a day unless `TAGALONG_DAILY_BUDGET_USD` sets
+  another when the brain starts; the **Settings → Daily budget** box does not change it.
 - **Waiting on you**: every change Scout wants to make in a connected app and every hand-off card
   still waiting for Send, with **Allow once**, **Open** and **Decline**, and the last ones answered
   with how each ended. The nav shows how many wait. A change waits an hour and a card a day; a
@@ -424,7 +422,10 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   on you. Every change shows who made it and why, and opens to its text; the newest one has
   **Undo**. Edit any page and **Save** (a page longer than it holds is cut to fit, and says so).
   The pages are plain files in `%APPDATA%\Tagalong\self`.
-- **Settings**, in seven sections. Press ⓘ beside a setting for the longer story.
+- **Settings**, in seven sections. Press ⓘ beside a setting for the longer story. Below the form,
+  **Permissions** lists each tool Scout can use with an **Ask** or **Auto** switch: Auto means Scout
+  does it without asking. A tool its body marks as always confirm is fixed on Ask,
+  and a tool of a body that is not connected is dimmed.
   - **How Scout thinks**: Scout's real brain, and whether your Claude Code sign-in works (checked
     locally with `claude auth status`). Without Claude Code you pick a service and paste its key,
     and saving moves Scout to it.

@@ -1,36 +1,12 @@
 /**
- * Home's Spend card: today's and this month's usage by who spent it (Scout or the experts)
- * and on which service, and whether the daily budget paused proactive comments. Contains
- * SpendCard and formatSpend.
+ * Home's Spend card: what was spent today against the daily limit, and whether the limit
+ * paused Scout for the day. The brain reports only these two numbers. Contains SpendCard.
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import type { UsageRow, UsageSummaryResult } from '@tagalong/protocol';
 import { useHostBridge } from '../host-bridge';
+import type { SpendToday } from '../host-bridge';
 import { changesActivity } from './activity-view';
-
-const PROVIDER_LABELS: Readonly<Record<string, string>> = {
-  anthropic: 'Anthropic',
-  openrouter: 'OpenRouter',
-  fake: 'Fake',
-};
-
-/** "Scout · OpenRouter", "Experts · Claude Code". The sign-in reads as itself for Scout. */
-function who(row: UsageRow): string {
-  const provider =
-    row.providerId === 'claude-code'
-      ? row.source === 'scout'
-        ? 'Claude sign-in'
-        : 'Claude Code'
-      : (PROVIDER_LABELS[row.providerId] ?? row.providerId);
-  return `${row.source === 'scout' ? 'Scout' : 'Experts'} · ${provider}`;
-}
-
-function tokens(count: number): string {
-  if (count < 1000) return `${count}`;
-  if (count < 1_000_000) return `${Math.round(count / 1000)}k`;
-  return `${(count / 1_000_000).toFixed(1)}M`;
-}
 
 function dollars(usd: number): string {
   return usd > 0 && usd < 0.01 ? 'under $0.01' : `$${usd.toFixed(2)}`;
@@ -42,35 +18,12 @@ function cap(usd: number): string {
 }
 
 /**
- * One row's amount. Dollars only for priced calls; a model with no known price shows its
- * tokens and says so, and the Claude sign-in is the person's plan, so never money.
- */
-export function formatSpend(row: UsageRow): string {
-  if (row.providerId === 'claude-code') {
-    return `${tokens(row.inputTokens + row.outputTokens)} tokens (your plan)`;
-  }
-  const unknown = `${tokens(row.unpricedTokens)} tokens · price unknown`;
-  if (row.costUsd === null) return unknown;
-  return row.unpricedTokens > 0 ? `${dollars(row.costUsd)} + ${unknown}` : dollars(row.costUsd);
-}
-
-function Rows({ rows }: { rows: readonly UsageRow[] }) {
-  return rows.map((row) => (
-    <p key={`${row.source}:${row.providerId}`} className="home-card__row">
-      <span>{who(row)}</span>
-      <span>{formatSpend(row)}</span>
-    </p>
-  ));
-}
-
-/**
- * Home's Spend card: what Scout and the experts used today and this month, and whether
- * the daily budget has paused proactive comments. Read again whenever a turn, a hand-off
- * or a routine run finishes, the same moments Activity refreshes.
+ * Home's Spend card. Read again whenever a turn, a hand-off or a routine run finishes, the
+ * same moments Activity refreshes.
  */
 export function SpendCard() {
   const bridge = useHostBridge();
-  const [summary, setSummary] = useState<UsageSummaryResult | null>(null);
+  const [spend, setSpend] = useState<SpendToday | null>(null);
   const [failed, setFailed] = useState(false);
 
   const refresh = useCallback(() => {
@@ -80,7 +33,7 @@ export function SpendCard() {
       .call(bridge)
       .then((next) => {
         setFailed(false);
-        setSummary(next);
+        setSpend(next);
       })
       .catch(() => setFailed(true));
   }, [bridge]);
@@ -93,29 +46,30 @@ export function SpendCard() {
   }, [bridge, refresh]);
 
   if (bridge.usageSummary === undefined) return null;
-  const { dailyUsd, spentOut } = summary?.budget ?? { dailyUsd: null, spentOut: false };
+  const limit = spend?.limitUsd ?? null;
+  const spentOut = spend !== null && limit !== null && spend.spentUsd >= limit;
   return (
     <section className="home-card" aria-label="Spend">
       <h2 className="home-card__label">SPEND</h2>
-      {failed && summary === null && <p>Tagalong could not read what was spent.</p>}
-      {summary !== null && (
+      {failed && spend === null && <p>Tagalong could not read what was spent.</p>}
+      {spend !== null && (
         <>
-          {spentOut && dailyUsd !== null && (
+          {spentOut && limit !== null && (
             <p className="home-card__lead">
-              Proactive comments paused: today’s {cap(dailyUsd)} is spent.
+              Today’s {cap(limit)} is spent; Scout pauses until midnight.
             </p>
           )}
           <h3 className="home-card__label">TODAY</h3>
-          {summary.today.length === 0 ? (
+          {spend.spentUsd === 0 ? (
             <p>Nothing spent yet today.</p>
           ) : (
-            <Rows rows={summary.today} />
-          )}
-          {summary.month.length > 0 && (
-            <>
-              <h3 className="home-card__label">THIS MONTH</h3>
-              <Rows rows={summary.month} />
-            </>
+            <p className="home-card__row">
+              <span>
+                {limit === null
+                  ? dollars(spend.spentUsd)
+                  : `${dollars(spend.spentUsd)} of ${cap(limit)}`}
+              </span>
+            </p>
           )}
         </>
       )}

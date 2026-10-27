@@ -343,6 +343,10 @@ neither read nor change settings.
 data directory, `%APPDATA%\Tagalong` on Windows. Neither is in the database. See
 [storage.md](storage.md).
 
+Tool permissions (Ask or Auto per tool, shown in Home → Settings → Permissions) are not settings
+here: they are brain state in the `permissions` table of `tagalong.db`, read and set through the
+brain's `list_permissions` and `set_permission` (see [brain.md](brain.md#permissions-and-asks)).
+
 ## Failure handling
 
 - **A bad settings file** never stops boot: the `.bak`, then the defaults, with a warning. The bad

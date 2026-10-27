@@ -27,11 +27,19 @@ import type {
   SettingsPatch,
   MemoryEntry,
 } from '@tagalong/protocol';
-import type { AskInput, ConfirmHandoff, HostBridge, TurnEvent } from '../host-bridge';
+import type {
+  AskInput,
+  ConfirmHandoff,
+  HostBridge,
+  PermissionRow,
+  TurnEvent,
+} from '../host-bridge';
 
 export interface FakeHostBridge extends HostBridge {
   /** Delivers an event to every subscriber synchronously, so tests need no timers. */
   emit(event: TurnEvent): void;
+  /** Tells every `onBrainChanged` subscriber that the brain changed `what`. */
+  emitChanged(what: string): void;
   readonly asks: readonly AskInput[];
   readonly interrupts: readonly string[];
   /** Every watch id the panel asked to stop, in order. */
@@ -46,6 +54,10 @@ export interface FakeHostBridge extends HostBridge {
   sightLog: SightLogEntry[];
   /** What Scout remembers, newest first; delete edits it. */
   memories: MemoryEntry[];
+  /** Home's Permissions rows; setPermission edits them, a test may swap them. */
+  permissions: PermissionRow[];
+  /** Every setPermission call, in order. */
+  readonly permissionSets: readonly { tool: string; mode: 'ask' | 'auto' }[];
   /** How many times the activity was listed. */
   activityReads: number;
   /** The experience log, newest first, and each episode's events by id. */
@@ -129,6 +141,8 @@ export function createFakeHostBridge(
     sightLog?: SightLogEntry[];
     /** What Scout remembers, newest first. */
     memories?: MemoryEntry[];
+    /** Home's Permissions rows. */
+    permissions?: PermissionRow[];
     /** Whether a calendar link is kept; absent, none is. */
     calendar?: CalendarCheckResult;
     /** Every ask, waiting or answered. */
@@ -138,6 +152,7 @@ export function createFakeHostBridge(
   } = {},
 ): FakeHostBridge {
   const handlers = new Set<(event: TurnEvent) => void>();
+  const changedHandlers = new Set<(what: string) => void>();
   const asks: AskInput[] = [];
   const interrupts: string[] = [];
   const stoppedWatches: string[] = [];
@@ -161,6 +176,7 @@ export function createFakeHostBridge(
   const copied: string[] = [];
   const calendarLinks: (string | null)[] = [];
   const appliedSettings: SettingsPatch[] = [];
+  const permissionSets: { tool: string; mode: 'ask' | 'auto' }[] = [];
   let calendar: CalendarCheckResult = options.calendar ?? { linked: false, meetings: 0 };
   let routineCount = 0;
   const toView = (draft: RoutineDraftInput & { id?: string }): RoutineView => {
@@ -505,6 +521,18 @@ export function createFakeHostBridge(
       fake.memories = fake.memories.filter((memory) => memory.id !== id);
       return Promise.resolve(fake.memories.length < before);
     },
+    permissions: (options.permissions ?? []).map((row) => ({ ...row })),
+    permissionSets,
+    listPermissions() {
+      return Promise.resolve(fake.permissions.map((row) => ({ ...row })));
+    },
+    setPermission(tool, mode) {
+      permissionSets.push({ tool, mode });
+      fake.permissions = fake.permissions.map((row) =>
+        row.name === tool ? { ...row, mode } : row,
+      );
+      return Promise.resolve();
+    },
     copied,
     appliedSettings,
     applySettings(patch) {
@@ -523,6 +551,15 @@ export function createFakeHostBridge(
     },
     checkCalendar() {
       return Promise.resolve(calendar);
+    },
+    onBrainChanged(handler) {
+      changedHandlers.add(handler);
+      return () => {
+        changedHandlers.delete(handler);
+      };
+    },
+    emitChanged(what) {
+      for (const handler of [...changedHandlers]) handler(what);
     },
     emit(event) {
       // Copied first so a handler that unsubscribes mid-emit cannot skip its neighbours.

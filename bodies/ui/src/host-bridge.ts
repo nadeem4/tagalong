@@ -31,10 +31,28 @@ import type {
   RoutineView,
   SettingsPatch,
   SightLogEntry,
-  UsageSummaryResult,
   MemoryEntry,
 } from '@tagalong/protocol';
 import type { FixTarget, HealthFacts } from './health';
+
+/** What the brain knows of spend: today's dollars and the daily limit (null when it has none). */
+export interface SpendToday {
+  spentUsd: number;
+  limitUsd: number | null;
+}
+
+/**
+ * One tool in Home's Permissions list: whether Scout asks before using it (`ask`) or just does
+ * (`auto`). A locked tool always asks; an offline body's tool cannot be changed yet.
+ */
+export interface PermissionRow {
+  name: string;
+  description: string;
+  effect: 'read' | 'change';
+  mode: 'ask' | 'auto';
+  locked: boolean;
+  online: boolean;
+}
 
 /**
  * The core-to-host notifications a panel renders: everything about a turn in flight, a
@@ -224,8 +242,17 @@ export interface HostBridge {
   setCalendarLink?(link: string | null): Promise<CalendarCheckResult>;
   /** Whether a calendar link is kept, without showing it. */
   checkCalendar?(): Promise<CalendarCheckResult>;
-  /** Home's Spend card: today's and this month's usage, and the daily budget. */
-  usageSummary?(): Promise<UsageSummaryResult>;
+  /** Home's Spend card: what was spent today and the daily limit, as the brain knows them. */
+  usageSummary?(): Promise<SpendToday>;
+  /** Home's Permissions: each tool Scout can use and whether it asks first. */
+  listPermissions?(): Promise<PermissionRow[]>;
+  /** Sets one tool to ask or auto; rejects when the brain refuses (a locked tool, say). */
+  setPermission?(tool: string, mode: 'ask' | 'auto'): Promise<void>;
+  /**
+   * The brain changed something Home shows (`memory`, `permissions`): read it again. Returns an
+   * unsubscribe function. Optional: a host without a brain never sends it.
+   */
+  onBrainChanged?(handler: (what: string) => void): () => void;
   /**
    * "Scout, what's wrong?": what the health card reads, from calls the host already makes.
    * No model call, so it works when Scout cannot think. Never a key or a secret.

@@ -5,16 +5,20 @@
  */
 
 import type { Expert } from '@tagalong/protocol';
-import type { ConfirmHandoff } from '@tagalong/ui';
+import type { ConfirmHandoff, SpendToday } from '@tagalong/ui';
 import { IPC } from '../../shared/ipc';
+import { callJson } from '../brain/call-json';
+import type { BrainCall } from '../brain/call-json';
 import type { EngineCall, IpcHandle } from './handle';
 
 export interface ExpertIpcDeps {
   /** Throws when the engine is not running. */
   engine: () => EngineCall;
+  /** The brain's tools: today's spend comes from it. */
+  brain: BrainCall;
 }
 
-export function registerExpertIpc(handle: IpcHandle, { engine }: ExpertIpcDeps): void {
+export function registerExpertIpc(handle: IpcHandle, { engine, brain }: ExpertIpcDeps): void {
   // Home's activity view.
   handle(IPC.listActivity, async (_event, params: { before?: string; limit?: number }) =>
     engine().call('activity.list', {
@@ -55,7 +59,18 @@ export function registerExpertIpc(handle: IpcHandle, { engine }: ExpertIpcDeps):
   );
 
   // Home's Spend card.
-  handle(IPC.usageSummary, async () => engine().call('usage.summary', {}));
+  // The brain knows today's dollars and the limit; the by-provider rows and the month are gone.
+  handle(IPC.usageSummary, async (): Promise<SpendToday> => {
+    const spend = (await callJson(brain, 'spend_today')) as {
+      spent_usd?: unknown;
+      limit_usd?: unknown;
+    } | null;
+    if (typeof spend?.spent_usd !== 'number') throw new Error('brain sent bad spend');
+    return {
+      spentUsd: spend.spent_usd,
+      limitUsd: typeof spend.limit_usd === 'number' ? spend.limit_usd : null,
+    };
+  });
 
   // Home's Experts tab.
   handle(IPC.listExperts, async (): Promise<Expert[]> => {

@@ -71,6 +71,8 @@ export const IPC = {
   clearSightLog: 'tagalong:sight-log:clear',
   listMemories: 'tagalong:memory:list',
   deleteMemory: 'tagalong:memory:delete',
+  listPermissions: 'tagalong:permissions:list',
+  setPermission: 'tagalong:permissions:set',
   setCalendarLink: 'tagalong:calendar:set-link',
   checkCalendar: 'tagalong:calendar:check',
   usageSummary: 'tagalong:usage:summary',
@@ -156,6 +158,8 @@ export const IPC = {
   getStatusMark: 'tagalong:status:get',
   statusMarkEvent: 'tagalong:status:event',
   setStatusMark: 'tagalong:status:set',
+  // The brain changed something Home shows (memory, permissions): pushed to every window.
+  brainChangedEvent: 'tagalong:brain:changed',
 } as const;
 
 /** What the figure hands its preload on a drop: the files, and the drag's link and text. */

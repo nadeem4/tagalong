@@ -37,6 +37,9 @@ class FakeSource:
     def specs(self):
         return [s for s in self._specs if s.name not in self.offline]
 
+    def known_specs(self):
+        return list(self._specs)
+
     async def run(self, call, tool):
         self.ran.append(tool)
         return f"ran {tool}"
@@ -444,3 +447,24 @@ async def test_turn_cancel_mid_ask_closes_it_cancelled_and_leaves_nothing():
 async def test_without_asks_the_gate_step_is_skipped():
     box = Toolbox([FakeSource([spec("t")])])
     assert await box.run(call("t")) == "ran t"
+
+
+def test_known_specs_keep_offline_body_tools():
+    bodies = Bodies()
+    connect(bodies, "desktop")
+    box = Toolbox([BrainSource([(spec("a"), None)]), BodySource(bodies)])
+    bodies.disconnect("desktop", bodies._online["desktop"].peer)
+    assert [s.name for s in box.known_specs()] == ["a", "desktop__see_screen"]
+    assert box.sources[1].specs() == []
+
+
+def test_home_tools_are_home_audience_contract_records():
+    h = ToolSpec("h", "h d", {"type": "object"}, frozenset({"home"}), effect="read")
+    box = Toolbox([BrainSource([(spec("a"), None), (h, None)])])
+    [record] = box.home_tools()
+    assert record.model_dump(exclude_none=True) == {
+        "name": "h",
+        "description": "h d",
+        "input_schema": {"type": "object"},
+        "effect": "read",
+    }

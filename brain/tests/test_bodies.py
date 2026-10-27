@@ -348,3 +348,22 @@ def test_online_ids_lists_connected_bodies():
     bodies.connect(body("b"), [], FakePeer(), None)
     bodies.disconnect("b", peer)  # wrong peer: b stays online
     assert bodies.online_ids() == ["a", "b"]
+
+
+def test_known_tools_survive_disconnect():
+    bodies = Bodies()
+    peer = FakePeer()
+    bodies.connect(body("desktop"), [tool("see_screen")], peer, None)
+    bodies.set_tools("desktop", peer, [tool("see_screen"), tool("type_text")])
+    bodies.disconnect("desktop", peer)
+    assert not bodies.is_online("desktop")
+    assert [t.name for t in bodies.known_tools()["desktop"]] == ["see_screen", "type_text"]
+
+
+def test_known_tools_ignores_stale_peer_set_tools():
+    bodies = Bodies()
+    old, new = FakePeer(), FakePeer()
+    bodies.connect(body("desktop"), [tool("a")], old, None)
+    bodies.connect(body("desktop"), [tool("b")], new, None)
+    bodies.set_tools("desktop", old, [tool("zzz")])
+    assert [t.name for t in bodies.known_tools()["desktop"]] == ["b"]

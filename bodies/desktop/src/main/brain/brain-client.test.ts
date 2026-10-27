@@ -146,6 +146,38 @@ describe('BrainClient', () => {
     expect(e).not.toBeInstanceOf(BrainOffline);
   });
 
+  it('call sends the tool and its input, and resolves with the output parts', async () => {
+    const { client, s } = await online();
+    const p = client.call('list_memories');
+    const req = s.sent[1]!;
+    expect(req).toMatchObject({ method: 'call', params: { tool: 'list_memories', input: {} } });
+    const output = [{ type: 'text', text: '{"memories":[]}' }];
+    s.receive({ jsonrpc: '2.0', id: req.id, result: { output } });
+    await expect(p).resolves.toEqual(output);
+  });
+
+  it('call rejects BrainOffline when the brain is not online', async () => {
+    const { client } = setup();
+    await expect(client.call('list_memories')).rejects.toBeInstanceOf(BrainOffline);
+  });
+
+  it('call rejects with an RpcError carrying the brain error code', async () => {
+    const { client, s } = await online();
+    const p = client.call('forget', { id: 9 });
+    expect(s.sent[1]!.params).toEqual({ tool: 'forget', input: { id: 9 } });
+    s.receive({ jsonrpc: '2.0', id: s.sent[1]!.id, error: { code: -32001, message: 'nope' } });
+    const e = await p.catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(RpcError);
+    expect((e as RpcError).code).toBe(-32001);
+  });
+
+  it('call rejects when the brain sends a result that is not output parts', async () => {
+    const { client, s } = await online();
+    const p = client.call('list_memories');
+    s.receive({ jsonrpc: '2.0', id: s.sent[1]!.id, result: { nope: 1 } });
+    await expect(p).rejects.toThrow('brain sent bad call result');
+  });
+
   it('say times out after 30 s with a plain Error', async () => {
     const { client } = await online();
     const p = client.say({ text: 'hi' });

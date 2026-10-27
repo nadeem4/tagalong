@@ -1,6 +1,6 @@
 /** Tests for MemoryView: rows, kind labels, delete, and the less common paths. */
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { MemoryEntry } from '@tagalong/protocol';
 import { HostBridgeProvider } from '../host-bridge';
@@ -74,24 +74,39 @@ describe('MemoryView', () => {
     vi.restoreAllMocks();
   });
 
-  it('reads again after a turn ends, when Scout may have remembered something', async () => {
+  it('reads again when the brain says memory changed, and only then', async () => {
     const bridge = createFakeHostBridge({ memories: [] });
     renderView(bridge);
     await screen.findByText('Scout doesn’t remember anything yet.');
     bridge.memories = [TEA];
-    bridge.emit({ type: 'turn.delta', turnId: 't1', text: 'a' });
+    act(() => bridge.emitChanged('permissions'));
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(screen.queryByRole('list', { name: 'What Scout remembers' })).toBeNull();
-    bridge.emit({
-      type: 'turn.completed',
-      turnId: 't1',
-      text: 'done',
-      stopReason: 'end',
-      usage: { inputTokens: 1, outputTokens: 1 },
-    });
+    act(() => bridge.emitChanged('memory'));
     expect(await screen.findByRole('list', { name: 'What Scout remembers' })).toHaveTextContent(
       'Prefers green tea',
     );
+  });
+
+  it('stops listening for changes when it goes away', async () => {
+    const bridge = createFakeHostBridge({ memories: [] });
+    const off = vi.fn();
+    bridge.onBrainChanged = () => off;
+    const { unmount } = render(
+      <HostBridgeProvider bridge={bridge}>
+        <MemoryView name="Scout" />
+      </HostBridgeProvider>,
+    );
+    await screen.findByText('Scout doesn’t remember anything yet.');
+    unmount();
+    expect(off).toHaveBeenCalled();
+  });
+
+  it('works on a host that never reports changes', async () => {
+    const bridge = createFakeHostBridge({ memories: [TEA] });
+    delete bridge.onBrainChanged;
+    renderView(bridge);
+    expect(await screen.findByRole('list', { name: 'What Scout remembers' })).toBeInTheDocument();
   });
 
   it('says the page is not available on a host without it', () => {

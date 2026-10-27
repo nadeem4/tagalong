@@ -5,6 +5,7 @@ turn cleared even if the task is cancelled before it ever ran.
 """
 
 import asyncio
+import json
 import logging
 import uuid
 from collections.abc import Callable
@@ -15,10 +16,10 @@ from brain.bodies import Bodies
 from brain.memory import Memory, _compaction_text
 from brain.mind.prompt import render_know, system_prompt, user_content
 from brain.mind.resume import rebuild_history
-from brain.mind.turn import Model, run_turn
-from brain.protocol import SayParams, SayResult
+from brain.mind.turn import Call, Model, run_turn
+from brain.protocol import SayParams, SayResult, Tool
 from brain.toolbox import BodySource, BrainSource, Toolbox
-from brain.tools import brain_tools
+from brain.tools import brain_tools, home_tools
 
 log = logging.getLogger("brain")
 
@@ -39,10 +40,18 @@ class Session:
         self._step_cap = step_cap
         self._memory = memory
         self._asks = Asks(bodies)
+        notify = bodies.notify
+        tools = brain_tools(memory, notify) + home_tools(budget, lambda: self.toolbox)
+
+        def save_mode(name: str, mode: str) -> None:
+            # Every save (Home's set_permission or an "always" answer) refreshes open panels.
+            memory.set_permission_mode(name, mode)
+            notify("changed", {"what": "permissions"})
+
         self.toolbox = Toolbox(
-            [BrainSource(brain_tools(memory)), BodySource(bodies)],
+            [BrainSource(tools), BodySource(bodies)],
             memory.permission_modes,
-            memory.set_permission_mode,
+            save_mode,
             self._asks,
         )
         self._now = now
@@ -104,6 +113,14 @@ class Session:
 
     def open_asks(self) -> list[dict]:
         return self._asks.open_asks()
+
+    def home_tools(self) -> list[Tool]:
+        return self.toolbox.home_tools()
+
+    async def call_home(self, tool: str, tool_input: dict) -> str:
+        """Run a Home tool through the toolbox gate (caller "home" skips the ask)."""
+        out = await self.toolbox.run(Call(uuid.uuid4().hex, tool, tool_input, "", ""), "home")
+        return out if isinstance(out, str) else json.dumps(out)
 
     def _append_user(self, content: list) -> None:
         # Input arriving while the last user message is still unsaved joins it, so one burst is

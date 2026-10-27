@@ -1735,33 +1735,24 @@ brain routes them to the model, check them in the brain's logs or a contract-v1 
 
 ### SP.1. Home shows what Scout and the experts used
 
-1. **Setup:** Scout thinks with OpenRouter on `anthropic/claude-haiku-4.5`, with a key stored.
-2. **Action:** ask Scout two questions, then open **Home → Overview**. **Expected:** the **Spend**
-   card lists **Today** and **This month** with a row `Scout · OpenRouter` and a dollar amount (or
-   "under $0.01"). It updates when a turn finishes, without reopening Home.
-3. **Action:** switch Scout to a model not in the price table (any other OpenRouter model) and ask
-   again. **Expected:** the row shows tokens and "price unknown". No dollar figure is guessed.
-4. **Action:** switch Scout to the Claude sign-in and ask again; then send a task to Claude Code.
-   **Expected:** `Scout · Claude sign-in` and `Experts · Claude Code` show tokens and "(your plan)",
-   never dollars.
+1. **Setup:** the brain running with its model and key as usual. Its daily limit is $5 unless
+   `TAGALONG_DAILY_BUDGET_USD` sets another (read at brain start, from the environment or the data
+   folder's `.env`).
+2. **Action:** ask Scout two questions, then open **Home → Overview**.
+   **Expected:** the **Spend** card shows **Today** with one line, the dollars the brain counted
+   against its daily limit (for example "$0.31 of $5"), or "Nothing spent yet today." It updates
+   when a turn finishes, without reopening Home. The card lists no per-provider rows and no month:
+   the brain reports only today's spend and the limit.
 
-### SP.2. The cap pauses proactive work only
+### SP.2. The cap stops Scout for the day
 
-1. **Setup:** OpenRouter on a priced model, as above. Keep an eye on things on, and a routine
-   scheduled a few minutes from now.
-2. **Action:** in **Settings → Daily budget** type `0.01` and save, then ask Scout questions until
-   today's spend passes $0.01. **Expected:** the Spend card says "Proactive comments paused: today's
-   $0.01 is spent."
-3. **Action:** wait for the routine's time. **Expected:** it does not run; **Activity** shows it
-   with "Skipped: today's budget is spent." Scout says nothing about it.
-4. **Action:** open a window whose title reads like trouble ("Build failed") and stay on it.
-   **Expected:** no check-in (no "Sent to AI" for it).
-5. **Action:** ask Scout a question, press **Run now** on the routine, start a watch and send a
-   hand-off. **Expected:** all of them run; the finished hand-off gets no check-in line.
-6. **Action:** type `-1` or `abc` in the budget and save. **Expected:** the field says what it needs;
-   nothing is saved. Clear the box and save: the cap is off and the paused line goes.
-7. **Action:** with only the Claude sign-in in use, set the cap to `0.01`. **Expected:** the cap
-   never trips, because the sign-in has no price.
+1. **Setup:** start the brain with `TAGALONG_DAILY_BUDGET_USD=0.01`; the **Settings → Daily budget**
+   box does not change the brain's limit.
+2. **Action:** ask Scout questions until today's spend passes $0.01. **Expected:** the Spend card
+   says "Today's $0.01 is spent; Scout pauses until midnight." (the brain counts the day by the
+   machine's local date). The next question ends at once with the reason `over_budget`.
+3. **Action:** start the brain with `TAGALONG_DAILY_BUDGET_USD=-1` or `abc`. **Expected:** it
+   refuses to start and names the bad value. Remove the variable: the limit is $5 again.
 
 ## File this as a bug
 
@@ -2109,6 +2100,23 @@ three times: the wording should vary, the behaviour should not.
    **Expected:** Scout deletes it (check Home: the row is gone), with no card. If two memories
    match, Scout asks which one, in its own words.
 4. **Nothing on a routine.** A routine's own run never deletes a memory (its turn has no `forget`).
+5. **Live update.** With Home open on **What Scout remembers**, ask Scout to remember something.
+   **Expected:** the row appears without reopening Home.
+6. **Usage.** Open Home → **Overview**. **Expected:** **Spend** shows today's spend and the limit.
+
+## Permissions _(real brain)_
+
+1. **The list.** Open Home → **Settings**, below the form. **Expected:** a **Permissions** card with
+   one row per Scout tool (name, one line on what it does, an **Ask** or **Auto** switch).
+2. **Auto.** Switch a tool Scout uses (for example moving a window) to **Auto**, then ask Scout to
+   use it. **Expected:** Scout stops asking and just does it. Switch it back to **Ask**: it asks
+   again.
+3. **Locked.** Find a tool its body marks as always confirm (one whose ask offers only Allow and
+   Deny). **Expected:** it reads **Ask**, says "Always asks", and its switch cannot be pressed.
+4. **Offline body.** Close the browser extension's connection (or run with only the desktop).
+   **Expected:** a body that is not connected has its tools dimmed, marked "Not connected", with the
+   switch off limits.
+5. **Live update.** Open Home, then answer **Always allow** on an ask for a tool in the list. **Expected:** the list updates without reopening Home.
 
 ## Log file
 

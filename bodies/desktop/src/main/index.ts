@@ -112,6 +112,7 @@ import { registerPickUpIpc } from './ipc/pick-up';
 import { PickUpAllowlist, PickUpWaiting } from './pick-up-open';
 import { registerSightLogIpc } from './ipc/sight-log';
 import { registerMemoryIpc } from './ipc/memory';
+import { registerPermissionsIpc } from './ipc/permissions';
 import { registerSettingsIpc } from './ipc/settings';
 import { registerTurnIpc } from './ipc/turns';
 import { dropDesk, registerDropIpc } from './drop';
@@ -304,7 +305,16 @@ async function start(): Promise<void> {
     platform,
     exclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
     onCapture: announceCapture,
-    onNotification: (method, params) => turnEvents.map(method, params).forEach(forwardTurn),
+    onNotification: (method, params) => {
+      // The brain changed something Home shows (memory, permissions): every window may refetch.
+      if (method === 'changed') {
+        const { what } = params as { what: string };
+        for (const window of BrowserWindow.getAllWindows()) {
+          if (!window.isDestroyed()) window.webContents.send(IPC.brainChangedEvent, what);
+        }
+      }
+      turnEvents.map(method, params).forEach(forwardTurn);
+    },
     onResync: () => turnEvents.resync().forEach(forwardTurn),
     onStatus: (status) => {
       brainStatus = status;
@@ -992,7 +1002,7 @@ function registerIpc(): void {
     takeDrop: () => drops.take(),
   });
   registerScoutIpc(handle);
-  registerExpertIpc(handle, { engine });
+  registerExpertIpc(handle, { engine, brain: required().brain });
   registerConnectionIpc(handle, {
     engine,
     answer: (ask, decision) => required().brain.answer(ask, decision),
@@ -1005,7 +1015,8 @@ function registerIpc(): void {
     openPath: (folder) => shell.openPath(folder),
   });
   registerSightLogIpc(handle, { engine });
-  registerMemoryIpc(handle, { engine });
+  registerMemoryIpc(handle, { brain: required().brain });
+  registerPermissionsIpc(handle, { brain: required().brain });
   registerRoutineIpc(handle, {
     engine,
     openHome: (page) => openHome(page),

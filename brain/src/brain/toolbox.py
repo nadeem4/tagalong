@@ -17,7 +17,7 @@ from brain.asks import Asks
 from brain.bodies import Bodies
 from brain.mind.prompt import part_blocks
 from brain.mind.turn import Call
-from brain.protocol import LIMITS, CallResult, ErrorCode, RpcError
+from brain.protocol import LIMITS, CallResult, ErrorCode, RpcError, Tool
 
 log = logging.getLogger("brain")
 
@@ -40,6 +40,10 @@ class ToolSpec:
 class Source(Protocol):
     def specs(self) -> list[ToolSpec]: ...
 
+    def known_specs(self) -> list[ToolSpec]:
+        """`specs` plus tools that cannot be served now (an offline body's last declared)."""
+        ...
+
     async def run(self, call: Call, tool: str) -> str | list[dict]: ...
 
     def unavailable(self, name: str) -> RpcError | None:
@@ -53,6 +57,9 @@ class BrainSource:
 
     def specs(self) -> list[ToolSpec]:
         return [spec for spec, _ in self._tools.values()]
+
+    def known_specs(self) -> list[ToolSpec]:
+        return self.specs()
 
     async def run(self, call: Call, tool: str) -> str | list[dict]:
         return await self._tools[tool][1](call.input)
@@ -71,19 +78,24 @@ class BodySource:
         self._bodies = bodies
 
     def specs(self) -> list[ToolSpec]:
-        out = []
-        for body in sorted(self._bodies.online(), key=lambda b: b.id):
-            for tool in self._bodies.tools(body.id):
-                out.append(
-                    ToolSpec(
-                        f"{body.id}{SEP}{tool.name}",
-                        tool.description,
-                        tool.input_schema,
-                        effect=tool.effect or "change",
-                        locked=tool.confirm is True,
-                    )
-                )
-        return out
+        return self._specs_of({b.id: self._bodies.tools(b.id) for b in self._bodies.online()})
+
+    def known_specs(self) -> list[ToolSpec]:
+        return self._specs_of(self._bodies.known_tools())
+
+    @staticmethod
+    def _specs_of(tools_by_body: dict[str, list[Tool]]) -> list[ToolSpec]:
+        return [
+            ToolSpec(
+                f"{body_id}{SEP}{tool.name}",
+                tool.description,
+                tool.input_schema,
+                effect=tool.effect or "change",
+                locked=tool.confirm is True,
+            )
+            for body_id, tools in sorted(tools_by_body.items())
+            for tool in tools
+        ]
 
     async def run(self, call: Call, tool: str) -> str | list[dict]:
         body_id, _, plain = tool.partition(SEP)
@@ -139,6 +151,23 @@ class Toolbox:
         if spec.locked and mode == "auto":
             raise RpcError(ErrorCode.invalid_params, f"{name} always asks first.")
         self._save_mode(name, mode)
+
+    def known_specs(self) -> list[ToolSpec]:
+        return [spec for source in self.sources for spec in source.known_specs()]
+
+    def home_tools(self) -> list[Tool]:
+        """Home's tool catalogue for `hello`: contract records only (no audience, no mode)."""
+        return [
+            Tool(
+                name=s.name,
+                description=s.description,
+                input_schema=s.input_schema,
+                effect=s.effect,
+            )
+            for source in self.sources
+            for s in source.specs()
+            if "home" in s.audience
+        ]
 
     def model_tools(self) -> list[dict]:
         out = []
