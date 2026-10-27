@@ -36,6 +36,10 @@ class Budget:
         self._roll()
         return self._spent
 
+    @property
+    def limit(self) -> float:
+        return self._limit
+
     def allows(self) -> bool:
         return self.spent < self._limit
 

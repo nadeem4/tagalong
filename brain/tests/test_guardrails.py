@@ -106,3 +106,7 @@ def test_ledger_format(tmp_path):
     make(tmp_path).spend(usage(1_000_000), "claude-opus-5-5")
     data = json.loads((tmp_path / "budget.json").read_text())
     assert data == {"date": "2026-10-25", "spent_usd": 4.0}
+
+
+def test_limit_property(tmp_path):
+    assert make(tmp_path, limit=7.5).limit == 7.5

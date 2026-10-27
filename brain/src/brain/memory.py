@@ -292,6 +292,14 @@ class Memory:
         self._db.execute("DELETE FROM memories WHERE id=?", (item_id,))
         return item
 
+    def list_items(self, limit: int) -> list[Item]:
+        """Every kind, newest first (by last change); for Home's memory list."""
+        rows = self._db.execute(
+            f"SELECT {_COLUMNS} FROM memories ORDER BY updated_at DESC, id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [Item(*r) for r in rows]
+
     def always_loaded(self) -> dict[str, list[Item]]:
         out: dict[str, list[Item]] = {}
         for spec in KINDS.values():

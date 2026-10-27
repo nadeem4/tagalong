@@ -83,6 +83,7 @@ class Bodies:
     def __init__(self) -> None:
         self._outboxes: dict[str, Outbox] = {}
         self._online: dict[str, _Online] = {}
+        self._known: dict[str, list[Tool]] = {}  # last declared tools, kept after disconnect
         self._pending: dict[str, tuple[Peer, asyncio.Future[list[dict]]]] = {}
         self._next_id = 0
 
@@ -93,6 +94,7 @@ class Bodies:
             old.peer.close()
             self._fail_pending(old.peer)
         self._online[body.id] = _Online(body, tools, peer)
+        self._known[body.id] = tools
         if last_seq is None:
             return Joined(box.latest, False, [])
         missed = box.since(last_seq)
@@ -111,9 +113,14 @@ class Bodies:
         current = self._online.get(body_id)
         if current is not None and current.peer is peer:
             current.tools = tools
+            self._known[body_id] = tools
 
     def tools(self, body_id: str) -> list[Tool]:
         return self._online[body_id].tools
+
+    def known_tools(self) -> dict[str, list[Tool]]:
+        # Home lists permissions for tools whose body is offline right now.
+        return dict(self._known)
 
     def online(self) -> list[Body]:
         return [o.body for o in self._online.values()]

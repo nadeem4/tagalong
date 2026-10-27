@@ -18,7 +18,7 @@ from brain.mind.resume import rebuild_history
 from brain.mind.turn import Model, run_turn
 from brain.protocol import SayParams, SayResult
 from brain.toolbox import BodySource, BrainSource, Toolbox
-from brain.tools import brain_tools
+from brain.tools import brain_tools, home_tools
 
 log = logging.getLogger("brain")
 
@@ -39,8 +39,10 @@ class Session:
         self._step_cap = step_cap
         self._memory = memory
         self._asks = Asks(bodies)
+        notify = bodies.notify
+        tools = brain_tools(memory, notify) + home_tools(budget, lambda: self.toolbox, notify)
         self.toolbox = Toolbox(
-            [BrainSource(brain_tools(memory)), BodySource(bodies)],
+            [BrainSource(tools), BodySource(bodies)],
             memory.permission_modes,
             memory.set_permission_mode,
             self._asks,
