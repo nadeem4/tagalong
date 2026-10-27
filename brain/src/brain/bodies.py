@@ -124,6 +124,15 @@ class Bodies:
             if body_id in self._online:
                 self._online[body_id].peer.send(frame)
 
+    def notify_one(self, body_id: str, method: str, params: dict) -> None:
+        # Queued even when offline, so the body sees it on reconnect within the replay window.
+        frame = self._outboxes.setdefault(body_id, Outbox()).add(method, params)
+        if body_id in self._online:
+            self._online[body_id].peer.send(frame)
+
+    def online_ids(self) -> list[str]:
+        return list(self._online)
+
     def is_online(self, body_id: str) -> bool:
         return body_id in self._online
 

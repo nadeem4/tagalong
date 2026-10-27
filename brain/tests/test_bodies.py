@@ -324,3 +324,27 @@ async def test_response_with_null_result_raises_tool_failed():
 def test_unhashable_response_id_is_ignored():
     bodies = Bodies()
     bodies.resolve("a", online(bodies), {"id": [1], "result": 1})
+
+
+def test_notify_one_queues_for_offline_and_sends_to_online():
+    bodies = Bodies()
+    a, b = FakePeer(), FakePeer()
+    bodies.connect(body("a"), [], a, None)
+    bodies.connect(body("b"), [], b, None)
+    bodies.disconnect("b", b)
+    bodies.notify("say", {})  # seq 1 on both
+    bodies.notify_one("a", "ask", {"id": "x"})
+    bodies.notify_one("b", "ask", {"id": "y"})
+    assert seqs(a.frames) == [1, 2]
+    assert json.loads(a.frames[1])["method"] == "ask"
+    assert b.frames == []
+    assert bodies.connect(body("b"), [], FakePeer(), 1).backlog[0].count('"y"') == 1
+
+
+def test_online_ids_lists_connected_bodies():
+    bodies = Bodies()
+    peer = FakePeer()
+    bodies.connect(body("a"), [], peer, None)
+    bodies.connect(body("b"), [], FakePeer(), None)
+    bodies.disconnect("b", peer)  # wrong peer: b stays online
+    assert bodies.online_ids() == ["a", "b"]
