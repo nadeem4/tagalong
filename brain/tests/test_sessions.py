@@ -16,6 +16,7 @@ from brain.mind.resume import rebuild_history
 from brain.mind.turn import Final
 from brain.protocol import SayParams
 from brain.sessions import Session
+from brain.toolbox import BrainSource, ToolSpec
 
 
 class Gate:
@@ -214,7 +215,7 @@ async def test_turn_sends_memory_tools():
     session, _ = make(model)
     session.say("desktop", say("hello"))
     await finish(session)
-    assert [t["name"] for t in model.tools[0]] == ["remember", "recall", "forget"]
+    assert [t["name"] for t in model.tools[0]] == ["forget", "recall", "remember"]  # sorted
 
 
 async def test_what_you_know_in_system_prompt():
@@ -292,12 +293,13 @@ async def test_cancelled_turn_is_saved_valid(tmp_path):
     )
     running = asyncio.Event()
 
-    async def blocked(name, args):
+    async def blocked(args):
         running.set()
         await asyncio.Event().wait()
 
     session, _ = make(Gate([call, "never"]), memory)
-    session._run_tool = blocked
+    stuck = ToolSpec("recall", "blocks", {"type": "object"})
+    session.toolbox.sources[:] = [BrainSource([(stuck, blocked)])]
     result = session.say("desktop", say("a"))
     await running.wait()  # the cancel lands while the tool is running
     session.cancel(result.turn)

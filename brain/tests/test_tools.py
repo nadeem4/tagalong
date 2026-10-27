@@ -5,7 +5,7 @@ import re
 import pytest
 
 from brain.memory import Hit, Memory, MemoryRefused
-from brain.tools import RECALL_MAX_CHARS, TOOLS, format_hits, make_run_tool
+from brain.tools import RECALL_MAX_CHARS, brain_tools, format_hits
 
 
 @pytest.fixture
@@ -17,10 +17,16 @@ def mem(tmp_path):
 
 @pytest.fixture
 def run(mem):
-    return make_run_tool(mem)
+    handlers = {spec.name: handler for spec, handler in brain_tools(mem)}
+
+    async def run(name, args):
+        return await handlers[name](args)
+
+    return run
 
 
-def test_tool_list_names_and_schemas():
+def test_tool_list_names_and_schemas(mem):
+    TOOLS = [spec.__dict__ for spec, _ in brain_tools(mem)]
     assert [t["name"] for t in TOOLS] == ["remember", "recall", "forget"]
     for t in TOOLS:
         assert t["input_schema"]["type"] == "object"
@@ -32,6 +38,11 @@ def test_tool_list_names_and_schemas():
     assert "summary" in TOOLS[1]["input_schema"]["properties"]["kind"]["enum"]
     assert "chat" in TOOLS[1]["input_schema"]["properties"]["kind"]["enum"]
     assert TOOLS[2]["input_schema"]["properties"]["id"]["type"] == "integer"
+    assert [t["audience"] for t in TOOLS] == [
+        frozenset({"scout"}),
+        frozenset({"scout"}),
+        frozenset({"scout", "home"}),
+    ]
 
 
 async def test_remember_result_names_the_id(run):
@@ -84,11 +95,6 @@ async def test_forget_returns_what_was_deleted(run):
     await run("remember", {"kind": "about_you", "text": "Likes tea"})
     out = await run("forget", {"id": 1})
     assert "Likes tea" in out
-
-
-async def test_unknown_tool_raises(run):
-    with pytest.raises(RuntimeError, match="unknown tool nope"):
-        await run("nope", {})
 
 
 async def test_missing_argument_raises(run):

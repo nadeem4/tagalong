@@ -44,6 +44,15 @@ class ErrorCode(IntEnum):
     over_limit = -32008
 
 
+class RpcError(Exception):
+    """A contract-coded failure; the toolbox raises it and the caller words it for the model."""
+
+    def __init__(self, code: ErrorCode, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
 # An optional field may be absent but never null. Only these accept a JSON null: the nullable
 # `body` of reply and turn, and the free-form `data` and `context` payloads.
 # It matches by field name on every model, so a future optional field named body, data or
