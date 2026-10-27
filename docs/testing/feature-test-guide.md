@@ -316,6 +316,17 @@ desktop app. You need `uv` and an Anthropic key.
 6. **Action:** set `TAGALONG_DAILY_BUDGET_USD=0.0001`, start the brain, and send a `say` twice.
    **Expected:** once `spent_usd` in `~/.tagalong/budget.json` passes the limit, a `say` gets a
    result and its turn ends at once with `reason: "over_budget"` and no deltas.
+7. **Action:** start the brain normally, say hello as in step 2, then paste a `say` with the text
+   `Remember that I like short answers.`
+   **Expected:** a `tool` notification for `remember` with `state: "started"`, then `ended` with
+   `ok: true`; a short reply. Scout does not claim it saved something before the tool ended. A
+   row of kind `instruction` appears in `~/.tagalong/tagalong.db` (for example
+   `sqlite3 ~/.tagalong/tagalong.db "select id, kind, text from memories"`).
+8. **Action:** stop the brain and start it again, say hello, then `say` with `What do I like?`
+   **Expected:** the answer mentions short answers. The item was loaded into the prompt from the
+   database; the conversation itself is not restored.
+9. **Action:** `say` with `Forget that.`
+   **Expected:** a `forget` tool `ended` with `ok: true`; the row is gone from `memories`.
 
 ## The desktop on the Python brain
 

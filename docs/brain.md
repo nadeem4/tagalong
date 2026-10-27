@@ -3,7 +3,8 @@
 The brain is the Python side of contract v1 ([protocol/README.md](../protocol/README.md)). It is
 being built row by row and replaces `packages/core`. Today bodies can connect, declare their tools,
 catch up on missed notifications, and talk to Scout: `say` starts a turn and the reply streams
-back. Scout remembers through the `remember`, `recall` and `forget` tools (stored in `tagalong.db` in the data folder); no saved chat yet (see [Not built yet](#not-built-yet)).
+back. Scout remembers through the `remember`, `recall` and `forget` tools, kept in `tagalong.db`
+(see [memory.md](memory.md)). There is no saved chat yet (see [Not built yet](#not-built-yet)).
 
 ## Run it
 
@@ -18,14 +19,14 @@ It logs one line, `brain listening on ws://127.0.0.1:47321`, and runs until Ctrl
 It needs an Anthropic key. With no `ANTHROPIC_API_KEY` in the environment or in
 `<TAGALONG_HOME>/.env`, it logs one line saying where to put it and exits with status 1.
 
-| Variable                    | Default           | Meaning                                              |
-| --------------------------- | ----------------- | ---------------------------------------------------- |
-| `TAGALONG_BRAIN_ADDR`       | `127.0.0.1:47321` | `host:port` to listen on. Port `0` picks a free port |
-| `TAGALONG_HOME`             | `~/.tagalong`     | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`  |
-| `TAGALONG_MODEL`            | `claude-opus-5-5` | Model Scout thinks with                              |
-| `TAGALONG_DAILY_BUDGET_USD` | `5`               | Most Scout may spend per local day, in USD           |
-| `TAGALONG_STEP_CAP`         | `25`              | Most model calls in one turn                         |
-| `ANTHROPIC_API_KEY`         | none, required    | Anthropic key                                        |
+| Variable                    | Default           | Meaning                                                            |
+| --------------------------- | ----------------- | ------------------------------------------------------------------ |
+| `TAGALONG_BRAIN_ADDR`       | `127.0.0.1:47321` | `host:port` to listen on. Port `0` picks a free port               |
+| `TAGALONG_HOME`             | `~/.tagalong`     | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env` |
+| `TAGALONG_MODEL`            | `claude-opus-5-5` | Model Scout thinks with                                            |
+| `TAGALONG_DAILY_BUDGET_USD` | `5`               | Most Scout may spend per local day, in USD                         |
+| `TAGALONG_STEP_CAP`         | `25`              | Most model calls in one turn                                       |
+| `ANTHROPIC_API_KEY`         | none, required    | Anthropic key                                                      |
 
 `<TAGALONG_HOME>/.env` holds `KEY=value` lines (`#` comments and quotes allowed). Any
 `TAGALONG_*` setting above except `TAGALONG_HOME`, and `ANTHROPIC_API_KEY`, may live there. It only
@@ -48,6 +49,8 @@ the total can run a little low.
 | `brain/src/brain/config.py`      | Reads the environment and `.env`, keeps the session id                               |
 | `brain/src/brain/guardrails.py`  | The daily budget and its `budget.json` ledger                                        |
 | `brain/src/brain/sessions.py`    | The one conversation: history, the running turn, `say` joins, `cancel`               |
+| `brain/src/brain/memory.py`      | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                 |
+| `brain/src/brain/tools.py`       | The brain's own tools (`remember`, `recall`, `forget`) and their dispatcher          |
 | `brain/src/brain/mind/soul.md`   | Scout's character, the start of the system prompt                                    |
 | `brain/src/brain/mind/prompt.py` | The system prompt (soul, local time, online bodies) and `say` content blocks         |
 | `brain/src/brain/mind/turn.py`   | The thinking loop and the Anthropic streaming call                                   |
@@ -100,9 +103,12 @@ flowchart TD
 
 - A `say` while a turn runs joins it: the result has `joined: true` and the message is folded
   into the next step.
-- Every step rebuilds the system prompt: Scout's soul, the local time, and the bodies online.
+- At the start of a turn the always-loaded memories are read once. Every step rebuilds the system
+  prompt from Scout's soul, that "What you know" block, the local time, and the bodies online.
 - Text streams as `reply` notifications with `delta`. Tools run at the same time, each with
-  `tool` `started` then `ended`. No body tools are offered to the model yet.
+  `tool` `started` then `ended`. The model is offered the memory tools (`remember`, `recall`,
+  `forget`); a refused or failed call ends as an error result the model reads. No body tools are
+  offered to the model yet.
 - A turn ends with one of `done`, `cancelled`, `error`, `over_budget` or `step_cap`. A refusal or
   a failed model call is `error`.
 - If any delta was sent, exactly one `reply` with `done: true` follows, whatever the end reason.
@@ -162,7 +168,7 @@ The desktop app (`bodies/desktop`) is a body of this brain. It no longer runs th
 
 | Row   | Brings                                                                                                                                                                                                           |
 | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 6     | Memory and saved chat history. A restart starts a fresh conversation                                                                                                                                             |
+| 6     | Saved chat and resume. A restart starts a fresh conversation                                                                                                                                                     |
 | 7     | Body tools for Scout (`use` plugs into the loop), the brain's tools in the `hello` result, `use` and its `cancel` to bodies, `call`, model tool names `<body>__<tool>`, part size checks as `say` and tools land |
 | Later | Live-state replay after `resync`, asks, `answer` and confirm guardrails                                                                                                                                          |
 
