@@ -1,4 +1,4 @@
-﻿# The Python brain
+# The Python brain
 
 The brain is the Python side of contract v1 ([protocol/README.md](../protocol/README.md)). It is
 being built row by row and replaces `packages/core`. Today bodies can connect, declare their tools,
