@@ -12,6 +12,7 @@ import pytest
 
 from brain.bodies import Bodies
 from brain.memory import Memory
+from brain.mind.resume import rebuild_history
 from brain.mind.turn import Final
 from brain.protocol import SayParams
 from brain.sessions import Session
@@ -289,15 +290,22 @@ async def test_cancelled_turn_is_saved_valid(tmp_path):
         "tool_use",
         SimpleNamespace(),
     )
-    gate = asyncio.Event()
-    session, _ = make(Gate([call, gate, "never"]), memory)
+    running = asyncio.Event()
+
+    async def blocked(name, args):
+        running.set()
+        await asyncio.Event().wait()
+
+    session, _ = make(Gate([call, "never"]), memory)
+    session._run_tool = blocked
     result = session.say("desktop", say("a"))
-    await asyncio.sleep(0.05)
+    await running.wait()  # the cancel lands while the tool is running
     session.cancel(result.turn)
     await finish_quietly(session)
     rows = memory.load_messages()
     assert rows == session.history
     assert rows[-1]["content"][0]["type"] == "tool_result"
+    assert rows[-1]["content"][0]["content"] == "cancelled"
 
 
 async def test_late_says_are_saved(tmp_path):
@@ -359,17 +367,47 @@ async def test_same_compaction_not_summarised_twice_after_restart(tmp_path):
     assert len(memory.search("lisbon", kind="summary")) == 1
 
 
-async def test_persist_failure_does_not_block_ended(tmp_path):
+async def test_persist_failure_does_not_block_ended(tmp_path, caplog):
     memory = file_memory(tmp_path)
+    real = memory.save_messages
 
     def boom(messages):
         raise RuntimeError("disk full")
 
     memory.save_messages = boom
-    session, sent = make(Gate(["one"]), memory)
+    session, sent = make(Gate(["one", "two"]), memory)
     session.say("desktop", say("a"))
     await finish_quietly(session)
     assert states(sent) == ["started", "ended"]
+    assert "could not save the chat" in caplog.text
+    memory.save_messages = real
+    session.say("desktop", say("b"))
+    await finish_quietly(session)
+    assert len(memory.load_messages()) == 4
+
+
+async def test_cancelled_result_added_on_resume_is_stored(tmp_path):
+    memory = file_memory(tmp_path)
+    memory.save_messages(
+        [
+            {"role": "user", "content": [{"type": "text", "text": "a"}]},
+            {
+                "role": "assistant",
+                "content": [{"type": "tool_use", "id": "t1", "name": "recall", "input": {}}],
+            },
+        ]
+    )
+    session, _ = make(Gate(["one"]), memory)
+    session.say("desktop", say("b"))
+    await finish_quietly(session)
+    rebuilt = rebuild_history(file_memory(tmp_path).load_messages())
+    for i, m in enumerate(rebuilt):
+        if m["role"] == "assistant" and isinstance(m["content"], list):
+            ids = [b["id"] for b in m["content"] if b.get("type") == "tool_use"]
+            answered = [b.get("tool_use_id") for b in rebuilt[i + 1]["content"]]
+            assert all(x in answered for x in ids)
+    stored = memory.load_messages()
+    assert stored[2]["content"][0]["tool_use_id"] == "t1"
 
 
 async def test_no_merge_into_saved_message(tmp_path):

@@ -38,8 +38,13 @@ class Session:
         self._memory = memory
         self._run_tool = make_run_tool(memory)
         self._now = now
-        self.history: list = rebuild_history(memory.load_messages())
+        loaded = memory.load_messages()
+        self.history: list = rebuild_history(loaded)
         self._saved = len(self.history)  # history[:_saved] is already in the database
+        if self.history and (not loaded or self.history[-1] is not loaded[-1]):
+            # rebuild_history added a cancelled tool_result; store it with the next save so
+            # the stored chat stays valid.
+            self._saved -= 1
         self._inbox: list = []
         self._turn_id: str | None = None
         self._task: asyncio.Task | None = None
