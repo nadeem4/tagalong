@@ -12,6 +12,7 @@ from functools import cache
 from importlib.resources import files
 from typing import Any
 
+from brain.memory import Item
 from brain.protocol import Body, FilePart, ImagePart, SayParams, TextPart
 
 IMAGE_MIMES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
@@ -22,13 +23,34 @@ def _soul() -> str:
     return files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8").strip()
 
 
-def system_prompt(now: datetime, bodies: list[Body]) -> str:
+# Headings live here, not in memory.KINDS: they are wording for the model, not storage.
+_KNOW_HEADINGS = {
+    "instruction": "Instructions from the owner",
+    "about_you": "About the owner",
+    "tracking": "Things to keep an eye on",
+}
+
+
+def render_know(groups: dict[str, list[Item]]) -> str:
+    blocks = []
+    for kind, heading in _KNOW_HEADINGS.items():
+        items = groups.get(kind)
+        if not items:
+            continue
+        lines = [f"- [{i.id}] {f'({i.cadence}) ' if i.cadence else ''}{i.text}" for i in items]
+        blocks.append(f"{heading}:\n" + "\n".join(lines))
+    return "\n\n".join(blocks)
+
+
+def system_prompt(now: datetime, bodies: list[Body], know: str = "") -> str:
     if bodies:
         lines = [f"- {b.id} ({b.kind}): {b.name}" for b in sorted(bodies, key=lambda b: b.id)]
         online = "Bodies online:\n" + "\n".join(lines)
     else:
         online = "Bodies online: no body is connected."
-    return "\n\n".join([_soul(), f"Now: {now.strftime('%A %d %B %Y, %H:%M')}", online])
+    now_line = f"Now: {now.strftime('%A %d %B %Y, %H:%M')}"
+    known = [f"What you know:\n{know}"] if know else []
+    return "\n\n".join([_soul(), *known, now_line, online])
 
 
 def _text(text: str) -> dict[str, Any]:
