@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import acp
+import pytest
 from acp.schema import (
     AcceptElicitationResponse,
     AllowedOutcome,
@@ -81,6 +82,10 @@ async def running(tmp_path: Path, steps: list[dict], client: Recorder | None = N
 
 
 def logged(log: Path) -> list[dict]:
+    return [f for f in _all_lines(log) if "env" not in f]
+
+
+def _all_lines(log: Path) -> list[dict]:
     return [json.loads(line) for line in log.read_text().splitlines()]
 
 
@@ -215,3 +220,47 @@ async def test_no_script_means_prompts_end_immediately(tmp_path):
         session = await conn.new_session(cwd=str(tmp_path), mcp_servers=[])
         result = await conn.prompt(prompt=prompt_blocks("x"), session_id=session.session_id)
         assert result.stop_reason == "end_turn"
+
+
+async def test_crash_step_kills_the_process_mid_prompt(tmp_path):
+    steps = [{"text": "about to die"}, {"crash": 3}, {"text": "never"}]
+    async with running(tmp_path, steps) as (conn, process, client, _log):
+        session = await conn.new_session(cwd=str(tmp_path), mcp_servers=[])
+        with pytest.raises(Exception):  # noqa: B017 - the connection error type is the package's
+            await conn.prompt(prompt=prompt_blocks("go"), session_id=session.session_id)
+        assert await asyncio.wait_for(process.wait(), 10) == 3
+        assert client.texts() == ["about to die"]
+
+
+async def test_first_log_line_reports_key_variables_and_inherited_path(tmp_path):
+    script = tmp_path / "script.json"
+    script.write_text("[]")
+    log = tmp_path / "log.jsonl"
+    env = {"FAKE_ACP_SCRIPT": str(script), "FAKE_ACP_LOG": str(log), "ANTHROPIC_API_KEY": "sk-x"}
+    async with acp.spawn_agent_process(Recorder(), sys.executable, str(AGENT), env=env) as (
+        conn,
+        _process,
+    ):
+        await conn.initialize(protocol_version=1)
+    first = _all_lines(log)[0]["env"]
+    assert first["ANTHROPIC_API_KEY"] == "sk-x"
+    assert first["ANTHROPIC_AUTH_TOKEN"] is None
+    assert first["PATH_set"] is True
+
+
+async def test_list_of_lists_script_gives_each_prompt_its_own_steps(tmp_path):
+    steps = [[{"text": "one"}], [{"text": "two"}, {"sleep": 0.05}]]
+    async with running(tmp_path, steps) as (conn, _process, client, _log):
+        session = await conn.new_session(cwd=str(tmp_path), mcp_servers=[])
+        for _ in range(3):
+            await conn.prompt(prompt=prompt_blocks("go"), session_id=session.session_id)
+        assert client.texts() == ["one", "two", "two"]
+
+
+async def test_cancel_before_the_prompt_starts_still_cancels_it(tmp_path):
+    async with running(tmp_path, [{"text": "never"}]) as (conn, _process, client, _log):
+        session = await conn.new_session(cwd=str(tmp_path), mcp_servers=[])
+        await conn.cancel(session_id=session.session_id)
+        result = await conn.prompt(prompt=prompt_blocks("go"), session_id=session.session_id)
+        assert result.stop_reason == "cancelled"
+        assert client.texts() == []

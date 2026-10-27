@@ -4,8 +4,10 @@ Run as a subprocess over stdio. FAKE_ACP_SCRIPT names a JSON list of steps repla
 each session/prompt; FAKE_ACP_LOG names a file that gets every frame the client sent,
 one JSON object per line. Frame shapes follow tests/fixtures/acp/. Needs only Python.
 
-Steps: {"text": s} message chunk | {"permission": {"title", "kind"?, "options"?}} ask and
-wait | {"question": {"message", "options": [labels]}} elicitation and wait | {"hang": true}
+The script may instead be a list of step lists, one per prompt (the last is reused).
+Steps: {"sleep": secs} pause | {"crash": code} os._exit mid-prompt | {"text": s} message
+chunk | {"permission": {"title", "kind"?, "options"?}} ask and wait |
+{"question": {"message", "options": [labels]}} elicitation and wait | {"hang": true}
 wait until session/cancel | {"end": stop_reason} finish the prompt (default end_turn).
 """
 
@@ -36,6 +38,8 @@ class FakeAgent:
     def __init__(self, steps: list[dict]) -> None:
         self.steps = steps
         self.running: dict[str, asyncio.Task] = {}
+        self.cancelled: set[str] = set()
+        self.turn = 0
 
     def on_connect(self, conn) -> None:
         self.conn = conn
@@ -56,7 +60,12 @@ class FakeAgent:
         return schema.SetSessionModeResponse()
 
     async def prompt(self, session_id, prompt, **kw):
-        task = asyncio.ensure_future(self._run_steps(session_id))
+        # A cancel that arrived before this prompt began still applies to it.
+        if session_id in self.cancelled:
+            self.cancelled.discard(session_id)
+            return schema.PromptResponse(stop_reason="cancelled")
+        steps = self._steps_for_turn()
+        task = asyncio.ensure_future(self._run_steps(session_id, steps))
         self.running[session_id] = task
         try:
             return schema.PromptResponse(stop_reason=await task)
@@ -66,10 +75,19 @@ class FakeAgent:
             raise
         finally:
             self.running.pop(session_id, None)
+            self.cancelled.discard(session_id)
 
     async def cancel(self, session_id, **kw):
+        self.cancelled.add(session_id)
         if task := self.running.get(session_id):
             task.cancel()
+
+    def _steps_for_turn(self) -> list[dict]:
+        # A list of lists gives each prompt its own steps; the last list is reused after that.
+        if not self.steps or not all(isinstance(s, list) for s in self.steps):
+            return self.steps
+        turn, self.turn = self.turn, self.turn + 1
+        return self.steps[min(turn, len(self.steps) - 1)]
 
     async def ext_method(self, method, params):
         return {}
@@ -77,8 +95,8 @@ class FakeAgent:
     async def ext_notification(self, method, params):
         pass
 
-    async def _run_steps(self, session_id: str) -> str:
-        for step in self.steps:
+    async def _run_steps(self, session_id: str, steps: list[dict]) -> str:
+        for step in steps:
             if "text" in step:
                 await self.conn.session_update(
                     session_id, acp.update_agent_message_text(step["text"])
@@ -87,6 +105,11 @@ class FakeAgent:
                 await self._ask_permission(session_id, step["permission"])
             elif "question" in step:
                 await self._ask_question(session_id, step["question"])
+            elif "sleep" in step:
+                await asyncio.sleep(step["sleep"])
+            elif "crash" in step:
+                # Abrupt exit, no cleanup: what a crashed adapter looks like to the runner.
+                os._exit(step["crash"])
             elif step.get("hang"):
                 await asyncio.Event().wait()
             elif "end" in step:
@@ -136,7 +159,14 @@ def frame_logger(path: str):
 async def main() -> None:
     script = os.environ.get("FAKE_ACP_SCRIPT")
     steps = json.loads(Path(script).read_text()) if script else []
-    observers = [frame_logger(log)] if (log := os.environ.get("FAKE_ACP_LOG")) else []
+    log = os.environ.get("FAKE_ACP_LOG")
+    observers = [frame_logger(log)] if log else []
+    if log:
+        # Lets tests prove which secrets reached the child and that the rest was inherited.
+        env = {k: os.environ.get(k) for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
+        env["PATH_set"] = "PATH" in os.environ
+        with open(log, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"env": env}) + "\n")
     # run_agent returns when stdin closes, which is how the real adapter ends too.
     await acp.run_agent(FakeAgent(steps), use_unstable_protocol=True, observers=observers)
 
