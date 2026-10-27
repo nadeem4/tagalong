@@ -4,10 +4,13 @@ Pure unit tests with a fake peer: no sockets, and the clock is injected so the r
 window can be tested without sleeping.
 """
 
+import asyncio
 import json
 
+import pytest
+
 from brain.bodies import Bodies, Joined, Outbox
-from brain.protocol import Body, Tool
+from brain.protocol import Body, ErrorCode, RpcError, Tool
 
 
 class Clock:
@@ -153,3 +156,156 @@ def test_set_tools_from_stale_peer_is_ignored():
     bodies.connect(body("a"), [tool("x")], new, None)
     bodies.set_tools("a", old, [tool("stale")])
     assert bodies.tools("a") == [tool("x")]
+
+
+# --- use requests -----------------------------------------------------------
+
+OK = {"output": [{"type": "text", "text": "ok"}]}
+
+
+async def start_use(bodies: Bodies, peer: FakePeer, call_id="c1", timeout=30.0):
+    """Run use() as a task and wait until its frame is on the peer."""
+    task = asyncio.create_task(bodies.use("a", call_id, "see_screen", {}, timeout))
+    while not peer.frames:
+        await asyncio.sleep(0)
+    return task, json.loads(peer.frames[-1])
+
+
+def online(bodies: Bodies) -> FakePeer:
+    peer = FakePeer()
+    bodies.connect(body("a"), [], peer, None)
+    return peer
+
+
+async def test_use_sends_frame_and_returns_output():
+    bodies = Bodies()
+    peer = online(bodies)
+    task, frame = await start_use(bodies, peer)
+    assert frame["method"] == "use" and frame["jsonrpc"] == "2.0"
+    assert frame["params"] == {"call": "c1", "tool": "see_screen", "input": {}}
+    assert "seq" not in frame["params"]
+    bodies.resolve("a", peer, {"id": frame["id"], "result": OK})
+    assert await task == OK["output"]
+
+
+async def test_use_to_offline_body_raises_body_offline():
+    with pytest.raises(RpcError) as err:
+        await Bodies().use("a", "c1", "t", {})
+    assert err.value.code == ErrorCode.body_offline
+
+
+async def test_error_response_raises_rpcerror_with_its_code():
+    bodies = Bodies()
+    peer = online(bodies)
+    task, frame = await start_use(bodies, peer)
+    bodies.resolve("a", peer, {"id": frame["id"], "error": {"code": -32007, "message": "boom"}})
+    with pytest.raises(RpcError) as err:
+        await task
+    assert err.value.code == ErrorCode.tool_failed and err.value.message == "boom"
+
+
+async def test_unknown_error_code_becomes_tool_failed():
+    bodies = Bodies()
+    peer = online(bodies)
+    task, frame = await start_use(bodies, peer)
+    bodies.resolve("a", peer, {"id": frame["id"], "error": {"code": 42, "message": "odd"}})
+    with pytest.raises(RpcError) as err:
+        await task
+    assert err.value.code == ErrorCode.tool_failed and err.value.message == "odd"
+
+
+async def test_disconnect_fails_pending_with_body_offline():
+    bodies = Bodies()
+    peer = online(bodies)
+    task, _ = await start_use(bodies, peer)
+    bodies.disconnect("a", peer)
+    with pytest.raises(RpcError) as err:
+        await task
+    assert err.value.code == ErrorCode.body_offline
+    assert bodies._pending == {}
+
+
+async def test_replaced_connection_fails_old_pending():
+    bodies = Bodies()
+    old = online(bodies)
+    task, _ = await start_use(bodies, old)
+    bodies.connect(body("a"), [], FakePeer(), None)
+    with pytest.raises(RpcError) as err:
+        await task
+    assert err.value.code == ErrorCode.body_offline
+
+
+async def test_timeout_raises_timeout_and_sends_cancel():
+    bodies = Bodies()
+    peer = online(bodies)
+    with pytest.raises(RpcError) as err:
+        await bodies.use("a", "c1", "t", {}, timeout=0.01)
+    assert err.value.code == ErrorCode.timeout
+    assert json.loads(peer.frames[-1])["method"] == "cancel"
+    assert json.loads(peer.frames[-1])["params"] == {"call": "c1"}
+    assert bodies._pending == {}
+
+
+async def test_task_cancel_sends_cancel_and_leaves_no_pending():
+    bodies = Bodies()
+    peer = online(bodies)
+    task, _ = await start_use(bodies, peer)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert json.loads(peer.frames[-1])["params"] == {"call": "c1"}
+    assert json.loads(peer.frames[-1])["method"] == "cancel"
+    assert bodies._pending == {}
+
+
+async def test_late_response_after_timeout_is_ignored():
+    bodies = Bodies()
+    peer = online(bodies)
+    task = asyncio.create_task(bodies.use("a", "c1", "t", {}, timeout=0.01))
+    while not peer.frames:
+        await asyncio.sleep(0)
+    frame = json.loads(peer.frames[0])
+    with pytest.raises(RpcError):
+        await task
+    bodies.resolve("a", peer, {"id": frame["id"], "result": OK})  # must not raise
+
+
+async def test_response_from_old_peer_is_ignored():
+    bodies = Bodies()
+    old = online(bodies)
+    bodies.connect(body("a"), [], new := FakePeer(), None)
+    task, frame = await start_use(bodies, new)
+    bodies.resolve("a", old, {"id": frame["id"], "result": OK})
+    assert not task.done()
+    bodies.resolve("a", new, {"id": frame["id"], "result": OK})
+    assert await task == OK["output"]
+
+
+async def test_duplicate_response_ignored():
+    bodies = Bodies()
+    peer = online(bodies)
+    task, frame = await start_use(bodies, peer)
+    bodies.resolve("a", peer, {"id": frame["id"], "result": OK})
+    bodies.resolve("a", peer, {"id": frame["id"], "error": {"code": -32007, "message": "x"}})
+    assert await task == OK["output"]
+
+
+async def test_ids_are_unique_per_request():
+    bodies = Bodies()
+    peer = online(bodies)
+    t1, f1 = await start_use(bodies, peer, "c1")
+    peer.frames.clear()
+    t2, f2 = await start_use(bodies, peer, "c2")
+    assert f1["id"] != f2["id"]
+    for t in (t1, t2):
+        t.cancel()
+    await asyncio.gather(t1, t2, return_exceptions=True)
+
+
+def test_is_online():
+    bodies = Bodies()
+    assert not bodies.is_online("a")
+    peer = online(bodies)
+    assert bodies.is_online("a")
+    bodies.disconnect("a", peer)
+    assert not bodies.is_online("a")

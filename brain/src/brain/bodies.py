@@ -1,10 +1,13 @@
-"""Connected bodies, their tools, and a per-body outbox of numbered notifications.
+"""Connected bodies, their tools, a per-body outbox of numbered notifications, and `use` calls.
 
-Pure and synchronous on purpose: the server's Peer enqueues writes, and connect()
-returns the backlog instead of sending it so the hello result can go out first.
-Outboxes outlive connections (kept per body id) so a reconnect can replay what it missed.
+No socket code: the server's Peer enqueues writes, and connect() returns the backlog
+instead of sending it so the hello result can go out first. Outboxes outlive connections
+(kept per body id) so a reconnect can replay what it missed. `use` requests are not
+replayed: each is bound to the peer it was sent on and fails if that peer goes away.
 """
 
+import asyncio
+import contextlib
 import json
 import time
 from collections import deque
@@ -12,7 +15,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol
 
-from brain.protocol import LIMITS, Body, Tool
+from brain.protocol import LIMITS, Body, ErrorCode, RpcError, Tool
 
 
 class Peer(Protocol):
@@ -80,12 +83,15 @@ class Bodies:
     def __init__(self) -> None:
         self._outboxes: dict[str, Outbox] = {}
         self._online: dict[str, _Online] = {}
+        self._pending: dict[str, tuple[Peer, asyncio.Future[list[dict]]]] = {}
+        self._next_id = 0
 
     def connect(self, body: Body, tools: list[Tool], peer: Peer, last_seq: int | None) -> Joined:
         box = self._outboxes.setdefault(body.id, Outbox())
         old = self._online.get(body.id)
         if old is not None:
             old.peer.close()
+            self._fail_pending(old.peer)
         self._online[body.id] = _Online(body, tools, peer)
         if last_seq is None:
             return Joined(box.latest, False, [])
@@ -98,6 +104,7 @@ class Bodies:
         current = self._online.get(body_id)
         if current is not None and current.peer is peer:
             del self._online[body_id]
+        self._fail_pending(peer)
 
     def set_tools(self, body_id: str, peer: Peer, tools: list[Tool]) -> None:
         # A replaced connection may still deliver a frame; only the current peer counts.
@@ -116,3 +123,67 @@ class Bodies:
             frame = box.add(method, params)
             if body_id in self._online:
                 self._online[body_id].peer.send(frame)
+
+    def is_online(self, body_id: str) -> bool:
+        return body_id in self._online
+
+    async def use(
+        self, body_id: str, call_id: str, tool: str, tool_input: dict, timeout: float = 30.0
+    ) -> list[dict]:
+        current = self._online.get(body_id)
+        if current is None:
+            raise RpcError(ErrorCode.body_offline, f"{body_id} is offline")
+        peer = current.peer
+        self._next_id += 1
+        request_id = f"u{self._next_id}"
+        future: asyncio.Future[list[dict]] = asyncio.get_running_loop().create_future()
+        self._pending[request_id] = (peer, future)
+        try:
+            peer.send(
+                json.dumps(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": request_id,
+                        "method": "use",
+                        "params": {"call": call_id, "tool": tool, "input": tool_input},
+                    }
+                )
+            )
+            async with asyncio.timeout(timeout):
+                return await future
+        except TimeoutError:
+            self._cancel(peer, call_id)
+            raise RpcError(ErrorCode.timeout, f"{tool} timed out after {timeout:g}s") from None
+        except asyncio.CancelledError:
+            self._cancel(peer, call_id)
+            raise
+        finally:
+            # Always drop the entry so a late or duplicate response finds nothing to resolve.
+            self._pending.pop(request_id, None)
+
+    def resolve(self, body_id: str, peer: Peer, message: dict) -> None:
+        entry = self._pending.get(message.get("id", ""))
+        if entry is None or entry[0] is not peer or entry[1].done():
+            return
+        future = entry[1]
+        error = message.get("error")
+        if error is None:
+            future.set_result(message.get("result", {}).get("output", []))
+            return
+        try:
+            code = ErrorCode(error.get("code"))
+        except ValueError:
+            code = ErrorCode.tool_failed
+        future.set_exception(RpcError(code, str(error.get("message", ""))))
+
+    def _cancel(self, peer: Peer, call_id: str) -> None:
+        # Best effort: the peer may already be gone.
+        with contextlib.suppress(Exception):
+            peer.send(
+                json.dumps({"jsonrpc": "2.0", "method": "cancel", "params": {"call": call_id}})
+            )
+
+    def _fail_pending(self, peer: Peer) -> None:
+        for held, future in list(self._pending.values()):
+            if held is peer and not future.done():
+                future.set_exception(RpcError(ErrorCode.body_offline, "the body disconnected"))
