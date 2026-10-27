@@ -3,7 +3,8 @@
  * the UI needs no change when the brain moves to Python. Stateful: `turn.completed` carries
  * the whole reply, but the brain streams it, so the mapper keeps each open turn's text.
  */
-import type { ReplyParams, ToolParams, TurnParams } from '@tagalong/contract';
+import type { AskParams, ReplyParams, ToolParams, TurnParams } from '@tagalong/contract';
+import type { Ask } from '@tagalong/protocol';
 import type { TurnEvent } from '@tagalong/ui';
 
 const BUDGET_MESSAGE = "Scout has used today's budget. It starts again tomorrow.";
@@ -69,6 +70,47 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
     ];
   }
 
+  // Open confirm asks, so a closed frame can say who still waits.
+  const asks = new Map<string, Ask>();
+
+  const waiting = (): TurnEvent => ({ type: 'asks.changed', waiting: [...asks.values()] });
+
+  function ask(p: AskParams): TurnEvent[] {
+    if (p.state === 'closed') return asks.delete(p.id) ? [waiting()] : [];
+    if (!p.confirm || p.tool === undefined) return [];
+    const input = Object.entries(p.input ?? {}).map(
+      ([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`,
+    );
+    // Scout's own words lead; with none, the tool and what it was given stand in.
+    const summary = p.text !== '' ? p.text : [p.tool, ...input].join('\n');
+    // Body tools arrive as `<body>__<name>`; a name without it is the brain's own.
+    const body = p.tool.includes('__') ? p.tool.split('__')[0]! : '';
+    const app = body === '' ? 'Scout' : body.charAt(0).toUpperCase() + body.slice(1);
+    asks.set(p.id, {
+      id: p.id,
+      kind: 'app-change',
+      petId: petId(),
+      summary,
+      risk: 'change',
+      app,
+      tool: p.tool,
+      state: 'waiting',
+      createdAt: new Date().toISOString(),
+    });
+    return [
+      {
+        type: 'connector.confirm',
+        approvalId: p.id,
+        turnId: p.turn ?? '',
+        petId: petId(),
+        app,
+        tool: p.tool,
+        summary,
+        options: p.options,
+      },
+    ];
+  }
+
   return {
     map(method: string, params: unknown): TurnEvent[] {
       if (method === 'turn') {
@@ -91,6 +133,7 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
         return [{ type: 'turn.delta', turnId: p.turn, text: p.delta }];
       }
       if (method === 'tool') return tool(params as ToolParams);
+      if (method === 'ask') return ask(params as AskParams);
       return [];
     },
 
@@ -98,6 +141,10 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
     resync(): TurnEvent[] {
       const events = [...open.keys()].map((id) => error(id, 'brain_restarted', LOST_MESSAGE));
       open.clear();
+      if (asks.size > 0) {
+        asks.clear();
+        events.push(waiting());
+      }
       return events;
     },
   };

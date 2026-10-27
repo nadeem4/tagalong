@@ -10,12 +10,21 @@ import type { EngineCall, IpcHandle } from './handle';
 export interface ConnectionIpcDeps {
   /** Throws when the engine is not running. */
   engine: () => EngineCall;
+  /** The person's click on a card: the brain's `answer` for that ask. */
+  answer: (ask: string, decision: 'once' | 'always' | 'deny') => Promise<void>;
 }
 
-export function registerConnectionIpc(handle: IpcHandle, { engine }: ConnectionIpcDeps): void {
-  handle(IPC.approveTool, async (_event, approvalId: string, decision: 'once' | 'deny') => {
-    await engine().call('tool.approve', { approvalId, decision });
-  });
+export function registerConnectionIpc(
+  handle: IpcHandle,
+  { engine, answer }: ConnectionIpcDeps,
+): void {
+  handle(
+    IPC.approveTool,
+    async (_event, approvalId: string, decision: 'once' | 'always' | 'deny') => {
+      // The card is already gone; an ask that closed or a brain that dropped has nobody to tell.
+      await answer(approvalId, decision).catch(() => undefined);
+    },
+  );
   handle(IPC.listConnections, async () => engine().call('connections.list', {}));
   handle(IPC.addConnection, async (_event, params: ConnectionsAddParams) => {
     // Parsed here so the defaults (no args, no env) are filled before the call goes out.

@@ -78,7 +78,7 @@ desktop app and the Chrome extension run on it. It holds:
 - experts and hand-offs: briefs sent to Claude Code, with the project and edit permission you
   confirm;
 - connected apps over MCP (Notion, GitHub, Linear, or any MCP server): reads run at once, every
-  change waits for Allow once;
+  change waits for Allow once (the Python brain's permission asks also offer Always allow and Deny);
 - routines, and a local WebSocket server that speaks the JSON-RPC protocol defined in
   `packages/protocol` (zod schemas).
 

@@ -16,19 +16,38 @@ function setup() {
     'connections.signIn': { connection: CONNECTION },
     'connections.remove': { removed: true },
   });
-  registerConnectionIpc(ipc.handle, { engine: () => engine.client });
-  return { ...ipc, calls: engine.calls };
+  const answers: [string, string][] = [];
+  registerConnectionIpc(ipc.handle, {
+    engine: () => engine.client,
+    answer: (ask, decision) => {
+      answers.push([ask, decision]);
+      return Promise.resolve();
+    },
+  });
+  return { ...ipc, calls: engine.calls, answers };
 }
 
 describe('registerConnectionIpc', () => {
-  it("answers Scout's request to change something in an app", async () => {
-    const { invoke, calls } = setup();
+  it("answers Scout's ask on the brain, not the old engine", async () => {
+    const { invoke, calls, answers } = setup();
     await invoke(IPC.approveTool, 'a1', 'once');
-    await invoke(IPC.approveTool, 'a2', 'deny');
-    expect(calls).toEqual([
-      ['tool.approve', { approvalId: 'a1', decision: 'once' }],
-      ['tool.approve', { approvalId: 'a2', decision: 'deny' }],
+    await invoke(IPC.approveTool, 'a2', 'always');
+    await invoke(IPC.approveTool, 'a3', 'deny');
+    expect(answers).toEqual([
+      ['a1', 'once'],
+      ['a2', 'always'],
+      ['a3', 'deny'],
     ]);
+    expect(calls).toEqual([]);
+  });
+
+  it('an answer the brain refuses (the ask already closed) does not throw into the card', async () => {
+    const ipc = fakeIpc();
+    registerConnectionIpc(ipc.handle, {
+      engine: () => fakeEngine({}).client,
+      answer: () => Promise.reject(new Error('no open ask')),
+    });
+    await expect(ipc.invoke(IPC.approveTool, 'a1', 'once')).resolves.toBeUndefined();
   });
 
   it('fills the defaults of a new local connection before it goes out', async () => {

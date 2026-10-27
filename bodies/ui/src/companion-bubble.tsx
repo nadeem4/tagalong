@@ -207,7 +207,7 @@ export function CompanionBubble({
     resume === undefined ? { state: 'idle' } : { state: 'done', text: resume.answer },
   );
   const [handoff, setHandoff] = useState<Handoff | null>(null);
-  // A change Scout wants to make in a connected app, waiting for Allow once or Cancel.
+  // A change Scout wants to make in a connected app, waiting for Allow once, Always allow or Deny.
   const [confirm, setConfirm] = useState<ConnectorConfirmParams | null>(null);
   // A routine Scout wrote or changed, waiting for Save.
   const [routine, setRoutine] = useState<RoutineProposedParams | null>(null);
@@ -705,7 +705,7 @@ export function CompanionBubble({
         {...(bridge.openLogs !== undefined ? { onOpenLogs: () => void bridge.openLogs?.() } : {})}
       />
     );
-  const answerConfirm = (decision: 'once' | 'deny'): void => {
+  const answerConfirm = (decision: 'once' | 'always' | 'deny'): void => {
     if (confirm === null) return;
     void bridge.approveTool?.(confirm.approvalId, decision);
     setConfirm(null);

@@ -66,7 +66,7 @@ export interface FakeHostBridge extends HostBridge {
   readonly dismissedHandoffs: readonly string[];
   readonly cancelledHandoffs: readonly string[];
   /** Every answer to a connector confirm card, in order. */
-  readonly approvals: readonly { approvalId: string; decision: 'once' | 'deny' }[];
+  readonly approvals: readonly { approvalId: string; decision: 'once' | 'always' | 'deny' }[];
   /** Every saved ask, waiting or answered; a test edits it, then emits `asks.changed`. */
   savedAsks: Ask[];
   /** Every answer from Waiting on you, and every Open, in order. */
@@ -148,7 +148,7 @@ export function createFakeHostBridge(
   const confirmedHandoffs: ConfirmHandoff[] = [];
   const dismissedHandoffs: string[] = [];
   const cancelledHandoffs: string[] = [];
-  const approvals: { approvalId: string; decision: 'once' | 'deny' }[] = [];
+  const approvals: { approvalId: string; decision: 'once' | 'always' | 'deny' }[] = [];
   const answeredAsks: { id: string; decision: 'approve' | 'decline' }[] = [];
   const openedAsks: string[] = [];
   const addedConnections: ConnectionsAddParams[] = [];

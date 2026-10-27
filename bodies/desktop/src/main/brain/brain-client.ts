@@ -101,6 +101,14 @@ export class BrainClient {
     this.socket?.send(JSON.stringify({ jsonrpc: '2.0', method: 'cancel', params: { turn } }));
   }
 
+  /** The person's click on an ask. Rejects when the brain is offline or the ask already closed. */
+  answer(ask: string, decision: 'once' | 'always' | 'deny'): Promise<void> {
+    if (this.status !== 'online') return Promise.reject(new BrainOffline());
+    // The card says once; the contract's option is allow.
+    const option = decision === 'once' ? 'allow' : decision;
+    return this.request('answer', { ask, option }).then(() => undefined);
+  }
+
   private setStatus(status: BrainStatus): void {
     if (this.status === status) return;
     this.status = status;

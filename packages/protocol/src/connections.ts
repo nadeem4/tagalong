@@ -172,6 +172,11 @@ export const ConnectorConfirmParams = z.object({
   summary: z.string().min(1),
   /** `high`: it cannot be undone, and the card says so. */
   risk: AskRisk.optional(),
+  /**
+   * The brain's ask options, in order (`allow`, `always`, `deny`; no `always` on a locked
+   * tool). Absent on the old brain's card, which offers Allow once and Deny only.
+   */
+  options: z.array(z.string()).optional(),
 });
 export type ConnectorConfirmParams = z.infer<typeof ConnectorConfirmParams>;
 
