@@ -9,7 +9,7 @@ import datetime
 from types import SimpleNamespace
 
 from brain.guardrails import Budget
-from brain.mind.turn import AnthropicModel, Final, _request, run_turn
+from brain.mind.turn import AnthropicModel, Call, Final, _request, run_turn
 
 
 def text_step(text="hi", stop="end_turn", deltas=None):
@@ -17,8 +17,11 @@ def text_step(text="hi", stop="end_turn", deltas=None):
     return (deltas if deltas is not None else [text]), Final(content, stop, SimpleNamespace())
 
 
-def tool_step(*calls, stop="tool_use"):
-    content = [{"type": "tool_use", "id": i, "name": n, "input": {}} for i, n in calls]
+def tool_step(*calls, stop="tool_use", text=None, tool_input=None):
+    content = [{"type": "text", "text": text}] if text else []
+    content += [
+        {"type": "tool_use", "id": i, "name": n, "input": tool_input or {}} for i, n in calls
+    ]
     return [], Final(content, stop, SimpleNamespace())
 
 
@@ -28,9 +31,11 @@ class FakeModel:
     def __init__(self, steps):
         self.steps = list(steps)
         self.calls = 0
+        self.tools_seen = []
 
     async def stream(self, system, messages, tools):
         self.calls += 1
+        self.tools_seen.append(tools)
         step = self.steps.pop(0)
         if isinstance(step, Exception):
             raise step
@@ -53,18 +58,20 @@ class Spend:
         self.spent.append(model)
 
 
-async def ok_tool(name, tool_input):
-    return [{"type": "text", "text": f"ran {name}"}]
+async def ok_tool(call):
+    return [{"type": "text", "text": f"ran {call.name}"}]
 
 
-def start(model, history, sent, *, run_tool=ok_tool, inbox=None, budget=None, step_cap=10):
+def start(
+    model, history, sent, *, run_tool=ok_tool, tools=None, inbox=None, budget=None, step_cap=10
+):
     return run_turn(
         turn_id="t1",
         body_id="desktop",
         model=model,
         system=lambda: "sys",
         history=history,
-        tools=[],
+        tools=tools or (lambda: []),
         run_tool=run_tool,
         inbox=inbox if inbox is not None else [],
         notify=lambda m, p: sent.append((m, p)),
@@ -95,11 +102,11 @@ async def test_plain_answer_streams_and_finishes():
 async def test_tools_run_concurrently_and_results_are_one_message():
     a, b = asyncio.Event(), asyncio.Event()
 
-    async def tool(name, tool_input):
-        mine, other = (a, b) if name == "one" else (b, a)
+    async def tool(call):
+        mine, other = (a, b) if call.name == "one" else (b, a)
         mine.set()
         await asyncio.wait_for(other.wait(), 1)  # only finishes if both run at once
-        return [{"type": "text", "text": name}]
+        return [{"type": "text", "text": call.name}]
 
     reason, history, sent, _ = await go(
         [tool_step(("c1", "one"), ("c2", "two")), text_step("ok")], run_tool=tool
@@ -127,7 +134,7 @@ async def test_tools_run_concurrently_and_results_are_one_message():
 
 
 async def test_raising_tool_gives_error_result():
-    async def boom(name, tool_input):
+    async def boom(call):
         raise RuntimeError("nope")
 
     reason, history, sent, _ = await go([tool_step(("c1", "x")), text_step("ok")], run_tool=boom)
@@ -147,7 +154,7 @@ async def test_raising_tool_gives_error_result():
 async def test_say_queued_during_tools_follows_results():
     inbox = []
 
-    async def tool(name, tool_input):
+    async def tool(call):
         inbox.append([{"type": "text", "text": "also this"}])
         return []
 
@@ -238,12 +245,12 @@ async def test_cancel_while_tools_run_closes_history():
     started = asyncio.Event()
     cancelled = []
 
-    async def hang(name, tool_input):
+    async def hang(call):
         started.set()
         try:
             await asyncio.sleep(10)
         except asyncio.CancelledError:
-            cancelled.append(name)
+            cancelled.append(call.name)
             raise
 
     history = [{"role": "user", "content": "go"}]
@@ -373,3 +380,30 @@ async def test_unexpected_exception_closes_history_and_sends_done():
     assert history[-1]["content"][0]["type"] == "tool_result"
     assert history[-1]["content"][0]["tool_use_id"] == "c1"
     assert len(dones(sent)) == 1
+
+
+async def test_tools_are_asked_for_at_every_step():
+    lists = iter([[{"name": "a"}], [{"name": "a"}, {"name": "b"}]])
+    _, _, _, model = await go([tool_step(("c1", "a")), text_step()], tools=lambda: next(lists))
+    assert [t["name"] for t in model.tools_seen[0]] == ["a"]
+    assert [t["name"] for t in model.tools_seen[1]] == ["a", "b"]
+
+
+async def test_run_tool_gets_a_call_with_turn_and_step_text():
+    seen = []
+
+    async def tool(call):
+        seen.append(call)
+        return "ok"
+
+    step = tool_step(("c1", "x"), text="Looking now.", tool_input={"q": 1})
+    await go([step, text_step()], run_tool=tool)
+    assert seen == [Call("c1", "x", {"q": 1}, "t1", "Looking now.")]
+
+
+async def test_tool_result_blocks_pass_through():
+    async def tool(call):
+        return [{"type": "text", "text": "hi"}]
+
+    _, history, _, _ = await go([tool_step(("c1", "x")), text_step()], run_tool=tool)
+    assert history[2]["content"][0]["content"] == [{"type": "text", "text": "hi"}]
