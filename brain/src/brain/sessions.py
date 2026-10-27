@@ -11,15 +11,13 @@ from collections.abc import Callable
 from datetime import datetime
 
 from brain.bodies import Bodies
-from brain.mind.prompt import system_prompt, user_content
+from brain.memory import Memory
+from brain.mind.prompt import render_know, system_prompt, user_content
 from brain.mind.turn import Model, run_turn
 from brain.protocol import SayParams, SayResult
+from brain.tools import TOOLS, make_run_tool
 
 log = logging.getLogger("brain")
-
-
-async def _no_tools(name: str, tool_input: dict):
-    raise RuntimeError("no tools yet")
 
 
 class Session:
@@ -29,12 +27,15 @@ class Session:
         budget,
         bodies: Bodies,
         step_cap: int,
+        memory: Memory,
         now: Callable[[], datetime] = lambda: datetime.now().astimezone(),
     ) -> None:
         self._model = model
         self._budget = budget
         self._bodies = bodies
         self._step_cap = step_cap
+        self._memory = memory
+        self._run_tool = make_run_tool(memory)
         self._now = now
         self.history: list = []
         self._inbox: list = []
@@ -53,6 +54,8 @@ class Session:
             self._append_user([b for s in self._inbox for b in s])
             self._inbox.clear()
         self._append_user(content)
+        # Read once per turn so the system prompt stays identical across its steps (cache).
+        know = render_know(self._memory.always_loaded())
         notify = self._bodies.notify
         # Deferred a tick so the say result goes out before the started notification.
         asyncio.get_running_loop().call_soon(
@@ -63,10 +66,10 @@ class Session:
                 turn_id=turn_id,
                 body_id=body_id,
                 model=self._model,
-                system=lambda: system_prompt(self._now(), self._bodies.online()),
+                system=lambda: system_prompt(self._now(), self._bodies.online(), know),
                 history=self.history,
-                tools=[],
-                run_tool=_no_tools,
+                tools=TOOLS,
+                run_tool=self._run_tool,
                 inbox=self._inbox,
                 notify=notify,
                 budget=self._budget,

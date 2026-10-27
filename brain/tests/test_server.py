@@ -13,6 +13,7 @@ from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed
 
 from brain.bodies import Bodies
+from brain.memory import Memory
 from brain.mind.turn import Final
 from brain.server import start_server
 from brain.sessions import Session
@@ -233,7 +234,7 @@ class Open:
 async def chat():
     gate = asyncio.Event()
     bodies = Bodies()
-    session = Session(ScriptedModel(gate), Open(), bodies, 10)
+    session = Session(ScriptedModel(gate), Open(), bodies, 10, Memory(":memory:"))
     server = await start_server("127.0.0.1", 0, bodies, "s1", session)
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     yield url, gate

@@ -3,7 +3,7 @@
 The brain is the Python side of contract v1 ([protocol/README.md](../protocol/README.md)). It is
 being built row by row and replaces `packages/core`. Today bodies can connect, declare their tools,
 catch up on missed notifications, and talk to Scout: `say` starts a turn and the reply streams
-back. Scout has no tools, memory or saved chat yet (see [Not built yet](#not-built-yet)).
+back. Scout remembers through the `remember`, `recall` and `forget` tools (stored in `tagalong.db` in the data folder); no saved chat yet (see [Not built yet](#not-built-yet)).
 
 ## Run it
 
@@ -21,7 +21,7 @@ It needs an Anthropic key. With no `ANTHROPIC_API_KEY` in the environment or in
 | Variable                    | Default           | Meaning                                              |
 | --------------------------- | ----------------- | ---------------------------------------------------- |
 | `TAGALONG_BRAIN_ADDR`       | `127.0.0.1:47321` | `host:port` to listen on. Port `0` picks a free port |
-| `TAGALONG_HOME`             | `~/.tagalong`     | Data folder. Holds `session`, `budget.json`, `.env`  |
+| `TAGALONG_HOME`             | `~/.tagalong`     | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`  |
 | `TAGALONG_MODEL`            | `claude-opus-5-5` | Model Scout thinks with                              |
 | `TAGALONG_DAILY_BUDGET_USD` | `5`               | Most Scout may spend per local day, in USD           |
 | `TAGALONG_STEP_CAP`         | `25`              | Most model calls in one turn                         |
