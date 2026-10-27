@@ -409,6 +409,16 @@ async def test_home_caller_skips_the_ask():
     assert bodies.sent == []
 
 
+async def test_other_caller_in_audience_is_still_asked():
+    spec_x = ToolSpec("x", "x", {"type": "object"}, frozenset({"scout", "expert"}))
+    bodies = AskBodies()
+    box = Toolbox([FakeSource([spec_x])], asks=Asks(bodies))
+    task = asyncio.create_task(box.run(call("x"), caller="expert"))
+    await until(lambda: opened_asks(bodies))
+    box._asks.answer(opened_asks(bodies)[0]["id"], "allow", "desktop")
+    assert await task == "ran x"
+
+
 async def test_nobody_online_says_nobody_was_there():
     box, source, bodies, _ = gated(online=())
     with pytest.raises(RpcError) as err:

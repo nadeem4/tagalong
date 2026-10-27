@@ -48,6 +48,11 @@ export const SayParams = z
   .refine((m) => m.text !== undefined || m.parts !== undefined, 'say needs text or parts');
 export type SayParams = z.infer<typeof SayParams>;
 
+const CONFIRM_OPTIONS = [
+  ['allow', 'deny'],
+  ['allow', 'always', 'deny'],
+];
+
 export const SayResult = z.object({ turn: Id, joined: z.boolean() });
 export type SayResult = z.infer<typeof SayResult>;
 
@@ -137,7 +142,9 @@ const AskOpen = z
       !a.confirm ||
       (a.tool !== undefined &&
         a.input !== undefined &&
-        (a.options.join() === 'allow,deny' || a.options.join() === 'allow,always,deny')),
+        CONFIRM_OPTIONS.some(
+          (o) => o.length === a.options.length && o.every((v, i) => v === a.options[i]),
+        )),
     'a confirm ask needs tool, input and options ["allow","deny"] or ["allow","always","deny"]',
   );
 

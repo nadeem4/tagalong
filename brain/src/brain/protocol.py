@@ -262,7 +262,7 @@ class ToolParams(Model):
     summary: str | None = None
 
 
-# lways is offered only for tools the user has not locked; the brain decides when.
+# always is offered only for tools the user has not locked; the brain decides when.
 CONFIRM_OPTIONS = (["allow", "deny"], ["allow", "always", "deny"])
 
 

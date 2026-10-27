@@ -177,7 +177,7 @@ class Toolbox:
                 if spec.name == call.name:
                     if caller not in spec.audience:
                         raise RpcError(ErrorCode.unknown_tool, f"No tool named {call.name}.")
-                    if caller == "scout" and self._asks is not None and self.mode(spec) == "ask":
+                    if caller != "home" and self._asks is not None and self.mode(spec) == "ask":
                         await self._ask(call, spec)
                     return await source.run(call, call.name)
         for source in self.sources:
