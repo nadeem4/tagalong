@@ -340,8 +340,8 @@ Right-click the tray icon and choose **Open Tagalong**. The tray has only four i
 Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the rest, in twelve pages:
 
 - **Overview**: whether Scout is ready and what it thinks with, your experts, what was spent today
-  and this month (**Spend**), and the latest activity. Spend shows dollars for models with a known
-  price, tokens and "price unknown" for the rest, and tokens "(your plan)" for the Claude sign-in.
+  (**Spend**), and the latest activity. Spend shows the dollars spent today against the daily limit,
+  as the brain reports them.
   **Settings → Daily budget** (off by default) pauses keep-an-eye comments and scheduled routines
   until midnight once that day's priced spend reaches it; asking Scout, Run now, watches and
   hand-offs always go through.

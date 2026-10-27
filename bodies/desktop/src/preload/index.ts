@@ -31,14 +31,13 @@ import type {
   RoutineProposedParams,
   RoutineResultParams,
   RoutineView,
-  UsageSummaryResult,
   Settings,
   SettingsPatch,
   SightLogEntry,
   StatusMark,
   MemoryEntry,
 } from '@tagalong/protocol';
-import type { AskInput, DropOffer, HostBridge, TurnEvent } from '@tagalong/ui';
+import type { AskInput, DropOffer, HostBridge, SpendToday, TurnEvent } from '@tagalong/ui';
 import { IPC } from '../shared/ipc';
 import { heldUntilHeard } from './held';
 import type {
@@ -159,7 +158,12 @@ const bridge: HostBridge = {
   setCalendarLink: (link: string | null) =>
     ipcRenderer.invoke(IPC.setCalendarLink, link) as Promise<CalendarCheckResult>,
   checkCalendar: () => ipcRenderer.invoke(IPC.checkCalendar) as Promise<CalendarCheckResult>,
-  usageSummary: () => ipcRenderer.invoke(IPC.usageSummary) as Promise<UsageSummaryResult>,
+  usageSummary: () => ipcRenderer.invoke(IPC.usageSummary) as Promise<SpendToday>,
+  onBrainChanged: (handler: (what: string) => void) => {
+    const listener = (_event: IpcRendererEvent, what: string): void => handler(what);
+    ipcRenderer.on(IPC.brainChangedEvent, listener);
+    return () => void ipcRenderer.off(IPC.brainChangedEvent, listener);
+  },
   applySettings: (patch: SettingsPatch) =>
     ipcRenderer.invoke(IPC.applySettings, patch) as Promise<void>,
   expertCatalog: () => ipcRenderer.invoke(IPC.expertCatalog) as Promise<CatalogStatus[]>,

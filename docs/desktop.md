@@ -362,6 +362,18 @@ Nothing in the app uses it yet; slice 5c wires it in (`onNotification` into the 
 - **`use` requests:** the brain asks the body to run one of the tools it announced in hello. Answers:
   the tool's output parts; or an error with `invalid_params` (bad params), `unknown_tool` (not in
   the hello list) or `tool_failed` (the tool threw).
+- **Home tools:** `call(tool, input = {})` is a request that sends `call { tool, input }` and resolves
+  with the output parts. It needs `online` (otherwise `BrainOffline`) and rejects with `RpcError`
+  (carrying the brain's error code) when the brain refuses. `brain/call-json.ts` (`callJson`) parses
+  the single JSON text part the Home tools return. Home's What Scout remembers uses `list_memories`
+  and `forget` (`ipc/memory.ts`: brain kinds `instruction` map to Preference, `summary` to Summary,
+  the rest to Fact; a refused `forget` or an id that is not a number gives `false`; an offline brain
+  rejects, so the page says it could not read). The Spend card uses `spend_today` (`ipc/experts.ts`,
+  answering `{ spentUsd, limitUsd }`): the by-provider rows and the month are gone until the brain can
+  report them.
+- **`changed` notifications:** `index.ts` sends each one's `what` to every window on
+  `IPC.brainChangedEvent`; the preload exposes it as `onBrainChanged(handler)` on the HostBridge.
+  Memory view reads again on `memory`.
 - **Answering an ask:** `answer(ask, decision)` is a request that sends `answer { ask, option }`,
   with the card's `once` sent as `allow` and `always` / `deny` as they are. It needs `online`
   (otherwise `BrainOffline`) and rejects if the brain refuses it (the ask already closed). The
@@ -380,7 +392,7 @@ understands. It keeps each open turn's reply text, because `turn.completed` carr
 | `tool` started / ended                         | `turn.toolRequest` (call id as `approvalId` and `callId`, empty input) / `turn.toolResult`                                                                                                                                                                                                                       |
 | `ask` open with `confirm: true`                | `connector.confirm`: `approvalId` is the ask id, `turnId` its turn, `app` the tool's body label (text before `__`, capitalised) or `Scout` for a brain tool, `summary` the ask `text` (or, when empty, the tool name and its input, one `key: value` per line), `options` carried (no `always` on a locked tool) |
 | `ask` closed                                   | `connector.dismiss { approvalId }`, which only the bubble handles (never `asks.changed`: Home counts and lists those from the old engine, which knows no brain ask); a closed ask the mapper never showed gives nothing                                                                                          |
-| `changed`                                      | nothing yet                                                                                                                                                                                                                                                                                                      |
+| `changed`                                      | no TurnEvent; its `what` goes to the windows on `IPC.brainChangedEvent` (`onBrainChanged`)                                                                                                                                                                                                                       |
 | resync                                         | `turn.error` `brain_restarted` for each open turn (started, or seen in a reply, and not ended), then `connector.dismiss` for each open ask; the state is cleared                                                                                                                                                 |
 
 ### Preload and the tagalongHost bridge

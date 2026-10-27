@@ -4,6 +4,7 @@
  * replay (last_seq); what the notifications mean is the caller's job.
  */
 import {
+  CallResult,
   ErrorCode,
   HelloResult,
   PROTOCOL,
@@ -99,6 +100,19 @@ export class BrainClient {
   cancel(turn: string): void {
     if (this.status !== 'online') return;
     this.socket?.send(JSON.stringify({ jsonrpc: '2.0', method: 'cancel', params: { turn } }));
+  }
+
+  /**
+   * Runs one of the brain's own tools for Home (list_memories, spend_today, ...) and resolves
+   * with its output parts. Rejects BrainOffline when not online, RpcError on a brain error.
+   */
+  call(tool: string, input: Record<string, unknown> = {}): Promise<Part[]> {
+    if (this.status !== 'online') return Promise.reject(new BrainOffline());
+    return this.request('call', { tool, input }).then((r) => {
+      const parsed = CallResult.safeParse(r);
+      if (!parsed.success) throw new Error('brain sent bad call result');
+      return parsed.data.output;
+    });
   }
 
   /** The person's click on an ask. Rejects when the brain is offline or the ask already closed. */

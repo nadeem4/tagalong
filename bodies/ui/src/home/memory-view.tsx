@@ -63,9 +63,9 @@ export function MemoryView({ name }: { name: string }) {
 
   useEffect(() => {
     refresh();
-    // A turn may have remembered or forgotten something.
-    return bridge.onTurnEvent((event) => {
-      if (event.type === 'turn.completed') refresh();
+    // The brain says so when Scout remembers or forgets something mid-turn.
+    return bridge.onBrainChanged?.((what) => {
+      if (what === 'memory') refresh();
     });
   }, [bridge, refresh]);
 

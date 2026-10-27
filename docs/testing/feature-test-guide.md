@@ -1736,14 +1736,11 @@ brain routes them to the model, check them in the brain's logs or a contract-v1 
 ### SP.1. Home shows what Scout and the experts used
 
 1. **Setup:** Scout thinks with OpenRouter on `anthropic/claude-haiku-4.5`, with a key stored.
-2. **Action:** ask Scout two questions, then open **Home → Overview**. **Expected:** the **Spend**
-   card lists **Today** and **This month** with a row `Scout · OpenRouter` and a dollar amount (or
-   "under $0.01"). It updates when a turn finishes, without reopening Home.
-3. **Action:** switch Scout to a model not in the price table (any other OpenRouter model) and ask
-   again. **Expected:** the row shows tokens and "price unknown". No dollar figure is guessed.
-4. **Action:** switch Scout to the Claude sign-in and ask again; then send a task to Claude Code.
-   **Expected:** `Scout · Claude sign-in` and `Experts · Claude Code` show tokens and "(your plan)",
-   never dollars.
+2. **Action:** with the brain running, ask Scout two questions, then open **Home → Overview**.
+   **Expected:** the **Spend** card shows **Today** with one line, the dollars spent against the
+   daily limit (for example "$0.31 of $1"), or "Nothing spent yet today." It updates when a turn
+   finishes, without reopening Home. The card lists no per-provider rows and no month: the brain
+   reports only today's spend and the limit.
 
 ### SP.2. The cap pauses proactive work only
 

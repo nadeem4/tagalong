@@ -353,10 +353,14 @@ method reaches the history index.
 
 ### Desktop IPC
 
-| Channel                                       | Handler                                         |
-| --------------------------------------------- | ----------------------------------------------- |
-| `IPC.listMemories` (`tagalong:memory:list`)   | `memory.list { limit: 200 }`, returns the array |
-| `IPC.deleteMemory` (`tagalong:memory:delete`) | `memory.delete { id }`, returns `deleted`       |
+Home's memory page now reads from the Python brain, not the old engine:
+
+| Channel                                       | Handler                                                                               |
+| --------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `IPC.listMemories` (`tagalong:memory:list`)   | brain tool `list_memories`, mapped to `MemoryEntry` (`at` becomes `createdAt`)        |
+| `IPC.deleteMemory` (`tagalong:memory:delete`) | brain tool `forget { id }`; `true` when it ran, `false` when the brain refused the id |
+
+The page reads again when the brain sends `changed { what: "memory" }` (see docs/desktop.md).
 
 ### Tools
 

@@ -389,7 +389,7 @@ The nav lists twelve pages (`HomePage`), the companion's name filling in where i
 | Activity (`activity`)           | `ActivityView`             | `listActivity` pages                                                                                 |
 | How Scout decided (`decisions`) | `DecisionsView`            | `listExperience`, `getExperience`, `clearExperience`                                                 |
 | What Scout saw (`sightLog`)     | `SightLogView`             | `listSightLog`, `deleteSightLog`, `clearSightLog`; days from `setup().sightLogDays`                  |
-| What Scout remembers (`memory`) | `MemoryView`               | `listMemories`, `deleteMemory`                                                                       |
+| What Scout remembers (`memory`) | `MemoryView`               | `listMemories`, `deleteMemory`; re-reads on `onBrainChanged('memory')`                               |
 | What Scout learned (`learned`)  | `LearnedView`              | `listSelf`, `getSelf`, `writeSelf`, `undoSelf`, `acceptSelf`, `rejectSelf`                           |
 | Settings (`settings`)           | the host's `settings` slot | the host's settings form                                                                             |
 
