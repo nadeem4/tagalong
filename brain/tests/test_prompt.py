@@ -180,3 +180,7 @@ def test_unsupported_image_mime_becomes_note():
 def test_context_keeps_non_ascii_readable():
     blocks = user_content(say(text="hi", context={"window": "café"}))
     assert "café" in blocks[-1]["text"]
+
+
+def test_soul_tells_scout_its_words_before_a_change_are_the_approval_text():
+    assert "words you write just before" in system_prompt(NOW, [])

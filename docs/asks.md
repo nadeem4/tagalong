@@ -7,7 +7,35 @@ app (`app-change`) or a hand-off card (`handoff`). Asks give every card one outc
 rule, one place in Home (**Waiting on you**) and one audit trail. Only a person's click approves an
 ask; silence never does.
 
-## Where it lives
+## In the Python brain
+
+The Python brain asks before Scout runs a tool that changes something. It is a different, simpler
+thing from the saved asks below: an ask lives only in memory and waits for one `answer`.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+flowchart TD
+  A[Scout calls a tool] --> B{Mode is ask?}
+  B -- no --> R[Tool runs]
+  B -- yes --> C{Anyone online?}
+  C -- no --> D[Denied: nobody was there]
+  C -- yes --> E[Open ask to every body]
+  E --> F{First answer}
+  F -- allow --> R
+  F -- always --> G[Save auto] --> R
+  F -- deny --> H[Denied: user said no]
+  E -- 5 minutes --> I[Closed: timeout]
+  E -- turn cancelled --> J[Closed: cancelled]
+```
+
+- Options are `allow`, `always`, `deny`; a locked tool has no `always`.
+- The first answer wins. A second answer, an answer after the ask closed, or an unknown id gets
+  `not_found`. An option the ask did not offer gets `invalid_params`.
+- A body that connects while an ask is open is sent it again.
+- Code: `brain/src/brain/asks.py` and gate step 3 in `brain/src/brain/toolbox.py`. Details are in
+  [brain.md](brain.md#permissions-and-asks).
+
+## Where it lives (old brain)
 
 | File                                             | What it holds                                                                                                                         |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |

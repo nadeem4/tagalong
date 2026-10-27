@@ -82,6 +82,13 @@ MIGRATIONS = (
         INSERT INTO messages_fts(rowid, text) VALUES (new.id, new.text);
     END;
     """,
+    # Per-tool permission choice; no row means the tool's default applies.
+    """
+    CREATE TABLE permissions(
+        tool TEXT PRIMARY KEY,
+        mode TEXT NOT NULL CHECK(mode IN ('ask','auto'))
+    );
+    """,
 )
 
 
@@ -194,6 +201,16 @@ class Memory:
 
     def close(self) -> None:
         self._db.close()
+
+    def permission_modes(self) -> dict[str, str]:
+        return dict(self._db.execute("SELECT tool, mode FROM permissions"))
+
+    def set_permission_mode(self, tool: str, mode: str) -> None:
+        self._db.execute(
+            "INSERT INTO permissions(tool, mode) VALUES (?,?)"
+            " ON CONFLICT(tool) DO UPDATE SET mode=excluded.mode",
+            (tool, mode),
+        )
 
     def _item(self, item_id: int) -> Item | None:
         row = self._db.execute(f"SELECT {_COLUMNS} FROM memories WHERE id=?", (item_id,)).fetchone()

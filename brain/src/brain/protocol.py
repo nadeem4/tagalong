@@ -99,6 +99,7 @@ class Tool(Model):
     description: str
     input_schema: Input
     confirm: bool | None = None
+    effect: Literal["read", "change"] | None = None
 
     @field_validator("name")
     @classmethod
@@ -261,6 +262,10 @@ class ToolParams(Model):
     summary: str | None = None
 
 
+# always is offered only for tools the user has not locked; the brain decides when.
+CONFIRM_OPTIONS = (["allow", "deny"], ["allow", "always", "deny"])
+
+
 class AskOpen(Model):
     seq: Seq
     id: Id
@@ -275,9 +280,12 @@ class AskOpen(Model):
     @model_validator(mode="after")
     def _confirm_shape(self) -> "AskOpen":
         if self.confirm and (
-            self.tool is None or self.input is None or self.options != ["allow", "deny"]
+            self.tool is None or self.input is None or self.options not in CONFIRM_OPTIONS
         ):
-            raise ValueError('a confirm ask needs tool, input and options ["allow","deny"]')
+            raise ValueError(
+                "a confirm ask needs tool, input and options "
+                '["allow","deny"] or ["allow","always","deny"]'
+            )
         return self
 
 

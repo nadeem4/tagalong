@@ -5,6 +5,7 @@ import re
 import pytest
 
 from brain.memory import Hit, Memory, MemoryRefused
+from brain.toolbox import BrainSource, Toolbox
 from brain.tools import RECALL_MAX_CHARS, brain_tools, format_hits
 
 
@@ -126,3 +127,11 @@ async def test_chat_hits_fenced_in_recall(mem, run):
     mem.save_messages([{"role": "user", "content": "we planned the Lisbon trip"}])
     out = await run("recall", {"query": "lisbon"})
     assert '<data kind="chat">we planned the Lisbon trip</data>' in out
+
+
+def test_brain_memory_tools_default_auto(mem):
+    box = Toolbox([BrainSource(brain_tools(mem))], mem.permission_modes, mem.set_permission_mode)
+    modes = {s.name: box.mode(s) for s in box.sources[0].specs()}
+    assert modes == {"remember": "auto", "recall": "auto", "forget": "auto"}
+    effects = {s.name: s.effect for s in box.sources[0].specs()}
+    assert effects == {"remember": "change", "recall": "read", "forget": "change"}

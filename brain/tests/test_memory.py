@@ -371,3 +371,24 @@ def test_failed_migration_rolls_back(tmp_path, monkeypatch):
     db.close()
     monkeypatch.undo()
     Memory(tmp_path / "r.db").close()  # the real migrations still apply afterwards
+
+
+def test_migration_creates_permissions_and_survives_reopen(tmp_path):
+    m = Memory(tmp_path / "p.db")
+    assert m.permission_modes() == {}
+    m.set_permission_mode("x", "auto")
+    m.close()
+    m = Memory(tmp_path / "p.db")
+    assert m.permission_modes() == {"x": "auto"}
+    m.close()
+
+
+def test_set_permission_mode_upserts(mem):
+    mem.set_permission_mode("x", "ask")
+    mem.set_permission_mode("x", "auto")
+    assert mem.permission_modes() == {"x": "auto"}
+
+
+def test_set_permission_mode_rejects_other_modes(mem):
+    with pytest.raises(sqlite3.IntegrityError):
+        mem.set_permission_mode("x", "maybe")

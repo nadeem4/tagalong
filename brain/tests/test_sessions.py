@@ -298,7 +298,7 @@ async def test_cancelled_turn_is_saved_valid(tmp_path):
         await asyncio.Event().wait()
 
     session, _ = make(Gate([call, "never"]), memory)
-    stuck = ToolSpec("recall", "blocks", {"type": "object"})
+    stuck = ToolSpec("recall", "blocks", {"type": "object"}, effect="read")
     session.toolbox.sources[:] = [BrainSource([(stuck, blocked)])]
     result = session.say("desktop", say("a"))
     await running.wait()  # the cancel lands while the tool is running

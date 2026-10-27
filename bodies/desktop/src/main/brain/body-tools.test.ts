@@ -44,6 +44,15 @@ describe('bodyTools declarations', () => {
     ]);
     for (const tool of tools) expect(Tool.safeParse(tool).success).toBe(true);
   });
+
+  it('marks all three as reads', () => {
+    const { tools } = setup();
+    expect(tools.map((t) => [t.name, t.effect])).toEqual([
+      ['list_windows', 'read'],
+      ['read_window_text', 'read'],
+      ['look_at_window', 'read'],
+    ]);
+  });
 });
 
 describe('list_windows', () => {

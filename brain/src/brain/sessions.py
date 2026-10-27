@@ -10,6 +10,7 @@ import uuid
 from collections.abc import Callable
 from datetime import datetime
 
+from brain.asks import Asks
 from brain.bodies import Bodies
 from brain.memory import Memory, _compaction_text
 from brain.mind.prompt import render_know, system_prompt, user_content
@@ -37,7 +38,13 @@ class Session:
         self._bodies = bodies
         self._step_cap = step_cap
         self._memory = memory
-        self.toolbox = Toolbox([BrainSource(brain_tools(memory)), BodySource(bodies)])
+        self._asks = Asks(bodies)
+        self.toolbox = Toolbox(
+            [BrainSource(brain_tools(memory)), BodySource(bodies)],
+            memory.permission_modes,
+            memory.set_permission_mode,
+            self._asks,
+        )
         self._now = now
         loaded = memory.load_messages()
         self.history: list = rebuild_history(loaded)
@@ -91,6 +98,12 @@ class Session:
     def cancel(self, turn_id: str) -> None:
         if turn_id == self._turn_id and self._task is not None:
             self._task.cancel()
+
+    def answer(self, ask_id: str, option: str, body_id: str) -> None:
+        self._asks.answer(ask_id, option, body_id)
+
+    def open_asks(self) -> list[dict]:
+        return self._asks.open_asks()
 
     def _append_user(self, content: list) -> None:
         # Input arriving while the last user message is still unsaved joins it, so one burst is
