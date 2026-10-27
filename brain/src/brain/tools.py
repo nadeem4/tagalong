@@ -78,8 +78,7 @@ def _render(hits: list[Hit]) -> str:
     lines = [_line(h) for h in hits]
     if any(h.kind == "summary" for h in hits):
         lines.insert(0, _PREAMBLE)
-    return "
-".join(lines)
+    return "\n".join(lines)
 
 
 def make_run_tool(memory: Memory) -> Callable[[str, dict], Awaitable[str]]:
