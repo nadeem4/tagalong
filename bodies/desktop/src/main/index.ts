@@ -112,6 +112,7 @@ import { registerPickUpIpc } from './ipc/pick-up';
 import { PickUpAllowlist, PickUpWaiting } from './pick-up-open';
 import { registerSightLogIpc } from './ipc/sight-log';
 import { registerMemoryIpc } from './ipc/memory';
+import { registerPermissionsIpc } from './ipc/permissions';
 import { registerSettingsIpc } from './ipc/settings';
 import { registerTurnIpc } from './ipc/turns';
 import { dropDesk, registerDropIpc } from './drop';
@@ -1015,6 +1016,7 @@ function registerIpc(): void {
   });
   registerSightLogIpc(handle, { engine });
   registerMemoryIpc(handle, { brain: required().brain });
+  registerPermissionsIpc(handle, { brain: required().brain });
   registerRoutineIpc(handle, {
     engine,
     openHome: (page) => openHome(page),

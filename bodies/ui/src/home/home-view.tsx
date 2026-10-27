@@ -22,6 +22,7 @@ import { HOME_CSS } from './home-styles';
 import { RoutinesPanel } from './routines-panel';
 import { LearnedView } from './learned-view';
 import { MemoryView } from './memory-view';
+import { PermissionsPanel } from './permissions-panel';
 import { SightLogView } from './sight-log-view';
 import { SpendCard } from './spend-card';
 import { WaitingView } from './waiting-view';
@@ -209,7 +210,12 @@ export function HomeView({
         )}
         {page === 'memory' && <MemoryView name={name} />}
         {page === 'learned' && <LearnedView name={name} />}
-        {page === 'settings' && settings}
+        {page === 'settings' && (
+          <>
+            {settings}
+            <PermissionsPanel />
+          </>
+        )}
       </main>
     </div>
   );

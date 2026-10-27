@@ -71,6 +71,8 @@ export const IPC = {
   clearSightLog: 'tagalong:sight-log:clear',
   listMemories: 'tagalong:memory:list',
   deleteMemory: 'tagalong:memory:delete',
+  listPermissions: 'tagalong:permissions:list',
+  setPermission: 'tagalong:permissions:set',
   setCalendarLink: 'tagalong:calendar:set-link',
   checkCalendar: 'tagalong:calendar:check',
   usageSummary: 'tagalong:usage:summary',

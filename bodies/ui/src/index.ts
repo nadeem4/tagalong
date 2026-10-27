@@ -6,7 +6,14 @@
  * HostBridge.
  */
 export { HostBridgeProvider } from './host-bridge';
-export type { AskInput, ConfirmHandoff, HostBridge, SpendToday, TurnEvent } from './host-bridge';
+export type {
+  AskInput,
+  ConfirmHandoff,
+  HostBridge,
+  PermissionRow,
+  SpendToday,
+  TurnEvent,
+} from './host-bridge';
 
 export { ChatPanel } from './chat-panel';
 export { CompanionBubble, GreetingLine } from './companion-bubble';

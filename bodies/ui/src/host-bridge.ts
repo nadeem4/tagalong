@@ -42,6 +42,19 @@ export interface SpendToday {
 }
 
 /**
+ * One tool in Home's Permissions list: whether Scout asks before using it (`ask`) or just does
+ * (`auto`). A locked tool always asks; an offline body's tool cannot be changed yet.
+ */
+export interface PermissionRow {
+  name: string;
+  description: string;
+  effect: 'read' | 'change';
+  mode: 'ask' | 'auto';
+  locked: boolean;
+  online: boolean;
+}
+
+/**
  * The core-to-host notifications a panel renders: everything about a turn in flight, a
  * watch, a hand-off to an expert as it goes, connector confirms and routines.
  */
@@ -231,6 +244,10 @@ export interface HostBridge {
   checkCalendar?(): Promise<CalendarCheckResult>;
   /** Home's Spend card: what was spent today and the daily limit, as the brain knows them. */
   usageSummary?(): Promise<SpendToday>;
+  /** Home's Permissions: each tool Scout can use and whether it asks first. */
+  listPermissions?(): Promise<PermissionRow[]>;
+  /** Sets one tool to ask or auto; rejects when the brain refuses (a locked tool, say). */
+  setPermission?(tool: string, mode: 'ask' | 'auto'): Promise<void>;
   /**
    * The brain changed something Home shows (`memory`, `permissions`): read it again. Returns an
    * unsubscribe function. Optional: a host without a brain never sends it.

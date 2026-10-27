@@ -1,7 +1,7 @@
 /**
  * A scripted brain for the e2e suites: a real websocket server speaking contract v1, so the
  * desktop's whole path (BrainClient, turn events, bubble) runs without Python or a model.
- * It answers hello, then every say with the same short reply. A say that mentions "permission"
+ * It answers hello, Home's permission tools (`call`), then every say with the same short reply. A say that mentions "permission"
  * first opens one confirm ask and holds the turn until the desktop answers it, as the real
  * brain does; every `answer` frame is recorded for the test.
  */
@@ -15,6 +15,8 @@ export interface FakeBrain {
   addr: string;
   /** Every `answer` frame the desktop sent, in order. */
   answers: { ask: string; option: string }[];
+  /** Every `set_permission` call Home made, in order. */
+  permissionSets: { tool: string; mode: string }[];
   close(): Promise<void>;
 }
 
@@ -26,6 +28,25 @@ export async function startFakeBrain(): Promise<FakeBrain> {
   let seq = 0;
   let turns = 0;
   const answers: { ask: string; option: string }[] = [];
+  const permissionSets: { tool: string; mode: string }[] = [];
+  const permissions = [
+    {
+      name: 'desktop__move_window',
+      description: 'Move a window on your desktop',
+      effect: 'change',
+      mode: 'ask',
+      locked: false,
+      online: true,
+    },
+    {
+      name: 'desktop__close_window',
+      description: 'Close a window on your desktop',
+      effect: 'change',
+      mode: 'ask',
+      locked: true,
+      online: true,
+    },
+  ];
 
   server.on('connection', (socket: WebSocket) => {
     const notify = (method: string, params: Record<string, unknown>) =>
@@ -69,6 +90,23 @@ export async function startFakeBrain(): Promise<FakeBrain> {
             input: { x: 0 },
           });
         } else finish();
+      } else if (msg.method === 'call') {
+        // Home's tools: only the permission pair, kept in memory like the real brain's store.
+        const params = msg.params as { tool?: string; input?: { tool?: string; mode?: string } };
+        let value: unknown = {};
+        if (params.tool === 'list_permissions') value = { tools: permissions };
+        else if (params.tool === 'set_permission') {
+          const row = permissions.find((p) => p.name === params.input?.tool);
+          if (row !== undefined) row.mode = String(params.input?.mode);
+          permissionSets.push({
+            tool: String(params.input?.tool),
+            mode: String(params.input?.mode),
+          });
+          value = { tool: params.input?.tool, mode: params.input?.mode };
+          notify('changed', { what: 'permissions' });
+        }
+        const output = [{ type: 'text', text: JSON.stringify(value) }];
+        socket.send(JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { output } }));
       } else if (msg.method === 'answer') {
         const ask = String(msg.params?.ask);
         answers.push({ ask, option: String(msg.params?.option) });
@@ -83,6 +121,7 @@ export async function startFakeBrain(): Promise<FakeBrain> {
   return {
     addr: `127.0.0.1:${(server.address() as AddressInfo).port}`,
     answers,
+    permissionSets,
     close: () =>
       new Promise<void>((resolve) => {
         for (const client of server.clients) client.terminate();

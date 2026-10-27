@@ -325,6 +325,24 @@ describe('HomeView', () => {
     expect(await screen.findByText('The settings form')).toBeVisible();
   });
 
+  it('shows Permissions under the settings form on the Settings page only', async () => {
+    const permissions = [
+      {
+        name: 'recall',
+        description: 'Look up what Scout remembers',
+        effect: 'read' as const,
+        mode: 'auto' as const,
+        locked: false,
+        online: true,
+      },
+    ];
+    renderHome(createFakeHostBridge({ pets: [SCOUT], permissions }), { page: 'settings' });
+    expect(await screen.findByText('The settings form')).toBeVisible();
+    expect(await screen.findByRole('switch', { name: 'recall' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
+    expect(screen.queryByRole('switch', { name: 'recall' })).toBeNull();
+  });
+
   it('changes how Scout thinks: provider and model, saved on Save', async () => {
     const saved: Pet[] = [];
     renderHome(createFakeHostBridge({ pets: [SCOUT] }), { page: 'scout', homeHost: host(saved) });

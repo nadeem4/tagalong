@@ -361,6 +361,8 @@ Home's memory page now reads from the Python brain, not the old engine:
 | `IPC.deleteMemory` (`tagalong:memory:delete`) | brain tool `forget { id }`; `true` when it ran, `false` when the brain refused the id |
 
 The page reads again when the brain sends `changed { what: "memory" }` (see docs/desktop.md).
+Permissions for Scout's tools are separate, in Home → Settings → Permissions; see
+[brain.md](brain.md#permissions-and-asks).
 
 ### Tools
 

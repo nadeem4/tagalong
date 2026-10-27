@@ -345,8 +345,8 @@ Electron in main, so a page cannot forge it) with that window's `webContents`: `
 ### Talking to the brain
 
 `src/main/brain/brain-client.ts` is the desktop's end of contract v1 ([protocol/README.md](../protocol/README.md)).
-Nothing in the app uses it yet; slice 5c wires it in (`onNotification` into the mapper's `map`,
-`onResync` into its `resync`).
+The app uses it for turns and for Home: `onNotification` feeds the mapper's `map`, `onResync` its
+`resync`, and `call(tool, input)` runs a brain tool for Home (see below).
 
 - **Dial address:** `ws://<addr>`, with `addr` as `host:port`. The first frame is `hello` with
   the protocol version, the body (`desktop`), the body's tools and, after a reconnect, `last_seq`.
@@ -370,7 +370,16 @@ Nothing in the app uses it yet; slice 5c wires it in (`onNotification` into the 
   the rest to Fact; a refused `forget` or an id that is not a number gives `false`; an offline brain
   rejects, so the page says it could not read). The Spend card uses `spend_today` (`ipc/experts.ts`,
   answering `{ spentUsd, limitUsd }`): the by-provider rows and the month are gone until the brain can
-  report them.
+  report them. Home's Permissions list (a card under the Settings form,
+  `bodies/ui/src/home/permissions-panel.tsx`) uses `list_permissions` and `set_permission`
+  (`ipc/permissions.ts`, channels `tagalong:permissions:list` and `tagalong:permissions:set`): rows
+  pass through as the brain sends them, a mode other than `ask` or `auto` is refused before it
+  reaches the brain, and a brain refusal (a locked tool) rejects so the panel reads the list again.
+  Each row has an Ask/Auto switch; a locked tool shows Ask, "Always asks", and a disabled switch; a
+  tool of an offline body is dimmed, marked "Not connected", and its switch is disabled (the brain
+  cannot set a mode for it yet). The list reads again on `changed { what: "permissions" }`. The e2e
+  fake brain (`e2e/fixtures/fake-brain.ts`) answers these two tools, and `e2e/permissions.spec.ts`
+  checks the card.
 - **`changed` notifications:** `index.ts` sends each one's `what` to every window on
   `IPC.brainChangedEvent`; the preload exposes it as `onBrainChanged(handler)` on the HostBridge.
   Memory view reads again on `memory`.
