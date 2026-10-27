@@ -6,9 +6,10 @@ It is informational: hello returns it and bodies never send it back.
 
 import math
 import os
+import shlex
 import uuid
 from collections.abc import Mapping, MutableMapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 DEFAULT_HOST = "127.0.0.1"
@@ -16,6 +17,8 @@ DEFAULT_PORT = 47321
 DEFAULT_MODEL = "claude-opus-5-5"
 DEFAULT_DAILY_BUDGET_USD = 5.0
 DEFAULT_STEP_CAP = 25
+DEFAULT_EXPERT_CMD = "claude-agent-acp"
+DEFAULT_EXPERT_TIMEOUT_S = 1800.0
 
 
 @dataclass(frozen=True)
@@ -26,6 +29,8 @@ class Config:
     model: str = DEFAULT_MODEL
     daily_budget_usd: float = DEFAULT_DAILY_BUDGET_USD
     step_cap: int = DEFAULT_STEP_CAP
+    expert_cmd: list[str] = field(default_factory=lambda: [DEFAULT_EXPERT_CMD])
+    expert_timeout: float = DEFAULT_EXPERT_TIMEOUT_S
 
 
 def load_config(env: Mapping[str, str] = os.environ) -> Config:
@@ -48,6 +53,8 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         model=env.get("TAGALONG_MODEL") or DEFAULT_MODEL,
         daily_budget_usd=_budget(env.get("TAGALONG_DAILY_BUDGET_USD")),
         step_cap=_step_cap(env.get("TAGALONG_STEP_CAP")),
+        expert_cmd=shlex.split(env.get("TAGALONG_EXPERT_CMD") or DEFAULT_EXPERT_CMD),
+        expert_timeout=_expert_timeout(env.get("TAGALONG_EXPERT_TIMEOUT_S")),
     )
 
 
@@ -60,6 +67,18 @@ def _budget(text: str | None) -> float:
         raise ValueError(f"bad TAGALONG_DAILY_BUDGET_USD: {text!r}") from None
     if not math.isfinite(value) or value <= 0:
         raise ValueError(f"TAGALONG_DAILY_BUDGET_USD must be positive: {text!r}")
+    return value
+
+
+def _expert_timeout(text: str | None) -> float:
+    if not text:
+        return DEFAULT_EXPERT_TIMEOUT_S
+    try:
+        value = float(text)
+    except ValueError:
+        raise ValueError(f"bad TAGALONG_EXPERT_TIMEOUT_S: {text!r}") from None
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError(f"TAGALONG_EXPERT_TIMEOUT_S must be positive: {text!r}")
     return value
 
 
