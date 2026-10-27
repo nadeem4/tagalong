@@ -1,0 +1,543 @@
+{
+  "description": "AskUserQuestion arrives as elicitation/create (mode form) once the client advertises elicitation.form. Reply: accept with content question_N = option label, or question_N_custom = free text.",
+  "pick_option": [
+    {
+      "dir": "client->agent",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "sess-1",
+          "prompt": [
+            {
+              "text": "Before doing anything, ask me which colour I prefer (use your question tool), then just reply with that colour.",
+              "type": "text"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "AskUserQuestion"
+              }
+            },
+            "toolCallId": "toolu_01PLqnqDkVewXbQEYmiFQRuS",
+            "sessionUpdate": "tool_call",
+            "name": "AskUserQuestion",
+            "rawInput": {},
+            "status": "pending",
+            "title": "Asking for your input",
+            "kind": "other",
+            "content": []
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "AskUserQuestion"
+              }
+            },
+            "toolCallId": "toolu_01PLqnqDkVewXbQEYmiFQRuS",
+            "sessionUpdate": "tool_call_update",
+            "rawInput": {
+              "questions": [
+                {
+                  "question": "Which colour do you prefer?",
+                  "header": "Colour",
+                  "multiSelect": false,
+                  "options": [
+                    {
+                      "label": "Red",
+                      "description": "Red"
+                    },
+                    {
+                      "label": "Blue",
+                      "description": "Blue"
+                    },
+                    {
+                      "label": "Green",
+                      "description": "Green"
+                    },
+                    {
+                      "label": "Yellow",
+                      "description": "Yellow"
+                    }
+                  ]
+                }
+              ]
+            },
+            "title": "Which colour do you prefer?",
+            "content": [
+              {
+                "type": "content",
+                "content": {
+                  "type": "text",
+                  "text": "Which colour do you prefer?"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "elicitation/create",
+        "params": {
+          "mode": "form",
+          "sessionId": "sess-1",
+          "toolCallId": "toolu_01PLqnqDkVewXbQEYmiFQRuS",
+          "message": "Which colour do you prefer?",
+          "requestedSchema": {
+            "type": "object",
+            "properties": {
+              "question_0": {
+                "type": "string",
+                "title": "Colour",
+                "oneOf": [
+                  {
+                    "const": "Red",
+                    "title": "Red",
+                    "description": "Red"
+                  },
+                  {
+                    "const": "Blue",
+                    "title": "Blue",
+                    "description": "Blue"
+                  },
+                  {
+                    "const": "Green",
+                    "title": "Green",
+                    "description": "Green"
+                  },
+                  {
+                    "const": "Yellow",
+                    "title": "Yellow",
+                    "description": "Yellow"
+                  }
+                ]
+              },
+              "question_0_custom": {
+                "type": "string",
+                "title": "Other",
+                "description": "Type your own answer, or add a note to the option you chose above (optional)."
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "dir": "client->agent",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "result": {
+          "content": {
+            "question_0": "Red"
+          },
+          "action": "accept"
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolResponse": {
+                  "questions": [
+                    {
+                      "question": "Which colour do you prefer?",
+                      "header": "Colour",
+                      "options": [
+                        {
+                          "label": "Red",
+                          "description": "Red"
+                        },
+                        {
+                          "label": "Blue",
+                          "description": "Blue"
+                        },
+                        {
+                          "label": "Green",
+                          "description": "Green"
+                        },
+                        {
+                          "label": "Yellow",
+                          "description": "Yellow"
+                        }
+                      ],
+                      "multiSelect": false
+                    }
+                  ],
+                  "answers": {
+                    "Which colour do you prefer?": "Red"
+                  }
+                },
+                "toolName": "AskUserQuestion"
+              }
+            },
+            "toolCallId": "toolu_01PLqnqDkVewXbQEYmiFQRuS",
+            "sessionUpdate": "tool_call_update"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "AskUserQuestion"
+              }
+            },
+            "toolCallId": "toolu_01PLqnqDkVewXbQEYmiFQRuS",
+            "sessionUpdate": "tool_call_update",
+            "status": "completed",
+            "rawOutput": "Your questions have been answered: \"Which colour do you prefer?\"=\"Red\". You can now continue with these answers in mind.",
+            "content": [
+              {
+                "type": "content",
+                "content": {
+                  "type": "text",
+                  "text": "Your questions have been answered: \"Which colour do you prefer?\"=\"Red\". You can now continue with these answers in mind."
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "Red"
+            },
+            "messageId": "msg_011CgTa5gEJvonF4G2wbe7o5"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "stopReason": "end_turn"
+        }
+      }
+    }
+  ],
+  "free_text": [
+    {
+      "dir": "client->agent",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "sess-1",
+          "prompt": [
+            {
+              "text": "Before doing anything, ask me which colour I prefer (use your question tool), then just reply with that colour.",
+              "type": "text"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "AskUserQuestion"
+              }
+            },
+            "toolCallId": "toolu_01P8YsFHcL3Zb2U1n1bGAbzu",
+            "sessionUpdate": "tool_call",
+            "name": "AskUserQuestion",
+            "rawInput": {},
+            "status": "pending",
+            "title": "Asking for your input",
+            "kind": "other",
+            "content": []
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "AskUserQuestion"
+              }
+            },
+            "toolCallId": "toolu_01P8YsFHcL3Zb2U1n1bGAbzu",
+            "sessionUpdate": "tool_call_update",
+            "rawInput": {
+              "questions": [
+                {
+                  "question": "Which colour do you prefer?",
+                  "header": "Colour",
+                  "multiSelect": false,
+                  "options": [
+                    {
+                      "label": "Red",
+                      "description": "Red"
+                    },
+                    {
+                      "label": "Blue",
+                      "description": "Blue"
+                    },
+                    {
+                      "label": "Green",
+                      "description": "Green"
+                    },
+                    {
+                      "label": "Yellow",
+                      "description": "Yellow"
+                    }
+                  ]
+                }
+              ]
+            },
+            "title": "Which colour do you prefer?",
+            "content": [
+              {
+                "type": "content",
+                "content": {
+                  "type": "text",
+                  "text": "Which colour do you prefer?"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "elicitation/create",
+        "params": {
+          "mode": "form",
+          "sessionId": "sess-1",
+          "toolCallId": "toolu_01P8YsFHcL3Zb2U1n1bGAbzu",
+          "message": "Which colour do you prefer?",
+          "requestedSchema": {
+            "type": "object",
+            "properties": {
+              "question_0": {
+                "type": "string",
+                "title": "Colour",
+                "oneOf": [
+                  {
+                    "const": "Red",
+                    "title": "Red",
+                    "description": "Red"
+                  },
+                  {
+                    "const": "Blue",
+                    "title": "Blue",
+                    "description": "Blue"
+                  },
+                  {
+                    "const": "Green",
+                    "title": "Green",
+                    "description": "Green"
+                  },
+                  {
+                    "const": "Yellow",
+                    "title": "Yellow",
+                    "description": "Yellow"
+                  }
+                ]
+              },
+              "question_0_custom": {
+                "type": "string",
+                "title": "Other",
+                "description": "Type your own answer, or add a note to the option you chose above (optional)."
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "dir": "client->agent",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "result": {
+          "content": {
+            "question_0_custom": "teal"
+          },
+          "action": "accept"
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolResponse": {
+                  "questions": [
+                    {
+                      "question": "Which colour do you prefer?",
+                      "header": "Colour",
+                      "options": [
+                        {
+                          "label": "Red",
+                          "description": "Red"
+                        },
+                        {
+                          "label": "Blue",
+                          "description": "Blue"
+                        },
+                        {
+                          "label": "Green",
+                          "description": "Green"
+                        },
+                        {
+                          "label": "Yellow",
+                          "description": "Yellow"
+                        }
+                      ],
+                      "multiSelect": false
+                    }
+                  ],
+                  "answers": {
+                    "Which colour do you prefer?": "teal"
+                  }
+                },
+                "toolName": "AskUserQuestion"
+              }
+            },
+            "toolCallId": "toolu_01P8YsFHcL3Zb2U1n1bGAbzu",
+            "sessionUpdate": "tool_call_update"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "AskUserQuestion"
+              }
+            },
+            "toolCallId": "toolu_01P8YsFHcL3Zb2U1n1bGAbzu",
+            "sessionUpdate": "tool_call_update",
+            "status": "completed",
+            "rawOutput": "The user answered: \"Which colour do you prefer?\"=\"teal\". Read the answers carefully \u2014 they may request clarification, changes, or that you not proceed \u2014 and follow what they actually say.",
+            "content": [
+              {
+                "type": "content",
+                "content": {
+                  "type": "text",
+                  "text": "The user answered: \"Which colour do you prefer?\"=\"teal\". Read the answers carefully \u2014 they may request clarification, changes, or that you not proceed \u2014 and follow what they actually say."
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "Teal."
+            },
+            "messageId": "msg_011CgTa7u7GTKtcoGTMy5yjX"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "stopReason": "end_turn"
+        }
+      }
+    }
+  ]
+}

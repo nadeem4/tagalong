@@ -1,0 +1,745 @@
+{
+  "description": "default mode, Write tool: session/request_permission, the reply (selected option id, and cancelled outcome), tool_call updates, final text and stopReason.",
+  "selected": [
+    {
+      "dir": "client->agent",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "sess-1",
+          "prompt": [
+            {
+              "text": "Create a file named hello.txt containing the word hi. Do nothing else.",
+              "type": "text"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "Write"
+              }
+            },
+            "toolCallId": "toolu_01JcysjPDz7zn6TWH5NSU1xu",
+            "sessionUpdate": "tool_call",
+            "name": "Write",
+            "rawInput": {},
+            "status": "pending",
+            "title": "Preparing file\u2026",
+            "kind": "edit",
+            "content": [],
+            "locations": []
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "Write"
+              }
+            },
+            "toolCallId": "toolu_01JcysjPDz7zn6TWH5NSU1xu",
+            "sessionUpdate": "tool_call_update",
+            "rawInput": {
+              "file_path": "C:/redacted/work/hello.txt"
+            },
+            "title": "Write hello.txt",
+            "locations": [
+              {
+                "path": "C:/redacted/work/hello.txt"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "Write"
+              }
+            },
+            "toolCallId": "toolu_01JcysjPDz7zn6TWH5NSU1xu",
+            "sessionUpdate": "tool_call_update",
+            "rawInput": {
+              "file_path": "C:/redacted/work/hello.txt",
+              "content": "hi"
+            },
+            "content": [
+              {
+                "type": "diff",
+                "path": "C:/redacted/work/hello.txt",
+                "oldText": null,
+                "newText": "hi"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "session/request_permission",
+        "params": {
+          "toolCall": {
+            "toolCallId": "toolu_01JcysjPDz7zn6TWH5NSU1xu",
+            "name": "Write",
+            "status": "pending",
+            "rawInput": {
+              "file_path": "C:/redacted/work/hello.txt",
+              "content": "hi"
+            },
+            "title": "Write hello.txt",
+            "kind": "edit",
+            "content": [
+              {
+                "type": "diff",
+                "path": "C:/redacted/work/hello.txt",
+                "oldText": null,
+                "newText": "hi"
+              }
+            ],
+            "locations": [
+              {
+                "path": "C:/redacted/work/hello.txt"
+              }
+            ]
+          },
+          "options": [
+            {
+              "optionId": "allow-once",
+              "name": "Yes",
+              "kind": "allow_once"
+            },
+            {
+              "optionId": "allow-with-updates",
+              "name": "Yes, allow all edits during this session",
+              "kind": "allow_always"
+            },
+            {
+              "optionId": "reject",
+              "name": "No",
+              "kind": "reject_once"
+            }
+          ],
+          "sessionId": "sess-1"
+        }
+      }
+    },
+    {
+      "dir": "client->agent",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "result": {
+          "outcome": {
+            "optionId": "allow-once",
+            "outcome": "selected"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolResponse": {
+                  "type": "create",
+                  "filePath": "C:/redacted/work/hello.txt",
+                  "content": "hi",
+                  "structuredPatch": [],
+                  "originalFile": null,
+                  "userModified": false
+                },
+                "toolName": "Write"
+              }
+            },
+            "toolCallId": "toolu_01JcysjPDz7zn6TWH5NSU1xu",
+            "sessionUpdate": "tool_call_update"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "Write"
+              }
+            },
+            "toolCallId": "toolu_01JcysjPDz7zn6TWH5NSU1xu",
+            "sessionUpdate": "tool_call_update",
+            "status": "completed",
+            "rawOutput": "File created successfully at: C:/redacted/work/hello.txt (file state is current in your context \u2014 no need to Read it back)"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "I created `hello.txt"
+            },
+            "messageId": "msg_011CgTabbBYjypax1v6kzzem"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "` in the working directory."
+            },
+            "messageId": "msg_011CgTabbBYjypax1v6kzzem"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": " It contains the word `hi"
+            },
+            "messageId": "msg_011CgTabbBYjypax1v6kzzem"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "`."
+            },
+            "messageId": "msg_011CgTabbBYjypax1v6kzzem"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "stopReason": "end_turn"
+        }
+      }
+    }
+  ],
+  "cancelled": [
+    {
+      "dir": "client->agent",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "sess-1",
+          "prompt": [
+            {
+              "text": "Create a file named hello.txt containing the word hi. Do nothing else.",
+              "type": "text"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "Write"
+              }
+            },
+            "toolCallId": "toolu_01K6dn8FVxD4EnLRwq1k2S4k",
+            "sessionUpdate": "tool_call",
+            "name": "Write",
+            "rawInput": {},
+            "status": "pending",
+            "title": "Preparing file\u2026",
+            "kind": "edit",
+            "content": [],
+            "locations": []
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "Write"
+              }
+            },
+            "toolCallId": "toolu_01K6dn8FVxD4EnLRwq1k2S4k",
+            "sessionUpdate": "tool_call_update",
+            "rawInput": {
+              "file_path": "C:/redacted/work/hello.txt"
+            },
+            "title": "Write hello.txt",
+            "locations": [
+              {
+                "path": "C:/redacted/work/hello.txt"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "Write"
+              }
+            },
+            "toolCallId": "toolu_01K6dn8FVxD4EnLRwq1k2S4k",
+            "sessionUpdate": "tool_call_update",
+            "rawInput": {
+              "file_path": "C:/redacted/work/hello.txt",
+              "content": "hi"
+            },
+            "content": [
+              {
+                "type": "diff",
+                "path": "C:/redacted/work/hello.txt",
+                "oldText": null,
+                "newText": "hi"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "session/request_permission",
+        "params": {
+          "toolCall": {
+            "toolCallId": "toolu_01K6dn8FVxD4EnLRwq1k2S4k",
+            "name": "Write",
+            "status": "pending",
+            "rawInput": {
+              "file_path": "C:/redacted/work/hello.txt",
+              "content": "hi"
+            },
+            "title": "Write hello.txt",
+            "kind": "edit",
+            "content": [
+              {
+                "type": "diff",
+                "path": "C:/redacted/work/hello.txt",
+                "oldText": null,
+                "newText": "hi"
+              }
+            ],
+            "locations": [
+              {
+                "path": "C:/redacted/work/hello.txt"
+              }
+            ]
+          },
+          "options": [
+            {
+              "optionId": "allow-once",
+              "name": "Yes",
+              "kind": "allow_once"
+            },
+            {
+              "optionId": "allow-with-updates",
+              "name": "Yes, allow all edits during this session",
+              "kind": "allow_always"
+            },
+            {
+              "optionId": "reject",
+              "name": "No",
+              "kind": "reject_once"
+            }
+          ],
+          "sessionId": "sess-1"
+        }
+      }
+    },
+    {
+      "dir": "client->agent",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "result": {
+          "outcome": {
+            "outcome": "cancelled"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "Write",
+                "nonExecutionKind": "permission-rule"
+              }
+            },
+            "toolCallId": "toolu_01K6dn8FVxD4EnLRwq1k2S4k",
+            "sessionUpdate": "tool_call_update",
+            "status": "failed",
+            "rawOutput": "Tool permission request failed: Error: Tool use aborted",
+            "content": [
+              {
+                "type": "content",
+                "content": {
+                  "type": "text",
+                  "text": "```\nTool permission request failed: Error: Tool use aborted\n```"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "I did"
+            },
+            "messageId": "msg_011CgTa8aeY8BoXGszigoDDf"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "n't create `hello.tx"
+            },
+            "messageId": "msg_011CgTa8aeY8BoXGszigoDDf"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "t`: the write was abor"
+            },
+            "messageId": "msg_011CgTa8aeY8BoXGszigoDDf"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "ted at"
+            },
+            "messageId": "msg_011CgTa8aeY8BoXGszigoDDf"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": " the permission pr"
+            },
+            "messageId": "msg_011CgTa8aeY8BoXGszigoDDf"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "ompt, so"
+            },
+            "messageId": "msg_011CgTa8aeY8BoXGszigoDDf"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": " the file doesn't exist"
+            },
+            "messageId": "msg_011CgTa8aeY8BoXGszigoDDf"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "."
+            },
+            "messageId": "msg_011CgTa8aeY8BoXGszigoDDf"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": " Appro"
+            },
+            "messageId": "msg_011CgTa8aeY8BoXGszigoDDf"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "ve the write,"
+            },
+            "messageId": "msg_011CgTa8aeY8BoXGszigoDDf"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": " or tell me to try again,"
+            },
+            "messageId": "msg_011CgTa8aeY8BoXGszigoDDf"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": " and"
+            },
+            "messageId": "msg_011CgTa8aeY8BoXGszigoDDf"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": " I'll create it."
+            },
+            "messageId": "msg_011CgTa8aeY8BoXGszigoDDf"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "stopReason": "end_turn"
+        }
+      }
+    }
+  ]
+}
