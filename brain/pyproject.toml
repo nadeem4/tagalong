@@ -4,6 +4,7 @@ version = "0.0.0"
 description = "Tagalong brain: the Python side of contract v1"
 requires-python = ">=3.12"
 dependencies = [
+    "agent-client-protocol==0.12.1",
     "anthropic>=2.3.0",
     "pydantic>=2.14.1",
     "websockets>=17.3",
