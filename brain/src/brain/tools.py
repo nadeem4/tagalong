@@ -12,6 +12,7 @@ from collections.abc import Callable
 
 from brain.guardrails import Budget
 from brain.memory import KINDS, Hit, Memory, MemoryRefused
+from brain.protocol import ErrorCode, RpcError
 from brain.toolbox import Handler, Toolbox, ToolSpec
 
 Notify = Callable[[str, dict], None]
@@ -206,7 +207,9 @@ def home_tools(
         return json.dumps({"tools": rows})
 
     async def set_permission(args: dict) -> str:
-        _need("set_permission", args, "tool", "mode")
+        if not args.get("tool") or not args.get("mode"):
+            # Home sent bad params; Scout never calls this, so it is not a MemoryRefused.
+            raise RpcError(ErrorCode.invalid_params, "set_permission needs tool and mode.")
         toolbox().set_mode(args["tool"], args["mode"])
         notify("changed", {"what": "permissions"})
         return json.dumps({"tool": args["tool"], "mode": args["mode"]})

@@ -68,10 +68,12 @@ async def test_hello_ok(env):
     bodies, url = env
     async with connect(url) as ws:
         reply = await call(ws, hello())
-        assert reply == {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "result": {"protocol": 1, "session": "s1", "tools": [], "seq": 0, "resync": False},
+        result = reply["result"]
+        assert {k: v for k, v in result.items() if k != "tools"} == {
+            "protocol": 1,
+            "session": "s1",
+            "seq": 0,
+            "resync": False,
         }
         assert [b.id for b in bodies.online()] == ["desktop"]
 
@@ -230,6 +232,9 @@ class ScriptedModel:
 
 
 class Open:
+    spent = 0.0
+    limit = 5.0
+
     def allows(self):
         return True
 
@@ -583,3 +588,130 @@ async def test_answered_ask_is_not_replayed(ask_env):
         assert reply["result"]["resync"] is True
         reply = await call(ws, request("cancel", {"turn": "none"}, req_id=5))
         assert reply["id"] == 5
+
+
+# --- Home: hello lists its tools, call runs them ---------------------------------
+
+
+async def test_hello_lists_home_tools_as_contract_records(env):
+    _, url = env
+    async with connect(url) as ws:
+        tools = (await call(ws, hello()))["result"]["tools"]
+    names = sorted(t["name"] for t in tools)
+    assert names == ["forget", "list_memories", "list_permissions", "set_permission", "spend_today"]
+    for t in tools:
+        assert set(t) == {"name", "description", "input_schema", "effect"}
+
+
+async def call_tool(ws, tool, input=None, req_id=9, seen=None):
+    """Send `call`; return the reply, collecting notifications that arrive first in `seen`."""
+    await ws.send(json.dumps(request("call", {"tool": tool, "input": input or {}}, req_id)))
+    async with asyncio.timeout(5):
+        while True:
+            frame = json.loads(await ws.recv())
+            if frame.get("id") == req_id:
+                return frame
+            if seen is not None:
+                seen.append(frame)
+
+
+def call_json(reply):
+    (part,) = reply["result"]["output"]
+    assert part["type"] == "text"
+    return json.loads(part["text"])
+
+
+async def test_call_spend_today_returns_one_json_text_part(env):
+    _, url = env
+    async with connect(url) as ws:
+        await call(ws, hello())
+        body = call_json(await call_tool(ws, "spend_today"))
+    assert set(body) == {"spent_usd", "limit_usd"}
+
+
+async def test_call_scout_only_tool_is_unknown_tool(env):
+    _, url = env
+    async with connect(url) as ws:
+        await call(ws, hello())
+        reply = await call_tool(ws, "recall", {"query": "x"})
+    assert reply["error"]["code"] == -32001
+
+
+async def test_call_missing_tool_params_is_invalid_params(env):
+    _, url = env
+    async with connect(url) as ws:
+        await call(ws, hello())
+        await ws.send(json.dumps(request("call", {"input": {}}, 9)))
+        reply = json.loads(await ws.recv())
+    assert reply["error"]["code"] == -32602
+
+
+async def test_call_forget_missing_id_is_tool_failed(env):
+    _, url = env
+    async with connect(url) as ws:
+        await call(ws, hello())
+        reply = await call_tool(ws, "forget", {"id": 999})
+    assert reply["error"]["code"] == -32007
+    assert "999" in reply["error"]["message"]
+
+
+async def test_call_set_permission_without_args_is_invalid_params(env):
+    _, url = env
+    async with connect(url) as ws:
+        await call(ws, hello())
+        reply = await call_tool(ws, "set_permission", {})
+    assert reply["error"]["code"] == -32602
+
+
+async def test_call_set_permission_changes_list_and_tells_every_body(env):
+    _, url = env
+    other = {**hello(req_id=1), "params": {**hello()["params"], "body": EXT}}
+    async with connect(url) as ws, connect(url) as ws2:
+        await call(ws, hello())
+        await call(ws2, other)
+        seen = []
+        reply = await call_tool(
+            ws, "set_permission", {"tool": "desktop__see_screen", "mode": "ask"}, seen=seen
+        )
+        assert call_json(reply) == {"tool": "desktop__see_screen", "mode": "ask"}
+        rows = call_json(await call_tool(ws, "list_permissions"))["tools"]
+        row = next(r for r in rows if r["name"] == "desktop__see_screen")
+        assert row["mode"] == "ask"
+        async with asyncio.timeout(5):
+            frame = await next_method(ws2, "changed")
+        assert frame["params"]["what"] == "permissions"
+        assert any(f.get("method") == "changed" for f in seen)
+
+
+async def test_slow_call_does_not_block_a_use_response(tool_env, monkeypatch):
+    url, model = tool_env
+    release = asyncio.Event()
+
+    async def slow(self, tool, input):
+        await release.wait()
+        return "{}"
+
+    monkeypatch.setattr(Session, "call_home", slow)
+    async with connect(url) as ws:
+        await start_tool_turn(ws)
+        await ws.send(json.dumps(request("call", {"tool": "spend_today", "input": {}}, 9)))
+        use = await next_method(ws, "use")
+        await ws.send(
+            json.dumps(
+                {
+                    "jsonrpc": "2.0",
+                    "id": use["id"],
+                    "result": {"output": [{"type": "text", "text": "a desk"}]},
+                }
+            )
+        )
+        async with asyncio.timeout(5):
+            while model.step < 2:
+                await asyncio.sleep(0.01)
+        release.set()
+        async with asyncio.timeout(5):
+            while True:
+                frame = json.loads(await ws.recv())
+                if frame.get("id") == 9:
+                    break
+        assert call_json(frame) == {}

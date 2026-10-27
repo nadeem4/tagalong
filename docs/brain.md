@@ -1,4 +1,4 @@
-# The Python brain
+﻿# The Python brain
 
 The brain is the Python side of contract v1 ([protocol/README.md](../protocol/README.md)). It is
 being built row by row and replaces `packages/core`. Today bodies can connect, declare their tools,
@@ -73,8 +73,9 @@ the total can run a little low.
   `invalid_request`. The connection stays open.
 - `say` starts or joins a turn (see [What a turn does](#what-a-turn-does)); bad params get
   `invalid_params`. `cancel` with a turn id ends that turn; a turn that is over or unknown is
-  ignored. `call` and `answer` answer `method_not_found` until they are built. `event`,
-  `progress` and unknown notifications are ignored. An unknown request gets `method_not_found`.
+  ignored. `answer` is described under [Permissions and asks](#permissions-and-asks) and `call`
+  under [Home tools](#home-tools). `event`, `progress` and unknown notifications are ignored. An
+  unknown request gets `method_not_found`.
 - Bad JSON or a binary frame gets `parse_error`. Anything that is not a JSON-RPC object gets
   `invalid_request`. After `hello` the connection stays open; before it, it closes.
 - A newer connection with the same body id closes the older one. Its `tools` frames are
@@ -238,14 +239,41 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
   `resync`, is sent every ask still open again, with fresh `seq` numbers. A body that reconnects
   without `resync` gets the ask once, from its backlog.
 
+## Home tools
+
+Home is a screen in a body. It reads and changes the brain through the same toolbox Scout uses,
+so there is one gate and no second path.
+
+- **Hello.** The `hello` result's `tools` lists every tool whose audience includes `home`
+  (`Session.home_tools()`): name, description, `input_schema` and `effect` only. Audience, mode and
+  locked never reach the wire. Home tools are never offered to the model.
+- **Call.** `call {tool, input}` runs `Toolbox.run(..., caller="home")`, which skips the ask. It
+  runs in its own task, so a slow call never blocks the read loop that delivers `use` responses
+  and `answer`s. The result is `{output: [{type: "text", text: <JSON>}]}`. A `call` sent as a
+  notification (no id) is ignored; a closed connection cancels its running calls.
+- **Errors.** A tool Home may not use, or that does not exist, is `unknown_tool`. Bad params
+  (including a `set_permission` without `tool` or `mode`) are `invalid_params`. A tool that fails
+  (for example `forget` with an id that does not exist) is `tool_failed` with the message. Any
+  `RpcError` a tool raises keeps its code (for example `set_permission` of a locked tool to
+  `auto` is `invalid_params`).
+- **Changed.** `remember` and `forget` send `changed {what: "memory"}`; `set_permission` sends
+  `changed {what: "permissions"}`. Every body gets it, so Home refetches.
+
+| Tool               | Input                        | Result text (JSON)                                                                                             |
+| ------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `list_memories`    | `{}`                         | `{"memories": [{"id", "kind", "text", "cadence", "at"}]}`, newest first, at most 200                           |
+| `forget`           | `{"id": int}`                | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                        |
+| `spend_today`      | `{}`                         | `{"spent_usd": float, "limit_usd": float}`                                                                     |
+| `list_permissions` | `{}`                         | `{"tools": [{"name", "description", "effect", "mode", "locked", "online"}]}`, sorted by name, Scout tools only |
+| `set_permission`   | `{"tool": str, "mode": str}` | `{"tool", "mode"}`; `mode` is `ask` or `auto`                                                                  |
+
+`list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
+
 ## Not built yet
 
-| Row   | Brings                                                             |
-| ----- | ------------------------------------------------------------------ |
-| 7     | The brain's tools in the `hello` result, `call` (Home runs a tool) |
-| Later | Live-state replay of open turns after `resync`                     |
-
-Until then `call` answers `method_not_found`.
+| Row   | Brings                                         |
+| ----- | ---------------------------------------------- |
+| Later | Live-state replay of open turns after `resync` |
 
 ## Tests
 

@@ -2,7 +2,8 @@
 
 Each connection owns one queue drained by a single writer task, so Peer.send never raises
 or awaits (Bodies.notify loops over peers) and the hello result always precedes its backlog.
-Hello, tools, say, answer and cancel are handled; any other request answers method_not_found.
+Hello, tools, say, call, answer and cancel are handled; any other request answers
+method_not_found. `call` runs in its own task and replies through the peer queue.
 A body that joins without a usable backlog is sent the asks still open.
 Response frames (a body's answer to `use`) go to Bodies.resolve.
 """
@@ -20,6 +21,8 @@ from brain.bodies import Bodies
 from brain.protocol import (
     PROTOCOL,
     AnswerParams,
+    CallParams,
+    CallResult,
     CancelTurnParams,
     ErrorCode,
     HelloParams,
@@ -90,6 +93,7 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session_id: str, sessio
     peer = _Peer()
     writer = asyncio.create_task(_writer(ws, peer))
     body_id: str | None = None
+    calls: set[asyncio.Task] = set()
     try:
         async for raw in ws:
             message = _parse(raw)
@@ -114,6 +118,12 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session_id: str, sessio
                 except Exception:
                     log.exception("bad response frame")
                 continue
+            if method == "call":
+                if "id" in message:  # a notification has nowhere to reply
+                    task = asyncio.create_task(_call(message, req_id, peer, session))
+                    calls.add(task)
+                    task.add_done_callback(calls.discard)
+                continue
             try:
                 reply = _dispatch(method, message, req_id, body_id, peer, bodies, session)
             except Exception:
@@ -124,6 +134,8 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session_id: str, sessio
     except ConnectionClosed:
         pass
     finally:
+        for task in calls:
+            task.cancel()  # nobody is left to read their replies
         if body_id is not None:
             bodies.disconnect(body_id, peer)
         peer.close()
@@ -150,7 +162,11 @@ def _hello(
         return None
     joined = bodies.connect(params.body, params.tools, peer, params.last_seq)
     result = HelloResult(
-        protocol=PROTOCOL, session=session_id, tools=[], seq=joined.seq, resync=joined.resync
+        protocol=PROTOCOL,
+        session=session_id,
+        tools=session.home_tools(),
+        seq=joined.seq,
+        resync=joined.resync,
     )
     peer.send(_result(req_id, result))
     for frame in joined.backlog:
@@ -160,6 +176,24 @@ def _hello(
         for ask in session.open_asks():
             bodies.notify_one(params.body.id, "ask", ask)
     return params.body.id
+
+
+async def _call(message: dict, req_id: Any, peer: _Peer, session: Session) -> None:
+    """Run a Home tool in its own task so a slow one never blocks the read loop, which must
+    keep delivering `use` responses and answers."""
+    try:
+        params = CallParams.model_validate(message.get("params"))
+        text = await session.call_home(params.tool, params.input)
+        reply = _result(req_id, CallResult(output=[{"type": "text", "text": text}]))
+    except ValidationError as exc:
+        reply = _error(req_id, ErrorCode.invalid_params, str(exc))
+    except RpcError as exc:
+        reply = _error(req_id, exc.code, str(exc))
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        reply = _error(req_id, ErrorCode.tool_failed, str(exc) or type(exc).__name__)
+    peer.send(reply)
 
 
 def _dispatch(
