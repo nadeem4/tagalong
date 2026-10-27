@@ -226,7 +226,7 @@ async def test_crash_step_kills_the_process_mid_prompt(tmp_path):
     steps = [{"text": "about to die"}, {"crash": 3}, {"text": "never"}]
     async with running(tmp_path, steps) as (conn, process, client, _log):
         session = await conn.new_session(cwd=str(tmp_path), mcp_servers=[])
-        with pytest.raises(Exception):  # noqa: B017 - the connection error type is the package's
+        with pytest.raises(ConnectionError):
             await conn.prompt(prompt=prompt_blocks("go"), session_id=session.session_id)
         assert await asyncio.wait_for(process.wait(), 10) == 3
         assert client.texts() == ["about to die"]
@@ -236,7 +236,12 @@ async def test_first_log_line_reports_key_variables_and_inherited_path(tmp_path)
     script = tmp_path / "script.json"
     script.write_text("[]")
     log = tmp_path / "log.jsonl"
-    env = {"FAKE_ACP_SCRIPT": str(script), "FAKE_ACP_LOG": str(log), "ANTHROPIC_API_KEY": "sk-x"}
+    env = {
+        "FAKE_ACP_SCRIPT": str(script),
+        "FAKE_ACP_LOG": str(log),
+        "ANTHROPIC_API_KEY": "sk-x",
+        "ANTHROPIC_AUTH_TOKEN": "tok",
+    }
     async with acp.spawn_agent_process(Recorder(), sys.executable, str(AGENT), env=env) as (
         conn,
         _process,
@@ -244,7 +249,7 @@ async def test_first_log_line_reports_key_variables_and_inherited_path(tmp_path)
         await conn.initialize(protocol_version=1)
     first = _all_lines(log)[0]["env"]
     assert first["ANTHROPIC_API_KEY"] == "sk-x"
-    assert first["ANTHROPIC_AUTH_TOKEN"] is None
+    assert first["ANTHROPIC_AUTH_TOKEN"] == "tok"
     assert first["PATH_set"] is True
 
 
@@ -257,10 +262,12 @@ async def test_list_of_lists_script_gives_each_prompt_its_own_steps(tmp_path):
         assert client.texts() == ["one", "two", "two"]
 
 
-async def test_cancel_before_the_prompt_starts_still_cancels_it(tmp_path):
-    async with running(tmp_path, [{"text": "never"}]) as (conn, _process, client, _log):
+async def test_a_late_cancel_does_not_cancel_the_next_prompt(tmp_path):
+    steps = [{"text": "again"}, {"end": "end_turn"}]
+    async with running(tmp_path, steps) as (conn, _process, client, _log):
         session = await conn.new_session(cwd=str(tmp_path), mcp_servers=[])
+        await conn.prompt(prompt=prompt_blocks("one"), session_id=session.session_id)
         await conn.cancel(session_id=session.session_id)
-        result = await conn.prompt(prompt=prompt_blocks("go"), session_id=session.session_id)
-        assert result.stop_reason == "cancelled"
-        assert client.texts() == []
+        result = await conn.prompt(prompt=prompt_blocks("two"), session_id=session.session_id)
+        assert result.stop_reason == "end_turn"
+        assert client.texts() == ["again", "again"]

@@ -38,7 +38,6 @@ class FakeAgent:
     def __init__(self, steps: list[dict]) -> None:
         self.steps = steps
         self.running: dict[str, asyncio.Task] = {}
-        self.cancelled: set[str] = set()
         self.turn = 0
 
     def on_connect(self, conn) -> None:
@@ -60,10 +59,6 @@ class FakeAgent:
         return schema.SetSessionModeResponse()
 
     async def prompt(self, session_id, prompt, **kw):
-        # A cancel that arrived before this prompt began still applies to it.
-        if session_id in self.cancelled:
-            self.cancelled.discard(session_id)
-            return schema.PromptResponse(stop_reason="cancelled")
         steps = self._steps_for_turn()
         task = asyncio.ensure_future(self._run_steps(session_id, steps))
         self.running[session_id] = task
@@ -75,10 +70,9 @@ class FakeAgent:
             raise
         finally:
             self.running.pop(session_id, None)
-            self.cancelled.discard(session_id)
 
     async def cancel(self, session_id, **kw):
-        self.cancelled.add(session_id)
+        # Only a running prompt can be cancelled; a late cancel must not hit the next one.
         if task := self.running.get(session_id):
             task.cancel()
 
