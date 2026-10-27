@@ -539,5 +539,746 @@
         }
       }
     }
+  ],
+  "two_questions_multi_select_answered": [
+    {
+      "dir": "client->agent",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "sess-1",
+          "prompt": [
+            {
+              "text": "Use your question tool ONCE with two questions: (1) which colours I like, multi-select, options Red, Blue, Green; (2) which size, single-select, options Small, Large. Then reply with only my answers.",
+              "type": "text"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "AskUserQuestion"
+              }
+            },
+            "toolCallId": "toolu_01VrmPSJLhtqJunAUV89osFW",
+            "sessionUpdate": "tool_call",
+            "name": "AskUserQuestion",
+            "rawInput": {},
+            "status": "pending",
+            "title": "Asking for your input",
+            "kind": "other",
+            "content": []
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "AskUserQuestion"
+              }
+            },
+            "toolCallId": "toolu_01VrmPSJLhtqJunAUV89osFW",
+            "sessionUpdate": "tool_call_update",
+            "rawInput": {
+              "questions": [
+                {
+                  "question": "Which colours do you like?",
+                  "header": "Colours",
+                  "multiSelect": true,
+                  "options": [
+                    {
+                      "label": "Red",
+                      "description": "Red"
+                    },
+                    {
+                      "label": "Blue",
+                      "description": "Blue"
+                    },
+                    {
+                      "label": "Green",
+                      "description": "Green"
+                    }
+                  ]
+                },
+                {
+                  "question": "Which size?",
+                  "header": "Size",
+                  "multiSelect": false,
+                  "options": [
+                    {
+                      "label": "Small",
+                      "description": "Small"
+                    },
+                    {
+                      "label": "Large",
+                      "description": "Large"
+                    }
+                  ]
+                }
+              ]
+            },
+            "content": [
+              {
+                "type": "content",
+                "content": {
+                  "type": "text",
+                  "text": "Which colours do you like?"
+                }
+              },
+              {
+                "type": "content",
+                "content": {
+                  "type": "text",
+                  "text": "Which size?"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "elicitation/create",
+        "params": {
+          "mode": "form",
+          "sessionId": "sess-1",
+          "toolCallId": "toolu_01VrmPSJLhtqJunAUV89osFW",
+          "message": "Please answer the following questions.",
+          "requestedSchema": {
+            "type": "object",
+            "properties": {
+              "question_0": {
+                "type": "array",
+                "title": "Colours",
+                "description": "Which colours do you like?",
+                "items": {
+                  "anyOf": [
+                    {
+                      "const": "Red",
+                      "title": "Red",
+                      "description": "Red"
+                    },
+                    {
+                      "const": "Blue",
+                      "title": "Blue",
+                      "description": "Blue"
+                    },
+                    {
+                      "const": "Green",
+                      "title": "Green",
+                      "description": "Green"
+                    }
+                  ]
+                }
+              },
+              "question_0_custom": {
+                "type": "string",
+                "title": "Other",
+                "description": "Type your own answer to add to your selection above (optional)."
+              },
+              "question_1": {
+                "type": "string",
+                "title": "Size",
+                "description": "Which size?",
+                "oneOf": [
+                  {
+                    "const": "Small",
+                    "title": "Small",
+                    "description": "Small"
+                  },
+                  {
+                    "const": "Large",
+                    "title": "Large",
+                    "description": "Large"
+                  }
+                ]
+              },
+              "question_1_custom": {
+                "type": "string",
+                "title": "Other",
+                "description": "Type your own answer, or add a note to the option you chose above (optional)."
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "dir": "client->agent",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "result": {
+          "content": {
+            "question_0": ["Red", "Blue"],
+            "question_1": "Large"
+          },
+          "action": "accept"
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolResponse": {
+                  "questions": [
+                    {
+                      "question": "Which colours do you like?",
+                      "header": "Colours",
+                      "options": [
+                        {
+                          "label": "Red",
+                          "description": "Red"
+                        },
+                        {
+                          "label": "Blue",
+                          "description": "Blue"
+                        },
+                        {
+                          "label": "Green",
+                          "description": "Green"
+                        }
+                      ],
+                      "multiSelect": true
+                    },
+                    {
+                      "question": "Which size?",
+                      "header": "Size",
+                      "options": [
+                        {
+                          "label": "Small",
+                          "description": "Small"
+                        },
+                        {
+                          "label": "Large",
+                          "description": "Large"
+                        }
+                      ],
+                      "multiSelect": false
+                    }
+                  ],
+                  "answers": {
+                    "Which colours do you like?": "Red, Blue",
+                    "Which size?": "Large"
+                  }
+                },
+                "toolName": "AskUserQuestion"
+              }
+            },
+            "toolCallId": "toolu_01VrmPSJLhtqJunAUV89osFW",
+            "sessionUpdate": "tool_call_update"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "AskUserQuestion"
+              }
+            },
+            "toolCallId": "toolu_01VrmPSJLhtqJunAUV89osFW",
+            "sessionUpdate": "tool_call_update",
+            "status": "completed",
+            "rawOutput": "Your questions have been answered: \"Which colours do you like?\"=\"Red, Blue\", \"Which size?\"=\"Large\". You can now continue with these answers in mind.",
+            "content": [
+              {
+                "type": "content",
+                "content": {
+                  "type": "text",
+                  "text": "Your questions have been answered: \"Which colours do you like?\"=\"Red, Blue\", \"Which size?\"=\"Large\". You can now continue with these answers in mind."
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "Colours: Red,"
+            },
+            "messageId": "msg_011CgTb7whuMYSKPaY7AqDCc"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": " Blue."
+            },
+            "messageId": "msg_011CgTb7whuMYSKPaY7AqDCc"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": " Size: Large."
+            },
+            "messageId": "msg_011CgTb7whuMYSKPaY7AqDCc"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "stopReason": "end_turn"
+        }
+      }
+    }
+  ],
+  "two_questions_declined": [
+    {
+      "dir": "client->agent",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "sess-1",
+          "prompt": [
+            {
+              "text": "Use your question tool ONCE with two questions: (1) which colours I like, multi-select, options Red, Blue, Green; (2) which size, single-select, options Small, Large. Then reply with only my answers.",
+              "type": "text"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "AskUserQuestion"
+              }
+            },
+            "toolCallId": "toolu_01EvmGQivFmLzF3K1RiXKQ5Z",
+            "sessionUpdate": "tool_call",
+            "name": "AskUserQuestion",
+            "rawInput": {},
+            "status": "pending",
+            "title": "Asking for your input",
+            "kind": "other",
+            "content": []
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "AskUserQuestion"
+              }
+            },
+            "toolCallId": "toolu_01EvmGQivFmLzF3K1RiXKQ5Z",
+            "sessionUpdate": "tool_call_update",
+            "rawInput": {
+              "questions": [
+                {
+                  "question": "Which colours do you like?",
+                  "header": "Colours",
+                  "multiSelect": true,
+                  "options": [
+                    {
+                      "label": "Red",
+                      "description": "Red"
+                    },
+                    {
+                      "label": "Blue",
+                      "description": "Blue"
+                    },
+                    {
+                      "label": "Green",
+                      "description": "Green"
+                    }
+                  ]
+                },
+                {
+                  "question": "Which size?",
+                  "header": "Size",
+                  "multiSelect": false,
+                  "options": [
+                    {
+                      "label": "Small",
+                      "description": "Small"
+                    },
+                    {
+                      "label": "Large",
+                      "description": "Large"
+                    }
+                  ]
+                }
+              ]
+            },
+            "content": [
+              {
+                "type": "content",
+                "content": {
+                  "type": "text",
+                  "text": "Which colours do you like?"
+                }
+              },
+              {
+                "type": "content",
+                "content": {
+                  "type": "text",
+                  "text": "Which size?"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "elicitation/create",
+        "params": {
+          "mode": "form",
+          "sessionId": "sess-1",
+          "toolCallId": "toolu_01EvmGQivFmLzF3K1RiXKQ5Z",
+          "message": "Please answer the following questions.",
+          "requestedSchema": {
+            "type": "object",
+            "properties": {
+              "question_0": {
+                "type": "array",
+                "title": "Colours",
+                "description": "Which colours do you like?",
+                "items": {
+                  "anyOf": [
+                    {
+                      "const": "Red",
+                      "title": "Red",
+                      "description": "Red"
+                    },
+                    {
+                      "const": "Blue",
+                      "title": "Blue",
+                      "description": "Blue"
+                    },
+                    {
+                      "const": "Green",
+                      "title": "Green",
+                      "description": "Green"
+                    }
+                  ]
+                }
+              },
+              "question_0_custom": {
+                "type": "string",
+                "title": "Other",
+                "description": "Type your own answer to add to your selection above (optional)."
+              },
+              "question_1": {
+                "type": "string",
+                "title": "Size",
+                "description": "Which size?",
+                "oneOf": [
+                  {
+                    "const": "Small",
+                    "title": "Small",
+                    "description": "Small"
+                  },
+                  {
+                    "const": "Large",
+                    "title": "Large",
+                    "description": "Large"
+                  }
+                ]
+              },
+              "question_1_custom": {
+                "type": "string",
+                "title": "Other",
+                "description": "Type your own answer, or add a note to the option you chose above (optional)."
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "dir": "client->agent",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "result": {
+          "action": "decline"
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolResponse": {
+                  "questions": [
+                    {
+                      "question": "Which colours do you like?",
+                      "header": "Colours",
+                      "options": [
+                        {
+                          "label": "Red",
+                          "description": "Red"
+                        },
+                        {
+                          "label": "Blue",
+                          "description": "Blue"
+                        },
+                        {
+                          "label": "Green",
+                          "description": "Green"
+                        }
+                      ],
+                      "multiSelect": true
+                    },
+                    {
+                      "question": "Which size?",
+                      "header": "Size",
+                      "options": [
+                        {
+                          "label": "Small",
+                          "description": "Small"
+                        },
+                        {
+                          "label": "Large",
+                          "description": "Large"
+                        }
+                      ],
+                      "multiSelect": false
+                    }
+                  ],
+                  "answers": {}
+                },
+                "toolName": "AskUserQuestion"
+              }
+            },
+            "toolCallId": "toolu_01EvmGQivFmLzF3K1RiXKQ5Z",
+            "sessionUpdate": "tool_call_update"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "AskUserQuestion"
+              }
+            },
+            "toolCallId": "toolu_01EvmGQivFmLzF3K1RiXKQ5Z",
+            "sessionUpdate": "tool_call_update",
+            "status": "completed",
+            "rawOutput": "The user did not answer the questions.",
+            "content": [
+              {
+                "type": "content",
+                "content": {
+                  "type": "text",
+                  "text": "The user did not answer the questions."
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "You didn't"
+            },
+            "messageId": "msg_011CgTb92yhBcvyJeAZRXH7D"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": " answer either question, so I have"
+            },
+            "messageId": "msg_011CgTb92yhBcvyJeAZRXH7D"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": " no col"
+            },
+            "messageId": "msg_011CgTb92yhBcvyJeAZRXH7D"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": "ours or size"
+            },
+            "messageId": "msg_011CgTb92yhBcvyJeAZRXH7D"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "sessionUpdate": "agent_message_chunk",
+            "content": {
+              "type": "text",
+              "text": " to report."
+            },
+            "messageId": "msg_011CgTb92yhBcvyJeAZRXH7D"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "stopReason": "end_turn"
+        }
+      }
+    }
   ]
 }

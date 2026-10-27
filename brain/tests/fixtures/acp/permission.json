@@ -741,5 +741,222 @@
         }
       }
     }
+  ],
+  "session_cancel_while_pending": [
+    {
+      "dir": "client->agent",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "sess-1",
+          "prompt": [
+            {
+              "text": "Create a file named hello.txt containing the word hi. Do nothing else.",
+              "type": "text"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "Write"
+              }
+            },
+            "toolCallId": "toolu_01BP7GYKnkZanzMcG9BAeisi",
+            "sessionUpdate": "tool_call",
+            "name": "Write",
+            "rawInput": {},
+            "status": "pending",
+            "title": "Preparing file\u2026",
+            "kind": "edit",
+            "content": [],
+            "locations": []
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "Write"
+              }
+            },
+            "toolCallId": "toolu_01BP7GYKnkZanzMcG9BAeisi",
+            "sessionUpdate": "tool_call_update",
+            "rawInput": {
+              "file_path": "C:/redacted/work/hello.txt"
+            },
+            "title": "Write hello.txt",
+            "locations": [
+              {
+                "path": "C:/redacted/work/hello.txt"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "Write"
+              }
+            },
+            "toolCallId": "toolu_01BP7GYKnkZanzMcG9BAeisi",
+            "sessionUpdate": "tool_call_update",
+            "rawInput": {
+              "file_path": "C:/redacted/work/hello.txt",
+              "content": "hi"
+            },
+            "content": [
+              {
+                "type": "diff",
+                "path": "C:/redacted/work/hello.txt",
+                "oldText": null,
+                "newText": "hi"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "session/request_permission",
+        "params": {
+          "toolCall": {
+            "toolCallId": "toolu_01BP7GYKnkZanzMcG9BAeisi",
+            "name": "Write",
+            "status": "pending",
+            "rawInput": {
+              "file_path": "C:/redacted/work/hello.txt",
+              "content": "hi"
+            },
+            "title": "Write hello.txt",
+            "kind": "edit",
+            "content": [
+              {
+                "type": "diff",
+                "path": "C:/redacted/work/hello.txt",
+                "oldText": null,
+                "newText": "hi"
+              }
+            ],
+            "locations": [
+              {
+                "path": "C:/redacted/work/hello.txt"
+              }
+            ]
+          },
+          "options": [
+            {
+              "optionId": "allow-once",
+              "name": "Yes",
+              "kind": "allow_once"
+            },
+            {
+              "optionId": "allow-with-updates",
+              "name": "Yes, allow all edits during this session",
+              "kind": "allow_always"
+            },
+            {
+              "optionId": "reject",
+              "name": "No",
+              "kind": "reject_once"
+            }
+          ],
+          "sessionId": "sess-1"
+        }
+      }
+    },
+    {
+      "dir": "client->agent",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/cancel",
+        "params": {
+          "sessionId": "sess-1"
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "$/cancel_request",
+        "params": {
+          "requestId": 0
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "Write",
+                "nonExecutionKind": "user-rejected"
+              }
+            },
+            "toolCallId": "toolu_01BP7GYKnkZanzMcG9BAeisi",
+            "sessionUpdate": "tool_call_update",
+            "status": "failed",
+            "rawOutput": "The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.\n\nNote: The user's next message may contain a correction or preference. Pay close attention \u2014 if they explain what went wrong or how they'd prefer you to work, consider saving that to memory for future sessions.",
+            "content": [
+              {
+                "type": "content",
+                "content": {
+                  "type": "text",
+                  "text": "```\nThe user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.\n\nNote: The user's next message may contain a correction or preference. Pay close attention \u2014 if they explain what went wrong or how they'd prefer you to work, consider saving that to memory for future sessions.\n```"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "stopReason": "cancelled"
+        }
+      }
+    }
   ]
 }

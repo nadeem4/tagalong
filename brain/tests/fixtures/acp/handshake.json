@@ -9,6 +9,12 @@
         "method": "initialize",
         "params": {
           "protocolVersion": 1,
+          "clientCapabilities": {
+            "auth": {},
+            "elicitation": {
+              "form": {}
+            }
+          },
           "clientInfo": {
             "name": "tagalong-spike",
             "version": "0"
@@ -62,6 +68,7 @@
             "title": "Claude Agent",
             "version": "0.98.0"
           },
+          "authMethods": [],
           "_meta": {
             "steering": {
               "supported": true
@@ -152,7 +159,7 @@
               "type": "text",
               "text": "Hi!"
             },
-            "messageId": "msg_011CgTZmrHoCYjhp1AB5UGDR"
+            "messageId": "msg_011CgTb73iHWEHXbAb8m7yyG"
           }
         }
       }
