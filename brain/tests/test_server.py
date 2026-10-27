@@ -372,8 +372,9 @@ async def test_model_tool_call_reaches_body_and_result_returns(tool_env):
             "result": {"output": [{"type": "text", "text": "a desk"}]},
         }
         await ws.send(json.dumps(result))
-        while model.step < 2:
-            await asyncio.sleep(0.01)
+        async with asyncio.timeout(5):
+            while model.step < 2:
+                await asyncio.sleep(0.01)
         assert tool_result(model)["tool_use_id"] == "c1"
         assert "is_error" not in tool_result(model)
         assert "a desk" in json.dumps(tool_result(model)["content"])
@@ -384,8 +385,9 @@ async def test_body_disconnect_mid_use_gives_is_error_offline(tool_env):
     async with connect(url) as ws:
         await start_tool_turn(ws)
         await next_method(ws, "use")
-    while model.step < 2:
-        await asyncio.sleep(0.01)
+    async with asyncio.timeout(5):
+        while model.step < 2:
+            await asyncio.sleep(0.01)
     assert tool_result(model)["is_error"] is True
     assert "offline" in json.dumps(tool_result(model)["content"])
 
@@ -406,5 +408,14 @@ async def test_response_frame_is_not_an_error(tool_env):
     async with connect(url) as ws:
         await call(ws, hello())
         await ws.send(json.dumps({"jsonrpc": "2.0", "id": "nope", "result": {"output": "x"}}))
+        reply = await call(ws, request("tools", {"tools": []}))
+        assert reply["result"] == {}
+
+
+async def test_malformed_response_keeps_connection(tool_env):
+    url, _ = tool_env
+    async with connect(url) as ws:
+        await call(ws, hello())
+        await ws.send(json.dumps({"jsonrpc": "2.0", "id": [1], "result": 1}))
         reply = await call(ws, request("tools", {"tools": []}))
         assert reply["result"] == {}

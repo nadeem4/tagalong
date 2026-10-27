@@ -106,7 +106,10 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session_id: str, sessio
                     break
                 continue
             if not isinstance(method, str):
-                bodies.resolve(body_id, peer, message)  # a response to a `use`
+                try:
+                    bodies.resolve(body_id, peer, message)  # a response to a `use`
+                except Exception:
+                    log.exception("bad response frame")
                 continue
             try:
                 reply = _dispatch(method, message, req_id, body_id, peer, bodies, session)

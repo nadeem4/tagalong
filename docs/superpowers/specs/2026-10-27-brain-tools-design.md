@@ -13,7 +13,7 @@ The user decides what Scout may do without asking. Every tool has a permission, 
 user controls, the way coding agents handle tool permissions.
 
 This row builds the tool framework, not every tool. A new kind of tool (MCP in row 9, experts in row 8) is a new
-*source* plugged into the same toolbox; the thinking loop does not change.
+_source_ plugged into the same toolbox; the thinking loop does not change.
 
 ## Goals
 
@@ -57,14 +57,14 @@ This row builds the tool framework, not every tool. A new kind of tool (MCP in r
 
 One record per tool, whatever the source:
 
-| Field          | Meaning                                                                          |
-| -------------- | -------------------------------------------------------------------------------- |
-| `name`         | full model-facing name (`recall`, `desktop__list_windows`)                       |
-| `description`, `input_schema` | as the model sees them                                            |
-| `effect`       | `read` (leaves no state behind) or `change`                                      |
-| `for`          | `scout`, `home` or both: who may run it                                          |
-| `default_mode` | `auto` or `ask`; when absent, `read` gives `auto` and `change` gives `ask`       |
-| `locked`       | always ask, the user cannot set it to auto (body tools with `confirm: true`)     |
+| Field                         | Meaning                                                                      |
+| ----------------------------- | ---------------------------------------------------------------------------- |
+| `name`                        | full model-facing name (`recall`, `desktop__list_windows`)                   |
+| `description`, `input_schema` | as the model sees them                                                       |
+| `effect`                      | `read` (leaves no state behind) or `change`                                  |
+| `for`                         | `scout`, `home` or both: who may run it                                      |
+| `default_mode`                | `auto` or `ask`; when absent, `read` gives `auto` and `change` gives `ask`   |
+| `locked`                      | always ask, the user cannot set it to auto (body tools with `confirm: true`) |
 
 ### Sources
 
@@ -72,7 +72,7 @@ A source is anything that can (a) list its tool specs right now and (b) run one 
 row:
 
 - **Brain source**: the brain's own tools (`tools.py`). Memory tools `remember`, `recall`, `forget` are `for:
-  scout` (and `forget` also `home`) with `default_mode: auto`, since remembering is how Scout keeps up (my
+scout` (and `forget` also `home`) with `default_mode: auto`, since remembering is how Scout keeps up (my
   call). Home tools listed below.
 - **Body source**: one per online body. Lists that body's declared tools with the `<body id>__` prefix; runs a
   call by sending `use` with the plain name to that body's current connection and waiting for its response.
@@ -91,7 +91,7 @@ Every call, in this order:
 4. Run, bounded by a timeout: `use` 30 s, brain tools none. Past it: `timeout`, and the brain sends the body a
    `cancel` for that call.
 
-Errors reach the model as tool results with `is_error`, worded so it knows *why* (denied, offline, timed out)
+Errors reach the model as tool results with `is_error`, worded so it knows _why_ (denied, offline, timed out)
 and can say so or try another way. Later rules (jobs get read tools only, spend caps per tool) are new checks
 in this one gate.
 
@@ -136,11 +136,11 @@ in this one gate.
 
 ## Slices
 
-| Slice | PR contents                                                                                   |
-| ----- | --------------------------------------------------------------------------------------------- |
+| Slice | PR contents                                                                                                                                                                           |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 7a    | Toolbox, sources, gate steps 1, 2 and 4; body tools offered to Scout; `use`, its cancel on turn cancel and timeout, `body_offline` on disconnect; per-step tool list in the turn loop |
-| 7b    | Permissions: `effect` contract change, permissions table and defaults, gate step 3, asks and `answer`, desktop ask buttons |
-| 7c    | Home through the brain: brain tools in `hello`, `call`, Home tools, `changed`, desktop Home memory and usage on the brain, Permissions list |
+| 7b    | Permissions: `effect` contract change, permissions table and defaults, gate step 3, asks and `answer`, desktop ask buttons                                                            |
+| 7c    | Home through the brain: brain tools in `hello`, `call`, Home tools, `changed`, desktop Home memory and usage on the brain, Permissions list                                           |
 
 Each slice updates docs/brain.md, protocol/README.md where the contract changes, docs/desktop.md for desktop
 work, and docs/testing/feature-test-guide.md.

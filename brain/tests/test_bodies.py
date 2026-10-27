@@ -309,3 +309,18 @@ def test_is_online():
     assert bodies.is_online("a")
     bodies.disconnect("a", peer)
     assert not bodies.is_online("a")
+
+
+async def test_response_with_null_result_raises_tool_failed():
+    bodies = Bodies()
+    peer = online(bodies)
+    task, frame = await start_use(bodies, peer)
+    bodies.resolve("a", peer, {"id": frame["id"], "result": None})
+    with pytest.raises(RpcError) as err:
+        await task
+    assert err.value.code == ErrorCode.tool_failed
+
+
+def test_unhashable_response_id_is_ignored():
+    bodies = Bodies()
+    bodies.resolve("a", online(bodies), {"id": [1], "result": 1})

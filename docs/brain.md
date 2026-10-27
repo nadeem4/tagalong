@@ -43,22 +43,22 @@ the total can run a little low.
 
 ## Files
 
-| File                             | What it does                                                                                  |
-| -------------------------------- | --------------------------------------------------------------------------------------------- |
-| `brain/src/brain/protocol.py`    | Contract v1 as pydantic types                                                                 |
-| `brain/src/brain/config.py`      | Reads the environment and `.env`, keeps the session id                                        |
-| `brain/src/brain/guardrails.py`  | The daily budget and its `budget.json` ledger                                                 |
-| `brain/src/brain/sessions.py`    | The one conversation: history, the running turn, `say` joins, `cancel`                        |
-| `brain/src/brain/mind/resume.py` | Rebuilds a valid history from the saved chat at start                                         |
-| `brain/src/brain/memory.py`      | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                          |
-| `brain/src/brain/toolbox.py`     | `Toolbox`: every tool the model or Home may call, from sources (`BrainSource`, `BodySource`); lists scout tools and gates each call |
-| `brain/src/brain/tools.py`       | The brain's own tools (`remember`, `recall`, `forget`) as specs and handlers for `BrainSource` |
-| `brain/src/brain/mind/soul.md`   | Scout's character, the start of the system prompt                                             |
-| `brain/src/brain/mind/prompt.py` | The system prompt (soul, local time, online bodies, "What you know") and `say` content blocks |
-| `brain/src/brain/mind/turn.py`   | The thinking loop and the Anthropic streaming call                                            |
-| `brain/src/brain/bodies.py`      | Online bodies, their tools, and one outbox per body id                                        |
-| `brain/src/brain/server.py`      | The websocket server: parsing, errors, `hello`, `tools`, `say`, `cancel`, the writer          |
-| `brain/src/brain/main.py`        | The `uv run brain` entry point                                                                |
+| File                             | What it does                                                                                                                      |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `brain/src/brain/protocol.py`    | Contract v1 as pydantic types                                                                                                     |
+| `brain/src/brain/config.py`      | Reads the environment and `.env`, keeps the session id                                                                            |
+| `brain/src/brain/guardrails.py`  | The daily budget and its `budget.json` ledger                                                                                     |
+| `brain/src/brain/sessions.py`    | The one conversation: history, the running turn, `say` joins, `cancel`                                                            |
+| `brain/src/brain/mind/resume.py` | Rebuilds a valid history from the saved chat at start                                                                             |
+| `brain/src/brain/memory.py`      | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                                                              |
+| `brain/src/brain/toolbox.py`     | `Toolbox`: lists and gates every tool call, from `BrainSource` and `BodySource`                                                   |
+| `brain/src/brain/tools.py`       | The brain's own tools (`remember`, `recall`, `forget`) as specs and handlers for `BrainSource`                                    |
+| `brain/src/brain/mind/soul.md`   | Scout's character, the start of the system prompt                                                                                 |
+| `brain/src/brain/mind/prompt.py` | The system prompt (soul, local time, online bodies, "What you know") and `say` content blocks                                     |
+| `brain/src/brain/mind/turn.py`   | The thinking loop and the Anthropic streaming call                                                                                |
+| `brain/src/brain/bodies.py`      | Online bodies, their tools, one outbox per body id, `use` requests and their pending table                                        |
+| `brain/src/brain/server.py`      | The websocket server: parsing, errors, `hello`, `tools`, `say`, `cancel`, routing `use` responses to `Bodies.resolve`, the writer |
+| `brain/src/brain/main.py`        | The `uv run brain` entry point                                                                                                    |
 
 ## What a connection does
 
@@ -181,9 +181,11 @@ The desktop app (`bodies/desktop`) is a body of this brain. It no longer runs th
   between steps changes what Scout may call. A tool whose body is offline is never offered.
 - **Names.** Body tools reach the model as `<body id>__<tool>`; the body sees its plain name in
   `use`. A full name over 64 characters is dropped and logged.
-- **Gate.** Each call is checked in order: unknown name, wrong caller (the tool's audience), then
-  a source that owns the name but cannot serve it now (body offline). Each failure becomes an
-  `is_error` tool result worded with the reason.
+- **Gate.** A call whose name matches a tool the caller may use runs. A match the caller may not
+  use (the tool's audience) is reported as an unknown tool. Otherwise the not-found step runs: a
+  name that belongs to an offline body is reported as body offline, anything else as an unknown
+  tool. Each failure becomes an `is_error` tool result worded with the reason. The ask and
+  permission steps arrive in a later slice.
 - **Body calls.** `use` waits at most 30 s. On timeout or when the turn is cancelled the brain
   sends the body `cancel {call}`. If the body disconnects mid-call the result says it went
   offline. Response frames from a body are resolved in the read loop by `Bodies.resolve`.
@@ -192,10 +194,10 @@ The desktop app (`bodies/desktop`) is a body of this brain. It no longer runs th
 
 ## Not built yet
 
-| Row   | Brings                                                                                                                                                                                                           |
-| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Row   | Brings                                                                                            |
+| ----- | ------------------------------------------------------------------------------------------------- |
 | 7     | The brain's tools in the `hello` result, `call` (Home runs a tool), the gate steps that need asks |
-| Later | Live-state replay after `resync`, asks, `answer` and confirm guardrails                                                                                                                                          |
+| Later | Live-state replay after `resync`, asks, `answer` and confirm guardrails                           |
 
 Until then `call` and `answer` answer `method_not_found`.
 

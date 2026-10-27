@@ -162,19 +162,26 @@ class Bodies:
             self._pending.pop(request_id, None)
 
     def resolve(self, body_id: str, peer: Peer, message: dict) -> None:
-        entry = self._pending.get(message.get("id", ""))
+        # A body is untrusted input: a bad id is ignored, a bad shape fails only that call.
+        request_id = message.get("id")
+        if not isinstance(request_id, str):
+            return
+        entry = self._pending.get(request_id)
         if entry is None or entry[0] is not peer or entry[1].done():
             return
         future = entry[1]
-        error = message.get("error")
-        if error is None:
-            future.set_result(message.get("result", {}).get("output", []))
-            return
         try:
-            code = ErrorCode(error.get("code"))
-        except ValueError:
-            code = ErrorCode.tool_failed
-        future.set_exception(RpcError(code, str(error.get("message", ""))))
+            error = message.get("error")
+            if error is None:
+                future.set_result(message["result"]["output"])
+                return
+            try:
+                code = ErrorCode(error.get("code"))
+            except ValueError:
+                code = ErrorCode.tool_failed
+            future.set_exception(RpcError(code, str(error.get("message", ""))))
+        except (AttributeError, KeyError, TypeError):
+            future.set_exception(RpcError(ErrorCode.tool_failed, "malformed response from body"))
 
     def _cancel(self, peer: Peer, call_id: str) -> None:
         # Best effort: the peer may already be gone.
