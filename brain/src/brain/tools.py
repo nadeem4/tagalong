@@ -4,6 +4,7 @@ Handlers sit in one name -> function dict so body tools can join it later. Refus
 arguments raise; run_turn turns any exception into an is_error tool result the model reads.
 """
 
+import re
 from collections.abc import Awaitable, Callable
 
 from brain.memory import KINDS, Hit, Memory, MemoryRefused
@@ -60,8 +61,21 @@ TOOLS: list[dict] = [
 ]
 
 
+CHAT_HIT_MAX_CHARS = 500
+_FENCED = ("summary", "chat")
+
+
+def _fence_safe(text: str) -> str:
+    """Stored text must not be able to close its own <data> fence."""
+    return re.sub(r"</(?=data)", "&lt;/", text, flags=re.IGNORECASE)
+
+
 def _line(hit: Hit) -> str:
-    text = f'<data kind="summary">{hit.text}</data>' if hit.kind == "summary" else hit.text
+    text = hit.text
+    if hit.kind == "chat" and len(text) > CHAT_HIT_MAX_CHARS:
+        text = text[: CHAT_HIT_MAX_CHARS - 1] + "…"
+    if hit.kind in _FENCED:
+        text = f'<data kind="{hit.kind}">{_fence_safe(text)}</data>'
     return f"{hit.ref} {hit.kind} {hit.at[:10]} {text}"
 
 
@@ -77,7 +91,7 @@ def format_hits(hits: list[Hit]) -> str:
 
 def _render(hits: list[Hit]) -> str:
     lines = [_line(h) for h in hits]
-    if any(h.kind == "summary" for h in hits):
+    if any(h.kind in _FENCED for h in hits):
         lines.insert(0, _PREAMBLE)
     return "\n".join(lines)
 

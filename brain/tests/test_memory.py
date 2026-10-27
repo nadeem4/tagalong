@@ -217,3 +217,128 @@ def test_replace_without_cadence_keeps_old_cadence(mem):
     new = mem.remember("tracking", "Watch the nightly build", replaces=old.id)
     assert new.cadence == "daily"
     assert mem.remember("tracking", "Watch it", "weekly", replaces=old.id).cadence == "weekly"
+
+
+# --- 6b: saved chat, summaries, hardening ---
+
+
+def _msg(role, *blocks):
+    return {"role": role, "content": list(blocks)}
+
+
+def test_save_and_load_round_trip(mem):
+    msgs = [
+        {"role": "user", "content": "hello there"},
+        _msg("assistant", {"type": "text", "text": "hi"}),
+    ]
+    mem.save_messages(msgs)
+    assert mem.load_messages() == msgs
+
+
+def test_images_and_documents_are_not_stored(tmp_path):
+    path = tmp_path / "img.db"
+    m = Memory(path)
+    big = "QUJD" * 500
+    m.save_messages(
+        [
+            _msg(
+                "user",
+                {"type": "image", "source": {"type": "base64", "data": big}},
+                {"type": "document", "source": {"type": "base64", "data": big}},
+            )
+        ]
+    )
+    loaded = m.load_messages()
+    m.close()
+    assert loaded[0]["content"] == [
+        {"type": "text", "text": "[screenshot]"},
+        {"type": "text", "text": "[document]"},
+    ]
+    for f in tmp_path.glob("img.db*"):
+        assert big.encode() not in f.read_bytes()
+
+
+def test_save_is_atomic_and_ordered(mem):
+    mem.save_messages([{"role": "user", "content": "one"}])
+    with pytest.raises(TypeError):
+        mem.save_messages(
+            [{"role": "user", "content": "two"}, {"role": "user", "content": object()}]
+        )
+    assert [m["content"] for m in mem.load_messages()] == ["one"]
+    mem.save_messages([{"role": "user", "content": "two"}, {"role": "user", "content": "three"}])
+    assert [m["content"] for m in mem.load_messages()] == ["one", "two", "three"]
+
+
+def test_thinking_and_tool_input_not_in_text_column(mem):
+    mem.save_messages(
+        [
+            _msg(
+                "assistant",
+                {"type": "thinking", "thinking": "secretthought", "signature": "s"},
+                {"type": "tool_use", "id": "t1", "name": "x", "input": {"q": "secretinput"}},
+                {"type": "text", "text": "visible"},
+            ),
+            _msg("user", {"type": "tool_result", "tool_use_id": "t1", "content": "resultbody"}),
+        ]
+    )
+    texts = [r[0] for r in mem._db.execute("SELECT text FROM messages ORDER BY id")]
+    assert texts == ["visible", "resultbody"]
+
+
+def test_search_finds_chat(mem):
+    mem.save_messages([{"role": "user", "content": "we planned the Lisbon trip"}])
+    hits = mem.search("lisbon")
+    assert len(hits) == 1
+    assert hits[0].kind == "chat"
+    assert hits[0].ref.startswith("chat:")
+    assert "Lisbon" in hits[0].text
+    assert mem.search("lisbon", kind="project") == []
+    assert len(mem.search("lisbon", kind="chat")) == 1
+
+
+def test_search_orders_memory_before_chat_up_to_limit(mem):
+    mem.remember("project", "lisbon notes")
+    mem.save_messages([{"role": "user", "content": "lisbon chat"}])
+    assert [h.kind for h in mem.search("lisbon")] == ["project", "chat"]
+    assert [h.kind for h in mem.search("lisbon", limit=1)] == ["project"]
+    assert mem.search("lisbon", kind="chat")[0].kind == "chat"
+
+
+def test_add_summary_is_search_only_kind(mem):
+    item = mem.add_summary("We talked about tea")
+    assert item.kind == "summary"
+    assert "summary" not in mem.always_loaded()
+    assert [h.kind for h in mem.search("tea")] == ["summary"]
+
+
+def test_compaction_text_reads_content():
+    assert memory._compaction_text({"type": "compaction", "content": "sum"}) == "sum"
+    assert memory._compaction_text({"type": "compaction", "content": None}) == ""
+
+
+def test_upgrade_from_v1_keeps_items(tmp_path):
+    path = tmp_path / "v1.db"
+    db = sqlite3.connect(path)
+    db.executescript(memory.MIGRATIONS[0] + "PRAGMA user_version = 1;")
+    db.execute(
+        "INSERT INTO memories(kind,text,created_at,updated_at)"
+        " VALUES('about_you','Likes tea','a','a')"
+    )
+    db.commit()
+    db.close()
+    m = Memory(path)
+    assert m.always_loaded()["about_you"][0].text == "Likes tea"
+    m.save_messages([{"role": "user", "content": "hi"}])
+    assert len(m.load_messages()) == 1
+    m.close()
+
+
+def test_failed_migration_rolls_back(tmp_path, monkeypatch):
+    bad = memory.MIGRATIONS + ("CREATE TABLE half(x); CREATE TABLE half(x);",)
+    monkeypatch.setattr(memory, "MIGRATIONS", bad)
+    with pytest.raises(sqlite3.OperationalError):
+        Memory(tmp_path / "r.db")
+    db = sqlite3.connect(tmp_path / "r.db")
+    assert db.execute("PRAGMA user_version").fetchone()[0] == len(memory.MIGRATIONS) - 1
+    assert db.execute("SELECT name FROM sqlite_master WHERE name='half'").fetchall() == []
+    db.close()
