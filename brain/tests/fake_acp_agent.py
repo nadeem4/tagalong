@@ -8,7 +8,8 @@ The script may instead be a list of step lists, one per prompt (the last is reus
 Steps: {"sleep": secs} pause | {"crash": code} os._exit mid-prompt | {"text": s} message
 chunk | {"permission": {"title", "kind"?, "options"?}} ask and wait |
 {"question": {"message", "options": [labels]}} elicitation and wait | {"hang": true}
-wait until session/cancel | {"end": stop_reason} finish the prompt (default end_turn).
+wait until session/cancel | {"stubborn": true} hang, ignoring cancel | {"end": stop_reason}
+finish the prompt (default end_turn). Env FAKE_ACP_HANG_INIT=1 never answers initialize.
 """
 
 import asyncio
@@ -39,11 +40,14 @@ class FakeAgent:
         self.steps = steps
         self.running: dict[str, asyncio.Task] = {}
         self.turn = 0
+        self.stubborn = False
 
     def on_connect(self, conn) -> None:
         self.conn = conn
 
     async def initialize(self, protocol_version, client_capabilities=None, **kw):
+        if os.environ.get("FAKE_ACP_HANG_INIT"):
+            await asyncio.Event().wait()  # an adapter that never answers the handshake
         return schema.InitializeResponse(
             protocol_version=1, agent_info=schema.Implementation(name="fake-acp", version="0")
         )
@@ -73,6 +77,8 @@ class FakeAgent:
 
     async def cancel(self, session_id, **kw):
         # Only a running prompt can be cancelled; a late cancel must not hit the next one.
+        if self.stubborn:
+            return
         if task := self.running.get(session_id):
             task.cancel()
 
@@ -104,6 +110,10 @@ class FakeAgent:
             elif "crash" in step:
                 # Abrupt exit, no cleanup: what a crashed adapter looks like to the runner.
                 os._exit(step["crash"])
+            elif step.get("stubborn"):
+                # Hangs and ignores session/cancel, like a wedged adapter.
+                self.stubborn = True
+                await asyncio.Event().wait()
             elif step.get("hang"):
                 await asyncio.Event().wait()
             elif "end" in step:

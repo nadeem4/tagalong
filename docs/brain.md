@@ -290,7 +290,10 @@ A missing command is reported with that step. `TAGALONG_EXPERT_CMD` swaps the co
 `TAGALONG_EXPERT_TIMEOUT_S` sets the run limit. The child gets the brain's environment without
 `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN`, so Claude Code bills the user's own login, not
 the key Scout uses. The process is closed by closing its stdin; if it stays alive it is killed with
-its children (`taskkill /T /F` on Windows).
+its children (`taskkill /T /F` on Windows). Start and the mode change are bounded by a 60 s
+startup limit (an adapter that never answers is killed and reported). `stop()` and `close()` are
+safe from any state, including from inside `on_end`; teardown is shared, so `on_end` fires once,
+after the process is gone. A stop answers any pending permission or question as cancelled.
 
 ## Not built yet
 

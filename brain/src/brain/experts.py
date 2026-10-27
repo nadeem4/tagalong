@@ -9,6 +9,7 @@ the whole tree if closing stdin does not end it.
 """
 
 import asyncio
+import logging
 import os
 import shutil
 import subprocess
@@ -33,6 +34,7 @@ from acp.schema import (
 STRIPPED_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
 INSTALL_STEP = "npm install -g @agentclientprotocol/claude-agent-acp"
 _NO_MESSAGE = object()
+log = logging.getLogger(__name__)
 
 
 class ExpertError(RuntimeError):
@@ -106,10 +108,14 @@ class ExpertRun:
         on_progress: Callable[[str], Awaitable[None]],
         on_end: Callable[[str, str, str | None], Awaitable[None]],
         grace: float = 3.0,
+        # The real adapter needs ~5 s to load the user's plugins and MCP servers; 60 s leaves
+        # room for a cold start without waiting forever on an adapter that never answers.
+        startup_timeout: float = 60.0,
     ) -> None:
         self._command = command
         self._timeout = timeout
         self._grace = grace
+        self._startup_timeout = startup_timeout
         self._on_permission = on_permission
         self._on_question = on_question
         self._on_progress = on_progress
@@ -120,6 +126,8 @@ class ExpertRun:
         self._notes: list[str] = []
         self._active = False
         self._stopping = False
+        self._shutdown_task: asyncio.Future | None = None
+        self._asks: set[asyncio.Future] = set()
         self._message_id: object = _NO_MESSAGE
         self.process: asyncio.subprocess.Process | None = None
         self.session_id = ""
@@ -137,57 +145,91 @@ class ExpertRun:
         env = {k: v for k, v in os.environ.items() if k not in STRIPPED_ENV}
         self._stack = AsyncExitStack()
         try:
-            self._conn, self.process = await self._stack.enter_async_context(
-                acp.spawn_agent_process(
-                    _Client(self),
-                    exe,
-                    *self._command[1:],
-                    env=env,
-                    # Nobody reads the adapter's stderr; a full pipe would stall it.
-                    transport_kwargs={"stderr": subprocess.DEVNULL},
-                    use_unstable_protocol=True,
+            async with asyncio.timeout(self._startup_timeout):
+                self._conn, self.process = await self._stack.enter_async_context(
+                    acp.spawn_agent_process(
+                        _Client(self),
+                        exe,
+                        *self._command[1:],
+                        env=env,
+                        # Nobody reads the adapter's stderr; a full pipe would stall it.
+                        transport_kwargs={"stderr": subprocess.DEVNULL},
+                        use_unstable_protocol=True,
+                    )
                 )
-            )
-            caps = ClientCapabilities(
-                elicitation=ElicitationCapabilities(form=ElicitationFormCapabilities())
-            )
-            await self._conn.initialize(
-                protocol_version=acp.PROTOCOL_VERSION, client_capabilities=caps
-            )
-            session = await self._conn.new_session(cwd=str(folder), mcp_servers=[])
+                caps = ClientCapabilities(
+                    elicitation=ElicitationCapabilities(form=ElicitationFormCapabilities())
+                )
+                await self._conn.initialize(
+                    protocol_version=acp.PROTOCOL_VERSION, client_capabilities=caps
+                )
+                session = await self._conn.new_session(cwd=str(folder), mcp_servers=[])
+        except TimeoutError:
+            await self._shutdown()
+            raise ExpertError(
+                f"The expert did not answer within {self._startup_timeout:g} s while starting."
+            ) from None
         except BaseException:
             await self._shutdown()
             raise
         self.session_id = session.session_id
-        return [Mode(m.id, m.name, m.description or "") for m in session.modes.available_modes]
+        modes = session.modes.available_modes if session.modes else []
+        return [Mode(m.id, m.name, m.description or "") for m in modes]
 
     async def begin(self, mode_id: str, task: str) -> None:
-        await self._conn.set_session_mode(session_id=self.session_id, mode_id=mode_id)
+        try:
+            async with asyncio.timeout(self._startup_timeout):
+                await self._conn.set_session_mode(session_id=self.session_id, mode_id=mode_id)
+        except TimeoutError:
+            await self._shutdown()
+            raise ExpertError(
+                f"The expert did not answer within {self._startup_timeout:g} s to a mode change."
+            ) from None
         self._active = True
         self._task = asyncio.ensure_future(self._drive(task))
 
     def note(self, text: str) -> bool:
-        """Queue a follow-up prompt; False when the run is not active any more."""
-        if not self._active:
+        """Queue a follow-up prompt; False when the run has ended or is being stopped."""
+        if not self._active or self._stopping:
             return False
         self._notes.append(text)
         return True
 
     async def stop(self) -> None:
-        if self._task is None or self._task.done():
+        task = self._task
+        # From inside on_end (or after the run) there is nothing to wait for, and a task
+        # must not await itself.
+        if task is None or task.done() or task is asyncio.current_task() or not self._active:
             await self._shutdown()
             return
-        self._stopping = True
-        self._notes.clear()
-        with suppress(Exception):
-            await self._conn.cancel(session_id=self.session_id)
-        done, _ = await asyncio.wait({self._task}, timeout=self._grace)
+        if not self._stopping:
+            self._stopping = True
+            self._notes.clear()
+            with suppress(Exception):
+                await self._conn.cancel(session_id=self.session_id)
+            # ACP: after session/cancel every pending ask must be answered as cancelled.
+            for ask in list(self._asks):
+                ask.cancel()
+        done, _ = await asyncio.wait({task}, timeout=self._grace)
         if not done:
             await self._shutdown()  # the prompt call then fails and the run ends stopped
-        await self._task
+        await task
 
     async def close(self) -> None:
         await self.stop()
+
+    async def _ask(self, callback, arg):
+        """Run an ask callback so stop() can cancel it; a stop-cancelled ask answers None."""
+        ask = asyncio.ensure_future(callback(arg))
+        self._asks.add(ask)
+        try:
+            return await ask
+        except asyncio.CancelledError:
+            if ask.cancelled() and self._stopping:
+                return None
+            raise
+        finally:
+            self._asks.discard(ask)
 
     async def _drive(self, first: str) -> None:
         state, reason = "done", "end_turn"
@@ -206,11 +248,11 @@ class ExpertRun:
                     if not self._notes:
                         break
                     prompt = self._notes.pop(0)
-        except TimeoutError:
-            state, reason = "error", "timeout"
         except Exception as exc:
             if self._stopping:
                 state, reason = "stopped", "stopped"
+            elif isinstance(exc, TimeoutError):
+                state, reason = "error", "timeout"
             else:
                 state, reason = (
                     "error",
@@ -218,21 +260,36 @@ class ExpertRun:
                 )
         self._active = False
         self.result = self.progress or None
-        await self._shutdown()
-        await self._on_end(state, reason, self.result)
-
-    async def _shutdown(self) -> None:
-        stack, self._stack = self._stack, None
-        if stack is None:
-            return
-        process = self.process
-        with suppress(Exception):
-            process.stdin.close()  # the adapter exits by itself when stdin closes
         try:
-            await asyncio.wait_for(process.wait(), self._grace)
-        except TimeoutError:
-            await kill_tree(process)
-        await stack.aclose()
+            await self._shutdown()
+        except Exception:
+            log.exception("expert shutdown failed")
+        try:
+            await self._on_end(state, reason, self.result)
+        except Exception:
+            log.exception("expert on_end failed")
+
+    def _shutdown(self) -> asyncio.Future:
+        # One shared teardown: every caller awaits the same task, so nobody returns (or
+        # reports the end) before the process is gone.
+        if self._shutdown_task is None:
+            self._shutdown_task = asyncio.ensure_future(self._do_shutdown())
+        return self._shutdown_task
+
+    async def _do_shutdown(self) -> None:
+        stack, self._stack = self._stack, None
+        process = self.process
+        try:
+            if process is not None:
+                with suppress(Exception):
+                    process.stdin.close()  # the adapter exits by itself when stdin closes
+                try:
+                    await asyncio.wait_for(process.wait(), self._grace)
+                except TimeoutError:
+                    await kill_tree(process)
+        finally:
+            if stack is not None:
+                await stack.aclose()
 
     async def _message_chunk(self, message_id, text: str) -> None:
         if message_id != self._message_id:
@@ -262,7 +319,7 @@ class _Client:
             input=tool_call.raw_input if isinstance(tool_call.raw_input, dict) else {},
             options=[PermissionOption(o.option_id, o.name, str(o.kind)) for o in options],
         )
-        chosen = await self._run._on_permission(request)
+        chosen = await self._run._ask(self._run._on_permission, request)
         outcome = (
             DeniedOutcome(outcome="cancelled")
             if chosen is None
@@ -271,7 +328,9 @@ class _Client:
         return RequestPermissionResponse(outcome=outcome)
 
     async def create_elicitation(self, message, mode, **kw):
-        answer = await self._run._on_question(Question(message, _fields(mode.requested_schema)))
+        answer = await self._run._ask(
+            self._run._on_question, Question(message, _fields(mode.requested_schema))
+        )
         if answer is None:
             return CancelElicitationResponse(action="cancel")
         return AcceptElicitationResponse(action="accept", content=answer)
