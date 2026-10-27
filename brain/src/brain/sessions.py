@@ -11,8 +11,9 @@ from collections.abc import Callable
 from datetime import datetime
 
 from brain.bodies import Bodies
-from brain.memory import Memory
+from brain.memory import Memory, _compaction_text
 from brain.mind.prompt import render_know, system_prompt, user_content
+from brain.mind.resume import rebuild_history
 from brain.mind.turn import Model, run_turn
 from brain.protocol import SayParams, SayResult
 from brain.tools import TOOLS, make_run_tool
@@ -37,7 +38,8 @@ class Session:
         self._memory = memory
         self._run_tool = make_run_tool(memory)
         self._now = now
-        self.history: list = []
+        self.history: list = rebuild_history(memory.load_messages())
+        self._saved = len(self.history)  # history[:_saved] is already in the database
         self._inbox: list = []
         self._turn_id: str | None = None
         self._task: asyncio.Task | None = None
@@ -86,7 +88,7 @@ class Session:
 
     def _append_user(self, content: list) -> None:
         # The API wants alternating roles, so consecutive user content shares one message.
-        if self.history and self.history[-1]["role"] == "user":
+        if len(self.history) > self._saved and self.history[-1]["role"] == "user":
             self.history[-1]["content"] += content
         else:
             self.history.append({"role": "user", "content": content})
@@ -105,6 +107,22 @@ class Session:
                 self._inbox.clear()
             self._turn_id = None
             self._task = None
+        self._persist()
         self._bodies.notify(
             "turn", {"turn": turn_id, "body": body_id, "state": "ended", "reason": reason}
         )
+
+    def _persist(self) -> None:
+        # Saving is best effort: a full disk must not stop the ended notification.
+        try:
+            new = self.history[self._saved :]
+            self._memory.save_messages(new)
+            self._saved = len(self.history)  # before summaries, so a failure there cannot re-save
+            for message in new:
+                if message["role"] != "assistant" or isinstance(message["content"], str):
+                    continue
+                for block in message["content"]:
+                    if block.get("type") == "compaction" and (text := _compaction_text(block)):
+                        self._memory.add_summary(text)
+        except Exception:
+            log.exception("could not save the chat")
