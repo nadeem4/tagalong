@@ -492,6 +492,18 @@ async def test_answer_always_replies_empty_closes_ask_and_runs_the_tool(ask_env)
         assert use["params"]["tool"] == "click"
 
 
+async def test_answer_always_tells_bodies_permissions_changed(ask_env):
+    url, _ = ask_env
+    async with connect(url) as ws:
+        ask = (await open_ask(ws))["params"]
+        seen = await answer(ws, ask["id"], "always")
+        async with asyncio.timeout(5):
+            while not any(f.get("method") == "use" for f in seen):
+                seen.append(json.loads(await ws.recv()))
+        changed = [f["params"]["what"] for f in seen if f.get("method") == "changed"]
+        assert changed == ["permissions"]
+
+
 async def test_answer_deny_keeps_the_tool_from_running(ask_env):
     url, model = ask_env
     async with connect(url) as ws:

@@ -1,6 +1,6 @@
 /**
  * Home's Spend card: what was spent today against the daily limit, and whether the limit
- * paused proactive comments. The brain reports only these two numbers. Contains SpendCard.
+ * paused Scout for the day. The brain reports only these two numbers. Contains SpendCard.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -56,7 +56,7 @@ export function SpendCard() {
         <>
           {spentOut && limit !== null && (
             <p className="home-card__lead">
-              Proactive comments paused: today’s {cap(limit)} is spent.
+              Today’s {cap(limit)} is spent; Scout pauses until midnight.
             </p>
           )}
           <h3 className="home-card__label">TODAY</h3>

@@ -44,11 +44,11 @@ describe('SpendCard', () => {
     await waitFor(() => expect(screen.getByText('under $0.01 of $1')).toBeInTheDocument());
   });
 
-  it('says proactive comments are paused once today’s limit is spent', async () => {
+  it('says Scout pauses until midnight once today’s limit is spent', async () => {
     renderCard(() => ({ spentUsd: 1.02, limitUsd: 1 }));
     await waitFor(() =>
       expect(
-        screen.getByText('Proactive comments paused: today’s $1 is spent.'),
+        screen.getByText('Today’s $1 is spent; Scout pauses until midnight.'),
       ).toBeInTheDocument(),
     );
   });

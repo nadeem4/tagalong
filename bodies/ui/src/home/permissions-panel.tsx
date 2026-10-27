@@ -51,11 +51,13 @@ export function PermissionsPanel() {
     <section className="home-card home-perms" aria-label="Permissions">
       <h2 className="home-card__label">PERMISSIONS</h2>
       <p>
-        Scout asks before it uses a tool unless you switch it to Auto. Switching back to Ask is
-        always one click.
+        Ask: Scout checks with you first. Auto: it just does it. Tools that only read start on Auto.
       </p>
       {failed && rows === null && (
-        <p role="alert">Tagalong could not read the permissions. Reopen Home to try again.</p>
+        <p role="alert">
+          Tagalong could not read the permissions. They load again when Home reopens or a permission
+          changes.
+        </p>
       )}
       {rows !== null && rows.length === 0 && <p>Scout has no tools yet.</p>}
       {rows !== null && rows.length > 0 && (

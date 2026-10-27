@@ -163,10 +163,12 @@ def home(mem, tmp_path):
     def notify(method, params):
         sent.append((method, params))
 
-    tools = brain_tools(mem, notify) + home_tools(budget, lambda: box, notify)
-    box = Toolbox(
-        [BrainSource(tools), BodySource(bodies)], mem.permission_modes, mem.set_permission_mode
-    )
+    def save_mode(name, mode):
+        mem.set_permission_mode(name, mode)
+        notify("changed", {"what": "permissions"})  # as Session does
+
+    tools = brain_tools(mem, notify) + home_tools(budget, lambda: box)
+    box = Toolbox([BrainSource(tools), BodySource(bodies)], mem.permission_modes, save_mode)
     handlers = {spec.name: handler for spec, handler in tools}
 
     async def run(name, args=None):

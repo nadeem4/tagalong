@@ -177,9 +177,7 @@ def brain_tools(
     ]
 
 
-def home_tools(
-    budget: Budget, toolbox: Callable[[], Toolbox], notify: Notify
-) -> list[tuple[ToolSpec, Handler]]:
+def home_tools(budget: Budget, toolbox: Callable[[], Toolbox]) -> list[tuple[ToolSpec, Handler]]:
     """Home-only tools about spending and permissions.
 
     The toolbox is passed as a getter because these tools are part of the toolbox's own
@@ -210,8 +208,7 @@ def home_tools(
         if not args.get("tool") or not args.get("mode"):
             # Home sent bad params; Scout never calls this, so it is not a MemoryRefused.
             raise RpcError(ErrorCode.invalid_params, "set_permission needs tool and mode.")
-        toolbox().set_mode(args["tool"], args["mode"])
-        notify("changed", {"what": "permissions"})
+        toolbox().set_mode(args["tool"], args["mode"])  # the save path sends `changed`
         return json.dumps({"tool": args["tool"], "mode": args["mode"]})
 
     home = frozenset({"home"})

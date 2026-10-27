@@ -1744,21 +1744,14 @@ brain routes them to the model, check them in the brain's logs or a contract-v1 
    when a turn finishes, without reopening Home. The card lists no per-provider rows and no month:
    the brain reports only today's spend and the limit.
 
-### SP.2. The cap pauses proactive work only
+### SP.2. The cap stops Scout for the day
 
 1. **Setup:** start the brain with `TAGALONG_DAILY_BUDGET_USD=0.01`; the **Settings → Daily budget**
-   box does not change the brain's limit. Keep an eye on things on, and a routine scheduled a few
-   minutes from now.
+   box does not change the brain's limit.
 2. **Action:** ask Scout questions until today's spend passes $0.01. **Expected:** the Spend card
-   says "Proactive comments paused: today's $0.01 is spent." The brain also ends any turn that
-   starts after that with the reason `over_budget`.
-3. **Action:** wait for the routine's time. **Expected:** it does not run; **Activity** shows it
-   with "Skipped: today's budget is spent." Scout says nothing about it.
-4. **Action:** open a window whose title reads like trouble ("Build failed") and stay on it.
-   **Expected:** no check-in (no "Sent to AI" for it).
-5. **Action:** ask Scout a question, press **Run now** on the routine, start a watch and send a
-   hand-off. **Expected:** all of them run; the finished hand-off gets no check-in line.
-6. **Action:** start the brain with `TAGALONG_DAILY_BUDGET_USD=-1` or `abc`. **Expected:** it
+   says "Today's $0.01 is spent; Scout pauses until midnight." (the brain counts the day by the
+   machine's local date). The next question ends at once with the reason `over_budget`.
+3. **Action:** start the brain with `TAGALONG_DAILY_BUDGET_USD=-1` or `abc`. **Expected:** it
    refuses to start and names the bad value. Remove the variable: the limit is $5 again.
 
 ## File this as a bug
@@ -2123,8 +2116,7 @@ three times: the wording should vary, the behaviour should not.
 4. **Offline body.** Close the browser extension's connection (or run with only the desktop).
    **Expected:** a body that is not connected has its tools dimmed, marked "Not connected", with the
    switch off limits.
-5. **Live update.** Change a mode from a second Home window or by answering **Always allow** on an
-   ask. **Expected:** the list updates without reopening Home.
+5. **Live update.** Open Home, then answer **Always allow** on an ask for a tool in the list. **Expected:** the list updates without reopening Home.
 
 ## Log file
 

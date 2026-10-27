@@ -41,11 +41,17 @@ class Session:
         self._memory = memory
         self._asks = Asks(bodies)
         notify = bodies.notify
-        tools = brain_tools(memory, notify) + home_tools(budget, lambda: self.toolbox, notify)
+        tools = brain_tools(memory, notify) + home_tools(budget, lambda: self.toolbox)
+
+        def save_mode(name: str, mode: str) -> None:
+            # Every save (Home's set_permission or an "always" answer) refreshes open panels.
+            memory.set_permission_mode(name, mode)
+            notify("changed", {"what": "permissions"})
+
         self.toolbox = Toolbox(
             [BrainSource(tools), BodySource(bodies)],
             memory.permission_modes,
-            memory.set_permission_mode,
+            save_mode,
             self._asks,
         )
         self._now = now
