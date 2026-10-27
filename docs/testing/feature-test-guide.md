@@ -320,8 +320,8 @@ desktop app. You need `uv` and an Anthropic key.
    `Remember that I like short answers.`
    **Expected:** a `tool` notification for `remember` with `state: "started"`, then `ended` with
    `ok: true`; a short reply. Scout does not claim it saved something before the tool ended. A
-   row of kind `instruction` appears in `~/.tagalong/tagalong.db`. Check it from `brain/` (the folder is
-   `TAGALONG_HOME` if you set it):
+   row of kind `instruction` or `about_you` appears in `~/.tagalong/tagalong.db`. Check it from
+   `brain/` (the folder is `TAGALONG_HOME` if you set it):
    `uv run python -c "import sqlite3,pathlib; print(sqlite3.connect(pathlib.Path.home()/'.tagalong'/'tagalong.db').execute('select id, kind, text from memories').fetchall())"`
 8. **Action:** stop the brain and start it again, say hello, then `say` with `What do I like?`
    **Expected:** the answer mentions short answers. The item was loaded into the prompt from the

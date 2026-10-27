@@ -200,9 +200,10 @@ class Memory:
             # The new text already exists as another item: drop the old one, keep that one.
             self._db.execute("DELETE FROM memories WHERE id=?", (replaces,))
             return self._item(twin[0])  # type: ignore[return-value]
+        # A reworded tracking item keeps its cadence unless a new one is given.
         self._db.execute(
             "UPDATE memories SET text=?, cadence=?, updated_at=? WHERE id=?",
-            (text, cadence, now, replaces),
+            (text, cadence if cadence is not None else old.cadence, now, replaces),
         )
         return self._item(replaces)  # type: ignore[return-value]
 

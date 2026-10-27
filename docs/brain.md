@@ -43,20 +43,20 @@ the total can run a little low.
 
 ## Files
 
-| File                             | What it does                                                                         |
-| -------------------------------- | ------------------------------------------------------------------------------------ |
-| `brain/src/brain/protocol.py`    | Contract v1 as pydantic types                                                        |
-| `brain/src/brain/config.py`      | Reads the environment and `.env`, keeps the session id                               |
-| `brain/src/brain/guardrails.py`  | The daily budget and its `budget.json` ledger                                        |
-| `brain/src/brain/sessions.py`    | The one conversation: history, the running turn, `say` joins, `cancel`               |
-| `brain/src/brain/memory.py`      | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                 |
-| `brain/src/brain/tools.py`       | The brain's own tools (`remember`, `recall`, `forget`) and their dispatcher          |
-| `brain/src/brain/mind/soul.md`   | Scout's character, the start of the system prompt                                    |
-| `brain/src/brain/mind/prompt.py` | The system prompt (soul, local time, online bodies) and `say` content blocks         |
-| `brain/src/brain/mind/turn.py`   | The thinking loop and the Anthropic streaming call                                   |
-| `brain/src/brain/bodies.py`      | Online bodies, their tools, and one outbox per body id                               |
-| `brain/src/brain/server.py`      | The websocket server: parsing, errors, `hello`, `tools`, `say`, `cancel`, the writer |
-| `brain/src/brain/main.py`        | The `uv run brain` entry point                                                       |
+| File                             | What it does                                                                                  |
+| -------------------------------- | --------------------------------------------------------------------------------------------- |
+| `brain/src/brain/protocol.py`    | Contract v1 as pydantic types                                                                 |
+| `brain/src/brain/config.py`      | Reads the environment and `.env`, keeps the session id                                        |
+| `brain/src/brain/guardrails.py`  | The daily budget and its `budget.json` ledger                                                 |
+| `brain/src/brain/sessions.py`    | The one conversation: history, the running turn, `say` joins, `cancel`                        |
+| `brain/src/brain/memory.py`      | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                          |
+| `brain/src/brain/tools.py`       | The brain's own tools (`remember`, `recall`, `forget`) and their dispatcher                   |
+| `brain/src/brain/mind/soul.md`   | Scout's character, the start of the system prompt                                             |
+| `brain/src/brain/mind/prompt.py` | The system prompt (soul, local time, online bodies, "What you know") and `say` content blocks |
+| `brain/src/brain/mind/turn.py`   | The thinking loop and the Anthropic streaming call                                            |
+| `brain/src/brain/bodies.py`      | Online bodies, their tools, and one outbox per body id                                        |
+| `brain/src/brain/server.py`      | The websocket server: parsing, errors, `hello`, `tools`, `say`, `cancel`, the writer          |
+| `brain/src/brain/main.py`        | The `uv run brain` entry point                                                                |
 
 ## What a connection does
 

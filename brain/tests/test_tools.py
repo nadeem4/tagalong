@@ -91,5 +91,9 @@ async def test_unknown_tool_raises(run):
 
 
 async def test_missing_argument_raises(run):
-    with pytest.raises(KeyError):
+    with pytest.raises(MemoryRefused, match="remember needs kind and text"):
         await run("remember", {"kind": "about_you"})
+    with pytest.raises(MemoryRefused, match="recall needs query"):
+        await run("recall", {})
+    with pytest.raises(MemoryRefused, match="forget needs id"):
+        await run("forget", {})

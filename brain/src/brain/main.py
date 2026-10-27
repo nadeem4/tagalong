@@ -41,12 +41,15 @@ async def _run() -> None:
     model = AnthropicModel(AsyncAnthropic(), config.model)
     budget = Budget(config.data_dir / "budget.json", config.daily_budget_usd)
     session = Session(model, budget, bodies, config.step_cap, memory)
-    server = await start_server(
-        config.host, config.port, bodies, session_id(config.data_dir), session
-    )
-    port = server.sockets[0].getsockname()[1]
-    log.info("brain listening on ws://%s:%d", config.host, port)
-    await server.serve_forever()
+    try:
+        server = await start_server(
+            config.host, config.port, bodies, session_id(config.data_dir), session
+        )
+        port = server.sockets[0].getsockname()[1]
+        log.info("brain listening on ws://%s:%d", config.host, port)
+        await server.serve_forever()
+    finally:
+        memory.close()
 
 
 def main() -> None:

@@ -40,8 +40,8 @@ The kinds table in `memory.py` is the only place caps and rules live.
 
 - At the start of each turn the brain reads the always-loaded kinds once. Every step of the turn
   puts them in the system prompt under "What you know", grouped as instructions, about the owner,
-  and things to keep an eye on, each line `- [id] text`, with a `(cadence)` prefix on tracking items (`- [id] (daily) text`). The id lets Scout use `replaces` or
-  `forget`.
+  and things to keep an eye on, each line `- [id] text`, with a `(cadence)` prefix on tracking items (`- [id] (daily) text`).
+  The id lets Scout use `replaces` or `forget`.
 - `soul.md` tells Scout to save instructions and tracking requests, to prefer `replaces` over a
   near-duplicate, and to `recall` before saying it does not know.
 - Storage is one `memories` table plus an FTS5 index kept in step by triggers. The schema version

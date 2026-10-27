@@ -6,7 +6,7 @@ arguments raise; run_turn turns any exception into an is_error tool result the m
 
 from collections.abc import Awaitable, Callable
 
-from brain.memory import KINDS, Hit, Memory
+from brain.memory import KINDS, Hit, Memory, MemoryRefused
 
 RECALL_MAX_CHARS = 4000
 
@@ -19,7 +19,8 @@ TOOLS: list[dict] = [
         "description": (
             "Save something worth keeping across conversations: a standing instruction, a fact "
             "about the user, something you track, or project notes. Pass replaces=<id> to "
-            "update an existing item instead of adding a duplicate."
+            "update an existing item instead of adding a duplicate; its cadence is kept if "
+            "you omit it."
         ),
         "input_schema": {
             "type": "object",
@@ -81,8 +82,14 @@ def _render(hits: list[Hit]) -> str:
     return "\n".join(lines)
 
 
+def _need(tool: str, args: dict, *names: str) -> None:
+    if any(n not in args for n in names):
+        raise MemoryRefused(f"{tool} needs {' and '.join(names)}.")
+
+
 def make_run_tool(memory: Memory) -> Callable[[str, dict], Awaitable[str]]:
     async def remember(args: dict) -> str:
+        _need("remember", args, "kind", "text")
         item = memory.remember(
             args["kind"], args["text"], args.get("cadence"), args.get("replaces")
         )
@@ -90,10 +97,12 @@ def make_run_tool(memory: Memory) -> Callable[[str, dict], Awaitable[str]]:
         return f"{verb} {item.kind} #{item.id}"
 
     async def recall(args: dict) -> str:
+        _need("recall", args, "query")
         hits = memory.search(args["query"], args.get("kind"))
         return format_hits(hits) if hits else "No matching memories."
 
     async def forget(args: dict) -> str:
+        _need("forget", args, "id")
         item = memory.forget(args["id"])
         return f"forgot {item.kind} #{item.id}: {item.text}"
 

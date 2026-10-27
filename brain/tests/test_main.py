@@ -53,3 +53,24 @@ def test_memory_open_failure_exits(monkeypatch, tmp_path):
     with pytest.raises(SystemExit) as exit_info:
         asyncio.run(_run())
     assert exit_info.value.code == 1
+
+
+def test_memory_closed_on_shutdown(monkeypatch, tmp_path):
+    closed = []
+    real = main.Memory
+
+    class Spy(real):
+        def close(self):
+            closed.append(True)
+            super().close()
+
+    async def stop(*args):
+        raise RuntimeError("stop")
+
+    monkeypatch.setenv("TAGALONG_HOME", str(tmp_path))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
+    monkeypatch.setattr(main, "Memory", Spy)
+    monkeypatch.setattr(main, "start_server", stop)
+    with pytest.raises(RuntimeError):
+        asyncio.run(_run())
+    assert closed == [True]

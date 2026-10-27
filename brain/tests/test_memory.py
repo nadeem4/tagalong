@@ -210,3 +210,10 @@ def test_search_sees_replaced_and_forgotten(mem):
 def test_fts_query_quotes_tokens():
     assert memory.fts_query('Foo "bar"!') == '"foo" OR "bar"'
     assert memory.fts_query("***") == ""
+
+
+def test_replace_without_cadence_keeps_old_cadence(mem):
+    old = mem.remember("tracking", "Watch the build", "daily")
+    new = mem.remember("tracking", "Watch the nightly build", replaces=old.id)
+    assert new.cadence == "daily"
+    assert mem.remember("tracking", "Watch it", "weekly", replaces=old.id).cadence == "weekly"
