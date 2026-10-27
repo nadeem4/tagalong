@@ -12,6 +12,7 @@ import pytest
 
 from brain.bodies import Bodies
 from brain.memory import Memory
+from brain.mind.resume import rebuild_history
 from brain.mind.turn import Final
 from brain.protocol import SayParams
 from brain.sessions import Session
@@ -262,3 +263,160 @@ async def test_joined_say_does_not_refresh_know():
     await finish(session)
     assert model.systems[0] == model.systems[1]
     assert "added mid-turn" not in model.systems[0]
+
+
+# --- saved chat: save at turn end, resume on start, summaries from compaction ---
+
+
+def file_memory(tmp_path):
+    return Memory(tmp_path / "t.db")
+
+
+async def test_turn_end_saves_new_messages(tmp_path):
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate(["one", "two"]), memory)
+    session.say("desktop", say("a"))
+    await finish_quietly(session)
+    assert [m["role"] for m in memory.load_messages()] == ["user", "assistant"]
+    session.say("desktop", say("b"))
+    await finish_quietly(session)
+    assert [m["role"] for m in memory.load_messages()] == ["user", "assistant"] * 2
+
+
+async def test_cancelled_turn_is_saved_valid(tmp_path):
+    memory = file_memory(tmp_path)
+    call = Final(
+        [{"type": "tool_use", "id": "t1", "name": "recall", "input": {"query": "x"}}],
+        "tool_use",
+        SimpleNamespace(),
+    )
+    running = asyncio.Event()
+
+    async def blocked(name, args):
+        running.set()
+        await asyncio.Event().wait()
+
+    session, _ = make(Gate([call, "never"]), memory)
+    session._run_tool = blocked
+    result = session.say("desktop", say("a"))
+    await running.wait()  # the cancel lands while the tool is running
+    session.cancel(result.turn)
+    await finish_quietly(session)
+    rows = memory.load_messages()
+    assert rows == session.history
+    assert rows[-1]["content"][0]["type"] == "tool_result"
+    assert rows[-1]["content"][0]["content"] == "cancelled"
+
+
+async def test_late_says_are_saved(tmp_path):
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate([asyncio.Event(), "x"]), memory)
+    result = session.say("desktop", say("a"))
+    await asyncio.sleep(0)
+    session.say("desktop", say("late"))
+    session.cancel(result.turn)
+    await finish_quietly(session)
+    saved = memory.load_messages()
+    assert saved[-1]["content"][-1] == {"type": "text", "text": "late"}
+
+
+async def test_resume_after_restart(tmp_path):
+    first, _ = make(Gate(["one"]), file_memory(tmp_path))
+    first.say("desktop", say("a"))
+    await finish_quietly(first)
+    model = Gate(["two"])
+    second, _ = make(model, file_memory(tmp_path))
+    assert second.history == first.history
+    second.say("desktop", say("b"))
+    await finish_quietly(second)
+    assert model.seen[0][0] == first.history[0]
+    assert len(model.seen[0]) == 3
+
+
+def compaction_final():
+    return Final(
+        [{"type": "compaction", "content": "We planned Lisbon"}, {"type": "text", "text": "ok"}],
+        "end_turn",
+        SimpleNamespace(),
+    )
+
+
+async def test_compaction_block_becomes_summary_item_and_replays(tmp_path):
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate([compaction_final()]), memory)
+    session.say("desktop", say("trip"))
+    await finish_quietly(session)
+    assert [h.kind for h in memory.search("lisbon", kind="summary")] == ["summary"]
+    model = Gate(["next"])
+    second, _ = make(model, file_memory(tmp_path))
+    assert second.history[0]["content"] == [{"type": "text", "text": "trip"}]
+    second.say("desktop", say("more"))
+    await finish_quietly(second)
+    sent = model.seen[0][1]["content"]
+    assert sent[0] == {"type": "compaction", "content": "We planned Lisbon"}
+
+
+async def test_same_compaction_not_summarised_twice_after_restart(tmp_path):
+    memory = file_memory(tmp_path)
+    session, _ = make(Gate([compaction_final()]), memory)
+    session.say("desktop", say("trip"))
+    await finish_quietly(session)
+    second, _ = make(Gate(["next"]), file_memory(tmp_path))
+    second.say("desktop", say("more"))
+    await finish_quietly(second)
+    assert len(memory.search("lisbon", kind="summary")) == 1
+
+
+async def test_persist_failure_does_not_block_ended(tmp_path, caplog):
+    memory = file_memory(tmp_path)
+    real = memory.save_messages
+
+    def boom(messages):
+        raise RuntimeError("disk full")
+
+    memory.save_messages = boom
+    session, sent = make(Gate(["one", "two"]), memory)
+    session.say("desktop", say("a"))
+    await finish_quietly(session)
+    assert states(sent) == ["started", "ended"]
+    assert "could not save the chat" in caplog.text
+    memory.save_messages = real
+    session.say("desktop", say("b"))
+    await finish_quietly(session)
+    assert len(memory.load_messages()) == 4
+
+
+async def test_cancelled_result_added_on_resume_is_stored(tmp_path):
+    memory = file_memory(tmp_path)
+    memory.save_messages(
+        [
+            {"role": "user", "content": [{"type": "text", "text": "a"}]},
+            {
+                "role": "assistant",
+                "content": [{"type": "tool_use", "id": "t1", "name": "recall", "input": {}}],
+            },
+        ]
+    )
+    session, _ = make(Gate(["one"]), memory)
+    session.say("desktop", say("b"))
+    await finish_quietly(session)
+    rebuilt = rebuild_history(file_memory(tmp_path).load_messages())
+    for i, m in enumerate(rebuilt):
+        if m["role"] == "assistant" and isinstance(m["content"], list):
+            ids = [b["id"] for b in m["content"] if b.get("type") == "tool_use"]
+            assert not ids or i + 1 < len(rebuilt)
+            answered = [b.get("tool_use_id") for b in rebuilt[i + 1]["content"]] if ids else []
+            assert all(x in answered for x in ids)
+    stored = memory.load_messages()
+    assert stored[2]["content"][0]["tool_use_id"] == "t1"
+
+
+async def test_no_merge_into_saved_message(tmp_path):
+    memory = file_memory(tmp_path)
+    memory.save_messages([{"role": "user", "content": [{"type": "text", "text": "old"}]}])
+    session, _ = make(Gate(["one"]), memory)
+    assert len(session.history) == 1
+    session.say("desktop", say("new"))
+    assert [m["role"] for m in session.history] == ["user", "user"]
+    assert session.history[0]["content"] == [{"type": "text", "text": "old"}]
+    await finish_quietly(session)

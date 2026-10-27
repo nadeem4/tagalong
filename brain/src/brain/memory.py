@@ -4,6 +4,7 @@ The kinds table below is the only place caps and rules live. Refusals raise Memo
 with a plain sentence the model reads and can act on; code never evicts items silently.
 """
 
+import json
 import re
 import sqlite3
 from collections.abc import Callable
@@ -58,6 +59,29 @@ MIGRATIONS = (
         INSERT INTO memories_fts(rowid, text) VALUES (new.id, new.text);
     END;
     """,
+    # Saved chat. Images and documents never land here; see _clean_block.
+    """
+    CREATE TABLE messages(
+        id INTEGER PRIMARY KEY,
+        at TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content_json TEXT NOT NULL,
+        text TEXT NOT NULL
+    );
+    CREATE VIRTUAL TABLE messages_fts USING fts5(
+        text, content='messages', content_rowid='id', tokenize='porter unicode61'
+    );
+    CREATE TRIGGER messages_ai AFTER INSERT ON messages BEGIN
+        INSERT INTO messages_fts(rowid, text) VALUES (new.id, new.text);
+    END;
+    CREATE TRIGGER messages_ad AFTER DELETE ON messages BEGIN
+        INSERT INTO messages_fts(messages_fts, rowid, text) VALUES ('delete', old.id, old.text);
+    END;
+    CREATE TRIGGER messages_au AFTER UPDATE ON messages BEGIN
+        INSERT INTO messages_fts(messages_fts, rowid, text) VALUES ('delete', old.id, old.text);
+        INSERT INTO messages_fts(rowid, text) VALUES (new.id, new.text);
+    END;
+    """,
 )
 
 
@@ -96,6 +120,37 @@ def fts_query(text: str) -> str:
     return " OR ".join(f'"{w}"' for w in re.findall(r"\w+", text.lower()))
 
 
+_MARKERS = {"image": "[screenshot]", "document": "[document]"}
+
+
+def _compaction_text(block: dict) -> str:
+    """The summary text of a compaction block; empty when compaction failed (content null)."""
+    return block.get("content") or ""
+
+
+def _clean_block(block, texts: list[str]):
+    """Replace image/document blocks with text markers; collect searchable text.
+
+    Thinking and tool_use input are kept in content_json (the API needs them to resume) but
+    never reach the searchable text.
+    """
+    if not isinstance(block, dict):
+        return block
+    kind = block.get("type")
+    if kind in _MARKERS:
+        texts.append(_MARKERS[kind])
+        return {"type": "text", "text": _MARKERS[kind]}
+    if kind == "text":
+        texts.append(block.get("text", ""))
+    elif kind == "tool_result":
+        inner = block.get("content")
+        if isinstance(inner, str):
+            texts.append(inner)
+        elif isinstance(inner, list):
+            return {**block, "content": [_clean_block(b, texts) for b in inner]}
+    return block
+
+
 def _model_kinds() -> str:
     return ", ".join(k.name for k in KINDS.values() if k.written_by == "model")
 
@@ -129,7 +184,13 @@ class Memory:
         for n in range(version, len(MIGRATIONS)):
             # One transaction per migration; the version bump commits with it.
             script = "BEGIN;" + MIGRATIONS[n] + f"PRAGMA user_version = {n + 1}; COMMIT;"
-            self._db.executescript(script)
+            try:
+                self._db.executescript(script)
+            except BaseException:
+                if self._db.in_transaction:
+                    self._db.execute("ROLLBACK")
+                self._db.close()
+                raise
 
     def close(self) -> None:
         self._db.close()
@@ -226,18 +287,63 @@ class Memory:
                 out[spec.name] = [Item(*r) for r in rows]
         return out
 
+    def add_summary(self, text: str) -> Item:
+        """Code-written compaction summary; skips the model-write checks and caps."""
+        now = self._now().isoformat()
+        cur = self._db.execute(
+            "INSERT INTO memories(kind, text, cadence, created_at, updated_at)"
+            " VALUES ('summary',?,NULL,?,?)",
+            (text.strip(), now, now),
+        )
+        return self._item(cur.lastrowid)  # type: ignore[arg-type,return-value]
+
+    def save_messages(self, messages: list[dict]) -> None:
+        now = self._now().isoformat()
+        self._db.execute("BEGIN IMMEDIATE")
+        try:
+            for m in messages:
+                texts: list[str] = []
+                content = m["content"]
+                if isinstance(content, str):
+                    texts.append(content)
+                else:
+                    content = [_clean_block(b, texts) for b in content]
+                self._db.execute(
+                    "INSERT INTO messages(at, role, content_json, text) VALUES (?,?,?,?)",
+                    (now, m["role"], json.dumps(content), "\n".join(t for t in texts if t)),
+                )
+        except BaseException:
+            self._db.execute("ROLLBACK")
+            raise
+        self._db.execute("COMMIT")
+
+    def load_messages(self) -> list[dict]:
+        rows = self._db.execute("SELECT role, content_json FROM messages ORDER BY id")
+        return [{"role": r, "content": json.loads(c)} for r, c in rows]
+
     def search(self, query: str, kind: str | None = None, limit: int = 10) -> list[Hit]:
         match = fts_query(query)
-        if not match or (kind is not None and kind not in KINDS):
+        if not match or (kind is not None and kind != "chat" and kind not in KINDS):
             return []
-        sql = (
-            "SELECT m.id, m.kind, m.updated_at, m.text FROM memories_fts"
-            " JOIN memories m ON m.id = memories_fts.rowid WHERE memories_fts MATCH ?"
-        )
-        args: list = [match]
-        if kind is not None:
-            sql += " AND m.kind = ?"
-            args.append(kind)
-        sql += " ORDER BY bm25(memories_fts) LIMIT ?"
-        args.append(limit)
-        return [Hit(str(i), k, at, t) for i, k, at, t in self._db.execute(sql, args)]
+        hits: list[Hit] = []
+        if kind != "chat":
+            sql = (
+                "SELECT m.id, m.kind, m.updated_at, m.text FROM memories_fts"
+                " JOIN memories m ON m.id = memories_fts.rowid WHERE memories_fts MATCH ?"
+            )
+            args: list = [match]
+            if kind is not None:
+                sql += " AND m.kind = ?"
+                args.append(kind)
+            sql += " ORDER BY bm25(memories_fts) LIMIT ?"
+            args.append(limit)
+            hits = [Hit(str(i), k, at, t) for i, k, at, t in self._db.execute(sql, args)]
+        if kind is None or kind == "chat":
+            rows = self._db.execute(
+                "SELECT m.id, m.at, m.text FROM messages_fts"
+                " JOIN messages m ON m.id = messages_fts.rowid WHERE messages_fts MATCH ?"
+                " ORDER BY bm25(messages_fts) LIMIT ?",
+                (match, limit - len(hits)),
+            )
+            hits += [Hit(f"chat:{i}", "chat", at, t) for i, at, t in rows]
+        return hits

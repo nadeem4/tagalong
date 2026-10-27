@@ -325,10 +325,19 @@ desktop app. You need `uv` and an Anthropic key.
    `uv run python -c "import sqlite3,pathlib; print(sqlite3.connect(pathlib.Path.home()/'.tagalong'/'tagalong.db').execute('select id, kind, text from memories').fetchall())"`
 8. **Action:** stop the brain and start it again, say hello, then `say` with `What do I like?`
    **Expected:** the answer mentions short answers. The item was loaded into the prompt from the
-   database; the conversation itself is not restored.
+   database.
 9. **Action:** `say` with `Forget that.`
    **Expected:** a `forget` tool `ended` with `ok: true`; rerun the check from step 7 and the
    row is gone from `memories`.
+10. **Action:** `say` with `We are planning a trip to Lisbon.`, stop the brain, start it, say hello, then
+    `say` with `What were we just talking about?`
+    **Expected:** Scout answers about the Lisbon trip; the chat was picked up after the restart.
+11. **Action:** `say` with `Search our chat for Lisbon.`
+    **Expected:** a `recall` tool call that finds the old message.
+12. **Action:** hold a long chat until the model compacts it (hard to trigger by hand; skip it if the
+    chat never gets that long), then run the SQL check with step 7's python one-liner:
+    `select kind, text from memories where kind='summary'`.
+    **Expected:** one `summary` row per compaction.
 
 ## The desktop on the Python brain
 
