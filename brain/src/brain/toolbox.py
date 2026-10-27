@@ -9,8 +9,12 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Protocol
 
+from pydantic import ValidationError
+
+from brain.bodies import Bodies
+from brain.mind.prompt import part_blocks
 from brain.mind.turn import Call
-from brain.protocol import ErrorCode, RpcError
+from brain.protocol import LIMITS, CallResult, ErrorCode, RpcError
 
 log = logging.getLogger("brain")
 
@@ -48,6 +52,46 @@ class BrainSource:
         return await self._tools[tool][1](call.input)
 
     def unavailable(self, name: str) -> RpcError | None:
+        return None
+
+
+SEP = "__"  # joins body id and tool name; bodies may not use it in tool names
+
+
+class BodySource:
+    """Each online body's declared tools, offered as `body__tool` and run through Bodies.use."""
+
+    def __init__(self, bodies: Bodies) -> None:
+        self._bodies = bodies
+
+    def specs(self) -> list[ToolSpec]:
+        out = []
+        for body in sorted(self._bodies.online(), key=lambda b: b.id):
+            for tool in self._bodies.tools(body.id):
+                out.append(
+                    ToolSpec(f"{body.id}{SEP}{tool.name}", tool.description, tool.input_schema)
+                )
+        return out
+
+    async def run(self, call: Call, tool: str) -> str | list[dict]:
+        body_id, _, plain = tool.partition(SEP)
+        raw = await self._bodies.use(body_id, call.id, plain, call.input)
+        try:
+            parts = CallResult.model_validate({"output": raw}).output
+        except ValidationError:
+            raise RpcError(ErrorCode.tool_failed, "body sent a bad result") from None
+        total = 0
+        for part in parts:
+            size = len(part.data) * 3 // 4 if hasattr(part, "data") else 0
+            total += size
+            if size > LIMITS["part_bytes"] or total > LIMITS["message_bytes"]:
+                raise RpcError(ErrorCode.over_limit, f"{plain} sent more data than allowed.")
+        return part_blocks(parts)
+
+    def unavailable(self, name: str) -> RpcError | None:
+        body_id, sep, _ = name.partition(SEP)
+        if sep and not self._bodies.is_online(body_id):
+            return RpcError(ErrorCode.body_offline, f"{body_id} is not connected right now.")
         return None
 
 

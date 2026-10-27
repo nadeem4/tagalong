@@ -13,7 +13,7 @@ from importlib.resources import files
 from typing import Any
 
 from brain.memory import Item
-from brain.protocol import Body, FilePart, ImagePart, SayParams, TextPart
+from brain.protocol import Body, FilePart, ImagePart, Part, SayParams, TextPart
 
 IMAGE_MIMES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
@@ -78,11 +78,10 @@ def _file_block(part: FilePart) -> dict[str, Any]:
     return _unreadable(name, part.mime)
 
 
-def user_content(params: SayParams) -> list[dict[str, Any]]:
+def part_blocks(parts: list[Part]) -> list[dict[str, Any]]:
+    """Model content blocks for parts; shared by user messages and body tool results."""
     blocks: list[dict[str, Any]] = []
-    if params.text:
-        blocks.append(_text(params.text))
-    for part in params.parts or []:
+    for part in parts:
         if isinstance(part, TextPart):
             if part.text:
                 blocks.append(_text(part.text))
@@ -94,6 +93,14 @@ def user_content(params: SayParams) -> list[dict[str, Any]]:
                 blocks.append(_unreadable("unnamed", part.mime))
         elif isinstance(part, FilePart):
             blocks.append(_file_block(part))
+    return blocks
+
+
+def user_content(params: SayParams) -> list[dict[str, Any]]:
+    blocks: list[dict[str, Any]] = []
+    if params.text:
+        blocks.append(_text(params.text))
+    blocks.extend(part_blocks(params.parts or []))
     if params.context is not None:
         blocks.append(
             _text(
