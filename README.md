@@ -63,6 +63,10 @@ Scout remembers instructions and facts about you across restarts, in `~/.tagalon
 If the brain is not running, the desktop still opens and shows "Scout's brain is not running." It
 connects by itself once the brain is up.
 
+When Scout's brain wants to use a tool that needs your say-so, the bubble asks in Scout's words
+with **Allow once**, **Always allow** (not offered for a locked tool) and **Deny**. Several asks
+queue and show one at a time; if the brain is offline when you click, the card stays up.
+
 The [developer guide](docs/development.md) covers getting pnpm, testing, packaging and the Chrome
 extension.
 

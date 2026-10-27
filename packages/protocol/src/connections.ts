@@ -163,8 +163,9 @@ export const ConnectionsChangedParams = z.object({ connections: z.array(Connecti
  * `tool.approve`: `once` runs it this one time, `deny` cancels it.
  */
 export const ConnectorConfirmParams = z.object({
-  approvalId: z.uuid(),
-  turnId: z.uuid(),
+  // Plain strings: the brain's ask ids are uuid hex, and an ask may have no turn ('').
+  approvalId: z.string().min(1),
+  turnId: z.string(),
   petId: z.string().min(1),
   app: z.string().min(1),
   tool: z.string().min(1),
@@ -172,8 +173,20 @@ export const ConnectorConfirmParams = z.object({
   summary: z.string().min(1),
   /** `high`: it cannot be undone, and the card says so. */
   risk: AskRisk.optional(),
+  /**
+   * The brain's ask options, in order (`allow`, `always`, `deny`; no `always` on a locked
+   * tool). Absent on the old brain's card, which offers Allow once and Deny only.
+   */
+  options: z.array(z.string()).optional(),
 });
 export type ConnectorConfirmParams = z.infer<typeof ConnectorConfirmParams>;
+
+/**
+ * A confirm card's ask closed (answered, timed out, cancelled). Only the bubble reads it:
+ * unlike `asks.changed`, Home's waiting count and list ignore it.
+ */
+export const ConnectorDismissParams = z.object({ approvalId: z.string().min(1) });
+export type ConnectorDismissParams = z.infer<typeof ConnectorDismissParams>;
 
 /** A free id from a name: `Google Calendar` becomes `google-calendar`, then `-2`, `-3`. */
 export function connectionIdFrom(name: string, taken: readonly string[]): string {

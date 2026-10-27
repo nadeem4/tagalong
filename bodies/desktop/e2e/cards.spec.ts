@@ -222,7 +222,7 @@ test.describe('the connector confirm card', () => {
     const panel = await ask(app, 'note that I need milk again');
     const card = panel.getByRole('region', { name: 'Change something in Notes?' });
     await expect(card).toBeVisible({ timeout: 30_000 });
-    await card.getByRole('button', { name: 'Cancel' }).click();
+    await card.getByRole('button', { name: 'Deny' }).click();
     await expect(card).toHaveCount(0);
 
     const home = await activity(app);

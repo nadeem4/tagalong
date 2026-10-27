@@ -106,6 +106,7 @@ const CORE_TO_HOST_NOTIFICATIONS = [
   'pet.remark',
   'connections.changed',
   'connector.confirm',
+  'connector.dismiss',
   'asks.changed',
   'routine.proposed',
   'routine.result',

@@ -116,7 +116,7 @@ const bridge: HostBridge = {
     ipcRenderer.invoke(IPC.cancelHandoff, handoffId) as Promise<void>,
   searchProjects: (query: string) =>
     ipcRenderer.invoke(IPC.searchProjects, query) as Promise<ProjectCandidate[]>,
-  approveTool: (approvalId: string, decision: 'once' | 'deny') =>
+  approveTool: (approvalId: string, decision: 'once' | 'always' | 'deny') =>
     ipcRenderer.invoke(IPC.approveTool, approvalId, decision) as Promise<void>,
   listAsks: () => ipcRenderer.invoke(IPC.listAsks) as Promise<AsksListResult>,
   answerAsk: (id: string, decision: 'approve' | 'decline') =>

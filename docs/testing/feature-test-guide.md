@@ -367,6 +367,16 @@ their rows return.
    **Expected:** Scout lists them (it called `desktop__list_windows`).
 10. **Action:** ask the same, and quit the desktop app while Scout is working on it.
     **Expected:** the reply says it could not reach the desktop; no hang.
+11. **Action:** ask Scout to do something that changes a window (for example "move the Notes
+    window to the left").
+    **Expected:** the bubble asks in Scout's own words, with **Allow once**, **Always allow** and
+    **Deny**. **Allow once** runs it; the next time the bubble asks again.
+12. **Action:** repeat and press **Always allow**.
+    **Expected:** it runs, and later asks for the same tool no longer appear. Press **Deny** on
+    another tool's ask: Scout tells you it was told no.
+13. **Action:** while an ask is open, restart the desktop app (or drop and restore the connection).
+    **Expected:** the ask is still open in the bubble. With a second body connected, answering in
+    one closes the card in the other.
 
 ## Hand-offs to Claude Code
 

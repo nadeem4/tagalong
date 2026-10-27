@@ -3,7 +3,7 @@
  * the UI needs no change when the brain moves to Python. Stateful: `turn.completed` carries
  * the whole reply, but the brain streams it, so the mapper keeps each open turn's text.
  */
-import type { ReplyParams, ToolParams, TurnParams } from '@tagalong/contract';
+import type { AskParams, ReplyParams, ToolParams, TurnParams } from '@tagalong/contract';
 import type { TurnEvent } from '@tagalong/ui';
 
 const BUDGET_MESSAGE = "Scout has used today's budget. It starts again tomorrow.";
@@ -69,6 +69,39 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
     ];
   }
 
+  // Ids of the confirm cards shown, so a closed frame only dismisses a card that was shown.
+  // The dismissal is its own event, not asks.changed: Home counts and lists those from the
+  // old engine, which knows nothing of the brain's asks.
+  const asks = new Set<string>();
+
+  const dismiss = (approvalId: string): TurnEvent => ({ type: 'connector.dismiss', approvalId });
+
+  function ask(p: AskParams): TurnEvent[] {
+    if (p.state === 'closed') return asks.delete(p.id) ? [dismiss(p.id)] : [];
+    if (!p.confirm || p.tool === undefined) return [];
+    const input = Object.entries(p.input ?? {}).map(
+      ([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`,
+    );
+    // Scout's own words lead; with none, the tool and what it was given stand in.
+    const summary = p.text !== '' ? p.text : [p.tool, ...input].join('\n');
+    // Body tools arrive as `<body>__<name>`; a name without it is the brain's own.
+    const body = p.tool.includes('__') ? p.tool.split('__')[0]! : '';
+    const app = body === '' ? 'Scout' : body.charAt(0).toUpperCase() + body.slice(1);
+    asks.add(p.id);
+    return [
+      {
+        type: 'connector.confirm',
+        approvalId: p.id,
+        turnId: p.turn ?? '',
+        petId: petId(),
+        app,
+        tool: p.tool,
+        summary,
+        options: p.options,
+      },
+    ];
+  }
+
   return {
     map(method: string, params: unknown): TurnEvent[] {
       if (method === 'turn') {
@@ -91,6 +124,7 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
         return [{ type: 'turn.delta', turnId: p.turn, text: p.delta }];
       }
       if (method === 'tool') return tool(params as ToolParams);
+      if (method === 'ask') return ask(params as AskParams);
       return [];
     },
 
@@ -98,6 +132,8 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
     resync(): TurnEvent[] {
       const events = [...open.keys()].map((id) => error(id, 'brain_restarted', LOST_MESSAGE));
       open.clear();
+      for (const id of asks) events.push(dismiss(id));
+      asks.clear();
       return events;
     },
   };

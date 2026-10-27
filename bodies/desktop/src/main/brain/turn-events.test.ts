@@ -159,3 +159,84 @@ describe('createTurnEvents', () => {
     expect(m.map('turn', turn('ended', 'done', 'z'))[0]).toMatchObject({ text: 'x' });
   });
 });
+
+describe('createTurnEvents: asks', () => {
+  const open = (over: Record<string, unknown> = {}) => ({
+    seq: ++seq,
+    id: 'a1',
+    state: 'open',
+    turn: T,
+    text: "I'll move the window.",
+    options: ['allow', 'always', 'deny'],
+    confirm: true,
+    tool: 'desktop__move_window',
+    input: { x: 1 },
+    ...over,
+  });
+  const closed = (id = 'a1') => ({
+    seq: ++seq,
+    id,
+    state: 'closed',
+    reason: 'answered',
+    option: 'allow',
+  });
+
+  it('maps a confirm ask to one connector.confirm carrying the ask id, words and options', () => {
+    expect(make().map('ask', open())).toEqual([
+      {
+        type: 'connector.confirm',
+        approvalId: 'a1',
+        turnId: T,
+        petId: 'pet-1',
+        app: 'Desktop',
+        tool: 'desktop__move_window',
+        summary: "I'll move the window.",
+        options: ['allow', 'always', 'deny'],
+      },
+    ]);
+  });
+
+  it('a locked ask carries no always', () => {
+    const [e] = make().map('ask', open({ options: ['allow', 'deny'] }));
+    expect(e).toMatchObject({ options: ['allow', 'deny'] });
+  });
+
+  it('an empty text shows the tool and its input instead', () => {
+    const [e] = make().map('ask', open({ text: '', input: { x: 1, title: 'Notes' } }));
+    expect(e).toMatchObject({ summary: 'desktop__move_window\nx: 1\ntitle: Notes' });
+  });
+
+  it("a brain tool's ask belongs to Scout", () => {
+    const [e] = make().map('ask', open({ tool: 'forget_memory' }));
+    expect(e).toMatchObject({ app: 'Scout' });
+  });
+
+  it('an ask that is not a confirm maps to nothing', () => {
+    const { confirm: _c, tool: _t, input: _i, ...plain } = open();
+    expect(make().map('ask', plain)).toEqual([]);
+  });
+
+  // Home counts asks.changed and lists them from the old engine, which knows nothing of the
+  // brain's asks, so a brain ask is dismissed through an event only the bubble handles.
+  it('a closed ask dismisses just that card and never emits asks.changed', () => {
+    const m = make();
+    m.map('ask', open());
+    m.map('ask', open({ id: 'a2' }));
+    expect(m.map('ask', closed('a1'))).toEqual([{ type: 'connector.dismiss', approvalId: 'a1' }]);
+    expect(m.map('ask', closed('a2'))).toEqual([{ type: 'connector.dismiss', approvalId: 'a2' }]);
+  });
+
+  it('a closed ask it never showed maps to nothing', () => {
+    expect(make().map('ask', closed('zz'))).toEqual([]);
+  });
+
+  it('a lost brain dismisses every open ask', () => {
+    const m = make();
+    m.map('ask', open());
+    m.map('ask', open({ id: 'a2' }));
+    expect(m.resync()).toEqual([
+      { type: 'connector.dismiss', approvalId: 'a1' },
+      { type: 'connector.dismiss', approvalId: 'a2' },
+    ]);
+  });
+});

@@ -1,4 +1,4 @@
-/** Tests for the connector confirm card: Allow once and Cancel. */
+/** Tests for the confirm card: Allow once, Always allow and Deny, for apps and the brain's asks. */
 
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
@@ -48,15 +48,126 @@ describe('the connector confirm card', () => {
     expect(screen.queryByRole('region', { name: 'Change something in Notion?' })).toBeNull();
   });
 
-  it('Cancel answers no', async () => {
+  it('Deny answers no', async () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge, true);
     act(() => bridge.emit(confirm()));
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Deny' }));
       await Promise.resolve();
     });
     expect(bridge.approvals).toEqual([{ approvalId: APPROVAL, decision: 'deny' }]);
+  });
+
+  describe("an ask from the brain's tool gate", () => {
+    const ask = (over: Record<string, unknown> = {}) =>
+      ({
+        ...confirm(),
+        app: 'Desktop',
+        tool: 'desktop__move_window',
+        summary: "I'll move the Notes window to the left.",
+        options: ['allow', 'always', 'deny'] as string[],
+        ...over,
+      }) as const;
+
+    it('shows Scout’s words, never the connector wording', () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(ask()));
+      const card = screen.getByRole('region', { name: 'Allow desktop__move_window?' });
+      expect(card).toHaveTextContent("I'll move the Notes window to the left.");
+      expect(card).not.toHaveTextContent('Change in');
+    });
+
+    it('with no words, shows the tool name and its input', () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(ask({ summary: 'desktop__move_window\nx: 1' })));
+      const card = screen.getByRole('region', { name: 'Allow desktop__move_window?' });
+      expect(card).toHaveTextContent('desktop__move_window');
+      expect(card).toHaveTextContent('x: 1');
+    });
+
+    it.each([
+      ['Allow once', 'once'],
+      ['Always allow', 'always'],
+      ['Deny', 'deny'],
+    ] as const)('%s answers %s', async (name, decision) => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(ask()));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name }));
+        await Promise.resolve();
+      });
+      expect(bridge.approvals).toEqual([{ approvalId: APPROVAL, decision }]);
+    });
+
+    it('shows a multi-line text whole, with no Details split', () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(ask({ summary: 'First I will look.\nThen I will move it.' })));
+      const card = screen.getByRole('region', { name: 'Allow desktop__move_window?' });
+      expect(card).toHaveTextContent('First I will look.');
+      expect(card).toHaveTextContent('Then I will move it.');
+      expect(screen.queryByText('Details')).toBeNull();
+    });
+
+    it('shows every open ask in turn: answering the first brings up the second', async () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(ask({ approvalId: 'a1', summary: 'Move the window.' })));
+      act(() => bridge.emit(ask({ approvalId: 'a2', summary: 'Close the tab.' })));
+      expect(screen.getByText('Move the window.')).toBeInTheDocument();
+      expect(screen.queryByText('Close the tab.')).toBeNull();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Allow once' }));
+        await Promise.resolve();
+      });
+      expect(screen.getByText('Close the tab.')).toBeInTheDocument();
+      expect(bridge.approvals).toEqual([{ approvalId: 'a1', decision: 'once' }]);
+    });
+
+    it('a dismissed ask removes its card and leaves the others', () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(ask({ approvalId: 'a1', summary: 'Move the window.' })));
+      act(() => bridge.emit(ask({ approvalId: 'a2', summary: 'Close the tab.' })));
+      act(() => bridge.emit({ type: 'connector.dismiss', approvalId: 'a2' }));
+      expect(screen.getByText('Move the window.')).toBeInTheDocument();
+      act(() => bridge.emit({ type: 'connector.dismiss', approvalId: 'a1' }));
+      expect(screen.queryByRole('button', { name: 'Allow once' })).toBeNull();
+    });
+
+    it('a dismissed first ask hands over to the next', () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(ask({ approvalId: 'a1', summary: 'Move the window.' })));
+      act(() => bridge.emit(ask({ approvalId: 'a2', summary: 'Close the tab.' })));
+      act(() => bridge.emit({ type: 'connector.dismiss', approvalId: 'a1' }));
+      expect(screen.getByText('Close the tab.')).toBeInTheDocument();
+    });
+
+    it('keeps the card when the answer did not get through (brain offline)', async () => {
+      const bridge = createFakeHostBridge();
+      bridge.approveTool = () => Promise.reject(new Error('brain offline'));
+      renderBubble(bridge);
+      act(() => bridge.emit(ask()));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Allow once' }));
+        await Promise.resolve();
+      });
+      expect(screen.getByRole('button', { name: 'Allow once' })).toBeInTheDocument();
+    });
+
+    it('a locked tool has no Always allow', () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(ask({ options: ['allow', 'deny'] })));
+      expect(screen.getByRole('button', { name: 'Allow once' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Deny' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Always allow' })).toBeNull();
+    });
   });
 
   it('says when a change cannot be undone', () => {

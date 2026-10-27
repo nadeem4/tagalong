@@ -321,6 +321,27 @@ describe('BrainClient', () => {
     expect(s.sent.at(-1)).toEqual({ jsonrpc: '2.0', method: 'cancel', params: { turn: 't1' } });
   });
 
+  it.each([
+    ['once', 'allow'],
+    ['always', 'always'],
+    ['deny', 'deny'],
+  ] as const)(
+    'answer(ask, %s) sends the brain option %s and resolves on its reply',
+    async (decision, option) => {
+      const { client, s } = await online();
+      const done = client.answer('a1', decision);
+      const sent = s.sent.at(-1)!;
+      expect(sent).toMatchObject({ method: 'answer', params: { ask: 'a1', option } });
+      s.receive({ jsonrpc: '2.0', id: sent.id, result: {} });
+      await expect(done).resolves.toBeUndefined();
+    },
+  );
+
+  it('answer rejects BrainOffline when the brain is not online', async () => {
+    const { client } = setup();
+    await expect(client.answer('a1', 'deny')).rejects.toBeInstanceOf(BrainOffline);
+  });
+
   it('cancel(turn) is a no-op when offline', async () => {
     const { client, s } = await online();
     s.drop();

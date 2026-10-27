@@ -993,7 +993,10 @@ function registerIpc(): void {
   });
   registerScoutIpc(handle);
   registerExpertIpc(handle, { engine });
-  registerConnectionIpc(handle, { engine });
+  registerConnectionIpc(handle, {
+    engine,
+    answer: (ask, decision) => required().brain.answer(ask, decision),
+  });
   registerAskIpc(handle, { engine });
   registerPickUpIpc(handle, {
     engine,

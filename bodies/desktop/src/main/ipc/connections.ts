@@ -3,19 +3,36 @@
  * registerConnectionIpc.
  */
 
+import { ErrorCode } from '@tagalong/contract';
 import { ConnectionsAddParams } from '@tagalong/protocol';
+import { RpcError } from '../brain/brain-client';
 import { IPC } from '../../shared/ipc';
 import type { EngineCall, IpcHandle } from './handle';
 
 export interface ConnectionIpcDeps {
   /** Throws when the engine is not running. */
   engine: () => EngineCall;
+  /** The person's click on a card: the brain's `answer` for that ask. */
+  answer: (ask: string, decision: 'once' | 'always' | 'deny') => Promise<void>;
 }
 
-export function registerConnectionIpc(handle: IpcHandle, { engine }: ConnectionIpcDeps): void {
-  handle(IPC.approveTool, async (_event, approvalId: string, decision: 'once' | 'deny') => {
-    await engine().call('tool.approve', { approvalId, decision });
-  });
+export function registerConnectionIpc(
+  handle: IpcHandle,
+  { engine, answer }: ConnectionIpcDeps,
+): void {
+  handle(
+    IPC.approveTool,
+    async (_event, approvalId: string, decision: 'once' | 'always' | 'deny') => {
+      try {
+        await answer(approvalId, decision);
+      } catch (e) {
+        // An ask the brain no longer has needs no answer; the card goes with its closed frame.
+        // Anything else (offline, a failed send) rejects, so the card stays up to click again.
+        if (e instanceof RpcError && e.code === ErrorCode.not_found) return;
+        throw e;
+      }
+    },
+  );
   handle(IPC.listConnections, async () => engine().call('connections.list', {}));
   handle(IPC.addConnection, async (_event, params: ConnectionsAddParams) => {
     // Parsed here so the defaults (no args, no env) are filled before the call goes out.

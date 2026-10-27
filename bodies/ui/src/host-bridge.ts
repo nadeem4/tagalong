@@ -48,6 +48,7 @@ type TurnNotification =
   | 'handoff.progress'
   | 'handoff.finished'
   | 'connector.confirm'
+  | 'connector.dismiss'
   | 'asks.changed'
   | 'routine.proposed'
   | 'routine.result'
@@ -151,8 +152,8 @@ export interface HostBridge {
   cancelHandoff?(handoffId: string): Promise<void>;
   /** Projects on this computer matching a name or path, for "Change project". */
   searchProjects?(query: string): Promise<ProjectCandidate[]>;
-  /** The person's answer to a connector confirm card: run it once, or cancel it. */
-  approveTool?(approvalId: string, decision: 'once' | 'deny'): Promise<void>;
+  /** The person's answer to a confirm card: run it once, always allow the tool, or deny it. */
+  approveTool?(approvalId: string, decision: 'once' | 'always' | 'deny'): Promise<void>;
   /**
    * Home's Waiting on you: what waits on the person and the last answered. Allow once and
    * Decline answer an ask (resolves false when it no longer waited); Open brings a hand-off
