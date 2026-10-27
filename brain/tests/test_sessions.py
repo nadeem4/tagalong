@@ -404,7 +404,8 @@ async def test_cancelled_result_added_on_resume_is_stored(tmp_path):
     for i, m in enumerate(rebuilt):
         if m["role"] == "assistant" and isinstance(m["content"], list):
             ids = [b["id"] for b in m["content"] if b.get("type") == "tool_use"]
-            answered = [b.get("tool_use_id") for b in rebuilt[i + 1]["content"]]
+            assert not ids or i + 1 < len(rebuilt)
+            answered = [b.get("tool_use_id") for b in rebuilt[i + 1]["content"]] if ids else []
             assert all(x in answered for x in ids)
     stored = memory.load_messages()
     assert stored[2]["content"][0]["tool_use_id"] == "t1"
