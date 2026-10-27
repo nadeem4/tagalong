@@ -4,6 +4,7 @@ The kinds table below is the only place caps and rules live. Refusals raise Memo
 with a plain sentence the model reads and can act on; code never evicts items silently.
 """
 
+import re
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -74,12 +75,25 @@ class Item:
     updated_at: str
 
 
+@dataclass(frozen=True)
+class Hit:
+    ref: str
+    kind: str
+    at: str
+    text: str
+
+
 _COLUMNS = "id, kind, text, cadence, created_at, updated_at"
 
 
 def _probe_fts5(db: sqlite3.Connection) -> None:
     db.execute("CREATE VIRTUAL TABLE temp._fts_probe USING fts5(x)")
     db.execute("DROP TABLE temp._fts_probe")
+
+
+def fts_query(text: str) -> str:
+    """Turn free text into a safe FTS5 query: quoted word tokens joined by OR."""
+    return " OR ".join(f'"{w}"' for w in re.findall(r"\w+", text.lower()))
 
 
 def _model_kinds() -> str:
@@ -198,3 +212,31 @@ class Memory:
             raise MemoryRefused(f"no memory with id {item_id}.")
         self._db.execute("DELETE FROM memories WHERE id=?", (item_id,))
         return item
+
+    def always_loaded(self) -> dict[str, list[Item]]:
+        out: dict[str, list[Item]] = {}
+        for spec in KINDS.values():
+            if not spec.always_loaded:
+                continue
+            rows = self._db.execute(
+                f"SELECT {_COLUMNS} FROM memories WHERE kind=? ORDER BY id", (spec.name,)
+            ).fetchall()
+            if rows:
+                out[spec.name] = [Item(*r) for r in rows]
+        return out
+
+    def search(self, query: str, kind: str | None = None, limit: int = 10) -> list[Hit]:
+        match = fts_query(query)
+        if not match or (kind is not None and kind not in KINDS):
+            return []
+        sql = (
+            "SELECT m.id, m.kind, m.updated_at, m.text FROM memories_fts"
+            " JOIN memories m ON m.id = memories_fts.rowid WHERE memories_fts MATCH ?"
+        )
+        args: list = [match]
+        if kind is not None:
+            sql += " AND m.kind = ?"
+            args.append(kind)
+        sql += " ORDER BY bm25(memories_fts) LIMIT ?"
+        args.append(limit)
+        return [Hit(str(i), k, at, t) for i, k, at, t in self._db.execute(sql, args)]

@@ -147,3 +147,66 @@ def test_creates_missing_folder(tmp_path):
     m = Memory(tmp_path / "a" / "b" / "t.db")
     m.remember("about_you", "x")
     m.close()
+
+
+def test_always_loaded_groups_in_kind_order(mem):
+    mem.remember("tracking", "t")
+    mem.remember("instruction", "i")
+    mem.remember("project", "p")
+    assert list(mem.always_loaded()) == ["instruction", "tracking"]
+
+
+def test_always_loaded_oldest_first(mem):
+    a = mem.remember("about_you", "first")
+    b = mem.remember("about_you", "second")
+    assert [i.id for i in mem.always_loaded()["about_you"]] == [a.id, b.id]
+
+
+def test_search_finds_by_stem(mem):
+    item = mem.remember("about_you", "Prefers short answers")
+    [hit] = mem.search("answer")
+    assert hit.ref == str(item.id)
+    assert hit.kind == "about_you"
+    assert hit.at == item.updated_at
+    assert hit.text == "Prefers short answers"
+
+
+def test_search_kind_filter(mem):
+    mem.remember("about_you", "likes tea")
+    mem.remember("project", "tea shop site")
+    assert [h.kind for h in mem.search("tea", kind="project")] == ["project"]
+    assert mem.search("tea", kind="nonsense") == []
+
+
+def test_search_limit(mem):
+    for i in range(5):
+        mem.remember("project", f"tea note {i}")
+    assert len(mem.search("tea", limit=3)) == 3
+
+
+def test_search_covers_search_only_and_always_kinds(mem):
+    mem.remember("project", "tea shop")
+    mem.remember("instruction", "tea first")
+    assert {h.kind for h in mem.search("tea")} == {"project", "instruction"}
+
+
+@pytest.mark.parametrize("q", ['"unclosed', "AND", "foo*", "a:b", "NEAR(", "", "***"])
+def test_search_survives_hostile_queries(mem, q):
+    mem.remember("about_you", "foo and a b")
+    assert isinstance(mem.search(q), list)
+    if q in ("", "***"):
+        assert mem.search(q) == []
+
+
+def test_search_sees_replaced_and_forgotten(mem):
+    a = mem.remember("about_you", "likes tea")
+    mem.remember("about_you", "likes coffee", replaces=a.id)
+    assert mem.search("tea") == []
+    assert len(mem.search("coffee")) == 1
+    mem.forget(a.id)
+    assert mem.search("coffee") == []
+
+
+def test_fts_query_quotes_tokens():
+    assert memory.fts_query('Foo "bar"!') == '"foo" OR "bar"'
+    assert memory.fts_query("***") == ""
