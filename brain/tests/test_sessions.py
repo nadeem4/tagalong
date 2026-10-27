@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from brain.bodies import Bodies
+from brain.memory import Memory
 from brain.mind.turn import Final
 from brain.protocol import SayParams
 from brain.sessions import Session
@@ -22,13 +23,20 @@ class Gate:
     def __init__(self, steps):
         self.steps = list(steps)
         self.seen = []
+        self.systems = []
+        self.tools = []
 
     async def stream(self, system, messages, tools):
         self.seen.append(list(messages))
+        self.systems.append(system)
+        self.tools.append(tools)
         step = self.steps.pop(0)
         if isinstance(step, asyncio.Event):
             await step.wait()
             step = self.steps.pop(0)
+        if isinstance(step, Final):  # a scripted tool_use step
+            yield step
+            return
         yield step
         yield Final([{"type": "text", "text": step}], "end_turn", SimpleNamespace())
 
@@ -41,12 +49,12 @@ class Open:
         pass
 
 
-def make(model):
+def make(model, memory=None):
     sent = []
     bodies = Bodies()
     bodies.notify = lambda m, p: sent.append((m, p))
     now = lambda: datetime.datetime(2026, 1, 1, 9, 0)  # noqa: E731
-    return Session(model, Open(), bodies, 10, now=now), sent
+    return Session(model, Open(), bodies, 10, memory or Memory(":memory:"), now=now), sent
 
 
 def say(text):
@@ -188,3 +196,69 @@ async def finish_quietly(session):
     task = session._task
     await asyncio.wait({task})
     await asyncio.sleep(0)  # let the done-callback run
+
+
+def remember_call(text):
+    block = {
+        "type": "tool_use",
+        "id": "t1",
+        "name": "remember",
+        "input": {"kind": "instruction", "text": text},
+    }
+    return Final([block], "tool_use", SimpleNamespace())
+
+
+async def test_turn_sends_memory_tools():
+    model = Gate(["hi"])
+    session, _ = make(model)
+    session.say("desktop", say("hello"))
+    await finish(session)
+    assert [t["name"] for t in model.tools[0]] == ["remember", "recall", "forget"]
+
+
+async def test_what_you_know_in_system_prompt():
+    memory = Memory(":memory:")
+    memory.remember("instruction", "answer in French")
+    model = Gate(["hi"])
+    session, _ = make(model, memory)
+    session.say("desktop", say("hello"))
+    await finish(session)
+    assert "What you know" in model.systems[0] and "answer in French" in model.systems[0]
+
+
+async def test_know_read_once_per_turn():
+    memory = Memory(":memory:")
+    model = Gate([remember_call("be brief"), "ok", "again"])
+    session, _ = make(model, memory)
+    session.say("desktop", say("hello"))
+    await finish(session)
+    assert model.systems[0] == model.systems[1]
+    assert "be brief" not in model.systems[0]
+    session.say("desktop", say("next"))
+    await finish(session)
+    assert "be brief" in model.systems[2]
+
+
+async def test_remember_tool_round_trip():
+    memory = Memory(":memory:")
+    model = Gate([remember_call("be brief"), "ok"])
+    session, _ = make(model, memory)
+    session.say("desktop", say("hello"))
+    await finish(session)
+    assert [i.text for i in memory.always_loaded()["instruction"]] == ["be brief"]
+    result = session.history[2]["content"][0]
+    assert result["type"] == "tool_result" and "is_error" not in result
+
+
+async def test_joined_say_does_not_refresh_know():
+    memory = Memory(":memory:")
+    gate = asyncio.Event()
+    model = Gate([gate, remember_call("be brief"), "ok"])
+    session, _ = make(model, memory)
+    session.say("desktop", say("a"))
+    memory.remember("instruction", "added mid-turn")
+    session.say("desktop", say("b"))
+    gate.set()
+    await finish(session)
+    assert model.systems[0] == model.systems[1]
+    assert "added mid-turn" not in model.systems[0]

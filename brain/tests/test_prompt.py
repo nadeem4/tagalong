@@ -7,7 +7,8 @@ from importlib.resources import files
 
 import pytest
 
-from brain.mind.prompt import system_prompt, user_content
+from brain.memory import Item
+from brain.mind.prompt import render_know, system_prompt, user_content
 from brain.protocol import Body, SayParams
 
 NOW = datetime(2026, 10, 25, 15, 24, 59)
@@ -40,6 +41,48 @@ def test_system_prompt_sections_in_order():
         "- desk (desktop): Windows PC",
         "- ext (extension): Chrome",
     ]
+
+
+def item(id, kind, text, cadence=None):
+    return Item(id, kind, text, cadence, "2026-10-25T00:00:00", "2026-10-25T00:00:00")
+
+
+def test_render_know_groups_with_ids():
+    out = render_know(
+        {
+            "instruction": [item(1, "instruction", "Reply in French")],
+            "about_you": [item(2, "about_you", "Works nights")],
+            "tracking": [item(3, "tracking", "Watch the build", "daily")],
+        }
+    )
+    assert out == (
+        "Instructions from the owner:\n- [1] Reply in French\n\n"
+        "About the owner:\n- [2] Works nights\n\n"
+        "Things to keep an eye on:\n- [3] (daily) Watch the build"
+    )
+
+
+def test_render_know_empty_is_blank():
+    assert render_know({}) == ""
+    assert render_know({"instruction": []}) == ""
+
+
+def test_system_prompt_places_know_between_soul_and_now():
+    know = render_know({"instruction": [item(1, "instruction", "Be brief")]})
+    sections = system_prompt(NOW, [], know).split("\n\n")
+    assert sections[0].startswith("You are Scout")
+    assert sections[-3] == "What you know:\nInstructions from the owner:\n- [1] Be brief"
+    assert sections[-2].startswith("Now: ")
+
+
+def test_system_prompt_without_know_unchanged():
+    assert "What you know" not in system_prompt(NOW, [])
+
+
+def test_soul_has_memory_rules():
+    soul = files("brain.mind").joinpath("soul.md").read_text(encoding="utf-8").lower()
+    assert "instruction" in soul and "tracking" in soul
+    assert "replaces" in soul and "recall" in soul
 
 
 def test_system_prompt_with_no_bodies():
