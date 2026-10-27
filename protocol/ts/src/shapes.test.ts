@@ -66,4 +66,13 @@ describe('shapes', () => {
     expect(Part.safeParse({ type: 'file', mime: 'a/b', ref: 'f1' }).success).toBe(false);
     expect(Part.safeParse({ type: 'file', mime: 'a/b', data: 'AA==' }).success).toBe(true);
   });
+
+  it('accepts effect read or change on a tool, nothing else', () => {
+    const tool = { name: 'n', description: 'd', input_schema: {} };
+    expect(Tool.safeParse({ ...tool, effect: 'read' }).success).toBe(true);
+    expect(Tool.safeParse({ ...tool, effect: 'change' }).success).toBe(true);
+    expect(Tool.safeParse(tool).success).toBe(true);
+    expect(Tool.safeParse({ ...tool, effect: 'write' }).success).toBe(false);
+    expect(Tool.safeParse({ ...tool, effect: null }).success).toBe(false);
+  });
 });

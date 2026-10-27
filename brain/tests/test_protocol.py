@@ -15,6 +15,7 @@ from brain.protocol import (
     BRAIN_TO_BODY,
     LIMITS,
     PROTOCOL,
+    AskOpen,
     Body,
     ErrorCode,
     ErrorObject,
@@ -186,3 +187,41 @@ def test_null_allowed_only_where_nullable():
 def test_null_rejected_on_optional_fields(origin, method, params):
     with pytest.raises(ValidationError):
         MAPS[origin][method][0].model_validate(params)
+
+
+def test_tool_effect_is_read_or_change_never_null():
+    base = {"name": "n", "description": "d", "input_schema": {}}
+    assert Tool.model_validate({**base, "effect": "read"}).effect == "read"
+    assert Tool.model_validate(base).effect is None
+    assert "effect" not in Tool.model_validate(base).model_dump(exclude_none=True)
+    for bad in ("write", None):
+        with pytest.raises(ValidationError):
+            Tool.model_validate({**base, "effect": bad})
+
+
+@pytest.mark.parametrize(
+    ("options", "ok"),
+    [
+        (["allow", "deny"], True),
+        (["allow", "always", "deny"], True),
+        (["deny", "allow"], False),
+        (["always"], False),
+        (["allow", "deny", "always"], False),
+    ],
+)
+def test_confirm_ask_options(options, ok):
+    params = {
+        "seq": 1,
+        "id": "a",
+        "state": "open",
+        "text": "t",
+        "options": options,
+        "confirm": True,
+        "tool": "desktop__x",
+        "input": {},
+    }
+    if ok:
+        AskOpen.model_validate(params)
+    else:
+        with pytest.raises(ValidationError):
+            AskOpen.model_validate(params)

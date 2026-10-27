@@ -49,6 +49,7 @@ export const Tool = z.object({
   description: z.string(),
   input_schema: z.record(z.string(), z.unknown()),
   confirm: z.boolean().optional(),
+  effect: z.enum(['read', 'change']).optional(),
 });
 export type Tool = z.infer<typeof Tool>;
 

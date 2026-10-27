@@ -25,6 +25,7 @@ const tools: Tool[] = [
       'else or minimized, and roughly how much readable text it holds. No window ' +
       'contents, so it is cheap. This is how you find the window you want before calling ' +
       'read_window_text on it, including windows the user cannot see right now.',
+    effect: 'read',
     input_schema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
@@ -38,6 +39,7 @@ const tools: Tool[] = [
       'what is on screen and words may be misread. A short result may mean you could not ' +
       'read inside the window rather than that it is empty; the result notes when that ' +
       'happens.',
+    effect: 'read',
     input_schema: {
       type: 'object',
       properties: {
@@ -61,6 +63,7 @@ const tools: Tool[] = [
       'behind other windows. Use it when the picture matters; for text prefer ' +
       'read_window_text, which is exact and far cheaper. A minimized window has nothing ' +
       'to photograph, and blind spots refuse it; the result says so.',
+    effect: 'read',
     input_schema: {
       type: 'object',
       properties: {

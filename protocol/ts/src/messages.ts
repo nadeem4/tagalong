@@ -137,10 +137,8 @@ const AskOpen = z
       !a.confirm ||
       (a.tool !== undefined &&
         a.input !== undefined &&
-        a.options.length === 2 &&
-        a.options[0] === 'allow' &&
-        a.options[1] === 'deny'),
-    'a confirm ask needs tool, input and options ["allow","deny"]',
+        (a.options.join() === 'allow,deny' || a.options.join() === 'allow,always,deny')),
+    'a confirm ask needs tool, input and options ["allow","deny"] or ["allow","always","deny"]',
   );
 
 const AskClosed = z.object({
