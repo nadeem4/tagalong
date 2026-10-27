@@ -50,6 +50,8 @@ class Asks:
             async with asyncio.timeout(self._timeout):
                 return await entry.future
         except TimeoutError:
+            if entry.future.done() and not entry.future.cancelled():
+                return entry.future.result()  # the answer landed just before the timeout
             self._close(ask_id, "timeout")
             raise RpcError(ErrorCode.timeout, "nobody answered the ask in time") from None
         except asyncio.CancelledError:
@@ -58,7 +60,8 @@ class Asks:
 
     def answer(self, ask_id: str, option: str, body_id: str) -> None:
         entry = self._open.get(ask_id)
-        if entry is None:
+        # A done future means the wait was cancelled or timed out and is about to close.
+        if entry is None or entry.future.done():
             raise RpcError(ErrorCode.not_found, f"no open ask {ask_id}")
         if option not in entry.params["options"]:
             raise RpcError(ErrorCode.invalid_params, f"{option} is not offered by this ask")
@@ -68,7 +71,7 @@ class Asks:
         self._bodies.notify("ask", {**closed, "option": option, "by": body_id})
 
     def open_asks(self) -> list[dict]:
-        return [e.params for e in self._open.values()]
+        return [dict(e.params) for e in self._open.values()]
 
     def _close(self, ask_id: str, reason: str) -> None:
         if self._open.pop(ask_id, None) is not None:

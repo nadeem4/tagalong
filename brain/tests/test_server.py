@@ -23,6 +23,12 @@ TOOL = {
     "name": "see_screen",
     "description": "Capture the screen",
     "input_schema": {"type": "object", "properties": {}},
+    "effect": "read",  # reads run without an ask, so the plain tool tests need no answers
+}
+CLICK = {
+    "name": "click",
+    "description": "Click the mouse",
+    "input_schema": {"type": "object", "properties": {}},
 }
 
 
@@ -40,7 +46,8 @@ def request(method, params, req_id=2):
 @pytest.fixture
 async def env():
     bodies = Bodies()
-    server = await start_server("127.0.0.1", 0, bodies, "s1", None)
+    session = Session(ScriptedModel(asyncio.Event()), Open(), bodies, 10, Memory(":memory:"))
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
     url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
     yield bodies, url
     server.close()
@@ -317,7 +324,8 @@ class ToolModel:
 
     model_id = "claude-sonnet-5-5"
 
-    def __init__(self):
+    def __init__(self, tool="desktop__see_screen"):
+        self.tool = tool
         self.step = 0
         self.seen = []
 
@@ -325,7 +333,7 @@ class ToolModel:
         self.step += 1
         self.seen.append(list(messages))
         if self.step == 1:
-            block = {"type": "tool_use", "id": "c1", "name": "desktop__see_screen", "input": {}}
+            block = {"type": "tool_use", "id": "c1", "name": self.tool, "input": {}}
             yield Final([block], "tool_use", SimpleNamespace())
         else:
             yield Final([{"type": "text", "text": "ok"}], "end_turn", SimpleNamespace())
@@ -419,3 +427,159 @@ async def test_malformed_response_keeps_connection(tool_env):
         await ws.send(json.dumps({"jsonrpc": "2.0", "id": [1], "result": 1}))
         reply = await call(ws, request("tools", {"tools": []}))
         assert reply["result"] == {}
+
+
+# --- asks: answer and replay -------------------------------------------------
+
+EXT = {"id": "ext", "kind": "extension", "name": "Chrome"}
+
+
+def hello_with_click(last_seq=None, body=DESKTOP, req_id=1):
+    frame = hello(last_seq=last_seq, req_id=req_id)
+    frame["params"]["body"] = body
+    frame["params"]["tools"] = [TOOL, CLICK]
+    return frame
+
+
+@pytest.fixture
+async def ask_env():
+    model = ToolModel(tool="desktop__click")
+    bodies = Bodies()
+    session = Session(model, Open(), bodies, 10, Memory(":memory:"))
+    server = await start_server("127.0.0.1", 0, bodies, "s1", session)
+    url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+    yield url, model
+    server.close()
+    await server.wait_closed()
+
+
+async def open_ask(ws):
+    """Join as desktop, start a turn that clicks, and return the open ask frame."""
+    await call(ws, hello_with_click())
+    await call(ws, request("say", {"text": "click"}))
+    async with asyncio.timeout(5):
+        return await next_method(ws, "ask")
+
+
+async def answer(ws, ask_id, option, req_id=7):
+    """Send an answer; return every frame up to its reply (the closed ask may come first)."""
+    await ws.send(json.dumps(request("answer", {"ask": ask_id, "option": option}, req_id)))
+    out = []
+    async with asyncio.timeout(5):
+        while True:
+            frame = json.loads(await ws.recv())
+            out.append(frame)
+            if frame.get("id") == req_id:
+                return out
+
+
+async def test_answer_always_replies_empty_closes_ask_and_runs_the_tool(ask_env):
+    url, _ = ask_env
+    async with connect(url) as ws:
+        ask = (await open_ask(ws))["params"]
+        assert ask["state"] == "open" and ask["options"] == ["allow", "always", "deny"]
+        frames = await answer(ws, ask["id"], "always")
+        assert frames[-1]["result"] == {}
+        closed = [f["params"] for f in frames if f.get("method") == "ask"][0]
+        assert closed["state"] == "closed" and closed["reason"] == "answered"
+        assert closed["option"] == "always" and closed["by"] == "desktop"
+        use = await next_method(ws, "use")
+        assert use["params"]["tool"] == "click"
+
+
+async def test_answer_deny_keeps_the_tool_from_running(ask_env):
+    url, model = ask_env
+    async with connect(url) as ws:
+        ask = (await open_ask(ws))["params"]
+        await answer(ws, ask["id"], "deny")
+        async with asyncio.timeout(5):
+            while model.step < 2:
+                await asyncio.sleep(0.01)
+    result = tool_result(model)
+    assert result["is_error"] is True
+    assert "said no to desktop__click" in json.dumps(result["content"])
+
+
+async def test_answer_unknown_ask_is_not_found(ask_env):
+    url, _ = ask_env
+    async with connect(url) as ws:
+        await call(ws, hello())
+        reply = await call(ws, request("answer", {"ask": "nope", "option": "allow"}))
+        assert reply["error"]["code"] == -32002
+
+
+async def test_answer_with_unoffered_option_is_invalid_params_and_ask_stays_open(ask_env):
+    url, _ = ask_env
+    async with connect(url) as ws:
+        ask = (await open_ask(ws))["params"]
+        bad = await answer(ws, ask["id"], "maybe")
+        assert bad[-1]["error"]["code"] == -32602
+        ok = await answer(ws, ask["id"], "allow", req_id=8)
+        assert ok[-1]["result"] == {}
+
+
+async def test_answer_after_it_closed_is_not_found(ask_env):
+    url, _ = ask_env
+    async with connect(url) as ws:
+        ask = (await open_ask(ws))["params"]
+        await answer(ws, ask["id"], "allow")
+        late = await answer(ws, ask["id"], "deny", req_id=8)
+        assert late[-1]["error"]["code"] == -32002
+
+
+async def test_answer_with_bad_params_is_invalid_params(ask_env):
+    url, _ = ask_env
+    async with connect(url) as ws:
+        await call(ws, hello())
+        reply = await call(ws, request("answer", {"option": "allow"}))
+        assert reply["error"]["code"] == -32602
+
+
+async def test_resync_reconnect_gets_the_open_ask_again(ask_env):
+    url, _ = ask_env
+    async with connect(url) as ws:
+        ask = (await open_ask(ws))["params"]
+    async with connect(url) as ws:
+        reply = await call(ws, hello_with_click(last_seq=9999))
+        assert reply["result"]["resync"] is True
+        again = json.loads(await ws.recv())
+        assert again["method"] == "ask" and again["params"]["id"] == ask["id"]
+        assert again["params"]["state"] == "open"
+        assert again["params"]["seq"] > ask["seq"]
+
+
+async def test_new_body_sees_the_open_ask(ask_env):
+    url, _ = ask_env
+    async with connect(url) as ws:
+        ask = (await open_ask(ws))["params"]
+        async with connect(url) as other:
+            reply = await call(other, hello_with_click(body=EXT))
+            assert reply["result"]["resync"] is False
+            seen = json.loads(await other.recv())
+            assert seen["params"]["id"] == ask["id"] and seen["params"]["state"] == "open"
+
+
+async def test_reconnect_without_resync_gets_the_ask_once_from_the_backlog(ask_env):
+    url, _ = ask_env
+    async with connect(url) as ws:
+        ask = (await open_ask(ws))["params"]
+    async with connect(url) as ws:
+        reply = await call(ws, hello_with_click(last_seq=ask["seq"] - 1))
+        assert reply["result"]["resync"] is False
+        got = json.loads(await ws.recv())
+        assert got["params"]["id"] == ask["id"] and got["params"]["seq"] == ask["seq"]
+        # Nothing else follows: the next frame is the reply to this request.
+        reply = await call(ws, request("cancel", {"turn": "none"}, req_id=5))
+        assert reply["id"] == 5
+
+
+async def test_answered_ask_is_not_replayed(ask_env):
+    url, _ = ask_env
+    async with connect(url) as ws:
+        ask = (await open_ask(ws))["params"]
+        await answer(ws, ask["id"], "allow")
+    async with connect(url) as ws:
+        reply = await call(ws, hello_with_click(last_seq=9999))
+        assert reply["result"]["resync"] is True
+        reply = await call(ws, request("cancel", {"turn": "none"}, req_id=5))
+        assert reply["id"] == 5

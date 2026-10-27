@@ -3,7 +3,8 @@
 The brain is the Python side of contract v1 ([protocol/README.md](../protocol/README.md)). It is
 being built row by row and replaces `packages/core`. Today bodies can connect, declare their tools,
 catch up on missed notifications, and talk to Scout: `say` starts a turn and the reply streams
-back. Scout can use the tools bodies declare (see [Toolbox](#toolbox)). Scout remembers through the `remember`, `recall` and `forget` tools, kept in `tagalong.db`
+back. Scout can use the tools bodies declare, and asks the user first before a tool that changes
+something (see [Toolbox](#toolbox)). Scout remembers through the `remember`, `recall` and `forget` tools, kept in `tagalong.db`
 (see [memory.md](memory.md)). The chat is saved and picked up again after a restart (see [What a turn does](#what-a-turn-does)).
 
 ## Run it
@@ -43,22 +44,23 @@ the total can run a little low.
 
 ## Files
 
-| File                             | What it does                                                                                                                      |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `brain/src/brain/protocol.py`    | Contract v1 as pydantic types                                                                                                     |
-| `brain/src/brain/config.py`      | Reads the environment and `.env`, keeps the session id                                                                            |
-| `brain/src/brain/guardrails.py`  | The daily budget and its `budget.json` ledger                                                                                     |
-| `brain/src/brain/sessions.py`    | The one conversation: history, the running turn, `say` joins, `cancel`                                                            |
-| `brain/src/brain/mind/resume.py` | Rebuilds a valid history from the saved chat at start                                                                             |
-| `brain/src/brain/memory.py`      | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                                                              |
-| `brain/src/brain/toolbox.py`     | `Toolbox`: lists and gates every tool call, from `BrainSource` and `BodySource`                                                   |
-| `brain/src/brain/tools.py`       | The brain's own tools (`remember`, `recall`, `forget`) as specs and handlers for `BrainSource`                                    |
-| `brain/src/brain/mind/soul.md`   | Scout's character, the start of the system prompt                                                                                 |
-| `brain/src/brain/mind/prompt.py` | The system prompt (soul, local time, online bodies, "What you know") and `say` content blocks                                     |
-| `brain/src/brain/mind/turn.py`   | The thinking loop and the Anthropic streaming call                                                                                |
-| `brain/src/brain/bodies.py`      | Online bodies, their tools, one outbox per body id, `use` requests and their pending table                                        |
-| `brain/src/brain/server.py`      | The websocket server: parsing, errors, `hello`, `tools`, `say`, `cancel`, routing `use` responses to `Bodies.resolve`, the writer |
-| `brain/src/brain/main.py`        | The `uv run brain` entry point                                                                                                    |
+| File                             | What it does                                                                                                                                                     |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `brain/src/brain/protocol.py`    | Contract v1 as pydantic types                                                                                                                                    |
+| `brain/src/brain/config.py`      | Reads the environment and `.env`, keeps the session id                                                                                                           |
+| `brain/src/brain/guardrails.py`  | The daily budget and its `budget.json` ledger                                                                                                                    |
+| `brain/src/brain/sessions.py`    | The one conversation: history, the running turn, `say` joins, `cancel`                                                                                           |
+| `brain/src/brain/mind/resume.py` | Rebuilds a valid history from the saved chat at start                                                                                                            |
+| `brain/src/brain/memory.py`      | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                                                                                             |
+| `brain/src/brain/toolbox.py`     | `Toolbox`: lists and gates every tool call, from `BrainSource` and `BodySource`                                                                                  |
+| `brain/src/brain/asks.py`        | `Asks`: opens a permission ask to the bodies, waits for one answer, times out, closes on cancel                                                                  |
+| `brain/src/brain/tools.py`       | The brain's own tools (`remember`, `recall`, `forget`) as specs and handlers for `BrainSource`                                                                   |
+| `brain/src/brain/mind/soul.md`   | Scout's character, the start of the system prompt                                                                                                                |
+| `brain/src/brain/mind/prompt.py` | The system prompt (soul, local time, online bodies, "What you know") and `say` content blocks                                                                    |
+| `brain/src/brain/mind/turn.py`   | The thinking loop and the Anthropic streaming call                                                                                                               |
+| `brain/src/brain/bodies.py`      | Online bodies, their tools, one outbox per body id, `use` requests and their pending table                                                                       |
+| `brain/src/brain/server.py`      | The websocket server: parsing, errors, `hello`, `tools`, `say`, `answer`, `cancel`, replaying open asks, routing `use` responses to `Bodies.resolve`, the writer |
+| `brain/src/brain/main.py`        | The `uv run brain` entry point                                                                                                                                   |
 
 ## What a connection does
 
@@ -184,22 +186,66 @@ The desktop app (`bodies/desktop`) is a body of this brain. It no longer runs th
 - **Gate.** A call whose name matches a tool the caller may use runs. A match the caller may not
   use (the tool's audience) is reported as an unknown tool. Otherwise the not-found step runs: a
   name that belongs to an offline body is reported as body offline, anything else as an unknown
-  tool. Each failure becomes an `is_error` tool result worded with the reason. The ask and
-  permission steps arrive in a later slice.
+  tool. Each failure becomes an `is_error` tool result worded with the reason.
+- **Gate step 3: ask.** A call from Scout to a tool whose mode is `ask` waits for a person (see
+  [Permissions and asks](#permissions-and-asks)). A call from Home skips this step. A tool never
+  runs without passing the gate.
 - **Body calls.** `use` waits at most 30 s. On timeout or when the turn is cancelled the brain
   sends the body `cancel {call}`. If the body disconnects mid-call the result says it went
   offline. Response frames from a body are resolved in the read loop by `Bodies.resolve`.
 - **Results.** Parts a body returns are size-checked and turned into model blocks; a bad or
   oversized result is an error result.
 
+## Permissions and asks
+
+Every tool has a mode, `ask` or `auto`. `Toolbox.mode(spec)` picks it in this order: locked is
+always `ask`; then the user's saved choice; then the tool's own default; then the effect.
+
+| Tool                                     | Default mode            |
+| ---------------------------------------- | ----------------------- |
+| Reads (`effect: "read"`)                 | `auto`                  |
+| Changes (`effect: "change"`)             | `ask`                   |
+| Memory tools (`remember`, `forget`)      | `auto`                  |
+| A body tool that does not declare effect | `ask`                   |
+| Locked (`confirm: true` from the body)   | `ask`, and never `auto` |
+
+The user's saved choices live in the `permissions` table in `tagalong.db`:
+
+| Column | Holds                            |
+| ------ | -------------------------------- |
+| `tool` | The full tool name (primary key) |
+| `mode` | `ask` or `auto`                  |
+
+No row means the tool's default applies. `Toolbox.set_mode` refuses `auto` on a locked tool.
+
+An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-and-confirm)):
+
+- **Options.** `["allow", "always", "deny"]`, or `["allow", "deny"]` for a locked tool. `always`
+  allows this call and saves `auto` for the tool.
+- **Text.** The words Scout wrote just before the tool call. The soul tells Scout so: "When you
+  call a tool that changes something, the words you write just before it are what the user sees
+  when asked to approve it, so say what you are about to do."
+- **Answering.** Any online body can send `answer {ask, option}`. The first answer wins: the brain
+  closes the ask for every body (`reason: "answered"`, with `by`), and later answers get
+  `not_found`. An option the ask did not offer gets `invalid_params` and the ask stays open.
+- **Deny.** The tool does not run. Scout is told "The user said no to <tool>."
+- **No answer.** After 5 minutes the ask closes with `reason: "timeout"` and the call fails with a
+  timeout error.
+- **Nobody online.** No ask is opened. The tool does not run and Scout is told "Nobody was there
+  to ask, so <tool> was not run."
+- **Turn cancelled.** An open ask closes with `reason: "cancelled"` and nothing is left behind.
+- **Reconnect.** Asks live in memory only. A body that joins with no `last_seq`, or that is told
+  `resync`, is sent every ask still open again, with fresh `seq` numbers. A body that reconnects
+  without `resync` gets the ask once, from its backlog.
+
 ## Not built yet
 
-| Row   | Brings                                                                                            |
-| ----- | ------------------------------------------------------------------------------------------------- |
-| 7     | The brain's tools in the `hello` result, `call` (Home runs a tool), the gate steps that need asks |
-| Later | Live-state replay after `resync`, asks, `answer` and confirm guardrails                           |
+| Row   | Brings                                                             |
+| ----- | ------------------------------------------------------------------ |
+| 7     | The brain's tools in the `hello` result, `call` (Home runs a tool) |
+| Later | Live-state replay of open turns after `resync`                     |
 
-Until then `call` and `answer` answer `method_not_found`.
+Until then `call` answers `method_not_found`.
 
 ## Tests
 

@@ -182,5 +182,5 @@ A body that is too far behind.
 ## Left to the builder
 
 - How the outbox is stored (memory or disk); a brain restart may simply mean `resync`.
-- Timeouts for asks, and the exact JSON Schema subset tools may use. The brain's `use` timeout is 30 s; a `use` that times out or whose turn is cancelled gets `cancel {call}` (no `seq`).
+- Timeouts for asks (the Python brain closes a confirm ask `timeout` after 5 minutes), and the exact JSON Schema subset tools may use. A body that joins with no `last_seq`, or is told `resync`, is sent every ask still open again as a fresh `ask` (`open`) with a new `seq`; a body that reconnects without `resync` gets the ask once, from the backlog. The brain's `use` timeout is 30 s; a `use` that times out or whose turn is cancelled gets `cancel {call}` (no `seq`).
 - How the brain turns events, context and tool results into model input.

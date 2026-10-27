@@ -2,7 +2,8 @@
 
 Each connection owns one queue drained by a single writer task, so Peer.send never raises
 or awaits (Bodies.notify loops over peers) and the hello result always precedes its backlog.
-Hello, tools, say and cancel are handled; any other request answers method_not_found.
+Hello, tools, say, answer and cancel are handled; any other request answers method_not_found.
+A body that joins without a usable backlog is sent the asks still open.
 Response frames (a body's answer to `use`) go to Bodies.resolve.
 """
 
@@ -18,10 +19,12 @@ from websockets.exceptions import ConnectionClosed
 from brain.bodies import Bodies
 from brain.protocol import (
     PROTOCOL,
+    AnswerParams,
     CancelTurnParams,
     ErrorCode,
     HelloParams,
     HelloResult,
+    RpcError,
     SayParams,
     ToolsParams,
 )
@@ -101,7 +104,7 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session_id: str, sessio
                 if method != "hello":  # method may be None for a response
                     peer.send(_error(req_id, ErrorCode.invalid_request, "hello must come first"))
                     break
-                body_id = _hello(message, req_id, peer, bodies, session_id)
+                body_id = _hello(message, req_id, peer, bodies, session_id, session)
                 if body_id is None:
                     break
                 continue
@@ -127,8 +130,11 @@ async def _handler(ws: ServerConnection, bodies: Bodies, session_id: str, sessio
         await asyncio.gather(writer, return_exceptions=True)
 
 
-def _hello(message: dict, req_id: Any, peer: _Peer, bodies: Bodies, session_id: str) -> str | None:
-    """Join the body and queue the result then the backlog; None means hello failed."""
+def _hello(
+    message: dict, req_id: Any, peer: _Peer, bodies: Bodies, session_id: str, session: Session
+) -> str | None:
+    """Join the body and queue the result, the backlog, then any open asks it cannot have;
+    None means hello failed."""
     raw = message.get("params")
     # Check the version first: a future protocol may change the shape, and its body
     # should learn "mismatch", not "invalid params".
@@ -149,6 +155,10 @@ def _hello(message: dict, req_id: Any, peer: _Peer, bodies: Bodies, session_id: 
     peer.send(_result(req_id, result))
     for frame in joined.backlog:
         peer.send(frame)
+    if joined.resync or params.last_seq is None:
+        # The backlog cannot show asks this body missed, so send the ones still open again.
+        for ask in session.open_asks():
+            bodies.notify_one(params.body.id, "ask", ask)
     return params.body.id
 
 
@@ -178,6 +188,15 @@ def _dispatch(
             return _result(req_id, session.say(body_id, say))
         except ValueError as exc:  # ValidationError is a ValueError
             return _error(req_id, ErrorCode.invalid_params, str(exc))
+    if method == "answer":
+        try:
+            reply = AnswerParams.model_validate(message.get("params"))
+            session.answer(reply.ask, reply.option, body_id)
+        except ValidationError as exc:
+            return _error(req_id, ErrorCode.invalid_params, str(exc))
+        except RpcError as exc:
+            return _error(req_id, exc.code, str(exc))
+        return _result(req_id, {})
     if method == "cancel":
         try:
             cancel = CancelTurnParams.model_validate(message.get("params"))

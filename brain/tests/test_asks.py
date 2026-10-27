@@ -5,6 +5,7 @@ validated against the contract's AskParams.
 """
 
 import asyncio
+import time
 
 import pytest
 
@@ -165,4 +166,62 @@ async def test_open_asks_lists_only_open():
     assert asks.open_asks() == [params]
     asks.answer(params["id"], "deny", "desktop")
     await task
+    assert asks.open_asks() == []
+
+
+async def test_open_asks_returns_copies():
+    bodies = FakeBodies()
+    asks = Asks(bodies)
+    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
+    params = await opened(bodies)
+    asks.open_asks()[0]["options"] = ["tampered"]
+    assert asks.open_asks()[0]["options"] == ["allow", "always", "deny"]
+    asks.answer(params["id"], "deny", "desktop")
+    await task
+
+
+async def test_answer_after_timeout_is_not_found():
+    bodies = FakeBodies()
+    asks = Asks(bodies, timeout=0.01)
+    with pytest.raises(RpcError):
+        await asks.permission(call(), "desktop__x", False)
+    ask_id = bodies.sent[0][1]["id"]
+    with pytest.raises(RpcError) as err:
+        asks.answer(ask_id, "allow", "desktop")
+    assert err.value.code == ErrorCode.not_found
+
+
+async def test_answer_in_the_tick_after_timeout_fired_is_not_found():
+    # Both timers come due in one loop pass: the timeout cancels the wait first, then the
+    # answer runs before the handler has closed the ask. It must not hit a finished future.
+    bodies = FakeBodies()
+    asks = Asks(bodies, timeout=0.05)
+    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
+    params = await opened(bodies)
+    seen: list[RpcError] = []
+
+    def late_answer() -> None:
+        try:
+            asks.answer(params["id"], "allow", "desktop")
+        except RpcError as exc:
+            seen.append(exc)
+
+    asyncio.get_running_loop().call_later(0.06, late_answer)
+    time.sleep(0.1)  # block the loop so both timers are due together
+    with pytest.raises(RpcError) as err:
+        await task
+    assert err.value.code == ErrorCode.timeout
+    assert [e.code for e in seen] == [ErrorCode.not_found]
+
+
+async def test_answer_landing_just_before_timeout_wins():
+    bodies = FakeBodies()
+    asks = Asks(bodies, timeout=0.05)
+    task = asyncio.create_task(asks.permission(call(), "desktop__x", False))
+    params = await opened(bodies)
+    asyncio.get_running_loop().call_later(
+        0.01, lambda: asks.answer(params["id"], "allow", "desktop")
+    )
+    time.sleep(0.1)  # answer and timeout both due in one loop pass, the answer first
+    assert await task == "allow"
     assert asks.open_asks() == []

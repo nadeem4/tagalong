@@ -1,10 +1,12 @@
 """Tests for the Toolbox: audience filtering, the 64-char cap and the gate checks in run."""
 
+import asyncio
 import json
 import logging
 
 import pytest
 
+from brain.asks import Asks
 from brain.bodies import Bodies
 from brain.mind.turn import Call
 from brain.protocol import Body, ErrorCode, RpcError, Tool
@@ -12,10 +14,10 @@ from brain.toolbox import BodySource, BrainSource, ToolSpec
 from brain.toolbox import Toolbox as RealToolbox
 
 
-def Toolbox(sources, stored=None):
+def Toolbox(sources, stored=None, asks=None):
     """A toolbox whose stored modes are a plain dict, as the tests need no database."""
     stored = {} if stored is None else stored
-    return RealToolbox(sources, lambda: stored, stored.__setitem__)
+    return RealToolbox(sources, lambda: stored, stored.__setitem__, asks)
 
 
 def spec(name, audience=("scout",)):
@@ -287,3 +289,148 @@ def test_set_mode_bad_mode():
     with pytest.raises(RpcError) as e:
         Toolbox([FakeSource([spec("a")])]).set_mode("a", "maybe")
     assert e.value.code == ErrorCode.invalid_params
+
+
+# --- gate step 3: ask before an ask-mode tool runs ---------------------------
+
+
+class AskBodies:
+    """Just enough Bodies for Asks: who is online, and the frames sent."""
+
+    def __init__(self, online=("desktop",)):
+        self.online = list(online)
+        self.sent = []
+
+    def online_ids(self):
+        return self.online
+
+    def notify(self, method, params):
+        self.sent.append(params)
+
+
+def opened_asks(bodies):
+    return [p for p in bodies.sent if p["state"] == "open"]
+
+
+async def until(check):
+    for _ in range(50):
+        if check():
+            return
+        await asyncio.sleep(0)
+    raise AssertionError("condition never became true")
+
+
+def gated(tool_effect="change", locked=False, online=("desktop",), stored=None):
+    bodies = AskBodies(online)
+    source = FakeSource(
+        [ToolSpec("t", "t tool", {"type": "object"}, effect=tool_effect, locked=locked)]
+    )
+    stored = {} if stored is None else stored
+    return Toolbox([source], stored, Asks(bodies)), source, bodies, stored
+
+
+def call_with_text(name, call_id="c1", text="Doing it."):
+    return Call(id=call_id, name=name, input={}, turn="t1", text=text)
+
+
+async def test_auto_tool_runs_without_an_ask():
+    box, source, bodies, _ = gated(tool_effect="read")
+    assert await box.run(call("t")) == "ran t"
+    assert bodies.sent == []
+
+
+async def test_ask_mode_tool_opens_an_ask_and_runs_on_allow():
+    box, source, bodies, _ = gated()
+    task = asyncio.create_task(box.run(call_with_text("t")))
+    await until(lambda: opened_asks(bodies))
+    ask = opened_asks(bodies)[0]
+    assert ask["text"] == "Doing it." and ask["tool"] == "t"
+    assert source.ran == []  # nothing ran while the ask is open
+    box._asks.answer(ask["id"], "allow", "desktop")
+    assert await task == "ran t"
+
+
+async def test_deny_gives_denied_and_the_tool_never_runs():
+    box, source, bodies, _ = gated()
+    task = asyncio.create_task(box.run(call("t")))
+    await until(lambda: opened_asks(bodies))
+    box._asks.answer(opened_asks(bodies)[0]["id"], "deny", "desktop")
+    with pytest.raises(RpcError) as err:
+        await task
+    assert err.value.code == ErrorCode.denied
+    assert str(err.value) == "The user said no to t."
+    assert source.ran == []
+
+
+async def test_always_saves_auto_runs_and_next_call_asks_nothing():
+    box, source, bodies, stored = gated()
+    task = asyncio.create_task(box.run(call("t")))
+    await until(lambda: opened_asks(bodies))
+    box._asks.answer(opened_asks(bodies)[0]["id"], "always", "desktop")
+    assert await task == "ran t"
+    assert stored == {"t": "auto"}
+    assert await box.run(call("t")) == "ran t"
+    assert len(opened_asks(bodies)) == 1
+
+
+async def test_locked_tool_never_saves_auto_and_cannot_be_answered_always():
+    box, source, bodies, stored = gated(locked=True)
+    task = asyncio.create_task(box.run(call("t")))
+    await until(lambda: opened_asks(bodies))
+    ask = opened_asks(bodies)[0]
+    assert ask["options"] == ["allow", "deny"]
+    with pytest.raises(RpcError) as err:
+        box._asks.answer(ask["id"], "always", "desktop")
+    assert err.value.code == ErrorCode.invalid_params
+    box._asks.answer(ask["id"], "allow", "desktop")
+    assert await task == "ran t"
+    assert stored == {}
+
+
+async def test_two_calls_in_one_step_open_independent_asks_with_shared_text():
+    box, source, bodies, _ = gated()
+    first = asyncio.create_task(box.run(call_with_text("t", "c1", "Both now.")))
+    second = asyncio.create_task(box.run(call_with_text("t", "c2", "Both now.")))
+    await until(lambda: len(opened_asks(bodies)) == 2)
+    a, b = opened_asks(bodies)
+    assert a["id"] != b["id"] and a["text"] == b["text"] == "Both now."
+    box._asks.answer(a["id"], "allow", "desktop")
+    box._asks.answer(b["id"], "deny", "desktop")
+    assert await first == "ran t"
+    with pytest.raises(RpcError):
+        await second
+
+
+async def test_home_caller_skips_the_ask():
+    spec_home = ToolSpec("h", "h", {"type": "object"}, frozenset({"home", "scout"}))
+    bodies = AskBodies()
+    box = Toolbox([FakeSource([spec_home])], asks=Asks(bodies))
+    assert await box.run(call("h"), caller="home") == "ran h"
+    assert bodies.sent == []
+
+
+async def test_nobody_online_says_nobody_was_there():
+    box, source, bodies, _ = gated(online=())
+    with pytest.raises(RpcError) as err:
+        await box.run(call("t"))
+    assert err.value.code == ErrorCode.denied
+    assert str(err.value) == "Nobody was there to ask, so t was not run."
+    assert source.ran == []
+
+
+async def test_turn_cancel_mid_ask_closes_it_cancelled_and_leaves_nothing():
+    box, source, bodies, _ = gated()
+    task = asyncio.create_task(box.run(call("t")))
+    await until(lambda: opened_asks(bodies))
+    ask = opened_asks(bodies)[0]
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert bodies.sent[-1] == {"id": ask["id"], "state": "closed", "reason": "cancelled"}
+    assert box._asks.open_asks() == []
+    assert source.ran == []
+
+
+async def test_without_asks_the_gate_step_is_skipped():
+    box = Toolbox([FakeSource([spec("t")])])
+    assert await box.run(call("t")) == "ran t"
