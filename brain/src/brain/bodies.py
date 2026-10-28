@@ -86,6 +86,8 @@ class Bodies:
         self._known: dict[str, list[Tool]] = {}  # last declared tools, kept after disconnect
         self._pending: dict[str, tuple[Peer, asyncio.Future[list[dict]]]] = {}
         self._next_id = 0
+        # Session sets this so a wake that waited for a body can start when one joins.
+        self.on_connect: Callable[[], None] | None = None
 
     def connect(self, body: Body, tools: list[Tool], peer: Peer, last_seq: int | None) -> Joined:
         box = self._outboxes.setdefault(body.id, Outbox())
@@ -95,6 +97,8 @@ class Bodies:
             self._fail_pending(old.peer)
         self._online[body.id] = _Online(body, tools, peer)
         self._known[body.id] = tools
+        if self.on_connect is not None:
+            self.on_connect()
         if last_seq is None:
             return Joined(box.latest, False, [])
         missed = box.since(last_seq)

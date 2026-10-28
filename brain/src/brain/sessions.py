@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import uuid
+from collections import deque
 from collections.abc import Callable
 from datetime import datetime
 from functools import partial
@@ -23,7 +24,7 @@ from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Model, run_turn
 from brain.protocol import SayParams, SayResult, Tool
 from brain.toolbox import BodySource, BrainSource, Toolbox
-from brain.tools import brain_tools, expert_tools, home_tools
+from brain.tools import _fence_safe, brain_tools, expert_tools, home_tools
 
 log = logging.getLogger("brain")
 
@@ -80,13 +81,51 @@ class Session:
         self._inbox: list = []
         self._turn_id: str | None = None
         self._task: asyncio.Task | None = None
+        self._last_body: str | None = None  # where a wake turn goes first
+        self._wakes: deque[tuple[str, Callable[[], None] | None]] = deque()
+        bodies.on_connect = self._run_wakes
 
     def say(self, body_id: str, params: SayParams) -> SayResult:
         content = user_content(params)  # may raise ValueError before anything changes
+        self._last_body = body_id
         # A finished task whose callback has not run yet is a dead turn: start a new one.
-        if self._task is not None and not self._task.done():
+        if self._busy():
             self._inbox.append(content)
             return SayResult(turn=self._turn_id, joined=True)
+        return SayResult(turn=self._start_turn(body_id, content), joined=False)
+
+    def wake(self, event_text: str, on_start: Callable[[], None] | None = None) -> None:
+        """Start a turn the brain begins itself (a job ended). Events queue, one turn each.
+
+        on_start runs when this event's turn actually starts, so the caller can mark the event
+        as told only then.
+        """
+        self._wakes.append((event_text, on_start))
+        self._run_wakes()
+
+    def _busy(self) -> bool:
+        return self._task is not None and not self._task.done()
+
+    def _run_wakes(self) -> None:
+        # Called on wake, when a turn ends and when a body connects: the three things that
+        # can unblock a waiting event.
+        if not self._wakes or self._busy():
+            return
+        if self._last_body is not None and self._bodies.is_online(self._last_body):
+            body_id = self._last_body
+        elif online := self._bodies.online_ids():
+            body_id = online[0]
+        else:
+            return  # no body to tell; the next connect retries
+        text, on_start = self._wakes.popleft()
+        if on_start is not None:
+            on_start()
+        # Job output is untrusted, so it goes in a fence it cannot close.
+        self._start_turn(
+            body_id, [{"type": "text", "text": f'<data kind="job">{_fence_safe(text)}</data>'}]
+        )
+
+    def _start_turn(self, body_id: str, content: list) -> str:
         turn_id = uuid.uuid4().hex
         self._turn_id = turn_id
         if self._inbox:  # says from the finished turn come before this newer one
@@ -117,7 +156,7 @@ class Session:
         )
         self._task = task
         task.add_done_callback(lambda t: self._ended(t, turn_id, body_id))
-        return SayResult(turn=turn_id, joined=False)
+        return turn_id
 
     def cancel(self, turn_id: str) -> None:
         if turn_id == self._turn_id and self._task is not None:
@@ -163,6 +202,7 @@ class Session:
         self._bodies.notify(
             "turn", {"turn": turn_id, "body": body_id, "state": "ended", "reason": reason}
         )
+        self._run_wakes()  # after ended, so the next turn's started comes second
 
     def _persist(self) -> None:
         # Saving is best effort: a full disk must not stop the ended notification.
