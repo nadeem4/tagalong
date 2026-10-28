@@ -1319,8 +1319,8 @@ that calls tools (your Claude sign-in or OpenRouter + Claude).
 
 ### C1. Add a local app
 
-The brain must be running. Browser sign-in (OAuth) is not built yet (9c), so the apps here use a
-command or a pasted key.
+The brain must be running. Sign-in with the app's own page is in [C8](#c8-an-app-with-browser-sign-in-oauth);
+the apps in C1 to C7 use a command or a pasted key.
 
 - [ ] Home → **Connections** → **Add an app** → **A command on this PC**, name `Files`, command
       `npx -y @modelcontextprotocol/server-filesystem C:/Users/<you>/Documents` → **Add**. The page
@@ -1369,7 +1369,8 @@ command or a pasted key.
       other questions.
 - [ ] Stop the brain and open Connections. The page says the brain isn't running and offers **Try
       again**; start the brain and press it, and the apps come back.
-- [ ] An app with browser sign-in shows its status like any other and has no sign-in button.
+- [ ] An app that does not use browser sign-in (a command, a pasted key) never shows a **Sign in**
+      button.
 
 ### C7. Where things run
 
@@ -1380,6 +1381,32 @@ command or a pasted key.
       with the brain. Start it again: **Connected** and the apps come back.
 - [ ] Start the brain on another port and the desktop with `TAGALONG_BRAIN_ADDR=127.0.0.1:50000`. The
       card shows that address.
+
+### C8. An app with browser sign-in (OAuth)
+
+You need a real MCP server that signs in with OAuth (for example Notion's or Linear's hosted MCP
+address, which is https). The brain and the desktop run on this PC.
+
+- [ ] **Add an app** → **An address on the web**, name, its https address, **Signs in with** →
+      **The app's own sign-in page** → **Add**. A note says the brain and browser must be on the same
+      computer. The row reads **Needs sign-in** with a **Sign in** button, and no browser has opened.
+- [ ] Press **Sign in**. Your browser opens the app's page and the chip reads **Waiting for the
+      browser**. Approve it. The browser shows the brain's "you can close this tab" page, and the row
+      becomes **Connected** with a tool count (no need to press anything).
+- [ ] Ask Scout something that reads with that app: it answers from it.
+- [ ] Abandon it: press **Sign in** on another needs-sign-in app, close the browser tab without
+      approving, and wait five minutes. The row goes back to **Needs sign-in** and **Sign in** works
+      again.
+- [ ] Restart the brain with the tokens saved. The app connects by itself, with no browser. Look in
+      the brain's data folder: `app-oauth/<app id>.json` exists and holds the tokens (nothing about it
+      appears in Settings files, `tagalong.db` or the page).
+- [ ] Switch a needs-sign-in app **Off**: its **Sign in** button goes. Switch it **On** again: it comes back.
+- [ ] **Remove** the app: `app-oauth/<app id>.json` is gone.
+- [ ] With the brain on another machine, **Sign in** opens the browser on the desktop's PC, but the
+      redirect lands on that PC's own 127.0.0.1, not the brain's, so nothing finishes: after five
+      minutes the row goes back to **Needs sign-in**. This is the known same-machine limit.
+- [ ] Ask Scout to open a web page with the desktop tool (desktop__open_url): it asks first, and
+      the ask offers no **Always allow**.
 
 ## Waiting on you
 

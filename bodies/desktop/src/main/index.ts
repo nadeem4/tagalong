@@ -307,6 +307,7 @@ async function start(): Promise<void> {
     platform,
     exclusions: () => desktop?.settings.captureExclusions ?? settings.captureExclusions,
     onCapture: announceCapture,
+    openExternal: (url) => shell.openExternal(url),
     onNotification: (method, params) => {
       // The brain changed something Home shows (memory, permissions): every window may refetch.
       if (method === 'changed') {

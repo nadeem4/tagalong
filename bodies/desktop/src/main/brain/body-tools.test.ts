@@ -30,28 +30,82 @@ function setup(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
   const onCapture = vi.fn();
-  const tools = bodyTools(platform as unknown as Platform, () => exclusions, onCapture);
-  return { platform, onCapture, ...tools };
+  const openExternal = vi.fn(async (_url: string) => undefined);
+  const tools = bodyTools(
+    platform as unknown as Platform,
+    () => exclusions,
+    onCapture,
+    openExternal,
+  );
+  return { platform, onCapture, openExternal, ...tools };
 }
 
 describe('bodyTools declarations', () => {
-  it('declares exactly list_windows, read_window_text and look_at_window, all valid', () => {
+  it('declares list_windows, read_window_text, look_at_window and open_url, all valid', () => {
     const { tools } = setup();
     expect(tools.map((t) => t.name)).toEqual([
       'list_windows',
       'read_window_text',
       'look_at_window',
+      'open_url',
     ]);
     for (const tool of tools) expect(Tool.safeParse(tool).success).toBe(true);
   });
 
-  it('marks all three as reads', () => {
+  it('marks the window tools as reads and open_url as a change', () => {
     const { tools } = setup();
     expect(tools.map((t) => [t.name, t.effect])).toEqual([
       ['list_windows', 'read'],
       ['read_window_text', 'read'],
       ['look_at_window', 'read'],
+      ['open_url', 'change'],
     ]);
+  });
+});
+
+describe('open_url', () => {
+  it('is declared confirm: true so Always allow can never switch the ask off', () => {
+    const { tools } = setup();
+    expect(tools.find((t) => t.name === 'open_url')?.confirm).toBe(true);
+    expect(tools.filter((t) => t.confirm).length).toBe(1);
+  });
+
+  it('opens an https page in the browser', async () => {
+    const { run, openExternal } = setup();
+    await run('open_url', { url: 'https://auth.example/authorize?x=1' });
+    expect(openExternal).toHaveBeenCalledWith('https://auth.example/authorize?x=1');
+  });
+
+  it.each([
+    'http://127.0.0.1:8080/cb',
+    'http://example.com',
+    'file:///c:/windows/system32/calc.exe',
+    'javascript:alert(1)',
+    'not a url',
+    '',
+  ])('refuses %j without opening anything', async (url) => {
+    const { run, openExternal } = setup();
+    await expect(run('open_url', { url })).rejects.toMatchObject({
+      code: ErrorCode.invalid_params,
+    });
+    expect(openExternal).not.toHaveBeenCalled();
+  });
+
+  it('refuses a missing or non-string url', async () => {
+    const { run, openExternal } = setup();
+    await expect(run('open_url', {})).rejects.toMatchObject({ code: ErrorCode.invalid_params });
+    await expect(run('open_url', { url: 7 })).rejects.toMatchObject({
+      code: ErrorCode.invalid_params,
+    });
+    expect(openExternal).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed open as tool_failed', async () => {
+    const { run, openExternal } = setup();
+    openExternal.mockRejectedValueOnce(new Error('no browser'));
+    await expect(run('open_url', { url: 'https://a.example' })).rejects.toMatchObject({
+      code: ErrorCode.tool_failed,
+    });
   });
 });
 

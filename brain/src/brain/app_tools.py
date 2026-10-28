@@ -22,6 +22,7 @@ from mcp.types import (
 )
 
 from brain.apps import AUTHS, TRANSPORTS, AppError, Apps, TokenFile, validate_app
+from brain.bodies import Bodies
 from brain.mind.turn import Call
 from brain.protocol import ErrorCode, RpcError
 from brain.toolbox import NAME_MAX, SEP, Handler, ToolSpec
@@ -135,9 +136,12 @@ def format_result(app_id: str, result: CallToolResult) -> str:
 
 
 def app_home_tools(
-    apps: Apps, memory: "Memory", tokens: TokenFile, notify: Notify
+    apps: Apps, memory: "Memory", tokens: TokenFile, notify: Notify, bodies: Bodies
 ) -> list[tuple[ToolSpec, Handler]]:
-    """Home-only calls to manage apps. Refusals are plain lines raised as invalid_params."""
+    """Home-only calls to manage apps. Refusals are plain lines raised as invalid_params.
+
+    `bodies` is how sign-in reaches a browser: Apps knows no bodies, so the open_url it is
+    handed here asks an online body to run its own open_url tool."""
 
     def refuse(message: str) -> RpcError:
         return RpcError(ErrorCode.invalid_params, message)
@@ -237,6 +241,33 @@ def app_home_tools(
         await apps.restart(app_id)
         return json.dumps({"id": app_id, "restarting": True})
 
+    def browser_body() -> str | None:
+        """An online body that can open a web page on the person's machine."""
+        return next(
+            (b for b in bodies.online_ids() if any(t.name == "open_url" for t in bodies.tools(b))),
+            None,
+        )
+
+    async def sign_in_app(args: dict) -> str:
+        app_id = known(args)
+        row = next(r for r in memory.list_apps() if r.id == app_id)
+        if row.auth != "oauth":
+            raise refuse(f"{row.name} does not use sign-in.")
+        if not row.enabled:
+            raise refuse(f"Turn {row.name} on before signing in.")
+        body_id = browser_body()
+        if body_id is None:
+            raise refuse("Open Tagalong on the machine the brain runs on to sign in.")
+
+        async def open_url(url: str) -> None:
+            await bodies.use(body_id, f"sign-in-{app_id}", "open_url", {"url": url})
+
+        try:
+            await apps.sign_in(app_id, open_url)
+        except AppError as exc:
+            raise refuse(str(exc)) from None
+        return json.dumps({"id": app_id, "status": "connecting"})
+
     home = frozenset({"home"})
     by_id = {
         "type": "object",
@@ -294,6 +325,16 @@ def app_home_tools(
         (
             ToolSpec("restart_app", "Reconnect an app.", by_id, home, effect="change"),
             restart_app,
+        ),
+        (
+            ToolSpec(
+                "sign_in_app",
+                "Open an app's sign-in page in the browser; it connects when the person finishes.",
+                by_id,
+                home,
+                effect="change",
+            ),
+            sign_in_app,
         ),
     ]
 

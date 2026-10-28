@@ -45,7 +45,7 @@ async def _run() -> None:
     budget = Budget(config.data_dir / "budget.json", config.daily_budget_usd)
     make_run = partial(ExpertRun, command=config.expert_cmd, timeout=config.expert_timeout)
     tokens = TokenFile(config.data_dir)
-    apps = Apps(memory, bodies.notify, os.environ, tokens=tokens)
+    apps = Apps(memory, bodies.notify, os.environ, tokens=tokens, data_dir=config.data_dir)
     session = Session(
         model, budget, bodies, config.step_cap, memory, make_run=make_run, apps=apps, tokens=tokens
     )

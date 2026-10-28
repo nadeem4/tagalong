@@ -10,6 +10,7 @@ const tools = {
   platform: { listWindows: async () => ({ windows: [] }) } as unknown as Platform,
   exclusions: () => ({}) as CaptureExclusions,
   onCapture: noop,
+  openExternal: async () => undefined,
 };
 
 function setup(env: NodeJS.ProcessEnv) {
@@ -62,6 +63,7 @@ describe('startBrain', () => {
       'list_windows',
       'read_window_text',
       'look_at_window',
+      'open_url',
     ]);
 
     const result = { protocol: 1, session: 's', tools: [], seq: 0, resync: false };

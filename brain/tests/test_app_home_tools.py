@@ -14,7 +14,7 @@ from brain.apps import AppRow, Apps, TokenFile
 from brain.bodies import Bodies
 from brain.memory import Memory
 from brain.mind.turn import Call
-from brain.protocol import RpcError
+from brain.protocol import Body, RpcError, Tool
 from brain.sessions import Session
 
 FAKE = str(Path(__file__).parent / "fake_mcp_server.py")
@@ -34,14 +34,18 @@ async def rig(tmp_path):
     sent = []
     tokens = TokenFile(tmp_path)
     apps = Apps(mem, lambda m, p: sent.append((m, p)), {}, connect_timeout=15, tokens=tokens)
+    bodies = Bodies()
     handlers = {
-        s.name: h for s, h in app_home_tools(apps, mem, tokens, lambda m, p: sent.append((m, p)))
+        s.name: h
+        for s, h in app_home_tools(apps, mem, tokens, lambda m, p: sent.append((m, p)), bodies)
     }
 
     async def call(name, args=None):
         return json.loads(await handlers[name](args or {}))
 
-    yield SimpleRig(mem, apps, tokens, call, sent, handlers)
+    rig = SimpleRig(mem, apps, tokens, call, sent, handlers)
+    rig.bodies = bodies
+    yield rig
     await apps.shutdown()
     mem.close()
 
@@ -63,13 +67,16 @@ async def until(check, timeout=20.0):
 
 
 async def test_home_tools_are_home_only(rig):
-    specs = [s for s, _ in app_home_tools(rig.apps, rig.mem, rig.tokens, lambda m, p: None)]
+    specs = [
+        s for s, _ in app_home_tools(rig.apps, rig.mem, rig.tokens, lambda m, p: None, rig.bodies)
+    ]
     assert [s.name for s in specs] == [
         "list_apps",
         "add_app",
         "set_app_enabled",
         "remove_app",
         "restart_app",
+        "sign_in_app",
     ]
     assert all(s.audience == frozenset({"home"}) for s in specs)
     assert specs[0].effect == "read"
@@ -261,6 +268,97 @@ async def test_failed_store_leaves_no_token(rig, monkeypatch):
     assert rig.tokens.get("r") is None
 
 
+# ---- sign in ----
+
+
+class OpenPeer:
+    """A body that records each use request and answers it."""
+
+    def __init__(self, bodies, body_id="desktop"):
+        self.bodies, self.body_id, self.used = bodies, body_id, []
+
+    def send(self, frame):
+        msg = json.loads(frame)
+        self.used.append(msg["params"])
+        self.bodies.resolve(self.body_id, self, {"id": msg["id"], "result": {"output": []}})
+
+    def close(self):
+        pass
+
+
+def body_with_tools(bodies, tools=("open_url",)):
+    peer = OpenPeer(bodies)
+    decl = [Tool(name=n, description="d", input_schema={"type": "object"}) for n in tools]
+    bodies.connect(Body(id="desktop", kind="desktop", name="d"), decl, peer, None)
+    return peer
+
+
+def oauth_row(rig, enabled=True):
+    rig.mem.add_app(
+        AppRow("gh", "GitHub", "http", {"url": "https://x.example/mcp"}, "oauth", enabled)
+    )
+
+
+@pytest.fixture
+def signs_in(rig, monkeypatch):
+    """Replaces Apps.sign_in with a recorder; its open_url is the callable the tool built."""
+    got = {}
+
+    async def fake(app_id, open_url):
+        got["id"], got["open_url"] = app_id, open_url
+
+    monkeypatch.setattr(rig.apps, "sign_in", fake)
+    return got
+
+
+async def test_sign_in_app_opens_the_page_through_the_body(rig, signs_in):
+    oauth_row(rig)
+    peer = body_with_tools(rig.bodies)
+    out = await rig.call("sign_in_app", {"id": "gh"})
+    assert out == {"id": "gh", "status": "connecting"}
+    assert signs_in["id"] == "gh"
+    await signs_in["open_url"]("https://auth.example/authorize?x=1")
+    assert [(u["tool"], u["input"]) for u in peer.used] == [
+        ("open_url", {"url": "https://auth.example/authorize?x=1"})
+    ]
+
+
+async def test_sign_in_app_without_a_body_that_can_open_urls(rig, signs_in):
+    oauth_row(rig)
+    with pytest.raises(RpcError) as err:
+        await rig.handlers["sign_in_app"]({"id": "gh"})
+    assert err.value.message == "Open Tagalong on the machine the brain runs on to sign in."
+    body_with_tools(rig.bodies, tools=("other",))
+    with pytest.raises(RpcError) as err:
+        await rig.handlers["sign_in_app"]({"id": "gh"})
+    assert err.value.message == "Open Tagalong on the machine the brain runs on to sign in."
+    assert signs_in == {}
+
+
+async def test_sign_in_app_refuses_an_app_that_is_off(rig, signs_in):
+    oauth_row(rig, enabled=False)
+    body_with_tools(rig.bodies)
+    with pytest.raises(RpcError) as err:
+        await rig.handlers["sign_in_app"]({"id": "gh"})
+    assert err.value.message == "Turn GitHub on before signing in."
+    assert signs_in == {}
+
+
+async def test_sign_in_app_refuses_an_app_without_oauth(rig, signs_in):
+    await rig.call("add_app", stdio("Fake"))
+    body_with_tools(rig.bodies)
+    with pytest.raises(RpcError) as err:
+        await rig.handlers["sign_in_app"]({"id": "fake"})
+    assert err.value.message == "Fake does not use sign-in."
+    assert signs_in == {}
+
+
+async def test_sign_in_app_unknown_id(rig, signs_in):
+    with pytest.raises(RpcError) as err:
+        await rig.handlers["sign_in_app"]({"id": "nope"})
+    assert err.value.message == "There is no app called nope."
+
+
 # ---- wiring ----
 
 
@@ -269,7 +367,14 @@ async def test_session_offers_app_tools_and_home_calls(rig):
     bodies.notify = lambda m, p: None
     session = Session(object(), Open(), bodies, 10, rig.mem, apps=rig.apps, tokens=rig.tokens)
     home = {t.name for t in session.home_tools()}
-    assert {"list_apps", "add_app", "set_app_enabled", "remove_app", "restart_app"} <= home
+    assert {
+        "list_apps",
+        "add_app",
+        "set_app_enabled",
+        "remove_app",
+        "restart_app",
+        "sign_in_app",
+    } <= home
     await session.call_home("add_app", stdio())
     await until(lambda: rig.apps.status("fake").state == "connected")
     model_tools = {t["name"] for t in session.toolbox.model_tools()}

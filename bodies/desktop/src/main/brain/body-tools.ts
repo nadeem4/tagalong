@@ -1,5 +1,5 @@
 /**
- * The desktop's body tools for contract v1: list_windows, read_window_text, look_at_window.
+ * The desktop's body tools for contract v1: list_windows, read_window_text, look_at_window, open_url.
  * Declared in `hello`, run when the brain sends `use`. Names and descriptions carry over from
  * the old brain's perception tools. Every run is bounded at 15 s, and any capture that
  * reads pixels raises the capture notice, as the old engine host did.
@@ -73,6 +73,21 @@ const tools: Tool[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: 'open_url',
+    description:
+      'Open a web page in the default browser on this machine. Only https addresses. ' +
+      'The brain uses it for sign-in pages.',
+    effect: 'change',
+    // Always asks: Always allow must not let Scout open any page an app's text talks it into.
+    confirm: true,
+    input_schema: {
+      type: 'object',
+      properties: { url: { type: 'string', description: 'An https address.' } },
+      required: ['url'],
+      additionalProperties: false,
+    },
+  },
 ];
 
 function failed(message: string): RpcError {
@@ -87,6 +102,7 @@ export function bodyTools(
   platform: Platform,
   exclusions: () => CaptureExclusions,
   onCapture: (notice: CaptureNotice) => void,
+  openExternal: (url: string) => Promise<void>,
 ): { tools: Tool[]; run: (tool: string, input: Record<string, unknown>) => Promise<Part[]> } {
   const announce = (blocked: CaptureBlock | null) =>
     onCapture(captureNotice({ at: new Date(), screenshot: true, blocked, paused: false }));
@@ -141,10 +157,28 @@ export function bodyTools(
     return [{ type: 'image', mime: shot.image.mime, data: shot.image.base64 }];
   }
 
+  // https only: the address comes from a remote app's sign-in flow, so no http, file: or app
+  // schemes may reach the shell.
+  async function openUrl(input: Record<string, unknown>): Promise<Part[]> {
+    const raw = input['url'];
+    let url: URL | undefined;
+    try {
+      if (typeof raw === 'string') url = new URL(raw);
+    } catch {
+      url = undefined;
+    }
+    if (url?.protocol !== 'https:') {
+      throw new RpcError(ErrorCode.invalid_params, 'open_url needs an https address');
+    }
+    await openExternal(url.href);
+    return text('Opened in the browser.');
+  }
+
   const handlers: Record<string, (input: Record<string, unknown>) => Promise<Part[]>> = {
     list_windows: listWindows,
     read_window_text: readWindowText,
     look_at_window: lookAtWindow,
+    open_url: openUrl,
   };
 
   async function run(tool: string, input: Record<string, unknown>): Promise<Part[]> {

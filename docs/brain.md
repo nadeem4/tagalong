@@ -59,6 +59,7 @@ the total can run a little low.
 | `brain/src/brain/experts.py`     | `ExpertRun`: drives Claude Code in a folder over ACP; callbacks for permissions, questions, progress and the end                                                 |
 | `brain/src/brain/jobs.py`        | `Jobs`: hand-off ask, relayed Claude Code asks, the 2-job cap, progress and the `jobs` rows, `changed: jobs`                                                     |
 | `brain/src/brain/apps.py`        | `Apps`: connects each enabled app (MCP over stdio or http), keeps it alive, `TokenFile` (`app-tokens.json`), `validate_app`                                      |
+| `brain/src/brain/app_oauth.py`   | `FileTokenStorage` (`app-oauth/`), the loopback callback listener and the OAuth provider for sign-in                                                             |
 | `brain/src/brain/app_tools.py`   | `AppSource` (apps' tools as a toolbox source), tool classification, result fencing, Home's app calls                                                             |
 | `brain/src/brain/tools.py`       | The brain's own tools (memory, Home and expert tools) as specs and handlers for `BrainSource`                                                                    |
 | `brain/src/brain/mind/soul.md`   | Scout's character, the start of the system prompt                                                                                                                |
@@ -170,8 +171,9 @@ The desktop app (`bodies/desktop`) is a body of this brain. It no longer runs th
 - Start the brain first (`cd brain && uv run brain`), then the desktop (`pnpm dev:desktop`). The
   desktop dials `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`, the same variable the brain
   listens on) and retries every 2 s, so either order works.
-- It sends `hello` declaring the window body tools `list_windows`, `read_window_text` and
-  `look_at_window` (see [desktop.md](desktop.md)); the brain offers them to the model as `desktop__<tool>`.
+- It sends `hello` declaring the body tools `list_windows`, `read_window_text`, `look_at_window` and
+  `open_url` (see [desktop.md](desktop.md)); the brain offers them to the model as `desktop__<tool>`.
+  `open_url` (https only) is also what `sign_in_app` uses to open a connected app's sign-in page.
   An ask is a `say` with the text, the screenshot as an image part
   and `context.window`; interrupt is `cancel`.
 - With the brain down, the bubble shows "Scout's brain is not running." A brain restart ends the
@@ -298,15 +300,16 @@ so there is one gate and no second path.
 
 The app calls below are Home-only. A refusal is `invalid_params` with a plain line. Each change
 sends `changed {what: "apps"}`, as does every status change of an app. Home's Connections page calls
-all five (see [connected-apps.md](connected-apps.md#homes-connections-page)).
+all six (see [connected-apps.md](connected-apps.md#homes-connections-page)).
 
-| Tool              | Input                                                                                            | Result text (JSON)                                                                                                                                                   |
-| ----------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `list_apps`       | `{}`                                                                                             | `{"apps": [{"id", "name", "transport", "auth", "enabled", "url" (http) or "command" + "args" (stdio), "status", "error", "tools": [{"name", "effect", "locked"}]}]}` |
-| `add_app`         | `{"name", "transport": "stdio"\|"http", "command"?, "args"?, "env"?, "url"?, "auth"?, "token"?}` | `{"id"}`; connects at once. `token` (only with `auth: "token"`) goes to `app-tokens.json`, never the row                                                             |
-| `set_app_enabled` | `{"id", "enabled": bool}`                                                                        | `{"id", "enabled"}`                                                                                                                                                  |
-| `remove_app`      | `{"id"}`                                                                                         | `{"id", "removed": true}`; stops the app, deletes its row and token                                                                                                  |
-| `restart_app`     | `{"id"}`                                                                                         | `{"id", "restarting": true}`                                                                                                                                         |
+| Tool              | Input                                                                                            | Result text (JSON)                                                                                                                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_apps`       | `{}`                                                                                             | `{"apps": [{"id", "name", "transport", "auth", "enabled", "url" (http) or "command" + "args" (stdio), "status", "error", "tools": [{"name", "effect", "locked"}]}]}`                          |
+| `add_app`         | `{"name", "transport": "stdio"\|"http", "command"?, "args"?, "env"?, "url"?, "auth"?, "token"?}` | `{"id"}`; connects at once. `token` (only with `auth: "token"`) goes to `app-tokens.json`, never the row                                                                                      |
+| `set_app_enabled` | `{"id", "enabled": bool}`                                                                        | `{"id", "enabled"}`                                                                                                                                                                           |
+| `remove_app`      | `{"id"}`                                                                                         | `{"id", "removed": true}`; stops the app, deletes its row and token                                                                                                                           |
+| `restart_app`     | `{"id"}`                                                                                         | `{"id", "restarting": true}`                                                                                                                                                                  |
+| `sign_in_app`     | `{"id"}`                                                                                         | `{"id", "status": "connecting"}` at once; asks an online body's `open_url` to open the sign-in page. Refuses an unknown id, a non-`oauth` app, a switched-off app, or no body with `open_url` |
 
 An unknown id is refused with `There is no app called <id>.`
 
@@ -331,6 +334,16 @@ url shows empty. Home shows these rows in its "Where things run" card.
   `${VAR}` references in env stay as written and are filled from the brain's environment at connect.
 - **`app-tokens.json`** in the data directory holds pasted tokens by app id (kept owner-only where
   the platform allows). A token is never in a row, a tool list or an error line.
+- **OAuth** (`app_oauth.py`): an `auth: "oauth"` app signs in through the app's own page. The brain
+  runs the MCP SDK's `OAuthClientProvider` (client name "Tagalong", PKCE, dynamic registration) with
+  a one-request listener on `127.0.0.1` (port picked by the system, 300 s wait) as the redirect.
+  The provider asks a body's `open_url` to show the page. Only https is followed, or http to
+  loopback. With no saved tokens the app starts `needs-sign-in` and opens no browser; `sign_in_app`
+  starts it. A 401 mid-session returns the app to `needs-sign-in`.
+- **`app-oauth/<app id>.json`** in the data directory (`FileTokenStorage`) holds that app's tokens
+  and client registration, with `saved_at` and `expires_in` so tokens refresh before they expire.
+  A new sign-in clears the old registration (the redirect port changes). Removing the app deletes
+  the file. Like `app-tokens.json`, it never reaches a row, a tool list or an error line.
 
 ## Experts
 
