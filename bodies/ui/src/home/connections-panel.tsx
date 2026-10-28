@@ -12,7 +12,7 @@ type Status = { text: string; error: boolean } | null;
 
 const BRAIN_OFFLINE = 'brain offline';
 
-const STATUS_WORDS: Record<AppInfo['status'], string> = {
+export const STATUS_WORDS: Record<AppInfo['status'], string> = {
   off: 'Off',
   connecting: 'Connecting',
   connected: 'Connected',
@@ -20,7 +20,7 @@ const STATUS_WORDS: Record<AppInfo['status'], string> = {
   error: 'Not working',
 };
 
-const STATUS_DOT: Record<AppInfo['status'], string> = {
+export const STATUS_DOT: Record<AppInfo['status'], string> = {
   off: 'home-dot home-dot--off',
   connecting: 'home-dot home-dot--warn',
   connected: 'home-dot',
