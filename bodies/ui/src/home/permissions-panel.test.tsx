@@ -90,6 +90,18 @@ describe('PermissionsPanel', () => {
     expect(bridge.permissionSets).toEqual([]);
   });
 
+  it('says a tool that asks itself does so, with the switch disabled', async () => {
+    const bridge = createFakeHostBridge({
+      permissions: [{ ...MOVE, name: 'hand_off', self_asks: true }],
+    });
+    renderPanel(bridge);
+    const toggle = await screen.findByRole('switch', { name: 'hand_off' });
+    expect(screen.getByText('Asks itself')).toBeInTheDocument();
+    expect(toggle).toBeDisabled();
+    fireEvent.click(toggle);
+    expect(bridge.permissionSets).toEqual([]);
+  });
+
   it('marks an offline body’s tool Not connected and leaves its switch off limits', async () => {
     const bridge = createFakeHostBridge({ permissions: [OFFLINE] });
     renderPanel(bridge);

@@ -112,6 +112,7 @@ import { registerPickUpIpc } from './ipc/pick-up';
 import { PickUpAllowlist, PickUpWaiting } from './pick-up-open';
 import { registerSightLogIpc } from './ipc/sight-log';
 import { registerMemoryIpc } from './ipc/memory';
+import { registerJobsIpc } from './ipc/jobs';
 import { registerPermissionsIpc } from './ipc/permissions';
 import { registerSettingsIpc } from './ipc/settings';
 import { registerTurnIpc } from './ipc/turns';
@@ -1006,6 +1007,7 @@ function registerIpc(): void {
   registerConnectionIpc(handle, {
     engine,
     answer: (ask, decision) => required().brain.answer(ask, decision),
+    reply: (ask, option, text) => required().brain.answerWith(ask, option, text),
   });
   registerAskIpc(handle, { engine });
   registerPickUpIpc(handle, {
@@ -1017,6 +1019,7 @@ function registerIpc(): void {
   registerSightLogIpc(handle, { engine });
   registerMemoryIpc(handle, { brain: required().brain });
   registerPermissionsIpc(handle, { brain: required().brain });
+  registerJobsIpc(handle, { brain: required().brain });
   registerRoutineIpc(handle, {
     engine,
     openHome: (page) => openHome(page),

@@ -10,6 +10,7 @@ export type {
   AskInput,
   ConfirmHandoff,
   HostBridge,
+  JobRow,
   PermissionRow,
   SpendToday,
   TurnEvent,

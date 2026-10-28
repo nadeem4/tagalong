@@ -42,6 +42,12 @@ describe('registerPermissionsIpc', () => {
     expect(calls).toEqual([['list_permissions', {}]]);
   });
 
+  it('keeps the self_asks flag, so Home can say a tool asks itself', async () => {
+    const row = { ...TOOL, name: 'hand_off', self_asks: true };
+    const { invoke } = setup(() => text({ tools: [row] }));
+    expect(await invoke(IPC.listPermissions)).toEqual([row]);
+  });
+
   it('sets a mode through the brain', async () => {
     const { invoke, calls } = setup(() => text({ tool: TOOL.name, mode: 'auto' }));
     await invoke(IPC.setPermission, TOOL.name, 'auto');

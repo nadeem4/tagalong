@@ -41,6 +41,7 @@ import type {
   AskInput,
   DropOffer,
   HostBridge,
+  JobRow,
   PermissionRow,
   SpendToday,
   TurnEvent,
@@ -124,6 +125,8 @@ const bridge: HostBridge = {
     ipcRenderer.invoke(IPC.searchProjects, query) as Promise<ProjectCandidate[]>,
   approveTool: (approvalId: string, decision: 'once' | 'always' | 'deny') =>
     ipcRenderer.invoke(IPC.approveTool, approvalId, decision) as Promise<void>,
+  answerJobAsk: (approvalId: string, answer: { option: string; text?: string }) =>
+    ipcRenderer.invoke(IPC.answerJobAsk, approvalId, answer) as Promise<void>,
   listAsks: () => ipcRenderer.invoke(IPC.listAsks) as Promise<AsksListResult>,
   answerAsk: (id: string, decision: 'approve' | 'decline') =>
     ipcRenderer.invoke(IPC.answerAsk, id, decision) as Promise<boolean>,
@@ -164,6 +167,8 @@ const bridge: HostBridge = {
   listPermissions: () => ipcRenderer.invoke(IPC.listPermissions) as Promise<PermissionRow[]>,
   setPermission: (tool: string, mode: 'ask' | 'auto') =>
     ipcRenderer.invoke(IPC.setPermission, tool, mode) as Promise<void>,
+  listJobs: () => ipcRenderer.invoke(IPC.listJobs) as Promise<JobRow[]>,
+  stopJob: (job: string) => ipcRenderer.invoke(IPC.stopJob, job) as Promise<void>,
   copyText: (text: string) => ipcRenderer.invoke(IPC.copyText, text) as Promise<void>,
   setCalendarLink: (link: string | null) =>
     ipcRenderer.invoke(IPC.setCalendarLink, link) as Promise<CalendarCheckResult>,

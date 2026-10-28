@@ -297,6 +297,35 @@ describe('HomeView', () => {
     expect(pages).toEqual(['experts', 'settings']);
   });
 
+  it('shows Jobs above the experts list on the Experts page only', async () => {
+    const jobs = [
+      {
+        id: 'j1',
+        agent: 'claude-code',
+        task: 'Fix the login bug',
+        folder: 'C:\\code\\app',
+        mode: 'edit',
+        state: 'running',
+        reason: null,
+        progress: null,
+        result: null,
+        startedAt: '2026-10-28T09:00:00.000Z',
+        endedAt: null,
+      },
+    ];
+    renderHome(createFakeHostBridge({ pets: [SCOUT], experts: [CLAUDE], jobs }), {
+      page: 'experts',
+    });
+    const panel = await screen.findByRole('region', { name: 'Jobs' });
+    expect(within(panel).getByText('Fix the login bug')).toBeVisible();
+    expect(
+      panel.compareDocumentPosition(await screen.findByRole('button', { name: 'Add expert' })) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
+    expect(screen.queryByRole('region', { name: 'Jobs' })).toBeNull();
+  });
+
   it('shows What Scout saw after How Scout decided, kept as the host says', async () => {
     const days: HomeHost = {
       ...host(),

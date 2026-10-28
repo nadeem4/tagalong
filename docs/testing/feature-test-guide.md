@@ -381,24 +381,21 @@ their rows return.
 
 ## Hand off to Claude Code (real brain, real Claude Code)
 
-This section needs slice 8b: the desktop showing non-confirm asks with their options and input.
-Until then the hand-off ask appears on no body, so Scout's `hand_off` waits out the ask timeout
-and says it was not started, and these steps cannot pass.
-
 This section covers the Python brain. It needs `npm install -g @agentclientprotocol/claude-agent-acp`
 (Node 22 or newer), Claude Code logged in with your own login, the brain and the desktop running
-as above, and a small test folder you do not mind Claude Code editing. The Home Jobs panel also
-arrives in 8b, so for now check jobs by asking Scout ("list my jobs", "stop that job").
+as above, and a small test folder you do not mind Claude Code editing. Jobs show in Home →
+Experts, in the **Jobs** card at the top (the Experts list under it is from the old engine and
+does not work). Asking Scout ("list my jobs", "stop that job") also works.
 
 1. **Action:** ask "Hand this to Claude Code: add a README line to the project in
    `C:\path\to\test-folder`."
    **Expected:** an ask card shows the task and the folder, with one button per mode (Manual,
-   Accept edits, Plan, Auto, Bypass permissions) and Cancel. No second allow or deny card appears.
+   Accept edits, Plan, Auto, Bypass permissions) and cancel. No second allow or deny card appears.
    Pick **Plan**: Scout says the job started and gives its id.
 2. **Action:** ask "Hand this to Claude Code: list the files here." without naming a folder.
    **Expected:** Scout asks which folder; it does not start anything or guess one. Name a folder
    that does not exist: Scout says there is no folder at that path.
-3. **Action:** start a hand-off and press **Cancel** on the mode card.
+3. **Action:** start a hand-off and press **cancel** on the mode card.
    **Expected:** Scout says it was not started, and no `claude` or `node` process is left.
 4. **Action:** hand off a task that edits a file in **Manual** mode.
    **Expected:** Claude Code's permission request arrives as an ask (tool and input shown, buttons
@@ -419,6 +416,22 @@ arrives in 8b, so for now check jobs by asking Scout ("list my jobs", "stop that
    nothing. A second finish report does not follow for the same job.
 10. **Action:** start a job whose result needs no comment.
     **Expected:** Scout may stay silent. Silence is allowed; no canned line appears.
+11. **Action:** with a long job running, open Home → Experts.
+    **Expected:** the Jobs card lists it with its task, "Running", folder, mode, start time and
+    its latest progress line. Press **Stop**: the row reads "Stopped" within a moment. Start a
+    short job and let it finish: the row reads "Done" and **Show result** opens the result text.
+12. **Action:** with the bubble closed and Scout silent, start a Manual-mode job that needs
+    permission (or asks a question) and leave the relayed ask unanswered for a minute.
+    **Expected:** the bubble comes up by itself with the card (the request and its input, one
+    button per option) and stays until you answer or it times out, though no chat turn is running.
+    Ending a chat turn meanwhile does not remove it.
+13. **Action:** in Manual mode, have the job do something that needs permission. Then have it ask
+    a question ("Ask me which colour to use").
+    **Expected:** a "Claude Code asks" card shows the request and its input with one button per
+    option; the question card has a **Your answer** field and **Send** (Enter sends too). Typing
+    an answer and sending it continues the job with your words.
+14. **Action:** open Home → Settings → Permissions.
+    **Expected:** Claude Code's tool shows "Asks itself" and its switch is disabled.
 
 ## Hand-offs to Claude Code (old engine)
 

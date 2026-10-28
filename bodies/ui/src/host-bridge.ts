@@ -51,7 +51,24 @@ export interface PermissionRow {
   effect: 'read' | 'change';
   mode: 'ask' | 'auto';
   locked: boolean;
+  /** The tool opens its own ask with the person, so the switch changes nothing (brain's flag). */
+  self_asks?: boolean;
   online: boolean;
+}
+
+/** One Claude Code job in Home's Jobs panel, as the brain's list_jobs sends it. */
+export interface JobRow {
+  id: string;
+  agent: string;
+  task: string;
+  folder: string;
+  mode: string;
+  state: string;
+  reason: string | null;
+  progress: string | null;
+  result: string | null;
+  startedAt: string;
+  endedAt: string | null;
 }
 
 /**
@@ -173,6 +190,11 @@ export interface HostBridge {
   /** The person's answer to a confirm card: run it once, always allow the tool, or deny it. */
   approveTool?(approvalId: string, decision: 'once' | 'always' | 'deny'): Promise<void>;
   /**
+   * The answer to a Claude Code job's ask: one of its own option names, or typed text for a
+   * question. Separate from approveTool because these options are not allow/always/deny.
+   */
+  answerJobAsk?(approvalId: string, answer: { option: string; text?: string }): Promise<void>;
+  /**
    * Home's Waiting on you: what waits on the person and the last answered. Allow once and
    * Decline answer an ask (resolves false when it no longer waited); Open brings a hand-off
    * card up again in the bubble. All optional: a host without Home never shows the page.
@@ -248,6 +270,10 @@ export interface HostBridge {
   listPermissions?(): Promise<PermissionRow[]>;
   /** Sets one tool to ask or auto; rejects when the brain refuses (a locked tool, say). */
   setPermission?(tool: string, mode: 'ask' | 'auto'): Promise<void>;
+  /** Home's Jobs panel: recent Claude Code jobs, newest first. */
+  listJobs?(): Promise<JobRow[]>;
+  /** Stops one running job; rejects when the brain refuses (already ended, say). */
+  stopJob?(job: string): Promise<void>;
   /**
    * The brain changed something Home shows (`memory`, `permissions`): read it again. Returns an
    * unsubscribe function. Optional: a host without a brain never sends it.

@@ -64,7 +64,8 @@ export function PermissionsPanel() {
         <ul aria-label="Permissions" className="perm-list">
           {rows.map((row, index) => {
             const labelId = `${idPrefix}-${index}`;
-            const fixed = row.locked || !row.online;
+            const selfAsks = row.self_asks === true;
+            const fixed = row.locked || selfAsks || !row.online;
             return (
               <li key={row.name} className={row.online ? 'perm-row' : 'perm-row perm-row--offline'}>
                 <span className="perm-row__body">
@@ -73,6 +74,7 @@ export function PermissionsPanel() {
                   </span>
                   <span className="perm-row__text">{row.description}</span>
                   {row.locked && <span className="perm-row__note">Always asks</span>}
+                  {selfAsks && <span className="perm-row__note">Asks itself</span>}
                   {!row.online && <span className="perm-row__note">Not connected</span>}
                 </span>
                 <button

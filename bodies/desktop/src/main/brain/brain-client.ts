@@ -123,6 +123,13 @@ export class BrainClient {
     return this.request('answer', { ask, option }).then(() => undefined);
   }
 
+  /** The answer to a job's ask: one of its own option names, or typed text for a question. */
+  answerWith(ask: string, option: string, text?: string): Promise<void> {
+    if (this.status !== 'online') return Promise.reject(new BrainOffline());
+    const params = text === undefined ? { ask, option } : { ask, option, text };
+    return this.request('answer', params).then(() => undefined);
+  }
+
   private setStatus(status: BrainStatus): void {
     if (this.status === status) return;
     this.status = status;

@@ -369,6 +369,29 @@ describe('BrainClient', () => {
     },
   );
 
+  it('answerWith sends a job ask its own option name, and typed text when given', async () => {
+    const { client, s } = await online();
+    const named = client.answerWith('a1', 'Edit');
+    const first = s.sent.at(-1)!;
+    expect(first).toMatchObject({ method: 'answer', params: { ask: 'a1', option: 'Edit' } });
+    expect(first.params).not.toHaveProperty('text');
+    s.receive({ jsonrpc: '2.0', id: first.id, result: {} });
+    await named;
+    const typed = client.answerWith('a2', 'duckdb', 'duckdb');
+    const second = s.sent.at(-1)!;
+    expect(second).toMatchObject({
+      method: 'answer',
+      params: { ask: 'a2', option: 'duckdb', text: 'duckdb' },
+    });
+    s.receive({ jsonrpc: '2.0', id: second.id, result: {} });
+    await expect(typed).resolves.toBeUndefined();
+  });
+
+  it('answerWith rejects BrainOffline when the brain is not online', async () => {
+    const { client } = setup();
+    await expect(client.answerWith('a1', 'Edit')).rejects.toBeInstanceOf(BrainOffline);
+  });
+
   it('answer rejects BrainOffline when the brain is not online', async () => {
     const { client } = setup();
     await expect(client.answer('a1', 'deny')).rejects.toBeInstanceOf(BrainOffline);

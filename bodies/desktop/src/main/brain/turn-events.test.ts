@@ -211,9 +211,91 @@ describe('createTurnEvents: asks', () => {
     expect(e).toMatchObject({ app: 'Scout' });
   });
 
-  it('an ask that is not a confirm maps to nothing', () => {
-    const { confirm: _c, tool: _t, input: _i, ...plain } = open();
-    expect(make().map('ask', plain)).toEqual([]);
+  // Asks a Claude Code job opens have no turn and no confirm (custom option names).
+  describe('asks with no turn and no confirm', () => {
+    const jobAsk = (over: Record<string, unknown> = {}) => {
+      const { turn: _turn, confirm: _confirm, ...rest } = open();
+      return { ...rest, ...over };
+    };
+
+    it('the hand-off ask carries the task, the folder and every mode plus cancel', () => {
+      const [e] = make().map(
+        'ask',
+        jobAsk({
+          text: 'Fix the login bug',
+          tool: 'hand_off',
+          input: { folder: 'C:\\work\\app' },
+          options: ['Plan', 'Edit', 'cancel'],
+        }),
+      );
+      expect(e).toEqual({
+        type: 'connector.confirm',
+        approvalId: 'a1',
+        turnId: '',
+        petId: 'pet-1',
+        app: 'Scout',
+        tool: 'hand_off',
+        summary: 'Fix the login bug\nfolder: C:\\work\\app',
+        options: ['Plan', 'Edit', 'cancel'],
+      });
+    });
+
+    it('a relayed Claude Code permission ask shows the tool, its input and its own options', () => {
+      const [e] = make().map(
+        'ask',
+        jobAsk({
+          text: '',
+          tool: 'claude_code:Edit file',
+          input: { path: 'a.ts' },
+          options: ['Allow once', 'Reject'],
+        }),
+      );
+      expect(e).toMatchObject({
+        type: 'connector.confirm',
+        app: 'Claude Code',
+        tool: 'claude_code:Edit file',
+        summary: 'claude_code:Edit file\npath: a.ts',
+        options: ['Allow once', 'Reject'],
+      });
+    });
+
+    it('a question ask (no tool) is marked as a question and keeps its choices', () => {
+      const [e] = make().map(
+        'ask',
+        jobAsk({
+          text: 'Which database?',
+          options: ['sqlite', 'postgres'],
+          tool: undefined,
+          input: undefined,
+        }),
+      );
+      expect(e).toMatchObject({
+        type: 'connector.confirm',
+        app: 'Claude Code',
+        summary: 'Which database?',
+        options: ['sqlite', 'postgres'],
+        question: true,
+      });
+    });
+
+    it('a question ask with no text still has a prompt', () => {
+      const [e] = make().map(
+        'ask',
+        jobAsk({ text: '', options: [], tool: undefined, input: undefined }),
+      );
+      expect(e).toMatchObject({ question: true, summary: 'Claude Code asks' });
+    });
+
+    it('a cancelled close dismisses the card with no turn running', () => {
+      const m = make();
+      m.map(
+        'ask',
+        jobAsk({ tool: 'hand_off', input: { folder: 'x' }, options: ['Plan', 'cancel'] }),
+      );
+      expect(m.map('ask', { seq: ++seq, id: 'a1', state: 'closed', reason: 'cancelled' })).toEqual([
+        { type: 'connector.dismiss', approvalId: 'a1' },
+      ]);
+    });
   });
 
   // Home counts asks.changed and lists them from the old engine, which knows nothing of the

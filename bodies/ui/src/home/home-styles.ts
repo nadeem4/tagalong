@@ -204,6 +204,25 @@ export const HOME_CSS = `
 .perm-row--offline .perm-row__name, .perm-row--offline .perm-row__text { opacity: 0.6; }
 .perm-row .tg-switch { flex: none; }
 .perm-row .tg-switch:disabled { opacity: 0.55; cursor: not-allowed; }
+.home-jobs { max-width: 772px; margin: 0 ${t.space.xxl}px ${t.space.xxl}px; }
+.job-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.job-row {
+  display: flex; flex-direction: column; gap: ${t.space.xs}px;
+  padding: ${t.space.lg}px 0; border-top: 1px solid ${t.color.panelLine};
+}
+.job-row__head { display: flex; align-items: baseline; gap: ${t.space.lg}px; justify-content: space-between; }
+.job-row__task { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; overflow-wrap: anywhere; }
+.job-row__state {
+  flex: none; padding: 1px ${t.space.md}px; border: 1px solid ${t.color.panelMuted};
+  border-radius: 999px; font-size: ${t.fontSize.small}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText};
+}
+.job-row__state--running { background: ${t.color.gold}; border-color: ${t.color.gold}; color: ${t.color.goldInk}; }
+.job-row__meta, .job-row__text { font-size: ${t.fontSize.body}px; color: ${t.color.panelMuted}; line-height: 1.4; overflow-wrap: anywhere; }
+.job-row__actions { display: flex; gap: ${t.space.lg}px; }
+.job-row__result {
+  margin: 0; padding: ${t.space.md}px; white-space: pre-wrap; overflow-wrap: anywhere;
+  font: inherit; font-size: ${t.fontSize.body}px; color: ${t.color.panelText}; border: 1px solid ${t.color.panelLine}; border-radius: 8px;
+}
 .home-controls { border-radius: 0; }
 .home-controls * { box-sizing: border-box; }
 .home-controls .tg-footer { margin-top: ${t.space.xxl}px; }

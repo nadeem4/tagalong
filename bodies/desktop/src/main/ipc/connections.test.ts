@@ -19,17 +19,32 @@ function setup() {
     'connections.remove': { removed: true },
   });
   const answers: [string, string][] = [];
+  const replies: [string, string, string | undefined][] = [];
   registerConnectionIpc(ipc.handle, {
     engine: () => engine.client,
     answer: (ask, decision) => {
       answers.push([ask, decision]);
       return Promise.resolve();
     },
+    reply: (ask, option, text) => {
+      replies.push([ask, option, text]);
+      return Promise.resolve();
+    },
   });
-  return { ...ipc, calls: engine.calls, answers };
+  return { ...ipc, calls: engine.calls, answers, replies };
 }
 
 describe('registerConnectionIpc', () => {
+  it("answers a Claude Code job's ask by option name, with typed text when given", async () => {
+    const { invoke, replies } = setup();
+    await invoke(IPC.answerJobAsk, 'a1', { option: 'Edit' });
+    await invoke(IPC.answerJobAsk, 'a2', { option: 'duckdb', text: 'duckdb' });
+    expect(replies).toEqual([
+      ['a1', 'Edit', undefined],
+      ['a2', 'duckdb', 'duckdb'],
+    ]);
+  });
+
   it("answers Scout's ask on the brain, not the old engine", async () => {
     const { invoke, calls, answers } = setup();
     await invoke(IPC.approveTool, 'a1', 'once');
@@ -48,9 +63,15 @@ describe('registerConnectionIpc', () => {
     registerConnectionIpc(ipc.handle, {
       engine: () => fakeEngine({}).client,
       answer: () => Promise.reject(error),
+      reply: () => Promise.reject(error),
     });
     return ipc;
   };
+
+  it('a job ask the brain no longer has does not throw into the card either', async () => {
+    const ipc = failing(new RpcError(ErrorCode.not_found, 'no open ask'));
+    await expect(ipc.invoke(IPC.answerJobAsk, 'a1', { option: 'Edit' })).resolves.toBeUndefined();
+  });
 
   it('an ask the brain no longer has (not_found) does not throw into the card', async () => {
     const ipc = failing(new RpcError(ErrorCode.not_found, 'no open ask'));
