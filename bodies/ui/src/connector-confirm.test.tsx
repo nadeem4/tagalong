@@ -250,6 +250,25 @@ describe('the connector confirm card', () => {
       ]);
     });
 
+    it('Enter in the answer field sends it, and does nothing while empty', async () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() =>
+        bridge.emit(jobAsk({ tool: 'question', question: true, summary: 'Which?', options: [] })),
+      );
+      const field = screen.getByRole('textbox', { name: 'Your answer' });
+      fireEvent.keyDown(field, { key: 'Enter' });
+      expect(bridge.jobAnswers).toEqual([]);
+      fireEvent.change(field, { target: { value: 'duckdb' } });
+      await act(async () => {
+        fireEvent.keyDown(field, { key: 'Enter' });
+        await Promise.resolve();
+      });
+      expect(bridge.jobAnswers).toEqual([
+        { approvalId: APPROVAL, option: 'duckdb', text: 'duckdb' },
+      ]);
+    });
+
     it('a question with no typed text cannot be sent', () => {
       const bridge = createFakeHostBridge();
       renderBubble(bridge);

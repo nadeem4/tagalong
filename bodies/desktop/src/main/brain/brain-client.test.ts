@@ -1,4 +1,4 @@
-﻿/**
+/**
  * BrainClient against a fake socket and fake timers: hello, say, notifications, use,
  * cancel and reconnect, all driven by hand so no network or real clock is involved.
  */
@@ -278,7 +278,7 @@ describe('BrainClient', () => {
     });
   });
 
-  it('onUse throws â†’ error tool_failed (-32007)', async () => {
+  it('onUse throws → error tool_failed (-32007)', async () => {
     const { s, onUse } = await online();
     onUse.mockRejectedValueOnce(new Error('boom'));
     s.receive({
@@ -317,7 +317,7 @@ describe('BrainClient', () => {
     expect(s.sent.at(-1)).toMatchObject({ id: 'b1', error: { code: -32007, message: 'odd' } });
   });
 
-  it('use for an undeclared tool â†’ unknown_tool (-32001)', async () => {
+  it('use for an undeclared tool → unknown_tool (-32001)', async () => {
     const { s, onUse } = await online();
     s.receive({
       jsonrpc: '2.0',
@@ -330,7 +330,7 @@ describe('BrainClient', () => {
     expect(s.sent.at(-1)).toMatchObject({ id: 'b1', error: { code: -32001 } });
   });
 
-  it('use with bad params â†’ invalid_params (-32602)', async () => {
+  it('use with bad params → invalid_params (-32602)', async () => {
     const { s } = await online();
     s.receive({ jsonrpc: '2.0', id: 'b1', method: 'use', params: { tool: 1 } });
     await vi.advanceTimersByTimeAsync(0);
@@ -405,7 +405,7 @@ describe('BrainClient', () => {
     expect(s.sent).toHaveLength(before);
   });
 
-  it('stop â†’ say rejects BrainOffline; statuses end offline', async () => {
+  it('stop → say rejects BrainOffline; statuses end offline', async () => {
     const { client, statuses } = await online();
     client.stop();
     expect(statuses.at(-1)).toBe('offline');

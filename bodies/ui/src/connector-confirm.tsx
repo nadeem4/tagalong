@@ -49,7 +49,14 @@ export function ConnectorConfirmCard({
         {confirm.question === true && (
           <label className="bubble-field">
             Your answer
-            <input type="text" value={typed} onChange={(e) => setTyped(e.target.value)} />
+            <input
+              type="text"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && text !== '') onReply({ option: text, text });
+              }}
+            />
           </label>
         )}
         <div className="bubble-row">
