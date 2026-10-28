@@ -57,6 +57,7 @@ the total can run a little low.
 | `brain/src/brain/toolbox.py`     | `Toolbox`: lists and gates every tool call, from `BrainSource` and `BodySource`                                                                                  |
 | `brain/src/brain/asks.py`        | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers)                                                              |
 | `brain/src/brain/experts.py`     | `ExpertRun`: drives Claude Code in a folder over ACP; callbacks for permissions, questions, progress and the end                                                 |
+| `brain/src/brain/jobs.py`        | `Jobs`: hand-off ask, relayed Claude Code asks, the 2-job cap, progress and the `jobs` rows, `changed: jobs`                                                     |
 | `brain/src/brain/tools.py`       | The brain's own tools (`remember`, `recall`, `forget`) as specs and handlers for `BrainSource`                                                                   |
 | `brain/src/brain/mind/soul.md`   | Scout's character, the start of the system prompt                                                                                                                |
 | `brain/src/brain/mind/prompt.py` | The system prompt (soul, local time, online bodies, "What you know") and `say` content blocks                                                                    |
