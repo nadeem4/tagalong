@@ -48,7 +48,9 @@ def system_prompt(now: datetime, bodies: list[Body], know: str = "") -> str:
         online = "Bodies online:\n" + "\n".join(lines)
     else:
         online = "Bodies online: no body is connected."
-    now_line = f"Now: {now.strftime('%A %d %B %Y, %H:%M')}"
+    # The offset lets Scout turn "at 3pm" into an ISO time for set_timer.
+    offset = f" UTC{now.strftime('%z')[:3]}:{now.strftime('%z')[3:]}" if now.tzinfo else ""
+    now_line = f"Now: {now.strftime('%A %d %B %Y, %H:%M')}{offset}"
     known = [f"What you know:\n{know}"] if know else []
     return "\n\n".join([_soul(), *known, now_line, online])
 

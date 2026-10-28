@@ -27,8 +27,9 @@ from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Model, run_turn
 from brain.protocol import SayParams, SayResult, Tool
 from brain.scheduler import Scheduler
+from brain.timers import Timers
 from brain.toolbox import BodySource, BrainSource, Toolbox
-from brain.tools import brain_tools, expert_tools, home_tools
+from brain.tools import brain_tools, expert_tools, home_tools, timer_tools
 
 log = logging.getLogger("brain")
 
@@ -61,10 +62,13 @@ class Session:
         )
         self.jobs = Jobs(memory, self._asks, notify, make_run, on_finished=self._on_job_finished)
         self.jobs.startup()  # rows left running by a dead brain become stopped
+        # The scheduler is built further down; the timers only reach it once started.
+        timers = Timers(memory, lambda *a, **kw: self.scheduler.emit(*a, **kw), now)
         tools = (
             brain_tools(memory, notify)
             + home_tools(budget, lambda: self.toolbox)
             + expert_tools(self.jobs)
+            + timer_tools(memory, timers, now)
         )
         sources: list = []
         if apps is not None and tokens is not None:  # the two always come as a pair
@@ -110,6 +114,7 @@ class Session:
         bodies.on_connect = self.scheduler.pump
         for job in memory.unreported_jobs():  # ended while the brain was down, or never told
             self._on_job_finished(job)
+        timers.start()
 
     def say(self, body_id: str, params: SayParams) -> SayResult:
         content = user_content(params)  # may raise ValueError before anything changes

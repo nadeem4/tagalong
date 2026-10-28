@@ -189,3 +189,16 @@ def test_soul_tells_scout_its_words_before_a_change_are_the_approval_text():
 def test_soul_says_job_notes_are_events_not_requests():
     soul = system_prompt(NOW, []).lower()
     assert "event" in soul and "data" in soul
+
+
+def test_now_line_has_the_utc_offset_when_aware():
+    from datetime import timedelta, timezone
+
+    now = datetime(2026, 10, 28, 9, 0, tzinfo=timezone(timedelta(hours=1)))
+    assert "Now: Wednesday 28 October 2026, 09:00 UTC+01:00" in system_prompt(now, [])
+
+
+def test_now_line_without_tzinfo_is_unchanged():
+    out = system_prompt(datetime(2026, 10, 28, 9, 0), [])
+    assert "Now: Wednesday 28 October 2026, 09:00\n" in out + "\n"
+    assert "UTC" not in out.split("Now:")[1].split("\n")[0]

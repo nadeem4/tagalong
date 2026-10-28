@@ -14,7 +14,14 @@ from brain.memory import Hit, Memory, MemoryRefused
 from brain.mind.turn import Call
 from brain.protocol import Body, ErrorCode, RpcError, Tool
 from brain.toolbox import BodySource, BrainSource, Toolbox, ToolSpec
-from brain.tools import RECALL_MAX_CHARS, brain_tools, expert_tools, format_hits, home_tools
+from brain.tools import (
+    RECALL_MAX_CHARS,
+    brain_tools,
+    expert_tools,
+    format_hits,
+    home_tools,
+    timer_tools,
+)
 
 
 @pytest.fixture
@@ -497,3 +504,111 @@ def test_home_tools_contract_records_have_no_for_or_mode(home):
             "input_schema",
             "effect",
         }
+
+
+# --- timers ---
+
+
+_T0 = datetime.datetime(2026, 10, 28, 9, 0, tzinfo=datetime.timezone(datetime.timedelta(hours=1)))
+
+
+class _FakeTimers:
+    def __init__(self):
+        self.changes = 0
+
+    def changed(self):
+        self.changes += 1
+
+
+@pytest.fixture
+def trun(mem):
+    fake = _FakeTimers()
+    pairs = timer_tools(mem, fake, lambda: _T0)
+    handlers = {spec.name: handler for spec, handler in pairs}
+
+    async def call(name, args):
+        return await handlers[name](args)
+
+    call.fake = fake
+    call.specs = {spec.name: spec for spec, _ in pairs}
+    return call
+
+
+async def test_set_timer_in_minutes_adds_a_row_and_rearms(mem, trun):
+    out = await trun("set_timer", {"note": "check build", "in_minutes": 30})
+    t = mem.list_timers()[0]
+    assert t.next_at == _T0 + datetime.timedelta(minutes=30)
+    assert t.repeat_s is None
+    assert out == f"timer {t.id} set for 2026-10-28T09:30:00+01:00"
+    assert trun.fake.changes == 1
+
+
+async def test_set_timer_at_with_offset_stores_utc(mem, trun):
+    out = await trun("set_timer", {"note": "n", "at": "2026-10-28T15:00:00+01:00"})
+    t = mem.list_timers()[0]
+    assert t.next_at == datetime.datetime(2026, 10, 28, 14, 0, tzinfo=datetime.UTC)
+    assert out.endswith("2026-10-28T15:00:00+01:00")
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        {"note": "n", "in_minutes": 5, "at": "2026-10-28T15:00:00+01:00"},
+        {"note": "n"},
+        {"note": "n", "at": "2026-10-28T15:00:00"},
+        {"note": "n", "at": "2026-10-28T08:00:00+01:00"},
+        {"note": "n", "at": "not a time"},
+        {"note": "n", "in_minutes": 0},
+        {"note": "n", "in_minutes": 5, "repeat_minutes": 4},
+        {"note": "  ", "in_minutes": 5},
+        {"note": "x" * 501, "in_minutes": 5},
+    ],
+)
+async def test_set_timer_refuses_bad_input(mem, trun, args):
+    with pytest.raises(MemoryRefused):
+        await trun("set_timer", args)
+    assert mem.list_timers() == []
+    assert trun.fake.changes == 0
+
+
+async def test_set_timer_repeat_of_5_is_allowed(mem, trun):
+    out = await trun("set_timer", {"note": "n", "in_minutes": 5, "repeat_minutes": 5})
+    assert mem.list_timers()[0].repeat_s == 300
+    assert out.endswith(", repeats every 5 minutes")
+
+
+async def test_list_timers_shows_next_and_repeat(mem, trun):
+    await trun("set_timer", {"note": "later", "in_minutes": 60})
+    await trun("set_timer", {"note": "soon", "in_minutes": 10, "repeat_minutes": 15})
+    rows = json.loads(await trun("list_timers", {}))["timers"]
+    assert [r["note"] for r in rows] == ["soon", "later"]
+    assert rows[0]["next_at"] == "2026-10-28T08:10:00+00:00"
+    assert rows[0]["repeat_minutes"] == 15
+    assert rows[1]["repeat_minutes"] is None
+    assert set(rows[0]) == {"id", "note", "next_at", "repeat_minutes"}
+
+
+async def test_cancel_timer_removes_it_and_refuses_unknown_ids(mem, trun):
+    await trun("set_timer", {"note": "n", "in_minutes": 5})
+    tid = mem.list_timers()[0].id
+    await trun("cancel_timer", {"id": tid})
+    assert mem.list_timers() == []
+    assert trun.fake.changes == 2
+    with pytest.raises(MemoryRefused, match=f"no timer with id {tid}."):
+        await trun("cancel_timer", {"id": tid})
+
+
+async def test_timer_tool_modes(trun):
+    assert trun.specs["set_timer"].default_mode == "auto"
+    assert trun.specs["cancel_timer"].default_mode == "auto"
+    assert trun.specs["set_timer"].effect == "change"
+    assert trun.specs["list_timers"].effect == "read"
+    assert all(s.audience == frozenset({"scout"}) for s in trun.specs.values())
+
+
+async def test_set_timer_with_a_naive_clock_still_gets_an_aware_time(mem):
+    pairs = timer_tools(mem, _FakeTimers(), lambda: datetime.datetime(2026, 10, 28, 9, 0))
+    handlers = {s.name: h for s, h in pairs}
+    out = await handlers["set_timer"]({"note": "n", "in_minutes": 5})
+    assert mem.list_timers()[0].next_at.tzinfo is not None
+    assert out.startswith("timer ")
