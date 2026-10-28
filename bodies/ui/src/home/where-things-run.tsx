@@ -18,7 +18,7 @@ const LINK: Record<BrainLink['status'], { words: string; dot: string }> = {
 };
 
 // Static on purpose: Claude Code is the one expert and the brain starts it locally.
-const EXPERTS = 'Claude Code · a process the brain starts on this machine';
+const EXPERTS = 'Claude Code · runs on this machine, started by the brain';
 
 /** Where an app runs: its web address, or the command line the brain starts. */
 function describeApp(app: AppInfo): string {
@@ -57,12 +57,13 @@ export function WhereThingsRun() {
   const state = LINK[link.status];
 
   return (
-    <section className="home-card" aria-label="Where things run">
+    <section className="home-card home-card--run" aria-label="Where things run">
       <h2 className="home-card__label">WHERE THINGS RUN</h2>
       <p className="home-card__row">
         <strong>Brain · {link.addr}</strong>
         <span>
-          <span className={state.dot} aria-hidden="true" /> {state.words}
+          <span className={state.dot} aria-hidden="true" />
+          {state.words}
         </span>
       </p>
       {link.status === 'offline' ? (
@@ -74,7 +75,7 @@ export function WhereThingsRun() {
               {app.name} · {describeApp(app)}
             </strong>
             <span>
-              <span className={STATUS_DOT[app.status]} aria-hidden="true" />{' '}
+              <span className={STATUS_DOT[app.status]} aria-hidden="true" />
               {STATUS_WORDS[app.status]}
             </span>
           </p>

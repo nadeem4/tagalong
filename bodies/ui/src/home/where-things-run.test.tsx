@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Tests for WhereThingsRun: the brain's address with its link state, each connected app by
  * where it runs, Claude Code as a local process, and the refetch when the brain changes.
  */
@@ -75,7 +75,9 @@ describe('WhereThingsRun', () => {
 
   it('names Claude Code as a local process the brain starts', async () => {
     renderCard(createFakeHostBridge());
-    expect(await card()).toHaveTextContent(/Claude Code.*this machine/);
+    expect(await card()).toHaveTextContent(
+      'Claude Code · runs on this machine, started by the brain',
+    );
   });
 
   it('reads again when the brain says its link changed', async () => {
