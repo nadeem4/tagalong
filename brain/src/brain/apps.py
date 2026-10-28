@@ -209,7 +209,8 @@ class _Slot:
     relist: bool = False
     dropped: bool = False  # the connection closed; the app task then tears down
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)  # serialises stop and restart
-    open_url: OpenUrl | None = None  # set only for a sign-in the user asked for
+    open_url: OpenUrl | None = None  # set only while a sign-in the user asked for is running
+    signed_out: bool = False  # the server refused our sign-in mid-session
 
 
 def _root(exc: BaseException) -> BaseException:
@@ -347,15 +348,21 @@ class Apps:
         except TimeoutError:
             raise AppError(f"{slot.row.name} did not answer in time.") from None
         except MCPError as exc:
-            if exc.code != CONNECTION_CLOSED:
+            if exc.code != CONNECTION_CLOSED and not slot.signed_out:
                 raise AppError(f"{slot.row.name} said: {_plain(exc)}") from None
             raise self._drop(slot) from None
         except Exception as exc:
+            if slot.signed_out:
+                raise self._drop(slot) from None
             raise AppError(f"{slot.row.name}: {_plain(exc)}") from None
 
     def _drop(self, slot: _Slot) -> AppError:
-        message = f"The connection {slot.row.name} closed."
-        self._set(slot, "error", message)
+        if slot.signed_out:  # a refused sign-in is not a broken connection
+            message = f"Sign in to {slot.row.name} again."
+            self._set(slot, "needs-sign-in", message)
+        else:
+            message = f"The connection {slot.row.name} closed."
+            self._set(slot, "error", message)
         slot.dropped = True
         slot.wake.set()
         return AppError(message)
@@ -390,6 +397,7 @@ class Apps:
                     await session.initialize()
                     tools = await self._list(session)
                 slot.session, slot.tools = session, tools
+                slot.open_url = None  # the sign-in is over; later 401s never reopen a browser
                 self._set(slot, "connected")
                 while True:
                     try:
@@ -400,6 +408,8 @@ class Apps:
                     if slot.stopping:
                         return
                     if slot.dropped:
+                        if slot.signed_out:
+                            raise NeedsSignIn(f"Sign in to {slot.row.name} again.")
                         raise AppError(f"The connection {slot.row.name} closed.")
                     if slot.relist:
                         slot.relist = False
@@ -473,25 +483,33 @@ class Apps:
         if self._data_dir is None:
             raise OAuthError("Sign-in is not set up in this brain.")
         storage = FileTokenStorage(self._data_dir, row.id)
+        listener: LoopbackCallback | None = None
+        redirect_uri = "http://127.0.0.1/callback"  # unused unless a sign-in was asked for
         if slot.open_url is None:
             if await storage.get_tokens() is None:
                 raise NeedsSignIn("Sign in to connect.")
+        else:
+            listener = LoopbackCallback()
+            redirect_uri = await listener.start()
+            stack.callback(listener.close)
 
-            async def no_browser(_: str) -> None:
-                raise NeedsSignIn("The sign-in ran out; sign in again.")
+        # Read slot.open_url at call time: once connected it is cleared, so a later 401 can
+        # never open a browser the user did not ask for or reuse a finished listener.
+        def lost() -> NeedsSignIn:
+            slot.signed_out = True
+            return NeedsSignIn(f"Sign in to {row.name} again.")
 
-            async def no_wait() -> tuple[str, str]:
-                raise NeedsSignIn("The sign-in ran out; sign in again.")
-
-            return make_provider(row, storage, "http://127.0.0.1/callback", no_browser, no_wait)
-        listener = LoopbackCallback()
-        redirect_uri = await listener.start()
-        stack.callback(listener.close)
+        async def open_url(url: str) -> None:
+            if slot.open_url is None:
+                raise lost()
+            await slot.open_url(url)
 
         async def wait() -> tuple[str, str]:
+            if slot.open_url is None or listener is None:
+                raise lost()
             return await listener.wait(self._signin_timeout)
 
-        return make_provider(row, storage, redirect_uri, slot.open_url, wait)
+        return make_provider(row, storage, redirect_uri, open_url, wait)
 
     async def _list(self, session: ClientSession) -> list[Tool]:
         tools: list[Tool] = []

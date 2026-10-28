@@ -66,8 +66,13 @@ def build(port: int) -> object:
             }
         )
 
+    async def revoke(_: Request) -> Response:
+        GOOD_TOKENS.clear()  # every token is refused from now on, like a server-side sign-out
+        return Response(status_code=204)
+
     api = Starlette(
         routes=[
+            Route("/revoke", revoke, methods=["POST"]),
             Route("/.well-known/oauth-protected-resource/mcp", resource_metadata),
             Route("/.well-known/oauth-protected-resource", resource_metadata),
             Route("/.well-known/oauth-authorization-server", as_metadata),

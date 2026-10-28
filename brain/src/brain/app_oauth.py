@@ -64,18 +64,22 @@ class FileTokenStorage:
         os.replace(tmp, self._path)
 
     async def get_tokens(self) -> OAuthToken | None:
-        data = self._read()
         try:
-            tokens = OAuthToken.model_validate(data["tokens"])
+            return OAuthToken.model_validate(self._read()["tokens"])
         except (KeyError, ValueError):
             return None
+
+    def expires_at(self) -> float | None:
+        """When the saved token runs out (the SDK is only given the relative `expires_in`)."""
+        data = self._read()
         saved_at = data.get("saved_at")
-        if tokens.expires_in and isinstance(saved_at, int | float):
-            if time.time() > saved_at + tokens.expires_in:
-                # The SDK only knows relative expiry. An empty access token makes it refresh
-                # first instead of sending a token that is certain to be refused.
-                return tokens.model_copy(update={"access_token": ""})
-        return tokens
+        try:
+            lifetime = data["tokens"].get("expires_in")
+        except (KeyError, AttributeError):
+            return None
+        if lifetime and isinstance(saved_at, int | float):
+            return saved_at + lifetime
+        return None
 
     async def set_tokens(self, tokens: OAuthToken) -> None:
         self._write(
@@ -169,6 +173,19 @@ def _may_open(url: str) -> bool:
         return False
 
 
+class _Provider(OAuthClientProvider):
+    """The SDK provider, told when tokens loaded from disk expire so it refreshes in time."""
+
+    def __init__(self, *args: Any, expires_at: Callable[[], float | None], **kw: Any) -> None:
+        super().__init__(*args, **kw)
+        self._expires_at = expires_at
+
+    async def _initialize(self) -> None:
+        await super()._initialize()
+        if self.context.current_tokens is not None:
+            self.context.token_expiry_time = self._expires_at()
+
+
 def make_provider(
     app: "AppRow",
     storage: FileTokenStorage,
@@ -194,4 +211,11 @@ def make_provider(
         response_types=["code"],
         token_endpoint_auth_method="none",
     )
-    return OAuthClientProvider(app.config["url"], meta, storage, redirect_handler, callback_handler)
+    return _Provider(
+        app.config["url"],
+        meta,
+        storage,
+        redirect_handler,
+        callback_handler,
+        expires_at=storage.expires_at,
+    )

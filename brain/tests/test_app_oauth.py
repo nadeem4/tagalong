@@ -21,7 +21,7 @@ import pytest
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 
 from brain.app_oauth import FileTokenStorage, LoopbackCallback, OAuthError, make_provider
-from brain.apps import AppRow, Apps
+from brain.apps import AppError, AppRow, Apps
 from brain.memory import Memory
 
 FAKE_OAUTH = str(Path(__file__).parent / "fake_oauth_server.py")
@@ -90,19 +90,17 @@ async def test_token_text_is_never_logged(tmp_path, caplog):
     assert "secret" not in caplog.text
 
 
-async def test_expired_tokens_load_with_an_empty_access_token(tmp_path):
+async def test_storage_reports_when_the_saved_token_expires(tmp_path):
     store = FileTokenStorage(tmp_path, "notes")
+    assert store.expires_at() is None
+    before = time.time()
     await store.set_tokens(
         OAuthToken(access_token="a", token_type="Bearer", refresh_token="r", expires_in=60)
     )
-    fresh = await store.get_tokens()
-    assert fresh and fresh.access_token == "a"
-    path = tmp_path / "app-oauth" / "notes.json"
-    data = json.loads(path.read_text(encoding="utf-8"))
-    data["saved_at"] = time.time() - 120
-    path.write_text(json.dumps(data), encoding="utf-8")
-    stale = await store.get_tokens()
-    assert stale and stale.access_token == "" and stale.refresh_token == "r"
+    at = store.expires_at()
+    assert at is not None and before + 60 <= at <= time.time() + 60
+    await store.set_tokens(OAuthToken(access_token="a", token_type="Bearer"))  # no lifetime given
+    assert store.expires_at() is None
 
 
 # ---- loopback listener ----
@@ -391,3 +389,58 @@ async def test_sign_in_refuses_an_app_without_oauth(tmp_path):
 
     with pytest.raises(Exception, match="does not use sign-in"):
         await apps.sign_in("plain", never)
+
+
+async def _revoke(url: str) -> None:
+    base = url.removesuffix("/mcp")
+    await asyncio.to_thread(
+        urllib.request.urlopen, urllib.request.Request(f"{base}/revoke", method="POST")
+    )
+
+
+async def test_a_401_mid_session_flips_to_needs_sign_in_without_a_browser(rig):
+    opened: list[str] = []
+
+    async def open_url(url):
+        opened.append(url)
+        await _browser(url)
+
+    await rig.apps.sign_in("notes", open_url)
+    await rig.state("connected")
+    await _revoke(rig.url)
+    with pytest.raises(AppError, match="Sign in to Notes again"):
+        await rig.apps.call("notes", "echo", {"text": "hi"})
+    await rig.state("needs-sign-in")
+    assert len(opened) == 1  # the browser is never opened without the user asking
+
+
+async def test_a_dropped_signed_in_connection_is_an_error_not_a_sign_in_failure(rig):
+    await rig.apps.sign_in("notes", _browser)
+    await rig.state("connected")
+    slot = rig.apps._slots["notes"]
+    assert slot.open_url is None  # the sign-in is over once connected
+    rig.apps._drop(slot)  # as a closed connection would
+    await rig.state("error")
+    assert "closed" in rig.apps.status("notes").error
+
+
+async def test_token_expiring_mid_session_is_refreshed(rig):
+    store = FileTokenStorage(rig.data, "notes")
+    await store.set_client_info(CLIENT)
+    await store.set_tokens(
+        OAuthToken(access_token="good-token", token_type="Bearer", refresh_token="r1", expires_in=3)
+    )
+    path = rig.data / "app-oauth" / "notes.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["saved_at"] = time.time() - 1  # two seconds of life left
+    path.write_text(json.dumps(data), encoding="utf-8")
+    expiry = data["saved_at"] + 3
+    await rig.apps.start()
+    await rig.state("connected")
+    while time.time() < expiry + 0.2:
+        await asyncio.sleep(0.1)
+    result = await rig.apps.call("notes", "echo", {"text": "after"})
+    assert result.content[0].text == "after"
+    assert rig.apps.status("notes").state == "connected"
+    saved = await store.get_tokens()
+    assert saved and saved.access_token == "refreshed-token"
