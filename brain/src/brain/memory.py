@@ -148,6 +148,7 @@ _JOB_COLUMNS = (
 )
 _JOB_FIELDS = {c.strip() for c in _JOB_COLUMNS.split(",")} - {"id"}
 JOB_RESULT_CAP = 20_000
+JOB_PROGRESS_CAP = 2_000
 
 
 def _probe_fts5(db: sqlite3.Connection) -> None:
@@ -270,6 +271,8 @@ class Memory:
             return
         if isinstance(fields.get("result"), str):
             fields["result"] = fields["result"][:JOB_RESULT_CAP]
+        if isinstance(fields.get("progress"), str):
+            fields["progress"] = fields["progress"][-JOB_PROGRESS_CAP:]  # a running tail
         sets = ", ".join(f"{k}=?" for k in fields)
         self._db.execute(f"UPDATE jobs SET {sets} WHERE id=?", (*fields.values(), id))
 

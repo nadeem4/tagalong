@@ -381,10 +381,14 @@ their rows return.
 
 ## Hand off to Claude Code (real brain, real Claude Code)
 
-This section covers the Python brain. Needs `npm install -g @agentclientprotocol/claude-agent-acp`
-(Node 22 or newer), Claude Code logged in with your own login, the brain and the desktop running as above, and a small test
-folder you do not mind Claude Code editing. The Home Jobs panel arrives in 8b, so for now check
-jobs by asking Scout ("list my jobs", "stop that job").
+This section needs slice 8b: the desktop showing non-confirm asks with their options and input.
+Until then the hand-off ask appears on no body, so Scout's `hand_off` waits out the ask timeout
+and says it was not started, and these steps cannot pass.
+
+This section covers the Python brain. It needs `npm install -g @agentclientprotocol/claude-agent-acp`
+(Node 22 or newer), Claude Code logged in with your own login, the brain and the desktop running
+as above, and a small test folder you do not mind Claude Code editing. The Home Jobs panel also
+arrives in 8b, so for now check jobs by asking Scout ("list my jobs", "stop that job").
 
 1. **Action:** ask "Hand this to Claude Code: add a README line to the project in
    `C:\path\to\test-folder`."

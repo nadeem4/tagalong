@@ -396,6 +396,43 @@ async def test_list_returns_the_last_twenty_newest_first_with_progress(make_rig)
     assert len(listed) == 20 and listed[0].id == "j21" and listed[0].progress == "latest words"
 
 
+async def test_shutdown_stops_every_running_job_and_leaves_no_process(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
+    first = await rig.jobs.start("one", str(rig.folder))
+    await rig.jobs.start("two", str(rig.folder))
+    await rig.jobs.shutdown()
+    assert rig.memory.running_jobs() == [] and rig.jobs._runs == {}
+    assert rig.memory.get_job(first).state == "stopped"
+    await until(lambda: not any(alive(r) for r in rig.runs))
+
+
+async def test_shutdown_swallows_one_runs_failure_and_stops_the_rest(make_rig):
+    rig = make_rig(FakeAsks(Answer("Plan"), Answer("Plan")))
+    await rig.jobs.start("one", str(rig.folder))
+    await rig.jobs.start("two", str(rig.folder))
+
+    async def boom():
+        raise RuntimeError("stuck")
+
+    rig.runs[0].stop = boom
+    await rig.jobs.shutdown()
+    assert not alive(rig.runs[1])
+    del rig.runs[0].stop  # back to the real stop so the rig can clean the stuck one up
+
+
+async def test_cancelling_start_while_it_waits_on_the_mode_ask_cleans_up(make_rig):
+    rig = make_rig(FakeAsks(), max_running=1)  # the mode ask blocks forever
+    task = asyncio.create_task(rig.jobs.start("go", str(rig.folder)))
+    await until(lambda: rig.asks.open_ids)
+    ask_id = rig.asks.opened[0]["ask_id"]
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert ask_id in rig.asks.closed_by_cancel and not rig.asks.open_ids
+    assert rig.jobs._starting == 0 and rig.memory.list_jobs() == []
+    await until(lambda: not alive(rig.runs[0]))
+
+
 async def test_startup_stops_leftover_running_rows(make_rig):
     rig = make_rig(FakeAsks())
     rig.memory.add_job("old", "claude_code", "t", str(rig.folder), "plan")

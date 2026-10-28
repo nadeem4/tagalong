@@ -8,6 +8,7 @@ import inspect
 import time
 import uuid
 from collections.abc import Callable
+from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -121,6 +122,12 @@ class Jobs:
 
     async def stop(self, job_id: str) -> None:
         await self._running(job_id).stop()
+
+    async def shutdown(self) -> None:
+        """Stop every running job before the brain exits; one stuck run must not block the rest."""
+        for run in list(self._runs.values()):
+            with suppress(Exception):
+                await run.stop()
 
     def list(self) -> list[Job]:
         return self._memory.list_jobs(LIST_LIMIT)

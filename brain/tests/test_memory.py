@@ -430,6 +430,13 @@ def test_job_round_trip(mem):
     assert mem.get_job("nope") is None
 
 
+def test_update_job_keeps_only_the_last_2000_chars_of_progress(mem):
+    mem.add_job("j1", "a", "t", "f", "m")
+    mem.update_job("j1", progress="x" * 5000 + "tail")
+    got = mem.get_job("j1").progress
+    assert len(got) == 2000 and got.endswith("tail")
+
+
 def test_update_job_unknown_field_refused(mem):
     mem.add_job("j1", "a", "t", "f", "m")
     with pytest.raises(ValueError):
@@ -473,9 +480,9 @@ def test_unreported_jobs_finished_only(mem):
     assert mem.get_job("seen").reported is True
 
 
-def test_job_result_capped_and_progress_as_given(mem):
+def test_job_result_capped_at_20000_and_progress_at_2000(mem):
     mem.add_job("j", "a", "t", "f", "m")
     mem.update_job("j", result="x" * 25_000, progress="p" * 5000)
     got = mem.get_job("j")
     assert len(got.result) == 20_000
-    assert len(got.progress) == 5000
+    assert len(got.progress) == 2000

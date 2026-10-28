@@ -52,6 +52,8 @@ async def _run() -> None:
         log.info("brain listening on ws://%s:%d", config.host, port)
         await server.serve_forever()
     finally:
+        # Stop the experts while the cancelled loop can still await them, then close memory.
+        await session.jobs.shutdown()
         memory.close()
 
 

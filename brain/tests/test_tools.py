@@ -273,6 +273,18 @@ async def test_list_jobs_is_json_with_the_row_fields(home, mem):
     )
 
 
+async def test_list_jobs_trims_result_to_its_start_and_progress_to_its_end(home, mem):
+    mem.add_job("j1", "claude_code", "task", "C:/x", "default")
+    mem.update_job("j1", result="R" * 1500, progress="a" * 1500 + "end")
+    mem.add_job("j2", "claude_code", "task", "C:/x", "default")
+    mem.update_job("j2", result="short", progress="p" * 1000)
+    home.jobs.rows = mem.list_jobs(20)
+    rows = {j["id"]: j for j in json.loads(await home.run("list_jobs"))["jobs"]}
+    assert rows["j1"]["result"] == "R" * 1000 + "…"
+    assert rows["j1"]["progress"] == "…" + "a" * 996 + "end"
+    assert rows["j2"]["result"] == "short" and rows["j2"]["progress"] == "p" * 1000
+
+
 async def test_stop_job_stops_and_refusal_is_rpc_error(home):
     out = json.loads(await home.run("stop_job", {"job": "j1"}))
     assert out == {"job": "j1", "stopping": True}
