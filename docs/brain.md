@@ -60,6 +60,7 @@ the total can run a little low.
 | `brain/src/brain/experts.py`     | `ExpertRun`: drives Claude Code in a folder over ACP; callbacks for permissions, questions, progress and the end                                                 |
 | `brain/src/brain/events.py`      | The event kinds registry (batch window, per-hour cap) and the loader for `mind/events.md`                                                                        |
 | `brain/src/brain/scheduler.py`   | `Scheduler.emit`: holds events in batches, applies the caps and the budget, starts one wake turn per batch                                                       |
+| `brain/src/brain/timers.py`      | `Timers`: fires Scout's stored timers as `timer` events and keeps one wake armed                                                                                 |
 | `brain/src/brain/mind/events.md` | One note per event kind on how Scout should weigh it (model wording, not code)                                                                                   |
 | `brain/src/brain/jobs.py`        | `Jobs`: hand-off ask, relayed Claude Code asks, the 2-job cap, progress and the `jobs` rows, `changed: jobs`                                                     |
 | `brain/src/brain/apps.py`        | `Apps`: connects each enabled app (MCP over stdio or http), keeps it alive, `TokenFile` (`app-tokens.json`), `validate_app`                                      |
@@ -120,7 +121,7 @@ flowchart TD
 - A `say` while a turn runs joins it: the result has `joined: true` and the message is folded
   into the next step.
 - At the start of a turn the always-loaded memories are read once. Every step rebuilds the system
-  prompt from Scout's soul, that "What you know" block, the local time, and the bodies online.
+  prompt from Scout's soul, that "What you know" block, the local time (with its UTC offset), and the bodies online.
 - Text streams as `reply` notifications with `delta`. Tools run at the same time, each with
   `tool` `started` then `ended`. The model is offered the memory tools (`remember`, `recall`,
   `forget`) and every online body's tools (see Toolbox); a refused or failed call ends as an error
@@ -220,6 +221,7 @@ tool's own default; then the effect.
 | Reads (`effect: "read"`), such as `list_jobs` | `auto`                  |
 | Changes (`effect: "change"`)                  | `ask`                   |
 | Memory tools (`remember`, `forget`)           | `auto`                  |
+| Timer tools `set_timer` and `cancel_timer`    | `auto`                  |
 | Expert tools `tell_expert` and `stop_job`     | `auto`                  |
 | `hand_off` (asks itself, see below)           | `auto`, no gate ask     |
 | A body tool that does not declare effect      | `ask`                   |
@@ -415,6 +417,7 @@ Event kinds (`EVENT_KINDS` in `events.py`):
 | Kind        | Batch window | Cap per hour | Note                                            |
 | ----------- | ------------ | ------------ | ----------------------------------------------- |
 | `job_ended` | 30 s         | 10           | A job ended; endings within 30 s share one wake |
+| `timer`     | none         | 6            | One of Scout's timers came due                  |
 
 A kind can also set `wakes` (false: keep only the latest fact, no turn) and `enabled`. An event with
 a `key` replaces an older held event of the same kind and key. Held events live in memory only: a
@@ -470,6 +473,41 @@ shows them as Scout does.
 - **Shutdown.** On exit `main.py` calls `Jobs.shutdown()` before closing memory: it stops every
   running job (rows become `stopped`, adapters end) and ignores a run that fails to stop. Shutdown
   sends no report: those jobs stay unreported and are told about at the next start.
+
+## Timers
+
+Scout can leave itself a message for later. `Timers` (`timers.py`) fires the stored timers as `timer`
+events; the scheduler (see [Jobs and tools](#jobs-and-tools)) decides when Scout hears them. A
+timer wakes with no batching and at most 6 times an hour.
+
+The `timers` table (in `tagalong.db`): `id`, `note`, `next_at` (UTC ISO text, so text order is time
+order), `repeat_s` (null for a one-off), `created_at` and `fired` (0 or 1). Times are stored in UTC.
+The "Now" line in Scout's prompt carries the owner's UTC offset so Scout can turn "at 3pm" into an
+ISO time.
+
+| Tool           | Effect | Mode   | Does                                                                                   |
+| -------------- | ------ | ------ | -------------------------------------------------------------------------------------- |
+| `set_timer`    | change | `auto` | `{note, in_minutes or at, repeat_minutes?}`. Returns `timer <id> set for <local time>` |
+| `list_timers`  | read   | `auto` | `{"timers": [{id, note, next_at (UTC), repeat_minutes}]}`, soonest first               |
+| `cancel_timer` | change | `auto` | `{id}`. Returns `timer <id> cancelled`                                                 |
+
+`set_timer` takes a `note` of 1 to 500 characters (a message to Scout's future self) and exactly
+one of `in_minutes` (more than 0) or `at` (ISO 8601 with a UTC offset, in the future). A repeat
+(`repeat_minutes`) must be 5 or more. Refusals are plain sentences the model reads, for example
+`repeat_minutes must be at least 5.`, `at is not in the future.` or, from `cancel_timer`,
+`no timer with id 7.`.
+
+- **Firing.** When a timer is due, `Timers` emits `timer` with the facts `id`, `note` and
+  `repeat_minutes`, keyed `timer:<id>`. It sleeps until the next due timer, and wakes at least
+  hourly to re-check.
+- **One-offs.** A due one-off is marked `fired` and deleted once Scout's wake turn starts. If the
+  brain stops before that, the timer is emitted again at the next start.
+- **Repeats.** A repeating timer sets its next time from the moment it fired, not the old time. After
+  a long outage it fires once, not once per missed interval.
+- **Watching something.** "Watch my email" is a repeating timer. Its note names the connected app and
+  what counts as worth saying; on each wake Scout uses the app's tools and may stay silent.
+- **Known gap.** Timers fire only while the brain runs. One that came due while it was off fires
+  once at the next start. There is no heartbeat: Scout wakes only for events and its own timers.
 
 ## Not built yet
 
