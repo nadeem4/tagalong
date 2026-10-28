@@ -1,4 +1,4 @@
-﻿# The Python brain
+# The Python brain
 
 The brain is the Python side of contract v1 ([protocol/README.md](../protocol/README.md)). It is
 being built row by row and replaces `packages/core`. Today bodies can connect, declare their tools,
@@ -203,7 +203,7 @@ The desktop app (`bodies/desktop`) is a body of this brain. It no longer runs th
 ## Permissions and asks
 
 Every tool has a mode, `ask` or `auto`. `Toolbox.mode(spec)` picks it in this order: locked is
-always `ask`; then the user's saved choice; then the tool's own default; then the effect.
+`ask`, unless the tool asks for itself (below); then the user's saved choice; then the tool's own default; then the effect.
 
 | Tool                                     | Default mode            |
 | ---------------------------------------- | ----------------------- |
@@ -221,6 +221,10 @@ The user's saved choices live in the `permissions` table in `tagalong.db`:
 | `mode` | `ask` or `auto`                  |
 
 No row means the tool's default applies. `Toolbox.set_mode` refuses `auto` on a locked tool.
+
+A tool whose `ToolSpec` sets `self_asks` runs its own ask with the user, so the gate opens none:
+its mode is always `auto` and `Toolbox.set_mode` refuses any change ("<name> asks for itself.").
+`list_permissions` rows carry `self_asks` next to `locked`; `locked` stays false for it.
 
 Expert jobs (Claude Code hand-offs) live in the `jobs` table of the same file: id, agent, task, folder, mode, state (`running`, `done`, `error`, `stopped`), reason, progress, result (capped at 20,000 characters), session id, a `reported` flag and start and end times. Rows still `running` at brain start become `stopped` with reason `brain restarted`.
 

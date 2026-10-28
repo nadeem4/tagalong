@@ -197,6 +197,7 @@ def home_tools(budget: Budget, toolbox: Callable[[], Toolbox]) -> list[tuple[Too
                 "effect": s.effect,
                 "mode": box.mode(s),
                 "locked": s.locked,
+                "self_asks": s.self_asks,
                 "online": s.name in current,
             }
             for s in sorted(box.known_specs(), key=lambda s: s.name)

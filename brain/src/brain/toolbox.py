@@ -35,6 +35,7 @@ class ToolSpec:
     effect: Literal["read", "change"] = "change"  # unknown effect is treated as a change
     default_mode: Literal["ask", "auto"] | None = None  # beats the effect-based default
     locked: bool = False  # always asks; the person cannot turn this to auto
+    self_asks: bool = False  # runs its own ask with the user, so the gate adds none
 
 
 class Source(Protocol):
@@ -133,6 +134,8 @@ class Toolbox:
         self._asks = asks  # None skips gate step 3 (the ask)
 
     def mode(self, spec: ToolSpec) -> Literal["ask", "auto"]:
+        if spec.self_asks:
+            return "auto"
         if spec.locked:
             return "ask"
         stored = self._modes().get(spec.name)
@@ -148,6 +151,8 @@ class Toolbox:
             raise RpcError(ErrorCode.unknown_tool, f"No tool named {name}.")
         if mode not in ("ask", "auto"):
             raise RpcError(ErrorCode.invalid_params, "mode must be ask or auto.")
+        if spec.self_asks:
+            raise RpcError(ErrorCode.invalid_params, f"{name} asks for itself.")
         if spec.locked and mode == "auto":
             raise RpcError(ErrorCode.invalid_params, f"{name} always asks first.")
         self._save_mode(name, mode)

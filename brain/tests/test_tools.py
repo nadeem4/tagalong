@@ -11,7 +11,7 @@ from brain.bodies import Bodies
 from brain.guardrails import Budget
 from brain.memory import Hit, Memory, MemoryRefused
 from brain.protocol import Body, ErrorCode, RpcError, Tool
-from brain.toolbox import BodySource, BrainSource, Toolbox
+from brain.toolbox import BodySource, BrainSource, Toolbox, ToolSpec
 from brain.tools import RECALL_MAX_CHARS, brain_tools, format_hits, home_tools
 
 
@@ -258,8 +258,10 @@ async def test_list_permissions_marks_locked_and_mode(home):
         "effect",
         "mode",
         "locked",
+        "self_asks",
         "online",
     }
+    assert by_name["remember"]["self_asks"] is False
     assert by_name["desktop__type_text"]["locked"] is True
     assert by_name["desktop__type_text"]["mode"] == "ask"
     assert by_name["desktop__see_screen"]["locked"] is False
@@ -268,6 +270,19 @@ async def test_list_permissions_marks_locked_and_mode(home):
     for hidden in ("list_memories", "spend_today", "list_permissions", "set_permission"):
         assert hidden not in by_name  # home-only tools are not Scout's permissions
     assert "forget" in by_name  # scout and home
+
+
+async def test_list_permissions_reports_self_asks_and_set_permission_refuses(home):
+    spec = ToolSpec("hand_off", "d", {"type": "object"}, locked=False, self_asks=True)
+    home.box.sources.append(BrainSource([(spec, None)]))
+    row = {t["name"]: t for t in json.loads(await home.run("list_permissions"))["tools"]}[
+        "hand_off"
+    ]
+    assert row["self_asks"] is True and row["locked"] is False and row["mode"] == "auto"
+    with pytest.raises(RpcError) as err:
+        await home.run("set_permission", {"tool": "hand_off", "mode": "ask"})
+    assert err.value.code == ErrorCode.invalid_params
+    assert home.sent == []
 
 
 async def test_set_permission_changes_mode_and_sends_changed_permissions(home):
