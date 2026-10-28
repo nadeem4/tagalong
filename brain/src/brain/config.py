@@ -19,6 +19,7 @@ DEFAULT_DAILY_BUDGET_USD = 5.0
 DEFAULT_STEP_CAP = 25
 DEFAULT_EXPERT_CMD = "claude-agent-acp"
 DEFAULT_EXPERT_TIMEOUT_S = 1800.0
+DEFAULT_WAKES_PER_HOUR = 12
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,7 @@ class Config:
     step_cap: int = DEFAULT_STEP_CAP
     expert_cmd: list[str] = field(default_factory=lambda: [DEFAULT_EXPERT_CMD])
     expert_timeout: float = DEFAULT_EXPERT_TIMEOUT_S
+    wakes_per_hour: int = DEFAULT_WAKES_PER_HOUR
 
 
 def split_command(cmd: str, posix: bool | None = None) -> list[str]:
@@ -66,6 +68,7 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         step_cap=_step_cap(env.get("TAGALONG_STEP_CAP")),
         expert_cmd=split_command(env.get("TAGALONG_EXPERT_CMD") or DEFAULT_EXPERT_CMD),
         expert_timeout=_expert_timeout(env.get("TAGALONG_EXPERT_TIMEOUT_S")),
+        wakes_per_hour=_wakes_per_hour(env.get("TAGALONG_WAKES_PER_HOUR")),
     )
 
 
@@ -102,6 +105,18 @@ def _step_cap(text: str | None) -> int:
         raise ValueError(f"bad TAGALONG_STEP_CAP: {text!r}") from None
     if value < 1:
         raise ValueError(f"TAGALONG_STEP_CAP must be at least 1: {text!r}")
+    return value
+
+
+def _wakes_per_hour(text: str | None) -> int:
+    if not text:
+        return DEFAULT_WAKES_PER_HOUR
+    try:
+        value = int(text)
+    except ValueError:
+        raise ValueError(f"bad TAGALONG_WAKES_PER_HOUR: {text!r}") from None
+    if value < 1:
+        raise ValueError(f"TAGALONG_WAKES_PER_HOUR must be at least 1: {text!r}")
     return value
 
 

@@ -71,6 +71,10 @@ When Scout's brain wants to use a tool that needs your say-so, the bubble asks i
 with **Allow once**, **Always allow** (not offered for a locked tool) and **Deny**. Several asks
 queue and show one at a time; if the brain is offline when you click, the card stays up.
 
+Scout can speak first. When a background job ends, the brain wakes Scout once (jobs that end within
+30 seconds share one wake), and Scout decides whether it has anything to say. The wake limit is
+`TAGALONG_WAKES_PER_HOUR` (default 12); see [docs/brain.md](docs/brain.md).
+
 The [developer guide](docs/development.md) covers getting pnpm, testing, packaging and the Chrome
 extension.
 

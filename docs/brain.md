@@ -29,11 +29,12 @@ It needs an Anthropic key. With no `ANTHROPIC_API_KEY` in the environment or in
 | `TAGALONG_STEP_CAP`         | `25`               | Most model calls in one turn                                              |
 | `TAGALONG_EXPERT_CMD`       | `claude-agent-acp` | Command that starts the Claude Code ACP adapter (split like a shell line) |
 | `TAGALONG_EXPERT_TIMEOUT_S` | `1800`             | Longest an expert run may take, in seconds                                |
+| `TAGALONG_WAKES_PER_HOUR`   | `12`               | Most wakes per hour, all capped kinds together (whole number, 1 or more)  |
 | `ANTHROPIC_API_KEY`         | none, required     | Anthropic key                                                             |
 
 `<TAGALONG_HOME>/.env` holds `KEY=value` lines (`#` comments and quotes allowed). Any
 `TAGALONG_*` setting above except `TAGALONG_HOME`, and `ANTHROPIC_API_KEY`, may live there. It only
-fills keys the environment lacks, so the environment wins. A bad budget or step cap stops the brain at
+fills keys the environment lacks, so the environment wins. A bad budget, step cap or wakes-per-hour value stops the brain at
 start.
 
 The `session` file keeps one id across restarts. `hello` returns it.
@@ -57,6 +58,9 @@ the total can run a little low.
 | `brain/src/brain/toolbox.py`     | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                     |
 | `brain/src/brain/asks.py`        | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers)                                                              |
 | `brain/src/brain/experts.py`     | `ExpertRun`: drives Claude Code in a folder over ACP; callbacks for permissions, questions, progress and the end                                                 |
+| `brain/src/brain/events.py`      | The event kinds registry (batch window, per-hour cap) and the loader for `mind/events.md`                                                                        |
+| `brain/src/brain/scheduler.py`   | `Scheduler.emit`: holds events in batches, applies the caps and the budget, starts one wake turn per batch                                                       |
+| `brain/src/brain/mind/events.md` | One note per event kind on how Scout should weigh it (model wording, not code)                                                                                   |
 | `brain/src/brain/jobs.py`        | `Jobs`: hand-off ask, relayed Claude Code asks, the 2-job cap, progress and the `jobs` rows, `changed: jobs`                                                     |
 | `brain/src/brain/apps.py`        | `Apps`: connects each enabled app (MCP over stdio or http), keeps it alive, `TokenFile` (`app-tokens.json`), `validate_app`                                      |
 | `brain/src/brain/app_oauth.py`   | `FileTokenStorage` (`app-oauth/`), the loopback callback listener and the OAuth provider for sign-in                                                             |
@@ -388,18 +392,51 @@ the adapter's own message (for example that auth is required).
 that `main.py` configures (`TAGALONG_EXPERT_CMD`, `TAGALONG_EXPERT_TIMEOUT_S`) and calls
 `startup()`, which turns rows left `running` into `stopped` with reason `brain restarted`.
 
-**Wake and the finish turn.** `Session.wake(event_text)` is the entry point for events that are not
-the user talking. It queues the event; when no turn runs, it starts one turn per event, in order,
-through the same path as `say` (same budget, step cap and turn notifications). The turn goes to the
-body Scout last talked to if it is online, else any online body; with none online the event waits
-until a body connects. The event is fenced as `<data kind="job">`, so its text is data, not
-instructions.
+**Wake and the finish turn.** `Session.scheduler` (`scheduler.py`) is the entry point for events that
+are not the user talking: `emit(Event)`. It holds events in per-kind batches (`events.py`; a job
+ending batches for 30 s, at most 10 wakes an hour, and `TAGALONG_WAKES_PER_HOUR` caps all capped kinds
+together). When no turn runs and a batch is due, it starts one turn per batch through the same path
+as `say` (same budget, step cap and turn notifications); with the daily budget spent the held
+events are dropped and logged. A job report dropped this way stays untold until the brain
+next starts, even after the budget resets. The turn goes to the body Scout last talked to if it is online, else
+any online body; with none online the batch waits until a body connects. A batch held while a turn
+runs starts when that turn ends, whichever way it ends. The text is fenced as `<data kind="event">`
+with the kind's name, its note on how to weigh it and the facts, so it is data, not instructions. A
+start that raises is logged and the batch is dropped, never raised into the caller.
 
-When a job ends, the session wakes Scout with a note of facts only (id, task, folder, state, reason,
-and the result cut at 4,000 characters with `[trimmed]`). `reported` is set once that turn has started (a failed start leaves it unreported). At
-brain start every finished unreported job (including those just stopped) is queued again. Scout's
-prompt says a job note is an event, not a request; the model decides whether to speak, and may say
-nothing.
+When a job ends, the session emits a `job_ended` event whose fact is a note (id, task, folder,
+state, reason, and the result cut at 4,000 characters with `[trimmed]`). `reported` is set once that
+turn has started (a failed start leaves it unreported). At brain start every finished unreported
+job (including those just stopped) is emitted again. Scout's prompt says an event is not a request
+from the owner; the model decides whether to speak, and may say nothing.
+
+Event kinds (`EVENT_KINDS` in `events.py`):
+
+| Kind        | Batch window | Cap per hour | Note                                            |
+| ----------- | ------------ | ------------ | ----------------------------------------------- |
+| `job_ended` | 30 s         | 10           | A job ended; endings within 30 s share one wake |
+
+A kind can also set `wakes` (false: keep only the latest fact, no turn) and `enabled`. An event with
+a `key` replaces an older held event of the same kind and key. Held events live in memory only: a
+brain restart loses them, and unreported jobs are emitted again at start.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+flowchart TD
+  A[emit event] --> B{known and enabled kind?}
+  B -- no --> X[log and drop]
+  B -- yes --> C[add to the kind's batch, key replaces older]
+  C --> D{daily budget spent?}
+  D -- yes --> X2[drop held events, log]
+  D -- no --> E{turn running?}
+  E -- yes --> W[wait for turn end]
+  E -- no --> F{batch window over and caps ok?}
+  F -- no --> T[timer wakes the scheduler later]
+  F -- yes --> G{a body online?}
+  G -- no --> W2[wait for a body to connect]
+  G -- yes --> H[start one turn, fenced data kind=event]
+  H --> I[Scout decides: speak or stay silent]
+```
 
 | Tool          | Audience    | Effect | Gate                      | Does                                                                         |
 | ------------- | ----------- | ------ | ------------------------- | ---------------------------------------------------------------------------- |

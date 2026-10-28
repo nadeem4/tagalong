@@ -187,4 +187,5 @@ def test_soul_tells_scout_its_words_before_a_change_are_the_approval_text():
 
 
 def test_soul_says_job_notes_are_events_not_requests():
-    assert "job note" in system_prompt(NOW, []).lower()
+    soul = system_prompt(NOW, []).lower()
+    assert "event" in soul and "data" in soul

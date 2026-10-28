@@ -12,6 +12,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Python brain: talk to Scout](#python-brain-talk-to-scout)
 - [The desktop on the Python brain](#the-desktop-on-the-python-brain)
 - [Hand off to Claude Code (real brain, real Claude Code)](#hand-off-to-claude-code-real-brain-real-claude-code)
+- [Scout speaks first: job reports (real brain)](#scout-speaks-first-job-reports-real-brain)
 - [Connected apps on the Python brain (real brain, a real stdio app)](#connected-apps-on-the-python-brain-real-brain-a-real-stdio-app)
 - [Hand-offs to Claude Code (old engine)](#hand-offs-to-claude-code-old-engine)
 - [Settings](#settings)
@@ -413,8 +414,9 @@ does not work). Asking Scout ("list my jobs", "stop that job") also works.
    **Expected:** the job shows as stopped with reason "brain restarted". Nothing resumes. Scout may
    mention it once when the desktop reconnects, and not again after that.
 9. **Action:** start a short job, close Home and wait for it to finish.
-   **Expected:** Scout speaks up on its own with a short report of the result, though you asked
-   nothing. A second finish report does not follow for the same job.
+   **Expected:** about 30 seconds after the job ends (the brain batches job endings), Scout speaks
+   up on its own with a short report of the result, though you asked nothing. A second finish report
+   does not follow for the same job. See "Scout speaks first" below.
 10. **Action:** start a job whose result needs no comment.
     **Expected:** Scout may stay silent. Silence is allowed; no canned line appears.
 11. **Action:** with a long job running, open Home → Experts.
@@ -433,6 +435,24 @@ does not work). Asking Scout ("list my jobs", "stop that job") also works.
     an answer and sending it continues the job with your words.
 14. **Action:** open Home → Settings → Permissions.
     **Expected:** Claude Code's tool shows "Asks itself" and its switch is disabled.
+
+## Scout speaks first: job reports (real brain)
+
+Needs the same setup as the hand-off section above. The brain batches job endings for 30 seconds,
+so allow about that long before expecting a report.
+
+1. **Action:** hand off a short job (for example "list the files here") and wait for it to end.
+   **Expected:** about 30 seconds after the job ends Scout speaks once about it, without being
+   asked. It does not speak about the same job again.
+2. **Action:** hand off a job that is bound to fail (a task that needs a tool Claude Code cannot
+   use, or stop the job from Home).
+   **Expected:** Scout reports it honestly as failed or stopped, with the reason; it does not call it
+   done.
+3. **Action:** start two short jobs within 30 seconds of each other and let both end.
+   **Expected:** one wake covers both: Scout speaks once about the two jobs, not twice.
+4. **Action:** start a long job, stop the brain while it runs, then start the brain again.
+   **Expected:** the job shows as stopped with reason "brain restarted". Scout reports it once after
+   the restart (once the desktop is connected), and not again on the next restart.
 
 ## Connected apps on the Python brain (real brain, a real stdio app)
 
