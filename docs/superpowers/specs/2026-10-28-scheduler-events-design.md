@@ -10,8 +10,8 @@ example a Claude Code job), gets on with their day, and Scout comes back only wh
 truly needs them.
 
 The core idea is a **framework**: one front door where anything can report "something happened".
-Code decides *when* Scout gets a chance to think; the model decides *whether* to say anything and
-*what*. Adding, removing or retuning a trigger must be a small, local change, because we expect
+Code decides _when_ Scout gets a chance to think; the model decides _whether_ to say anything and
+_what_. Adding, removing or retuning a trigger must be a small, local change, because we expect
 to keep adding triggers (desktop notifications, mail watches, later a camera on a physical Scout
 noticing the user looks sad).
 
@@ -44,7 +44,7 @@ noticing the user looks sad).
 - Scout chatters: speaks on routine progress, every window switch, or repeats itself.
 - Canned lines or hand-coded behaviour ("if email from boss, say X"). Code supplies the moment
   and the facts; Scout writes every word. A silent wake is a good outcome, not a failure.
-- Scout acts on the user's behalf in new ways. In this row Scout only *answers expert questions*
+- Scout acts on the user's behalf in new ways. In this row Scout only _answers expert questions_
   it can answer from the conversation and memory; permission asks still go to the user.
 - Adding a trigger requires touching the scheduler core.
 
@@ -127,10 +127,10 @@ flowchart LR
 ### Expert events
 
 - Job ended (done, error, stopped): moves onto `emit`, same facts as today's `job_note`.
-- Expert *question* asks (free-text questions from the expert, `jobs.py:177-195`) go to Scout first
+- Expert _question_ asks (free-text questions from the expert, `jobs.py:177-195`) go to Scout first
   as a waking event. Scout answers from the conversation and memory when it can, and asks the user
   only when it truly needs them. Scout's answer goes back to the expert through a tool.
-- Expert *permission* asks and progress are unchanged: permission asks still go straight to the
+- Expert _permission_ asks and progress are unchanged: permission asks still go straight to the
   user as cards (until learned approvals), progress never wakes Scout.
 
 ## Decisions settled after the builder check (designer's calls)
@@ -154,16 +154,17 @@ flowchart LR
   so a fire still waiting in the queue is replaced and fires never pile up.
 - **Defaults per kind:**
 
-  | Kind | Wakes | Batch | Max per hour |
-  |---|---|---|---|
-  | `timer` | yes | 0 s | 6 |
-  | `body_online` | yes, only if that body was offline 10+ min | 0 s | 2 |
-  | `back` | yes | 0 s | 2 |
-  | `job_ended` | yes | 30 s | 10 |
-  | `job_question` | yes (no batch, no cap) | — | — |
-  | `focus` | no (context only) | — | — |
+  | Kind           | Wakes                                      | Batch | Max per hour |
+  | -------------- | ------------------------------------------ | ----- | ------------ |
+  | `timer`        | yes                                        | 0 s   | 6            |
+  | `body_online`  | yes, only if that body was offline 10+ min | 0 s   | 2            |
+  | `back`         | yes                                        | 0 s   | 2            |
+  | `job_ended`    | yes                                        | 30 s  | 10           |
+  | `job_question` | yes (no batch, no cap)                     | —     | —            |
+  | `focus`        | no (context only)                          | —     | —            |
 
   Global cap: 12 wake turns per rolling hour (`job_question` not counted).
+
 - **Time.** Timers are stored in UTC. `set_timer` takes minutes from now, or an ISO time with a
   UTC offset. Scout already sees the current time; it must include the UTC offset so Scout can
   convert "3 pm".
