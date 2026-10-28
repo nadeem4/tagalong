@@ -22,6 +22,7 @@ import { HOME_CSS } from './home-styles';
 import { RoutinesPanel } from './routines-panel';
 import { LearnedView } from './learned-view';
 import { MemoryView } from './memory-view';
+import { JobsPanel } from './jobs-panel';
 import { PermissionsPanel } from './permissions-panel';
 import { SightLogView } from './sight-log-view';
 import { SpendCard } from './spend-card';
@@ -190,7 +191,12 @@ export function HomeView({
             }
           />
         )}
-        {page === 'experts' && <ExpertsPanel />}
+        {page === 'experts' && (
+          <>
+            <JobsPanel />
+            <ExpertsPanel />
+          </>
+        )}
         {/* Kept mounted once opened, so a routine being edited (Scout's card or your own)
             survives a look at another page, and a card already saved is not opened again. */}
         {(page === 'routines' || routinesSeen) && (
