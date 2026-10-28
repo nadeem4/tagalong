@@ -197,4 +197,44 @@ describe('ConnectionsPanel', () => {
     expect(await screen.findByRole('status')).toHaveTextContent(/brain isn’t running/i);
     expect(screen.queryByRole('heading', { name: 'Connections' })).not.toBeNull();
   });
+
+  it('reads the offline error through Electron’s wrapper, with one note and no alert', async () => {
+    const bridge = createFakeHostBridge({
+      listFails: "Error invoking remote method 'tagalong:connections:list': Error: brain offline",
+    });
+    render(
+      <HostBridgeProvider bridge={bridge}>
+        <ConnectionsPanel />
+      </HostBridgeProvider>,
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent(/brain isn’t running/i);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('shows a brain refusal as its own plain line, without Electron’s wrapper', async () => {
+    const bridge = createFakeHostBridge({ apps: [FILES] });
+    bridge.addConnection = () =>
+      Promise.reject(
+        new Error(
+          "Error invoking remote method 'tagalong:connections:add': Error: a stdio app needs a command.",
+        ),
+      );
+    await renderPanel(bridge);
+    fireEvent.click(screen.getByText('Add an app'));
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Wiki' } });
+    fireEvent.change(screen.getByLabelText('Address'), {
+      target: { value: 'https://wiki.example/mcp' },
+    });
+    await click(screen.getByRole('button', { name: 'Add' }));
+    expect(screen.getByRole('alert')).toHaveTextContent(/^a stdio app needs a command\.$/);
+  });
+
+  it('says the list may be out of date when the brain drops with apps on screen', async () => {
+    const bridge = createFakeHostBridge({ apps: [FILES] });
+    await renderPanel(bridge);
+    bridge.listConnections = () => Promise.reject(new Error('brain offline'));
+    await click(screen.getByRole('switch', { name: 'Scout can use Files' }));
+    expect(await screen.findByRole('status')).toHaveTextContent(/may be out of date/i);
+    expect(screen.getByRole('region', { name: 'Files' })).toBeInTheDocument();
+  });
 });

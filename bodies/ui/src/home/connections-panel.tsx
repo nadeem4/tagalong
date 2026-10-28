@@ -10,8 +10,7 @@ import { useHostBridge } from '../host-bridge';
 
 type Status = { text: string; error: boolean } | null;
 
-const OFFLINE =
-  'Scout’s brain isn’t running, so your apps can’t be shown. Start it, then try again.';
+const BRAIN_OFFLINE = 'brain offline';
 
 const STATUS_WORDS: Record<AppInfo['status'], string> = {
   off: 'Off',
@@ -52,10 +51,10 @@ function envLines(text: string): Record<string, string> | string {
   return env;
 }
 
-/** The person-readable line for a failed call; the offline case gets the longer note. */
+/** A failed call's own words: Electron wraps them in "Error invoking remote method '…': Error: ". */
 function failure(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  return message === 'brain offline' ? OFFLINE : message;
+  return message.replace(/^Error invoking remote method '[^']+': (\w*Error: )?/, '');
 }
 
 /**
@@ -76,9 +75,9 @@ export function ConnectionsPanel() {
         setApps(latest.apps);
       })
       .catch((error: unknown) => {
-        setOffline(true);
         setApps((current) => current ?? []);
-        if (failure(error) !== OFFLINE) setStatus({ text: failure(error), error: true });
+        if (failure(error) === BRAIN_OFFLINE) setOffline(true);
+        else setStatus({ text: failure(error), error: true });
       });
   }, [bridge]);
   useEffect(reload, [reload]);
@@ -106,7 +105,9 @@ export function ConnectionsPanel() {
       if (done !== undefined) setStatus({ text: done, error: false });
       return true;
     } catch (error) {
-      setStatus({ text: failure(error), error: true });
+      // Offline gets the note under the intro, not a second red line.
+      if (failure(error) === BRAIN_OFFLINE) setOffline(true);
+      else setStatus({ text: failure(error), error: true });
       return false;
     } finally {
       reload();
@@ -125,7 +126,9 @@ export function ConnectionsPanel() {
       </p>
       {offline && (
         <p className="tg-note" role="status">
-          {OFFLINE}{' '}
+          {apps.length > 0
+            ? 'Scout’s brain isn’t running, so this list may be out of date. Start it, then try again.'
+            : 'Scout’s brain isn’t running, so your apps can’t be shown. Start it, then try again.'}{' '}
           <button type="button" className="tg-btn-quiet" onClick={reload}>
             Try again
           </button>
