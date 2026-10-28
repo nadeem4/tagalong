@@ -73,6 +73,16 @@ export class BrainClient {
     return this.sessionId;
   }
 
+  /** "host:port" the client dials, for the Home card that says where the brain is. */
+  get addr(): string {
+    return this.options.addr;
+  }
+
+  /** Where the link stands now; offline until start() has tried. */
+  get link(): BrainStatus {
+    return this.status ?? 'offline';
+  }
+
   start(): void {
     if (!this.stopped) return;
     this.stopped = false;

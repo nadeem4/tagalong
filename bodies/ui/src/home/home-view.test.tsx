@@ -235,6 +235,12 @@ describe('HomeView', () => {
     await waitFor(() => expect(recent).toHaveTextContent('Find why the shutdown test fails'));
   });
 
+  it('shows where things run on the overview', async () => {
+    renderHome(createFakeHostBridge({ pets: [SCOUT] }));
+    const where = await screen.findByRole('region', { name: 'Where things run' });
+    await waitFor(() => expect(where).toHaveTextContent('ws://127.0.0.1:47321'));
+  });
+
   it('keeps a routine being edited when you switch pages, and never reopens a saved card', async () => {
     const routineDraft = {
       proposalId: '60000000-0000-4000-8000-000000000002',

@@ -10,7 +10,7 @@ import pytest
 
 from brain import main
 from brain.app_tools import AppSource, app_home_tools
-from brain.apps import Apps, TokenFile
+from brain.apps import AppRow, Apps, TokenFile
 from brain.bodies import Bodies
 from brain.memory import Memory
 from brain.mind.turn import Call
@@ -78,6 +78,54 @@ async def test_home_tools_are_home_only(rig):
 
 async def test_list_apps_empty(rig):
     assert await rig.call("list_apps") == {"apps": []}
+
+
+async def test_list_apps_stdio_shows_command_and_args(rig):
+    await rig.call("add_app", stdio(env={"API_KEY": "topsecret"}))
+    app = (await rig.call("list_apps"))["apps"][0]
+    assert app["command"] == sys.executable
+    assert app["args"] == [FAKE]
+    assert "url" not in app
+
+
+async def test_list_apps_http_shows_url_only(rig):
+    await rig.call(
+        "add_app",
+        {"name": "Wiki", "transport": "http", "url": "https://127.0.0.1:1/mcp", "auth": "none"},
+    )
+    app = (await rig.call("list_apps"))["apps"][0]
+    assert app["url"] == "https://127.0.0.1:1/mcp"
+    assert "command" not in app and "args" not in app
+
+
+async def test_list_apps_never_leaks_secrets(rig):
+    await rig.call("add_app", stdio("Local", env={"API_KEY": "topsecret"}))
+    await rig.call(
+        "add_app",
+        {
+            "name": "Remote",
+            "transport": "http",
+            "url": "https://user:pw123@host.example/x?key=qsecret#frag",
+            "auth": "token",
+            "token": "tok456",
+        },
+    )
+    listed = await rig.call("list_apps")
+    text = json.dumps(listed)
+    for secret in ("topsecret", "tok456", "pw123", "user:", "qsecret", "frag"):
+        assert secret not in text
+    remote = next(a for a in listed["apps"] if a["id"] == "remote")
+    assert remote["url"] == "https://host.example/x"
+
+
+@pytest.mark.parametrize("bad", ["http://h:99999/x", "http://[::1/x"])
+async def test_list_apps_survives_a_malformed_url(rig, bad):
+    # A hand-edited row must not hide every other app; its url falls back to "".
+    await rig.call("add_app", stdio())
+    rig.mem.add_app(AppRow("bad", "Bad", "http", {"url": bad}, "none", False))
+    apps = {a["id"]: a for a in (await rig.call("list_apps"))["apps"]}
+    assert set(apps) == {"fake", "bad"}
+    assert apps["bad"]["url"] == ""
 
 
 async def test_add_app_connects_and_lists_tools(rig):

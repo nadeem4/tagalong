@@ -405,7 +405,13 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   as for `approveTool`.
 - **`changed` notifications:** `index.ts` sends each one's `what` to every window on
   `IPC.brainChangedEvent`; the preload exposes it as `onBrainChanged(handler)` on the HostBridge.
-  Memory view reads again on `memory`, the Jobs panel on `jobs`.
+  Memory view reads again on `memory`, the Jobs panel on `jobs`. The brain link sends `link`
+  (online, connecting, offline, outdated) when it changes, so the "Where things run" card reads again.
+- **Where things run:** a card on Home's Overview (`bodies/ui/src/home/where-things-run.tsx`). The
+  `brainLink` IPC (`tagalong:brain:link`, `ipc/brain-link.ts`) returns `{ addr: "ws://<addr>", status }`;
+  the address is `TAGALONG_BRAIN_ADDR` (default `127.0.0.1:47321`), exactly what the desktop dials.
+  Apps come from `listConnections`. Offline, the card says apps return with the brain.
+  `e2e/where-things-run.spec.ts` covers it on the fake brain.
 - **Answering an ask:** `answer(ask, decision)` is a request that sends `answer { ask, option }`,
   with the card's `once` sent as `allow` and `always` / `deny` as they are. It needs `online`
   (otherwise `BrainOffline`) and rejects if the brain refuses it (the ask already closed). The

@@ -10,4 +10,12 @@ describe('HOME_CSS', () => {
       `.home :focus-visible {\n  outline: ${t.size.focusRing}px solid ${t.color.gold}; outline-offset: ${t.size.focusOffset}px;`,
     );
   });
+
+  it('shows the where-things-run status dots and keeps the wrap rule to that card', () => {
+    expect(HOME_CSS).toContain(
+      '.home-card--run .home-dot { display: inline-block; margin-right: 6px; }',
+    );
+    expect(HOME_CSS).toContain('.home-card--run .home-card__row strong { min-width: 0;');
+    expect(HOME_CSS).not.toContain('\n.home-card__row strong');
+  });
 });

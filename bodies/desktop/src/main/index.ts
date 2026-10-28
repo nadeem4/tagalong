@@ -113,6 +113,7 @@ import { PickUpAllowlist, PickUpWaiting } from './pick-up-open';
 import { registerSightLogIpc } from './ipc/sight-log';
 import { registerMemoryIpc } from './ipc/memory';
 import { registerJobsIpc } from './ipc/jobs';
+import { registerBrainLinkIpc } from './ipc/brain-link';
 import { registerPermissionsIpc } from './ipc/permissions';
 import { registerSettingsIpc } from './ipc/settings';
 import { registerTurnIpc } from './ipc/turns';
@@ -322,6 +323,10 @@ async function start(): Promise<void> {
       brainStatus = status;
       markBrainLink(statusMarks, status);
       watchOffline(status);
+      // Home's "Where things run" shows the link; it reads it again when it changes.
+      for (const window of BrowserWindow.getAllWindows()) {
+        if (!window.isDestroyed()) window.webContents.send(IPC.brainChangedEvent, 'link');
+      }
     },
   });
 
@@ -1021,6 +1026,7 @@ function registerIpc(): void {
   registerMemoryIpc(handle, { brain: required().brain });
   registerPermissionsIpc(handle, { brain: required().brain });
   registerJobsIpc(handle, { brain: required().brain });
+  registerBrainLinkIpc(handle, { brain: required().brain });
   registerRoutineIpc(handle, {
     engine,
     openHome: (page) => openHome(page),

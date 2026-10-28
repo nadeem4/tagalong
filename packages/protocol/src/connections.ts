@@ -229,6 +229,10 @@ export const AppInfo = z.object({
   status: ConnectionStatus,
   /** Empty when nothing is wrong. */
   error: z.string(),
+  /** Where it runs: `url` for http, `command` and `args` for stdio. Never env, headers or tokens. */
+  url: z.string().optional(),
+  command: z.string().optional(),
+  args: z.array(z.string()).optional(),
   tools: z.array(AppToolInfo),
 });
 export type AppInfo = z.infer<typeof AppInfo>;

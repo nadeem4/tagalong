@@ -164,6 +164,8 @@ export const IPC = {
   setStatusMark: 'tagalong:status:set',
   // The brain changed something Home shows (memory, permissions): pushed to every window.
   brainChangedEvent: 'tagalong:brain:changed',
+  // Home's "Where things run": the address the desktop dials and whether the link is up.
+  brainLink: 'tagalong:brain:link',
 } as const;
 
 /** What the figure hands its preload on a drop: the files, and the drag's link and text. */

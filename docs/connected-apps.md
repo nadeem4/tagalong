@@ -135,6 +135,10 @@ flowchart LR
   offers **Try again**.
 - **No sign-in button yet**: an `oauth` app shows its status and error like any other; its sign-in
   arrives in 9c. The desktop's sign-in call rejects until then.
+- **Where things run**: Overview has a read-only card with each app's command line
+  (`node files-server.js`) or web address, plus its status. Secrets never show: the brain strips
+  them from `list_apps` (see [brain.md](brain.md#home-tools)). Do not put secrets in args; use `${VAR}` env
+  references, which stay in the env.
 - **Per-tool permissions** stay in Settings › Permissions; this page has no tool list.
 
 ### Not built yet

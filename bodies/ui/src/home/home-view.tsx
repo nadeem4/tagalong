@@ -26,6 +26,7 @@ import { JobsPanel } from './jobs-panel';
 import { PermissionsPanel } from './permissions-panel';
 import { SightLogView } from './sight-log-view';
 import { SpendCard } from './spend-card';
+import { WhereThingsRun } from './where-things-run';
 import { WaitingView } from './waiting-view';
 
 export type HomePage =
@@ -315,6 +316,7 @@ function Overview({
           </button>
         </section>
       </div>
+      <WhereThingsRun />
       <SpendCard />
       <section className="home-card" aria-label="Recent">
         <h2 className="home-card__label">RECENT</h2>

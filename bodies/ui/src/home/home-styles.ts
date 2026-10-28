@@ -54,12 +54,14 @@ export const HOME_CSS = `
 .home-card__lead { display: flex; align-items: center; gap: ${t.space.md}px; }
 .home-card p.home-card__lead { font-size: ${t.fontSize.field}px; font-weight: ${t.fontWeight.semibold}; color: ${t.color.panelText}; }
 .home-card p.home-card__row { display: flex; justify-content: space-between; gap: ${t.space.lg}px; color: ${t.color.panelText}; }
+.home-card--run .home-card__row strong { min-width: 0; overflow-wrap: anywhere; }
 .home-card__row span:last-child { flex: none; color: ${t.color.panelMuted}; }
 .home-dot { width: 8px; height: 8px; border-radius: 50%; background: #2F9E44; }
 .home-dot--warn { background: ${t.color.gold}; }
 .home-dot--err { background: ${t.color.errInk}; }
 .home-dot--off { background: ${t.color.panelMuted}; }
 .tg-chip .home-dot { display: inline-block; }
+.home-card--run .home-dot { display: inline-block; margin-right: 6px; }
 .home-note {
   margin: 0; padding: ${t.space.xxl}px; font-size: ${t.fontSize.field}px; line-height: 1.5;
   color: ${t.color.panelMuted};

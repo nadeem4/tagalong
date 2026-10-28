@@ -49,7 +49,20 @@ const APPS = [
     enabled: true,
     status: 'connected',
     error: '',
+    command: 'node',
+    args: ['files-server.js'],
     tools: [{ name: 'files__read', effect: 'look', locked: false }],
+  },
+  {
+    id: 'wiki',
+    name: 'Wiki',
+    transport: 'http',
+    auth: 'none',
+    enabled: true,
+    status: 'connected',
+    error: '',
+    url: 'https://wiki.example.com/mcp',
+    tools: [],
   },
 ];
 

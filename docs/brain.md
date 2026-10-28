@@ -300,15 +300,19 @@ The app calls below are Home-only. A refusal is `invalid_params` with a plain li
 sends `changed {what: "apps"}`, as does every status change of an app. Home's Connections page calls
 all five (see [connected-apps.md](connected-apps.md#homes-connections-page)).
 
-| Tool              | Input                                                                                            | Result text (JSON)                                                                                                       |
-| ----------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `list_apps`       | `{}`                                                                                             | `{"apps": [{"id", "name", "transport", "auth", "enabled", "status", "error", "tools": [{"name", "effect", "locked"}]}]}` |
-| `add_app`         | `{"name", "transport": "stdio"\|"http", "command"?, "args"?, "env"?, "url"?, "auth"?, "token"?}` | `{"id"}`; connects at once. `token` (only with `auth: "token"`) goes to `app-tokens.json`, never the row                 |
-| `set_app_enabled` | `{"id", "enabled": bool}`                                                                        | `{"id", "enabled"}`                                                                                                      |
-| `remove_app`      | `{"id"}`                                                                                         | `{"id", "removed": true}`; stops the app, deletes its row and token                                                      |
-| `restart_app`     | `{"id"}`                                                                                         | `{"id", "restarting": true}`                                                                                             |
+| Tool              | Input                                                                                            | Result text (JSON)                                                                                                                                                   |
+| ----------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_apps`       | `{}`                                                                                             | `{"apps": [{"id", "name", "transport", "auth", "enabled", "url" (http) or "command" + "args" (stdio), "status", "error", "tools": [{"name", "effect", "locked"}]}]}` |
+| `add_app`         | `{"name", "transport": "stdio"\|"http", "command"?, "args"?, "env"?, "url"?, "auth"?, "token"?}` | `{"id"}`; connects at once. `token` (only with `auth: "token"`) goes to `app-tokens.json`, never the row                                                             |
+| `set_app_enabled` | `{"id", "enabled": bool}`                                                                        | `{"id", "enabled"}`                                                                                                                                                  |
+| `remove_app`      | `{"id"}`                                                                                         | `{"id", "removed": true}`; stops the app, deletes its row and token                                                                                                  |
+| `restart_app`     | `{"id"}`                                                                                         | `{"id", "restarting": true}`                                                                                                                                         |
 
 An unknown id is refused with `There is no app called <id>.`
+
+`list_apps` never returns a secret. Env values, headers and tokens do not leave the brain. A url
+is cut to scheme, host, port and path: userinfo, query and fragment are stripped, and a malformed
+url shows empty. Home shows these rows in its "Where things run" card.
 
 ## Connected apps
 
