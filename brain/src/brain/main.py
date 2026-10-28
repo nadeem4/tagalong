@@ -47,7 +47,15 @@ async def _run() -> None:
     tokens = TokenFile(config.data_dir)
     apps = Apps(memory, bodies.notify, os.environ, tokens=tokens, data_dir=config.data_dir)
     session = Session(
-        model, budget, bodies, config.step_cap, memory, make_run=make_run, apps=apps, tokens=tokens
+        model,
+        budget,
+        bodies,
+        config.step_cap,
+        memory,
+        make_run=make_run,
+        apps=apps,
+        tokens=tokens,
+        wakes_per_hour=config.wakes_per_hour,
     )
     try:
         server = await start_server(

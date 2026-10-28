@@ -93,21 +93,36 @@ class Scheduler:
         self.pump()
 
     def pump(self) -> None:
-        if self._groups and not self._budget.allows():
-            self._drop_all()
-        if self._groups and not self._busy():
-            group = next((g for g in self._groups if self._remaining(g) <= 0), None)
-            body_id = self._choose_body() if group is not None else None
-            if group is not None and body_id is not None:
-                self._groups.remove(group)
-                if group.kind.max_per_hour is not None:
-                    self._wakes.append((self._now(), group.kind.name))
-                text = wake_text(group.kind, group.events, self._notes.get(group.kind.name, ""))
-                self._start(body_id, [{"type": "text", "text": text}])
-                for on_start in group.on_starts:  # after the start, so a failed start stays untold
-                    if on_start is not None:
-                        on_start()
-        self._arm_timer()
+        try:
+            if self._groups and not self._budget.allows():
+                self._drop_all()
+            if self._groups and not self._busy():
+                group = next((g for g in self._groups if self._remaining(g) <= 0), None)
+                body_id = self._choose_body() if group is not None else None
+                if group is not None and body_id is not None:
+                    self._groups.remove(group)
+                    self._run(group, body_id)
+        finally:
+            self._arm_timer()
+
+    def _run(self, group: _Group, body_id: str) -> None:
+        # A failed start drops the group (as the old queue did): pump is called from done
+        # callbacks and body connects, so it must not raise. The events stay untold, and
+        # unreported jobs are re-emitted at the next start.
+        if group.kind.max_per_hour is not None:
+            self._wakes.append((self._now(), group.kind.name))
+        text = wake_text(group.kind, group.events, self._notes.get(group.kind.name, ""))
+        try:
+            self._start(body_id, [{"type": "text", "text": text}])
+        except Exception:
+            log.exception("could not start a %s wake", group.kind.name)
+            return
+        for on_start in group.on_starts:  # after the start, so a failed start stays untold
+            if on_start is not None:
+                try:
+                    on_start()
+                except Exception:
+                    log.exception("on_start failed for a %s wake", group.kind.name)
 
     def turn_ended(self, turn_id: str) -> None:
         self.pump()

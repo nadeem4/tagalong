@@ -388,19 +388,22 @@ the adapter's own message (for example that auth is required).
 that `main.py` configures (`TAGALONG_EXPERT_CMD`, `TAGALONG_EXPERT_TIMEOUT_S`) and calls
 `startup()`, which turns rows left `running` into `stopped` with reason `brain restarted`.
 
-**Wake and the finish turn.** `Session.wake(event_text)` is the entry point for events that are not
-the user talking. It queues the event; when no turn runs, it starts one turn per event, in order,
-through the same path as `say` (same budget, step cap and turn notifications). The turn goes to the
-body Scout last talked to if it is online, else any online body; with none online the event waits
-until a body connects. The event is fenced as `<data kind="job">`, so its text is data, not
-instructions.
+**Wake and the finish turn.** `Session.scheduler` (`scheduler.py`) is the entry point for events that
+are not the user talking: `emit(Event)`. It holds events in per-kind batches (`events.py`; a job
+ending batches for 30 s, at most 10 wakes an hour, and `TAGALONG_WAKES_PER_HOUR` caps all kinds
+together). When no turn runs and a batch is due, it starts one turn per batch through the same path
+as `say` (same budget, step cap and turn notifications); with the daily budget spent the held
+events are dropped and logged. The turn goes to the body Scout last talked to if it is online, else
+any online body; with none online the batch waits until a body connects. A batch held while a turn
+runs starts when that turn ends, whichever way it ends. The text is fenced as `<data kind="event">`
+with the kind's name, its note on how to weigh it and the facts, so it is data, not instructions. A
+start that raises is logged and the batch is dropped, never raised into the caller.
 
-When a job ends, the session wakes Scout with a note of facts only (id, task, folder, state, reason,
-and the result cut at 4,000 characters with `[trimmed]`). `reported` is set once that turn has started (a failed start leaves it unreported). At
-brain start every finished unreported job (including those just stopped) is queued again. Scout's
-prompt says a job note is an event, not a request; the model decides whether to speak, and may say
-nothing.
-
+When a job ends, the session emits a `job_ended` event whose fact is a note (id, task, folder,
+state, reason, and the result cut at 4,000 characters with `[trimmed]`). `reported` is set once that
+turn has started (a failed start leaves it unreported). At brain start every finished unreported
+job (including those just stopped) is emitted again. Scout's prompt says an event is not a request
+from the owner; the model decides whether to speak, and may say nothing.
 | Tool          | Audience    | Effect | Gate                      | Does                                                                         |
 | ------------- | ----------- | ------ | ------------------------- | ---------------------------------------------------------------------------- |
 | `hand_off`    | scout       | change | asks itself (`self_asks`) | `{task, folder}`. Returns `job <id> started`, or the plain reason it did not |

@@ -320,3 +320,31 @@ async def test_cap_held_group_arms_a_timer_for_the_cap_wait(monkeypatch):
     )
     rig.scheduler.pump()
     assert delays == [3600 - 120]
+
+
+def failing_rig(**kw) -> Rig:
+    rig = Rig(**kw)
+
+    def boom(body_id, content):
+        raise RuntimeError("cannot start")
+
+    rig.scheduler._start = boom
+    return rig
+
+
+def test_failed_start_is_logged_not_raised_and_never_marked_told(caplog):
+    rig = failing_rig()
+    told = []
+    with caplog.at_level(logging.ERROR, logger="brain"):
+        rig.scheduler.emit(ev("ping"), on_start=lambda: told.append(1))
+    assert told == []
+    assert "cannot start" in caplog.text
+    assert rig.scheduler.next_due() is None  # dropped, like the old queue; a restart re-emits
+
+
+async def test_failed_start_still_rearms_the_timer_for_other_groups():
+    rig = failing_rig()
+    rig.scheduler.emit(ev("slow"))  # held for its batch
+    rig.scheduler.emit(ev("ping"))  # starts now and fails
+    assert rig.scheduler._timer is not None
+    rig.scheduler._timer.cancel()
