@@ -84,6 +84,8 @@ export interface FakeHostBridge extends HostBridge {
   readonly cancelledHandoffs: readonly string[];
   /** Every answer to a connector confirm card, in order. */
   readonly approvals: readonly { approvalId: string; decision: 'once' | 'always' | 'deny' }[];
+  /** Every answer to a Claude Code job's ask (its own option, or typed text), in order. */
+  readonly jobAnswers: readonly { approvalId: string; option: string; text?: string }[];
   /** Every saved ask, waiting or answered; a test edits it, then emits `asks.changed`. */
   savedAsks: Ask[];
   /** Every answer from Waiting on you, and every Open, in order. */
@@ -172,6 +174,7 @@ export function createFakeHostBridge(
   const cancelledHandoffs: string[] = [];
   const approvals: { approvalId: string; decision: 'once' | 'always' | 'deny' }[] = [];
   const answeredAsks: { id: string; decision: 'approve' | 'decline' }[] = [];
+  const jobAnswers: { approvalId: string; option: string; text?: string }[] = [];
   const openedAsks: string[] = [];
   const addedConnections: ConnectionsAddParams[] = [];
   const signIns: string[] = [];
@@ -393,6 +396,11 @@ export function createFakeHostBridge(
     approvals,
     approveTool(approvalId, decision) {
       approvals.push({ approvalId, decision });
+      return Promise.resolve();
+    },
+    jobAnswers,
+    answerJobAsk(approvalId, answer) {
+      jobAnswers.push({ approvalId, ...answer });
       return Promise.resolve();
     },
     savedAsks: (options.savedAsks ?? []).map((ask) => ({ ...ask })),

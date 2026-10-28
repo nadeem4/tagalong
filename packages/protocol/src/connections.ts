@@ -178,6 +178,8 @@ export const ConnectorConfirmParams = z.object({
    * tool). Absent on the old brain's card, which offers Allow once and Deny only.
    */
   options: z.array(z.string()).optional(),
+  /** A Claude Code job asks the person something: the card takes typed text as well as a choice. */
+  question: z.boolean().optional(),
 });
 export type ConnectorConfirmParams = z.infer<typeof ConnectorConfirmParams>;
 

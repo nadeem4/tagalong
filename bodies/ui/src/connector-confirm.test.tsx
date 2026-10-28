@@ -170,6 +170,102 @@ describe('the connector confirm card', () => {
     });
   });
 
+  // Asks a Claude Code job opens: no turn, custom option names, answered by name.
+  describe('an ask from a Claude Code job', () => {
+    const jobAsk = (over: Record<string, unknown> = {}) =>
+      ({
+        ...confirm(),
+        turnId: '',
+        app: 'Scout',
+        tool: 'hand_off',
+        summary: 'Fix the login bug\nfolder: C:\\work\\app',
+        options: ['Plan', 'Edit', 'cancel'] as string[],
+        ...over,
+      }) as const;
+
+    it('the hand-off shows the task and folder, and each option is a button that answers by name', async () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(jobAsk()));
+      const card = screen.getByRole('region', { name: 'Scout asks' });
+      expect(card).toHaveTextContent('Fix the login bug');
+      expect(card).toHaveTextContent('folder: C:\\work\\app');
+      expect(screen.queryByRole('button', { name: 'Allow once' })).toBeNull();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+        await Promise.resolve();
+      });
+      expect(bridge.jobAnswers).toEqual([{ approvalId: APPROVAL, option: 'Edit' }]);
+      expect(bridge.approvals).toEqual([]);
+      expect(screen.queryByRole('region', { name: 'Scout asks' })).toBeNull();
+    });
+
+    it('a relayed permission shows the tool, its input and its own options', async () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() =>
+        bridge.emit(
+          jobAsk({
+            app: 'Claude Code',
+            tool: 'claude_code:Edit file',
+            summary: 'claude_code:Edit file\npath: a.ts',
+            options: ['Allow once', 'Reject'],
+          }),
+        ),
+      );
+      const card = screen.getByRole('region', { name: 'Claude Code asks' });
+      expect(card).toHaveTextContent('claude_code:Edit file');
+      expect(card).toHaveTextContent('path: a.ts');
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
+        await Promise.resolve();
+      });
+      expect(bridge.jobAnswers).toEqual([{ approvalId: APPROVAL, option: 'Reject' }]);
+    });
+
+    it('a question takes typed text and sends it as the answer', async () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() =>
+        bridge.emit(
+          jobAsk({
+            app: 'Claude Code',
+            tool: 'question',
+            question: true,
+            summary: 'Which database?',
+            options: ['sqlite'],
+          }),
+        ),
+      );
+      expect(screen.getByRole('button', { name: 'sqlite' })).toBeInTheDocument();
+      fireEvent.change(screen.getByRole('textbox', { name: 'Your answer' }), {
+        target: { value: 'duckdb' },
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+        await Promise.resolve();
+      });
+      expect(bridge.jobAnswers).toEqual([
+        { approvalId: APPROVAL, option: 'duckdb', text: 'duckdb' },
+      ]);
+    });
+
+    it('a question with no typed text cannot be sent', () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(jobAsk({ tool: 'question', question: true, options: [] })));
+      expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled();
+    });
+
+    it('closes cleanly when the ask is cancelled, with no turn running', () => {
+      const bridge = createFakeHostBridge();
+      renderBubble(bridge);
+      act(() => bridge.emit(jobAsk()));
+      act(() => bridge.emit({ type: 'connector.dismiss', approvalId: APPROVAL }));
+      expect(screen.queryByRole('region', { name: 'Scout asks' })).toBeNull();
+    });
+  });
+
   it('says when a change cannot be undone', () => {
     const bridge = createFakeHostBridge();
     renderBubble(bridge);

@@ -51,6 +51,8 @@ export interface PermissionRow {
   effect: 'read' | 'change';
   mode: 'ask' | 'auto';
   locked: boolean;
+  /** The tool opens its own ask with the person, so the switch changes nothing (brain's flag). */
+  self_asks?: boolean;
   online: boolean;
 }
 
@@ -187,6 +189,11 @@ export interface HostBridge {
   searchProjects?(query: string): Promise<ProjectCandidate[]>;
   /** The person's answer to a confirm card: run it once, always allow the tool, or deny it. */
   approveTool?(approvalId: string, decision: 'once' | 'always' | 'deny'): Promise<void>;
+  /**
+   * The answer to a Claude Code job's ask: one of its own option names, or typed text for a
+   * question. Separate from approveTool because these options are not allow/always/deny.
+   */
+  answerJobAsk?(approvalId: string, answer: { option: string; text?: string }): Promise<void>;
   /**
    * Home's Waiting on you: what waits on the person and the last answered. Allow once and
    * Decline answer an ask (resolves false when it no longer waited); Open brings a hand-off

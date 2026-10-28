@@ -1007,6 +1007,7 @@ function registerIpc(): void {
   registerConnectionIpc(handle, {
     engine,
     answer: (ask, decision) => required().brain.answer(ask, decision),
+    reply: (ask, option, text) => required().brain.answerWith(ask, option, text),
   });
   registerAskIpc(handle, { engine });
   registerPickUpIpc(handle, {

@@ -28,7 +28,7 @@ import {
   withProgress,
   type Handoff,
 } from './handoff-card';
-import { ConnectorConfirmCard } from './connector-confirm';
+import { ConnectorConfirmCard, type JobAnswer } from './connector-confirm';
 import { RoutineCard } from './routine-card';
 import { SettingsCard } from './settings-card';
 import { PickUpCard } from './pick-up-card';
@@ -730,6 +730,14 @@ export function CompanionBubble({
       () => undefined,
     );
   };
+  const replyConfirm = (answer: JobAnswer): void => {
+    if (confirm === null) return;
+    const { approvalId } = confirm;
+    void Promise.resolve(bridge.answerJobAsk?.(approvalId, answer)).then(
+      () => dropConfirms((c) => c.approvalId === approvalId),
+      () => undefined,
+    );
+  };
   const closeDrop = (): void => {
     setOpenDrop(undefined);
     onDropDone?.();
@@ -754,7 +762,12 @@ export function CompanionBubble({
         />
       )}
       {confirm !== null && (
-        <ConnectorConfirmCard key={confirm.approvalId} confirm={confirm} onAnswer={answerConfirm} />
+        <ConnectorConfirmCard
+          key={confirm.approvalId}
+          confirm={confirm}
+          onAnswer={answerConfirm}
+          onReply={replyConfirm}
+        />
       )}
       {routine !== null && (
         <RoutineCard key={routine.proposalId} proposal={routine} onDone={() => setRoutine(null)} />

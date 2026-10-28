@@ -1,4 +1,4 @@
-/**
+﻿/**
  * BrainClient against a fake socket and fake timers: hello, say, notifications, use,
  * cancel and reconnect, all driven by hand so no network or real clock is involved.
  */
@@ -278,7 +278,7 @@ describe('BrainClient', () => {
     });
   });
 
-  it('onUse throws → error tool_failed (-32007)', async () => {
+  it('onUse throws â†’ error tool_failed (-32007)', async () => {
     const { s, onUse } = await online();
     onUse.mockRejectedValueOnce(new Error('boom'));
     s.receive({
@@ -317,7 +317,7 @@ describe('BrainClient', () => {
     expect(s.sent.at(-1)).toMatchObject({ id: 'b1', error: { code: -32007, message: 'odd' } });
   });
 
-  it('use for an undeclared tool → unknown_tool (-32001)', async () => {
+  it('use for an undeclared tool â†’ unknown_tool (-32001)', async () => {
     const { s, onUse } = await online();
     s.receive({
       jsonrpc: '2.0',
@@ -330,7 +330,7 @@ describe('BrainClient', () => {
     expect(s.sent.at(-1)).toMatchObject({ id: 'b1', error: { code: -32001 } });
   });
 
-  it('use with bad params → invalid_params (-32602)', async () => {
+  it('use with bad params â†’ invalid_params (-32602)', async () => {
     const { s } = await online();
     s.receive({ jsonrpc: '2.0', id: 'b1', method: 'use', params: { tool: 1 } });
     await vi.advanceTimersByTimeAsync(0);
@@ -369,6 +369,29 @@ describe('BrainClient', () => {
     },
   );
 
+  it('answerWith sends a job ask its own option name, and typed text when given', async () => {
+    const { client, s } = await online();
+    const named = client.answerWith('a1', 'Edit');
+    const first = s.sent.at(-1)!;
+    expect(first).toMatchObject({ method: 'answer', params: { ask: 'a1', option: 'Edit' } });
+    expect(first.params).not.toHaveProperty('text');
+    s.receive({ jsonrpc: '2.0', id: first.id, result: {} });
+    await named;
+    const typed = client.answerWith('a2', 'duckdb', 'duckdb');
+    const second = s.sent.at(-1)!;
+    expect(second).toMatchObject({
+      method: 'answer',
+      params: { ask: 'a2', option: 'duckdb', text: 'duckdb' },
+    });
+    s.receive({ jsonrpc: '2.0', id: second.id, result: {} });
+    await expect(typed).resolves.toBeUndefined();
+  });
+
+  it('answerWith rejects BrainOffline when the brain is not online', async () => {
+    const { client } = setup();
+    await expect(client.answerWith('a1', 'Edit')).rejects.toBeInstanceOf(BrainOffline);
+  });
+
   it('answer rejects BrainOffline when the brain is not online', async () => {
     const { client } = setup();
     await expect(client.answer('a1', 'deny')).rejects.toBeInstanceOf(BrainOffline);
@@ -382,7 +405,7 @@ describe('BrainClient', () => {
     expect(s.sent).toHaveLength(before);
   });
 
-  it('stop → say rejects BrainOffline; statuses end offline', async () => {
+  it('stop â†’ say rejects BrainOffline; statuses end offline', async () => {
     const { client, statuses } = await online();
     client.stop();
     expect(statuses.at(-1)).toBe('offline');

@@ -50,6 +50,7 @@ export const IPC = {
   cancelHandoff: 'tagalong:handoffs:cancel',
   searchProjects: 'tagalong:projects:search',
   approveTool: 'tagalong:tool:approve',
+  answerJobAsk: 'tagalong:jobask:answer',
   listAsks: 'tagalong:asks:list',
   answerAsk: 'tagalong:asks:answer',
   openAsk: 'tagalong:asks:open',

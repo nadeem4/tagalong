@@ -125,6 +125,8 @@ const bridge: HostBridge = {
     ipcRenderer.invoke(IPC.searchProjects, query) as Promise<ProjectCandidate[]>,
   approveTool: (approvalId: string, decision: 'once' | 'always' | 'deny') =>
     ipcRenderer.invoke(IPC.approveTool, approvalId, decision) as Promise<void>,
+  answerJobAsk: (approvalId: string, answer: { option: string; text?: string }) =>
+    ipcRenderer.invoke(IPC.answerJobAsk, approvalId, answer) as Promise<void>,
   listAsks: () => ipcRenderer.invoke(IPC.listAsks) as Promise<AsksListResult>,
   answerAsk: (id: string, decision: 'approve' | 'decline') =>
     ipcRenderer.invoke(IPC.answerAsk, id, decision) as Promise<boolean>,

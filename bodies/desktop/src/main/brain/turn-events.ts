@@ -78,15 +78,28 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
 
   function ask(p: AskParams): TurnEvent[] {
     if (p.state === 'closed') return asks.delete(p.id) ? [dismiss(p.id)] : [];
-    if (!p.confirm || p.tool === undefined) return [];
+    // The wire is not validated here, so a frame with no id or options is no ask at all.
+    if (p.state !== 'open' || typeof p.id !== 'string' || !Array.isArray(p.options)) return [];
+    // A tool-gate ask is a confirm; a job's ask (no confirm) is a hand-off or relayed permission
+    // when it has a tool, and a question for the person when it has none.
+    const question = !p.confirm && p.tool === undefined;
+    const tool = p.tool ?? 'question';
     const input = Object.entries(p.input ?? {}).map(
       ([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`,
     );
-    // Scout's own words lead; with none, the tool and what it was given stand in.
-    const summary = p.text !== '' ? p.text : [p.tool, ...input].join('\n');
+    // Scout's own words lead; with none, the tool and what it was given stand in. A job's ask
+    // keeps its input beside the words: the hand-off's folder is only there.
+    const lead = p.text !== '' ? p.text : question ? '' : tool;
+    const summary =
+      p.confirm && p.text !== '' ? p.text : [lead, ...input].filter((s) => s !== '').join('\n');
     // Body tools arrive as `<body>__<name>`; a name without it is the brain's own.
-    const body = p.tool.includes('__') ? p.tool.split('__')[0]! : '';
-    const app = body === '' ? 'Scout' : body.charAt(0).toUpperCase() + body.slice(1);
+    const body = tool.includes('__') ? tool.split('__')[0]! : '';
+    const app =
+      question || tool.startsWith('claude_code:')
+        ? 'Claude Code'
+        : body === ''
+          ? 'Scout'
+          : body.charAt(0).toUpperCase() + body.slice(1);
     asks.add(p.id);
     return [
       {
@@ -95,9 +108,10 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
         turnId: p.turn ?? '',
         petId: petId(),
         app,
-        tool: p.tool,
+        tool,
         summary,
         options: p.options,
+        ...(question ? { question: true } : {}),
       },
     ];
   }
