@@ -103,7 +103,7 @@ import { createHomeWindow } from './windows/home';
 import { createWelcomeWindow } from './windows/welcome';
 import { fromWindow, registerClipboardIpc } from './ipc/clipboard';
 import { registerAskIpc } from './ipc/asks';
-import { registerConnectionIpc } from './ipc/connections';
+import { forwardAppsChanged, registerConnectionIpc } from './ipc/connections';
 import { registerScoutIpc } from './ipc/scout';
 import { registerExpertIpc } from './ipc/experts';
 import type { EngineCall, IpcHandle } from './ipc/handle';
@@ -310,6 +310,7 @@ async function start(): Promise<void> {
       // The brain changed something Home shows (memory, permissions): every window may refetch.
       if (method === 'changed') {
         const { what } = params as { what: string };
+        forwardAppsChanged(what, forwardToRenderers);
         for (const window of BrowserWindow.getAllWindows()) {
           if (!window.isDestroyed()) window.webContents.send(IPC.brainChangedEvent, what);
         }
@@ -1005,7 +1006,7 @@ function registerIpc(): void {
   registerScoutIpc(handle);
   registerExpertIpc(handle, { engine, brain: required().brain });
   registerConnectionIpc(handle, {
-    engine,
+    brain: required().brain,
     answer: (ask, decision) => required().brain.answer(ask, decision),
     reply: (ask, option, text) => required().brain.answerWith(ask, option, text),
   });
