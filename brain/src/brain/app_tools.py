@@ -8,7 +8,7 @@ app's own claim and cannot be trusted to lower the bar. Results come back fenced
 import json
 import logging
 import re
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from mcp.types import (
     CallToolResult,
@@ -20,11 +20,14 @@ from mcp.types import (
     Tool,
 )
 
-from brain.apps import AppError, Apps
+from brain.apps import AUTHS, TRANSPORTS, AppError, Apps, TokenFile, validate_app
 from brain.mind.turn import Call
 from brain.protocol import ErrorCode, RpcError
-from brain.toolbox import NAME_MAX, SEP, ToolSpec
-from brain.tools import _fence_safe
+from brain.toolbox import NAME_MAX, SEP, Handler, ToolSpec
+from brain.tools import Notify, _fence_safe
+
+if TYPE_CHECKING:
+    from brain.memory import Memory
 
 log = logging.getLogger("brain")
 
@@ -115,6 +118,155 @@ def format_result(app_id: str, result: CallToolResult) -> str:
     if len(body) > RESULT_MAX:
         body = body[: RESULT_MAX - 1] + "\u2026"
     return f'<data kind="app" app="{app_id}">\n{_fence_safe(body)}\n</data>'
+
+
+def app_home_tools(
+    apps: Apps, memory: "Memory", tokens: TokenFile, notify: Notify
+) -> list[tuple[ToolSpec, Handler]]:
+    """Home-only calls to manage apps. Refusals are plain lines raised as invalid_params."""
+
+    def refuse(message: str) -> RpcError:
+        return RpcError(ErrorCode.invalid_params, message)
+
+    def known(args: dict) -> str:
+        app_id = args.get("id")
+        if not any(r.id == app_id for r in memory.list_apps()):
+            raise refuse(f"There is no app called {app_id}.")
+        return app_id
+
+    async def list_apps(args: dict) -> str:
+        rows = []
+        for row in memory.list_apps():
+            status = apps.status(row.id)
+            tools = [
+                {"name": s.name, "effect": s.effect, "locked": s.locked}
+                for s in specs_for(row.id, apps.tools(row.id))
+            ]
+            rows.append(
+                {
+                    "id": row.id,
+                    "name": row.name,
+                    "transport": row.transport,
+                    "auth": row.auth,
+                    "enabled": row.enabled,
+                    "status": status.state,
+                    "error": status.error,
+                    "tools": tools,
+                }
+            )
+        return json.dumps({"apps": rows})
+
+    async def add_app(args: dict) -> str:
+        args = dict(args)
+        token = args.pop("token", None)
+        config = {k: args[k] for k in ("command", "args", "env", "url") if k in args}
+        params = {k: args[k] for k in ("name", "transport", "auth") if k in args}
+        try:
+            row = validate_app(
+                {**params, "config": config}, taken={r.id for r in memory.list_apps()}
+            )
+        except AppError as exc:
+            raise refuse(str(exc)) from None
+        if row.auth == "token" and not (isinstance(token, str) and token):
+            raise refuse("an app with token sign-in needs its token.")
+        if token is not None and row.auth != "token":
+            raise refuse("a token only goes with auth token.")
+        if token is not None:
+            tokens.set(row.id, token)
+        try:
+            memory.add_app(row)
+        except BaseException:
+            tokens.delete(row.id)  # a failed save must not leave a secret behind
+            raise
+        await apps.restart(row.id)
+        notify("changed", {"what": "apps"})
+        return json.dumps({"id": row.id})
+
+    async def set_app_enabled(args: dict) -> str:
+        app_id = known(args)
+        enabled = args.get("enabled")
+        if not isinstance(enabled, bool):
+            raise refuse("set_app_enabled needs enabled true or false.")
+        memory.set_app_enabled(app_id, enabled)
+        await apps.restart(app_id)
+        notify("changed", {"what": "apps"})
+        return json.dumps({"id": app_id, "enabled": enabled})
+
+    async def remove_app(args: dict) -> str:
+        app_id = known(args)
+        memory.remove_app(app_id)
+        tokens.delete(app_id)
+        try:
+            await apps.restart(app_id)  # row gone: it stops the app and forgets its slot
+        except AppError:
+            pass
+        notify("changed", {"what": "apps"})
+        return json.dumps({"id": app_id, "removed": True})
+
+    async def restart_app(args: dict) -> str:
+        app_id = known(args)
+        await apps.restart(app_id)
+        return json.dumps({"id": app_id, "restarting": True})
+
+    home = frozenset({"home"})
+    by_id = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}},
+        "required": ["id"],
+    }
+    add_schema = {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string"},
+            "transport": {"type": "string", "enum": list(TRANSPORTS)},
+            "command": {"type": "string"},
+            "args": {"type": "array", "items": {"type": "string"}},
+            "env": {"type": "object", "additionalProperties": {"type": "string"}},
+            "url": {"type": "string"},
+            "auth": {"type": "string", "enum": list(AUTHS)},
+            "token": {"type": "string"},
+        },
+        "required": ["name", "transport"],
+    }
+    enabled_schema = {
+        "type": "object",
+        "properties": {"id": {"type": "string"}, "enabled": {"type": "boolean"}},
+        "required": ["id", "enabled"],
+    }
+    return [
+        (
+            ToolSpec(
+                "list_apps",
+                "Every connected app with its status and tools.",
+                {"type": "object", "properties": {}},
+                home,
+                effect="read",
+            ),
+            list_apps,
+        ),
+        (
+            ToolSpec("add_app", "Add an app and connect it.", add_schema, home, effect="change"),
+            add_app,
+        ),
+        (
+            ToolSpec(
+                "set_app_enabled",
+                "Turn an app on or off.",
+                enabled_schema,
+                home,
+                effect="change",
+            ),
+            set_app_enabled,
+        ),
+        (
+            ToolSpec("remove_app", "Remove an app.", by_id, home, effect="change"),
+            remove_app,
+        ),
+        (
+            ToolSpec("restart_app", "Reconnect an app.", by_id, home, effect="change"),
+            restart_app,
+        ),
+    ]
 
 
 class AppSource:

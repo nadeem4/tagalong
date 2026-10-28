@@ -14,6 +14,8 @@ from collections.abc import Callable
 from datetime import datetime
 from functools import partial
 
+from brain.app_tools import AppSource, app_home_tools
+from brain.apps import Apps, TokenFile
 from brain.asks import Asks
 from brain.bodies import Bodies
 from brain.config import DEFAULT_EXPERT_CMD, DEFAULT_EXPERT_TIMEOUT_S
@@ -40,6 +42,8 @@ class Session:
         memory: Memory,
         now: Callable[[], datetime] = lambda: datetime.now().astimezone(),
         make_run: Callable[..., ExpertRun] | None = None,
+        apps: Apps | None = None,
+        tokens: TokenFile | None = None,
     ) -> None:
         self._model = model
         self._budget = budget
@@ -59,6 +63,10 @@ class Session:
             + home_tools(budget, lambda: self.toolbox)
             + expert_tools(self.jobs)
         )
+        sources = [BodySource(bodies)]
+        if apps is not None and tokens is not None:  # the two always come as a pair
+            tools += app_home_tools(apps, memory, tokens, notify)
+            sources.append(AppSource(apps))
 
         def save_mode(name: str, mode: str) -> None:
             # Every save (Home's set_permission or an "always" answer) refreshes open panels.
@@ -66,7 +74,7 @@ class Session:
             notify("changed", {"what": "permissions"})
 
         self.toolbox = Toolbox(
-            [BrainSource(tools), BodySource(bodies)],
+            [BrainSource(tools), *sources],
             memory.permission_modes,
             save_mode,
             self._asks,

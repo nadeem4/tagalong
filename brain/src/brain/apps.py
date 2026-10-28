@@ -106,10 +106,16 @@ def _check_http(config: dict[str, Any]) -> dict[str, Any]:
     url = config.get("url")
     if not isinstance(url, str) or not url.strip():
         raise AppError("an http app needs a url.")
-    parts = urlparse(url)
-    local = parts.hostname in _LOCAL_HOSTS
+    try:
+        parts = urlparse(url)
+        host = parts.hostname
+    except ValueError:
+        raise AppError("the url is not a valid address.") from None
+    local = host in _LOCAL_HOSTS
     if parts.scheme != "https" and not (parts.scheme == "http" and local):
         raise AppError("the url must use https (http is only allowed for localhost).")
+    if not host:
+        raise AppError("the url needs a host name.")
     return {"url": url}
 
 

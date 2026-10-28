@@ -102,6 +102,15 @@ def test_validate_http_scheme():
     assert validate_app(good_http(config={"url": "http://127.0.0.1:3000/x"}))
 
 
+def test_validate_http_rejects_malformed_and_hostless_urls():
+    with pytest.raises(AppError, match="url"):
+        validate_app(good_http(config={"url": "http://[bad"}))
+    with pytest.raises(AppError, match="host"):
+        validate_app(good_http(config={"url": "https://"}))
+    with pytest.raises(AppError, match="host"):
+        validate_app(good_http(config={"url": "https:///path"}))
+
+
 def test_validate_http_needs_url():
     with pytest.raises(AppError, match="url"):
         validate_app(good_http(config={}))
