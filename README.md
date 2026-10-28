@@ -361,7 +361,9 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
   switch on **Let it edit files by default** (Coder starts with it on) or allow edits when you send
   a task, and it searches the web only when **Let it search the web** is on. **Save and test**
   checks that Claude Code starts, which costs nothing. There is no default project folder: each
-  task picks its project, and you confirm before anything is sent.
+  task picks its project, and you confirm before anything is sent. A **Jobs** card on this page
+  lists the jobs Scout has handed to Claude Code, with **Stop** for a running one and **Show
+  result** for a finished one.
   - **From the catalog**, below the templates: **Researcher**, **Trip planner** and **Social media
     manager**. Each card shows the Claude Code plugins it uses (**Installed** or **Missing**), the
     apps it may use from your own Claude Code connectors, what it may do in plain words, and the
@@ -429,7 +431,8 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 - **Settings**, in seven sections. Press ⓘ beside a setting for the longer story. Below the form,
   **Permissions** lists each tool Scout can use with an **Ask** or **Auto** switch: Auto means Scout
   does it without asking. A tool its body marks as always confirm is fixed on Ask,
-  and a tool of a body that is not connected is dimmed.
+  and a tool of a body that is not connected is dimmed. Claude Code's tool shows **Asks itself**
+  instead of a switch, because Claude Code does its own asking.
   - **How Scout thinks**: Scout's real brain, and whether your Claude Code sign-in works (checked
     locally with `claude auth status`). Without Claude Code you pick a service and paste its key,
     and saving moves Scout to it.

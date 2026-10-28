@@ -390,12 +390,12 @@ does not work). Asking Scout ("list my jobs", "stop that job") also works.
 1. **Action:** ask "Hand this to Claude Code: add a README line to the project in
    `C:\path\to\test-folder`."
    **Expected:** an ask card shows the task and the folder, with one button per mode (Manual,
-   Accept edits, Plan, Auto, Bypass permissions) and Cancel. No second allow or deny card appears.
+   Accept edits, Plan, Auto, Bypass permissions) and cancel. No second allow or deny card appears.
    Pick **Plan**: Scout says the job started and gives its id.
 2. **Action:** ask "Hand this to Claude Code: list the files here." without naming a folder.
    **Expected:** Scout asks which folder; it does not start anything or guess one. Name a folder
    that does not exist: Scout says there is no folder at that path.
-3. **Action:** start a hand-off and press **Cancel** on the mode card.
+3. **Action:** start a hand-off and press **cancel** on the mode card.
    **Expected:** Scout says it was not started, and no `claude` or `node` process is left.
 4. **Action:** hand off a task that edits a file in **Manual** mode.
    **Expected:** Claude Code's permission request arrives as an ask (tool and input shown, buttons
@@ -420,11 +420,11 @@ does not work). Asking Scout ("list my jobs", "stop that job") also works.
     **Expected:** the Jobs card lists it with its task, "Running", folder, mode, start time and
     its latest progress line. Press **Stop**: the row reads "Stopped" within a moment. Start a
     short job and let it finish: the row reads "Done" and **Show result** opens the result text.
-12. **Action:** hand off while the bubble is closed and Scout is silent (no turn running), and
-    leave the mode ask unanswered for a minute.
-    **Expected:** the bubble comes up by itself with the mode card (task and folder, one button
-    per mode, Cancel) and stays until you answer or it times out. Ending a chat turn meanwhile
-    does not remove it.
+12. **Action:** with the bubble closed and Scout silent, start a Manual-mode job that needs
+    permission (or asks a question) and leave the relayed ask unanswered for a minute.
+    **Expected:** the bubble comes up by itself with the card (the request and its input, one
+    button per option) and stays until you answer or it times out, though no chat turn is running.
+    Ending a chat turn meanwhile does not remove it.
 13. **Action:** in Manual mode, have the job do something that needs permission. Then have it ask
     a question ("Ask me which colour to use").
     **Expected:** a "Claude Code asks" card shows the request and its input with one button per

@@ -278,6 +278,14 @@ describe('createTurnEvents: asks', () => {
       });
     });
 
+    it('a question ask with no text still has a prompt', () => {
+      const [e] = make().map(
+        'ask',
+        jobAsk({ text: '', options: [], tool: undefined, input: undefined }),
+      );
+      expect(e).toMatchObject({ question: true, summary: 'Claude Code asks' });
+    });
+
     it('a cancelled close dismisses the card with no turn running', () => {
       const m = make();
       m.map(

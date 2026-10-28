@@ -385,10 +385,9 @@ shows them as Scout does.
 
 ## Not built yet
 
-| Row   | Brings                                                                                                                                                           |
-| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 8b    | Home's Jobs panel; the desktop shows non-confirm asks (options as buttons, input such as the folder, free text), so the hand-off and relayed asks reach the user |
-| Later | Live-state replay of open turns after `resync`                                                                                                                   |
+| Row   | Brings                                         |
+| ----- | ---------------------------------------------- |
+| Later | Live-state replay of open turns after `resync` |
 
 ## Tests
 

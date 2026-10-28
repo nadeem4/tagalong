@@ -89,7 +89,7 @@ export function createTurnEvents(petId: () => string, session: () => string | nu
     );
     // Scout's own words lead; with none, the tool and what it was given stand in. A job's ask
     // keeps its input beside the words: the hand-off's folder is only there.
-    const lead = p.text !== '' ? p.text : question ? '' : tool;
+    const lead = p.text !== '' ? p.text : question ? 'Claude Code asks' : tool;
     const summary =
       p.confirm && p.text !== '' ? p.text : [lead, ...input].filter((s) => s !== '').join('\n');
     // Body tools arrive as `<body>__<name>`; a name without it is the brain's own.
