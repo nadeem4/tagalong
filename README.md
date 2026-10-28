@@ -399,9 +399,13 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
 - **Connections**: the apps Scout can use, so "what is on my calendar" or "any reviews waiting on
   GitHub" just work. The Python brain runs these itself (stdio or http MCP apps, a pasted key for
   http) and this page reads and changes them through the brain, so the brain has to be running.
-  Browser sign-in (OAuth) and the Popular and "found in Claude Code" lists are still to come (see
-  [docs/connected-apps.md](docs/connected-apps.md)).
-  - **Add an app**: any MCP server, by its https address (with a pasted key, or none) or by the
+  Apps with their own sign-in page work too (see [docs/connected-apps.md](docs/connected-apps.md)).
+  The Popular and "found in Claude Code" lists are not built.
+  - **Sign in**: an app that signs in with its own page shows **Needs sign-in** and a **Sign in**
+    button. It opens the app's page in your browser; the chip reads **Waiting for the browser**
+    until you finish (or five minutes pass). The brain and the browser must be on the same computer.
+  - **Add an app**: any MCP server, by its https address (with a pasted key, the app's own sign-in
+    page, or none) or by the
     command that starts it on this PC (with `NAME=value` lines for its environment; `${NAME}` takes
     the value from your own environment). A pasted key goes to the brain once and is never shown
     again.
