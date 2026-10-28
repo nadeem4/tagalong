@@ -126,6 +126,9 @@ class Jobs:
 
     async def shutdown(self) -> None:
         """Stop every running job before the brain exits; one stuck run must not block the rest."""
+        # The exiting brain would drop any turn a report starts, so leave the report for the
+        # next start (unreported jobs are re-queued then).
+        self._on_finished = lambda job: None
         for run in list(self._runs.values()):
             with suppress(Exception):
                 await run.stop()

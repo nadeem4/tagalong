@@ -594,6 +594,20 @@ async def test_wake_waits_until_a_body_connects():
     assert wake_started(sent) == ["desktop"]
 
 
+async def test_wake_that_fails_to_start_is_not_marked_told():
+    session, _ = make(Gate(["never"]))
+    join(session, "desktop")
+    started = []
+
+    def broken(body_id, content):
+        raise RuntimeError("cannot start")
+
+    session._start_turn = broken
+    with pytest.raises(RuntimeError):
+        session.wake("job done", on_start=lambda: started.append(1))
+    assert started == []
+
+
 async def test_wake_over_budget_ends_over_budget():
     class Broke(Open):
         def allows(self):

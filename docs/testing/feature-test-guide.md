@@ -417,7 +417,7 @@ arrives in 8b, so for now check jobs by asking Scout ("list my jobs", "stop that
 9. **Action:** start a short job, close Home and wait for it to finish.
    **Expected:** Scout speaks up on its own with a short report of the result, though you asked
    nothing. A second finish report does not follow for the same job.
-10. **Action:** start a job whose result needs no comment, or one you already saw reported.
+10. **Action:** start a job whose result needs no comment.
     **Expected:** Scout may stay silent. Silence is allowed; no canned line appears.
 
 ## Hand-offs to Claude Code (old engine)

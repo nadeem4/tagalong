@@ -9,6 +9,7 @@ replayed: each is bound to the peer it was sent on and fails if that peer goes a
 import asyncio
 import contextlib
 import json
+import logging
 import time
 from collections import deque
 from collections.abc import Callable
@@ -16,6 +17,8 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from brain.protocol import LIMITS, Body, ErrorCode, RpcError, Tool
+
+log = logging.getLogger("brain")
 
 
 class Peer(Protocol):
@@ -98,7 +101,10 @@ class Bodies:
         self._online[body.id] = _Online(body, tools, peer)
         self._known[body.id] = tools
         if self.on_connect is not None:
-            self.on_connect()
+            try:
+                self.on_connect()
+            except Exception:  # a failed wake must not leave the body half-connected
+                log.exception("on_connect failed")
         if last_seq is None:
             return Joined(box.latest, False, [])
         missed = box.since(last_seq)

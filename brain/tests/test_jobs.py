@@ -420,6 +420,16 @@ async def test_shutdown_swallows_one_runs_failure_and_stops_the_rest(make_rig):
     del rig.runs[0].stop  # back to the real stop so the rig can clean the stuck one up
 
 
+async def test_shutdown_leaves_the_report_for_the_next_start(make_rig):
+    # A job stopped by shutdown must not wake a turn the exiting brain would drop.
+    rig = make_rig(FakeAsks(Answer("Plan")))
+    job_id = await rig.jobs.start("one", str(rig.folder))
+    await rig.jobs.shutdown()
+    assert rig.finished == []
+    assert rig.memory.get_job(job_id).state == "stopped"
+    assert not rig.memory.get_job(job_id).reported
+
+
 async def test_cancelling_start_while_it_waits_on_the_mode_ask_cleans_up(make_rig):
     rig = make_rig(FakeAsks(), max_running=1)  # the mode ask blocks forever
     task = asyncio.create_task(rig.jobs.start("go", str(rig.folder)))

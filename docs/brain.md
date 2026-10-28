@@ -345,7 +345,7 @@ until a body connects. The event is fenced as `<data kind="job">`, so its text i
 instructions.
 
 When a job ends, the session wakes Scout with a note of facts only (id, task, folder, state, reason,
-and the result cut at 4,000 characters with `[trimmed]`). `reported` is set when that turn starts. At
+and the result cut at 4,000 characters with `[trimmed]`). `reported` is set once that turn has started (a failed start leaves it unreported). At
 brain start every finished unreported job (including those just stopped) is queued again. Scout's
 prompt says a job note is an event, not a request; the model decides whether to speak, and may say
 nothing.
@@ -380,7 +380,8 @@ shows them as Scout does.
   the next change.
 - **Restart.** Jobs do not resume. A brain restart marks running jobs `stopped`.
 - **Shutdown.** On exit `main.py` calls `Jobs.shutdown()` before closing memory: it stops every
-  running job (rows become `stopped`, adapters end) and ignores a run that fails to stop.
+  running job (rows become `stopped`, adapters end) and ignores a run that fails to stop. Shutdown
+  sends no report: those jobs stay unreported and are told about at the next start.
 
 ## Not built yet
 

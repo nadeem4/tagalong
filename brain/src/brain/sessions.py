@@ -1,4 +1,5 @@
 """The one conversation: shared history, at most one running turn, says that join it.
+It also runs the wakes the brain starts itself (a job ended).
 
 Turn bookkeeping lives in a done callback, not in the task body, so `ended` is sent and the
 turn cleared even if the task is cancelled before it ever ran.
@@ -123,12 +124,12 @@ class Session:
         else:
             return  # no body to tell; the next connect retries
         text, on_start = self._wakes.popleft()
-        if on_start is not None:
-            on_start()
         # Job output is untrusted, so it goes in a fence it cannot close.
         self._start_turn(
             body_id, [{"type": "text", "text": f'<data kind="job">{_fence_safe(text)}</data>'}]
         )
+        if on_start is not None:  # after the start, so a failed start stays unreported
+            on_start()
 
     def _start_turn(self, body_id: str, content: list) -> str:
         turn_id = uuid.uuid4().hex
