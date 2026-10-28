@@ -21,6 +21,7 @@ The brain is being rewritten in Python; the TypeScript apps stay as bodies.
 - Check: pnpm typecheck && pnpm lint && pnpm format:check
 - Brain: cd brain && uv sync; uv run pytest; uv run ruff check; uv run ruff format --check; uv run brain (starts the websocket server)
 - Run: cd brain && uv run brain (leave it running), then pnpm dev:desktop; the desktop dials the brain at TAGALONG_BRAIN_ADDR (default 127.0.0.1:47321) and retries every 2 s
+- Experts: npm install -g @agentclientprotocol/claude-agent-acp (Node 22+), and Claude Code logged in (it runs on the user's login, not the API key)
 - Package: pnpm package:win
 
 ## Layout

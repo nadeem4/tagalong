@@ -282,6 +282,22 @@ def test_set_mode_refuses_auto_on_locked():
     box.set_mode("a", "ask")  # tightening a locked tool is fine
 
 
+def test_self_asking_tool_is_auto_even_when_locked_or_stored_ask():
+    spec = mode_spec(locked=True, self_asks=True)
+    assert Toolbox([], {"a": "ask"}).mode(spec) == "auto"
+
+
+def test_set_mode_refuses_any_change_on_self_asking_tool():
+    stored = {}
+    box = Toolbox([FakeSource([mode_spec(self_asks=True)])], stored)
+    for mode in ("ask", "auto"):
+        with pytest.raises(RpcError) as e:
+            box.set_mode("a", mode)
+        assert e.value.code == ErrorCode.invalid_params
+        assert str(e.value) == "a asks for itself."
+    assert stored == {}
+
+
 def test_set_mode_unknown_tool():
     with pytest.raises(RpcError) as e:
         Toolbox([FakeSource([spec("a")])]).set_mode("nope", "auto")
@@ -323,10 +339,19 @@ async def until(check):
     raise AssertionError("condition never became true")
 
 
-def gated(tool_effect="change", locked=False, online=("desktop",), stored=None):
+def gated(tool_effect="change", locked=False, online=("desktop",), stored=None, self_asks=False):
     bodies = AskBodies(online)
     source = FakeSource(
-        [ToolSpec("t", "t tool", {"type": "object"}, effect=tool_effect, locked=locked)]
+        [
+            ToolSpec(
+                "t",
+                "t tool",
+                {"type": "object"},
+                effect=tool_effect,
+                locked=locked,
+                self_asks=self_asks,
+            )
+        ]
     )
     stored = {} if stored is None else stored
     return Toolbox([source], stored, Asks(bodies)), source, bodies, stored
@@ -388,6 +413,12 @@ async def test_locked_tool_never_saves_auto_and_cannot_be_answered_always():
     box._asks.answer(ask["id"], "allow", "desktop")
     assert await task == "ran t"
     assert stored == {}
+
+
+async def test_self_asking_tool_opens_no_gate_ask():
+    box, source, bodies, _ = gated(locked=True, self_asks=True)
+    assert await box.run(call("t")) == "ran t"
+    assert bodies.sent == []
 
 
 async def test_two_calls_in_one_step_open_independent_asks_with_shared_text():

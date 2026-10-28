@@ -57,7 +57,8 @@ the total can run a little low.
 | `brain/src/brain/toolbox.py`     | `Toolbox`: lists and gates every tool call, from `BrainSource` and `BodySource`                                                                                  |
 | `brain/src/brain/asks.py`        | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers)                                                              |
 | `brain/src/brain/experts.py`     | `ExpertRun`: drives Claude Code in a folder over ACP; callbacks for permissions, questions, progress and the end                                                 |
-| `brain/src/brain/tools.py`       | The brain's own tools (`remember`, `recall`, `forget`) as specs and handlers for `BrainSource`                                                                   |
+| `brain/src/brain/jobs.py`        | `Jobs`: hand-off ask, relayed Claude Code asks, the 2-job cap, progress and the `jobs` rows, `changed: jobs`                                                     |
+| `brain/src/brain/tools.py`       | The brain's own tools (memory, Home and expert tools) as specs and handlers for `BrainSource`                                                                    |
 | `brain/src/brain/mind/soul.md`   | Scout's character, the start of the system prompt                                                                                                                |
 | `brain/src/brain/mind/prompt.py` | The system prompt (soul, local time, online bodies, "What you know") and `say` content blocks                                                                    |
 | `brain/src/brain/mind/turn.py`   | The thinking loop and the Anthropic streaming call                                                                                                               |
@@ -202,16 +203,19 @@ The desktop app (`bodies/desktop`) is a body of this brain. It no longer runs th
 
 ## Permissions and asks
 
-Every tool has a mode, `ask` or `auto`. `Toolbox.mode(spec)` picks it in this order: locked is
-always `ask`; then the user's saved choice; then the tool's own default; then the effect.
+Every tool has a mode, `ask` or `auto`. `Toolbox.mode(spec)` picks it in this order: a tool that
+asks for itself (below) is `auto`; then locked is `ask`; then the user's saved choice; then the
+tool's own default; then the effect.
 
-| Tool                                     | Default mode            |
-| ---------------------------------------- | ----------------------- |
-| Reads (`effect: "read"`)                 | `auto`                  |
-| Changes (`effect: "change"`)             | `ask`                   |
-| Memory tools (`remember`, `forget`)      | `auto`                  |
-| A body tool that does not declare effect | `ask`                   |
-| Locked (`confirm: true` from the body)   | `ask`, and never `auto` |
+| Tool                                          | Default mode            |
+| --------------------------------------------- | ----------------------- |
+| Reads (`effect: "read"`), such as `list_jobs` | `auto`                  |
+| Changes (`effect: "change"`)                  | `ask`                   |
+| Memory tools (`remember`, `forget`)           | `auto`                  |
+| Expert tools `tell_expert` and `stop_job`     | `auto`                  |
+| `hand_off` (asks itself, see below)           | `auto`, no gate ask     |
+| A body tool that does not declare effect      | `ask`                   |
+| Locked (`confirm: true` from the body)        | `ask`, and never `auto` |
 
 The user's saved choices live in the `permissions` table in `tagalong.db`:
 
@@ -221,6 +225,12 @@ The user's saved choices live in the `permissions` table in `tagalong.db`:
 | `mode` | `ask` or `auto`                  |
 
 No row means the tool's default applies. `Toolbox.set_mode` refuses `auto` on a locked tool.
+
+A tool whose `ToolSpec` sets `self_asks` runs its own ask with the user, so the gate opens none:
+its mode is always `auto` and `Toolbox.set_mode` refuses any change ("<name> asks for itself.").
+`list_permissions` rows carry `self_asks` next to `locked`; `locked` stays false for it.
+
+Expert jobs (Claude Code hand-offs) live in the `jobs` table of the same file: id, agent, task, folder, mode, state (`running`, `done`, `error`, `stopped`), reason, progress, result (capped at 20,000 characters), session id, a `reported` flag and start and end times. Rows still `running` at brain start become `stopped` with reason `brain restarted`.
 
 An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-and-confirm)):
 
@@ -271,20 +281,27 @@ so there is one gate and no second path.
 - **Changed.** `remember` and `forget` send `changed {what: "memory"}`; `set_permission` sends
   `changed {what: "permissions"}`. Every body gets it, so Home refetches.
 
-| Tool               | Input                        | Result text (JSON)                                                                                             |
-| ------------------ | ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `list_memories`    | `{}`                         | `{"memories": [{"id", "kind", "text", "cadence", "at"}]}`, newest first, at most 200                           |
-| `forget`           | `{"id": int}`                | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                        |
-| `spend_today`      | `{}`                         | `{"spent_usd": float, "limit_usd": float}`                                                                     |
-| `list_permissions` | `{}`                         | `{"tools": [{"name", "description", "effect", "mode", "locked", "online"}]}`, sorted by name, Scout tools only |
-| `set_permission`   | `{"tool": str, "mode": str}` | `{"tool", "mode"}`; `mode` is `ask` or `auto`                                                                  |
+| Tool               | Input                        | Result text (JSON)                                                                                                          |
+| ------------------ | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `list_memories`    | `{}`                         | `{"memories": [{"id", "kind", "text", "cadence", "at"}]}`, newest first, at most 200                                        |
+| `forget`           | `{"id": int}`                | a plain sentence, `forgot <kind> #<id>: <text>` (Scout may call it too)                                                     |
+| `spend_today`      | `{}`                         | `{"spent_usd": float, "limit_usd": float}`                                                                                  |
+| `list_permissions` | `{}`                         | `{"tools": [{"name", "description", "effect", "mode", "locked", "self_asks", "online"}]}`, sorted by name, Scout tools only |
+| `set_permission`   | `{"tool": str, "mode": str}` | `{"tool", "mode"}`; `mode` is `ask` or `auto`                                                                               |
+| `list_jobs`        | `{}`                         | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                              |
+| `stop_job`         | `{"job": str}`               | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                          |
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
 
-## Experts runner
+## Experts
+
+Scout can hand a task to Claude Code, which works in a folder as a job. `experts.py` runs it,
+`jobs.py` manages the jobs, and four tools put it in Scout's and Home's hands.
+
+### Runner
 
 `experts.py` holds `ExpertRun`, the one object that drives Claude Code in a folder over the Agent
-Client Protocol. It is not wired into Scout yet. `start(folder)` spawns the adapter, runs
+Client Protocol. `Jobs` creates one per job. `start(folder)` spawns the adapter, runs
 `initialize` (advertising `elicitation.form` so questions work) and `session/new`, and returns
 the modes. `begin(mode, task)` sets the mode and sends the first prompt without waiting. `note(text)`
 queues a follow-up prompt for after the current turn and returns `False` once the run has ended.
@@ -309,11 +326,55 @@ startup limit (an adapter that never answers is killed and reported). `stop()` a
 safe from any state, including from inside `on_end`; teardown is shared, so `on_end` fires once,
 after the process is gone. A stop answers any pending permission or question as cancelled.
 
+Claude Code runs on the user's own login. It must be logged in, or the first hand-off fails with
+the adapter's own message (for example that auth is required).
+
+### Jobs and tools
+
+`Jobs` (`jobs.py`) owns the running `ExpertRun`s and the rows of the `jobs` table (columns under
+[Permissions and asks](#permissions-and-asks)). `Session` builds it with the `ExpertRun` factory
+that `main.py` configures (`TAGALONG_EXPERT_CMD`, `TAGALONG_EXPERT_TIMEOUT_S`) and calls
+`startup()`, which turns rows left `running` into `stopped` with reason `brain restarted`.
+
+| Tool          | Audience    | Effect | Gate                      | Does                                                                         |
+| ------------- | ----------- | ------ | ------------------------- | ---------------------------------------------------------------------------- |
+| `hand_off`    | scout       | change | asks itself (`self_asks`) | `{task, folder}`. Returns `job <id> started`, or the plain reason it did not |
+| `tell_expert` | scout       | change | `auto`                    | `{job, note}`. Queues a follow-up prompt for a running job                   |
+| `list_jobs`   | scout, home | read   | `auto`                    | `{"jobs": [...]}`, the last 20 rows newest first, with the latest progress   |
+| `stop_job`    | scout, home | change | `auto`                    | `{job}`. Stops a running job; Home gets `{"job", "stopping": true}`          |
+
+Refusals (`JobError`) are plain sentences: for `hand_off` and `tell_expert` they are the tool's
+result line; for `stop_job` they are an `invalid_params` `RpcError` with the same words, so Home
+shows them as Scout does.
+
+- **Hand-off ask.** `hand_off` needs an absolute folder that exists ("no folder at <path>"
+  otherwise). It starts the adapter and opens an ask whose text is the task, with the folder as
+  its input and the modes the adapter reports plus `cancel` as options. A mode answer starts the
+  job. `cancel`, no answer in 5 minutes, or nobody online closes the adapter and returns "not
+  started". The tool asks for itself, so the gate adds no allow or deny ask, and Home cannot
+  change its mode.
+- **Relayed asks.** Claude Code's permission requests and questions become turn-less asks
+  (`Asks.open`) tied to the job and kept open as long as it lives. A stopped or finished job
+  closes its open asks with `cancelled`. Each answer sends `changed {what: "jobs"}`.
+- **Limits.** At most 2 jobs run at once (a hand-off waiting on its ask holds a slot); a third
+  fails naming the running jobs. A result is capped at 20,000 characters and progress keeps its
+  last 2,000 (it is a running tail). `list_jobs` trims each row for Scout's context: a result to
+  its first 1,000 characters and progress to its last 1,000, a trimmed end marked with `…`. The
+  run limit is `TAGALONG_EXPERT_TIMEOUT_S` (30 minutes by default).
+- **Changed.** Every state change sends `changed {what: "jobs"}`. Progress text is throttled to
+  one per 2 seconds, with no trailing notify, so a body may show slightly stale progress until
+  the next change.
+- **Restart.** Jobs do not resume. A brain restart marks running jobs `stopped`.
+- **Shutdown.** On exit `main.py` calls `Jobs.shutdown()` before closing memory: it stops every
+  running job (rows become `stopped`, adapters end) and ignores a run that fails to stop.
+
 ## Not built yet
 
-| Row   | Brings                                         |
-| ----- | ---------------------------------------------- |
-| Later | Live-state replay of open turns after `resync` |
+| Row   | Brings                                                                                                                                                           |
+| ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 8a3   | The finish turn: Scout reports a finished job, and unreported jobs requeue                                                                                       |
+| 8b    | Home's Jobs panel; the desktop shows non-confirm asks (options as buttons, input such as the folder, free text), so the hand-off and relayed asks reach the user |
+| Later | Live-state replay of open turns after `resync`                                                                                                                   |
 
 ## Tests
 

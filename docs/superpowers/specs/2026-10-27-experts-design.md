@@ -60,7 +60,7 @@ The runner sits behind one small class so a fake ACP agent replaces it in tests.
 
 1. The tool description tells the model to use the folder the user named, and to ask the user if they did not name one.
 2. The handler resolves `folder` to an absolute path. It must exist and be a directory, otherwise the tool fails with a plain message ("no folder at C:\...") and the model asks the user again.
-3. The handler starts the adapter and session (steps 1-2 above), then opens an ask: `text` is the task, the ask shows the absolute folder, and `options` are the five modes the adapter reports (shown by name: Manual, Accept edits, Plan, Auto, Bypass permissions; answered by id: `default`, `acceptEdits`, `plan`, `auto`, `bypassPermissions`) plus `cancel` (user's choice: all five are offered). Bodies already show any options as buttons.
+3. The handler starts the adapter and session (steps 1-2 above), then opens an ask: `text` is the task, the ask shows the absolute folder, and `options` are the five modes the adapter reports (shown by name: Manual, Accept edits, Plan, Auto, Bypass permissions; answered by id: `default`, `acceptEdits`, `plan`, `auto`, `bypassPermissions`) plus `cancel` (user's choice: all five are offered). Bodies show these as buttons once 8b builds the non-confirm ask card.
 4. A mode answer sets the mode and sends the task. `cancel`, deny or timeout closes the adapter and returns "not started" to the model.
 
 The tool asks every time on its own, so it is `locked` at the gate with `auto` mode (my call): no second allow/deny ask, and Home cannot switch it to "always".
@@ -105,7 +105,7 @@ When a job ends, the brain starts a turn of its own: `Session.wake(event)`. It w
 
 ### Home
 
-Home gets `list_jobs` and `stop_job` through `hello` and `call`, like 7c. Desktop work: a Jobs panel in Home that lists jobs (task, folder, mode, state, progress, time, result on expand) with Stop on running ones, refetching on `changed: jobs`. The desktop's ask card already shows any options as buttons; 8b checks the hand-off ask (mode buttons, folder visible) and the relayed asks look right, and fixes only what does not. Old hand-off cards and the pick-up card are not ported.
+Home gets `list_jobs` and `stop_job` through `hello` and `call`, like 7c. Desktop work: a Jobs panel in Home that lists jobs (task, folder, mode, state, progress, time, result on expand) with Stop on running ones, refetching on `changed: jobs`. The desktop's ask card shows `confirm` asks only (it drops every ask without `confirm`), so 8b must build the non-confirm ask card: options as buttons, the input (the folder, a relayed tool's input) and free text. That covers the hand-off ask and the relayed permission and question asks. Old hand-off cards and the pick-up card are not ported.
 
 ## Task 1 findings (verified 2026-10-27, Windows 11, Node 22.23, Python 3.13)
 

@@ -11,7 +11,8 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Scout's brain](#scouts-brain)
 - [Python brain: talk to Scout](#python-brain-talk-to-scout)
 - [The desktop on the Python brain](#the-desktop-on-the-python-brain)
-- [Hand-offs to Claude Code](#hand-offs-to-claude-code)
+- [Hand off to Claude Code (real brain, real Claude Code)](#hand-off-to-claude-code-real-brain-real-claude-code)
+- [Hand-offs to Claude Code (old engine)](#hand-offs-to-claude-code-old-engine)
 - [Settings](#settings)
 - [Greeting](#greeting)
 - [Keeping an eye on things](#keeping-an-eye-on-things)
@@ -378,7 +379,45 @@ their rows return.
     **Expected:** the ask is still open in the bubble. With a second body connected, answering in
     one closes the card in the other.
 
-## Hand-offs to Claude Code
+## Hand off to Claude Code (real brain, real Claude Code)
+
+This section needs slice 8b: the desktop showing non-confirm asks with their options and input.
+Until then the hand-off ask appears on no body, so Scout's `hand_off` waits out the ask timeout
+and says it was not started, and these steps cannot pass.
+
+This section covers the Python brain. It needs `npm install -g @agentclientprotocol/claude-agent-acp`
+(Node 22 or newer), Claude Code logged in with your own login, the brain and the desktop running
+as above, and a small test folder you do not mind Claude Code editing. The Home Jobs panel also
+arrives in 8b, so for now check jobs by asking Scout ("list my jobs", "stop that job").
+
+1. **Action:** ask "Hand this to Claude Code: add a README line to the project in
+   `C:\path\to\test-folder`."
+   **Expected:** an ask card shows the task and the folder, with one button per mode (Manual,
+   Accept edits, Plan, Auto, Bypass permissions) and Cancel. No second allow or deny card appears.
+   Pick **Plan**: Scout says the job started and gives its id.
+2. **Action:** ask "Hand this to Claude Code: list the files here." without naming a folder.
+   **Expected:** Scout asks which folder; it does not start anything or guess one. Name a folder
+   that does not exist: Scout says there is no folder at that path.
+3. **Action:** start a hand-off and press **Cancel** on the mode card.
+   **Expected:** Scout says it was not started, and no `claude` or `node` process is left.
+4. **Action:** hand off a task that edits a file in **Manual** mode.
+   **Expected:** Claude Code's permission request arrives as an ask (tool and input shown, buttons
+   for its options). Pick one: the job goes on, and asking Scout to list jobs shows it moving.
+5. **Action:** hand off "Ask me which colour to use, then write it to colour.txt."
+   **Expected:** the question arrives as an ask with its choices (you can type your own answer).
+   Answer it: the job continues and `colour.txt` has your answer.
+6. **Action:** start a long job and say "stop that job".
+   **Expected:** the job ends as stopped, its open asks close, and no `claude` or `node` process
+   stays behind. Asking Scout to stop it again gets a plain "not running" answer.
+7. **Action:** start two long jobs, then ask for a third.
+   **Expected:** Scout says 2 jobs are already running and names them.
+8. **Action:** start a long job, then stop the brain and start it again; ask Scout to list jobs.
+   **Expected:** the job shows as stopped with reason "brain restarted". Nothing resumes.
+
+## Hand-offs to Claude Code (old engine)
+
+These sections cover the old packages/core engine, which the desktop no longer boots. For the
+Python brain see "Hand off to Claude Code (real brain, real Claude Code)" above.
 
 ### E.1. Scout briefs, you press Send
 

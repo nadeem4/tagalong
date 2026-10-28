@@ -215,7 +215,29 @@ async def test_turn_sends_memory_tools():
     session, _ = make(model)
     session.say("desktop", say("hello"))
     await finish(session)
-    assert [t["name"] for t in model.tools[0]] == ["forget", "recall", "remember"]  # sorted
+    names = [t["name"] for t in model.tools[0]]
+    assert names == sorted(names)
+    assert {"forget", "recall", "remember"} <= set(names)
+
+
+async def test_turn_offers_the_expert_tools_and_home_gets_two():
+    model = Gate(["hi"])
+    session, _ = make(model)
+    session.say("desktop", say("hello"))
+    await finish(session)
+    names = {t["name"] for t in model.tools[0]}
+    assert {"hand_off", "tell_expert", "list_jobs", "stop_job"} <= names
+    home = {t.name for t in session.home_tools()}
+    assert {"list_jobs", "stop_job"} <= home
+    assert not home & {"hand_off", "tell_expert"}
+
+
+def test_session_start_marks_running_jobs_stopped():
+    memory = Memory(":memory:")
+    memory.add_job("j1", "claude_code", "task", "C:/x", "default")
+    session, _ = make(Gate([]), memory)
+    job = session.jobs.list()[0]
+    assert job.state == "stopped" and job.reason == "brain restarted"
 
 
 async def test_what_you_know_in_system_prompt():
@@ -447,8 +469,9 @@ async def test_body_tools_offered_then_gone_after_disconnect():
     await finish_quietly(session)
     first = [t["name"] for t in model.tools[0]]
     second = [t["name"] for t in model.tools[1]]
-    assert first == ["forget", "recall", "remember", "desktop__see_screen"]
-    assert second == ["forget", "recall", "remember"]
+    assert "desktop__see_screen" in first
+    assert "desktop__see_screen" not in second
+    assert first[-1] == "desktop__see_screen" and first[:-1] == second  # body tools come last
 
 
 async def test_session_answer_passes_text_to_the_ask():
