@@ -412,7 +412,13 @@ arrives in 8b, so for now check jobs by asking Scout ("list my jobs", "stop that
 7. **Action:** start two long jobs, then ask for a third.
    **Expected:** Scout says 2 jobs are already running and names them.
 8. **Action:** start a long job, then stop the brain and start it again; ask Scout to list jobs.
-   **Expected:** the job shows as stopped with reason "brain restarted". Nothing resumes.
+   **Expected:** the job shows as stopped with reason "brain restarted". Nothing resumes. Scout may
+   mention it once when the desktop reconnects, and not again after that.
+9. **Action:** start a short job, close Home and wait for it to finish.
+   **Expected:** Scout speaks up on its own with a short report of the result, though you asked
+   nothing. A second finish report does not follow for the same job.
+10. **Action:** start a job whose result needs no comment, or one you already saw reported.
+    **Expected:** Scout may stay silent. Silence is allowed; no canned line appears.
 
 ## Hand-offs to Claude Code (old engine)
 

@@ -1,5 +1,9 @@
 # Experts, hand-offs and Scout's own work
 
+> This page describes the old `packages/core` engine. Claude Code hand-offs now live in the Python
+> brain: its `hand_off` tool, jobs, and the finish turn that reports a finished job. See
+> [brain.md](brain.md#jobs-and-tools).
+
 ## Purpose
 
 Scout, the companion on screen, never does long work itself. It writes a brief and hands it to an
