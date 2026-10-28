@@ -10,10 +10,9 @@ import type {
   EpisodeEvent,
   SelfNight,
   SelfVersion,
+  AppAddParams,
+  AppInfo,
   CalendarCheckResult,
-  ConnectionState,
-  ConnectionsAddParams,
-  ConnectionsListResult,
   ContextSnapshot,
   CatalogStatus,
   Expert,
@@ -91,10 +90,11 @@ export interface FakeHostBridge extends HostBridge {
   /** Every answer from Waiting on you, and every Open, in order. */
   readonly answeredAsks: readonly { id: string; decision: 'approve' | 'decline' }[];
   readonly openedAsks: readonly string[];
-  /** Home's connections; a test edits them, then emits `connections.changed`. */
-  connections: ConnectionsListResult;
-  readonly addedConnections: readonly ConnectionsAddParams[];
-  readonly signIns: readonly string[];
+  /** The brain's apps; a test edits them, then emits `connections.changed`. */
+  apps: AppInfo[];
+  readonly addedConnections: readonly AppAddParams[];
+  readonly enabledCalls: readonly { id: string; enabled: boolean }[];
+  readonly restarts: readonly string[];
   readonly removedConnections: readonly string[];
   /** Home's routines, as saved; a test reads them back after a save. */
   routines: RoutineView[];
@@ -140,9 +140,10 @@ export function createFakeHostBridge(
     pickFolder?: () => string | null;
     /** What a project search answers; absent answers nothing found. */
     searchProjects?: (query: string) => ProjectCandidate[];
-    connections?: Partial<ConnectionsListResult>;
-    /** What adding answers; absent answers a connected connection with no tools. */
-    addConnection?: (params: ConnectionsAddParams) => ConnectionState;
+    /** The brain's apps to start with. */
+    apps?: AppInfo[];
+    /** Listing apps rejects with this message, as "brain offline" does. */
+    listFails?: string;
     routines?: RoutineView[];
     /** What Scout saw, newest first. */
     sightLog?: SightLogEntry[];
@@ -176,8 +177,9 @@ export function createFakeHostBridge(
   const answeredAsks: { id: string; decision: 'approve' | 'decline' }[] = [];
   const jobAnswers: { approvalId: string; option: string; text?: string }[] = [];
   const openedAsks: string[] = [];
-  const addedConnections: ConnectionsAddParams[] = [];
-  const signIns: string[] = [];
+  const addedConnections: AppAddParams[] = [];
+  const enabledCalls: { id: string; enabled: boolean }[] = [];
+  const restarts: string[] = [];
   const removedConnections: string[] = [];
   const ranRoutines: string[] = [];
   const confirmedRoutines: { proposalId: string; routine?: RoutineDraftInput }[] = [];
@@ -203,13 +205,6 @@ export function createFakeHostBridge(
       id: draft.id ?? `30000000-0000-4000-8000-${String(routineCount).padStart(12, '0')}`,
       createdAt: existing?.createdAt ?? '2026-10-13T07:00:00.000Z',
     } as RoutineView;
-  };
-  const update = (id: string, patch: Partial<ConnectionState>): ConnectionState => {
-    const list = fake.connections.connections;
-    const index = list.findIndex((c) => c.id === id);
-    const next = { ...list[index]!, ...patch };
-    list[index] = next;
-    return next;
   };
 
   const fake: FakeHostBridge = {
@@ -425,51 +420,45 @@ export function createFakeHostBridge(
       openedAsks.push(id);
       return Promise.resolve(true);
     },
-    connections: {
-      connections: [...(options.connections?.connections ?? [])],
-      popular: [...(options.connections?.popular ?? [])],
-      found: [...(options.connections?.found ?? [])],
-    },
+    apps: [...(options.apps ?? [])],
     addedConnections,
-    signIns,
+    enabledCalls,
+    restarts,
     removedConnections,
     listConnections() {
-      return Promise.resolve(structuredClone(fake.connections));
+      if (options.listFails !== undefined) return Promise.reject(new Error(options.listFails));
+      return Promise.resolve({ apps: structuredClone(fake.apps) });
     },
     addConnection(params) {
       addedConnections.push(params);
-      const added: ConnectionState = options.addConnection?.(params) ?? {
-        id: params.id ?? params.name.toLowerCase(),
+      const id = params.name.toLowerCase();
+      fake.apps.push({
+        id,
         name: params.name,
-        transport:
-          params.transport.type === 'http'
-            ? params.transport
-            : {
-                ...params.transport,
-                args: params.transport.args ?? [],
-                env: params.transport.env ?? {},
-              },
-        auth: params.auth,
-        secretNames: [],
+        transport: params.transport,
+        auth: params.auth ?? 'none',
         enabled: true,
-        // An OAuth app is still signing in in the browser when add answers.
-        status: params.auth === 'oauth' ? 'connecting' : 'connected',
+        status: 'connected',
+        error: '',
         tools: [],
-      };
-      fake.connections.connections.push(added);
-      return Promise.resolve(added);
+      });
+      return Promise.resolve({ id });
     },
     setConnectionEnabled(id, enabled) {
-      return Promise.resolve(update(id, { enabled, status: enabled ? 'connected' : 'off' }));
+      enabledCalls.push({ id, enabled });
+      fake.apps = fake.apps.map((a) =>
+        a.id === id ? { ...a, enabled, status: enabled ? 'connected' : 'off' } : a,
+      );
+      return Promise.resolve({ id, enabled });
     },
-    signInConnection(id) {
-      signIns.push(id);
-      return Promise.resolve(update(id, { status: 'connecting' }));
+    restartConnection(id) {
+      restarts.push(id);
+      return Promise.resolve({ id });
     },
     removeConnection(id) {
       removedConnections.push(id);
-      fake.connections.connections = fake.connections.connections.filter((c) => c.id !== id);
-      return Promise.resolve(true);
+      fake.apps = fake.apps.filter((a) => a.id !== id);
+      return Promise.resolve({ id, removed: true });
     },
     routines: [...(options.routines ?? [])],
     ranRoutines,

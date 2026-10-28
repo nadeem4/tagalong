@@ -38,21 +38,19 @@ function deps(patch: Partial<HealthDeps> = {}): HealthDeps {
     testExpert: () => Promise.resolve({ ok: true }),
     listConnections: () =>
       Promise.resolve({
-        connections: [
+        apps: [
           {
             id: 'github',
             name: 'GitHub',
-            transport: { type: 'http', url: 'https://example.com/mcp' },
-            auth: { type: 'oauth' },
-            secretNames: [],
+            transport: 'http' as const,
+            auth: 'oauth' as const,
             enabled: true,
-            status: 'needs-sign-in',
+            status: 'needs-sign-in' as const,
+            error: '',
             tools: [],
           },
         ],
-        popular: [],
-        found: [],
-      } as never),
+      }),
     listMicrophones: () => Promise.resolve([{ id: 'mic-1', label: 'Desk mic' }]),
     voiceModels: () => Promise.resolve({ mouth: true, ears: false }),
     hostsStatus: () => Promise.resolve({ extension: false }),

@@ -559,9 +559,9 @@ test('Home is one window: Scout, experts, activity and settings', async () => {
   await nav.getByRole('button', { name: 'Experts' }).click();
   await expect(home.getByRole('button', { name: 'Add expert' })).toBeVisible();
 
-  // The Connections page offers the popular apps; nothing connects until Connect is pressed.
+  // The Connections page lists the apps the (fake) brain keeps.
   await nav.getByRole('button', { name: 'Connections' }).click();
-  await expect(home.getByRole('button', { name: 'Connect Notion' })).toBeVisible({
+  await expect(home.getByRole('region', { name: 'Files' })).toBeVisible({
     timeout: 15_000,
   });
   await home.screenshot({ path: join(appDir, 'test-results', 'connections.png') });

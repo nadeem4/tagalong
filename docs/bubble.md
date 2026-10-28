@@ -385,7 +385,7 @@ The nav lists twelve pages (`HomePage`), the companion's name filling in where i
 | Scout (`scout`)                 | `ScoutPanel`               | provider and model, `host.listModels`, `host.savePet`                                                |
 | Experts (`experts`)             | `ExpertsPanel`             | `listExperts`, `saveExpert`, `deleteExpert`, `testExpert`, `expertCatalog`, `installExpert`          |
 | Routines (`routines`)           | `RoutinesPanel`            | `listRoutines`, `saveRoutine`, `deleteRoutine`, `setRoutineEnabled`, `runRoutine`, the calendar link |
-| Connections (`connections`)     | `ConnectionsPanel`         | `listConnections`, `addConnection`, `setConnectionEnabled`, `signInConnection`, `removeConnection`   |
+| Connections (`connections`)     | `ConnectionsPanel`         | `listConnections`, `addConnection`, `setConnectionEnabled`, `restartConnection`, `removeConnection`  |
 | Activity (`activity`)           | `ActivityView`             | `listActivity` pages                                                                                 |
 | How Scout decided (`decisions`) | `DecisionsView`            | `listExperience`, `getExperience`, `clearExperience`                                                 |
 | What Scout saw (`sightLog`)     | `SightLogView`             | `listSightLog`, `deleteSightLog`, `clearSightLog`; days from `setup().sightLogDays`                  |

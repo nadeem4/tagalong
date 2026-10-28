@@ -1,21 +1,19 @@
 /**
- * Home's Connections page: the person's apps over MCP. Popular apps, servers found in
- * Claude Code, and Add a connector. Contains ConnectionsPanel and splitCommand.
+ * Home's Connections page: the apps the brain keeps over MCP. One row per app (status,
+ * tool count, on/off, Restart, Remove) and one Add form. The brain owns the list and the keys;
+ * this page only asks and reads again. Contains ConnectionsPanel and splitCommand.
  */
 
 import { useCallback, useEffect, useId, useState } from 'react';
-import type {
-  ConnectionState,
-  ConnectionsAddParams,
-  ConnectionsListResult,
-  FoundConnector,
-  PopularConnector,
-} from '@tagalong/protocol';
+import type { AppAddParams, AppInfo } from '@tagalong/protocol';
 import { useHostBridge } from '../host-bridge';
 
 type Status = { text: string; error: boolean } | null;
 
-const STATUS_WORDS: Record<ConnectionState['status'], string> = {
+const OFFLINE =
+  'Scout’s brain isn’t running, so your apps can’t be shown. Start it, then try again.';
+
+const STATUS_WORDS: Record<AppInfo['status'], string> = {
   off: 'Off',
   connecting: 'Connecting',
   connected: 'Connected',
@@ -23,12 +21,17 @@ const STATUS_WORDS: Record<ConnectionState['status'], string> = {
   error: 'Not working',
 };
 
-const STATUS_CHIP: Record<ConnectionState['status'], string> = {
-  off: 'tg-chip',
-  connecting: 'tg-chip tg-chip--warn',
-  connected: 'tg-chip tg-chip--ok',
-  'needs-sign-in': 'tg-chip tg-chip--warn',
-  error: 'tg-chip tg-chip--err',
+const STATUS_DOT: Record<AppInfo['status'], string> = {
+  off: 'home-dot home-dot--off',
+  connecting: 'home-dot home-dot--warn',
+  connected: 'home-dot',
+  'needs-sign-in': 'home-dot home-dot--warn',
+  error: 'home-dot home-dot--err',
+};
+
+const TRANSPORT_WORDS: Record<AppInfo['transport'], string> = {
+  stdio: 'Runs on this PC',
+  http: 'Web address',
 };
 
 /** `npx -y "my server" C:/x` as a command and its arguments; quotes keep spaces. */
@@ -49,63 +52,70 @@ function envLines(text: string): Record<string, string> | string {
   return env;
 }
 
-/** What the person hears after Connect, from the state the engine answered with. */
-function outcome(state: ConnectionState): Status {
-  if (state.status === 'connecting' && state.auth === 'oauth') {
-    return { text: `Finish signing in to ${state.name} in your browser.`, error: false };
-  }
-  if (state.status === 'connected') return { text: `${state.name} is connected.`, error: false };
-  if (state.error !== undefined) return { text: state.error, error: true };
-  return { text: `${state.name} is ${STATUS_WORDS[state.status].toLowerCase()}.`, error: false };
+/** The person-readable line for a failed call; the offline case gets the longer note. */
+function failure(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message === 'brain offline' ? OFFLINE : message;
 }
 
 /**
- * Home's Connections page: the person's apps over MCP. Popular apps connect with one
- * button, servers already set up in Claude Code are reused, and anything else is added
- * under Add a connector. Scout reads with them on its own and asks before every change.
+ * Home's Connections page. Scout reads with an app on its own and asks before every change;
+ * which tools ask is set in Permissions, not here.
  */
 export function ConnectionsPanel() {
   const bridge = useHostBridge();
-  const [list, setList] = useState<ConnectionsListResult | null>(null);
+  const [apps, setApps] = useState<AppInfo[] | null>(null);
   const [status, setStatus] = useState<Status>(null);
+  const [offline, setOffline] = useState(false);
 
   const reload = useCallback(() => {
-    void bridge.listConnections?.().then(setList);
+    bridge
+      .listConnections?.()
+      .then((latest) => {
+        setOffline(false);
+        setApps(latest.apps);
+      })
+      .catch((error: unknown) => {
+        setOffline(true);
+        setApps((current) => current ?? []);
+        if (failure(error) !== OFFLINE) setStatus({ text: failure(error), error: true });
+      });
   }, [bridge]);
   useEffect(reload, [reload]);
   useEffect(
     () =>
       bridge.onTurnEvent((event) => {
-        if (event.type !== 'connections.changed') return;
-        setList((current) => current && { ...current, connections: event.connections });
+        if (event.type === 'connections.changed') reload();
       }),
-    [bridge],
+    [bridge, reload],
   );
 
   if (bridge.listConnections === undefined) {
     return <p className="home-note">Connections are set up in the Tagalong desktop app.</p>;
   }
-  if (list === null) return <p className="home-note">Loading connections…</p>;
+  if (apps === null) return <p className="home-note">Loading connections…</p>;
 
-  const add = async (params: ConnectionsAddParams): Promise<boolean> => {
+  // Run a call, then read the list again whatever it said: the brain is the truth.
+  const act = async (
+    call: (() => Promise<unknown>) | undefined,
+    done?: string,
+  ): Promise<boolean> => {
     setStatus(null);
     try {
-      const state = await bridge.addConnection?.(params);
-      if (state === undefined) return false;
-      setStatus(outcome(state));
-      reload();
+      await call?.();
+      if (done !== undefined) setStatus({ text: done, error: false });
       return true;
     } catch (error) {
-      setStatus({
-        text: `Not connected. ${error instanceof Error ? error.message : String(error)}`,
-        error: true,
-      });
+      setStatus({ text: failure(error), error: true });
       return false;
+    } finally {
+      reload();
     }
   };
 
-  const connectedIds = list.connections.map((c) => c.id);
-  const popular = list.popular.filter((p) => !connectedIds.includes(p.id));
+  const add = (params: AppAddParams): Promise<boolean> =>
+    act(() => bridge.addConnection!(params), `${params.name} added.`);
+
   return (
     <div className="tg-panel home-controls home-conns">
       <h1 className="home-title">Connections</h1>
@@ -113,6 +123,14 @@ export function ConnectionsPanel() {
         Let Scout use your apps: “what’s on my calendar”, “any reviews waiting”. Scout reads with
         them on its own, and asks you before it changes anything.
       </p>
+      {offline && (
+        <p className="tg-note" role="status">
+          {OFFLINE}{' '}
+          <button type="button" className="tg-btn-quiet" onClick={reload}>
+            Try again
+          </button>
+        </p>
+      )}
       {status !== null && (
         <p
           className={status.error ? 'tg-error' : 'tg-note'}
@@ -121,82 +139,45 @@ export function ConnectionsPanel() {
           {status.text}
         </p>
       )}
-      {list.connections.length > 0 && (
-        <>
-          <h3>Connected</h3>
-          <ul aria-label="Connections" className="home-list home-conns__list">
-            {list.connections.map((connection) => (
-              <ConnectionRow
-                key={connection.id}
-                connection={connection}
-                onChange={(next) =>
-                  setList(
-                    (current) =>
-                      current && {
-                        ...current,
-                        connections: current.connections.map((c) => (c.id === next.id ? next : c)),
-                      },
-                  )
-                }
-                onRemoved={() => {
-                  setStatus({ text: `${connection.name} is disconnected.`, error: false });
-                  reload();
-                }}
-              />
-            ))}
-          </ul>
-        </>
+      {apps.length > 0 && (
+        <ul aria-label="Apps" className="home-list home-conns__list">
+          {apps.map((app) => (
+            <AppRow
+              key={app.id}
+              app={app}
+              onSwitch={() => void act(() => bridge.setConnectionEnabled!(app.id, !app.enabled))}
+              onRestart={() => void act(() => bridge.restartConnection!(app.id))}
+              onRemove={() =>
+                void act(() => bridge.removeConnection!(app.id), `${app.name} removed.`)
+              }
+            />
+          ))}
+        </ul>
       )}
-      {popular.length > 0 && (
-        <>
-          <h3>Popular</h3>
-          <ul aria-label="Popular" className="home-list home-conns__list">
-            {popular.map((entry) => (
-              <PopularRow key={entry.id} entry={entry} onAdd={add} />
-            ))}
-          </ul>
-        </>
-      )}
-      {list.found.length > 0 && (
-        <>
-          <h3>Found on this PC</h3>
-          <ul aria-label="Found on this PC" className="home-list home-conns__list">
-            {list.found.map((entry) => (
-              <FoundRow key={entry.name} entry={entry} onAdd={add} />
-            ))}
-          </ul>
-        </>
-      )}
+      {apps.length === 0 && !offline && <p className="tg-note">No apps yet. Add one below.</p>}
       <details className="home-conns__advanced">
-        <summary className="tg-note">Add a connector</summary>
+        <summary className="tg-note">Add an app</summary>
         <AddForm onAdd={add} />
       </details>
     </div>
   );
 }
 
-function ConnectionRow({
-  connection,
-  onChange,
-  onRemoved,
+function AppRow({
+  app,
+  onSwitch,
+  onRestart,
+  onRemove,
 }: {
-  connection: ConnectionState;
-  onChange: (next: ConnectionState) => void;
-  onRemoved: () => void;
+  app: AppInfo;
+  onSwitch: () => void;
+  onRestart: () => void;
+  onRemove: () => void;
 }) {
-  const bridge = useHostBridge();
   const [confirming, setConfirming] = useState(false);
   const switchLabel = useId();
-  const { name, tools } = connection;
-  const reads = tools.filter((t) => t.access === 'read').length;
-  const summary =
-    connection.status === 'connected'
-      ? `${tools.length} tool${tools.length === 1 ? '' : 's'}: ${reads} read, ${tools.length - reads} ask first`
-      : (connection.error ?? STATUS_WORDS[connection.status]);
-  const canSignIn =
-    connection.auth === 'oauth' &&
-    connection.enabled &&
-    (connection.status === 'needs-sign-in' || connection.status === 'error');
+  const { name, tools } = app;
+  const toolCount = `${tools.length} tool${tools.length === 1 ? '' : 's'}`;
 
   return (
     <li>
@@ -204,11 +185,14 @@ function ConnectionRow({
         <div className="home-conn__head">
           <span className="home-entry__body">
             <span className="home-entry__title">{name}</span>
-            <span className={connection.status === 'error' ? 'tg-error' : 'home-entry__preview'}>
-              {summary}
+            <span className="home-entry__preview">
+              {TRANSPORT_WORDS[app.transport]} · {toolCount}
             </span>
           </span>
-          <span className={STATUS_CHIP[connection.status]}>{STATUS_WORDS[connection.status]}</span>
+          <span className="tg-chip">
+            <span className={STATUS_DOT[app.status]} aria-hidden="true" />{' '}
+            {STATUS_WORDS[app.status]}
+          </span>
           <span id={switchLabel} hidden>
             Scout can use {name}
           </span>
@@ -216,65 +200,51 @@ function ConnectionRow({
             type="button"
             role="switch"
             className="tg-switch"
-            aria-checked={connection.enabled}
+            aria-checked={app.enabled}
             aria-labelledby={switchLabel}
-            onClick={() =>
-              void bridge.setConnectionEnabled?.(connection.id, !connection.enabled).then(onChange)
-            }
+            onClick={onSwitch}
           >
-            {connection.enabled ? 'On' : 'Off'}
+            {app.enabled ? 'On' : 'Off'}
           </button>
         </div>
-        {tools.length > 0 && (
-          <details>
-            <summary className="tg-note">Tools</summary>
-            <ul className="tg-tools">
-              {tools.map((tool) => (
-                <li key={tool.name}>
-                  <span>
-                    <strong>{tool.name}</strong>
-                    {tool.description !== undefined && (
-                      <>
-                        <br />
-                        <small>{tool.description.split('\n', 1)[0]}</small>
-                      </>
-                    )}
-                  </span>
-                  <span className={tool.access === 'read' ? 'tg-chip' : 'tg-chip tg-chip--warn'}>
-                    {tool.access === 'read' ? 'Reads' : 'Asks first'}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
+        {app.error !== '' && <p className="tg-error">{app.error}</p>}
         <div className="home-conn__actions">
-          {canSignIn && (
-            <button
-              type="button"
-              className="tg-btn-quiet"
-              onClick={() => void bridge.signInConnection?.(connection.id).then(onChange)}
-            >
-              Sign in again
-            </button>
-          )}
+          <button
+            type="button"
+            className="tg-btn-quiet"
+            aria-label={`Restart ${name}`}
+            onClick={onRestart}
+          >
+            Restart
+          </button>
           {confirming ? (
             <span className="home-danger">
               <button
                 type="button"
                 className="tg-btn-quiet"
-                onClick={() => void bridge.removeConnection?.(connection.id).then(onRemoved)}
+                aria-label={`Yes, remove ${name}`}
+                onClick={onRemove}
               >
-                Disconnect {name} and delete its sign-in
+                Yes, remove
               </button>
-              <button type="button" className="tg-btn-quiet" onClick={() => setConfirming(false)}>
-                Keep {name}
+              <button
+                type="button"
+                className="tg-btn-quiet"
+                aria-label={`Keep ${name}`}
+                onClick={() => setConfirming(false)}
+              >
+                Keep
               </button>
             </span>
           ) : (
             <span className="home-danger">
-              <button type="button" className="tg-btn-quiet" onClick={() => setConfirming(true)}>
-                Disconnect
+              <button
+                type="button"
+                className="tg-btn-quiet"
+                aria-label={`Remove ${name}`}
+                onClick={() => setConfirming(true)}
+              >
+                Remove
               </button>
             </span>
           )}
@@ -307,171 +277,31 @@ function SecretField({
   );
 }
 
-function PopularRow({
-  entry,
-  onAdd,
-}: {
-  entry: PopularConnector;
-  onAdd: (params: ConnectionsAddParams) => Promise<boolean>;
-}) {
-  const [asking, setAsking] = useState(false);
-  const [key, setKey] = useState('');
-  const base = {
-    id: entry.id,
-    name: entry.name,
-    transport: { type: 'http' as const, url: entry.url },
-    auth: entry.auth,
-  };
-  return (
-    <li>
-      <section className="home-conn" aria-label={`${entry.name}, not connected`}>
-        <div className="home-conn__head">
-          <span className="home-entry__body">
-            <span className="home-entry__title">{entry.name}</span>
-            <span className="home-entry__preview">{entry.blurb}</span>
-          </span>
-          {!asking && (
-            <button
-              type="button"
-              className="tg-btn-quiet"
-              aria-label={`Connect ${entry.name}`}
-              onClick={() => (entry.auth === 'token' ? setAsking(true) : void onAdd(base))}
-            >
-              Connect
-            </button>
-          )}
-        </div>
-        {asking && (
-          <div className="home-conn__form">
-            {entry.tokenHint !== undefined && <p className="tg-note">{entry.tokenHint}</p>}
-            {entry.tokenUrl !== undefined && (
-              <p className="tg-note">
-                Make one at <span className="home-conn__url">{entry.tokenUrl}</span>
-              </p>
-            )}
-            <SecretField label={`Key for ${entry.name}`} value={key} onChange={setKey} />
-            <div className="home-conn__actions">
-              <button
-                type="button"
-                className="tg-btn"
-                disabled={key.trim() === ''}
-                onClick={() => void onAdd({ ...base, secrets: { token: key.trim() } })}
-              >
-                Connect
-              </button>
-              <button type="button" className="tg-btn-quiet" onClick={() => setAsking(false)}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-      </section>
-    </li>
-  );
-}
+type SignIn = 'token' | 'none';
 
-function FoundRow({
-  entry,
-  onAdd,
-}: {
-  entry: FoundConnector;
-  onAdd: (params: ConnectionsAddParams) => Promise<boolean>;
-}) {
-  const [asking, setAsking] = useState(false);
-  const [values, setValues] = useState<Record<string, string>>({});
-  const remote = entry.transport.type === 'http';
-  // A remote server's only key Tagalong can send is an Authorization header.
-  const needsKey = remote && entry.missingSecrets.includes('Authorization');
-  const otherHeaders = remote ? entry.missingSecrets.filter((h) => h !== 'Authorization') : [];
-  const asked = remote ? (needsKey ? ['token'] : []) : entry.missingSecrets;
-  const where =
-    entry.transport.type === 'http'
-      ? entry.transport.url
-      : [entry.transport.command, ...entry.transport.args].join(' ');
-  const params = (): ConnectionsAddParams => ({
-    name: entry.name,
-    transport: entry.transport,
-    auth: remote ? (needsKey ? 'token' : 'oauth') : 'none',
-    ...(asked.length > 0 ? { secrets: values } : {}),
-  });
-  const ready = asked.every((name) => (values[name] ?? '').trim() !== '');
-
-  return (
-    <li>
-      <section className="home-conn" aria-label={`${entry.name}, found in Claude Code`}>
-        <div className="home-conn__head">
-          <span className="home-entry__body">
-            <span className="home-entry__title">{entry.name}</span>
-            <span className="home-entry__preview">
-              From Claude Code{entry.project !== undefined ? `, ${entry.project}` : ''} · {where}
-            </span>
-          </span>
-          {!asking && (
-            <button
-              type="button"
-              className="tg-btn-quiet"
-              aria-label={`Use ${entry.name}`}
-              onClick={() => (asked.length > 0 ? setAsking(true) : void onAdd(params()))}
-            >
-              Use
-            </button>
-          )}
-        </div>
-        {asking && (
-          <div className="home-conn__form">
-            <p className="tg-note">
-              Claude Code keeps these values itself, and Tagalong does not copy them. Paste them
-              here; they go to your keychain.
-            </p>
-            {asked.map((name) => (
-              <SecretField
-                key={name}
-                label={name === 'token' ? `Key for ${entry.name}` : `${name} for ${entry.name}`}
-                value={values[name] ?? ''}
-                onChange={(value) => setValues((current) => ({ ...current, [name]: value }))}
-              />
-            ))}
-            {otherHeaders.length > 0 && (
-              <p className="tg-note">
-                Tagalong sends only an Authorization key, not {otherHeaders.join(', ')}.
-              </p>
-            )}
-            <div className="home-conn__actions">
-              <button
-                type="button"
-                className="tg-btn"
-                disabled={!ready}
-                onClick={() => void onAdd(params())}
-              >
-                Connect
-              </button>
-              <button type="button" className="tg-btn-quiet" onClick={() => setAsking(false)}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-      </section>
-    </li>
-  );
-}
-
-type SignIn = 'oauth' | 'token' | 'none';
-
-function AddForm({ onAdd }: { onAdd: (params: ConnectionsAddParams) => Promise<boolean> }) {
+function AddForm({ onAdd }: { onAdd: (params: AppAddParams) => Promise<boolean> }) {
   const [kind, setKind] = useState<'remote' | 'local'>('remote');
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
-  const [signIn, setSignIn] = useState<SignIn>('oauth');
+  const [signIn, setSignIn] = useState<SignIn>('none');
   const [key, setKey] = useState('');
   const [command, setCommand] = useState('');
   const [env, setEnv] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
   const group = useId();
 
+  // The key is sent once: it is gone from the form as soon as the brain has it.
+  const clear = (): void => {
+    setName('');
+    setUrl('');
+    setKey('');
+    setCommand('');
+    setEnv('');
+  };
+
   const submit = async (): Promise<void> => {
     setProblem(null);
-    if (name.trim() === '') return setProblem('Give the connector a name.');
+    if (name.trim() === '') return setProblem('Give the app a name.');
     if (kind === 'remote') {
       if (!/^https:\/\/\S+$/.test(url.trim())) {
         return setProblem('Use an address that starts with https://');
@@ -479,24 +309,27 @@ function AddForm({ onAdd }: { onAdd: (params: ConnectionsAddParams) => Promise<b
       if (signIn === 'token' && key.trim() === '') return setProblem('Paste the key.');
       const added = await onAdd({
         name: name.trim(),
-        transport: { type: 'http', url: url.trim() },
+        transport: 'http',
+        url: url.trim(),
         auth: signIn,
-        ...(signIn === 'token' ? { secrets: { token: key.trim() } } : {}),
+        ...(signIn === 'token' ? { token: key.trim() } : {}),
       });
-      if (added) setName('');
+      if (added) clear();
       return;
     }
     const [program, ...args] = splitCommand(command.trim());
-    if (program === undefined) return setProblem('Type the command that starts the connector.');
-    const secrets = envLines(env);
-    if (typeof secrets === 'string') return setProblem(secrets);
+    if (program === undefined) return setProblem('Type the command that starts the app.');
+    const vars = envLines(env);
+    if (typeof vars === 'string') return setProblem(vars);
     const added = await onAdd({
       name: name.trim(),
-      transport: { type: 'stdio', command: program, args, env: {} },
+      transport: 'stdio',
+      command: program,
+      args,
+      env: vars,
       auth: 'none',
-      ...(Object.keys(secrets).length > 0 ? { secrets } : {}),
     });
-    if (added) setName('');
+    if (added) clear();
   };
 
   return (
@@ -504,7 +337,7 @@ function AddForm({ onAdd }: { onAdd: (params: ConnectionsAddParams) => Promise<b
       <p className="tg-note">
         Any MCP server: an address on the web, or a command that runs on this PC.
       </p>
-      <div className="tg-choices" role="radiogroup" aria-label="Kind of connector">
+      <div className="tg-choices" role="radiogroup" aria-label="Kind of app">
         <label className="tg-choice">
           <input
             type="radio"
@@ -541,9 +374,8 @@ function AddForm({ onAdd }: { onAdd: (params: ConnectionsAddParams) => Promise<b
           <label>
             <span>Signs in with</span>
             <select value={signIn} onChange={(event) => setSignIn(event.target.value as SignIn)}>
-              <option value="oauth">The app’s own sign-in, in your browser</option>
-              <option value="token">A key you paste</option>
               <option value="none">Nothing</option>
+              <option value="token">A key you paste</option>
             </select>
           </label>
           {signIn === 'token' && <SecretField label="Key" value={key} onChange={setKey} />}
@@ -559,7 +391,10 @@ function AddForm({ onAdd }: { onAdd: (params: ConnectionsAddParams) => Promise<b
             />
           </label>
           <label>
-            <span>Environment (NAME=value, one per line, kept in your keychain)</span>
+            <span>
+              Environment (NAME=value, one per line; {'${NAME}'} takes the value from your own
+              environment)
+            </span>
             <textarea rows={2} value={env} onChange={(event) => setEnv(event.target.value)} />
           </label>
         </>

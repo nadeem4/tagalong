@@ -7,6 +7,8 @@
 import { createContext, createElement, useContext } from 'react';
 import type { ReactNode } from 'react';
 import type {
+  AppAddParams,
+  AppsList,
   CalendarCheckResult,
   ActivityListResult,
   AsksListResult,
@@ -15,9 +17,6 @@ import type {
   SelfGetResult,
   SelfListResult,
   Brief,
-  ConnectionState,
-  ConnectionsAddParams,
-  ConnectionsListResult,
   ContextSnapshot,
   CoreToHostNotification,
   CatalogStatus,
@@ -203,15 +202,17 @@ export interface HostBridge {
   answerAsk?(id: string, decision: 'approve' | 'decline'): Promise<boolean>;
   openAsk?(id: string): Promise<boolean>;
   /**
-   * Home's Connections page: the person's apps over MCP, the Popular list and the servers
-   * found in Claude Code. All optional: a host without Home never shows the page.
+   * Home's Connections page: the apps the brain keeps (MCP). All optional: a host without
+   * Home never shows the page. They reject with "brain offline" while the brain is away.
+   * Only `listConnections` and `addConnection` have answers worth reading; the page lists again
+   * after the rest.
    */
-  listConnections?(): Promise<ConnectionsListResult>;
-  addConnection?(params: ConnectionsAddParams): Promise<ConnectionState>;
-  setConnectionEnabled?(id: string, enabled: boolean): Promise<ConnectionState>;
-  signInConnection?(id: string): Promise<ConnectionState>;
-  /** Disconnect: tokens and keys deleted, the connection forgotten. */
-  removeConnection?(id: string): Promise<boolean>;
+  listConnections?(): Promise<AppsList>;
+  addConnection?(params: AppAddParams): Promise<{ id: string }>;
+  setConnectionEnabled?(id: string, enabled: boolean): Promise<unknown>;
+  restartConnection?(id: string): Promise<unknown>;
+  /** Remove: the brain forgets the app and deletes its stored key. */
+  removeConnection?(id: string): Promise<unknown>;
   /**
    * Home's Routines page and the routine card. All optional: a host without Home never shows
    * either. Saving, in Home or on the card, is the person's consent.

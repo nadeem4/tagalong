@@ -1,43 +1,35 @@
-/** Tests for ConnectionsPanel: Popular, Claude Code servers, Add a connector, Disconnect. */
+/** Tests for ConnectionsPanel: the brain's apps, Add an app, switch, Restart, Remove. */
 
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { ConnectionState, FoundConnector, PopularConnector } from '@tagalong/protocol';
+import type { AppInfo } from '@tagalong/protocol';
 import { HostBridgeProvider } from '../host-bridge';
 import { createFakeHostBridge, type FakeHostBridge } from '../test-support/fake-host-bridge';
 import { ConnectionsPanel } from './connections-panel';
 
-const POPULAR: PopularConnector[] = [
-  {
-    id: 'notion',
-    name: 'Notion',
-    url: 'https://mcp.notion.com/mcp',
-    auth: 'oauth',
-    blurb: 'Search and read your pages.',
-  },
-  {
-    id: 'github',
-    name: 'GitHub',
-    url: 'https://api.githubcopilot.com/mcp/',
-    auth: 'token',
-    blurb: 'Pull requests and reviews.',
-    tokenHint: 'Paste a GitHub personal access token.',
-    tokenUrl: 'https://github.com/settings/personal-access-tokens/new',
-  },
-];
-
-const LINEAR: ConnectionState = {
-  id: 'linear',
-  name: 'Linear',
-  transport: { type: 'http', url: 'https://mcp.linear.app/mcp' },
-  auth: 'oauth',
-  secretNames: [],
+const FILES: AppInfo = {
+  id: 'files',
+  name: 'Files',
+  transport: 'stdio',
+  auth: 'none',
   enabled: true,
   status: 'connected',
+  error: '',
   tools: [
-    { name: 'list_issues', description: 'List issues.', access: 'read' },
-    { name: 'create_issue', description: 'Create an issue.', access: 'write' },
+    { name: 'files__read', effect: 'look', locked: false },
+    { name: 'files__write', effect: 'change', locked: false },
   ],
+};
+
+const WIKI: AppInfo = {
+  id: 'wiki',
+  name: 'Wiki',
+  transport: 'http',
+  auth: 'token',
+  enabled: true,
+  status: 'error',
+  error: 'Could not reach wiki.example.',
+  tools: [],
 };
 
 async function renderPanel(bridge: FakeHostBridge) {
@@ -57,179 +49,152 @@ const click = async (element: HTMLElement) => {
 };
 
 describe('ConnectionsPanel', () => {
-  it('connects a popular app that signs in with one click', async () => {
-    const bridge = createFakeHostBridge({ connections: { popular: POPULAR } });
+  it('lists each app with its transport, status text, tool count and switch', async () => {
+    const bridge = createFakeHostBridge({ apps: [FILES] });
     await renderPanel(bridge);
-    const popular = screen.getByRole('list', { name: 'Popular' });
-    await click(within(popular).getByRole('button', { name: 'Connect Notion' }));
-    expect(bridge.addedConnections).toEqual([
-      {
-        id: 'notion',
-        name: 'Notion',
-        transport: { type: 'http', url: 'https://mcp.notion.com/mcp' },
-        auth: 'oauth',
-      },
-    ]);
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'Finish signing in to Notion in your browser.',
-    );
-  });
-
-  it('asks for a key for an app that takes one, and sends it only to be stored', async () => {
-    const bridge = createFakeHostBridge({ connections: { popular: POPULAR } });
-    await renderPanel(bridge);
-    await click(screen.getByRole('button', { name: 'Connect GitHub' }));
-    expect(screen.getByText('Paste a GitHub personal access token.')).toBeInTheDocument();
-    const key = screen.getByLabelText('Key for GitHub');
-    expect(key).toHaveAttribute('type', 'password');
-    fireEvent.change(key, { target: { value: 'ghp_abc' } });
-    await click(screen.getByRole('button', { name: 'Connect' }));
-    expect(bridge.addedConnections[0]).toMatchObject({
-      id: 'github',
-      auth: 'token',
-      secrets: { token: 'ghp_abc' },
-    });
-  });
-
-  it('hides a popular app already connected', async () => {
-    const bridge = createFakeHostBridge({
-      connections: { popular: POPULAR, connections: [{ ...LINEAR, id: 'notion', name: 'Notion' }] },
-    });
-    await renderPanel(bridge);
-    expect(screen.queryByRole('button', { name: 'Connect Notion' })).toBeNull();
-  });
-
-  it('shows each connection with its status, its tools as reads or changes, and a switch', async () => {
-    const bridge = createFakeHostBridge({ connections: { connections: [LINEAR] } });
-    await renderPanel(bridge);
-    const row = screen.getByRole('region', { name: 'Linear' });
+    const row = screen.getByRole('region', { name: 'Files' });
+    expect(row).toHaveTextContent('Runs on this PC');
     expect(row).toHaveTextContent('Connected');
     expect(row).toHaveTextContent('2 tools');
-    fireEvent.click(within(row).getByText('Tools'));
-    expect(within(row).getByText('list_issues').closest('li')).toHaveTextContent('Reads');
-    expect(within(row).getByText('create_issue').closest('li')).toHaveTextContent('Asks first');
-    await click(within(row).getByRole('switch', { name: 'Scout can use Linear' }));
-    expect(bridge.connections.connections[0]?.enabled).toBe(false);
+    expect(within(row).getByRole('switch', { name: 'Scout can use Files' })).toBeChecked();
   });
 
-  it('offers Sign in again when an app needs it, and says why it failed in plain words', async () => {
+  it('says plainly when an app is not working, with the brain’s line', async () => {
+    const bridge = createFakeHostBridge({ apps: [WIKI] });
+    await renderPanel(bridge);
+    const row = screen.getByRole('region', { name: 'Wiki' });
+    expect(row).toHaveTextContent('Web address');
+    expect(row).toHaveTextContent('Not working');
+    expect(row).toHaveTextContent('Could not reach wiki.example.');
+  });
+
+  it('offers no sign-in button yet, even for an oauth app that needs it', async () => {
     const bridge = createFakeHostBridge({
-      connections: {
-        connections: [
-          {
-            ...LINEAR,
-            status: 'needs-sign-in',
-            tools: [],
-            error: 'Linear wants you to sign in again.',
-          },
-        ],
-      },
+      apps: [{ ...WIKI, auth: 'oauth', status: 'needs-sign-in', error: 'Sign in again.' }],
     });
     await renderPanel(bridge);
-    const row = screen.getByRole('region', { name: 'Linear' });
-    expect(row).toHaveTextContent('Linear wants you to sign in again.');
-    await click(within(row).getByRole('button', { name: 'Sign in again' }));
-    expect(bridge.signIns).toEqual(['linear']);
+    expect(screen.queryByRole('button', { name: /sign in/i })).toBeNull();
   });
 
-  it('Disconnect asks once more, then removes it with its tokens', async () => {
-    const bridge = createFakeHostBridge({ connections: { connections: [LINEAR] } });
-    await renderPanel(bridge);
-    await click(screen.getByRole('button', { name: 'Disconnect' }));
-    await click(screen.getByRole('button', { name: 'Disconnect Linear and delete its sign-in' }));
-    expect(bridge.removedConnections).toEqual(['linear']);
-    expect(screen.queryByRole('region', { name: 'Linear' })).toBeNull();
-  });
-
-  it('reuses a server found in Claude Code, asking for any secret it did not copy', async () => {
-    const found: FoundConnector[] = [
-      {
-        name: 'wiki',
-        transport: { type: 'http', url: 'https://wiki.example/mcp' },
-        scope: 'user',
-        missingSecrets: [],
-      },
-      {
-        name: 'db',
-        transport: { type: 'stdio', command: 'db-server', args: [], env: {} },
-        scope: 'local',
-        project: 'C:/code/app',
-        missingSecrets: ['API_KEY'],
-      },
-    ];
-    const bridge = createFakeHostBridge({ connections: { found } });
-    await renderPanel(bridge);
-    const list = screen.getByRole('list', { name: 'Found on this PC' });
-    expect(list).toHaveTextContent('From Claude Code');
-    await click(within(list).getByRole('button', { name: 'Use wiki' }));
-    expect(bridge.addedConnections[0]).toEqual({
-      name: 'wiki',
-      transport: { type: 'http', url: 'https://wiki.example/mcp' },
-      auth: 'oauth',
-    });
-    await click(within(list).getByRole('button', { name: 'Use db' }));
-    fireEvent.change(screen.getByLabelText('API_KEY for db'), { target: { value: 'sk-1' } });
-    await click(within(list).getByRole('button', { name: 'Connect' }));
-    expect(bridge.addedConnections[1]).toEqual({
-      name: 'db',
-      transport: { type: 'stdio', command: 'db-server', args: [], env: {} },
-      auth: 'none',
-      secrets: { API_KEY: 'sk-1' },
-    });
-  });
-
-  it('adds a local command under Advanced', async () => {
+  it('adds a local command with its arguments and environment lines', async () => {
     const bridge = createFakeHostBridge();
     await renderPanel(bridge);
-    fireEvent.click(screen.getByText('Add a connector'));
+    fireEvent.click(screen.getByText('Add an app'));
     fireEvent.click(screen.getByLabelText('A command on this PC'));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Files' } });
     fireEvent.change(screen.getByLabelText('Command'), {
       target: { value: 'npx -y @modelcontextprotocol/server-filesystem C:/notes' },
     });
+    fireEvent.change(screen.getByLabelText(/Environment/), {
+      target: { value: 'API_KEY=${API_KEY}\n' },
+    });
     await click(screen.getByRole('button', { name: 'Add' }));
-    expect(bridge.addedConnections[0]).toEqual({
-      name: 'Files',
-      transport: {
-        type: 'stdio',
+    expect(bridge.addedConnections).toEqual([
+      {
+        name: 'Files',
+        transport: 'stdio',
         command: 'npx',
         args: ['-y', '@modelcontextprotocol/server-filesystem', 'C:/notes'],
-        env: {},
+        env: { API_KEY: '${API_KEY}' },
+        auth: 'none',
       },
-      auth: 'none',
-    });
+    ]);
+    // The brain's answer is read again: the new app shows up.
+    expect(await screen.findByRole('region', { name: 'Files' })).toBeInTheDocument();
   });
 
-  it('adds a remote URL under Advanced, refusing one that is not https', async () => {
+  it('refuses a web address that is not https', async () => {
     const bridge = createFakeHostBridge();
     await renderPanel(bridge);
-    fireEvent.click(screen.getByText('Add a connector'));
+    fireEvent.click(screen.getByText('Add an app'));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Wiki' } });
     fireEvent.change(screen.getByLabelText('Address'), {
       target: { value: 'http://wiki.example' },
     });
     await click(screen.getByRole('button', { name: 'Add' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Use an address that starts with https://');
+    expect(bridge.addedConnections).toEqual([]);
+  });
+
+  it('sends a pasted key once, then clears the field', async () => {
+    const bridge = createFakeHostBridge();
+    await renderPanel(bridge);
+    fireEvent.click(screen.getByText('Add an app'));
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Wiki' } });
     fireEvent.change(screen.getByLabelText('Address'), {
       target: { value: 'https://wiki.example/mcp' },
     });
+    fireEvent.change(screen.getByLabelText('Signs in with'), { target: { value: 'token' } });
+    const key = screen.getByLabelText('Key');
+    expect(key).toHaveAttribute('type', 'password');
+    fireEvent.change(key, { target: { value: 'sk-secret' } });
     await click(screen.getByRole('button', { name: 'Add' }));
-    expect(bridge.addedConnections[0]).toMatchObject({ name: 'Wiki', auth: 'oauth' });
+    expect(bridge.addedConnections).toEqual([
+      {
+        name: 'Wiki',
+        transport: 'http',
+        url: 'https://wiki.example/mcp',
+        auth: 'token',
+        token: 'sk-secret',
+      },
+    ]);
+    expect(screen.getByLabelText('Key')).toHaveValue('');
+    expect(screen.queryByDisplayValue('sk-secret')).toBeNull();
   });
 
-  it('updates live when a connection changes', async () => {
-    const bridge = createFakeHostBridge({ connections: { connections: [LINEAR] } });
+  it('turns an app on or off with its switch', async () => {
+    const bridge = createFakeHostBridge({ apps: [FILES] });
     await renderPanel(bridge);
-    act(() =>
-      bridge.emit({
-        type: 'connections.changed',
-        connections: [
-          { ...LINEAR, status: 'error', tools: [], error: 'Could not connect to Linear.' },
-        ],
-      }),
+    await click(screen.getByRole('switch', { name: 'Scout can use Files' }));
+    expect(bridge.enabledCalls).toEqual([{ id: 'files', enabled: false }]);
+    expect(screen.getByRole('switch', { name: 'Scout can use Files' })).not.toBeChecked();
+  });
+
+  it('Restart asks the brain to restart that app', async () => {
+    const bridge = createFakeHostBridge({ apps: [WIKI] });
+    await renderPanel(bridge);
+    await click(screen.getByRole('button', { name: 'Restart Wiki' }));
+    expect(bridge.restarts).toEqual(['wiki']);
+  });
+
+  it('Remove asks once more, in the page, before removing', async () => {
+    const bridge = createFakeHostBridge({ apps: [FILES] });
+    await renderPanel(bridge);
+    await click(screen.getByRole('button', { name: 'Remove Files' }));
+    expect(bridge.removedConnections).toEqual([]);
+    await click(screen.getByRole('button', { name: 'Yes, remove Files' }));
+    expect(bridge.removedConnections).toEqual(['files']);
+    expect(screen.queryByRole('region', { name: 'Files' })).toBeNull();
+  });
+
+  it('Keep backs out of a Remove', async () => {
+    const bridge = createFakeHostBridge({ apps: [FILES] });
+    await renderPanel(bridge);
+    await click(screen.getByRole('button', { name: 'Remove Files' }));
+    await click(screen.getByRole('button', { name: 'Keep Files' }));
+    expect(bridge.removedConnections).toEqual([]);
+    expect(screen.getByRole('button', { name: 'Remove Files' })).toBeInTheDocument();
+  });
+
+  it('reads the list again when connections change', async () => {
+    const bridge = createFakeHostBridge({ apps: [FILES] });
+    await renderPanel(bridge);
+    bridge.apps = [{ ...FILES, status: 'error', error: 'It stopped.' }];
+    await act(async () => {
+      bridge.emit({ type: 'connections.changed' } as never);
+      await Promise.resolve();
+    });
+    expect(await screen.findByText('It stopped.')).toBeInTheDocument();
+  });
+
+  it('says the brain is offline instead of an empty page', async () => {
+    const bridge = createFakeHostBridge({ listFails: 'brain offline' });
+    render(
+      <HostBridgeProvider bridge={bridge}>
+        <ConnectionsPanel />
+      </HostBridgeProvider>,
     );
-    expect(screen.getByRole('region', { name: 'Linear' })).toHaveTextContent(
-      'Could not connect to Linear.',
-    );
+    expect(await screen.findByRole('status')).toHaveTextContent(/brain isn’t running/i);
+    expect(screen.queryByRole('heading', { name: 'Connections' })).not.toBeNull();
   });
 });

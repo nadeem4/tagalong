@@ -1,7 +1,7 @@
 /**
  * A scripted brain for the e2e suites: a real websocket server speaking contract v1, so the
  * desktop's whole path (BrainClient, turn events, bubble) runs without Python or a model.
- * It answers hello, Home's permission and jobs tools (`call`), then every say with the same short reply. A say that mentions "permission"
+ * It answers hello, Home's permission, jobs and apps tools (`call`), then every say with the same short reply. A say that mentions "permission"
  * first opens one confirm ask and holds the turn until the desktop answers it, as the real
  * brain does. A say that mentions "hand off" replies, then (turn over) opens a job's three
  * asks one after another: a mode, a relayed permission, a question. Every `answer` frame is
@@ -38,6 +38,20 @@ const JOB = {
   started_at: '2026-10-27T10:00:00Z',
   ended_at: null,
 } as Record<string, unknown>;
+
+// One connected app, as the brain's list_apps row.
+const APPS = [
+  {
+    id: 'files',
+    name: 'Files',
+    transport: 'stdio',
+    auth: 'none',
+    enabled: true,
+    status: 'connected',
+    error: '',
+    tools: [{ name: 'files__read', effect: 'look', locked: false }],
+  },
+];
 
 export async function startFakeBrain(): Promise<FakeBrain> {
   // Port 0: a free port, so a real brain on 47321 never collides with the suite.
@@ -161,7 +175,8 @@ export async function startFakeBrain(): Promise<FakeBrain> {
             row.ended_at = '2026-10-27T10:00:30Z';
           }
           notify('changed', { what: 'jobs' });
-        } else if (params.tool === 'list_permissions') value = { tools: permissions };
+        } else if (params.tool === 'list_apps') value = { apps: APPS };
+        else if (params.tool === 'list_permissions') value = { tools: permissions };
         else if (params.tool === 'set_permission') {
           const row = permissions.find((p) => p.name === params.input?.tool);
           if (row !== undefined) row.mode = String(params.input?.mode);

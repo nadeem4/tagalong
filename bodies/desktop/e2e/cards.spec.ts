@@ -173,10 +173,11 @@ test.describe('the connector confirm card', () => {
     await avatar.evaluate(
       (params) =>
         window.tagalong.addConnection!({
-          id: 'notes',
           name: 'Notes',
           auth: 'none',
-          transport: { type: 'stdio', command: params.node, args: [params.server, params.notes] },
+          transport: 'stdio',
+          command: params.node,
+          args: [params.server, params.notes],
         }),
       { node: process.execPath, server, notes },
     );
@@ -184,8 +185,8 @@ test.describe('the connector confirm card', () => {
       .poll(
         () =>
           avatar.evaluate(async () => {
-            const { connections } = await window.tagalong.listConnections!();
-            return connections.find((c) => c.id === 'notes')?.status;
+            const { apps } = await window.tagalong.listConnections!();
+            return apps.find((c) => c.id === 'notes')?.status;
           }),
         { timeout: 30_000 },
       )

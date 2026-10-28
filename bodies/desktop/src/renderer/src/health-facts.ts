@@ -4,7 +4,7 @@
  * exist, each within a time budget, with no model call. Used by the bubble (panel.tsx).
  */
 import { chosenMouth } from '@tagalong/protocol';
-import type { ConnectionsListResult, Expert } from '@tagalong/protocol';
+import type { AppsList, Expert } from '@tagalong/protocol';
 import type { HealthFacts } from '@tagalong/ui';
 import type { ClaudeSignIn, HostView, VoiceModels } from '../../shared/ipc';
 import { scoutBrain } from './settings/brain';
@@ -15,7 +15,7 @@ export interface HealthDeps {
   checkClaudeSignIn(): Promise<ClaudeSignIn>;
   listExperts(): Promise<Expert[]>;
   testExpert(expertId: string): Promise<{ ok: boolean }>;
-  listConnections(): Promise<ConnectionsListResult>;
+  listConnections(): Promise<AppsList>;
   listMicrophones(): Promise<{ id: string }[]>;
   voiceModels(): Promise<VoiceModels>;
   hostsStatus(): Promise<{ extension: boolean }>;
@@ -99,7 +99,7 @@ export async function gatherHealth(deps: HealthDeps): Promise<HealthFacts> {
     connections:
       connections === 'unknown'
         ? 'unknown'
-        : connections.connections.map(({ name, status }) => ({ name, status })),
+        : connections.apps.map(({ name, status }) => ({ name, status })),
     voice:
       view === 'unknown' || settings === null || models === 'unknown'
         ? 'unknown'

@@ -6,8 +6,8 @@ Scout can use the user's own apps (Notion, GitHub, Linear, or any local tool) th
 Context Protocol. The Python brain is the MCP client (the official `mcp` SDK). Each app tool becomes
 one Scout tool: reads run at once, changes ask first, and risky ones ask every time.
 
-Status: the brain side is built (slice 9a). Home's Connections page on the brain is coming in 9b,
-and OAuth sign-in in 9c. Until 9b, apps are managed through the Home calls below.
+Status: the brain side (slice 9a) and Home's Connections page on it (9b) are built. OAuth sign-in
+comes in 9c.
 
 ## Where it lives
 
@@ -107,10 +107,38 @@ and deletes its row and token. A bad request is a plain line, such as `a stdio a
 `the url must use https (http is only allowed for localhost).` or `an app with token sign-in needs
 its token.`.
 
+### Home's Connections page
+
+`bodies/ui/src/home/connections-panel.tsx` shows the brain's `list_apps` and nothing else; the brain
+owns the list and the keys.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#ffffff','primaryTextColor':'#000000','primaryBorderColor':'#000000','lineColor':'#000000'}}}%%
+flowchart LR
+  P["ConnectionsPanel"] -- "listConnections, addConnection, ..." --> I["desktop ipc/connections.ts"]
+  I -- "call list_apps, add_app, set_app_enabled, restart_app, remove_app" --> B["Python brain"]
+  B -- "changed what apps" --> I
+  I -- "connections.changed, no payload" --> P
+  P -- "reads the list again" --> I
+```
+
+- **Rows**: name, "Runs on this PC" or "Web address", a status dot and word (`Connected`,
+  `Connecting`, `Needs sign-in`, `Not working`, `Off`), the tool count, the brain's error line when
+  there is one, the on/off switch, **Restart** and **Remove**. **Remove** asks again inside the page
+  (**Yes, remove** or **Keep**) before `remove_app`.
+- **Add an app** (one form): a command on this PC (command, args, `NAME=value` env lines, which may
+  be `${NAME}`) or a web address (https only; auth none, or a pasted key in a password field). The
+  key is sent once, as `token`, and the field is cleared as soon as the brain accepts it.
+- **After every call** the page reads `list_apps` again, whatever the call answered, and it does the
+  same on `connections.changed`.
+- **Brain away**: the calls reject with `brain offline`; the page says the brain is not running and
+  offers **Try again**.
+- **No sign-in button yet**: an `oauth` app shows its status and error like any other; its sign-in
+  arrives in 9c. The desktop's sign-in call rejects until then.
+- **Per-tool permissions** stay in Settings › Permissions; this page has no tool list.
+
 ### Not built yet
 
-- **9b**: Home's Connections page and the desktop IPC on the brain (the old page still talks to the
-  old engine).
 - **9c**: OAuth sign-in, and the popular and "found in Claude Code" lists.
 
 ## Storage
