@@ -13,6 +13,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
+from brain.apps import AppRow
+
 
 @dataclass(frozen=True)
 class Kind:
@@ -97,6 +99,17 @@ MIGRATIONS = (
         state TEXT, reason TEXT, progress TEXT, result TEXT, session_id TEXT,
         reported INTEGER DEFAULT 0,
         started_at TEXT, ended_at TEXT
+    );
+    """,
+    # Connected apps (MCP servers). config holds transport details as JSON; tokens never live here.
+    """
+    CREATE TABLE apps(
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        transport TEXT NOT NULL CHECK(transport IN ('stdio','http')),
+        config TEXT NOT NULL,
+        auth TEXT NOT NULL CHECK(auth IN ('none','token','oauth')),
+        enabled INTEGER NOT NULL DEFAULT 1
     );
     """,
 )
@@ -245,6 +258,24 @@ class Memory:
             " ON CONFLICT(tool) DO UPDATE SET mode=excluded.mode",
             (tool, mode),
         )
+
+    def list_apps(self) -> list[AppRow]:
+        rows = self._db.execute(
+            "SELECT id, name, transport, config, auth, enabled FROM apps ORDER BY rowid"
+        )
+        return [AppRow(i, n, t, json.loads(c), a, bool(e)) for i, n, t, c, a, e in rows]
+
+    def add_app(self, row: AppRow) -> None:
+        self._db.execute(
+            "INSERT INTO apps(id, name, transport, config, auth, enabled) VALUES (?,?,?,?,?,?)",
+            (row.id, row.name, row.transport, json.dumps(row.config), row.auth, int(row.enabled)),
+        )
+
+    def set_app_enabled(self, app_id: str, enabled: bool) -> None:
+        self._db.execute("UPDATE apps SET enabled=? WHERE id=?", (int(enabled), app_id))
+
+    def remove_app(self, app_id: str) -> None:
+        self._db.execute("DELETE FROM apps WHERE id=?", (app_id,))
 
     def _jobs(self, where: str = "", args: tuple = (), limit: int | None = None) -> list[Job]:
         sql = f"SELECT {_JOB_COLUMNS} FROM jobs {where} ORDER BY rowid DESC"

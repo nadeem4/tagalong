@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+from types import SimpleNamespace
 
 import pytest
 
@@ -499,3 +500,72 @@ def test_home_tools_are_home_audience_contract_records():
         "input_schema": {"type": "object"},
         "effect": "read",
     }
+
+
+# ---- Task 4: connected app tools through the toolbox ----
+
+
+class _AppsStub:
+    def __init__(self, state="connected"):
+        self.state = state
+
+    def ids(self):
+        return ["lin"]
+
+    def name(self, app_id):
+        return "Linear"
+
+    def status(self, app_id):
+        return SimpleNamespace(state=self.state)
+
+    def tools(self, app_id):
+        from mcp.types import Tool, ToolAnnotations
+
+        schema = {"type": "object"}
+        return [
+            Tool(name="get", input_schema=schema, annotations=ToolAnnotations(read_only_hint=True)),
+            Tool(name="update", input_schema=schema),
+            Tool(name="delete_issue", input_schema=schema),
+            Tool(name="x" * 80, input_schema=schema),
+        ]
+
+    async def call(self, app_id, tool, args):
+        from mcp.types import CallToolResult, TextContent
+
+        return CallToolResult(content=[TextContent(type="text", text=f"did {tool}")])
+
+
+def app_box(state="connected", stored=None):
+    from brain.app_tools import AppSource
+
+    return Toolbox([AppSource(_AppsStub(state))], stored)
+
+
+def test_app_tools_listed_and_long_names_cut():
+    names = [t["name"] for t in app_box().model_tools()]
+    assert len(names) == 4  # the 80-char tool is cut to fit, never over 64
+    assert all(len(n) <= 64 for n in names)
+    assert {"lin__delete_issue", "lin__get", "lin__update"} <= set(names)
+
+
+def test_app_tool_default_modes_and_locked():
+    box = app_box()
+    by_name = {s.name: s for s in box.sources[0].specs()}
+    assert box.mode(by_name["lin__get"]) == "auto"
+    assert box.mode(by_name["lin__update"]) == "ask"
+    assert box.mode(by_name["lin__delete_issue"]) == "ask"
+    with pytest.raises(RpcError) as e:
+        box.set_mode("lin__delete_issue", "auto")
+    assert e.value.code == ErrorCode.invalid_params
+    box.set_mode("lin__get", "ask")  # modes reuse the permissions store, no new storage
+
+
+async def test_app_tool_runs_through_the_toolbox():
+    out = await app_box().run(call("lin__get"))
+    assert "did get" in out
+
+
+async def test_offline_app_raises_the_plain_error():
+    with pytest.raises(RpcError) as e:
+        await app_box("error").run(call("lin__get"))
+    assert e.value.message == "Linear is not connected right now."

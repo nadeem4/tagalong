@@ -12,6 +12,7 @@ from functools import partial
 
 from anthropic import AsyncAnthropic
 
+from brain.apps import Apps, TokenFile
 from brain.bodies import Bodies
 from brain.config import load_config, load_env_file, session_id
 from brain.experts import ExpertRun
@@ -43,17 +44,24 @@ async def _run() -> None:
     model = AnthropicModel(AsyncAnthropic(), config.model)
     budget = Budget(config.data_dir / "budget.json", config.daily_budget_usd)
     make_run = partial(ExpertRun, command=config.expert_cmd, timeout=config.expert_timeout)
-    session = Session(model, budget, bodies, config.step_cap, memory, make_run=make_run)
+    tokens = TokenFile(config.data_dir)
+    apps = Apps(memory, bodies.notify, os.environ, tokens=tokens)
+    session = Session(
+        model, budget, bodies, config.step_cap, memory, make_run=make_run, apps=apps, tokens=tokens
+    )
     try:
         server = await start_server(
             config.host, config.port, bodies, session_id(config.data_dir), session
         )
+        await apps.start()  # connects in the background, so a slow app never delays boot
         port = server.sockets[0].getsockname()[1]
         log.info("brain listening on ws://%s:%d", config.host, port)
         await server.serve_forever()
     finally:
-        # Stop the experts while the cancelled loop can still await them, then close memory.
+        # Stop the experts and apps while the cancelled loop can still await them, then close
+        # memory.
         await session.jobs.shutdown()
+        await apps.shutdown()
         memory.close()
 
 

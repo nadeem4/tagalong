@@ -397,7 +397,9 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
     and says it ran late. Results wait while a full-screen app or a call is in front. Click the
     result's line to read it all and ask a follow-up.
 - **Connections**: the apps Scout can use, so "what is on my calendar" or "any reviews waiting on
-  GitHub" just work.
+  GitHub" just work. The Python brain now runs these itself (stdio or http MCP apps, a pasted token
+  for http); Home's page on it and OAuth sign-in are still to come (see
+  [docs/connected-apps.md](docs/connected-apps.md)).
   - **Popular**: Notion and Linear connect with **Connect**, which opens their sign-in in your
     browser. GitHub asks for a personal access token instead.
   - **Found on this PC**: the MCP servers already set up in Claude Code. **Use** adds one; a key
