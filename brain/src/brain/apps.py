@@ -7,6 +7,7 @@ closes in the same task (anyio cancel scopes break when they are closed from ano
 """
 
 import asyncio
+import json
 import logging
 import os
 import re
@@ -14,6 +15,7 @@ import shutil
 from collections.abc import Callable, Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
@@ -131,6 +133,45 @@ def validate_app(params: dict[str, Any], taken: set[str] | frozenset[str] = froz
     return AppRow(slug_for(name, taken), name, transport, checked, auth, True)
 
 
+class TokenFile:
+    """App tokens live in `data_dir/app-tokens.json`, never in the apps table or an error line.
+
+    Kept owner-only (0600) where the platform honours it; on Windows chmod does little, so the
+    file relies on the user's profile folder permissions.
+    """
+
+    def __init__(self, data_dir: Path | str) -> None:
+        self._path = Path(data_dir) / "app-tokens.json"
+
+    def _read(self) -> dict[str, str]:
+        try:
+            data = json.loads(self._path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def _write(self, data: dict[str, str]) -> None:
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self._path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data), encoding="utf-8")
+        try:
+            os.chmod(tmp, 0o600)
+        except OSError:
+            pass
+        os.replace(tmp, self._path)
+
+    def get(self, app_id: str) -> str | None:
+        return self._read().get(app_id)
+
+    def set(self, app_id: str, token: str) -> None:
+        self._write({**self._read(), app_id: token})
+
+    def delete(self, app_id: str) -> None:
+        data = self._read()
+        if data.pop(app_id, None) is not None:
+            self._write(data)
+
+
 @dataclass(frozen=True)
 class AppStatus:
     state: str  # off | connecting | connected | needs-sign-in | error
@@ -171,12 +212,14 @@ class Apps:
         env: Mapping[str, str],
         connect_timeout: float = 30,
         ping_interval: float = 30,
+        tokens: TokenFile | None = None,
     ) -> None:
         self._memory = memory
         self._notify = notify
         self._env = env
         self._connect_timeout = connect_timeout
         self._ping_interval = ping_interval  # how often an idle connection is checked alive
+        self._tokens = tokens
         self._slots: dict[str, _Slot] = {}
 
     async def start(self) -> None:
@@ -228,6 +271,13 @@ class Apps:
             return AppStatus("off")
         return AppStatus(slot.state, slot.error, len(slot.tools))
 
+    def ids(self) -> list[str]:
+        return list(self._slots)
+
+    def name(self, app_id: str) -> str:
+        slot = self._slots.get(app_id)
+        return slot.row.name if slot else app_id
+
     def tools(self, app_id: str) -> list[Tool]:
         slot = self._slots.get(app_id)
         return list(slot.tools) if slot else []
@@ -248,7 +298,7 @@ class Apps:
             raise AppError(f"{slot.row.name} did not answer in time.") from None
         except MCPError as exc:
             if exc.code != CONNECTION_CLOSED:
-                raise AppError(f"{slot.row.name}: {_plain(exc)}") from None
+                raise AppError(f"{slot.row.name} said: {_plain(exc)}") from None
             raise self._drop(slot) from None
         except Exception as exc:
             raise AppError(f"{slot.row.name}: {_plain(exc)}") from None
@@ -330,7 +380,13 @@ class Apps:
             errlog = stack.enter_context(open(os.devnull, "w"))  # noqa: SIM115
             read, write = await stack.enter_async_context(stdio_client(params, errlog=errlog))
         else:
-            client = await stack.enter_async_context(create_mcp_http_client())
+            headers = None
+            if row.auth == "token":
+                token = self._tokens.get(row.id) if self._tokens else None
+                if not token:
+                    raise AppError(f"{row.name} needs its token added again.")
+                headers = {"Authorization": f"Bearer {token}"}
+            client = await stack.enter_async_context(create_mcp_http_client(headers=headers))
             read, write = await stack.enter_async_context(
                 streamable_http_client(row.config["url"], http_client=client)
             )

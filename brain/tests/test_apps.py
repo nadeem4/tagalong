@@ -7,13 +7,15 @@ import socket
 import sqlite3
 import subprocess
 import sys
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 import pytest
 
 from brain import memory
-from brain.apps import AppError, AppRow, Apps, expand_env, slug_for, validate_app
+from brain.apps import AppError, AppRow, Apps, TokenFile, expand_env, slug_for, validate_app
 from brain.memory import Memory
 
 FAKE = str(Path(__file__).parent / "fake_mcp_server.py")
@@ -195,7 +197,7 @@ async def until(predicate, timeout=15.0):
 
 
 class Rig:
-    def __init__(self, rows, env=None, connect_timeout=15, ping_interval=30):
+    def __init__(self, rows, env=None, connect_timeout=15, ping_interval=30, tokens=None):
         self.memory = Memory(":memory:")
         for row in rows:
             self.memory.add_app(row)
@@ -206,6 +208,7 @@ class Rig:
             env or {},
             connect_timeout=connect_timeout,
             ping_interval=ping_interval,
+            tokens=tokens,
         )
 
     async def up(self, app_id, state="connected"):
@@ -454,3 +457,82 @@ async def test_concurrent_restarts_leave_one_process(make, tmp_path):
     await rig.apps.shutdown()
     await until(lambda: not pid_alive(last), timeout=10)
     # The restart that lost the race wrote its own pid first; it must be gone too.
+
+
+# ---- Task 4: token file and bearer header ----
+
+
+def test_token_file_roundtrip(tmp_path):
+    tokens = TokenFile(tmp_path)
+    assert tokens.get("linear") is None
+    tokens.set("linear", "s3cret")
+    assert TokenFile(tmp_path).get("linear") == "s3cret"  # survives reopen
+    tokens.set("other", "x")
+    tokens.delete("linear")
+    assert tokens.get("linear") is None
+    assert tokens.get("other") == "x"
+    tokens.delete("nope")  # deleting an absent token is fine
+
+
+def test_token_never_reaches_the_apps_table(tmp_path, mem):
+    TokenFile(tmp_path).set("linear", "s3cret-token")
+    mem.add_app(validate_app({**good_http(), "auth": "token"}))
+    assert (tmp_path / "app-tokens.json").exists()
+    db = sqlite3.connect(tmp_path / "a.db")
+    dump = "\n".join(db.iterdump())
+    db.close()
+    assert "s3cret-token" not in dump
+
+
+class _Recorder(BaseHTTPRequestHandler):
+    seen: list[str | None] = []
+
+    def do_POST(self):  # noqa: N802
+        _Recorder.seen.append(self.headers.get("Authorization"))
+        self.send_response(500)
+        self.end_headers()
+
+    def log_message(self, *args):
+        pass
+
+
+@pytest.fixture
+def recorder():
+    _Recorder.seen = []
+    server = HTTPServer(("127.0.0.1", 0), _Recorder)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{server.server_port}/mcp"
+    server.shutdown()
+
+
+async def test_http_token_app_sends_bearer(make, recorder, tmp_path):
+    TokenFile(tmp_path).set("web", "tok123")
+    row = AppRow("web", "web", "http", {"url": recorder}, "token", True)
+    rig = make([row], tokens=TokenFile(tmp_path))
+    await rig.apps.start()
+    await rig.up("web", "error")
+    assert _Recorder.seen and set(_Recorder.seen) == {"Bearer tok123"}
+    assert "tok123" not in rig.apps.status("web").error
+
+
+async def test_http_none_auth_sends_no_header(make, recorder):
+    rig = make([AppRow("web", "web", "http", {"url": recorder}, "none", True)])
+    await rig.apps.start()
+    await rig.up("web", "error")
+    assert _Recorder.seen and set(_Recorder.seen) == {None}
+
+
+async def test_missing_token_is_a_plain_error(make, recorder, tmp_path):
+    row = AppRow("web", "Web", "http", {"url": recorder}, "token", True)
+    rig = make([row], tokens=TokenFile(tmp_path))
+    await rig.apps.start()
+    await rig.up("web", "error")
+    assert rig.apps.status("web").error == "Web needs its token added again."
+    assert _Recorder.seen == []
+
+
+async def test_apps_lists_ids_and_names(make):
+    rig = make([stdio_row(enabled=False)])
+    await rig.apps.start()
+    assert rig.apps.ids() == ["fake"]
+    assert rig.apps.name("fake") == "fake"

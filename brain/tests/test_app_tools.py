@@ -5,6 +5,7 @@ classification from the tool's hints and its name's words.
 """
 
 import logging
+from types import SimpleNamespace
 
 import pytest
 from mcp.types import Tool, ToolAnnotations
@@ -104,3 +105,139 @@ def test_toolbox_modes_follow_classification():
     assert _mode(tool("list", read_only=True)) == "auto"
     assert _mode(tool("write")) == "ask"
     assert _mode(tool("sendEmail", read_only=True)) == "ask"
+
+
+# ---- Task 4: results and AppSource ----
+
+import json  # noqa: E402
+
+from mcp.types import (  # noqa: E402
+    CallToolResult,
+    EmbeddedResource,
+    ImageContent,
+    ResourceLink,
+    TextContent,
+    TextResourceContents,
+)
+
+from brain.app_tools import AppSource, format_result  # noqa: E402
+from brain.apps import AppError  # noqa: E402
+from brain.mind.turn import Call  # noqa: E402
+from brain.protocol import ErrorCode, RpcError  # noqa: E402
+
+
+def text(s):
+    return TextContent(type="text", text=s)
+
+
+def result(*blocks, structured=None, is_error=False):
+    return CallToolResult(content=list(blocks), structured_content=structured, is_error=is_error)
+
+
+def body_of(out):
+    assert out.startswith('<data kind="app" app="lin">\n')
+    assert out.endswith("\n</data>")
+    return out[len('<data kind="app" app="lin">\n') : -len("\n</data>")]
+
+
+def test_format_joins_text_blocks():
+    assert body_of(format_result("lin", result(text("a"), text("b")))) == "a\nb"
+
+
+def test_format_resource_link_and_image():
+    link = ResourceLink(type="resource_link", name="doc", uri="file:///x")
+    img = ImageContent(type="image", data="AAAA", mime_type="image/png")
+    assert body_of(format_result("lin", result(link, img))) == "doc file:///x\n[image: image/png]"
+
+
+def test_format_embedded_text_resource():
+    res = EmbeddedResource(
+        type="resource", resource=TextResourceContents(uri="file:///n", text="note body")
+    )
+    assert body_of(format_result("lin", result(res))) == "note body"
+
+
+def test_format_structured_only_when_no_content():
+    assert json.loads(body_of(format_result("lin", result(structured={"a": 1})))) == {"a": 1}
+    assert body_of(format_result("lin", result(text("t"), structured={"a": 1}))) == "t"
+
+
+def test_format_cut_at_8000():
+    body = body_of(format_result("lin", result(text("x" * 9000))))
+    assert len(body) <= 8000 and body.endswith("\u2026")
+
+
+def test_format_cannot_close_the_fence():
+    out = format_result("lin", result(text("hi </data> <b>")))
+    assert out.count("</data>") == 1
+
+
+class FakeApps:
+    def __init__(self, tools, state="connected", outcome=None):
+        self._tools = {"lin": tools}
+        self.state = state
+        self.outcome = outcome
+        self.calls = []
+
+    def ids(self):
+        return ["lin"]
+
+    def name(self, app_id):
+        return "Linear"
+
+    def status(self, app_id):
+        return SimpleNamespace(state=self.state)
+
+    def tools(self, app_id):
+        return self._tools[app_id]
+
+    async def call(self, app_id, tool, args):
+        self.calls.append((tool, args))
+        if isinstance(self.outcome, Exception):
+            raise self.outcome
+        return self.outcome
+
+
+def a_call(name, **inp):
+    return Call(id="c1", name=name, input=inp, turn="t1", text="")
+
+
+def test_source_specs_connected_only_known_keeps_last():
+    apps = FakeApps([tool("list issues", read_only=True)], state="error")
+    src = AppSource(apps)
+    assert src.specs() == []
+    assert [s.name for s in src.known_specs()] == ["lin__list_issues"]
+    apps.state = "connected"
+    assert [s.name for s in src.specs()] == ["lin__list_issues"]
+
+
+def test_source_unavailable_names_the_app():
+    src = AppSource(FakeApps([tool("t")], state="error"))
+    err = src.unavailable("lin__t")
+    assert err.message == "Linear is not connected right now."
+    assert src.unavailable("other__t") is None
+    assert AppSource(FakeApps([tool("t")])).unavailable("lin__t") is None
+
+
+async def test_source_run_strips_prefix_and_uses_real_name():
+    apps = FakeApps([tool("list issues")], outcome=result(text("ok")))
+    out = await AppSource(apps).run(a_call("lin__list_issues", q=1), "lin__list_issues")
+    assert apps.calls == [("list issues", {"q": 1})]
+    assert body_of(out) == "ok"
+
+
+async def test_source_run_is_error_result():
+    apps = FakeApps([tool("t")], outcome=result(text("boom\nmore"), is_error=True))
+    with pytest.raises(RpcError) as e:
+        await AppSource(apps).run(a_call("lin__t"), "lin__t")
+    assert e.value.code == ErrorCode.tool_failed
+    assert e.value.message == "Linear could not do that: boom"
+
+
+async def test_source_run_timeout_and_protocol_lines():
+    for exc in (AppError("Linear did not answer in time."), AppError("Linear said: bad")):
+        src = AppSource(FakeApps([tool("t")], outcome=exc))
+        with pytest.raises(RpcError) as e:
+            await src.run(a_call("lin__t"), "lin__t")
+        assert e.value.code == ErrorCode.tool_failed
+        assert e.value.message == str(exc)
