@@ -10,7 +10,7 @@ import pytest
 
 from brain import main
 from brain.app_tools import AppSource, app_home_tools
-from brain.apps import Apps, TokenFile
+from brain.apps import AppRow, Apps, TokenFile
 from brain.bodies import Bodies
 from brain.memory import Memory
 from brain.mind.turn import Call
@@ -116,6 +116,16 @@ async def test_list_apps_never_leaks_secrets(rig):
         assert secret not in text
     remote = next(a for a in listed["apps"] if a["id"] == "remote")
     assert remote["url"] == "https://host.example/x"
+
+
+@pytest.mark.parametrize("bad", ["http://h:99999/x", "http://[::1/x"])
+async def test_list_apps_survives_a_malformed_url(rig, bad):
+    # A hand-edited row must not hide every other app; its url falls back to "".
+    await rig.call("add_app", stdio())
+    rig.mem.add_app(AppRow("bad", "Bad", "http", {"url": bad}, "none", False))
+    apps = {a["id"]: a for a in (await rig.call("list_apps"))["apps"]}
+    assert set(apps) == {"fake", "bad"}
+    assert apps["bad"]["url"] == ""
 
 
 async def test_add_app_connects_and_lists_tools(rig):

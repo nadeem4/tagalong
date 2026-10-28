@@ -151,12 +151,15 @@ def app_home_tools(
     def target(row) -> dict:
         """Where the app runs, for Home. Never env, tokens or url secrets (userinfo, query)."""
         if row.transport == "http":
-            parts = urlsplit(row.config.get("url", ""))
-            host = parts.hostname or ""
-            if ":" in host:
-                host = f"[{host}]"
-            netloc = f"{host}:{parts.port}" if parts.port else host
-            return {"url": urlunsplit((parts.scheme, netloc, parts.path, "", ""))}
+            try:
+                parts = urlsplit(row.config.get("url", ""))
+                host = parts.hostname or ""
+                if ":" in host:
+                    host = f"[{host}]"
+                netloc = f"{host}:{parts.port}" if parts.port else host
+                return {"url": urlunsplit((parts.scheme, netloc, parts.path, "", ""))}
+            except ValueError:  # one bad row must not hide every app
+                return {"url": ""}
         return {"command": row.config.get("command", ""), "args": row.config.get("args", [])}
 
     async def list_apps(args: dict) -> str:
