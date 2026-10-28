@@ -1,7 +1,7 @@
 """Tests for the SQLite memory store: kinds rules, remember, replace, forget, open/migrate."""
 
 import sqlite3
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
@@ -486,3 +486,77 @@ def test_job_result_capped_at_20000_and_progress_at_2000(mem):
     got = mem.get_job("j")
     assert len(got.result) == 20_000
     assert len(got.progress) == 2000
+
+
+# ---- timers (10b) ----
+
+
+def _t(hour, minute=0, tz=UTC):
+    return datetime(2026, 3, 1, hour, minute, tzinfo=tz)
+
+
+def test_timers_table_exists_after_migration(mem):
+    assert mem.list_timers() == []
+    cols = [r[1] for r in mem._db.execute("PRAGMA table_info(timers)")]
+    assert cols == ["id", "note", "next_at", "repeat_s", "created_at", "fired"]
+
+
+def test_add_and_list_timers_soonest_first(mem):
+    late = mem.add_timer("late", _t(12))
+    soon = mem.add_timer("soon", _t(9), repeat_s=600)
+    assert soon.repeat_s == 600 and late.repeat_s is None and not soon.fired
+    assert soon.next_at == _t(9)
+    assert [t.note for t in mem.list_timers()] == ["soon", "late"]
+    assert mem.get_timer(late.id) == late
+    assert mem.get_timer(999) is None
+
+
+def test_due_timers_returns_only_those_at_or_before_now(mem):
+    mem.add_timer("past", _t(8))
+    mem.add_timer("exact", _t(9))
+    mem.add_timer("future", _t(10))
+    assert [t.note for t in mem.due_timers(_t(9))] == ["past", "exact"]
+
+
+def test_next_at_is_stored_in_utc_and_compares_across_offsets(mem):
+    plus5 = timezone(timedelta(hours=5))
+    t = mem.add_timer("tz", datetime(2026, 3, 1, 14, 0, tzinfo=plus5))
+    assert t.next_at == _t(9)
+    assert t.next_at.utcoffset() == timedelta(0)
+    stored = mem._db.execute("SELECT next_at FROM timers").fetchone()[0]
+    assert stored == "2026-03-01T09:00:00+00:00"
+    assert mem.due_timers(_t(9))[0].id == t.id
+
+
+def test_delete_timer_returns_false_for_unknown_id(mem):
+    t = mem.add_timer("x", _t(9))
+    assert mem.delete_timer(t.id) is True
+    assert mem.delete_timer(t.id) is False
+    assert mem.list_timers() == []
+
+
+def test_set_timer_next_moves_a_timer(mem):
+    t = mem.add_timer("x", _t(9), repeat_s=300)
+    mem.set_timer_next(t.id, _t(11))
+    assert mem.get_timer(t.id).next_at == _t(11)
+    assert mem.due_timers(_t(10)) == []
+
+
+def test_fired_timers_are_excluded_from_due_and_listed_separately(mem):
+    a = mem.add_timer("a", _t(8))
+    mem.add_timer("b", _t(8))
+    mem.mark_timer_fired(a.id)
+    assert [t.note for t in mem.due_timers(_t(9))] == ["b"]
+    assert [t.id for t in mem.fired_timers()] == [a.id]
+    assert mem.get_timer(a.id).fired is True
+
+
+def test_an_older_database_migrates_forward(tmp_path):
+    path = tmp_path / "old.db"
+    db = sqlite3.connect(path, isolation_level=None)
+    n = len(memory.MIGRATIONS) - 1
+    db.executescript("".join(memory.MIGRATIONS[:n]) + f"PRAGMA user_version = {n};")
+    db.close()
+    m = Memory(path)
+    assert m.list_timers() == []
+    m.close()
