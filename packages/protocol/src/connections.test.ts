@@ -133,6 +133,31 @@ describe('AppsList', () => {
     expect(parsed.apps[0]?.tools).toHaveLength(2);
   });
 
+  it('parses where an app runs: url for http, command and args for stdio', () => {
+    const base = { auth: 'none', enabled: true, status: 'connected', error: '', tools: [] };
+    const parsed = AppsList.parse({
+      apps: [
+        {
+          ...base,
+          id: 'wiki',
+          name: 'Wiki',
+          transport: 'http',
+          url: 'https://wiki.example.com/mcp',
+        },
+        {
+          ...base,
+          id: 'files',
+          name: 'Files',
+          transport: 'stdio',
+          command: 'node',
+          args: ['f.js'],
+        },
+      ],
+    });
+    expect(parsed.apps[0]?.url).toBe('https://wiki.example.com/mcp');
+    expect(parsed.apps[1]).toMatchObject({ command: 'node', args: ['f.js'] });
+  });
+
   it('refuses an unknown transport', () => {
     const bad = {
       apps: [

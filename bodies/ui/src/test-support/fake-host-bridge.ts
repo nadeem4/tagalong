@@ -28,6 +28,7 @@ import type {
 } from '@tagalong/protocol';
 import type {
   AskInput,
+  BrainLink,
   ConfirmHandoff,
   HostBridge,
   JobRow,
@@ -153,6 +154,8 @@ export function createFakeHostBridge(
     permissions?: PermissionRow[];
     /** Home's Jobs rows. */
     jobs?: JobRow[];
+    /** The brain link; defaults to online at the default address. */
+    brainLink?: BrainLink;
     /** Whether a calendar link is kept; absent, none is. */
     calendar?: CalendarCheckResult;
     /** Every ask, waiting or answered. */
@@ -540,6 +543,11 @@ export function createFakeHostBridge(
     },
     jobs: (options.jobs ?? []).map((row) => ({ ...row })),
     jobStops,
+    brainLink() {
+      return Promise.resolve(
+        options.brainLink ?? { addr: 'ws://127.0.0.1:47321', status: 'online' },
+      );
+    },
     listJobs() {
       return Promise.resolve(fake.jobs.map((row) => ({ ...row })));
     },

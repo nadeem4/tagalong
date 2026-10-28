@@ -8,6 +8,7 @@
 export { HostBridgeProvider } from './host-bridge';
 export type {
   AskInput,
+  BrainLink,
   ConfirmHandoff,
   HostBridge,
   JobRow,

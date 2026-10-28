@@ -38,6 +38,7 @@ import type {
 } from '@tagalong/protocol';
 import type {
   AskInput,
+  BrainLink,
   DropOffer,
   HostBridge,
   JobRow,
@@ -166,6 +167,7 @@ const bridge: HostBridge = {
   listPermissions: () => ipcRenderer.invoke(IPC.listPermissions) as Promise<PermissionRow[]>,
   setPermission: (tool: string, mode: 'ask' | 'auto') =>
     ipcRenderer.invoke(IPC.setPermission, tool, mode) as Promise<void>,
+  brainLink: () => ipcRenderer.invoke(IPC.brainLink) as Promise<BrainLink>,
   listJobs: () => ipcRenderer.invoke(IPC.listJobs) as Promise<JobRow[]>,
   stopJob: (job: string) => ipcRenderer.invoke(IPC.stopJob, job) as Promise<void>,
   copyText: (text: string) => ipcRenderer.invoke(IPC.copyText, text) as Promise<void>,

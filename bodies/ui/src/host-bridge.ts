@@ -70,6 +70,12 @@ export interface JobRow {
   endedAt: string | null;
 }
 
+/** Where the desktop dials the brain (`ws://host:port`) and whether the link is up. */
+export interface BrainLink {
+  addr: string;
+  status: 'connecting' | 'online' | 'offline' | 'outdated';
+}
+
 /**
  * The core-to-host notifications a panel renders: everything about a turn in flight, a
  * watch, a hand-off to an expert as it goes, connector confirms and routines.
@@ -278,8 +284,11 @@ export interface HostBridge {
   listJobs?(): Promise<JobRow[]>;
   /** Stops one running job; rejects when the brain refuses (already ended, say). */
   stopJob?(job: string): Promise<void>;
+  /** Home's "Where things run": the brain's address and link status. Optional: no brain, no card. */
+  brainLink?(): Promise<BrainLink>;
   /**
-   * The brain changed something Home shows (`memory`, `permissions`): read it again. Returns an
+   * The brain changed something Home shows (`memory`, `permissions`; `link` when the connection
+   * to the brain goes up or down): read it again. Returns an
    * unsubscribe function. Optional: a host without a brain never sends it.
    */
   onBrainChanged?(handler: (what: string) => void): () => void;

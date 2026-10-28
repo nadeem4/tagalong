@@ -121,6 +121,14 @@ describe('BrainClient', () => {
     expect(client.session).toBe('s1');
   });
 
+  it('exposes the address it dials and its link status', async () => {
+    const { client, s } = await online();
+    expect(client.addr).toBe('127.0.0.1:47321');
+    expect(client.link).toBe('online');
+    s.drop();
+    expect(client.link).toBe('offline');
+  });
+
   it('say resolves with the SayResult for its id', async () => {
     const { client, s } = await online();
     const p = client.say({ text: 'hi' });
