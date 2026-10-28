@@ -181,7 +181,7 @@ describe('ConnectionsPanel', () => {
     await renderPanel(bridge);
     bridge.apps = [{ ...FILES, status: 'error', error: 'It stopped.' }];
     await act(async () => {
-      bridge.emit({ type: 'connections.changed' } as never);
+      bridge.emit({ type: 'connections.changed' });
       await Promise.resolve();
     });
     expect(await screen.findByText('It stopped.')).toBeInTheDocument();

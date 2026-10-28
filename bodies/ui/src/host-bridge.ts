@@ -87,7 +87,6 @@ type TurnNotification =
   | 'routine.proposed'
   | 'routine.result'
   | 'routines.changed'
-  | 'connections.changed'
   | 'pet.mood'
   | 'settings.proposed'
   // Only the line about a finished hand-off (with `handoffId`); other lines show beside Scout.
@@ -97,9 +96,13 @@ type TurnNotification =
  * Derived from the protocol catalog rather than restated, so a new turn.* notification
  * lands in the UI as a compile error instead of a silently ignored event.
  */
-export type TurnEvent = {
-  [N in TurnNotification]: { type: N } & NotificationParamsOf<N>;
-}[TurnNotification];
+export type TurnEvent =
+  | {
+      [N in TurnNotification]: { type: N } & NotificationParamsOf<N>;
+    }[TurnNotification]
+  // The brain only says the apps changed; the page reads the list again. The old engine's
+  // payload (packages/core) is not part of the bodies' contract.
+  | { type: 'connections.changed' };
 
 export interface AskInput {
   petId: string;
