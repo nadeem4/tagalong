@@ -1,4 +1,4 @@
-/** Tests for the desktop's body tools: declarations, minimized windows, refusals, notices, timeout. */
+﻿/** Tests for the desktop's body tools: declarations, minimized windows, refusals, notices, timeout. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorCode, Tool } from '@tagalong/contract';
 import type { CaptureExclusions } from '@tagalong/protocol';
@@ -64,6 +64,12 @@ describe('bodyTools declarations', () => {
 });
 
 describe('open_url', () => {
+  it('is declared confirm: true so Always allow can never switch the ask off', () => {
+    const { tools } = setup();
+    expect(tools.find((t) => t.name === 'open_url')?.confirm).toBe(true);
+    expect(tools.filter((t) => t.confirm).length).toBe(1);
+  });
+
   it('opens an https page in the browser', async () => {
     const { run, openExternal } = setup();
     await run('open_url', { url: 'https://auth.example/authorize?x=1' });
