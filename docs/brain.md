@@ -297,7 +297,8 @@ so there is one gate and no second path.
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
 
 The app calls below are Home-only. A refusal is `invalid_params` with a plain line. Each change
-sends `changed {what: "apps"}`, as does every status change of an app.
+sends `changed {what: "apps"}`, as does every status change of an app. Home's Connections page calls
+all five (see [connected-apps.md](connected-apps.md#homes-connections-page)).
 
 | Tool              | Input                                                                                            | Result text (JSON)                                                                                                       |
 | ----------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |

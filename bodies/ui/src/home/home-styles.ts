@@ -57,6 +57,9 @@ export const HOME_CSS = `
 .home-card__row span:last-child { flex: none; color: ${t.color.panelMuted}; }
 .home-dot { width: 8px; height: 8px; border-radius: 50%; background: #2F9E44; }
 .home-dot--warn { background: ${t.color.gold}; }
+.home-dot--err { background: ${t.color.errInk}; }
+.home-dot--off { background: ${t.color.panelMuted}; }
+.tg-chip .home-dot { display: inline-block; }
 .home-note {
   margin: 0; padding: ${t.space.xxl}px; font-size: ${t.fontSize.field}px; line-height: 1.5;
   color: ${t.color.panelMuted};
@@ -154,7 +157,6 @@ export const HOME_CSS = `
 .home-conn__head .tg-error { font-weight: 400; }
 .home-conn__actions { display: flex; align-items: center; gap: ${t.space.md}px; }
 .home-conn__form { display: flex; flex-direction: column; padding-top: ${t.space.md}px; }
-.home-conn__url { overflow-wrap: anywhere; color: ${t.color.panelText}; }
 .home-conns details > summary { cursor: pointer; margin: 0; }
 .home-conns__advanced { margin-top: ${t.space.xl}px; }
 .home-templates {

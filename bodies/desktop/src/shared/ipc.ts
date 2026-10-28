@@ -59,6 +59,7 @@ export const IPC = {
   setConnectionEnabled: 'tagalong:connections:set-enabled',
   signInConnection: 'tagalong:connections:sign-in',
   removeConnection: 'tagalong:connections:remove',
+  restartConnection: 'tagalong:connections:restart',
   listRoutines: 'tagalong:routines:list',
   saveRoutine: 'tagalong:routines:save',
   deleteRoutine: 'tagalong:routines:delete',

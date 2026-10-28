@@ -176,7 +176,7 @@ desktop no longer boots the engine. Read
 | Scout talks: answers read aloud in a calm British voice, made on this computer, or through ElevenLabs with your own key                |                                                                     |
 | Talk to Scout: hold a key, ask out loud, hear a short spoken answer; speech is turned into text on this computer                       |                                                                     |
 | Scout thinks through your Claude Code sign-in, or OpenRouter, Anthropic or an OpenAI-compatible service                                | An "always allow" for changes in connected apps                     |
-| Connections: Scout uses your apps over MCP (Notion, GitHub, Linear, Claude Code's servers); every change asks first                    |                                                                     |
+| Connections: Scout uses your apps over MCP (local commands or web addresses, added in Home); every change asks first                   |                                                                     |
 | Routines: Scout does things on its own, on a schedule or when something happens, and tells you in the bubble, aloud or by notification |                                                                     |
 | Background work: Scout reads, compares and summarises on its own while you keep talking; what finishes comes back together, once       |                                                                     |
 | Spend: Home shows what Scout and the experts used, and an optional daily budget pauses proactive comments and routines                 |                                                                     |
@@ -397,17 +397,18 @@ Tagalong**, **Pause sight**, **Show or hide Scout** and **Quit**. Home holds the
     and says it ran late. Results wait while a full-screen app or a call is in front. Click the
     result's line to read it all and ask a follow-up.
 - **Connections**: the apps Scout can use, so "what is on my calendar" or "any reviews waiting on
-  GitHub" just work. The Python brain now runs these itself (stdio or http MCP apps, a pasted token
-  for http); Home's page on it and OAuth sign-in are still to come (see
+  GitHub" just work. The Python brain runs these itself (stdio or http MCP apps, a pasted key for
+  http) and this page reads and changes them through the brain, so the brain has to be running.
+  Browser sign-in (OAuth) and the Popular and "found in Claude Code" lists are still to come (see
   [docs/connected-apps.md](docs/connected-apps.md)).
-  - **Popular**: Notion and Linear connect with **Connect**, which opens their sign-in in your
-    browser. GitHub asks for a personal access token instead.
-  - **Found on this PC**: the MCP servers already set up in Claude Code. **Use** adds one; a key
-    Claude Code keeps is not copied, so you paste it once.
-  - **Add a connector**: any other MCP server, by its https address or by the command that starts it
-    on this PC.
-  - Each connection shows whether it works, its tools (**Reads** or **Asks first**), an on/off
-    switch, **Sign in again** when needed, and **Disconnect**, which deletes its sign-in.
+  - **Add an app**: any MCP server, by its https address (with a pasted key, or none) or by the
+    command that starts it on this PC (with `NAME=value` lines for its environment; `${NAME}` takes
+    the value from your own environment). A pasted key goes to the brain once and is never shown
+    again.
+  - Each app shows its name, whether it runs on this PC or is a web address, whether it works (with
+    a plain line when it does not), how many tools it has, an on/off switch, **Restart** and
+    **Remove** (which asks once more).
+  - Which of an app's tools ask first is set in Settings › Permissions.
   - Scout reads with an app on its own. Anything that changes something (a tool the app does not
     mark read-only) shows a card in Scout's bubble: which app, what will change, **Allow once** or
     **Cancel**.

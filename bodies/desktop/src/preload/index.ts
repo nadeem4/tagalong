@@ -9,6 +9,8 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { IpcRendererEvent } from 'electron';
 import type {
   ActivityListResult,
+  AppAddParams,
+  AppsList,
   AsksListResult,
   ExperienceGetResult,
   ExperienceListResult,
@@ -16,9 +18,6 @@ import type {
   SelfListResult,
   CalendarCheckResult,
   CatalogStatus,
-  ConnectionState,
-  ConnectionsAddParams,
-  ConnectionsListResult,
   ContextSnapshot,
   EarsEvent,
   Expert,
@@ -131,15 +130,15 @@ const bridge: HostBridge = {
   answerAsk: (id: string, decision: 'approve' | 'decline') =>
     ipcRenderer.invoke(IPC.answerAsk, id, decision) as Promise<boolean>,
   openAsk: (id: string) => ipcRenderer.invoke(IPC.openAsk, id) as Promise<boolean>,
-  listConnections: () => ipcRenderer.invoke(IPC.listConnections) as Promise<ConnectionsListResult>,
-  addConnection: (params: ConnectionsAddParams) =>
-    ipcRenderer.invoke(IPC.addConnection, params) as Promise<ConnectionState>,
+  listConnections: () => ipcRenderer.invoke(IPC.listConnections) as Promise<AppsList>,
+  addConnection: (params: AppAddParams) =>
+    ipcRenderer.invoke(IPC.addConnection, params) as Promise<{ id: string }>,
   setConnectionEnabled: (id: string, enabled: boolean) =>
-    ipcRenderer.invoke(IPC.setConnectionEnabled, id, enabled) as Promise<ConnectionState>,
-  signInConnection: (id: string) =>
-    ipcRenderer.invoke(IPC.signInConnection, id) as Promise<ConnectionState>,
+    ipcRenderer.invoke(IPC.setConnectionEnabled, id, enabled) as Promise<unknown>,
+  restartConnection: (id: string) =>
+    ipcRenderer.invoke(IPC.restartConnection, id) as Promise<unknown>,
   removeConnection: (id: string) =>
-    ipcRenderer.invoke(IPC.removeConnection, id) as Promise<boolean>,
+    ipcRenderer.invoke(IPC.removeConnection, id) as Promise<unknown>,
   listRoutines: () => ipcRenderer.invoke(IPC.listRoutines) as Promise<RoutineView[]>,
   saveRoutine: (routine: RoutineDraftInput & { id?: string }) =>
     ipcRenderer.invoke(IPC.saveRoutine, routine) as Promise<RoutineView>,

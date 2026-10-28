@@ -104,10 +104,6 @@ export const SETTINGS_CSS = `
 .tg-choice:has(input:checked) { border-color: ${t.color.gold}; background: ${t.color.panelTile}; }
 .tg-choice:has(input:focus-visible) { outline: ${t.size.focusRing}px solid ${t.color.gold}; outline-offset: ${t.size.focusOffset}px; }
 .tg-choice input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-.tg-tools { list-style: none; margin: 0; padding: 0; }
-.tg-tools li { display: flex; align-items: center; gap: ${t.space.lg}px; padding: ${t.space.md}px 0; border-bottom: 1px solid ${t.color.panelLine}; }
-.tg-tools li > span { flex: 1; }
-.tg-tools small { color: ${t.color.panelMuted}; font-size: ${t.fontSize.small}px; }
 .tg-switch {
   display: inline-flex; align-items: center; gap: ${t.space.xs}px; min-width: 64px; height: 32px;
   padding: 0 ${t.space.lg}px; border-radius: ${t.radius.field}px; border: 1px solid ${t.color.panelMuted};

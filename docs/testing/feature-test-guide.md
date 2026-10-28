@@ -436,11 +436,11 @@ does not work). Asking Scout ("list my jobs", "stop that job") also works.
 
 ## Connected apps on the Python brain (real brain, a real stdio app)
 
-Home's Connections page is not on the brain yet (9b), so this drives the brain's Home calls
-(`list_apps`, `add_app`, `set_app_enabled`, `remove_app`, `restart_app`) with `call` over the
-websocket, for example from a small script. It needs the brain running and a real stdio MCP
-server you can start with a command, such as `npx -y @modelcontextprotocol/server-filesystem
-C:\path\to\test-folder`, plus the desktop to talk to Scout.
+Home's Connections page drives the brain's Home calls (`list_apps`, `add_app`, `set_app_enabled`,
+`remove_app`, `restart_app`), so use it for the steps below; the calls named in each step are what
+the page sends. It needs the brain running and a real stdio MCP server you can start with a
+command, such as `npx -y @modelcontextprotocol/server-filesystem C:\path\to\test-folder`, plus the
+desktop to talk to Scout. The page's own checks are in [Connections](#connections-your-apps-over-mcp).
 
 1. **Action:** `add_app {name: "Files", transport: "stdio", command: "npx", args: ["-y",
 "@modelcontextprotocol/server-filesystem", "C:\\path\\to\\test-folder"]}`, then `list_apps`.
@@ -1317,61 +1317,59 @@ Run with a real microphone and without `TAGALONG_FAKE_STT`. Switch **Always list
 These use real apps and a real provider, so they are yours to run. Scout must think with a provider
 that calls tools (your Claude sign-in or OpenRouter + Claude).
 
-### C1. Connect Notion
+### C1. Add a local app
 
-- [ ] Home → **Connections** → Popular → **Connect Notion**. Your browser opens Notion's sign-in;
-      the page says **Finish signing in to Notion in your browser.**
-- [ ] Approve in Notion. The browser shows "You are signed in"; Home lists Notion as **Connected**
-      with its tools, each **Reads** or **Asks first**.
-- [ ] Restart Tagalong. Notion connects again with no browser.
-- [ ] Remove Notion, connect it again and press **Cancel** (or Deny) on Notion's page. Home says the
-      sign-in did not work straight away, not after five minutes.
+The brain must be running. Browser sign-in (OAuth) is not built yet (9c), so the apps here use a
+command or a pasted key.
 
-### C2. Read with Notion
+- [ ] Home → **Connections** → **Add an app** → **A command on this PC**, name `Files`, command
+      `npx -y @modelcontextprotocol/server-filesystem C:/Users/<you>/Documents` → **Add**. The page
+      says **Files added.** and lists Files as **Runs on this PC**, then **Connected** with a tool
+      count.
+- [ ] Restart Tagalong (and the brain). Files connects again by itself.
+- [ ] A command with `NAME=value` lines in **Environment** (one holding `${NAME}`) adds without error;
+      a line without `=` is refused with a plain message.
+- [ ] An address that is not https is refused with a plain message, before anything is sent.
 
-- [ ] Ask Scout "look at my launch plan in Notion" (a page you have). Scout answers from the page with
-      no card. Activity shows "Scout read Notion" with the tool name.
+### C2. Read with an app
+
+- [ ] Ask Scout "what files are in my Documents folder?". Scout answers from the app with no card.
+      Activity shows "Scout read Files" with the tool name.
 
 ### C3. A change asks first
 
-- [ ] Ask Scout "add a page in Notion called Tagalong test". The bubble comes up with a card: Notion,
-      what will change, the title. Nothing has changed in Notion yet.
-- [ ] Press **Cancel**. Scout says nothing was changed; Activity shows "Scout did not change Notion".
-- [ ] Ask again and press **Allow once**. The page appears in Notion; Activity shows "Scout changed
-      Notion".
+- [ ] Ask Scout to write a new file called `tagalong-test.txt`. The bubble comes up with a card: the
+      app, what will change. Nothing has changed yet.
+- [ ] Press **Cancel**. Scout says nothing was changed.
+- [ ] Ask again and press **Allow once**. The file appears.
 - [ ] Ask again and leave the card. Home › **Waiting on you** lists it, with when it ends (an hour
       after it was asked). The checks for answering from Home and for a restart are in
       [Waiting on you](#waiting-on-you).
-- [ ] Ask for a page with a long body (a few paragraphs). The card shows the whole body, scrolling
-      inside the card, never cut off with "...".
 
-### C4. GitHub with a token
+### C4. A web app with a pasted key
 
-- [ ] **Connect GitHub**, paste a personal access token (read-only is enough), **Connect**. GitHub
-      shows **Connected**.
-- [ ] Ask "any reviews waiting for me on GitHub?". Scout lists them.
-- [ ] Settings files and `tagalong.db` do not contain the token (search the data folder for it).
+- [ ] **Add an app** → **An address on the web**, name, an https MCP address, **Signs in with** →
+      **A key you paste**, paste the key, **Add**. The Key field is empty again straight away and
+      shows dots while you type. The app shows **Connected**.
+- [ ] Settings files, `tagalong.db` and the page do not contain the key; only `app-tokens.json` in
+      the brain's data folder does.
 
-### C5. Found on this PC
+### C5. Switch, Restart, Remove
 
-- [ ] With a server set up in Claude Code (`claude mcp add ...`), it is listed under **Found on this
-      PC** with "From Claude Code". **Use** adds it; one with a key in its env asks for the key first.
-- [ ] A server already connected is not listed again.
+- [ ] Switch an app **Off**. Its word reads **Off**, Scout no longer uses it and says so if you ask.
+      Switch it **On**: it connects again.
+- [ ] End the app's process (Task Manager). Within about 30 seconds its row says **Not working** and
+      why. **Restart** brings it back to **Connected**.
+- [ ] **Remove** shows **Yes, remove** and **Keep** on the page (no browser dialog). **Keep** backs
+      out; **Yes, remove** removes the app and its key, and the page says **Files removed.**
 
-### C6. Add a connector
-
-- [ ] **Add a connector** → **A command on this PC**, name `Files`, command
-      `npx -y @modelcontextprotocol/server-filesystem C:/Users/<you>/Documents` → **Add**. It connects
-      and lists its tools.
-- [ ] An address that is not https is refused with a plain message.
-
-### C7. Failures stay plain
+### C6. Failures stay plain
 
 - [ ] Add a command that does not exist. Its row says **Not working** and why; Scout still answers
       other questions.
-- [ ] Switch a connection **Off**. Scout no longer uses it, and says so if you ask for it.
-- [ ] **Disconnect** → **Disconnect ... and delete its sign-in**. It is gone; connecting again asks
-      you to sign in again.
+- [ ] Stop the brain and open Connections. The page says the brain isn't running and offers **Try
+      again**; start the brain and press it, and the apps come back.
+- [ ] An app with browser sign-in shows its status like any other and has no sign-in button.
 
 ## Waiting on you
 
@@ -1857,7 +1855,7 @@ brain routes them to the model, check them in the brain's logs or a contract-v1 
 
 ### B.1. A failing `npm test` filed on GitHub _(real brain)_
 
-1. **Setup:** connect GitHub (Home → Connections → GitHub, with a token that can open issues in a
+1. **Setup:** connect GitHub (Home → Connections → Add an app, an https MCP address with a key that can open issues in a
    test repo you own). In a terminal, run `npm test` in a project with one failing test, so the
    failure is on screen. The terminal's title or text should show the repo, or name it when you ask.
 2. **Action:** ask Scout "file this as a bug in <owner>/<repo>". **Expected:** the confirm card
@@ -2049,7 +2047,7 @@ Privacy, add the title pattern `*Bank*` to your exclusions (used in X.12; remove
 
 ## What needs me? _(real brain)_
 
-Needs GitHub connected (Home → Connections → GitHub, with a token) and a real provider for Scout.
+Needs GitHub connected (Home → Connections → Add an app, with a key) and a real provider for Scout.
 
 1. Ask Scout "What needs me?". The answer is one list grouped by app, oldest first, one line each
    with how long it has waited: pull requests asking for your review and issues assigned to you.
