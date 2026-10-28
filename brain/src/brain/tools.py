@@ -1,16 +1,18 @@
 """The brain's own tools as specs plus handlers for a BrainSource.
 
-Scout's memory tools (remember, recall, forget) and Home-only tools (audience {"home"}, never
-offered to the model) that return one JSON string. Refusals and bad arguments raise; run_turn
-turns any exception into an is_error tool result the model reads. Handlers that change what
-Home shows send `changed` through the notify they are given.
+Scout's memory tools (remember, recall, forget), the Claude Code hand-off tools, and Home-only
+tools (audience {"home"}, never offered to the model) that return one JSON string. Refusals
+and bad arguments raise; run_turn turns any exception into an is_error tool result the model
+reads. Handlers that change what Home shows send `changed` through the notify they are given.
 """
 
 import json
 import re
 from collections.abc import Callable
+from dataclasses import asdict
 
 from brain.guardrails import Budget
+from brain.jobs import JobError, Jobs
 from brain.memory import KINDS, Hit, Memory, MemoryRefused
 from brain.protocol import ErrorCode, RpcError
 from brain.toolbox import Handler, Toolbox, ToolSpec
@@ -173,6 +175,103 @@ def brain_tools(
                 effect="read",
             ),
             list_memories,
+        ),
+    ]
+
+
+def expert_tools(jobs: Jobs) -> list[tuple[ToolSpec, Handler]]:
+    """Scout's hand-off tools. A refusal (JobError) is a plain line for Scout; Home's stop_job
+    raises it as an RpcError so the body shows the same words."""
+
+    async def hand_off(args: dict) -> str:
+        _need("hand_off", args, "task", "folder")
+        try:
+            job_id = await jobs.start(args["task"], args["folder"])
+        except JobError as err:
+            return str(err)
+        return f"job {job_id} started"
+
+    async def tell_expert(args: dict) -> str:
+        _need("tell_expert", args, "job", "note")
+        try:
+            jobs.tell(args["job"], args["note"])
+        except JobError as err:
+            return str(err)
+        return f"note queued for job {args['job']}"
+
+    async def list_jobs(args: dict) -> str:
+        return json.dumps({"jobs": [asdict(j) for j in jobs.list()]})
+
+    async def stop_job(args: dict) -> str:
+        if not args.get("job"):
+            raise RpcError(ErrorCode.invalid_params, "stop_job needs job.")
+        try:
+            await jobs.stop(args["job"])
+        except JobError as err:
+            raise RpcError(ErrorCode.invalid_params, str(err)) from err
+        return json.dumps({"job": args["job"], "stopping": True})
+
+    scout, both = frozenset({"scout"}), frozenset({"scout", "home"})
+    job_id = {"type": "string", "description": "The job id from hand_off or list_jobs."}
+    return [
+        (
+            ToolSpec(
+                "hand_off",
+                "Hand a task to Claude Code, which works in a folder on the user's computer and "
+                "reports back when done. Use the folder the user named; if they did not name "
+                "one, ask them which folder first, never guess. The user picks how much freedom "
+                "Claude Code gets; this tool asks them itself. Returns the job id once started.",
+                {
+                    "type": "object",
+                    "properties": {
+                        "task": {"type": "string", "description": "What Claude Code should do."},
+                        "folder": {"type": "string", "description": "Absolute folder path."},
+                    },
+                    "required": ["task", "folder"],
+                },
+                scout,
+                effect="change",
+                self_asks=True,
+            ),
+            hand_off,
+        ),
+        (
+            ToolSpec(
+                "tell_expert",
+                "Send a follow-up note to a running Claude Code job. It is read after the "
+                "current step finishes.",
+                {
+                    "type": "object",
+                    "properties": {"job": job_id, "note": {"type": "string"}},
+                    "required": ["job", "note"],
+                },
+                scout,
+                effect="change",
+                default_mode="auto",
+            ),
+            tell_expert,
+        ),
+        (
+            ToolSpec(
+                "list_jobs",
+                "Recent Claude Code jobs (the last 20), newest first, with state and latest "
+                "progress.",
+                {"type": "object", "properties": {}},
+                both,
+                effect="read",
+            ),
+            list_jobs,
+        ),
+        (
+            ToolSpec(
+                "stop_job",
+                "Stop a running Claude Code job.",
+                {"type": "object", "properties": {"job": job_id}, "required": ["job"]},
+                both,
+                effect="change",
+                default_mode="auto",
+            ),
+            stop_job,
         ),
     ]
 

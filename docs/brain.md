@@ -285,13 +285,20 @@ so there is one gate and no second path.
 | `spend_today`      | `{}`                         | `{"spent_usd": float, "limit_usd": float}`                                                                     |
 | `list_permissions` | `{}`                         | `{"tools": [{"name", "description", "effect", "mode", "locked", "online"}]}`, sorted by name, Scout tools only |
 | `set_permission`   | `{"tool": str, "mode": str}` | `{"tool", "mode"}`; `mode` is `ask` or `auto`                                                                  |
+| `list_jobs`        | `{}`                         | `{"jobs": [job rows]}`, last 20, newest first (see [Experts](#experts)); Scout may call it too                 |
+| `stop_job`         | `{"job": str}`               | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)             |
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
 
-## Experts runner
+## Experts
+
+Scout can hand a task to Claude Code, which works in a folder as a job. `experts.py` runs it,
+`jobs.py` manages the jobs, and four tools put it in Scout's and Home's hands.
+
+### Runner
 
 `experts.py` holds `ExpertRun`, the one object that drives Claude Code in a folder over the Agent
-Client Protocol. It is not wired into Scout yet. `start(folder)` spawns the adapter, runs
+Client Protocol. `Jobs` creates one per job. `start(folder)` spawns the adapter, runs
 `initialize` (advertising `elicitation.form` so questions work) and `session/new`, and returns
 the modes. `begin(mode, task)` sets the mode and sends the first prompt without waiting. `note(text)`
 queues a follow-up prompt for after the current turn and returns `False` once the run has ended.
@@ -316,11 +323,51 @@ startup limit (an adapter that never answers is killed and reported). `stop()` a
 safe from any state, including from inside `on_end`; teardown is shared, so `on_end` fires once,
 after the process is gone. A stop answers any pending permission or question as cancelled.
 
+Claude Code runs on the user's own login. It must be logged in, or the first hand-off fails with
+the adapter's own message (for example that auth is required).
+
+### Jobs and tools
+
+`Jobs` (`jobs.py`) owns the running `ExpertRun`s and the rows of the `jobs` table (columns under
+[Permissions and asks](#permissions-and-asks)). `Session` builds it with the `ExpertRun` factory
+that `main.py` configures (`TAGALONG_EXPERT_CMD`, `TAGALONG_EXPERT_TIMEOUT_S`) and calls
+`startup()`, which turns rows left `running` into `stopped` with reason `brain restarted`.
+
+| Tool          | Audience    | Effect | Gate                      | Does                                                                         |
+| ------------- | ----------- | ------ | ------------------------- | ---------------------------------------------------------------------------- |
+| `hand_off`    | scout       | change | asks itself (`self_asks`) | `{task, folder}`. Returns `job <id> started`, or the plain reason it did not |
+| `tell_expert` | scout       | change | `auto`                    | `{job, note}`. Queues a follow-up prompt for a running job                   |
+| `list_jobs`   | scout, home | read   | `auto`                    | `{"jobs": [...]}`, the last 20 rows newest first, with the latest progress   |
+| `stop_job`    | scout, home | change | `auto`                    | `{job}`. Stops a running job; Home gets `{"job", "stopping": true}`          |
+
+Refusals (`JobError`) are plain sentences: for `hand_off` and `tell_expert` they are the tool's
+result line; for `stop_job` they are an `invalid_params` `RpcError` with the same words, so Home
+shows them as Scout does.
+
+- **Hand-off ask.** `hand_off` needs an absolute folder that exists ("no folder at <path>"
+  otherwise). It starts the adapter and opens an ask whose text is the task, with the folder as
+  its input and the modes the adapter reports plus `cancel` as options. A mode answer starts the
+  job. `cancel`, no answer in 5 minutes, or nobody online closes the adapter and returns "not
+  started". The tool asks for itself, so the gate adds no allow or deny ask, and Home cannot
+  change its mode.
+- **Relayed asks.** Claude Code's permission requests and questions become turn-less asks
+  (`Asks.open`) tied to the job and kept open as long as it lives. A stopped or finished job
+  closes its open asks with `cancelled`. Each answer sends `changed {what: "jobs"}`.
+- **Limits.** At most 2 jobs run at once (a hand-off waiting on its ask holds a slot); a third
+  fails naming the running jobs. A result is capped at 20,000 characters. The run limit is
+  `TAGALONG_EXPERT_TIMEOUT_S` (30 minutes by default).
+- **Changed.** Every state change sends `changed {what: "jobs"}`. Progress text is throttled to
+  one per 2 seconds, with no trailing notify, so a body may show slightly stale progress until
+  the next change.
+- **Restart.** Jobs do not resume. A brain restart marks running jobs `stopped`.
+
 ## Not built yet
 
-| Row   | Brings                                         |
-| ----- | ---------------------------------------------- |
-| Later | Live-state replay of open turns after `resync` |
+| Row   | Brings                                                                     |
+| ----- | -------------------------------------------------------------------------- |
+| 8a3   | The finish turn: Scout reports a finished job, and unreported jobs requeue |
+| 8b    | Home's Jobs panel and the desktop checks of the hand-off and relayed asks  |
+| Later | Live-state replay of open turns after `resync`                             |
 
 ## Tests
 

@@ -10,16 +10,20 @@ import logging
 import uuid
 from collections.abc import Callable
 from datetime import datetime
+from functools import partial
 
 from brain.asks import Asks
 from brain.bodies import Bodies
+from brain.config import DEFAULT_EXPERT_CMD, DEFAULT_EXPERT_TIMEOUT_S
+from brain.experts import ExpertRun
+from brain.jobs import Jobs
 from brain.memory import Memory, _compaction_text
 from brain.mind.prompt import render_know, system_prompt, user_content
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Model, run_turn
 from brain.protocol import SayParams, SayResult, Tool
 from brain.toolbox import BodySource, BrainSource, Toolbox
-from brain.tools import brain_tools, home_tools
+from brain.tools import brain_tools, expert_tools, home_tools
 
 log = logging.getLogger("brain")
 
@@ -33,6 +37,7 @@ class Session:
         step_cap: int,
         memory: Memory,
         now: Callable[[], datetime] = lambda: datetime.now().astimezone(),
+        make_run: Callable[..., ExpertRun] | None = None,
     ) -> None:
         self._model = model
         self._budget = budget
@@ -41,7 +46,17 @@ class Session:
         self._memory = memory
         self._asks = Asks(bodies)
         notify = bodies.notify
-        tools = brain_tools(memory, notify) + home_tools(budget, lambda: self.toolbox)
+        # main passes the configured command and timeout; the defaults keep tests short.
+        make_run = make_run or partial(
+            ExpertRun, command=[DEFAULT_EXPERT_CMD], timeout=DEFAULT_EXPERT_TIMEOUT_S
+        )
+        self.jobs = Jobs(memory, self._asks, notify, make_run)
+        self.jobs.startup()  # rows left running by a dead brain become stopped
+        tools = (
+            brain_tools(memory, notify)
+            + home_tools(budget, lambda: self.toolbox)
+            + expert_tools(self.jobs)
+        )
 
         def save_mode(name: str, mode: str) -> None:
             # Every save (Home's set_permission or an "always" answer) refreshes open panels.

@@ -8,11 +8,13 @@ import asyncio
 import logging
 import os
 import sys
+from functools import partial
 
 from anthropic import AsyncAnthropic
 
 from brain.bodies import Bodies
 from brain.config import load_config, load_env_file, session_id
+from brain.experts import ExpertRun
 from brain.guardrails import Budget
 from brain.memory import Memory
 from brain.mind.turn import AnthropicModel
@@ -40,7 +42,8 @@ async def _run() -> None:
     bodies = Bodies()
     model = AnthropicModel(AsyncAnthropic(), config.model)
     budget = Budget(config.data_dir / "budget.json", config.daily_budget_usd)
-    session = Session(model, budget, bodies, config.step_cap, memory)
+    make_run = partial(ExpertRun, command=config.expert_cmd, timeout=config.expert_timeout)
+    session = Session(model, budget, bodies, config.step_cap, memory, make_run=make_run)
     try:
         server = await start_server(
             config.host, config.port, bodies, session_id(config.data_dir), session

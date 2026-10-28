@@ -58,6 +58,10 @@ pnpm install
 pnpm dev:desktop
 ```
 
+To let Scout hand work to Claude Code, install its adapter once with
+`npm install -g @agentclientprotocol/claude-agent-acp` (Node 22 or newer). Claude Code must be
+logged in: it runs on your own login, not the API key.
+
 Scout remembers instructions and facts about you across restarts, in `~/.tagalong/tagalong.db`, and picks the conversation back up after a restart. Scout can also use the desktop's window tools.
 
 If the brain is not running, the desktop still opens and shows "Scout's brain is not running." It
