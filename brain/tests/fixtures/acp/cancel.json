@@ -1,0 +1,234 @@
+{
+  "description": "session/cancel while a Bash tool call runs: tool_call_update failed, then session/prompt result with stopReason cancelled.",
+  "frames": [
+    {
+      "dir": "client->agent",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session/prompt",
+        "params": {
+          "sessionId": "sess-1",
+          "prompt": [
+            {
+              "text": "Count slowly from 1 to 200, one number per line, using the Bash tool with sleep 1 between each number.",
+              "type": "text"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "Bash"
+              }
+            },
+            "toolCallId": "toolu_015rQuf6HdxhUXKZnXz13Y7D",
+            "sessionUpdate": "tool_call",
+            "name": "Bash",
+            "rawInput": {},
+            "status": "pending",
+            "title": "Terminal",
+            "kind": "execute",
+            "content": []
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "Bash"
+              }
+            },
+            "toolCallId": "toolu_015rQuf6HdxhUXKZnXz13Y7D",
+            "sessionUpdate": "tool_call_update",
+            "rawInput": {
+              "command": "for i in $(seq 1 200); do echo $i; sleep 1; done"
+            },
+            "title": "for i in $(seq 1 200); do echo $i; sleep 1; done"
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "Bash"
+              }
+            },
+            "toolCallId": "toolu_015rQuf6HdxhUXKZnXz13Y7D",
+            "sessionUpdate": "tool_call_update",
+            "rawInput": {
+              "command": "for i in $(seq 1 200); do echo $i; sleep 1; done",
+              "description": "Count from 1 to 200, one second apart"
+            }
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "Bash"
+              }
+            },
+            "toolCallId": "toolu_015rQuf6HdxhUXKZnXz13Y7D",
+            "sessionUpdate": "tool_call_update",
+            "rawInput": {
+              "command": "for i in $(seq 1 200); do echo $i; sleep 1; done",
+              "description": "Count from 1 to 200, one second apart",
+              "timeout": 260000
+            },
+            "content": [
+              {
+                "type": "content",
+                "content": {
+                  "type": "text",
+                  "text": "Count from 1 to 200, one second apart"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "method": "session/request_permission",
+        "params": {
+          "toolCall": {
+            "toolCallId": "toolu_015rQuf6HdxhUXKZnXz13Y7D",
+            "name": "Bash",
+            "status": "pending",
+            "rawInput": {
+              "command": "for i in $(seq 1 200); do echo $i; sleep 1; done",
+              "timeout": 260000,
+              "description": "Count from 1 to 200, one second apart"
+            },
+            "title": "for i in $(seq 1 200); do echo $i; sleep 1; done",
+            "kind": "execute",
+            "content": [
+              {
+                "type": "content",
+                "content": {
+                  "type": "text",
+                  "text": "Count from 1 to 200, one second apart"
+                }
+              }
+            ]
+          },
+          "options": [
+            {
+              "optionId": "allow-once",
+              "name": "Yes",
+              "kind": "allow_once"
+            },
+            {
+              "optionId": "reject",
+              "name": "No",
+              "kind": "reject_once"
+            }
+          ],
+          "sessionId": "sess-1"
+        }
+      }
+    },
+    {
+      "dir": "client->agent",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 0,
+        "result": {
+          "outcome": {
+            "optionId": "allow-once",
+            "outcome": "selected"
+          }
+        }
+      }
+    },
+    {
+      "dir": "client->agent",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/cancel",
+        "params": {
+          "sessionId": "sess-1"
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "method": "session/update",
+        "params": {
+          "sessionId": "sess-1",
+          "update": {
+            "_meta": {
+              "claudeCode": {
+                "toolName": "Bash",
+                "nonExecutionKind": "user-rejected"
+              }
+            },
+            "toolCallId": "toolu_015rQuf6HdxhUXKZnXz13Y7D",
+            "sessionUpdate": "tool_call_update",
+            "status": "failed",
+            "rawOutput": "The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.\n\nNote: The user's next message may contain a correction or preference. Pay close attention \u2014 if they explain what went wrong or how they'd prefer you to work, consider saving that to memory for future sessions.",
+            "content": [
+              {
+                "type": "content",
+                "content": {
+                  "type": "text",
+                  "text": "```\nThe user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.\n\nNote: The user's next message may contain a correction or preference. Pay close attention \u2014 if they explain what went wrong or how they'd prefer you to work, consider saving that to memory for future sessions.\n```"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "dir": "agent->client",
+      "msg": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "stopReason": "cancelled"
+        }
+      }
+    }
+  ]
+}

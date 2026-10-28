@@ -20,14 +20,16 @@ It logs one line, `brain listening on ws://127.0.0.1:47321`, and runs until Ctrl
 It needs an Anthropic key. With no `ANTHROPIC_API_KEY` in the environment or in
 `<TAGALONG_HOME>/.env`, it logs one line saying where to put it and exits with status 1.
 
-| Variable                    | Default           | Meaning                                                            |
-| --------------------------- | ----------------- | ------------------------------------------------------------------ |
-| `TAGALONG_BRAIN_ADDR`       | `127.0.0.1:47321` | `host:port` to listen on. Port `0` picks a free port               |
-| `TAGALONG_HOME`             | `~/.tagalong`     | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env` |
-| `TAGALONG_MODEL`            | `claude-opus-5-5` | Model Scout thinks with                                            |
-| `TAGALONG_DAILY_BUDGET_USD` | `5`               | Most Scout may spend per local day, in USD                         |
-| `TAGALONG_STEP_CAP`         | `25`              | Most model calls in one turn                                       |
-| `ANTHROPIC_API_KEY`         | none, required    | Anthropic key                                                      |
+| Variable                    | Default            | Meaning                                                                   |
+| --------------------------- | ------------------ | ------------------------------------------------------------------------- |
+| `TAGALONG_BRAIN_ADDR`       | `127.0.0.1:47321`  | `host:port` to listen on. Port `0` picks a free port                      |
+| `TAGALONG_HOME`             | `~/.tagalong`      | Data folder. Holds `session`, `budget.json`, `tagalong.db`, `.env`        |
+| `TAGALONG_MODEL`            | `claude-opus-5-5`  | Model Scout thinks with                                                   |
+| `TAGALONG_DAILY_BUDGET_USD` | `5`                | Most Scout may spend per local day, in USD                                |
+| `TAGALONG_STEP_CAP`         | `25`               | Most model calls in one turn                                              |
+| `TAGALONG_EXPERT_CMD`       | `claude-agent-acp` | Command that starts the Claude Code ACP adapter (split like a shell line) |
+| `TAGALONG_EXPERT_TIMEOUT_S` | `1800`             | Longest an expert run may take, in seconds                                |
+| `ANTHROPIC_API_KEY`         | none, required     | Anthropic key                                                             |
 
 `<TAGALONG_HOME>/.env` holds `KEY=value` lines (`#` comments and quotes allowed). Any
 `TAGALONG_*` setting above except `TAGALONG_HOME`, and `ANTHROPIC_API_KEY`, may live there. It only
@@ -53,7 +55,8 @@ the total can run a little low.
 | `brain/src/brain/mind/resume.py` | Rebuilds a valid history from the saved chat at start                                                                                                            |
 | `brain/src/brain/memory.py`      | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                                                                                             |
 | `brain/src/brain/toolbox.py`     | `Toolbox`: lists and gates every tool call, from `BrainSource` and `BodySource`                                                                                  |
-| `brain/src/brain/asks.py`        | `Asks`: opens a permission ask to the bodies, waits for one answer, times out, closes on cancel                                                                  |
+| `brain/src/brain/asks.py`        | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers)                                                              |
+| `brain/src/brain/experts.py`     | `ExpertRun`: drives Claude Code in a folder over ACP; callbacks for permissions, questions, progress and the end                                                 |
 | `brain/src/brain/tools.py`       | The brain's own tools (`remember`, `recall`, `forget`) as specs and handlers for `BrainSource`                                                                   |
 | `brain/src/brain/mind/soul.md`   | Scout's character, the start of the system prompt                                                                                                                |
 | `brain/src/brain/mind/prompt.py` | The system prompt (soul, local time, online bodies, "What you know") and `say` content blocks                                                                    |
@@ -238,6 +241,15 @@ An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-a
 - **Reconnect.** Asks live in memory only. A body that joins with no `last_seq`, or that is told
   `resync`, is sent every ask still open again, with fresh `seq` numbers. A body that reconnects
   without `resync` gets the ask once, from its backlog.
+- **Asks without a turn.** `Asks.open(text=, options=, tool=, input=, timeout=, free_text=, ask_id=)`
+  is for work with no Scout turn (expert jobs). It sends a plain ask: no `turn`, no `confirm`, any
+  option names (for example `allow-once`, `reject`). It waits until closed; there is no default
+  timeout (pass `timeout` to get one). It returns `Answer(option, text)`; with nobody online it
+  returns `Answer(None, None)` at once and opens nothing. With `free_text=True` an answer whose
+  option is not listed is accepted when it carries non-empty `text` (the user typed their own
+  answer). `cancel_all(ask_ids)` closes the named asks with `reason: "cancelled"` and their waiters
+  get a `cancelled` error. `answer {ask, option, text}` now passes `text` through to the ask; the
+  closed frame is unchanged.
 
 ## Home tools
 
@@ -268,6 +280,34 @@ so there is one gate and no second path.
 | `set_permission`   | `{"tool": str, "mode": str}` | `{"tool", "mode"}`; `mode` is `ask` or `auto`                                                                  |
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
+
+## Experts runner
+
+`experts.py` holds `ExpertRun`, the one object that drives Claude Code in a folder over the Agent
+Client Protocol. It is not wired into Scout yet. `start(folder)` spawns the adapter, runs
+`initialize` (advertising `elicitation.form` so questions work) and `session/new`, and returns
+the modes. `begin(mode, task)` sets the mode and sends the first prompt without waiting. `note(text)`
+queues a follow-up prompt for after the current turn and returns `False` once the run has ended.
+`stop()` sends `session/cancel` and ends the process; `close()` ends it too. All callbacks are
+async: `on_permission` returns an option id (`None` sends a cancelled outcome), `on_question`
+returns the answer fields (`None` cancels), `on_progress` gets the latest assistant message and
+`on_end(state, reason, result)` ends the run with `done`, `error` (including `timeout` and an
+adapter crash) or `stopped`.
+
+Install the adapter once: `npm install -g @agentclientprotocol/claude-agent-acp` (Node 22 or newer).
+A missing command is reported with that step. `TAGALONG_EXPERT_CMD` swaps the command and
+`TAGALONG_EXPERT_TIMEOUT_S` sets the run limit. The command is split like a shell on Linux and
+macOS; on Windows backslashes are kept, so `C:\Users\me\AppData\Roaming\npm\claude-agent-acp.cmd`
+works as written (quote it if it has spaces). A question's `QuestionField` carries the key,
+title, the question's own text (`description`), the option labels and `multi` (a multi-select
+answers with a list of labels). The child gets the brain's environment without
+`ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN`, so Claude Code bills the user's own login, not
+the key Scout uses. The process is closed by closing its stdin; if it stays alive it is killed with
+its children (`taskkill /T /F` on Windows; on Linux and macOS only the adapter process is
+killed, and its children exit when their stdin closes). Start and the mode change are bounded by a 60 s
+startup limit (an adapter that never answers is killed and reported). `stop()` and `close()` are
+safe from any state, including from inside `on_end`; teardown is shared, so `on_end` fires once,
+after the process is gone. A stop answers any pending permission or question as cancelled.
 
 ## Not built yet
 

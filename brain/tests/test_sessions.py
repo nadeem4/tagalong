@@ -449,3 +449,14 @@ async def test_body_tools_offered_then_gone_after_disconnect():
     second = [t["name"] for t in model.tools[1]]
     assert first == ["forget", "recall", "remember", "desktop__see_screen"]
     assert second == ["forget", "recall", "remember"]
+
+
+async def test_session_answer_passes_text_to_the_ask():
+    session, _ = make(Gate([]))
+    session._bodies.online_ids = lambda: ["desktop"]
+    task = asyncio.create_task(session._asks.open(text="Which?", options=["a"], free_text=True))
+    await asyncio.sleep(0)
+    ask_id = session.open_asks()[0]["id"]
+    session.answer(ask_id, "typed", "desktop", text="my words")
+    answer = await task
+    assert (answer.option, answer.text) == ("typed", "my words")

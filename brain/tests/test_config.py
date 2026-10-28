@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from brain.config import load_config, load_env_file, session_id
+from brain.config import load_config, load_env_file, session_id, split_command
 
 
 def test_defaults():
@@ -93,3 +93,42 @@ def test_load_env_file_missing_is_fine(tmp_path):
     env = {}
     load_env_file(tmp_path, env)
     assert env == {}
+
+
+def test_expert_defaults():
+    cfg = load_config({})
+    assert (cfg.expert_cmd, cfg.expert_timeout) == (["claude-agent-acp"], 1800.0)
+
+
+def test_expert_overrides_split_the_command_like_a_shell():
+    cfg = load_config(
+        {
+            "TAGALONG_EXPERT_CMD": 'node "/opt/my agent/index.js" --x',
+            "TAGALONG_EXPERT_TIMEOUT_S": "60",
+        }
+    )
+    assert cfg.expert_cmd == ["node", "/opt/my agent/index.js", "--x"]
+    assert cfg.expert_timeout == 60.0
+
+
+@pytest.mark.parametrize("value", ["abc", "0", "-5", "nan"])
+def test_bad_expert_timeout_raises(value):
+    with pytest.raises(ValueError):
+        load_config({"TAGALONG_EXPERT_TIMEOUT_S": value})
+
+
+def test_split_command_keeps_backslashes_in_a_windows_path():
+    path = r"C:\Users\x\AppData\Roaming\npm\claude-agent-acp.cmd"
+    assert split_command(path, posix=False) == [path]
+
+
+def test_split_command_strips_quotes_around_a_windows_path_with_spaces():
+    cmd = r'"C:\Program Files\nodejs\agent.cmd" --x'
+    assert split_command(cmd, posix=False) == [r"C:\Program Files\nodejs\agent.cmd", "--x"]
+
+
+def test_split_command_posix_still_honours_quotes():
+    assert split_command('node "/opt/my agent/index.js"', posix=True) == [
+        "node",
+        "/opt/my agent/index.js",
+    ]

@@ -225,7 +225,7 @@ def _dispatch(
     if method == "answer":
         try:
             reply = AnswerParams.model_validate(message.get("params"))
-            session.answer(reply.ask, reply.option, body_id)
+            session.answer(reply.ask, reply.option, body_id, reply.text)
         except ValidationError as exc:
             return _error(req_id, ErrorCode.invalid_params, str(exc))
         except RpcError as exc:
