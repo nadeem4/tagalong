@@ -12,6 +12,7 @@ feature can run it and know whether it passed. Each step lists **Setup**, **Acti
 - [Python brain: talk to Scout](#python-brain-talk-to-scout)
 - [The desktop on the Python brain](#the-desktop-on-the-python-brain)
 - [Hand off to Claude Code (real brain, real Claude Code)](#hand-off-to-claude-code-real-brain-real-claude-code)
+- [Connected apps on the Python brain (real brain, a real stdio app)](#connected-apps-on-the-python-brain-real-brain-a-real-stdio-app)
 - [Hand-offs to Claude Code (old engine)](#hand-offs-to-claude-code-old-engine)
 - [Settings](#settings)
 - [Greeting](#greeting)
@@ -432,6 +433,46 @@ does not work). Asking Scout ("list my jobs", "stop that job") also works.
     an answer and sending it continues the job with your words.
 14. **Action:** open Home → Settings → Permissions.
     **Expected:** Claude Code's tool shows "Asks itself" and its switch is disabled.
+
+## Connected apps on the Python brain (real brain, a real stdio app)
+
+Home's Connections page is not on the brain yet (9b), so this drives the brain's Home calls
+(`list_apps`, `add_app`, `set_app_enabled`, `remove_app`, `restart_app`) with `call` over the
+websocket, for example from a small script. It needs the brain running and a real stdio MCP
+server you can start with a command, such as `npx -y @modelcontextprotocol/server-filesystem
+C:\path\to\test-folder`, plus the desktop to talk to Scout.
+
+1. **Action:** `add_app {name: "Files", transport: "stdio", command: "npx", args: ["-y",
+"@modelcontextprotocol/server-filesystem", "C:\\path\\to\\test-folder"]}`, then `list_apps`.
+   **Expected:** `{"id": "files"}`; the app shows `connecting`, then `connected` with its tools,
+   each with an effect (`read` or `change`) and `locked`.
+2. **Action:** ask Scout "what files are in the test folder?"
+   **Expected:** a read tool runs at once with no ask, and Scout answers from the folder.
+3. **Action:** ask Scout to write a new file in the folder.
+   **Expected:** an ask card (allow, always, deny). Allow runs it; deny leaves the folder alone.
+4. **Action:** ask Scout to move or delete a file (a tool whose name has a risky word such as
+   `delete`, or whose hint says destructive).
+   **Expected:** the ask comes every time, with no **always** option, even after earlier allows.
+5. **Action:** `set_app_enabled {id: "files", enabled: false}`, then `list_apps`.
+   **Expected:** `enabled: false`, status `off`, and Scout no longer has the app's tools.
+   Turn it on again: it connects and the tools return.
+6. **Action:** with the app connected, end its process (Task Manager, the `node` running it).
+   **Expected:** within about 30 seconds the app shows `error` with `The connection Files closed.`.
+   `restart_app {id: "files"}` brings it back to `connected`.
+7. **Action:** `add_app` with a command that does not exist.
+   **Expected:** an `error` row with `cannot find the command <name>`; the brain and the other apps
+   are unaffected. `remove_app` removes it.
+8. **Action:** `add_app` with `transport: "http"` and a `url` that starts with `http://example.com`.
+   **Expected:** a plain refusal (`the url must use https (http is only allowed for localhost).`) and
+   no row. An `auth: "token"` app without `token` is refused too.
+9. **Action:** add an `http` app with `auth: "token"` and a `token`, then open
+   `app-tokens.json` in the brain's data folder and the `apps` table.
+   **Expected:** the token is only in `app-tokens.json`. `remove_app` deletes it from there.
+10. **Action:** add an app whose `env` has `{"KEY": "${NOT_SET}"}`.
+    **Expected:** the app shows `error` with `needs NOT_SET set in brain's environment`.
+11. **Action:** add an app that hangs on start, then restart the brain.
+    **Expected:** the brain is listening at once and Scout answers; the app shows `error` after about
+    30 seconds. Stopping the brain leaves no stray process.
 
 ## Hand-offs to Claude Code (old engine)
 

@@ -58,6 +58,8 @@ the total can run a little low.
 | `brain/src/brain/asks.py`        | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers)                                                              |
 | `brain/src/brain/experts.py`     | `ExpertRun`: drives Claude Code in a folder over ACP; callbacks for permissions, questions, progress and the end                                                 |
 | `brain/src/brain/jobs.py`        | `Jobs`: hand-off ask, relayed Claude Code asks, the 2-job cap, progress and the `jobs` rows, `changed: jobs`                                                     |
+| `brain/src/brain/apps.py`        | `Apps`: connects each enabled app (MCP over stdio or http), keeps it alive, `TokenFile` (`app-tokens.json`), `validate_app`                                      |
+| `brain/src/brain/app_tools.py`   | `AppSource` (apps' tools as a toolbox source), tool classification, result fencing, Home's app calls                                                             |
 | `brain/src/brain/tools.py`       | The brain's own tools (memory, Home and expert tools) as specs and handlers for `BrainSource`                                                                    |
 | `brain/src/brain/mind/soul.md`   | Scout's character, the start of the system prompt                                                                                                                |
 | `brain/src/brain/mind/prompt.py` | The system prompt (soul, local time, online bodies, "What you know") and `say` content blocks                                                                    |
@@ -293,6 +295,37 @@ so there is one gate and no second path.
 | `stop_job`         | `{"job": str}`               | `{"job", "stopping": true}`; a job that is not running is `invalid_params` (Scout may call it too)                          |
 
 `list_permissions` includes the last-declared tools of bodies that are offline (`online: false`).
+
+The app calls below are Home-only. A refusal is `invalid_params` with a plain line. Each change
+sends `changed {what: "apps"}`, as does every status change of an app.
+
+| Tool              | Input                                                                                            | Result text (JSON)                                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `list_apps`       | `{}`                                                                                             | `{"apps": [{"id", "name", "transport", "auth", "enabled", "status", "error", "tools": [{"name", "effect", "locked"}]}]}` |
+| `add_app`         | `{"name", "transport": "stdio"\|"http", "command"?, "args"?, "env"?, "url"?, "auth"?, "token"?}` | `{"id"}`; connects at once. `token` (only with `auth: "token"`) goes to `app-tokens.json`, never the row                 |
+| `set_app_enabled` | `{"id", "enabled": bool}`                                                                        | `{"id", "enabled"}`                                                                                                      |
+| `remove_app`      | `{"id"}`                                                                                         | `{"id", "removed": true}`; stops the app, deletes its row and token                                                      |
+| `restart_app`     | `{"id"}`                                                                                         | `{"id", "restarting": true}`                                                                                             |
+
+An unknown id is refused with `There is no app called <id>.`
+
+## Connected apps
+
+`apps.py` and `app_tools.py` let Scout use MCP servers the user adds. See
+[connected-apps.md](connected-apps.md) for the user's view; this is the brain's side.
+
+- **`Apps`** keeps one long-lived task per enabled app. `main` calls `apps.start()` once the server
+  is up (it returns at once; a slow or hanging app never delays boot) and `apps.shutdown()` after
+  the experts stop and before memory closes.
+- **`AppSource`** is the toolbox's third source. A connected app's tools appear as `<app>__<tool>`
+  (Scout only, never Home). Reads run at once, changes ask, and a tool is locked (asks every time,
+  never `auto`) when its hints say destructive or its name has a risky word (`send`, `delete`,
+  `remove`, `destroy`, `trash`, `pay`, `charge`). An app that is not connected is offline.
+  Answers are capped at 8,000 characters and fenced as `<data kind="app" app="<id>">`.
+- **Rows** are in the `apps` table of `tagalong.db` (id, name, transport, config, auth, enabled).
+  `${VAR}` references in env stay as written and are filled from the brain's environment at connect.
+- **`app-tokens.json`** in the data directory holds pasted tokens by app id (kept owner-only where
+  the platform allows). A token is never in a row, a tool list or an error line.
 
 ## Experts
 

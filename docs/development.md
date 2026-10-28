@@ -27,7 +27,8 @@ tagalong/
     examples/                       # sample frames shared by the TypeScript and Python tests
     ts/                             # @tagalong/contract: zod schemas for contract v1
   brain/                            # the Python brain: uv project, tests/; src/brain/ has protocol.py,
-                                    # config.py, bodies.py, server.py and main.py (see docs/brain.md)
+                                    # config.py, bodies.py, server.py, apps.py, app_tools.py and
+                                    # main.py (see docs/brain.md)
   packages/
     protocol/src/
       index.ts                      # PROTOCOL_VERSION, ENGINE_HOST, DEFAULT_ENGINE_PORT, engineUrl
