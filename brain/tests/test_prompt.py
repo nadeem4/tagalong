@@ -184,3 +184,7 @@ def test_context_keeps_non_ascii_readable():
 
 def test_soul_tells_scout_its_words_before_a_change_are_the_approval_text():
     assert "words you write just before" in system_prompt(NOW, [])
+
+
+def test_soul_says_job_notes_are_events_not_requests():
+    assert "job note" in system_prompt(NOW, []).lower()

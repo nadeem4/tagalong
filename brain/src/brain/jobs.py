@@ -22,6 +22,7 @@ CANCEL = "cancel"
 HANDOFF_TIMEOUT_S = 300.0  # the hand-off ask has no job yet to bound it
 PROGRESS_NOTIFY_S = 2.0  # progress chunks are cheap; bodies refetch at most this often
 LIST_LIMIT = 20
+RESULT_NOTE_CHARS = 4000  # what one report carries; the full result stays in the row
 
 
 class JobError(Exception):
@@ -210,3 +211,21 @@ class Jobs:
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def job_note(job: Job) -> str:
+    """Facts about a finished job for Scout's wake turn. No wording for the user: Scout decides."""
+    lines = [
+        f"Job {job.id} ended.",
+        f"Task: {job.task}",
+        f"Folder: {job.folder}",
+        f"State: {job.state}",
+    ]
+    if job.reason:
+        lines.append(f"Reason: {job.reason}")
+    if job.result:
+        result = job.result[:RESULT_NOTE_CHARS]
+        if len(job.result) > RESULT_NOTE_CHARS:
+            result += "\n[trimmed]"
+        lines.append(f"Result:\n{result}")
+    return "\n".join(lines)

@@ -232,6 +232,8 @@ its mode is always `auto` and `Toolbox.set_mode` refuses any change ("<name> ask
 
 Expert jobs (Claude Code hand-offs) live in the `jobs` table of the same file: id, agent, task, folder, mode, state (`running`, `done`, `error`, `stopped`), reason, progress, result (capped at 20,000 characters), session id, a `reported` flag and start and end times. Rows still `running` at brain start become `stopped` with reason `brain restarted`.
 
+When a job ends, the session calls `Session.wake` with a note of facts only (id, task, folder, state, reason, and the result cut at 4,000 characters with `[trimmed]`), fenced as `<data kind="job">`. `reported` is set when that turn starts, and at brain start every finished unreported job (including those just stopped) is queued again. Scout's prompt says a job note is an event, not a request, and the model decides whether to speak.
+
 An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-and-confirm)):
 
 - **Options.** `["allow", "always", "deny"]`, or `["allow", "deny"]` for a locked tool. `always`
@@ -335,6 +337,8 @@ the adapter's own message (for example that auth is required).
 [Permissions and asks](#permissions-and-asks)). `Session` builds it with the `ExpertRun` factory
 that `main.py` configures (`TAGALONG_EXPERT_CMD`, `TAGALONG_EXPERT_TIMEOUT_S`) and calls
 `startup()`, which turns rows left `running` into `stopped` with reason `brain restarted`.
+
+When a job ends, the session calls `Session.wake` with a note of facts only (id, task, folder, state, reason, and the result cut at 4,000 characters with `[trimmed]`), fenced as `<data kind="job">`. `reported` is set when that turn starts, and at brain start every finished unreported job (including those just stopped) is queued again. Scout's prompt says a job note is an event, not a request, and the model decides whether to speak.
 
 | Tool          | Audience    | Effect | Gate                      | Does                                                                         |
 | ------------- | ----------- | ------ | ------------------------- | ---------------------------------------------------------------------------- |

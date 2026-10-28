@@ -17,8 +17,8 @@ from brain.asks import Asks
 from brain.bodies import Bodies
 from brain.config import DEFAULT_EXPERT_CMD, DEFAULT_EXPERT_TIMEOUT_S
 from brain.experts import ExpertRun
-from brain.jobs import Jobs
-from brain.memory import Memory, _compaction_text
+from brain.jobs import Jobs, job_note
+from brain.memory import Job, Memory, _compaction_text
 from brain.mind.prompt import render_know, system_prompt, user_content
 from brain.mind.resume import rebuild_history
 from brain.mind.turn import Call, Model, run_turn
@@ -51,7 +51,7 @@ class Session:
         make_run = make_run or partial(
             ExpertRun, command=[DEFAULT_EXPERT_CMD], timeout=DEFAULT_EXPERT_TIMEOUT_S
         )
-        self.jobs = Jobs(memory, self._asks, notify, make_run)
+        self.jobs = Jobs(memory, self._asks, notify, make_run, on_finished=self._on_job_finished)
         self.jobs.startup()  # rows left running by a dead brain become stopped
         tools = (
             brain_tools(memory, notify)
@@ -84,6 +84,8 @@ class Session:
         self._last_body: str | None = None  # where a wake turn goes first
         self._wakes: deque[tuple[str, Callable[[], None] | None]] = deque()
         bodies.on_connect = self._run_wakes
+        for job in memory.unreported_jobs():  # ended while the brain was down, or never told
+            self._on_job_finished(job)
 
     def say(self, body_id: str, params: SayParams) -> SayResult:
         content = user_content(params)  # may raise ValueError before anything changes
@@ -102,6 +104,9 @@ class Session:
         """
         self._wakes.append((event_text, on_start))
         self._run_wakes()
+
+    def _on_job_finished(self, job: Job) -> None:
+        self.wake(job_note(job), on_start=lambda: self._memory.mark_reported(job.id))
 
     def _busy(self) -> bool:
         return self._task is not None and not self._task.done()

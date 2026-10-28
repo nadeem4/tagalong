@@ -13,8 +13,8 @@ import pytest
 
 from brain.asks import Answer
 from brain.experts import ExpertRun
-from brain.jobs import JobError, Jobs
-from brain.memory import Memory
+from brain.jobs import JobError, Jobs, job_note
+from brain.memory import Job, Memory
 from brain.protocol import ErrorCode, RpcError
 
 AGENT = Path(__file__).parent / "fake_acp_agent.py"
@@ -439,3 +439,46 @@ async def test_startup_stops_leftover_running_rows(make_rig):
     rig.jobs.startup()
     job = rig.memory.get_job("old")
     assert (job.state, job.reason) == ("stopped", "brain restarted")
+
+
+def test_job_note_states_facts_and_trims_a_long_result():
+    job = Job(
+        "j1",
+        "claude_code",
+        "fix it",
+        "C:/x",
+        "default",
+        "done",
+        "end_turn",
+        None,
+        "A" * 5000,
+        "s1",
+        False,
+        "t0",
+        "t1",
+    )
+    note = job_note(job)
+    for fact in ("j1", "fix it", "C:/x", "done", "end_turn"):
+        assert fact in note
+    assert "A" * 4000 in note and "A" * 4001 not in note
+    assert note.endswith("[trimmed]")
+
+
+def test_job_note_without_a_result_or_reason():
+    job = Job(
+        "j2",
+        "claude_code",
+        "t",
+        "C:/x",
+        "default",
+        "stopped",
+        None,
+        None,
+        None,
+        None,
+        False,
+        "t0",
+        "t1",
+    )
+    note = job_note(job)
+    assert "stopped" in note and "[trimmed]" not in note
