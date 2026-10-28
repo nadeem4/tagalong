@@ -106,9 +106,9 @@ class Scheduler:
             self._arm_timer()
 
     def _run(self, group: _Group, body_id: str) -> None:
-        # A failed start drops the group (as the old queue did): pump is called from done
-        # callbacks and body connects, so it must not raise. The events stay untold, and
-        # unreported jobs are re-emitted at the next start.
+        # A raising start must not propagate: pump runs from done callbacks and body
+        # connects. The batch is dropped so a broken start cannot loop; unreported jobs
+        # re-emit at the next brain start.
         if group.kind.max_per_hour is not None:
             self._wakes.append((self._now(), group.kind.name))
         text = wake_text(group.kind, group.events, self._notes.get(group.kind.name, ""))

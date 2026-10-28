@@ -583,7 +583,6 @@ async def test_say_during_a_wake_turn_joins_it():
 
 
 # --- Scout reports back when a job ends (8a3) ---
-# --- Scout reports back when a job ends (8a3) ---
 
 
 def end_job(memory, job_id="j1", result="all good", state="done"):

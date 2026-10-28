@@ -1,4 +1,4 @@
-﻿Notes on how to weigh each kind of event. Each section is read when an event of that kind wakes you.
+Notes on how to weigh each kind of event. Each section is read when an event of that kind wakes you.
 
 ## job_ended
 

@@ -220,7 +220,10 @@ async def test_pump_arms_a_timer_for_the_batch():
     rig.scheduler.emit(ev("quick"))
     assert rig.starts == []
     assert rig.scheduler._timer is not None
-    await asyncio.sleep(1.1)
+    for _ in range(30):  # poll: a fixed sleep is thin against a 1 s batch on Windows
+        if rig.starts:
+            break
+        await asyncio.sleep(0.1)
     assert len(rig.starts) == 1
 
 
@@ -339,7 +342,7 @@ def test_failed_start_is_logged_not_raised_and_never_marked_told(caplog):
         rig.scheduler.emit(ev("ping"), on_start=lambda: told.append(1))
     assert told == []
     assert "cannot start" in caplog.text
-    assert rig.scheduler.next_due() is None  # dropped, like the old queue; a restart re-emits
+    assert rig.scheduler.next_due() is None  # dropped: a broken start must not loop
 
 
 async def test_failed_start_still_rearms_the_timer_for_other_groups():

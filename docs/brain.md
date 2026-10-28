@@ -29,7 +29,7 @@ It needs an Anthropic key. With no `ANTHROPIC_API_KEY` in the environment or in
 | `TAGALONG_STEP_CAP`         | `25`               | Most model calls in one turn                                              |
 | `TAGALONG_EXPERT_CMD`       | `claude-agent-acp` | Command that starts the Claude Code ACP adapter (split like a shell line) |
 | `TAGALONG_EXPERT_TIMEOUT_S` | `1800`             | Longest an expert run may take, in seconds                                |
-| `TAGALONG_WAKES_PER_HOUR`   | `12`               | Most wakes per hour, all kinds together (whole number, 1 or more)         |
+| `TAGALONG_WAKES_PER_HOUR`   | `12`               | Most wakes per hour, all capped kinds together (whole number, 1 or more)  |
 | `ANTHROPIC_API_KEY`         | none, required     | Anthropic key                                                             |
 
 `<TAGALONG_HOME>/.env` holds `KEY=value` lines (`#` comments and quotes allowed). Any
@@ -394,10 +394,11 @@ that `main.py` configures (`TAGALONG_EXPERT_CMD`, `TAGALONG_EXPERT_TIMEOUT_S`) a
 
 **Wake and the finish turn.** `Session.scheduler` (`scheduler.py`) is the entry point for events that
 are not the user talking: `emit(Event)`. It holds events in per-kind batches (`events.py`; a job
-ending batches for 30 s, at most 10 wakes an hour, and `TAGALONG_WAKES_PER_HOUR` caps all kinds
+ending batches for 30 s, at most 10 wakes an hour, and `TAGALONG_WAKES_PER_HOUR` caps all capped kinds
 together). When no turn runs and a batch is due, it starts one turn per batch through the same path
 as `say` (same budget, step cap and turn notifications); with the daily budget spent the held
-events are dropped and logged. The turn goes to the body Scout last talked to if it is online, else
+events are dropped and logged. A job report dropped this way stays untold until the brain
+next starts, even after the budget resets. The turn goes to the body Scout last talked to if it is online, else
 any online body; with none online the batch waits until a body connects. A batch held while a turn
 runs starts when that turn ends, whichever way it ends. The text is fenced as `<data kind="event">`
 with the kind's name, its note on how to weigh it and the facts, so it is data, not instructions. A
