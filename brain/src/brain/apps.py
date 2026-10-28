@@ -391,7 +391,11 @@ class Apps:
         # failure unwinds through the transport's own cancel scopes before we look at it.
         try:
             async with AsyncExitStack() as stack:
-                limit = self._signin_timeout if slot.open_url else self._connect_timeout
+                # The listener waits signin_timeout for the person; the connect steps around it
+                # still need their own time, and its "not finished" message must win the race.
+                limit = self._connect_timeout
+                if slot.open_url:
+                    limit += self._signin_timeout
                 async with asyncio.timeout(limit):
                     session = await self._connect(stack, slot)
                     await session.initialize()

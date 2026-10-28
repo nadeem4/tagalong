@@ -56,11 +56,10 @@ class FileTokenStorage:
     def _write(self, data: dict[str, Any]) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self._path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(data), encoding="utf-8")
-        try:
-            os.chmod(tmp, 0o600)
-        except OSError:
-            pass
+        # Created 0600 up front so the secret is never on disk readable by others, even briefly.
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(json.dumps(data))
         os.replace(tmp, self._path)
 
     async def get_tokens(self) -> OAuthToken | None:
@@ -103,6 +102,7 @@ class FileTokenStorage:
 
     def clear(self) -> None:
         self._path.unlink(missing_ok=True)
+        self._path.with_suffix(".tmp").unlink(missing_ok=True)  # a crashed write leaves one
 
 
 class LoopbackCallback:
@@ -136,7 +136,10 @@ class LoopbackCallback:
         try:
             line = await asyncio.wait_for(reader.readline(), 5)
             parts = line.decode("latin-1").split(" ")
-            url = urlparse(parts[1]) if len(parts) >= 2 else urlparse("")
+            try:
+                url = urlparse(parts[1]) if len(parts) >= 2 else urlparse("")
+            except ValueError:  # e.g. "http://[x/": answer it like any unknown path
+                url = urlparse("")
             known = url.path == "/callback"
             status, body = (b"200 OK", _PAGE) if known else (b"404 Not Found", b"")
             writer.write(

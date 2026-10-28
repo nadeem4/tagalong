@@ -80,6 +80,15 @@ def test_clear_removes_the_file(tmp_path):
     store.clear()  # clearing twice is fine
 
 
+def test_clear_also_removes_a_leftover_tmp_file(tmp_path):
+    store = FileTokenStorage(tmp_path, "notes")
+    tmp = tmp_path / "app-oauth" / "notes.tmp"
+    tmp.parent.mkdir()
+    tmp.write_text("secret", encoding="utf-8")
+    store.clear()
+    assert not tmp.exists()
+
+
 async def test_token_text_is_never_logged(tmp_path, caplog):
     caplog.set_level(logging.DEBUG)
     store = FileTokenStorage(tmp_path, "notes")
@@ -149,6 +158,39 @@ async def test_listener_reports_a_declined_sign_in():
     await asyncio.to_thread(_get, f"{uri}?error=access_denied&state=s")
     with pytest.raises(OAuthError, match="declined"):
         await waiter
+
+
+async def test_listener_survives_a_malformed_request_line():
+    cb = LoopbackCallback()
+    uri = await cb.start()
+    port = urlparse(uri).port
+    waiter = asyncio.create_task(cb.wait(5))
+
+    def bad() -> bytes:
+        with socket.create_connection(("127.0.0.1", port), timeout=2) as s:
+            s.sendall(b"GET http://[x/ HTTP/1.1\r\n\r\n")
+            s.settimeout(2)
+            return s.recv(100)
+
+    # answered like any unknown path, not dropped with an unhandled error in the loop
+    assert (await asyncio.to_thread(bad)).startswith(b"HTTP/1.1 404")
+    await asyncio.to_thread(_get, f"{uri}?code=abc&state=s")  # still serving afterwards
+    assert await waiter == ("abc", "s")
+
+
+async def test_token_file_is_never_written_world_readable_first(tmp_path, monkeypatch):
+    import os
+
+    modes: list[int] = []
+    real_open = os.open
+
+    def spy(path, flags, mode=0o777, **kw):
+        modes.append(mode)
+        return real_open(path, flags, mode, **kw)
+
+    monkeypatch.setattr(os, "open", spy)
+    await FileTokenStorage(tmp_path, "notes").set_tokens(TOKEN)
+    assert modes == [0o600]
 
 
 # ---- the URL guard ----
@@ -354,6 +396,8 @@ async def test_abandoned_sign_in_ends_needs_sign_in(tmp_path, oauth_server):
 
         await r.apps.sign_in("notes", open_url)
         await r.state("needs-sign-in")
+        # the listener's own wording, not the outer connect timeout's
+        assert "not finished" in r.apps.status("notes").error
     finally:
         await r.apps.shutdown()
 
