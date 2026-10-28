@@ -68,15 +68,28 @@ def spec_for(app_id: str, tool: Tool) -> ToolSpec | None:
     )
 
 
+_warned: set[tuple[str, str, str]] = set()  # specs run every turn; warn once per bad name
+
+
+def _first_time(kind: str, key: str, name: str) -> bool:
+    item = (kind, key, name)
+    if item in _warned:
+        return False
+    _warned.add(item)
+    return True
+
+
 def specs_for(app_id: str, tools: list[Tool]) -> list[ToolSpec]:
     """All of an app's specs; when two names collide the first wins and the rest are logged."""
     out: dict[str, ToolSpec] = {}
     for tool in tools:
         spec = spec_for(app_id, tool)
         if spec is None:
-            log.warning("app tool has no usable name, dropped: %s/%r", app_id, tool.name)
+            if _first_time("empty", app_id, tool.name):
+                log.warning("app tool has no usable name, dropped: %s/%r", app_id, tool.name)
         elif spec.name in out:
-            log.warning("app tool name clash, dropped: %s (from %r)", spec.name, tool.name)
+            if _first_time("clash", spec.name, tool.name):
+                log.warning("app tool name clash, dropped: %s (from %r)", spec.name, tool.name)
         else:
             out[spec.name] = spec
     return list(out.values())

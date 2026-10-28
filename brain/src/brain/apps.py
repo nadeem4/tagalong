@@ -131,6 +131,8 @@ def validate_app(params: dict[str, Any], taken: set[str] | frozenset[str] = froz
     auth = params.get("auth", "none")
     if auth not in AUTHS:
         raise AppError(f"auth must be one of: {', '.join(AUTHS)}.")
+    if auth == "token" and transport != "http":
+        raise AppError("token sign-in only works with an http app.")
     config = params.get("config")
     if not isinstance(config, dict):
         raise AppError("the app needs a config.")

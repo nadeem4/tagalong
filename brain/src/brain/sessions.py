@@ -63,10 +63,13 @@ class Session:
             + home_tools(budget, lambda: self.toolbox)
             + expert_tools(self.jobs)
         )
-        sources = [BodySource(bodies)]
+        sources: list = []
         if apps is not None and tokens is not None:  # the two always come as a pair
             tools += app_home_tools(apps, memory, tokens, notify)
+            # Before bodies: BodySource.unavailable claims any `x__y` name whose prefix is not an
+            # online body, which would hide an app's own "not connected" line behind its slug.
             sources.append(AppSource(apps))
+        sources.append(BodySource(bodies))
 
         def save_mode(name: str, mode: str) -> None:
             # Every save (Home's set_permission or an "always" answer) refreshes open panels.

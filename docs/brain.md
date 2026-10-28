@@ -54,7 +54,7 @@ the total can run a little low.
 | `brain/src/brain/sessions.py`    | The one conversation: history, the running turn, `say` joins, `cancel`                                                                                           |
 | `brain/src/brain/mind/resume.py` | Rebuilds a valid history from the saved chat at start                                                                                                            |
 | `brain/src/brain/memory.py`      | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                                                                                             |
-| `brain/src/brain/toolbox.py`     | `Toolbox`: lists and gates every tool call, from `BrainSource` and `BodySource`                                                                                  |
+| `brain/src/brain/toolbox.py`     | `Toolbox`: lists and gates every tool call, from `BrainSource`, `AppSource` and `BodySource`                                                                     |
 | `brain/src/brain/asks.py`        | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers)                                                              |
 | `brain/src/brain/experts.py`     | `ExpertRun`: drives Claude Code in a folder over ACP; callbacks for permissions, questions, progress and the end                                                 |
 | `brain/src/brain/jobs.py`        | `Jobs`: hand-off ask, relayed Claude Code asks, the 2-job cap, progress and the `jobs` rows, `changed: jobs`                                                     |

@@ -90,6 +90,14 @@ def test_clash_keeps_first_and_logs(caplog):
     assert "files__a_b" in caplog.text
 
 
+def test_clash_warns_once_across_calls(caplog):
+    tools = [tool("dup one"), tool("dup_one")]
+    with caplog.at_level(logging.WARNING, logger="brain"):
+        specs_for("once", tools)
+        specs_for("once", tools)
+    assert caplog.text.count("once__dup_one") == 1
+
+
 def test_truncation_clash_is_dropped():
     specs = specs_for("files", [tool("x" * 100), tool("x" * 101)])
     assert len(specs) == 1
@@ -241,3 +249,10 @@ async def test_source_run_timeout_and_protocol_lines():
             await src.run(a_call("lin__t"), "lin__t")
         assert e.value.code == ErrorCode.tool_failed
         assert e.value.message == str(exc)
+
+
+async def test_source_run_unknown_tool_is_plain_error():
+    with pytest.raises(RpcError) as e:
+        await AppSource(FakeApps([tool("t")])).run(a_call("lin__nope"), "lin__nope")
+    assert e.value.code == ErrorCode.unknown_tool
+    assert e.value.message == "No tool named lin__nope."

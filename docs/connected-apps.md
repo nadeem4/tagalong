@@ -48,11 +48,13 @@ An app row is `{ id, name, transport, config, auth, enabled }`.
   24 characters, never `desktop`, `extension` or `brain`. It prefixes the tool names.
 - `transport` is `stdio` (config `{ command, args, env }`) or `http` (config `{ url }`, Streamable
   HTTP; `https` only, or `http` to `localhost`, `127.0.0.1` or `::1`; the url needs a host).
-- `auth` is `none`, `token` (a pasted key sent as `Authorization: Bearer <token>`) or `oauth`
-  (sign-in comes in 9c; until then an `oauth` app connects without credentials).
+- `auth` is `none`, `token` (http apps only: a pasted key sent as `Authorization: Bearer <token>`)
+  or `oauth` (sign-in comes in 9c; until then an `oauth` app connects without credentials).
 - A stdio app's `env` values may hold `${VAR}` or `${VAR:-default}`. They stay as written in the row
   and are filled from the brain's environment only when the app is launched. An unset variable ends
-  as `needs VAR set in brain's environment` (the variable name only, never a value).
+  as `needs VAR set in brain's environment` (the variable name only, never a value). Literal env
+  values are saved in the apps table as typed, so put secrets in the brain's environment and refer
+  to them as `${VAR}`.
 
 A token is never in the row. It is in `app-tokens.json` in the data directory, by app id.
 
@@ -63,8 +65,9 @@ failing or hanging app is one `error` row and never stops the others, boot or a 
 that takes over 30 seconds ends as `error`. Status is `off`, `connecting`, `connected`,
 `needs-sign-in` (9c) or `error`, with a plain line for `error`. Every change sends
 `changed {what: "apps"}`. An idle connection is pinged every 30 seconds, and a closed one turns
-into `error` with `The connection <app> closed.`. When an app says its tool list changed, the
-brain reads it again.
+into `error` with `The connection <app> closed.`. A server that cannot answer a ping because a long
+tool call blocks it (single-threaded) is dropped the same way and shows the error, so restart it.
+When an app says its tool list changed, the brain reads it again.
 
 ### Read, change and locked
 

@@ -116,6 +116,18 @@ def test_validate_http_needs_url():
         validate_app(good_http(config={}))
 
 
+def test_validate_refuses_token_auth_on_stdio():
+    with pytest.raises(AppError, match="http"):
+        validate_app(
+            {
+                "name": "Files",
+                "transport": "stdio",
+                "config": {"command": "npx"},
+                "auth": "token",
+            }
+        )
+
+
 def test_validate_stdio():
     row = validate_app(
         {

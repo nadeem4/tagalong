@@ -13,6 +13,7 @@ from brain.app_tools import AppSource, app_home_tools
 from brain.apps import Apps, TokenFile
 from brain.bodies import Bodies
 from brain.memory import Memory
+from brain.mind.turn import Call
 from brain.protocol import RpcError
 from brain.sessions import Session
 
@@ -226,6 +227,19 @@ async def test_session_offers_app_tools_and_home_calls(rig):
     model_tools = {t["name"] for t in session.toolbox.model_tools()}
     assert "fake__read_note" in model_tools
     assert not model_tools & {"list_apps", "add_app", "remove_app"}
+
+
+async def test_dropped_app_tool_gets_the_apps_name_not_the_slug(rig):
+    bodies = Bodies()
+    bodies.notify = lambda m, p: None
+    session = Session(object(), Open(), bodies, 10, rig.mem, apps=rig.apps, tokens=rig.tokens)
+    await session.call_home("add_app", stdio("Fake App", args=["exit"]))
+    await until(lambda: rig.apps.status("fake-app").state == "error")
+    with pytest.raises(RpcError) as e:
+        await session.toolbox.run(
+            Call(id="c1", name="fake-app__read_note", input={}, turn="t", text="")
+        )
+    assert e.value.message == "Fake App is not connected right now."
 
 
 async def test_session_without_apps_has_no_app_calls():
