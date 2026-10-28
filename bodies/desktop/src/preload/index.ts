@@ -138,6 +138,8 @@ const bridge: HostBridge = {
     ipcRenderer.invoke(IPC.setConnectionEnabled, id, enabled) as Promise<unknown>,
   restartConnection: (id: string) =>
     ipcRenderer.invoke(IPC.restartConnection, id) as Promise<unknown>,
+  signInConnection: (id: string) =>
+    ipcRenderer.invoke(IPC.signInConnection, id) as Promise<unknown>,
   removeConnection: (id: string) =>
     ipcRenderer.invoke(IPC.removeConnection, id) as Promise<unknown>,
   listRoutines: () => ipcRenderer.invoke(IPC.listRoutines) as Promise<RoutineView[]>,

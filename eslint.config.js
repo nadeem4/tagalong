@@ -48,6 +48,7 @@ export default tseslint.config(
       '**/out/**',
       '**/coverage/**',
       '**/node_modules/**',
+      '**/.venv/**',
       '**/release/**',
       '.remember/**',
     ],

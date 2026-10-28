@@ -12,6 +12,10 @@ type Status = { text: string; error: boolean } | null;
 
 const BRAIN_OFFLINE = 'brain offline';
 
+// The brain opens the page on its own machine, so a brain elsewhere cannot finish a sign-in.
+const SAME_MACHINE =
+  'Signing in opens your browser, so Scout’s brain and the browser must be on the same computer.';
+
 export const STATUS_WORDS: Record<AppInfo['status'], string> = {
   off: 'Off',
   connecting: 'Connecting',
@@ -150,6 +154,7 @@ export function ConnectionsPanel() {
               app={app}
               onSwitch={() => void act(() => bridge.setConnectionEnabled!(app.id, !app.enabled))}
               onRestart={() => void act(() => bridge.restartConnection!(app.id))}
+              onSignIn={() => void act(() => bridge.signInConnection!(app.id))}
               onRemove={() =>
                 void act(() => bridge.removeConnection!(app.id), `${app.name} removed.`)
               }
@@ -170,17 +175,22 @@ function AppRow({
   app,
   onSwitch,
   onRestart,
+  onSignIn,
   onRemove,
 }: {
   app: AppInfo;
   onSwitch: () => void;
   onRestart: () => void;
+  onSignIn: () => void;
   onRemove: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
   const switchLabel = useId();
   const { name, tools } = app;
   const toolCount = `${tools.length} tool${tools.length === 1 ? '' : 's'}`;
+  // An oauth app that is connecting is waiting on the person's browser, not on the network.
+  const waiting = app.auth === 'oauth' && app.status === 'connecting';
+  const needsSignIn = app.auth === 'oauth' && app.status === 'needs-sign-in';
 
   return (
     <li>
@@ -194,7 +204,7 @@ function AppRow({
           </span>
           <span className="tg-chip">
             <span className={STATUS_DOT[app.status]} aria-hidden="true" />{' '}
-            {STATUS_WORDS[app.status]}
+            {waiting ? 'Waiting for the browser' : STATUS_WORDS[app.status]}
           </span>
           <span id={switchLabel} hidden>
             Scout can use {name}
@@ -211,7 +221,18 @@ function AppRow({
           </button>
         </div>
         {app.error !== '' && <p className="tg-error">{app.error}</p>}
+        {(needsSignIn || waiting) && <p className="tg-note">{SAME_MACHINE}</p>}
         <div className="home-conn__actions">
+          {needsSignIn && (
+            <button
+              type="button"
+              className="tg-btn"
+              aria-label={`Sign in to ${name}`}
+              onClick={onSignIn}
+            >
+              Sign in
+            </button>
+          )}
           <button
             type="button"
             className="tg-btn-quiet"
@@ -280,7 +301,7 @@ function SecretField({
   );
 }
 
-type SignIn = 'token' | 'none';
+type SignIn = 'oauth' | 'token' | 'none';
 
 function AddForm({ onAdd }: { onAdd: (params: AppAddParams) => Promise<boolean> }) {
   const [kind, setKind] = useState<'remote' | 'local'>('remote');
@@ -378,10 +399,12 @@ function AddForm({ onAdd }: { onAdd: (params: AppAddParams) => Promise<boolean> 
             <span>Signs in with</span>
             <select value={signIn} onChange={(event) => setSignIn(event.target.value as SignIn)}>
               <option value="none">Nothing</option>
+              <option value="oauth">The app’s own sign-in page</option>
               <option value="token">A key you paste</option>
             </select>
           </label>
           {signIn === 'token' && <SecretField label="Key" value={key} onChange={setKey} />}
+          {signIn === 'oauth' && <p className="tg-note">{SAME_MACHINE}</p>}
         </>
       ) : (
         <>

@@ -220,6 +220,8 @@ export interface HostBridge {
   addConnection?(params: AppAddParams): Promise<{ id: string }>;
   setConnectionEnabled?(id: string, enabled: boolean): Promise<unknown>;
   restartConnection?(id: string): Promise<unknown>;
+  /** Opens the app's sign-in in the browser on the brain's machine; the outcome arrives as `connections.changed`. */
+  signInConnection?(id: string): Promise<unknown>;
   /** Remove: the brain forgets the app and deletes its stored key. */
   removeConnection?(id: string): Promise<unknown>;
   /**

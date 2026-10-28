@@ -68,12 +68,53 @@ describe('ConnectionsPanel', () => {
     expect(row).toHaveTextContent('Could not reach wiki.example.');
   });
 
-  it('offers no sign-in button yet, even for an oauth app that needs it', async () => {
-    const bridge = createFakeHostBridge({
-      apps: [{ ...WIKI, auth: 'oauth', status: 'needs-sign-in', error: 'Sign in again.' }],
-    });
+  const OAUTH: AppInfo = {
+    ...WIKI,
+    auth: 'oauth',
+    status: 'needs-sign-in',
+    error: '',
+  };
+
+  it('Sign in asks the brain to open the browser for an app that needs it', async () => {
+    const bridge = createFakeHostBridge({ apps: [OAUTH] });
+    await renderPanel(bridge);
+    await click(screen.getByRole('button', { name: 'Sign in to Wiki' }));
+    expect(bridge.signIns).toEqual(['wiki']);
+  });
+
+  it('says it is waiting for the browser while connecting an oauth app', async () => {
+    const bridge = createFakeHostBridge({ apps: [{ ...OAUTH, status: 'connecting' }] });
+    await renderPanel(bridge);
+    const row = screen.getByRole('region', { name: 'Wiki' });
+    expect(row).toHaveTextContent('Waiting for the browser');
+    expect(within(row).queryByRole('button', { name: /sign in/i })).toBeNull();
+  });
+
+  it('shows no Sign in for apps that do not use it', async () => {
+    const bridge = createFakeHostBridge({ apps: [FILES, WIKI] });
     await renderPanel(bridge);
     expect(screen.queryByRole('button', { name: /sign in/i })).toBeNull();
+  });
+
+  it('offers sign-in at once after adding an app that signs in with its own page', async () => {
+    const bridge = createFakeHostBridge();
+    await renderPanel(bridge);
+    fireEvent.click(screen.getByText('Add an app'));
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Wiki' } });
+    fireEvent.change(screen.getByLabelText('Address'), {
+      target: { value: 'https://wiki.example/mcp' },
+    });
+    fireEvent.change(screen.getByLabelText('Signs in with'), { target: { value: 'oauth' } });
+    await click(screen.getByRole('button', { name: 'Add' }));
+    expect(bridge.addedConnections[0]).toMatchObject({ auth: 'oauth' });
+    expect(bridge.addedConnections[0]).not.toHaveProperty('token');
+    expect(await screen.findByRole('button', { name: 'Sign in to Wiki' })).toBeInTheDocument();
+  });
+
+  it('notes that sign-in needs the brain and the browser on one machine', async () => {
+    const bridge = createFakeHostBridge({ apps: [OAUTH] });
+    await renderPanel(bridge);
+    expect(screen.getByText(/same computer/i)).toBeInTheDocument();
   });
 
   it('adds a local command with its arguments and environment lines', async () => {

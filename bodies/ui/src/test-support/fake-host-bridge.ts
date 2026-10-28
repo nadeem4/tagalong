@@ -96,6 +96,7 @@ export interface FakeHostBridge extends HostBridge {
   readonly addedConnections: readonly AppAddParams[];
   readonly enabledCalls: readonly { id: string; enabled: boolean }[];
   readonly restarts: readonly string[];
+  readonly signIns: readonly string[];
   readonly removedConnections: readonly string[];
   /** Home's routines, as saved; a test reads them back after a save. */
   routines: RoutineView[];
@@ -183,6 +184,7 @@ export function createFakeHostBridge(
   const addedConnections: AppAddParams[] = [];
   const enabledCalls: { id: string; enabled: boolean }[] = [];
   const restarts: string[] = [];
+  const signIns: string[] = [];
   const removedConnections: string[] = [];
   const ranRoutines: string[] = [];
   const confirmedRoutines: { proposalId: string; routine?: RoutineDraftInput }[] = [];
@@ -427,6 +429,7 @@ export function createFakeHostBridge(
     addedConnections,
     enabledCalls,
     restarts,
+    signIns,
     removedConnections,
     listConnections() {
       if (options.listFails !== undefined) return Promise.reject(new Error(options.listFails));
@@ -441,7 +444,7 @@ export function createFakeHostBridge(
         transport: params.transport,
         auth: params.auth ?? 'none',
         enabled: true,
-        status: 'connected',
+        status: params.auth === 'oauth' ? 'needs-sign-in' : 'connected',
         error: '',
         tools: [],
       });
@@ -457,6 +460,12 @@ export function createFakeHostBridge(
     restartConnection(id) {
       restarts.push(id);
       return Promise.resolve({ id });
+    },
+    signInConnection(id) {
+      signIns.push(id);
+      // The brain answers at once; the browser outcome arrives later through `changed`.
+      fake.apps = fake.apps.map((a) => (a.id === id ? { ...a, status: 'connecting' } : a));
+      return Promise.resolve({ id, status: 'connecting' });
     },
     removeConnection(id) {
       removedConnections.push(id);
