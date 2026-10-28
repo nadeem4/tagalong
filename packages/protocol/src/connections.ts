@@ -205,3 +205,60 @@ export function connectionIdFrom(name: string, taken: readonly string[]): string
     if (!taken.includes(candidate)) return candidate;
   }
 }
+
+// --- The brain's Home calls (list_apps, add_app, ...), brain/src/brain/app_tools.py. ---
+// Flat on purpose: the brain takes command/url/token as top-level fields, not a nested transport.
+
+export const AppTransport = z.enum(['stdio', 'http']);
+/** `oauth` is accepted by the brain; its sign-in flow arrives in slice 9c. */
+export const AppAuth = z.enum(['none', 'token', 'oauth']);
+
+export const AppToolInfo = z.object({
+  name: z.string().min(1),
+  effect: z.string(),
+  /** A locked tool never offers "always allow". */
+  locked: z.boolean(),
+});
+
+export const AppInfo = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  transport: AppTransport,
+  auth: AppAuth,
+  enabled: z.boolean(),
+  status: ConnectionStatus,
+  /** Empty when nothing is wrong. */
+  error: z.string(),
+  tools: z.array(AppToolInfo),
+});
+export type AppInfo = z.infer<typeof AppInfo>;
+
+export const AppsList = z.object({ apps: z.array(AppInfo) });
+export type AppsList = z.infer<typeof AppsList>;
+
+export const AppAddParams = z
+  .object({
+    name: z.string().min(1).max(60),
+    transport: AppTransport,
+    command: z.string().min(1).optional(),
+    args: z.array(z.string()).optional(),
+    env: z.record(z.string(), z.string()).optional(),
+    url: z.string().min(1).optional(),
+    auth: AppAuth.default('none'),
+    token: z.string().min(1).optional(),
+  })
+  .superRefine((p, ctx) => {
+    const need = (ok: boolean, path: string, message: string) => {
+      if (!ok) ctx.addIssue({ code: 'custom', path: [path], message });
+    };
+    need(p.transport !== 'stdio' || !!p.command, 'command', 'a local app needs a command');
+    need(p.transport !== 'http' || !!p.url, 'url', 'a remote app needs an address');
+    need(p.auth !== 'token' || p.transport === 'http', 'auth', 'a token only works with http');
+    need(p.auth !== 'token' || !!p.token, 'token', 'token sign-in needs the token');
+    need(p.auth === 'token' || p.token === undefined, 'token', 'a token only goes with auth token');
+  });
+export type AppAddParams = z.input<typeof AppAddParams>;
+
+export const AppSetEnabledParams = z.object({ id: z.string().min(1), enabled: z.boolean() });
+/** For remove_app and restart_app. */
+export const AppIdParams = z.object({ id: z.string().min(1) });
