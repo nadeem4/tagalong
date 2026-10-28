@@ -195,7 +195,7 @@ async def until(predicate, timeout=15.0):
 
 
 class Rig:
-    def __init__(self, rows, env=None, connect_timeout=15):
+    def __init__(self, rows, env=None, connect_timeout=15, ping_interval=30):
         self.memory = Memory(":memory:")
         for row in rows:
             self.memory.add_app(row)
@@ -205,6 +205,7 @@ class Rig:
             lambda m, p: self.events.append((m, p)),
             env or {},
             connect_timeout=connect_timeout,
+            ping_interval=ping_interval,
         )
 
     async def up(self, app_id, state="connected"):
@@ -239,7 +240,7 @@ async def test_connects_and_lists_tools(make):
 async def test_start_returns_before_connecting(make):
     rig = make([stdio_row()])
     await rig.apps.start()
-    assert rig.apps.status("fake").state in ("connecting", "connected")
+    assert rig.apps.status("fake").state == "connecting"
 
 
 async def test_disabled_app_stays_off(make):
@@ -359,6 +360,28 @@ async def test_call_times_out(make):
         await rig.apps.call("fake", "slow", {}, timeout=0.5)
 
 
+async def wait_for_port(port: int, timeout: float = 20.0) -> None:
+    """The server needs a moment to listen; a refused connect would fail the test at once."""
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            socket.create_connection(("127.0.0.1", port), timeout=1).close()
+            return
+        except OSError:
+            if time.monotonic() > deadline:
+                raise
+            await asyncio.sleep(0.1)
+
+
+def kill_pid(pid: int) -> None:
+    subprocess.run(
+        ["taskkill", "/PID", str(pid), "/T", "/F"]
+        if sys.platform == "win32"
+        else ["kill", "-9", str(pid)],
+        capture_output=True,
+    )
+
+
 def free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -369,6 +392,7 @@ async def test_http_app_connects_and_stops(make):
     port = free_port()
     server = subprocess.Popen([sys.executable, FAKE, "--http", str(port)])
     try:
+        await wait_for_port(port)
         url = f"http://127.0.0.1:{port}/mcp"
         rig = make([AppRow("web", "web", "http", {"url": url}, "none", True)])
         await rig.apps.start()
@@ -389,3 +413,44 @@ async def test_http_unreachable_is_an_error(make):
     await rig.apps.start()
     await rig.up("web", "error")
     assert rig.apps.status("web").error
+
+
+async def test_dropped_connection_found_by_a_call(make, tmp_path):
+    pidfile = tmp_path / "pid"
+    rig = make([stdio_row(env={"FAKE_PIDFILE": str(pidfile)})])
+    await rig.apps.start()
+    await rig.up("fake")
+    pid = int(pidfile.read_text())
+    kill_pid(pid)
+    await until(lambda: not pid_alive(pid), timeout=10)
+    with pytest.raises(AppError, match="closed"):
+        await rig.apps.call("fake", "echo", {"text": "x"})
+    status = rig.apps.status("fake")
+    assert status.state == "error"
+    assert status.error == "The connection fake closed."
+
+
+async def test_dropped_connection_found_by_ping(make, tmp_path):
+    pidfile = tmp_path / "pid"
+    rig = make([stdio_row(env={"FAKE_PIDFILE": str(pidfile)})], ping_interval=0.3)
+    await rig.apps.start()
+    await rig.up("fake")
+    kill_pid(int(pidfile.read_text()))
+    await rig.up("fake", "error")
+    assert rig.apps.status("fake").error == "The connection fake closed."
+
+
+async def test_concurrent_restarts_leave_one_process(make, tmp_path):
+    pidfile = tmp_path / "pid"
+    rig = make([stdio_row(env={"FAKE_PIDFILE": str(pidfile)})])
+    await rig.apps.start()
+    await rig.up("fake")
+    first = int(pidfile.read_text())
+    await asyncio.gather(rig.apps.restart("fake"), rig.apps.restart("fake"))
+    await rig.up("fake")
+    await until(lambda: not pid_alive(first), timeout=10)
+    last = int(pidfile.read_text())
+    assert pid_alive(last)
+    await rig.apps.shutdown()
+    await until(lambda: not pid_alive(last), timeout=10)
+    # The restart that lost the race wrote its own pid first; it must be gone too.

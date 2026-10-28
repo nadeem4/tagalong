@@ -20,7 +20,9 @@ from urllib.parse import urlparse
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
+from mcp.shared.exceptions import MCPError
 from mcp.types import (
+    CONNECTION_CLOSED,
     CallToolResult,
     PaginatedRequestParams,
     Tool,
@@ -147,6 +149,8 @@ class _Slot:
     wake: asyncio.Event = field(default_factory=asyncio.Event)
     stopping: bool = False
     relist: bool = False
+    dropped: bool = False  # the connection closed; the app task then tears down
+    lock: asyncio.Lock = field(default_factory=asyncio.Lock)  # serialises stop and restart
 
 
 def _plain(exc: BaseException) -> str:
@@ -166,11 +170,13 @@ class Apps:
         notify: Callable[[str, dict], None],
         env: Mapping[str, str],
         connect_timeout: float = 30,
+        ping_interval: float = 30,
     ) -> None:
         self._memory = memory
         self._notify = notify
         self._env = env
         self._connect_timeout = connect_timeout
+        self._ping_interval = ping_interval  # how often an idle connection is checked alive
         self._slots: dict[str, _Slot] = {}
 
     async def start(self) -> None:
@@ -179,16 +185,28 @@ class Apps:
             self._launch(row)
 
     async def restart(self, app_id: str) -> None:
-        await self.stop(app_id)
         row = next((r for r in self._memory.list_apps() if r.id == app_id), None)
+        old = self._slots.get(app_id)
         if row is None:
+            await self.stop(app_id)
             self._slots.pop(app_id, None)
             raise AppError(f"no app {app_id}.")
-        self._launch(row)
+        if old is None:
+            self._launch(row)
+            return
+        async with old.lock:  # shared by every slot of this app, so re-read the current one
+            current = self._slots[app_id]
+            await self._stop(current)
+            self._launch(row)
 
     async def stop(self, app_id: str) -> None:
         slot = self._slots.get(app_id)
-        if slot is None or slot.task is None:
+        if slot is not None:
+            async with slot.lock:
+                await self._stop(self._slots[app_id])
+
+    async def _stop(self, slot: _Slot) -> None:
+        if slot.task is None:
             return
         task, slot.task = slot.task, None
         slot.stopping = True
@@ -228,11 +246,23 @@ class Apps:
                 return await session.call_tool(tool, args)
         except TimeoutError:
             raise AppError(f"{slot.row.name} did not answer in time.") from None
+        except MCPError as exc:
+            if exc.code != CONNECTION_CLOSED:
+                raise AppError(f"{slot.row.name}: {_plain(exc)}") from None
+            raise self._drop(slot) from None
         except Exception as exc:
             raise AppError(f"{slot.row.name}: {_plain(exc)}") from None
 
+    def _drop(self, slot: _Slot) -> AppError:
+        message = f"The connection {slot.row.name} closed."
+        self._set(slot, "error", message)
+        slot.dropped = True
+        slot.wake.set()
+        return AppError(message)
+
     def _launch(self, row: AppRow) -> None:
-        slot = _Slot(row, tools=self._slots[row.id].tools if row.id in self._slots else [])
+        old = self._slots.get(row.id)
+        slot = _Slot(row, tools=old.tools if old else [], lock=old.lock if old else asyncio.Lock())
         self._slots[row.id] = slot
         if not row.enabled:
             return
@@ -256,14 +286,20 @@ class Apps:
                 slot.session, slot.tools = session, tools
                 self._set(slot, "connected")
                 while True:
-                    await slot.wake.wait()
+                    try:
+                        await asyncio.wait_for(slot.wake.wait(), self._ping_interval)
+                    except TimeoutError:
+                        await self._ping(slot, session)
                     slot.wake.clear()
                     if slot.stopping:
                         return
+                    if slot.dropped:
+                        raise AppError(f"The connection {slot.row.name} closed.")
                     if slot.relist:
                         slot.relist = False
                         try:
-                            slot.tools = await self._list(session)
+                            async with asyncio.timeout(self._connect_timeout):
+                                slot.tools = await self._list(session)
                             self._notify("changed", {"what": "apps"})
                         except Exception:
                             log.warning(
@@ -273,6 +309,14 @@ class Apps:
             self._set(slot, "error", _plain(exc))
         finally:
             slot.session = None
+
+    async def _ping(self, slot: _Slot, session: ClientSession) -> None:
+        try:
+            async with asyncio.timeout(self._connect_timeout):
+                await session.send_ping()
+        except Exception:
+            slot.dropped = True
+            slot.wake.set()
 
     async def _connect(self, stack: AsyncExitStack, slot: _Slot) -> ClientSession:
         row = slot.row
