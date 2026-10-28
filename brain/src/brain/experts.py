@@ -1,11 +1,9 @@
 """ExpertRun: drives Claude Code in a folder over ACP, knowing nothing of asks or jobs.
 
-It spawns the ACP adapter, runs one session, and reports through callbacks (all async):
-on_permission(request) -> option id | None, on_question(question) -> answer dict | None
-(None cancels), on_progress(text), on_end(state, reason, result) with state done, error
-or stopped. The API key variables are stripped from the child so Claude Code bills the
-user's own login. The adapter may be a .cmd shim and spawn children, so teardown kills
-the whole tree if closing stdin does not end it.
+One session, reported through async callbacks: on_permission -> option id | None,
+on_question -> answer dict | None (None cancels), on_progress, on_end(done|error|stopped).
+API key variables are stripped from the child so Claude Code bills the user's own login.
+The adapter may be a .cmd shim with children, so teardown kills the tree if stdin close fails.
 """
 
 import asyncio
@@ -68,6 +66,8 @@ class QuestionField:
     key: str  # answer under this key; free text goes under f"{key}_custom"
     title: str
     options: list[str]
+    description: str = ""  # the question's own text; the elicitation message is generic
+    multi: bool = False  # array field: the answer is a list of option labels
 
 
 @dataclass(frozen=True)
@@ -350,5 +350,13 @@ def _fields(schema) -> list[QuestionField]:
             continue
         prop = prop if isinstance(prop, dict) else prop.model_dump(by_alias=True)
         choices = prop.get("oneOf") or (prop.get("items") or {}).get("anyOf") or []
-        fields.append(QuestionField(key, prop.get("title") or "", [c["const"] for c in choices]))
+        fields.append(
+            QuestionField(
+                key,
+                prop.get("title") or "",
+                [c["const"] for c in choices],
+                prop.get("description") or "",
+                prop.get("type") == "array",
+            )
+        )
     return fields

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from brain.config import load_config, load_env_file, session_id
+from brain.config import load_config, load_env_file, session_id, split_command
 
 
 def test_defaults():
@@ -115,3 +115,20 @@ def test_expert_overrides_split_the_command_like_a_shell():
 def test_bad_expert_timeout_raises(value):
     with pytest.raises(ValueError):
         load_config({"TAGALONG_EXPERT_TIMEOUT_S": value})
+
+
+def test_split_command_keeps_backslashes_in_a_windows_path():
+    path = r"C:\Users\x\AppData\Roaming\npm\claude-agent-acp.cmd"
+    assert split_command(path, posix=False) == [path]
+
+
+def test_split_command_strips_quotes_around_a_windows_path_with_spaces():
+    cmd = r'"C:\Program Files\nodejs\agent.cmd" --x'
+    assert split_command(cmd, posix=False) == [r"C:\Program Files\nodejs\agent.cmd", "--x"]
+
+
+def test_split_command_posix_still_honours_quotes():
+    assert split_command('node "/opt/my agent/index.js"', posix=True) == [
+        "node",
+        "/opt/my agent/index.js",
+    ]

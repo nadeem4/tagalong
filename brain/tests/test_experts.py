@@ -200,6 +200,47 @@ async def test_question_goes_to_the_callback_and_the_answer_reaches_the_agent(tm
     assert reply["result"] == {"action": "accept", "content": {"question_0": "Red"}}
 
 
+async def test_two_multi_select_questions_keep_their_text_and_the_list_answer_passes_through(
+    tmp_path,
+):
+    h = Harness()
+    h.question_answer = {"question_0": ["Red", "Blue"], "question_1": "Large"}
+    steps = [
+        {
+            "question": {
+                "message": "Please answer the following questions.",
+                "questions": [
+                    {
+                        "header": "Colours",
+                        "description": "Which colours do you like?",
+                        "options": ["Red", "Blue", "Green"],
+                        "multi": True,
+                    },
+                    {
+                        "header": "Size",
+                        "description": "Which size?",
+                        "options": ["Small", "Large"],
+                    },
+                ],
+            }
+        }
+    ]
+    run = make_run(h, tmp_path, steps)
+    try:
+        await run.start(tmp_path)
+        await run.begin("default", "go")
+        await finished(h)
+    finally:
+        await run.close()
+    fields = h.questions[0].fields
+    assert [(f.key, f.title, f.description, f.multi, f.options) for f in fields] == [
+        ("question_0", "Colours", "Which colours do you like?", True, ["Red", "Blue", "Green"]),
+        ("question_1", "Size", "Which size?", False, ["Small", "Large"]),
+    ]
+    reply = next(f for f in frames(tmp_path) if f.get("result", {}).get("action"))
+    assert reply["result"]["content"] == {"question_0": ["Red", "Blue"], "question_1": "Large"}
+
+
 async def test_question_none_cancels(tmp_path):
     h = Harness()
     h.question_answer = None

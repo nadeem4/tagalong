@@ -7,7 +7,8 @@ one JSON object per line. Frame shapes follow tests/fixtures/acp/. Needs only Py
 The script may instead be a list of step lists, one per prompt (the last is reused).
 Steps: {"sleep": secs} pause | {"crash": code} os._exit mid-prompt | {"text": s} message
 chunk | {"permission": {"title", "kind"?, "options"?}} ask and wait |
-{"question": {"message", "options": [labels]}} elicitation and wait | {"hang": true}
+{"question": {"message", "options": [labels]} or {"message", "questions": [...]}}
+elicitation and wait | {"hang": true}
 wait until session/cancel | {"stubborn": true} hang, ignoring cancel | {"end": stop_reason}
 finish the prompt (default end_turn). Env FAKE_ACP_HANG_INIT=1 never answers initialize.
 """
@@ -135,14 +136,21 @@ class FakeAgent:
 
     async def _ask_question(self, session_id: str, spec: dict) -> None:
         # Same form Claude Code builds for AskUserQuestion: one choice plus a free-text box.
-        properties = {
-            "question_0": {
-                "type": "string",
-                "title": spec.get("header", "Question"),
-                "oneOf": [{"const": o, "title": o} for o in spec["options"]],
-            },
-            "question_0_custom": {"type": "string", "title": "Other"},
-        }
+        # spec["questions"] ({header, description, options, multi?} each) builds several fields;
+        # multi-select ones are arrays with items.anyOf, as in the real two-question frame.
+        questions = spec.get("questions") or [
+            {"header": spec.get("header", "Question"), "options": spec["options"]}
+        ]
+        properties = {}
+        for i, q in enumerate(questions):
+            choices = [{"const": o, "title": o} for o in q["options"]]
+            prop: dict = {"type": "string", "title": q["header"], "oneOf": choices}
+            if q.get("multi"):
+                prop = {"type": "array", "title": q["header"], "items": {"anyOf": choices}}
+            if "description" in q:
+                prop["description"] = q["description"]
+            properties[f"question_{i}"] = prop
+            properties[f"question_{i}_custom"] = {"type": "string", "title": "Other"}
         mode = schema.ElicitationFormSessionMode(
             session_id=session_id,
             tool_call_id="call-2",

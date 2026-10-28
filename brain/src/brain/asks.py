@@ -68,6 +68,8 @@ class Asks:
     ) -> Answer:
         # No turn and no confirm: a job's ask can outlive turns, and confirm asks only
         # allow the fixed allow/always/deny sets. Waits until closed unless timeout is given.
+        if ask_id is not None and ask_id in self._open:
+            raise ValueError(f"ask {ask_id} is already open")
         if not self.anyone_online():
             return Answer(None)
         params: dict = {"id": ask_id or uuid.uuid4().hex, "state": "open", "text": text}
@@ -98,8 +100,10 @@ class Asks:
     def cancel_all(self, ask_ids: Iterable[str]) -> None:
         """Close the named open asks as cancelled; their waiters get a cancelled error."""
         for ask_id in ask_ids:
-            entry = self._open.pop(ask_id, None)
-            if entry is not None:
+            entry = self._open.get(ask_id)
+            # A done future means its waiter was cancelled or timed out; it closes the ask itself.
+            if entry is not None and not entry.future.done():
+                del self._open[ask_id]
                 entry.future.set_exception(RpcError(ErrorCode.cancelled, "the ask was cancelled"))
                 self._bodies.notify("ask", {"id": ask_id, "state": "closed", "reason": "cancelled"})
 

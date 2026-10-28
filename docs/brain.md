@@ -55,7 +55,7 @@ the total can run a little low.
 | `brain/src/brain/mind/resume.py` | Rebuilds a valid history from the saved chat at start                                                                                                            |
 | `brain/src/brain/memory.py`      | Scout's memory: the kinds table and the SQLite store (`tagalong.db`)                                                                                             |
 | `brain/src/brain/toolbox.py`     | `Toolbox`: lists and gates every tool call, from `BrainSource` and `BodySource`                                                                                  |
-| `brain/src/brain/asks.py`        | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers)                                                               |
+| `brain/src/brain/asks.py`        | `Asks`: opens permission asks (turn-bound) and `open` asks (no turn, custom options, typed answers)                                                              |
 | `brain/src/brain/experts.py`     | `ExpertRun`: drives Claude Code in a folder over ACP; callbacks for permissions, questions, progress and the end                                                 |
 | `brain/src/brain/tools.py`       | The brain's own tools (`remember`, `recall`, `forget`) as specs and handlers for `BrainSource`                                                                   |
 | `brain/src/brain/mind/soul.md`   | Scout's character, the start of the system prompt                                                                                                                |
@@ -296,10 +296,15 @@ adapter crash) or `stopped`.
 
 Install the adapter once: `npm install -g @agentclientprotocol/claude-agent-acp` (Node 22 or newer).
 A missing command is reported with that step. `TAGALONG_EXPERT_CMD` swaps the command and
-`TAGALONG_EXPERT_TIMEOUT_S` sets the run limit. The child gets the brain's environment without
+`TAGALONG_EXPERT_TIMEOUT_S` sets the run limit. The command is split like a shell on Linux and
+macOS; on Windows backslashes are kept, so `C:\Users\me\AppData\Roaming\npm\claude-agent-acp.cmd`
+works as written (quote it if it has spaces). A question's `QuestionField` carries the key,
+title, the question's own text (`description`), the option labels and `multi` (a multi-select
+answers with a list of labels). The child gets the brain's environment without
 `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN`, so Claude Code bills the user's own login, not
 the key Scout uses. The process is closed by closing its stdin; if it stays alive it is killed with
-its children (`taskkill /T /F` on Windows). Start and the mode change are bounded by a 60 s
+its children (`taskkill /T /F` on Windows; on Linux and macOS only the adapter process is
+killed, and its children exit when their stdin closes). Start and the mode change are bounded by a 60 s
 startup limit (an adapter that never answers is killed and reported). `stop()` and `close()` are
 safe from any state, including from inside `on_end`; teardown is shared, so `on_end` fires once,
 after the process is gone. A stop answers any pending permission or question as cancelled.

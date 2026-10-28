@@ -138,12 +138,12 @@ Captured with a scratch client against the real adapter on the user's Claude Cod
 
 ## Slices
 
-| Slice | PR      | Contents                                                                                                                                                                                                                                    |
-| ----- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 8a    | brain   | Task 1 checks; ACP runner (with fake agent), hand-off ask, relayed asks, `jobs` table, the four tools, `changed: jobs`, restart cleanup, `Session.wake` and the finish turn, docs/brain.md section and setup notes (installing the adapter) |
-| 8b    | desktop | Home Jobs panel through `call`, refetch on `changed: jobs`, hand-off and relayed asks shown right, e2e on the fake brain, docs/desktop.md and feature-test-guide                                                                            |
-
-If 8a runs past ~1,000 lines, split the wake turn into 8a2.
+| Slice | PR      | Contents                                                                                                                                                                               |
+| ----- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 8a1   | brain   | Task 1 spike, fake ACP agent, ACP runner, turn-less asks                                                                                                                               |
+| 8a2   | brain   | `jobs` table, self-asking gate flag, hand-off ask, relayed asks, four tools (`hand_off`, `tell_expert`, `list_jobs`, `stop_job`), `changed: jobs`, restart cleanup, config/main wiring |
+| 8a3   | brain   | `Session.wake`, finish turn, requeue unreported jobs, docs                                                                                                                             |
+| 8b    | desktop | Home Jobs panel through `call`, refetch on `changed: jobs`, relayed asks UI, e2e on the fake brain                                                                                     |
 
 ## Decided
 

@@ -337,3 +337,28 @@ async def test_open_first_answer_wins():
         asks.answer(params["id"], "b", "extension")
     assert err.value.code == ErrorCode.not_found
     assert await task == Answer("a", None)
+
+
+async def test_cancel_all_skips_an_ask_whose_waiter_was_already_cancelled():
+    bodies = FakeBodies()
+    asks = Asks(bodies)
+    task = asyncio.create_task(asks.open(text="Which?", options=["a"], ask_id="job1-a"))
+    await opened(bodies)
+    await asyncio.sleep(0)
+    task.cancel()  # the waiter's future is cancelled now; its cleanup runs a tick later
+    asks.cancel_all(["job1-a"])  # must not raise InvalidStateError
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert asks.open_asks() == []
+
+
+async def test_open_rejects_a_duplicate_ask_id():
+    bodies = FakeBodies()
+    asks = Asks(bodies)
+    first = asyncio.create_task(asks.open(text="Which?", options=["a"], ask_id="job1-a"))
+    await opened(bodies)
+    await asyncio.sleep(0)
+    with pytest.raises(ValueError):
+        await asks.open(text="Again?", options=["a"], ask_id="job1-a")
+    asks.answer("job1-a", "a", "desktop")  # the first ask is untouched
+    assert await first == Answer("a", None)

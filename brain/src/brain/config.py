@@ -33,6 +33,17 @@ class Config:
     expert_timeout: float = DEFAULT_EXPERT_TIMEOUT_S
 
 
+def split_command(cmd: str, posix: bool | None = None) -> list[str]:
+    # POSIX shlex eats backslashes, which mangles C:\Users\... paths. Non-POSIX mode keeps
+    # them, but also keeps the quotes, so strip those.
+    if posix is None:
+        posix = os.name != "nt"
+    parts = shlex.split(cmd, posix=posix)
+    if posix:
+        return parts
+    return [p[1:-1] if len(p) > 1 and p[0] == p[-1] and p[0] in "\"'" else p for p in parts]
+
+
 def load_config(env: Mapping[str, str] = os.environ) -> Config:
     host, port = DEFAULT_HOST, DEFAULT_PORT
     addr = env.get("TAGALONG_BRAIN_ADDR")
@@ -53,7 +64,7 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         model=env.get("TAGALONG_MODEL") or DEFAULT_MODEL,
         daily_budget_usd=_budget(env.get("TAGALONG_DAILY_BUDGET_USD")),
         step_cap=_step_cap(env.get("TAGALONG_STEP_CAP")),
-        expert_cmd=shlex.split(env.get("TAGALONG_EXPERT_CMD") or DEFAULT_EXPERT_CMD),
+        expert_cmd=split_command(env.get("TAGALONG_EXPERT_CMD") or DEFAULT_EXPERT_CMD),
         expert_timeout=_expert_timeout(env.get("TAGALONG_EXPERT_TIMEOUT_S")),
     )
 
