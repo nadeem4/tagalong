@@ -1,4 +1,4 @@
-# The Python brain
+﻿# The Python brain
 
 The brain is the Python side of contract v1 ([protocol/README.md](../protocol/README.md)). It is
 being built row by row and replaces `packages/core`. Today bodies can connect, declare their tools,
@@ -221,6 +221,8 @@ The user's saved choices live in the `permissions` table in `tagalong.db`:
 | `mode` | `ask` or `auto`                  |
 
 No row means the tool's default applies. `Toolbox.set_mode` refuses `auto` on a locked tool.
+
+Expert jobs (Claude Code hand-offs) live in the `jobs` table of the same file: id, agent, task, folder, mode, state (`running`, `done`, `error`, `stopped`), reason, progress, result (capped at 20,000 characters), session id, a `reported` flag and start and end times. Rows still `running` at brain start become `stopped` with reason `brain restarted`.
 
 An ask is a `confirm` ask (see [protocol/README.md](../protocol/README.md#asks-and-confirm)):
 

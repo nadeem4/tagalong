@@ -89,6 +89,16 @@ MIGRATIONS = (
         mode TEXT NOT NULL CHECK(mode IN ('ask','auto'))
     );
     """,
+    # Expert jobs (Claude Code hand-offs). Rows still running at brain start become stopped.
+    """
+    CREATE TABLE jobs(
+        id TEXT PRIMARY KEY,
+        agent TEXT, task TEXT, folder TEXT, mode TEXT,
+        state TEXT, reason TEXT, progress TEXT, result TEXT, session_id TEXT,
+        reported INTEGER DEFAULT 0,
+        started_at TEXT, ended_at TEXT
+    );
+    """,
 )
 
 
@@ -107,6 +117,23 @@ class Item:
 
 
 @dataclass(frozen=True)
+class Job:
+    id: str
+    agent: str
+    task: str
+    folder: str
+    mode: str
+    state: str
+    reason: str | None
+    progress: str | None
+    result: str | None
+    session_id: str | None
+    reported: bool
+    started_at: str
+    ended_at: str | None
+
+
+@dataclass(frozen=True)
 class Hit:
     ref: str
     kind: str
@@ -115,6 +142,12 @@ class Hit:
 
 
 _COLUMNS = "id, kind, text, cadence, created_at, updated_at"
+_JOB_COLUMNS = (
+    "id, agent, task, folder, mode, state, reason, progress, result, session_id,"
+    " reported, started_at, ended_at"
+)
+_JOB_FIELDS = {c.strip() for c in _JOB_COLUMNS.split(",")} - {"id"}
+JOB_RESULT_CAP = 20_000
 
 
 def _probe_fts5(db: sqlite3.Connection) -> None:
@@ -211,6 +244,59 @@ class Memory:
             " ON CONFLICT(tool) DO UPDATE SET mode=excluded.mode",
             (tool, mode),
         )
+
+    def _jobs(self, where: str = "", args: tuple = (), limit: int | None = None) -> list[Job]:
+        sql = f"SELECT {_JOB_COLUMNS} FROM jobs {where} ORDER BY rowid DESC"
+        if limit is not None:
+            sql += " LIMIT ?"
+            args += (limit,)
+        return [
+            Job(*r[:10], bool(r[10]), r[11], r[12]) for r in self._db.execute(sql, args).fetchall()
+        ]
+
+    def add_job(self, id: str, agent: str, task: str, folder: str, mode: str) -> Job:
+        self._db.execute(
+            "INSERT INTO jobs(id, agent, task, folder, mode, state, started_at)"
+            " VALUES (?,?,?,?,?,'running',?)",
+            (id, agent, task, folder, mode, self._now().isoformat()),
+        )
+        return self._jobs("WHERE id=?", (id,))[0]
+
+    def update_job(self, id: str, **fields) -> None:
+        unknown = set(fields) - _JOB_FIELDS
+        if unknown:
+            raise ValueError(f"Unknown job fields: {', '.join(sorted(unknown))}")
+        if not fields:
+            return
+        if isinstance(fields.get("result"), str):
+            fields["result"] = fields["result"][:JOB_RESULT_CAP]
+        sets = ", ".join(f"{k}=?" for k in fields)
+        self._db.execute(f"UPDATE jobs SET {sets} WHERE id=?", (*fields.values(), id))
+
+    def get_job(self, id: str) -> Job | None:
+        rows = self._jobs("WHERE id=?", (id,))
+        return rows[0] if rows else None
+
+    def list_jobs(self, limit: int = 20) -> list[Job]:
+        """Newest first."""
+        return self._jobs(limit=limit)
+
+    def running_jobs(self) -> list[Job]:
+        return self._jobs("WHERE state='running'")
+
+    def stop_running_on_start(self) -> None:
+        """No job survives a brain restart; mark the leftovers stopped."""
+        self._db.execute(
+            "UPDATE jobs SET state='stopped', reason='brain restarted', ended_at=?"
+            " WHERE state='running'",
+            (self._now().isoformat(),),
+        )
+
+    def unreported_jobs(self) -> list[Job]:
+        return self._jobs("WHERE state!='running' AND reported=0")
+
+    def mark_reported(self, id: str) -> None:
+        self._db.execute("UPDATE jobs SET reported=1 WHERE id=?", (id,))
 
     def _item(self, item_id: int) -> Item | None:
         row = self._db.execute(f"SELECT {_COLUMNS} FROM memories WHERE id=?", (item_id,)).fetchone()

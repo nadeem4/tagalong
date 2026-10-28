@@ -392,3 +392,90 @@ def test_set_permission_mode_upserts(mem):
 def test_set_permission_mode_rejects_other_modes(mem):
     with pytest.raises(sqlite3.IntegrityError):
         mem.set_permission_mode("x", "maybe")
+
+
+# ---- jobs (8a2) ----
+
+
+def test_jobs_migration_keeps_existing_data(tmp_path):
+    path = tmp_path / "old.db"
+    db = sqlite3.connect(path, isolation_level=None)
+    db.executescript("".join(memory.MIGRATIONS[:3]) + "PRAGMA user_version = 3;")
+    db.execute(
+        "INSERT INTO memories(kind,text,created_at,updated_at)"
+        " VALUES('about_you','Likes tea','a','a')"
+    )
+    db.close()
+    m = Memory(path)
+    assert m.always_loaded()["about_you"][0].text == "Likes tea"
+    assert m.list_jobs() == []
+    m.close()
+
+
+def test_job_round_trip(mem):
+    job = mem.add_job("j1", "claude-code", "fix the test", "C:/p", "default")
+    assert job.state == "running"
+    assert job.reported is False
+    assert job.ended_at is None
+    assert job.started_at
+    mem.update_job("j1", state="done", progress="almost", result="all fixed", session_id="s1")
+    got = mem.get_job("j1")
+    assert (got.state, got.progress, got.result, got.session_id) == (
+        "done",
+        "almost",
+        "all fixed",
+        "s1",
+    )
+    assert got.agent == "claude-code" and got.folder == "C:/p" and got.mode == "default"
+    assert mem.get_job("nope") is None
+
+
+def test_update_job_unknown_field_refused(mem):
+    mem.add_job("j1", "a", "t", "f", "m")
+    with pytest.raises(ValueError):
+        mem.update_job("j1", nonsense="x")
+
+
+def test_list_jobs_newest_first_and_limited(mem):
+    for i in range(5):
+        mem.add_job(f"j{i}", "a", "t", "f", "m")
+    assert [j.id for j in mem.list_jobs()] == ["j4", "j3", "j2", "j1", "j0"]
+    assert [j.id for j in mem.list_jobs(limit=2)] == ["j4", "j3"]
+
+
+def test_running_jobs_only_running(mem):
+    mem.add_job("a", "a", "t", "f", "m")
+    mem.add_job("b", "a", "t", "f", "m")
+    mem.update_job("b", state="done")
+    assert [j.id for j in mem.running_jobs()] == ["a"]
+
+
+def test_stop_running_on_start_only_touches_running(mem):
+    mem.add_job("a", "a", "t", "f", "m")
+    mem.add_job("b", "a", "t", "f", "m")
+    mem.update_job("b", state="done", ended_at="x")
+    mem.stop_running_on_start()
+    a, b = mem.get_job("a"), mem.get_job("b")
+    assert (a.state, a.reason) == ("stopped", "brain restarted")
+    assert a.ended_at
+    assert (b.state, b.reason, b.ended_at) == ("done", None, "x")
+
+
+def test_unreported_jobs_finished_only(mem):
+    for name in ("run", "done", "err", "stop", "seen"):
+        mem.add_job(name, "a", "t", "f", "m")
+    mem.update_job("done", state="done")
+    mem.update_job("err", state="error")
+    mem.update_job("stop", state="stopped")
+    mem.update_job("seen", state="done")
+    mem.mark_reported("seen")
+    assert {j.id for j in mem.unreported_jobs()} == {"done", "err", "stop"}
+    assert mem.get_job("seen").reported is True
+
+
+def test_job_result_capped_and_progress_as_given(mem):
+    mem.add_job("j", "a", "t", "f", "m")
+    mem.update_job("j", result="x" * 25_000, progress="p" * 5000)
+    got = mem.get_job("j")
+    assert len(got.result) == 20_000
+    assert len(got.progress) == 5000
