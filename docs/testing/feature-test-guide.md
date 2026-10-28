@@ -1402,8 +1402,11 @@ address, which is https). The brain and the desktop run on this PC.
       appears in Settings files, `tagalong.db` or the page).
 - [ ] Switch a needs-sign-in app **Off**: its **Sign in** button goes. Switch it **On** again: it comes back.
 - [ ] **Remove** the app: `app-oauth/<app id>.json` is gone.
-- [ ] With the brain on another machine (or the desktop closed), **Sign in** shows "Open Tagalong on
-      the machine the brain runs on to sign in."
+- [ ] With the brain on another machine, **Sign in** opens the browser on the desktop's PC, but the
+      redirect lands on that PC's own 127.0.0.1, not the brain's, so nothing finishes: after five
+      minutes the row goes back to **Needs sign-in**. This is the known same-machine limit.
+- [ ] Ask Scout to open a web page with the desktop tool (desktop__open_url): it asks first, and
+      the ask offers no **Always allow**.
 
 ## Waiting on you
 
