@@ -310,6 +310,10 @@ all five (see [connected-apps.md](connected-apps.md#homes-connections-page)).
 
 An unknown id is refused with `There is no app called <id>.`
 
+`list_apps` never returns a secret. Env values, headers and tokens do not leave the brain. A url
+is cut to scheme, host, port and path: userinfo, query and fragment are stripped, and a malformed
+url shows empty. Home shows these rows in its "Where things run" card.
+
 ## Connected apps
 
 `apps.py` and `app_tools.py` let Scout use MCP servers the user adds. See

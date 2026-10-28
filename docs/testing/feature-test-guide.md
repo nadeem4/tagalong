@@ -1371,6 +1371,16 @@ command or a pasted key.
       again**; start the brain and press it, and the apps come back.
 - [ ] An app with browser sign-in shows its status like any other and has no sign-in button.
 
+### C7. Where things run
+
+- [ ] With the brain running, Home → **Overview** → **Where things run** shows
+      `ws://127.0.0.1:47321` with **Connected**, each app by its command or https address and status,
+      and Claude Code as a process on this machine. No env value, header or key appears.
+- [ ] Stop the brain. Within a few seconds the card says **Offline** and that apps return with the
+      brain. Start it again: **Connected** and the apps come back.
+- [ ] Start the brain on another port and the desktop with `TAGALONG_BRAIN_ADDR=127.0.0.1:50000`. The
+      card shows that address.
+
 ## Waiting on you
 
 Everything that waits on you (a change in a connected app, a hand-off card) is saved and listed in
