@@ -1,12 +1,22 @@
-"""Tests for connected apps: slugs, env expansion, validation, and the apps table store."""
+"""Tests for connected apps: slugs, env expansion, validation, the apps table store, and the
+Apps manager (against a real fake MCP server over stdio and http, including process cleanup)."""
 
+import asyncio
+import os
+import socket
 import sqlite3
+import subprocess
+import sys
+import time
+from pathlib import Path
 
 import pytest
 
 from brain import memory
-from brain.apps import AppError, AppRow, expand_env, slug_for, validate_app
+from brain.apps import AppError, AppRow, Apps, expand_env, slug_for, validate_app
 from brain.memory import Memory
+
+FAKE = str(Path(__file__).parent / "fake_mcp_server.py")
 
 
 @pytest.fixture
@@ -146,3 +156,236 @@ def test_store_survives_reopen(tmp_path):
     m = Memory(tmp_path / "r.db")
     assert m.list_apps()[0].config == {"url": "https://mcp.linear.app/mcp"}
     m.close()
+
+
+# ---- Apps manager ----
+
+
+def stdio_row(app_id="fake", mode=None, env=None, command=None, enabled=True) -> AppRow:
+    args = [FAKE] + ([mode] if mode else [])
+    config = {"command": command or sys.executable, "args": args, "env": env or {}}
+    return AppRow(app_id, app_id, "stdio", config, "none", enabled)
+
+
+def pid_alive(pid: int) -> bool:
+    if sys.platform == "win32":
+        import ctypes
+
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)  # QUERY_LIMITED
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return code.value == 259  # STILL_ACTIVE
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+async def until(predicate, timeout=15.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return
+        await asyncio.sleep(0.05)
+    raise AssertionError("condition not reached in time")
+
+
+class Rig:
+    def __init__(self, rows, env=None, connect_timeout=15):
+        self.memory = Memory(":memory:")
+        for row in rows:
+            self.memory.add_app(row)
+        self.events: list[tuple[str, dict]] = []
+        self.apps = Apps(
+            self.memory,
+            lambda m, p: self.events.append((m, p)),
+            env or {},
+            connect_timeout=connect_timeout,
+        )
+
+    async def up(self, app_id, state="connected"):
+        await until(lambda: self.apps.status(app_id).state == state)
+
+
+@pytest.fixture
+async def make():
+    rigs: list[Rig] = []
+
+    def build(rows, **kw):
+        rig = Rig(rows, **kw)
+        rigs.append(rig)
+        return rig
+
+    yield build
+    for rig in rigs:
+        await rig.apps.shutdown()
+
+
+async def test_connects_and_lists_tools(make):
+    rig = make([stdio_row()])
+    await rig.apps.start()
+    await rig.up("fake")
+    names = {t.name for t in rig.apps.tools("fake")}
+    assert {"echo", "read_note", "delete_note", "slow", "big", "add_tool"} == names
+    assert rig.apps.status("fake").tool_count == 6
+    result = await rig.apps.call("fake", "echo", {"text": "hi"})
+    assert result.content[0].text == "hi"
+
+
+async def test_start_returns_before_connecting(make):
+    rig = make([stdio_row()])
+    await rig.apps.start()
+    assert rig.apps.status("fake").state in ("connecting", "connected")
+
+
+async def test_disabled_app_stays_off(make):
+    rig = make([stdio_row(enabled=False)])
+    await rig.apps.start()
+    await asyncio.sleep(0.2)
+    assert rig.apps.status("fake").state == "off"
+    assert rig.apps.tools("fake") == []
+
+
+async def test_server_that_hangs_times_out(make):
+    rig = make([stdio_row(mode="hang")], connect_timeout=0.5)
+    await rig.apps.start()
+    await rig.up("fake", "error")
+    assert "did not answer in time" in rig.apps.status("fake").error
+
+
+async def test_server_that_exits_is_an_error(make):
+    rig = make([stdio_row(mode="exit")])
+    await rig.apps.start()
+    await rig.up("fake", "error")
+    assert rig.apps.status("fake").error
+
+
+async def test_missing_command_names_it(make):
+    rig = make([stdio_row(command="no-such-command-xyz")])
+    await rig.apps.start()
+    await rig.up("fake", "error")
+    assert rig.apps.status("fake").error == "cannot find the command no-such-command-xyz"
+
+
+async def test_unset_env_ref_is_a_plain_error(make):
+    rig = make([stdio_row(env={"TOKEN": "${NOPE_TOKEN}"})])
+    await rig.apps.start()
+    await rig.up("fake", "error")
+    assert rig.apps.status("fake").error == "needs NOPE_TOKEN set in brain's environment"
+
+
+async def test_a_failing_app_leaves_another_connected(make):
+    rig = make([stdio_row("good"), stdio_row("bad", mode="exit")])
+    await rig.apps.start()
+    await rig.up("good")
+    await rig.up("bad", "error")
+    assert rig.apps.status("good").state == "connected"
+
+
+async def test_restart_reconnects(make):
+    rig = make([stdio_row()])
+    await rig.apps.start()
+    await rig.up("fake")
+    await rig.apps.restart("fake")
+    await rig.up("fake")
+    result = await rig.apps.call("fake", "echo", {"text": "again"})
+    assert result.content[0].text == "again"
+
+
+async def test_process_is_gone_after_stop_and_shutdown(make, tmp_path):
+    pidfile = tmp_path / "pid"
+    rig = make([stdio_row(env={"FAKE_PIDFILE": str(pidfile)})])
+    await rig.apps.start()
+    await rig.up("fake")
+    pid = int(pidfile.read_text())
+    assert pid_alive(pid)
+    await rig.apps.stop("fake")
+    assert rig.apps.status("fake").state == "off"
+    await until(lambda: not pid_alive(pid), timeout=10)
+
+    await rig.apps.restart("fake")
+    await rig.up("fake")
+    pid2 = int(pidfile.read_text())
+    assert pid_alive(pid2)
+    await rig.apps.shutdown()
+    await until(lambda: not pid_alive(pid2), timeout=10)
+
+
+async def test_last_tools_survive_stop(make):
+    rig = make([stdio_row()])
+    await rig.apps.start()
+    await rig.up("fake")
+    await rig.apps.stop("fake")
+    assert len(rig.apps.tools("fake")) == 6
+
+
+async def test_tool_list_changed_relists(make):
+    rig = make([stdio_row()])
+    await rig.apps.start()
+    await rig.up("fake")
+    await rig.apps.call("fake", "add_tool", {})
+    await until(lambda: rig.apps.status("fake").tool_count == 7)
+    assert "extra" in {t.name for t in rig.apps.tools("fake")}
+
+
+async def test_state_changes_notify(make):
+    rig = make([stdio_row()])
+    await rig.apps.start()
+    await rig.up("fake")
+    assert ("changed", {"what": "apps"}) in rig.events
+    before = len(rig.events)
+    await rig.apps.stop("fake")
+    assert len(rig.events) > before
+
+
+async def test_call_when_not_connected_is_a_plain_error(make):
+    rig = make([stdio_row(enabled=False)])
+    await rig.apps.start()
+    with pytest.raises(AppError, match="not connected"):
+        await rig.apps.call("fake", "echo", {"text": "x"})
+    with pytest.raises(AppError, match="no app"):
+        await rig.apps.call("ghost", "echo", {})
+
+
+async def test_call_times_out(make):
+    rig = make([stdio_row()])
+    await rig.apps.start()
+    await rig.up("fake")
+    with pytest.raises(AppError, match="did not answer"):
+        await rig.apps.call("fake", "slow", {}, timeout=0.5)
+
+
+def free_port() -> int:
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+async def test_http_app_connects_and_stops(make):
+    port = free_port()
+    server = subprocess.Popen([sys.executable, FAKE, "--http", str(port)])
+    try:
+        url = f"http://127.0.0.1:{port}/mcp"
+        rig = make([AppRow("web", "web", "http", {"url": url}, "none", True)])
+        await rig.apps.start()
+        await rig.up("web")
+        assert rig.apps.status("web").tool_count == 6
+        result = await rig.apps.call("web", "echo", {"text": "net"})
+        assert result.content[0].text == "net"
+        await rig.apps.stop("web")
+        assert rig.apps.status("web").state == "off"
+    finally:
+        server.kill()
+        server.wait()
+
+
+async def test_http_unreachable_is_an_error(make):
+    url = f"http://127.0.0.1:{free_port()}/mcp"
+    rig = make([AppRow("web", "web", "http", {"url": url}, "none", True)])
+    await rig.apps.start()
+    await rig.up("web", "error")
+    assert rig.apps.status("web").error

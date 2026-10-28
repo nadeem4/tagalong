@@ -1,13 +1,36 @@
-"""Connected apps (MCP servers): the row type, slug and env helpers, and param validation.
+"""Connected apps (MCP servers): the row type, helpers, validation, and the Apps manager.
 
-The store lives in memory.py. Secrets never enter a row: `${VAR}` refs stay verbatim here and
-are expanded only at connect time, and tokens go to their own file (never through validate_app).
+The store lives in memory.py (which imports this module, so Memory is type-only here). Secrets
+never enter a row: `${VAR}` refs stay verbatim and are expanded only at connect time, and tokens
+go to their own file. Apps keeps one long-lived task per app so each SDK transport opens and
+closes in the same task (anyio cancel scopes break when they are closed from another one).
 """
 
+import asyncio
+import logging
+import os
 import re
-from dataclasses import dataclass
-from typing import Any
+import shutil
+from collections.abc import Callable, Mapping
+from contextlib import AsyncExitStack
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
+
+from mcp import ClientSession
+from mcp.client.stdio import StdioServerParameters, stdio_client
+from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
+from mcp.types import (
+    CallToolResult,
+    PaginatedRequestParams,
+    Tool,
+    ToolListChangedNotification,
+)
+
+if TYPE_CHECKING:
+    from brain.memory import Memory
+
+log = logging.getLogger("brain")
 
 # Ids the brain's own bodies use; an app slug must never shadow them.
 RESERVED_IDS = frozenset({"desktop", "extension", "brain"})
@@ -104,3 +127,186 @@ def validate_app(params: dict[str, Any], taken: set[str] | frozenset[str] = froz
     checked = _check_stdio(config) if transport == "stdio" else _check_http(config)
     name = name.strip()
     return AppRow(slug_for(name, taken), name, transport, checked, auth, True)
+
+
+@dataclass(frozen=True)
+class AppStatus:
+    state: str  # off | connecting | connected | needs-sign-in | error
+    error: str = ""
+    tool_count: int = 0
+
+
+@dataclass
+class _Slot:
+    row: AppRow
+    state: str = "off"
+    error: str = ""
+    tools: list[Tool] = field(default_factory=list)  # kept after a disconnect for the UI
+    session: ClientSession | None = None
+    task: asyncio.Task | None = None
+    wake: asyncio.Event = field(default_factory=asyncio.Event)
+    stopping: bool = False
+    relist: bool = False
+
+
+def _plain(exc: BaseException) -> str:
+    """The first line of the real error; never anything from env values."""
+    while isinstance(exc, BaseExceptionGroup) and exc.exceptions:
+        exc = exc.exceptions[0]
+    if isinstance(exc, TimeoutError):
+        return "did not answer in time"
+    lines = str(exc).strip().splitlines()
+    return lines[0] if lines else type(exc).__name__
+
+
+class Apps:
+    def __init__(
+        self,
+        memory: "Memory",
+        notify: Callable[[str, dict], None],
+        env: Mapping[str, str],
+        connect_timeout: float = 30,
+    ) -> None:
+        self._memory = memory
+        self._notify = notify
+        self._env = env
+        self._connect_timeout = connect_timeout
+        self._slots: dict[str, _Slot] = {}
+
+    async def start(self) -> None:
+        """Begin connecting every enabled app in the background and return at once."""
+        for row in self._memory.list_apps():
+            self._launch(row)
+
+    async def restart(self, app_id: str) -> None:
+        await self.stop(app_id)
+        row = next((r for r in self._memory.list_apps() if r.id == app_id), None)
+        if row is None:
+            self._slots.pop(app_id, None)
+            raise AppError(f"no app {app_id}.")
+        self._launch(row)
+
+    async def stop(self, app_id: str) -> None:
+        slot = self._slots.get(app_id)
+        if slot is None or slot.task is None:
+            return
+        task, slot.task = slot.task, None
+        slot.stopping = True
+        slot.wake.set()
+        if slot.state == "connecting":
+            task.cancel()
+        done, _ = await asyncio.wait({task}, timeout=15)
+        if not done:  # a stuck close must not hang shutdown
+            task.cancel()
+            await asyncio.wait({task}, timeout=5)
+        self._set(slot, "off")
+
+    async def shutdown(self) -> None:
+        await asyncio.gather(*(self.stop(app_id) for app_id in list(self._slots)))
+
+    def status(self, app_id: str) -> AppStatus:
+        slot = self._slots.get(app_id)
+        if slot is None:
+            return AppStatus("off")
+        return AppStatus(slot.state, slot.error, len(slot.tools))
+
+    def tools(self, app_id: str) -> list[Tool]:
+        slot = self._slots.get(app_id)
+        return list(slot.tools) if slot else []
+
+    async def call(
+        self, app_id: str, tool: str, args: dict[str, Any], timeout: float = 60
+    ) -> CallToolResult:
+        slot = self._slots.get(app_id)
+        if slot is None:
+            raise AppError(f"no app {app_id}.")
+        session = slot.session
+        if slot.state != "connected" or session is None:
+            raise AppError(f"{slot.row.name} is not connected.")
+        try:
+            async with asyncio.timeout(timeout):
+                return await session.call_tool(tool, args)
+        except TimeoutError:
+            raise AppError(f"{slot.row.name} did not answer in time.") from None
+        except Exception as exc:
+            raise AppError(f"{slot.row.name}: {_plain(exc)}") from None
+
+    def _launch(self, row: AppRow) -> None:
+        slot = _Slot(row, tools=self._slots[row.id].tools if row.id in self._slots else [])
+        self._slots[row.id] = slot
+        if not row.enabled:
+            return
+        self._set(slot, "connecting")
+        slot.task = asyncio.create_task(self._run(slot))
+
+    def _set(self, slot: _Slot, state: str, error: str = "") -> None:
+        if (slot.state, slot.error) != (state, error):
+            slot.state, slot.error = state, error
+            self._notify("changed", {"what": "apps"})
+
+    async def _run(self, slot: _Slot) -> None:
+        # Everything, including the error handling, sits outside the stack's `async with` so a
+        # failure unwinds through the transport's own cancel scopes before we look at it.
+        try:
+            async with AsyncExitStack() as stack:
+                async with asyncio.timeout(self._connect_timeout):
+                    session = await self._connect(stack, slot)
+                    await session.initialize()
+                    tools = await self._list(session)
+                slot.session, slot.tools = session, tools
+                self._set(slot, "connected")
+                while True:
+                    await slot.wake.wait()
+                    slot.wake.clear()
+                    if slot.stopping:
+                        return
+                    if slot.relist:
+                        slot.relist = False
+                        try:
+                            slot.tools = await self._list(session)
+                            self._notify("changed", {"what": "apps"})
+                        except Exception:
+                            log.warning(
+                                "could not refresh tools for %s", slot.row.id, exc_info=True
+                            )
+        except Exception as exc:
+            self._set(slot, "error", _plain(exc))
+        finally:
+            slot.session = None
+
+    async def _connect(self, stack: AsyncExitStack, slot: _Slot) -> ClientSession:
+        row = slot.row
+        if row.transport == "stdio":
+            command = row.config["command"]
+            exe = shutil.which(command)
+            if exe is None:
+                raise AppError(f"cannot find the command {command}")
+            env = {k: expand_env(v, self._env) for k, v in row.config.get("env", {}).items()}
+            params = StdioServerParameters(command=exe, args=row.config.get("args", []), env=env)
+            errlog = stack.enter_context(open(os.devnull, "w"))  # noqa: SIM115
+            read, write = await stack.enter_async_context(stdio_client(params, errlog=errlog))
+        else:
+            client = await stack.enter_async_context(create_mcp_http_client())
+            read, write = await stack.enter_async_context(
+                streamable_http_client(row.config["url"], http_client=client)
+            )
+
+        async def on_message(message: object) -> None:
+            # Re-listing here would wait on the receive loop that is running this handler.
+            if isinstance(message, ToolListChangedNotification):
+                slot.relist = True
+                slot.wake.set()
+
+        return await stack.enter_async_context(
+            ClientSession(read, write, message_handler=on_message)
+        )
+
+    async def _list(self, session: ClientSession) -> list[Tool]:
+        tools: list[Tool] = []
+        params = None
+        while True:
+            page = await session.list_tools(params=params)
+            tools.extend(page.tools)
+            if not page.next_cursor:
+                return tools
+            params = PaginatedRequestParams(cursor=page.next_cursor)
