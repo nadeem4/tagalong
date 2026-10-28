@@ -94,8 +94,9 @@ tagalong/
       scripts/start-fresh.mjs       # runs the app on a new temp data folder
       e2e/                          # smoke, brain-offline, first-run, launch-greeting, hotkey-recovery, listening
                                     # (Always listening) and cards.spec.ts (the hand-off, connector
-                                    # confirm and routine cards)
-      e2e/fixtures/fake-brain.ts    # a ws server speaking contract v1, for smoke and listening
+                                    # confirm and routine cards), asks, permissions and jobs.spec.ts
+                                    # (Home's Jobs panel and a job's asks)
+      e2e/fixtures/fake-brain.ts    # a ws server speaking contract v1, for smoke, listening, asks, permissions, jobs
       e2e/fixtures/notes-mcp.mjs    # a tiny stdio MCP server with one write tool, for cards.spec.ts
       src/main/                     # index.ts, brain/ (brain-client.ts, turn-events.ts,
                                     # start.ts), context.ts,
@@ -290,7 +291,9 @@ test:e2e`.
 
 The suites run offline on fakes. The desktop answers turns only through a brain, so `smoke.spec.ts` and
 `listening.spec.ts` start `e2e/fixtures/fake-brain.ts`, a `ws` server that speaks contract v1 (it answers
-`hello`, then every `say` with one scripted reply), and pass its address as `TAGALONG_BRAIN_ADDR`.
+`hello`, then every `say` with one scripted reply; it also answers Home's permission and jobs tools and, for a
+say that mentions "permission" or "hand off", opens the asks `asks.spec.ts` and `jobs.spec.ts` need), and pass
+its address as `TAGALONG_BRAIN_ADDR`.
 `brain-offline.spec.ts` points the app at a port nothing listens on and expects the offline mark. Other fakes:
 `TAGALONG_FAKE_TTS=1`, `TAGALONG_FAKE_STT=1`. Specs for features the new brain has not rebuilt yet are
 `test.skip` with a reason of the form `returns with row N: <feature>` (the Launch board row that brings

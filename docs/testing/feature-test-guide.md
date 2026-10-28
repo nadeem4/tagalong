@@ -381,14 +381,11 @@ their rows return.
 
 ## Hand off to Claude Code (real brain, real Claude Code)
 
-This section needs slice 8b: the desktop showing non-confirm asks with their options and input.
-Until then the hand-off ask appears on no body, so Scout's `hand_off` waits out the ask timeout
-and says it was not started, and these steps cannot pass.
-
 This section covers the Python brain. It needs `npm install -g @agentclientprotocol/claude-agent-acp`
 (Node 22 or newer), Claude Code logged in with your own login, the brain and the desktop running
-as above, and a small test folder you do not mind Claude Code editing. The Home Jobs panel also
-arrives in 8b, so for now check jobs by asking Scout ("list my jobs", "stop that job").
+as above, and a small test folder you do not mind Claude Code editing. Jobs show in Home →
+Experts, in the **Jobs** card at the top (the Experts list under it is from the old engine and
+does not work). Asking Scout ("list my jobs", "stop that job") also works.
 
 1. **Action:** ask "Hand this to Claude Code: add a README line to the project in
    `C:\path\to\test-folder`."
@@ -419,6 +416,22 @@ arrives in 8b, so for now check jobs by asking Scout ("list my jobs", "stop that
    nothing. A second finish report does not follow for the same job.
 10. **Action:** start a job whose result needs no comment.
     **Expected:** Scout may stay silent. Silence is allowed; no canned line appears.
+11. **Action:** with a long job running, open Home → Experts.
+    **Expected:** the Jobs card lists it with its task, "Running", folder, mode, start time and
+    its latest progress line. Press **Stop**: the row reads "Stopped" within a moment. Start a
+    short job and let it finish: the row reads "Done" and **Show result** opens the result text.
+12. **Action:** hand off while the bubble is closed and Scout is silent (no turn running), and
+    leave the mode ask unanswered for a minute.
+    **Expected:** the bubble comes up by itself with the mode card (task and folder, one button
+    per mode, Cancel) and stays until you answer or it times out. Ending a chat turn meanwhile
+    does not remove it.
+13. **Action:** in Manual mode, have the job do something that needs permission. Then have it ask
+    a question ("Ask me which colour to use").
+    **Expected:** a "Claude Code asks" card shows the request and its input with one button per
+    option; the question card has a **Your answer** field and **Send** (Enter sends too). Typing
+    an answer and sending it continues the job with your words.
+14. **Action:** open Home → Settings → Permissions.
+    **Expected:** Claude Code's tool shows "Asks itself" and its switch is disabled.
 
 ## Hand-offs to Claude Code (old engine)
 

@@ -381,10 +381,31 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
   tool of an offline body is dimmed, marked "Not connected", and its switch is disabled (the brain
   cannot set a mode for it yet). The list reads again on `changed { what: "permissions" }`. The e2e
   fake brain (`e2e/fixtures/fake-brain.ts`) answers these two tools, and `e2e/permissions.spec.ts`
-  checks the card.
+  checks the card. A tool the brain marks `self_asks` (Claude Code's own, which asks through a
+  job) shows "Asks itself" with a disabled switch.
+- **Jobs panel:** Home's Experts page opens with a Jobs card (`bodies/ui/src/home/jobs-panel.tsx`)
+  above the old Experts list. It uses `list_jobs` and `stop_job` (`ipc/jobs.ts`, channels
+  `jobs:list` and `jobs:stop`): the brain's snake_case rows become `JobRow`s, newest first as the
+  brain sends them, each with its task, state, folder, mode, start time or duration, progress
+  while running, reason when ended, and a Show result toggle once finished. **Stop** shows on
+  running jobs and sends `stop_job { job }`; the brain refuses a stop it must not do and the
+  panel reads the list again either way. The list also reads again on `changed { what: "jobs" }`.
+  The old `ExpertsPanel` under it calls the retired engine (`engine()` throws), so it does not
+  work; do not rely on it. `e2e/jobs.spec.ts` covers the panel on the fake brain.
+- **Job asks:** a Claude Code job asks the person through the same `ask` path, but without
+  `confirm` and with its own options. Three cases, all shown as a card in the bubble even with
+  no turn running (the bubble is brought up on `connector.confirm`): the hand-off mode ask (tool
+  `hand_off`, the folder in its input, one button per mode and Cancel), a relayed Claude Code
+  permission ask (tool `claude_code:<title>`, its input shown, one button per Claude Code option),
+  and a question (no tool: a "Your answer" field with Send, Enter also sends, plus a button per
+  choice when it has any). A click answers through `answerJobAsk` (`ipc/connections.ts`), which
+  calls `BrainClient.answerWith(ask, option, text?)`, sending `answer { ask, option, text? }` with
+  the option's exact name. Typed text goes as both `option` and `text`, because the brain takes
+  an unlisted option only with free text. A closed ask removes its card; `not_found` is swallowed
+  as for `approveTool`.
 - **`changed` notifications:** `index.ts` sends each one's `what` to every window on
   `IPC.brainChangedEvent`; the preload exposes it as `onBrainChanged(handler)` on the HostBridge.
-  Memory view reads again on `memory`.
+  Memory view reads again on `memory`, the Jobs panel on `jobs`.
 - **Answering an ask:** `answer(ask, decision)` is a request that sends `answer { ask, option }`,
   with the card's `once` sent as `allow` and `always` / `deny` as they are. It needs `online`
   (otherwise `BrainOffline`) and rejects if the brain refuses it (the ask already closed). The
@@ -394,17 +415,18 @@ The app uses it for turns and for Home: `onNotification` feeds the mapper's `map
 `turn-events.ts` turns the validated notifications into the TurnEvents the renderer already
 understands. It keeps each open turn's reply text, because `turn.completed` carries the whole reply.
 
-| Brain notification                             | UI TurnEvent                                                                                                                                                                                                                                                                                                     |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `turn` started                                 | `turn.started` (`conversationId` is the session id, or `brain`)                                                                                                                                                                                                                                                  |
-| `reply` delta                                  | `turn.delta`; `reply` done gives nothing                                                                                                                                                                                                                                                                         |
-| `turn` ended `done` / `cancelled` / `step_cap` | `turn.completed` with stop reason `end` / `aborted` / `tool_limit` and the joined deltas (empty for a silent turn); usage is zero                                                                                                                                                                                |
-| `turn` ended `over_budget` / `error`           | `turn.error` with code `over_budget` / `brain_error`                                                                                                                                                                                                                                                             |
-| `tool` started / ended                         | `turn.toolRequest` (call id as `approvalId` and `callId`, empty input) / `turn.toolResult`                                                                                                                                                                                                                       |
-| `ask` open with `confirm: true`                | `connector.confirm`: `approvalId` is the ask id, `turnId` its turn, `app` the tool's body label (text before `__`, capitalised) or `Scout` for a brain tool, `summary` the ask `text` (or, when empty, the tool name and its input, one `key: value` per line), `options` carried (no `always` on a locked tool) |
-| `ask` closed                                   | `connector.dismiss { approvalId }`, which only the bubble handles (never `asks.changed`: Home counts and lists those from the old engine, which knows no brain ask); a closed ask the mapper never showed gives nothing                                                                                          |
-| `changed`                                      | no TurnEvent; its `what` goes to the windows on `IPC.brainChangedEvent` (`onBrainChanged`)                                                                                                                                                                                                                       |
-| resync                                         | `turn.error` `brain_restarted` for each open turn (started, or seen in a reply, and not ended), then `connector.dismiss` for each open ask; the state is cleared                                                                                                                                                 |
+| Brain notification                             | UI TurnEvent                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `turn` started                                 | `turn.started` (`conversationId` is the session id, or `brain`)                                                                                                                                                                                                                                                                              |
+| `reply` delta                                  | `turn.delta`; `reply` done gives nothing                                                                                                                                                                                                                                                                                                     |
+| `turn` ended `done` / `cancelled` / `step_cap` | `turn.completed` with stop reason `end` / `aborted` / `tool_limit` and the joined deltas (empty for a silent turn); usage is zero                                                                                                                                                                                                            |
+| `turn` ended `over_budget` / `error`           | `turn.error` with code `over_budget` / `brain_error`                                                                                                                                                                                                                                                                                         |
+| `tool` started / ended                         | `turn.toolRequest` (call id as `approvalId` and `callId`, empty input) / `turn.toolResult`                                                                                                                                                                                                                                                   |
+| `ask` open with `confirm: true`                | `connector.confirm`: `approvalId` is the ask id, `turnId` its turn, `app` the tool's body label (text before `__`, capitalised) or `Scout` for a brain tool, `summary` the ask `text` (or, when empty, the tool name and its input, one `key: value` per line), `options` carried (no `always` on a locked tool)                             |
+| `ask` open without `confirm` (a job's ask)     | `connector.confirm` too, with `turnId` empty (the ask has no turn), `summary` the text plus its input as `key: value` lines, `app` `Claude Code` for a `claude_code:` tool or a question, else `Scout`; a question (no `tool`) has `tool: 'question'` and `question: true`; the card is removed only by the ask's `closed` frame or a resync |
+| `ask` closed                                   | `connector.dismiss { approvalId }`, which only the bubble handles (never `asks.changed`: Home counts and lists those from the old engine, which knows no brain ask); a closed ask the mapper never showed gives nothing                                                                                                                      |
+| `changed`                                      | no TurnEvent; its `what` goes to the windows on `IPC.brainChangedEvent` (`onBrainChanged`)                                                                                                                                                                                                                                                   |
+| resync                                         | `turn.error` `brain_restarted` for each open turn (started, or seen in a reply, and not ended), then `connector.dismiss` for each open ask; the state is cleared                                                                                                                                                                             |
 
 ### Preload and the tagalongHost bridge
 
