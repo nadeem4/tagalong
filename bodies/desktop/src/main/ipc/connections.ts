@@ -68,8 +68,8 @@ export function registerConnectionIpc(
   handle(IPC.restartConnection, async (_event, id: unknown) =>
     callJson(brain, 'restart_app', AppIdParams.parse({ id })),
   );
-  // The brain has no sign-in call until slice 9c.
-  handle(IPC.signInConnection, async () => {
-    throw new Error('Sign-in comes with the next update');
-  });
+  // Returns at once; the outcome arrives as the app's state through `changed`.
+  handle(IPC.signInConnection, async (_event, id: unknown) =>
+    callJson(brain, 'sign_in_app', AppIdParams.parse({ id })),
+  );
 }

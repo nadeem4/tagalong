@@ -65,7 +65,7 @@ class Session:
         )
         sources: list = []
         if apps is not None and tokens is not None:  # the two always come as a pair
-            tools += app_home_tools(apps, memory, tokens, notify)
+            tools += app_home_tools(apps, memory, tokens, notify, bodies)
             # Before bodies: BodySource.unavailable claims any `x__y` name whose prefix is not an
             # online body, which would hide an app's own "not connected" line behind its slug.
             sources.append(AppSource(apps))

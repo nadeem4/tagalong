@@ -19,6 +19,8 @@ export type StartBrainOptions = Pick<
   platform: Platform;
   exclusions: () => CaptureExclusions;
   onCapture: (notice: CaptureNotice) => void;
+  /** Opens a page in the browser for the brain's open_url tool (the shell, in the app). */
+  openExternal: (url: string) => Promise<void>;
   env?: NodeJS.ProcessEnv;
   /** Tests pass a fake; the app uses the global WebSocket. */
   openSocket?: BrainClientOptions['openSocket'];
@@ -46,9 +48,10 @@ export function startBrain(options: StartBrainOptions): BrainClient {
     platform,
     exclusions,
     onCapture,
+    openExternal,
     ...handlers
   } = options;
-  const { tools, run } = bodyTools(platform, exclusions, onCapture);
+  const { tools, run } = bodyTools(platform, exclusions, onCapture, openExternal);
   const brain = new BrainClient({
     ...handlers,
     addr: env.TAGALONG_BRAIN_ADDR ?? DEFAULT_ADDR,

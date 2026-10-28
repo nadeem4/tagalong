@@ -150,12 +150,28 @@ describe('registerConnectionIpc', () => {
     expect(calls).toEqual([]);
   });
 
-  it('sign-in waits for the next update', async () => {
+  it('signs in through the brain tool', async () => {
+    const { invoke, calls } = setup(() => text({ id: 'files', status: 'connecting' }));
+    await invoke(IPC.signInConnection, 'files');
+    expect(calls).toEqual([['sign_in_app', { id: 'files' }]]);
+  });
+
+  it('refuses a bad id for sign-in without asking the brain', async () => {
     const { invoke, calls } = setup();
-    await expect(invoke(IPC.signInConnection, 'files')).rejects.toThrow(
-      'Sign-in comes with the next update',
-    );
+    await expect(invoke(IPC.signInConnection, 7)).rejects.toThrow();
     expect(calls).toEqual([]);
+  });
+
+  it("passes the brain's refusal on, such as no browser to sign in with", async () => {
+    const { invoke } = setup(() => {
+      throw new RpcError(
+        ErrorCode.invalid_params,
+        'Open Tagalong on the machine the brain runs on to sign in.',
+      );
+    });
+    await expect(invoke(IPC.signInConnection, 'files')).rejects.toThrow(
+      'Open Tagalong on the machine the brain runs on to sign in.',
+    );
   });
 
   it('an offline brain rejects with its readable message, not a hang', async () => {
