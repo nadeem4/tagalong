@@ -12,7 +12,7 @@ import logging
 import os
 import re
 import shutil
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -31,6 +31,14 @@ from mcp.types import (
     ToolListChangedNotification,
 )
 
+from brain.app_oauth import (
+    FileTokenStorage,
+    LoopbackCallback,
+    NeedsSignIn,
+    OAuthError,
+    make_provider,
+)
+
 if TYPE_CHECKING:
     from brain.memory import Memory
 
@@ -42,6 +50,7 @@ SLUG_MAX = 24
 TRANSPORTS = ("stdio", "http")
 AUTHS = ("none", "token", "oauth")
 _LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
+OpenUrl = Callable[[str], Awaitable[None]]  # opens the sign-in page; the body decides how
 _ENV_REF = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}")
 
 
@@ -200,12 +209,18 @@ class _Slot:
     relist: bool = False
     dropped: bool = False  # the connection closed; the app task then tears down
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)  # serialises stop and restart
+    open_url: OpenUrl | None = None  # set only for a sign-in the user asked for
+
+
+def _root(exc: BaseException) -> BaseException:
+    while isinstance(exc, BaseExceptionGroup) and exc.exceptions:
+        exc = exc.exceptions[0]
+    return exc
 
 
 def _plain(exc: BaseException) -> str:
     """The first line of the real error; never anything from env values."""
-    while isinstance(exc, BaseExceptionGroup) and exc.exceptions:
-        exc = exc.exceptions[0]
+    exc = _root(exc)
     if isinstance(exc, TimeoutError):
         return "did not answer in time"
     lines = str(exc).strip().splitlines()
@@ -221,10 +236,14 @@ class Apps:
         connect_timeout: float = 30,
         ping_interval: float = 30,
         tokens: TokenFile | None = None,
+        data_dir: Path | str | None = None,
+        signin_timeout: float = 300,
     ) -> None:
         self._memory = memory
         self._notify = notify
         self._env = env
+        self._data_dir = data_dir  # where oauth tokens live; None means oauth apps cannot sign in
+        self._signin_timeout = signin_timeout  # a person is slower than a server
         self._connect_timeout = connect_timeout
         self._ping_interval = ping_interval  # how often an idle connection is checked alive
         self._tokens = tokens
@@ -236,19 +255,42 @@ class Apps:
             self._launch(row)
 
     async def restart(self, app_id: str) -> None:
+        await self._relaunch(app_id)
+
+    async def sign_in(self, app_id: str, open_url: OpenUrl) -> None:
+        """Start a browser sign-in in the background; the outcome shows as the app's state."""
+        row = next((r for r in self._memory.list_apps() if r.id == app_id), None)
+        if row is None:
+            raise AppError(f"no app {app_id}.")
+        if row.auth != "oauth":
+            raise AppError(f"{row.name} does not use sign-in.")
+        if self._data_dir is None:
+            raise AppError("Sign-in is not set up in this brain.")
+        await self._relaunch(app_id, open_url)
+
+    async def _relaunch(self, app_id: str, open_url: OpenUrl | None = None) -> None:
         row = next((r for r in self._memory.list_apps() if r.id == app_id), None)
         old = self._slots.get(app_id)
         if row is None:
             await self.stop(app_id)
             self._slots.pop(app_id, None)
+            self._forget_oauth(app_id)  # a removed app leaves no tokens behind
             raise AppError(f"no app {app_id}.")
         if old is None:
-            self._launch(row)
+            if open_url:
+                self._forget_oauth(app_id)
+            self._launch(row, open_url)
             return
         async with old.lock:  # shared by every slot of this app, so re-read the current one
             current = self._slots[app_id]
             await self._stop(current)
-            self._launch(row)
+            if open_url:  # a fresh sign-in starts clean: the old client id has the old port
+                self._forget_oauth(app_id)
+            self._launch(row, open_url)
+
+    def _forget_oauth(self, app_id: str) -> None:
+        if self._data_dir is not None:
+            FileTokenStorage(self._data_dir, app_id).clear()
 
     async def stop(self, app_id: str) -> None:
         slot = self._slots.get(app_id)
@@ -318,9 +360,14 @@ class Apps:
         slot.wake.set()
         return AppError(message)
 
-    def _launch(self, row: AppRow) -> None:
+    def _launch(self, row: AppRow, open_url: OpenUrl | None = None) -> None:
         old = self._slots.get(row.id)
-        slot = _Slot(row, tools=old.tools if old else [], lock=old.lock if old else asyncio.Lock())
+        slot = _Slot(
+            row,
+            tools=old.tools if old else [],
+            lock=old.lock if old else asyncio.Lock(),
+            open_url=open_url,
+        )
         self._slots[row.id] = slot
         if not row.enabled:
             return
@@ -337,7 +384,8 @@ class Apps:
         # failure unwinds through the transport's own cancel scopes before we look at it.
         try:
             async with AsyncExitStack() as stack:
-                async with asyncio.timeout(self._connect_timeout):
+                limit = self._signin_timeout if slot.open_url else self._connect_timeout
+                async with asyncio.timeout(limit):
                     session = await self._connect(stack, slot)
                     await session.initialize()
                     tools = await self._list(session)
@@ -364,7 +412,14 @@ class Apps:
                                 "could not refresh tools for %s", slot.row.id, exc_info=True
                             )
         except Exception as exc:
-            self._set(slot, "error", _plain(exc))
+            root = _root(exc)
+            if isinstance(root, NeedsSignIn):
+                self._set(slot, "needs-sign-in", str(root))
+            elif slot.open_url:  # a sign-in that failed, was refused or was abandoned
+                known = isinstance(root, OAuthError | TimeoutError)
+                self._set(slot, "needs-sign-in", _plain(exc) if known else "The sign-in failed.")
+            else:
+                self._set(slot, "error", _plain(exc))
         finally:
             slot.session = None
 
@@ -394,7 +449,10 @@ class Apps:
                 if not token:
                     raise AppError(f"{row.name} needs its token added again.")
                 headers = {"Authorization": f"Bearer {token}"}
-            client = await stack.enter_async_context(create_mcp_http_client(headers=headers))
+            auth = await self._oauth(stack, slot) if row.auth == "oauth" else None
+            client = await stack.enter_async_context(
+                create_mcp_http_client(headers=headers, auth=auth)
+            )
             read, write = await stack.enter_async_context(
                 streamable_http_client(row.config["url"], http_client=client)
             )
@@ -408,6 +466,32 @@ class Apps:
         return await stack.enter_async_context(
             ClientSession(read, write, message_handler=on_message)
         )
+
+    async def _oauth(self, stack: AsyncExitStack, slot: _Slot) -> Any:
+        """The SDK's auth for this app. Without a user-asked sign-in it never opens a browser."""
+        row = slot.row
+        if self._data_dir is None:
+            raise OAuthError("Sign-in is not set up in this brain.")
+        storage = FileTokenStorage(self._data_dir, row.id)
+        if slot.open_url is None:
+            if await storage.get_tokens() is None:
+                raise NeedsSignIn("Sign in to connect.")
+
+            async def no_browser(_: str) -> None:
+                raise NeedsSignIn("The sign-in ran out; sign in again.")
+
+            async def no_wait() -> tuple[str, str]:
+                raise NeedsSignIn("The sign-in ran out; sign in again.")
+
+            return make_provider(row, storage, "http://127.0.0.1/callback", no_browser, no_wait)
+        listener = LoopbackCallback()
+        redirect_uri = await listener.start()
+        stack.callback(listener.close)
+
+        async def wait() -> tuple[str, str]:
+            return await listener.wait(self._signin_timeout)
+
+        return make_provider(row, storage, redirect_uri, slot.open_url, wait)
 
     async def _list(self, session: ClientSession) -> list[Tool]:
         tools: list[Tool] = []
